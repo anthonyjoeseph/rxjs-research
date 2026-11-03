@@ -335,7 +335,7 @@ mutual
   few (s-take sy nf m _) env ef lo = lag-≈ m (take-lag nf (few sy env ef (λ ki → lo (k-kid (k-take ki)))))
   few {C = C} (s-took _ _ _ _ tp hk m _) env ef lo = lag-≈ m (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-take ki)))))
   few (s-flat _ sy jn (_ , m) _ _) env ef lo = lag-≈ m (lag-at (λ r → _ , proj₁ r) (flat-f sy jn env ef lo))
-  few (s-conn refl _ bs ss tn fl (m , _)) env ef lo = lag-≈ m (lag-at (λ r → _ , proj₁ r) (conn-f bs ss tn fl env ef lo))
+  few (s-conn refl _ bs _ ss tn fl (m , _)) env ef lo = lag-≈ m (lag-at (λ r → _ , proj₁ r) (conn-f bs ss tn fl env ef lo))
   few (s-join {j = j} {x = x} en _ _ _ _) env ef lo = lag-≈ en (ef x j)
   few {C = C} (s-joinx _ fn) env ef lo = fin-lag {C = C} fn
 
@@ -501,10 +501,14 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
       s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env lo′) (kill-out op) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
              (behind-bef {C = C} bh (flat-f sy jn env ef lo))
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
-    sh {sc = sc} (s-conn {k = k} refl pt bs ss tn fl m) env ef lo = s-conn refl pt bs′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
+    sh {sc = sc} (s-conn {k = k} refl pt bs bb ss tn fl m) env ef lo = s-conn refl pt bs′ bb′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
       where
-        bs′ = λ t → sh (bs t) (env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env)
-                       (envl-bind {o = CS.src k} {r = CS.connAt k} (src-f (ss t) env ef lo) ef) (λ ki → lo (k-kid (k-body ki)))
+        envb : T (CS.srcLive k) → Env (full (binds (CS.src k) (CS.connAt k) sc)) C p
+        envb t = env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env
+        envlb : T (CS.srcLive k) → EnvL (full (binds (CS.src k) (CS.connAt k) sc)) C p
+        envlb t = envl-bind {o = CS.src k} {r = CS.connAt k} (src-f (ss t) env ef lo) ef
+        bs′ = λ t → sh (bs t) (envb t) (envlb t) (λ ki → lo (k-kid (k-body ki)))
+        bb′ = λ t → behind-bef {C = C} (bb t) (few (bs t) (envb t) (envlb t) (λ ki → lo (k-kid (k-body ki))))
         unsh : T (CS.srcLive k) → ∀ {c} → Frozen k c end → ¬ Owes (bef p) c → T (CS.closed k)
         unsh t {c} y n with owes? C c
         ... | inj₁ o  = ⊥-elim (n (src-b (ss t) env lo (y , tt , o)))

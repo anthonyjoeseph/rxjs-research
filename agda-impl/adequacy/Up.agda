@@ -193,8 +193,8 @@ module Past (p : Pos) where
     up (s-flat {sc = sc} {op = op} {f = f} ji sy jn m so bh) sd nr nh =
       s-flat ji (up sy so no nh) (joined-up (off-rg so no) (kill-up op (off-rg so no)) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) jn) m so (behind-up bh)
       where no = λ r → nr (proj₁ r)
-    up (s-conn {k = k} refl pt bs ss tn fl m) sd nr nh =
-      s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh))
+    up (s-conn {k = k} refl pt bs bb ss tn fl m) sd nr nh =
+      s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh)) (λ t → behind-up (bb t))
              (λ t → src-up (ss t) (Parts.ss pt) ns nh) (λ nt → torn-up (tn nt)) (flags-up {k = k} (off-rg (Parts.ss pt) ns) fl) m
       where
         nb = λ r → nr (Parts.b⊆ pt r)
@@ -324,11 +324,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → (∀ {β : EmissionSet B} → β p (toEv e) → Flags (aft p) k β → Flags (aft p) (record k { owedAt = x }) β)
             → SimC Rt ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS (record k { owedAt = x }) o s , rising e , p ⟩
   rise-body {k = k} {c = c} {e = e} {p = p} lv fix = keeps Rt λ
-    { (flying (f-body fr sc pt _ src fl eq) cl (sy , row)) → flying fr cl
+    { (flying (f-body fr sc pt _ src bb fl eq) cl (sy , row)) → flying fr cl
         (let rb = Sound.rg (Parts.sb pt) row (vis e)
              ns = λ r → Parts.apart pt rb r
              nh = λ hv → Parts.clear-b pt (vhot-hots (full (scopeOf c)) hv) rb
-         in s-conn sc (re-parts refl pt) (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy)
+         in s-conn sc (re-parts refl pt) (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc sy) (λ _ → Past.behind-up p bb)
                    (λ _ → src-owe (Past.src-up p src (Parts.ss pt) ns nh)) (λ nl → ⊥-elim (notT _ nl lt))
                    (fix row (Past.flags-up p {k = k} (Past.off-rg p (Parts.ss pt) ns) fl)) eq
           , proj₁ (to (alike (proj₁ eq)) ((Connecting.body row , conn-reach (few-src sc src) (proj₂ eq row)) , vis e)))
@@ -504,9 +504,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up (f-lane fr) lv rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr lv rp nr nh in Cr′ , f-lane fr′ , mv
   fr-up (f-lnct {b = true} fr) _ rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr tt rp nr nh in Cr′ , f-lnct fr′ , mv
   fr-up (f-lnct {b = false} _) ()
-  fr-up {p = p} (f-src {k = k} {c = c} {E′ = E′} fr sc pt lv nc sb fl fz eq bh sd af ao ni) _ rp nr nh =
+  fr-up {p = p} (f-src {k = k} {c = c} {E′ = E′} fr sc pt lv nc sb bb fl fz eq bh sd af ao ni) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (Parts.s⊆ pt rp) nr′ nh
-    in Cr′ , f-src fr′ sc pt lv nc (Past.up p sb (Parts.sb pt) nb nhb) (Past.flags-up p {k = k} of fl) fz eq (Past.behind-up p bh) (Past.subd-up p sd) af ao ni , mv
+    in Cr′ , f-src fr′ sc pt lv nc (Past.up p sb (Parts.sb pt) nb nhb) (Past.behind-up p bb) (Past.flags-up p {k = k} of fl) fz eq (Past.behind-up p bh) (Past.subd-up p sd) af ao ni , mv
     where
       nb : ¬ Parts.Rb pt p
       nb r = Parts.apart pt r rp
@@ -517,9 +517,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nhb (inj₂ h)                 = nh h
       nr′ : NoRow E′ p
       nr′ y v = let (cy , v′) = from (alike (proj₁ eq)) (y , v) in nb (Sound.rg (Parts.sb pt) (conn-vis cy v′) v′)
-  fr-up {p = p} (f-body {k = k} {c = c} {E′ = E′} fr sc pt lv os fl eq) _ rp nr nh =
+  fr-up {p = p} (f-body {k = k} {c = c} {E′ = E′} fr sc pt lv os bb fl eq) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (Parts.b⊆ pt rp) nr′ nhc
-    in Cr′ , f-body fr′ sc pt lv (Past.src-up p os (Parts.ss pt) ns nhc) (Past.flags-up p {k = k} (Past.off-rg p (Parts.ss pt) ns) fl) eq , mv
+    in Cr′ , f-body fr′ sc pt lv (Past.src-up p os (Parts.ss pt) ns nhc) (Past.behind-up p bb) (Past.flags-up p {k = k} (Past.off-rg p (Parts.ss pt) ns) fl) eq , mv
     where
       ns : ¬ Parts.Rs pt p
       ns r = Parts.apart pt rp r
@@ -530,8 +530,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up {Cr = Cr} {p = p} (f-isle {k = k} u hb le na nc bh sd ss ao ni) _ _ _ _ =
     Cr , f-isle u hb (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) na nc (Past.behind-up p bh) (Past.subd-up p sd) ss ao ni , silent ≃-refl
   fr-up (f-took _ _ _ _ _ _ _ _) ()
-  fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-islec _ _ _ _ _ _ _ _ _) ()
   fr-up (f-islep _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (d-map _) ()
@@ -619,9 +619,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   rise-src-nx : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
               → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
-  rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd af ao _) cl (sy , row)) =
+  rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs bb fl fz eq bh sd af ao _) cl (sy , row)) =
     let open Fed {e = nx a} fr sc pt lv fz eq row
-    in Cr↑ , aft p , settled c-abs fr↑ (s-conn sc pt (λ _ → body bs)
+    in Cr↑ , aft p , settled c-abs fr↑ (s-conn sc pt (λ _ → body bs) (λ _ → Past.behind-up p bb)
                                               (λ _ → src-on nc (sync-≈ sy fz) (Past.behind-up p bh) (Past.subd-up p sd) af ao)
                                               (λ nl → ⊥-elim (notT _ nl lv)) (flags-on nc (λ ()) fl) eq)
      , moves
@@ -629,12 +629,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-src-nx {k = k} {a = a} {p = p} refl (flying (f-isle u hb le na nc bh sd ss ao ni) _ (sy , _)) =
     _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le)
     , silent ≃-refl
-  rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (d-src _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
+  rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-nx refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
     _ , _ , unread-at Rt u (sh-dead hk) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
@@ -644,12 +644,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- Its end: the connect closed where it fell, while it runs.
   rise-src-cp : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
               → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs fl fz eq bh sd _ _ _) cl (sy , row)) =
+  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs bb fl fz eq bh sd _ _ _) cl (sy , row)) =
     let open Fed {e = cp} fr sc pt lv fz eq row
         sy′ = sync-≈ sy fz
     in Cr↑ , aft p
      , subst (λ k″ → Inv Rt Cr↑ (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live {k = k} {p} lv))
-             (settled c-abs fr↑ (s-conn sc (re-parts refl pt) (λ _ → body bs)
+             (settled c-abs fr↑ (s-conn sc (re-parts refl pt) (λ _ → body bs) (λ _ → Past.behind-up p bb)
                                         (λ _ → src-done refl (end-tail sy′ (Parts.ss pt) fk (≺-irrefl {p})) (proj₂ (husk-of sy′)) bh sd)
                                         (λ nl → ⊥-elim (notT _ nl lv)) (flags-shut refl fl) eq))
      , moves
@@ -662,12 +662,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
                         fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
       (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao) fed (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) , silent ≃-refl)
     where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
-  rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (d-src _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _) _ ())
   rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
+  rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
   rise-src-cp refl (adrift (f-islec _ _ _ _ cl _ _ _ _) cl′ _)       = ⊥-elim (or-shut cl cl′)
   rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb le ni) _ (Q , hk , le′)) =
     shut-by {k = k} {p} (λ k″ → After Cr ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩)

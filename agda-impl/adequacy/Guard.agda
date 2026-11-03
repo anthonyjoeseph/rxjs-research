@@ -383,14 +383,14 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       ...   | refl = clear cl (proj₁ (from (alike le) (l , v))) v qw wy
   lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-  lift (f-body fr sc pt _ sr _ ce) sf _ r z cl g =
+  lift (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  lift (f-body fr sc pt _ sr _ _ ce) sf _ r z cl g =
     lift fr sf _ (voc (proj₁ ce) (Connecting.body r , conn-reach {e = skip} (src-behind sc sr) z (proj₂ ce r))) z
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
   lift (f-isle _ _ _ _ _ _ _ _ _ _) ()
   lift (f-took _ _ _ _ _ _ _ _) _ ()
-  lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (d-map _) _ ()
   lift (d-scan _) _ ()
   lift (d-cut _) _ ()

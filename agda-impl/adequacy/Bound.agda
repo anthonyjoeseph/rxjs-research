@@ -283,7 +283,7 @@ mutual
   bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from (alike m) (x , v)) ow
   bound (s-took fl g ni oa _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
   bound (s-flat _ sy jn m _ _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (alike (proj₂ m)) (x , v)))) v ow
-  bound (s-conn refl _ bs ss _ fl m) env lo (x , v , ow) = let ((y , _) , v′) = from (alike (proj₁ m)) (x , v) in conn-b bs ss fl env lo (y , v′) ow
+  bound (s-conn refl _ bs _ ss _ fl m) env lo (x , v , ow) = let ((y , _) , v′) = from (alike (proj₁ m)) (x , v) in conn-b bs ss fl env lo (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp _) env lo r = ⊥-elim (sp r)
 

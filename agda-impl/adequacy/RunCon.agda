@@ -224,10 +224,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lane fr)                                         t = closed-off fr t
   closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
   closed-off (f-lnct {b = false} fr)                             _ = tt
-  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _ _)       t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
-  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                    _ = tt
-  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                _ = tt
-  closed-off (f-body fr _ _ _ _ _ _)                             t = closed-off fr t
+  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _ _ _)     t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
+  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _)                  _ = tt
+  closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)              _ = tt
+  closed-off (f-body fr _ _ _ _ _ _ _)                           t = closed-off fr t
   closed-off (d-map _)                                           _ = tt
   closed-off (d-scan _)                                          _ = tt
   closed-off (d-cut _)                                           _ = tt
@@ -271,22 +271,22 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → NoIsle b → Lo (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b)) (at (p ++ [ ix 1 ]))
            → Inv Rt Cr C ⟨ c , connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b , absorbed , r ⟩
            → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
-  con-body {sl = true} {cx = cx} nb lo (settled {N = owes} c-abs fr sy@(s-conn scp pt bs ss tn fl eq)) with ss tt
+  con-body {sl = true} {cx = cx} nb lo (settled {N = owes} c-abs fr sy@(s-conn scp pt bs bb ss tn fl eq)) with ss tt
   ... | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ... | src-shut cl′ sp tp hk bh sd =
-    _ , _ , settled {Rg = nowhere} {E = none′} c-sub (f-srcc fr scp (re-parts refl pt) tt cl′ sp tp bh sd (bs tt) (re-flags fl) eq) (_ , hk , ⊑-refl) , silent ≃-refl
+    _ , _ , settled {Rg = nowhere} {E = none′} c-sub (f-srcc fr scp (re-parts refl pt) tt cl′ sp tp bh sd (bs tt) (bb tt) (re-flags fl) eq) (_ , hk , ⊑-refl) , silent ≃-refl
   ... | src-pend _ nc₀ refl _ _ _ _ ow with fr-shift Rt fr sy ow lo
-  ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ ss′ _ fl′ eq′ , d with ss′ tt
+  ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ bb′ ss′ _ fl′ eq′ , d with ss′ tt
   ...     | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ...     | src-shut cl′ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
   ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ =
     Cr′ , bef (cx ++ [ ix 1 ]) ,
-    pending (f-src fr′ scp′ (re-parts refl pt′) tt nc (bs′ tt) (re-flags fl′) ≈-refl eq′
+    pending (f-src fr′ scp′ (re-parts refl pt′) tt nc (bs′ tt) (bb′ tt) (re-flags fl′) ≈-refl eq′
                    (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok)
                    (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₁ refl) nb)
             (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent (vis-≃ d)
-  con-body {sl = false} nb lo (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) =
+  con-body {sl = false} nb lo (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
     unread-body (un-torn fr scp (re-parts refl pt) tt (re-flags fl) eq (Torn.tl (tn tt))) (Torn.sh (tn tt)) (Torn.bh (tn tt)) ⊑-refl nb
   con-body {Cr} {C} nb lo (settled {N = dead _} c-abs fr (_ , h-blank , le)) =
     Cr , C , settled {Rg = nowhere} {E = none′} c-sub (d-src {N = ∅ᵖ} (un-dead fr) h-blank (⊑-trans le ∅-⊑) nb) (∅ᵖ , h-blank , ⊑-refl) , silent ≃-refl
@@ -302,12 +302,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
           → Lo o (after y)
           → Inv Rt Cr C ⟨ c , connS (cs cl sl sa p (just y) ow cx ea sr sc) o b , absorbed , r ⟩
           → Ran Cr ⟨ c , connS (cs cl sl true p nothing ow cx ea sr sc) (proj₁ (unsubIf (not sl ∨ closed c) o)) b , absorbed , y ⟩
-  con-att {Cr} {C} {c = c} {sl = true} lo (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) with closed c | closed-off fr
+  con-att {Cr} {C} {c = c} {sl = true} lo (settled {N = owes} c-abs fr (s-conn scp pt bs bb ss tn fl eq)) with closed c | closed-off fr
   ... | true  | off = ⊥-elim (off tt)
   ... | false | _   =
-    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) bs (λ t → src-att lo (ss t)) (λ ()) (re-flags fl) eq) , silent ≃-refl
-  con-att {Cr} {C} {sl = false} lo (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) =
-    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) (λ ()) (λ ()) (λ t → torn-att lo (tn t)) (re-flags fl) eq) , silent ≃-refl
+    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) bs bb (λ t → src-att lo (ss t)) (λ ()) (re-flags fl) eq) , silent ≃-refl
+  con-att {Cr} {C} {sl = false} lo (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
+    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) (λ ()) (λ ()) (λ ()) (λ t → torn-att lo (tn t)) (re-flags fl) eq) , silent ≃-refl
   con-att {Cr} {C} lo (settled {N = dead _} c-abs fr (_ , h-blank , le)) = Cr , C , settled c-abs fr (_ , h-blank , le) , silent ≃-refl
   con-att {Cr} {C} {c = c} {sl = sl} lo (settled {N = dead _} c-abs fr (_ , h-conn sh hb , le)) with srch-att (not sl ∨ closed c) lo sh
   ... | _ , sh′ , le′ = Cr , C , settled c-abs fr (_ , h-conn sh′ hb , ⊑-trans le (∪-⊑ le′ ⊑-refl)) , silent ≃-refl
@@ -321,8 +321,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   con-owed : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {cl sl sa p as cx ea sr sc} {q} {o : St Γ X} {b : St (X ∷ Γ) B} {r}
            → Inv Rt Cr C ⟨ c , connS (cs cl sl sa p as (just q) cx ea sr sc) o b , absorbed , r ⟩
            → Ran Cr ⟨ c , connS (cs cl false sa p as nothing cx ea sr sc) (proj₁ (unsubIf sa o)) b , absorbed , q ⟩
-  con-owed {Cr} {C} {cl = cl} {sl = true} {sa} {p} {as} {cx} {ea} {sr} {sc} (settled {N = owes} c-abs fr (s-conn refl pt bs ss tn fl eq)) =
-    Cr , C , settled c-abs fr (s-conn refl (re-parts refl pt) (λ ()) (λ ()) (λ _ → tn′)
+  con-owed {Cr} {C} {cl = cl} {sl = true} {sa} {p} {as} {cx} {ea} {sr} {sc} (settled {N = owes} c-abs fr (s-conn refl pt bs _ ss tn fl eq)) =
+    Cr , C , settled c-abs fr (s-conn refl (re-parts refl pt) (λ ()) (λ ()) (λ ()) (λ _ → tn′)
       (record { shut = Flags.shut fl ; unshut = λ () ; owed = λ ()
               ; torn = λ _ (x , v , o) → proj₂ (Flags.owed fl refl) (owes-≼ C o (Sound.ends (Parts.sb pt) (proj₁ (Flags.owed fl refl)) x v)) }) eq) ,
     silent ≃-refl
@@ -331,8 +331,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       off = srch-off (proj₂ srh)
       tn′ = record { Ps = proj₁ off ; Pb = proj₁ (husk-of (bs tt)) ; sh = proj₁ (proj₂ off) ; bh = proj₂ (husk-of (bs tt))
                    ; tl = owed-tl {k = cs cl false sa p as nothing cx ea sr sc} (bs tt) (Parts.sb pt) (proj₁ (Flags.owed fl refl)) (proj₂ (Flags.owed fl refl)) (src-pt (ss tt) (Parts.ss pt)) (proj₂ (proj₂ off)) }
-  con-owed {Cr} {C} {sl = false} (settled {N = owes} c-abs fr (s-conn scp pt bs ss tn fl eq)) =
-    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) (λ ()) (λ ()) (λ t → torn-off (tn t))
+  con-owed {Cr} {C} {sl = false} (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
+    Cr , C , settled c-abs fr (s-conn scp (re-parts refl pt) (λ ()) (λ ()) (λ ()) (λ t → torn-off (tn t))
       (record { shut = Flags.shut fl ; unshut = λ () ; torn = Flags.torn fl ; owed = λ () }) eq) ,
     silent ≃-refl
   con-owed {Cr} {C} (settled {N = dead _} c-abs fr (_ , h-blank , le)) = Cr , C , settled c-abs fr (_ , h-blank , le) , silent ≃-refl

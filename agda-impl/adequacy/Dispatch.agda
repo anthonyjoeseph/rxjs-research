@@ -51,7 +51,7 @@ open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
-open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
+open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past; pend-past)
 open import adequacy.Few using (fr-shift)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
@@ -355,8 +355,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q) → PendV Cr C c o q
-  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
-    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
+    inj₁ (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-islep {k = k} u hb le na nc ba an sc (ok , adm) ss nb) refl pe wn =
     inj₁ (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
                          (subd (λ o → o) ok) ss (inj₂ (ba , an)) nb
@@ -372,9 +372,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp (f-lane _)                                               ()   _ _
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _
-  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _)                      ()   _ _
-  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                         ()   _ _
-  srcp (f-body _ _ _ _ _ _ _)                                   ()   _ _
+  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                    ()   _ _
+  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _)                       ()   _ _
+  srcp (f-body _ _ _ _ _ _ _ _)                                 ()   _ _
   srcp (d-map _)                                                ()   _ _
   srcp (d-scan _)                                               ()   _ _
   srcp (d-cut _)                                                ()   _ _
@@ -412,7 +412,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
     let (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
-    in pending (f-body fr refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+        ow₀ = owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []))
+    in pending (f-body fr refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁)
+                 (behind-past C ow₀ (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) (conn-flags {s = s} {b = b} ow)
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb)
 

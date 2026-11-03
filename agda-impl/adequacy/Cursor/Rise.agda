@@ -65,7 +65,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Inv Cr C ⟨ c , connS k o b , absorbed , p ⟩
   unread-at (un-dead fr) sh hb le = settled c-abs fr (_ , h-conn sh hb , le)
   unread-at {C = C} (un-torn fr sc pt nl fl eq tp) sh hb le =
-    settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t))
+    settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t))
                              (λ _ → record { Ps = _ ; Pb = _ ; sh = sh ; bh = hb ; tl = tailp-⊑ {C = C} tp le }) fl eq)
 
   ----------------------------------------------------------------------
@@ -233,7 +233,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-bodyx : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s e p} → CS.srcLive k ≡ false
              → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
   rise-bodyx nl = keeps λ
-    { (flying (f-body _ _ _ lv _ _ _) _ _) → ⊥-elim (unlive nl lv)
+    { (flying (f-body _ _ _ lv _ _ _ _) _ _) → ⊥-elim (unlive nl lv)
     ; (flying (d-body _ _ _) _ ())
     ; (adrift (d-body u sh le) cl (Q , hk , le′)) → unread-at u sh hk (⊑-trans le (∪-⊑ ⊑-refl le′))
     ; (settled () _ _) }
