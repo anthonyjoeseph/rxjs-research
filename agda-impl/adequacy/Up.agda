@@ -115,8 +115,10 @@ module Past (p : Pos) where
   subd-up : ∀ {Γ} {sc : Scope Γ} {r} → SubdAt sc (bef p) r → SubdAt sc (aft p) r
   subd-up (subd f ok) = subd (λ {y} o → f {y} (dn {y} o)) ok
 
-  torn-up : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {β} → Torn sc (bef p) k o b β → Torn sc (aft p) k o b β
-  torn-up t = record { Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t ; tl = tailp-up (Torn.tl t) }
+  -- the dead part's own cursors: reach at `bef p` is reach at `aft p`
+  torn-up : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {β E} → Torn sc (bef p) k o b β E → Torn sc (aft p) k o b β E
+  torn-up t = record { D = Torn.D t ; Db = Torn.Db t ; dom = Torn.dom t ; Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t
+                     ; bu = Torn.bu t ; tl = tailp-up (Torn.tl t) }
 
   -- A joiner's unfed rows: its binder has no visible row at `p`.
   unfed-aft : ∀ {Γ A} (ρ : DenEnv Γ) (x : A ∈ Γ) {j q e} → ¬ VHot ρ p → p ≺ q
@@ -186,8 +188,8 @@ module Past (p : Pos) where
     up (s-scan sy fd m sm)     sd nr nh = s-scan (up sy sm nr nh) (fold-up (off-rg sm nr) fd) m sm
     up (s-cut sy)              sd nr nh = s-cut (up sy sd nr nh)
     up (s-take sy nf m sm)     sd nr nh = s-take (up sy sm nr nh) (λ y nk → in-rg sm nr y _ (nf y nk)) m sm
-    up {A = A} (s-took {i = i} {keep = keep} {Es = Es} {r = r} fl@(a , y , nk , nf) g ni oa tp hk m sm) sd nr nh =
-      s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-up oa) (tailp-up tp) hk m sm
+    up {A = A} (s-took {i = i} {keep = keep} {Es = Es} {r = r} fl@(a , y , nk , nf) g ni oa tp hk dm nf′ m sm) sd nr nh =
+      s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-up oa) (tailp-up tp) hk dm nf′ m sm
       where
         -- its completion is one of its rows
         owe-up : ∀ {w} → OweAt (bef p) w r → OweAt (aft p) w r
