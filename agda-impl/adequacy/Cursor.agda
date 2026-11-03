@@ -438,16 +438,24 @@ Ticked tapeOver          = ⊤
 -- shows in what holds it, at or under the row, pinned to a connect
 -- subscribed by the holder's death.
 
--- Owed at `C` only what `D` owed: `C` is `D` moved on.
+-- A connect at `r` the cursor has reached: at or before the row last
+-- delivered, or the one about to be.  Alike either side of a rise, so a
+-- part dying as its row rises keeps what it had reached.
+Thru : Cur → Pos → Set
+Thru origin  r = ⊥
+Thru (bef p) r = r ≼ p
+Thru (aft p) r = r ≼ p
+
+-- Reached at `C` whatever `D` reached: `C` is `D` moved on.
 Dom : Cur → Cur → Set
-Dom C D = ∀ {q} → Owes C q → Owes D q
+Dom C D = ∀ {r} → Thru D r → Thru C r
 
 -- A pin of `E` shows in `E′`.
 record Up {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B) : Set where
   constructor up
   field
-    lift : ∀ {y r} → ¬ Owes D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
-         → Σ Pos λ xs → Σ Pos λ r′ → ¬ Owes D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
+    lift : ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
+         → Σ Pos λ xs → Σ Pos λ r′ → Thru D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
 
 -- An isle's burst shows in its connect's entry: a row inside its
 -- subscription, with finitely many before it, is pinned there a level
@@ -504,19 +512,19 @@ data SrcH : ∀ {Γ X B} → Scope Γ → Cur → CS Γ X → St Γ X → Emissi
 record Torn {Γ X B} (sc : Scope Γ) (C : Cur) (k : CS Γ X) (o : St Γ X) (b : St (X ∷ Γ) B) (β E : EmissionSet B) : Set₁ where
   inductive
   field
-    D     : Cur
+    D Db  : Cur
     dom   : Dom C D
     Ps Pb : Pts
     sh    : SrcH sc D k o E Ps
-    bh    : Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D b β Pb
-    bu    : Up D β D E
+    bh    : Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Pb
+    bu    : Up Db β D E
     tl    : TailP C (Connecting.ConnT (CS.connAt k) (Frozen k) β) (Ps ∪ᵖ Pb)
 
 -- A lane in its joiner's list, live or over: its list entry over its
 -- switch, both on while it runs and both off once it is over.
 data LaneSt {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (q : Pos) (a : A) : St Γ B → Bool → Set₁ where
   l-live : ∀ {at l E} → Hole C P q a ∅ᵖ E true → Sync sc Rg C l E → Sound Rg E → LaneSt sc Rg C P q a (lnS true (cutS true at l)) true
-  l-dead : ∀ {at l E Ph D} → Hole C P q a Ph E false → Husk sc D l (Lane P q a) Ph → Dom C D → (∀ {r} → ¬ Owes D r → NoKill P q r) → LaneSt sc Rg C P q a (lnS false (cutS false at l)) false
+  l-dead : ∀ {at l E Ph D} → Hole C P q a Ph E false → Husk sc D l (Lane P q a) Ph → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → LaneSt sc Rg C P q a (lnS false (cutS false at l)) false
 
 -- The values passed that began a lane, oldest first, and how many of
 -- their lanes run.
@@ -616,7 +624,7 @@ data Sync where
   -- lies in what its source still runs
   s-took : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i} {keep : A → Bool} {w s Es E r P}
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r
-         → TailP C (TakeWhile.TakeT i keep Es) P → ∀ {D} → Husk sc D s Es P → Dom C D → (∀ {r′} → ¬ Owes D r′ → ¬ TakeWhile.Failed i keep Es r′)
+         → TailP C (TakeWhile.TakeT i keep Es) P → ∀ {D} → Husk sc D s Es P → Dom C D → (∀ {r′} → Thru D r′ → ¬ TakeWhile.Failed i keep Es r′)
          → TakeWhile.TakeT i keep Es ≈ E → Sound Rg Es → Sync sc Rg C (takeS i keep w s) E
   -- a joiner: its outer, and its bookkeeping over its policy
   s-flat : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E}
@@ -684,22 +692,22 @@ data HuskL where
   hl-more : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} {l : St Γ A} {ls E₁ E P Q} → Husk sc D₁ l E₁ P → Up D₁ E₁ D E → HuskL sc D ls E Q → HuskL sc D (l ∷ ls) E (P ∪ᵖ Q)
 
 data SrcH where
-  sh-dead  : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Husk sc D₁ o (Frozen k) P → Up D₁ (Frozen k) D E
+  sh-dead  : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E₁ : EmissionSet X} {E : EmissionSet B} {P} → Husk sc D₁ o E₁ P → Up D₁ E₁ D E
            → T (CS.srcAtt k) ⊎ T (CS.closed k) → SrcH sc D k o E (Under P)
   sh-isle  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri Ci}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k
-           → Sound Ri (Frozen k) → AttOwed k → Bursts k E → ¬ Owes D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Sound Ri (Frozen k) → AttOwed k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
   -- an isle whose source has ended
   sh-islec : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E : EmissionSet B} {Ci P}
            → T (not (CS.srcAtt k)) → T (CS.closed k) → Spent Ci (Frozen k) → TailP Ci (Frozen k) P → Husk sc D₁ o (Frozen k) P → Dom Ci D₁
-           → Behind Ci (Frozen k) → Subd sc Ci k → Bursts k E → ¬ Owes D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Behind Ci (Frozen k) → Subd sc Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
   -- a source not yet subscribed: its whole burst, which runs whatever
   -- happens above it, its body's mark subscribing it regardless
   sh-pend  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → CS.scope k ≡ sc
            → Adm (binds (CS.src k) (CS.connAt k) sc) → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Within Ri sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ])) → Sound Ri (Frozen k)
-           → Bursts k E → ¬ Owes D (CS.connAt k)
+           → Bursts k E → Thru D (CS.connAt k)
            → SrcH sc D k (pend o (CS.connAt k ++ [ ix 1 ])) E (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
 
 -- A connect's parts read again under fields they do not read.

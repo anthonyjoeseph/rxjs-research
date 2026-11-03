@@ -35,8 +35,9 @@ open import denotation.Laws.BoundedInv using (module BoundedI)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; takeS)
 open import adequacy.Rows using (full; Frozen)
-open import adequacy.Cursor using (Cur; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
-open import adequacy.Cursor.Tear using (by; husk-of; src-husk; begun-husk; lane-husk)
+open import adequacy.Cursor using (Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; Hole; Dom; Thru; Up; NoKill; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+open import adequacy.Cursor.Tear using (by; husk-of; src-husk; begun-husk)
+open import adequacy.Cursor.Show using (flat-up-lane)
 open import adequacy.Bound using (owes?; owes-≼; starts-past; past)
 open import adequacy.Few using (join-pin; kept-lane; ix0)
 
@@ -104,6 +105,12 @@ in-burst x h = _ , (_ , x , h) , refl
 SrcPT : ∀ {Γ X} → Cur → CS Γ X → Pts → Set
 SrcPT C k P = Σ (List Pos) λ ks → ∀ {k′ e} → Frozen k k′ e → Held C k k′ e → Owes C (ix0 k′) → P (ix0 k′) ⊎ ix0 k′ ∈ ks
 
+-- A dead lane's: what its hole's tail still runs.
+dead-pt : ∀ {A B} {C} {P : Pol A B} {q a Ph E} → Hole C P q a Ph E false
+        → Σ (List Pos) λ ks → ∀ {y r} → Kept P q a y (pin r) → Owes C y → Ph y ⊎ y ∈ ks
+dead-pt (h-end _ _ (tailp ks f))  = ks , λ kp o → f kp o
+dead-pt (h-kill _ _ (tailp ks f)) = ks , λ kp o → f kp o
+
 mutual
   pin-tail : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} (sy : Sync sc Rg C s E) → PinTail C E (proj₁ (husk-of sy))
   pin-tail (s-cold _ _ (ks , f)) = ptl ks λ x o _ → [ (λ t → ⊥-elim (ine-pin t)) , inj₂ ]′ (f x o)
@@ -113,14 +120,14 @@ mutual
   pin-tail {C = C} (s-scan sy _ m _)     = pt-bn {C = C} (cov m) (λ { (Scan.spin x) → x }) (pin-tail sy)
   pin-tail (s-cut sy)            = pin-tail sy
   pin-tail {C = C} (s-take sy _ m _)     = pt-bn {C = C} (cov m) (λ { (TakeWhile.left x _ _) → x }) (pin-tail sy)
-  pin-tail {C = C} (s-took _ _ _ _ tp _ m _) = pt-bn {C = C} (cov m) (λ x → x) (tailp-pt {C = C} tp)
-  pin-tail {sc = sc} {C = C} (s-flat {op = op} {f = f} {O = O} ji sy (joined {vs} bg wa wh _ _ _ _ _) (_ , m) _ _)
-    with pin-tail sy | begun-pt bg
+  pin-tail {C = C} (s-took _ _ _ _ tp _ _ _ m _) = pt-bn {C = C} (cov m) (λ x → x) (tailp-pt {C = C} tp)
+  pin-tail {sc = sc} {C = C} (s-flat {op = op} {f = f} {ω = ω} {O = O} {E = E} ji sy (joined {vs} bg wa wh _ _ _ _ li) je@(_ , m) _ bh)
+    with pin-tail sy | begun-pt {O = O} {E = E} (λ {q} {a} {D} x rn dm nk → flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {ω = ω} {O = O} {E = E} {q = q} {a = a} ji je bh li x rn dm nk) bg
   ... | ptl ko fo | kl , fl = pt-bn {C = C} {E = JoinF op F O} (cov m) proj₁ (ptl (ko ++ kl) λ {y} {r} x o no → pick (join-pin op F O x) o no)
     where
       F = λ a → ⟦ f a ⟧ (full sc)
       pick : ∀ {y r} → O y (pin r) ⊎ (Σ Pos λ q → Σ _ λ a → O q (out a) × Runs (polF op F O) q × Kept (polF op F O) q a y (pin r))
-           → Owes C y → ¬ Owes C r → (proj₁ (husk-of sy) ∪ᵖ proj₁ (begun-husk bg)) y ⊎ y ∈ ko ++ kl
+           → Owes C y → ¬ Owes C r → (proj₁ (husk-of sy) ∪ᵖ proj₁ (begun-husk {O = O} {E = E} (λ {q} {a} {D} x rn dm nk → flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {ω = ω} {O = O} {E = E} {q = q} {a = a} ji je bh li x rn dm nk) bg)) y ⊎ y ∈ ko ++ kl
       pick (inj₁ x) o no = [ (λ h → inj₁ (inj₁ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fo x o no)
       pick (inj₂ (q , a , x , ru , kp)) o no with lane-pin op ji x (kept-lane {P = polF op F O} kp)
       ... | s , st , qs , sr with owes? C q
@@ -128,9 +135,9 @@ mutual
       ...   | inj₂ nq with wh x nq ru
       ...     | inj₁ iv = [ (λ h → inj₁ (inj₂ h)) , (λ i → inj₂ (∈-++⁺ʳ ko i)) ]′ (fl iv kp o no)
       ...     | inj₂ iw = ⊥-elim (no (owes-≼ C (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ wa) iw))) st) sr))
-  pin-tail {C = C} {E = E} (s-conn {k = k} refl pt bs _ ss tn _ (m , _)) =
+  pin-tail {C = C} {E = E} (s-conn {k = k} refl pt bs bb ss tn fl ce@(m , _)) =
     by-elim (λ h → PinTail C E (proj₁ h)) (CS.srcLive k) _ _
-      (λ l → pt-bn {C = C} (cov m) proj₁ (conn-pt {C = C} {k = k} (src-pt (ss l) (Parts.ss pt)) (pin-tail (bs l))))
+      (λ l → pt-bn {C = C} (cov m) proj₁ (conn-pt {C = C} {k = k} (src-pt pt (ss l) (bb l) fl ce) (pin-tail (bs l))))
       (λ nl → pt-bn {C = C} (cov m) proj₁ (tailp-pt {C = C} (Torn.tl (tn nl))))
   pin-tail {sc = sc} (s-join {x = x} en _ _ _ _) =
     ptl (proj₁ (cov en)) λ e o _ → [ (λ t → ⊥-elim (hot-nopin sc x t)) , inj₂ ]′ (proj₂ (cov en) e)
@@ -147,9 +154,10 @@ mutual
 
   -- A source's: a burst begun before the cursor runs on in its isle; an
   -- attached one's is finitely many, and so are the rows the cursor passed.
-  src-pt : ∀ {Γ X} {Rg C} {k : CS Γ X} {o} (sw : Src (CS.scope k) Rg C k o) (ss : Sound Rg (Frozen k)) → SrcPT C k (proj₁ (src-husk refl sw ss))
-  src-pt {C = C} {k = k} (src-pend _ _ _ _ _ _ _ ow _) _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ++ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
-  src-pt {C = C} {k = k} (src-on nc sy bh sd af _) ss =
+  src-pt : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} (pt : Parts (CS.scope k) Rg k β) (sw : Src (CS.scope k) (Parts.Rs pt) C k o)
+         (bb : Behind C β) (fl : Flags C k β) (ce : ConnE (CS.connAt k) (Frozen k) β E) → SrcPT C k (proj₁ (src-husk refl pt sw bb fl ce))
+  src-pt {C = C} {k = k} _ (src-pend _ _ _ _ _ _ _ ow _) _ _ _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ++ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
+  src-pt {C = C} {k = k} _ (src-on nc sy bh sd af _) _ _ _ =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ t → let (ka , fa) = af t ; (ptl kp fp) = pin-tail sy ; (kh , fh) = bh in
              map ix0 (ka ++ (kp ++ kh)) , λ {k′} x h _ →
@@ -157,7 +165,7 @@ mutual
                          , (λ { (_ , refl , np) → [ (λ q → inj₁ (k′ , q , refl)) , (λ i → inj₂ (∈-map⁺ ix0 (∈-++⁺ʳ ka (∈-++⁺ˡ i)))) ]′ (fp x ok np) }) ]′ h)
                , (λ nk → inj₂ (∈-map⁺ ix0 (∈-++⁺ʳ ka (∈-++⁺ʳ kp (fh x nk))))) ]′ (owes? C k′))
       (λ _ → [] , λ x h _ → inj₁ (in-burst {C = C} {k = k} x h))
-  src-pt {C = C} {k = k} (src-shut _ _ tp _ bh _) _ =
+  src-pt {C = C} {k = k} _ (src-shut _ _ tp _ _ bh _) _ _ _ =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ _ → let (tailp kt ft) = tp ; (kh , fh) = bh in
              map ix0 (kt ++ kh) , λ {k′} x _ _ →
@@ -166,21 +174,19 @@ mutual
       (λ _ → [] , λ x h _ → inj₁ (in-burst {C = C} {k = k} x h))
 
   -- A begun lane's pins.
-  begun-pt : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O vs ls n} (bg : Begun sc Rl C P O vs ls n)
-           → Σ (List Pos) λ ks → ∀ {q a y r} → (q , a) ∈ vs → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (begun-husk bg) y ⊎ y ∈ ks
-  begun-pt none = [] , λ ()
-  begun-pt (more _ _ _ ln bg) with lane-pt ln | begun-pt bg
-  ... | kl , fl | kb , fb = kl ++ kb , λ where
-    (here refl) kp o no → [ (λ h → inj₁ (inj₁ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fl kp o no)
+  begun-pt : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}
+             (lf : ∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
+             (bg : Begun sc Rl C P O vs ls n)
+           → Σ (List Pos) λ ks → ∀ {q a y r} → (q , a) ∈ vs → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (begun-husk lf bg) y ⊎ y ∈ ks
+  begun-pt lf none = [] , λ ()
+  begun-pt {C = C} {P = P} lf (more _ _ _ (l-live (h-live _ m _) sy _) bg) with pt-bn {C = C} (cov m) (λ x → x) (pin-tail sy) | begun-pt lf bg
+  ... | ptl kl fl | kb , fb = kl ++ kb , λ where
+    (here refl) kp o no → [ (λ h → inj₁ (inj₁ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fl (kept-lane {P = P} kp) o no)
     (there i) kp o no   → [ (λ h → inj₁ (inj₂ h)) , (λ j → inj₂ (∈-++⁺ʳ kl j)) ]′ (fb i kp o no)
-
-  lane-pt : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {q a l b} (ln : LaneSt sc Rg C P q a l b)
-          → Σ (List Pos) λ ks → ∀ {y r} → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (lane-husk ln) y ⊎ y ∈ ks
-  lane-pt {C = C} {P = P} (l-live (h-live _ m _) sy _) with pt-bn {C = C} (cov m) (λ x → x) (pin-tail sy)
-  ... | ptl ks f = ks , λ kp → f (kept-lane {P = P} kp)
-  lane-pt (l-dead (h-end _ _ (tailp ks f)) _)  = ks , λ kp o _ → f kp o
-  lane-pt (l-dead (h-kill _ _ (tailp ks f)) _) = ks , λ kp o _ → f kp o
-
+  begun-pt lf (more _ _ _ (l-dead hl _ _ _) bg) with dead-pt hl | begun-pt lf bg
+  ... | kl , fl | kb , fb = kl ++ kb , λ where
+    (here refl) kp o no → [ (λ h → inj₁ (inj₁ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fl kp o)
+    (there i) kp o no   → [ (λ h → inj₁ (inj₂ h)) , (λ j → inj₂ (∈-++⁺ʳ kl j)) ]′ (fb i kp o no)
 
 ------------------------------------------------------------------------
 -- A NODE ENDED BEFORE THE CURSOR owes what its isles still run, but for

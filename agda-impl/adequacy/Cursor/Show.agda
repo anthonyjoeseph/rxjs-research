@@ -13,21 +13,43 @@ open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix; inside)
-open import denotation.EmissionSet using (EmissionSet; out; pin; _≺_; Reach; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
-open import denotation.Laws.Modulus using (≺→≼)
+open import denotation.Events using (Pos; Timeline; ix; inside; <ᵖ-step)
+open import denotation.EmissionSet using (EmissionSet; out; pin; _≺_; _≼_; Reach; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
+open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺)
+open import Data.Bool.Properties using (T-≡)
+open import Function.Bundles using (Equivalence)
+open import Data.Unit using (tt)
 open import operation.PureObservable using (module Machine)
 open Machine using (Scope; CS)
 open import adequacy.Rows using (Frozen; full)
-open import adequacy.Cursor using (Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs; Lane; polF; up; JoinF; JoinE; JInv;
+open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs; Lane; polF; up; JoinF; JoinE; JInv;
   JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE; Src)
 open import denotation.Laws.Worlds using (Hots)
-open import adequacy.Bound using (owes-≼; past)
 open import adequacy.PinLift using (reach-≈; reach-map; reach-scan; reach-take)
+
+-- What the cursor reached lies at or before all it owes.
+thru-owes : ∀ C {r q} → Thru C r → Owes C q → r ≼ q
+thru-owes origin  ()
+thru-owes (bef p) {r} {q} t o = ≼-trans {r} {p} {q} t o
+thru-owes (aft p) {r} {q} t o = ≺→≼ {r} {q} (≼-≺-≺ {r} {p} {q} t o)
+
+-- A connect the cursor has passed it has reached.
+thru-no : ∀ C {r} → ¬ Owes C r → Thru C r
+thru-no origin  n = n tt
+thru-no (bef p) {r} n pr = n (≺→≼ {p} {r} pr)
+thru-no (aft p) n = n
+
+-- A connect whose source's subscription the cursor is past it has
+-- reached: nothing lies between a row and its first effect.
+thru-sub : ∀ C {r} → (∀ {y} → Owes C y → (r ++ [ ix 1 ]) ≼ y) → Thru C r
+thru-sub origin  {r} ps = ps {r} tt (≺-ext r [])
+thru-sub (bef p) {r} ps pr = ps {p} (≼-refl {p}) (≺-trans {p} {r} {r ++ [ ix 1 ]} pr (≺-ext r []))
+thru-sub (aft p) {r} ps pr = ≺-irrefl {r} (≺-≼-≺ {r} {r ++ [ ix 1 ]} {r} (≺-ext r [])
+                               (≼-trans {r ++ [ ix 1 ]} {p ++ [ ix 0 ]} {r} (ps {p ++ [ ix 0 ]} (≺-ext p [])) (λ t → subst T (<ᵖ-step p r (Equivalence.to T-≡ pr)) t)))
 
 -- A pin kept at its own row.
 up-at : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B}
-      → (∀ {y r} → ¬ Owes D r → T (inside r y) → E y (pin r) → Reach E y (pin r) → ¬ Owes D′ r × E′ y (pin r) × Reach E′ y (pin r))
+      → (∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r) → Thru D′ r × E′ y (pin r) × Reach E′ y (pin r))
       → Up D E D′ E′
 up-at {E′ = E′} f = up λ {y} {r} nr i x rc → let (n′ , x′ , rc′) = f nr i x rc in [] , r , n′ , subst (λ z → T (inside r z)) (sym (++-identityʳ y)) i
                     , subst (λ z → E′ z (pin r)) (sym (++-identityʳ y)) x′
@@ -47,12 +69,12 @@ up-scan {f = f} {z = z} {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′
 
 -- A take whose failure, if any, the cursor has not yet passed.
 up-take : ∀ {A} {incl} {keep : A → Bool} {D} {E : EmissionSet A}
-        → (∀ {r} → ¬ Owes D r → ¬ TakeWhile.Failed incl keep E r) → Up D E D (TakeWhile.TakeT incl keep E)
+        → (∀ {r} → Thru D r → ¬ TakeWhile.Failed incl keep E r) → Up D E D (TakeWhile.TakeT incl keep E)
 up-take {incl = incl} {keep = keep} {D = D} {E = E} nf = up-at {D = D} {D′ = D} {E = E} {E′ = TakeWhile.TakeT incl keep E} λ nr i x rc → nr , TakeWhile.left x (nf nr) i , reach-take rc
 
 -- A cursor moved on has passed what its earlier self passed.
 up-adv : ∀ {A B} {D₁ D C} {E₁ : EmissionSet A} {E : EmissionSet B} → Dom C D → Up D₁ E₁ D E → Up D₁ E₁ C E
-up-adv dm (up u) = up λ nr i x rc → let (xs , r′ , n′ , rest) = u nr i x rc in xs , r′ , (λ o → n′ (dm o)) , rest
+up-adv dm (up u) = up λ nr i x rc → let (xs , r′ , n′ , rest) = u nr i x rc in xs , r′ , dm n′ , rest
 
 -- Two layers.
 up-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
@@ -62,17 +84,17 @@ up-∘ {E₃ = E₃} (up u) (up v) = up λ {y} nr i x rc → let (xs , r′ , n�
     , subst (λ z → E₃ z (pin r″)) (++-assoc y xs zs) x″
     , subst (λ z → Reach E₃ z (pin r″)) (++-assoc y xs zs) rc″
 
--- A cursor moved on reads only pins its earlier self had passed.
+-- What an earlier cursor reached, a later one has.
 up-pre : ∀ {A B} {D C C′} {E : EmissionSet A} {E′ : EmissionSet B} → Dom C D → Up C E C′ E′ → Up D E C′ E′
-up-pre dm (up u) = up λ nr → u (λ o → nr (dm o))
+up-pre dm (up u) = up λ nr → u (dm nr)
 
 -- No failing value passed: none fails before a pin's connect passed.
-nofail-up : ∀ {A} {incl} {keep : A → Bool} {C} {E : EmissionSet A} → NoFail C keep E → ∀ {r} → ¬ Owes C r → ¬ TakeWhile.Failed incl keep E r
-nofail-up {C = C} nf nr (q , _ , x , k , qr) = nr (owes-≼ C (nf x k) (≺→≼ {q} {_} qr))
+nofail-up : ∀ {A} {incl} {keep : A → Bool} {C} {E : EmissionSet A} → NoFail C keep E → ∀ {r} → Thru C r → ¬ TakeWhile.Failed incl keep E r
+nofail-up {C = C} nf t (q , _ , x , k , qr) = thru-owes C t (nf x k) qr
 
 -- No kill passed: none cuts a lane before a pin's connect passed.
-unkilled-no : ∀ {A B} {C} {P : Pol A B} {q} → Unkilled C P q → ∀ {r} → ¬ Owes C r → NoKill P q r
-unkilled-no {C = C} uk {r} nr kl = ≺→≼ {r} {_} (past C nr (uk kl))
+unkilled-no : ∀ {A B} {C} {P : Pol A B} {q} → Unkilled C P q → ∀ {r} → Thru C r → NoKill P q r
+unkilled-no {C = C} uk t kl = thru-owes C t (uk kl)
 
 ------------------------------------------------------------------------
 -- The joiner and the connect: where a pin shows past a truncation.
@@ -91,7 +113,7 @@ postulate
                → JInv sc f O → JoinE sc op f ω O E → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
                → LanesIn (Hots (full sc)) (JRl sc Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O
                → O q (out a) → Runs (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q
-               → Dom C D → (∀ {r} → ¬ Owes D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
+               → Dom C D → (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
                → Up D (Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a) C E
 
   -- A CONNECT'S BODY PIN SHOWS IN ITS ENTRY, kept by `body`.

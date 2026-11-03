@@ -16,7 +16,7 @@ open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import denotation.Laws.Modulus using (≺-ext)
 open import Relation.Nullary using (¬_)
-open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no;
+open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-no;
   flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts)
 open import operation.PureObservable using (module Machine)
 
@@ -25,7 +25,7 @@ open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; attached; attAt;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; Frozen; full; pendRows)
-open import adequacy.Cursor using (Cur; Lane; Up; up; Dom; Subd; SubdAt; Owes; Behind; Flags; ConnE; Runs; NoKill; h-live; Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Sound; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_; h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined; l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map; s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend; src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
+open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Subd; SubdAt; Owes; Behind; Flags; ConnE; Runs; NoKill; h-live; Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Sound; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_; h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined; l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map; s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend; src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
 
 open _≃_
 
@@ -48,9 +48,9 @@ unbind : ∀ {Γ X B} {k : CS Γ X} {sc} {D} {b : St (X ∷ Γ) B} {β Q} → CS
        → Husk (binds (CS.src k) (CS.connAt k) sc) D b β Q → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D b β Q
 unbind refl h = h
 
--- Past its subscription: past its connect.
-subd-gone : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → ¬ Owes C (CS.connAt k)
-subd-gone {k = k} sd o = SubdAt.past sd o (≺-ext (CS.connAt k) [])
+-- Past its subscription: through its connect.
+subd-thru : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k)
+subd-thru {C = C} sd = thru-sub C (SubdAt.past sd)
 
 -- A cursor moved on: every closure read from it.
 mutual
@@ -70,9 +70,9 @@ mutual
 
   srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
   srch-adv dm (sh-dead hk u sf)                       = sh-dead hk (up-adv dm u) sf
-  srch-adv dm (sh-isle na nc sy bh sd ss ao bu nr)    = sh-isle na nc sy bh sd ss ao bu (λ o → nr (dm o))
-  srch-adv dm (sh-islec na cl sp tp hk di bh sd bu nr) = sh-islec na cl sp tp hk di bh sd bu (λ o → nr (dm o))
-  srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (λ o → nr (dm o))
+  srch-adv dm (sh-isle na nc sy bh sd ss ao bu nr)    = sh-isle na nc sy bh sd ss ao bu (dm nr)
+  srch-adv dm (sh-islec na cl sp tp hk di bh sd bu nr) = sh-islec na cl sp tp hk di bh sd bu (dm nr)
+  srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (dm nr)
 
 -- Nothing, shown nowhere.
 ∅E : ∀ {A} → EmissionSet A
@@ -106,27 +106,27 @@ mutual
 
   src-husk : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} → CS.scope k ≡ sc → (pt : Parts sc Rg k β)
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
-  src-husk sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
-    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts na sc pt sr bb fl ce) nr
+  src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
+    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts na sc pt sr bb fl ce) (thru-no C nr)
   src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt sr bb fl ce) (inj₁ t))
-                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (conn-bursts na sc pt sr bb fl ce) (subd-gone {k = k} sd))
+                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
   src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt sr bb fl ce)) (inj₁ t))
-                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (conn-bursts na sc pt sr bb fl ce) (subd-gone {k = k} sd))
+                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}
-             → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → ¬ Owes D r → NoKill P q r) → Up D (Lane P q a) C E)
+             → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
              → Begun sc Rl C P O vs ls n → Σ Pts (HuskL sc C ls E)
   begun-husk lf none                 = _ , hl-none
   begun-husk {P = P} {O = O} {E = E} lf (more x _ rn ln bg) =
     lane-husk {P = P} {O = O} {E = E} (λ {q} {a} {D} → lf {q} {a} {D}) x rn ln (proj₂ (begun-husk {O = O} {E = E} (λ {q} {a} {D} → lf {q} {a} {D}) bg))
 
   lane-husk : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {O E q a l b ls Q}
-            → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → ¬ Owes D r → NoKill P q r) → Up D (Lane P q a) C E)
+            → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
             → O q (out a) → Runs P q → LaneSt sc Rg C P q a l b → HuskL sc C ls E Q → Σ Pts (HuskL sc C (l ∷ ls) E)
   lane-husk {C = C} {P = P} lf x rn (l-live (h-live _ m uk) sy _) hl =
-    _ , hl-more (h-ln (h-cut (proj₂ (husk-of sy)) up-id) up-id) (up-∘ (up-≈ m) (lf {D = C} x rn (λ o → o) (unkilled-no {C = C} {P = P} uk))) hl
+    _ , hl-more (h-ln (h-cut (proj₂ (husk-of sy)) up-id) up-id) (up-∘ (up-≈ m) (lf {D = C} x rn (λ t → t) (unkilled-no {C = C} {P = P} uk))) hl
   lane-husk lf x rn (l-dead {D = D} _ hk dm nk) hl =
     _ , hl-more (h-ln (h-cut hk up-id) up-id) (lf {D = D} x rn dm nk) hl
 
