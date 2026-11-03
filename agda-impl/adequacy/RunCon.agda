@@ -120,7 +120,7 @@ srch-att bb lo (sh-pend _ _ _ () _ _ _ _ _)
 -- A live source, attached.
 src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {cl sl sa p ow cx ea sr sc′} {y} {o : St Γ X}
         → Lo o (after y) → Src sc Rg C (cs cl sl sa p (just y) ow cx ea sr sc′) o → Src sc Rg C (cs cl sl true p nothing ow cx ea sr sc′) o
-src-att lo (src-pend _ _ _ () _ _ _ _)
+src-att lo (src-pend _ _ _ () _ _ _ _ _)
 src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-on nc sy bh sd af ao) =
   src-on nc sy bh sd (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af ao λ { refl → λ _ → att-fin {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} sy bh sd lo }) (λ ())
 src-att lo (src-shut cl sp tp hk bh sd) = src-shut cl sp tp hk bh sd
@@ -275,11 +275,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ... | src-shut cl′ sp tp hk bh sd =
     _ , _ , settled {Rg = nowhere} {E = none′} c-sub (f-srcc fr scp (re-parts refl refl pt) tt cl′ sp tp bh sd (bs tt) (bb tt) (re-flags fl) eq) (_ , hk , ⊑-refl) , silent ≃-refl
-  ... | src-pend _ nc₀ refl _ _ _ _ ow with fr-shift Rt fr sy ow lo
+  ... | src-pend _ nc₀ refl _ _ _ _ ow _ with fr-shift Rt fr sy ow lo
   ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ bb′ ss′ _ fl′ eq′ , d with ss′ tt
   ...     | src-on _ sy′ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ...     | src-shut cl′ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
-  ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ =
+  ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ _ =
     Cr′ , bef (cx ++ [ ix 1 ]) ,
     pending (f-src fr′ scp′ (re-parts refl refl pt′) tt nc (bs′ tt) (bb′ tt) (re-flags fl′) ≈-refl eq′
                    (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok)

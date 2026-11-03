@@ -330,7 +330,7 @@ on-chain sc f {O} ji op li z x l qw wy =
 
 -- A source's rows behind the cursor, few, however it stands.
 src-behind : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Behind C (Frozen k)
-src-behind {C = C} {k = k} eq (src-pend _ _ _ _ adm _ _ ow) = behind-pend {C = C} {k = k} eq adm ow
+src-behind {C = C} {k = k} eq (src-pend _ _ _ _ adm _ _ ow _) = behind-pend {C = C} {k = k} eq adm ow
 src-behind _  (src-on _ _ bh _ _ _)         = bh
 src-behind _  (src-shut _ _ _ _ bh _)       = bh
 

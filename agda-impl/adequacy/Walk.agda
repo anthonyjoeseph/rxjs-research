@@ -17,12 +17,13 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import denotation.Events using (Pos)
+open import denotation.Laws.Modulus using (≺-ext)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; closed; free; cpAt; cutAt; overAt)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; Rgn; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; sh-pend)
+open import adequacy.Cursor using (Cur; Rgn; SubdAt; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; sh-pend)
 open import adequacy.Cursor.Tear using (c-abs; NoIsle; Clear; Pending)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; onoff; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled)
@@ -176,8 +177,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-on nc (sync-≈ h fe) bh sd af ao) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcc fr sc pt lv cl sp tp bh sd bs bb fl eq) (Q , hk , le) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
-    climb (f-srcp fr sc pt lv nc na ba an adm bs bb fl fe eq ow _ _) (_ , refl , pe , wn) =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-pend na nc ba an adm (≈-trans pe fe) wn ow) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+    climb (f-srcp {k = k} fr sc pt lv nc na ba an adm bs bb fl fe eq ow sd _) (_ , refl , pe , wn) =
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-pend na nc ba an adm (≈-trans pe fe) wn ow (λ o → SubdAt.past sd o (≺-ext (CS.connAt k) [])))
+                       (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-body {k = k} fr sc pt lv os bb fl eq) h =
       climb fr (s-conn sc pt (λ _ → subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ _ _ _) sc h) (λ _ → bb) (λ _ → os) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (d-map fr)                    (Q , hk , le) = climb fr (Q , h-map hk , le)
@@ -352,7 +354,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | inj₁ lv with os lv
   ...   | src-on nc sy bh sd af ao   = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao nb , sy
   ...   | src-shut cl sp tp hk bh sd = C , dead _ , nowhere , none′ , f-srcc fr sc pt lv cl sp tp bh sd (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
-  ...   | src-pend _ _ _ _ _ _ _ _   = ⊥-elim (np tt)
+  ...   | src-pend _ _ _ _ _ _ _ _ _ = ⊥-elim (np tt)
   down-src _ nb (C , dead P , _ , _ , fr , (Q , h-conn sh hb , le)) = src-dead (un-dead fr) sh hb le nb
   down-src _ nb (C , dead P , _ , _ , fr , (Q , h-blank (f , qs , qb) , le)) =
     C , dead ∅ᵖ , nowhere , none′ , d-src (un-dead fr) (h-blank qb) (⊑-trans le ∅-⊑) nb f , (_ , h-blank qs , ⊑-refl)

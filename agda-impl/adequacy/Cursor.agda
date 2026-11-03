@@ -443,9 +443,11 @@ Dom : Cur → Cur → Set
 Dom C D = ∀ {q} → Owes C q → Owes D q
 
 -- A pin of `E` shows in `E′`.
-Up : ∀ {A B} → Cur → EmissionSet A → Cur → EmissionSet B → Set
-Up {A} {B} D E D′ E′ = ∀ {y r} → ¬ Owes D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
-                     → Σ Pos λ xs → Σ Pos λ r′ → ¬ Owes D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
+record Up {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B) : Set where
+  constructor up
+  field
+    lift : ∀ {y r} → ¬ Owes D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
+         → Σ Pos λ xs → Σ Pos λ r′ → ¬ Owes D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
 
 -- An isle's burst shows in its connect's entry: a row inside its
 -- subscription, with finitely many before it, is pinned there a level
@@ -514,7 +516,7 @@ record Torn {Γ X B} (sc : Scope Γ) (C : Cur) (k : CS Γ X) (o : St Γ X) (b : 
 -- switch, both on while it runs and both off once it is over.
 data LaneSt {Γ A B} (sc : Scope Γ) (Rg : Rgn) (C : Cur) (P : Pol A B) (q : Pos) (a : A) : St Γ B → Bool → Set₁ where
   l-live : ∀ {at l E} → Hole C P q a ∅ᵖ E true → Sync sc Rg C l E → Sound Rg E → LaneSt sc Rg C P q a (lnS true (cutS true at l)) true
-  l-dead : ∀ {at l E Ph D} → Hole C P q a Ph E false → Husk sc D l (Lane P q a) Ph → Dom C D → LaneSt sc Rg C P q a (lnS false (cutS false at l)) false
+  l-dead : ∀ {at l E Ph D} → Hole C P q a Ph E false → Husk sc D l (Lane P q a) Ph → Dom C D → (∀ {r} → ¬ Owes D r → NoKill P q r) → LaneSt sc Rg C P q a (lnS false (cutS false at l)) false
 
 -- The values passed that began a lane, oldest first, and how many of
 -- their lanes run.
@@ -652,7 +654,7 @@ data Src where
            → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Within Rg sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]))
-           → Owes C (CS.connAt k ++ [ ix 1 ])
+           → Owes C (CS.connAt k ++ [ ix 1 ]) → ¬ Owes C (CS.connAt k)
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible

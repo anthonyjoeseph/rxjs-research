@@ -401,7 +401,7 @@ mutual
         → Behind (bef p) (Frozen k)
   src-f {C = C} (src-on _ sy bh _ _ _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
   src-f {C = C} (src-shut _ _ tp hk bh _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
-  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ a _ _ _) env ef lo =
+  src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ a _ _ _ _) env ef lo =
     behind-pend {C = bef p} {k = k} refl a (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
 
   -- A joiner's: its outer's, a value's first effect, a begun lane's, a
@@ -582,8 +582,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
     src-sh : ∀ {Γ X B} {Rg} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvL (full (CS.scope k)) C p → LoP (connS k o b) p
            → Src (CS.scope k) Rg (bef p) k o
-    src-sh {k = k} {b = b} (src-pend {o = o′} na nc be an adm pr wn _) env ef lo =
-      src-pend na nc be an adm pr wn (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
+    src-sh {k = k} {b = b} (src-pend {o = o′} na nc be an adm pr wn _ nr) env ef lo =
+      src-pend na nc be an adm pr wn (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be))) (λ h → nr (owes-≼ C op h))
     src-sh {k = k} (src-on nc sy bh sd af ao) env ef lo =
       src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd) af ao
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))

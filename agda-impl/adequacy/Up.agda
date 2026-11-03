@@ -213,7 +213,7 @@ module Past (p : Pos) where
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
-    src-up (src-pend na nc be an adm pr wn ow) ss nr nh = src-pend na nc be an adm pr wn (owes-up (off nr (proj₁ wn)) ow)
+    src-up {k = k} (src-pend na nc be an adm pr wn ow ng) ss nr nh = src-pend na nc be an adm pr wn (owes-up (off nr (proj₁ wn)) ow) (λ h → ng (≺→≼ {p} {CS.connAt k} h))
     src-up (src-on nc sy bh sd af ao)    ss nr nh = src-on nc (up sy ss nr nh) (behind-up bh) (subd-up sd) af ao
     src-up {k = k} (src-shut cl sp tp hk bh sd) ss nr nh =
       src-shut cl (spent-up {E = adequacy.Rows.Frozen k} sp) (tailp-up tp) hk (behind-up bh) (subd-up sd)
@@ -251,7 +251,7 @@ module Past (p : Pos) where
 
 -- Where a connect owes its own end is no part of what it owes.
 src-owe : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {C} {k : CS Γ X} {o x} → Src sc Rs C k o → Src sc Rs C (record k { owedAt = x }) o
-src-owe (src-pend na nc be an adm pr wn ow) = src-pend na nc be an adm pr wn ow
+src-owe (src-pend na nc be an adm pr wn ow ng) = src-pend na nc be an adm pr wn ow ng
 src-owe (src-on nc sy bh sd af ao)     = src-on nc sy bh sd af ao
 src-owe (src-shut cl sp tp hk bh sd)   = src-shut cl sp tp hk bh sd
 

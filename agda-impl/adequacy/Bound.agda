@@ -342,7 +342,7 @@ mutual
   bound {C = C} (s-scan sy _ m _) env lo (x , v , ow) = scan-b {C = C} (bound sy env (λ ki → lo (k-kid (k-scan ki)))) (from (alike m) (x , v)) ow
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound {C = C} (s-take sy nf m _) env lo (x , v , ow) = take-b {C = C} (bound sy env (λ ki → lo (k-kid (k-take ki)))) nf (from (alike m) (x , v)) ow
-  bound (s-took fl g ni oa _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
+  bound (s-took fl g ni oa _ _ _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
   bound {sc = sc} {C = C} (s-flat {op = op} {f = f} _ sy (joined bg _ wh _ ah _ en _) m _ _) env lo (x , v , ow) =
     flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full sc)} {C = C} (bound sy env (λ ki → lo (k-kid (k-outer ki))))
       (λ iv kl ln v′ ow′ → begun-b bg iv kl ln v′ ow′ en env (λ i ki → lo (k-kid (k-lane i ki)))) wh ah
@@ -385,8 +385,8 @@ mutual
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → LoP (connS k o b) p
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
   src-b (src-on _ sy _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
-  src-b (src-shut _ sp _ _ _ _) env lo r = ⊥-elim (sp r)
-  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _) env lo {q} (x , _ , _) =
+  src-b (src-shut _ sp _ _ _ _ _) env lo r = ⊥-elim (sp r)
+  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
 
@@ -410,8 +410,8 @@ mutual
          → Ends P O → Env (full sc) C p → LoP l p → p ≼ k
   lane-b (l-live (h-live _ eq _) sy _) _ _ ln v ow _ env lo =
     bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (from (alike eq) (ln , v)) , v , ow)
-  lane-b {C = C} (l-dead (h-end lc nc _) _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
-  lane-b {C = C} (l-dead (h-kill kq nq _) _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
+  lane-b {C = C} (l-dead (h-end lc nc _) _ _ _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
+  lane-b {C = C} (l-dead (h-kill kq nq _) _ _ _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
 
 ------------------------------------------------------------------------
 -- What a part has passed
@@ -436,8 +436,8 @@ postulate
 -- passed, or none yet, its subscription not before `p`.
 few-src : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p} → CS.scope k ≡ sc → Src sc Rs (bef p) k o → FewBefore (Frozen k) p
 few-src _ (src-on _ _ bh _ _ _) = few-behind bh
-few-src _ (src-shut _ _ _ _ bh _) = few-behind bh
-few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow) = [] , λ {y} r lt →
+few-src _ (src-shut _ _ _ _ _ bh _) = few-behind bh
+few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow _) = [] , λ {y} r lt →
   ⊥-elim (ow (≺-trans {CS.connAt k ++ [ ix 1 ]} {y} {p}
                (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) r)
                (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y []) lt)))
