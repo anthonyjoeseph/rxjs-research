@@ -69,7 +69,9 @@ open import Data.Bool using (not)
 open import Data.List using (_ʳ++_)
 open import Relation.Binary.PropositionalEquality using (trans)
 open import denotation.Events using (inside)
-open import denotation.EmissionSet using (pin)
+open import denotation.EmissionSet using (pin; Unpinned)
+open import adequacy.Cursor using (vis)
+open import adequacy.Rows using (toEv)
 open import denotation.Laws.Worlds using (⊑-inside; inside-⊑; ⊑-≼)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-≼-≺)
 open import adequacy.Cursor using (notT; SubdAt; Flags; module Flags)
@@ -389,6 +391,18 @@ src-row {p = p} {y = y} r mu al with bool? (inside (p ++ [ ix 1 ]) y)
 ...   | m-skip = skip , Connecting.echo r al tt (nT ni) , m-skip
 ...   | m-pin {p′} i = pin p′ , Connecting.kept r (λ be → ≼-≺-≺ {p′} {y} (⊑-≼ (inside-⊑ p′ y i)) (al be)) (nT ni) i , mute-z (m-pin i)
 
+-- A source's row of its own, a level down in its connect: a pin inside
+-- the subscribe burst, an echo past it while the body runs.
+src-out : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} {y e} → σ y e → Unpinned e → Connecting.Alive p σ β y
+        → Σ (Ev B) λ e′ → Connecting.ConnT p σ β (y ++ [ ix 0 ]) e′ × Mute (y ++ [ ix 0 ]) e′
+src-out {p = p} {y = y} r up al with bool? (inside (p ++ [ ix 1 ]) y)
+... | inj₁ i  = pin p , Connecting.burst r i , m-pin (⊑-inside (⊑-trans (⊑-trans (⊑-snoc⁺ p) (inside-⊑ (p ++ [ ix 1 ]) y i)) (⊑-snoc⁺ y)))
+... | inj₂ ni = skip , Connecting.echo r al up (nT ni) , m-skip
+
+unp : ∀ {A} (e : Evᴹ A) → Unpinned (toEv e)
+unp (nx _) = tt
+unp cp     = tt
+
 -- THE FLOOR, frame by frame: every connect a source frame reads owes its
 -- body's end no sooner than the clock.
 Lo₀ : ∀ {R Γ A} → Pos → Ctx R Γ A → Set
@@ -547,6 +561,34 @@ module Outer {R} (o : PureObs [] R) where
       lc x′ l _ qw wy = proj₂ (Sound.rg sd x tt) (on-chain (scopeOf c) f ji op li z₁ x′ l qw wy)
   outer-row (d-outer _ _ _) _ ()
 
+  -- A source's step in flight: its row a level down, carried up.
+  src-step : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s ε q Rg N E}
+           → Fr Rt Cr (bef q) Rg (inSrc k b c) N E → Lo₀ q (inSrc k b c) → Fly (scopeOf c) Rg q N s E ε → Lifted Cr q ⊎ Isled Cr
+  src-step {ε = ε} {q} (f-src {k = k} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _) (lof , lo) (_ , row) =
+    let (_ , cr , mu) = src-out fk (unp ε) alive in
+    lift fr lo tt (voc (proj₁ ce) (cr , conn-reach bσ z₁ (zs-reach bβ z₁))) mu z₁
+      (clr-≈ (proj₁ ce) (clr-tr (clr-conn clb))) (Parts.s⊆ pt rs)
+    where
+      fk = voc fz row
+      rs : Parts.Rs pt q
+      rs = Sound.rg (Parts.ss pt) fk (vis ε)
+      past : (CS.connAt k ++ [ ix 1 ]) ≼ q
+      past = SubdAt.past sd {q} (≼-refl {q})
+      clb : Clr q (q ++ [ ix 0 ]) β
+      clb = clr λ b v qw wy → Parts.b-chain pt past rs (zl-ze z₁ (zs-btw z₁ qw wy)) (Sound.rg (Parts.sb pt) b v)
+      on : ∀ {c₀} → q ≼ c₀ → c₀ ≼ q → Ze q c₀
+      on {c₀} qc cq with <ᵖ-split c₀ q (≼-false {c₀} {q} cq)
+      ... | inj₁ lt   = ⊥-elim (qc (Equivalence.from T-≡ lt))
+      ... | inj₂ refl = e₀
+      alive : Connecting.Alive (CS.connAt k) (Frozen k) β q
+      alive = conn-alive {q = q} {q} pt fl lv lof past rs on
+  src-step (f-isle u _ _ na _ _ _ _ _ _) _ _ = inj₂ (isled u na)
+  src-step (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  src-step (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  src-step (d-src _ _ _ _ _) _ ()
+  src-step (f-islec _ _ _ _ _ _ _ _ _) _ ()
+  src-step (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ()
+
   -- Lifted, clear at `q`, the cursor short of the row met next: a row
   -- under the first child at or before it.
   under : ∀ {Cr q p e} → Lifted Cr q → Due Cr Rt p e → RowUnder o (q ++ [ ix 0 ]) p
@@ -560,15 +602,14 @@ module Outer {R} (o : PureObs [] R) where
   ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
 
 postulate
-  -- AN OUTER'S GUARD IN AN ISLE: an outer whose lift meets a source in
-  -- its subscribe burst under a connect no live node reads, its value
-  -- rising, has a row under its first child, at or before the row met
-  -- next.  Nothing such a source runs shows where the root reads, so the
-  -- row must come from elsewhere.
-  guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
-            → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
+  -- A GUARD IN AN ISLE: a step rising whose lift meets a source in its
+  -- subscribe burst under a connect no live node reads has a row under
+  -- its first child, at or before the row met next.  Nothing such a
+  -- source runs shows where the root reads but its pins.
+  guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e}
+            → Path (load o) rs ⟨ c , s , rising ε , q ⟩
             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-            → ∀ {Cr C Rg N E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg (inOuter op f ω d n qu ls c) N E
+            → ∀ {Cr C Rg N E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg c N E
             → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr
             → RowUnder o (q ++ [ ix 0 ]) p
 
@@ -584,6 +625,19 @@ outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
 ...   | inj₁ lf = Outer.under o lf du
 ...   | inj₂ il = guard-src o pth m fr il
 outer-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
+
+-- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves a
+-- row a level down, under it, at or before the row met next.
+echo-guard : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q p e}
+           → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
+           → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+           → RowUnder o (q ++ [ ix 0 ]) p
+echo-guard o {k = k} {b} {c} {s} pth m
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
+... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.src-step o fr (lo₀ (inSrc k b c) {s} (floor o pth tt)) fy
+...   | inj₁ lf = Outer.under o lf du
+...   | inj₂ il = guard-src o pth m fr il
+echo-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 postulate
   -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued

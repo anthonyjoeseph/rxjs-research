@@ -45,7 +45,7 @@ open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (bound; lo-p)
 open _≃_ using (from)
 open import denotation.Laws.Modulus using (≼-false)
-open import adequacy.Guard using (RowUnder; Gd; gd)
+open import adequacy.Guard using (RowUnder; Gd; gd; echo-guard)
 
 -- A position's first child keyed before its second.
 part : ∀ q → at (q ++ [ ix 0 ]) <ᴷ at (q ++ [ ix 1 ]) ≡ true
@@ -81,13 +81,6 @@ postulate
               → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
               → RowUnder o (q ++ [ ix 0 ]) p
-
-  -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves a
-  -- row a level down, under it, at or before the row met next.
-  echo-guard : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q p e}
-             → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → RowUnder o (q ++ [ ix 0 ]) p
 
   -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
   -- open observer hears plays its due at a row at or before it, or at an

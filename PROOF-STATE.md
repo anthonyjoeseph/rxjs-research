@@ -52,12 +52,13 @@ Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-
 
 A step that begins work a level down — a lane, a defer's body, a
 source's feed — leaves a row first, so is never still. Open: a root row
-under it, at or before the one met next. Lifted through every live frame
-but a connect's source, whose echo needs its body unended and whose burst
-leaves pins; a dead part may tie no root row; a bounded hand-off needs
-`Hand` from the queue. Settled by bodies over the frames.
+under it, at or before the one met next. Lifted through every live frame;
+open where the lift meets an isle, whose pins reach the root only through
+dead frames that tie no entry, and past the root's cursor rather than the
+isle's; a bounded hand-off needs `Hand` from the queue. Settled by bodies
+over the frames.
 
-Members: `guard-src`, `lanes-guard`, `echo-guard`, `defer-guard`.
+Members: `guard-src`, `lanes-guard`, `defer-guard`.
 
 #### THE MARK AT ITS ROW
 
