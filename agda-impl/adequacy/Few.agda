@@ -32,17 +32,17 @@ open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _�
   ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
   module TakeWhile; module Connecting; module Bounded; module Switch)
 open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
-open import operation.Key using (at; after)
+open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
 open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed)
-open import adequacy.Floor.Keys using (plug-in; own-bld; os)
-open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
+open import adequacy.Floor.Keys using (own-bld; os)
+open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body)
 open import denotation.Read using (Visible)
-open import adequacy.Bound using (Bnd; tr; on; lt; owes-≼; owes?; T?; LoP; KAt; lo-p; next-slot; in-slot; Env; env-bind; unfed-b; of-lb; cold-b;
-  lane-st; body-key; bound; src-b; join-b; begun-b; behind-pend; pend-past)
+open import adequacy.Bound using (Bnd; tr; on; lt; owes-≼; owes?; T?; LoP; KAt; next-slot; in-slot; Env; env-bind; unfed-b;
+  of-lb; cold-b; lane-st; body-key; bound; src-b; join-b; begun-b; behind-pend; pend-past)
 open import denotation.Laws.Worlds using (Hots; ok-step)
 import denotation.Laws.Worlds as Wd
 

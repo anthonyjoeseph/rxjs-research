@@ -8,23 +8,22 @@
 -- connect has behind it.
 module adequacy.PinLift where
 
-open import Data.Bool using (T; not)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Bool using (T)
 open import Data.Bool using (Bool)
 open import Data.List using (List; []; _∷_; [_]; _++_; map; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺; ∈-concatMap⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-concatMap⁺)
 open import Data.List.Relation.Unary.Any as Any using (here; there)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Product using (Σ; _×_; _,_)
+open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; ix; last; inside)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; _≺_; _≼_; Dep; Reach; Few; MapT; map-out; map-skip; map-pin; map-end;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; MapT; map-out; map-skip; map-pin; map-end;
   module Scan; module TakeWhile)
-open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼; ≼-refl; ≼-≺-≺)
-open import adequacy.Cursor using (Cur; Owes; Behind; _≈_; cov; voc)
+open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; ≼-≺-≺)
+open import adequacy.Cursor using (Owes; Behind; _≈_; cov)
 open import adequacy.Bound using (owes-≼)
 
 ------------------------------------------------------------------------

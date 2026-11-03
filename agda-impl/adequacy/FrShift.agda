@@ -11,7 +11,7 @@
 -- whole tree's least key, an isle's binders by `subd-env`.
 module adequacy.FrShift where
 
-open import Data.Bool using (T; true; false)
+open import Data.Bool using (true; false)
 open import Data.List using (List; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
@@ -27,8 +27,8 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; binds; CS; connS; flatS; takeS)
 open import adequacy.Rows using (full; Frozen; _≃_; _⇄_; ≃-refl)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; Owes; Due; Pol; Kill; kill-out; Kept; Hole; h-live; polF; JoinF; joined; Behind; Src; Sync;
-  burst-dn; alike; _≈_; Rgn)
+open import adequacy.Cursor using (Cur; bef; Owes; Due; Pol; Kill; kill-out; Kept; Hole; h-live; polF; JoinF; joined; Behind;
+  Src; Sync; burst-dn; alike; Rgn)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
