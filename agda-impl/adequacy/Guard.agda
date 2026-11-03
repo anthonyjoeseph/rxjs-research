@@ -1,0 +1,513 @@
+{-# OPTIONS --guardedness #-}
+
+-- A GUARD ROW, LIFTED: a row a step leaves at the first child of where it
+-- begins work, carried up through the frames above it to a row of the
+-- root's entry under that first child, at or before the row met next.
+module adequacy.Guard where
+
+open import Data.Bool using (T)
+open import Data.Bool.Properties using (T-≡)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Function using (Equivalence)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+
+open import denotation.Events using (Pos; ix; <ᵖ-split; <ᵖ-between)
+open import denotation.EmissionSet using (EmissionSet; Ev; _≺_; _≼_; Truncate)
+open import denotation.Read using (Visible)
+open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl)
+open import denotation.Laws.BoundedInv using (first-child)
+open import adequacy.Weight using (prefixes)
+open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; Need; owes; dead; lane; lanecut; pnd; NoFail; Rgn; Sound;
+  Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live;
+  h-end; h-kill; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane;
+  f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
+  d-src; d-body; f-isle; f-islec; f-islep)
+open import adequacy.Rows using (module _≃_)
+open _≃_ using (from)
+open import operation.PureObservable using (module Machine)
+open Machine using (Ctx; Scope; scopeOf)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Data.Maybe using (just; nothing)
+open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import denotation.Events using (Timeline)
+open import denotation.EmissionSet using (Den; ⟦_⟧; Work; module Joining; module Merge; module Bounded; module Switch; module Exhaust)
+open import denotation.Laws.Worlds using (W⁼; here; inW; step; timer; join; ⊑-trans; ⊑-snoc⁺)
+open import adequacy.Rows using (full)
+open import denotation.Laws.Worlds using (Hots)
+open import adequacy.Enter using (module Lanes)
+open import adequacy.Regions using (lane-sole)
+open import denotation.EmissionSet using (out; skip; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile)
+open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
+open import Relation.Nullary using (¬_)
+open import Data.Bool using (Bool; true; false)
+open import Data.Unit using (⊤; tt)
+open import denotation.Events using (last; root)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import denotation.EmissionSet using (enter)
+open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
+open import operation.PureObservable using (PureObs)
+open Machine using (⟨_,_,_,_⟩; rising; nx; cp; St; load; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
+open import adequacy.Rows using (conv; back)
+open import adequacy.Simulated using (cursor)
+open import adequacy.Simulation using (Simulation; module Along)
+open import adequacy.Path using (Path)
+open import adequacy.Cursor using (Fly; Due)
+open import adequacy.Cursor.Rise using (flying; adrift)
+open import Data.List using (map)
+open import denotation.EmissionSet using (Reach; Dep; module Connecting)
+open import adequacy.Cursor using (Src; src-pend; src-on; src-shut; Parts)
+open import adequacy.Rows using (Frozen)
+open Machine using (CS) renaming (Ev to Evᴹ)
+open import adequacy.Bound using (behind-pend)
+
+-- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
+-- of one.
+data Zs (q : Pos) : Pos → Set where
+  z₁ : Zs q (q ++ [ ix 0 ])
+  z+ : ∀ {y} → Zs q y → Zs q (y ++ [ ix 0 ])
+
+-- A chain's foot past its head.
+zs-past : ∀ {q y} → Zs q y → q ≺ y
+zs-past {q} z₁ = ≺-ext q []
+zs-past {q} (z+ {y} z) = ≺-trans {q} {y} {y ++ [ ix 0 ]} (zs-past z) (≺-ext y [])
+
+-- The positions from `q` up to, not including, the chain's foot.
+zl : ∀ {q y} → Zs q y → List Pos
+zl {q} z₁       = [ q ]
+zl (z+ {y} z) = y ∷ zl z
+
+-- Between `q` and a first-child chain's foot: on the chain.
+zs-btw : ∀ {q y w} (z : Zs q y) → q ≼ w → w ≺ y → w ∈ zl z
+zs-btw {q} {w = w} z₁ qw wy with <ᵖ-split q w (≼-false {q} {w} qw)
+... | inj₁ lt   = ⊥-elim (first-child q (Equivalence.from T-≡ lt) wy)
+... | inj₂ refl = here refl
+zs-btw {w = w} (z+ {y} z) qw wy with ≼-or-≻ y w
+... | inj₂ wy′ = there (zs-btw z qw wy′)
+... | inj₁ yw with <ᵖ-split y w (≼-false {y} {w} yw)
+...   | inj₁ lt   = ⊥-elim (first-child y (Equivalence.from T-≡ lt) wy)
+...   | inj₂ refl = here refl
+
+-- A chain's foot lies under the first child.
+zs-under : ∀ {q y} → Zs q y → Σ Pos λ xs → y ≡ (q ++ [ ix 0 ]) ++ xs
+zs-under z₁ = [] , sym (++-identityʳ _)
+zs-under (z+ {y} z) with zs-under z
+... | xs , refl = xs ++ [ ix 0 ] , ++-assoc _ xs [ ix 0 ]
+
+-- A position under the first child has it among its ancestors.
+under-∈ : ∀ q xs → (q ++ [ ix 0 ]) ∈ prefixes ((q ++ [ ix 0 ]) ++ xs)
+under-∈ []      xs = here refl
+under-∈ (a ∷ q) xs = there (∈-map⁺ (a ∷_) (under-∈ q xs))
+
+-- A row at a chain's foot, of an entry with few rows behind `q`, reaches
+-- what it depends on: those behind and the chain.
+reach-zs : ∀ {A} {t : EmissionSet A} {q y e} → Behind (bef q) t → Zs q y → t y e → Truncate t y e
+reach-zs {t = t} {q} {y} (ks , f) z r = r , ks ++ zl z , λ {k} {e′} tk ky _ → go tk ky (≼-or-≻ q k)
+  where go : ∀ {k e′} → t k e′ → k ≺ y → q ≼ k ⊎ k ≺ q → k ∈ ks ++ zl z
+        go tk ky (inj₁ qk) = ∈-++⁺ʳ ks (zs-btw z qk ky)
+        go tk ky (inj₂ kq) = ∈-++⁺ˡ (f tk λ qk → qk kq)
+
+-- Nothing visible from `q` up to, not including, `y`.
+record Clr {A} (q y : Pos) (E : EmissionSet A) : Set where
+  constructor clr
+  field clear : ∀ {w e} → E w e → Visible e → q ≼ w → w ≺ y → ⊥
+open Clr
+
+-- Clear at `q`, a row under its first child: a row under it at or before
+-- any visible row at or past `q`.
+pick : ∀ {A} {t : EmissionSet A} {q r e′ p e} → t r e′ → (Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs)
+     → (∀ {e″} → t q e″ → Visible e″ → ⊥) → t p e → Visible e → q ≼ p
+     → Σ Pos λ r′ → Σ (Ev A) λ e″ → t r′ e″ × r′ ≼ p × (q ++ [ ix 0 ]) ∈ prefixes r′
+pick {q = q} {r} {e′} {p} tr (xs , refl) cq tp vp qp with ≼-or-≻ r p
+... | inj₁ rp = r , e′ , tr , rp , under-∈ q xs
+... | inj₂ pr with <ᵖ-split q p (≼-false {q} {p} qp)
+...   | inj₂ refl = ⊥-elim (cq tp vp)
+...   | inj₁ qp′ with ≼-or-≻ (q ++ [ ix 0 ]) p
+...     | inj₂ pz = ⊥-elim (first-child q (Equivalence.from T-≡ qp′) pz)
+...     | inj₁ zp with <ᵖ-split (q ++ [ ix 0 ]) p (≼-false {q ++ [ ix 0 ]} {p} zp)
+...       | inj₂ refl = p , _ , tp , ≼-refl {p} , subst (λ u → (q ++ [ ix 0 ]) ∈ prefixes u) (++-identityʳ _) (under-∈ q [])
+...       | inj₁ zp′ with <ᵖ-between (q ++ [ ix 0 ]) p xs zp′ (Equivalence.to T-≡ pr)
+...         | zs , refl = _ , _ , tp , ≼-refl {(q ++ [ ix 0 ]) ++ zs} , under-∈ q zs
+
+------------------------------------------------------------------------
+-- THE LIFT: a skip at a chain's foot, nothing visible on the chain,
+-- carried up through every live frame to the root's entry.
+
+-- A hole whose frame still reads it: owed, or a running lane.
+LiveN : Need → Set
+LiveN owes          = ⊤
+LiveN (dead _)      = ⊥
+LiveN (lane b _)    = T b
+LiveN (lanecut b _) = T b
+LiveN (pnd _)       = ⊥
+
+-- Clear row for row: clear above.
+clr-≈ : ∀ {A} {E E′ : EmissionSet A} {q y} → E ≈ E′ → Clr q y E → Clr q y E′
+clr-≈ m (clr c) = clr λ r v → c (proj₁ (from (alike m) (r , v))) v
+
+clr-map : ∀ {A B} {f : A → B} {E q y} → Clr q y E → Clr q y (MapT f E)
+clr-map (clr c) = clr go
+  where go : ∀ {w e} → MapT _ _ w e → Visible e → _
+        go (map-out r) _ = c r _
+        go (map-end r) _ = c r _
+        go (map-skip _) ()
+        go (map-pin _) ()
+
+clr-scan : ∀ {A B} {f : B → A → B} {z E q y} → Clr q y E → Clr q y (Scan.ScanT f z E)
+clr-scan {f = f} {z} {E} {q} {y} (clr c) = clr go
+  where go : ∀ {w e} → Scan.ScanT f z E w e → Visible e → q ≼ w → w ≺ y → ⊥
+        go (Scan.sval (Scan.acc₀ r _))    _ = c r _
+        go (Scan.sval (Scan.acc _ r _ _)) _ = c r _
+        go (Scan.send r)                  _ = c r _
+        go (Scan.sstep _) ()
+        go (Scan.spin _) ()
+
+clr-take : ∀ {A} {i} {keep : A → Bool} {E q y} → NoFail (bef q) keep E → Clr q y E → Clr q y (TakeWhile.TakeT i keep E)
+clr-take {i = i} {keep} {E} {q} {y} nf (clr c) = clr go
+  where go : ∀ {w e} → TakeWhile.TakeT i keep E w e → Visible e → q ≼ w → w ≺ y → ⊥
+        go (TakeWhile.pass r _ _) _ = c r _
+        go (TakeWhile.tend r _)   _ = c r _
+        go (TakeWhile.fail {q′} r k _ _) _ _ wy = c r _ (nf r k) (≺-trans {q′} {q′ ++ [ ix 0 ]} {y} (≺-ext q′ []) wy)
+        go (TakeWhile.stop {q′} r k _)   _ _ wy = c r _ (nf r k) (≺-trans {q′} {q′ ++ [ last ]} {y} (≺-ext q′ []) wy)
+        go (TakeWhile.step _ _) ()
+        go (TakeWhile.left _ _ _) ()
+
+-- Nothing failed short of the foot.
+unfailed : ∀ {A} {i} {keep : A → Bool} {E q y} → NoFail (bef q) keep E → Clr q y E → ¬ TakeWhile.Failed i keep E y
+unfailed nf (clr c) (_ , _ , r , k , lt) = c r _ (nf r k) lt
+
+clr-tr : ∀ {A} {t : EmissionSet A} {q y} → Clr q y t → Clr q y (Truncate t)
+clr-tr (clr c) = clr λ r v → c (proj₁ r) v
+
+-- A first-child chain from `q` down to `w`, `q` itself included.
+data Ze (q : Pos) : Pos → Set where
+  e₀ : Ze q q
+  e+ : ∀ {w} → Ze q w → Ze q (w ++ [ ix 0 ])
+
+zs-ze : ∀ {q y} → Zs q y → Ze q y
+zs-ze z₁     = e+ e₀
+zs-ze (z+ z) = e+ (zs-ze z)
+
+zl-ze : ∀ {q y w} (z : Zs q y) → w ∈ zl z → Ze q w
+zl-ze z₁     (here refl) = e₀
+zl-ze (z+ z) (here refl) = zs-ze z
+zl-ze (z+ z) (there m)   = zl-ze z m
+
+-- On the chain, the rest of it below.
+zl-zs : ∀ {q y w} (z : Zs q y) → w ∈ zl z → Zs w y
+zl-zs z₁     (here refl) = z₁
+zl-zs (z+ z) (here refl) = z₁
+zl-zs (z+ z) (there m)   = z+ (zl-zs z m)
+
+-- A world position at a first child not its root: at its parent.
+w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ++ [ ix 0 ] → (s ≡ x ++ [ ix 0 ] → ⊥) → W⁼ H s x
+w-down here eq ne = ⊥-elim (ne eq)
+w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (∷ʳ-injectiveˡ x′ x eq) w
+w-down {x = x} (inW (timer t _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
+... | ()
+w-down {x = x} (inW (join {h} _ _ _)) eq _ with ∷ʳ-injectiveʳ h x eq
+... | ()
+
+-- A lane subscribes at a second child.
+st1 : ∀ op {A B} {F : A → Den B} {O q a s} → Start (polF op F O) q a s → Σ Pos λ s′ → s ≡ s′ ++ [ ix 1 ]
+st1 (mergeᶠ nothing) {q = q} refl                        = q , refl
+st1 (mergeᶠ (just m)) (_ , _ , Bounded.room _)           = _ , refl
+st1 (mergeᶠ (just m)) (_ , _ , Bounded.freed _ _)        = _ , refl
+st1 (mergeᶠ (just m)) (_ , _ , Bounded.queued _ _ _ _ _) = _ , refl
+st1 switchᶠ {q = q} refl                                 = q , refl
+st1 exhaustᶠ {q = q} refl                                = q , refl
+
+-- A lane's region holds a first-child chain's head where it holds a
+-- point of the chain.
+rg-down : ∀ {A B} {H : Pos → Set} op {F : A → Den B} {O : EmissionSet A} {q w q′}
+        → Ze q w → LaneRg H (polF op F O) O q′ w → LaneRg H (polF op F O) O q′ q
+rg-down op e₀ r = r
+rg-down op (e+ {w} e) (a , s , x , st , ws , ex) =
+  rg-down op e (a , s , x , st , w-down ws refl ne , λ r pl v le → ex r pl v (⊑-trans le (⊑-snoc⁺ w)))
+  where ne : s ≡ w ++ [ ix 0 ] → ⊥
+        ne eq with st1 op st
+        ... | s′ , refl with ∷ʳ-injectiveʳ s′ w eq
+        ...   | ()
+
+-- A joiner's visible rows, no lane begun before it: its outer's end, or a
+-- lane's row.
+module JV {A B : Set} {Ln : Pos → A → EmissionSet B} {o : EmissionSet A} {Bg : EmissionSet B} {Over Rn : Pos → Set}
+          {Ct : Pos → Pos → Set} {Hd : Pos → Set} where
+  open Joining Ln o Bg Over Rn Ct Hd
+
+  jvis : (∀ {k e} → Bg k e → ⊥) → ∀ {k e} → JoinT k e → Visible e → o k end ⊎ Σ Pos λ q → Σ A λ a → o q (out a) × Ln q a k e
+  jvis nb (oend r _)            _ = inj₁ r
+  jvis nb (lane x _ l _ _)      _ = inj₂ (_ , _ , x , l)
+  jvis nb (lend x _ l _ _ _)    _ = inj₂ (_ , _ , x , l)
+  jvis nb (run b _)             _ = ⊥-elim (nb b)
+  jvis nb (rend b _ _)          _ = ⊥-elim (nb b)
+  jvis nb (val _)               ()
+  jvis nb (step _)              ()
+  jvis nb (opin _)              ()
+  jvis nb (opass _ _)           ()
+  jvis nb (lpass _ _ _ _ _ _)   ()
+  jvis nb (hand _ _ _ _ _)      ()
+  jvis nb (left _ _ _ _ _)      ()
+  jvis nb (rpass _ _ _)         ()
+  jvis nb (rhand _ _)           ()
+
+jv : ∀ op {A B} {F : A → Den B} {O k e} → JoinF op F O k e → Visible e
+   → O k end ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Lane (polF op F O) q a k e
+jv (mergeᶠ nothing)  r v = JV.jvis (λ ()) r v
+jv (mergeᶠ (just m)) r v = JV.jvis (λ ()) r v
+jv switchᶠ           r v = JV.jvis (λ ()) r v
+jv exhaustᶠ          r v = JV.jvis (λ ()) r v
+
+jstep : ∀ op {A B} {F : A → Den B} {O q} → O q skip → JoinF op F O q skip
+jstep (mergeᶠ nothing) {F = F} {O} r = Merge.step {f = F} {o = O} r
+jstep (mergeᶠ (just m)) {F = F} {O} r = Bounded.step {n = m} {f = F} {o = O} r
+jstep switchᶠ {F = F} {O} r = Switch.step {f = F} {o = O} r
+jstep exhaustᶠ {F = F} {O} r = Exhaust.step {f = F} {o = O} r
+
+jval : ∀ op {A B} {F : A → Den B} {O q a} → O q (out a) → JoinF op F O (q ++ [ ix 0 ]) skip
+jval (mergeᶠ nothing) {F = F} {O} x = Merge.val {f = F} {o = O} x
+jval (mergeᶠ (just m)) {F = F} {O} x = Bounded.val {n = m} {f = F} {o = O} x
+jval switchᶠ {F = F} {O} x = Switch.val {f = F} {o = O} x
+jval exhaustᶠ {F = F} {O} x = Exhaust.val {f = F} {o = O} x
+
+jlane : ∀ op {A B} {F : A → Den B} {O q a k e} → O q (out a) → Runs (polF op F O) q → Lane (polF op F O) q a k e
+      → (∀ {q′} → Kill (polF op F O) q q′ → q′ ≺ k → ⊥) → Work e → JoinF op F O k e
+jlane (mergeᶠ nothing) {F = F} {O} x rn l nk w = Merge.lane {f = F} {o = O} x rn l (λ ()) w
+jlane (mergeᶠ (just m)) {F = F} {O} x rn l nk w = Bounded.lane {n = m} {f = F} {o = O} x rn l (λ ()) w
+jlane switchᶠ {F = F} {O} x rn l nk w = Switch.lane {f = F} {o = O} x rn l (λ { (_ , a′ , x′ , lt , lt′) → nk (a′ , x′ , lt) lt′ }) w
+jlane exhaustᶠ {F = F} {O} x rn l nk w = Exhaust.lane {f = F} {o = O} x rn l (λ ()) w
+
+-- A joiner clear on the chain: its outer, and every lane.
+clr-join : ∀ op {A B} {F : A → Den B} {O q y} → (∀ {w} → O w end → q ≼ w → w ≺ y → ⊥)
+         → (∀ {q′ a w e} → O q′ (out a) → Lane (polF op F O) q′ a w e → Visible e → q ≼ w → w ≺ y → ⊥)
+         → Clr q y (JoinF op F O)
+clr-join op c nl = clr λ r v qw wy → [ (λ e → c e qw wy) , (λ { (_ , _ , x , l) → nl x l v qw wy }) ]′ (jv op r v)
+
+-- A lane's row on the chain: the chain's head in the lane's region.
+on-chain : ∀ {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : EmissionSet A} (ji : JInv sc f O) op {Rg : Rgn}
+         → LanesIn (Hots (full sc)) (JRl sc Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O
+         → ∀ {q y q′ a w e} (z : Zs q y) → O q′ (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q′ a w e → q ≼ w → w ≺ y
+         → LaneRg (Hots (full sc)) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O q′ q
+on-chain sc f {O} ji op li z x l qw wy =
+  rg-down op {F = λ a → ⟦ f a ⟧ (full sc)} {O} (zl-ze z (zs-btw z qw wy)) (proj₂ (Lanes.lane-rows sc f ji op li x l))
+
+-- A source's rows behind the cursor, few, however it stands.
+src-behind : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Behind C (Frozen k)
+src-behind {C = C} {k = k} eq (src-pend _ _ _ _ adm _ _ ow) = behind-pend {C = C} {k = k} eq adm ow
+src-behind _  (src-on _ _ bh _ _ _)         = bh
+src-behind _  (src-shut _ _ _ _ bh _)       = bh
+
+-- A body's row at a chain's foot reaches within the connect: the body's
+-- reach, and the source's rows behind or on the chain, one level down.
+conn-reach : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} {q y e} → Behind (bef q) σ → Zs q y → Reach β y e
+           → Reach (Connecting.ConnT p σ β) y e
+conn-reach {p = p} {σ} {β} {q} {y} {e} (ks , f) z (ls , g) = ls ++ map (_++ [ ix 0 ]) (ks ++ zl z) , go
+  where
+    on : ∀ {k e′} → σ k e′ → k ≺ y → q ≼ k ⊎ k ≺ q → k ∈ ks ++ zl z
+    on r ky (inj₁ qk) = ∈-++⁺ʳ ks (zs-btw z qk ky)
+    on r ky (inj₂ kq) = ∈-++⁺ˡ (f r λ qk → qk kq)
+    sl : ∀ {k e′} → σ k e′ → (k ++ [ ix 0 ]) ≺ y → (k ++ [ ix 0 ]) ∈ (ls ++ map (_++ [ ix 0 ]) (ks ++ zl z))
+    sl {k} r lt = ∈-++⁺ʳ ls (∈-map⁺ (_++ [ ix 0 ]) (on r ky (≼-or-≻ q k)))
+      where ky = ≺-trans {k} {k ++ [ ix 0 ]} {y} (≺-ext k []) lt
+    go : ∀ {k e′} → Connecting.ConnT p σ β k e′ → k ≺ y → Dep y e k e′ → k ∈ (ls ++ map (_++ [ ix 0 ]) (ks ++ zl z))
+    go (Connecting.body r)        lt d = ∈-++⁺ˡ (g r lt d)
+    go (Connecting.burst r _)     lt _ = sl r lt
+    go (Connecting.echo r _ _ _)  lt _ = sl r lt
+    go (Connecting.kept r _ _ _)  lt _ = sl r lt
+
+-- A connect clear where its body is: its burst, echoes and kept pins are
+-- silent.
+clr-conn : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} {q y} → Clr q y β → Clr q y (Connecting.ConnT p σ β)
+clr-conn {p = p} {σ} {β} {q} {y} (clr c) = clr go
+  where go : ∀ {w e} → Connecting.ConnT p σ β w e → Visible e → q ≼ w → w ≺ y → ⊥
+        go (Connecting.body r)       = c r
+        go (Connecting.burst _ _)    ()
+        go (Connecting.echo _ _ _ _) ()
+        go (Connecting.kept _ _ _ _) ()
+
+-- No connect's source on the way up.
+srcFree : ∀ {R Γ A} → Ctx R Γ A → Bool
+srcFree top                               = true
+srcFree (inMap f c)                       = srcFree c
+srcFree (inScan f z c)                    = srcFree c
+srcFree (inCut l a c)                     = srcFree c
+srcFree (inLn b c)                        = srcFree c
+srcFree (inTake i p w c)                  = srcFree c
+srcFree (inOuter op f ω d n q ls c)       = srcFree c
+srcFree (inLanes op f ω d n q o pre post c) = srcFree c
+srcFree (inSrc k b c)                     = false
+srcFree (inBody k o c)                    = srcFree c
+
+module Lift {R : Set} (Rt : EmissionSet R) where
+
+  -- A skip of the root's at a chain's foot, the chain clear.
+  Lifted : Cur → Pos → Set
+  Lifted Cr q = Σ Pos λ r → Rt r skip × Zs q r × Clr q r Rt × Cr ≡ bef q
+
+  lift : ∀ {Cr Γ A} {c : Ctx R Γ A} {Rg N E q y} → Fr Rt Cr (bef q) Rg c N E → T (srcFree c) → LiveN N
+       → E y skip → Zs q y → Clr q y E → Rg q → Lifted Cr q
+  lift {y = y} (f-top m) sf   _ r z cl g = y , voc m r , z , clr-≈ m cl , refl
+  lift (f-map fr m _) sf      _ r z cl g = lift fr sf _ (voc m (map-skip r)) z (clr-≈ m (clr-map cl)) g
+  lift (f-scan fr _ m _) sf   _ r z cl g = lift fr sf _ (voc m (Scan.sstep r)) z (clr-≈ m (clr-scan cl)) g
+  lift (f-cut fr) sf          _ r z cl g = lift fr sf _ r z cl g
+  lift {q = q} {y} (f-take {i = i} fr nf m _) sf _ r z cl g = lift fr sf _ (voc m (TakeWhile.step r (unfailed {i = i} {q = q} {y} nf cl))) z (clr-≈ m (clr-take {q = q} {y} nf cl)) g
+  lift (f-lane fr) sf         l r z cl g = lift fr sf l r z cl g
+  lift (f-lnct {b = true} fr) sf _ r z cl g = lift fr sf _ r z cl g
+  lift (f-lnct {b = false} fr) _ ()
+  lift {q = q} {y} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) sf _ r z cl g =
+    lift fr sf _ (voc (proj₂ je) (reach-zs bh z (jstep op r))) z
+      (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} (λ e qw wy → clear cl e tt qw wy) λ x l _ qw wy → proj₂ g (on-chain (scopeOf c) f ji op li z x l qw wy)))) (proj₁ g)
+    where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
+  lift {q = q} {y} (f-lanes {op = op} {f = f} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh) sf _ r z cl g =
+    lift fr sf _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk tt))) z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
+    where
+      F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
+      ly = voc le r
+      ry : LaneRg (Hots (full (scopeOf c))) (polF op F′ O) O q₀ y
+      ry = proj₂ (Lanes.lane-rows (scopeOf c) f ji op li x ly)
+      down : ∀ {w} → q ≼ w → w ≺ y → LaneRg (Hots (full (scopeOf c))) (polF op F′ O) O q₀ w
+      down qw wy = rg-down op {F = F′} {O} (zs-ze (zl-zs z (zs-btw z qw wy))) ry
+      nk : ∀ {q′} → Kill (polF op F′ O) q₀ q′ → q′ ≺ y → ⊥
+      nk k lt = proj₂ (Sound.rg so (proj₁ (proj₂ (kill-out op k))) tt) (down (uk k) lt)
+      oc : ∀ {w} → O w end → q ≼ w → w ≺ y → ⊥
+      oc e qw wy = proj₂ (Sound.rg so e tt) (down qw wy)
+      lc : ∀ {q′ a′ w e} → O q′ (out a′) → Lane (polF op F′ O) q′ a′ w e → Visible e → q ≼ w → w ≺ y → ⊥
+      lc x′ l v qw wy with lane-sole (JInv.ok ji) F′ (JInv.fi ji) (JInv.io ji) op (proj₂ (Lanes.lane-rows (scopeOf c) f ji op li x′ l)) (down qw wy)
+      ... | refl with Sound.fn so x x′ tt tt
+      ...   | refl = clear cl (proj₁ (from (alike le) (l , v))) v qw wy
+  lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  lift (f-body fr sc pt _ sr _ ce) sf _ r z cl g =
+    lift fr sf _ (voc (proj₁ ce) (Connecting.body r , conn-reach {e = skip} (src-behind sc sr) z (proj₂ ce r))) z
+      (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
+  lift (f-isle _ _ _ _ _ _ _ _ _ _) ()
+  lift (f-took _ _ _ _ _ _ _ _) _ ()
+  lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (d-map _) _ ()
+  lift (d-scan _) _ ()
+  lift (d-cut _) _ ()
+  lift (d-ln _) _ ()
+  lift (d-take _) _ ()
+  lift (d-outer _ _ _) _ ()
+  lift (d-lanes _ _ _ _ _) _ ()
+  lift (d-src _ _ _ _) _ ()
+  lift (d-body _ _ _) _ ()
+  lift (f-islec _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-islep _ _ _ _ _ _ _ _ _ _ _) _ ()
+
+-- A ROW AT OR UNDER `y`: a row of the root's entry at or before `p`, with
+-- `y` itself or one of its ancestors.  A connect shows its source's rows a
+-- level down, so a row made inside a source is met only under it.
+RowUnder : ∀ {R} → PureObs [] R → Pos → Pos → Set
+RowUnder o y p = Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × y ∈ prefixes r
+
+module Outer {R} (o : PureObs [] R) where
+  private
+    Rt = enter (⟦ o ⟧ []ᴬ) root
+  open Lift Rt
+
+  -- An outer's value in flight: its first child a skip of the joiner's,
+  -- nothing visible at the value, carried up.
+  outer-row : ∀ {Cr Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q Rg N E}
+            → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → T (srcFree c) → Fly (scopeOf c) Rg q N s E (nx a) → Lifted Cr q
+  outer-row {q = q} (f-outer {op = op} {f = f} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) sf (_ , x) =
+    lift fr sf tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) z₁
+      (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ (Sound.rg sd x tt))
+    where
+      F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
+      oc : ∀ {w} → O w end → q ≼ w → w ≺ (q ++ [ ix 0 ]) → ⊥
+      oc {w} e qw wy with zs-btw {q} {q ++ [ ix 0 ]} {w} z₁ qw wy
+      ... | here refl with Sound.fn sd x e tt tt
+      ...   | ()
+      lc : ∀ {q′ a′ w e} → O q′ (out a′) → Lane (polF op F′ O) q′ a′ w e → Visible e → q ≼ w → w ≺ (q ++ [ ix 0 ]) → ⊥
+      lc x′ l _ qw wy = proj₂ (Sound.rg sd x tt) (on-chain (scopeOf c) f ji op li z₁ x′ l qw wy)
+  outer-row (d-outer _ _ _) _ ()
+
+  -- Lifted, clear at `q`, the cursor short of the row met next: a row
+  -- under the first child at or before it.
+  under : ∀ {Cr q p e} → Lifted Cr q → Due Cr Rt p e → RowUnder o (q ++ [ ix 0 ]) p
+  under {q = q} (r , tr , z , cl , refl) (tp , vp , ow) = pick tr (zs-under z) (λ t v → clear cl t v (≼-refl {q}) (zs-past z)) tp vp ow
+
+  -- The row met next, owed at the cursor the run reaches.
+  met : ∀ {rs k p e} (pth : Path (load o) rs k) → Meets Rt (conv rs ++ [ (p , e) ])
+      → Due (proj₁ (proj₁ (Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))))) Rt p e
+  met {rs} pth m with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
+                    | Along.met-next (cursor o) {c = nothing} (conv rs) m
+  ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
+
+-- A flag, true or false.
+bool? : ∀ b → T b ⊎ b ≡ false
+bool? true  = inj₁ tt
+bool? false = inj₂ refl
+
+postulate
+  -- AN OUTER'S GUARD UNDER A SOURCE: an outer under a connect's source,
+  -- its value rising, has a row under its first child, at or before the
+  -- row met next.
+  guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
+            → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
+            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → srcFree c ≡ false
+            → RowUnder o (q ++ [ ix 0 ]) p
+
+  -- AN OUTER'S GUARD IN A DEAD PART: an outer no live node reads, its
+  -- value rising, has a row under its first child, at or before the row
+  -- met next.
+  guard-adrift : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
+               → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
+               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+               → ∀ {Cr C Rg P E} → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg (inOuter op f ω d n qu ls c) (dead P) E
+               → RowUnder o (q ++ [ ix 0 ]) p
+
+-- AN OUTER'S GUARD IS MET: an outer's value rising has a row under its
+-- first child, at or before the row met next.
+outer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
+            → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
+            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → RowUnder o (q ++ [ ix 0 ]) p
+outer-guard o {c = c} pth m with bool? (srcFree c)
+... | inj₂ sf = guard-src o pth m sf
+... | inj₁ sf with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
+...   | (_ , _ , flying fr _ fy , _) , _ | d = Outer.under o (Outer.outer-row o fr sf fy) d
+...   | (_ , _ , adrift fr _ _ , _) , _ | _ = guard-adrift o pth m fr
+
+postulate
+  -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued
+  -- has a row under its first child, at or before the row met next.
+  lanes-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n a qu} {o′ : St Γ A} {pre post} {c : Ctx R Γ B} {s q p e}
+              → Path (load o) rs ⟨ inLanes op f ω d n (a ∷ qu) o′ pre post c , s , rising cp , q ⟩
+              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+              → RowUnder o (q ++ [ ix 0 ]) p
+
+-- WHERE A RISE SUBSCRIBES, ITS GUARD: an outer's value, or a lane's end
+-- handing off to a queued value.
+Gd : ∀ {R} → PureObs [] R → Pos → ∀ {Γ A} → Ctx R Γ A → Evᴹ A → Pos → Set
+Gd o q (inOuter op f ω d n qu ls c)                 (nx a) p = RowUnder o (q ++ [ ix 0 ]) p
+Gd o q (inLanes op f ω d n (a ∷ qu) o′ pre post c) cp     p = RowUnder o (q ++ [ ix 0 ]) p
+Gd o q _                                            _      p = ⊤
+
+gd : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e}
+   → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+   → Gd o q c ε p
+gd o {c = top}                                   pth m = tt
+gd o {c = inMap _ _}                             pth m = tt
+gd o {c = inScan _ _ _}                          pth m = tt
+gd o {c = inCut _ _ _}                           pth m = tt
+gd o {c = inLn _ _}                              pth m = tt
+gd o {c = inTake _ _ _ _}                        pth m = tt
+gd o {c = inOuter _ _ _ _ _ _ _ _} {ε = nx _}    pth m = outer-guard o pth m
+gd o {c = inOuter _ _ _ _ _ _ _ _} {ε = cp}      pth m = tt
+gd o {c = inLanes _ _ _ _ _ [] _ _ _ _} {ε = nx _} pth m = tt
+gd o {c = inLanes _ _ _ _ _ (_ ∷ _) _ _ _ _} {ε = nx _} pth m = tt
+gd o {c = inLanes _ _ _ _ _ [] _ _ _ _} {ε = cp}  pth m = tt
+gd o {c = inLanes _ _ _ _ _ (_ ∷ _) _ _ _ _} {ε = cp} pth m = lanes-guard o pth m
+gd o {c = inSrc _ _ _}                           pth m = tt
+gd o {c = inBody _ _ _}                          pth m = tt
