@@ -639,6 +639,18 @@ postulate
   -- in its subscribe burst under a connect no live node reads has a row of
   -- the root's entry under its first child.  Nothing such a source runs
   -- shows where the root reads but its pins.
+  -- DEAD ROUTE: a weight every silent isle step lightens.  A body under a
+  --   take whose cut waits on its attach keeps its joiners on, so a feed
+  --   from the isle enqueues inbox entries heavier than the climb dropped.
+  --   `off` empties those joiners, but an outer or defer step inside the
+  --   isle does real work and lightens nothing.
+  -- DEAD ROUTE: a cursor-free field, set where the reader dies, giving
+  --   every burst row of the connect a root row.  Unrestricted it is false:
+  --   an inner connect whose body never returns leaves source pins with
+  --   infinitely many burst pins before them, which the connect truncates.
+  --   Restricted to burst rows with few source rows before them, it cannot
+  --   be set for an isle subscribed inside a part already dead, whose
+  --   enclosing isle's source has no such bound at that row.
   isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q Cr}
            → Path (load o) rs ⟨ c , s , m , q ⟩ → Busy m
            → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
