@@ -45,7 +45,7 @@ open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (bound; lo-p)
 open _≃_ using (from)
 open import denotation.Laws.Modulus using (≼-false)
-open import adequacy.Guard using (RowUnder; Gd; gd; echo-guard)
+open import adequacy.Guard using (RowUnder; Gd; gd; echo-guard; defer-guard)
 
 -- A position's first child keyed before its second.
 part : ∀ q → at (q ++ [ ix 0 ]) <ᴷ at (q ++ [ ix 1 ]) ≡ true
@@ -66,22 +66,6 @@ under-listed : ∀ {R} (o : PureObs [] R) p {y} ks → (∀ {q′ e′} → ente
 under-listed o p ks cov (_ , _ , tr , le , mr) = ∈-++⁺ʳ ks (anc-∈ ks (cov tr le) mr)
 
 postulate
-  -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
-  -- run subscribes has a row under its guard, at or before the row met next.
-  -- Its guard is the defer's own skip at `ix 0`; `Lift.lift` carries it
-  -- up once the frames hold their rows behind `bef q`.
-  --
-  -- DEAD ROUTE: lifting from the pending frame as it stands.  A pending
-  --   subscription's cursor owes `q` but may lie before it, and the rows
-  --   between (an earlier lane's end, an outer's guard) are listed by no
-  --   frame's `Behind`, so the joiner's `Truncate` cannot be built; the
-  --   frames must first be re-cursored to `bef q`, as `rc` does for a
-  --   hole whose rows it is given.
-  defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
-              → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
-              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-              → RowUnder o (q ++ [ ix 0 ]) p
-
   -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
   -- open observer hears plays its due at a row at or before it, or at an
   -- ancestor of one.

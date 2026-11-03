@@ -85,6 +85,21 @@ open import adequacy.Apart.Floor using (floor)
 open Machine using (plug; mapS; scanS; cutS; lnS; takeS; flatS; connS)
 open Machine using (binds; free)
 open import adequacy.Cursor using (Husk; Burst; Subd; AttOwed; NoIsle; _⊑_; _∪ᵖ_)
+open import adequacy.Cursor using (Adm; cov; Owes)
+open import adequacy.Rows using (pendRows)
+open import adequacy.Dispatch using (module Over)
+open import adequacy.FrShift using (rc; hr; HR)
+open import adequacy.Few using (lag)
+open import adequacy.Apart.Floor using (Busy)
+open import adequacy.Bound using (good-full; pend-past)
+open Machine using (pend; subscribing)
+open import Tree using (Later; defer)
+open import denotation.EmissionSet using (approx; DeferT; Lim) renaming (from to limᶠ; guard to dg; body to db)
+open import denotation.Laws using (inv-approx)
+open import denotation.Laws.Worlds using (Ok; InvAt; world-after; ok-step)
+open import denotation.Laws.Modulus using (ticks; ≺-irrefl; ≺→≼)
+open import Data.Nat using (zero; suc; _≤_)
+open import Data.Nat.Properties using (n≤1+n)
 
 -- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
 -- of one.
@@ -624,20 +639,20 @@ postulate
   -- in its subscribe burst under a connect no live node reads has a row of
   -- the root's entry under its first child.  Nothing such a source runs
   -- shows where the root reads but its pins.
-  isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q Cr}
-           → Path (load o) rs ⟨ c , s , rising ε , q ⟩
+  isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q Cr}
+           → Path (load o) rs ⟨ c , s , m , q ⟩ → Busy m
            → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
            → Σ Pos λ r → Σ (Ev R) λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs
 
 -- A GUARD IN AN ISLE: a row under the step's first child, at or before
 -- the row met next, which the connect's frames bound past it.
-guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e Cr}
-          → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Due Cr (enter (⟦ o ⟧ []ᴬ) root) p e
+guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q p e Cr}
+          → Path (load o) rs ⟨ c , s , m , q ⟩ → Busy m → Due Cr (enter (⟦ o ⟧ []ᴬ) root) p e
           → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
           → RowUnder o (q ++ [ ix 0 ]) p
-guard-src o {q = q} pth du il@(Lift.isled u _ _ _ _ _ _ _ _ _ eq _ _) with isle-row o pth il
+guard-src o {q = q} pth bz du il@(Lift.isled u _ _ _ _ _ _ _ _ _ eq _ _) with isle-row o pth bz il
 ... | _ , _ , tr , un = cap tr un (proj₁ du) (fb-u (enter (⟦ o ⟧ []ᴬ) root) u lo du)
-  where lo = lo-p (lo-weaken (at (q ++ [ ix 0 ])) (after q) (subst (λ S → Lo S (after q)) eq (floor o pth tt)) (at-after q [ ix 0 ]))
+  where lo = lo-p (lo-weaken (at (q ++ [ ix 0 ])) (after q) (subst (λ S → Lo S (after q)) eq (floor o pth bz)) (at-after q [ ix 0 ]))
 
 -- AN OUTER'S GUARD IS MET: an outer's value rising has a row under its
 -- first child, at or before the row met next.
@@ -649,7 +664,7 @@ outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
 ... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.outer-row o fr (lo₀ c {flatS op f ω d n qu s ls} (floor o pth tt)) fy
 ...   | inj₁ lf = Outer.under o lf du
-...   | inj₂ il = guard-src o pth du il
+...   | inj₂ il = guard-src o pth tt du il
 outer-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves a
@@ -662,8 +677,73 @@ echo-guard o {k = k} {b} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
 ... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.src-step o fr (lo₀ (inSrc k b c) {s} (floor o pth tt)) fy
 ...   | inj₁ lf = Outer.under o lf du
-...   | inj₂ il = guard-src o pth du il
+...   | inj₂ il = guard-src o pth tt du il
 echo-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
+
+-- A DEFER'S GUARD: its skip at its first child, a row of its entry.  Its
+-- body's rows all lie past its second child.
+defer-row : ∀ {Γ A} (sc : Scope Γ) (l : Later Timeline Γ A) {q} → Adm sc → Ok (Hots (full sc)) q
+          → pendRows (full sc) (defer l) q (q ++ [ ix 0 ]) skip
+defer-row sc l {q} a ok = limᶠ 1 row , [] , λ { (limᶠ N h) lt _ → ⊥-elim (before N (proj₁ (h (suc N) (n≤1+n N))) lt) }
+  where
+    before : ∀ m {k e} → DeferT (approx m (Later.force l) (full sc)) q k e → k ≺ (q ++ [ ix 0 ]) → ⊥
+    before m dg lt = ≺-irrefl {q ++ [ ix 0 ]} lt
+    before m {k} (db x) lt =
+      ≺-irrefl {q ++ [ ix 0 ]} (≺-trans {q ++ [ ix 0 ]} {q ++ [ ix 1 ]} {q ++ [ ix 0 ]} (ticks q 0)
+        (≺-trans {q ++ [ ix 1 ]} {k} {q ++ [ ix 0 ]} (world-after (InvAt.world I x) (InvAt.real I x)) lt))
+      where I = inv-approx m (Later.force l) (full sc) (good-full sc a) (q ++ [ ix 1 ]) (ok-step q ok)
+    row : ∀ n → 1 ≤ n → enter (approx n (defer l) (full sc)) q (q ++ [ ix 0 ]) skip
+    row zero ()
+    row (suc m) _ = dg , [] , λ x lt _ → ⊥-elim (before m x lt)
+
+-- A DEFER'S GUARD, LIFTED: the frames re-cursored to the defer's own
+-- position, its guard carried up.
+defer-lift : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e Cr C Rg E}
+           → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
+           → Due Cr (enter (⟦ o ⟧ []ᴬ) root) p e
+           → Fr (enter (⟦ o ⟧ []ᴬ) root) Cr C Rg c owes E → Owes C q → HR C q (scopeOf c) E
+           → E (q ++ [ ix 0 ]) skip → Clr q (q ++ [ ix 0 ]) E → Rg q
+           → RowUnder o (q ++ [ ix 0 ]) p
+defer-lift o {c = c} {l} {q} pth du fr ow h g cl rg
+  with rc (enter (⟦ o ⟧ []ᴬ) root) {s = pend (defer l) q} fr h ow (lo-p (lo-weaken (at q) (after q) (floor o pth tt) (at-after₀ q)))
+... | _ , fr′ , _ , _ , d
+  with Lift.lift (enter (⟦ o ⟧ []ᴬ) root) {s = pend (defer l) q} fr′ (lo₀ c {pend (defer l) q} (floor o pth tt)) tt g m-skip z₁ cl rg
+...   | inj₁ lf = Outer.under o lf (_≃_.to d du)
+...   | inj₂ il = guard-src o pth tt (_≃_.to d du) il
+
+-- A pending defer: its rows past it, so none owed before it, and none at
+-- it.
+defer-pend : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e Cr C}
+           → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
+           → Due Cr (enter (⟦ o ⟧ []ᴬ) root) p e
+           → Over.PendV (enter (⟦ o ⟧ []ᴬ) root) Cr C c (defer l) q
+           → RowUnder o (q ++ [ ix 0 ]) p
+defer-pend o {c = c} {l} {q} {C = C} pth du (Rg , E , fr , ow , ok , ad , pe , wi) =
+  defer-lift o pth du fr ow (hr λ _ _ → lag (proj₁ (cov pe)) has , bd) (voc pe (defer-row sc l ad ok)) cl (proj₁ wi)
+  where
+    sc = scopeOf c
+    past : ∀ {y e′} → pendRows (full sc) (defer l) q y e′ → q ≺ y
+    past = pend-past sc (defer l) ad ok
+    has : ∀ {y e′} → E y e′ → Owes C y → y ≺ q → y ∈ proj₁ (cov pe)
+    has x _ yq with proj₂ (cov pe) x
+    ... | inj₁ r = ⊥-elim (≺-irrefl {q} (≺-trans {q} {_} {q} (past r) yq))
+    ... | inj₂ i = i
+    bd : ∀ {y e′} → Due C E y e′ → q ≼ y
+    bd {y} (x , v , _) = ≺→≼ {q} {y} (past (proj₁ (from (alike pe) (x , v))))
+    go : ∀ {w e′} → w ∈ [ q ] → E w e′ → Visible e′ → ⊥
+    go (here refl) r v = ≺-irrefl {q} (past (proj₁ (from (alike pe) (r , v))))
+    cl : Clr q (q ++ [ ix 0 ]) E
+    cl = clr λ {w} r v qw wy → go (zs-btw {q} {q ++ [ ix 0 ]} {w} z₁ qw wy) r v
+
+-- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
+-- run subscribes has a row under its guard, at or before the row met next.
+defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
+            → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
+            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → RowUnder o (q ++ [ ix 0 ]) p
+defer-guard o pth m
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
+... | (_ , _ , iv , _) , _ | du = defer-pend o pth du (Over.pend-view (enter (⟦ o ⟧ []ᴬ) root) iv)
 
 postulate
   -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued
