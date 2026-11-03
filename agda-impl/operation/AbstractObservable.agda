@@ -252,8 +252,30 @@ mutual
 
   cut : ∀ {Γ A} → St Γ A → St Γ A × Torn
   cut (cutS l attached s)  = wrap (cutS false attached) (unsub s)
-  cut (cutS l (attAt p) s) = cutS false (attAt p) s , []
+  cut (cutS l (attAt p) s) = cutS false (attAt p) (off s) , []
   cut s                    = s , []
+
+  -- A cut waiting on its attach: every subject's subscriber under it
+  -- leaves its subject at once, as an rxjs subscriber added to its
+  -- destination closes with it; the rest waits for the attach.
+  off : ∀ {Γ A} → St Γ A → St Γ A
+  off (mapS f s)                = mapS f (off s)
+  off (scanS f z s)             = scanS f z (off s)
+  off (cutS l a s)              = cutS l a (off s)
+  off (lnS b s)                 = lnS b (off s)
+  off (takeS i p w s)           = takeS i p w (off s)
+  off (flatS op f ω d n q o ls) = flatS op f ω d n q (off o) (offL ls)
+  off (connS k o b)             = connS k (offIf (CS.srcAtt k) o) (off b)
+  off (joinS j g x ib)          = joinS j false x []
+  off s                         = s
+
+  offL : ∀ {Γ A} → List (St Γ A) → List (St Γ A)
+  offL []       = []
+  offL (s ∷ ls) = off s ∷ offL ls
+
+  offIf : ∀ {Γ A} → Bool → St Γ A → St Γ A
+  offIf true  s = off s
+  offIf false s = s
 
   killAll : ∀ {Γ B} → List (St Γ B) → List (St Γ B) × Torn
   killAll []                = [] , []

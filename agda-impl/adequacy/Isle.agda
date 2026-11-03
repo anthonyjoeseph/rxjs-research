@@ -23,12 +23,12 @@ open import denotation.Events using (Pos; ix)
 open import operation.Key using (Key; at; after; _<ᴷ_; clash; ≮ᴷ-trans)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; Out; search; Found; found; plug; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; cutT; alive;
-                    unsub; cut; killAll; unsubIf; feed; feedL; ended; same?; Ev; attached; attAt;
+                    unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; ended; same?; Ev; attached; attAt;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo;
                                    Keeps; mapKp; scanKp; cutKp; takeKp; outerKp; laneKp; Below; keyOf; seek-b)
-open import adequacy.Floor.Keys using (ob; os; own-bld; plug-in; mem-self; mem-swap; unsubIf-in)
+open import adequacy.Floor.Keys using (ob; os; own-bld; plug-in; mem-self; mem-swap; unsubIf-in; offIf-in)
 open import adequacy.Stamped using (StOK; LOK; BodyOK; IsPend; is-pend)
 open import adequacy.Cursor using (Settles; NoIsle; NoIsleL; Clear; Pending)
 
@@ -239,7 +239,7 @@ mutual
 
   kp-cut : ∀ {Γ A} (s : St Γ A) → G s → Keep s (proj₁ (cut s))
   kp-cut (cutS l attached s)  g = proj₁ (kp-unsub s g) , λ { (a-cut a) → a-cut (proj₂ (kp-unsub s g) a) }
-  kp-cut (cutS l (attAt p) s) g = g , λ { (a-cut a) → a-cut a }
+  kp-cut (cutS l (attAt p) s) g = proj₁ (kp-off s g) , λ { (a-cut a) → a-cut (proj₂ (kp-off s g) a) }
   kp-cut (pend o q)              g = g , λ a → a
   kp-cut (coldS b l)             g = g , λ a → a
   kp-cut (ofS i p xs)            g = g , λ a → a
@@ -251,6 +251,39 @@ mutual
   kp-cut (flatS op f ω d n q o ls) g = g , λ a → a
   kp-cut (connS k o b)           g = g , λ a → a
   kp-cut (joinS j g′ x ib)       g = g , λ a → a
+
+  kp-off : ∀ {Γ A} (s : St Γ A) → G s → Keep s (off s)
+  kp-off (mapS f s)      g = proj₁ (kp-off s g) , λ { (a-map a) → a-map (proj₂ (kp-off s g) a) }
+  kp-off (scanS f z s)   g = proj₁ (kp-off s g) , λ { (a-scan a) → a-scan (proj₂ (kp-off s g) a) }
+  kp-off (cutS l a s)    g = proj₁ (kp-off s g) , λ { (a-cut a′) → a-cut (proj₂ (kp-off s g) a′) }
+  kp-off (lnS b s)       g = proj₁ (kp-off s g) , λ { (a-ln a) → a-ln (proj₂ (kp-off s g) a) }
+  kp-off (takeS i p w s) g = proj₁ (kp-off s g) , λ { (a-take a) → a-take (proj₂ (kp-off s g) a) }
+  kp-off (flatS op f ω d n q o ls) (go , gl) =
+    (proj₁ (kp-off o go) , proj₁ (kp-offL ls gl)) ,
+    λ { (a-outer a) → a-outer (proj₂ (kp-off o go) a) ; (a-lane m a) → let (w , m′ , a′) = proj₂ (kp-offL ls gl) m a in a-lane m′ a′ }
+  kp-off (connS k o b) (al , up , go , gb) =
+    (al , (λ {y} → up′ {y}) , proj₁ (kp-offIf (CS.srcAtt k) o go) , proj₁ (kp-off b gb)) ,
+    λ { (a-here e) → a-here e ; (a-src a) → a-src (proj₂ (kp-offIf (CS.srcAtt k) o go) a) ; (a-body a) → a-body (proj₂ (kp-off b gb) a) }
+    where
+      up′ : Up k (offIf (CS.srcAtt k) o) (off b)
+      up′ a = (λ ki → proj₁ (up (proj₂ (kp-off b gb) a)) (offIf-in (CS.srcAtt k) o ki)) , proj₂ (up (proj₂ (kp-off b gb) a))
+  kp-off (joinS j g x ib) _ = tt₁ , λ ()
+  kp-off (pend o q)       g = g , λ a → a
+  kp-off (coldS b l)      g = g , λ a → a
+  kp-off (ofS i p xs)     g = g , λ a → a
+  kp-off doneS            g = g , λ a → a
+
+  kp-offL : ∀ {Γ B} (ls : List (St Γ B)) → GL ls → GL (offL ls) × LSub (offL ls) ls
+  kp-offL []       _        = tt₁ , λ ()
+  kp-offL (l ∷ ls) (g , gs) = (proj₁ (kp-off l g) , proj₁ (kp-offL ls gs)) , sub
+    where
+      sub : LSub (off l ∷ offL ls) (l ∷ ls)
+      sub (here refl) a = _ , here refl , proj₂ (kp-off l g) a
+      sub (there m)   a = let (w , m′ , a′) = proj₂ (kp-offL ls gs) m a in w , there m′ , a′
+
+  kp-offIf : ∀ {Γ A} b (s : St Γ A) → G s → Keep s (offIf b s)
+  kp-offIf true  s g = kp-off s g
+  kp-offIf false s g = g , λ a → a
 
   kp-kill : ∀ {Γ B} (ls : List (St Γ B)) → GL ls → GL (proj₁ (killAll ls)) × LSub (proj₁ (killAll ls)) ls
   kp-kill []                (_) = tt₁ , λ ()

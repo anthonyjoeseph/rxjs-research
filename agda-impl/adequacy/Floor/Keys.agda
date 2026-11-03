@@ -25,7 +25,7 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
-                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
+                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-irrefl; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Path using (_⊑_; ⊑i)
@@ -265,7 +265,7 @@ mutual
   cut-in (cutS l attached s)  (k-own ())
   cut-in (cutS l attached s)  (k-kid (k-cut h)) = k-kid (k-cut (unsub-in s h))
   cut-in (cutS l (attAt p) s) (k-own m) = k-own m
-  cut-in (cutS l (attAt p) s) (k-kid (k-cut h)) = k-kid (k-cut h)
+  cut-in (cutS l (attAt p) s) (k-kid (k-cut h)) = k-kid (k-cut (off-in s h))
   cut-in (pend o q)              h = h
   cut-in (coldS b l)             h = h
   cut-in (ofS i q xs)            h = h
@@ -277,6 +277,38 @@ mutual
   cut-in (flatS op f ω d n q o ls) h = h
   cut-in (connS k o b)           h = h
   cut-in (joinS j g x ib)        h = h
+
+  off-in : ∀ {Γ A} (s : St Γ A) {κ} → KeyIn (off s) κ → KeyIn s κ
+  off-in (pend o q)              h = h
+  off-in (coldS b l)             h = h
+  off-in (ofS i q xs)            h = h
+  off-in doneS                   h = h
+  off-in (mapS f s)              (k-kid (k-map h)) = k-kid (k-map (off-in s h))
+  off-in (scanS f z s)           (k-kid (k-scan h)) = k-kid (k-scan (off-in s h))
+  off-in (cutS l (attAt p) s)    (k-own m) = k-own m
+  off-in (cutS l attached s)     (k-own ())
+  off-in (cutS l a s)            (k-kid (k-cut h)) = k-kid (k-cut (off-in s h))
+  off-in (lnS b s)               (k-kid (k-ln h)) = k-kid (k-ln (off-in s h))
+  off-in (takeS i q w s)         (k-own m) = k-own (subst (_ ∈_) (own-take w) m)
+  off-in (takeS i q w s)         (k-kid (k-take h)) = k-kid (k-take (off-in s h))
+  off-in (flatS op f ω d n q o ls) (k-kid (k-outer h)) = k-kid (k-outer (off-in o h))
+  off-in (flatS op f ω d n q o ls) (k-kid (k-lane m h)) with offL-in ls m h
+  ... | _ , m′ , h′ = k-kid (k-lane m′ h′)
+  off-in (connS k o b)           (k-own m) = k-own (own-same k {o} {offIf (CS.srcAtt k) o} {b} {off b} m)
+  off-in (connS k o b)           (k-kid (k-src h)) = k-kid (k-src (offIf-in (CS.srcAtt k) o h))
+  off-in (connS k o b)           (k-kid (k-body h)) = k-kid (k-body (off-in b h))
+  off-in (joinS j g x ib)        (k-own ())
+  off-in (joinS j g x ib)        (k-kid ())
+
+  offL-in : ∀ {Γ B} (ls : List (St Γ B)) {x κ} → x ∈ offL ls → KeyIn x κ → Σ _ λ y → y ∈ ls × KeyIn y κ
+  offL-in []       ()
+  offL-in (l ∷ ls) (here refl) h = l , here refl , off-in l h
+  offL-in (l ∷ ls) (there m)   h with offL-in ls m h
+  ... | y , m′ , h′ = y , there m′ , h′
+
+  offIf-in : ∀ {Γ A} b (s : St Γ A) {κ} → KeyIn (offIf b s) κ → KeyIn s κ
+  offIf-in true  s h = off-in s h
+  offIf-in false s h = h
 
   kill-in : ∀ {Γ B} (ls : List (St Γ B)) {x κ} → x ∈ proj₁ (killAll ls) → KeyIn x κ → Σ _ λ y → y ∈ ls × KeyIn y κ
   kill-in []                (()) h

@@ -31,7 +31,7 @@ open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <�
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
-                    unsub; cut; killAll; unsubIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
+                    unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
                     search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf; own; leafM; joinM)
 open import operation.Key using (Key; _<ᴷ_; at-<ᴷ) renaming (at to atᴷ)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
@@ -214,6 +214,11 @@ body-unsubIf : ∀ {Γ A} b m (o : St Γ A) → BodyOK m o → BodyOK m (proj₁
 body-unsubIf true  m o h = body-unsub m o h
 body-unsubIf false m o h = h
 
+body-offIf : ∀ {Γ A} b m (o : St Γ A) → BodyOK m o → BodyOK m (offIf b o)
+body-offIf false m        o h = h
+body-offIf true  nothing  o h = tt
+body-offIf true  (just p) o h = is-pend o h (λ o′ → IsPend (off o′) (p ++ [ ix 1 ])) (λ _ → refl)
+
 body-feed : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) m (o : St Γ A) → BodyOK m o → BodyOK m (feed i p e o)
 body-feed i p e nothing  o h = tt
 body-feed i p e (just r) o h = is-pend o h (λ o′ → IsPend (feed i p e o′) (r ++ [ ix 1 ])) (λ _ → refl)
@@ -298,7 +303,7 @@ mutual
 
   cut-ok : ∀ {Γ A} (s : St Γ A) → StOK s → StOK (proj₁ (cut s))
   cut-ok (cutS l attached s)  (ha , hs) = tt , unsub-ok s hs
-  cut-ok (cutS l (attAt p) s) h         = h
+  cut-ok (cutS l (attAt p) s) (ha , hs) = ha , off-ok s hs
   cut-ok (pend o q)              h = h
   cut-ok (coldS b l)             h = h
   cut-ok (ofS i p xs)            h = h
@@ -330,6 +335,28 @@ mutual
   unsubIf-ok : ∀ {Γ A} b (s : St Γ A) → StOK s → StOK (proj₁ (unsubIf b s))
   unsubIf-ok true  s h = unsub-ok s h
   unsubIf-ok false s h = h
+
+  off-ok : ∀ {Γ A} (s : St Γ A) → StOK s → StOK (off s)
+  off-ok (mapS f s)              h          = off-ok s h
+  off-ok (scanS f z s)           h          = off-ok s h
+  off-ok (cutS l a s)            (ha , hs)  = ha , off-ok s hs
+  off-ok (lnS b s)               h          = off-ok s h
+  off-ok (takeS i p w s)         (hw , hs)  = hw , off-ok s hs
+  off-ok (flatS op f ω d n q o ls) (ho , hl)  = off-ok o ho , offL-ok ls hl
+  off-ok (connS k o b)           (hk , ho , hb , hbo) = hk , offIf-ok (CS.srcAtt k) o ho , off-ok b hb , body-offIf (CS.srcAtt k) (CS.bodyAt k) o hbo
+  off-ok (joinS j g x ib)        (hj , _)   = hj , tt
+  off-ok (pend o q)              h          = h
+  off-ok (coldS b l)             h          = h
+  off-ok (ofS i p xs)            h          = h
+  off-ok doneS                   h          = h
+
+  offL-ok : ∀ {Γ A} (ls : List (St Γ A)) → LOK ls → LOK (offL ls)
+  offL-ok []       _        = tt
+  offL-ok (s ∷ ls) (h , hs) = off-ok s h , offL-ok ls hs
+
+  offIf-ok : ∀ {Γ A} b (s : St Γ A) → StOK s → StOK (offIf b s)
+  offIf-ok true  s h = off-ok s h
+  offIf-ok false s h = h
 
 queued-ok : ∀ {A} j p (e : Ev A) ib → Ix j → Ix p → QOK ib → QOK (queued j p e ib)
 queued-ok j p (nx a) ib hj hp hb with j <ᵖ p

@@ -28,7 +28,7 @@ open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
-                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
+                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; off; offL; offIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
 open import operation.Key using (Key; at; _<ᴷ_; at-<ᴷ; <ᴷ-trans; <ᴷ-irrefl; clash)
 open import adequacy.Rows using (conv; back; module _≃_)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
@@ -184,6 +184,30 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
   take-le d (overAt r) h = h
 
   mutual
+    off-le : ∀ {Γ A} d (s : St Γ A) → pot d (off s) ≤ pot d s
+    off-le d (pend o q)              = ≤-refl
+    off-le d (coldS b l)             = ≤-refl
+    off-le d (ofS i q xs)            = ≤-refl
+    off-le d doneS                   = ≤-refl
+    off-le d (mapS f s)              = off-le (suc d) s
+    off-le d (scanS f z s)           = off-le (suc d) s
+    off-le d (cutS l (attAt q) s)    = +-monoʳ-≤ (2 + d) (off-le (suc d) s)
+    off-le d (cutS l attached s)     = off-le (suc d) s
+    off-le d (lnS b s)               = off-le (suc d) s
+    off-le d (takeS i q w s)         = take-le d w (off-le (suc d) s)
+    off-le d (flatS op f ω b n q o ls) = +-mono-≤ (off-le (suc d) o) (offL-le (suc d) ls)
+    off-le d (connS k o b)           = +-mono-≤ (+-monoʳ-≤ (connW d k) (offIf-le (CS.srcAtt k) (suc d) o)) (off-le (suc d) b)
+    off-le d (joinS j g x ib)        = z≤n
+
+    offL-le : ∀ {Γ A} d (ls : List (St Γ A)) → potL d (offL ls) ≤ potL d ls
+    offL-le d []       = z≤n
+    offL-le d (s ∷ ls) = +-mono-≤ (off-le d s) (offL-le d ls)
+
+    offIf-le : ∀ {Γ A} b d (s : St Γ A) → pot d (offIf b s) ≤ pot d s
+    offIf-le true  d s = off-le d s
+    offIf-le false d s = ≤-refl
+
+  mutual
     unsub-le : ∀ {Γ A} d (s : St Γ A) → pot d (proj₁ (unsub s)) ≤ pot d s
     unsub-le d (pend o q)              = ≤-refl
     unsub-le d (coldS true l) with due l
@@ -203,7 +227,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
 
     cut-le : ∀ {Γ A} d (s : St Γ A) → pot d (proj₁ (cut s)) ≤ pot d s
     cut-le d (cutS l attached s)  = unsub-le (suc d) s
-    cut-le d (cutS l (attAt q) s) = ≤-refl
+    cut-le d (cutS l (attAt q) s) = +-monoʳ-≤ (2 + d) (off-le (suc d) s)
     cut-le d (pend o q)           = ≤-refl
     cut-le d (coldS b l)          = ≤-refl
     cut-le d (ofS i q xs)         = ≤-refl
