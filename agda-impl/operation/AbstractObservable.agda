@@ -188,9 +188,10 @@ dirs c@(inSrc k b c′)                     = dirs c′ ++ [ dir c ]
 dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
 
 -- What the hole's observer answers when polled: rxjs's `closed`.  A
--- switch off answers true; a connect's source asks its subject, and
--- answers true too once the connect is torn down after the source's
--- subscribe returned.  Torn down before, the source runs on: rxjs's
+-- switch off answers true, as does a takeWhile past its failing value,
+-- which unsubscribes its source before that value's call returns; a
+-- connect's source asks its subject, and answers true too once the
+-- connect is torn down after the source's subscribe returned.  Torn down before, the source runs on: rxjs's
 -- `connect` calls `source.subscribe(subject)` whatever its subscriber
 -- did, and nothing can unsubscribe a subscription not yet returned.
 closed : ∀ {R Γ A} → Ctx R Γ A → Bool
@@ -199,7 +200,8 @@ closed (inMap f c)                       = closed c
 closed (inScan f z c)                    = closed c
 closed (inCut l a c)                     = not l ∨ closed c
 closed (inLn b c)                        = closed c
-closed (inTake i p w c)                  = closed c
+closed (inTake i p free c)               = closed c
+closed (inTake i p _ c)                  = true
 closed (inOuter op f ω d n q ls c)         = closed c
 closed (inLanes op f ω d n q o pre post c) = closed c
 closed (inSrc k b c)                     = CS.closed k ∨ (CS.srcAtt k ∧ closed c)
