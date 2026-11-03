@@ -51,7 +51,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick; inside)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; Reach; Few; Truncate; enter; ⟦_⟧; Den; hot; coldAt; Rejoin;
   InE; MapT; LaneOf; module Scan; module TakeWhile; module Connecting; module Merge;
   module Bounded; module Switch; module Exhaust)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
@@ -92,6 +92,15 @@ Spent C E = ∀ {q e} → Due C E q e → ⊥
 -- What a connect's body and a joiner read before the row in flight.
 Behind : ∀ {A} → Cur → EmissionSet A → Set
 Behind C E = Σ (List Pos) λ ks → ∀ {y e} → E y e → ¬ Owes C y → y ∈ ks
+
+-- A PIN CARRIED ONE FRAME UP: a pin under its connect, the connect passed
+-- at `D`, waiting on finitely many rows, shows in the frame's entry at or
+-- under its row, pinned to that connect or one enclosing it, passed at
+-- `D′`, waiting on finitely many rows.  What a part no live node reads
+-- still shows above it: the pins of the bursts begun before it went.
+PinUp : ∀ {A B} → Cur → Cur → EmissionSet A → EmissionSet B → Set
+PinUp D D′ E E′ = ∀ {y r} → E y (pin r) → T (inside r y) → ¬ Owes D r → Reach E y (pin r)
+                → Σ Pos λ r′ → Σ Pos λ xs → E′ (y ++ xs) (pin r′) × T (inside r′ (y ++ xs)) × ¬ Owes D′ r′ × Reach E′ (y ++ xs) (pin r′)
 
 -- Every row of `E′` a row of `E` at its position, but for finitely many.
 Beneath : ∀ {A} → EmissionSet A → EmissionSet A → Set
@@ -188,6 +197,14 @@ AttFin k = T (CS.srcAtt k) → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y 
 -- owed just after its connect's `ix 1`, or its body not yet run.
 AttOwed : ∀ {Γ X} → CS Γ X → Set
 AttOwed k = CS.attSrc k ≡ just (CS.connAt k ++ [ ix 1 ]) ⊎ (CS.bodyAt k ≡ just (CS.connAt k) × CS.attSrc k ≡ nothing)
+
+-- AN ISLE'S ROWS ONE FRAME UP: its connect passed at `D`, and a row of its
+-- source's burst with finitely many rows before it shows at its connect
+-- as that connect's pin, waiting on finitely many rows.
+IsleUp : ∀ {Γ X B} → CS Γ X → Cur → EmissionSet B → Set
+IsleUp k D E = ¬ Owes D (CS.connAt k)
+             × (∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → Few (Frozen k) y
+                → E (y ++ [ ix 0 ]) (pin (CS.connAt k)) × Reach E (y ++ [ ix 0 ]) (pin (CS.connAt k)))
 
 -- Within `Q` but for finitely many.
 _⊑_ : Pts → Pts → Set
@@ -474,6 +491,14 @@ data HuskL : ∀ {Γ} → Scope Γ → ∀ {A} → List (St Γ A) → Pts → Se
 -- own cursor.
 data SrcH : ∀ {Γ X} → Scope Γ → CS Γ X → St Γ X → Pts → Set₁
 
+-- WHAT A PART NO LIVE NODE READS STILL SHOWS: each node's entry, every
+-- part's pins carried up to it, the part gone at `D`.
+data Ties : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {P} → Husk sc s P → Cur → EmissionSet A → Set₁
+data TiesL : ∀ {Γ} {sc : Scope Γ} {A} {ls : List (St Γ A)} {P} → HuskL sc ls P → Cur → EmissionSet A → Set₁
+
+-- A source's, to its connect's entry: an isle's burst, as its pins.
+data TiesS : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} → SrcH sc k o P → ∀ {B} → Cur → EmissionSet B → Set₁
+
 -- A connect torn down: what its source and body still run, and its rows
 -- owed within them.
 record Torn {Γ X B} (sc : Scope Γ) (C : Cur) (k : CS Γ X) (o : St Γ X) (b : St (X ∷ Γ) B) (β : EmissionSet B) : Set₁ where
@@ -671,6 +696,47 @@ data SrcH where
            → Adm (binds (CS.src k) (CS.connAt k) sc) → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Within Ri sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ])) → Sound Ri (Frozen k)
            → SrcH sc k (pend o (CS.connAt k ++ [ ix 1 ])) (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
+
+data Ties where
+  t-blank : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {q : Quiet s} {D : Cur} {E : EmissionSet A} → Ties (h-blank {sc = sc} {s = s} q) D E
+  t-map   : ∀ {Γ} {sc : Scope Γ} {A B} {f : A → B} {s P} {hk : Husk sc s P} {D₀ D : Cur} {E₀ : EmissionSet A} {E : EmissionSet B}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → Ties (h-map {f = f} hk) D E
+  t-scan  : ∀ {Γ} {sc : Scope Γ} {A B} {f : B → A → B} {z s P} {hk : Husk sc s P} {D₀ D : Cur} {E₀ : EmissionSet A} {E : EmissionSet B}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → Ties (h-scan {f = f} {z = z} hk) D E
+  t-cut   : ∀ {Γ} {sc : Scope Γ} {A} {l a} {s : St Γ A} {P} {hk : Husk sc s P} {D₀ D : Cur} {E₀ E : EmissionSet A}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → Ties (h-cut {l = l} {a = a} hk) D E
+  t-ln    : ∀ {Γ} {sc : Scope Γ} {A} {b} {s : St Γ A} {P} {hk : Husk sc s P} {D₀ D : Cur} {E₀ E : EmissionSet A}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → Ties (h-ln {b = b} hk) D E
+  t-take  : ∀ {Γ} {sc : Scope Γ} {A} {i} {keep : A → Bool} {w s P} {hk : Husk sc s P} {D₀ D : Cur} {E₀ E : EmissionSet A}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → Ties (h-take {i = i} {keep = keep} {w = w} hk) D E
+  t-flat  : ∀ {Γ} {sc : Scope Γ} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls P Q} {ho : Husk sc o P} {hl : HuskL sc ls Q} {D₀ D : Cur} {E₀ : EmissionSet A} {E : EmissionSet B}
+          → Ties ho D₀ E₀ → PinUp D₀ D E₀ E → TiesL hl D E → Ties (h-flat {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} ho hl) D E
+  t-conn  : ∀ {Γ} {sc : Scope Γ} {X B} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {P Q} {sh : SrcH sc k o P}
+              {bh : Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) b Q} {D₁ D : Cur} {β E : EmissionSet B}
+          → TiesS sh D E → Ties bh D₁ β → PinUp D₁ D β E → Ties (h-conn sh bh) D E
+
+data TiesL where
+  tl-none : ∀ {Γ} {sc : Scope Γ} {A} {D : Cur} {E : EmissionSet A} → TiesL (hl-none {sc = sc} {A = A}) D E
+  tl-more : ∀ {Γ} {sc : Scope Γ} {A} {l : St Γ A} {ls P Q} {hk : Husk sc l P} {hl : HuskL sc ls Q} {D₀ D : Cur} {E₀ E : EmissionSet A}
+          → Ties hk D₀ E₀ → PinUp D₀ D E₀ E → TiesL hl D E → TiesL (hl-more hk hl) D E
+
+data TiesS where
+  ts-dead  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o P} {hk : Husk sc o P} {f : T (CS.srcAtt k) ⊎ T (CS.closed k)} {B} {D₀ D : Cur} {E : EmissionSet B}
+           → Ties hk D₀ (Frozen k) → PinUp D₀ D (Frozen k) E → TiesS (sh-dead {k = k} hk f) D E
+  ts-isle  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri Ci} {na : T (not (CS.srcAtt k))} {nc : T (not (CS.closed k))}
+               {sy : Sync sc Ri Ci o (Frozen k)} {bh : Behind Ci (Frozen k)} {sd : Subd sc Ci k} {ss : Sound Ri (Frozen k)} {ao : AttOwed k}
+               {B} {D : Cur} {E : EmissionSet B}
+           → IsleUp k D E → TiesS (sh-isle {sc = sc} {k = k} {o = o} na nc sy bh sd ss ao) D E
+  ts-islec : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ci P} {na : T (not (CS.srcAtt k))} {nc : T (CS.closed k)}
+               {sp : Spent Ci (Frozen k)} {tp : TailP Ci (Frozen k) P} {hk : Husk sc o P} {bh : Behind Ci (Frozen k)} {sd : Subd sc Ci k}
+               {B} {D₀ D : Cur} {E : EmissionSet B}
+           → Ties hk D₀ (Frozen k) → PinUp D₀ D (Frozen k) E → TiesS (sh-islec {sc = sc} {k = k} {o = o} na nc sp tp hk bh sd) D E
+  ts-pend  : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {o Ri} {na : T (not (CS.srcAtt k))} {nc : T (not (CS.closed k))}
+               {ba : CS.bodyAt k ≡ just (CS.connAt k)} {an : CS.attSrc k ≡ nothing} {sc′ : CS.scope k ≡ sc}
+               {adm : Adm (binds (CS.src k) (CS.connAt k) sc)} {pe : pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k}
+               {wn : Within Ri sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]))} {ss : Sound Ri (Frozen k)}
+               {B} {D : Cur} {E : EmissionSet B}
+           → TiesS (sh-pend {sc = sc} {k = k} {o = o} {Ri = Ri} na nc ba an sc′ adm pe wn ss) D E
 
 -- A connect's parts read again under fields they do not read.
 re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → CS.connAt k ≡ CS.connAt k′ → Frozen k ≡ Frozen k′
