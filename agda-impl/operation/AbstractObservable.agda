@@ -191,9 +191,11 @@ dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
 -- switch off answers true, as does a takeWhile past its failing value,
 -- which unsubscribes its source before that value's call returns; a
 -- connect's source asks its subject, and answers true too once the
--- connect is torn down after the source's subscribe returned.  Torn down before, the source runs on: rxjs's
--- `connect` calls `source.subscribe(subject)` whatever its subscriber
--- did, and nothing can unsubscribe a subscription not yet returned.
+-- connect is torn down after the source's subscribe returned, by its own
+-- observer or by its body's completion, which also closes the body.
+-- Torn down before, the source runs on: rxjs's `connect` calls
+-- `source.subscribe(subject)` whatever its subscriber did, and nothing
+-- can unsubscribe a subscription not yet returned.
 closed : ∀ {R Γ A} → Ctx R Γ A → Bool
 closed top                               = false
 closed (inMap f c)                       = closed c
@@ -204,8 +206,8 @@ closed (inTake i p free c)               = closed c
 closed (inTake i p _ c)                  = true
 closed (inOuter op f ω d n q ls c)         = closed c
 closed (inLanes op f ω d n q o pre post c) = closed c
-closed (inSrc k b c)                     = CS.closed k ∨ (CS.srcAtt k ∧ closed c)
-closed (inBody k o c)                    = closed c
+closed (inSrc k b c)                     = CS.closed k ∨ (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c))
+closed (inBody k o c)                    = not (CS.srcLive k) ∨ closed c
 
 -- Whether a joiner's binder, up its own context, has completed.
 closedUp : ∀ {R Γ A X} → Ctx R Γ A → X ∈ Γ → Bool

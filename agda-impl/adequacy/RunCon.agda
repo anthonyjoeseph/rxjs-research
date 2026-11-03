@@ -210,6 +210,10 @@ Off (lane _ _)    = ⊥
 Off (lanecut _ _) = ⊥
 Off (pnd _)       = ⊤
 
+-- A live connect's parts close only with what is above it.
+live-or : ∀ b {x} → T b → T (not b ∨ x) → T x
+live-or true _ t = t
+
 module _ {R : Set} (Rt : EmissionSet R) where
 
   closed-off : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} → Fr Rt Cr C Rg c N E → T (closed c) → Off N
@@ -224,10 +228,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lane fr)                                         t = closed-off fr t
   closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
   closed-off (f-lnct {b = false} fr)                             _ = tt
-  closed-off (f-src {k = k} fr _ _ _ nc _ _ _ _ _ _ _ _ _ _)     t = closed-off fr (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t))
+  closed-off (f-src {k = k} fr _ _ lv nc _ _ _ _ _ _ _ _ _ _)    t = closed-off fr (live-or (CS.srcLive k) lv (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t)))
   closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _)                  _ = tt
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)              _ = tt
-  closed-off (f-body fr _ _ _ _ _ _ _)                           t = closed-off fr t
+  closed-off (f-body {k = k} fr _ _ lv _ _ _ _)                  t = closed-off fr (live-or (CS.srcLive k) lv t)
   closed-off (d-map _)                                           _ = tt
   closed-off (d-scan _)                                          _ = tt
   closed-off (d-cut _)                                           _ = tt

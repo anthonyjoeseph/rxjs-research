@@ -317,6 +317,10 @@ shut-by {k = k} {p} F l t =
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
+  -- A body read while its source runs is closed only if its connect is.
+  live-cl : ∀ {b x} → b ≡ true → (not b ∨ x) ≡ false → x ≡ false
+  live-cl refl e = e
+
   -- A connect read where its source runs is no torn one.
   unread-live : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k k″ : CS Γ X} {P} → T (CS.srcLive k) → Unread Rt Cr C c k P → Unread Rt Cr C c k″ P
   unread-live _  (un-dead fr)              = un-dead fr
@@ -326,7 +330,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → (∀ {Rb} {β : EmissionSet B} → Sound Rb β → β p (toEv e) → Past.Off p (Frozen k) → Flags (bef p) k β → Flags (aft p) (record k { owedAt = x }) β)
             → SimC Rt ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS (record k { owedAt = x }) o s , rising e , p ⟩
   rise-body {k = k} {c = c} {e = e} {p = p} lv fix = keeps Rt λ
-    { (flying (f-body fr sc pt _ src bb fl eq) cl (sy , row)) → flying fr cl
+    { (flying (f-body fr sc pt _ src bb fl eq) cl (sy , row)) → flying fr (live-cl lv cl)
         (let rb = Sound.rg (Parts.sb pt) row (vis e)
              ns = λ r → Parts.apart pt rb r
              nh = λ hv → Parts.clear-b pt (vhot-hots (full (scopeOf c)) hv) rb
@@ -335,7 +339,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
                    (fix (Parts.sb pt) row (Past.off-rg p (Parts.ss pt) ns) fl) eq
           , proj₁ (to (alike (proj₁ eq)) ((Connecting.body row , conn-reach (few-src sc src) (proj₂ eq row)) , vis e)))
     ; (flying (d-body _ _ _) _ ())
-    ; (adrift (d-body (un-dead fr) sh le) cl (Q , hk , le′)) → adrift fr cl (_ , husk-owe (h-conn sh hk) , ⊑-trans le (∪-⊑ ⊑-refl le′))
+    ; (adrift (d-body (un-dead fr) sh le) cl (Q , hk , le′)) → adrift fr (live-cl lv cl) (_ , husk-owe (h-conn sh hk) , ⊑-trans le (∪-⊑ ⊑-refl le′))
     ; (adrift (d-body (un-torn _ _ _ nl _ _ _) _ _) _ _) → ⊥-elim (notT _ nl lt)
     ; (settled () _ _) }
     where
