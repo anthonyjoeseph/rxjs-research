@@ -28,7 +28,7 @@ open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; Need; ow
   Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live;
   h-end; h-kill; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane;
   f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes;
-  d-src; d-body; f-isle; f-islec; f-islep)
+  d-src; d-body; f-isle; f-islec; f-islep; Ze; e₀; e+)
 open import adequacy.Rows using (module _≃_)
 open _≃_ using (from)
 open import operation.PureObservable using (module Machine)
@@ -41,7 +41,7 @@ open import denotation.EmissionSet using (Den; ⟦_⟧; Work; module Joining; mo
 open import denotation.Laws.Worlds using (W⁼; here; inW; step; timer; join; ⊑-trans; ⊑-snoc⁺)
 open import adequacy.Rows using (full)
 open import denotation.Laws.Worlds using (Hots)
-open import adequacy.Enter using (module Lanes)
+open import adequacy.Enter using (module Lanes; w-down)
 open import adequacy.Regions using (lane-sole)
 open import denotation.EmissionSet using (out; skip; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
@@ -185,11 +185,6 @@ unfailed nf (clr c) (_ , _ , r , k , lt) = c r _ (nf r k) lt
 clr-tr : ∀ {A} {t : EmissionSet A} {q y} → Clr q y t → Clr q y (Truncate t)
 clr-tr (clr c) = clr λ r v → c (proj₁ r) v
 
--- A first-child chain from `q` down to `w`, `q` itself included.
-data Ze (q : Pos) : Pos → Set where
-  e₀ : Ze q q
-  e+ : ∀ {w} → Ze q w → Ze q (w ++ [ ix 0 ])
-
 zs-ze : ∀ {q y} → Zs q y → Ze q y
 zs-ze z₁     = e+ e₀
 zs-ze (z+ z) = e+ (zs-ze z)
@@ -204,15 +199,6 @@ zl-zs : ∀ {q y w} (z : Zs q y) → w ∈ zl z → Zs w y
 zl-zs z₁     (here refl) = z₁
 zl-zs (z+ z) (here refl) = z₁
 zl-zs (z+ z) (there m)   = z+ (zl-zs z m)
-
--- A world position at a first child not its root: at its parent.
-w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ++ [ ix 0 ] → (s ≡ x ++ [ ix 0 ] → ⊥) → W⁼ H s x
-w-down here eq ne = ⊥-elim (ne eq)
-w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (∷ʳ-injectiveˡ x′ x eq) w
-w-down {x = x} (inW (timer t _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
-... | ()
-w-down {x = x} (inW (join {h} _ _ _)) eq _ with ∷ʳ-injectiveʳ h x eq
-... | ()
 
 -- A lane subscribes at a second child.
 st1 : ∀ op {A B} {F : A → Den B} {O q a s} → Start (polF op F O) q a s → Σ Pos λ s′ → s ≡ s′ ++ [ ix 1 ]

@@ -525,15 +525,25 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
     unshut : T (CS.srcLive k) → ∀ {c} → Frozen k c end → ¬ Owes C c → T (CS.closed k)
     torn   : T (not (CS.srcLive k)) → Spent C β
     owed   : ∀ {q} → CS.owedAt k ≡ just q → β q end × ¬ Owes C q
+    ended  : T (CS.srcLive k) → ∀ {c} → β c end → ¬ Owes C c → CS.owedAt k ≡ just c
+
+-- A first-child chain from `q` down to `w`, `q` itself included.
+data Ze (q : Pos) : Pos → Set where
+  e₀ : Ze q q
+  e+ : ∀ {w} → Ze q w → Ze q (w ++ [ ix 0 ])
 
 -- A connect's two parts: its body's region and its source's, inside its
--- own and apart, each holding no row of a handle in scope.
+-- own and apart, each holding no row of a handle in scope.  The body's
+-- region leads none of the source's, nor reaches down a first-child chain
+-- from a point of the source's past its subscription.
 record Parts {Γ X B} (sc : Scope Γ) (Rg : Rgn) (k : CS Γ X) (β : EmissionSet B) : Set₁ where
   field
     Rb Rs : Rgn
     b⊆    : ∀ {y} → Rb y → Rg y
     s⊆    : ∀ {y} → Rs y → Rg y
     apart : ∀ {y} → Rb y → Rs y → ⊥
+    b-lead  : ∀ {w x} → Rb w → Rs x → w ⊑ʷ x → ⊥
+    b-chain : ∀ {x w} → (CS.connAt k ++ [ ix 1 ]) ≼ x → Rs x → Ze x w → Rb w → ⊥
     clear-b : ∀ {y} → Hots (full sc) y → Rb y → ⊥
     clear-s : ∀ {y} → Hots (full sc) y → Rs y → ⊥
     sb    : Sound Rb β
@@ -645,8 +655,11 @@ data SrcH where
            → SrcH sc k (pend o (CS.connAt k ++ [ ix 1 ])) (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
 
 -- A connect's parts read again under fields they do not read.
-re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → Frozen k ≡ Frozen k′ → Parts sc Rg k β → Parts sc Rg k′ β
-re-parts e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
+re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSet B} → CS.connAt k ≡ CS.connAt k′ → Frozen k ≡ Frozen k′
+         → Parts sc Rg k β → Parts sc Rg k′ β
+re-parts {k = k} {k′} ca e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
+                       ; b-lead = Parts.b-lead pt
+                       ; b-chain = λ {x} px → Parts.b-chain pt (subst (λ u → (u ++ [ ix 1 ]) ≼ x) (sym ca) px)
                        ; clear-b = Parts.clear-b pt ; clear-s = Parts.clear-s pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
 
 -- No rise in flight.

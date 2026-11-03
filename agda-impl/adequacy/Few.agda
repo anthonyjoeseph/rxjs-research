@@ -501,7 +501,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
       s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env lo′) (kill-out op) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
              (behind-bef {C = C} bh (flat-f sy jn env ef lo))
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
-    sh {sc = sc} (s-conn {k = k} refl pt bs bb ss tn fl m) env ef lo = s-conn refl pt bs′ bb′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
+    sh {sc = sc} (s-conn {k = k} {β = β} refl pt bs bb ss tn fl m) env ef lo = s-conn refl pt bs′ bb′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
       where
         envb : T (CS.srcLive k) → Env (full (binds (CS.src k) (CS.connAt k) sc)) C p
         envb t = env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env
@@ -513,8 +513,12 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         unsh t {c} y n with owes? C c
         ... | inj₁ o  = ⊥-elim (n (src-b (ss t) env lo (y , tt , o)))
         ... | inj₂ no = Flags.unshut fl t y no
+        ends : T (CS.srcLive k) → ∀ {c} → β c end → ¬ Owes (bef p) c → CS.owedAt k ≡ just c
+        ends t {c} y n with owes? C c
+        ... | inj₁ o  = ⊥-elim (n (bound (bs t) (envb t) (λ ki → lo (k-kid (k-body ki))) (y , tt , o)))
+        ... | inj₂ no = Flags.ended fl t y no
         fl′ = record { shut = λ c → proj₁ (Flags.shut fl c) , nm (proj₂ (Flags.shut fl c)) ; unshut = unsh
-                     ; torn = λ nt → spent (Flags.torn fl nt) ; owed = λ e → proj₁ (Flags.owed fl e) , nm (proj₂ (Flags.owed fl e)) }
+                     ; torn = λ nt → spent (Flags.torn fl nt) ; owed = λ e → proj₁ (Flags.owed fl e) , nm (proj₂ (Flags.owed fl e)) ; ended = ends }
         tn′ = λ nt → let t = tn nt in record { Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t ; tl = td (Torn.tl t) }
     sh {sc = sc} (s-join {x = x} {E = E} en d ap hd adm) env ef lo = s-join en d′ ap (λ i u → hd i (unfed-dn (lookup (full sc) x) u)) adm
       where

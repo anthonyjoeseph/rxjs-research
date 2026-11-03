@@ -38,8 +38,8 @@ open import denotation.Events using (Pos; Label; Timeline; ix; root; _≟ᵖ_)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; _≺_; enter; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; After; Truncate;
   module Joining; module Bounded; module Switch; module Exhaust; module Connecting)
-open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl; ≺→≼)
-open import denotation.Laws.Worlds using (W; W⁼; step; here; inW; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl;
+open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl; ≺→≼; ≺-ext)
+open import denotation.Laws.Worlds using (W; W⁼; step; timer; join; here; inW; ⊑-trans; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl;
   ⊑-≼; ⊑-snoc⁺; PinBy; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init;
   nonempty⁼; ok-step; real-snoc; anc-lead; anc-trans; world-anc; world-anc⁼)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -53,7 +53,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (Scope; binds; CS; cs)
 open import adequacy.Rows using (full; pendRows)
 open import adequacy.Cursor using (Rgn; Sound; Excl; Within; Parts; JRo; JRl; LaneRg; Start; polF; Adm; Owes; Joined; joined; JInv;
-  none; LanesIn; Ends; Lane; JoinF)
+  none; LanesIn; Ends; Lane; JoinF; Ze; e₀; e+)
 open import adequacy.Bound using (good-full; owes-≼)
 
 ------------------------------------------------------------------------
@@ -427,6 +427,21 @@ flat-joined {C} {sc = sc} {op = op} {f} {s} {q} ow ok ad wi =
 conn₀ : ∀ {Γ X} → Obs Timeline Γ X → Pos → Scope Γ → CS Γ X
 conn₀ s q sc = cs false true false (just q) nothing nothing q root s sc
 
+-- A world's point one first child down, short of the world's start: its
+-- parent is in the world too.
+w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ++ [ ix 0 ] → (s ≡ x ++ [ ix 0 ] → ⊥) → W⁼ H s x
+w-down here eq ne = ⊥-elim (ne eq)
+w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (∷ʳ-injectiveˡ x′ x eq) w
+w-down {x = x} (inW (timer t _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
+... | ()
+w-down {x = x} (inW (join {h} _ _ _)) eq _ with ∷ʳ-injectiveʳ h x eq
+... | ()
+
+-- A chain's head leads its foot.
+ze-⊑ : ∀ {q w} → Ze q w → q ⊑ w
+ze-⊑ {q} e₀    = ⊑-refl q
+ze-⊑ (e+ {w} e) = ⊑-trans (ze-⊑ e) (⊑-snoc⁺ w)
+
 module ConnAt {Γ X B} (sc : Scope Γ) (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) B) (q : Pos)
               (ok : Ok (Hots (full sc)) q) (ad : Adm sc) where
   H : Pos → Set
@@ -513,12 +528,22 @@ conn-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {s : Obs Timeline Γ X} {b : Obs 
 conn-parts {sc = sc} {s = s} {b} {q} ok ad (_ , wi) = pt , wb , ws
   where
     open ConnAt sc s b q ok ad
+    -- a point of the body's world past the source's subscription has its
+    -- chain's head in that world too: the chain never reaches `q`
+    up : ∀ {x w} → (q ++ [ ix 1 ]) ≼ x → Ze x w → W⁼ H₀ (q ++ [ ix 0 ]) w → W⁼ H₀ (q ++ [ ix 0 ]) x
+    up px e₀ h = h
+    up {x} px (e+ {w} e) h = up px e (w-down h refl ne)
+      where ne : q ++ [ ix 0 ] ≡ w ++ [ ix 0 ] → ⊥
+            ne eq with ∷ʳ-injectiveˡ q w eq
+            ... | refl = px (≼-≺-≺ {x} {q} {q ++ [ ix 1 ]} (⊑-≼ (ze-⊑ e)) (≺-ext q []))
     pt = record
       { Rb      = Rb
       ; Rs      = Rs
       ; b⊆      = λ rb → wi (narrow⁼ σw (proj₁ rb)) (b-excl rb)
       ; s⊆      = λ rs → wi (nest-in (step here plain-ix) (proj₁ rs)) (s-excl rs)
       ; apart   = λ {y} rb rs → bl (proj₁ rb) (proj₁ rs) (⊑-refl y)
+      ; b-lead  = λ rb rs le → bl (proj₁ rb) (proj₁ rs) le
+      ; b-chain = λ {x} px rs e rb → bl (up px e (proj₁ rb)) (proj₁ rs) (⊑-refl x)
       ; clear-b = λ {y} h rb → proj₂ ok h (narrow⁼ σw (proj₁ rb)) (⊑-inside (⊑-refl y))
       ; clear-s = λ {y} h rs → proj₂ ok h (nest-in (step here plain-ix) (proj₁ rs)) (⊑-inside (⊑-refl y))
       ; sb      = within-sound {sc = binds s q sc} Iβ wb

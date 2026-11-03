@@ -291,9 +291,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt Cr C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt Cr C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-    -- A CONNECT ENTERED: its flags fresh.
-    conn-flags : ∀ {C Γ X B} {sc : Scope Γ} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
-               → Owes C q → Flags C (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))
     sub-cold   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : Timeline A} {q p}
                → Inv Rt Cr C ⟨ c , pend (cold x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , coldS true (opening q (timelineAt x q)) , absorbed , q ⟩
     sub-defer  : ∀ {Cr C Γ A} {c : Ctx R Γ A} {l q p}
@@ -413,8 +410,13 @@ module Over {R : Set} (Rt : EmissionSet R) where
     let (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
         ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
         ow₀ = owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []))
+        -- fresh: its source's rows and its body's all still owed
+        fl : Flags C (conn₀ s q (scopeOf c)) (pendRows (full (binds s q (scopeOf c))) b (q ⊕ [ ix 0 ]))
+        fl = record { shut = λ () ; torn = λ () ; owed = λ ()
+                    ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ C ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
+                    ; ended = λ _ {c′} y n → ⊥-elim (n (owes-≼ C ow₀ (≺→≼ {q ⊕ [ ix 0 ]} {c′} (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad) y)))) }
     in pending (f-body fr refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁)
-                 (behind-past C ow₀ (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) (conn-flags {s = s} {b = b} ow)
+                 (behind-past C ow₀ (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) fl
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb)
 

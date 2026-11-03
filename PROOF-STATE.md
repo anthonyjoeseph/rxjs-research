@@ -86,8 +86,7 @@ Members: `sub-scan`, `sub-take`.
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
-`conn-flags`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
 
 ## Tier 1 — the simultaneous spec
 
