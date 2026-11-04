@@ -5,21 +5,22 @@
 -- a cursor that has moved on has passed whatever its earlier self had.
 module adequacy.Cursor.Show where
 
-open import Data.Bool using (Bool; T; true; false)
+open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List using ([]; _∷_; [_]; _++_; map)
 open import Data.List.Properties using (++-identityʳ; ++-assoc; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import Data.List.Relation.Unary.All using (All; _∷_) renaming ([] to []ᴬ)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
-open import Data.Product using (_×_; _,_; proj₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
 open import denotation.Events using (Timeline; ix; inside; <ᵖ-step; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; module Connecting; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; skip; module Connecting; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
 open import Data.Bool.Properties using (T-≡)
@@ -30,9 +31,11 @@ open Machine using (Scope; CS)
 open import adequacy.Rows using (Frozen; full)
 open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs;
   Lane; polF; up; JoinF; JoinE; JInv; JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE;
-  Src; bursts)
+  Src; src-pend; src-on; src-shut; bursts; BurstsAt; notT; AttFin)
 open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; nonempty⁼; world-after; world-after⁼; inside-⊑; ⊑-inside)
-open import adequacy.Bound using (next-slot)
+open import adequacy.Bound using (next-slot; in-slot; owes?)
+open import adequacy.Rows using (≼-≢)
+import denotation.Laws.Worlds as W
 open import adequacy.PinLift using (reach-≈; reach-img; reach-map; reach-scan; reach-take)
 
 -- What the cursor reached lies at or before all it owes.
@@ -40,6 +43,11 @@ thru-owes : ∀ C {r q} → Thru C r → Owes C q → r ≼ q
 thru-owes origin  ()
 thru-owes (bef p) {r} {q} t o = ≼-trans {r} {p} {q} t o
 thru-owes (aft p) {r} {q} t o = ≺→≼ {r} {q} (≼-≺-≺ {r} {p} {q} t o)
+
+-- Reached at a cursor: so is anything no later.
+thru-dn : ∀ D {r q} → r ≼ q → Thru D q → Thru D r
+thru-dn (bef p) {r} {q} rq t = ≼-trans {r} {q} {p} rq t
+thru-dn (aft p) {r} {q} rq t = ≼-trans {r} {q} {p} rq t
 
 -- A connect the cursor has passed it has reached.
 thru-no : ∀ C {r} → ¬ Owes C r → Thru C r
@@ -212,11 +220,100 @@ postulate
                → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
                → ConnE (CS.connAt k) (Frozen k) β E → Up C β C E
 
-  -- AN ATTACHED SOURCE'S PIN SHOWS IN ITS CONNECT'S ENTRY: inside the
-  -- subscription re-pinned to the connect by `burst`, its few rows there
-  -- behind it; past it kept by `kept`, the body alive after it.
-  conn-up-src : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
-              → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
-              → ConnE (CS.connAt k) (Frozen k) β E → Up C (Frozen k) C E
+-- An attached source: live, its rows inside the subscription few.
+src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → T (CS.srcAtt k) → Src sc Rg C k o → T (CS.srcLive k) × AttFin k
+src-att sa (src-pend na _ _ _ _ _ _ _ _)  = ⊥-elim (notT _ na sa)
+src-att sa (src-on _ _ _ _ af _ _ lv)      = lv , af
+src-att sa (src-shut _ _ _ _ _ _ _ _ af lv) = lv , af
+
+pin-inj : ∀ {A} {a b} → pin {A} a ≡ pin b → a ≡ b
+pin-inj refl = refl
+
+-- AN ATTACHED SOURCE'S PIN SHOWS IN ITS CONNECT'S ENTRY.  Inside the
+-- subscription it is re-pinned to the connect by `burst`: every source
+-- row before it lies inside the subscription too, the slot after which
+-- none reaches, so it has few.  Past the subscription it is kept by
+-- `kept`: the body is alive after the pin's connect, whose end the cursor
+-- has not passed, or which lies under the body's end still owed, and no
+-- point of the source's world is the body's.
+conn-up-src : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
+            → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
+            → ConnE (CS.connAt k) (Frozen k) β E → Up C (Frozen k) C E
+conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt sr bb fl ce = up lift
+  where
+    c = CS.connAt k
+    open Connecting c (Frozen k) β using (ConnT; Alive; body; burst; echo; kept)
+    lv = proj₁ (src-att sa sr)
+    Iσ = Parts.iσ pt
+    Iβ = Parts.iβ pt
+
+    -- a source pin's connect: at or past the subscription
+    past : ∀ {y r} → Frozen k y (pin r) → (c ++ [ ix 1 ]) ≼ r
+    past = pin-law (real-snoc c plain-ix (Parts.cr pt)) Iσ
+
+    -- no point of the source's world is one of the body's
+    apart : ∀ {y r q e} → Frozen k y (pin r) → β q e → T (inside q r) → ⊥
+    apart {_} {r} {q} x b i = Parts.wapart pt (inW (InvAt.world Iβ b)) (proj₁ (InvAt.pinned Iσ x)) (inside-⊑ q r i)
+
+    -- before a row inside the subscription: only rows inside it
+    few : ∀ {y} → T (inside (c ++ [ ix 1 ]) y) → Few (Frozen k) y
+    few {y} iw with proj₂ (src-att sa sr) sa
+    ... | ks , f = ks , g
+      where
+        g : ∀ {k′ e′} → Frozen k k′ e′ → k′ ≺ y → k′ ∈ ks
+        g {k′} x lt with inside (c ++ [ ix 1 ]) k′ in e
+        ... | true  = f x (subst T (sym e) tt)
+        ... | false = ⊥-elim (≺-irrefl {c ++ [ ix 2 ]} (≼-≺-≺ {c ++ [ ix 2 ]} {k′} {c ++ [ ix 2 ]}
+                        (next-slot c k′ (≺→≼ {c ++ [ ix 1 ]} {k′} (world-after (InvAt.world Iσ x) (InvAt.real Iσ x))) (λ t → subst T e t))
+                        (≺-trans {k′} {y} {c ++ [ ix 2 ]} lt (in-slot c y iw))))
+
+    -- the body alive after a reached source pin's connect
+    alive : ∀ {y r} → Frozen k y (pin r) → Thru C r → Alive r
+    alive {y} {r} x tr {q} b with owes? C q
+    ... | inj₁ o  = ≼-≢ {r} {q} (thru-owes C tr o) (λ { refl → apart x b (Equivalence.from T-≡ (inside-self r)) })
+    ... | inj₂ no with Flags.owing fl (Flags.ended fl lv b no) tr
+    ...   | inj₁ rq = ≼-≢ {r} {q} rq (λ { refl → apart x b (Equivalence.from T-≡ (inside-self r)) })
+    ...   | inj₂ i  = ⊥-elim (apart x b i)
+
+    -- what a kept row waits on: the source row's, re-pinned, and the
+    -- body's rows before the pin's connect, all behind the cursor
+    reach : ∀ {y r} → Frozen k y (pin r) → T (inside r y) → Reach (Frozen k) y (pin r) → Thru C r
+          → Reach ConnT (y ++ [ ix 0 ]) (pin r)
+    reach {y} {r} x ir (ks , f) tr = map (_++ [ ix 0 ]) ks ++ proj₁ bb , g
+      where
+        ir′ : T (inside r (y ++ [ ix 0 ]))
+        ir′ = inside-trans r y (y ++ [ ix 0 ]) ir (⊑-inside {y} {y ++ [ ix 0 ]} ([ ix 0 ] , refl))
+        down : ∀ {k′} → (k′ ++ [ ix 0 ]) ≺ r → k′ ≺ r
+        down {k′} lt = ≺-trans {k′} {k′ ++ [ ix 0 ]} {r} (≺-ext k′ []) lt
+        notc : c ≡ r → ⊥
+        notc eq = ≺-irrefl {c} (≺-≼-≺ {c} {c ++ [ ix 1 ]} {c} (≺-ext c []) (subst ((c ++ [ ix 1 ]) ≼_) (sym eq) (past x)))
+        g : ∀ {q e′} → ConnT q e′ → q ≺ (y ++ [ ix 0 ]) → (T (inside r (y ++ [ ix 0 ])) → PDep r q e′) → q ∈ map (_++ [ ix 0 ]) ks ++ proj₁ bb
+        g (body {q} b) _ d with d ir′
+        ... | inj₁ qr = ∈-++⁺ʳ (map (_++ [ ix 0 ]) ks) (proj₂ bb b (λ o → ≺-irrefl {q} (≺-≼-≺ {q} {r} {q} qr (thru-owes C tr o))))
+        ... | inj₂ refl = ⊥-elim (Parts.wapart pt (proj₁ (InvAt.pinned Iβ b)) (proj₁ (InvAt.pinned Iσ x)) (W.⊑-refl r))
+        g (burst {k′} x′ _) lt d = ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt) λ _ → h (d ir′)))
+          where h : PDep r (k′ ++ [ ix 0 ]) (pin c) → PDep r k′ _
+                h (inj₁ lt′) = inj₁ (down {k′} lt′)
+                h (inj₂ eq)  = ⊥-elim (notc (pin-inj eq))
+        g (echo {k′} x′ _ _ _) lt d = ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt) λ _ → h (d ir′)))
+          where h : PDep r (k′ ++ [ ix 0 ]) skip → PDep r k′ _
+                h (inj₁ lt′) = inj₁ (down {k′} lt′)
+                h (inj₂ ())
+        g (kept {k′} x′ _ _ _) lt d = ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt) λ _ → h (d ir′)))
+          where h : PDep r (k′ ++ [ ix 0 ]) _ → PDep r k′ _
+                h (inj₁ lt′) = inj₁ (down {k′} lt′)
+                h (inj₂ eq)  = inj₂ (cong pin (pin-inj eq))
+
+    lift : ∀ {y r} → Thru C r → T (inside r y) → Frozen k y (pin r) → Reach (Frozen k) y (pin r)
+         → Σ _ λ xs → Σ _ λ r′ → Thru C r′ × T (inside r′ (y ++ xs)) × E (y ++ xs) (pin r′) × Reach E (y ++ xs) (pin r′) × All (_≡ ix 0) xs
+    lift {y} {r} tr ir x rc with inside (c ++ [ ix 1 ]) y in e
+    ... | true  = let iw = subst T (sym e) tt ; (w , rw) = BurstsAt.win (conn-bursts pt ce) x iw (few iw)
+                  in [ ix 0 ] , c , thru-dn C {c} {r} (≺→≼ {c} {r} (≺-≼-≺ {c} {c ++ [ ix 1 ]} {r} (≺-ext c []) (past x))) tr
+                   , in-call c y iw , w , rw , refl ∷ []ᴬ
+    ... | false = [ ix 0 ] , r , tr , inside-trans r y (y ++ [ ix 0 ]) ir (⊑-inside {y} {y ++ [ ix 0 ]} ([ ix 0 ] , refl))
+                , voc (proj₁ ce) (kp , rk) , reach-≈ (proj₁ ce) (reach-img (λ t → _ , proj₁ t , λ eq → eq) rk) , refl ∷ []ᴬ
+      where
+        kp = kept x (alive x tr) (subst (λ b → T (not b)) (sym e) tt) ir
+        rk = reach x ir rc tr
 
 

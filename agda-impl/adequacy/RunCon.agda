@@ -35,7 +35,7 @@ open import adequacy.Cursor using (Cur; bef; aft; Owes; Behind; Pts; Held; AttFi
   re-parts; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans;
   h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn;
   Torn; ≈-refl; notT; subd; Thru; Up; up; InCall; Bursts; BurstsAt)
-open import adequacy.Cursor.Show using (up-pre; conn-up-body; in-call)
+open import adequacy.Cursor.Show using (up-pre; conn-up-body; in-call; thru-dn)
 open import adequacy.Cursor.Tear using (husk-of; src-husk; unsubIf-husk; quiet-unsubIf; NoIsle; c-abs; sync-pend)
 open import adequacy.Cursor.Frame using (Unread; un-dead; un-torn; owes; dead; lane; lanecut; pnd; Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; RT)
@@ -86,11 +86,6 @@ att-fin : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → Sync sc Rg C o
         → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ ks
 att-fin {k = k} sy bh sd lo with att-rows {k = k} sy bh sd lo
 ... | ks , f = ks , λ x i → f x (in-slot (CS.connAt k) _ i)
-
--- Reached at a cursor: so is anything no later.
-thru-dn : ∀ D {r q} → r ≼ q → Thru D q → Thru D r
-thru-dn (bef p) {r} {q} rq t = ≼-trans {r} {q} {p} rq t
-thru-dn (aft p) {r} {q} rq t = ≼-trans {r} {q} {p} rq t
 
 -- AN ISLE ATTACHING: its pins, read through its cursor, show in its
 -- connect's entry a level down.  A row inside the subscription has
