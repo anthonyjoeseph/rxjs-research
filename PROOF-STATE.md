@@ -40,18 +40,11 @@ so a freed slot is its `Starts.queued`. Settled when each is a body.
 
 Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
 
-#### THE MARK AT ITS ROW
-
-Open: that an open cold's tick is an ancestor of a row at or before the
-row met next, so it is listed. Settled by a body over the cursor `Inv`.
-
-Members: `tick-row`.
-
 #### THE COLD STEPPED
 
-A cold entered at its timeline, and each turn of its tape, keep `Inv`.
-Open: whether a stall or a frame's close moves nothing owed. Settled when
-each is a body.
+A cold entered at its timeline, and each turn of its tape, keep `Inv`:
+`s-cold`'s tape rows owed, in the entry and in the region. Open: whether
+a stall or a frame's close moves nothing owed. Settled when each is a body.
 
 Members: `sub-cold`, `abs-leaf`.
 

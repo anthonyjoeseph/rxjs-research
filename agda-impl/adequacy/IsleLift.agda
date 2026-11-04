@@ -28,14 +28,14 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import denotation.Events using (Pos; ix; inside; inside-self; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; pin; Reach; Few; _≺_; _≼_; ⟦_⟧)
 open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl; ≺-ext; ≺-trans; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
 open import denotation.Laws.Worlds using (⊑-inside)
-open import operation.Key using (at; after; ≮ᴷ-trans; <ᴷ-asym)
+open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; connS; mapS; scanS; cutS; lnS; takeS; flatS; binds; scopeOf;
                     inOuter; inLanes; inSrc; inBody; inTake)
@@ -55,7 +55,7 @@ open import adequacy.Few using (lag; EnvL; lag-≈; lag-at; map-row; scan-row; t
 open import adequacy.Bound using (LoP; Env; lo-p; map-b; scan-b; take-b; took-b; ≮-after; ≮-≼; body-key)
 open import adequacy.FrameBound using (conn-fb; pre-in; post-in)
 open import adequacy.Least using (Lo; k-own; k-kid; k-lane; k-outer; k-body; k-src)
-open import adequacy.Floor.Keys using (plug-in; own-bld; os; lo-weaken; at-after₀)
+open import adequacy.Floor.Keys using (plug-in; own-bld; os)
 
 ------------------------------------------------------------------------
 -- THE STEP'S FIRST-CHILD CHAIN
