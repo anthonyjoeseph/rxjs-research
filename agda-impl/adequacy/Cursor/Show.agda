@@ -16,11 +16,15 @@ open import Data.List.Relation.Unary.All using (All; _∷_) renaming ([] to []�
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; yes) renaming (no to nay)
+open import Data.Nat using (_<_)
+open import Data.Nat.Properties using (<-cmp)
+open import Relation.Binary.Definitions using (Tri; tri<; tri≈; tri>)
+open import denotation.Laws.Worlds.Leaves using (out-inj)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix; inside; <ᵖ-step; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; skip; module Connecting; module Joining; module Bounded; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
+open import denotation.Events using (Pos; _≟ᵖ_; Timeline; ix; inside; <ᵖ-step; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; skip; module Connecting; module Joining; module Bounded; Den; After; end; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
 open import Data.Bool.Properties using (T-≡)
@@ -37,7 +41,7 @@ open import adequacy.Bound using (next-slot; in-slot; owes?; owes-≼)
 open import adequacy.Rows using (≼-≢)
 import denotation.Laws.Worlds as W
 open import adequacy.PinLift using (reach-≈; reach-img; reach-map; reach-scan; reach-take; reach-few; PinFew)
-open import denotation.Laws.JoinInv using (module Join)
+open import denotation.Laws.JoinInv using (module Join; module Kids)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Nth using (module Nths)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
@@ -203,29 +207,20 @@ conn-bursts {X = X} {k = k} {β} {E} pt (ce , _) = bursts wn kp
 ------------------------------------------------------------------------
 -- The joiner and the connect: where a pin shows past a truncation.
 
-postulate
-  -- A LANE'S PIN SHOWS IN ITS JOINER'S ENTRY: no kill before its connect,
-  -- so `left` keeps it.
-  flat-up-lane : ∀ {Γ} {sc : Scope Γ} {Rg C D A B} {op} {f : A → Obs Timeline Γ B} {ω O E q a}
-               → JInv sc f O → JoinE sc op f ω O E → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
-               → LanesIn (Hots (full sc)) (JRl sc Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O
-               → O q (out a) → Runs (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q
-               → Dom C D → (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
-               → Up D (Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a) C E
-
--- A joiner's pins of one connect before a row: its outer's, which that
--- row waited on, when no lane pins the connect.
+-- A joiner's pins of one connect before a row: its outer's and its
+-- lanes', each few.
 module JoinPins {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet A) (Over Runs : Pos → Set) (Cut : Pos → Pos → Set)
                 (Hand : Pos → Set) where
   open Joining Lane o (λ _ _ → ⊥) Over Runs Cut Hand using (JoinT; opin; lane; left; run)
 
-  pin-few : ∀ {y r} → T (inside r y) → Reach o y (pin r) → (∀ {q a k} → o q (out a) → Lane q a k (pin r) → ⊥) → PinFew JoinT r y
-  pin-few {y} {r} _ (ks , f) nl = ks , g
+  pin-few : ∀ {y r} ks → (∀ {k} → o k (pin r) → k ≺ y → k ∈ ks) → (∀ {q a k} → o q (out a) → Lane q a k (pin r) → k ≺ y → k ∈ ks)
+          → PinFew JoinT r y
+  pin-few {y} {r} ks fo fl = ks , g
     where
       g : ∀ {k} → JoinT k (pin r) → k ≺ y → k ∈ ks
-      g (opin x) lt         = f x lt (λ _ → inj₂ refl)
-      g (lane x _ l _ _) _  = ⊥-elim (nl x l)
-      g (left x _ l _ _) _  = ⊥-elim (nl x l)
+      g (opin x) lt         = fo x lt
+      g (lane x _ l _ _) lt = fl x l lt
+      g (left x _ l _ _) lt = fl x l lt
       g (run () _) _
 
 -- No lane pins an outer pin's connect: that connect leads the outer row,
@@ -252,6 +247,105 @@ lane-not-outer {sc = sc} op {f} {O} ji {y} {r} xo x l = go op l
 thru-few : ∀ {A} C {E : EmissionSet A} {r} → Behind C E → Thru C r → Few E r
 thru-few C {r = r} (ks , f) tr = ks , λ {k} x kr → f x (λ o → ≺-irrefl {k} (≺-≼-≺ {k} {r} {k} kr (thru-owes C tr o)))
 
+-- A joiner's pins of one connect before a row, by operator.
+join-pins : ∀ {A B} (f′ : A → Den B) (O : EmissionSet A) op {y r} ks → (∀ {k} → O k (pin r) → k ≺ y → k ∈ ks)
+          → (∀ {q a k} → O q (out a) → Lane (polF op f′ O) q a k (pin r) → k ≺ y → k ∈ ks) → PinFew (JoinF op f′ O) r y
+join-pins f′ O (mergeᶠ nothing)  = JoinPins.pin-few _ O _ _ _ _
+join-pins f′ O (mergeᶠ (just m)) = JoinPins.pin-few _ O _ _ _ _
+join-pins f′ O switchᶠ           = JoinPins.pin-few _ O _ _ _ _
+join-pins f′ O exhaustᶠ          = JoinPins.pin-few _ O _ _ _ _
+
+-- A lane's pin's connect: in the world of some value's second child.
+lane-root : ∀ {Γ A B} {sc : Scope Γ} op {f : A → Obs Timeline Γ B} {O : EmissionSet A} → JInv sc f O
+          → ∀ {q a k r} → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a k (pin r)
+          → Σ Pos λ q₀ → Σ A λ b → O q₀ (out b) × W⁼ (Hots (full sc)) (q₀ ++ [ ix 1 ]) r × T (inside r k)
+lane-root {sc = sc} op {f} {O} ji x l = go op l
+  where
+    f′ = λ a → ⟦ f a ⟧ (full sc)
+    Io = JInv.io ji
+    root : ∀ m {i q s a} → Bounded.Sub m f′ O i q s a → Σ Pos λ q′ → Σ _ λ b → O q′ (out b) × W⁼ (Hots (full sc)) (q′ ++ [ ix 1 ]) s
+    root m sb with BoundedI.seat* (JInv.ok ji) m f′ (JInv.fi ji) Io sb
+    ... | BoundedI.seat′ _ _ _ nr rw = _ , _ , Nths.nth-val O nr , rw
+    go : ∀ op {k r} → Lane (polF op f′ O) _ _ k (pin r) → Σ Pos λ q₀ → Σ _ λ b → O q₀ (out b) × W⁼ (Hots (full sc)) (q₀ ++ [ ix 1 ]) r × T (inside r k)
+    go (mergeᶠ nothing) (l , _) = _ , _ , x , InvAt.pinned (Join.LI (JInv.ok ji) f′ (JInv.fi ji) Io x) l
+    go switchᶠ          (l , _) = _ , _ , x , InvAt.pinned (Join.LI (JInv.ok ji) f′ (JInv.fi ji) Io x) l
+    go exhaustᶠ         (l , _) = _ , _ , x , InvAt.pinned (Join.LI (JInv.ok ji) f′ (JInv.fi ji) Io x) l
+    go (mergeᶠ (just m)) (_ , _ , sb , l , _) with root m sb | InvAt.pinned (BoundedI.LI (JInv.ok ji) m f′ (JInv.fi ji) Io sb) l
+    ... | q₀ , b , x₀ , rw | w , i = q₀ , b , x₀ , W.nest⁼ rw w , i
+
+-- Two lanes pinning one connect, each under it: one lane.
+lane-same : ∀ {Γ A B} {sc : Scope Γ} op {f : A → Obs Timeline Γ B} {O : EmissionSet A} → JInv sc f O
+          → ∀ {q a q′ a′ y k r} → O q (out a) → O q′ (out a′)
+          → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a y (pin r) → T (inside r y)
+          → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q′ a′ k (pin r) → T (inside r k)
+          → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a k (pin r)
+lane-same {A = A} {B = B} {sc = sc} op {f} {O} ji {q} {a} {q′} {a′} {y} {k} {r} x x′ l iy l′ ik = go op l l′
+  where
+    f′ = λ a → ⟦ f a ⟧ (full sc)
+    Io = JInv.io ji
+    same : ∀ {L : Pos → A → EmissionSet B} → q ≡ q′ → L q′ a′ k (pin r) → L q a k (pin r)
+    same refl l′ with out-inj (InvAt.func Io x x′)
+    ... | refl = l′
+    -- merge, switch and exhaust: each lane at its value's second child
+    one : (l : Join.Lane (JInv.ok ji) f′ (JInv.fi ji) Io q a y (pin r)) → (l′ : Join.Lane (JInv.ok ji) f′ (JInv.fi ji) Io q′ a′ k (pin r))
+        → Join.Lane (JInv.ok ji) f′ (JInv.fi ji) Io q a k (pin r)
+    one l l′ with q ≟ᵖ q′
+    ... | yes eq = same {L = Join.Lane (JInv.ok ji) f′ (JInv.fi ji) Io} eq l′
+    ... | nay ne = ⊥-elim (Kids.kid-lane (JInv.ok ji) Io x plain-ix (proj₁ (InvAt.pinned (Join.LI (JInv.ok ji) f′ (JInv.fi ji) Io x) (proj₁ l)))
+                     x′ (Join.lw (JInv.ok ji) f′ (JInv.fi ji) Io x′ l′) (λ eq → ne (∷ʳ-injectiveˡ q q′ eq)) (inside-⊑ r k ik))
+    go : ∀ op → Lane (polF op f′ O) q a y (pin r) → Lane (polF op f′ O) q′ a′ k (pin r) → Lane (polF op f′ O) q a k (pin r)
+    go (mergeᶠ nothing) l l′ = one l l′
+    go switchᶠ          l l′ = one l l′
+    go exhaustᶠ         l l′ = one l l′
+    go (mergeᶠ (just m)) (i , s , sb , l) (i′ , s′ , sb′ , l′) = bnd (<-cmp i i′)
+      where
+        open BoundedI (JInv.ok ji) m f′ (JInv.fi ji) Io using (LI; sub-fun; rel; apart; queued-in; apart-ww; nest-back; lr-row)
+        w⁼  = proj₁ (InvAt.pinned (LI sb) (proj₁ l))
+        w⁼′ = proj₁ (InvAt.pinned (LI sb′) (proj₁ l′))
+        nq : ∀ {i q s a y} → (sb : Bounded.Sub m f′ O i q s a) → (l : After (f′ a) s y (pin r)) → After (f′ a) s y end → Bounded.Queued m f′ O y → ⊥
+        nq sb l e _ with InvAt.func (LI sb) (proj₁ l) (proj₁ e)
+        ... | ()
+        bnd : Tri (i < i′) (i ≡ i′) (i′ < i) → Lane (polF (mergeᶠ (just m)) f′ O) q a k (pin r)
+        bnd (tri≈ _ refl _) with sub-fun sb sb′
+        ... | refl , refl , refl = i′ , s′ , sb′ , l′
+        bnd (tri< lt _ _) with rel lt sb sb′
+        ... | apart xr xr′ ne rw rw′ = ⊥-elim (apart-ww xr xr′ ne (W.nest⁼ rw w⁼) (W.nest⁼ rw′ w⁼′))
+        ... | queued-in ac _ v      = ⊥-elim (nest-back sb ac (W.nest⁼ v w⁼′) (lr-row l (nq sb l)) (inside-⊑ r y iy))
+        bnd (tri> _ _ lt) with rel lt sb′ sb
+        ... | apart xr xr′ ne rw rw′ = ⊥-elim (apart-ww xr xr′ ne (W.nest⁼ rw w⁼′) (W.nest⁼ rw′ w⁼))
+        ... | queued-in ac _ v      = ⊥-elim (nest-back sb′ ac (W.nest⁼ v w⁼) (lr-row l′ (nq sb′ l′)) (inside-⊑ r k ik))
+
+-- A LANE'S PIN SHOWS IN ITS JOINER'S ENTRY, kept by `left`: no kill
+-- before its connect, so no cut there.  What it waits on there is the rows
+-- before its connect, which the cursor has behind it, and the connect's
+-- other pins: its own lane's, which it waited on already; no other lane's,
+-- whose world is apart; and no outer row's, none of which lies under a
+-- lane's world.
+flat-up-lane : ∀ {Γ} {sc : Scope Γ} {Rg C D A B} {op} {f : A → Obs Timeline Γ B} {ω O E q a}
+             → JInv sc f O → JoinE sc op f ω O E → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
+             → LanesIn (Hots (full sc)) (JRl sc Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O
+             → O q (out a) → Runs (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q
+             → Dom C D → (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
+             → Up D (Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a) C E
+flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {O = O} {E = E} {q = q} {a = a} ji je bh _ x rn dm nk =
+  up-at {D = D} {D′ = C} {E = Lane (polF op f′ O) q a} {E′ = E} lift
+  where
+    f′ = λ a → ⟦ f a ⟧ (full sc)
+    P = polF op f′ O
+    kept : ∀ op {y r} → Runs (polF op f′ O) q → Lane (polF op f′ O) q a y (pin r) → NoKill (polF op f′ O) q r → T (inside r y)
+         → JoinF op f′ O y (pin r)
+    kept (mergeᶠ nothing)  rn l _  i = Joining.left x rn l (λ ()) i
+    kept (mergeᶠ (just m)) rn l _  i = Joining.left x rn l (λ ()) i
+    kept exhaustᶠ          rn l _  i = Joining.left x rn l (λ ()) i
+    kept switchᶠ {r = r}   rn l nk′ i = Joining.left x rn l (λ { (q′ , a′ , x′ , qq′ , q′r) → ≺-irrefl {q′} (≺-≼-≺ {q′} {r} {q′} q′r (nk′ (a′ , x′ , qq′))) }) i
+    lift : ∀ {y r} → Thru D r → T (inside r y) → Lane P q a y (pin r) → Reach (Lane P q a) y (pin r) → Thru C r × E y (pin r) × Reach E y (pin r)
+    lift {y} {r} tr i l rc = dm tr , voc (proj₂ je) (kept op rn l (nk tr) i , rk) , reach-≈ (proj₂ je) (reach-img (λ t → _ , proj₁ t , λ eq → eq) rk)
+      where
+        rk : Reach (JoinF op f′ O) y (pin r)
+        rk = reach-few i (thru-few C bh (dm tr)) (join-pins f′ O op (proj₁ rc)
+               (λ {k} xo _ → let (_ , _ , x₀ , w , _) = lane-root op ji x l in ⊥-elim (InvAt.under (JInv.io ji) x₀ xo plain-ix w (inside-⊑ r k (proj₂ (InvAt.pinned (JInv.io ji) xo)))))
+               (λ {q′} {a′} {k} x′ l′ lt → proj₂ rc (lane-same op ji x x′ l i l′ (proj₂ (proj₂ (proj₂ (proj₂ (lane-root op ji x′ l′)))))) lt (λ _ → inj₂ refl)))
+
 -- A JOINER'S OUTER PIN SHOWS IN ITS ENTRY, kept by `opin`: what it waits
 -- on there is the rows before its connect, which the cursor has behind
 -- it, and the connect's other pins, which no lane carries.
@@ -267,17 +361,13 @@ flat-up-outer {sc = sc} {C = C} {op = op} {f = f} {O = O} {E = E} ji _ je bh = u
     held (mergeᶠ (just m)) x = Joining.opin x
     held switchᶠ           x = Joining.opin x
     held exhaustᶠ          x = Joining.opin x
-    pins : ∀ op {y r} → T (inside r y) → Reach O y (pin r) → (∀ {q a k} → O q (out a) → Lane (polF op f′ O) q a k (pin r) → ⊥)
-         → PinFew (JoinF op f′ O) r y
-    pins (mergeᶠ nothing)  = JoinPins.pin-few _ O _ _ _ _
-    pins (mergeᶠ (just m)) = JoinPins.pin-few _ O _ _ _ _
-    pins switchᶠ           = JoinPins.pin-few _ O _ _ _ _
-    pins exhaustᶠ          = JoinPins.pin-few _ O _ _ _ _
+    pins = join-pins f′ O
     lift : ∀ {y r} → Thru C r → T (inside r y) → O y (pin r) → Reach O y (pin r) → Thru C r × E y (pin r) × Reach E y (pin r)
     lift {y} {r} tr i x rc = tr , voc (proj₂ je) (held op x , rk) , reach-≈ (proj₂ je) (reach-img (λ t → _ , proj₁ t , λ eq → eq) rk)
       where
         rk : Reach F y (pin r)
-        rk = reach-few i (thru-few C bh tr) (pins op i rc (lane-not-outer op ji x))
+        rk = reach-few i (thru-few C bh tr) (pins op (proj₁ rc) (λ x′ lt → proj₂ rc x′ lt (λ _ → inj₂ refl))
+                                                    (λ x′ l _ → ⊥-elim (lane-not-outer op ji x x′ l)))
 
 -- An attached source: live, its rows inside the subscription few.
 src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → T (CS.srcAtt k) → Src sc Rg C k o → T (CS.srcLive k) × AttFin k
