@@ -436,14 +436,13 @@ conn-up-body {C = C} {k = k} {β = β} {E = E} _ pt sr bb _ ce = up-at {D = C} {
 -- `kept`: the body is alive after the pin's connect, whose end the cursor
 -- has not passed, or which lies under the body's end still owed, and no
 -- point of the source's world is the body's.
-conn-up-src : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
-            → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
+conn-up-src : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {β E : EmissionSet B}
+            → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → T (CS.srcLive k) → AttFin k → Behind C β → Flags C k β
             → ConnE (CS.connAt k) (Frozen k) β E → Up C (Frozen k) C E
-conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt sr bb fl ce = up lift
+conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt lv af bb fl ce = up lift
   where
     c = CS.connAt k
     open Connecting c (Frozen k) β using (ConnT; Alive; body; burst; echo; kept)
-    lv = proj₁ (src-att sa sr)
     Iσ = Parts.iσ pt
     Iβ = Parts.iβ pt
 
@@ -457,7 +456,7 @@ conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt sr bb fl ce = up lift
 
     -- before a row inside the subscription: only rows inside it
     few : ∀ {y} → T (inside (c ++ [ ix 1 ]) y) → Few (Frozen k) y
-    few {y} iw with proj₂ (src-att sa sr) sa
+    few {y} iw with af sa
     ... | ks , f = ks , g
       where
         g : ∀ {k′ e′} → Frozen k k′ e′ → k′ ≺ y → k′ ∈ ks

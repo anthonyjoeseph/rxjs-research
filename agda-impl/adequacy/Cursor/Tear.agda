@@ -14,7 +14,7 @@ open import Tree using (Obs)
 open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-no;
-  flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts)
+  flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts; src-att)
 open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
@@ -54,27 +54,12 @@ unbind refl h = h
 subd-thru : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k)
 subd-thru {C = C} sd = thru-sub C (SubdAt.past sd)
 
--- A cursor moved on: every closure read from it.
-mutual
-  husk-adv : ∀ {Γ} {sc : Scope Γ} {C D A} {s : St Γ A} {E P} → Dom C D → Husk sc D s E P → Husk sc C s E P
-  husk-adv dm (h-blank q)       = h-blank q
-  husk-adv dm (h-map hk u)      = h-map hk (up-adv dm u)
-  husk-adv dm (h-scan hk u)     = h-scan hk (up-adv dm u)
-  husk-adv dm (h-cut hk u)      = h-cut hk (up-adv dm u)
-  husk-adv dm (h-ln hk u)       = h-ln hk (up-adv dm u)
-  husk-adv dm (h-take hk u)     = h-take hk (up-adv dm u)
-  husk-adv dm (h-flat ho u hl)  = h-flat ho (up-adv dm u) (huskL-adv dm hl)
-  husk-adv dm (h-conn sh bh u)  = h-conn (srch-adv dm sh) bh (up-adv dm u)
-
-  huskL-adv : ∀ {Γ} {sc : Scope Γ} {C D A} {ls : List (St Γ A)} {E P} → Dom C D → HuskL sc D ls E P → HuskL sc C ls E P
-  huskL-adv dm hl-none          = hl-none
-  huskL-adv dm (hl-more h u t)  = hl-more h (up-adv dm u) (huskL-adv dm t)
-
-  srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
-  srch-adv dm (sh-dead hk u sf)                       = sh-dead hk (up-adv dm u) sf
-  srch-adv dm (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss ao ic bu (dm nr)
-  srch-adv dm (sh-islec na cl sp tp hk di bh sd ao ic bu nr) = sh-islec na cl sp tp hk di bh sd ao ic bu (dm nr)
-  srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (dm nr)
+-- A cursor moved on: a source's closure read from it.
+srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
+srch-adv dm (sh-dead hk u sf)                       = sh-dead hk (up-adv dm u) sf
+srch-adv dm (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss ao ic bu (dm nr)
+srch-adv dm (sh-islec na cl sp tp hk di bh sd ao ic bu nr) = sh-islec na cl sp tp hk di bh sd ao ic bu (dm nr)
+srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (dm nr)
 
 -- Nothing, shown nowhere.
 ∅E : ∀ {A} → EmissionSet A
@@ -111,10 +96,10 @@ mutual
   src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
     _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts pt ce) (thru-no C nr)
   src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic _) bb fl ce =
-    by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt sr bb fl ce) (inj₁ t))
+    by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce) (inj₁ t))
                      (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts pt ce) (subd-thru {k = k} sd))
   src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic _ _) bb fl ce =
-    by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt sr bb fl ce)) (inj₁ t))
+    by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce)) (inj₁ t))
                      (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts pt ce) (subd-thru {k = k} sd))
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}

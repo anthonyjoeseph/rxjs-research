@@ -8,8 +8,8 @@ module adequacy.Guard where
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.List using ([]; _∷_; [_]; _++_)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -102,38 +102,7 @@ open import denotation.Laws.Modulus using (ticks; ≺-irrefl; ≺→≼)
 open import Data.Nat using (zero; suc; _≤_)
 open import Data.Nat.Properties using (n≤1+n)
 
--- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
--- of one.
-data Zs (q : Pos) : Pos → Set where
-  z₁ : Zs q (q ++ [ ix 0 ])
-  z+ : ∀ {y} → Zs q y → Zs q (y ++ [ ix 0 ])
-
--- A chain's foot past its head.
-zs-past : ∀ {q y} → Zs q y → q ≺ y
-zs-past {q} z₁ = ≺-ext q []
-zs-past {q} (z+ {y} z) = ≺-trans {q} {y} {y ++ [ ix 0 ]} (zs-past z) (≺-ext y [])
-
--- The positions from `q` up to, not including, the chain's foot.
-zl : ∀ {q y} → Zs q y → List Pos
-zl {q} z₁       = [ q ]
-zl (z+ {y} z) = y ∷ zl z
-
--- Between `q` and a first-child chain's foot: on the chain.
-zs-btw : ∀ {q y w} (z : Zs q y) → q ≼ w → w ≺ y → w ∈ zl z
-zs-btw {q} {w = w} z₁ qw wy with <ᵖ-split q w (≼-false {q} {w} qw)
-... | inj₁ lt   = ⊥-elim (first-child q (Equivalence.from T-≡ lt) wy)
-... | inj₂ refl = here refl
-zs-btw {w = w} (z+ {y} z) qw wy with ≼-or-≻ y w
-... | inj₂ wy′ = there (zs-btw z qw wy′)
-... | inj₁ yw with <ᵖ-split y w (≼-false {y} {w} yw)
-...   | inj₁ lt   = ⊥-elim (first-child y (Equivalence.from T-≡ lt) wy)
-...   | inj₂ refl = here refl
-
--- A chain's foot lies under the first child.
-zs-under : ∀ {q y} → Zs q y → Σ Pos λ xs → y ≡ (q ++ [ ix 0 ]) ++ xs
-zs-under z₁ = [] , sym (++-identityʳ _)
-zs-under (z+ {y} z) with zs-under z
-... | xs , refl = xs ++ [ ix 0 ] , ++-assoc _ xs [ ix 0 ]
+open import adequacy.IsleLift using (Zs; z₁; z+; zs-past; zl; zs-btw; zs-under; isle-pin; pn)
 
 -- A position under the first child has it among its ancestors.
 under-∈ : ∀ q xs → (q ++ [ ix 0 ]) ∈ prefixes ((q ++ [ ix 0 ]) ++ xs)
@@ -636,27 +605,17 @@ module Outer {R} (o : PureObs [] R) where
                     | Along.met-next (cursor o) {c = nothing} (conv rs) m
   ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
 
-postulate
-  -- AN ISLE SHOWS UNDER ITS STEP: a step rising whose lift meets a source
-  -- in its subscribe burst under a connect no live node reads has a row of
-  -- the root's entry under its first child.  Nothing such a source runs
-  -- shows where the root reads but its pins.
-  -- DEAD ROUTE: a weight every silent isle step lightens.  A body under a
-  --   take whose cut waits on its attach keeps its joiners on, so a feed
-  --   from the isle enqueues inbox entries heavier than the climb dropped.
-  --   `off` empties those joiners, but an outer or defer step inside the
-  --   isle does real work and lightens nothing.
-  -- DEAD ROUTE: a cursor-free field, set where the reader dies, giving
-  --   every burst row of the connect a root row.  Unrestricted it is false:
-  --   an inner connect whose body never returns leaves source pins with
-  --   infinitely many burst pins before them, which the connect truncates.
-  --   Restricted to burst rows with few source rows before them, it cannot
-  --   be set for an isle subscribed inside a part already dead, whose
-  --   enclosing isle's source has no such bound at that row.
-  isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q Cr}
-           → Path (load o) rs ⟨ c , s , m , q ⟩ → Busy m
-           → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
-           → Σ Pos λ r → Σ (Ev R) λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs
+-- AN ISLE SHOWS UNDER ITS STEP: a step rising whose lift meets a source
+-- in its subscribe burst under a connect no live node reads has a row of
+-- the root's entry under its first child.
+isle-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q Cr}
+         → Path (load o) rs ⟨ c , s , m , q ⟩ → Busy m
+         → Lift.Isled (enter (⟦ o ⟧ []ᴬ) root) Cr q (plug c s)
+         → Σ Pos λ r → Σ (Ev R) λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × Σ Pos λ xs → r ≡ (q ++ [ ix 0 ]) ++ xs
+isle-row o {q = q} pth bz (Lift.isled {c = c} {k = k} {b = b} {o = o′} u hb _ le _ _ bh sd _ ao _ bu nr _ eq row yq)
+  with isle-pin (enter (⟦ o ⟧ []ᴬ) root) {c = c} {k = k} {o = o′} {b = b} u hb le bh sd ao bu nr (subst (λ S → Lo S (after q)) eq (floor o pth bz)) row yq
+... | pn {y} _ _ x _ z with zs-under z
+...   | xs , refl = y , _ , x , xs , refl
 
 -- A GUARD IN AN ISLE: a row under the step's first child, at or before
 -- the row met next, which the connect's frames bound past it.

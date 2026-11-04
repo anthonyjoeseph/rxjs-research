@@ -17,14 +17,12 @@ open import Data.List.Relation.Unary.Any using (here; there) renaming (map to an
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; ix; last; inside)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; MapT; map-out; map-skip; map-pin; map-end;
   module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; ≼-≺-≺)
-open import adequacy.Cursor using (Owes; Behind; _≈_; cov)
-open import adequacy.Bound using (owes-≼)
+open import adequacy.Cursor using (_≈_; cov)
 
 ------------------------------------------------------------------------
 -- What a pin waits on, split: every row before its connect, and its own
@@ -36,14 +34,6 @@ PinFew E r y = Σ (List Pos) λ ks → ∀ {k} → E k (pin r) → k ≺ y → k
 
 reach-few : ∀ {A} {E : EmissionSet A} {y r} → T (inside r y) → Few E r → PinFew E r y → Reach E y (pin r)
 reach-few i (ks , f) (ls , g) = ks ++ ls , λ x ky d → [ (λ kr → ∈-++⁺ˡ (f x kr)) , (λ { refl → ∈-++⁺ʳ ks (g x ky) }) ]′ (d i)
-
--- A pin's wait, read without its connect: its own pins before it.
-few-pin : ∀ {A} {E : EmissionSet A} {y r} → T (inside r y) → Reach E y (pin r) → PinFew E r y
-few-pin i (ks , f) = ks , λ x ky → f x ky (λ _ → inj₂ refl)
-
--- Passed at `C`, a connect: every row before it.
-before-few : ∀ {A} {C} {E : EmissionSet A} {r} → Behind C E → ¬ Owes C r → Few E r
-before-few {C = C} {r = r} (ks , f) nr = ks , λ {k} x kr → f x (λ o → nr (owes-≼ C o (≺→≼ {k} {r} kr)))
 
 ------------------------------------------------------------------------
 -- Images

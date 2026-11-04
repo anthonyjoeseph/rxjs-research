@@ -22,8 +22,8 @@ open import Function using (Equivalence)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; ix; inside; inside-++)
-open import denotation.EmissionSet using (EmissionSet; pin; end; _≺_; _≼_; Reach; module Connecting)
-open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≼-trans; ≺-trans)
+open import denotation.EmissionSet using (EmissionSet; pin; end; _≺_; Reach; module Connecting)
+open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans)
 open import denotation.Laws.Worlds using (ok-step)
 open import operation.Key using (at; after; at-after-≮)
 open import operation.PureObservable using (module Machine)
@@ -31,10 +31,10 @@ open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; 
                     pend; connS; inSrc; scopeOf; binds; closed; unsubIf)
 open import adequacy.Rows using (Frozen; ≃-refl; Vis; _≃_; _⇄_; silent; Moves)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; aft; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd;
-  re-parts; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans;
-  h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn;
-  Torn; ≈-refl; notT; subd; Thru; Up; up; InCall; Bursts; BurstsAt)
+open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; re-parts;
+  under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank;
+  h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn;
+  ≈-refl; notT; subd; Thru; Up; up; InCall; Bursts; BurstsAt)
 open import adequacy.Cursor.Show using (up-pre; conn-up-body; in-call; thru-dn)
 open import adequacy.Cursor.Tear using (husk-of; src-husk; unsubIf-husk; quiet-unsubIf; NoIsle; c-abs; sync-pend)
 open import adequacy.Cursor.Frame using (Unread; un-dead; un-torn; owes; dead; lane; lanecut; pnd; Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
