@@ -44,9 +44,9 @@ open import adequacy.Bound using (Bnd; LoP; Env; owes-≼; map-b; scan-b; take-b
 
 HB : ∀ {Γ A} → Cur → Pos → Scope Γ → Need → EmissionSet A → Set₁
 HB C p sc owes          E = Env (full sc) C p → Bnd C p E
-HB C p sc (dead _)      E = ⊤
-HB C p sc (lane b _)    E = T b → Env (full sc) C p → Bnd C p E
-HB C p sc (lanecut b _) E = T b → Env (full sc) C p → Bnd C p E
+HB C p sc (dead _ _)      E = ⊤
+HB C p sc (lane b _ _)    E = T b → Env (full sc) C p → Bnd C p E
+HB C p sc (lanecut b _ _) E = T b → Env (full sc) C p → Bnd C p E
 HB C p sc (pnd _)       E = ⊥₁
 
 -- A connect's entry, its body bounded while its source runs.
@@ -104,7 +104,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     fb {s = s} (f-cut fr) lo hb = fb {s = Machine.cutS true _ s} fr lo hb
     fb {C = C} {s = s} (f-take fr nf m _) lo hb =
       fb {s = takeS _ _ _ s} fr lo λ env (x , v , ow) → take-b {C = C} (hb env) nf (from (alike m) (x , v)) ow
-    fb {C = C} {c = Machine.inTake _ _ _ c} {s = s} (f-took fr fl g ni oa _ m sd) lo _ =
+    fb {C = C} {c = Machine.inTake _ _ _ c} {s = s} (f-took fr fl g ni oa _ _ _ m sd) lo _ =
       fb {s = takeS _ _ _ s} fr lo λ env (x , v , ow) →
         took-b {C = C} {s = s} fl g ni oa sd (λ ki → lo (plug-in c ki)) (from (alike m) (x , v)) ow
     fb {C = C} {c = Machine.inOuter op f _ _ _ _ ls c} {s = s} (f-outer fr _ (joined bg _ wh _ ah _ en _) je _ _) lo hb =
@@ -113,7 +113,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           (λ iv kl ln v′ ow′ → begun-b bg iv kl ln v′ ow′ en env (λ i ki → lo (plug-in c (k-kid (k-lane i ki))))) wh ah
           (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
     fb {C = C} {c = Machine.inLanes op f _ _ _ _ o pre post c} {s = s}
-       (f-lanes {vs₁ = vs₁} fr _ sy bg₁ y _ _ hl bg₂ _ _ wh _ ah _ en _ je _ _ _) lo hb =
+       (f-lanes {vs₁ = vs₁} fr _ sy bg₁ y _ _ hl bg₂ _ _ wh _ ah _ en _ je _ _ _ _) lo hb =
       fb {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr lo λ env (x , v , ow) →
         flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full (scopeOf c))} {C = C}
           (bound sy env (λ ki → lo (plug-in c (k-kid (k-outer ki)))))
@@ -128,7 +128,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)
                          (λ ki → lo (plug-in c (k-kid (k-body ki)))))
           (λ _ (x , v , ow) → let (y , v′) = from (alike fe) (x , v) in hb env (y , v′ , ow)) fl env ce
-    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ bs _ fl ce) lo _ =
+    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ _ bs _ fl ce) lo _ =
       fb {s = connS k s b} fr lo λ env →
         conn-fb {C = C} sc
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)
@@ -138,23 +138,23 @@ module _ {R : Set} (Rt : EmissionSet R) where
     fb {C = C} {c = Machine.inBody k o c} {s = s} (f-body fr sc _ _ sr _ fl ce) lo hb =
       fb {s = connS k o s} fr lo λ env →
         conn-fb {C = C} sc (λ _ → hb) (λ _ → src-fb {b = s} sc sr env (λ ki → lo (plug-in c ki))) fl env ce
-    fb {s = s} (d-map fr) lo _ = fb {s = Machine.mapS _ s} fr lo _
-    fb {s = s} (d-scan fr) lo _ = fb {s = Machine.scanS _ _ s} fr lo _
-    fb {s = s} (d-cut fr) lo _ = fb {s = Machine.cutS _ _ s} fr lo _
-    fb {s = s} (d-ln fr) lo _ = fb {s = Machine.lnS _ s} fr lo _
-    fb {s = s} (d-take fr) lo _ = fb {s = takeS _ _ _ s} fr lo _
-    fb {c = Machine.inOuter _ _ _ _ _ _ ls _} {s = s} (d-outer fr _ _) lo _ = fb {s = flatS _ _ _ _ _ _ s ls} fr lo _
-    fb {c = Machine.inLanes _ _ _ _ _ _ o pre post _} {s = s} (d-lanes fr _ _ _ _) lo _ =
+    fb {s = s} (d-map fr _) lo _ = fb {s = Machine.mapS _ s} fr lo _
+    fb {s = s} (d-scan fr _) lo _ = fb {s = Machine.scanS _ _ s} fr lo _
+    fb {s = s} (d-cut fr _) lo _ = fb {s = Machine.cutS _ _ s} fr lo _
+    fb {s = s} (d-ln fr _) lo _ = fb {s = Machine.lnS _ s} fr lo _
+    fb {s = s} (d-take fr _) lo _ = fb {s = takeS _ _ _ s} fr lo _
+    fb {c = Machine.inOuter _ _ _ _ _ _ ls _} {s = s} (d-outer fr _ _ _) lo _ = fb {s = flatS _ _ _ _ _ _ s ls} fr lo _
+    fb {c = Machine.inLanes _ _ _ _ _ _ o pre post _} {s = s} (d-lanes fr _ _ _ _ _ _) lo _ =
       fb {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr lo _
-    fb (d-src u _ _ _ _) lo _ = fb-u u lo
-    fb (d-body u _ _) lo _ = fb-u u lo
-    fb (f-isle u _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (f-islec u _ _ _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (f-islep u _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (d-src u _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (d-body u _ _ _) lo _ = fb-u u lo
+    fb (f-isle u _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-islec u _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-islep u _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
 
-    fb-u : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {P} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
-         → Unread Rt Cr C c k P → LoP (plug c (connS k o b)) p → Bnd Cr p Rt
+    fb-u : ∀ {Cr C D Γ X B} {E β : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {P} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
+         → Unread Rt Cr C D E β c k P → LoP (plug c (connS k o b)) p → Bnd Cr p Rt
     fb-u {o = o} {b} (un-dead fr) lo = fb {s = connS _ o b} fr lo _
-    fb-u {C = C} {k = k} {o = o} {b} (un-torn fr sc _ nl fl ce _) lo =
+    fb-u {C = C} {k = k} {o = o} {b} (un-torn fr sc _ nl fl ce _ _) lo =
       fb {s = connS k o b} fr lo λ env →
         conn-fb {C = C} sc (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t)) fl env ce

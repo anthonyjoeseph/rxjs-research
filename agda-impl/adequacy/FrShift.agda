@@ -51,11 +51,11 @@ open HR
 
 HF : ∀ {Γ A} → Cur → Pos → Scope Γ → Need → EmissionSet A → Set₁
 HF C p sc owes              E = HR C p sc E
-HF C p sc (dead _)          E = ⊥₁
-HF C p sc (lane true _)     E = HR C p sc E
-HF C p sc (lane false _)    E = ⊥₁
-HF C p sc (lanecut true _)  E = HR C p sc E
-HF C p sc (lanecut false _) E = ⊥₁
+HF C p sc (dead _ _)          E = ⊥₁
+HF C p sc (lane true _ _)     E = HR C p sc E
+HF C p sc (lane false _ _)    E = ⊥₁
+HF C p sc (lanecut true _ _)  E = HR C p sc E
+HF C p sc (lanecut false _ _) E = ⊥₁
 HF C p sc (pnd _)           E = ⊥₁
 
 -- A frame's entry read off its hole's.
@@ -144,13 +144,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
       hf′ = hr λ env ef → lag-≈ (proj₂ je) (lag-at (λ r → _ , proj₁ r) (jl env ef)) ,
         λ (x , v , ow) → flat-b {op = op} {F = F} {C = C} (proj₂ (run hf env ef)) (lb env) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
   rc {C = C} {c = Machine.inLanes op f _ _ _ qu o pre post c} {E = E} {s = s} {p}
-     (f-lanes {E′ = E′} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {ws = ws} {q = q} {a = a} {b = true} fr ji sy bg₁ y nq ru hl bg₂ eqn wt wh od ah as en li je sd sdl bh) hf w lo =
+     (f-lanes {E′ = E′} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {ws = ws} {q = q} {a = a} {b = true} fr ji sy bg₁ y nq ru hl bg₂ eqn wt wh od ah as en li je sd sdl bh _) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr hf′ w lo
         ob = bound sy env loo
     in Cr′ , f-lanes fr′ ji (shift sy w env ef loo) (Shifted.begun-sh {C} {p} w (ku ob) bg₁ env ef lpre) y (Shifted.nm {C} {p} w nq) ru (Shifted.hole-sh {C} {p} w (ku ob) hl)
                  (Shifted.begun-sh {C} {p} w (ku ob) bg₂ env ef lpost) eqn (Shifted.waiting-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} {qu = qu} (lb env ef) ah wt)
                  (Shifted.whole-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} ob wh) (Shifted.od-sh {C} {p} w {O = O} ob od)
-                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef))
+                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef)) (λ ())
        , env , ef , d
     where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
@@ -174,7 +174,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr λ env ef → lag-≈ (proj₂ je) (lag-at (λ r → _ , proj₁ r) (jl env ef)) ,
         λ (x , v , ow) → flat-b {op = op} {F = F} {C = C} (bound sy env loo) (lb env ef) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
-  rc (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc {s = s} (f-lane {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.lnS true s} fr hf w lo in Cr′ , f-lane fr′ , rs
   rc (f-lane {b = false} _) () w lo
   rc {s = s} (f-lnct {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.cutS true _ s} fr hf w lo in Cr′ , f-lnct fr′ , rs
@@ -213,9 +213,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
         let (envb , efb , sb , bf) = body-env {b = s} sc sr env ef loc
         in lag-≈ (proj₁ ce) (lag-at (λ r → _ , proj₁ r) (conn-lag {k = k} (proj₁ (run hf envb efb)) bf)) ,
            conn-fb {C = C} sc (λ _ _ → proj₂ (run hf envb efb)) (λ _ → sb) fl env ce
-  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk le na nc bh sd ss ao ni) hf w lo =
-    Cr , f-isle u hk (burst-dn {C = Ci} {C′ = bef p} {k = k} (λ o → owes-≼ Ci w o) le) na nc (behind-bef bh (proj₁ (run hf env ef)))
-                (Shifted.subd′ {Ci} {p} w sd) ss ao ni
+  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao bu nr ni) hf w lo =
+    Cr , f-isle u hk ub (burst-dn {C = Ci} {C′ = bef p} {k = k} (λ o → owes-≼ Ci w o) le) na nc (behind-bef bh (proj₁ (run hf env ef)))
+                (Shifted.subd′ {Ci} {p} w sd) ss ao bu nr ni
        , env , ef , ≃-refl
     where
       loc : LoP (connS k s b) p
@@ -224,20 +224,20 @@ module _ {R : Set} (Rt : EmissionSet R) where
                                                            (λ ae → loc (k-own (own-bld k {o = s} {b = b} (os ae)))))
       env = proj₁ ie
       ef  = proj₂ ie
-  rc (f-took _ _ _ _ _ _ _ _) () w lo
-  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-took _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
-  rc (d-map _) () w lo
-  rc (d-scan _) () w lo
-  rc (d-cut _) () w lo
-  rc (d-ln _) () w lo
-  rc (d-take _) () w lo
-  rc (d-outer _ _ _) () w lo
-  rc (d-lanes _ _ _ _ _) () w lo
-  rc (d-src _ _ _ _ _) () w lo
-  rc (d-body _ _ _) () w lo
-  rc (f-islec _ _ _ _ _ _ _ _ _) () w lo
-  rc (f-islep _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (d-map _ _) () w lo
+  rc (d-scan _ _) () w lo
+  rc (d-cut _ _) () w lo
+  rc (d-ln _ _) () w lo
+  rc (d-take _ _) () w lo
+  rc (d-outer _ _ _ _) () w lo
+  rc (d-lanes _ _ _ _ _ _ _) () w lo
+  rc (d-src _ _ _ _ _ _ _) () w lo
+  rc (d-body _ _ _ _) () w lo
+  rc (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
 
   -- The frames, and the hole itself by `shift`, its keys being the tree's.
   fr-shift : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s : St Γ A} {Rg E p}
