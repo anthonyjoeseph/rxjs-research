@@ -33,7 +33,7 @@ open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; Bursts
   Lane; polF; up; JoinF; JoinE; JInv; JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE;
   Src; src-pend; src-on; src-shut; bursts; BurstsAt; notT; AttFin)
 open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; nonempty⁼; world-after; world-after⁼; inside-⊑; ⊑-inside)
-open import adequacy.Bound using (next-slot; in-slot; owes?)
+open import adequacy.Bound using (next-slot; in-slot; owes?; owes-≼)
 open import adequacy.Rows using (≼-≢)
 import denotation.Laws.Worlds as W
 open import adequacy.PinLift using (reach-≈; reach-img; reach-map; reach-scan; reach-take)
@@ -215,11 +215,6 @@ postulate
                → Dom C D → (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
                → Up D (Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a) C E
 
-  -- A CONNECT'S BODY PIN SHOWS IN ITS ENTRY, kept by `body`.
-  conn-up-body : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
-               → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
-               → ConnE (CS.connAt k) (Frozen k) β E → Up C β C E
-
 -- An attached source: live, its rows inside the subscription few.
 src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → T (CS.srcAtt k) → Src sc Rg C k o → T (CS.srcLive k) × AttFin k
 src-att sa (src-pend na _ _ _ _ _ _ _ _)  = ⊥-elim (notT _ na sa)
@@ -228,6 +223,57 @@ src-att sa (src-shut _ _ _ _ _ _ _ _ af lv) = lv , af
 
 pin-inj : ∀ {A} {a b} → pin {A} a ≡ pin b → a ≡ b
 pin-inj refl = refl
+
+-- A CONNECT'S BODY PIN SHOWS IN ITS ENTRY, kept by `body`.  What it
+-- waits on there: the body's rows it waited on, and the source's rows
+-- before its connect, which the cursor has passed and the source has
+-- behind it.  No source row is re-pinned to the same connect: a burst's
+-- connect is the body's own, before every body pin, and no point of the
+-- source's world is the body's.
+conn-up-body : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
+             → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
+             → ConnE (CS.connAt k) (Frozen k) β E → Up C β C E
+conn-up-body {C = C} {k = k} {β = β} {E = E} _ pt sr bb _ ce = up-at {D = C} {D′ = C} {E = β} {E′ = E} lift
+  where
+    c = CS.connAt k
+    open Connecting c (Frozen k) β using (ConnT; body; burst; echo; kept)
+    Iσ = Parts.iσ pt
+    Iβ = Parts.iβ pt
+
+    -- the source's rows the cursor has passed: finitely many
+    sbf : ∀ {sc′ Rg′ o′} → Src sc′ Rg′ C k o′ → Σ _ λ ks → ∀ {q e} → Frozen k q e → ¬ Owes C q → q ∈ ks
+    sbf (src-pend _ _ _ _ _ _ _ ow _)   = [] , λ x no → ⊥-elim (no (owes-≼ C ow (≺→≼ {c ++ [ ix 1 ]} (world-after (InvAt.world Iσ x) (InvAt.real Iσ x)))))
+    sbf (src-on _ _ bs _ _ _ _ _)       = bs
+    sbf (src-shut _ _ _ _ _ bs _ _ _ _) = bs
+    sb = sbf sr
+
+    lift : ∀ {y r} → Thru C r → T (inside r y) → β y (pin r) → Reach β y (pin r) → Thru C r × E y (pin r) × Reach E y (pin r)
+    lift {y} {r} tr ir b (ks , f) = tr , voc (proj₁ ce) (body b , rk) , reach-≈ (proj₁ ce) (reach-img (λ t → _ , proj₁ t , λ eq → eq) rk)
+      where
+        -- the body's pin: of a connect past the body's subscription
+        cr : (c ++ [ ix 0 ]) ≼ r
+        cr = pin-law (real-snoc c plain-ix (Parts.cr pt)) Iβ b
+        notc : c ≡ r → ⊥
+        notc eq = ≺-irrefl {c} (≺-≼-≺ {c} {c ++ [ ix 0 ]} {c} (≺-ext c []) (subst ((c ++ [ ix 0 ]) ≼_) (sym eq) cr))
+        notk : ∀ {k′} → Frozen k k′ (pin r) → ⊥
+        notk x = Parts.wapart pt (proj₁ (InvAt.pinned Iβ b)) (proj₁ (InvAt.pinned Iσ x)) (W.⊑-refl r)
+        -- a source row before the pin's connect: passed
+        passed : ∀ {k′ e} → Frozen k k′ e → (k′ ++ [ ix 0 ]) ≺ r → k′ ∈ proj₁ sb
+        passed {k′} x lt = proj₂ sb x (λ o → ≺-irrefl {k′} (≺-≼-≺ {k′} {r} {k′} (≺-trans {k′} {k′ ++ [ ix 0 ]} {r} (≺-ext k′ []) lt) (thru-owes C tr o)))
+        rk : Reach ConnT y (pin r)
+        rk = ks ++ map (_++ [ ix 0 ]) (proj₁ sb) , g
+          where
+            g : ∀ {q e′} → ConnT q e′ → q ≺ y → (T (inside r y) → PDep r q e′) → q ∈ ks ++ map (_++ [ ix 0 ]) (proj₁ sb)
+            g (body b′) lt d = ∈-++⁺ˡ (f b′ lt d)
+            g (burst {k′} x _) _ d with d ir
+            ... | inj₁ lt = ∈-++⁺ʳ ks (∈-map⁺ (_++ [ ix 0 ]) (passed x lt))
+            ... | inj₂ eq = ⊥-elim (notc (pin-inj eq))
+            g (echo {k′} x _ _ _) _ d with d ir
+            ... | inj₁ lt = ∈-++⁺ʳ ks (∈-map⁺ (_++ [ ix 0 ]) (passed x lt))
+            ... | inj₂ ()
+            g (kept {k′} x _ _ _) _ d with d ir
+            ... | inj₁ lt = ∈-++⁺ʳ ks (∈-map⁺ (_++ [ ix 0 ]) (passed x lt))
+            ... | inj₂ refl = ⊥-elim (notk x)
 
 -- AN ATTACHED SOURCE'S PIN SHOWS IN ITS CONNECT'S ENTRY.  Inside the
 -- subscription it is re-pinned to the connect by `burst`: every source
