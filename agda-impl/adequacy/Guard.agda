@@ -331,8 +331,8 @@ on-chain sc f {O} ji op li z x l qw wy =
 -- A source's rows behind the cursor, few, however it stands.
 src-behind : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Behind C (Frozen k)
 src-behind {C = C} {k = k} eq (src-pend _ _ _ _ adm _ _ ow _) = behind-pend {C = C} {k = k} eq adm ow
-src-behind _  (src-on _ _ bh _ _ _ _)       = bh
-src-behind _  (src-shut _ _ _ _ _ bh _ _)   = bh
+src-behind _  (src-on _ _ bh _ _ _ _ _)       = bh
+src-behind _  (src-shut _ _ _ _ _ bh _ _ _ _)   = bh
 
 -- A body's row at a chain's foot reaches within the connect: the body's
 -- reach, and the source's rows behind or on the chain, one level down.
@@ -552,7 +552,7 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
   lift (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni) _ _ r _ z _ _ = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu nr ni refl r (inj₂ z))
   lift (f-took _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (d-map _ _) _ ()
   lift (d-scan _ _) _ ()
@@ -618,7 +618,7 @@ module Outer {R} (o : PureObs [] R) where
       alive : Connecting.Alive (CS.connAt k) (Frozen k) β q
       alive = conn-alive {q = q} {q} pt fl lv lof past rs on
   src-step (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni) _ (_ , row) = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu nr ni refl row (inj₁ refl))
-  src-step (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  src-step (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (d-src _ _ _ _ _ _ _) _ ()
   src-step (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
@@ -719,7 +719,7 @@ defer-lift : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e Cr C
            → E (q ++ [ ix 0 ]) skip → Clr q (q ++ [ ix 0 ]) E → Rg q
            → RowUnder o (q ++ [ ix 0 ]) p
 defer-lift o {c = c} {l} {q} pth du fr ow h g cl rg
-  with rc (enter (⟦ o ⟧ []ᴬ) root) {s = pend (defer l) q} fr h ow (lo-p (lo-weaken (at q) (after q) (floor o pth tt) (at-after₀ q)))
+  with rc (enter (⟦ o ⟧ []ᴬ) root) {s = pend (defer l) q} fr h ow (lo-weaken (at q) (after q) (floor o pth tt) (at-after₀ q))
 ... | _ , fr′ , _ , _ , d
   with Lift.lift (enter (⟦ o ⟧ []ᴬ) root) {s = pend (defer l) q} fr′ (lo₀ c {pend (defer l) q} (floor o pth tt)) tt g m-skip z₁ cl rg
 ...   | inj₁ lf = Outer.under o lf (_≃_.to d du)

@@ -596,6 +596,9 @@ record Flags {Γ X B} (C : Cur) (k : CS Γ X) (β : EmissionSet B) : Set where
     torn   : T (not (CS.srcLive k)) → Spent C β
     owed   : ∀ {q} → CS.owedAt k ≡ just q → β q end × ¬ Owes C q
     ended  : T (CS.srcLive k) → ∀ {c} → β c end → ¬ Owes C c → CS.owedAt k ≡ just c
+    -- its teardown not yet run: nothing reached past its body's end but
+    -- under it
+    owing  : ∀ {q} → CS.owedAt k ≡ just q → ∀ {r} → Thru C r → r ≼ q ⊎ T (inside q r)
 
 -- A first-child chain from `q` down to `w`, `q` itself included.
 data Ze (q : Pos) : Pos → Set where
@@ -689,12 +692,13 @@ data Src where
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Behind C (Frozen k)
-           → Subd sc C k → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → (T (not (CS.srcAtt k)) → InCall C k) → Src sc Rg C k o
+           → Subd sc C k → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → (T (not (CS.srcAtt k)) → InCall C k) → T (CS.srcLive k)
+           → Src sc Rg C k o
   -- ended: nothing visible left to owe, the rest within what its subtree
   -- still runs
   src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o P} → T (CS.closed k) → Spent C (Frozen k)
            → TailP C (Frozen k) P → ∀ {D} → Husk sc D o (Frozen k) P → Dom C D → Behind C (Frozen k)
-           → Subd sc C k → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k) → Src sc Rg C k o
+           → Subd sc C k → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k) → AttFin k → T (CS.srcLive k) → Src sc Rg C k o
 
 data Husk where
   -- nothing in it still in step

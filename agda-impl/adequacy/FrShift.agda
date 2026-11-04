@@ -32,9 +32,9 @@ open import adequacy.Cursor using (Cur; bef; Owes; Due; Pol; Kill; kill-out; Kep
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
-open import adequacy.Floor.Keys using (plug-in; own-bld; os)
+open import adequacy.Floor.Keys using (plug-in; own-bld; os; oo)
 open import adequacy.Least using (k-own; k-kid; k-outer; k-lane; k-body; Lo)
-open import adequacy.Bound using (Bnd; LoP; Env; env-bind; owes-≼; lo-p; map-b; scan-b; take-b; flat-b; begun-b; bound; src-b; body-key)
+open import adequacy.Bound using (Bnd; LoP; Env; env-bind; owes-≼; lo-p; map-b; scan-b; take-b; flat-b; begun-b; bound; src-b; body-key; ≮-after)
 open import adequacy.FrameBound using (conn-fb; lanes-b; pre-in; post-in)
 open import adequacy.Few using (call-sh; Lag; EnvL; KLag; LBnd; lag-≈; lag-at; map-row; scan-row; take-lag; behind-bef; conn-lag; flat-lag; hole-kl;
   begun-f; few; envl-bind; src-f; subd-env; att-slot; shift; module Shifted)
@@ -79,7 +79,7 @@ body-env {k = k} refl sr env ef lo =
   src-b sr env lo , src-f sr env ef lo
 
 src-sh′ : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p} → Owes C p
-        → CS.scope k ≡ sc → Src sc Rg C k o → Env (full sc) C p → EnvL (full sc) C p → LoP (connS k o b) p → Src sc Rg (bef p) k o
+        → CS.scope k ≡ sc → Src sc Rg C k o → Env (full sc) C p → EnvL (full sc) C p → Lo (connS k o b) (at p) → Src sc Rg (bef p) k o
 src-sh′ {C = C} {b = b} {p} w refl sr env ef lo = Shifted.src-sh {C} {p} w {b = b} sr env ef lo
 
 -- A live lane's kept rows, among its siblings'.
@@ -109,7 +109,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
                                     × Due Cr Rt ≃ Due Cr′ Rt
 
   rc : ∀ {Cr C Γ A Rg} {c : Ctx R Γ A} {N E} {s : St Γ A} {p}
-     → Fr Rt Cr C Rg c N E → HF C p (scopeOf c) N E → Owes C p → LoP (plug c s) p → Out Cr C Rg c N E p
+     → Fr Rt Cr C Rg c N E → HF C p (scopeOf c) N E → Owes C p → Lo (plug c s) (at p) → Out Cr C Rg c N E p
   rc {C = C} {p = p} (f-top eq) hf w lo = bef p , f-top eq , (λ ()) , (λ ()) , due
     where
       due : Due C Rt ≃ Due (bef p) Rt
@@ -134,19 +134,21 @@ module _ {R : Set} (Rt : EmissionSet R) where
     in Cr′ , f-outer fr′ ji (Shifted.joined-sh {C} {p} w (proj₂ (run hf env ef)) (kill-out op) jn env ef lol) je sd (behind-bef bh (jl env ef)) , env , ef , d
     where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
-      lol : ∀ {l} → l ∈ ls → LoP l p
+      lol : ∀ {l} → l ∈ ls → Lo l (at p)
       lol i ki = lo (plug-in c (k-kid (k-lane i ki)))
+      lolp : ∀ {l} → l ∈ ls → LoP l p
+      lolp i = lo-p (lol i)
       lb : Env (full (scopeOf c)) C p → LBnd C p (polF op F O) _
-      lb env iv kl ln v ow = begun-b {O = O} bg iv kl ln v ow en env lol
+      lb env iv kl ln v ow = begun-b {O = O} bg iv kl ln v ow en env lolp
       jl : Env (full (scopeOf c)) C p → EnvL (full (scopeOf c)) C p → Lag C p (JoinF op F O)
-      jl env ef = flat-lag {op = op} {F = F} {O = O} (proj₁ (run hf env ef)) (proj₂ (run hf env ef)) (begun-f bg env ef lol) (lb env) wh ah
+      jl env ef = flat-lag {op = op} {F = F} {O = O} (proj₁ (run hf env ef)) (proj₂ (run hf env ef)) (begun-f bg env ef lolp) (lb env) wh ah
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr λ env ef → lag-≈ (proj₂ je) (lag-at (λ r → _ , proj₁ r) (jl env ef)) ,
         λ (x , v , ow) → flat-b {op = op} {F = F} {C = C} (proj₂ (run hf env ef)) (lb env) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
   rc {C = C} {c = Machine.inLanes op f _ _ _ qu o pre post c} {E = E} {s = s} {p}
      (f-lanes {E′ = E′} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {ws = ws} {q = q} {a = a} {b = true} fr ji sy bg₁ y nq ru hl bg₂ eqn wt wh od ah as en li je sd sdl bh _) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr hf′ w lo
-        ob = bound sy env loo
+        ob = bound sy env loop
     in Cr′ , f-lanes fr′ ji (shift sy w env ef loo) (Shifted.begun-sh {C} {p} w (ku ob) bg₁ env ef lpre) y (Shifted.nm {C} {p} w nq) ru (Shifted.hole-sh {C} {p} w (ku ob) hl)
                  (Shifted.begun-sh {C} {p} w (ku ob) bg₂ env ef lpost) eqn (Shifted.waiting-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} {qu = qu} (lb env ef) ah wt)
                  (Shifted.whole-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} ob wh) (Shifted.od-sh {C} {p} w {O = O} ob od)
@@ -156,24 +158,26 @@ module _ {R : Set} (Rt : EmissionSet R) where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
       P = polF op F O
       vs = vs₁ ++ (q , a) ∷ vs₂
-      loo : LoP o p
+      loo : Lo o (at p)
       loo ki = lo (plug-in c (k-kid (k-outer ki)))
+      loop : LoP o p
+      loop = lo-p loo
       lol : ∀ {l} → l ∈ pre ʳ++ s ∷ post → LoP l p
-      lol i ki = lo (plug-in c (k-kid (k-lane i ki)))
-      lpre : ∀ {l} → l ∈ reverse pre → LoP l p
-      lpre i = lol (pre-in pre i)
-      lpost : ∀ {l} → l ∈ post → LoP l p
-      lpost i = lol (post-in pre i)
+      lol i = lo-p (λ ki → lo (plug-in c (k-kid (k-lane i ki))))
+      lpre : ∀ {l} → l ∈ reverse pre → Lo l (at p)
+      lpre i ki = lo (plug-in c (k-kid (k-lane (pre-in pre i) ki)))
+      lpost : ∀ {l} → l ∈ post → Lo l (at p)
+      lpost i ki = lo (plug-in c (k-kid (k-lane (post-in pre i) ki)))
       ku : Bnd C p O → ∀ {q₁ q′} → Kill (polF op F O) q₁ q′ → Owes C q′ → Owes (bef p) q′
       ku ob k ow = ob (proj₁ (proj₂ (kill-out op k)) , _ , ow)
       lb : Env (full (scopeOf c)) C p → EnvL (full (scopeOf c)) C p → LBnd C p (polF op F O) (vs₁ ++ (q , a) ∷ vs₂)
       lb env ef iv kl ln v ow = lanes-b {pre = pre} {post = post} {s = s} bg₁ hl bg₂ y en env (λ _ → proj₂ (run hf env ef)) lol iv kl ln v ow
       jl : Env (full (scopeOf c)) C p → EnvL (full (scopeOf c)) C p → Lag C p (JoinF op F O)
-      jl env ef = flat-lag {op = op} {F = F} {O = O} (few sy env ef loo) (bound sy env loo)
-                    (klag-mid {C = C} {p = p} {P = P} {vs₁ = vs₁} {vs₂ = vs₂} {q = q} {a = a} (begun-f bg₁ env ef lpre) (live-kl hl (proj₁ (run hf env ef))) (begun-f bg₂ env ef lpost)) (lb env ef) wh ah
+      jl env ef = flat-lag {op = op} {F = F} {O = O} (few sy env ef loop) (bound sy env loop)
+                    (klag-mid {C = C} {p = p} {P = P} {vs₁ = vs₁} {vs₂ = vs₂} {q = q} {a = a} (begun-f bg₁ env ef (λ i → lo-p (lpre i))) (live-kl hl (proj₁ (run hf env ef))) (begun-f bg₂ env ef (λ i → lo-p (lpost i)))) (lb env ef) wh ah
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr λ env ef → lag-≈ (proj₂ je) (lag-at (λ r → _ , proj₁ r) (jl env ef)) ,
-        λ (x , v , ow) → flat-b {op = op} {F = F} {C = C} (bound sy env loo) (lb env ef) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
+        λ (x , v , ow) → flat-b {op = op} {F = F} {C = C} (bound sy env loop) (lb env ef) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
   rc (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc {s = s} (f-lane {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.lnS true s} fr hf w lo in Cr′ , f-lane fr′ , rs
   rc (f-lane {b = false} _) () w lo
@@ -182,14 +186,15 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rc {C = C} {c = Machine.inSrc k b c} {E = E} {s = s} {p} (f-src {E′ = E′} fr sc pt sl nc bs bhβ fl fe ce bhk sd af ao _ ni) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = connS k s b} fr hf′ w lo
         (envb , efb) = benv env ef
-    in Cr′ , f-src fr′ sc pt sl nc (shift bs w envb efb lob) (behind-bef bhβ (few bs envb efb lob))
-                 (Shifted.flags-sh {C} {p} w (λ _ → fbd (proj₂ (run hf env ef))) (λ _ → bound bs envb lob) fl)
+    in Cr′ , f-src fr′ sc pt sl nc (shift bs w envb efb lob) (behind-bef bhβ (few bs envb efb (lo-p lob)))
+                 (Shifted.flags-sh {C} {p} w (λ _ → fbd (proj₂ (run hf env ef))) (λ _ → bound bs envb (lo-p lob))
+                   (λ {q} e → ≮-after q p (lo (plug-in c (k-own (own-bld k {o = s} {b = b} (oo e)))))) fl)
                  fe ce (bfr (proj₁ (run hf env ef))) (Shifted.subd′ {C} {p} w sd) af ao (λ na → call-sh {k = k} {o = s} {b = b} (ao na) loc) ni
        , env , ef , d
     where
       loc : LoP (connS k s b) p
-      loc ki = lo (plug-in c ki)
-      lob : LoP b p
+      loc = lo-p (λ ki → lo (plug-in c ki))
+      lob : Lo b (at p)
       lob ki = lo (plug-in c (k-kid (k-body ki)))
       fbd : Bnd C p E → Bnd C p (Frozen k)
       fbd bd (x , v , ow) = let (y , v′) = from (alike fe) (x , v) in bd (y , v′ , ow)
@@ -199,20 +204,21 @@ module _ {R : Set} (Rt : EmissionSet R) where
       benv env ef = bind-env {k = k} sc (fbd (proj₂ (run hf env ef))) (bfr (proj₁ (run hf env ef))) env ef
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr λ env ef →
-        lag-≈ (proj₁ ce) (lag-at (λ r → _ , proj₁ r) (conn-lag {k = k} (few bs (proj₁ (benv env ef)) (proj₂ (benv env ef)) lob) (bfr (proj₁ (run hf env ef))))) ,
-        conn-fb {C = C} sc (λ _ _ → bound bs (proj₁ (benv env ef)) lob) (λ _ → fbd (proj₂ (run hf env ef))) fl env ce
+        lag-≈ (proj₁ ce) (lag-at (λ r → _ , proj₁ r) (conn-lag {k = k} (few bs (proj₁ (benv env ef)) (proj₂ (benv env ef)) (lo-p lob)) (bfr (proj₁ (run hf env ef))))) ,
+        conn-fb {C = C} sc (λ _ _ → bound bs (proj₁ (benv env ef)) (lo-p lob)) (λ _ → fbd (proj₂ (run hf env ef))) fl env ce
   rc {C = C} {c = Machine.inBody k o c} {s = s} {p} (f-body {E′ = E′} fr sc pt sl sr bhE fl ce) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = connS k o s} fr hf′ w lo
-        (envb , efb , sb , bf) = body-env {b = s} sc sr env ef loc
+        (envb , efb , sb , bf) = body-env {b = s} sc sr env ef (lo-p loc)
     in Cr′ , f-body fr′ sc pt sl (src-sh′ {b = s} w sc sr env ef loc) (behind-bef bhE (proj₁ (run hf envb efb)))
-                 (Shifted.flags-sh {C} {p} w (λ _ → sb) (λ _ → proj₂ (run hf envb efb)) fl) ce
+                 (Shifted.flags-sh {C} {p} w (λ _ → sb) (λ _ → proj₂ (run hf envb efb))
+                   (λ {q} e → ≮-after q p (lo (plug-in c (k-own (own-bld k {o = o} {b = s} (oo e)))))) fl) ce
        , envb , efb , d
     where
-      loc : LoP (connS k o s) p
+      loc : Lo (connS k o s) (at p)
       loc ki = lo (plug-in c ki)
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr λ env ef →
-        let (envb , efb , sb , bf) = body-env {b = s} sc sr env ef loc
+        let (envb , efb , sb , bf) = body-env {b = s} sc sr env ef (lo-p loc)
         in lag-≈ (proj₁ ce) (lag-at (λ r → _ , proj₁ r) (conn-lag {k = k} (proj₁ (run hf envb efb)) bf)) ,
            conn-fb {C = C} sc (λ _ _ → proj₂ (run hf envb efb)) (λ _ → sb) fl env ce
   rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao _ bu nr ni) hf w lo =
@@ -221,13 +227,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
        , env , ef , ≃-refl
     where
       loc : LoP (connS k s b) p
-      loc ki = lo (plug-in c ki)
+      loc = lo-p (λ ki → lo (plug-in c ki))
       ie = subd-env {k = k} sd (att-slot {k = k} {p = p} ao (λ be → loc (k-own (body-key k {o = s} {b = b} be)))
                                                            (λ ae → loc (k-own (own-bld k {o = s} {b = b} (os ae)))))
       env = proj₁ ie
       ef  = proj₂ ie
   rc (f-took _ _ _ _ _ _ _ _ _ _) () w lo
-  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (d-map _ _) () w lo
   rc (d-scan _ _) () w lo
@@ -246,8 +252,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Fr Rt Cr C Rg c owes E → Sync (scopeOf c) Rg C s E → Owes C p → Lo (plug c s) (at p)
            → Σ Cur λ Cr′ → Fr Rt Cr′ (bef p) Rg c owes E × Sync (scopeOf c) Rg (bef p) s E × Due Cr Rt ≃ Due Cr′ Rt
   fr-shift {c = c} {s = s} fr sy w lo =
-    let (Cr′ , fr′ , env , ef , d) = rc {s = s} fr (hr λ env ef → few sy env ef los , bound sy env los) w (lo-p lo)
+    let (Cr′ , fr′ , env , ef , d) = rc {s = s} fr (hr λ env ef → few sy env ef (lo-p los) , bound sy env (lo-p los)) w lo
     in Cr′ , fr′ , shift sy w env ef los , d
     where
-      los : LoP s _
-      los ki = lo-p lo (plug-in c ki)
+      los : Lo s (at _)
+      los ki = lo (plug-in c ki)

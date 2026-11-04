@@ -34,7 +34,7 @@ open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
   LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Bounded; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.ColdInv using (slot; slot-last; burst-lb)
@@ -50,6 +50,7 @@ open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm;
   Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
   o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+open import adequacy.Floor.Keys using (at-after)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
 ------------------------------------------------------------------------
@@ -107,6 +108,25 @@ LoP s p = ∀ {κ} → KeyIn s κ → KAt p κ
 -- A connect's attach no earlier than `at p`: `p` at or before its next slot.
 att-≼ : ∀ c p → after (c ++ [ ix 1 ]) <ᴷ at p ≡ false → p ≼ (c ++ [ ix 2 ])
 att-≼ c p h t = clash (<ᴷ-trans (after (c ++ [ ix 1 ])) (at (c ++ [ ix 2 ])) (at p) (attach-next c) (trans (at-<ᴷ (c ++ [ ix 2 ]) p) (Equivalence.to T-≡ t))) h
+
+-- A key `after y` no earlier than `at p`: `p` at or before `y`, or under it.
+≮-after : ∀ y p → after y <ᴷ at p ≡ false → p ≼ y ⊎ T (inside y p)
+≮-after y p h with ≼-or-≻ p y
+... | inj₁ py = inj₁ py
+... | inj₂ yp with inside y p in e
+...   | true  = inj₂ tt
+...   | false = ⊥-elim (clash (after-lt y p (Equivalence.to T-≡ yp) (λ z eq → subst T e (⊑-inside {y} {p} (z , eq)))) h)
+
+-- At or before what lies no later than `q`'s subtree: so no later itself.
+thru-under : ∀ {p q r} → p ≼ q ⊎ T (inside q p) → r ≼ p → r ≼ q ⊎ T (inside q r)
+thru-under {p} {q} {r} (inj₁ pq) rp = inj₁ (≼-trans {r} {p} {q} rp pq)
+thru-under {p} {q} {r} (inj₂ i)  rp with ≼-or-≻ r q
+... | inj₁ rq = inj₁ rq
+... | inj₂ qr with inside q r in e | inside-⊑ q p i
+...   | true  | _        = inj₂ tt
+...   | false | zs , refl = ⊥-elim (rp (Equivalence.from T-≡ (trans (sym (at-<ᴷ (q ++ zs) r))
+          (<ᴷ-trans (at (q ++ zs)) (after q) (at r) (at-after q zs)
+            (after-lt q r (Equivalence.to T-≡ qr) (λ z eq → subst T e (⊑-inside {q} {r} (z , eq))))))))
 
 lo-p : ∀ {Γ A} {s : St Γ A} {p} → Lo s (at p) → LoP s p
 lo-p {p = p} lo {at y}    ki      = ≮-≼ y p (lo ki)
@@ -384,8 +404,8 @@ mutual
   src-b : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → LoP (connS k o b) p
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on _ sy _ _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
-  src-b (src-shut _ sp _ _ _ _ _ _) env lo r = ⊥-elim (sp r)
+  src-b (src-on _ sy _ _ _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp _ _ _ _ _ _ _ _) env lo r = ⊥-elim (sp r)
   src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
@@ -435,8 +455,8 @@ postulate
 -- A source's rows a body row at `p` reads: few, by what the source has
 -- passed, or none yet, its subscription not before `p`.
 few-src : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p} → CS.scope k ≡ sc → Src sc Rs (bef p) k o → FewBefore (Frozen k) p
-few-src _ (src-on _ _ bh _ _ _ _) = few-behind bh
-few-src _ (src-shut _ _ _ _ _ bh _ _) = few-behind bh
+few-src _ (src-on _ _ bh _ _ _ _ _) = few-behind bh
+few-src _ (src-shut _ _ _ _ _ bh _ _ _ _) = few-behind bh
 few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow _) = [] , λ {y} r lt →
   ⊥-elim (ow (≺-trans {CS.connAt k ++ [ ix 1 ]} {y} {p}
                (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) r)

@@ -48,7 +48,7 @@ open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken; 
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
-open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past; pend-past; LoP; lo-p)
+open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past; pend-past)
 open import adequacy.FrShift using (fr-shift; rc; hr; HR)
 open import adequacy.Few using (lag; owes-call)
 open import adequacy.Apart.Floor using (floor)
@@ -369,7 +369,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _
   srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  ()   _ _
-  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                   ()   _ _
+  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                   ()   _ _
   srcp (f-body _ _ _ _ _ _ _ _)                                 ()   _ _
   srcp (d-map _ _)                                                ()   _ _
   srcp (d-scan _ _)                                               ()   _ _
@@ -416,7 +416,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- A CONNECT SUBSCRIBED: the cursor moves to its body's subscription,
   -- the connect behind it, nothing owed passed.
   sub-conn : ∀ {Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
-           → LoP (plug c (pend (connect s b) q)) (q ⊕ [ ix 0 ])
+           → Lo (plug c (pend (connect s b) q)) (at (q ⊕ [ ix 0 ]))
            → SimC Rt ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
                      ⟨ inBody (conn₀ s q (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
   sub-conn {c = c} {s = s} {b = b} {q = q} lo {C = C} i with pend-view i
@@ -427,7 +427,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
         ow₁ = ≺→≼ {q ⊕ [ ix 0 ]} {q ⊕ [ ix 1 ]} (ticks q 0)
         -- fresh: its source's rows and its body's all still owed
         fl : Flags (bef (q ⊕ [ ix 0 ])) (conn₀ s q (scopeOf c)) (pendRows (full (binds s q (scopeOf c))) b (q ⊕ [ ix 0 ]))
-        fl = record { shut = λ () ; torn = λ () ; owed = λ ()
+        fl = record { shut = λ () ; torn = λ () ; owed = λ () ; owing = λ ()
                     ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 1 ]} {c′} ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
                     ; ended = λ _ {c′} y n → ⊥-elim (n (≺→≼ {q ⊕ [ ix 0 ]} {c′} (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad) y))) }
     in Cr′ , bef (q ⊕ [ ix 0 ]) ,
@@ -702,7 +702,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | true  | refl = keeps Rt (sub-joined cu)
   ... | false | refl = keeps Rt (sub-join cu)
 
-  reach-pend : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → LoP (plug c (pend o q)) (q ⊕ [ ix 0 ]) → Reach ⟨ c , pend o q , subscribing , p ⟩
+  reach-pend : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Lo (plug c (pend o q)) (at (q ⊕ [ ix 0 ])) → Reach ⟨ c , pend o q , subscribing , p ⟩
   reach-pend c empty             q p _  = within tt λ { refl → keeps Rt sub-empty }
   reach-pend c (of xs)           q p _  = within tt λ { refl → keeps Rt sub-of }
   reach-pend c (map f s)         q p _  = within tt λ { refl → keeps Rt sub-map }
@@ -719,7 +719,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   reach : ∀ {o₀ : PureObs [] R} {rs} (k : Conf R) → Path (load o₀) rs k → Reach k
   reach ⟨ c , s , rising e , p ⟩                        _   = within (rise-mv c s e p) (rise-sim c s e p)
   reach {o₀ = o₀} ⟨ c , pend o q , subscribing , p ⟩ pth with pend-focus o₀ pth
-  ... | _ , refl = reach-pend c o q q (lo-p (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) (floor o₀ pth tt) (at-after q [ ix 0 ])))
+  ... | _ , refl = reach-pend c o q q (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) (floor o₀ pth tt) (at-after q [ ix 0 ]))
   reach ⟨ c , coldS b l , subscribing , p ⟩             _   = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , ofS j q xs , subscribing , p ⟩            _   = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , doneS , subscribing , p ⟩                 _   = within tt λ { refl → keeps Rt λ i → i }

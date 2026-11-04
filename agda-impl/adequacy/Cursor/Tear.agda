@@ -110,10 +110,10 @@ mutual
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
   src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
     _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts pt ce) (thru-no C nr)
-  src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic) bb fl ce =
+  src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic _) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt sr bb fl ce) (inj₁ t))
                      (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts pt ce) (subd-thru {k = k} sd))
-  src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic) bb fl ce =
+  src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic _ _) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt sr bb fl ce)) (inj₁ t))
                      (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts pt ce) (subd-thru {k = k} sd))
 

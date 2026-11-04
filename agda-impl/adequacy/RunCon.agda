@@ -55,7 +55,7 @@ vis-≃ d = (λ (x , v) → to d x , v) ⇄ (λ (x , v) → from d x , v)
 -- A connect's flags read again under fields they do not read.
 re-flags : ∀ {Γ X B} {C} {cl sl sa p as ow cx ea sr sc sa′ p′ as′} {β : EmissionSet B}
          → Flags C (cs {Γ} {X} cl sl sa p as ow cx ea sr sc) β → Flags C (cs cl sl sa′ p′ as′ ow cx ea sr sc) β
-re-flags fl = record { shut = Flags.shut fl ; unshut = Flags.unshut fl ; torn = Flags.torn fl ; owed = Flags.owed fl ; ended = Flags.ended fl }
+re-flags fl = record { shut = Flags.shut fl ; unshut = Flags.unshut fl ; torn = Flags.torn fl ; owed = Flags.owed fl ; ended = Flags.ended fl ; owing = Flags.owing fl }
 
 ------------------------------------------------------------------------
 -- A SOURCE'S ATTACH: its subscribe call has returned, so every key
@@ -172,9 +172,13 @@ srch-att bb lo (sh-pend _ _ _ () _ _ _ _ _ _ _)
 src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {cl sl sa p ow cx ea sr sc′} {y} {o : St Γ X}
         → Lo o (after y) → Src sc Rg C (cs cl sl sa p (just y) ow cx ea sr sc′) o → Src sc Rg C (cs cl sl true p nothing ow cx ea sr sc′) o
 src-att lo (src-pend _ _ _ () _ _ _ _ _)
-src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-on nc sy bh sd af ao _) =
-  src-on nc sy bh sd (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af ao λ { refl → λ _ → att-fin {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} sy bh sd lo }) (λ ()) (λ ())
-src-att lo (src-shut cl sp tp hk dm bh sd _) = src-shut cl sp tp hk dm bh sd (λ ())
+src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-on nc sy bh sd af ao _ lv) =
+  src-on nc sy bh sd (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af ao λ { refl → λ _ → att-fin {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} sy bh sd lo }) (λ ()) (λ ()) lv
+src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-shut cl′ sp tp hk dm bh sd ic af lv) =
+  src-shut cl′ sp tp hk dm bh sd (λ ())
+    (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af (λ na → proj₁ (ic na))
+      λ { refl → λ _ → let (ks , f) = islec-rows {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} tp hk bh lo
+                       in ks , λ x i → f x (in-slot cx _ i) }) lv
 
 -- A torn connect's source, attached and stopped.
 torn-att : ∀ {Γ X B} {sc : Scope Γ} {C} {cl sl sa p ow cx ea sr sc′} {y} {o : St Γ X} {b : St (X ∷ Γ) B} {β E}
@@ -278,7 +282,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
   closed-off (f-lnct {b = false} fr)                             _ = tt
   closed-off (f-src {k = k} fr _ _ lv nc _ _ _ _ _ _ _ _ _ _ _)  t = closed-off fr (live-or (CS.srcLive k) lv (and-right (CS.srcAtt k) (or-right (CS.closed k) nc t)))
-  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  _ = tt
+  closed-off (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  _ = tt
   closed-off (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)              _ = tt
   closed-off (f-body {k = k} fr _ _ lv _ _ _ _)                  t = closed-off fr (live-or (CS.srcLive k) lv t)
   closed-off (d-map _ _)                                           _ = tt
@@ -326,12 +330,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Inv Rt Cr C ⟨ c , connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b , absorbed , r ⟩
            → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
   con-body {sl = true} {cx = cx} nb lo (settled {N = owes} c-abs fr sy@(s-conn scp pt bs bb ss tn fl eq)) with ss tt
-  ... | src-on _ sy′ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
-  ... | src-shut _ _ _ (h-blank ()) _ _ _ _
+  ... | src-on _ sy′ _ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
+  ... | src-shut _ _ _ (h-blank ()) _ _ _ _ _ _
   ... | src-pend _ nc₀ refl _ _ _ _ ow _ with fr-shift Rt fr sy ow lo
   ...   | Cr′ , fr′ , s-conn scp′ pt′ bs′ bb′ ss′ _ fl′ eq′ , d with ss′ tt
-  ...     | src-on _ sy′ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
-  ...     | src-shut cl′ _ _ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
+  ...     | src-on _ sy′ _ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
+  ...     | src-shut cl′ _ _ _ _ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
   ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ _ =
     Cr′ , bef (cx ++ [ ix 1 ]) ,
     pending (f-src fr′ scp′ (re-parts refl refl pt′) tt nc (bs′ tt) (bb′ tt) (re-flags fl′) ≈-refl eq′
@@ -376,7 +380,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Ran Cr ⟨ c , connS (cs cl false sa p as nothing cx ea sr sc) (proj₁ (unsubIf sa o)) b , absorbed , q ⟩
   con-owed {Cr} {C} {cl = cl} {sl = true} {sa} {p} {as} {cx} {ea} {sr} {sc} (settled {N = owes} c-abs fr (s-conn refl pt bs bb ss tn fl eq)) =
     Cr , C , settled c-abs fr (s-conn refl (re-parts refl refl pt) (λ ()) (λ ()) (λ ()) (λ _ → tn′)
-      (record { shut = Flags.shut fl ; unshut = λ () ; owed = λ () ; ended = λ ()
+      (record { shut = Flags.shut fl ; unshut = λ () ; owed = λ () ; ended = λ () ; owing = λ ()
               ; torn = λ _ (x , v , o) → proj₂ (Flags.owed fl refl) (owes-≼ C o (Sound.ends (Parts.sb pt) (proj₁ (Flags.owed fl refl)) x v)) }) eq) ,
     silent ≃-refl
     where
@@ -387,7 +391,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
                    ; tl = owed-tl {k = cs cl false sa p as nothing cx ea sr sc} (bs tt) (Parts.sb pt) (proj₁ (Flags.owed fl refl)) (proj₂ (Flags.owed fl refl)) (src-pt pt (ss tt) (bb tt) fl eq) (proj₂ (proj₂ off)) }
   con-owed {Cr} {C} {sl = false} (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
     Cr , C , settled c-abs fr (s-conn scp (re-parts refl refl pt) (λ ()) (λ ()) (λ ()) (λ t → torn-off (tn t))
-      (record { shut = Flags.shut fl ; unshut = λ () ; torn = Flags.torn fl ; owed = λ () ; ended = λ () }) eq) ,
+      (record { shut = Flags.shut fl ; unshut = λ () ; torn = Flags.torn fl ; owed = λ () ; ended = λ () ; owing = λ () }) eq) ,
     silent ≃-refl
   con-owed {Cr} {C} {sa = sa} {o = o} (settled {N = dead _ _} c-abs fr (_ , h-blank (f , qo , qb) , le)) =
     Cr , C , settled c-abs fr (_ , h-blank (f , quiet-unsubIf sa {s = o} qo , qb) , le) , silent ≃-refl

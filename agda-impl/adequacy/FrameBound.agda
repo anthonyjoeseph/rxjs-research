@@ -128,7 +128,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)
                          (λ ki → lo (plug-in c (k-kid (k-body ki)))))
           (λ _ (x , v , ow) → let (y , v′) = from (alike fe) (x , v) in hb env (y , v′ , ow)) fl env ce
-    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ _ _ bs _ fl ce) lo _ =
+    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ _ _ _ bs _ fl ce) lo _ =
       fb {s = connS k s b} fr lo λ env →
         conn-fb {C = C} sc
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)

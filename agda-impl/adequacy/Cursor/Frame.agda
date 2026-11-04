@@ -148,7 +148,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C D Rg Rg′ E′ β P}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
             → Spent C (Frozen k) → TailP C (Frozen k) P → Dom C D → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k)
+            → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k) → AttFin k
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
             → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr Cr C Rg′ (inSrc k b c) (dead D P) (Frozen k)

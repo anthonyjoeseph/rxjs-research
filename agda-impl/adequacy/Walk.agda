@@ -205,9 +205,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
     climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
     climb (f-lnct {b = b} fr)           h = climb fr (_ , _ , refl , hold-lh b h)
     climb (f-src fr sc pt lv nc bs bb fl fe eq bh sd af ao ic _) h =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-on nc (sync-≈ h fe) bh sd af ao ic) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
-    climb (f-srcc fr sc pt lv cl sp tp dm bh sd ic bs bb fl eq) (Q , hk , le) =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk dm bh sd ic) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-on nc (sync-≈ h fe) bh sd af ao ic lv) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+    climb (f-srcc fr sc pt lv cl sp tp dm bh sd ic af bs bb fl eq) (Q , hk , le) =
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk dm bh sd ic af lv) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcp {k = k} fr sc pt lv nc na ba an adm bs bb fl fe eq ow sd _) (_ , refl , pe , wn) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-pend na nc ba an adm (≈-trans pe fe) wn ow (λ o → SubdAt.past sd o (≺-ext (CS.connAt k) [])))
                        (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
@@ -266,7 +266,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     dead-closed (f-lnct {b = true} _) ()
     dead-closed (f-lnct {b = false} _) refl = tt
     dead-closed (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-    dead-closed (f-srcc {k = k} {c = c} _ _ _ _ cl _ _ _ _ _ _ _ _ _ _) refl =
+    dead-closed (f-srcc {k = k} {c = c} _ _ _ _ cl _ _ _ _ _ _ _ _ _ _ _) refl =
       or-l (CS.closed k) (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c)) cl
     dead-closed (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
     dead-closed (f-body _ _ _ _ _ _ _ _) ()
@@ -383,8 +383,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-src {k = k} np nb (C , owes , _ , _ , fr , s-conn sc pt bs bb os tn fl eq) with live? (CS.srcLive k)
   ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl nb
   ... | inj₁ lv with os lv
-  ...   | src-on nc sy bh sd af ao ic   = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao ic nb , sy
-  ...   | src-shut cl sp tp hk dm bh sd ic = C , dead _ _ , nowhere , _ , f-srcc fr sc pt lv cl sp tp dm bh sd ic (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
+  ...   | src-on nc sy bh sd af ao ic _   = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao ic nb , sy
+  ...   | src-shut cl sp tp hk dm bh sd ic af _ = C , dead _ _ , nowhere , _ , f-srcc fr sc pt lv cl sp tp dm bh sd ic af (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
   ...   | src-pend _ _ _ _ _ _ _ _ _    = ⊥-elim (np tt)
   down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-conn sh hb u , le)) = src-dead (un-dead fr) sh hb u le nb
   down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-blank (f , qs , qb) , le)) =
