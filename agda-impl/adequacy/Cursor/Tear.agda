@@ -4,7 +4,6 @@ module adequacy.Cursor.Tear where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥)
-open import Data.List using ([_]; _++_)
 open import Data.List using (List; []; _∷_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; [_,_]′)
@@ -12,10 +11,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix)
+open import denotation.Events using (Pos; Timeline)
 open import denotation.EmissionSet using (EmissionSet; out)
-open import denotation.Laws.Modulus using (≺-ext)
-open import Relation.Nullary using (¬_)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-no;
   flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts)
 open import operation.PureObservable using (module Machine)
@@ -24,8 +21,13 @@ open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; attached; attAt;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
-open import adequacy.Rows using (_≃_; Frozen; full; pendRows)
-open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Subd; SubdAt; Owes; Behind; Flags; ConnE; Runs; NoKill; h-live; Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Sound; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_; h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined; l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map; s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend; src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
+open import adequacy.Rows using (_≃_; Frozen)
+open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
+  Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_;
+  h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined;
+  l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map;
+  s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend;
+  src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
 
 open _≃_
 
@@ -107,13 +109,13 @@ mutual
   src-husk : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} → CS.scope k ≡ sc → (pt : Parts sc Rg k β)
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
   src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
-    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts na sc pt sr bb fl ce) (thru-no C nr)
+    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts pt ce) (thru-no C nr)
   src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt sr bb fl ce) (inj₁ t))
-                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
+                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts pt ce) (subd-thru {k = k} sd))
   src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt sr bb fl ce)) (inj₁ t))
-                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
+                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts pt ce) (subd-thru {k = k} sd))
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}
              → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)

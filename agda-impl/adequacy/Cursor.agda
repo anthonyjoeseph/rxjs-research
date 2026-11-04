@@ -38,7 +38,7 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
-open import Data.List.Relation.Unary.All using (lookup)
+open import Data.List.Relation.Unary.All using (All; lookup)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -450,12 +450,13 @@ Thru (aft p) r = r ≼ p
 Dom : Cur → Cur → Set
 Dom C D = ∀ {r} → Thru D r → Thru C r
 
--- A pin of `E` shows in `E′`.
+-- A pin of `E` shows in `E′`, down a first-child chain.
 record Up {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B) : Set where
   constructor up
   field
     lift : ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
          → Σ Pos λ xs → Σ Pos λ r′ → Thru D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
+           × All (_≡ ix 0) xs
 
 -- An unattached source's cursor: within its subscribe call, reaching
 -- nothing past the slot after it.
@@ -617,6 +618,12 @@ record Parts {Γ X B} (sc : Scope Γ) (Rg : Rgn) (k : CS Γ X) (β : EmissionSet
     clear-s : ∀ {y} → Hots (full sc) y → Rs y → ⊥
     sb    : Sound Rb β
     ss    : Sound Rs (Frozen k)
+    -- each read where it was entered, the two worlds apart
+    cr     : Real (CS.connAt k)
+    Hβ     : Pos → Set
+    iβ     : InvAt Hβ (CS.connAt k ++ [ ix 0 ]) β
+    iσ     : InvAt (Hots (full sc)) (CS.connAt k ++ [ ix 1 ]) (Frozen k)
+    wapart : ∀ {w x} → W⁼ Hβ (CS.connAt k ++ [ ix 0 ]) w → W⁼ (Hots (full sc)) (CS.connAt k ++ [ ix 1 ]) x → w ⊑ʷ x → ⊥
 
 data Sync where
   -- a started cold: what its tape has left is what its entry owes
@@ -731,4 +738,8 @@ re-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k k′ : CS Γ X} {β : EmissionSe
 re-parts {k = k} {k′} ca e pt = record { Rb = Parts.Rb pt ; Rs = Parts.Rs pt ; b⊆ = Parts.b⊆ pt ; s⊆ = Parts.s⊆ pt ; apart = Parts.apart pt
                        ; b-lead = Parts.b-lead pt
                        ; b-chain = λ {x} px → Parts.b-chain pt (subst (λ u → (u ++ [ ix 1 ]) ≼ x) (sym ca) px)
-                       ; clear-b = Parts.clear-b pt ; clear-s = Parts.clear-s pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt) }
+                       ; clear-b = Parts.clear-b pt ; clear-s = Parts.clear-s pt ; sb = Parts.sb pt ; ss = subst (Sound (Parts.Rs pt)) e (Parts.ss pt)
+                       ; cr = subst Real ca (Parts.cr pt) ; Hβ = Parts.Hβ pt
+                       ; iβ = subst (λ u → InvAt (Parts.Hβ pt) (u ++ [ ix 0 ]) _) ca (Parts.iβ pt)
+                       ; iσ = subst (λ u → InvAt _ (u ++ [ ix 1 ]) (Frozen k′)) ca (subst (InvAt _ _) e (Parts.iσ pt))
+                       ; wapart = λ {w} {x} → subst (λ u → W⁼ (Parts.Hβ pt) (u ++ [ ix 0 ]) w → W⁼ _ (u ++ [ ix 1 ]) x → w ⊑ʷ x → ⊥) ca (Parts.wapart pt) }

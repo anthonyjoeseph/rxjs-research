@@ -10,10 +10,10 @@ module adequacy.PinLift where
 
 open import Data.Bool using (T)
 open import Data.Bool using (Bool)
-open import Data.List using (List; []; _∷_; [_]; _++_; map; concatMap)
+open import Data.List using (List; []; _∷_; [_]; _++_; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-concatMap⁺)
-open import Data.List.Relation.Unary.Any as Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -82,7 +82,7 @@ reach-mv : ∀ {A B} {E : EmissionSet A} {E′ : EmissionSet B} {y r} (g : Pos �
          → (∀ {k′ e′} → E′ k′ e′ → Σ Pos λ k → Σ (Ev A) λ e → E k e × k ≼ k′ × k′ ∈ g k × (e′ ≡ pin r → e ≡ pin r))
          → Reach E y (pin r) → Reach E′ y (pin r)
 reach-mv {y = y} {r = r} g im (ks , f) = concatMap g ks , λ {k′} x ky d → let (k , _ , x′ , le , m , pp) = im x in
-  ∈-concatMap⁺ g (Any.map (λ { refl → m }) (f x′ (≼-≺-≺ {k} {k′} {y} le ky) (λ i → [ (λ lt → inj₁ (≼-≺-≺ {k} {k′} {r} le lt)) , (λ eq → inj₂ (pp eq)) ]′ (d i))))
+  ∈-concatMap⁺ g (any-map (λ { refl → m }) (f x′ (≼-≺-≺ {k} {k′} {y} le ky) (λ i → [ (λ lt → inj₁ (≼-≺-≺ {k} {k′} {r} le lt)) , (λ eq → inj₂ (pp eq)) ]′ (d i))))
 
 -- A take's rows: at its source's, or one under it.
 tk : Pos → List Pos

@@ -27,7 +27,6 @@ open import adequacy.Cursor using (Up; up; Dom; Thru; Lane; NoKill; Cur; Rgn; Su
 open import adequacy.Cursor.Tear using (c-abs; NoIsle; Clear; Pending)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-∘)
 open import adequacy.PinLift using (reach-≈)
-open import Relation.Nullary using (¬_)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; onoff; LaneHold; Hold; Fr; Unread; un-dead; un-torn; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled)
 open _≃_

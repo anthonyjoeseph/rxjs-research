@@ -28,29 +28,22 @@ open import denotation.Events using (Pos; Timeline; ix; last)
 open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≼-antisym)
-open import denotation.Laws.Worlds using (Real; InvAt; real-snoc; plain-ix; real-init; nonempty⁼; world-after⁼; inside-⊑)
+open import denotation.Laws.Worlds using (InvAt; real-snoc; plain-ix)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Laws.JoinInv using (module Join)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; takeS)
 open import adequacy.Rows using (full; Frozen)
-open import adequacy.Cursor using (Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP; tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; Hole; Dom; Thru; Up; NoKill; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Parts; joined; src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+open import adequacy.Cursor using (Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP;
+  tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; Hole; Dom;
+  Thru; Up; NoKill; h-live; h-end; h-kill; l-live; l-dead; Begun; none; more; Parts; joined;
+  src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take;
+  s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Cursor.Tear using (by; husk-of; src-husk; begun-husk)
-open import adequacy.Cursor.Show using (flat-up-lane)
+open import adequacy.Cursor.Show using (flat-up-lane; pin-law)
 open import adequacy.Bound using (owes?; owes-≼; starts-past; past)
 open import adequacy.Few using (join-pin; kept-lane; ix0)
-
-------------------------------------------------------------------------
--- The law it rests on
-
--- A reading's pin is of a connect at or past the reading's subscription.
-pin-law : ∀ {A H s} {X : EmissionSet A} → Real s → InvAt H s X → ∀ {y r} → X y (pin r) → s ≼ r
-pin-law {s = s} rs I {y} {r} x with InvAt.pinned I x
-... | w⁼ , ins with inside-⊑ r y ins
-...   | zs , refl with real-init r zs (InvAt.real I x)
-...     | inj₁ refl = ⊥-elim (nonempty⁼ (λ { refl → rs }) w⁼)
-...     | inj₂ rr   = world-after⁼ w⁼ rr
 
 -- A lane's pin is of a connect at or past where the lane subscribed.
 lane-pin : ∀ {Γ A B} {sc : Scope Γ} op {f : A → Obs Timeline Γ B} {O : EmissionSet A} → JInv sc f O

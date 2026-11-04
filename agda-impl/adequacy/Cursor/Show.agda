@@ -5,27 +5,35 @@
 -- a cursor that has moved on has passed whatever its earlier self had.
 module adequacy.Cursor.Show where
 
-open import Data.Bool using (Bool; T; not)
-open import Data.List using ([]; _∷_; [_]; _++_)
-open import Data.List.Properties using (++-identityʳ; ++-assoc)
-open import Data.Product using (Σ; _×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym)
+open import Data.Bool using (Bool; T; true; false)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List using ([]; _∷_; [_]; _++_; map)
+open import Data.List.Properties using (++-identityʳ; ++-assoc; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
+open import Data.Product using (_×_; _,_; proj₁)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix; inside; <ᵖ-step)
-open import denotation.EmissionSet using (EmissionSet; out; pin; _≺_; _≼_; Reach; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
-open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺)
+open import denotation.Events using (Timeline; ix; inside; <ᵖ-step; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; module Connecting; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
+open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-antisym)
+open import denotation.Laws.BoundedInv using (first-child)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Unit using (tt)
 open import operation.PureObservable using (module Machine)
 open Machine using (Scope; CS)
 open import adequacy.Rows using (Frozen; full)
-open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs; Lane; polF; up; JoinF; JoinE; JInv;
-  JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE; Src)
-open import denotation.Laws.Worlds using (Hots)
-open import adequacy.PinLift using (reach-≈; reach-map; reach-scan; reach-take)
+open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs;
+  Lane; polF; up; JoinF; JoinE; JInv; JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE;
+  Src; bursts)
+open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; nonempty⁼; world-after; world-after⁼; inside-⊑; ⊑-inside)
+open import adequacy.Bound using (next-slot)
+open import adequacy.PinLift using (reach-≈; reach-img; reach-map; reach-scan; reach-take)
 
 -- What the cursor reached lies at or before all it owes.
 thru-owes : ∀ C {r q} → Thru C r → Owes C q → r ≼ q
@@ -53,7 +61,7 @@ up-at : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B}
       → Up D E D′ E′
 up-at {E′ = E′} f = up λ {y} {r} nr i x rc → let (n′ , x′ , rc′) = f nr i x rc in [] , r , n′ , subst (λ z → T (inside r z)) (sym (++-identityʳ y)) i
                     , subst (λ z → E′ z (pin r)) (sym (++-identityʳ y)) x′
-                    , subst (λ z → Reach E′ z (pin r)) (sym (++-identityʳ y)) rc′
+                    , subst (λ z → Reach E′ z (pin r)) (sym (++-identityʳ y)) rc′ , []ᴬ
 
 up-id : ∀ {A} {D} {E : EmissionSet A} → Up D E D E
 up-id {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = E} λ nr _ x rc → nr , x , rc
@@ -79,10 +87,10 @@ up-adv dm (up u) = up λ nr i x rc → let (xs , r′ , n′ , rest) = u nr i x 
 -- Two layers.
 up-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
      → Up D₁ E₁ D₂ E₂ → Up D₂ E₂ D₃ E₃ → Up D₁ E₁ D₃ E₃
-up-∘ {E₃ = E₃} (up u) (up v) = up λ {y} nr i x rc → let (xs , r′ , n′ , i′ , x′ , rc′) = u nr i x rc ; (zs , r″ , n″ , i″ , x″ , rc″) = v n′ i′ x′ rc′ in xs ++ zs , r″ , n″
+up-∘ {E₃ = E₃} (up u) (up v) = up λ {y} nr i x rc → let (xs , r′ , n′ , i′ , x′ , rc′ , z′) = u nr i x rc ; (zs , r″ , n″ , i″ , x″ , rc″ , z″) = v n′ i′ x′ rc′ in xs ++ zs , r″ , n″
     , subst (λ z → T (inside r″ z)) (++-assoc y xs zs) i″
     , subst (λ z → E₃ z (pin r″)) (++-assoc y xs zs) x″
-    , subst (λ z → Reach E₃ z (pin r″)) (++-assoc y xs zs) rc″
+    , subst (λ z → Reach E₃ z (pin r″)) (++-assoc y xs zs) rc″ , ++⁺ z′ z″
 
 -- What an earlier cursor reached, a later one has.
 up-pre : ∀ {A B} {D C C′} {E : EmissionSet A} {E′ : EmissionSet B} → Dom C D → Up C E C′ E′ → Up D E C′ E′
@@ -95,6 +103,89 @@ nofail-up {C = C} nf t (q , _ , x , k , qr) = thru-owes C t (nf x k) qr
 -- No kill passed: none cuts a lane before a pin's connect passed.
 unkilled-no : ∀ {A B} {C} {P : Pol A B} {q} → Unkilled C P q → ∀ {r} → Thru C r → NoKill P q r
 unkilled-no {C = C} uk t kl = thru-owes C t (uk kl)
+
+------------------------------------------------------------------------
+-- Where a connect's pins lie
+
+-- A reading's pin is of a connect at or past the reading's subscription.
+pin-law : ∀ {A H s} {X : EmissionSet A} → Real s → InvAt H s X → ∀ {y r} → X y (pin r) → s ≼ r
+pin-law {s = s} rs I {y} {r} x with InvAt.pinned I x
+... | w⁼ , ins with inside-⊑ r y ins
+...   | zs , refl with real-init r zs (InvAt.real I x)
+...     | inj₁ refl = ⊥-elim (nonempty⁼ (λ { refl → rs }) w⁼)
+...     | inj₂ rr   = world-after⁼ w⁼ rr
+
+-- First children in their parents' order.
+snoc0-≺ : ∀ k y → (k ++ [ ix 0 ]) ≺ (y ++ [ ix 0 ]) → k ≺ y
+snoc0-≺ k y lt with k <ᵖ y in e
+... | true  = tt
+... | false with <ᵖ-split y k e
+...   | inj₂ refl = ⊥-elim (≺-irrefl {k ++ [ ix 0 ]} lt)
+...   | inj₁ yk   = ⊥-elim (first-child y {k ++ [ ix 0 ]} (≺-trans {y} {k} {k ++ [ ix 0 ]} (Equivalence.from T-≡ yk) (≺-ext k [])) lt)
+
+-- Within a connect's subscription: a first child within the connect.
+in-call : ∀ c y → T (inside (c ++ [ ix 1 ]) y) → T (inside c (y ++ [ ix 0 ]))
+in-call c y iw with inside-⊑ (c ++ [ ix 1 ]) y iw
+... | w , refl = Equivalence.from T-≡ (subst (λ z → inside c z ≡ true)
+                   (sym (trans (++-assoc (c ++ [ ix 1 ]) w [ ix 0 ]) (++-assoc c [ ix 1 ] (w ++ [ ix 0 ]))))
+                   (inside-++ c c (ix 1 ∷ (w ++ [ ix 0 ])) (inside-self c)))
+
+-- Under what lies under: inside is transitive.
+inside-trans : ∀ x y z → T (inside x y) → T (inside y z) → T (inside x z)
+inside-trans x y z i j with inside-⊑ x y i
+... | zs , refl with inside-⊑ (x ++ zs) z j
+...   | ws , refl = ⊑-inside {x} {(x ++ zs) ++ ws} (zs ++ ws , ++-assoc x zs ws)
+
+-- The slot after a subscription is no point of its world.
+no-slot : ∀ {H c w} → Real c → W⁼ H (c ++ [ ix 1 ]) w → w ≡ c ++ [ ix 2 ] → ⊥
+no-slot {c = c} _ here eq with ∷ʳ-injectiveʳ c c eq
+... | ()
+no-slot {c = c} rc (inW (step {x} w pl)) eq with ∷ʳ-injectiveˡ x c eq
+... | refl = world-after⁼ w rc (≺-ext c [])
+no-slot {c = c} _ (inW (timer {e} t _)) eq with ∷ʳ-injectiveʳ (ix t ∷ []) c eq
+... | ()
+no-slot {c = c} _ (inW (join {h} _ _ _)) eq with ∷ʳ-injectiveʳ h c eq
+... | ()
+
+-- AN ISLE'S BURST SHOWS IN ITS CONNECT'S ENTRY: `burst` pins each row of
+-- the subscription, and every row before it is a source row's child; the
+-- body's rows lie past the connect and pin none of it.  A source's pin is
+-- of a connect inside its subscription or past the slot after it, so no
+-- row past the subscription pinned no later than that slot is `kept`.
+conn-bursts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {k : CS Γ X} {β E : EmissionSet B}
+            → Parts sc Rg k β → ConnE (CS.connAt k) (Frozen k) β E → Bursts k E
+conn-bursts {X = X} {k = k} {β} {E} pt (ce , _) = bursts wn kp
+  where
+    c = CS.connAt k
+    open Connecting c (Frozen k) β using (ConnT; body; burst; echo; kept)
+    rβ : Real (c ++ [ ix 0 ])
+    rβ = real-snoc c plain-ix (Parts.cr pt)
+
+    -- the body's rows: past the connect, none pinned to it
+    bd : ∀ {q e′} → β q e′ → PDep c q e′ → ⊥
+    bd b (inj₁ qc) = ≺-irrefl {c} (≺-trans {c} {c ++ [ ix 0 ]} {c} (≺-ext c [])
+                       (≺-trans {c ++ [ ix 0 ]} {_} {c} (world-after (InvAt.world (Parts.iβ pt) b) (InvAt.real (Parts.iβ pt) b)) qc))
+    bd b (inj₂ refl) = pin-law rβ (Parts.iβ pt) b (≺-ext c [])
+
+    wn : ∀ {y} {e : Ev X} → Frozen k y e → T (inside (c ++ [ ix 1 ]) y) → Few (Frozen k) y
+       → E (y ++ [ ix 0 ]) (pin c) × Reach E (y ++ [ ix 0 ]) (pin c)
+    wn {y} x iw (fks , f) = voc ce (burst x iw , rc) , reach-≈ ce (reach-img (λ t → _ , proj₁ t , λ eq → eq) rc)
+      where
+        rc : Reach ConnT (y ++ [ ix 0 ]) (pin c)
+        rc = map (_++ [ ix 0 ]) fks , λ where
+          (body b)        _  d → ⊥-elim (bd b (d (in-call c y iw)))
+          (burst {k′} x′ _)    lt _ → ∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt))
+          (echo {k′} x′ _ _ _) lt _ → ∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt))
+          (kept {k′} x′ _ _ _) lt _ → ∈-map⁺ (_++ [ ix 0 ]) (f x′ (snoc0-≺ k′ y lt))
+
+    kp : ∀ {y r} → Frozen k y (pin r) → ¬ T (inside (c ++ [ ix 1 ]) y) → T (inside r y) → r ≼ (c ++ [ ix 2 ])
+       → Reach (Frozen k) y (pin r)
+       → r ≼ c × E (y ++ [ ix 0 ]) (pin r) × Reach E (y ++ [ ix 0 ]) (pin r)
+    kp {y} {r} x ni ir rs _ with inside (c ++ [ ix 1 ]) r in ic
+    ... | true  = ⊥-elim (ni (inside-trans (c ++ [ ix 1 ]) r y (Equivalence.from T-≡ ic) ir))
+    ... | false = ⊥-elim (no-slot (Parts.cr pt) (proj₁ (InvAt.pinned (Parts.iσ pt) x))
+                    (≼-antisym {r} {c ++ [ ix 2 ]} rs
+                      (next-slot c r (pin-law (real-snoc c plain-ix (Parts.cr pt)) (Parts.iσ pt) x) (λ t → subst T ic t))))
 
 ------------------------------------------------------------------------
 -- The joiner and the connect: where a pin shows past a truncation.
@@ -128,9 +219,4 @@ postulate
               → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
               → ConnE (CS.connAt k) (Frozen k) β E → Up C (Frozen k) C E
 
-  -- AN ISLE'S BURST SHOWS IN ITS CONNECT'S ENTRY: `burst` pins each row of
-  -- the subscription, and nothing before the connect is in it.
-  conn-bursts : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
-              → T (not (CS.srcAtt k)) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
-              → ConnE (CS.connAt k) (Frozen k) β E → Bursts k E
 

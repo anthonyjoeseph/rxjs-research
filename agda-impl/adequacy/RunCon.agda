@@ -10,30 +10,33 @@ open import Data.Bool using (true; false; T; not; _∨_; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.All using (All; _∷_) renaming ([] to []ᴬ)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Data.List.Properties using (++-assoc)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; ix; inside; inside-self; inside-++)
+open import denotation.Events using (Pos; ix; inside; inside-++)
 open import denotation.EmissionSet using (EmissionSet; pin; end; _≺_; _≼_; Reach; module Connecting)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≼-trans; ≺-trans)
-open import denotation.Laws.Worlds using (ok-step; inside-⊑)
+open import denotation.Laws.Worlds using (ok-step)
 open import operation.Key using (at; after; at-after-≮)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; moved; plug; run; own; CS; cs; bodyM; srcAttM; owedM;
                     pend; connS; inSrc; scopeOf; binds; closed; unsubIf)
 open import adequacy.Rows using (Frozen; ≃-refl; Vis; _≃_; _⇄_; silent; Moves)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; aft; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; re-parts; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn; ≈-refl; notT; subd; Thru; Up; up; InCall; Bursts; BurstsAt; Dom)
-open import adequacy.Cursor.Show using (up-pre; conn-up-body)
-open import adequacy.Cursor.Tear using (husk-of; src-husk; unsubIf-husk; quiet-unsubIf; NoIsle; c-abs; c-sub; sync-pend)
+open import adequacy.Cursor using (Cur; bef; aft; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd;
+  re-parts; under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans;
+  h-blank; h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn;
+  Torn; ≈-refl; notT; subd; Thru; Up; up; InCall; Bursts; BurstsAt)
+open import adequacy.Cursor.Show using (up-pre; conn-up-body; in-call)
+open import adequacy.Cursor.Tear using (husk-of; src-husk; unsubIf-husk; quiet-unsubIf; NoIsle; c-abs; sync-pend)
 open import adequacy.Cursor.Frame using (Unread; un-dead; un-torn; owes; dead; lane; lanecut; pnd; Need; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-isle; f-islec; f-islep; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; RT)
 open import adequacy.Least using (Lo; k-kid; k-body)
@@ -42,7 +45,6 @@ open import adequacy.Bound using (behind-pend; owes?; owes-≼; lo-att; in-slot)
 open import adequacy.Few using (few; before; subd-env; nxt; cl; owes-call; tailp-lag; husk-f)
 open import adequacy.FrShift using (fr-shift)
 open import adequacy.PinTail using (pin-tail; ptl; end-tail; SrcPT; src-pt)
-open import adequacy.Walk using (nowhere; none′)
 open import adequacy.Stamped using (StOK)
 open import adequacy.Isle using (G; NoAttB; att-key; noatt-noisle)
 
@@ -101,20 +103,16 @@ isle-up {k = k} {Ci} {D} {E} ic (ks , f) bu nr = up lift
     c = CS.connAt k
     lift : ∀ {y r} → Thru Ci r → T (inside r y) → Frozen k y (pin r) → Reach (Frozen k) y (pin r)
          → Σ Pos λ xs → Σ Pos λ r′ → Thru D r′ × T (inside r′ (y ++ xs)) × E (y ++ xs) (pin r′) × Reach E (y ++ xs) (pin r′)
+           × All (_≡ ix 0) xs
     lift {y} {r} t i x rc with inside (c ++ [ ix 1 ]) y in iw
     ... | false =
       let (rc′ , x′ , q) = BurstsAt.kept bu x (λ t′ → subst T iw t′) i (ic t) rc
       in [ ix 0 ] , r , thru-dn D {r} {c} rc′ nr
-       , Equivalence.from T-≡ (inside-++ r y [ ix 0 ] (Equivalence.to T-≡ i)) , x′ , q
-    ... | true  with inside-⊑ (c ++ [ ix 1 ]) y (subst T (sym iw) tt)
-    ...   | w , refl =
+       , Equivalence.from T-≡ (inside-++ r y [ ix 0 ] (Equivalence.to T-≡ i)) , x′ , q , refl ∷ []ᴬ
+    ... | true  =
       let iw′ = subst T (sym iw) tt
           (x′ , rc′) = BurstsAt.win bu x iw′ (ks , λ {k′} x″ lt → f x″ (≺-trans {k′} {y} {c ++ [ ix 2 ]} lt (in-slot c y iw′)))
-      in [ ix 0 ] , c , nr
-       , Equivalence.from T-≡ (subst (λ z → inside c z ≡ true)
-                                (sym (trans (++-assoc (c ++ [ ix 1 ]) w [ ix 0 ]) (++-assoc c [ ix 1 ] (w ++ [ ix 0 ]))))
-                                (inside-++ c c (ix 1 ∷ (w ++ [ ix 0 ])) (inside-self c)))
-       , x′ , rc′
+      in [ ix 0 ] , c , nr , in-call c y iw′ , x′ , rc′ , refl ∷ []ᴬ
 
 -- Attached now: already, or its attach owed just after its `ix 1`.
 att-now : ∀ {Γ X} {cl sl p ow cx ea sr sc y} sa

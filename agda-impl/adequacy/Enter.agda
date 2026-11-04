@@ -548,6 +548,11 @@ conn-parts {sc = sc} {s = s} {b} {q} ok ad (_ , wi) = pt , wb , ws
       ; clear-s = λ {y} h rs → proj₂ ok h (nest-in (step here plain-ix) (proj₁ rs)) (⊑-inside (⊑-refl y))
       ; sb      = within-sound {sc = binds s q sc} Iβ wb
       ; ss      = within-sound {sc = sc} Iσ ws
+      ; cr      = proj₁ ok
+      ; Hβ      = H₀
+      ; iβ      = Iβ
+      ; iσ      = Iσ
+      ; wapart  = bl
       }
 
 -- A connect's body subscribed admissibly.
