@@ -71,8 +71,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
   opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li) m so bh sy row st ln ru nk =
-    Cr↑ , pending (f-lnct (f-lane (f-lanes fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k)))) none (sym (+-comm n 1))
-                                           (wait-up ah′ wt) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh))))
+    Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k)))) none (sym (+-comm n 1))
+                                           (wait-up ah′ wt) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()))))
                   (≺-ext p {ix 1} [] , ok , JInv.adm ji , ≈-refl , wi)
         , moves
     where
@@ -152,7 +152,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ln = record { alike = (λ (x , v) → (x , g x) , v) ⇄ (λ ((x , _) , v) → x , v)
                   ; cov = [] , λ x → inj₁ (proj₁ x)
                   ; voc = λ x → x , g x }
-  merge-start (flying (d-outer _ _ _) _ ())
+  merge-start (flying (d-outer _ _ _ _) _ ())
   merge-start (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   merge-start (settled () _ _)
 

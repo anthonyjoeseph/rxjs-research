@@ -24,7 +24,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import adequacy.Rows using (toEv; full; pendRows; Frozen)
 open import denotation.Laws.Worlds using (Ok; Hots; Real; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
-open import adequacy.Cursor using (Adm; Ahead; Asc; AttFin; AttOwed; Begun; Behind; Burst; ConnE; Cur; Ends; Failure; Flags; Folded; Gone; Hole; Husk; HuskL; JInv; JRl; JRo; JoinE; JoinF; Joined; LanesIn; NoFail; OuterDone; OweAt; Owes; Parts; Pts; Rgn; Runs; Sound; Spent; Src; SrcH; Subd; Sync; TailP; Under; Waiting; Whole; Within; Up; Dom; Thru; Bursts; Lane; NoKill; _∪ᵖ_; _≈_; _⊑_; aft; bef; bump; polF)
+open import adequacy.Cursor using (Adm; Ahead; Asc; AttFin; AttOwed; Begun; Behind; Burst; ConnE; Cur; Ends; Failure; Flags; Folded; Gone; Hole; Husk; HuskL; JInv; JRl; JRo; JoinE; JoinF; Joined; LanesIn; NoFail; OuterDone; OweAt; Owes; Parts; Pts; Rgn; Runs; Sound; Spent; Src; SrcH; Subd; Sync; TailP; Under; Waiting; Whole; Within; Up; Dom; Thru; Bursts; InCall; Lane; NoKill; _∪ᵖ_; _≈_; _⊑_; aft; bef; bump; polF)
 open import adequacy.Cursor.Tear using (NoIsle)
 
 
@@ -142,11 +142,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (not (CS.closed k))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
             → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′ → Behind C (Frozen k) → Subd (scopeOf c) C k
-            → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → NoIsle b → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
+            → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → (T (not (CS.srcAtt k)) → InCall C k) → NoIsle b
+            → Fr Cr C (Parts.Rs pt) (inSrc k b c) owes E
     -- a source ended while its connect runs: nothing reads what is left
     f-srcc  : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {C D Rg Rg′ E′ β P}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k β) → T (CS.srcLive k) → T (CS.closed k)
             → Spent C (Frozen k) → TailP C (Frozen k) P → Dom C D → Behind C (Frozen k) → Subd (scopeOf c) C k
+            → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k)
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
             → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E′
             → Fr Cr C Rg′ (inSrc k b c) (dead D P) (Frozen k)
@@ -188,14 +190,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
     f-isle  : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D Db Ri Ci P Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
-            → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k
+            → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k → InCall Ci k
             → Bursts k E′ → Thru D (CS.connAt k)
             → NoIsle b → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D D₁ Db Ci Rg′ P N Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
-            → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Dom Ci D₁ → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k
+            → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Dom Ci D₁ → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → AttOwed k → InCall Ci k
             → Bursts k E′ → Thru D (CS.connAt k)
             → Fr Cr C Rg′ (inSrc k b c) (dead D₁ N) (Frozen k)
     -- an isle's source not yet subscribed: its cursor at where it will be

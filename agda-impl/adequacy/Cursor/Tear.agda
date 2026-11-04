@@ -70,8 +70,8 @@ mutual
 
   srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
   srch-adv dm (sh-dead hk u sf)                       = sh-dead hk (up-adv dm u) sf
-  srch-adv dm (sh-isle na nc sy bh sd ss ao bu nr)    = sh-isle na nc sy bh sd ss ao bu (dm nr)
-  srch-adv dm (sh-islec na cl sp tp hk di bh sd bu nr) = sh-islec na cl sp tp hk di bh sd bu (dm nr)
+  srch-adv dm (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss ao ic bu (dm nr)
+  srch-adv dm (sh-islec na cl sp tp hk di bh sd ao ic bu nr) = sh-islec na cl sp tp hk di bh sd ao ic bu (dm nr)
   srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (dm nr)
 
 -- Nothing, shown nowhere.
@@ -108,12 +108,12 @@ mutual
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
   src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
     _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts na sc pt sr bb fl ce) (thru-no C nr)
-  src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao) bb fl ce =
+  src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt sr bb fl ce) (inj₁ t))
-                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
-  src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd) bb fl ce =
+                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
+  src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic) bb fl ce =
     by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt sr bb fl ce)) (inj₁ t))
-                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
+                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts na sc pt sr bb fl ce) (subd-thru {k = k} sd))
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}
              → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
@@ -186,8 +186,8 @@ mutual
 
   srch-off : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → SrcH sc D k o E P → SrcH sc D k (offIf (CS.srcAtt k) o) E P
   srch-off {k = k} (sh-dead hk u sf) = sh-dead (offIf-husk (CS.srcAtt k) hk) u sf
-  srch-off {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _)  = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
-  srch-off {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _) = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
+  srch-off {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _ _)  = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
+  srch-off {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _ _ _) = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
   srch-off {k = k} sh@(sh-pend na _ _ _ _ _ _ _ _ _ _) = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
 
   offIf-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} b → Husk sc D s E P → Husk sc D (offIf b s) E P
@@ -315,8 +315,8 @@ mutual
   srch-unsub : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → SrcH sc D k o E P
              → Σ Pts λ P′ → SrcH sc D k (proj₁ (unsubIf (CS.srcAtt k) o)) E P′ × P ⊑ P′
   srch-unsub {k = k} (sh-dead hk u sf) = let (_ , h , le) = unsubIf-husk (CS.srcAtt k) hk in _ , sh-dead h u sf , under-⊑ le
-  srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _)  = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
-  srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
+  srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _ _)  = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
+  srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-pend na _ _ _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
 
 ------------------------------------------------------------------------

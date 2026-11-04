@@ -384,8 +384,8 @@ mutual
   src-b : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → LoP (connS k o b) p
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on _ sy _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
-  src-b (src-shut _ sp _ _ _ _ _) env lo r = ⊥-elim (sp r)
+  src-b (src-on _ sy _ _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp _ _ _ _ _ _) env lo r = ⊥-elim (sp r)
   src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
@@ -435,8 +435,8 @@ postulate
 -- A source's rows a body row at `p` reads: few, by what the source has
 -- passed, or none yet, its subscription not before `p`.
 few-src : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p} → CS.scope k ≡ sc → Src sc Rs (bef p) k o → FewBefore (Frozen k) p
-few-src _ (src-on _ _ bh _ _ _) = few-behind bh
-few-src _ (src-shut _ _ _ _ _ bh _) = few-behind bh
+few-src _ (src-on _ _ bh _ _ _ _) = few-behind bh
+few-src _ (src-shut _ _ _ _ _ bh _ _) = few-behind bh
 few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow _) = [] , λ {y} r lt →
   ⊥-elim (ow (≺-trans {CS.connAt k ++ [ ix 1 ]} {y} {p}
                (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) r)

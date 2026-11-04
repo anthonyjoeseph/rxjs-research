@@ -23,7 +23,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; closed; free; cpAt; cutAt; overAt)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Up; up; Dom; Thru; Lane; NoKill; Cur; Rgn; SubdAt; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; sh-pend; voc)
+open import adequacy.Cursor using (Up; up; Dom; Thru; Lane; NoKill; Cur; Rgn; SubdAt; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; sh-pend; voc; BurstsAt; bursts)
 open import adequacy.Cursor.Tear using (c-abs; NoIsle; Clear; Pending)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-∘)
 open import adequacy.PinLift using (reach-≈)
@@ -42,12 +42,17 @@ due-≈ eq = (λ (x , v , o) → let (y , v′) = to (alike eq) (x , v) in y , v
 spent-≈ : ∀ {A} {C} {E E′ : EmissionSet A} → Spent C E → E ≈ E′ → Spent C E′
 spent-≈ {C = C} sp eq d = sp (from (due-≈ {C = C} eq) d)
 
+-- A burst's rows read through an alike entry.
+bursts-≈ : ∀ {X B} {F : EmissionSet X} {c} {E E′ : EmissionSet B} → E ≈ E′ → BurstsAt F c E → BurstsAt F c E′
+bursts-≈ m (bursts w kp) = bursts (λ x i f → let (r , rc) = w x i f in voc m r , reach-≈ m rc)
+                                  (λ x ni i le rc → let (a , r , q) = kp x ni i le rc in a , voc m r , reach-≈ m q)
+
 -- A torn connect read through an alike entry.
 srch-≈ : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E E′ : EmissionSet B} {P} → E ≈ E′ → SrcH sc D k o E P → SrcH sc D k o E′ P
 srch-≈ m (sh-dead hk u sf) = sh-dead hk (up-∘ u (up-≈ m)) sf
-srch-≈ m (sh-isle na nc sy bh sd ss ao bu nr) = sh-isle na nc sy bh sd ss ao (λ x i f → let (r , rc) = bu x i f in voc m r , reach-≈ m rc) nr
-srch-≈ m (sh-islec na cl sp tp hk dm bh sd bu nr) = sh-islec na cl sp tp hk dm bh sd (λ x i f → let (r , rc) = bu x i f in voc m r , reach-≈ m rc) nr
-srch-≈ m (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss (λ x i f → let (r , rc) = bu x i f in voc m r , reach-≈ m rc) nr
+srch-≈ m (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss ao ic (bursts-≈ m bu) nr
+srch-≈ m (sh-islec na cl sp tp hk dm bh sd ao ic bu nr) = sh-islec na cl sp tp hk dm bh sd ao ic (bursts-≈ m bu) nr
+srch-≈ m (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss (bursts-≈ m bu) nr
 
 torn-≈ : ∀ {Γ X B} {sc : Scope Γ} {C} {k : CS Γ X} {o b} {β E E′ : EmissionSet B} → E ≈ E′ → Torn sc C k o b β E → Torn sc C k o b β E′
 torn-≈ m t = record { D = Torn.D t ; Db = Torn.Db t ; dom = Torn.dom t ; Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = srch-≈ m (Torn.sh t) ; bh = Torn.bh t
@@ -200,10 +205,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
                (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd dl) rt))
     climb (f-lane fr)                   (at , l , refl , h) = climb fr (at , l , refl , h)
     climb (f-lnct {b = b} fr)           h = climb fr (_ , _ , refl , hold-lh b h)
-    climb (f-src fr sc pt lv nc bs bb fl fe eq bh sd af ao _) h =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-on nc (sync-≈ h fe) bh sd af ao) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
-    climb (f-srcc fr sc pt lv cl sp tp dm bh sd bs bb fl eq) (Q , hk , le) =
-      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk dm bh sd) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+    climb (f-src fr sc pt lv nc bs bb fl fe eq bh sd af ao ic _) h =
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-on nc (sync-≈ h fe) bh sd af ao ic) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
+    climb (f-srcc fr sc pt lv cl sp tp dm bh sd ic bs bb fl eq) (Q , hk , le) =
+      climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-shut cl sp (tailp-⊑ tp le) hk dm bh sd ic) (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
     climb (f-srcp {k = k} fr sc pt lv nc na ba an adm bs bb fl fe eq ow sd _) (_ , refl , pe , wn) =
       climb fr (s-conn sc pt (λ _ → bs) (λ _ → bb) (λ _ → src-pend na nc ba an adm (≈-trans pe fe) wn ow (λ o → SubdAt.past sd o (≺-ext (CS.connAt k) [])))
                        (λ nl → ⊥-elim (notT _ nl lv)) fl eq)
@@ -219,8 +224,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     ... | Q′ , hl , le″ = climb fr (_ , h-flat ho uo hl , ⊑-trans le (∪-⊑ ⊑-refl (⊑-trans (∪-⊑ ⊑-refl (∪-⊑ le′ ⊑-refl)) le″)))
     climb (d-src u hb ub us le _ f)     (Q , hk , le′) = unread-up u (sh-dead hk us f) hb ub (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl))
     climb (d-body u sh us le)           (Q , hk , le′) = unread-up u sh hk us (⊑-trans le (∪-⊑ ⊑-refl le′))
-    climb (f-isle u hb ub le na nc bh sd ss ao bu nr _) h = unread-up u (sh-isle na nc h bh sd ss ao bu nr) hb ub le
-    climb (f-islec u hb ub le na cl sp tp dm bh sd bu nr) (Q , hk , le′) = unread-up u (sh-islec na cl sp (tailp-⊑ tp le′) hk dm bh sd bu nr) hb ub le
+    climb (f-isle u hb ub le na nc bh sd ss ao ic bu nr _) h = unread-up u (sh-isle na nc h bh sd ss ao ic bu nr) hb ub le
+    climb (f-islec u hb ub le na cl sp tp dm bh sd ao ic bu nr) (Q , hk , le′) = unread-up u (sh-islec na cl sp (tailp-⊑ tp le′) hk dm bh sd ao ic bu nr) hb ub le
     climb (f-islep u hb ub le na nc ba an sc adm ss bu nr _) (_ , refl , pe , wn) = unread-up u (sh-pend na nc ba an sc adm pe wn ss bu nr) hb ub le
 
     unread-up : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {o b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps
@@ -261,8 +266,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     dead-closed (f-lane _) ()
     dead-closed (f-lnct {b = true} _) ()
     dead-closed (f-lnct {b = false} _) refl = tt
-    dead-closed (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-    dead-closed (f-srcc {k = k} {c = c} _ _ _ _ cl _ _ _ _ _ _ _ _ _) refl =
+    dead-closed (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+    dead-closed (f-srcc {k = k} {c = c} _ _ _ _ cl _ _ _ _ _ _ _ _ _ _) refl =
       or-l (CS.closed k) (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c)) cl
     dead-closed (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
     dead-closed (f-body _ _ _ _ _ _ _ _) ()
@@ -282,8 +287,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       or-r (CS.closed k) (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c))
            (and-i (CS.srcAtt k) (not (CS.srcLive k) ∨ closed c) at (unread-closed u))
     dead-closed (d-body u _ _ _) refl = unread-closed u
-    dead-closed (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-    dead-closed (f-islec {k = k} {c = c} _ _ _ _ _ cl _ _ _ _ _ _ _) refl =
+    dead-closed (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+    dead-closed (f-islec {k = k} {c = c} _ _ _ _ _ cl _ _ _ _ _ _ _ _ _) refl =
       or-l (CS.closed k) (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c)) cl
     dead-closed (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
 
@@ -301,8 +306,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   src-dead : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {s b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k s E Ps
            → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → NoIsle b → Res Cr (inSrc k b c) s
   src-dead {C = C} u (sh-dead hk us f) hb ub le nb                = C , dead _ _ , nowhere , _ , d-src u hb ub us le nb f , (_ , hk , ⊑-refl)
-  src-dead u (sh-isle na nc sy bh sd ss ao bu nr) hb ub le nb     = _ , owes , _ , _ , f-isle u hb ub le na nc bh sd ss ao bu nr nb , sy
-  src-dead {C = C} u (sh-islec na cl sp tp hk dm bh sd bu nr) hb ub le _ = C , dead _ _ , nowhere , _ , f-islec u hb ub le na cl sp tp dm bh sd bu nr , (_ , hk , ⊑-refl)
+  src-dead u (sh-isle na nc sy bh sd ss ao ic bu nr) hb ub le nb     = _ , owes , _ , _ , f-isle u hb ub le na nc bh sd ss ao ic bu nr nb , sy
+  src-dead {C = C} u (sh-islec na cl sp tp hk dm bh sd ao ic bu nr) hb ub le _ = C , dead _ _ , nowhere , _ , f-islec u hb ub le na cl sp tp dm bh sd ao ic bu nr , (_ , hk , ⊑-refl)
   src-dead u (sh-pend na nc ba an sc adm pe wn ss bu nr) hb ub le nb = _ , pnd _ , _ , _ , f-islep u hb ub le na nc ba an sc adm ss bu nr nb , (_ , refl , pe , wn)
 
   body-dead : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {o b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps
@@ -379,8 +384,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-src {k = k} np nb (C , owes , _ , _ , fr , s-conn sc pt bs bb os tn fl eq) with live? (CS.srcLive k)
   ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl nb
   ... | inj₁ lv with os lv
-  ...   | src-on nc sy bh sd af ao      = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao nb , sy
-  ...   | src-shut cl sp tp hk dm bh sd = C , dead _ _ , nowhere , _ , f-srcc fr sc pt lv cl sp tp dm bh sd (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
+  ...   | src-on nc sy bh sd af ao ic   = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao ic nb , sy
+  ...   | src-shut cl sp tp hk dm bh sd ic = C , dead _ _ , nowhere , _ , f-srcc fr sc pt lv cl sp tp dm bh sd ic (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
   ...   | src-pend _ _ _ _ _ _ _ _ _    = ⊥-elim (np tt)
   down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-conn sh hb u , le)) = src-dead (un-dead fr) sh hb u le nb
   down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-blank (f , qs , qb) , le)) =

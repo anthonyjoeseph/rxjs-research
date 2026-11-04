@@ -31,13 +31,13 @@ open import denotation.Events using (Pos; Timeline; ix; last; sub; ofᴱ; <ᵖ-s
 open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; Den; hot; coldAt; Proper; DenEnv; ⟦_⟧; Ended; enter; shown; heard;
   ended; late; InE; MapT; map-out; map-end; map-skip; map-pin; module Joining; module Scan;
   module TakeWhile; module Connecting; module Bounded; module Switch)
-open import denotation.Laws.Modulus using (≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
+open import denotation.Laws.Modulus using (≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; ≺-ext; ≺-absurd; ≼-antisym; ≼-false; ≼-or-≻)
 open import operation.Key using (after)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed)
+open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
 open import adequacy.Cursor.Show using (thru-owes)
 open import adequacy.Floor.Keys using (own-bld; os)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body)
@@ -284,6 +284,18 @@ att-slot {k = k} {p} (inj₂ (e , _)) bl _ q₂p =
   bl e (≺-trans {q₁} {CS.connAt k ++ [ ix 2 ]} {p} (in-slot (CS.connAt k) q₁ (Equivalence.from T-≡ (inside-self q₁))) q₂p)
   where q₁ = CS.connAt k ++ [ ix 1 ]
 
+-- A cursor owing a connect's subscription is within its subscribe call.
+owes-call : ∀ {Γ X} {k : CS Γ X} C → Owes C (CS.connAt k ++ [ ix 1 ]) → InCall C k
+owes-call {k = k} C ow {r} t = ≼-trans {r} {q₁} {CS.connAt k ++ [ ix 2 ]} (thru-owes C t ow)
+  (≺→≼ {q₁} {CS.connAt k ++ [ ix 2 ]} (in-slot (CS.connAt k) q₁ (Equivalence.from T-≡ (inside-self q₁))))
+  where q₁ = CS.connAt k ++ [ ix 1 ]
+
+-- An unattached source's cursor moved to just before a key of its
+-- connect's subtree: still within its subscribe call.
+call-sh : ∀ {Γ X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p} → AttOwed k → LoP (connS k o b) p → InCall (bef p) k
+call-sh {k = k} {o = o} {b = b} {p} ao lo {r} t = ≼-trans {r} {p} {CS.connAt k ++ [ ix 2 ]} t
+  (att-slot {k = k} {p = p} ao (λ be → lo (k-own (body-key k {o = o} {b = b} be))) (λ ae → lo (k-own (own-bld k {o = o} {b = b} (os ae)))))
+
 -- A connect's while its source runs: its body's, or a source row's
 -- first effect, the source passed at `p`.
 conn-lag : ∀ {Γ X B} {C} {k : CS Γ X} {β : EmissionSet B} {p}
@@ -363,9 +375,9 @@ mutual
   srch-f {k = k} {p = p} (sh-pend _ _ ba _ refl (ok , a) _ _ _ _ _) _ bl _ = [] , λ { (k′ , (_ , x , _) , refl) yp →
     ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
                      (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }
-  srch-f {k = k} {p = p} (sh-isle {Ci = Ci} na nc sy bh sd ss ao _ _) lo bl al =
+  srch-f {k = k} {p = p} (sh-isle {Ci = Ci} na nc sy bh sd ss ao _ _ _) lo bl al =
     let ie = subd-env {k = k} sd (att-slot {k = k} {p = p} ao bl al) in burst-plag {C = Ci} {k = k} (before {C = Ci} {E = Frozen k} bh (few sy (proj₁ ie) (proj₂ ie) lo))
-  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk _ bh sd _ _) lo _ _ = burst-plag {C = Ci} {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
+  srch-f {k = k} (sh-islec {Ci = Ci} na cl sp tp hk _ bh sd _ _ _ _) lo _ _ = burst-plag {C = Ci} {k = k} (before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk lo)))
 
   few : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → EnvL (full sc) C p → LoP s p
       → Lag C p E
@@ -400,8 +412,8 @@ mutual
   src-f : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvL (full (CS.scope k)) C p → LoP (connS k o b) p
         → Behind (bef p) (Frozen k)
-  src-f {C = C} (src-on _ sy bh _ _ _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
-  src-f {C = C} (src-shut _ _ tp hk _ bh _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
+  src-f {C = C} (src-on _ sy bh _ _ _ _) env ef lo = behind-bef {C = C} bh (few sy env ef (λ ki → lo (k-kid (k-src ki))))
+  src-f {C = C} (src-shut _ _ tp hk _ bh _ _) env ef lo = behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))
   src-f {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ a _ _ _ _) env ef lo =
     behind-pend {C = bef p} {k = k} refl a (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
 
@@ -588,11 +600,12 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
            → Src (CS.scope k) Rg (bef p) k o
     src-sh {k = k} {b = b} (src-pend {o = o′} na nc be an adm pr wn _ nr) env ef lo =
       src-pend na nc be an adm pr wn (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be))) (λ h → nr (owes-≼ C op h))
-    src-sh {k = k} (src-on nc sy bh sd af ao) env ef lo =
-      src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd) af ao
+    src-sh {k = k} {o = o} {b = b} (src-on nc sy bh sd af ao _) env ef lo =
+      src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef lo′)) (subd′ sd) af ao (λ na → call-sh {k = k} {o = o} {b = b} (ao na) lo)
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))
-    src-sh {k = k} (src-shut cl sp tp hk dm bh sd) env ef lo =
+    src-sh {k = k} {o = o} {b = b} (src-shut cl sp tp hk dm bh sd ic) env ef lo =
       src-shut cl (spent sp) (td tp) hk (λ t → th (dm t)) (behind-bef {C = C} bh (tailp-lag {C = C} tp (husk-f hk (λ ki → lo (k-kid (k-src ki)))))) (subd′ sd)
+               (λ na → proj₁ (ic na) , call-sh {k = k} {o = o} {b = b} (proj₁ (ic na)) lo)
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → (∀ {q e} → Due C O q e → p ≼ q) → (∀ {q q′} → Kill P q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′) → Joined sc Rl C P O d n qu ls

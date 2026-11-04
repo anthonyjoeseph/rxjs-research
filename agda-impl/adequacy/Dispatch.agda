@@ -50,7 +50,7 @@ open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
 open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past; pend-past; LoP; lo-p)
 open import adequacy.FrShift using (fr-shift; rc; hr; HR)
-open import adequacy.Few using (lag)
+open import adequacy.Few using (lag; owes-call)
 open import adequacy.Apart.Floor using (floor)
 open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
@@ -224,7 +224,7 @@ delivers-owed : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E m p} → Sync
 delivers-owed (s-of d _)                 d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
 delivers-owed (s-of d _)                 d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _ _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -254,15 +254,15 @@ marked-pend {s = s} p mk with pend-shape s p
 
 
 -- What a part no live node reads still runs, kept by a mark's run.
-rest-of : ∀ {Γ} {sc : Scope Γ} {A} {i q} {xs : List A} {s″ : St Γ A} {P} → Quiet s″ → Rest sc (ofS i q xs) P → Rest sc s″ P
+rest-of : ∀ {Γ} {sc : Scope Γ} {D} {A} {i q} {xs : List A} {s″ : St Γ A} {E P} → Quiet s″ → Rest sc D (ofS i q xs) E P → Rest sc D s″ E P
 rest-of q (_ , h-blank _ , le) = _ , h-blank q , le
 
-rest-join : ∀ {Γ} {sc : Scope Γ} {A} {j g} {x : A ∈ Γ} {ib} {s″ : St Γ A} {P} → Quiet s″ → Rest sc (joinS j g x ib) P → Rest sc s″ P
+rest-join : ∀ {Γ} {sc : Scope Γ} {D} {A} {j g} {x : A ∈ Γ} {ib} {s″ : St Γ A} {E P} → Quiet s″ → Rest sc D (joinS j g x ib) E P → Rest sc D s″ E P
 rest-join q (_ , h-blank _ , le) = _ , h-blank q , le
 
-rest-take : ∀ {Γ} {sc : Scope Γ} {A} {i} {keep : A → Bool} {w w′ s₀ P} → Rest sc (takeS i keep w s₀) P → Rest sc (takeS i keep w′ s₀) P
+rest-take : ∀ {Γ} {sc : Scope Γ} {D} {A} {i} {keep : A → Bool} {w w′ s₀ E P} → Rest sc D (takeS i keep w s₀) E P → Rest sc D (takeS i keep w′ s₀) E P
 rest-take (_ , h-blank q , le) = _ , h-blank q , le
-rest-take (_ , h-take hk , le) = _ , h-take hk , le
+rest-take (_ , h-take hk u , le) = _ , h-take hk u , le
 
 -- NO MARK, NOTHING OWED.
 none-spent : ∀ {R} {t : St [] R} {Rg C E} → Sync unbound Rg C t E → search top t ≡ nothing → Spent C E
@@ -352,43 +352,43 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q) → PendV Cr C c o q
   srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
-    (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
-  srcp (f-islep {k = k} u hb le na nc ba an sc (ok , adm) ss nb) refl pe wn =
-    (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) nb
+    (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) (λ _ → owes-call {k = k} C ow) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb) refl pe wn =
+    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb
          , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
   srcp (f-scan _ _ _ _)                                         ()   _ _
   srcp (f-cut _)                                                ()   _ _
   srcp (f-take _ _ _ _)                                         ()   _ _
-  srcp (f-took _ _ _ _ _ _ _ _)                                 ()   _ _
+  srcp (f-took _ _ _ _ _ _ _ _ _ _)                                 ()   _ _
   srcp (f-outer _ _ _ _ _ _)                                    ()   _ _
-  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)      ()   _ _
+  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)    ()   _ _
   srcp (f-lane _)                                               ()   _ _
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _
-  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                    ()   _ _
-  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _)                       ()   _ _
+  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  ()   _ _
+  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                   ()   _ _
   srcp (f-body _ _ _ _ _ _ _ _)                                 ()   _ _
-  srcp (d-map _)                                                ()   _ _
-  srcp (d-scan _)                                               ()   _ _
-  srcp (d-cut _)                                                ()   _ _
-  srcp (d-ln _)                                                 ()   _ _
-  srcp (d-take _)                                               ()   _ _
-  srcp (d-outer _ _ _)                                          ()   _ _
-  srcp (d-lanes _ _ _ _ _)                                      ()   _ _
-  srcp (d-src _ _ _ _ _)                                        ()   _ _
-  srcp (d-body _ _ _)                                           ()   _ _
-  srcp (f-isle _ _ _ _ _ _ _ _ _ _)                             ()   _ _
-  srcp (f-islec _ _ _ _ _ _ _ _ _)                              ()   _ _
+  srcp (d-map _ _)                                                ()   _ _
+  srcp (d-scan _ _)                                               ()   _ _
+  srcp (d-cut _ _)                                                ()   _ _
+  srcp (d-ln _ _)                                                 ()   _ _
+  srcp (d-take _ _)                                               ()   _ _
+  srcp (d-outer _ _ _ _)                                          ()   _ _
+  srcp (d-lanes _ _ _ _ _ _ _)                                      ()   _ _
+  srcp (d-src _ _ _ _ _ _ _)                                        ()   _ _
+  srcp (d-body _ _ _ _)                                           ()   _ _
+  srcp (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _)                     ()   _ _
+  srcp (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  ()   _ _
 
   pend-view : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q p} → Inv Rt Cr C ⟨ c , pend o q , subscribing , p ⟩ → PendV Cr C c o q
   pend-view (pending fr h)                                     = _ , _ , fr , h
   pend-view {o = o} {q} (settled {N = owes} c-sub fr h)       = ⊥-elim (sync-pend {s = pend o q} tt h)
-  pend-view (settled {N = dead _} c-sub fr (_ , h-blank () , _))
-  pend-view (settled {N = lane _ _} c-sub fr (_ , _ , () , _))
-  pend-view (settled {N = lanecut _ _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {N = dead _ _} c-sub fr (_ , h-blank () , _))
+  pend-view (settled {N = lane _ _ _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {N = lanecut _ _ _} c-sub fr (_ , _ , () , _))
   pend-view {o = o} (settled {N = pnd _} c-sub fr (_ , refl , pe , wn)) = srcp {o = o} fr refl pe wn
 
   -- A joiner's entry, its outer's entered where it subscribed.
@@ -428,11 +428,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
         -- fresh: its source's rows and its body's all still owed
         fl : Flags (bef (q ⊕ [ ix 0 ])) (conn₀ s q (scopeOf c)) (pendRows (full (binds s q (scopeOf c))) b (q ⊕ [ ix 0 ]))
         fl = record { shut = λ () ; torn = λ () ; owed = λ ()
-                    ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ (bef (q ⊕ [ ix 0 ])) ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
+                    ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 1 ]} {c′} ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
                     ; ended = λ _ {c′} y n → ⊥-elim (n (≺→≼ {q ⊕ [ ix 0 ]} {c′} (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad) y))) }
     in Cr′ , bef (q ⊕ [ ix 0 ]) ,
        pending (f-body fr′ refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁ (λ h → h (≺-ext q [])))
-                 (behind-past (bef (q ⊕ [ ix 0 ])) (≼-refl {q ⊕ [ ix 0 ]}) (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) fl
+                 (behind-past (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 0 ]} (≼-refl {q ⊕ [ ix 0 ]}) (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) fl
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (≼-refl {q ⊕ [ ix 0 ]} , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb) ,
        silent (vis-≃ d)
@@ -462,16 +462,16 @@ module Over {R : Set} (Rt : EmissionSet R) where
   Next : ∀ {Γ A} → Cur → Ctx R Γ A → St Γ A → Pos → Pos → Set₁
   Next {A = A} Cr c s r p =
       (Σ Cur λ Cr′ → Inv Rt Cr′ (bef p) ⟨ c , s , absorbed , r ⟩ × Vis (RT Rt Cr) ≃ Vis (RT Rt Cr′))
-    ⊎ (Σ Cur λ C → Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c (dead P) E × Rest (scopeOf c) s P)
+    ⊎ (Σ Cur λ C → Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Σ Cur λ D → Fr Rt Cr C Rg c (dead D P) E × Rest (scopeOf c) D s E P)
 
   search-least : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ p}
                → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → Clear c′
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ) → Delivers s′ m p → Next Cr c′ s′ r p
   search-least {c = c} {s = s} {c′ = c′} {s′ = s′} (settled _ fr h) cl fd dl with climb Rt fr h
   ... | _ , _ , e , sy with descend Rt c′ s′ (λ x → marked-pend x (found-mark c s fd)) cl (subst (λ t → Sync unbound _ _ t _) (sym (found-plug c s fd)) sy) e
-  ...   | C′ , dead P , Rg , E , fr′ , h′                    = inj₂ (C′ , Rg , P , E , fr′ , h′)
-  ...   | _ , lane _ _ , _ , _ , _ , (_ , _ , refl , _)     = ⊥-elim (ln-none dl)
-  ...   | _ , lanecut _ _ , _ , _ , _ , (_ , _ , refl , _)  = ⊥-elim (cut-none dl)
+  ...   | C′ , dead D P , Rg , E , fr′ , h′                  = inj₂ (C′ , Rg , P , E , D , fr′ , h′)
+  ...   | _ , lane _ _ _ , _ , _ , _ , (_ , _ , refl , _)   = ⊥-elim (ln-none dl)
+  ...   | _ , lanecut _ _ _ , _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (cut-none dl)
   ...   | _ , pnd _ , _ , _ , _ , (_ , refl , _)            = ⊥-elim (pend-none dl)
   ...   | _ , owes , _ , _ , fr′ , h′ with fr-shift Rt fr′ h′ (delivers-owed h′ dl) (lo-at c s fd dl)
   ...     | Cr′ , fr″ , h″ , d = inj₁ (Cr′ , settled c-abs fr″ h″ , vis-≃ d)
@@ -480,35 +480,35 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- adrift in what it still runs.
   stepped : ∀ {Cr Γ A} {c′ : Ctx R Γ A} {s′ r p s″ e″ p″} → closed c′ ≡ false → Next Cr c′ s′ r p
           → (∀ {Cr′} → Inv Rt Cr′ (bef p) ⟨ c′ , s′ , absorbed , r ⟩ → Inv Rt Cr′ (bef p) ⟨ c′ , s″ , rising e″ , p″ ⟩)
-          → (∀ {P} → Rest (scopeOf c′) s′ P → Rest (scopeOf c′) s″ P)
+          → (∀ {D E P} → Rest (scopeOf c′) D s′ E P → Rest (scopeOf c′) D s″ E P)
           → Σ Cur λ Cr′ → Σ Cur λ C′ → Inv Rt Cr′ C′ ⟨ c′ , s″ , rising e″ , p″ ⟩ × Moves (RT Rt Cr) [] (RT Rt Cr′)
   stepped      _  (inj₁ (Cr′ , i , d))              g _  = Cr′ , _ , g i , silent d
-  stepped {Cr} cl (inj₂ (C′ , _ , _ , _ , fr , h)) _ tr = Cr , C′ , adrift fr cl (tr h) , silent ≃-refl
+  stepped {Cr} cl (inj₂ (C′ , _ , _ , _ , _ , fr , h)) _ tr = Cr , C′ , adrift fr cl (tr h) , silent ≃-refl
 
   -- A torn joiner's row dropped: nothing owed before, nothing after.
   joinx-hold : ∀ {Γ A} {sc : Scope Γ} {Rg C N j} {x : A ∈ Γ} {u ib E}
              → Hold sc Rg C N (joinS j false x (u ∷ ib)) E → Hold sc Rg C N (joinS j false x ib) E
   joinx-hold {N = owes}        (s-joinx sp fn)     = s-joinx sp fn
-  joinx-hold {N = dead _}      (_ , h-blank _ , le) = _ , h-blank tt , le
-  joinx-hold {N = lane _ _}    (_ , _ , () , _)
-  joinx-hold {N = lanecut _ _} (_ , _ , () , _)
+  joinx-hold {N = dead _ _}      (_ , h-blank _ , le) = _ , h-blank tt , le
+  joinx-hold {N = lane _ _ _}    (_ , _ , () , _)
+  joinx-hold {N = lanecut _ _ _} (_ , _ , () , _)
   joinx-hold {N = pnd _}       (_ , () , _)
 
   join-off : ∀ {Cr C Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {u ib r p}
            → Inv Rt Cr C ⟨ c , joinS j false x (u ∷ ib) , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , joinS j false x ib , absorbed , p ⟩
   join-off (settled _ fr h) = settled c-abs fr (joinx-hold h)
 
-  off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
+  off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {D E P} → Rest (scopeOf c) D s E P → Rest (scopeOf c) D s′ E P)
            → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Off N → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
   off-keep {N = owes}        _  _  _  _           ()
-  off-keep {N = dead _}      _  tr fr h           _ = settled c-abs fr (tr h)
-  off-keep {N = lane _ _}    _  _  _  _           ()
-  off-keep {N = lanecut _ _} _  _  _  _           ()
+  off-keep {N = dead _ _}      _  tr fr h           _ = settled c-abs fr (tr h)
+  off-keep {N = lane _ _ _}    _  _  _  _           ()
+  off-keep {N = lanecut _ _ _} _  _  _  _           ()
   off-keep {N = pnd _}       np _  _  (_ , e , _) _ = ⊥-elim (np (subst Pending (sym e) tt))
 
   -- A run under a closed context delivers nothing and owes nothing.
   closed-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s s′ : St Γ A} {r p} → closed c ≡ true → (Pending s → ⊥)
-              → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
+              → (∀ {D E P} → Rest (scopeOf c) D s E P → Rest (scopeOf c) D s′ E P)
               → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
   closed-keep cl np tr (settled _ fr h) = off-keep np tr fr h (closed-off Rt fr (subst T (sym cl) tt))
 

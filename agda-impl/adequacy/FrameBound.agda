@@ -122,13 +122,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
     fb {s = s} (f-lane fr) lo hb = fb {s = Machine.lnS _ s} fr lo hb
     fb {s = s} (f-lnct {b = true} fr) lo hb = fb {s = Machine.cutS true _ s} fr lo (λ _ → hb)
     fb {s = s} (f-lnct {b = false} fr) lo hb = fb {s = Machine.cutS false _ s} fr lo (λ ())
-    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-src fr sc _ _ _ bs _ fl fe ce _ _ _ _ _) lo hb =
+    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-src fr sc _ _ _ bs _ fl fe ce _ _ _ _ _ _) lo hb =
       fb {s = connS k s b} fr lo λ env →
         conn-fb {C = C} sc
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)
                          (λ ki → lo (plug-in c (k-kid (k-body ki)))))
           (λ _ (x , v , ow) → let (y , v′) = from (alike fe) (x , v) in hb env (y , v′ , ow)) fl env ce
-    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ _ bs _ fl ce) lo _ =
+    fb {C = C} {c = Machine.inSrc k b c} {s = s} (f-srcc fr sc _ _ _ sp _ _ _ _ _ bs _ fl ce) lo _ =
       fb {s = connS k s b} fr lo λ env →
         conn-fb {C = C} sc
           (λ _ envb → bound bs (subst (λ x → Env (full (binds (CS.src k) (CS.connAt k) x)) C _) sc envb)
@@ -148,8 +148,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       fb {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr lo _
     fb (d-src u _ _ _ _ _ _) lo _ = fb-u u lo
     fb (d-body u _ _ _) lo _ = fb-u u lo
-    fb (f-isle u _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (f-islec u _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-isle u _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-islec u _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
     fb (f-islep u _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
 
     fb-u : ∀ {Cr C D Γ X B} {E β : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {P} {o : St Γ X} {b : St (X ∷ Γ) B} {p}

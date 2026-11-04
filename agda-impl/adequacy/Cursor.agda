@@ -457,12 +457,27 @@ record Up {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B
     lift : ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
          → Σ Pos λ xs → Σ Pos λ r′ → Thru D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
 
--- An isle's burst shows in its connect's entry: a row inside its
--- subscription, with finitely many before it, is pinned there a level
--- down.
+-- An unattached source's cursor: within its subscribe call, reaching
+-- nothing past the slot after it.
+InCall : ∀ {Γ X} → Cur → CS Γ X → Set
+InCall C k = Dom (bef (CS.connAt k ++ [ ix 2 ])) C
+
+-- An isle's pins show in its connect's entry a level down.  A row inside
+-- its subscription, with finitely many before it, is pinned there to the
+-- connect (`burst`).  A row past it pinned to a connect no later than the
+-- slot after the subscription is pinned to one enclosing the connect,
+-- and kept (`kept`).
+record BurstsAt {X B} (F : EmissionSet X) (c : Pos) (E : EmissionSet B) : Set where
+  constructor bursts
+  field
+    win  : ∀ {y} {e : Ev X} → F y e → T (inside (c ++ [ ix 1 ]) y) → Few F y
+         → E (y ++ [ ix 0 ]) (pin c) × Reach E (y ++ [ ix 0 ]) (pin c)
+    kept : ∀ {y r} → F y (pin r) → ¬ T (inside (c ++ [ ix 1 ]) y) → T (inside r y) → r ≼ (c ++ [ ix 2 ])
+         → Reach F y (pin r)
+         → r ≼ c × E (y ++ [ ix 0 ]) (pin r) × Reach E (y ++ [ ix 0 ]) (pin r)
+
 Bursts : ∀ {Γ X B} → CS Γ X → EmissionSet B → Set
-Bursts {X = X} k E = ∀ {y} {e : Ev X} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → Few (Frozen k) y
-                   → E (y ++ [ ix 0 ]) (pin (CS.connAt k)) × Reach E (y ++ [ ix 0 ]) (pin (CS.connAt k))
+Bursts k E = BurstsAt (Frozen k) (CS.connAt k) E
 
 ------------------------------------------------------------------------
 -- A NODE IN STEP WITH ITS FROZEN ENTRY: what its state still owes is
@@ -667,12 +682,12 @@ data Src where
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible
   src-on   : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o} → T (not (CS.closed k)) → Sync sc Rg C o (Frozen k) → Behind C (Frozen k)
-           → Subd sc C k → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → Src sc Rg C k o
+           → Subd sc C k → AttFin k → (T (not (CS.srcAtt k)) → AttOwed k) → (T (not (CS.srcAtt k)) → InCall C k) → Src sc Rg C k o
   -- ended: nothing visible left to owe, the rest within what its subtree
   -- still runs
   src-shut : ∀ {Γ X} {sc : Scope Γ} {Rg} {C} {k : CS Γ X} {o P} → T (CS.closed k) → Spent C (Frozen k)
            → TailP C (Frozen k) P → ∀ {D} → Husk sc D o (Frozen k) P → Dom C D → Behind C (Frozen k)
-           → Subd sc C k → Src sc Rg C k o
+           → Subd sc C k → (T (not (CS.srcAtt k)) → AttOwed k × InCall C k) → Src sc Rg C k o
 
 data Husk where
   -- nothing in it still in step
@@ -696,11 +711,11 @@ data SrcH where
            → T (CS.srcAtt k) ⊎ T (CS.closed k) → SrcH sc D k o E (Under P)
   sh-isle  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri Ci}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k
-           → Sound Ri (Frozen k) → AttOwed k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Sound Ri (Frozen k) → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
   -- an isle whose source has ended
   sh-islec : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E : EmissionSet B} {Ci P}
            → T (not (CS.srcAtt k)) → T (CS.closed k) → Spent Ci (Frozen k) → TailP Ci (Frozen k) P → Husk sc D₁ o (Frozen k) P → Dom Ci D₁
-           → Behind Ci (Frozen k) → Subd sc Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Behind Ci (Frozen k) → Subd sc Ci k → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
   -- a source not yet subscribed: its whole burst, which runs whatever
   -- happens above it, its body's mark subscribing it regardless
   sh-pend  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri}

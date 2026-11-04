@@ -157,7 +157,7 @@ mutual
   src-pt : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} (pt : Parts (CS.scope k) Rg k β) (sw : Src (CS.scope k) (Parts.Rs pt) C k o)
          (bb : Behind C β) (fl : Flags C k β) (ce : ConnE (CS.connAt k) (Frozen k) β E) → SrcPT C k (proj₁ (src-husk refl pt sw bb fl ce))
   src-pt {C = C} {k = k} _ (src-pend _ _ _ _ _ _ _ ow _) _ _ _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ++ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
-  src-pt {C = C} {k = k} _ (src-on nc sy bh sd af _) _ _ _ =
+  src-pt {C = C} {k = k} _ (src-on nc sy bh sd af _ _) _ _ _ =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ t → let (ka , fa) = af t ; (ptl kp fp) = pin-tail sy ; (kh , fh) = bh in
              map ix0 (ka ++ (kp ++ kh)) , λ {k′} x h _ →
@@ -165,7 +165,7 @@ mutual
                          , (λ { (_ , refl , np) → [ (λ q → inj₁ (k′ , q , refl)) , (λ i → inj₂ (∈-map⁺ ix0 (∈-++⁺ʳ ka (∈-++⁺ˡ i)))) ]′ (fp x ok np) }) ]′ h)
                , (λ nk → inj₂ (∈-map⁺ ix0 (∈-++⁺ʳ ka (∈-++⁺ʳ kp (fh x nk))))) ]′ (owes? C k′))
       (λ _ → [] , λ x h _ → inj₁ (in-burst {C = C} {k = k} x h))
-  src-pt {C = C} {k = k} _ (src-shut _ _ tp _ _ bh _) _ _ _ =
+  src-pt {C = C} {k = k} _ (src-shut _ _ tp _ _ bh _ _) _ _ _ =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ _ → let (tailp kt ft) = tp ; (kh , fh) = bh in
              map ix0 (kt ++ kh) , λ {k′} x _ _ →

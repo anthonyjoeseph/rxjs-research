@@ -36,7 +36,7 @@ open import adequacy.Floor.Keys using (plug-in; own-bld; os)
 open import adequacy.Least using (k-own; k-kid; k-outer; k-lane; k-body; Lo)
 open import adequacy.Bound using (Bnd; LoP; Env; env-bind; owes-≼; lo-p; map-b; scan-b; take-b; flat-b; begun-b; bound; src-b; body-key)
 open import adequacy.FrameBound using (conn-fb; lanes-b; pre-in; post-in)
-open import adequacy.Few using (Lag; EnvL; KLag; LBnd; lag-≈; lag-at; map-row; scan-row; take-lag; behind-bef; conn-lag; flat-lag; hole-kl;
+open import adequacy.Few using (call-sh; Lag; EnvL; KLag; LBnd; lag-≈; lag-at; map-row; scan-row; take-lag; behind-bef; conn-lag; flat-lag; hole-kl;
   begun-f; few; envl-bind; src-f; subd-env; att-slot; shift; module Shifted)
 
 ------------------------------------------------------------------------
@@ -179,14 +179,16 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rc (f-lane {b = false} _) () w lo
   rc {s = s} (f-lnct {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.cutS true _ s} fr hf w lo in Cr′ , f-lnct fr′ , rs
   rc (f-lnct {b = false} _) () w lo
-  rc {C = C} {c = Machine.inSrc k b c} {E = E} {s = s} {p} (f-src {E′ = E′} fr sc pt sl nc bs bhβ fl fe ce bhk sd af ao ni) hf w lo =
+  rc {C = C} {c = Machine.inSrc k b c} {E = E} {s = s} {p} (f-src {E′ = E′} fr sc pt sl nc bs bhβ fl fe ce bhk sd af ao _ ni) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = connS k s b} fr hf′ w lo
         (envb , efb) = benv env ef
     in Cr′ , f-src fr′ sc pt sl nc (shift bs w envb efb lob) (behind-bef bhβ (few bs envb efb lob))
                  (Shifted.flags-sh {C} {p} w (λ _ → fbd (proj₂ (run hf env ef))) (λ _ → bound bs envb lob) fl)
-                 fe ce (bfr (proj₁ (run hf env ef))) (Shifted.subd′ {C} {p} w sd) af ao ni
+                 fe ce (bfr (proj₁ (run hf env ef))) (Shifted.subd′ {C} {p} w sd) af ao (λ na → call-sh {k = k} {o = s} {b = b} (ao na) loc) ni
        , env , ef , d
     where
+      loc : LoP (connS k s b) p
+      loc ki = lo (plug-in c ki)
       lob : LoP b p
       lob ki = lo (plug-in c (k-kid (k-body ki)))
       fbd : Bnd C p E → Bnd C p (Frozen k)
@@ -213,9 +215,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
         let (envb , efb , sb , bf) = body-env {b = s} sc sr env ef loc
         in lag-≈ (proj₁ ce) (lag-at (λ r → _ , proj₁ r) (conn-lag {k = k} (proj₁ (run hf envb efb)) bf)) ,
            conn-fb {C = C} sc (λ _ _ → proj₂ (run hf envb efb)) (λ _ → sb) fl env ce
-  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao bu nr ni) hf w lo =
+  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao _ bu nr ni) hf w lo =
     Cr , f-isle u hk ub (burst-dn {C = Ci} {C′ = bef p} {k = k} (λ o → owes-≼ Ci w o) le) na nc (behind-bef bh (proj₁ (run hf env ef)))
-                (Shifted.subd′ {Ci} {p} w sd) ss ao bu nr ni
+                (Shifted.subd′ {Ci} {p} w sd) ss ao (call-sh {k = k} {o = s} {b = b} ao loc) bu nr ni
        , env , ef , ≃-refl
     where
       loc : LoP (connS k s b) p
@@ -225,7 +227,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       env = proj₁ ie
       ef  = proj₂ ie
   rc (f-took _ _ _ _ _ _ _ _ _ _) () w lo
-  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (d-map _ _) () w lo
   rc (d-scan _ _) () w lo
@@ -236,7 +238,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rc (d-lanes _ _ _ _ _ _ _) () w lo
   rc (d-src _ _ _ _ _ _ _) () w lo
   rc (d-body _ _ _ _) () w lo
-  rc (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
 
   -- The frames, and the hole itself by `shift`, its keys being the tree's.
