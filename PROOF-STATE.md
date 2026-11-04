@@ -14,6 +14,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### AN ISLE'S SUBJECTS
+
+A joiner inside an isle joins a subject the engine has not closed: its
+end owed at the isle's cursor. Open: `Inv` relates no isle cursor to its
+parent's, and a dead binder carries no `unshut`. Settled by a body, or a
+cursor field on isle frames paid at every producer.
+
+Members: `shut-isle`.
+
 #### THE JOINER'S PAST
 
 A joiner subscribed at `q`: every row of its meaning lies past `q`.
@@ -28,7 +37,8 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
+Members: `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`,
+`feed-up`.
 
 #### THE JOINER STEPPED
 

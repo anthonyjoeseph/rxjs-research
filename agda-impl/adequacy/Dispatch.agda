@@ -55,6 +55,7 @@ open import adequacy.Apart.Floor using (floor)
 open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
+open import adequacy.SubJoin using (join-pend)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
 ------------------------------------------------------------------------
@@ -299,9 +300,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- a joiner of a completed subject: its end owed, under `last`
     sub-joined : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ true
                → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , ofS 0 q [] , absorbed , q ⟩
-    -- a joiner of a live subject: joined where it subscribed
-    sub-join   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ false
-               → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , joinS q true x [] , absorbed , q ⟩
 
     --------------------------------------------------------------------
     -- RISES that read their frame's bookkeeping.
@@ -390,6 +388,12 @@ module Over {R : Set} (Rt : EmissionSet R) where
   pend-view (settled {N = lane _ _ _} c-sub fr (_ , _ , () , _))
   pend-view (settled {N = lanecut _ _ _} c-sub fr (_ , _ , () , _))
   pend-view {o = o} (settled {N = pnd _} c-sub fr (_ , refl , pe , wn)) = srcp {o = o} fr refl pe wn
+
+  -- A joiner of a live subject: joined where it subscribed.
+  sub-join : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ false
+           → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , joinS q true x [] , absorbed , q ⟩
+  sub-join cu i with pend-view i
+  ... | _ , _ , fr , h = join-pend Rt cu fr h
 
   -- A joiner's entry, its outer's entered where it subscribed.
   flat-entry : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q {E}
