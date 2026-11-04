@@ -106,7 +106,7 @@ dead-pt (h-kill _ _ (tailp ks f)) = ks , λ kp o → f kp o
 
 mutual
   pin-tail : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} (sy : Sync sc Rg C s E) → PinTail C E (proj₁ (husk-of sy))
-  pin-tail (s-cold _ _ (ks , f)) = ptl ks λ x o _ → [ (λ t → ⊥-elim (ine-pin t)) , inj₂ ]′ (f x o)
+  pin-tail (s-cold _ _ (ks , f) _) = ptl ks λ x o _ → [ (λ t → ⊥-elim (ine-pin t)) , inj₂ ]′ (f x o)
   pin-tail (s-of _ (ks , f))     = ptl ks λ x o _ → [ (λ t → ⊥-elim (ine-pin t)) , inj₂ ]′ (f x o)
   pin-tail (s-done _ (ks , f))   = ptl ks λ x o _ → inj₂ (f x o)
   pin-tail {C = C} (s-map sy m _)        = pt-bn {C = C} (cov m) (λ { (map-pin x) → x }) (pin-tail sy)

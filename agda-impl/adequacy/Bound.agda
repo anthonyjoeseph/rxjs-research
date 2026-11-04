@@ -352,7 +352,7 @@ flat-b {op = op} {F} {O} {C} {p = p} {k} ob lb wh ah r v ow with join-row op F O
 mutual
   bound : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → LoP s p
         → ∀ {q e} → Due C E q e → p ≼ q
-  bound (s-cold {l = l} tk d _) env lo r = cold-b l tk lo (proj₁ (to d r))
+  bound (s-cold {l = l} tk d _ _) env lo r = cold-b l tk lo (proj₁ (to d r))
   bound {p = p} (s-of {i = i} {q = q₀} {xs = []} d _) env lo {q} r =
     tr p (q₀ ++ [ last ]) q (lo (k-own (here refl))) (of-lb q₀ i [] (proj₁ (to d r)))
   bound {p = p} (s-of {i = i} {q = q₀} {xs = x ∷ xs} d _) env lo {q} r =

@@ -381,7 +381,7 @@ mutual
 
   few : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → EnvL (full sc) C p → LoP s p
       → Lag C p E
-  few (s-cold {l = l} tk _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ t → ⊥-elim (cold-b l tk lo t yp)) , (λ i → i) ]′ (f r o)
+  few (s-cold {l = l} tk _ (ks , f) _) env ef lo = lag ks λ r o yp → [ (λ t → ⊥-elim (cold-b l tk lo t yp)) , (λ i → i) ]′ (f r o)
   few (s-of {xs = xs} _ (ks , f)) env ef lo = lag ks λ r o yp → [ (λ t → ⊥-elim (of-p xs lo t yp)) , (λ i → i) ]′ (f r o)
   few {C = C} (s-done _ fn) env ef lo = fin-lag {C = C} fn
   few (s-map sy m _) env ef lo = lag-≈ m (lag-at map-row (few sy env ef (λ ki → lo (k-kid (k-map ki)))))
@@ -567,7 +567,8 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
   mutual
     sh : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {s : St Γ A} {E} → Sync sc Rg C s E → Env (full sc) C p → EnvL (full sc) C p → Lo s (at p)
        → Sync sc Rg (bef p) s E
-    sh sy@(s-cold tk d tl) env ef lo = s-cold tk (≃-trans (≃-sym (due-shift sy op env (lo-p lo))) d) (tail-dn {C = C} {C′ = bef p} (λ {y} → dn {y}) tl)
+    sh sy@(s-cold {l = l} tk d tl tw) env ef lo = s-cold tk (≃-trans (≃-sym (due-shift sy op env (lo-p lo))) d) (tail-dn {C = C} {C′ = bef p} (λ {y} → dn {y}) tl)
+      λ t → let (_ , r , g) = tw t in cold-b l tk (lo-p lo) t , r , g
     sh sy@(s-of d tl)      env ef lo = s-of (≃-trans (≃-sym (due-shift sy op env (lo-p lo))) d) (tail-dn {C = C} {C′ = bef p} (λ {y} → dn {y}) tl)
     sh (s-done sp fn)      env ef lo = s-done (spent sp) (fd fn)
     sh (s-map sy m sd)  env ef lo = s-map (sh sy env ef (λ ki → lo (k-kid (k-map ki)))) m sd

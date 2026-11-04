@@ -58,7 +58,7 @@ torn-≈ m t = record { D = Torn.D t ; Db = Torn.Db t ; dom = Torn.dom t ; Ps = 
                     ; bu = up-∘ (Torn.bu t) (up-≈ m) ; tl = Torn.tl t }
 
 sync-≈ : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E E′} → Sync sc Rg C s E → E ≈ E′ → Sync sc Rg C s E′
-sync-≈ {C = C} (s-cold tk d tl) e = s-cold tk (≃-trans (≃-sym (due-≈ {C = C} e)) d) (tail-≈ {C = C} e tl)
+sync-≈ {C = C} (s-cold tk d tl tr) e = s-cold tk (≃-trans (≃-sym (due-≈ {C = C} e)) d) (tail-≈ {C = C} e tl) λ t → let (o , r , g) = tr t in o , voc e r , g
 sync-≈ {C = C} (s-of d tl) e = s-of (≃-trans (≃-sym (due-≈ {C = C} e)) d) (tail-≈ {C = C} e tl)
 sync-≈ {C = C} (s-done sp fn) e = s-done (spent-≈ {C = C} sp e) (fin-≈ {C = C} e fn)
 sync-≈ (s-map sy eq sd)      e = s-map sy (≈-trans eq e) sd

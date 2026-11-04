@@ -143,20 +143,16 @@ burst-pin {c = c} bu tc ic dn fw (pn {y} {r} tr ir x rc z) with inside (c ++ [ i
 -- owed is a key of the tree, so no earlier than the step; a body's mark
 -- would be one at the step itself.
 step-in : ∀ {Γ X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {q}
-        → (CS.connAt k ++ [ ix 1 ]) ≼ q → AttOwed k → Lo (connS k o b) (after q)
+        → (CS.connAt k ++ [ ix 1 ]) ≼ q → AttOwed k → Lo (connS k o b) (at q)
         → T (inside (CS.connAt k ++ [ ix 1 ]) q)
 step-in {k = k} {o} {b} {q} cq (inj₁ ae) lo
-  with ≮-after (CS.connAt k ++ [ ix 1 ]) q
-         (≮ᴷ-trans (after (CS.connAt k ++ [ ix 1 ])) (after q) (at q) (lo (k-own (own-bld k {o = o} {b = b} (os ae)))) (<ᴷ-asym (at q) (after q) (at-after₀ q)))
+  with ≮-after (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (own-bld k {o = o} {b = b} (os ae))))
 ... | inj₂ i  = i
 ... | inj₁ qc with ≼-antisym {q} {CS.connAt k ++ [ ix 1 ]} qc cq
 ...   | refl = Equivalence.from T-≡ (inside-self q)
 step-in {k = k} {o} {b} {q} cq (inj₂ (be , _)) lo
-  with ≼-antisym {CS.connAt k ++ [ ix 1 ]} {q} cq
-         (≮-≼ (CS.connAt k ++ [ ix 1 ]) q
-           (≮ᴷ-trans (at (CS.connAt k ++ [ ix 1 ])) (after q) (at q) (lo (k-own (body-key k {o = o} {b = b} be))) (<ᴷ-asym (at q) (after q) (at-after₀ q))))
-... | refl with trans (sym (at-after₀ q)) (lo (k-own (body-key k {o = o} {b = b} be)))
-...   | ()
+  with ≼-antisym {CS.connAt k ++ [ ix 1 ]} {q} cq (≮-≼ (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = o} {b = b} be))))
+... | refl = Equivalence.from T-≡ (inside-self q)
 
 ------------------------------------------------------------------------
 -- WHAT A HOLE GIVES THE FRAMES ABOVE IT: under a live node, its rows
@@ -316,7 +312,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Unread Rt Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb
            → P ⊑ (Burst (bef q) k ∪ᵖ Qb) → Behind (bef q) (Frozen k) → Subd (scopeOf c) (bef q) k → AttOwed k
            → Bursts k E′ → Thru D (CS.connAt k)
-           → Lo (plug c (connS k o b)) (after q) → Frozen k y e → y ≡ q ⊎ Zs q y → Pin Cr Rt q
+           → Lo (plug c (connS k o b)) (at q) → Frozen k y e → y ≡ q ⊎ Zs q y → Pin Cr Rt q
   isle-pin {c = c} {k = k} {o} {b} {y = y} {q = q} u hb le bh sd ao bu nr lof row yq with foot yq
     where
       c₁ = CS.connAt k ++ [ ix 1 ]
@@ -332,4 +328,4 @@ module _ {R : Set} (Rt : EmissionSet R) where
       (⊑-plag le (plag-∪ (burst-plag {C = bef q} {k = k} (thru-few (bef q) bh (≼-refl {q}))) (husk-f hb (λ ki → lo (plug-in c (k-kid (k-body ki)))))))
     where
       lo : LoP (plug c (connS k o b)) q
-      lo = lo-p (lo-weaken (at q) (after q) lof (at-after₀ q))
+      lo = lo-p lof

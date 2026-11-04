@@ -70,7 +70,7 @@ up-∅ = up λ _ _ ()
 
 mutual
   husk-of : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Sync sc Rg C s E → Σ Pts (Husk sc C s E)
-  husk-of (s-cold _ _ _)            = _ , h-blank tt
+  husk-of (s-cold _ _ _ _)          = _ , h-blank tt
   husk-of (s-of _ _)                = _ , h-blank tt
   husk-of (s-done _ _)              = _ , h-blank tt
   husk-of (s-map sy m _)            = _ , h-map (proj₂ (husk-of sy)) (up-∘ up-map (up-≈ m))

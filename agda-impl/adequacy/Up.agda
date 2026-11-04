@@ -184,7 +184,8 @@ module Past (p : Pos) where
   mutual
     up : ∀ {Γ} {sc : Scope Γ} {Rg A} {s : St Γ A} {E} → Sync sc Rg (bef p) s E → Sound Rg E → ¬ Rg p → ¬ VHot (full sc) p
        → Sync sc Rg (aft p) s E
-    up (s-cold tk d tl)        sd nr nh = s-cold tk (≃-trans (≃-sym (due-up sd nr)) d) (tail-up tl)
+    up (s-cold tk d tl tw)     sd nr nh = s-cold tk (≃-trans (≃-sym (due-up sd nr)) d) (tail-up tl)
+      λ t → let (o , r , g) = tw t in owes-up (λ { refl → nr g }) o , r , g
     up (s-of d tl)             sd nr nh = s-of (≃-trans (≃-sym (due-up sd nr)) d) (tail-up tl)
     up {E = E} (s-done sp fn)  sd nr nh = s-done (spent-up {E = E} sp) (fin-up fn)
     up (s-map sy m sm)         sd nr nh = s-map (up sy sm nr nh) m sm

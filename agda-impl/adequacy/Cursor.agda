@@ -658,9 +658,11 @@ record Parts {Γ X B} (sc : Scope Γ) (Rg : Rgn) (k : CS Γ X) (β : EmissionSet
     wapart : ∀ {w x} → W⁼ Hβ (CS.connAt k ++ [ ix 0 ]) w → W⁼ (Hots (full sc)) (CS.connAt k ++ [ ix 1 ]) x → w ⊑ʷ x → ⊥
 
 data Sync where
-  -- a started cold: what its tape has left is what its entry owes
+  -- a started cold: what its tape has left is what its entry owes, and
+  -- every row its tape has left a row of its entry, owed, in its region
   s-cold : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {l} {E : EmissionSet A}
-         → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Tail C E (InE (tapeE l)) → Sync sc Rg C (coldS true l) E
+         → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Tail C E (InE (tapeE l))
+         → (∀ {y e} → InE (tapeE l) y e → Owes C y × E y e × Rg y) → Sync sc Rg C (coldS true l) E
   -- an of: what it has left is what its entry owes
   s-of   : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {E}
          → Due C E ≃ Due origin (InE (ofᴱ q i xs)) → Tail C E (InE (ofᴱ q i xs)) → Sync sc Rg C (ofS i q xs) E
