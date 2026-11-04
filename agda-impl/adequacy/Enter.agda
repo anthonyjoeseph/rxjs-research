@@ -409,7 +409,7 @@ flat-joined : ∀ {C Γ A B} {sc : Scope Γ} {Rg} {op} {f : A → Obs Timeline �
             → Joined sc (JRl sc Rg op f (pendRows (full sc) s q)) C (polF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q))
                      (pendRows (full sc) s q) false 0 [] []
 flat-joined {C} {sc = sc} {op = op} {f} {s} {q} ow ok ad wi =
-  joined {vs = []} {ws = []} none (refl , [] , λ ()) (λ x no _ → ⊥-elim (no (owed {C} ow x))) ((λ ()) , λ x no → no (owed {C} ow x))
+  joined {vs = []} {ws = []} none (refl , [] , (λ ()) , (λ _ → refl) , tt) (λ x no _ → ⊥-elim (no (owed {C} ow x))) ((λ ()) , λ x no → no (owed {C} ow x))
          (λ ()) [] (ends op) (lanes-in op (λ w ex → proj₂ wi w (as op ex)))
   where
     open Lanes sc f (flat-jinv {sc = sc} {f = f} {s = s} {q = q} ok ad)

@@ -127,7 +127,7 @@ mutual
       ...   | inj₁ oq = ⊥-elim (no (owes-≼ C (owes-≼ C oq (≺→≼ {q} {s} qs)) sr))
       ...   | inj₂ nq with wh x nq ru
       ...     | inj₁ iv = [ (λ h → inj₁ (inj₂ h)) , (λ i → inj₂ (∈-++⁺ʳ ko i)) ]′ (fl iv kp o no)
-      ...     | inj₂ iw = ⊥-elim (no (owes-≼ C (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ wa) iw))) st) sr))
+      ...     | inj₂ iw = ⊥-elim (no (owes-≼ C (proj₂ (proj₂ (proj₂ (proj₁ (proj₂ (proj₂ wa)) iw))) st) sr))
   pin-tail {C = C} {E = E} (s-conn {k = k} refl pt bs bb ss tn fl ce@(m , _)) =
     by-elim (λ h → PinTail C E (proj₁ h)) (CS.srcLive k) _ _
       (λ l → pt-bn {C = C} (cov m) proj₁ (conn-pt {C = C} {k = k} (src-pt pt (ss l) (bb l) fl ce) (pin-tail (bs l))))

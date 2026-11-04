@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
+open import adequacy.Cursor using (Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; head-≡; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
 open import adequacy.Cursor.Show using (thru-owes)
 open import adequacy.Floor.Keys using (own-bld; os; oo)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
@@ -537,8 +537,9 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
   -- leads, read past `p`: its outer's rows and its begun lanes' owed at
   -- or past `p`.
   waiting-sh : ∀ {A B} {P : Pol A B} {O : EmissionSet A} {vs ws qu} → LBnd C p P vs → Ahead C P vs ws
-             → Waiting C P O ws qu → Waiting (bef p) P O ws qu
-  waiting-sh {P = P} {O} {ws = ws} lb ah (eq , ap , wf) = eq , ap , wait
+             → Waiting C P O vs ws qu → Waiting (bef p) P O vs ws qu
+  waiting-sh {P = P} {O} {ws = ws} lb ah (eq , ap , wf , nq , hd) = eq , ap , wait , nq ,
+    head-≡ (λ (q , a , i , l , nk , o) → q , a , i , l , nk , dn o) (λ (q , a , i , l , nk , o) → q , a , i , l , nk , lb {e = end} i nk l tt o) hd
     where
       wait : ∀ {q a} → (q , a) ∈ ws → O q (out a) × ¬ Owes (bef p) q × Runs P q × (∀ {s} → adequacy.Cursor.Start P q a s → Owes (bef p) s)
       wait i with wf i

@@ -7,7 +7,7 @@
 -- the cursor has not passed, is pending within its own region.
 module adequacy.Admit where
 
-open import Data.Bool using (T; true; false)
+open import Data.Bool using (T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Nat using (suc)
@@ -36,7 +36,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; nx; attAt; pend;
                     inOuter; inLanes; inLn; inCut)
 open import adequacy.Rows using (full; pendRows; Moves; _⇄_)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; Queues; wait-vs)
 open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
 open import adequacy.Enter using (module Lanes; within-sound)
@@ -67,12 +67,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
         → Start (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a (p ++ [ ix 1 ])
         → pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ]) ≈ Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a
         → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p → (∀ {q q′} → Kill (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) q q′ → ⊥)
+        → T (not (Queues (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)))
         → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c))
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
-  opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li) m so bh sy row st ln ru nk =
+  opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li) m so bh sy row st ln ru nk nq =
     Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k)))) none (sym (+-comm n 1))
-                                           (wait-up ah′ wt) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()))))
+                                           (wait-vs {O = E} nq (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt)) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()))))
                   (≺-ext p {ix 1} [] , ok , JInv.adm ji , ≈-refl , wi)
         , moves
     where
@@ -141,7 +142,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   merge-start : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω d n q ls} {c : Ctx R Γ B} {o a p}
               → SimC Rt ⟨ inOuter (mergeᶠ nothing) f ω d n q ls c , o , rising (nx a) , p ⟩ [] (start c (mergeᶠ nothing) f ω d n q o ls a p)
   merge-start {f = f} {c = c} {a = a} {p = p} {Cr = Cr} (flying (f-outer fr ji jn m so bh) cl (sy , row)) =
-    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row refl ln tt (λ ())
+    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row refl ln tt (λ ()) tt
     in subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ nothing} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
     where
       s = p ++ [ ix 1 ]

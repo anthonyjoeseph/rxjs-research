@@ -34,24 +34,11 @@ Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-fail
 
 An outer's value or end and a lane's, each rising into `Joined`/`Begun`
 by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
-live count makes a freed slot the queue head's `Starts.queued`. Settled
-when each is a body.
+Open: whether begun lanes stay ascending (`Asc`), and whether a bounded
+queue's head starts under the first owed end of a begun lane (`Head`),
+so a freed slot is its `Starts.queued`. Settled when each is a body.
 
 Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
-
-#### THE GUARD ROWS
-
-A step that begins work a level down — a lane, a defer's body, a
-source's feed — leaves a row first, so is never still. Open: a root row
-under it, at or before the one met next. Every frame's `Up` is proven;
-open where an isle's pin climbs into an enclosing source still in its
-subscribe call: `win` needs that source's rows before the pin few, and
-the enclosing world's cursor stops where the isle began. A bounded
-hand-off needs its queue head to start at the ending lane's `ix 1`, a
-count no record holds. Settled by bodies over the frames.
-
-Members: `isle-row`, `lanes-guard`.
 
 #### THE MARK AT ITS ROW
 

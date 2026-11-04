@@ -123,7 +123,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Hole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a Ph E b
             → Begun (scopeOf c) (JRl (scopeOf c) Rg op f O) C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O vs₂ post n₂
             → n ≡ n₁ + bump b n₂
-            → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O ws qu
+            → Waiting C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws qu
             → Whole C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) O (vs₁ ++ (q , a) ∷ vs₂) ws
             → OuterDone C O d
             → Ahead C (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws

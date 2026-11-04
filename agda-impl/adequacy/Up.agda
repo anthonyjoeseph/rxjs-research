@@ -36,7 +36,7 @@ open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼
 open _≃_
 open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; Pol; Kill; kill-out; Ahead; Whole; OuterDone; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn; AttOwed; InCall; AttFin)
+open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn; AttOwed; InCall; AttFin)
 open import adequacy.Cursor.Tear using (c-abs; by; husk-of; NoIsle; NoIsleL; Settles; sync-pend)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; Unread; un-dead; un-torn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
@@ -175,9 +175,11 @@ module Past (p : Pos) where
     ahead-up le ah iw st with ah iw st
     ... | q′ , a′ , c , iv , lc , kc , oc , cz = q′ , a′ , c , iv , lc , kc , owes-up (le iv lc) oc , cz
 
-    wait-up : ∀ {vs ws qu} → Ahead (aft p) P vs ws → Waiting (bef p) P O ws qu → Waiting (aft p) P O ws qu
-    wait-up ah (eq , ap , wf) = eq , ap , λ iw → let (y , nq , r , _) = wf iw in
-      y , nm nq , r , λ {s} st → let (_ , _ , c , _ , _ , _ , oc , cz) = ah iw st in ≺-trans {p} {c} {s} oc cz
+    wait-up : ∀ {vs ws qu} → (∀ {q a c} → (q , a) ∈ vs → Lane P q a c end → p ≡ c → ⊥) → Ahead (aft p) P vs ws
+            → Waiting (bef p) P O vs ws qu → Waiting (aft p) P O vs ws qu
+    wait-up le ah (eq , ap , wf , nq , hd) = eq , ap , (λ iw → let (y , nq , r , _) = wf iw in
+      y , nm nq , r , λ {s} st → let (_ , _ , c , _ , _ , _ , oc , cz) = ah iw st in ≺-trans {p} {c} {s} oc cz) , nq ,
+      head-≡ (λ (q , a , i , l , nk , o) → q , a , i , l , nk , dn o) (λ (q , a , i , l , nk , o) → q , a , i , l , nk , owes-up (le i l) o) hd
 
   mutual
     up : ∀ {Γ} {sc : Scope Γ} {Rg A} {s : St Γ A} {E} → Sync sc Rg (bef p) s E → Sound Rg E → ¬ Rg p → ¬ VHot (full sc) p
@@ -243,7 +245,7 @@ module Past (p : Pos) where
               → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
               → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
     joined-up {P = P} {O = O} oo ku nl nh rl (joined bg wt wh od ah ao en li) =
-      joined (begun-up ku (λ _ → nl) nh bg) (wait-up ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
+      joined (begun-up ku (λ _ → nl) nh bg) (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
       where
         open Book {P = P} {O = O}
         ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
@@ -513,7 +515,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
     in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up ku nb₁ nh lf) y₀ (nm nq) ru (h-live st le (λ k → ku k (uk k))) (begun-up ku nb₂ nh rt) cnt
-                     (wait-up ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl , mv
+                     (wait-up (λ i lc → λ { refl → hole (val i) lc _ }) ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl , mv
     where
       open Past p using (up; begun-up; nm; off-rg; behind-up; kill-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p

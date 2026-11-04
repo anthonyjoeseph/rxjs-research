@@ -27,7 +27,8 @@ open import adequacy.Weight using (prefixes)
 open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; NoFail; Rgn; Sound; Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live; h-end; h-kill; Ze; e₀; e+)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Rows using (module _≃_)
-open _≃_ using (from)
+open _≃_ using (from; to)
+open import adequacy.Cursor using (Pol; OwedEnd; Waiting; Unkilled; Queues; Start; JRo)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; scopeOf)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -296,6 +297,67 @@ on-chain : ∀ {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emiss
          → LaneRg (Hots (full sc)) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O q′ q
 on-chain sc f {O} ji op li z x l qw wy =
   rg-down op {F = λ a → ⟦ f a ⟧ (full sc)} {O} (zl-ze z (zs-btw z qw wy)) (proj₂ (Lanes.lane-rows sc f ji op li x l))
+
+-- The queue's head, with a begun lane's end owed first at the cursor: it
+-- starts under that end, so the policy queues.
+head-at : ∀ {A B} {P : Pol A B} {O : EmissionSet A} {vs ws a qu q} → Waiting (bef q) P O vs ws (a ∷ qu)
+        → OwedEnd (bef q) P vs q → (T (not (Queues P)) → ⊥) × Σ Pos λ q₁ → Start P q₁ a (q ++ [ ix 1 ])
+head-at {ws = []} (() , _)
+head-at {ws = (q₁ , _) ∷ _} (refl , _ , _ , nq , hd) oe = (λ t → cons-[] (nq t)) , q₁ , hd oe λ oe′ → proj₂ (proj₂ (proj₂ (proj₂ (proj₂ oe′))))
+  where cons-[] : ∀ {X : Set} {x : X} {xs} → x ∷ xs ≡ [] → ⊥
+        cons-[] ()
+
+-- A live lane's end at the cursor: owed first.
+own-end : ∀ {A B} {P : Pol A B} {vs q₀ a₀ q} {E : EmissionSet B} → E ≈ Lane P q₀ a₀ → Unkilled (bef q) P q₀
+        → (q₀ , a₀) ∈ vs → E q end → OwedEnd (bef q) P vs q
+own-end {q = q} le uk iv row = _ , _ , iv , proj₁ (to (alike le) (row , tt)) , uk , ≼-refl {q}
+
+wk-end : ∀ {A} {e : Ev A} → e ≡ end → Work e → ⊥
+wk-end refl ()
+
+-- A LANE'S HAND-OFF: a live lane ending at the cursor with values queued
+-- hands its slot to the queue's head, a skip at its end's first child,
+-- nothing of the joiner's visible at its end.
+hand-at : ∀ op {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {O : EmissionSet A} (ji : JInv sc f O) {Rg : Rgn} {vs ws a qu q₀ a₀ q}
+          {E : EmissionSet B}
+        → LanesIn (Hots (full sc)) (JRl sc Rg op f O) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O → Sound (JRo sc Rg op f O) O
+        → O q₀ (out a₀) → Runs (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q₀ → E ≈ Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q₀ a₀
+        → Unkilled (bef q) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q₀ → (q₀ , a₀) ∈ vs
+        → Waiting (bef q) (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O vs ws (a ∷ qu) → Sound (JRl sc Rg op f O q₀) E → E q end
+        → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O (q ++ [ ix 0 ]) skip × Clr q (q ++ [ ix 0 ]) (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
+hand-at (mergeᶠ nothing) {sc = sc} {f} {O} ji {q₀ = q₀} {a₀} {q} li so y₀ ru le uk iv wt sl row =
+  ⊥-elim (proj₁ (head-at {O = O} wt (own-end {P = polF (mergeᶠ nothing) (λ a → ⟦ f a ⟧ (full sc)) O} {q₀ = q₀} {a₀} {q} le (λ {q′} → uk {q′}) iv row)) tt)
+hand-at switchᶠ          {sc = sc} {f} {O} ji {q₀ = q₀} {a₀} {q} li so y₀ ru le uk iv wt sl row =
+  ⊥-elim (proj₁ (head-at {O = O} wt (own-end {P = polF switchᶠ (λ a → ⟦ f a ⟧ (full sc)) O} {q₀ = q₀} {a₀} {q} le (λ {q′} → uk {q′}) iv row)) tt)
+hand-at exhaustᶠ         {sc = sc} {f} {O} ji {q₀ = q₀} {a₀} {q} li so y₀ ru le uk iv wt sl row =
+  ⊥-elim (proj₁ (head-at {O = O} wt (own-end {P = polF exhaustᶠ (λ a → ⟦ f a ⟧ (full sc)) O} {q₀ = q₀} {a₀} {q} le (λ {q′} → uk {q′}) iv row)) tt)
+hand-at (mergeᶠ (just m)) {sc = sc} {f} {O} ji {q₀ = q₀} {a₀} {q} li so y₀ ru le uk iv wt sl row
+  with head-at {O = O} wt (own-end {P = polF (mergeᶠ (just m)) (λ a → ⟦ f a ⟧ (full sc)) O} {q₀ = q₀} {a₀} {q} le (λ {q′} → uk {q′}) iv row)
+... | _ , q₁ , (i , sb) =
+  Bounded.hand {n = m} {f = F′} {o = O} y₀ ru (proj₁ (to (alike le) (row , tt))) (λ ()) (i , q₁ , _ , sb) ,
+  clr λ {w} r v qw wy → nrow r v (zs-btw {q} {q ++ [ ix 0 ]} {w} z₁ qw wy)
+  where
+    F′ = λ a → ⟦ f a ⟧ (full sc)
+    rq : LaneRg (Hots (full sc)) (polF (mergeᶠ (just m)) F′ O) O q₀ q
+    rq = proj₂ (Sound.rg sl row tt)
+    nrow : ∀ {w e} → Bounded.JoinT m F′ O w e → Visible e → w ∈ [ q ] → ⊥
+    nrow (Bounded.oend e _) _ (here refl) = proj₂ (Sound.rg so e tt) rq
+    nrow (Bounded.lane x _ l _ wk) v (here refl)
+      with lane-sole (JInv.ok ji) F′ (JInv.fi ji) (JInv.io ji) (mergeᶠ (just m)) (proj₂ (Lanes.lane-rows sc f ji (mergeᶠ (just m)) li x l)) rq
+    ... | refl with Sound.fn so x y₀ tt tt
+    ...   | refl = wk-end (Sound.fn sl (proj₁ (from (alike le) (l , v))) row v tt) wk
+    nrow (Bounded.lend _ _ _ _ nh _) _ (here refl) = nh (i , q₁ , _ , sb)
+    nrow (Bounded.run () _) _ _
+    nrow (Bounded.rend () _ _) _ _
+    nrow (Bounded.rpass () _ _) _ _
+    nrow (Bounded.rhand () _) _ _
+    nrow (Bounded.val _) () _
+    nrow (Bounded.step _) () _
+    nrow (Bounded.opin _) () _
+    nrow (Bounded.opass _ _) () _
+    nrow (Bounded.lpass _ _ _ _ _ _) () _
+    nrow (Bounded.hand _ _ _ _ _) () _
+    nrow (Bounded.left _ _ _ _ _) () _
 
 -- A source's rows behind the cursor, few, however it stands.
 src-behind : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → CS.scope k ≡ sc → Src sc Rg C k o → Behind C (Frozen k)
@@ -593,6 +655,20 @@ module Outer {R} (o : PureObs [] R) where
   src-step (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
 
+  -- A lane's end in flight with values queued: its hand-off's skip a
+  -- level down, carried up.
+  hand-row : ∀ {Cr Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n a qu} {o′ : St Γ A} {pre post} {c : Ctx R Γ B} {s q Rg N E}
+           → Fr Rt Cr (bef q) Rg (inLanes op f ω d n (a ∷ qu) o′ pre post c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E cp
+           → Lifted Cr q ⊎ Isled Cr q (plug c (flatS op f ω d n (a ∷ qu) o′ (pre ʳ++ s ∷ post)))
+  hand-row {op = op} {f} {ω} {d} {n} {a} {qu} {o′} {pre} {post} {s = s}
+           (f-lanes {vs₁ = vs₁} fr ji _ _ y₀ _ ru (h-live _ le uk) _ _ wt _ _ _ _ _ li je so sl bh _) lo (_ , _ , _ , _ , _ , row) =
+    let hc = hand-at op ji li so y₀ ru le uk (∈-++⁺ʳ vs₁ (here refl)) wt (sl tt) row in
+    lift {s = flatS op f ω d n (a ∷ qu) o′ (pre ʳ++ s ∷ post)} fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (proj₁ hc))) m-skip z₁
+      (clr-≈ (proj₂ je) (clr-tr (proj₂ hc))) (proj₁ (Sound.rg (sl tt) row tt))
+  hand-row (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
+  hand-row (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
+  hand-row (d-lanes _ _ _ _ _ _ _) _ ()
+
   -- Lifted, clear at `q`, the cursor short of the row met next: a row
   -- under the first child at or before it.
   under : ∀ {Cr q p e} → Lifted Cr q → Due Cr Rt p e → RowUnder o (q ++ [ ix 0 ]) p
@@ -718,13 +794,18 @@ defer-guard o pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
 ... | (_ , _ , iv , _) , _ | du = defer-pend o pth du (Over.pend-view (enter (⟦ o ⟧ []ᴬ) root) iv)
 
-postulate
-  -- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued
-  -- has a row under its first child, at or before the row met next.
-  lanes-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n a qu} {o′ : St Γ A} {pre post} {c : Ctx R Γ B} {s q p e}
-              → Path (load o) rs ⟨ inLanes op f ω d n (a ∷ qu) o′ pre post c , s , rising cp , q ⟩
-              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-              → RowUnder o (q ++ [ ix 0 ]) p
+-- A LANE'S HAND-OFF PASSES ITS GUARD: a lane ending with values queued
+-- has a row under its first child, at or before the row met next.
+lanes-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n a qu} {o′ : St Γ A} {pre post} {c : Ctx R Γ B} {s q p e}
+            → Path (load o) rs ⟨ inLanes op f ω d n (a ∷ qu) o′ pre post c , s , rising cp , q ⟩
+            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → RowUnder o (q ++ [ ix 0 ]) p
+lanes-guard o {op = op} {f} {ω} {d} {n} {a} {qu} {o′} {pre} {post} {c} {s} pth m
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
+... | (_ , _ , flying fr _ fy , _) , _ | du with Outer.hand-row o fr (lo₀ c {flatS op f ω d n (a ∷ qu) o′ (pre ʳ++ s ∷ post)} (floor o pth tt)) fy
+...   | inj₁ lf = Outer.under o lf du
+...   | inj₂ il = guard-src o pth tt du il
+lanes-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T cl (dead-closed (enter (⟦ o ⟧ []ᴬ) root) fr refl))
 
 -- WHERE A RISE SUBSCRIBES, ITS GUARD: an outer's value, or a lane's end
 -- handing off to a queued value.
