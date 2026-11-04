@@ -44,11 +44,12 @@ Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-
 
 A step that begins work a level down — a lane, a defer's body, a
 source's feed — leaves a row first, so is never still. Open: a root row
-under it, at or before the one met next. Lifted through every live frame;
-open where the lift meets an isle, whose pins reach the root only through
-dead frames that tie no entry, and past the root's cursor rather than the
-isle's; a bounded hand-off needs `Hand` from the queue. Settled by bodies
-over the frames.
+under it, at or before the one met next. Every frame's `Up` is proven;
+open where an isle's pin climbs into an enclosing source still in its
+subscribe call: `win` needs that source's rows before the pin few, and
+the enclosing world's cursor stops where the isle began. A bounded
+hand-off needs its queue head to start at the ending lane's `ix 1`, a
+count no record holds. Settled by bodies over the frames.
 
 Members: `isle-row`, `lanes-guard`.
 
