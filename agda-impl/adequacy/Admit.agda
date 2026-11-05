@@ -7,15 +7,16 @@
 -- the cursor has not passed, is pending within its own region.
 module adequacy.Admit where
 
-open import Data.Bool using (T; true; false; not)
+open import Data.Bool using (T; true; false; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
-open import Data.Nat using (suc)
-open import Data.Nat.Properties using (+-comm)
-open import Data.List using ([]; _∷_; [_]; _++_; reverse)
-open import Data.List.Properties using (reverse-involutive)
+open import Data.Nat using (suc; _<ᵇ_; _<?_; _+_; _∸_; _≤_; _<_)
+open import Data.Nat.Properties using (+-comm; +-identityʳ; <ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; <-irrefl; ≤-antisym; <-≤-trans; ≤-trans;
+                                      m≤n+m; m≤m+n; m+n≤o⇒m≤o∸n; m+n∸n≡m)
+open import Data.List using ([]; _∷_; [_]; _++_; reverse; length)
+open import Data.List.Properties using (reverse-involutive; ++-identityʳ; ++-assoc; map-++; length-++)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (tabulate) renaming (_∷_ to _∷ᴬ_; [] to []ᴬ)
 open import Data.List.Relation.Unary.AllPairs using () renaming (_∷_ to _∷ᴾ_; [] to []ᴾ)
@@ -23,26 +24,32 @@ open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (++�
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Maybe using (just; nothing)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (ix; Timeline; _≟ᵖ_)
-open import denotation.EmissionSet using (EmissionSet; _≺_; out; end; ⟦_⟧; enter; LaneOf)
-open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans)
+open import denotation.Events using (Pos; ix; Timeline; _≟ᵖ_)
+open import denotation.EmissionSet using (EmissionSet; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values)
+open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≺-absurd; ≼-≺-≺; ≼-trans)
+open import denotation.Laws.Nth using (module Nths)
+open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside)
   renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; nx; attAt; pend;
+open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; absorbed; flatS; nx; attAt; pend;
                     inOuter; inLanes; inLn; inCut)
 open import adequacy.Rows using (full; pendRows; Moves; _⇄_; _≃_)
 open _≃_ using (from)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike; Head)
+  renaming (Nths to Listed)
 open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
+open import adequacy.Cursor.Tear using (c-abs)
+open import adequacy.Census using (module Count)
 open import adequacy.Enter using (module Lanes; within-sound)
 open import adequacy.Walk using (dead-closed)
 open import adequacy.Up using (module Past; VHot; vhot-hots; begun-out; nr-≈; nr-tr; join-nr; fr-up; After)
+open import adequacy.Cursor using (s-flat)
 
 -- A begun lane's value, passed.
 begun-nq : ∀ {Γ} {sc} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n q a}
@@ -179,12 +186,201 @@ module _ {R : Set} (Rt : EmissionSet R) where
   merge-start (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   merge-start (settled () _ _)
 
+  -- A BOUNDED MERGE'S VALUE: its lane begun while a slot is free, else
+  -- queued, absorbed.  Counted (`Census`), the dead lanes are the slots
+  -- the live count leaves free: with one free, the lane is freed or has
+  -- room; with none, the queue's new head starts at the first owed end.
+  rise-outer-bounded : ∀ {Γ A B} {m} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
+                     → rise (inOuter (mergeᶠ (just m)) f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
+                     → SimC Rt ⟨ inOuter (mergeᶠ (just m)) f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+  rise-outer-bounded {m = m} {f = f} {ω = ω} {d = d} {n = n} {q = qu} {ls = ls} {c = c} {o = o} {a = a} {p = p} refl {Cr = Cr}
+    (flying (f-outer {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) jm so bh) cl (sy , row)) = go (n <ᵇ m) refl
+    where
+      sc = scopeOf c
+      F = λ a → ⟦ f a ⟧ (full sc)
+      P = polF (mergeᶠ (just m)) F E
+      s = p ++ [ ix 1 ]
+      io = JInv.io ji
+      open Count (JInv.ok ji) m F (JInv.fi ji) io hiding (P)
+      open Bounded m F E using (Sched; Kth; Starts; Sub; room; freed; queued)
+      open Values E using (Nth)
+      open Nths E using (nth-inj)
+      open BoundedI (JInv.ok ji) m F (JInv.fi ji) io using (sub-fun)
+      open Past p using (nm; owes-up; behind-up; begun-up; module Book)
+      open Book {P = P} {O = E} using (ahead-up; wait-up)
+
+      -- the outer's row at `p` is in what no lane's region holds
+      here-o = Sound.rg so row _
+      nl : ∀ {q′} → ¬ JRl sc Rg (mergeᶠ (just m)) f E q′ p
+      nl r = proj₂ here-o (proj₂ r)
+
+      rl = Lanes.lane-rows sc f ji (mergeᶠ (just m)) li
+
+      nh : ¬ VHot (full sc) p
+      nh = λ hv → proj₂ (JInv.ok ji) (vhot-hots (full sc) hv) (InvAt.world io row) (⊑-inside (⊑ʷ-refl p))
+
+      before : ∀ {q′} → ¬ Owes (bef p) q′ → q′ ≺ p
+      before {q′} nq with ≼-or-≻ p q′
+      ... | inj₁ pq = ⊥-elim (nq pq)
+      ... | inj₂ qp = qp
+
+      -- the value at `p` is the next after every value begun or waiting
+      nth-at : ∀ {vs ws} → Begun sc (JRl sc Rg (mergeᶠ (just m)) f E) (bef p) P E vs ls n → Waiting (bef p) P E vs ws qu
+             → Whole (bef p) P E vs ws → Listed E 0 (vs ++ ws) → Nth (length (vs ++ ws)) p a
+      nth-at {vs} {ws} bg′ wt′ wh′ L = nth-new L bf wi row
+        where
+          bf : ∀ {x} → x ∈ vs ++ ws → proj₁ x ≺ p
+          bf {x} i = [ (λ j → before {proj₁ x} (begun-nq bg′ j)) , (λ j → before {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt′)) j)))) ]′ (∈-++⁻ vs i)
+          wi : ∀ {q′ b} → E q′ (out b) → q′ ≺ p → (q′ , b) ∈ vs ++ ws
+          wi y lt = [ ∈-++⁺ˡ , ∈-++⁺ʳ vs ]′ (wh′ y (λ o → o lt) tt)
+
+      okp = ok-step p (ok-in (JInv.ok ji) (InvAt.world io row) (InvAt.real io row))
+      I = JInv.fi ji a s okp
+      g : ∀ {y e} → enter (F a) s y e → s ≺ y
+      g x = world-after (InvAt.world I x) (InvAt.real I x)
+
+      -- A SLOT FREE: the lane opened, with room or freed.
+      opening : n < m → ∀ {vs ws} → Begun sc (JRl sc Rg (mergeᶠ (just m)) f E) (bef p) P E vs ls n → Waiting (bef p) P E vs ws qu
+              → Whole (bef p) P E vs ws → Slots P vs ws n → Opening P vs ws n p a (pendRows (full sc) (f a) s)
+      opening lt _ _ _ (_ , _ , inj₂ eq) = ⊥-elim (<-irrefl eq lt)
+      opening lt {vs} bg′ wt′ wh′ (L₀ , _ , inj₁ refl) = record { st = N , nth , starts ; ln = ln ; ru = N , a , nth ; w[] = refl ; sl′ = sl′ }
+        where
+          N = length vs
+          L : Listed E 0 vs
+          L = subst (Listed E 0) (++-identityʳ vs) L₀
+          nth : Nth N p a
+          nth = subst (λ k → Nth k p a) (cong length (++-identityʳ vs)) (nth-at bg′ wt′ wh′ L₀)
+          census = cen-begun L bg′ (λ x → x) c-nil
+          starts : Starts N p (Sched N) s
+          starts with N <? m
+          ... | yes lt′ = room lt′
+          ... | no ge   = freed (≮⇒≥ ge) (freed-k N (proj₂ (proj₂ census)) lt (≮⇒≥ ge) (cen-lo (λ {c′} → before {c′}) (proj₁ (proj₂ census))))
+          back : ∀ {i s′ y e} → Sub i p s′ a → enter (F a) s′ y e → enter (F a) s y e
+          back (nj , st′) x with nth-inj nj nth
+          ... | refl with sub-fun (nj , st′) (nth , starts)
+          ...   | refl , refl , refl = x
+          ln : pendRows (full sc) (f a) s ≈ Lane P p a
+          ln = record { alike = (λ (x , v) → (N , s , (nth , starts) , x , g x) , v) ⇄ (λ ((_ , _ , sb , x , _) , v) → back sb x , v)
+                      ; cov = [] , λ (_ , _ , sb , x , _) → inj₁ (back sb x)
+                      ; voc = λ x → N , s , (nth , starts) , x , g x }
+          sl′ : Slots P (vs ++ (p , a) ∷ []) [] (suc n)
+          sl′ = subst (Listed E 0) (sym (++-identityʳ (vs ++ (p , a) ∷ []))) (nths-snoc vs L nth) , lt , inj₁ refl
+
+      go : ∀ b → (n <ᵇ m) ≡ b
+         → After Rt Cr (if b then start c (mergeᶠ (just m)) f ω d n qu o ls a p
+                        else ⟨ c , flatS (mergeᶠ (just m)) f ω d n (qu ++ [ a ]) o ls , absorbed , p ⟩)
+      go true e =
+        let (Cr′ , i , mv) = opens (mergeᶠ (just m)) fr ji jn jm so bh sy row (λ ()) (opening (<ᵇ⇒< n m (subst T (sym e) tt)))
+        in subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ (just m)} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
+      go false e = proj₁ lifted , aft p , settled c-abs (proj₁ (proj₂ lifted)) (s-flat ji sy (joined bg↑ wt′ wh↑ od↑ ah′ ao en li sl↑) jm so (behind-up bh))
+                 , proj₂ (proj₂ lifted)
+        where
+          -- NO SLOT FREE: every slot taken, the value queued.
+          taken : n ≡ m
+          taken = ≤-antisym (proj₁ (proj₂ sl)) (≮⇒≥ (λ lt → subst T e (<⇒<ᵇ lt)))
+
+          lifted = fr-up Rt fr tt (proj₁ here-o)
+                     (nr-≈ (proj₂ jm) (nr-tr (join-nr (mergeᶠ (just m)) F rl (λ y → end-at (InvAt.func io row y)) (λ _ _ _ r → nl r)))) nh
+            where
+              end-at : ∀ {b} → out b ≡ end → _
+              end-at ()
+
+          -- no begun lane ends at `p`
+          le : ∀ {q′ a′ c′} → (q′ , a′) ∈ vs → Lane P q′ a′ c′ end → p ≡ c′ → ⊥
+          le iv lc refl = nl (rl (begun-out bg iv) lc)
+
+          bg↑ = begun-up (λ ()) (λ _ → nl) nh bg
+          ah↑ = ahead-up le ah
+          wt↑ = wait-up le ah↑ wt
+
+          L₀ = proj₁ sl
+          Lv = proj₁ (nths-split vs L₀)
+          Lw = proj₂ (nths-split vs L₀)
+          nth₀ = nth-at bg wt wh L₀
+          N′ = length vs + length ws
+          nth′ : Nth N′ p a
+          nth′ = subst (λ k → Nth k p a) (length-++ vs) nth₀
+
+          -- the lanes counted at `aft p`: the begun, then the waiting
+          cv = cen-begun Lv bg↑ (λ x → x) c-nil
+          d′ = proj₁ cv
+          cs-v = proj₁ (proj₂ cv)
+          dm : d′ + m ≡ length vs
+          dm = subst (λ k → d′ + k ≡ length vs) taken (proj₂ (proj₂ cv))
+          cs-a : Census (aft p) vs N′ d′
+          cs-a = cen-wait Lw (λ x → x) ah↑ cs-v
+          m≤v : m ≤ length vs
+          m≤v = subst (m ≤_) dm (m≤n+m m d′)
+          d≤ : d′ ≤ N′ ∸ m
+          d≤ = m+n≤o⇒m≤o∸n d′ (subst (_≤ N′) (sym dm) (m≤m+n (length vs) (length ws)))
+
+          -- a queued lane starts past `p`
+          owe-start : ∀ {s′} → Start P p a s′ → p ≺ s′
+          owe-start (_ , _ , room _)                  = ≺-ext p []
+          owe-start (_ , _ , freed _ _)               = ≺-ext p []
+          owe-start (_ , _ , queued {c₀} _ pc _ _ _) = ≺-trans {p} {c₀} pc (≺-ext c₀ [])
+
+          wf′ : ∀ {q′ a′} → (q′ , a′) ∈ ws ++ (p , a) ∷ [] → E q′ (out a′) × ¬ Owes (aft p) q′ × Runs P q′ × (∀ {s′} → Start P q′ a′ s′ → Owes (aft p) s′)
+          wf′ iw with ∈-++⁻ ws iw
+          ... | inj₁ i           = proj₁ (proj₂ (proj₂ wt↑)) i
+          ... | inj₂ (here refl) = row , ≺-irrefl {p} , (N′ , a , nth′) , owe-start
+
+          -- the new head, alone: it starts at the first owed end
+          new-head : Nth (length vs) p a → Head (aft p) P vs ((p , a) ∷ [])
+          new-head nv {c₀} (q′ , a′ , iv , lc , _ , oc) least = length vs , nv , queued m≤v oc kin kle nkl
+            where
+              kin = let (j , nj , jlt) = nths-∈ Lv iv in kth-in (length vs) jlt (lane-ends nj lc)
+              dv : length vs ∸ m ≡ d′
+              dv = trans (cong (_∸ m) (sym dm)) (m+n∸n≡m d′ m)
+              kle = subst (Kth (_≼ c₀) (Sched (length vs))) (sym dv)
+                      (kth-add′ (length vs) kin (cen-lo (λ {c″} nc → ≼-≺-≺ {c″} {p} {c₀} nc oc) cs-v))
+              nkl = subst (λ k → ¬ Kth (_≺ c₀) (Sched (length vs)) k) (sym dv)
+                      (cen-hi (λ {c′} {c″} oe′ le′ lt′ → ≼-trans {c₀} {c′} {c″} (least oe′) le′ lt′) cs-v)
+
+          head-snoc : ∀ ws′ → Nth (length vs + length ws′) p a → Head (aft p) P vs ws′ → Head (aft p) P vs (ws′ ++ (p , a) ∷ [])
+          head-snoc []      nv _ = new-head (subst (λ k → Nth k p a) (+-identityʳ (length vs)) nv)
+          head-snoc (_ ∷ _) _  h = h
+
+          wt′ : Waiting (aft p) P E vs (ws ++ (p , a) ∷ []) (qu ++ [ a ])
+          wt′ = trans (map-++ proj₂ ws ((p , a) ∷ [])) (cong (_++ [ a ]) (proj₁ wt↑))
+              , pairs-++⁺ (proj₁ (proj₂ wt↑)) ([]ᴬ ∷ᴾ []ᴾ) (tabulate λ {x} i → before {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt)) i))) ∷ᴬ []ᴬ)
+              , wf′ , (λ ()) , head-snoc ws nth′ (proj₂ (proj₂ (proj₂ (proj₂ wt↑))))
+
+          wh↑ : Whole (aft p) P E vs (ws ++ (p , a) ∷ [])
+          wh↑ {q′} y nq r with p ≟ᵖ q′
+          ... | yes refl with InvAt.func io row y
+          ...   | refl = inj₂ (∈-++⁺ʳ ws (here refl))
+          wh↑ {q′} y nq r | no ne = [ inj₁ , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (wh y (λ o → nq (owes-up ne o)) r)
+
+          od↑ : OuterDone (aft p) E d
+          od↑ = (λ t → let (c′ , y , n′) = proj₁ od t in c′ , y , nm n′)
+              , (λ y n′ → proj₂ od y (λ o → n′ (owes-up (λ { refl → end-out (InvAt.func io row y) }) o)))
+            where
+              end-out : ∀ {b} → out b ≡ end → _
+              end-out ()
+
+          -- the new value's lane starts past an owed end: not with room,
+          -- not freed, so queued past one
+          from-start : ∀ {s′} → Starts N′ p (Sched N′) s′
+                     → Σ Pos λ q′ → Σ _ λ a′ → Σ Pos λ c′ → (q′ , a′) ∈ vs × Lane P q′ a′ c′ end × (∀ {q″} → Kill P q′ q″ → c′ ≼ q″) × Owes (aft p) c′ × c′ ≺ s′
+          from-start (room lt)  = ⊥-elim (<-irrefl refl (<-≤-trans lt (≤-trans m≤v (m≤m+n (length vs) (length ws)))))
+          from-start (freed _ K) =
+            ⊥-elim (cen-hi (λ {c′} {c″} (_ , _ , _ , _ , _ , oc) le′ lt′ → ≺-absurd {p} {c′} oc (≼-≺-≺ {c′} {c″} {p} le′ lt′)) cs-a (kth-le (Sched N′) d≤ K))
+          from-start (queued {c₀} _ _ _ K _) =
+            let (c″ , c′ , (q′ , a′ , iv , lc , kc , oc) , le′ , le₀) = cen-find {Q = _≼ c₀} cs-a (kth-le (Sched N′) d≤ K)
+            in q′ , a′ , c′ , iv , lc , (λ {q″} → kc {q″}) , oc , ≼-≺-≺ {c′} {c₀} {c₀ ++ [ ix 1 ]} (≼-trans {c′} {c″} {c₀} le′ le₀) (≺-ext c₀ [])
+
+          ah′ : Ahead (aft p) P vs (ws ++ (p , a) ∷ [])
+          ah′ iw st′ with ∈-++⁻ ws iw
+          ... | inj₁ i = ah↑ i st′
+          ah′ _ (j , nj , st′) | inj₂ (here refl) with nth-inj nj nth′
+          ...   | refl = from-start st′
+
+          sl↑ : Slots P vs (ws ++ (p , a) ∷ []) n
+          sl↑ = subst (Listed E 0) (++-assoc vs ws ((p , a) ∷ [])) (nths-snoc (vs ++ ws) L₀ nth₀) , proj₁ (proj₂ sl) , inj₂ taken
+  rise-outer-bounded refl (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
+
   postulate
-    -- A BOUNDED MERGE'S VALUE: its lane begun while a slot is free, else
-    -- queued, absorbed.
-    rise-outer-bounded : ∀ {Γ A B} {m} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                       → rise (inOuter (mergeᶠ (just m)) f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
-                       → SimC Rt ⟨ inOuter (mergeᶠ (just m)) f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
     -- A SWITCH'S VALUE: every begun lane killed, the value's begun.
     rise-outer-switch : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
                       → rise (inOuter switchᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t

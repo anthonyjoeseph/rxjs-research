@@ -42,13 +42,14 @@ Members: `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`,
 
 #### THE JOINER STEPPED
 
-An outer's value or end and a lane's, each rising into `Joined`/`Begun`
-by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether begun lanes stay ascending (`Asc`), and whether a bounded
-queue's head starts under the first owed end of a begun lane (`Head`),
-so a freed slot is its `Starts.queued`. Settled when each is a body.
+An outer's end, a switch's or exhaust's value, and a lane's rise, each
+into `Joined`/`Begun` by its policy. Open: whether begun lanes stay
+ascending (`Asc`) under a kill or drop, and whether a bounded lane's end,
+dequeuing the head, leaves the next value's `Head` read off the lanes'
+`Census`. Settled when each is a body.
 
-Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
+Members: `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`,
+`rise-lane-nx`, `rise-lane-cp`.
 
 #### THE COLD STEPPED
 
