@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.All using (tabulate) renaming (_∷_ to _�
 open import Data.List.Relation.Unary.AllPairs using () renaming (_∷_ to _∷ᴾ_; [] to []ᴾ)
 open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (++⁺ to pairs-++⁺)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; yes; no)
@@ -41,7 +41,7 @@ open Machine using (Ctx; Scope; lnS; cutS; cut; killAll; attached; ⟨_,_,_,_⟩
                     inOuter; inLanes; inLn; inCut)
 open import adequacy.Rows using (full; pendRows; Moves; _⇄_; _≃_)
 open _≃_ using (from)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike; Head; Hole; h-end; h-kill; LaneSt; l-live; l-dead; Kept; NoKill; Thru; TailP; tailp; tailp-⊑; ∅ᵖ; cov)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike; Head; Hole; Unkilled; h-end; h-kill; LaneSt; l-live; l-dead; Kept; NoKill; Thru; TailP; tailp; tailp-⊑; ∅ᵖ; cov)
   renaming (Nths to Listed)
 open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
@@ -65,21 +65,22 @@ before p {q} nq with ≼-or-≻ p q
 ... | inj₁ pq = ⊥-elim (nq pq)
 ... | inj₂ qp = qp
 
--- No lane running: every begun lane ended where passed.
-dead-ends : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {F : A → Den B} {O : EmissionSet A} {vs ls n q a}
-          → Begun sc Rl C (polF exhaustᶠ F O) O vs ls n → n ≡ 0 → (q , a) ∈ vs → Σ Pos λ c → LaneOf F q a c end × ¬ Owes C c
+-- No lane running: every begun lane ended, or was killed, where passed.
+dead-ends : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n q a}
+          → Begun sc Rl C P O vs ls n → n ≡ 0 → (q , a) ∈ vs
+          → (Σ Pos λ c → Lane P q a c end × ¬ Owes C c) ⊎ (Σ Pos λ q′ → Kill P q q′ × ¬ Owes C q′)
 dead-ends (more {b = true} _ _ _ _ _) () _
-dead-ends (more {b = false} _ _ _ (l-dead (h-end lc nc _) _ _ _) _) _ (here refl) = _ , lc , nc
-dead-ends (more {b = false} _ _ _ (l-dead (h-kill () _ _) _ _ _) _) _ (here refl)
+dead-ends (more {b = false} _ _ _ (l-dead (h-end lc nc _) _ _ _) _) _ (here refl) = inj₁ (_ , lc , nc)
+dead-ends (more {b = false} _ _ _ (l-dead (h-kill kq nq _) _ _ _) _) _ (here refl) = inj₂ (_ , kq , nq)
 dead-ends (more {b = false} _ _ _ _ bg) z (there i) = dead-ends bg z i
 
--- A lane running: a begun lane unended.
+-- A lane running: a begun lane unkilled and unended.
 live-of : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n}
-        → Begun sc Rl C P O vs ls n → ¬ n ≡ 0 → Σ Pos λ q → Σ A λ a → (q , a) ∈ vs × Unended C P q a
+        → Begun sc Rl C P O vs ls n → ¬ n ≡ 0 → Σ Pos λ q → Σ A λ a → (q , a) ∈ vs × Unkilled C P q × Unended C P q a
 live-of none nz = ⊥-elim (nz refl)
-live-of (more {q = q} {a = a} {b = true} _ _ _ (l-live (h-live _ _ _ ue) _ _) _) _ = q , a , here refl , ue
+live-of (more {q = q} {a = a} {b = true} _ _ _ (l-live (h-live _ _ uk ue) _ _) _) _ = q , a , here refl , uk , ue
 live-of (more {b = false} _ _ _ _ bg) nz with live-of bg nz
-... | q , a , i , ue = q , a , there i , ue
+... | q , a , i , uk , ue = q , a , there i , uk , ue
 
 -- An exhaust's cursor: at a value, the lane last run is one.
 module ExCur {A B : Set} (F : A → Den B) (O : EmissionSet A) (fn : ∀ {k e e′} → O k e → O k e′ → e ≡ e′) where
@@ -498,7 +499,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
                                           ; sl′ = inj₂ (p , vs , p , a , refl , (a , row) , ≺-irrefl {p} , (λ _ nk → nk) , ru sl , ended) }
       where
         ended : ∀ {q′ a′} → (q′ , a′) ∈ vs → Σ Pos λ c → LaneOf F q′ a′ c end × c ≺ p
-        ended i = let (c , lc , nc) = dead-ends bg refl i in c , lc , before p {c} nc
+        ended i with dead-ends bg refl i
+        ... | inj₁ (c , lc , nc) = c , lc , before p {c} nc
+        ... | inj₂ (_ , () , _)
         ru : Slots P (bef p) vs ws 0 → XCur p p
         ru (inj₁ (_ , allo)) = cur₀ row allo
         ru (inj₂ (x , us , q , aq , refl , (_ , xv) , nx′ , lt , cu , _)) =
@@ -553,7 +556,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       q≺p = before p {q} (begun-nq bg iq)
       live : Unended (bef p) P q aq
       live with live-of bg (λ ())
-      ... | q₀ , a₀ , i , u with ∈-++⁻ us i
+      ... | q₀ , a₀ , i , _ , u with ∈-++⁻ us i
       ...   | inj₂ (here refl) = u
       ...   | inj₁ j = let (c₀ , lc , cq) = ue j in ⊥-elim (u lc (λ {q′} ()) (≺-trans {c₀} {q} {p} cq q≺p))
 

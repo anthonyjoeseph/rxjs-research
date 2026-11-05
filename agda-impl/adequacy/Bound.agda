@@ -27,12 +27,12 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; _<ᵖ_; inside; inside-self; inside-++; <ᵖ-split; <ᵖ-part)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
-  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Bounded; module Switch; module Exhaust)
+  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
 open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -227,8 +227,8 @@ module _ {A B : Set} (L : Pos → A → EmissionSet B) (O : EmissionSet A) (Over
          (Cut : Pos → Pos → Set) (Hand : Pos → Set) where
   open Joining L O (λ _ _ → ⊥) Over R Cut Hand
 
-  jrow : ∀ {k e} → JoinT k e → Visible e → O k end ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ Cut q k
-  jrow (oend x _)           _  = inj₁ x
+  jrow : ∀ {k e} → JoinT k e → Visible e → (O k end × Done k) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ Cut q k
+  jrow (oend x dn)          _  = inj₁ (x , dn)
   jrow (lane x r l nc _)    _  = inj₂ (_ , _ , x , r , l , nc)
   jrow (lend x r l nc _ _)  _  = inj₂ (_ , _ , x , r , l , nc)
   jrow (val _)              ()
@@ -243,22 +243,35 @@ module _ {A B : Set} (L : Pos → A → EmissionSet B) (O : EmissionSet A) (Over
   jrow (rpass () _ _)       _
   jrow (rhand () _)         _
 
-nokill : ∀ {A B : Set} {O : EmissionSet A} {k e} (L : Pos → A → EmissionSet B) (R : Pos → Set)
-     → O k end ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ ⊥)
-     → O k end ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × (∀ {q′} → ⊥ → k ≼ q′))
+-- The joiner's meaning done at `c`: its outer ended, and every lane
+-- running, uncut, too.
+JDone : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → Pos → Set
+JDone (mergeᶠ nothing)  F O = Merge.Done F O
+JDone (mergeᶠ (just m)) F O = Bounded.Done m F O
+JDone switchᶠ           F O = Switch.Done F O
+JDone exhaustᶠ          F O = Exhaust.Done F O
+
+nokill : ∀ {A B : Set} {O : EmissionSet A} {D : Set} {k e} (L : Pos → A → EmissionSet B) (R : Pos → Set)
+     → (O k end × D) ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ ⊥)
+     → (O k end × D) ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × (∀ {q′} → ⊥ → k ≼ q′))
 nokill L R (inj₁ x)                      = inj₁ x
 nokill L R (inj₂ (q , a , x , r , l , _)) = inj₂ (q , a , x , r , l , λ ())
+
+join-row-d : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k e} → JoinF op F O k e → Visible e
+           → (O k end × JDone op F O k) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs (polF op F O) q × Lane (polF op F O) q a k e
+               × (∀ {q′} → Kill (polF op F O) q q′ → k ≼ q′)
+join-row-d (mergeᶠ nothing)  F O r v = nokill {O = O} (LaneOf F) (λ _ → ⊤) (jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) r v)
+join-row-d (mergeᶠ (just m)) F O r v =
+  nokill {O = O} (Bounded.Lane m F O) (Bounded.Indexed m F O) (jrow (Bounded.Lane m F O) O (Ended O) (Bounded.Indexed m F O) (λ _ _ → ⊥) (Bounded.Queued m F O) r v)
+join-row-d exhaustᶠ          F O r v = nokill {O = O} (LaneOf F) (Exhaust.Run F O) (jrow (LaneOf F) O (Ended O) (Exhaust.Run F O) (λ _ _ → ⊥) (λ _ → ⊥) r v)
+join-row-d switchᶠ           F O {k} r v with jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (Switch.Cut F O) (λ _ → ⊥) r v
+... | inj₁ x                       = inj₁ x
+... | inj₂ (q , a , x , ru , l , nc) = inj₂ (q , a , x , ru , l , λ { {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k) })
 
 join-row : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k e} → JoinF op F O k e → Visible e
          → O k end ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs (polF op F O) q × Lane (polF op F O) q a k e
              × (∀ {q′} → Kill (polF op F O) q q′ → k ≼ q′)
-join-row (mergeᶠ nothing)  F O r v = nokill {O = O} (LaneOf F) (λ _ → ⊤) (jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) r v)
-join-row (mergeᶠ (just m)) F O r v =
-  nokill {O = O} (Bounded.Lane m F O) (Bounded.Indexed m F O) (jrow (Bounded.Lane m F O) O (Ended O) (Bounded.Indexed m F O) (λ _ _ → ⊥) (Bounded.Queued m F O) r v)
-join-row exhaustᶠ          F O r v = nokill {O = O} (LaneOf F) (Exhaust.Run F O) (jrow (LaneOf F) O (Ended O) (Exhaust.Run F O) (λ _ _ → ⊥) (λ _ → ⊥) r v)
-join-row switchᶠ           F O {k} r v with jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (Switch.Cut F O) (λ _ → ⊥) r v
-... | inj₁ x                       = inj₁ x
-... | inj₂ (q , a , x , ru , l , nc) = inj₂ (q , a , x , ru , l , λ { {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k) })
+join-row op F O r v = [ (λ x → inj₁ (proj₁ x)) , inj₂ ]′ (join-row-d op F O r v)
 
 -- Where a bounded lane starts: past its value.
 starts-past : ∀ {A B} m (F : A → Den B) (O : EmissionSet A) {i q ls s} → Bounded.Starts m F O i q ls s → q ≺ s

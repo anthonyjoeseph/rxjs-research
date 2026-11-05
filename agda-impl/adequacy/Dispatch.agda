@@ -55,6 +55,7 @@ open import adequacy.Apart.Floor using (floor)
 open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
+open import adequacy.Settle using (rise-outer-cp)
 open import adequacy.SubJoin using (join-pend)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
@@ -308,8 +309,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
-                  → rise (inOuter op f ω d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising cp , p ⟩ sh k′
     rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
                   → rise (inLanes op f ω d n q o pre post c) s (nx b) p ≡ moved k′ sh t
                   → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
@@ -684,7 +683,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
   rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx Rt eq
-  rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp eq
+  rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp Rt eq
   rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
   rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp eq
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
