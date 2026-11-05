@@ -39,7 +39,7 @@ open Machine using (Ctx; St; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start;
 open import adequacy.Rows using (full; pendRows; ≃-refl; silent; _≃_; Moves; ≼-≢)
 open _≃_ using (to; from)
 open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; takes; bef; aft; Owes; Sound; JInv; joined; Begun; none; JoinE; JRl; JRo; Behind; Sync; s-flat;
-                                   polF; JoinF; Lane; Runs; Start; Whole; OuterDone; Waiting; Slots; Ends; Asc; LanesIn; NoKill; OwedEnd; Unended; Kept;
+                                   Head; polF; JoinF; Lane; Runs; Start; Whole; OuterDone; Waiting; Slots; Ends; Asc; LanesIn; NoKill; OwedEnd; Unended; Kept;
                                    h-live; h-end; l-dead; TailP; tailp; Beneath; alike; cov; voc; slots-mv; ≈-refl)
   renaming (Nths to Listed)
 open import adequacy.Cursor.Frame using (owes; Fr; f-lanes; f-lane; f-lnct; d-lanes)
