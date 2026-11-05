@@ -174,12 +174,12 @@ module _ {R : Set} (o : PureObs [] R) where
       ; (inj₂ sk) → lift₀ {s = flatS op f ω d n qu s ls} fr lo tt (voc (proj₂ je) (sk , reach₀ {e = skip} bh)) (ft-skip (proj₁ (Sound.rg sd r tt))) κ }
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
   lift₀ {s = s} (f-lanes {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {o = o′} {pre = pre} {post = post} {c = c} {O = O}
-                  fr _ _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ _ je _ _ bh _) lo _ r (ft-skip g) =
+                  fr _ _ _ x _ rn (h-live _ le uk _) _ _ _ _ _ _ _ _ _ je _ _ bh _ _) lo _ r (ft-skip g) =
     lift₀ {s = flatS op f ω d n qu o′ (pre ʳ++ s ∷ post)} fr lo tt
       (voc (proj₂ je) (jlane op {F = F′} {O} x rn (voc le r) (λ κ lt → uk κ lt) tt , reach₀ {e = skip} bh)) (ft-skip (proj₁ g))
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
   lift₀ {s = s} {q = y} (f-lanes {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {o = o′} {pre = pre} {post = post} {c = c} {O = O}
-                  fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so sl bh _) lo _ r ft-end κ =
+                  fr ji _ _ x _ rn (h-live _ le uk _) _ _ _ _ _ _ _ _ li je so sl bh _ _) lo _ r ft-end κ =
     lfin op {F = F′} {O} x rn (voc le r) (λ κ′ lt → uk κ′ lt) λ
       { (inj₁ e)         → lift₀ {s = S} fr lo tt (voc (proj₂ je) (e , reach₀ {e = end} bh)) ft-end κ
       ; (inj₂ (inj₁ sk)) → lift₀ {s = S} fr lo tt (voc (proj₂ je) (sk , reach₀ {e = skip} bh)) (ft-skip (proj₁ (Sound.rg (sl tt) r tt))) κ
@@ -188,8 +188,8 @@ module _ {R : Set} (o : PureObs [] R) where
                                     (clr-≈ (proj₂ je) (clr-tr (proj₂ hc))) (proj₁ (Sound.rg (sl tt) r tt)))) }
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
           S = flatS op f ω d n qu o′ (pre ʳ++ s ∷ post)
-  lift₀ (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift₀ (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift₀ (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift₀ (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift₀ {s = s} fr@(f-src {k = k} {b = b} {c = c} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ r (ft-skip g) κ =
     κ (lifted-below lo (Outer.src-at o fr (lo₀ (inSrc k b c) {s} lo) tt r tt g))
   lift₀ {s = s} fr@(f-src {k = k} {b = b} {c = c} _ _ pt _ _ _ _ _ fz _ _ _ _ _ _ _) lo _ r ft-end κ =
@@ -290,8 +290,8 @@ module _ {R : Set} (o : PureObs [] R) where
   ... | _ , _ , adrift fr cl′ _ = ⊥-elim (adrift-no cl′ fr)
   ... | _ , _ , settled () _ _
   climb {c = inLanes op f ω d n qu o′ pre post c} pth cl with inv-at pth
-  ... | _ , _ , flying (f-lanes {b = true} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , refl , _ , _) = climb {c = c} (pth ▸τ (_ , refl)) cl
-  ... | _ , _ , flying (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
+  ... | _ , _ , flying (f-lanes {b = true} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , refl , _ , _) = climb {c = c} (pth ▸τ (_ , refl)) cl
+  ... | _ , _ , flying (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
   ... | _ , _ , flying (d-lanes _ _ _ _ _ _ _) _ ()
   ... | _ , _ , adrift fr cl′ _ = ⊥-elim (adrift-no cl′ fr)
   ... | _ , _ , settled () _ _

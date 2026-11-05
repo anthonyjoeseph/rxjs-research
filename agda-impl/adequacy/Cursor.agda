@@ -40,7 +40,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Relation.Unary.All using (All; lookup)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _≤_)
+open import Data.Nat using (ℕ; suc; _+_; _≤_; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
@@ -53,7 +53,7 @@ open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; tick; insid
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; Few; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt;
   Rejoin; InE; MapT; LaneOf; module Scan; module TakeWhile; module Connecting; module Merge;
-  module Bounded; module Switch; module Exhaust)
+  module Bounded; module Switch; module Exhaust; module Values)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe; closed; free; cpAt; cutAt; overAt; scopeOf;
@@ -277,11 +277,22 @@ record Pol (A B : Set) : Set₁ where
   field
     Lane  : Pos → A → EmissionSet B
     Runs  : Pos → Set
+    -- what a passed value needs to be begun or waiting: a bounded merge
+    -- drops none
+    Takes : Pos → Set
+    takes : ∀ {q} → Runs q → Takes q
     Start : Pos → A → Pos → Set
     Kill  : Pos → Pos → Set
     -- whether a value can wait for a slot
     Queues : Bool
+    -- what its slots hold of the values begun and waiting, and the live count
+    Slots : List (Pos × A) → List (Pos × A) → ℕ → Set
 open Pol public
+
+-- The values listed, numbered in the outer's order from `i`.
+Nths : ∀ {A} → EmissionSet A → ℕ → List (Pos × A) → Set
+Nths O i []             = ⊤
+Nths O i ((q , a) ∷ xs) = Values.Nth O i q a × Nths O (suc i) xs
 
 -- No later value cuts the lane by `k`.
 NoKill : ∀ {A B} → Pol A B → Pos → Pos → Set
@@ -293,14 +304,25 @@ Kept : ∀ {A B} → Pol A B → Pos → A → EmissionSet B
 Kept P q a k e = (Lane P q a k e × NoKill P q k) ⊎ Σ Pos λ r → e ≡ pin r × Lane P q a k e × NoKill P q r × T (inside r k)
 
 polF : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → Pol A B
-polF (mergeᶠ nothing)  f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤
-                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false }
-polF (mergeᶠ (just m)) f O = record { Lane = Bounded.Lane m f O ; Runs = Bounded.Indexed m f O
-                                    ; Start = λ q a s → Σ ℕ λ i → Bounded.Sub m f O i q s a ; Kill = λ _ _ → ⊥ ; Queues = true }
-polF switchᶠ           f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤
-                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ q q′ → Σ _ λ a′ → O q′ (out a′) × q ≺ q′ ; Queues = false }
-polF exhaustᶠ          f O = record { Lane = LaneOf f ; Runs = Exhaust.Run f O
-                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false }
+polF (mergeᶠ nothing)  f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤ ; Takes = λ _ → ⊤ ; takes = λ r → r
+                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false
+                                    ; Slots = λ _ _ _ → ⊤ }
+polF (mergeᶠ (just m)) f O = record { Lane = Bounded.Lane m f O ; Runs = Bounded.Indexed m f O ; Takes = λ _ → ⊤ ; takes = λ _ → tt
+                                    ; Start = λ q a s → Σ ℕ λ i → Bounded.Sub m f O i q s a ; Kill = λ _ _ → ⊥ ; Queues = true
+                                    ; Slots = λ vs ws n → Nths O 0 (vs ++ ws) × n ≤ m × (ws ≡ [] ⊎ n ≡ m) }
+polF switchᶠ           f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤ ; Takes = λ _ → ⊤ ; takes = λ r → r
+                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ q q′ → Σ _ λ a′ → O q′ (out a′) × q ≺ q′ ; Queues = false
+                                    ; Slots = λ _ _ _ → ⊤ }
+polF exhaustᶠ          f O = record { Lane = LaneOf f ; Runs = Exhaust.Run f O ; Takes = Exhaust.Run f O ; takes = λ r → r
+                                    ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false
+                                    ; Slots = λ _ _ _ → ⊤ }
+
+-- A joiner with nothing begun or queued fills no slot.
+slots-0 : ∀ {A B} op (f : A → Den B) O → Pol.Slots (polF op f O) [] [] 0
+slots-0 (mergeᶠ nothing)  f O = tt
+slots-0 (mergeᶠ (just m)) f O = tt , z≤n , inj₁ refl
+slots-0 switchᶠ           f O = tt
+slots-0 exhaustᶠ          f O = tt
 
 -- The joiner's rows, as its operator's meaning reads them.
 JoinF : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → EmissionSet B
@@ -330,6 +352,10 @@ few-behind {p = p} (ks , f) = ks , λ {y} r lt → f r (λ py → py (≺-trans 
 Unkilled : ∀ {A B} → Cur → Pol A B → Pos → Set
 Unkilled C P q = ∀ {q′} → Kill P q q′ → Owes C q′
 
+-- A live lane's end before any cut not passed.
+Unended : ∀ {A B} → Cur → Pol A B → Pos → A → Set
+Unended C P q a = ∀ {c} → Lane P q a c end → NoKill P q c → Owes C c
+
 -- What kills a lane is a later value of its outer.
 kill-out : ∀ {A B} op {F : A → Den B} {O q q′} → Kill (polF op F O) q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′
 kill-out (mergeᶠ nothing)  ()
@@ -342,7 +368,7 @@ kill-out exhaustᶠ          ()
 -- by its end or a later value, what it still owes within what its state
 -- still runs.
 data Hole {A B} (C : Cur) (P : Pol A B) (q : Pos) (a : A) : Pts → EmissionSet B → Bool → Set₁ where
-  h-live : ∀ {s E} → Start P q a s → E ≈ Lane P q a → Unkilled C P q → Hole C P q a ∅ᵖ E true
+  h-live : ∀ {s E} → Start P q a s → E ≈ Lane P q a → Unkilled C P q → Unended C P q a → Hole C P q a ∅ᵖ E true
   h-end  : ∀ {c E Ph} → Lane P q a c end → ¬ Owes C c → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
   h-kill : ∀ {q′ E Ph} → Kill P q q′ → ¬ Owes C q′ → TailP C (Kept P q a) Ph → Hole C P q a Ph E false
 
@@ -396,14 +422,14 @@ head-≡ {ws = _ ∷ _} dn up hd oe least = hd (dn oe) λ oe′ → least (up oe
 head-[] : ∀ {A B} {C : Cur} {P : Pol A B} {vs ws} → ws ≡ [] → Head C P vs ws
 head-[] refl = tt
 
--- A policy that never queues waits on any lanes begun.
-wait-vs : ∀ {A B} {C : Cur} {P : Pol A B} {O : EmissionSet A} {vs vs′ ws qu} → T (not (Queues P))
+-- An empty queue waits on any lanes begun.
+wait-[] : ∀ {A B} {C : Cur} {P : Pol A B} {O : EmissionSet A} {vs vs′ ws qu} → ws ≡ []
         → Waiting C P O vs ws qu → Waiting C P O vs′ ws qu
-wait-vs nq′ (eq , ap , wf , nq , _) = eq , ap , wf , nq , head-[] (nq nq′)
+wait-[] e (eq , ap , wf , nq , _) = eq , ap , wf , nq , head-[] e
 
--- Every value passed that runs has begun its lane or waits.
+-- Every value passed that its policy takes has begun its lane or waits.
 Whole : ∀ {A B} → Cur → Pol A B → EmissionSet A → List (Pos × A) → List (Pos × A) → Set
-Whole C P O vs ws = ∀ {q a} → O q (out a) → ¬ Owes C q → Runs P q → (q , a) ∈ vs ⊎ (q , a) ∈ ws
+Whole C P O vs ws = ∀ {q a} → O q (out a) → ¬ Owes C q → Takes P q → (q , a) ∈ vs ⊎ (q , a) ∈ ws
 
 -- The state's flag: the outer's end passed.
 OuterDone : ∀ {A} → Cur → EmissionSet A → Bool → Set
@@ -583,7 +609,7 @@ data Begun {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (
 data Joined {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
   joined : ∀ {vs ws} → Begun sc Rl C P O vs ls n → Waiting C P O vs ws qu → Whole C P O vs ws → OuterDone C O d
-         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn (Hots (full sc)) Rl P O
+         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn (Hots (full sc)) Rl P O → Slots P vs ws n
          → Joined sc Rl C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.

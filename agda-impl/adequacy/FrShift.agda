@@ -17,6 +17,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -89,7 +90,7 @@ src-sh′ {C = C} {b = b} {p} w refl sr env ef lo = Shifted.src-sh {C} {p} w {b 
 -- A live lane's kept rows, among its siblings'.
 live-kl : ∀ {A B} {C p} {P : Pol A B} {q a Ph} {E : EmissionSet B} → Hole C P q a Ph E true → Lag C p E
         → Σ (List Pos) λ ks → ∀ {k e} → Kept P q a k e → Owes C k → k ≺ p → k ∈ ks
-live-kl {P = P} (h-live _ eq _) lg = hole-kl {P = P} eq lg
+live-kl {P = P} (h-live _ eq _ _) lg = hole-kl {P = P} eq lg
 
 klag-mid : ∀ {A B} {C p} {P : Pol A B} {vs₁ vs₂ : List (Pos × A)} {q a}
          → KLag C p P vs₁ → (Σ (List Pos) λ ks → ∀ {k e} → Kept P q a k e → Owes C k → k ≺ p → k ∈ ks) → KLag C p P vs₂
@@ -114,14 +115,14 @@ bnd-≈ m bd (x , v , ow) = let (y , v′) = from (alike m) (x , v) in bd (y , v
 outer-jl : ∀ {Γ A B} {sc : Scope Γ} {Rl C p} {op} {f : A → Obs Timeline Γ B} {d n qu} {ls : List (St Γ B)} {O : EmissionSet A}
          → Joined sc Rl C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls → (∀ {l} → l ∈ ls → LoP l p)
          → HR C p sc O → Env (full sc) C p → EnvL (full sc) C p → Lag C p (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
-outer-jl {sc = sc} {op = op} {f} {O = O} (joined bg _ wh _ ah _ en _) lol hf env ef =
+outer-jl {sc = sc} {op = op} {f} {O = O} (joined bg _ wh _ ah _ en _ _) lol hf env ef =
   flat-lag {op = op} {F = λ a → ⟦ f a ⟧ (full sc)} {O = O} (proj₁ (run hf env ef)) (proj₂ (run hf env ef)) (begun-f bg env ef lol)
     (λ iv kl ln v ow → begun-b {O = O} bg iv kl ln v ow en env lol) wh ah
 
 hr-outer : ∀ {Γ A B} {sc : Scope Γ} {Rl C p} {op} {f : A → Obs Timeline Γ B} {ω d n qu} {ls : List (St Γ B)} {O : EmissionSet A} {E′}
          → Joined sc Rl C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls → JoinE sc op f ω O E′ → (∀ {l} → l ∈ ls → LoP l p)
          → HR C p sc O → HR C p sc E′
-hr-outer {sc = sc} {C = C} {op = op} {f} {O = O} jn@(joined bg _ wh _ ah _ en _) je lol hf = hr λ env ef →
+hr-outer {sc = sc} {C = C} {op = op} {f} {O = O} jn@(joined bg _ wh _ ah _ en _ _) je lol hf = hr λ env ef →
   lag-≈ (proj₂ je) (lag-at (λ r → _ , proj₁ r) (outer-jl {C = C} {op = op} {f = f} {O = O} jn lol hf env ef)) ,
   λ (x , v , ow) → flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full sc)} {C = C} (proj₂ (run hf env ef))
     (λ iv kl ln v′ ow′ → begun-b {O = O} bg iv kl ln v′ ow′ en env lol) wh ah (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
@@ -233,13 +234,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr-outer {C = C} {op = op} {f = f} {ω = ω} {O = O} jn je lolp hf
   rc {C = C} {c = Machine.inLanes op f ω _ _ qu o pre post c} {E = E} {s = s} {p}
-     (f-lanes {E′ = E′} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {ws = ws} {q = q} {a = a} {b = true} fr ji sy bg₁ y nq ru hl bg₂ eqn wt wh od ah as en li je sd sdl bh _) hf w lo =
+     (f-lanes {E′ = E′} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {ws = ws} {q = q} {a = a} {b = true} fr ji sy bg₁ y nq ru hl bg₂ eqn wt wh od ah as en li je sd sdl bh _ sl) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr hf′ w lo
         ob = bound sy env loop
-    in Cr′ , f-lanes fr′ ji (shift sy w env ef loo) (Shifted.begun-sh {C} {p} w (ku ob) bg₁ env ef lpre) y (Shifted.nm {C} {p} w nq) ru (Shifted.hole-sh {C} {p} w (ku ob) hl)
-                 (Shifted.begun-sh {C} {p} w (ku ob) bg₂ env ef lpost) eqn (Shifted.waiting-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} {qu = qu} (lb env ef) ah wt)
+    in Cr′ , f-lanes fr′ ji (shift sy w env ef loo) (Shifted.begun-sh {C} {p} w (ku ob) (λ i → lb env ef (∈-++⁺ˡ i)) bg₁ env ef lpre) y (Shifted.nm {C} {p} w nq) ru (Shifted.hole-sh {C} {p} w (ku ob) (λ l nk o → lb env ef (∈-++⁺ʳ vs₁ (here refl)) nk l tt o) hl)
+                 (Shifted.begun-sh {C} {p} w (ku ob) (λ i → lb env ef (∈-++⁺ʳ vs₁ (there i))) bg₂ env ef lpost) eqn (Shifted.waiting-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} {qu = qu} (lb env ef) ah wt)
                  (Shifted.whole-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} ob wh) (Shifted.od-sh {C} {p} w {O = O} ob od)
-                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef)) (λ ())
+                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef)) (λ ()) sl
        , env , ef , d
     where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
@@ -263,7 +264,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       jl = lanes-jl {C = C} {op = op} {f = f} {pre = pre} {post = post} {s = s} {O = O} sy bg₁ hl bg₂ y wh ah en loop lol (λ env ef → live-kl hl (proj₁ (run hf env ef))) (λ env ef _ → proj₂ (run hf env ef))
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr-lanes {C = C} {op = op} {f = f} {ω = ω} {pre = pre} {post = post} {s = s} {O = O} sy bg₁ hl bg₂ y wh ah en je loop lol (λ env ef → live-kl hl (proj₁ (run hf env ef))) (λ env ef _ → proj₂ (run hf env ef))
-  rc (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
   rc {s = s} (f-lane {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.lnS true s} fr hf w lo in Cr′ , f-lane fr′ , rs
   rc (f-lane {b = false} _) () w lo
   rc {s = s} (f-lnct {b = true} fr) hf w lo = let (Cr′ , fr′ , rs) = rc {s = Machine.cutS true _ s} fr hf w lo in Cr′ , f-lnct fr′ , rs

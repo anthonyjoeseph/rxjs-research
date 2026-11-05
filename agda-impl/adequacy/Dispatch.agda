@@ -362,7 +362,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp (f-take _ _ _ _)                                         ()   _ _
   srcp (f-took _ _ _ _ _ _ _ _ _ _)                                 ()   _ _
   srcp (f-outer _ _ _ _ _ _)                                    ()   _ _
-  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)    ()   _ _
+  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)    ()   _ _
   srcp (f-lane _)                                               ()   _ _
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _

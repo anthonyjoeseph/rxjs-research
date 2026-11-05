@@ -175,7 +175,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   shut-up (f-take fr _ _ _) _ x cu                  = shut-up fr tt x cu
   shut-up (f-took _ _ _ _ _ _ _ _ _ _) () _ _
   shut-up (f-outer fr _ _ _ _ _) _ x cu             = shut-up fr tt x cu
-  shut-up (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
+  shut-up (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
   shut-up (f-lane fr) _ x cu                        = shut-up fr tt x cu
   shut-up (f-lnct fr) _ x cu                        = shut-up fr tt x cu
   shut-up (f-src fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu

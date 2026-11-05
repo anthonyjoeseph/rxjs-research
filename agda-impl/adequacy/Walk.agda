@@ -147,7 +147,7 @@ LaneDead C D P q a b E = T (not b) → E ≡ Lane P q a × Dom C D × (∀ {r} �
 -- A lane's state as its list entry holds it.
 laneSt : ∀ {Γ A B} {sc : Scope Γ} {Rg C D} {P : Pol A B} {q a} b {at l E Ph}
        → Hole C P q a Ph E b → LaneHold sc Rg C b D Ph l E → (T b → Sound Rg E) → LaneDead C D P q a b E → LaneSt sc Rg C P q a (lnS b (cutS b at l)) b
-laneSt true  hl@(h-live _ _ _) h sd _ = l-live hl h (sd _)
+laneSt true  hl@(h-live _ _ _ _) h sd _ = l-live hl h (sd _)
 laneSt {sc = sc} {D = D} false {l = l} hl (Q , hk , le) _ dl =
   let (eq , dm , nk) = dl tt in l-dead (hole-⊑ hl le) (subst (λ E → Husk sc D l E Q) eq hk) dm nk
 
@@ -197,8 +197,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     climb (f-take fr nf eq sd)          h = climb fr (s-take h nf eq sd)
     climb (f-took fr fl nr fz ow tp dm nf eq sd) (Q , hk , le) = climb fr (s-took fl (λ {q} → nr {q}) fz ow (tailp-⊑ tp le) hk dm nf eq sd)
     climb (f-outer fr ji j eq sd bh)    h = climb fr (s-flat ji h j eq sd bh)
-    climb (f-lanes {pre = pre} {b = b} fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd bh dl) (_ , _ , refl , h) =
-      climb fr (s-flat ji sy (joined bg wt wh od ah ao en li) eq so bh)
+    climb (f-lanes {pre = pre} {b = b} fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd bh dl sl) (_ , _ , refl , h) =
+      climb fr (s-flat ji sy (joined bg wt wh od ah ao en li sl) eq so bh)
       where
         bg = subst (Begun _ _ _ _ _ _ _) (sym cnt)
                (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join lf o nq r (laneSt b hl h sd dl) rt))
@@ -261,7 +261,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     dead-closed (f-took _ _ _ _ (o-cut _) _ _ _ _ _) refl = tt
     dead-closed (f-took _ _ _ _ (o-over _) _ _ _ _ _) refl = tt
     dead-closed (f-outer _ _ _ _ _ _) ()
-    dead-closed (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+    dead-closed (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
     dead-closed (f-lane _) ()
     dead-closed (f-lnct {b = true} _) ()
     dead-closed (f-lnct {b = false} _) refl = tt
@@ -366,10 +366,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   down-lanes : ∀ {Cr Γ A B} {op} {f} {ω} {d n qu} {o : St Γ A} {pre post} {c : Ctx R Γ B} {s}
              → Res Cr c (flatS op f ω d n qu o (pre ʳ++ s ∷ post)) → Res Cr (inLanes op f ω d n qu o pre post c) s
-  down-lanes {pre = pre} (C , owes , _ , _ , fr , s-flat ji sy (joined bg wt wh od ah ao en li) eq so bh)
+  down-lanes {pre = pre} (C , owes , _ , _ , fr , s-flat ji sy (joined bg wt wh od ah ao en li sl) eq so bh)
     with begun-split (reverse pre) (subst (λ ls → Begun _ _ _ _ _ _ ls _) (ʳ++-defn pre) bg)
   ... | split lf o nq r l rt cnt refl with laneHold l
-  ...   | _ , _ , _ , hl , hd , sd , dl = C , lane _ _ _ , _ , _ , f-lanes fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd bh dl , hd
+  ...   | _ , _ , _ , hl , hd , sd , dl = C , lane _ _ _ , _ , _ , f-lanes fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd bh dl sl , hd
   down-lanes {pre = pre} (C , dead D P , _ , _ , fr , (Q , h-flat ho uo hl , le)) with hl-unrev pre hl
   ... | _ , _ , ha , hl-more hs us hb , le′ = C , dead _ _ , nowhere , _ , d-lanes fr ho uo ha hb us (⊑-trans le (∪-⊑ ⊑-refl le′)) , (_ , hs , ⊑-refl)
   down-lanes {pre = pre} {post = post} {s = s} (C , dead D P , _ , _ , fr , (Q , h-blank (qo , ql) , le)) with quiet-split pre {s} {post} ql

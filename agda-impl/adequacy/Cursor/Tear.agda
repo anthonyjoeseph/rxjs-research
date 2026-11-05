@@ -80,7 +80,7 @@ mutual
     _ , h-take (proj₂ (husk-of sy)) (up-∘ (up-take {incl = i} {keep = keep} {D = C} {E = Es} (nofail-up {incl = i} {keep = keep} {C = C} {E = Es} nf)) (up-≈ m))
   husk-of {C = C} (s-took {i = i} {keep = keep} {Es = Es} _ _ _ _ _ {D} hk dm nf m _) =
     _ , h-take hk (up-∘ (up-adv {C = C} dm (up-take {incl = i} {keep = keep} {D = D} {E = Es} nf)) (up-≈ m))
-  husk-of {sc = sc} {C = C} (s-flat {op = op} {f = f} {ω = ω} {O = O} {E = E} ji sy (joined bg _ _ _ _ _ _ li) je so bh) =
+  husk-of {sc = sc} {C = C} (s-flat {op = op} {f = f} {ω = ω} {O = O} {E = E} ji sy (joined bg _ _ _ _ _ _ li _) je so bh) =
     _ , h-flat (proj₂ (husk-of sy)) (flat-up-outer {op = op} {f = f} {ω = ω} ji so je bh)
                (proj₂ (begun-husk {O = O} {E = E} (λ {q} {a} {D} x rn dm nk → flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {ω = ω} {O = O} {E = E} {q = q} {a = a} ji je bh li x rn dm nk) bg))
   husk-of (s-conn {k = k} sc pt bs bh ss tn fl ce) =
@@ -112,7 +112,7 @@ mutual
   lane-husk : ∀ {Γ A B} {sc : Scope Γ} {Rg C} {P : Pol A B} {O E q a l b ls Q}
             → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
             → O q (out a) → Runs P q → LaneSt sc Rg C P q a l b → HuskL sc C ls E Q → Σ Pts (HuskL sc C (l ∷ ls) E)
-  lane-husk {C = C} {P = P} lf x rn (l-live (h-live _ m uk) sy _) hl =
+  lane-husk {C = C} {P = P} lf x rn (l-live (h-live _ m uk _) sy _) hl =
     _ , hl-more (h-ln (h-cut (proj₂ (husk-of sy)) up-id) up-id) (up-∘ (up-≈ m) (lf {D = C} x rn (λ t → t) (unkilled-no {C = C} {P = P} uk))) hl
   lane-husk lf x rn (l-dead {D = D} _ hk dm nk) hl =
     _ , hl-more (h-ln (h-cut hk up-id) up-id) (lf {D = D} x rn dm nk) hl

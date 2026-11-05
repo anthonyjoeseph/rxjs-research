@@ -51,7 +51,7 @@ VHot (hot t ∷ᴬ ρ)    p = (Σ (Ev _) λ e → t p e × Visible e) ⊎ VHot �
 VHot (coldAt _ ∷ᴬ ρ) p = VHot ρ p
 
 joined-li : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O d n qu ls} → Joined sc Rl C P O d n qu ls → LanesIn (Hots (full sc)) Rl P O
-joined-li (joined _ _ _ _ _ _ _ li) = li
+joined-li (joined _ _ _ _ _ _ _ li _) = li
 
 vhot-hots : ∀ {Γ} (ρ : DenEnv Γ) {p} → VHot ρ p → Hots ρ p
 vhot-hots (hot t ∷ᴬ ρ)    (inj₁ (e , y , _)) = inj₁ (e , y)
@@ -226,7 +226,8 @@ module Past (p : Pos) where
 
     lane-up : ∀ {Γ} {sc : Scope Γ} {Rg : Rgn} {A B} {P : Pol A B} {q a l b} → (∀ {q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′)
             → ¬ Rg p → ¬ VHot (full sc) p → LaneSt sc Rg (bef p) P q a l b → LaneSt sc Rg (aft p) P q a l b
-    lane-up ku nr nh (l-live (h-live st e uk) sy sd) = l-live (h-live st e (λ k → ku k (uk k))) (up sy sd nr nh) sd
+    lane-up ku nr nh (l-live (h-live st e uk ue) sy sd) =
+      l-live (h-live st e (λ k → ku k (uk k)) (λ l nk → in-rg sd nr (proj₁ (from (alike e) (l , tt))) tt (ue l nk))) (up sy sd nr nh) sd
     lane-up ku nr nh (l-dead {E = E} (h-end {c = c} lc nc tp) hk dm nk)    = l-dead {E = E} (h-end lc (nm {c} nc) (tailp-up tp)) hk dm nk
     lane-up ku nr nh (l-dead {E = E} (h-kill {q′ = q′} kq nq tp) hk dm nk) = l-dead {E = E} (h-kill kq (nm {q′} nq) (tailp-up tp)) hk dm nk
 
@@ -245,8 +246,8 @@ module Past (p : Pos) where
               → Off O → (∀ {q q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′) → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p
               → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
               → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
-    joined-up {P = P} {O = O} oo ku nl nh rl (joined bg wt wh od ah ao en li) =
-      joined (begun-up ku (λ _ → nl) nh bg) (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
+    joined-up {P = P} {O = O} oo ku nl nh rl (joined bg wt wh od ah ao en li sl) =
+      joined (begun-up ku (λ _ → nl) nh bg) (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li sl
       where
         open Book {P = P} {O = O}
         ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
@@ -512,13 +513,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nl r = proj₂ rp (proj₂ r)
       rl = Lanes.lane-rows (scopeOf c) f ji op (joined-li jn)
   fr-up {p = p} (f-lanes {op = op} {f = f} {c = c} {Rg = Rg₀} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀}
-                   fr ji sy lf y₀ nq ru (h-live st le uk) rt cnt wt wh od ah ao en li m so sd bh dl) _ rp nr nh =
+                   fr ji sy lf y₀ nq ru (h-live st le uk ue) rt cnt wt wh od ah ao en li m so sd bh dl sl) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
-    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up ku nb₁ nh lf) y₀ (nm nq) ru (h-live st le (λ k → ku k (uk k))) (begun-up ku nb₂ nh rt) cnt
-                     (wait-up (λ i lc → λ { refl → hole (val i) lc _ }) ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl , mv
+    in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up ku nb₁ nh lf) y₀ (nm nq) ru (h-live st le (λ k → ku k (uk k)) (λ l nk → owes-up (λ { refl → hole y₀ l tt }) (ue l nk))) (begun-up ku nb₂ nh rt) cnt
+                     (wait-up (λ i lc → λ { refl → hole (val i) lc _ }) ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl sl , mv
     where
-      open Past p using (up; begun-up; nm; off-rg; behind-up; kill-up; module Book)
+      open Past p using (up; begun-up; nm; owes-up; off-rg; behind-up; kill-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p
       no r = proj₂ r (proj₂ rp)
       ku = kill-up op (off-rg so no)
@@ -541,8 +542,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ... | inj₂ (here refl) = y₀
       ... | inj₂ (there i′)  = begun-out rt i′
       ah′ = ahead-up (λ i lc → λ { refl → hole (val i) lc _ }) ah
-  fr-up (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
-  fr-up (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
+  fr-up (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) ()
   fr-up (f-lane fr) lv rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr lv rp nr nh in Cr′ , f-lane fr′ , mv
   fr-up (f-lnct {b = true} fr) _ rp nr nh = let (Cr′ , fr′ , mv) = fr-up fr tt rp nr nh in Cr′ , f-lnct fr′ , mv
   fr-up (f-lnct {b = false} _) ()

@@ -45,7 +45,7 @@ open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; 
 open import adequacy.Rows using (full; pendRows; Frozen; Inbox; this; that; tapeE)
 open import adequacy.Rows using (_≃_; ≼-≢)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
+open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
   JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
   Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
   o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
@@ -341,7 +341,7 @@ flat-b {op = op} {F} {O} {C} {p = p} {k} ob lb wh ah r v ow with join-row op F O
 ... | inj₁ y = ob (y , tt , ow)
 ... | inj₂ (q , a , y , ru , ln , kl) with lane-st op F O ln | owes? C q
 ...   | s , st , qs , sk | inj₁ oq = on p q k (ob (y , tt , oq)) (lt q s k qs sk)
-...   | s , st , qs , sk | inj₂ nq with wh y nq ru
+...   | s , st , qs , sk | inj₂ nq with wh y nq (takes (polF op F O) ru)
 ...     | inj₁ iv = lb iv kl ln v ow
 ...     | inj₂ iw with ah iw st
 ...       | q′ , a′ , c , iv′ , lc , kc , oc , cs′ = on p c k (lb {e = end} iv′ kc lc tt oc) (lt c s k cs′ sk)
@@ -363,7 +363,7 @@ mutual
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
   bound {C = C} (s-take sy nf m _) env lo (x , v , ow) = take-b {C = C} (bound sy env (λ ki → lo (k-kid (k-take ki)))) nf (from (alike m) (x , v)) ow
   bound (s-took fl g ni oa _ _ _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
-  bound {sc = sc} {C = C} (s-flat {op = op} {f = f} _ sy (joined bg _ wh _ ah _ en _) m _ _) env lo (x , v , ow) =
+  bound {sc = sc} {C = C} (s-flat {op = op} {f = f} _ sy (joined bg _ wh _ ah _ en _ _) m _ _) env lo (x , v , ow) =
     flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full sc)} {C = C} (bound sy env (λ ki → lo (k-kid (k-outer ki))))
       (λ iv kl ln v′ ow′ → begun-b bg iv kl ln v′ ow′ en env (λ i ki → lo (k-kid (k-lane i ki)))) wh ah
       (proj₁ (proj₁ (from (alike (proj₂ m)) (x , v)))) v ow
@@ -428,7 +428,7 @@ mutual
   lane-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {P : Pol A B} {O q a l b k e p}
          → LaneSt sc Rg C P q a l b → O q (out a) → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
          → Ends P O → Env (full sc) C p → LoP l p → p ≼ k
-  lane-b (l-live (h-live _ eq _) sy _) _ _ ln v ow _ env lo =
+  lane-b (l-live (h-live _ eq _ _) sy _) _ _ ln v ow _ env lo =
     bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (from (alike eq) (ln , v)) , v , ow)
   lane-b {C = C} (l-dead (h-end lc nc _) _ _ _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
   lane-b {C = C} (l-dead (h-kill kq nq _) _ _ _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))

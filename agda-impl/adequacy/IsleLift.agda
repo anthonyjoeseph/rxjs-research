@@ -213,14 +213,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
         (lc (hr-outer {C = C} {op = op} {f = f} {ω = ω} jn je (λ i ki → lo (plug-in c (k-kid (k-lane i ki)))) h)
             (λ env ef → up-pin (flat-up-outer {op = op} {f = f} {ω = ω} ji sd je bh) (pf env ef)))
     climbF {C = C} {c = inLanes op f ω d n qu o pre post c} {s = s}
-           (f-lanes {E′ = E′} {O = O} {q = q₀} {a = a} {b = true} fr ji sy bg₁ y _ ru hl@(h-live _ le uk) bg₂ _ _ wh _ ah _ en li je _ _ bh _) lo (lc h pf) =
+           (f-lanes {E′ = E′} {O = O} {q = q₀} {a = a} {b = true} fr ji sy bg₁ y _ ru hl@(h-live _ le uk _) bg₂ _ _ wh _ ah _ en li je _ _ bh _ _) lo (lc h pf) =
       climbF {s = flatS op f ω d n qu o (pre Data.List.ʳ++ s ∷ post)} fr lo
         (lc (hr-lanes {C = C} {op = op} {f = f} {ω = ω} {pre = pre} {post = post} {s = s} sy bg₁ hl bg₂ y wh ah en je
               (λ ki → lo (plug-in c (k-kid (k-outer ki)))) (λ i ki → lo (plug-in c (k-kid (k-lane i ki))))
               (λ env ef → live-kl hl (proj₁ (HR.run h env ef))) (λ env ef _ → proj₂ (HR.run h env ef)))
             (λ env ef → up-pin (up-∘ (up-≈ le) (flat-up-lane {sc = scopeOf c} {C = C} {D = C} {op = op} {f = f} {ω = ω} {O = O} {E = E′} {q = q₀} {a = a} ji je bh li y ru (λ t → t) (unkilled-no {C = C} {P = polF op (λ a′ → ⟦ f a′ ⟧ (full (scopeOf c))) O} {q = q₀} uk))) (pf env ef)))
     climbF {C = C} {c = inLanes op f ω d n qu o pre post c} {s = s}
-           (f-lanes {D = D} {E′ = E′} {O = O} {q = q₀} {a = a} {b = false} fr ji sy bg₁ y _ ru hl bg₂ _ _ wh _ ah _ en li je _ _ bh dl) lo (dc p pl) with dl tt
+           (f-lanes {D = D} {E′ = E′} {O = O} {q = q₀} {a = a} {b = false} fr ji sy bg₁ y _ ru hl bg₂ _ _ wh _ ah _ en li je _ _ bh dl _) lo (dc p pl) with dl tt
     ... | refl , dm , nk =
       climbF {s = flatS op f ω d n qu o (pre Data.List.ʳ++ s ∷ post)} fr lo
         (lc (hr-lanes {C = C} {op = op} {f = f} {ω = ω} {pre = pre} {post = post} {s = s} sy bg₁ hl bg₂ y wh ah en je

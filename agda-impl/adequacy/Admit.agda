@@ -29,14 +29,15 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (ix; Timeline; _≟ᵖ_)
 open import denotation.EmissionSet using (EmissionSet; _≺_; out; end; ⟦_⟧; enter; LaneOf)
-open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻)
+open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans)
 open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside)
   renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; nx; attAt; pend;
                     inOuter; inLanes; inLn; inCut)
-open import adequacy.Rows using (full; pendRows; Moves; _⇄_)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; Queues; wait-vs)
+open import adequacy.Rows using (full; pendRows; Moves; _⇄_; _≃_)
+open _≃_ using (from)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike)
 open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
 open import adequacy.Enter using (module Lanes; within-sound)
@@ -57,6 +58,16 @@ start-open cl rewrite cl = refl
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
+  -- A value's lane, as its policy opens it at `p`: subscribed under
+  -- `p`, its rows the value's entered there, no queue, its slot taken.
+  record Opening {A B} (P : Pol A B) vs ws n p a (L : EmissionSet B) : Set where
+    field
+      st  : Start P p a (p ++ [ ix 1 ])
+      ln  : L ≈ Lane P p a
+      ru  : Runs P p
+      w[] : ws ≡ []
+      sl′ : Slots P (vs ++ (p , a) ∷ []) ws (suc n)
+
   -- THE LANE OPENED: the frames above lifted past `p`, the joiner's
   -- bookkeeping with the value begun, its lane pending in its region.
   opens : ∀ {Cr Γ A B} op {f : A → Obs Timeline Γ B} {ω d n q ls} {c : Ctx R Γ B} {o a p Rg E E′}
@@ -64,16 +75,15 @@ module _ {R : Set} (Rt : EmissionSet R) where
         → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n q ls
         → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E → Behind (bef p) (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)
         → Sync (scopeOf c) (JRo (scopeOf c) Rg op f E) (aft p) o E → E p (out a)
-        → Start (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a (p ++ [ ix 1 ])
-        → pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ]) ≈ Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p a
-        → Runs (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) p → (∀ {q q′} → Kill (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) q q′ → ⊥)
-        → T (not (Queues (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)))
+        → (∀ {q q′} → Kill (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) q q′ → ⊥)
+        → (∀ {vs ws} → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n → Waiting (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws q
+           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
         → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c))
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
-  opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li) m so bh sy row st ln ru nk nq =
-    Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k)))) none (sym (+-comm n 1))
-                                           (wait-vs {O = E} nq (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt)) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()))))
+  opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) m so bh sy row nk opn =
+    Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k))) ue) none (sym (+-comm n 1))
+                                           (wait-[] {O = E} w[] (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt)) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()) sl′)))
                   (≺-ext p {ix 1} [] , ok , JInv.adm ji , ≈-refl , wi)
         , moves
     where
@@ -83,6 +93,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
       P = polF op (λ a → ⟦ f a ⟧ (full sc)) E
       s = p ++ [ ix 1 ]
       io = JInv.io ji
+      st = Opening.st (opn bg wt wh sl)
+      ln = Opening.ln (opn bg wt wh sl)
+      ru = Opening.ru (opn bg wt wh sl)
+      w[] = Opening.w[] (opn bg wt wh sl)
+      sl′ = Opening.sl′ (opn bg wt wh sl)
 
       -- the outer's row at `p` is in what no lane's region holds
       here-o = Sound.rg so row _
@@ -105,6 +120,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
       ok = ok-step p (ok-in (JInv.ok ji) (InvAt.world io row) (InvAt.real io row))
       wi = Lanes.lane-within sc f ji op li row st
+
+      I = JInv.fi ji a s ok
+
+      -- the lane's end lies past its subscription, past `p`
+      ue : Unended (aft p) P p a
+      ue l _ = let x = proj₁ (from (alike ln) (l , tt)) in ≺-trans {p} {s} (≺-ext p []) (world-after (InvAt.world I x) (InvAt.real I x))
 
       lf = subst (λ l → Begun sc (JRl sc Rg op f E) (aft p) P E vs l n) (sym (reverse-involutive ls)) (begun-up (λ k → ⊥-elim (nk k)) (λ _ → nl) nh bg)
 
@@ -142,7 +163,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
   merge-start : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω d n q ls} {c : Ctx R Γ B} {o a p}
               → SimC Rt ⟨ inOuter (mergeᶠ nothing) f ω d n q ls c , o , rising (nx a) , p ⟩ [] (start c (mergeᶠ nothing) f ω d n q o ls a p)
   merge-start {f = f} {c = c} {a = a} {p = p} {Cr = Cr} (flying (f-outer fr ji jn m so bh) cl (sy , row)) =
-    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row refl ln tt (λ ()) tt
+    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row (λ ())
+                           (λ _ wt _ _ → record { st = refl ; ln = ln ; ru = tt ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt ; sl′ = tt })
     in subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ nothing} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
     where
       s = p ++ [ ix 1 ]

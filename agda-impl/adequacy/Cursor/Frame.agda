@@ -24,7 +24,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import adequacy.Rows using (toEv; full; pendRows; Frozen)
 open import denotation.Laws.Worlds using (Ok; Hots; Real; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
-open import adequacy.Cursor using (Adm; Ahead; Asc; AttFin; AttOwed; Begun; Behind; Burst; ConnE; Cur; Ends; Failure; Flags; Folded; Gone; Hole; Husk; HuskL; JInv; JRl; JRo; JoinE; JoinF; Joined; LanesIn; NoFail; OuterDone; OweAt; Owes; Parts; Pts; Rgn; Runs; Sound; Spent; Src; SrcH; Subd; Sync; TailP; Under; Waiting; Whole; Within; Up; Dom; Thru; Bursts; InCall; Lane; NoKill; _∪ᵖ_; _≈_; _⊑_; aft; bef; bump; polF)
+open import adequacy.Cursor using (Slots; Adm; Ahead; Asc; AttFin; AttOwed; Begun; Behind; Burst; ConnE; Cur; Ends; Failure; Flags; Folded; Gone; Hole; Husk; HuskL; JInv; JRl; JRo; JoinE; JoinF; Joined; LanesIn; NoFail; OuterDone; OweAt; Owes; Parts; Pts; Rgn; Runs; Sound; Spent; Src; SrcH; Subd; Sync; TailP; Under; Waiting; Whole; Within; Up; Dom; Thru; Bursts; InCall; Lane; NoKill; _∪ᵖ_; _≈_; _⊑_; aft; bef; bump; polF)
 open import adequacy.Cursor.Tear using (NoIsle)
 
 
@@ -134,6 +134,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O)
             → (T (not b) → E ≡ Lane (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q a × Dom C D
                            × (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) q r))
+            → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) O) (vs₁ ++ (q , a) ∷ vs₂) ws n
             → Fr Cr C (JRl (scopeOf c) Rg op f O q) (inLanes op f ω d n qu o pre post c) (lane b D Ph) E
     -- under a lane's list entry, its switch; under that, its program
     f-lane  : ∀ {Γ A} {c : Ctx R Γ A} {C D Rg b P E} → Fr Cr C Rg c (lane b D P) E → Fr Cr C Rg (inLn b c) (lanecut b D P) E

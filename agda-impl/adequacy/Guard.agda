@@ -552,12 +552,12 @@ module Lift {R : Set} (Rt : EmissionSet R) where
   lift {s = s} (f-lane {b = b} fr) lo l r mu z cl g = lift {s = lnS b s} fr lo l r mu z cl g
   lift {s = s} (f-lnct {a = a} {b = true} fr) lo _ r mu z cl g = lift {s = cutS true a s} fr lo _ r mu z cl g
   lift (f-lnct {b = false} fr) _ ()
-  lift {s = s} {q = q} {y} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je _ bh) lo _ r mu z cl g =
+  lift {s = s} {q = q} {y} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li _) je _ bh) lo _ r mu z cl g =
     let (_ , r′ , mu′) = jrow op {F = F′} {O} mu r in
     lift {s = flatS op f ω d n qu s ls} fr lo _ (voc (proj₂ je) (reach-zs bh z r′)) mu′ z
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} (λ e qw wy → clear cl e tt qw wy) λ x l _ qw wy → proj₂ g (on-chain (scopeOf c) f ji op li z x l qw wy)))) (proj₁ g)
     where F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
-  lift {s = s} {q = q} {y} (f-lanes {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {o = o′} {pre = pre} {post = post} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk) _ _ _ _ _ _ _ _ li je so _ bh _) lo _ r mu z cl g =
+  lift {s = s} {q = q} {y} (f-lanes {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {o = o′} {pre = pre} {post = post} {c = c} {O = O} {q = q₀} {a} fr ji _ _ x _ rn (h-live _ le uk _) _ _ _ _ _ _ _ _ li je so _ bh _ _) lo _ r mu z cl g =
     lift {s = flatS op f ω d n qu o′ (pre ʳ++ s ∷ post)} fr lo _ (voc (proj₂ je) (reach-zs bh z (jlane op {F = F′} {O} x rn ly nk (mute-work mu)))) mu z (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ g)
     where
       F′ = λ a → ⟦ f a ⟧ (full (scopeOf c))
@@ -574,8 +574,8 @@ module Lift {R : Set} (Rt : EmissionSet R) where
       lc x′ l v qw wy with lane-sole (JInv.ok ji) F′ (JInv.fi ji) (JInv.io ji) op (proj₂ (Lanes.lane-rows (scopeOf c) f ji op li x′ l)) (down qw wy)
       ... | refl with Sound.fn so x x′ tt tt
       ...   | refl = clear cl (proj₁ (from (alike le) (l , v))) v qw wy
-  lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift {s = s} {q = q} {y} (f-src {k = k} {b = b} {β = β} fr _ pt lv _ _ bβ fl fz ce bσ sd _ _ _ _) (lof , lo) _ r mu z cl g =
     let (_ , row , mu′) = src-row (voc fz r) mu alive in
     lift {s = connS k s b} fr lo tt (voc (proj₁ ce) (row , conn-reach bσ (z+ z) (zs-reach bβ (z+ z)))) mu′ (z+ z)
@@ -626,7 +626,7 @@ module Outer {R} (o : PureObs [] R) where
   outer-row : ∀ {Cr Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q Rg N E}
             → Fr Rt Cr (bef q) Rg (inOuter op f ω d n qu ls c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E (nx a)
             → Lifted Cr q ⊎ Isled Cr q (plug c (flatS op f ω d n qu s ls))
-  outer-row {s = s} {q = q} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li) je sd bh) lo (_ , x) =
+  outer-row {s = s} {q = q} (f-outer {op = op} {f = f} {ω = ω} {d = d} {n = n} {qu = qu} {ls = ls} {c = c} {E = O} fr ji (joined _ _ _ _ _ _ _ li _) je sd bh) lo (_ , x) =
     lift {s = flatS op f ω d n qu s ls} fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (jval op {F = F′} {O} x))) m-skip z₁
       (clr-≈ (proj₂ je) (clr-tr (clr-join op {F = F′} {O} oc lc))) (proj₁ (Sound.rg sd x tt))
     where
@@ -684,12 +684,12 @@ module Outer {R} (o : PureObs [] R) where
            → Fr Rt Cr (bef q) Rg (inLanes op f ω d n (a ∷ qu) o′ pre post c) N E → Lo₀ q c → Fly (scopeOf c) Rg q N s E cp
            → Lifted Cr q ⊎ Isled Cr q (plug c (flatS op f ω d n (a ∷ qu) o′ (pre ʳ++ s ∷ post)))
   hand-row {op = op} {f} {ω} {d} {n} {a} {qu} {o′} {pre} {post} {s = s}
-           (f-lanes {vs₁ = vs₁} fr ji _ _ y₀ _ ru (h-live _ le uk) _ _ wt _ _ _ _ _ li je so sl bh _) lo (_ , _ , _ , _ , _ , row) =
+           (f-lanes {vs₁ = vs₁} fr ji _ _ y₀ _ ru (h-live _ le uk _) _ _ wt _ _ _ _ _ li je so sl bh _ _) lo (_ , _ , _ , _ , _ , row) =
     let hc = hand-at op ji li so y₀ ru le uk (∈-++⁺ʳ vs₁ (here refl)) wt (sl tt) row in
     lift {s = flatS op f ω d n (a ∷ qu) o′ (pre ʳ++ s ∷ post)} fr lo tt (voc (proj₂ je) (reach-zs bh z₁ (proj₁ hc))) m-skip z₁
       (clr-≈ (proj₂ je) (clr-tr (proj₂ hc))) (proj₁ (Sound.rg (sl tt) row tt))
-  hand-row (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
-  hand-row (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
+  hand-row (f-lanes _ _ _ _ _ _ _ (h-end _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
+  hand-row (f-lanes _ _ _ _ _ _ _ (h-kill _ _ _) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _)
   hand-row (d-lanes _ _ _ _ _ _ _) _ ()
 
   -- Lifted, clear at `q`, the cursor short of the row met next: a row

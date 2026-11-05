@@ -35,7 +35,7 @@ open import denotation.Laws.BoundedInv using (module BoundedI)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Scope; unbound; binds; CS; takeS)
 open import adequacy.Rows using (full; Frozen)
-open import adequacy.Cursor using (Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP;
+open import adequacy.Cursor using (takes; Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP;
   tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; Hole; Dom;
   Thru; Up; NoKill; h-live; h-end; h-kill; l-live; l-dead; Begun; none; more; Parts; joined;
   src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take;
@@ -114,7 +114,7 @@ mutual
   pin-tail (s-cut sy)            = pin-tail sy
   pin-tail {C = C} (s-take sy _ m _)     = pt-bn {C = C} (cov m) (λ { (TakeWhile.left x _ _) → x }) (pin-tail sy)
   pin-tail {C = C} (s-took _ _ _ _ tp _ _ _ m _) = pt-bn {C = C} (cov m) (λ x → x) (tailp-pt {C = C} tp)
-  pin-tail {sc = sc} {C = C} (s-flat {op = op} {f = f} {ω = ω} {O = O} {E = E} ji sy (joined {vs} bg wa wh _ _ _ _ li) je@(_ , m) _ bh)
+  pin-tail {sc = sc} {C = C} (s-flat {op = op} {f = f} {ω = ω} {O = O} {E = E} ji sy (joined {vs} bg wa wh _ _ _ _ li _) je@(_ , m) _ bh)
     with pin-tail sy | begun-pt {O = O} {E = E} (λ {q} {a} {D} x rn dm nk → flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {ω = ω} {O = O} {E = E} {q = q} {a = a} ji je bh li x rn dm nk) bg
   ... | ptl ko fo | kl , fl = pt-bn {C = C} {E = JoinF op F O} (cov m) proj₁ (ptl (ko ++ kl) λ {y} {r} x o no → pick (join-pin op F O x) o no)
     where
@@ -125,7 +125,7 @@ mutual
       pick (inj₂ (q , a , x , ru , kp)) o no with lane-pin op ji x (kept-lane {P = polF op F O} kp)
       ... | s , st , qs , sr with owes? C q
       ...   | inj₁ oq = ⊥-elim (no (owes-≼ C (owes-≼ C oq (≺→≼ {q} {s} qs)) sr))
-      ...   | inj₂ nq with wh x nq ru
+      ...   | inj₂ nq with wh x nq (takes (polF op F O) ru)
       ...     | inj₁ iv = [ (λ h → inj₁ (inj₂ h)) , (λ i → inj₂ (∈-++⁺ʳ ko i)) ]′ (fl iv kp o no)
       ...     | inj₂ iw = ⊥-elim (no (owes-≼ C (proj₂ (proj₂ (proj₂ (proj₁ (proj₂ (proj₂ wa)) iw))) st) sr))
   pin-tail {C = C} {E = E} (s-conn {k = k} refl pt bs bb ss tn fl ce@(m , _)) =
@@ -172,7 +172,7 @@ mutual
              (bg : Begun sc Rl C P O vs ls n)
            → Σ (List Pos) λ ks → ∀ {q a y r} → (q , a) ∈ vs → Kept P q a y (pin r) → Owes C y → ¬ Owes C r → proj₁ (begun-husk lf bg) y ⊎ y ∈ ks
   begun-pt lf none = [] , λ ()
-  begun-pt {C = C} {P = P} lf (more _ _ _ (l-live (h-live _ m _) sy _) bg) with pt-bn {C = C} (cov m) (λ x → x) (pin-tail sy) | begun-pt lf bg
+  begun-pt {C = C} {P = P} lf (more _ _ _ (l-live (h-live _ m _ _) sy _) bg) with pt-bn {C = C} (cov m) (λ x → x) (pin-tail sy) | begun-pt lf bg
   ... | ptl kl fl | kb , fb = kl ++ kb , λ where
     (here refl) kp o no → [ (λ h → inj₁ (inj₁ h)) , (λ i → inj₂ (∈-++⁺ˡ i)) ]′ (fl (kept-lane {P = P} kp) o no)
     (there i) kp o no   → [ (λ h → inj₁ (inj₂ h)) , (λ j → inj₂ (∈-++⁺ʳ kl j)) ]′ (fb i kp o no)

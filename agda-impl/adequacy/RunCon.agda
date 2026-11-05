@@ -272,7 +272,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   closed-off (f-take fr _ _ _)                                   t = closed-off fr t
   closed-off (f-took _ _ _ _ _ _ _ _ _ _)                            _ = tt
   closed-off (f-outer fr _ _ _ _ _)                              t = closed-off fr t
-  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t = closed-off fr t
+  closed-off (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) t = closed-off fr t
   closed-off (f-lane fr)                                         t = closed-off fr t
   closed-off (f-lnct {b = true} fr)                              t = closed-off fr t
   closed-off (f-lnct {b = false} fr)                             _ = tt

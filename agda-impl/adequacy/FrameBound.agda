@@ -68,7 +68,7 @@ src-fb refl sr env lo = src-b sr env lo
 hole-fb : ∀ {A B} {C} {P : Pol A B} {O : EmissionSet A} {q a Ph E b k e p}
         → Hole C P q a Ph E b → (T b → Bnd C p E) → O q (out a) → Ends P O
         → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k → p ≼ k
-hole-fb (h-live _ eq _) hb _ _ _ ln v ow = hb _ (proj₁ (from (alike eq) (ln , v)) , v , ow)
+hole-fb (h-live _ eq _ _) hb _ _ _ ln v ow = hb _ (proj₁ (from (alike eq) (ln , v)) , v , ow)
 hole-fb {C = C} (h-end lc nc _) _ y en _ ln v ow = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
 hole-fb {C = C} (h-kill kq nq _) _ _ _ kl _ _ ow = ⊥-elim (nq (owes-≼ C ow (kl kq)))
 
@@ -107,13 +107,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
     fb {C = C} {c = Machine.inTake _ _ _ c} {s = s} (f-took fr fl g ni oa _ _ _ m sd) lo _ =
       fb {s = takeS _ _ _ s} fr lo λ env (x , v , ow) →
         took-b {C = C} {s = s} fl g ni oa sd (λ ki → lo (plug-in c ki)) (from (alike m) (x , v)) ow
-    fb {C = C} {c = Machine.inOuter op f _ _ _ _ ls c} {s = s} (f-outer fr _ (joined bg _ wh _ ah _ en _) je _ _) lo hb =
+    fb {C = C} {c = Machine.inOuter op f _ _ _ _ ls c} {s = s} (f-outer fr _ (joined bg _ wh _ ah _ en _ _) je _ _) lo hb =
       fb {s = flatS _ _ _ _ _ _ s ls} fr lo λ env (x , v , ow) →
         flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full (scopeOf c))} {C = C} (hb env)
           (λ iv kl ln v′ ow′ → begun-b bg iv kl ln v′ ow′ en env (λ i ki → lo (plug-in c (k-kid (k-lane i ki))))) wh ah
           (proj₁ (proj₁ (from (alike (proj₂ je)) (x , v)))) v ow
     fb {C = C} {c = Machine.inLanes op f _ _ _ _ o pre post c} {s = s}
-       (f-lanes {vs₁ = vs₁} fr _ sy bg₁ y _ _ hl bg₂ _ _ wh _ ah _ en _ je _ _ _ _) lo hb =
+       (f-lanes {vs₁ = vs₁} fr _ sy bg₁ y _ _ hl bg₂ _ _ wh _ ah _ en _ je _ _ _ _ _) lo hb =
       fb {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr lo λ env (x , v , ow) →
         flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full (scopeOf c))} {C = C}
           (bound sy env (λ ki → lo (plug-in c (k-kid (k-outer ki)))))
