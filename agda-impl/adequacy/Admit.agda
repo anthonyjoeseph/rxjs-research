@@ -327,11 +327,6 @@ module _ {R : Set} (Rt : EmissionSet R) where
           wi : ∀ {q′ b} → E q′ (out b) → q′ ≺ p → (q′ , b) ∈ vs ++ ws
           wi y lt = [ ∈-++⁺ˡ , ∈-++⁺ʳ vs ]′ (wh′ y (λ o → o lt) tt)
 
-      okp = ok-step p (ok-in (JInv.ok ji) (InvAt.world io row) (InvAt.real io row))
-      I = JInv.fi ji a s okp
-      g : ∀ {y e} → enter (F a) s y e → s ≺ y
-      g x = world-after (InvAt.world I x) (InvAt.real I x)
-
       -- A SLOT FREE: the lane opened, with room or freed.
       opening : n < m → ∀ {vs ws} → Begun sc (JRl sc Rg (mergeᶠ (just m)) f E) (bef p) P E vs ls n → Waiting (bef p) P E vs ws qu
               → Whole (bef p) P E vs ws → Slots P (bef p) vs ws n → Opening P vs ws n p a (pendRows (full sc) (f a) s)
@@ -348,14 +343,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
           starts with N <? m
           ... | yes lt′ = room lt′
           ... | no ge   = freed (≮⇒≥ ge) (freed-k N (proj₂ (proj₂ census)) lt (≮⇒≥ ge) (cen-lo (λ {c′} → before p {c′}) (proj₁ (proj₂ census))))
-          back : ∀ {i s′ y e} → Sub i p s′ a → enter (F a) s′ y e → enter (F a) s y e
-          back (nj , st′) x with nth-inj nj nth
-          ... | refl with sub-fun (nj , st′) (nth , starts)
-          ...   | refl , refl , refl = x
           ln : pendRows (full sc) (f a) s ≈ Lane P p a
-          ln = record { alike = (λ (x , v) → (N , s , (nth , starts) , x , g x) , v) ⇄ (λ ((_ , _ , sb , x , _) , v) → back sb x , v)
-                      ; cov = [] , λ (_ , _ , sb , x , _) → inj₁ (back sb x)
-                      ; voc = λ x → N , s , (nth , starts) , x , g x }
+          ln = sub-ln (nth , starts)
           sl′ : Slots P (aft p) (vs ++ (p , a) ∷ []) [] (suc n)
           sl′ = subst (Listed E 0) (sym (++-identityʳ (vs ++ (p , a) ∷ []))) (nths-snoc vs L nth) , lt , inj₁ refl
 
@@ -420,15 +409,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
           -- the new head, alone: it starts at the first owed end
           new-head : Nth (length vs) p a → Head (aft p) P vs ((p , a) ∷ [])
-          new-head nv {c₀} (q′ , a′ , iv , lc , _ , oc) least = length vs , nv , queued m≤v oc kin kle nkl
-            where
-              kin = let (j , nj , jlt) = nths-∈ Lv iv in kth-in (length vs) jlt (lane-ends nj lc)
-              dv : length vs ∸ m ≡ d′
-              dv = trans (cong (_∸ m) (sym dm)) (m+n∸n≡m d′ m)
-              kle = subst (Kth (_≼ c₀) (Sched (length vs))) (sym dv)
-                      (kth-add′ (length vs) kin (cen-lo (λ {c″} nc → ≼-≺-≺ {c″} {p} {c₀} nc oc) cs-v))
-              nkl = subst (λ k → ¬ Kth (_≺ c₀) (Sched (length vs)) k) (sym dv)
-                      (cen-hi (λ {c′} {c″} oe′ le′ lt′ → ≼-trans {c₀} {c′} {c″} (least oe′) le′ lt′) cs-v)
+          new-head nv = head-at Lv cs-v dm (≺-irrefl {p}) nv {ws = []}
 
           head-snoc : ∀ ws′ → Nth (length vs + length ws′) p a → Head (aft p) P vs ws′ → Head (aft p) P vs (ws′ ++ (p , a) ∷ [])
           head-snoc []      nv _ = new-head (subst (λ k → Nth k p a) (+-identityʳ (length vs)) nv)
@@ -456,12 +437,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           -- not freed, so queued past one
           from-start : ∀ {s′} → Starts N′ p (Sched N′) s′
                      → Σ Pos λ q′ → Σ _ λ a′ → Σ Pos λ c′ → (q′ , a′) ∈ vs × Lane P q′ a′ c′ end × (∀ {q″} → Kill P q′ q″ → c′ ≼ q″) × Owes (aft p) c′ × c′ ≺ s′
-          from-start (room lt)  = ⊥-elim (<-irrefl refl (<-≤-trans lt (≤-trans m≤v (m≤m+n (length vs) (length ws)))))
-          from-start (freed _ K) =
-            ⊥-elim (cen-hi (λ {c′} {c″} (_ , _ , _ , _ , _ , oc) le′ lt′ → ≺-absurd {p} {c′} oc (≼-≺-≺ {c′} {c″} {p} le′ lt′)) cs-a (kth-le (Sched N′) d≤ K))
-          from-start (queued {c₀} _ _ _ K _) =
-            let (c″ , c′ , (q′ , a′ , iv , lc , kc , oc) , le′ , le₀) = cen-find {Q = _≼ c₀} cs-a (kth-le (Sched N′) d≤ K)
-            in q′ , a′ , c′ , iv , lc , (λ {q″} → kc {q″}) , oc , ≼-≺-≺ {c′} {c₀} {c₀ ++ [ ix 1 ]} (≼-trans {c′} {c″} {c₀} le′ le₀) (≺-ext c₀ [])
+          from-start = owed-start cs-a (≤-trans m≤v (m≤m+n (length vs) (length ws))) d≤ (≺-irrefl {p})
 
           ah′ : Ahead (aft p) P vs (ws ++ (p , a) ∷ [])
           ah′ iw st′ with ∈-++⁻ ws iw

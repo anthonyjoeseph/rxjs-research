@@ -11,7 +11,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_; z≤n; s≤s; _≟_)
 open import Data.Nat.Properties using (+-suc; +-identityʳ; ≤∧≢⇒<; ≤-pred; m<1+n⇒m<n∨m≡n; m≤m+n; n<1+n; ≤-trans; ≤-reflexive;
-                                      ∸-monoʳ-≤; m+n∸n≡m; <-irrefl; <-≤-trans)
+                                      ∸-monoʳ-≤; m+n∸n≡m; <-irrefl; <-≤-trans; m≤n+m; m+n≤o⇒m≤o∸n; m≤n⇒m≤1+n)
 open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,15 +22,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (mergeᶠ)
-open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Den; out; end; _≺_; _≼_; module Bounded; module Values)
-open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-trans; ≺-absurd; ≼-refl)
-open import denotation.Laws.Worlds using (Ok; InvAt; InvD)
+open import denotation.Events using (Pos; ix)
+open import denotation.EmissionSet using (EmissionSet; Den; out; end; _≺_; _≼_; enter; module Bounded; module Values)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-trans; ≺-absurd; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Worlds using (Ok; InvAt; InvD; world-after)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
-open import adequacy.Cursor using (Cur; Owes; Pol; polF; Begun; none; more; l-live; l-dead; h-live; h-end; h-kill; OwedEnd; Ahead)
+open import adequacy.Cursor using (Cur; Owes; Pol; polF; Begun; none; more; l-live; l-dead; h-live; h-end; h-kill; OwedEnd; Ahead; Head; _≈_)
   renaming (Nths to Listed)
+open import adequacy.Rows using (_⇄_)
+open import adequacy.Bound using (past)
 
 lt-le : ∀ {x c} → x ≺ c → x ≼ c
 lt-le {x} {c} lt cx = ≺-absurd {x} {c} lt cx
@@ -41,7 +43,7 @@ eq-le {x} refl = ≼-refl {x}
 module Count {A B H at} (ok : Ok H at) (m : ℕ) (F : A → Den B) (fi : ∀ a → InvD H (F a)) {O : EmissionSet A} (Io : InvAt H at O) where
   open Bounded m F O
   open Values O using (Nth; first; next; Next)
-  open BoundedI ok m F fi Io using (kth-cons; kth-down; kth-tail; kth-mono; sub-fun; lane-end)
+  open BoundedI ok m F fi Io using (kth-cons; kth-down; kth-tail; kth-mono; sub-fun; lane-end; LI)
   open Nths O using (nth-val; nth-fun; nth-lt; nth-inj)
 
   P : Pol A B
@@ -232,3 +234,65 @@ module Count {A B H at} (ok : Ok H at) (m : ℕ) (F : A → Den B) (fi : ∀ a �
       ...   | ()
   nth-new {(q₀ , a₀) ∷ xs} (nq₀ , ns) bf wh y =
     nth-from nq₀ ns (bf (here refl)) (λ iv → bf (there iv)) (λ {q} {b} x lt qp → past-head {q} {b} {q₀ , a₀} (wh x qp) lt) y
+
+  ------------------------------------------------------------------------
+  -- A lane subscribed: its rows the value's, entered where it starts.
+
+  sub-ln : ∀ {i q s a} → Sub i q s a → enter (F a) s ≈ Lane q a
+  sub-ln {q = q} {s} {a} sb =
+    record { alike = (λ (x , v) → (_ , s , sb , x , g x) , v) ⇄ (λ ((_ , _ , sb′ , x , _) , v) → back sb′ x , v)
+           ; cov   = [] , λ (_ , _ , sb′ , x , _) → inj₁ (back sb′ x)
+           ; voc   = λ x → _ , s , sb , x , g x }
+    where
+      g : ∀ {y e} → enter (F a) s y e → s ≺ y
+      g x = world-after (InvAt.world (LI sb) x) (InvAt.real (LI sb) x)
+      back : ∀ {j s′ y e} → Sub j q s′ a → enter (F a) s′ y e → enter (F a) s y e
+      back (nj , st′) x with nth-inj nj (proj₁ sb)
+      ... | refl with sub-fun (nj , st′) sb
+      ...   | refl , refl , refl = x
+
+  ------------------------------------------------------------------------
+  -- EVERY SLOT TAKEN, the census at a passed value's index: its lane has
+  -- no room, is not freed, so it is queued past an owed end.
+
+  owed-start : ∀ {C vs N d q s} → Census C vs N d → m ≤ N → d ≤ N ∸ m → ¬ Owes C q → Starts N q (Sched N) s
+             → Σ Pos λ q′ → Σ A λ a′ → Σ Pos λ c′ → (q′ , a′) ∈ vs × Lane q′ a′ c′ end × (∀ {q″} → ⊥ → c′ ≼ q″) × Owes C c′ × c′ ≺ s
+  owed-start _ le _ _ (room lt) = ⊥-elim (<-irrefl refl (<-≤-trans lt le))
+  owed-start {C} {N = N} {q = q} cs _ d≤ nq (freed _ K) =
+    ⊥-elim (cen-hi (λ {c′} {c″} (_ , _ , _ , _ , _ , oc) le′ lt′ → ≺-absurd {q} {c′} (past C nq oc) (≼-≺-≺ {c′} {c″} {q} le′ lt′)) cs (kth-le (Sched N) d≤ K))
+  owed-start {N = N} cs _ d≤ _ (queued {c₀} _ _ _ K _) =
+    let (c″ , c′ , (q′ , a′ , iv , lc , kc , oc) , le′ , le₀) = cen-find {Q = _≼ c₀} cs (kth-le (Sched N) d≤ K)
+    in q′ , a′ , c′ , iv , lc , (λ {q″} → kc {q″}) , oc , ≼-≺-≺ {c′} {c₀} {c₀ ++ [ ix 1 ]} (≼-trans {c′} {c″} {c₀} le′ le₀) (≺-ext c₀ [])
+
+  -- Every value waiting past index `N`, every slot taken: each lane
+  -- starts past an owed end, the earlier ones counted on.
+  ahead-from : ∀ {C vs N d} ws → Listed O N ws → (∀ {q a} → (q , a) ∈ ws → ¬ Owes C q) → Census C vs N d → d + m ≤ N → Ahead C P vs ws
+  ahead-from [] _ _ _ _ ()
+  ahead-from {C} {vs} {N} {d} ((q₁ , a₁) ∷ ws) (n₁ , ns) nq cs le = go
+    where
+      hd : ∀ {s} → Starts N q₁ (Sched N) s → _
+      hd = owed-start cs (≤-trans (m≤n+m m d) le) (m+n≤o⇒m≤o∸n d le) (nq (here refl))
+      on : ∀ {c} → Ends N (Sched N) c → Σ Pos λ c′ → OwedEnd C P vs c′ × c′ ≼ c
+      on {c} e with ends-at n₁ e
+      ... | j , s , (nj , st) , af with nth-inj nj n₁
+      ...   | refl with hd st
+      ...     | q′ , a′ , c′ , iv , lc , kc , oc , lt = c′ , (q′ , a′ , iv , lc , (λ {q″} → kc {q″}) , oc) , lt-le {c′} {c} (≺-trans {c′} {s} {c} lt (proj₂ af))
+      go : Ahead C P vs ((q₁ , a₁) ∷ ws)
+      go (here refl) (i , ni , st) with nth-inj ni n₁
+      ... | refl = hd st
+      go (there iw) st = ahead-from ws ns (λ i → nq (there i)) (c-on cs on) (m≤n⇒m≤1+n le) iw st
+
+  -- The queue's head, every slot taken, at the next index: queued under
+  -- the first owed end.
+  head-at : ∀ {C vs d q a} → Listed O 0 vs → Census C vs (length vs) d → d + m ≡ length vs → ¬ Owes C q → Nth (length vs) q a
+          → ∀ {ws} → Head C P vs ((q , a) ∷ ws)
+  head-at {C} {vs} {d} Lv cs dm nq nv {c = c₀} (q′ , a′ , iv , lc , _ , oc) least = length vs , nv , queued m≤v (past C nq oc) kin kle nkl
+    where
+      m≤v = subst (m ≤_) dm (m≤n+m m d)
+      kin = let (j , nj , jlt) = nths-∈ Lv iv in kth-in (length vs) jlt (lane-ends nj lc)
+      dv : length vs ∸ m ≡ d
+      dv = trans (cong (_∸ m) (sym dm)) (m+n∸n≡m d m)
+      kle = subst (Kth (_≼ c₀) (Sched (length vs))) (sym dv)
+              (kth-add′ (length vs) kin (cen-lo (λ {c″} nc → past C nc oc) cs))
+      nkl = subst (λ k → ¬ Kth (_≺ c₀) (Sched (length vs)) k) (sym dv)
+              (cen-hi (λ {c′} {c″} oe′ le′ lt′ → ≼-trans {c₀} {c′} {c″} (least oe′) le′ lt′) cs)

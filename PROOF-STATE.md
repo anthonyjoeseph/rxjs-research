@@ -14,16 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE JOINER STEPPED
-
-An outer's end and a lane's rise, each into `Joined`/`Begun` by its
-policy. Open: whether a bounded lane's end, dequeuing the head, leaves
-the next value's `Head` read off the lanes' `Census`; and whether an
-exhaust's slots (`ExSlots`) survive its running lane's end, the end the
-next value's `run` reads. Settled when each is a body.
-
-Members: `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
-
 #### THE JOINER'S PAST
 
 A joiner subscribed at `q`: every row of its meaning lies past `q`.

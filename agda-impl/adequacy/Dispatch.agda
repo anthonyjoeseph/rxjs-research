@@ -56,6 +56,7 @@ open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
 open import adequacy.Settle using (rise-outer-cp; rise-lane-nx)
+open import adequacy.LaneEnd using (rise-lane-cp)
 open import adequacy.SubJoin using (join-pend)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
@@ -309,9 +310,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
-                  → rise (inLanes op f ω d n q o pre post c) s cp p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising cp , p ⟩ sh k′
     --------------------------------------------------------------------
     -- MARK RUNS, the hole's cursor just before what they deliver.
     run-of-nx     : ∀ {Cr Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
@@ -682,7 +680,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx Rt eq
   rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp Rt eq
   rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx Rt eq
-  rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp eq
+  rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp Rt eq
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
   rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
