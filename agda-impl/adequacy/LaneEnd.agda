@@ -168,7 +168,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   handoff switchᶠ          _ _ _ _ _ _ _ wt _ _ _ _ _ _ _ _ _ = ⊥-elim (unq (proj₁ (proj₂ (proj₂ (proj₂ wt))) tt) (proj₁ wt))
   handoff exhaustᶠ         _ _ _ _ _ _ _ wt _ _ _ _ _ _ _ _ _ = ⊥-elim (unq (proj₁ (proj₂ (proj₂ (proj₂ wt))) tt) (proj₁ wt))
   handoff (mergeᶠ (just m)) {ws = []} _ _ _ _ _ _ _ (() , _) _ _ _ _ _ _ _ _ _
-  handoff (mergeᶠ (just m)) {ws = _ ∷ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ (_ , _ , inj₁ ())
+  handoff (mergeᶠ (just m)) {ws = _ ∷ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ (_ , _ , inj₁ ())
   handoff (mergeᶠ (just m)) {f = f} {ω = ω} {d = d} {n = n} {o = o} {ls = ls} {c = c} {Cr = Cr} {Rg = Rg} {O = O} {vs = vs} {ws = (q₁ , a₁) ∷ ws′} {p = p}
     cl lift ji sy bg sp oe₀ (refl , (_ ∷ᴾ ap) , wf , _ , hd) wh od ao en li jm so bh (L₀ , le , inj₂ nm′) =
     subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ (just m)} {f = f} {a = a₁} {p = p} cl))
