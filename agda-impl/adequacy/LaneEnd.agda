@@ -22,7 +22,7 @@ open import Data.List.Relation.Unary.All using (tabulate) renaming (_∷_ to _�
 open import Data.List.Relation.Unary.AllPairs using () renaming (_∷_ to _∷ᴾ_; [] to []ᴾ)
 open import Data.List.Relation.Unary.AllPairs.Properties using () renaming (++⁺ to pairs-++⁺)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
@@ -60,9 +60,9 @@ open import adequacy.Settle using (done-mk; done-use; begun-ru; lane-w)
 -- A tail read through finitely many rows more.
 
 tailp-bn : ∀ {A} {C} {E E′ X : EmissionSet A} {P} → Beneath E E′ → (∀ {y e} → X y e → E′ y e) → TailP C E P → TailP C X P
-tailp-bn (ls , g) back (tailp ks f) = tailp (ls ++ ks) λ x o → go (g (back x)) o
+tailp-bn {C = C} {E = E} {P = P} (ls , g) back (tailp ks f) = tailp (ls ++ ks) λ x o → go (g (back x)) o
   where
-    go : ∀ {y e} → _ → _ → _
+    go : ∀ {y e} → E y e ⊎ y ∈ ls → Owes C y → P y ⊎ y ∈ ls ++ ks
     go (inj₁ x′) o with f x′ o
     ... | inj₁ py = inj₁ py
     ... | inj₂ i  = inj₂ (∈-++⁺ʳ ls i)
@@ -174,7 +174,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ (just m)} {f = f} {a = a₁} {p = p} cl))
       ( proj₁ lifted , aft p
       , pending (f-lnct (f-lane (f-lanes {D = aft p} (proj₁ (proj₂ lifted)) ji sy lf′ y₁ (nm nqb₁) ru₁ (h-live st₁ ln₁ (λ ()) ue₁) none cnt′
-                                          wt′ wh′ od ah′ ao′ en li jm so (λ _ → within-sound (JInv.fi ji a₁ s₁ ok₁) wi) bh (λ ()) sl′)))
+                                          wt′ wh′ od ah′ ao′ en li jm so (λ _ → within-sound {sc = sc} (JInv.fi ji a₁ s₁ ok₁) wi) bh (λ ()) sl′)))
                 (≺-ext p {ix 1} [] , ok₁ , JInv.adm ji , ≈-refl , wi)
       , proj₂ (proj₂ lifted) )
     where
@@ -302,7 +302,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       sy↑ = up sy so no nh
 
       -- the lane listed ended: its husk what it still runs
-      dead = l-dead {E = E} (h-end lc (≺-irrefl {p}) (tailp-bn (cov le) kept-lane (end-tail sy′ (sd tt) row (≺-irrefl {p}))))
+      dead = l-dead {E = E} (h-end lc (≺-irrefl {p}) (tailp-bn (cov le) (kept-lane {P = P} {q = q₀} {a = a₀}) (end-tail sy′ (sd tt) row (≺-irrefl {p}))))
                     (husk-≈ le (proj₂ (husk-of sy′))) (λ t → t) (λ {r} t {q′} k → ≼-trans {r} {p} {q′} t (uk k))
 
       pn : n ≡ suc (n₁ + n₂)
@@ -397,7 +397,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       go {[]}    {_ ∷ _} (() , _) _ _
       go {[]}    {[]}    _ wh′ sl′ = quiet (pred n) refl od wh′ sl′
       go {_ ∷ _}         wt′ wh′ sl′ =
-        handoff op cl lift ji sy↑ bg″ sp (q₀ , a₀ , ∈-++⁺ʳ vs₁ (here refl) , lc , (λ k → uk k) , ≼-refl {p})
+        handoff op {Cr = Cr} cl lift ji sy↑ bg″ sp (q₀ , a₀ , ∈-++⁺ʳ vs₁ (here refl) , lc , (λ k → uk k) , ≼-refl {p})
                 wt′ (whole-up oo wh′) (od-up oo od) ao en li jm so (behind-up bh) sl′
   rise-lane-cp _ (flying (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _))
   rise-lane-cp _ (flying (d-lanes _ _ _ _ _ _ _) _ ())
