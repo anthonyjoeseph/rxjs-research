@@ -18,7 +18,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc; pred; _+_; _*_; _≤_; _<_; _<ᵇ_; _≡ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-monoˡ-<; +-monoʳ-<; +-mono-<-≤; <-≤-trans; n≤1+n; m≤m+n; m≤n+m; +-identityʳ; +-assoc; +-comm)
 open import Data.Nat.Tactic.RingSolver using (solve-∀)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -28,13 +28,13 @@ open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
-                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
+                    attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; off; offL; offIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
 open import operation.Key using (Key; at; _<ᴷ_; at-<ᴷ; <ᴷ-trans; <ᴷ-irrefl; clash)
 open import adequacy.Rows using (conv; back; module _≃_)
 open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth; syn; one; isNone; climb; module Weigh)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Simulated using (cursor)
-open import adequacy.Path using (Path; Still; _⇜_)
+open import adequacy.Path using (Path; Still)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
 open import adequacy.Floor using (fed-ahead)
@@ -42,9 +42,11 @@ open import adequacy.Simulation using (Simulation; module Along)
 open import adequacy.Cursor.Rise using (settled)
 import adequacy.Walk as Walk
 open import adequacy.Walk using (due-≈)
-open import adequacy.Bound using (bound; lo-p)
+open import adequacy.Bound using (bound; lo-p; ≮-≼)
+open import adequacy.TickRow using (tick-below)
 open _≃_ using (from)
 open import denotation.Laws.Modulus using (≼-false)
+open import adequacy.Guard using (RowUnder; Gd; gd; echo-guard; defer-guard; cap; module Outer)
 
 -- A position's first child keyed before its second.
 part : ∀ q → at (q ++ [ ix 0 ]) <ᴷ at (q ++ [ ix 1 ]) ≡ true
@@ -54,39 +56,20 @@ part q = trans (at-<ᴷ (q ++ [ ix 0 ]) (q ++ [ ix 1 ])) (<ᵖ-part q {ix 0} {ix
 over : ∀ q → at (q ++ [ ix 1 ]) <ᴷ at (q ++ [ ix 0 ]) ≡ true → ⊥
 over q h = clash (<ᴷ-trans (at (q ++ [ ix 1 ])) (at (q ++ [ ix 0 ])) (at (q ++ [ ix 1 ])) h (part q)) (<ᴷ-irrefl (at (q ++ [ ix 1 ])))
 
-postulate
-  -- A DEFER'S GUARD IS MET: short of a row a reader meets next, a defer a
-  -- run subscribes has its guard row, at or before the row met next.
-  defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
-              → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
-              → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-              → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+-- An ancestor of a listed position, among the ancestors listed.
+anc-∈ : ∀ {y r} ks → r ∈ ks → y ∈ prefixes r → y ∈ anc ks
+anc-∈ (r ∷ ks) (here refl) my = ∈-++⁺ˡ my
+anc-∈ (x ∷ ks) (there mr) my = ∈-++⁺ʳ (prefixes x) (anc-∈ ks mr my)
 
-  -- A LANE START PASSES ITS GUARD: a rise that subscribes begins a lane a
-  -- level down, past the row its outer value, or its freed slot, leaves,
-  -- at or before the row met next.
-  lane-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q k′ p e}
-             → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → k′ ⇜ ⟨ c , s , rising ε , q ⟩ → Conf.mode k′ ≡ subscribing
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+-- A row under `y` at or before the row met next: `y` listed.
+under-listed : ∀ {R} (o : PureObs [] R) p {y} ks → (∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
+             → RowUnder o y p → y ∈ ks ++ anc ks
+under-listed o p ks cov (_ , _ , tr , le , mr) = ∈-++⁺ʳ ks (anc-∈ ks (cov tr le) mr)
 
-  -- A SOURCE'S STEP IS ECHOED: a source rising under its connect leaves the
-  -- connect's row a level down, at or before the row met next.
-  echo-guard : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q p e}
-             → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-             → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
-
-  -- A COLD'S TICK IS A ROW: short of a row a reader meets next, a cold an
-  -- open observer hears plays its due at a row at or before it, or at an
-  -- ancestor of one.
-  tick-row : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t} {fr : Frame A′ t}
-           → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-           → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
-           → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t fr)) leafM (at (u ++ [ ix i ])))
-           → closed c′ ≡ false
-           → Σ Pos λ r → Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root r e′ × r ≼ p × (u ++ [ ix i ]) ∈ prefixes r
-
+-- A Bool not false is true.
+true-stable : ∀ b → ((b ≡ true → ⊥) → ⊥) → b ≡ true
+true-stable true  _  = refl
+true-stable false nn = ⊥-elim (nn λ ())
 
 -- THE LEAST MARK IS NOT PAST THE ROW: short of a row a reader meets
 -- next, the least mark a run finds, keyed at a position, is keyed at or
@@ -163,8 +146,7 @@ module Begun {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ)
   begun (connect s′ b)     pth refl _ =
     lt0 (lighter-at c (conn-arith _ (2 + D) (syn (suc D) s′) (syn (suc D) b) (wt-ahead D (at (q ++ [ ix 1 ])) (below q))))
   begun (defer l)          pth refl kept =
-    let (_ , tq , le) = defer-guard o pth m
-    in ⊥-elim (over q (kept (∈-++⁺ˡ (cov tq le)) (below q)))
+    ⊥-elim (over q (kept (under-listed o p ks cov (defer-guard o pth m)) (below q)))
   begun (cold x)           pth refl _ = lt0 (lighter-at c (cold-lt _ (opening-ahead o pth)))
   begun empty              pth refl _ = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ++ [ last ])) (below q))))
   begun (of xs)            pth refl _ = lt0 (lighter-at c (of-lt xs))
@@ -196,6 +178,30 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
   take-le d (overAt r) h = h
 
   mutual
+    off-le : ∀ {Γ A} d (s : St Γ A) → pot d (off s) ≤ pot d s
+    off-le d (pend o q)              = ≤-refl
+    off-le d (coldS b l)             = ≤-refl
+    off-le d (ofS i q xs)            = ≤-refl
+    off-le d doneS                   = ≤-refl
+    off-le d (mapS f s)              = off-le (suc d) s
+    off-le d (scanS f z s)           = off-le (suc d) s
+    off-le d (cutS l (attAt q) s)    = +-monoʳ-≤ (2 + d) (off-le (suc d) s)
+    off-le d (cutS l attached s)     = off-le (suc d) s
+    off-le d (lnS b s)               = off-le (suc d) s
+    off-le d (takeS i q w s)         = take-le d w (off-le (suc d) s)
+    off-le d (flatS op f ω b n q o ls) = +-mono-≤ (off-le (suc d) o) (offL-le (suc d) ls)
+    off-le d (connS k o b)           = +-mono-≤ (+-monoʳ-≤ (connW d k) (offIf-le (CS.srcAtt k) (suc d) o)) (off-le (suc d) b)
+    off-le d (joinS j g x ib)        = z≤n
+
+    offL-le : ∀ {Γ A} d (ls : List (St Γ A)) → potL d (offL ls) ≤ potL d ls
+    offL-le d []       = z≤n
+    offL-le d (s ∷ ls) = +-mono-≤ (off-le d s) (offL-le d ls)
+
+    offIf-le : ∀ {Γ A} b d (s : St Γ A) → pot d (offIf b s) ≤ pot d s
+    offIf-le true  d s = off-le d s
+    offIf-le false d s = ≤-refl
+
+  mutual
     unsub-le : ∀ {Γ A} d (s : St Γ A) → pot d (proj₁ (unsub s)) ≤ pot d s
     unsub-le d (pend o q)              = ≤-refl
     unsub-le d (coldS true l) with due l
@@ -215,7 +221,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
 
     cut-le : ∀ {Γ A} d (s : St Γ A) → pot d (proj₁ (cut s)) ≤ pot d s
     cut-le d (cutS l attached s)  = unsub-le (suc d) s
-    cut-le d (cutS l (attAt q) s) = ≤-refl
+    cut-le d (cutS l (attAt q) s) = +-monoʳ-≤ (2 + d) (off-le (suc d) s)
     cut-le d (pend o q)           = ≤-refl
     cut-le d (coldS b l)          = ≤-refl
     cut-le d (ofS i q xs)         = ≤-refl
@@ -307,7 +313,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
     open Shed L p (at q)
 
     Guard : Set
-    Guard = Σ _ λ e′ → enter (⟦ o ⟧ []ᴬ) root (q ++ [ ix 0 ]) e′ × (q ++ [ ix 0 ]) ≼ p
+    Guard = RowUnder o (q ++ [ ix 0 ]) p
 
     Kept : Conf R → Set
     Kept k′ = ∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → Clock k′ <ᴷ at q′ ≡ true
@@ -322,7 +328,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
 
     -- A lane begun has passed its guard.
     begun : (∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → at (q ++ [ ix 1 ]) <ᴷ at q′ ≡ true) → Guard → ⊥
-    begun kept (_ , tq , le) = over q (kept (∈-++⁺ˡ (cov tq le)) (below q))
+    begun kept g = over q (kept (under-listed o p ks cov g) (below q))
 
     -- A takeWhile's failing value: its end owed past where it fell.
     failed : ∀ {Γ A} {i f} (s : St Γ A) d → pot d (takeS i f (cpAt q) s) ≤ pot d (takeS i f free s)
@@ -331,7 +337,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
             dbl = solve-∀
 
   rose : ∀ {Γ A} (c : Ctx R Γ A) s ε {τ k′}
-       → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → (Conf.mode k′ ≡ subscribing → Guard)
+       → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Gd o q c ε p
        → Driver.step R ⟨ c , s , rising ε , q ⟩ ≡ Driver.silent τ k′ → Kept k′
        → Wᶜ L p (at q) k′ < Wᶜ L p (at q) ⟨ c , s , rising ε , q ⟩
   rose top s (nx a) pth g () kept
@@ -352,21 +358,21 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
   rose (inTake i f (overAt r) c) s ε pth g refl _ = up c _ ≤-refl z≤n
   rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g eq kept with closed c
   rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g refl kept | true  = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g refl kept | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter (mergeᶠ nothing) f ω d n qs ls c) s (nx a) pth g refl kept | false = ⊥-elim (begun kept g)
   rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g eq kept with n <ᵇ mx
   rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
   rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g eq kept | true with closed c
   rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
-  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter (mergeᶠ (just mx)) f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept g)
   rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g eq kept with killAll ls | kill-le (suc (depth c)) ls
   rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g eq kept | ls′ , t | h with closed c
   rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | true  = up c _ (+-monoʳ-≤ (pot (suc (depth c)) s) h) z≤n
-  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter switchᶠ f ω d n qs ls c) s (nx a) pth g refl kept | ls′ , t | h | false = ⊥-elim (begun kept g)
   rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g eq kept with n ≡ᵇ 0
   rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | false = up c _ ≤-refl z≤n
   rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g eq kept | true with closed c
   rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | true | true  = up c _ ≤-refl z≤n
-  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inOuter exhaustᶠ f ω d n qs ls c) s (nx a) pth g refl kept | true | false = ⊥-elim (begun kept g)
   rose (inOuter op f ω d n qs ls c) s cp pth g refl _ = up c _ ≤-refl (climb-le (if d then absorbed else settle true n (null qs)))
   rose (inLanes op f ω d n qs o′ pre post c) s (nx b) pth g eq kept with alive s
   rose (inLanes op f ω d n qs o′ pre post c) s (nx b) pth g refl kept | true  = up c _ ≤-refl ≤-refl
@@ -376,10 +382,9 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
   rose (inLanes op f ω d n [] o′ pre post c) s cp pth g refl kept | true = up c _ (lanes-le (depth c) o′ pre post s) (climb-le (settle d (pred n) true))
   rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g eq kept | true with closed c
   rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | true  = up c _ (lanes-le (depth c) o′ pre post s) z≤n
-  rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | false = ⊥-elim (begun kept (g refl))
+  rose (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp pth g refl kept | true | false = ⊥-elim (begun kept g)
   rose (inSrc k b c) s ε pth g eq kept =
-    let (_ , tq , le) = echo-guard o pth m
-    in ⊥-elim (clash (kept (∈-++⁺ˡ (cov tq le)) (below q)) (fed-ahead o pth (_ , eq)))
+    ⊥-elim (clash (kept (under-listed o p ks cov (echo-guard o pth m)) (below q)) (fed-ahead o pth (_ , eq)))
   rose (inBody k o′ c) s (nx b) pth g eq kept with CS.srcLive k
   rose (inBody k o′ c) s (nx b) pth g refl kept | true  = up c _ ≤-refl ≤-refl
   rose (inBody k o′ c) s (nx b) pth g refl kept | false = up c _ ≤-refl z≤n
@@ -394,11 +399,6 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) 
 ... | no ¬e with m
 ...   | here e   = ⊥-elim (¬e e)
 ...   | there m′ = ∈-listed ks q m′
-
--- An ancestor of a listed position, among the ancestors listed.
-anc-∈ : ∀ {y r} ks → r ∈ ks → y ∈ prefixes r → y ∈ anc ks
-anc-∈ (r ∷ ks) (here refl) my = ∈-++⁺ˡ my
-anc-∈ (x ∷ ks) (there mr) my = ∈-++⁺ʳ (prefixes x) (anc-∈ ks mr my)
 
 -- A context's directions, one per level.
 snoc-len : ∀ {n} (xs : List ℕ) {x} → length xs ≡ n → length (xs ++ [ x ]) ≡ suc n
@@ -517,7 +517,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
 
     -- A cold's turn.
     leafs : ∀ {Γ A} (c : Ctx R Γ A) b (l : Tape A) → (leafM , κ) ∈ own {Γ} (coldS b l) → Np
-          → (closed c ≡ false → ∀ {τ u i t} {fr : Frame A t} → l ≡ play τ u i t fr → κ ≡ at (u ++ [ ix i ]) → listed L κ ≡ true)
+          → (closed c ≡ false → b ≡ true → ∀ {τ u i t} {fr : Frame A t} → l ≡ play τ u i t fr → κ ≡ at (u ++ [ ix i ]) → listed L κ ≡ true)
           → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
           → ∀ {τ k′} → Driver.took R (run c (coldS b l) leafM q) ≡ Driver.silent τ k′ → Wᶜ L p κ k′ < pot 0 (plug c (coldS b l)) + 0
     leafs c b     overT              () np row ah eq
@@ -529,17 +529,17 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
     leafs c true  (play τ u i t fr)  (here k) np row ah refl | true =
       hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
     leafs c true  (play τ u i t (emit a f))  (here k) np row ah refl | false =
-      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl (cong proj₂ k))
+      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
                    (wt-ahead (depth c) (at (u ++ [ ix (suc i) ])) (subst (λ z → z <ᴷ at (u ++ [ ix (suc i) ]) ≡ true) (sym (cong proj₂ k))
                                             (trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ ix (suc i) ])) (<ᵖ-part u [] [] (<ᵖ-ix i)))))
                    (≤-reflexive (dirs-depth c)))
     leafs c true  (play τ u i t (stall f))  (here k) np row ah refl | false =
-      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl (cong proj₂ k))
+      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
                    (wt-ahead (depth c) (at (u ++ [ ix (suc i) ])) (subst (λ z → z <ᴷ at (u ++ [ ix (suc i) ]) ≡ true) (sym (cong proj₂ k))
                                             (trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ ix (suc i) ])) (<ᵖ-part u [] [] (<ᵖ-ix i)))))
                    z≤n)
     leafs {Γ} c true  (play τ u i t (close f))  (here k) np row ah refl | false =
-      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl (cong proj₂ k))
+      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
                    (cold-ahead {Γ} (depth c) true (rest τ (u ++ [ last ]) (From∞.force f)) (ah refl)) z≤n)
 
     -- A connect's admin mark.
@@ -565,7 +565,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
 
     -- The least mark run, by its kind.
     runs : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {mk} → Marked s mk → (mk , κ) ∈ own s → Np
-         → (closed c ≡ false → ∀ {b τ u i t} {fr : Frame A t} → s ≡ coldS b (play τ u i t fr) → mk ≡ leafM → κ ≡ at (u ++ [ ix i ]) → listed L κ ≡ true)
+         → (closed c ≡ false → ∀ {τ u i t} {fr : Frame A t} → s ≡ coldS true (play τ u i t fr) → mk ≡ leafM → κ ≡ at (u ++ [ ix i ]) → listed L κ ≡ true)
          → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
          → ∀ {τ k′} → Driver.took R (run c s mk q) ≡ Driver.silent τ k′ → Wᶜ L p κ k′ < pot 0 (plug c s) + 0
     runs c (ofK i p₀ []) (here k) np row ah eq with closed c
@@ -580,7 +580,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
       hole c (spend (depth c) (cong proj₂ k) (lift {c = c} (if g ∧ not (closed c) then rising (nx a) else absorbed)) (np (cong proj₂ k)))
     runs c (joinK j g x q₀ cp ib) (here k) np row ah refl =
       hole c (spend (depth c) (cong proj₂ k) (lift {c = c} (if g ∧ not (closed c) then rising cp else absorbed)) (np (cong proj₂ k)))
-    runs c (leafK b l) mi np row ah eq = leafs c b l mi np (λ cl {τ} {u} {i} {t} {fr} e → row cl {b} (cong (coldS b) e) refl) (λ e → ah (cong (coldS b) e) refl) eq
+    runs c (leafK b l) mi np row ah eq = leafs c b l mi np (λ cl bt {τ} {u} {i} {t} {fr} e → row cl {τ} {u} {i} {t} {fr} (trans (cong (λ b′ → coldS b′ l) bt) (cong (coldS true) e)) refl) (λ e → ah (cong (coldS b) e) refl) eq
     runs c (stopK i f r s₀) (here k) np row ah refl =
       hole c (sp (depth c) (cong proj₂ k) (lift {c = c} (if not (closed c) then rising cp else absorbed)) (np (cong proj₂ k)))
       where
@@ -599,7 +599,10 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
     subst (λ t → Wᶜ L p κ k′ < Weigh.pot L p κ 0 t + 0) (found-plug c s fd)
       (At.runs κ c′ (found-mark c s fd) (proj₁ (found-least {t = plug c s} fd))
         (λ { refl → mark-short o pth m fd })
-        (λ { cl refl refl refl → let (r , _ , tr , le , mr) = tick-row o pth m fd cl in ∈-listed L _ (∈-++⁺ʳ ks (anc-∈ ks (cov tr le) mr)) })
+        (λ { cl {u = u} {i = i} refl refl refl → true-stable (listed L (at (u ++ [ ix i ]))) λ k →
+               tick-below o pth fd cl λ (_ , _ , tr , xs , eq) →
+                 k (∈-listed L (u ++ [ ix i ]) (under-listed o p ks cov
+                      (cap {u = u} {a = ix i} tr (xs , eq) (proj₁ (Outer.met o pth m)) (≮-≼ p (u ++ [ ix i ]) (mark-short o pth m fd))))) })
         (λ { refl refl dr → frame-ahead o pth fd dr })
         eq)
 
@@ -609,6 +612,6 @@ still-lightens : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs
                → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
                → Still (ks ++ anc ks) k′ k → Wᶜ (ks ++ anc ks) p (Clock k) k′ < W (ks ++ anc ks) p k
 still-lightens o {k = ⟨ c , s , rising ε , q ⟩} pth m ks cov (st@(_ , eq) , kept) =
-  Rose.rose o m ks cov q c s ε pth (λ md → lane-guard o pth st md m) eq kept
+  Rose.rose o m ks cov q c s ε pth (gd o pth m) eq kept
 still-lightens o {k = ⟨ c , s , subscribing , q ⟩} pth m ks cov st = lightens-begin o pth m ks cov st
 still-lightens o {k = ⟨ c , s , absorbed , q ⟩} pth m ks cov ((_ , eq) , _) = Run.go o m ks cov q c s pth eq

@@ -14,14 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SHIFT UNDER A FOCUS
-
-The frames shifted to the least key and the hole's environment past it;
-the hole shifts by `shift`. Open: nothing beyond `shift` per frame.
-Settled by a body by frame.
-
-Members: `fr-env`.
-
 #### THE JOINER'S PAST
 
 A joiner subscribed at `q`: every row of its meaning lies past `q`.
@@ -36,39 +28,14 @@ marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
 whether every entry lands a region apart from its siblings' and clear of
 its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
-Members: `sub-join`, `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`, `feed-up`.
-
-#### THE JOINER STEPPED
-
-An outer's value or end and a lane's, each rising into `Joined`/`Begun`
-by its policy: a switch's kill, an exhaust's drop, a bounded queue.
-Open: whether begun lanes stay ascending (`Asc`), and whether `Begun`'s
-live count makes a freed slot the queue head's `Starts.queued`. Settled
-when each is a body.
-
-Members: `rise-outer-bounded`, `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`, `rise-lane-nx`, `rise-lane-cp`.
-
-#### THE GUARD ROWS
-
-A step that begins work a level down — a lane, a defer's body, a
-source's feed — leaves a row first, so is never still. Open: that the
-denotation has that row, at or before the one met next. Settled by
-bodies over the joiner's and connect's rows.
-
-Members: `lane-guard`, `echo-guard`, `defer-guard`.
-
-#### THE MARK AT ITS ROW
-
-Open: that an open cold's tick is an ancestor of a row at or before the
-row met next, so it is listed. Settled by a body over the cursor `Inv`.
-
-Members: `tick-row`.
+Members: `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`,
+`feed-up`.
 
 #### THE COLD STEPPED
 
-A cold entered at its timeline, and each turn of its tape, keep `Inv`.
-Open: whether a stall or a frame's close moves nothing owed. Settled when
-each is a body.
+A cold entered at its timeline, and each turn of its tape, keep `Inv`:
+`s-cold`'s tape rows owed, in the entry and in the region. Open: whether
+a stall or a frame's close moves nothing owed. Settled when each is a body.
 
 Members: `sub-cold`, `abs-leaf`.
 
@@ -84,8 +51,7 @@ Members: `sub-scan`, `sub-take`.
 Believed: a subscription's entry is its program's meaning there, and an
 of's next delivers its next row. Settled when each is a body.
 
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`,
-`conn-flags`.
+Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
 
 ## Tier 1 — the simultaneous spec
 

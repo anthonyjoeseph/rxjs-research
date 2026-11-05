@@ -27,14 +27,14 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; _<ᵖ_; inside; inside-self; inside-++; <ᵖ-split; <ᵖ-part)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
-  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Bounded; module Switch; module Exhaust)
+  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.ColdInv using (slot; slot-last; burst-lb)
@@ -45,11 +45,12 @@ open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; 
 open import adequacy.Rows using (full; pendRows; Frozen; Inbox; this; that; tapeE)
 open import adequacy.Rows using (_≃_; ≼-≢)
 open _≃_
-open import adequacy.Cursor using (Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
-  JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; Joined; joined; Ends;
-  Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
+open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
+  JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
+  Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
   o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
+open import adequacy.Floor.Keys using (at-after)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 
 ------------------------------------------------------------------------
@@ -107,6 +108,25 @@ LoP s p = ∀ {κ} → KeyIn s κ → KAt p κ
 -- A connect's attach no earlier than `at p`: `p` at or before its next slot.
 att-≼ : ∀ c p → after (c ++ [ ix 1 ]) <ᴷ at p ≡ false → p ≼ (c ++ [ ix 2 ])
 att-≼ c p h t = clash (<ᴷ-trans (after (c ++ [ ix 1 ])) (at (c ++ [ ix 2 ])) (at p) (attach-next c) (trans (at-<ᴷ (c ++ [ ix 2 ]) p) (Equivalence.to T-≡ t))) h
+
+-- A key `after y` no earlier than `at p`: `p` at or before `y`, or under it.
+≮-after : ∀ y p → after y <ᴷ at p ≡ false → p ≼ y ⊎ T (inside y p)
+≮-after y p h with ≼-or-≻ p y
+... | inj₁ py = inj₁ py
+... | inj₂ yp with inside y p in e
+...   | true  = inj₂ tt
+...   | false = ⊥-elim (clash (after-lt y p (Equivalence.to T-≡ yp) (λ z eq → subst T e (⊑-inside {y} {p} (z , eq)))) h)
+
+-- At or before what lies no later than `q`'s subtree: so no later itself.
+thru-under : ∀ {p q r} → p ≼ q ⊎ T (inside q p) → r ≼ p → r ≼ q ⊎ T (inside q r)
+thru-under {p} {q} {r} (inj₁ pq) rp = inj₁ (≼-trans {r} {p} {q} rp pq)
+thru-under {p} {q} {r} (inj₂ i)  rp with ≼-or-≻ r q
+... | inj₁ rq = inj₁ rq
+... | inj₂ qr with inside q r in e | inside-⊑ q p i
+...   | true  | _        = inj₂ tt
+...   | false | zs , refl = ⊥-elim (rp (Equivalence.from T-≡ (trans (sym (at-<ᴷ (q ++ zs) r))
+          (<ᴷ-trans (at (q ++ zs)) (after q) (at r) (at-after q zs)
+            (after-lt q r (Equivalence.to T-≡ qr) (λ z eq → subst T e (⊑-inside {q} {r} (z , eq))))))))
 
 lo-p : ∀ {Γ A} {s : St Γ A} {p} → Lo s (at p) → LoP s p
 lo-p {p = p} lo {at y}    ki      = ≮-≼ y p (lo ki)
@@ -207,8 +227,8 @@ module _ {A B : Set} (L : Pos → A → EmissionSet B) (O : EmissionSet A) (Over
          (Cut : Pos → Pos → Set) (Hand : Pos → Set) where
   open Joining L O (λ _ _ → ⊥) Over R Cut Hand
 
-  jrow : ∀ {k e} → JoinT k e → Visible e → O k end ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ Cut q k
-  jrow (oend x _)           _  = inj₁ x
+  jrow : ∀ {k e} → JoinT k e → Visible e → (O k end × Done k) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ Cut q k
+  jrow (oend x dn)          _  = inj₁ (x , dn)
   jrow (lane x r l nc _)    _  = inj₂ (_ , _ , x , r , l , nc)
   jrow (lend x r l nc _ _)  _  = inj₂ (_ , _ , x , r , l , nc)
   jrow (val _)              ()
@@ -223,22 +243,35 @@ module _ {A B : Set} (L : Pos → A → EmissionSet B) (O : EmissionSet A) (Over
   jrow (rpass () _ _)       _
   jrow (rhand () _)         _
 
-nokill : ∀ {A B : Set} {O : EmissionSet A} {k e} (L : Pos → A → EmissionSet B) (R : Pos → Set)
-     → O k end ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ ⊥)
-     → O k end ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × (∀ {q′} → ⊥ → k ≼ q′))
+-- The joiner's meaning done at `c`: its outer ended, and every lane
+-- running, uncut, too.
+JDone : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → Pos → Set
+JDone (mergeᶠ nothing)  F O = Merge.Done F O
+JDone (mergeᶠ (just m)) F O = Bounded.Done m F O
+JDone switchᶠ           F O = Switch.Done F O
+JDone exhaustᶠ          F O = Exhaust.Done F O
+
+nokill : ∀ {A B : Set} {O : EmissionSet A} {D : Set} {k e} (L : Pos → A → EmissionSet B) (R : Pos → Set)
+     → (O k end × D) ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × ¬ ⊥)
+     → (O k end × D) ⊎ Σ Pos (λ q → Σ A λ a → O q (out a) × R q × L q a k e × (∀ {q′} → ⊥ → k ≼ q′))
 nokill L R (inj₁ x)                      = inj₁ x
 nokill L R (inj₂ (q , a , x , r , l , _)) = inj₂ (q , a , x , r , l , λ ())
+
+join-row-d : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k e} → JoinF op F O k e → Visible e
+           → (O k end × JDone op F O k) ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs (polF op F O) q × Lane (polF op F O) q a k e
+               × (∀ {q′} → Kill (polF op F O) q q′ → k ≼ q′)
+join-row-d (mergeᶠ nothing)  F O r v = nokill {O = O} (LaneOf F) (λ _ → ⊤) (jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) r v)
+join-row-d (mergeᶠ (just m)) F O r v =
+  nokill {O = O} (Bounded.Lane m F O) (Bounded.Indexed m F O) (jrow (Bounded.Lane m F O) O (Ended O) (Bounded.Indexed m F O) (λ _ _ → ⊥) (Bounded.Queued m F O) r v)
+join-row-d exhaustᶠ          F O r v = nokill {O = O} (LaneOf F) (Exhaust.Run F O) (jrow (LaneOf F) O (Ended O) (Exhaust.Run F O) (λ _ _ → ⊥) (λ _ → ⊥) r v)
+join-row-d switchᶠ           F O {k} r v with jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (Switch.Cut F O) (λ _ → ⊥) r v
+... | inj₁ x                       = inj₁ x
+... | inj₂ (q , a , x , ru , l , nc) = inj₂ (q , a , x , ru , l , λ { {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k) })
 
 join-row : ∀ {A B} op (F : A → Den B) (O : EmissionSet A) {k e} → JoinF op F O k e → Visible e
          → O k end ⊎ Σ Pos λ q → Σ A λ a → O q (out a) × Runs (polF op F O) q × Lane (polF op F O) q a k e
              × (∀ {q′} → Kill (polF op F O) q q′ → k ≼ q′)
-join-row (mergeᶠ nothing)  F O r v = nokill {O = O} (LaneOf F) (λ _ → ⊤) (jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) r v)
-join-row (mergeᶠ (just m)) F O r v =
-  nokill {O = O} (Bounded.Lane m F O) (Bounded.Indexed m F O) (jrow (Bounded.Lane m F O) O (Ended O) (Bounded.Indexed m F O) (λ _ _ → ⊥) (Bounded.Queued m F O) r v)
-join-row exhaustᶠ          F O r v = nokill {O = O} (LaneOf F) (Exhaust.Run F O) (jrow (LaneOf F) O (Ended O) (Exhaust.Run F O) (λ _ _ → ⊥) (λ _ → ⊥) r v)
-join-row switchᶠ           F O {k} r v with jrow (LaneOf F) O (Ended O) (λ _ → ⊤) (Switch.Cut F O) (λ _ → ⊥) r v
-... | inj₁ x                       = inj₁ x
-... | inj₂ (q , a , x , ru , l , nc) = inj₂ (q , a , x , ru , l , λ { {q′} (a′ , x′ , qq′) q′k → nc (q′ , a′ , x′ , qq′ , q′k) })
+join-row op F O r v = [ (λ x → inj₁ (proj₁ x)) , inj₂ ]′ (join-row-d op F O r v)
 
 -- Where a bounded lane starts: past its value.
 starts-past : ∀ {A B} m (F : A → Den B) (O : EmissionSet A) {i q ls s} → Bounded.Starts m F O i q ls s → q ≺ s
@@ -266,53 +299,92 @@ inbox-lt (h ∷ᴬ _)  this     = h
 inbox-lt {q₀ = q₀} (_ ∷ᴬ hs) (that i) = inbox-lt {q₀ = q₀} hs i
 
 ------------------------------------------------------------------------
+-- A NODE'S BOUND FROM ITS PARTS': each former's rows owed at or past `p`,
+-- given that its parts' are.  `bound` reads the parts' off their `Sync`;
+-- a frame's hole, off whatever bounds it.
+
+-- What a part owes, at or past `p`.
+Bnd : ∀ {A} → Cur → Pos → EmissionSet A → Set
+Bnd C p E = ∀ {q e} → Due C E q e → p ≼ q
+
+map-b : ∀ {C A B} {f : A → B} {Es p q e} → Bnd C p Es → Σ (MapT f Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
+map-b b (map-out y , _) ow = b (y , tt , ow)
+map-b b (map-end y , _) ow = b (y , tt , ow)
+map-b b (map-skip _ , ()) ow
+map-b b (map-pin _ , ()) ow
+
+scan-b : ∀ {C A B} {f : B → A → B} {z₀} {Es p q e} → Bnd C p Es → Σ (Scan.ScanT f z₀ Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
+scan-b b (Scan.sval (Scan.acc₀ y _) , _)     ow = b (y , tt , ow)
+scan-b b (Scan.sval (Scan.acc _ y _ _) , _)  ow = b (y , tt , ow)
+scan-b b (Scan.send y , _)                   ow = b (y , tt , ow)
+scan-b b (Scan.sstep _ , ())                 ow
+scan-b b (Scan.spin _ , ())                  ow
+
+take-b : ∀ {C A} {i} {keep : A → Bool} {Es p q e}
+       → Bnd C p Es → (∀ {q a} → Es q (out a) → T (not (keep a)) → Owes C q)
+       → Σ (TakeWhile.TakeT i keep Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
+take-b b nf (TakeWhile.pass y _ _ , _) ow = b (y , tt , ow)
+take-b b nf (TakeWhile.tend y _ , _)   ow = b (y , tt , ow)
+take-b {p = p} b nf (TakeWhile.fail {q} y nk _ _ , _) ow = on p q (q ++ [ ix 0 ]) (b (y , tt , nf y nk)) (≺-ext q [])
+take-b {p = p} b nf (TakeWhile.stop {q} y nk _ , _)   ow = on p q (q ++ [ last ]) (b (y , tt , nf y nk)) (≺-ext q [])
+take-b b nf (TakeWhile.step _ _ , ())   ow
+take-b b nf (TakeWhile.left _ _ _ , ()) ow
+
+-- A connect: its body's rows, while its source runs, at or past `p` once
+-- the body's binder, its source, is.
+conn-b : ∀ {Γ X B} {C} {k : CS Γ X} {β : EmissionSet B} {p q e}
+       → (T (CS.srcLive k) → Env (full (binds (CS.src k) (CS.connAt k) (CS.scope k))) C p → Bnd C p β)
+       → (T (CS.srcLive k) → Bnd C p (Frozen k)) → Flags C k β → Env (full (CS.scope k)) C p
+       → Σ (Connecting.ConnT (CS.connAt k) (Frozen k) β q e) (λ _ → Visible e) → Owes C q → p ≼ q
+conn-b {k = k} bb sb fl env (Connecting.body y , v) ow with T? (CS.srcLive k)
+... | inj₁ t  = bb t (env-bind {o = CS.src k} {r = CS.connAt k} (sb t) env) (y , v , ow)
+... | inj₂ nt = ⊥-elim (Flags.torn fl nt (y , v , ow))
+conn-b bb sb fl env (Connecting.burst _ _ , ())     ow
+conn-b bb sb fl env (Connecting.echo _ _ _ _ , ())  ow
+conn-b bb sb fl env (Connecting.kept _ _ _ _ , ())  ow
+
+-- A joiner: its outer's end, or a begun lane's row, or a lane's end its
+-- queue's head starts past.
+flat-b : ∀ {A B} {op} {F : A → Den B} {O : EmissionSet A} {C vs ws p k e}
+       → Bnd C p O
+       → (∀ {q a k e} → (q , a) ∈ vs → (∀ {q′} → Kill (polF op F O) q q′ → k ≼ q′) → Lane (polF op F O) q a k e → Visible e → Owes C k → p ≼ k)
+       → Whole C (polF op F O) O vs ws → Ahead C (polF op F O) vs ws
+       → JoinF op F O k e → Visible e → Owes C k → p ≼ k
+flat-b {op = op} {F} {O} {C} {p = p} {k} ob lb wh ah r v ow with join-row op F O r v
+... | inj₁ y = ob (y , tt , ow)
+... | inj₂ (q , a , y , ru , ln , kl) with lane-st op F O ln | owes? C q
+...   | s , st , qs , sk | inj₁ oq = on p q k (ob (y , tt , oq)) (lt q s k qs sk)
+...   | s , st , qs , sk | inj₂ nq with wh y nq (takes (polF op F O) ru)
+...     | inj₁ iv = lb iv kl ln v ow
+...     | inj₂ iw with ah iw st
+...       | q′ , a′ , c , iv′ , lc , kc , oc , cs′ = on p c k (lb {e = end} iv′ kc lc tt oc) (lt c s k cs′ sk)
+
+------------------------------------------------------------------------
 -- THE BOUND
 
 mutual
   bound : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {s : St Γ A} {E p} → Sync sc Rg C s E → Env (full sc) C p → LoP s p
         → ∀ {q e} → Due C E q e → p ≼ q
-  bound (s-cold {l = l} tk d _) env lo r = cold-b l tk lo (proj₁ (to d r))
+  bound (s-cold {l = l} tk d _ _) env lo r = cold-b l tk lo (proj₁ (to d r))
   bound {p = p} (s-of {i = i} {q = q₀} {xs = []} d _) env lo {q} r =
     tr p (q₀ ++ [ last ]) q (lo (k-own (here refl))) (of-lb q₀ i [] (proj₁ (to d r)))
   bound {p = p} (s-of {i = i} {q = q₀} {xs = x ∷ xs} d _) env lo {q} r =
     tr p (q₀ ++ [ ix i ]) q (lo (k-own (here refl))) (of-lb q₀ i (x ∷ xs) (proj₁ (to d r)))
   bound (s-done sp _) env lo r = ⊥-elim (sp r)
-  bound (s-map sy m _) env lo (x , v , ow) = map-b sy env (λ ki → lo (k-kid (k-map ki))) (from (alike m) (x , v)) ow
-  bound (s-scan sy _ m _) env lo (x , v , ow) = scan-b sy env (λ ki → lo (k-kid (k-scan ki))) (from (alike m) (x , v)) ow
+  bound {C = C} (s-map sy m _) env lo (x , v , ow) = map-b {C = C} (bound sy env (λ ki → lo (k-kid (k-map ki)))) (from (alike m) (x , v)) ow
+  bound {C = C} (s-scan sy _ m _) env lo (x , v , ow) = scan-b {C = C} (bound sy env (λ ki → lo (k-kid (k-scan ki)))) (from (alike m) (x , v)) ow
   bound (s-cut sy) env lo r = bound sy env (λ ki → lo (k-kid (k-cut ki))) r
-  bound (s-take sy nf m _) env lo (x , v , ow) = take-b sy nf env (λ ki → lo (k-kid (k-take ki))) (from (alike m) (x , v)) ow
-  bound (s-took fl g ni oa _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
-  bound (s-flat _ sy jn m _ _) env lo (x , v , ow) = flat-b sy jn env lo (proj₁ (proj₁ (from (alike (proj₂ m)) (x , v)))) v ow
-  bound (s-conn refl _ bs ss _ fl m) env lo (x , v , ow) = let ((y , _) , v′) = from (alike (proj₁ m)) (x , v) in conn-b bs ss fl env lo (y , v′) ow
+  bound {C = C} (s-take sy nf m _) env lo (x , v , ow) = take-b {C = C} (bound sy env (λ ki → lo (k-kid (k-take ki)))) nf (from (alike m) (x , v)) ow
+  bound (s-took fl g ni oa _ _ _ _ m sd) env lo (x , v , ow) = took-b fl g ni oa sd lo (from (alike m) (x , v)) ow
+  bound {sc = sc} {C = C} (s-flat {op = op} {f = f} _ sy (joined bg _ wh _ ah _ en _ _) m _ _) env lo (x , v , ow) =
+    flat-b {op = op} {F = λ a → ⟦ f a ⟧ (full sc)} {C = C} (bound sy env (λ ki → lo (k-kid (k-outer ki))))
+      (λ iv kl ln v′ ow′ → begun-b bg iv kl ln v′ ow′ en env (λ i ki → lo (k-kid (k-lane i ki)))) wh ah
+      (proj₁ (proj₁ (from (alike (proj₂ m)) (x , v)))) v ow
+  bound {C = C} (s-conn refl _ bs _ ss _ fl m) env lo (x , v , ow) =
+    let ((y , _) , v′) = from (alike (proj₁ m)) (x , v) in
+    conn-b {C = C} (λ t envb → bound (bs t) envb (λ ki → lo (k-kid (k-body ki)))) (λ t → src-b (ss t) env lo) fl env (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp _) env lo r = ⊥-elim (sp r)
-
-  map-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {f : A → B} {s : St Γ A} {Es p q e}
-        → Sync sc Rg C s Es → Env (full sc) C p → LoP s p
-        → Σ (MapT f Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
-  map-b sy env lo (map-out y , _) ow = bound sy env lo (y , tt , ow)
-  map-b sy env lo (map-end y , _) ow = bound sy env lo (y , tt , ow)
-  map-b sy env lo (map-skip _ , ()) ow
-  map-b sy env lo (map-pin _ , ()) ow
-
-  scan-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {f : B → A → B} {z₀} {s : St Γ A} {Es p q e}
-         → Sync sc Rg C s Es → Env (full sc) C p → LoP s p
-         → Σ (Scan.ScanT f z₀ Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
-  scan-b sy env lo (Scan.sval (Scan.acc₀ y _) , _)     ow = bound sy env lo (y , tt , ow)
-  scan-b sy env lo (Scan.sval (Scan.acc _ y _ _) , _)  ow = bound sy env lo (y , tt , ow)
-  scan-b sy env lo (Scan.send y , _)                   ow = bound sy env lo (y , tt , ow)
-  scan-b sy env lo (Scan.sstep _ , ())                 ow
-  scan-b sy env lo (Scan.spin _ , ())                  ow
-
-  take-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A} {i} {keep : A → Bool} {s : St Γ A} {Es p q e}
-         → Sync sc Rg C s Es → (∀ {q a} → Es q (out a) → T (not (keep a)) → Owes C q) → Env (full sc) C p → LoP s p
-         → Σ (TakeWhile.TakeT i keep Es q e) (λ _ → Visible e) → Owes C q → p ≼ q
-  take-b sy nf env lo (TakeWhile.pass y _ _ , _) ow = bound sy env lo (y , tt , ow)
-  take-b sy nf env lo (TakeWhile.tend y _ , _)   ow = bound sy env lo (y , tt , ow)
-  take-b {p = p} sy nf env lo (TakeWhile.fail {q} y nk _ _ , _) ow = on p q (q ++ [ ix 0 ]) (bound sy env lo (y , tt , nf y nk)) (≺-ext q [])
-  take-b {p = p} sy nf env lo (TakeWhile.stop {q} y nk _ , _)   ow = on p q (q ++ [ last ]) (bound sy env lo (y , tt , nf y nk)) (≺-ext q [])
-  take-b sy nf env lo (TakeWhile.step _ _ , ())   ow
-  take-b sy nf env lo (TakeWhile.left _ _ _ , ()) ow
 
   took-b : ∀ {Γ Rg C A} {i} {keep : A → Bool} {w} {s : St Γ A} {Es r p q e}
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r → Sound Rg Es → LoP (takeS i keep w s) p
@@ -342,24 +414,12 @@ mutual
   took-end (o-cut no)  lo ow = ⊥-elim (no ow)
   took-end (o-over no) lo ow = ⊥-elim (no ow)
 
-  conn-b : ∀ {Γ X B} {Rb Rs C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {β p q e}
-         → (T (CS.srcLive k) → Sync (binds (CS.src k) (CS.connAt k) (CS.scope k)) Rb C b β)
-         → (T (CS.srcLive k) → Src (CS.scope k) Rs C k o) → Flags C k β
-         → Env (full (CS.scope k)) C p → LoP (connS k o b) p
-         → Σ (Connecting.ConnT (CS.connAt k) (adequacy.Rows.Frozen k) β q e) (λ _ → Visible e) → Owes C q → p ≼ q
-  conn-b {k = k} bs ss fl env lo (Connecting.body y , v) ow with T? (CS.srcLive k)
-  ... | inj₁ t  = bound (bs t) (env-bind {o = CS.src k} {r = CS.connAt k} (src-b (ss t) env lo) env) (λ ki → lo (k-kid (k-body ki))) (y , v , ow)
-  ... | inj₂ nt = ⊥-elim (Flags.torn fl nt (y , v , ow))
-  conn-b bs ss fl env lo (Connecting.burst _ _ , ())     ow
-  conn-b bs ss fl env lo (Connecting.echo _ _ _ _ , ())  ow
-  conn-b bs ss fl env lo (Connecting.kept _ _ _ _ , ())  ow
-
   src-b : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
         → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → LoP (connS k o b) p
         → ∀ {q e} → Due C (adequacy.Rows.Frozen k) q e → p ≼ q
-  src-b (src-on _ sy _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
-  src-b (src-shut _ sp _ _ _ _) env lo r = ⊥-elim (sp r)
-  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _) env lo {q} (x , _ , _) =
+  src-b (src-on _ sy _ _ _ _ _ _) env lo r = bound sy env (λ ki → lo (k-kid (k-src ki))) r
+  src-b (src-shut _ sp _ _ _ _ _ _ _ _) env lo r = ⊥-elim (sp r)
+  src-b {k = k} {b = b} {p = p} (src-pend {o = o′} _ _ be _ (ok , a) _ _ _ _) env lo {q} (x , _ , _) =
     on p (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be)))
        (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x)
 
@@ -372,22 +432,6 @@ mutual
   join-b {ib = (q₀ , _) ∷ _} d (h ∷ _) env lo r | inj₁ this = lo (k-own (here refl))
   join-b {ib = (q₀ , _) ∷ _} {p = p} d (h ∷ _) env lo {q} r | inj₁ (that i) = on p q₀ q (lo (k-own (here refl))) (inbox-lt {q₀ = q₀} h i)
 
-  flat-b : ∀ {Γ} {sc : Scope Γ} {Rg Rl} {C A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O p k e}
-         → Sync sc Rg C o O → Joined sc Rl C (polF op (λ a → ⟦ f a ⟧ (full sc)) O) O d n qu ls
-         → Env (full sc) C p → LoP (flatS op f ω d n qu o ls) p
-         → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O k e → Visible e → Owes C k → p ≼ k
-  flat-b {sc = sc} {C = C} {op = op} {f} {O = O} {p} {k} sy (joined bg _ wh _ ah _ en _) env lo r v ow
-    with join-row op (λ a → ⟦ f a ⟧ (full sc)) O r v
-  ... | inj₁ y = bound sy env (λ ki → lo (k-kid (k-outer ki))) (y , tt , ow)
-  ... | inj₂ (q , a , y , ru , ln , kl) with lane-st op (λ a → ⟦ f a ⟧ (full sc)) O ln | owes? C q
-  ...   | s , st , qs , sk | inj₁ oq =
-          on p q k (bound sy env (λ ki → lo (k-kid (k-outer ki))) (y , tt , oq)) (lt q s k qs sk)
-  ...   | s , st , qs , sk | inj₂ nq with wh y nq ru
-  ...     | inj₁ iv = begun-b {O = O} bg iv kl ln v ow en env (λ i ki → lo (k-kid (k-lane i ki)))
-  ...     | inj₂ iw with ah iw st
-  ...       | q′ , a′ , c , iv′ , lc , kc , oc , cs′ =
-              on p c k (begun-b {O = O} {k = c} {e = end} bg iv′ kc lc tt oc en env (λ i ki → lo (k-kid (k-lane i ki)))) (lt c s k cs′ sk)
-
   begun-b : ∀ {Γ} {sc : Scope Γ} {Rl} {C A B} {P : Pol A B} {O vs ls n q a k e p}
           → Begun sc Rl C P O vs ls n → (q , a) ∈ vs → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
           → Ends P O → Env (full sc) C p → (∀ {l} → l ∈ ls → LoP l p) → p ≼ k
@@ -397,10 +441,10 @@ mutual
   lane-b : ∀ {Γ} {sc : Scope Γ} {Rg} {C A B} {P : Pol A B} {O q a l b k e p}
          → LaneSt sc Rg C P q a l b → O q (out a) → (∀ {q′} → Kill P q q′ → k ≼ q′) → Lane P q a k e → Visible e → Owes C k
          → Ends P O → Env (full sc) C p → LoP l p → p ≼ k
-  lane-b (l-live (h-live _ eq) sy _) _ _ ln v ow _ env lo =
-    bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (to (alike eq) (ln , v)) , v , ow)
-  lane-b {C = C} (l-dead (h-end lc nc _) _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
-  lane-b {C = C} (l-dead (h-kill kq nq _) _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
+  lane-b (l-live (h-live _ eq _ _) sy _) _ _ ln v ow _ env lo =
+    bound sy env (λ ki → lo (k-kid (k-ln (k-kid (k-cut ki))))) (proj₁ (from (alike eq) (ln , v)) , v , ow)
+  lane-b {C = C} (l-dead (h-end lc nc _) _ _ _) y _ ln v ow en _ _ = ⊥-elim (nc (owes-≼ C ow (en y lc ln v)))
+  lane-b {C = C} (l-dead (h-kill kq nq _) _ _ _) _ kl _ _ ow _ _ _ = ⊥-elim (nq (owes-≼ C ow (kl kq)))
 
 ------------------------------------------------------------------------
 -- What a part has passed
@@ -424,9 +468,9 @@ postulate
 -- A source's rows a body row at `p` reads: few, by what the source has
 -- passed, or none yet, its subscription not before `p`.
 few-src : ∀ {Γ X} {sc : Scope Γ} {Rs} {k : CS Γ X} {o : St Γ X} {p} → CS.scope k ≡ sc → Src sc Rs (bef p) k o → FewBefore (Frozen k) p
-few-src _ (src-on _ _ bh _ _ _) = few-behind bh
-few-src _ (src-shut _ _ _ _ bh _) = few-behind bh
-few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow) = [] , λ {y} r lt →
+few-src _ (src-on _ _ bh _ _ _ _ _) = few-behind bh
+few-src _ (src-shut _ _ _ _ _ bh _ _ _ _) = few-behind bh
+few-src {k = k} {p = p} refl (src-pend _ _ _ _ (ok , a) _ _ ow _) = [] , λ {y} r lt →
   ⊥-elim (ow (≺-trans {CS.connAt k ++ [ ix 1 ]} {y} {p}
                (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) r)
                (≺-trans {y} {y ++ [ ix 0 ]} {p} (≺-ext y []) lt)))

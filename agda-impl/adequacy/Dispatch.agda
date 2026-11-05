@@ -22,10 +22,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Timeline; Pos; ix; last; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; at-out; at-end)
-open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; entered-reach)
+open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; at-out; at-end; _≺_; _≼_)
+open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; entered-reach; ticks)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
-open import operation.Key using (at)
+open import operation.Key using (at; after)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
@@ -35,26 +35,29 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; c-abs; c-sub;
-  Owes; Fr; Hold; owes; dead; lane; lanecut; pnd; Pts; ∅ᵖ; _⊑_; ∅-⊑; ⊑-refl; ⊑-trans; Rest;
-  h-blank; h-take; hl-none; sh-dead; un-dead; Clear; Pending; pend-shape; notT; sync-pend;
-  s-of; s-join; s-joinx; s-took; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes;
-  f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer;
-  d-lanes; d-src; d-body; f-isle; f-islec; f-islep; subd; o-cp)
+open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; notT; s-of; s-join; s-joinx; s-took; subd; o-cp)
+open import adequacy.Cursor.Tear using (c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
+open import adequacy.Cursor.Frame using (Fr; Hold; owes; dead; lane; lanecut; pnd; Rest; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
 open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; con-owed; Off; closed-off)
-open import adequacy.Stamped using (StOK; pend-of)
+open import adequacy.Stamped using (StOK; pend-of; pend-focus)
 open import adequacy.Isle using (G)
-open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in)
+open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken; at-after)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
-open import adequacy.Walk using (due-≈; climb; descend; refocus; nowhere; none′)
+open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
-open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past)
-open import adequacy.Few using (fr-shift)
+open import adequacy.Bound using (bound; owes-≼; behind-past; behind-pend; join-past; pend-past)
+open import adequacy.FrShift using (fr-shift; rc; hr; HR)
+open import adequacy.Few using (lag; owes-call)
+open import adequacy.Apart.Floor using (floor)
+open import denotation.Laws.BoundedInv using (first-child)
 open import adequacy.Up using (rise-body-nx; rise-body-cp; rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
+open import adequacy.Settle using (rise-outer-cp; rise-lane-nx)
+open import adequacy.LaneEnd using (rise-lane-cp)
+open import adequacy.SubJoin using (join-pend)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
 ------------------------------------------------------------------------
@@ -224,7 +227,7 @@ delivers-owed : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E m p} → Sync
 delivers-owed (s-of d _)                 d-of   = proj₂ (proj₂ (from d (at-out , tt , tt)))
 delivers-owed (s-of d _)                 d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
-delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _) d-stop = ow
+delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _ _ _) d-stop = ow
 
 -- No list entry, switch or pending program delivers.
 ln-none : ∀ {Γ A} {b} {l : St Γ A} {m p} → Delivers (lnS b l) m p → ⊥
@@ -254,15 +257,15 @@ marked-pend {s = s} p mk with pend-shape s p
 
 
 -- What a part no live node reads still runs, kept by a mark's run.
-rest-of : ∀ {Γ} {sc : Scope Γ} {A} {i q} {xs : List A} {s″ : St Γ A} {P} → Rest sc (ofS i q xs) P → Rest sc s″ P
-rest-of (_ , h-blank , le) = _ , h-blank , le
+rest-of : ∀ {Γ} {sc : Scope Γ} {D} {A} {i q} {xs : List A} {s″ : St Γ A} {E P} → Quiet s″ → Rest sc D (ofS i q xs) E P → Rest sc D s″ E P
+rest-of q (_ , h-blank _ , le) = _ , h-blank q , le
 
-rest-join : ∀ {Γ} {sc : Scope Γ} {A} {j g} {x : A ∈ Γ} {ib} {s″ : St Γ A} {P} → Rest sc (joinS j g x ib) P → Rest sc s″ P
-rest-join (_ , h-blank , le) = _ , h-blank , le
+rest-join : ∀ {Γ} {sc : Scope Γ} {D} {A} {j g} {x : A ∈ Γ} {ib} {s″ : St Γ A} {E P} → Quiet s″ → Rest sc D (joinS j g x ib) E P → Rest sc D s″ E P
+rest-join q (_ , h-blank _ , le) = _ , h-blank q , le
 
-rest-take : ∀ {Γ} {sc : Scope Γ} {A} {i} {keep : A → Bool} {w w′ s₀ P} → Rest sc (takeS i keep w s₀) P → Rest sc (takeS i keep w′ s₀) P
-rest-take (_ , h-blank , le)   = _ , h-blank , le
-rest-take (_ , h-take hk , le) = _ , h-take hk , le
+rest-take : ∀ {Γ} {sc : Scope Γ} {D} {A} {i} {keep : A → Bool} {w w′ s₀ E P} → Rest sc D (takeS i keep w s₀) E P → Rest sc D (takeS i keep w′ s₀) E P
+rest-take (_ , h-blank q , le) = _ , h-blank q , le
+rest-take (_ , h-take hk u , le) = _ , h-take hk u , le
 
 -- NO MARK, NOTHING OWED.
 none-spent : ∀ {R} {t : St [] R} {Rg C E} → Sync unbound Rg C t E → search top t ≡ nothing → Spent C E
@@ -291,9 +294,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     sub-take   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
                → Inv Rt Cr C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
                → Inv Rt Cr C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-    -- A CONNECT ENTERED: its flags fresh.
-    conn-flags : ∀ {C Γ X B} {sc : Scope Γ} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
-               → Owes C q → Flags C (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))
     sub-cold   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : Timeline A} {q p}
                → Inv Rt Cr C ⟨ c , pend (cold x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , coldS true (opening q (timelineAt x q)) , absorbed , q ⟩
     sub-defer  : ∀ {Cr C Γ A} {c : Ctx R Γ A} {l q p}
@@ -302,9 +302,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- a joiner of a completed subject: its end owed, under `last`
     sub-joined : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ true
                → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , ofS 0 q [] , absorbed , q ⟩
-    -- a joiner of a live subject: joined where it subscribed
-    sub-join   : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ false
-               → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , joinS q true x [] , absorbed , q ⟩
 
     --------------------------------------------------------------------
     -- RISES that read their frame's bookkeeping.
@@ -313,14 +310,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
     -- at `p`.
     rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
                     → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    rise-outer-cp : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o p k′ sh t}
-                  → rise (inOuter op f ω d n q ls c) o cp p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising cp , p ⟩ sh k′
-    rise-lane-nx  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
-                  → rise (inLanes op f ω d n q o pre post c) s (nx b) p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
-    rise-lane-cp  : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s p k′ sh t}
-                  → rise (inLanes op f ω d n q o pre post c) s cp p ≡ moved k′ sh t
-                  → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising cp , p ⟩ sh k′
     --------------------------------------------------------------------
     -- MARK RUNS, the hole's cursor just before what they deliver.
     run-of-nx     : ∀ {Cr Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
@@ -344,56 +333,61 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   ----------------------------------------------------------------------
   -- A SUBSCRIPTION OWED, whichever way the invariant holds it: pending,
-  -- or a connect's source not yet subscribed; or in a part no live node
-  -- reads, owing nothing.
+  -- or a connect's source not yet subscribed.  No part no live node
+  -- reads holds one.
   PendV : ∀ {Γ A} → Cur → Cur → Ctx R Γ A → Obs Timeline Γ A → Pos → Set₁
   PendV {A = A} Cr C c o q =
-      (Σ Rgn λ Rg → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c owes E
-         × Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q))
-    ⊎ (Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c (dead P) E × P ⊑ ∅ᵖ)
+      Σ Rgn λ Rg → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c owes E
+         × Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) o q ≈ E × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q)
 
   -- A pending source, read as subscribing.
   srcp : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q Rg N E} → Fr Rt Cr C Rg c N E → N ≡ pnd q
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q) → PendV Cr C c o q
-  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs fl fe eq ow sd nb) refl pe wn =
-    inj₁ (_ , _ , f-src fr sc pt lv nc bs fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
-  srcp (f-islep {k = k} u hb le na nc ba an sc (ok , adm) ss nb) refl pe wn =
-    inj₁ (_ , _ , f-isle u hb le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) nb
+  srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
+    (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) (λ _ → owes-call {k = k} C ow) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
+  srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb oz iz) refl pe wn =
+    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb oz iz
          , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
   srcp (f-scan _ _ _ _)                                         ()   _ _
   srcp (f-cut _)                                                ()   _ _
   srcp (f-take _ _ _ _)                                         ()   _ _
-  srcp (f-took _ _ _ _ _ _ _ _)                                 ()   _ _
+  srcp (f-took _ _ _ _ _ _ _ _ _ _)                                 ()   _ _
   srcp (f-outer _ _ _ _ _ _)                                    ()   _ _
-  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)      ()   _ _
+  srcp (f-lanes _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)    ()   _ _
   srcp (f-lane _)                                               ()   _ _
   srcp (f-lnct {b = true} _)                                    ()   _ _
   srcp (f-lnct {b = false} _)                                   ()   _ _
-  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _)                      ()   _ _
-  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _)                         ()   _ _
-  srcp (f-body _ _ _ _ _ _ _)                                   ()   _ _
-  srcp (d-map _)                                                ()   _ _
-  srcp (d-scan _)                                               ()   _ _
-  srcp (d-cut _)                                                ()   _ _
-  srcp (d-ln _)                                                 ()   _ _
-  srcp (d-take _)                                               ()   _ _
-  srcp (d-outer _ _ _)                                          ()   _ _
-  srcp (d-lanes _ _ _ _ _)                                      ()   _ _
-  srcp (d-src _ _ _ _)                                          ()   _ _
-  srcp (d-body _ _ _)                                           ()   _ _
-  srcp (f-isle _ _ _ _ _ _ _ _ _ _)                             ()   _ _
-  srcp (f-islec _ _ _ _ _ _ _ _ _)                              ()   _ _
+  srcp (f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  ()   _ _
+  srcp (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                   ()   _ _
+  srcp (f-body _ _ _ _ _ _ _ _)                                 ()   _ _
+  srcp (d-map _ _)                                                ()   _ _
+  srcp (d-scan _ _)                                               ()   _ _
+  srcp (d-cut _ _)                                                ()   _ _
+  srcp (d-ln _ _)                                                 ()   _ _
+  srcp (d-take _ _)                                               ()   _ _
+  srcp (d-outer _ _ _ _)                                          ()   _ _
+  srcp (d-lanes _ _ _ _ _ _ _)                                      ()   _ _
+  srcp (d-src _ _ _ _ _ _ _ pz oz iz)                                        ()   _ _
+  srcp (d-body _ _ _ _ oz iz)                                           ()   _ _
+  srcp (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz)                     ()   _ _
+  srcp (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz)                  ()   _ _
 
   pend-view : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q p} → Inv Rt Cr C ⟨ c , pend o q , subscribing , p ⟩ → PendV Cr C c o q
-  pend-view (pending fr h)                                     = inj₁ (_ , _ , fr , h)
+  pend-view (pending fr h)                                     = _ , _ , fr , h
   pend-view {o = o} {q} (settled {N = owes} c-sub fr h)       = ⊥-elim (sync-pend {s = pend o q} tt h)
-  pend-view (settled {N = dead _} c-sub fr (_ , h-blank , le)) = inj₂ (_ , _ , _ , fr , le)
-  pend-view (settled {N = lane _ _} c-sub fr (_ , _ , () , _))
-  pend-view (settled {N = lanecut _ _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {N = dead _ _} c-sub fr (_ , h-blank () , _))
+  pend-view (settled {N = lane _ _ _} c-sub fr (_ , _ , () , _))
+  pend-view (settled {N = lanecut _ _ _} c-sub fr (_ , _ , () , _))
   pend-view {o = o} (settled {N = pnd _} c-sub fr (_ , refl , pe , wn)) = srcp {o = o} fr refl pe wn
+
+  -- A joiner of a live subject: joined where it subscribed.
+  sub-join : ∀ {Cr C Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q p} → closedUp c x ≡ false
+           → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , joinS q true x [] , absorbed , q ⟩
+  sub-join cu i with pend-view i
+  ... | _ , _ , fr , h = join-pend Rt cu fr h
 
   -- A joiner's entry, its outer's entered where it subscribed.
   flat-entry : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) q {E}
@@ -403,26 +397,49 @@ module Over {R : Set} (Rt : EmissionSet R) where
   flat-entry sc switchᶠ           f s q eq = refl , eq
   flat-entry sc exhaustᶠ          f s q eq = refl , eq
 
-  sub-conn : ∀ {Cr C Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
-           → Inv Rt Cr C ⟨ c , pend (connect s b) q , subscribing , p ⟩
-           → Inv Rt Cr C ⟨ inBody (conn₀ s q (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
-  sub-conn {C = C} {c = c} {s = s} {b = b} {q = q} i with pend-view i
-  ... | inj₂ (_ , _ , _ , fr , le) =
-    settled {Rg = nowhere} {N = dead ∅ᵖ} {E = none′} c-sub (d-body (un-dead fr) (sh-dead h-blank) (⊑-trans le ∅-⊑)) (∅ᵖ , h-blank , ⊑-refl)
-  ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
+  -- A connect pending at `q`: none of its rows before its first child.
+  conn-hr : ∀ {Γ A B} {sc : Scope Γ} {s : Obs Timeline Γ A} {b : Obs Timeline (A ∷ Γ) B} {q C E} → Adm sc → Ok (Hots (full sc)) q
+          → pendRows (full sc) (connect s b) q ≈ E → HR C (q ⊕ [ ix 0 ]) sc E
+  conn-hr {sc = sc} {s = s} {b} {q} {C} {E} ad ok pe = hr λ _ _ → lag (proj₁ (cov pe)) has , bd
+    where
+      past : ∀ {y e} → pendRows (full sc) (connect s b) q y e → (q ⊕ [ ix 0 ]) ≼ y
+      past r = first-child q (pend-past sc (connect s b) ad ok r)
+      has : ∀ {y e} → E y e → Owes C y → y ≺ (q ⊕ [ ix 0 ]) → y ∈ proj₁ (cov pe)
+      has x _ yq with proj₂ (cov pe) x
+      ... | inj₁ r = ⊥-elim (past r yq)
+      ... | inj₂ i = i
+      bd : ∀ {y e} → Due C E y e → (q ⊕ [ ix 0 ]) ≼ y
+      bd (x , v , _) = past (proj₁ (from (alike pe) (x , v)))
+
+  -- A CONNECT SUBSCRIBED: the cursor moves to its body's subscription,
+  -- the connect behind it, nothing owed passed.
+  sub-conn : ∀ {Γ A B} {c : Ctx R Γ B} {s : Obs Timeline Γ A} {b q p}
+           → Lo (plug c (pend (connect s b) q)) (at (q ⊕ [ ix 0 ]))
+           → SimC Rt ⟨ c , pend (connect s b) q , subscribing , p ⟩ []
+                     ⟨ inBody (conn₀ s q (scopeOf c)) (pend s (q ⊕ [ ix 1 ])) c , pend b (q ⊕ [ ix 0 ]) , subscribing , q ⊕ [ ix 0 ] ⟩
+  sub-conn {c = c} {s = s} {b = b} {q = q} lo {C = C} i with pend-view i
+  ... | Rg , _ , fr , ow , ok , ad , eq , wi
+    with rc Rt {s = pend (connect s b) q} fr (conn-hr {s = s} {b = b} ad ok eq) (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []))) lo
+  ...   | Cr′ , fr′ , _ , _ , d =
     let (pt , wb , ws) = conn-parts {s = s} {b = b} ok ad wi
-        ow₁ = owes-≼ C {q} {q ⊕ [ ix 1 ]} ow (≺→≼ {q} {q ⊕ [ ix 1 ]} (≺-ext q []))
-    in pending (f-body fr refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁) (conn-flags {s = s} {b = b} ow)
+        ow₁ = ≺→≼ {q ⊕ [ ix 0 ]} {q ⊕ [ ix 1 ]} (ticks q 0)
+        -- fresh: its source's rows and its body's all still owed
+        fl : Flags (bef (q ⊕ [ ix 0 ])) (conn₀ s q (scopeOf c)) (pendRows (full (binds s q (scopeOf c))) b (q ⊕ [ ix 0 ]))
+        fl = record { shut = λ () ; torn = λ () ; owed = λ () ; owing = λ ()
+                    ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 1 ]} {c′} ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
+                    ; ended = λ _ {c′} y n → ⊥-elim (n (≺→≼ {q ⊕ [ ix 0 ]} {c′} (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad) y))) }
+    in Cr′ , bef (q ⊕ [ ix 0 ]) ,
+       pending (f-body fr′ refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁ (≼-refl {q ⊕ [ ix 0 ]}))
+                 (behind-past (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 0 ]} (≼-refl {q ⊕ [ ix 0 ]}) (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) fl
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
-         (owes-≼ C {q} {q ⊕ [ ix 0 ]} ow (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])) , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb)
+         (≼-refl {q ⊕ [ ix 0 ]} , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb) ,
+       silent (vis-≃ d)
 
   sub-flat : ∀ {Cr C Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {s q p}
            → Inv Rt Cr C ⟨ c , pend (flatMap op f s) q , subscribing , p ⟩
            → Inv Rt Cr C ⟨ inCut true (attAt q) (inOuter op f (s , q) false 0 [] [] c) , pend s q , subscribing , q ⟩
   sub-flat {C = C} {c = c} {op = op} {f = f} {s = s} {q = q} i with pend-view i
-  ... | inj₂ (_ , _ , _ , fr , le) =
-    settled {Rg = nowhere} {N = dead ∅ᵖ} {E = none′} c-sub (d-cut {Rg = nowhere} {E′ = none′} (d-outer fr hl-none (⊑-trans le ∅-⊑))) (∅ᵖ , h-blank , ⊑-refl)
-  ... | inj₁ (Rg , _ , fr , ow , ok , ad , eq , wi) =
+  ... | Rg , _ , fr , ow , ok , ad , eq , wi =
     pending (f-cut (f-outer fr (flat-jinv {f = f} {s = s} ok ad) (flat-joined {op = op} {f = f} {s = s} ow ok ad wi)
               (flat-entry (scopeOf c) op f s q eq) (flat-sound {op = op} {f = f} {s = s} ok ad wi)
               (behind-past C ow (join-past (scopeOf c) op f s ad ok))))
@@ -443,16 +460,16 @@ module Over {R : Set} (Rt : EmissionSet R) where
   Next : ∀ {Γ A} → Cur → Ctx R Γ A → St Γ A → Pos → Pos → Set₁
   Next {A = A} Cr c s r p =
       (Σ Cur λ Cr′ → Inv Rt Cr′ (bef p) ⟨ c , s , absorbed , r ⟩ × Vis (RT Rt Cr) ≃ Vis (RT Rt Cr′))
-    ⊎ (Σ Cur λ C → Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Fr Rt Cr C Rg c (dead P) E × Rest (scopeOf c) s P)
+    ⊎ (Σ Cur λ C → Σ Rgn λ Rg → Σ Pts λ P → Σ (EmissionSet A) λ E → Σ Cur λ D → Fr Rt Cr C Rg c (dead D P) E × Rest (scopeOf c) D s E P)
 
   search-least : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s r Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ m κ p}
                → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → Clear c′
                → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) m κ) → Delivers s′ m p → Next Cr c′ s′ r p
   search-least {c = c} {s = s} {c′ = c′} {s′ = s′} (settled _ fr h) cl fd dl with climb Rt fr h
   ... | _ , _ , e , sy with descend Rt c′ s′ (λ x → marked-pend x (found-mark c s fd)) cl (subst (λ t → Sync unbound _ _ t _) (sym (found-plug c s fd)) sy) e
-  ...   | C′ , dead P , Rg , E , fr′ , h′                    = inj₂ (C′ , Rg , P , E , fr′ , h′)
-  ...   | _ , lane _ _ , _ , _ , _ , (_ , _ , refl , _)     = ⊥-elim (ln-none dl)
-  ...   | _ , lanecut _ _ , _ , _ , _ , (_ , _ , refl , _)  = ⊥-elim (cut-none dl)
+  ...   | C′ , dead D P , Rg , E , fr′ , h′                  = inj₂ (C′ , Rg , P , E , D , fr′ , h′)
+  ...   | _ , lane _ _ _ , _ , _ , _ , (_ , _ , refl , _)   = ⊥-elim (ln-none dl)
+  ...   | _ , lanecut _ _ _ , _ , _ , _ , (_ , _ , refl , _) = ⊥-elim (cut-none dl)
   ...   | _ , pnd _ , _ , _ , _ , (_ , refl , _)            = ⊥-elim (pend-none dl)
   ...   | _ , owes , _ , _ , fr′ , h′ with fr-shift Rt fr′ h′ (delivers-owed h′ dl) (lo-at c s fd dl)
   ...     | Cr′ , fr″ , h″ , d = inj₁ (Cr′ , settled c-abs fr″ h″ , vis-≃ d)
@@ -461,35 +478,35 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- adrift in what it still runs.
   stepped : ∀ {Cr Γ A} {c′ : Ctx R Γ A} {s′ r p s″ e″ p″} → closed c′ ≡ false → Next Cr c′ s′ r p
           → (∀ {Cr′} → Inv Rt Cr′ (bef p) ⟨ c′ , s′ , absorbed , r ⟩ → Inv Rt Cr′ (bef p) ⟨ c′ , s″ , rising e″ , p″ ⟩)
-          → (∀ {P} → Rest (scopeOf c′) s′ P → Rest (scopeOf c′) s″ P)
+          → (∀ {D E P} → Rest (scopeOf c′) D s′ E P → Rest (scopeOf c′) D s″ E P)
           → Σ Cur λ Cr′ → Σ Cur λ C′ → Inv Rt Cr′ C′ ⟨ c′ , s″ , rising e″ , p″ ⟩ × Moves (RT Rt Cr) [] (RT Rt Cr′)
   stepped      _  (inj₁ (Cr′ , i , d))              g _  = Cr′ , _ , g i , silent d
-  stepped {Cr} cl (inj₂ (C′ , _ , _ , _ , fr , h)) _ tr = Cr , C′ , adrift fr cl (tr h) , silent ≃-refl
+  stepped {Cr} cl (inj₂ (C′ , _ , _ , _ , _ , fr , h)) _ tr = Cr , C′ , adrift fr cl (tr h) , silent ≃-refl
 
   -- A torn joiner's row dropped: nothing owed before, nothing after.
   joinx-hold : ∀ {Γ A} {sc : Scope Γ} {Rg C N j} {x : A ∈ Γ} {u ib E}
              → Hold sc Rg C N (joinS j false x (u ∷ ib)) E → Hold sc Rg C N (joinS j false x ib) E
   joinx-hold {N = owes}        (s-joinx sp fn)     = s-joinx sp fn
-  joinx-hold {N = dead _}      (_ , h-blank , le)  = _ , h-blank , le
-  joinx-hold {N = lane _ _}    (_ , _ , () , _)
-  joinx-hold {N = lanecut _ _} (_ , _ , () , _)
+  joinx-hold {N = dead _ _}      (_ , h-blank _ , le) = _ , h-blank tt , le
+  joinx-hold {N = lane _ _ _}    (_ , _ , () , _)
+  joinx-hold {N = lanecut _ _ _} (_ , _ , () , _)
   joinx-hold {N = pnd _}       (_ , () , _)
 
   join-off : ∀ {Cr C Γ A} {c : Ctx R Γ A} {j} {x : A ∈ Γ} {u ib r p}
            → Inv Rt Cr C ⟨ c , joinS j false x (u ∷ ib) , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , joinS j false x ib , absorbed , p ⟩
   join-off (settled _ fr h) = settled c-abs fr (joinx-hold h)
 
-  off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
+  off-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {Rg N E} {s s′ : St Γ A} {p} → (Pending s → ⊥) → (∀ {D E P} → Rest (scopeOf c) D s E P → Rest (scopeOf c) D s′ E P)
            → Fr Rt Cr C Rg c N E → Hold (scopeOf c) Rg C N s E → Off N → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
   off-keep {N = owes}        _  _  _  _           ()
-  off-keep {N = dead _}      _  tr fr h           _ = settled c-abs fr (tr h)
-  off-keep {N = lane _ _}    _  _  _  _           ()
-  off-keep {N = lanecut _ _} _  _  _  _           ()
+  off-keep {N = dead _ _}      _  tr fr h           _ = settled c-abs fr (tr h)
+  off-keep {N = lane _ _ _}    _  _  _  _           ()
+  off-keep {N = lanecut _ _ _} _  _  _  _           ()
   off-keep {N = pnd _}       np _  _  (_ , e , _) _ = ⊥-elim (np (subst Pending (sym e) tt))
 
   -- A run under a closed context delivers nothing and owes nothing.
   closed-keep : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s s′ : St Γ A} {r p} → closed c ≡ true → (Pending s → ⊥)
-              → (∀ {P} → Rest (scopeOf c) s P → Rest (scopeOf c) s′ P)
+              → (∀ {D E P} → Rest (scopeOf c) D s E P → Rest (scopeOf c) D s′ E P)
               → Inv Rt Cr C ⟨ c , s , absorbed , r ⟩ → Inv Rt Cr C ⟨ c , s′ , absorbed , p ⟩
   closed-keep cl np tr (settled _ fr h) = off-keep np tr fr h (closed-off Rt fr (subst T (sym cl) tt))
 
@@ -550,10 +567,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
            → search top (plug c s) ≡ just (found (Γ , A , c′ , ofS i q xs) ofM κ) → run c′ (ofS i q xs) ofM p ≡ moved k′ sh t
            → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-of {c′ = c′} {xs = xs} fd eq with closed c′ in cl | xs | eq
-    ... | true  | []     | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-of)
-    ... | true  | _ ∷ _  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-of)
-    ... | false | []     | refl = λ i → stepped cl (least fd d-ofx i) (run-of-end cl) rest-of
-    ... | false | _ ∷ _  | refl = λ i → stepped cl (least fd d-of i) (run-of-nx cl) rest-of
+    ... | true  | []     | refl = refocused (focus fd) (closed-keep cl (λ ()) (rest-of tt))
+    ... | true  | _ ∷ _  | refl = refocused (focus fd) (closed-keep cl (λ ()) (rest-of tt))
+    ... | false | []     | refl = λ i → stepped cl (least fd d-ofx i) (run-of-end cl) (rest-of tt)
+    ... | false | _ ∷ _  | refl = λ i → stepped cl (least fd d-of i) (run-of-nx cl) (rest-of tt)
 
     abs-att : ∀ {Γ A} {c′ : Ctx R Γ A} {l q s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , cutS l (attAt q) s₀) attM κ) → run c′ (cutS l (attAt q) s₀) attM p ≡ moved k′ sh t
@@ -574,11 +591,11 @@ module Over {R : Set} (Rt : EmissionSet R) where
              → run c′ (joinS j g x ((q , e) ∷ ib)) joinM p ≡ moved k′ sh t
              → SimC Rt ⟨ c , s , absorbed , p ⟩ sh k′
     abs-join {c′ = c′} {g = true} {e = nx a} fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped cl (least fd d-join i) (run-join-nx cl) rest-join
-    ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-join)
+    ... | false | refl = λ i → stepped cl (least fd d-join i) (run-join-nx cl) (rest-join tt)
+    ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) (rest-join tt))
     abs-join {c′ = c′} {g = true} {e = cp}   fd eq with closed c′ in cl | eq
-    ... | false | refl = λ i → stepped cl (least fd d-join i) (run-join-cp cl) rest-join
-    ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-join)
+    ... | false | refl = λ i → stepped cl (least fd d-join i) (run-join-cp cl) (rest-join tt)
+    ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) (rest-join tt))
     abs-join {g = false} {e = nx a} fd refl   = refocused (focus fd) join-off
     abs-join {g = false} {e = cp}   fd refl   = refocused (focus fd) join-off
 
@@ -661,9 +678,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
   rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
   rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx Rt eq
-  rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp eq
-  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx eq
-  rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp eq
+  rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp Rt eq
+  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx Rt eq
+  rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp Rt eq
   rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
   rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
   rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
@@ -683,23 +700,24 @@ module Over {R : Set} (Rt : EmissionSet R) where
   ... | true  | refl = keeps Rt (sub-joined cu)
   ... | false | refl = keeps Rt (sub-join cu)
 
-  reach-pend : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Reach ⟨ c , pend o q , subscribing , p ⟩
-  reach-pend c empty             q p = within tt λ { refl → keeps Rt sub-empty }
-  reach-pend c (of xs)           q p = within tt λ { refl → keeps Rt sub-of }
-  reach-pend c (map f s)         q p = within tt λ { refl → keeps Rt sub-map }
-  reach-pend c (flatMap op f s)  q p = within tt λ { refl → keeps Rt sub-flat }
-  reach-pend c (connected x)     q p = within (join-mv c x q {p}) (join-sim c x q p)
-  reach-pend c (cold x)          q p = driven tt λ { refl → keeps Rt sub-cold }
-  reach-pend c (scan f z s)      q p = within tt λ { refl → keeps Rt sub-scan }
-  reach-pend c (takeWhile b w s) q p = within tt λ { refl → keeps Rt sub-take }
-  reach-pend c (connect s b)     q p = within tt λ { refl → keeps Rt sub-conn }
-  reach-pend c (defer l)         q p = within tt λ { refl → keeps Rt sub-defer }
+  reach-pend : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Lo (plug c (pend o q)) (at (q ⊕ [ ix 0 ])) → Reach ⟨ c , pend o q , subscribing , p ⟩
+  reach-pend c empty             q p _  = within tt λ { refl → keeps Rt sub-empty }
+  reach-pend c (of xs)           q p _  = within tt λ { refl → keeps Rt sub-of }
+  reach-pend c (map f s)         q p _  = within tt λ { refl → keeps Rt sub-map }
+  reach-pend c (flatMap op f s)  q p _  = within tt λ { refl → keeps Rt sub-flat }
+  reach-pend c (connected x)     q p _  = within (join-mv c x q {p}) (join-sim c x q p)
+  reach-pend c (cold x)          q p _  = driven tt λ { refl → keeps Rt sub-cold }
+  reach-pend c (scan f z s)      q p _  = within tt λ { refl → keeps Rt sub-scan }
+  reach-pend c (takeWhile b w s) q p _  = within tt λ { refl → keeps Rt sub-take }
+  reach-pend c (connect s b)     q p lo = within tt λ { refl → sub-conn lo }
+  reach-pend c (defer l)         q p _  = within tt λ { refl → keeps Rt sub-defer }
 
   -- Subscribing to a node already running: nothing to do.  A mark run
   -- reads the run's path.
   reach : ∀ {o₀ : PureObs [] R} {rs} (k : Conf R) → Path (load o₀) rs k → Reach k
   reach ⟨ c , s , rising e , p ⟩                        _   = within (rise-mv c s e p) (rise-sim c s e p)
-  reach ⟨ c , pend o q , subscribing , p ⟩              _   = reach-pend c o q p
+  reach {o₀ = o₀} ⟨ c , pend o q , subscribing , p ⟩ pth with pend-focus o₀ pth
+  ... | _ , refl = reach-pend c o q q (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) (floor o₀ pth tt) (at-after q [ ix 0 ]))
   reach ⟨ c , coldS b l , subscribing , p ⟩             _   = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , ofS j q xs , subscribing , p ⟩            _   = within tt λ { refl → keeps Rt λ i → i }
   reach ⟨ c , doneS , subscribing , p ⟩                 _   = within tt λ { refl → keeps Rt λ i → i }

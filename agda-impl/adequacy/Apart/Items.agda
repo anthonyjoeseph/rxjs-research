@@ -34,7 +34,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 open import denotation.Events using (Pos; ix; last; _<ᵖ_; <ᵖ-part; <ᵖ-trans; <ᵖ-asym; ix-<)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
-                    CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; ended)
+                    CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; off; offL; offIf; ended)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Stamped using (Ix; ix-⊕; StOK; LOK; QOK; MOK)
@@ -462,7 +462,7 @@ mutual
 
   cut-⊆ : ∀ {Γ A} (s : St Γ A) → items (proj₁ (cut s)) ⊆ items s
   cut-⊆ (cutS l attached s)     = unsub-⊆ s
-  cut-⊆ (cutS l (attAt p) s)    = ⊆-refl
+  cut-⊆ (cutS l (attAt p) s)    = ⊆-++ (⊆-refl {x = attI (attAt p)}) (off-⊆ s)
   cut-⊆ (pend o q)              = ⊆-refl
   cut-⊆ (coldS b l)             = ⊆-refl
   cut-⊆ (ofS i p xs)            = ⊆-refl
@@ -474,6 +474,32 @@ mutual
   cut-⊆ (flatS op f ω d n q o ls) = ⊆-refl
   cut-⊆ (connS k o b)           = ⊆-refl
   cut-⊆ (joinS j g x ib)        = ⊆-refl
+
+  off-⊆ : ∀ {Γ A} (s : St Γ A) → items (off s) ⊆ items s
+  off-⊆ (mapS f s)              = off-⊆ s
+  off-⊆ (scanS f z s)           = off-⊆ s
+  off-⊆ (cutS l a s)            = ⊆-++ (⊆-refl {x = attI a}) (off-⊆ s)
+  off-⊆ (lnS b s)               = off-⊆ s
+  off-⊆ (takeS i p w s)         = ⊆-++ (⊆-refl {x = oweI w}) (off-⊆ s)
+  off-⊆ (flatS op f ω d n q o ls) = ⊆-++ (off-⊆ o) (offL-⊆ ls)
+  off-⊆ (connS k o b)           = ⊆-++ (⊆-refl {x = csI k}) (⊆-++ (offIf-⊆ (CS.srcAtt k) o) (off-⊆ b))
+  off-⊆ (joinS j g x ib)        = none (ibI ib ++ gI g j)
+    where
+      none : ∀ (L : List Rg) → [] ⊆ L
+      none []      = []ˢ
+      none (y ∷ L) = y ∷ʳ none L
+  off-⊆ (pend o q)              = ⊆-refl
+  off-⊆ (coldS b l)             = ⊆-refl
+  off-⊆ (ofS i p xs)            = ⊆-refl
+  off-⊆ doneS                   = ⊆-refl
+
+  offL-⊆ : ∀ {Γ B} (ls : List (St Γ B)) → itemsL (offL ls) ⊆ itemsL ls
+  offL-⊆ []       = ⊆-refl
+  offL-⊆ (s ∷ ls) = ⊆-++ (off-⊆ s) (offL-⊆ ls)
+
+  offIf-⊆ : ∀ {Γ A} b (s : St Γ A) → items (offIf b s) ⊆ items s
+  offIf-⊆ true  s = off-⊆ s
+  offIf-⊆ false s = ⊆-refl
 
   killAll-⊆ : ∀ {Γ B} (ls : List (St Γ B)) → itemsL (proj₁ (killAll ls)) ⊆ itemsL ls
   killAll-⊆ []                          = ⊆-refl

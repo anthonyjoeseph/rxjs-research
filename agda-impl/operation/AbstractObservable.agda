@@ -188,22 +188,26 @@ dirs c@(inSrc k b c′)                     = dirs c′ ++ [ dir c ]
 dirs c@(inBody k o c′)                    = dirs c′ ++ [ dir c ]
 
 -- What the hole's observer answers when polled: rxjs's `closed`.  A
--- switch off answers true; a connect's source asks its subject, and
--- answers true too once the connect is torn down after the source's
--- subscribe returned.  Torn down before, the source runs on: rxjs's
--- `connect` calls `source.subscribe(subject)` whatever its subscriber
--- did, and nothing can unsubscribe a subscription not yet returned.
+-- switch off answers true, as does a takeWhile past its failing value,
+-- which unsubscribes its source before that value's call returns; a
+-- connect's source asks its subject, and answers true too once the
+-- connect is torn down after the source's subscribe returned, by its own
+-- observer or by its body's completion, which also closes the body.
+-- Torn down before, the source runs on: rxjs's `connect` calls
+-- `source.subscribe(subject)` whatever its subscriber did, and nothing
+-- can unsubscribe a subscription not yet returned.
 closed : ∀ {R Γ A} → Ctx R Γ A → Bool
 closed top                               = false
 closed (inMap f c)                       = closed c
 closed (inScan f z c)                    = closed c
 closed (inCut l a c)                     = not l ∨ closed c
 closed (inLn b c)                        = closed c
-closed (inTake i p w c)                  = closed c
+closed (inTake i p free c)               = closed c
+closed (inTake i p _ c)                  = true
 closed (inOuter op f ω d n q ls c)         = closed c
 closed (inLanes op f ω d n q o pre post c) = closed c
-closed (inSrc k b c)                     = CS.closed k ∨ (CS.srcAtt k ∧ closed c)
-closed (inBody k o c)                    = closed c
+closed (inSrc k b c)                     = CS.closed k ∨ (CS.srcAtt k ∧ (not (CS.srcLive k) ∨ closed c))
+closed (inBody k o c)                    = not (CS.srcLive k) ∨ closed c
 
 -- Whether a joiner's binder, up its own context, has completed.
 closedUp : ∀ {R Γ A X} → Ctx R Γ A → X ∈ Γ → Bool
@@ -248,8 +252,30 @@ mutual
 
   cut : ∀ {Γ A} → St Γ A → St Γ A × Torn
   cut (cutS l attached s)  = wrap (cutS false attached) (unsub s)
-  cut (cutS l (attAt p) s) = cutS false (attAt p) s , []
+  cut (cutS l (attAt p) s) = cutS false (attAt p) (off s) , []
   cut s                    = s , []
+
+  -- A cut waiting on its attach: every subject's subscriber under it
+  -- leaves its subject at once, as an rxjs subscriber added to its
+  -- destination closes with it; the rest waits for the attach.
+  off : ∀ {Γ A} → St Γ A → St Γ A
+  off (mapS f s)                = mapS f (off s)
+  off (scanS f z s)             = scanS f z (off s)
+  off (cutS l a s)              = cutS l a (off s)
+  off (lnS b s)                 = lnS b (off s)
+  off (takeS i p w s)           = takeS i p w (off s)
+  off (flatS op f ω d n q o ls) = flatS op f ω d n q (off o) (offL ls)
+  off (connS k o b)             = connS k (offIf (CS.srcAtt k) o) (off b)
+  off (joinS j g x ib)          = joinS j false x []
+  off s                         = s
+
+  offL : ∀ {Γ A} → List (St Γ A) → List (St Γ A)
+  offL []       = []
+  offL (s ∷ ls) = off s ∷ offL ls
+
+  offIf : ∀ {Γ A} → Bool → St Γ A → St Γ A
+  offIf true  s = off s
+  offIf false s = s
 
   killAll : ∀ {Γ B} → List (St Γ B) → List (St Γ B) × Torn
   killAll []                = [] , []
