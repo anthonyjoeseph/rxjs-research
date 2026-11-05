@@ -29,25 +29,26 @@ open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix; Timeline; _≟ᵖ_)
-open import denotation.EmissionSet using (EmissionSet; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values)
+open import denotation.EmissionSet using (EmissionSet; Den; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values)
 open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≺-absurd; ≼-≺-≺; ≼-trans)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside)
   renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; absorbed; flatS; nx; attAt; pend;
+open Machine using (Ctx; Scope; lnS; cutS; cut; killAll; attached; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; absorbed; flatS; nx; attAt; pend;
                     inOuter; inLanes; inLn; inCut)
 open import adequacy.Rows using (full; pendRows; Moves; _⇄_; _≃_)
 open _≃_ using (from)
-open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike; Head)
+open import adequacy.Cursor using (Cur; Pol; Kill; kill-out; bef; aft; Owes; _≈_; ≈-refl; Sound; JInv; Joined; joined; Begun; none; more; JoinE; JRl; JRo; Behind; Sync; polF; JoinF; Lane; Start; Runs; Whole; OuterDone; Ahead; Asc; h-live; wait-[]; Waiting; Slots; Unended; alike; Head; Hole; h-end; h-kill; LaneSt; l-live; l-dead; Kept; NoKill; Thru; TailP; tailp; tailp-⊑; ∅ᵖ; cov)
   renaming (Nths to Listed)
 open import adequacy.Cursor.Frame using (owes; Fr; f-outer; f-lanes; f-lane; f-lnct; d-outer)
 open import adequacy.Cursor.Rise using (Inv; RT; SimC; settled; pending; flying; adrift)
-open import adequacy.Cursor.Tear using (c-abs)
+open import adequacy.Cursor.Tear using (c-abs; husk-of; unsub-husk; off-husk)
+open import adequacy.PinTail using (ptl; pt-bn; pin-tail)
 open import adequacy.Census using (module Count)
 open import adequacy.Enter using (module Lanes; within-sound)
-open import adequacy.Walk using (dead-closed)
+open import adequacy.Walk using (dead-closed; husk-≈)
 open import adequacy.Up using (module Past; VHot; vhot-hots; begun-out; nr-≈; nr-tr; join-nr; fr-up; After)
 open import adequacy.Cursor using (s-flat)
 
@@ -56,6 +57,47 @@ begun-nq : ∀ {Γ} {sc} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n q
          → Begun {Γ} sc Rl C P O vs ls n → (q , a) ∈ vs → ¬ Owes C q
 begun-nq (more _ nq _ _ _) (here refl) = nq
 begun-nq (more _ _ _ _ bg) (there i)   = begun-nq bg i
+
+-- A SWITCH'S KILL at `p`: the value there kills every begun lane.  A
+-- live lane is cut, its husk what its rows show past `p`; it runs
+-- nothing that is not its, and its kept pins are those `p` reaches.
+module Kills (p : Pos) where
+  open Past p using (up; nm; tailp-up)
+
+  kill-live : ∀ {Γ} {sc : Scope Γ} {Rg} {A B} {F : A → Den B} {O : EmissionSet A} {q a a′ at l E}
+            → O p (out a′) → ¬ Owes (bef p) q → ¬ Rg p → ¬ VHot (full sc) p
+            → Hole (bef p) (polF switchᶠ F O) q a ∅ᵖ E true → Sync sc Rg (bef p) l E → Sound Rg E
+            → LaneSt sc Rg (aft p) (polF switchᶠ F O) q a (lnS false (proj₁ (cut (cutS true at l)))) false
+  kill-live {sc = sc} {Rg = Rg} {F = F} {O = O} {q = q} {a = a} {a′ = a′} {at = at} {E = E} y nq nr nh (h-live st e uk ue) sy sd = cutting at
+    where
+      P = polF switchᶠ F O
+      kp : Pol.Kill P q p
+      kp = a′ , y , [ (λ le → ⊥-elim (nq le)) , (λ lt → lt) ]′ (≼-or-≻ p q)
+      sy′ = up sy sd nr nh
+      hk = husk-≈ e (proj₂ (husk-of sy′))
+      tp : TailP (aft p) (Kept P q a) (proj₁ (husk-of sy′))
+      tp with pt-bn (cov e) (λ x → x) (pin-tail sy′)
+      ... | ptl ks pf = tailp ks row
+        where
+          row : ∀ {y e} → Kept P q a y e → Owes (aft p) y → _
+          row (inj₁ (_ , nk)) o                  = ⊥-elim (nk kp o)
+          row (inj₂ (r , refl , ln , nkr , _)) o = pf ln o (nkr kp)
+      nk : ∀ {r} → Thru (aft p) r → NoKill P q r
+      nk {r} t {q′} k = ≼-trans {r} {p} {q′} t (uk k)
+      cutting : ∀ at′ → LaneSt sc Rg (aft p) P q a (lnS false (proj₁ (cut (cutS true at′ _)))) false
+      cutting attached  = let (_ , hk′ , le) = unsub-husk hk in l-dead {E = E} (h-kill kp (≺-irrefl {p}) (tailp-⊑ tp le)) hk′ (λ t → t) nk
+      cutting (attAt r) = l-dead {E = E} (h-kill kp (≺-irrefl {p}) tp) (off-husk hk) (λ t → t) nk
+
+  kill-begun : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {F : A → Den B} {O : EmissionSet A} {vs ls n a′}
+             → O p (out a′) → (∀ {q a} → (q , a) ∈ vs → ¬ Rl q p) → ¬ VHot (full sc) p
+             → Begun sc Rl (bef p) (polF switchᶠ F O) O vs ls n → Begun sc Rl (aft p) (polF switchᶠ F O) O vs (proj₁ (killAll ls)) 0
+  kill-begun y nl nh none = none
+  kill-begun {F = F} {O = O} y nl nh (more {q = q} x nq r (l-live {at = at} h sy sd) bg) =
+    more x (nm {q} nq) r (kill-live {F = F} {O = O} {at = at} y nq (nl (here refl)) nh h sy sd) (kill-begun {F = F} y (λ i → nl (there i)) nh bg)
+  kill-begun {F = F} y nl nh (more {q = q} x nq r (l-dead {E = E} (h-end {c = c} lc nc tp) hk dm nk) bg) =
+    more x (nm {q} nq) r (l-dead {E = E} (h-end lc (nm {c} nc) (tailp-up tp)) hk dm nk) (kill-begun {F = F} y (λ i → nl (there i)) nh bg)
+  kill-begun {F = F} y nl nh (more {q = q} x nq r (l-dead {E = E} (h-kill {q′ = q′} kq nq′ tp) hk dm nk) bg) =
+    more x (nm {q} nq) r (l-dead {E = E} (h-kill kq (nm {q′} nq′) (tailp-up tp)) hk dm nk) (kill-begun {F = F} y (λ i → nl (there i)) nh bg)
 
 -- The lane subscribed where its joiner's observer is open.
 start-open : ∀ {R Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {ω d n q o ls a p} → closed c ≡ false
@@ -77,19 +119,21 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- THE LANE OPENED: the frames above lifted past `p`, the joiner's
   -- bookkeeping with the value begun, its lane pending in its region.
-  opens : ∀ {Cr Γ A B} op {f : A → Obs Timeline Γ B} {ω d n q ls} {c : Ctx R Γ B} {o a p Rg E E′}
+  opens : ∀ {Cr Γ A B} op {f : A → Obs Timeline Γ B} {ω d n q ls n′ ls′} {c : Ctx R Γ B} {o a p Rg E E′}
         → Fr Rt Cr (bef p) Rg c owes E′ → (ji : JInv (scopeOf c) f E)
         → Joined (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E d n q ls
         → JoinE (scopeOf c) op f ω E E′ → Sound (JRo (scopeOf c) Rg op f E) E → Behind (bef p) (JoinF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E)
         → Sync (scopeOf c) (JRo (scopeOf c) Rg op f E) (aft p) o E → E p (out a)
-        → (∀ {q q′} → Kill (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) q q′ → ⊥)
+        → (∀ {vs} → (∀ {q′} → ¬ JRl (scopeOf c) Rg op f E q′ p) → ¬ VHot (full (scopeOf c)) p
+           → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n
+           → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (aft p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls′ n′)
         → (∀ {vs ws} → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n → Waiting (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws q
-           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
-        → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c))
+           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n′ p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
+        → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n′) q o (reverse ls′) [] c))
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
-  opens op {f = f} {d = d} {n = n} {ls = ls} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) m so bh sy row nk opn =
-    Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k))) ue) none (sym (+-comm n 1))
+  opens op {f = f} {d = d} {n = n} {ls = ls} {n′ = n′} {ls′ = ls′} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) m so bh sy row lb opn =
+    Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k))) ue) none (sym (+-comm n′ 1))
                                            (wait-[] {O = E} w[] (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt)) wh′ od′ ah″ ao′ en li m so (λ _ → within-sound {sc = sc} (JInv.fi ji a s ok) wi) (behind-up bh) (λ ()) sl′)))
                   (≺-ext p {ix 1} [] , ok , JInv.adm ji , ≈-refl , wi)
         , moves
@@ -134,7 +178,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ue : Unended (aft p) P p a
       ue l _ = let x = proj₁ (from (alike ln) (l , tt)) in ≺-trans {p} {s} (≺-ext p []) (world-after (InvAt.world I x) (InvAt.real I x))
 
-      lf = subst (λ l → Begun sc (JRl sc Rg op f E) (aft p) P E vs l n) (sym (reverse-involutive ls)) (begun-up (λ k → ⊥-elim (nk k)) (λ _ → nl) nh bg)
+      lf = subst (λ l → Begun sc (JRl sc Rg op f E) (aft p) P E vs l n′) (sym (reverse-involutive ls′)) (lb nl nh bg)
 
       -- no begun lane ends at `p`
       ah′ : Ahead (aft p) P vs ws
@@ -164,24 +208,27 @@ module _ {R : Set} (Rt : EmissionSet R) where
           end-out : ∀ {b} → out b ≡ end → _
           end-out ()
 
+  -- An unbounded lane's rows: the value's, entered under `p`.
+  lane-entered : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {E : EmissionSet A} {a p}
+               → JInv sc f E → E p (out a) → pendRows (full sc) (f a) (p ++ [ ix 1 ]) ≈ LaneOf (λ a → ⟦ f a ⟧ (full sc)) p a
+  lane-entered {sc = sc} {f = f} {a = a} {p = p} ji row =
+    record { alike = (λ (x , v) → (x , g x) , v) ⇄ (λ ((x , _) , v) → x , v)
+           ; cov = [] , λ x → inj₁ (proj₁ x)
+           ; voc = λ x → x , g x }
+    where
+      I = JInv.fi ji a (p ++ [ ix 1 ]) (ok-step p (ok-in (JInv.ok ji) (InvAt.world (JInv.io ji) row) (InvAt.real (JInv.io ji) row)))
+      g : ∀ {y e} → enter (⟦ f a ⟧ (full sc)) (p ++ [ ix 1 ]) y e → _
+      g x = world-after (InvAt.world I x) (InvAt.real I x)
+
   -- A MERGE'S VALUE begins its lane at once.  In a part no live node
   -- reads, the lane is subscribed by none: it settles there, running
   -- nothing.
   merge-start : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω d n q ls} {c : Ctx R Γ B} {o a p}
               → SimC Rt ⟨ inOuter (mergeᶠ nothing) f ω d n q ls c , o , rising (nx a) , p ⟩ [] (start c (mergeᶠ nothing) f ω d n q o ls a p)
   merge-start {f = f} {c = c} {a = a} {p = p} {Cr = Cr} (flying (f-outer fr ji jn m so bh) cl (sy , row)) =
-    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row (λ ())
-                           (λ _ wt _ _ → record { st = refl ; ln = ln ; ru = tt ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt ; sl′ = tt })
+    let (Cr′ , i , mv) = opens (mergeᶠ nothing) fr ji jn m so bh sy row (λ nl nh → Past.begun-up p (λ ()) (λ _ → nl) nh)
+                           (λ _ wt _ _ → record { st = refl ; ln = lane-entered ji row ; ru = tt ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt ; sl′ = tt })
     in subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ nothing} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
-    where
-      s = p ++ [ ix 1 ]
-      I = JInv.fi ji a s (ok-step p (ok-in (JInv.ok ji) (InvAt.world (JInv.io ji) row) (InvAt.real (JInv.io ji) row)))
-      g : ∀ {y e} → enter (⟦ f a ⟧ (full (scopeOf c))) s y e → _
-      g x = world-after (InvAt.world I x) (InvAt.real I x)
-      ln : pendRows (full (scopeOf c)) (f a) s ≈ LaneOf (λ a → ⟦ f a ⟧ (full (scopeOf c))) p a
-      ln = record { alike = (λ (x , v) → (x , g x) , v) ⇄ (λ ((x , _) , v) → x , v)
-                  ; cov = [] , λ x → inj₁ (proj₁ x)
-                  ; voc = λ x → x , g x }
   merge-start (flying (d-outer _ _ _ _) _ ())
   merge-start (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   merge-start (settled () _ _)
@@ -270,7 +317,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
          → After Rt Cr (if b then start c (mergeᶠ (just m)) f ω d n qu o ls a p
                         else ⟨ c , flatS (mergeᶠ (just m)) f ω d n (qu ++ [ a ]) o ls , absorbed , p ⟩)
       go true e =
-        let (Cr′ , i , mv) = opens (mergeᶠ (just m)) fr ji jn jm so bh sy row (λ ()) (opening (<ᵇ⇒< n m (subst T (sym e) tt)))
+        let (Cr′ , i , mv) = opens (mergeᶠ (just m)) fr ji jn jm so bh sy row (λ nl nh → Past.begun-up p (λ ()) (λ _ → nl) nh) (opening (<ᵇ⇒< n m (subst T (sym e) tt)))
         in subst (After Rt Cr) (sym (start-open {c = c} {op = mergeᶠ (just m)} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
       go false e = proj₁ lifted , aft p , settled c-abs (proj₁ (proj₂ lifted)) (s-flat ji sy (joined bg↑ wt′ wh↑ od↑ ah′ ao en li sl↑) jm so (behind-up bh))
                  , proj₂ (proj₂ lifted)
@@ -380,11 +427,19 @@ module _ {R : Set} (Rt : EmissionSet R) where
           sl↑ = subst (Listed E 0) (++-assoc vs ws ((p , a) ∷ [])) (nths-snoc (vs ++ ws) L₀ nth₀) , proj₁ (proj₂ sl) , inj₂ taken
   rise-outer-bounded refl (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
 
+  -- A SWITCH'S VALUE: every begun lane killed by it, the value's begun.
+  rise-outer-switch : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
+                    → rise (inOuter switchᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
+                    → SimC Rt ⟨ inOuter switchᶠ f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+  rise-outer-switch {f = f} {c = c} {a = a} {p = p} refl {Cr = Cr} (flying (f-outer fr ji jn m so bh) cl (sy , row)) =
+    let (Cr′ , i , mv) = opens switchᶠ fr ji jn m so bh sy row (λ nl nh → Kills.kill-begun p {F = λ a → ⟦ f a ⟧ (full (scopeOf c))} row (λ _ → nl) nh)
+                           (λ _ wt _ _ → record { st = refl ; ln = lane-entered ji row ; ru = tt ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt ; sl′ = tt })
+    in subst (After Rt Cr) (sym (start-open {c = c} {op = switchᶠ} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
+  rise-outer-switch refl (flying (d-outer _ _ _ _) _ ())
+  rise-outer-switch refl (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
+  rise-outer-switch refl (settled () _ _)
+
   postulate
-    -- A SWITCH'S VALUE: every begun lane killed, the value's begun.
-    rise-outer-switch : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                      → rise (inOuter switchᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
-                      → SimC Rt ⟨ inOuter switchᶠ f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
     -- AN EXHAUST'S VALUE: its lane begun while none runs, else dropped.
     rise-outer-exhaust : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
                        → rise (inOuter exhaustᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t

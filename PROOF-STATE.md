@@ -16,14 +16,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE JOINER STEPPED
 
-An outer's end, a switch's or exhaust's value, and a lane's rise, each
-into `Joined`/`Begun` by its policy. Open: whether a switch's kill leaves
-a killed lane's isles their pins, whether begun lanes stay ascending
-(`Asc`) under a kill or drop, and whether a bounded lane's end, dequeuing
-the head, leaves the next value's `Head` read off the lanes' `Census`.
+An outer's end, an exhaust's value, and a lane's rise, each into
+`Joined`/`Begun` by its policy. Open: whether begun lanes stay ascending
+(`Asc`) under a drop, and whether a bounded lane's end, dequeuing the
+head, leaves the next value's `Head` read off the lanes' `Census`.
 Settled when each is a body.
 
-Members: `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`,
+Members: `rise-outer-exhaust`, `rise-outer-cp`,
 `rise-lane-nx`, `rise-lane-cp`.
 
 #### THE JOINER'S PAST

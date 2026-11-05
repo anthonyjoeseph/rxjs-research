@@ -53,6 +53,21 @@ srch-≈ m (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss a
 srch-≈ m (sh-islec na cl sp tp hk dm bh sd ao ic bu nr) = sh-islec na cl sp tp hk dm bh sd ao ic (bursts-≈ m bu) nr
 srch-≈ m (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss (bursts-≈ m bu) nr
 
+-- A part no live node reads, read through an alike entry.
+husk-≈ : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E E′ : EmissionSet A} {P} → E ≈ E′ → Husk sc D s E P → Husk sc D s E′ P
+husk-≈ m (h-blank q)          = h-blank q
+husk-≈ m (h-map hk u)         = h-map hk (up-∘ u (up-≈ m))
+husk-≈ m (h-scan hk u)        = h-scan hk (up-∘ u (up-≈ m))
+husk-≈ m (h-cut hk u)         = h-cut hk (up-∘ u (up-≈ m))
+husk-≈ m (h-ln hk u)          = h-ln hk (up-∘ u (up-≈ m))
+husk-≈ m (h-take hk u)        = h-take hk (up-∘ u (up-≈ m))
+husk-≈ m (h-flat ho u hl)     = h-flat ho (up-∘ u (up-≈ m)) (huskL-≈ m hl)
+  where
+    huskL-≈ : ∀ {Γ} {sc : Scope Γ} {D} {A} {ls : List (St Γ A)} {E E′ : EmissionSet A} {P} → E ≈ E′ → HuskL sc D ls E P → HuskL sc D ls E′ P
+    huskL-≈ m hl-none           = hl-none
+    huskL-≈ m (hl-more hk u hl) = hl-more hk (up-∘ u (up-≈ m)) (huskL-≈ m hl)
+husk-≈ m (h-conn sh bh u op se) = h-conn (srch-≈ m sh) bh (up-∘ u (up-≈ m)) op se
+
 torn-≈ : ∀ {Γ X B} {sc : Scope Γ} {C} {k : CS Γ X} {o b} {β E E′ : EmissionSet B} → E ≈ E′ → Torn sc C k o b β E → Torn sc C k o b β E′
 torn-≈ m t = record { D = Torn.D t ; Db = Torn.Db t ; dom = Torn.dom t ; Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = srch-≈ m (Torn.sh t) ; bh = Torn.bh t
                     ; bu = up-∘ (Torn.bu t) (up-≈ m) ; tl = Torn.tl t ; opn = Torn.opn t }
