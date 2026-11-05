@@ -57,7 +57,8 @@ open import adequacy.FrShift using (fr-shift)
 open import adequacy.Dispatch using (module Over; found-lo)
 open import adequacy.Walk using (dead-closed)
 open import adequacy.IsleLift using (z₁; zs-under)
-open import adequacy.Guard using (LiveN; Clr; clr-≈; clr-tr; reach-zs; m-skip; jstep; jlane; hand-clr; src-behind; lo₀; flo; isle-row;
+open import adequacy.Settle using (jlane)
+open import adequacy.Guard using (LiveN; Clr; clr-≈; clr-tr; reach-zs; m-skip; jstep; hand-clr; src-behind; lo₀; flo; isle-row;
                                   module Lift; module Outer)
 
 -- A row of `t` at `y` or under it.

@@ -12,6 +12,8 @@ open import Data.Unit using (tt)
 open import Data.Nat using (zero; suc)
 open import Data.List using (List; []; _∷_; [_]; _++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
+open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -21,21 +23,23 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix; Timeline)
-open import denotation.EmissionSet using (EmissionSet; Den; Ended; Reach; _≺_; _≼_; out; end; ⟦_⟧; module Merge; module Bounded; module Switch; module Exhaust)
+open import denotation.EmissionSet using (EmissionSet; Den; Work; Ended; Reach; _≺_; _≼_; out; end; ⟦_⟧; module Merge; module Bounded; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≼-refl; ≺→≼; ≼-trans; ≼-antisym)
-open import denotation.Laws.Worlds using (InvAt; PinBy; ⊑-inside) renaming (⊑-refl to ⊑ʷ-refl)
+open import denotation.Laws.Worlds using (InvAt; PinBy; ⊑-inside; W; step; inW; plain-ix; nest-in; Hots) renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; Scope; ⟨_,_,_,_⟩; scopeOf; rise; moved; rising; absorbed; flatS; cp; inOuter; settle)
+open Machine using (Ctx; Scope; ⟨_,_,_,_⟩; scopeOf; rise; moved; rising; absorbed; flatS; cp; nx; inOuter; inLanes; settle)
 open import adequacy.Rows using (full; ≃-refl; silent; _≃_)
-open _≃_ using (to)
+open _≃_ using (to; from)
 open import adequacy.Cursor using (Pol; Kill; kill-out; takes; bef; aft; Owes; Sound; JInv; Joined; joined; Begun; more; JoinE; JRl; Behind; Sync; s-flat;
-                                   polF; JoinF; Lane; Runs; Whole; OuterDone; Ahead; Waiting; Slots; Ends; Asc; Unkilled; Unended; NoKill; alike; slots-mv)
-open import adequacy.Cursor.Frame using (owes; Fr; f-outer; d-outer)
+                                   polF; JoinF; Lane; Runs; Start; JRo; voc; h-live; l-live; Whole; OuterDone; Ahead; Waiting; Slots; Ends; Asc; Unkilled; Unended; NoKill; alike; slots-mv)
+open import adequacy.Cursor.Frame using (owes; Fr; f-outer; d-outer; f-lanes; d-lanes)
 open import adequacy.Cursor.Rise using (SimC; settled; flying; adrift)
 open import adequacy.Cursor.Tear using (c-abs)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Walk using (dead-closed)
-open import adequacy.Up using (module Past; VHot; vhot-hots; begun-out; NoRow; nr-≈; nr-tr; fr-up; After)
+open import adequacy.Walk using (dead-closed; begun-join)
+open import adequacy.Regions using (lane-sole)
+open import denotation.Laws.BoundedInv using (module BoundedI)
+open import adequacy.Up using (module Past; VHot; vhot-hots; begun-out; NoRow; nr-≈; nr-tr; fr-up; After; asc-pre; asc-post)
 open import adequacy.Bound using (JDone; join-row-d)
 open import adequacy.Admit using (before; begun-nq; dead-ends; live-of)
 
@@ -96,6 +100,27 @@ wait-undone (mergeᶠ (just m)) {p = p} {q = q} bg wt ah en iw dn with proj₁ (
 ...     | _ , _ , c , iv , lc′ , _ , oc , _ with dead-ends bg refl iv
 ...       | inj₁ (c′ , lc″ , nc′) = nc′ (≼-trans {p} {c} {c′} oc (en (begun-out bg iv) lc″ lc′ tt))
 ...       | inj₂ (_ , () , _)
+
+-- A lane's row, uncut, as its joiner's.
+jlane : ∀ op {A B} {F : A → Den B} {O q a k e} → O q (out a) → Runs (polF op F O) q → Lane (polF op F O) q a k e
+      → (∀ {q′} → Kill (polF op F O) q q′ → q′ ≺ k → ⊥) → Work e → JoinF op F O k e
+jlane (mergeᶠ nothing) {F = F} {O} x rn l nk w = Merge.lane {f = F} {o = O} x rn l (λ ()) w
+jlane (mergeᶠ (just m)) {F = F} {O} x rn l nk w = Bounded.lane {n = m} {f = F} {o = O} x rn l (λ ()) w
+jlane switchᶠ {F = F} {O} x rn l nk w = Switch.lane {f = F} {o = O} x rn l (λ { (_ , a′ , x′ , lt , lt′) → nk (a′ , x′ , lt) lt′ }) w
+jlane exhaustᶠ {F = F} {O} x rn l nk w = Exhaust.lane {f = F} {o = O} x rn l (λ ()) w
+
+-- A lane's start, and so its every row, lies in its joiner's world.
+start-w : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {O : EmissionSet A} (ji : JInv sc f O) op {q a s}
+        → O q (out a) → Start (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a s → W (Hots (full sc)) (JInv.at ji) s
+start-w ji (mergeᶠ nothing)  x refl = step (inW (InvAt.world (JInv.io ji) x)) plain-ix
+start-w {sc = sc} {f} ji (mergeᶠ (just m)) _ (_ , sb) = BoundedI.s-w (JInv.ok ji) m (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) sb
+start-w ji switchᶠ           x refl = step (inW (InvAt.world (JInv.io ji) x)) plain-ix
+start-w ji exhaustᶠ          x refl = step (inW (InvAt.world (JInv.io ji) x)) plain-ix
+
+lane-w : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {O : EmissionSet A} (ji : JInv sc f O) op {q a k e}
+       → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a k e → W (Hots (full sc)) (JInv.at ji) k
+lane-w {sc = sc} {f} ji op x l with Lanes.lane-row sc f ji op x l
+... | _ , st , w , _ = nest-in (start-w ji op x st) w
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
@@ -184,3 +209,68 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-outer-cp _ (flying (d-outer _ _ _ _) _ ())
   rise-outer-cp _ (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   rise-outer-cp _ (settled () _ _)
+
+  ----------------------------------------------------------------------
+  -- A LANE'S VALUE at `p`: the lane runs, so its row is the joiner's.
+  -- Nothing else of the joiner is at `p`: not its outer, whose region
+  -- holds no lane's, nor another lane, whose region is its own; so the
+  -- joiner's bookkeeping moves past it.
+  rise-lane-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q o pre post} {c : Ctx R Γ B} {s b p k′ sh t}
+               → rise (inLanes op f ω d n q o pre post c) s (nx b) p ≡ moved k′ sh t
+               → SimC Rt ⟨ inLanes op f ω d n q o pre post c , s , rising (nx b) , p ⟩ sh k′
+  rise-lane-nx {op = op} {f = f} {pre = pre} {c = c} {p = p} eq {Cr = Cr}
+    (flying (f-lanes {Rg = Rg} {E = E} {O = O} {vs₁ = vs₁} {vs₂ = vs₂} {q = q₀} {a = a₀} {b = true}
+              fr ji sy lf y₀ nq ru (h-live st le uk ue) rt cnt wt wh od ah ao en li jm so sd bh _ sl) cl (_ , _ , refl , _ , sy′ , row)) with eq
+  ... | refl = Cr , bef p , flying fr cl (s-flat ji (up sy so no nh) (joined bg′ (wait-up le-all ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li sl′) jm so (behind-up bh) , shown) , silent ≃-refl
+    where
+      sc = scopeOf c
+      F = λ a → ⟦ f a ⟧ (full sc)
+      P = polF op F O
+      open Past p using (up; begun-up; nm; owes-up; off-rg; in-off; behind-up; kill-up; module Book)
+      open Book {P = P} {O = O}
+
+      out-end : ∀ {v} → out v ≡ end → ⊥
+      out-end ()
+
+      ly = voc le row
+      hr : JRl sc Rg op f O q₀ p
+      hr = Lanes.lane-rows sc f ji op li y₀ ly
+      rl = Lanes.lane-rows sc f ji op li
+      -- the outer's region holds no lane's row
+      no : ¬ JRo sc Rg op f O p
+      no r = proj₂ r (proj₂ hr)
+      oo = off-rg so no
+      ku = kill-up op oo
+      nh : ¬ VHot (full sc) p
+      nh hv = proj₂ (JInv.ok ji) (vhot-hots (full sc) hv) (lane-w ji op y₀ ly) (⊑-inside (⊑ʷ-refl p))
+
+      sole : ∀ {q q′} → JRl sc Rg op f O q p → JRl sc Rg op f O q′ p → q ≡ q′
+      sole r r′ = lane-sole (JInv.ok ji) F (JInv.fi ji) (JInv.io ji) op (proj₂ r) (proj₂ r′)
+      nb₁ : ∀ {q a} → (q , a) ∈ vs₁ → ¬ JRl sc Rg op f O q p
+      nb₁ i r = ≺-irrefl {q₀} (subst (λ x → x ≺ q₀) (sole r hr) (asc-pre vs₁ ao i))
+      nb₂ : ∀ {q a} → (q , a) ∈ vs₂ → ¬ JRl sc Rg op f O q p
+      nb₂ i r = ≺-irrefl {q₀} (subst (λ x → q₀ ≺ x) (sole r hr) (asc-post vs₁ ao i))
+      val : ∀ {q a} → (q , a) ∈ vs₁ ++ (q₀ , a₀) ∷ vs₂ → O q (out a)
+      val i with ∈-++⁻ vs₁ i
+      ... | inj₁ i′          = begun-out lf i′
+      ... | inj₂ (here refl) = y₀
+      ... | inj₂ (there i′)  = begun-out rt i′
+
+      -- the lane's row at `p` is a value: it ends elsewhere
+      endne : ∀ {c′} → Lane P q₀ a₀ c′ end → p ≡ c′ → ⊥
+      endne lc refl = out-end (Sound.fn (sd tt) row (proj₁ (from (alike le) (lc , tt))) tt tt)
+      le-all : ∀ {q a c′} → (q , a) ∈ vs₁ ++ (q₀ , a₀) ∷ vs₂ → Lane P q a c′ end → p ≡ c′ → ⊥
+      le-all i lc refl with sole (rl (val i) lc) hr
+      ... | refl with Sound.fn so (val i) y₀ tt tt
+      ...   | refl = endne lc refl
+      ah′ = ahead-up le-all ah
+
+      hole = l-live (h-live st le (λ k → ku k (uk k)) (λ lc nk → owes-up (endne lc) (ue lc nk))) sy′ (sd tt)
+      bg′ = subst (Begun _ _ _ _ _ _ _) (sym cnt)
+              (subst (λ ls → Begun _ _ _ _ _ _ ls _) (sym (ʳ++-defn pre)) (begun-join (begun-up ku nb₁ nh lf) y₀ (nm nq) ru hole (begun-up ku nb₂ nh rt)))
+      sl′ = slots-mv op (λ {y} t → ≺→≼ {p} {y} t) (λ x o → in-off oo x tt o) sl
+      shown = proj₁ (to (alike (proj₂ jm)) ((jlane op y₀ ru ly (λ k lt → uk k lt) tt , proj₁ bh , λ tk kp _ → proj₂ bh tk (λ pk → pk kp)) , tt))
+  rise-lane-nx _ (flying (f-lanes {b = false} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ (_ , _ , _ , () , _))
+  rise-lane-nx _ (flying (d-lanes _ _ _ _ _ _ _) _ ())
+  rise-lane-nx _ (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
+  rise-lane-nx _ (settled () _ _)

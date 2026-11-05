@@ -41,6 +41,7 @@ open import adequacy.Rows using (full)
 open import denotation.Laws.Worlds using (Hots)
 open import adequacy.Enter using (module Lanes; w-down)
 open import adequacy.Regions using (lane-sole)
+open import adequacy.Settle using (jlane)
 open import denotation.EmissionSet using (out; skip; end; MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
 open import Relation.Nullary using (¬_)
@@ -277,13 +278,6 @@ jval (mergeᶠ nothing) {F = F} {O} x = Merge.val {f = F} {o = O} x
 jval (mergeᶠ (just m)) {F = F} {O} x = Bounded.val {n = m} {f = F} {o = O} x
 jval switchᶠ {F = F} {O} x = Switch.val {f = F} {o = O} x
 jval exhaustᶠ {F = F} {O} x = Exhaust.val {f = F} {o = O} x
-
-jlane : ∀ op {A B} {F : A → Den B} {O q a k e} → O q (out a) → Runs (polF op F O) q → Lane (polF op F O) q a k e
-      → (∀ {q′} → Kill (polF op F O) q q′ → q′ ≺ k → ⊥) → Work e → JoinF op F O k e
-jlane (mergeᶠ nothing) {F = F} {O} x rn l nk w = Merge.lane {f = F} {o = O} x rn l (λ ()) w
-jlane (mergeᶠ (just m)) {F = F} {O} x rn l nk w = Bounded.lane {n = m} {f = F} {o = O} x rn l (λ ()) w
-jlane switchᶠ {F = F} {O} x rn l nk w = Switch.lane {f = F} {o = O} x rn l (λ { (_ , a′ , x′ , lt , lt′) → nk (a′ , x′ , lt) lt′ }) w
-jlane exhaustᶠ {F = F} {O} x rn l nk w = Exhaust.lane {f = F} {o = O} x rn l (λ ()) w
 
 -- A joiner clear on the chain: its outer, and every lane.
 clr-join : ∀ op {A B} {F : A → Den B} {O q y} → (∀ {w} → O w end → q ≼ w → w ≺ y → ⊥)
