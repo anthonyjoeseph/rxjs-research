@@ -6,33 +6,35 @@
 -- queue: none running and none waiting.
 module adequacy.Settle where
 
-open import Data.Bool using (Bool; T; true; false)
+open import Data.Bool using (T; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Nat using (zero; suc)
-open import Data.List using (List; []; _∷_; [_]; _++_; null)
+open import Data.List using ([]; _∷_; _++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix; Timeline)
-open import denotation.EmissionSet using (EmissionSet; Den; Work; Ended; Reach; _≺_; _≼_; out; end; ⟦_⟧; module Merge; module Bounded; module Switch; module Exhaust)
+open import denotation.Events using (Timeline)
+open import denotation.EmissionSet using (EmissionSet; Den; Work; Ended; _≺_; _≼_; out; end; ⟦_⟧; module Merge; module Bounded;
+  module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≼-refl; ≺→≼; ≼-trans; ≼-antisym)
 open import denotation.Laws.Worlds using (InvAt; PinBy; ⊑-inside; W; step; inW; plain-ix; nest-in; Hots) renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; ⟨_,_,_,_⟩; scopeOf; rise; moved; rising; absorbed; flatS; cp; nx; inOuter; inLanes; settle)
 open import adequacy.Rows using (full; ≃-refl; silent; _≃_)
 open _≃_ using (to; from)
-open import adequacy.Cursor using (Pol; Kill; kill-out; takes; bef; aft; Owes; Sound; JInv; Joined; joined; Begun; more; JoinE; JRl; Behind; Sync; s-flat;
-                                   polF; JoinF; Lane; Runs; Start; JRo; voc; h-live; l-live; Whole; OuterDone; Ahead; Waiting; Slots; Ends; Asc; Unkilled; Unended; NoKill; alike; slots-mv)
-open import adequacy.Cursor.Frame using (owes; Fr; f-outer; d-outer; f-lanes; d-lanes)
+open import adequacy.Cursor using (Pol; Kill; kill-out; takes; bef; aft; Owes; Sound; JInv; joined; Begun; more; JRl; Sync;
+  s-flat; polF; JoinF; Lane; Runs; Start; JRo; voc; h-live; l-live; Whole; Ahead; Waiting;
+  Slots; Ends; Asc; alike; slots-mv)
+open import adequacy.Cursor.Frame using (f-outer; d-outer; f-lanes; d-lanes)
 open import adequacy.Cursor.Rise using (SimC; settled; flying; adrift)
 open import adequacy.Cursor.Tear using (c-abs)
 open import adequacy.Enter using (module Lanes)
