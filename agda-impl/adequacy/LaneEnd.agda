@@ -219,7 +219,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       -- the census at `aft p`: the begun lanes, then the head's, on
       cv = cen-begun Lv bg (λ i → ∈-++⁺ˡ i) c-nil
       d′ = proj₁ cv
-      on₁ : ∀ {c} → Ends (length vs) (Sched (length vs)) c → Σ Pos λ c′ → OwedEnd (aft p) P (vs ++ [ w ]) c′ × c′ ≼ c
+      on₁ : ∀ {c} → Bounded.Ends m F O (length vs) (Bounded.Sched m F O (length vs)) c → Σ Pos λ c′ → OwedEnd (aft p) P (vs ++ [ w ]) c′ × c′ ≼ c
       on₁ {c} e = c , (q₁ , a₁ , ∈-++⁺ʳ vs (here refl) , ends-at nth₁ e , (λ ()) , ue₁ (ends-at nth₁ e) (λ ())) , ≼-refl {c}
       eqL : suc (length vs) ≡ length (vs ++ [ w ])
       eqL = sym (trans (length-++ vs) (+-comm (length vs) 1))
