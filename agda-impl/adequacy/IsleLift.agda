@@ -41,12 +41,13 @@ open Machine using (St; Ctx; CS; plug; connS; mapS; scanS; cutS; lnS; takeS; fla
                     inOuter; inLanes; inSrc; inBody; inTake)
 open import adequacy.Rows using (Frozen; full; module _≃_)
 open _≃_ using (from)
-open import adequacy.Cursor using (Cur; bef; Thru; Dom; Up; up; BurstsAt; Bursts; Behind; alike; ≈-refl; Husk; Burst; Subd; SubdAt;
-  AttOwed; _⊑_; _∪ᵖ_; Pts; Hole; h-live; h-end; h-kill; notT; Pol; Kept; Owes; polF)
+open import adequacy.Cursor using (Cur; bef; Thru; Dom; Up; UpA; upa; BurstsAt; Bursts; Behind; alike; ≈-refl; Husk; Burst;
+  Subd; SubdAt; AttOwed; _⊑_; _∪ᵖ_; Pts; Hole; h-live; h-end; h-kill; notT; Pol; Kept; Owes;
+  polF)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr; Unread; un-dead; un-torn;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
-open import adequacy.Cursor.Show using (up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-dn; thru-few;
+open import adequacy.Cursor.Show using (up-≈; upa-of; thru-up0; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-dn; thru-few;
   flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts; in-call; inside-trans)
 open import adequacy.Cursor.Tear using (by)
 open import adequacy.FrShift using (HR; hr; hr-map; hr-outer; hr-lanes; hr-src; hr-body; live-kl; body-env)
@@ -116,9 +117,12 @@ chain-few {q = q} (ks , f) z = ks ++ zl z , λ {k} x ky →
 data Pin {A} (D : Cur) (E : EmissionSet A) (q : Pos) : Set where
   pn : ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r) → Zs q y → Pin D E q
 
-up-pin : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} {q} → Up D E D′ E′ → Pin D E q → Pin D′ E′ q
-up-pin (up u) (pn tr ir x rc z) with u tr ir x rc
+upa-pin : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} {q} → UpA D E D′ E′ → Pin D E q → Pin D′ E′ q
+upa-pin (upa u) (pn tr ir x rc z) with u tr ir x rc
 ... | xs , _ , tr′ , ir′ , x′ , rc′ , a = pn tr′ ir′ x′ rc′ (zs-all xs z a)
+
+up-pin : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} {q} → Up D E D′ E′ → Pin D E q → Pin D′ E′ q
+up-pin u = upa-pin (upa-of u)
 
 pin-dom : ∀ {A} {C D} {E : EmissionSet A} {q} → Dom C D → Pin D E q → Pin C E q
 pin-dom dm (pn tr ir x rc z) = pn (dm tr) ir x rc z
@@ -272,16 +276,16 @@ module _ {R : Set} (Rt : EmissionSet R) where
             (⊑-plag le (plag-∪ (husk-f ho (λ ki → lo (plug-in c (k-kid (k-outer ki)))))
                        (plag-∪ (huskl-f hpre (λ i ki → lo (plug-in c (k-kid (k-lane (pre-in pre (reverse⁺ i)) ki)))))
                        (plag-∪ pl (huskl-f hpost (λ i ki → lo (plug-in c (k-kid (k-lane (post-in pre i) ki))))))))))
-    climbF {c = inSrc k b c} {s = s} (d-src u hb _ u′ le _ _) lo (dc p pl) =
-      climbU {o = s} {b = b} u lo (up-pin u′ p) (⊑-plag le (plag-∪ (plag-under pl) (husk-f hb (λ ki → lo (plug-in c (k-kid (k-body ki)))))))
-    climbF {c = inBody k o c} {s = s} (d-body u sh u′ le) lo (dc p pl) =
+    climbF {c = inSrc k b c} {s = s} (d-src u hb _ u′ le _ _ pz oz iz) lo (dc p pl) =
+      climbU {o = s} {b = b} u lo (upa-pin u′ p) (⊑-plag le (plag-∪ (plag-under pl) (husk-f hb (λ ki → lo (plug-in c (k-kid (k-body ki)))))))
+    climbF {c = inBody k o c} {s = s} (d-body u sh u′ le oz iz) lo (dc p pl) =
       climbU {o = o} {b = s} u lo (up-pin u′ p)
         (⊑-plag le (plag-∪ (srch-f sh (λ ki → lo (plug-in c (k-kid (k-src ki))))
                                       (λ be → lo (plug-in c (k-own (body-key k {o = o} {b = s} be))))
                                       (λ ae → lo (plug-in c (k-own (own-bld k {o = o} {b = s} (os ae))))))
                            pl))
-    climbF {c = inSrc k b c} {s = s} {q} (f-isle {D = D} {Ci = Ci} u hb _ le _ _ bh sd _ ao ic bu nr _) lo (lc h pf) =
-      climbU {o = s} {b = b} u lo (burst-pin bu nr ic (λ tr rc → thru-dn D rc nr) fw (pf env ef))
+    climbF {c = inSrc k b c} {s = s} {q} (f-isle {D = D} {Ci = Ci} u hb _ le _ _ bh sd _ ao ic bu nr _ oz iz) lo (lc h pf) =
+      climbU {o = s} {b = b} u lo (burst-pin bu (thru-up0 D nr) ic (λ tr rc → thru-dn D rc (thru-up0 D nr)) fw (pf env ef))
         (⊑-plag le (plag-∪ (burst-plag {C = Ci} {k = k} fw) (husk-f hb (λ ki → lo (plug-in c (k-kid (k-body ki)))))))
       where
         ie = subd-env {k = k} sd (att-slot {k = k} {p = q} ao (λ be → lo (plug-in c (k-own (body-key k {o = s} {b = b} be))))
@@ -289,12 +293,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
         env = proj₁ ie
         ef  = proj₂ ie
         fw = before bh (proj₁ (HR.run h env ef))
-    climbF {c = inSrc k b c} {s = s} (f-islec {D = D} {Ci = Ci} u hb _ le _ _ _ tp dm bh _ _ ic bu nr) lo (dc p pl) =
-      climbU {o = s} {b = b} u lo (burst-pin bu nr (λ tr → ic (dm tr)) (λ tr rc → thru-dn D rc nr) fw p)
+    climbF {c = inSrc k b c} {s = s} (f-islec {D = D} {Ci = Ci} u hb _ le _ _ _ tp dm bh _ _ ic bu nr oz iz) lo (dc p pl) =
+      climbU {o = s} {b = b} u lo (burst-pin bu (thru-up0 D nr) (λ tr → ic (dm tr)) (λ tr rc → thru-dn D rc (thru-up0 D nr)) fw p)
         (⊑-plag le (plag-∪ (burst-plag {C = Ci} {k = k} fw) (husk-f hb (λ ki → lo (plug-in c (k-kid (k-body ki)))))))
       where
         fw = before bh (tailp-lag tp pl)
-    climbF (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo ()
+    climbF (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) lo ()
 
     climbU : ∀ {Cr C D Γ X B} {E β : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {P} {o : St Γ X} {b : St (X ∷ Γ) B} {q}
            → Unread Rt Cr C D E β c k P → LoP (plug c (connS k o b)) q → Pin D E q → PLag q P → Pin Cr Rt q

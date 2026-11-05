@@ -362,7 +362,7 @@ mutual
   husk-f (h-ln hk _)    lo = husk-f hk (λ ki → lo (k-kid (k-ln ki)))
   husk-f (h-take hk _)  lo = husk-f hk (λ ki → lo (k-kid (k-take ki)))
   husk-f (h-flat ho _ hl) lo = plag-∪ (husk-f ho (λ ki → lo (k-kid (k-outer ki)))) (huskl-f hl (λ i ki → lo (k-kid (k-lane i ki))))
-  husk-f (h-conn {k = k} {o = o} {b = b} sh hb _) lo = plag-∪ (srch-f sh (λ ki → lo (k-kid (k-src ki))) (λ be → lo (k-own (body-key k {o = o} {b = b} be))) (λ ae → lo (k-own (own-bld k {o = o} {b = b} (os ae))))) (husk-f hb (λ ki → lo (k-kid (k-body ki))))
+  husk-f (h-conn {k = k} {o = o} {b = b} sh hb _ _ _) lo = plag-∪ (srch-f sh (λ ki → lo (k-kid (k-src ki))) (λ be → lo (k-own (body-key k {o = o} {b = b} be))) (λ ae → lo (k-own (own-bld k {o = o} {b = b} (os ae))))) (husk-f hb (λ ki → lo (k-kid (k-body ki))))
 
   huskl-f : ∀ {Γ} {sc : Scope Γ} {A} {ls : List (St Γ A)} {D E P p} → HuskL sc D ls E P → (∀ {l} → l ∈ ls → LoP l p) → PLag p P
   huskl-f hl-none         lo = [] , λ ()
@@ -371,7 +371,7 @@ mutual
   srch-f : ∀ {Γ X B} {sc : Scope Γ} {k : CS Γ X} {o D} {E : EmissionSet B} {P p} → SrcH sc D k o E P → LoP o p
          → (CS.bodyAt k ≡ just (CS.connAt k) → p ≼ (CS.connAt k ++ [ ix 1 ])) → (∀ {y} → CS.attSrc k ≡ just y → KAt p (after y))
          → PLag p P
-  srch-f (sh-dead hk _ _) lo _ _ = plag-under (husk-f hk lo)
+  srch-f (sh-dead hk _ _ _) lo _ _ = plag-under (husk-f hk lo)
   srch-f {k = k} {p = p} (sh-pend _ _ ba _ refl (ok , a) _ _ _ _ _) _ bl _ = [] , λ { (k′ , (_ , x , _) , refl) yp →
     ⊥-elim (bl ba (≺-trans {CS.connAt k ++ [ ix 1 ]} {k′} {p}
                      (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok) x) (below k′ yp))) }
@@ -593,7 +593,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
         bb′ = λ t → behind-bef {C = C} (bb t) (few (bs t) (envb t) (envlb t) (lo-p (λ ki → lo (k-kid (k-body ki)))))
         fl′ = flags-sh (λ t → src-b (ss t) env (lo-p lo)) (λ t → bound (bs t) (envb t) (lo-p (λ ki → lo (k-kid (k-body ki)))))
                        (λ {q} e → ≮-after q p (lo (k-own (own-bld k {o} {b} (oo e))))) fl
-        tn′ = λ nt → let t = tn nt in record { D = Torn.D t ; Db = Torn.Db t ; dom = (λ u → th (Torn.dom t u)) ; bu = Torn.bu t ; Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t ; tl = td (Torn.tl t) }
+        tn′ = λ nt → let t = tn nt in record { D = Torn.D t ; Db = Torn.Db t ; dom = (λ u → th (Torn.dom t u)) ; bu = Torn.bu t ; Ps = Torn.Ps t ; Pb = Torn.Pb t ; sh = Torn.sh t ; bh = Torn.bh t ; tl = td (Torn.tl t) ; opn = Torn.opn t }
     sh {sc = sc} (s-join {x = x} {E = E} en d ap hd adm) env ef lo = s-join en d′ ap (λ i u → hd i (unfed-dn (lookup (full sc) x) u)) adm
       where
         d′ = (λ r → [ inj₁ , (λ u → inj₂ (unfed-up (lookup (full sc) x) (env x) u)) ]′ (to d (due-dn {E = E} r)))
@@ -605,7 +605,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvL (full (CS.scope k)) C p → Lo (connS k o b) (at p)
            → Src (CS.scope k) Rg (bef p) k o
     src-sh {k = k} {b = b} (src-pend {o = o′} na nc be an adm pr wn _ nr) env ef lo =
-      src-pend na nc be an adm pr wn (lo-p lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be))) (λ h → nr (owes-≼ C op h))
+      src-pend na nc be an adm pr wn (lo-p lo (k-own (body-key k {o = Machine.pend o′ (CS.connAt k ++ [ ix 1 ])} {b = b} be))) (thru-owes C nr op)
     src-sh {k = k} {o = o} {b = b} (src-on nc sy bh sd af ao _ lv) env ef lo =
       src-on nc (sh sy env ef lo′) (behind-bef {C = C} bh (few sy env ef (lo-p lo′))) (subd′ sd) af ao (λ na → call-sh {k = k} {o = o} {b = b} (ao na) (lo-p lo)) lv
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-src ki))

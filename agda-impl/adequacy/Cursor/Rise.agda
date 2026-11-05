@@ -22,7 +22,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-ext; ≺-irrefl; ≺-trans; ≼-or-≻; ≺-≼-≺)
 open import adequacy.Rows using (≼-≢; _≃_; _⇄_; ≃-refl; Moves; silent; shown; toEv; full; pendRows)
 open import denotation.Laws.Worlds using (Ok; Hots)
-open import adequacy.Cursor using (Adm; Cur; Due; Up; Folded; Husk; NoFail; Owes; Sound; SrcH; Sync; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; notT; o-cp; o-cut; o-over; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; vis; ∪-⊑; ⊑-refl; ⊑-trans)
+open import adequacy.Cursor using (Adm; Cur; Open; InScope; Due; Up; Folded; Husk; NoFail; Owes; Sound; SrcH; Sync; Within; _∪ᵖ_; _≈_; _⊑_; aft; alike; bef; fd-last; fd-none; h-conn; h-cut; h-ln; h-map; h-scan; h-take; notT; o-cp; o-cut; o-over; s-conn; s-cut; s-map; s-scan; s-take; s-took; tailp-dn; tailp-⊑; vis; ∪-⊑; ⊑-refl; ⊑-trans)
 open import adequacy.Cursor.Tear using (Calm; c-abs; cut-husk; husk-of; peel-cut; peel-take; unsub-husk; unsubIf-husk)
 open import adequacy.Cursor.Frame using (Fly; Fr; Hold; Rest; Unread; d-body; d-cut; d-ln; d-map; d-scan; d-take; dead; f-body; f-cut; f-lane; f-lnct; f-map; f-scan; f-take; f-took; f-top; lane; lanecut; owes; pnd; un-dead; un-torn)
 open import adequacy.PinTail using (took-tail)
@@ -64,12 +64,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- A connect no live node reads, settled where it is read.
   unread-at : ∀ {Cr C D Db Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {o b E P Ps Qb β p}
             → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb
-            → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb)
+            → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c) Db
             → Inv Cr C ⟨ c , connS k o b , absorbed , p ⟩
-  unread-at (un-dead fr) sh hb bu le = settled c-abs fr (_ , h-conn sh hb bu , le)
-  unread-at {C = C} {D = D} {Db = Db} (un-torn fr sc pt nl fl eq tp dm) sh hb bu le =
+  unread-at (un-dead fr) sh hb bu le op is = settled c-abs fr (_ , h-conn sh hb bu op is , le)
+  unread-at {C = C} {D = D} {Db = Db} (un-torn fr sc pt nl fl eq tp dm) sh hb bu le op _ =
     settled c-abs fr (s-conn sc pt (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t)) (λ t → ⊥-elim (notT _ nl t))
-                             (λ _ → record { D = D ; Db = Db ; dom = dm ; Ps = _ ; Pb = _ ; sh = sh ; bh = hb ; bu = bu ; tl = tailp-⊑ {C = C} tp le }) fl eq)
+                             (λ _ → record { D = D ; Db = Db ; dom = dm ; Ps = _ ; Pb = _ ; sh = sh ; bh = hb ; bu = bu ; tl = tailp-⊑ {C = C} tp le ; opn = op }) fl eq)
 
   ----------------------------------------------------------------------
   -- THE ROW SHOWN IS THE LEAST OWED, for free: a rise reaching the root
@@ -238,8 +238,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
              → SimC ⟨ inBody k o c , s , rising e , p ⟩ [] ⟨ c , connS k o s , absorbed , p ⟩
   rise-bodyx nl = keeps λ
     { (flying (f-body _ _ _ lv _ _ _ _) _ _) → ⊥-elim (unlive nl lv)
-    ; (flying (d-body _ _ _ _) _ ())
-    ; (adrift (d-body un sh u le) cl (Q , hk , le′)) → unread-at un sh hk u (⊑-trans le (∪-⊑ ⊑-refl le′))
+    ; (flying (d-body _ _ _ _ _ _) _ ())
+    ; (adrift (d-body un sh u le op is) cl (Q , hk , le′)) → unread-at un sh hk u (⊑-trans le (∪-⊑ ⊑-refl le′)) op is
     ; (settled () _ _) }
     where
       unlive : ∀ {b} → b ≡ false → T b → ⊥

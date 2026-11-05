@@ -23,9 +23,9 @@ open import Relation.Binary.Definitions using (Tri; tri<; tri≈; tri>)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; _≟ᵖ_; Timeline; ix; inside; <ᵖ-step; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
+open import denotation.Events using (Pos; _≟ᵖ_; Timeline; ix; sub; last; inside; <ᵖ-step; <ᵖ-part; _<ᵖ_; <ᵖ-split; inside-++; inside-self)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; PDep; skip; module Connecting; module Joining; module Bounded; Den; After; end; MapT; map-pin; ⟦_⟧; module Scan; module TakeWhile)
-open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-antisym)
+open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-absurd; ≼-or-≻; ≺-trans; ≺-irrefl; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
@@ -33,10 +33,10 @@ open import Data.Unit using (tt)
 open import operation.PureObservable using (module Machine)
 open Machine using (Scope; CS)
 open import adequacy.Rows using (Frozen; full)
-open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs;
+open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; UpA; upa; Lifts; Onward; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs;
   Lane; polF; up; JoinF; JoinE; JInv; JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE;
   Src; src-pend; src-on; src-shut; bursts; BurstsAt; notT; AttFin)
-open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; nonempty⁼; world-after; world-after⁼; inside-⊑; ⊑-inside)
+open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; nonempty⁼; world-after; world-after⁼; inside-⊑; ⊑-inside; Disj; conv; plain-last)
 open import adequacy.Bound using (next-slot; in-slot; owes?; owes-≼)
 open import adequacy.Rows using (≼-≢)
 import denotation.Laws.Worlds as W
@@ -72,46 +72,82 @@ thru-sub (bef p) {r} ps pr = ps {p} (≼-refl {p}) (≺-trans {p} {r} {r ++ [ ix
 thru-sub (aft p) {r} ps pr = ≺-irrefl {r} (≺-≼-≺ {r} {r ++ [ ix 1 ]} {r} (≺-ext r [])
                                (≼-trans {r ++ [ ix 1 ]} {p ++ [ ix 0 ]} {r} (ps {p ++ [ ix 0 ]} (≺-ext p [])) (λ t → subst T (<ᵖ-step p r (Equivalence.to T-≡ pr)) t)))
 
+-- So is its first child's first subscription.
+thru-sub0 : ∀ C {r} → (∀ {y} → Owes C y → (r ++ [ ix 1 ]) ≼ y) → Thru C (r ++ [ ix 0 ])
+thru-sub0 C {r} ps = thru-sub C {r ++ [ ix 0 ]} λ {y} o → ≼-trans {(r ++ [ ix 0 ]) ++ [ ix 1 ]} {r ++ [ ix 1 ]} {y} (≺→≼ {(r ++ [ ix 0 ]) ++ [ ix 1 ]} {r ++ [ ix 1 ]} lt) (ps o)
+  where
+    lt : ((r ++ [ ix 0 ]) ++ [ ix 1 ]) ≺ (r ++ [ ix 1 ])
+    lt = subst (λ z → z ≺ (r ++ [ ix 1 ])) (sym (++-assoc r [ ix 0 ] [ ix 1 ])) (Equivalence.from T-≡ (<ᵖ-part r (ix 1 ∷ []) [] refl))
+
+-- Reached at a first child: so is its parent.
+thru-up0 : ∀ D {r} → Thru D (r ++ [ ix 0 ]) → Thru D r
+thru-up0 D {r} = thru-dn D (≺→≼ {r} {r ++ [ ix 0 ]} (≺-ext r []))
+
+-- What the cursor owes, it has not passed.
+owes-onward : ∀ C {c} → Owes C c → Onward C c
+owes-onward C o t = thru-owes C t o
+
 -- A pin kept at its own row.
-up-at : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B}
+up-at : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} → Dom D′ D
       → (∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r) → Thru D′ r × E′ y (pin r) × Reach E′ y (pin r))
       → Up D E D′ E′
-up-at {E′ = E′} f = up λ {y} {r} nr i x rc → let (n′ , x′ , rc′) = f nr i x rc in [] , r , n′ , subst (λ z → T (inside r z)) (sym (++-identityʳ y)) i
+up-at {E′ = E′} dm f = up (λ {y} {r} nr i x rc → let (n′ , x′ , rc′) = f nr i x rc in [] , r , n′ , subst (λ z → T (inside r z)) (sym (++-identityʳ y)) i
                     , subst (λ z → E′ z (pin r)) (sym (++-identityʳ y)) x′
-                    , subst (λ z → Reach E′ z (pin r)) (sym (++-identityʳ y)) rc′ , []ᴬ
+                    , subst (λ z → Reach E′ z (pin r)) (sym (++-identityʳ y)) rc′ , []ᴬ) dm
 
 up-id : ∀ {A} {D} {E : EmissionSet A} → Up D E D E
-up-id {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = E} λ nr _ x rc → nr , x , rc
+up-id {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = E} (λ t → t) λ nr _ x rc → nr , x , rc
 
 up-≈ : ∀ {A} {D} {E E′ : EmissionSet A} → E ≈ E′ → Up D E D E′
-up-≈ {D = D} {E = E} {E′ = E′} m = up-at {D = D} {D′ = D} {E = E} {E′ = E′} λ nr _ x rc → nr , voc m x , reach-≈ m rc
+up-≈ {D = D} {E = E} {E′ = E′} m = up-at {D = D} {D′ = D} {E = E} {E′ = E′} (λ t → t) λ nr _ x rc → nr , voc m x , reach-≈ m rc
 
 up-map : ∀ {A B} {f : A → B} {D} {E : EmissionSet A} → Up D E D (MapT f E)
-up-map {f = f} {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = MapT f E} λ nr _ x rc → nr , map-pin x , reach-map rc
+up-map {f = f} {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = MapT f E} (λ t → t) λ nr _ x rc → nr , map-pin x , reach-map rc
 
 up-scan : ∀ {A B} {f : B → A → B} {z} {D} {E : EmissionSet A} → Up D E D (Scan.ScanT f z E)
-up-scan {f = f} {z = z} {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = Scan.ScanT f z E} λ nr _ x rc → nr , Scan.spin x , reach-scan rc
+up-scan {f = f} {z = z} {D = D} {E = E} = up-at {D = D} {D′ = D} {E = E} {E′ = Scan.ScanT f z E} (λ t → t) λ nr _ x rc → nr , Scan.spin x , reach-scan rc
 
 -- A take whose failure, if any, the cursor has not yet passed.
 up-take : ∀ {A} {incl} {keep : A → Bool} {D} {E : EmissionSet A}
         → (∀ {r} → Thru D r → ¬ TakeWhile.Failed incl keep E r) → Up D E D (TakeWhile.TakeT incl keep E)
-up-take {incl = incl} {keep = keep} {D = D} {E = E} nf = up-at {D = D} {D′ = D} {E = E} {E′ = TakeWhile.TakeT incl keep E} λ nr i x rc → nr , TakeWhile.left x (nf nr) i , reach-take rc
+up-take {incl = incl} {keep = keep} {D = D} {E = E} nf = up-at {D = D} {D′ = D} {E = E} {E′ = TakeWhile.TakeT incl keep E} (λ t → t) λ nr i x rc → nr , TakeWhile.left x (nf nr) i , reach-take rc
 
 -- A cursor moved on has passed what its earlier self passed.
+lifts-adv : ∀ {A B} {D₁ D C} {E₁ : EmissionSet A} {E : EmissionSet B} → Dom C D → Lifts D₁ E₁ D E → Lifts D₁ E₁ C E
+lifts-adv dm u nr i x rc = let (xs , r′ , n′ , rest) = u nr i x rc in xs , r′ , dm n′ , rest
+
 up-adv : ∀ {A B} {D₁ D C} {E₁ : EmissionSet A} {E : EmissionSet B} → Dom C D → Up D₁ E₁ D E → Up D₁ E₁ C E
-up-adv dm (up u) = up λ nr i x rc → let (xs , r′ , n′ , rest) = u nr i x rc in xs , r′ , dm n′ , rest
+up-adv dm (up u d) = up (lifts-adv dm u) (λ t → dm (d t))
+
+upa-adv : ∀ {A B} {D₁ D C} {E₁ : EmissionSet A} {E : EmissionSet B} → Dom C D → UpA D₁ E₁ D E → UpA D₁ E₁ C E
+upa-adv dm (upa u) = upa (lifts-adv dm u)
 
 -- Two layers.
-up-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
-     → Up D₁ E₁ D₂ E₂ → Up D₂ E₂ D₃ E₃ → Up D₁ E₁ D₃ E₃
-up-∘ {E₃ = E₃} (up u) (up v) = up λ {y} nr i x rc → let (xs , r′ , n′ , i′ , x′ , rc′ , z′) = u nr i x rc ; (zs , r″ , n″ , i″ , x″ , rc″ , z″) = v n′ i′ x′ rc′ in xs ++ zs , r″ , n″
+lifts-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
+        → Lifts D₁ E₁ D₂ E₂ → Lifts D₂ E₂ D₃ E₃ → Lifts D₁ E₁ D₃ E₃
+lifts-∘ {E₃ = E₃} u v {y} nr i x rc = let (xs , r′ , n′ , i′ , x′ , rc′ , z′) = u nr i x rc ; (zs , r″ , n″ , i″ , x″ , rc″ , z″) = v n′ i′ x′ rc′ in xs ++ zs , r″ , n″
     , subst (λ z → T (inside r″ z)) (++-assoc y xs zs) i″
     , subst (λ z → E₃ z (pin r″)) (++-assoc y xs zs) x″
     , subst (λ z → Reach E₃ z (pin r″)) (++-assoc y xs zs) rc″ , ++⁺ z′ z″
 
+up-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
+     → Up D₁ E₁ D₂ E₂ → Up D₂ E₂ D₃ E₃ → Up D₁ E₁ D₃ E₃
+up-∘ (up u d) (up v e) = up (lifts-∘ u v) (λ t → e (d t))
+
+upa-∘ : ∀ {A B X} {D₁ D₂ D₃} {E₁ : EmissionSet A} {E₂ : EmissionSet B} {E₃ : EmissionSet X}
+      → UpA D₁ E₁ D₂ E₂ → Up D₂ E₂ D₃ E₃ → UpA D₁ E₁ D₃ E₃
+upa-∘ (upa u) (up v _) = upa (lifts-∘ u v)
+
+-- Its reader's lead bounds its source's.
+up-ward : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} {c} → Up D E D′ E′ → Onward D′ c → Onward D c
+up-ward (up _ d) o t = o (d t)
+
+upa-of : ∀ {A B} {D D′} {E : EmissionSet A} {E′ : EmissionSet B} → Up D E D′ E′ → UpA D E D′ E′
+upa-of (up u _) = upa u
+
 -- What an earlier cursor reached, a later one has.
 up-pre : ∀ {A B} {D C C′} {E : EmissionSet A} {E′ : EmissionSet B} → Dom C D → Up C E C′ E′ → Up D E C′ E′
-up-pre dm (up u) = up λ nr → u (dm nr)
+up-pre dm (up u d) = up (λ nr → u (dm nr)) (λ t → d (dm t))
 
 -- No failing value passed: none fails before a pin's connect passed.
 nofail-up : ∀ {A} {incl} {keep : A → Bool} {C} {E : EmissionSet A} → NoFail C keep E → ∀ {r} → Thru C r → ¬ TakeWhile.Failed incl keep E r
@@ -163,6 +199,29 @@ no-slot {c = c} _ (inW (timer {e} t _)) eq with ∷ʳ-injectiveʳ (ix t ∷ []) 
 ... | ()
 no-slot {c = c} _ (inW (join {h} _ _ _)) eq with ∷ʳ-injectiveʳ h c eq
 ... | ()
+
+-- A hot past a subscription's first slot is past its next: no hot lies in
+-- a slot's world, and no sibling of the slots lies before the next one.
+hot-past : ∀ {H r c} → Disj H r → H c → (r ++ [ ix 0 ]) ≼ c → (r ++ [ ix 2 ]) ≼ c
+hot-past {r = r} {c} dj hc a with ≼-or-≻ (r ++ [ ix 2 ]) c
+... | inj₁ le = le
+... | inj₂ lt with conv {r} {r ++ [ ix 0 ]} {c} {r ++ [ ix 2 ]} ([ ix 0 ] , refl) a lt ([ ix 2 ] , refl)
+...   | [] , refl = λ _ → a (subst (λ v → v ≺ (r ++ [ ix 0 ])) (sym (++-identityʳ r)) (≺-ext r []))
+...   | ix i ∷ zs , refl = λ _ → dj hc (step here plain-ix) (⊑-inside {r ++ [ ix i ]} (zs , sym (++-assoc r [ ix i ] zs)))
+...   | last ∷ zs , refl = λ _ → dj hc (step here plain-last) (⊑-inside {r ++ [ last ]} (zs , sym (++-assoc r [ last ] zs)))
+...   | sub l ∷ zs , refl = λ _ → ≺-absurd {r ++ sub l ∷ zs} {r ++ [ ix 2 ]} lt (Equivalence.from T-≡ (<ᵖ-part r [] zs refl))
+
+-- A hot past an isle's first slot, read by a cursor within the call: past
+-- all it has reached, and owed there, since the hot is not the next slot.
+call-onward : ∀ {H r c} Ci → (∀ {s} → Thru Ci s → s ≼ (r ++ [ ix 2 ])) → Disj H r → H c → (r ++ [ ix 0 ]) ≼ c → Onward Ci c
+call-onward {r = r} {c} Ci ic dj hc a {s} t = ≼-trans {s} {r ++ [ ix 2 ]} {c} (ic t) (hot-past dj hc a)
+
+call-owes : ∀ {H r c} Ci → (∀ {s} → Thru Ci s → s ≼ (r ++ [ ix 2 ])) → Disj H r → H c → (r ++ [ ix 0 ]) ≼ c → Owes Ci c
+call-owes origin  _  _  _  _ = tt
+call-owes (bef s) ic dj hc a = call-onward (bef s) ic dj hc a {s} (≼-refl {s})
+call-owes {r = r} {c} (aft s) ic dj hc a =
+  ≼-≺-≺ {s} {r ++ [ ix 2 ]} {c} (ic (≼-refl {s}))
+        (≼-≢ {r ++ [ ix 2 ]} {c} (hot-past dj hc a) (λ { refl → dj hc (step here plain-ix) (Equivalence.from T-≡ (inside-self (r ++ [ ix 2 ]))) }))
 
 -- AN ISLE'S BURST SHOWS IN ITS CONNECT'S ENTRY: `burst` pins each row of
 -- the subscription, and every row before it is a source row's child; the
@@ -328,7 +387,7 @@ flat-up-lane : ∀ {Γ} {sc : Scope Γ} {Rg C D A B} {op} {f : A → Obs Timelin
              → Dom C D → (∀ {r} → Thru D r → NoKill (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q r)
              → Up D (Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a) C E
 flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {O = O} {E = E} {q = q} {a = a} ji je bh _ x rn dm nk =
-  up-at {D = D} {D′ = C} {E = Lane (polF op f′ O) q a} {E′ = E} lift
+  up-at {D = D} {D′ = C} {E = Lane (polF op f′ O) q a} {E′ = E} dm lift
   where
     f′ = λ a → ⟦ f a ⟧ (full sc)
     P = polF op f′ O
@@ -352,7 +411,7 @@ flat-up-lane {sc = sc} {C = C} {D = D} {op = op} {f = f} {O = O} {E = E} {q = q}
 flat-up-outer : ∀ {Γ} {sc : Scope Γ} {Rg C A B} {op} {f : A → Obs Timeline Γ B} {ω O E}
               → JInv sc f O → Sound (JRo sc Rg op f O) O → JoinE sc op f ω O E → Behind C (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
               → Up C O C E
-flat-up-outer {sc = sc} {C = C} {op = op} {f = f} {O = O} {E = E} ji _ je bh = up-at {D = C} {D′ = C} {E = O} {E′ = E} lift
+flat-up-outer {sc = sc} {C = C} {op = op} {f = f} {O = O} {E = E} ji _ je bh = up-at {D = C} {D′ = C} {E = O} {E′ = E} (λ t → t) lift
   where
     f′ = λ a → ⟦ f a ⟧ (full sc)
     F = JoinF op f′ O
@@ -387,7 +446,7 @@ pin-inj refl = refl
 conn-up-body : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B}
              → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β
              → ConnE (CS.connAt k) (Frozen k) β E → Up C β C E
-conn-up-body {C = C} {k = k} {β = β} {E = E} _ pt sr bb _ ce = up-at {D = C} {D′ = C} {E = β} {E′ = E} lift
+conn-up-body {C = C} {k = k} {β = β} {E = E} _ pt sr bb _ ce = up-at {D = C} {D′ = C} {E = β} {E′ = E} (λ t → t) lift
   where
     c = CS.connAt k
     open Connecting c (Frozen k) β using (ConnT; body; burst; echo; kept)
@@ -439,7 +498,7 @@ conn-up-body {C = C} {k = k} {β = β} {E = E} _ pt sr bb _ ce = up-at {D = C} {
 conn-up-src : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {β E : EmissionSet B}
             → T (CS.srcAtt k) → CS.scope k ≡ sc → (pt : Parts sc Rg k β) → T (CS.srcLive k) → AttFin k → Behind C β → Flags C k β
             → ConnE (CS.connAt k) (Frozen k) β E → Up C (Frozen k) C E
-conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt lv af bb fl ce = up lift
+conn-up-src {C = C} {k = k} {β = β} {E = E} sa _ pt lv af bb fl ce = up lift (λ t → t)
   where
     c = CS.connAt k
     open Connecting c (Frozen k) β using (ConnT; Alive; body; burst; echo; kept)

@@ -146,11 +146,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
     fb {c = Machine.inOuter _ _ _ _ _ _ ls _} {s = s} (d-outer fr _ _ _) lo _ = fb {s = flatS _ _ _ _ _ _ s ls} fr lo _
     fb {c = Machine.inLanes _ _ _ _ _ _ o pre post _} {s = s} (d-lanes fr _ _ _ _ _ _) lo _ =
       fb {s = flatS _ _ _ _ _ _ o (pre ʳ++ s ∷ post)} fr lo _
-    fb (d-src u _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (d-body u _ _ _) lo _ = fb-u u lo
-    fb (f-isle u _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (f-islec u _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
-    fb (f-islep u _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (d-src u _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (d-body u _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-isle u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-islec u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
+    fb (f-islep u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ = fb-u u lo
 
     fb-u : ∀ {Cr C D Γ X B} {E β : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {P} {o : St Γ X} {b : St (X ∷ Γ) B} {p}
          → Unread Rt Cr C D E β c k P → LoP (plug c (connS k o b)) p → Bnd Cr p Rt

@@ -302,9 +302,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
       loc ki = lo (plug-in c ki)
       hf′ : HR C p (scopeOf c) E′
       hf′ = hr-body {s = s} sc sr fl ce (lo-p loc) hf
-  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao _ bu nr ni) hf w lo =
+  rc {Cr = Cr} {C = Ci} {c = Machine.inSrc k b c} {s = s} {p} (f-isle u hk ub le na nc bh sd ss ao _ bu nr ni oz iz) hf w lo =
     Cr , f-isle u hk ub (burst-dn {C = Ci} {C′ = bef p} {k = k} (λ o → owes-≼ Ci w o) le) na nc (behind-bef bh (proj₁ (run hf env ef)))
-                (Shifted.subd′ {Ci} {p} w sd) ss ao (call-sh {k = k} {o = s} {b = b} ao loc) bu nr ni
+                (Shifted.subd′ {Ci} {p} w sd) ss ao (call-sh {k = k} {o = s} {b = b} ao loc) bu nr ni oz iz
        , env , ef , ≃-refl
     where
       loc : LoP (connS k s b) p
@@ -323,10 +323,10 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rc (d-take _ _) () w lo
   rc (d-outer _ _ _ _) () w lo
   rc (d-lanes _ _ _ _ _ _ _) () w lo
-  rc (d-src _ _ _ _ _ _ _) () w lo
-  rc (d-body _ _ _ _) () w lo
-  rc (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
-  rc (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) () w lo
+  rc (d-src _ _ _ _ _ _ _ pz oz iz) () w lo
+  rc (d-body _ _ _ _ oz iz) () w lo
+  rc (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) () w lo
+  rc (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) () w lo
 
   -- The frames, and the hole itself by `shift`, its keys being the tree's.
   fr-shift : ∀ {Cr C Γ A} {c : Ctx R Γ A} {s : St Γ A} {Rg E p}

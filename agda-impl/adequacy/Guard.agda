@@ -87,6 +87,7 @@ open Machine using (plug; mapS; scanS; cutS; lnS; takeS; flatS; connS)
 open Machine using (binds; free)
 open import adequacy.Cursor using (Husk; Burst; Subd; AttOwed; _⊑_; _∪ᵖ_; Up; InCall; Bursts; Thru)
 open import adequacy.Cursor.Tear using (NoIsle)
+open import adequacy.Cursor.Show using (thru-up0)
 open import adequacy.Cursor using (Adm; cov; Owes)
 open import adequacy.Rows using (pendRows)
 open import adequacy.Dispatch using (module Over)
@@ -594,7 +595,7 @@ module Lift {R : Set} (Rt : EmissionSet R) where
   lift {s = s} (f-body {k = k} {o = o′} fr sc pt _ sr _ _ ce) lo _ r mu z cl g =
     lift {s = connS k o′ s} fr lo _ (voc (proj₁ ce) (Connecting.body r , conn-reach (src-behind sc sr) z (proj₂ ce r))) mu z
       (clr-≈ (proj₁ ce) (clr-tr (clr-conn cl))) (Parts.b⊆ pt g)
-  lift (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni) _ _ r _ z _ _ = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu nr ni refl r (inj₂ z))
+  lift (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni oz iz) _ _ r _ z _ _ = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu (thru-up0 _ nr) ni refl r (inj₂ z))
   lift (f-took _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   lift (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
@@ -605,10 +606,10 @@ module Lift {R : Set} (Rt : EmissionSet R) where
   lift (d-take _ _) _ ()
   lift (d-outer _ _ _ _) _ ()
   lift (d-lanes _ _ _ _ _ _ _) _ ()
-  lift (d-src _ _ _ _ _ _ _) _ ()
-  lift (d-body _ _ _ _) _ ()
-  lift (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift (d-src _ _ _ _ _ _ _ pz oz iz) _ ()
+  lift (d-body _ _ _ _ oz iz) _ ()
+  lift (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
+  lift (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
 
 -- A ROW AT OR UNDER `y`: a row of the root's entry at or before `p`, with
 -- `y` itself or one of its ancestors.  A connect shows its source's rows a
@@ -659,24 +660,24 @@ module Outer {R} (o : PureObs [] R) where
       ... | inj₂ refl = e₀
       alive : Connecting.Alive (CS.connAt k) (Frozen k) β q
       alive = conn-alive {q = q} {q} pt fl lv lof past rs on
-  src-at (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni) _ _ row _ _ = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu nr ni refl row (inj₁ refl))
+  src-at (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni oz iz) _ _ row _ _ = inj₂ (isled u hb ub le na nc bh sd ss ao ic bu (thru-up0 _ nr) ni refl row (inj₁ refl))
   src-at (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-at (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  src-at (d-src _ _ _ _ _ _ _) _ ()
-  src-at (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  src-at (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  src-at (d-src _ _ _ _ _ _ _ pz oz iz) _ ()
+  src-at (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
+  src-at (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
 
   -- A source's step in flight: its row a level down, carried up.
   src-step : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s ε q Rg N E}
            → Fr Rt Cr (bef q) Rg (inSrc k b c) N E → Lo₀ q (inSrc k b c) → Fly (scopeOf c) Rg q N s E ε
            → Lifted Cr q ⊎ Isled Cr q (plug c (connS k s b))
   src-step {ε = ε} fr@(f-src _ _ pt _ _ _ _ _ fz _ _ _ _ _ _ _) lo (_ , row) = src-at fr lo tt row (unp ε) (Sound.rg (Parts.ss pt) (voc fz row) (vis ε))
-  src-step {ε = ε} fr@(f-isle _ _ _ _ _ _ _ _ ss _ _ _ _ _) lo (_ , row) = src-at fr lo tt row (unp ε) (Sound.rg ss row (vis ε))
+  src-step {ε = ε} fr@(f-isle _ _ _ _ _ _ _ _ ss _ _ _ _ _ oz iz) lo (_ , row) = src-at fr lo tt row (unp ε) (Sound.rg ss row (vis ε))
   src-step (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
   src-step (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  src-step (d-src _ _ _ _ _ _ _) _ ()
-  src-step (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  src-step (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  src-step (d-src _ _ _ _ _ _ _ pz oz iz) _ ()
+  src-step (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
+  src-step (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
 
   -- A lane's end in flight with values queued: its hand-off's skip a
   -- level down, carried up.

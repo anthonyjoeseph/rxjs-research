@@ -14,14 +14,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### AN ISLE'S SUBJECTS
+#### THE JOINER STEPPED
 
-A joiner inside an isle joins a subject the engine has not closed: its
-end owed at the isle's cursor. Open: `Inv` relates no isle cursor to its
-parent's, and a dead binder carries no `unshut`. Settled by a body, or a
-cursor field on isle frames paid at every producer.
+An outer's end, a switch's or exhaust's value, and a lane's rise, each
+into `Joined`/`Begun` by its policy. Open: whether a switch's kill leaves
+a killed lane's isles their pins, whether begun lanes stay ascending
+(`Asc`) under a kill or drop, and whether a bounded lane's end, dequeuing
+the head, leaves the next value's `Head` read off the lanes' `Census`.
+Settled when each is a body.
 
-Members: `shut-isle`.
+Members: `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`,
+`rise-lane-nx`, `rise-lane-cp`.
 
 #### THE JOINER'S PAST
 
@@ -39,17 +42,6 @@ its scope's hots, so the rest moves past `p`. Settled when each is a body.
 
 Members: `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`,
 `feed-up`.
-
-#### THE JOINER STEPPED
-
-An outer's end, a switch's or exhaust's value, and a lane's rise, each
-into `Joined`/`Begun` by its policy. Open: whether begun lanes stay
-ascending (`Asc`) under a kill or drop, and whether a bounded lane's end,
-dequeuing the head, leaves the next value's `Head` read off the lanes'
-`Census`. Settled when each is a body.
-
-Members: `rise-outer-switch`, `rise-outer-exhaust`, `rise-outer-cp`,
-`rise-lane-nx`, `rise-lane-cp`.
 
 #### THE COLD STEPPED
 

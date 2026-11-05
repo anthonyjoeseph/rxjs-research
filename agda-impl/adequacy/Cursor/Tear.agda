@@ -4,17 +4,18 @@ module adequacy.Cursor.Tear where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline)
+open import denotation.Events using (Pos; Timeline; ix)
 open import denotation.EmissionSet using (EmissionSet; out)
-open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no; thru-sub; thru-no;
-  flat-up-outer; flat-up-lane; conn-up-body; conn-up-src; conn-bursts; src-att)
+open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no;
+  thru-sub0; upa-adv; upa-of; up-ward; owes-onward; flat-up-outer; flat-up-lane; conn-up-body;
+  conn-up-src; conn-bursts; src-att)
 open import operation.PureObservable using (module Machine)
 
 open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
@@ -22,7 +23,7 @@ open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; attached; attAt;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; Frozen)
-open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
+open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Open; notT; Under; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
   Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_;
   h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined;
   l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map;
@@ -50,13 +51,23 @@ unbind : ∀ {Γ X B} {k : CS Γ X} {sc} {D} {b : St (X ∷ Γ) B} {β Q} → CS
        → Husk (binds (CS.src k) (CS.connAt k) sc) D b β Q → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D b β Q
 unbind refl h = h
 
--- Past its subscription: through its connect.
-subd-thru : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k)
-subd-thru {C = C} sd = thru-sub C (SubdAt.past sd)
+-- Past its subscription: through its first child.
+subd-thru0 : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k ++ [ ix 0 ])
+subd-thru0 {C = C} sd = thru-sub0 C (SubdAt.past sd)
+
+-- An attached source read as far as its reader.
+sh-up : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E₁ : EmissionSet X} {E : EmissionSet B} {P} → Husk sc D₁ o E₁ P → Up D₁ E₁ D E
+      → T (CS.srcAtt k) ⊎ T (CS.closed k) → SrcH sc D k o E (Under P)
+sh-up hk u sf = sh-dead hk (upa-of u) sf (λ {c} _ → up-ward {c = c} u)
+
+-- A live source's body: its source not closed, it ends past all the body
+-- reached.
+live-open : ∀ {Γ X B} {C} {k : CS Γ X} {β : EmissionSet B} → Flags C k β → T (CS.srcLive k) → Open k C
+live-open {C = C} {k = k} fl l nc fz t cr = notT (CS.closed k) nc (Flags.unshut fl l fz (λ o → owes-onward C o t cr))
 
 -- A cursor moved on: a source's closure read from it.
 srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
-srch-adv dm (sh-dead hk u sf)                       = sh-dead hk (up-adv dm u) sf
+srch-adv dm (sh-dead hk u sf ps)                    = sh-dead hk (upa-adv dm u) sf (λ h o → ps h (λ t → o (dm t)))
 srch-adv dm (sh-isle na nc sy bh sd ss ao ic bu nr) = sh-isle na nc sy bh sd ss ao ic bu (dm nr)
 srch-adv dm (sh-islec na cl sp tp hk di bh sd ao ic bu nr) = sh-islec na cl sp tp hk di bh sd ao ic bu (dm nr)
 srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc adm pe wn ss bu (dm nr)
@@ -65,8 +76,8 @@ srch-adv dm (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc
 ∅E : ∀ {A} → EmissionSet A
 ∅E _ _ = ⊥
 
-up-∅ : ∀ {A B} {D D′} {E : EmissionSet B} → Up D (∅E {A}) D′ E
-up-∅ = up λ _ _ ()
+up-∅ : ∀ {A B} {D} {E : EmissionSet B} → Up D (∅E {A}) D E
+up-∅ = up (λ _ _ ()) (λ t → t)
 
 mutual
   husk-of : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Sync sc Rg C s E → Σ Pts (Husk sc C s E)
@@ -86,21 +97,21 @@ mutual
   husk-of (s-conn {k = k} sc pt bs bh ss tn fl ce) =
     by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk sc pt (ss l) (bh l) fl ce))
                                        (unbind {k = k} sc (proj₂ (husk-of (bs l))))
-                                       (conn-up-body sc pt (ss l) (bh l) fl ce))
-                      (λ nl → _ , h-conn (srch-adv (Torn.dom (tn nl)) (Torn.sh (tn nl))) (Torn.bh (tn nl)) (up-adv (Torn.dom (tn nl)) (Torn.bu (tn nl))))
+                                       (conn-up-body sc pt (ss l) (bh l) fl ce) (live-open fl l) (inj₂ sc))
+                      (λ nl → _ , h-conn (srch-adv (Torn.dom (tn nl)) (Torn.sh (tn nl))) (Torn.bh (tn nl)) (up-adv (Torn.dom (tn nl)) (Torn.bu (tn nl))) (Torn.opn (tn nl)) (inj₂ sc))
   husk-of (s-join _ _ _ _ _)        = _ , h-blank tt
   husk-of (s-joinx _ _)             = _ , h-blank tt
 
   src-husk : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} → CS.scope k ≡ sc → (pt : Parts sc Rg k β)
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
   src-husk {C = C} sc pt sr@(src-pend na nc ba an adm pe wn _ nr) bb fl ce =
-    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts pt ce) (thru-no C nr)
+    _ , sh-pend na nc ba an sc adm pe wn (Parts.ss pt) (conn-bursts pt ce) nr
   src-husk {k = k} sc pt sr@(src-on nc sy bh sd _ ao ic _) bb fl ce =
-    by (CS.srcAtt k) (λ t → _ , sh-dead (proj₂ (husk-of sy)) (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce) (inj₁ t))
-                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts pt ce) (subd-thru {k = k} sd))
+    by (CS.srcAtt k) (λ t → _ , sh-up (proj₂ (husk-of sy)) (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce) (inj₁ t))
+                     (λ na → _ , sh-isle na nc sy bh sd (Parts.ss pt) (ao na) (ic na) (conn-bursts pt ce) (subd-thru0 {k = k} sd))
   src-husk {C = C} {k = k} sc pt sr@(src-shut cl sp tp hk dm bh sd ic _ _) bb fl ce =
-    by (CS.srcAtt k) (λ t → _ , sh-dead hk (up-pre dm (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce)) (inj₁ t))
-                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts pt ce) (subd-thru {k = k} sd))
+    by (CS.srcAtt k) (λ t → _ , sh-up hk (up-pre dm (conn-up-src t sc pt (proj₁ (src-att t sr)) (proj₂ (src-att t sr)) bb fl ce)) (inj₁ t))
+                     (λ na → _ , sh-islec {Ci = C} na cl sp tp hk dm bh sd (proj₁ (ic na)) (proj₂ (ic na)) (conn-bursts pt ce) (subd-thru0 {k = k} sd))
 
   begun-husk : ∀ {Γ A B} {sc : Scope Γ} {Rl C} {P : Pol A B} {O E vs ls n}
              → (∀ {q a D} → O q (out a) → Runs P q → Dom C D → (∀ {r} → Thru D r → NoKill P q r) → Up D (Lane P q a) C E)
@@ -165,14 +176,14 @@ mutual
   off-husk (h-ln hk u)      = h-ln (off-husk hk) u
   off-husk (h-take hk u)    = h-take (off-husk hk) u
   off-husk (h-flat ho u hl) = h-flat (off-husk ho) u (offL-husk hl)
-  off-husk (h-conn sh bh u) = h-conn (srch-off sh) (off-husk bh) u
+  off-husk (h-conn sh bh u op se) = h-conn (srch-off sh) (off-husk bh) u op se
 
   offL-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {ls : List (St Γ A)} {E P} → HuskL sc D ls E P → HuskL sc D (offL ls) E P
   offL-husk hl-none         = hl-none
   offL-husk (hl-more h u t) = hl-more (off-husk h) u (offL-husk t)
 
   srch-off : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → SrcH sc D k o E P → SrcH sc D k (offIf (CS.srcAtt k) o) E P
-  srch-off {k = k} (sh-dead hk u sf) = sh-dead (offIf-husk (CS.srcAtt k) hk) u sf
+  srch-off {k = k} (sh-dead hk u sf ps) = sh-dead (offIf-husk (CS.srcAtt k) hk) u sf ps
   srch-off {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _ _)  = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
   srch-off {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _ _ _) = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
   srch-off {k = k} sh@(sh-pend na _ _ _ _ _ _ _ _ _ _) = subst (λ o′ → SrcH _ _ k o′ _ _) (sym (offIf-off (CS.srcAtt k) na)) sh
@@ -249,7 +260,7 @@ mutual
   unsub-husk (h-ln hk u)      = _ , h-ln hk u , ⊑-refl
   unsub-husk (h-take hk u)    = let (_ , h , le) = cut-husk hk in _ , h-take h u , le
   unsub-husk (h-flat ho u hl) = let (_ , h , le) = cut-husk ho ; (_ , g , le′) = kill-husk hl in _ , h-flat h u g , ∪-⊑ le le′
-  unsub-husk (h-conn sh bh u) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn h g u , ∪-⊑ le le′
+  unsub-husk (h-conn sh bh u op se) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn h g u op se , ∪-⊑ le le′
 
   cut-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} → Husk sc D s E P → Σ Pts λ P′ → Husk sc D (proj₁ (cut s)) E P′ × P ⊑ P′
   cut-husk {s = s} (h-blank q)        = _ , h-blank (quiet-cut {s = s} q) , ⊑-refl
@@ -260,7 +271,7 @@ mutual
   cut-husk hk@(h-ln _ _)               = _ , hk , ⊑-refl
   cut-husk hk@(h-take _ _)             = _ , hk , ⊑-refl
   cut-husk hk@(h-flat _ _ _)           = _ , hk , ⊑-refl
-  cut-husk hk@(h-conn _ _ _)           = _ , hk , ⊑-refl
+  cut-husk hk@(h-conn _ _ _ _ _)       = _ , hk , ⊑-refl
 
   kill-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {ls : List (St Γ A)} {E P} → HuskL sc D ls E P → Σ Pts λ P′ → HuskL sc D (proj₁ (killAll ls)) E P′ × P ⊑ P′
   kill-husk hl-none                            = _ , hl-none , ⊑-refl
@@ -272,7 +283,7 @@ mutual
   kill-husk (hl-more hk@(h-cut _ _) u hl)      = kill-keep hk u hl
   kill-husk (hl-more hk@(h-take _ _) u hl)     = kill-keep hk u hl
   kill-husk (hl-more hk@(h-flat _ _ _) u hl)   = kill-keep hk u hl
-  kill-husk (hl-more hk@(h-conn _ _ _) u hl)   = kill-keep hk u hl
+  kill-husk (hl-more hk@(h-conn _ _ _ _ _) u hl)   = kill-keep hk u hl
 
   -- A list entry no kill reaches, kept.
   kill-keep : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} {l : St Γ A} {ls E₁ E P Q} → Husk sc D₁ l E₁ P → Up D₁ E₁ D E → HuskL sc D ls E Q
@@ -301,7 +312,7 @@ mutual
 
   srch-unsub : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → SrcH sc D k o E P
              → Σ Pts λ P′ → SrcH sc D k (proj₁ (unsubIf (CS.srcAtt k) o)) E P′ × P ⊑ P′
-  srch-unsub {k = k} (sh-dead hk u sf) = let (_ , h , le) = unsubIf-husk (CS.srcAtt k) hk in _ , sh-dead h u sf , under-⊑ le
+  srch-unsub {k = k} (sh-dead hk u sf ps) = let (_ , h , le) = unsubIf-husk (CS.srcAtt k) hk in _ , sh-dead h u sf ps , under-⊑ le
   srch-unsub {k = k} sh@(sh-isle na _ _ _ _ _ _ _ _ _)  = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-islec na _ _ _ _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl
   srch-unsub {k = k} sh@(sh-pend na _ _ _ _ _ _ _ _ _ _) = _ , subst (λ o′ → SrcH _ _ k o′ _ _) (sym (unsubIf-off (CS.srcAtt k) na)) sh , ⊑-refl

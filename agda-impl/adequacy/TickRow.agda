@@ -194,9 +194,9 @@ module _ {R : Set} (o : PureObs [] R) where
     κ (lifted-below lo (Outer.src-at o fr (lo₀ (inSrc k b c) {s} lo) tt r tt g))
   lift₀ {s = s} fr@(f-src {k = k} {b = b} {c = c} _ _ pt _ _ _ _ _ fz _ _ _ _ _ _ _) lo _ r ft-end κ =
     κ (lifted-below lo (Outer.src-at o fr (lo₀ (inSrc k b c) {s} lo) tt r tt (Sound.rg (Parts.ss pt) (voc fz r) tt)))
-  lift₀ {s = s} fr@(f-isle {k = k} {b = b} {c = c} _ _ _ _ _ _ _ _ _ _ _ _ _ _) lo _ r (ft-skip g) κ =
+  lift₀ {s = s} fr@(f-isle {k = k} {b = b} {c = c} _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) lo _ r (ft-skip g) κ =
     κ (lifted-below lo (Outer.src-at o fr (lo₀ (inSrc k b c) {s} lo) tt r tt g))
-  lift₀ {s = s} fr@(f-isle {k = k} {b = b} {c = c} _ _ _ _ _ _ _ _ ss _ _ _ _ _) lo _ r ft-end κ =
+  lift₀ {s = s} fr@(f-isle {k = k} {b = b} {c = c} _ _ _ _ _ _ _ _ ss _ _ _ _ _ oz iz) lo _ r ft-end κ =
     κ (lifted-below lo (Outer.src-at o fr (lo₀ (inSrc k b c) {s} lo) tt r tt (Sound.rg ss r tt)))
   lift₀ {s = s} (f-body {k = k} {o = o′} fr sc pt _ sr _ _ ce) lo _ r (ft-skip g) =
     lift₀ {s = connS k o′ s} fr lo tt (voc (proj₁ ce) (Connecting.body {p = CS.connAt k} r , conn-reach₀ {p = CS.connAt k} {e = skip} (src-behind sc sr) (proj₂ ce r))) (ft-skip (Parts.b⊆ pt g))
@@ -212,10 +212,10 @@ module _ {R : Set} (o : PureObs [] R) where
   lift₀ (d-take _ _) _ ()
   lift₀ (d-outer _ _ _ _) _ ()
   lift₀ (d-lanes _ _ _ _ _ _ _) _ ()
-  lift₀ (d-src _ _ _ _ _ _ _) _ ()
-  lift₀ (d-body _ _ _ _) _ ()
-  lift₀ (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
-  lift₀ (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ()
+  lift₀ (d-src _ _ _ _ _ _ _ pz oz iz) _ ()
+  lift₀ (d-body _ _ _ _ oz iz) _ ()
+  lift₀ (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
+  lift₀ (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ()
 
   -- The cursor invariant where a run has reached.
   inv-at : ∀ {rs k} → Path (load o) rs k → Σ Cur λ Cr → Σ Cur λ C → Inv Rt Cr C k

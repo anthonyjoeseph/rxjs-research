@@ -351,9 +351,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
        → pendRows (full (scopeOf c)) o q ≈ E → Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) o q) → PendV Cr C c o q
   srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
     (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) (λ _ → owes-call {k = k} C ow) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
-  srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb) refl pe wn =
+  srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb oz iz) refl pe wn =
     (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb oz iz
          , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
@@ -376,10 +376,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp (d-take _ _)                                               ()   _ _
   srcp (d-outer _ _ _ _)                                          ()   _ _
   srcp (d-lanes _ _ _ _ _ _ _)                                      ()   _ _
-  srcp (d-src _ _ _ _ _ _ _)                                        ()   _ _
-  srcp (d-body _ _ _ _)                                           ()   _ _
-  srcp (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _)                     ()   _ _
-  srcp (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)                  ()   _ _
+  srcp (d-src _ _ _ _ _ _ _ pz oz iz)                                        ()   _ _
+  srcp (d-body _ _ _ _ oz iz)                                           ()   _ _
+  srcp (f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz)                     ()   _ _
+  srcp (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz)                  ()   _ _
 
   pend-view : ∀ {Cr C Γ A} {c : Ctx R Γ A} {o q p} → Inv Rt Cr C ⟨ c , pend o q , subscribing , p ⟩ → PendV Cr C c o q
   pend-view (pending fr h)                                     = _ , _ , fr , h
@@ -435,7 +435,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
                     ; unshut = λ _ {c′} y n → ⊥-elim (n (owes-≼ (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 1 ]} {c′} ow₁ (≺→≼ {q ⊕ [ ix 1 ]} {c′} (pend-past (scopeOf c) s ad (ok-step q ok) y))))
                     ; ended = λ _ {c′} y n → ⊥-elim (n (≺→≼ {q ⊕ [ ix 0 ]} {c′} (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad) y))) }
     in Cr′ , bef (q ⊕ [ ix 0 ]) ,
-       pending (f-body fr′ refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁ (λ h → h (≺-ext q [])))
+       pending (f-body fr′ refl pt tt (src-pend tt tt refl refl (ok , ad) ≈-refl ws ow₁ (≼-refl {q ⊕ [ ix 0 ]}))
                  (behind-past (bef (q ⊕ [ ix 0 ])) {q ⊕ [ ix 0 ]} (≼-refl {q ⊕ [ ix 0 ]}) (pend-past (binds s q (scopeOf c)) b (ok , ad) (conn-ok {s = s} ok ad))) fl
                  (eq , entered-reach (⟦ b ⟧ (full (binds s q (scopeOf c)))) (q ⊕ [ ix 0 ])))
          (≼-refl {q ⊕ [ ix 0 ]} , conn-ok {s = s} ok ad , (ok , ad) , ≈-refl , wb) ,

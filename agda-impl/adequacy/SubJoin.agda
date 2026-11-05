@@ -10,13 +10,13 @@
 -- before its own, each a label down, since none lies under another.
 module adequacy.SubJoin where
 
-open import Data.Bool using (T; true; false)
+open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
-open import Data.List.Relation.Unary.All using (lookup)
+open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.AllPairs using () renaming ([] to []ᴾ)
 import Data.List as L
@@ -27,8 +27,8 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (connected)
-open import denotation.Events using (ix; sub; last; _<ᵖ_; <ᵖ-split; <ᵖ-down; <ᵖ-part)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Bare; Unpinned; Dep; Few; Reach; enter; ⟦_⟧; Den; hot;
+open import denotation.Events using (Pos; ix; sub; last; _<ᵖ_; <ᵖ-split; <ᵖ-down; <ᵖ-part)
+open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; end; pin; Bare; Unpinned; Dep; Few; Reach; enter; ⟦_⟧; Den; hot;
   coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; entered-few)
@@ -38,9 +38,11 @@ open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; binds; CS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (full; pendRows; Inbox; _≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; bef; Owes; Due; Unfed; Adm; Flags; Subd; subd; InCall; Thru; Within; _≈_; s-join)
+open import adequacy.Cursor using (Cur; origin; bef; Owes; Onward; Dom; Up; SubdAt; Due; Unfed; Adm; Flags; InCall; Within; _≈_;
+  s-join)
 open import adequacy.Cursor.Tear using (c-abs)
-open import adequacy.Cursor.Frame using (Fr; Unread; Need; owes; dead; lane; lanecut; pnd;
+open import adequacy.Cursor.Show using (owes-onward; up-ward; call-owes; call-onward)
+open import adequacy.Cursor.Frame using (Fr; Unread; un-dead; un-torn; Need; owes; dead; lane; lanecut; pnd;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled)
@@ -48,11 +50,41 @@ open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (owes?; owes-≼; good-full)
 
 ------------------------------------------------------------------------
--- A hot's ends, each still owed.
+-- A hot's ends: each still owed, or past all a cursor has reached.
+
+EndsIn : (Pos → Set) → ∀ {A} → Den A → Set
+EndsIn P (hot t)    = ∀ {c} → t c end → P c
+EndsIn P (coldAt _) = ⊤
 
 Shut : ∀ {A} → Cur → Den A → Set
-Shut C (hot t)    = ∀ {c} → t c end → Owes C c
-Shut C (coldAt _) = ⊤
+Shut C = EndsIn (Owes C)
+
+Onto : ∀ {A} → Cur → Den A → Set
+Onto D = EndsIn (Onward D)
+
+ends-imp : ∀ {P Q : Pos → Set} {A} (d : Den A) → (∀ {c} → P c → Q c) → EndsIn P d → EndsIn Q d
+ends-imp (hot t)    f e r = f (e r)
+ends-imp (coldAt _) _ _   = tt
+
+-- A binder's ends are hot rows of its environment.
+ends-hot : ∀ {Γ} (ρ : DenEnv Γ) {A} (x : A ∈ Γ) {P Q : Pos → Set} → (∀ {c} → Hots ρ c → P c → Q c) → EndsIn P (lookup ρ x) → EndsIn Q (lookup ρ x)
+ends-hot (hot t ∷ᴬ ρ)    (here refl) f e r = f (inj₁ (_ , r)) (e r)
+ends-hot (coldAt _ ∷ᴬ ρ) (here refl) _ _   = tt
+ends-hot (hot _ ∷ᴬ ρ)    (there x)   f e   = ends-hot ρ x (λ h → f (inj₂ h)) e
+ends-hot (coldAt _ ∷ᴬ ρ) (there x)   f e   = ends-hot ρ x f e
+
+onto-origin : ∀ {A} (d : Den A) → Onto origin d
+onto-origin (hot t)    _ ()
+onto-origin (coldAt _) = tt
+
+shut-onto : ∀ C {A} {d : Den A} → Shut C d → Onto C d
+shut-onto C {d = d} = ends-imp d (λ {c} o → owes-onward C {c} o)
+
+dom-onto : ∀ {C D A} {d : Den A} → Dom C D → Onto C d → Onto D d
+dom-onto {d = d} dm = ends-imp d (λ on t → on (dm t))
+
+up-onto : ∀ {A B Y} {D D₁} {E : EmissionSet B} {E′ : EmissionSet Y} {d : Den A} → Up D₁ E D E′ → Onto D d → Onto D₁ d
+up-onto {d = d} u = ends-imp d (λ {c} → up-ward {c = c} u)
 
 ------------------------------------------------------------------------
 -- A binder of an admissible scope: a lawful hot, each unpinned row with
@@ -145,9 +177,12 @@ join-due {C = C} {j} .(hot t) {t} refl B ow sh = (λ ((r , _) , v , o) → inj�
     back (inj₂ (u , v , o)) = (unfed u , rejoin-reach B (unfed u) v) , v , o
 
 ------------------------------------------------------------------------
--- THE SUBJECTS ABOVE A LIVE HOLE: each the engine has not closed ends
--- where the hole's cursor has not passed.  A binder whose source runs
--- reads it off its flags; an isle's hole reads it at the isle's cursor.
+-- THE SUBJECTS ABOVE A HOLE: each the engine has not closed ends where
+-- the hole's live cursor has not passed, and past all its dead cursor
+-- has reached.  A binder whose source runs reads it off its flags; a
+-- connect no live node reads, off where its body stood when it fell; an
+-- isle, off its parent's cursor, which is past its first slot, a hot
+-- being in no slot's world.
 
 -- A need some live node reads.
 Live : Need → Set
@@ -157,51 +192,105 @@ Live (lane _ _ _)    = ⊤
 Live (lanecut _ _ _) = ⊤
 Live (pnd _)         = ⊤
 
+-- The cursor a hole's need reads past: its live one, or a dead part's.
+Reads : Need → Cur → Cur
+Reads owes             C = C
+Reads (dead D _)       _ = D
+Reads (lane true _ _)  C = C
+Reads (lane false D _) _ = D
+Reads (lanecut true _ _)  C = C
+Reads (lanecut false D _) _ = D
+Reads (pnd _)          C = C
+
 module _ {R : Set} (Rt : EmissionSet R) where
 
-  postulate
-    -- AN ISLE'S SUBJECTS, at its own cursor: each the engine has not
-    -- closed ends past where the isle has reached.
-    shut-isle : ∀ {Cr C D Ci Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {E′ : EmissionSet B} {β : EmissionSet B} {P}
-              → Unread Rt Cr C D E′ β c k P → Thru D (CS.connAt k) → Subd (scopeOf c) Ci k → InCall Ci k
-              → ∀ {A} (x : A ∈ Γ) → closedUp c x ≡ false → Shut Ci (lookup (full (scopeOf c)) x)
+  mutual
+    shut-up : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E → Live N
+            → ∀ {X} (x : X ∈ Γ) → closedUp c x ≡ false → Shut C (lookup (full (scopeOf c)) x)
+    shut-up (f-top _) _ () _
+    shut-up (f-map fr _ _) _ x cu                     = shut-up fr tt x cu
+    shut-up (f-scan fr _ _ _) _ x cu                  = shut-up fr tt x cu
+    shut-up (f-cut fr) _ x cu                         = shut-up fr tt x cu
+    shut-up (f-take fr _ _ _) _ x cu                  = shut-up fr tt x cu
+    shut-up (f-took _ _ _ _ _ _ _ _ _ _) () _ _
+    shut-up (f-outer fr _ _ _ _ _) _ x cu             = shut-up fr tt x cu
+    shut-up (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
+    shut-up (f-lane fr) _ x cu                        = shut-up fr tt x cu
+    shut-up (f-lnct fr) _ x cu                        = shut-up fr tt x cu
+    shut-up (f-src fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
+    shut-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () _ _
+    shut-up (f-srcp fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
+    shut-up {C = C} (f-body {k = k} _ _ _ sl _ _ fl _) _ (here refl) cu {c′} r =
+      [ (λ o → o) , (λ no → ⊥-elim (subst T cu (Flags.unshut fl sl (proj₁ r) no))) ]′ (owes? C c′)
+    shut-up {C = C} (f-body fr sc _ _ _ _ _ _) _ (there x) cu =
+      subst (λ s → Shut C (lookup (full s) x)) (sym sc) (shut-up fr tt x cu)
+    shut-up (d-map _ _) () _ _
+    shut-up (d-scan _ _) () _ _
+    shut-up (d-cut _ _) () _ _
+    shut-up (d-ln _ _) () _ _
+    shut-up (d-take _ _) () _ _
+    shut-up (d-outer _ _ _ _) () _ _
+    shut-up (d-lanes _ _ _ _ _ _ _) () _ _
+    shut-up (d-src _ _ _ _ _ _ _ _ _ _) () _ _
+    shut-up (d-body _ _ _ _ _ _) () _ _
+    shut-up {C = Ci} {c = inSrc k _ c} (f-isle u _ _ _ _ _ _ sd _ _ ic _ th _ _ _) _ x cu =
+      ends-hot (full (scopeOf c)) x (λ hc on → call-owes {r = CS.connAt k} Ci ic (proj₂ (SubdAt.hok sd)) hc (on th)) (unread-past u x cu)
+    shut-up (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () _ _
+    shut-up {c = inSrc k _ c} (f-islep u _ _ _ _ _ _ _ _ adm _ _ th _ _ _) _ x cu =
+      ends-hot (full (scopeOf c)) x (λ hc on → call-owes {r = r} (bef (r ++ [ ix 1 ])) slot (proj₂ (proj₁ adm)) hc (on th)) (unread-past u x cu)
+      where
+        r = CS.connAt k
+        slot : InCall (bef (r ++ [ ix 1 ])) k
+        slot {s} t = ≼-trans {s} {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} t (≺→≼ {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} (Equivalence.from T-≡ (<ᵖ-part r {ix 1} {ix 2} [] [] refl)))
 
-  shut-up : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E → Live N
-          → ∀ {X} (x : X ∈ Γ) → closedUp c x ≡ false → Shut C (lookup (full (scopeOf c)) x)
-  shut-up (f-top _) _ () _
-  shut-up (f-map fr _ _) _ x cu                     = shut-up fr tt x cu
-  shut-up (f-scan fr _ _ _) _ x cu                  = shut-up fr tt x cu
-  shut-up (f-cut fr) _ x cu                         = shut-up fr tt x cu
-  shut-up (f-take fr _ _ _) _ x cu                  = shut-up fr tt x cu
-  shut-up (f-took _ _ _ _ _ _ _ _ _ _) () _ _
-  shut-up (f-outer fr _ _ _ _ _) _ x cu             = shut-up fr tt x cu
-  shut-up (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
-  shut-up (f-lane fr) _ x cu                        = shut-up fr tt x cu
-  shut-up (f-lnct fr) _ x cu                        = shut-up fr tt x cu
-  shut-up (f-src fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
-  shut-up (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () _ _
-  shut-up (f-srcp fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ x cu = shut-up fr tt x cu
-  shut-up {C = C} (f-body {k = k} _ _ _ sl _ _ fl _) _ (here refl) cu {c′} r =
-    [ (λ o → o) , (λ no → ⊥-elim (subst T cu (Flags.unshut fl sl (proj₁ r) no))) ]′ (owes? C c′)
-  shut-up {C = C} (f-body fr sc _ _ _ _ _ _) _ (there x) cu =
-    subst (λ s → Shut C (lookup (full s) x)) (sym sc) (shut-up fr tt x cu)
-  shut-up (d-map _ _) () _ _
-  shut-up (d-scan _ _) () _ _
-  shut-up (d-cut _ _) () _ _
-  shut-up (d-ln _ _) () _ _
-  shut-up (d-take _ _) () _ _
-  shut-up (d-outer _ _ _ _) () _ _
-  shut-up (d-lanes _ _ _ _ _ _ _) () _ _
-  shut-up (d-src _ _ _ _ _ _ _) () _ _
-  shut-up (d-body _ _ _ _) () _ _
-  shut-up (f-isle u _ _ _ _ _ _ sd _ _ ic _ th _) _ x cu = shut-isle u th sd ic x cu
-  shut-up (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () _ _
-  shut-up {c = inSrc k _ c} (f-islep u _ _ _ _ _ _ _ _ adm _ _ th _) _ x cu =
-    shut-isle u th (subd (λ o → o) (proj₁ adm)) slot x cu
-    where
-      r = CS.connAt k
-      slot : InCall (bef (r ++ [ ix 1 ])) k
-      slot {s} t = ≼-trans {s} {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} t (≺→≼ {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} (Equivalence.from T-≡ (<ᵖ-part r {ix 1} {ix 2} [] [] refl)))
+    -- Past all the cursor its need reads has reached.
+    past-up : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E
+            → ∀ {X} (x : X ∈ Γ) → closedUp c x ≡ false → Onto (Reads N C) (lookup (full (scopeOf c)) x)
+    past-up (f-top _) () _
+    past-up fr@(f-map _ _ _)                       x cu = live-onto fr tt x cu
+    past-up fr@(f-scan _ _ _ _)                    x cu = live-onto fr tt x cu
+    past-up fr@(f-cut _)                           x cu = live-onto fr tt x cu
+    past-up fr@(f-take _ _ _ _)                    x cu = live-onto fr tt x cu
+    past-up (f-took fr _ _ _ _ _ dm _ _ _)         x cu = dom-onto dm (live-onto fr tt x cu)
+    past-up fr@(f-outer _ _ _ _ _ _)               x cu = live-onto fr tt x cu
+    past-up fr@(f-lanes {b = true} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
+    past-up (f-lanes {b = false} fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ dl _) x cu = dom-onto (proj₁ (proj₂ (dl tt))) (live-onto fr tt x cu)
+    past-up (f-lane {b = true} fr)                 x cu = past-up fr x cu
+    past-up (f-lane {b = false} fr)                x cu = past-up fr x cu
+    past-up (f-lnct {b = true} fr)                 x cu = past-up fr x cu
+    past-up (f-lnct {b = false} fr)                x cu = past-up fr x cu
+    past-up fr@(f-src _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
+    past-up (f-srcc fr _ _ _ _ _ _ dm _ _ _ _ _ _ _ _) x cu = dom-onto dm (live-onto fr tt x cu)
+    past-up fr@(f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
+    past-up fr@(f-body _ _ _ _ _ _ _ _)            x cu = live-onto fr tt x cu
+    past-up (d-map fr u)                           x cu = up-onto u (past-up fr x cu)
+    past-up (d-scan fr u)                          x cu = up-onto u (past-up fr x cu)
+    past-up (d-cut fr u)                           x cu = up-onto u (past-up fr x cu)
+    past-up (d-ln fr u)                            x cu = up-onto u (past-up fr x cu)
+    past-up (d-take fr u)                          x cu = up-onto u (past-up fr x cu)
+    past-up (d-outer fr u _ _)                     x cu = up-onto u (past-up fr x cu)
+    past-up (d-lanes fr _ _ _ _ u _)               x cu = up-onto u (past-up fr x cu)
+    past-up {c = inSrc k _ c} (d-src u _ _ _ _ _ _ ps _ _) x cu =
+      ends-hot (full (scopeOf c)) x ps (unread-past u x cu)
+    past-up {c = inBody k _ c} (d-body _ _ _ _ op _) (here refl) cu r =
+      op (subst (λ b → T (not b)) (sym cu) tt) (proj₁ r)
+    past-up {c = inBody k _ c} (d-body _ _ _ _ _ (inj₁ refl)) (there x) cu = onto-origin (lookup (full (CS.scope k)) x)
+    past-up {c = inBody k _ c} (d-body u _ ub _ _ (inj₂ sc)) (there x) cu =
+      subst (λ s → Onto _ (lookup (full s) x)) (sym sc) (up-onto ub (unread-past u x cu))
+    past-up fr@(f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
+    past-up {c = inSrc k _ c} (f-islec u _ _ _ _ _ _ _ dm _ sd _ ic _ th _ _) x cu =
+      ends-hot (full (scopeOf c)) x (λ hc on {s} t → call-onward {r = CS.connAt k} _ ic (proj₂ (SubdAt.hok sd)) hc (on th) {s} (dm t)) (unread-past u x cu)
+    past-up fr@(f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
+
+    -- A dead part's parent: past all it has reached.
+    unread-past : ∀ {Cr C D Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {E β : EmissionSet B} {P}
+                → Unread Rt Cr C D E β c k P → ∀ {A} (x : A ∈ Γ) → closedUp c x ≡ false → Onto D (lookup (full (scopeOf c)) x)
+    unread-past (un-dead fr) x cu = past-up fr x cu
+    unread-past (un-torn fr _ _ _ _ _ _ dm) x cu = dom-onto dm (live-onto fr tt x cu)
+
+    live-onto : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E → Live N
+              → ∀ {X} (x : X ∈ Γ) → closedUp c x ≡ false → Onto C (lookup (full (scopeOf c)) x)
+    live-onto {C = C} fr l x cu = shut-onto C (shut-up fr l x cu)
 
   -- A JOINER OF A LIVE SUBJECT: joined where it subscribed, read off its
   -- pending frame.

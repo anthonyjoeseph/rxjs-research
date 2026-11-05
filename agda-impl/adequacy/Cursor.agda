@@ -506,12 +506,36 @@ Dom : Cur → Cur → Set
 Dom C D = ∀ {r} → Thru D r → Thru C r
 
 -- A pin of `E` shows in `E′`, down a first-child chain.
+Lifts : ∀ {A B} → Cur → EmissionSet A → Cur → EmissionSet B → Set
+Lifts D E D′ E′ = ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
+                → Σ Pos λ xs → Σ Pos λ r′ → Thru D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
+                  × All (_≡ ix 0) xs
+
+-- Its pins shown above, by a reader that has read whatever it has.
 record Up {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B) : Set where
   constructor up
   field
-    lift : ∀ {y r} → Thru D r → T (inside r y) → E y (pin r) → Reach E y (pin r)
-         → Σ Pos λ xs → Σ Pos λ r′ → Thru D′ r′ × T (inside r′ (y ++ xs)) × E′ (y ++ xs) (pin r′) × Reach E′ (y ++ xs) (pin r′)
-           × All (_≡ ix 0) xs
+    lift : Lifts D E D′ E′
+    dom  : Dom D′ D
+
+-- An attached source's pins shown above: read on, perhaps, past its
+-- reader, within its subscribe call.
+record UpA {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet B) : Set where
+  constructor upa
+  field
+    lift : Lifts D E D′ E′
+
+-- A connect's body, read under the scope it was bound in, or never read.
+InScope : ∀ {Γ X} → CS Γ X → Scope Γ → Cur → Set₁
+InScope k sc D = D ≡ origin ⊎ CS.scope k ≡ sc
+
+-- Every position `D` has reached lies at or before `c`.
+Onward : Cur → Pos → Set
+Onward D c = ∀ {r} → Thru D r → r ≼ c
+
+-- A connect's source, not closed, ends past what `D` has reached.
+Open : ∀ {Γ X} → CS Γ X → Cur → Set
+Open k D = T (not (CS.closed k)) → ∀ {c} → Frozen k c end → Onward D c
 
 -- An unattached source's cursor: within its subscribe call, reaching
 -- nothing past the slot after it.
@@ -590,6 +614,7 @@ record Torn {Γ X B} (sc : Scope Γ) (C : Cur) (k : CS Γ X) (o : St Γ X) (b : 
     bh    : Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Pb
     bu    : Up Db β D E
     tl    : TailP C (Connecting.ConnT (CS.connAt k) (Frozen k) β) (Ps ∪ᵖ Pb)
+    opn   : Open k Db
 
 -- A lane in its joiner's list, live or over: its list entry over its
 -- switch, both on while it runs and both off once it is over.
@@ -744,7 +769,7 @@ data Src where
            → Adm (binds (CS.src k) (CS.connAt k) sc)
            → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Within Rg sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]))
-           → Owes C (CS.connAt k ++ [ ix 1 ]) → ¬ Owes C (CS.connAt k)
+           → Owes C (CS.connAt k ++ [ ix 1 ]) → Thru C (CS.connAt k ++ [ ix 0 ])
            → Src sc Rg C k (pend o (CS.connAt k ++ [ ix 1 ]))
   -- subscribed: the cursor at or past its subscription, made where
   -- admissible
@@ -768,29 +793,31 @@ data Husk where
   h-flat  : ∀ {Γ} {sc : Scope Γ} {D D₁} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E P Q}
           → Husk sc D₁ o O P → Up D₁ O D E → HuskL sc D ls E Q → Husk sc D (flatS op f ω d n qu o ls) E (P ∪ᵖ Q)
   h-conn  : ∀ {Γ} {sc : Scope Γ} {D D₁} {X B} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {β E P Q}
-          → SrcH sc D k o E P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D₁ b β Q → Up D₁ β D E → Husk sc D (connS k o b) E (P ∪ᵖ Q)
+          → SrcH sc D k o E P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D₁ b β Q → Up D₁ β D E → Open k D₁ → InScope k sc D₁
+          → Husk sc D (connS k o b) E (P ∪ᵖ Q)
 
 data HuskL where
   hl-none : ∀ {Γ} {sc : Scope Γ} {D} {A} {E} → HuskL sc D {A} [] E ∅ᵖ
   hl-more : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} {l : St Γ A} {ls E₁ E P Q} → Husk sc D₁ l E₁ P → Up D₁ E₁ D E → HuskL sc D ls E Q → HuskL sc D (l ∷ ls) E (P ∪ᵖ Q)
 
 data SrcH where
-  sh-dead  : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E₁ : EmissionSet X} {E : EmissionSet B} {P} → Husk sc D₁ o E₁ P → Up D₁ E₁ D E
-           → T (CS.srcAtt k) ⊎ T (CS.closed k) → SrcH sc D k o E (Under P)
+  sh-dead  : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E₁ : EmissionSet X} {E : EmissionSet B} {P} → Husk sc D₁ o E₁ P → UpA D₁ E₁ D E
+           → T (CS.srcAtt k) ⊎ T (CS.closed k) → (∀ {c} → Hots (full sc) c → Onward D c → Onward D₁ c)
+           → SrcH sc D k o E (Under P)
   sh-isle  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri Ci}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → Sync sc Ri Ci o (Frozen k) → Behind Ci (Frozen k) → Subd sc Ci k
-           → Sound Ri (Frozen k) → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Sound Ri (Frozen k) → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k ++ [ ix 0 ]) → SrcH sc D k o E (Burst Ci k)
   -- an isle whose source has ended
   sh-islec : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E : EmissionSet B} {Ci P}
            → T (not (CS.srcAtt k)) → T (CS.closed k) → Spent Ci (Frozen k) → TailP Ci (Frozen k) P → Husk sc D₁ o (Frozen k) P → Dom Ci D₁
-           → Behind Ci (Frozen k) → Subd sc Ci k → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k) → SrcH sc D k o E (Burst Ci k)
+           → Behind Ci (Frozen k) → Subd sc Ci k → AttOwed k → InCall Ci k → Bursts k E → Thru D (CS.connAt k ++ [ ix 0 ]) → SrcH sc D k o E (Burst Ci k)
   -- a source not yet subscribed: its whole burst, which runs whatever
   -- happens above it, its body's mark subscribing it regardless
   sh-pend  : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {E : EmissionSet B} {Ri}
            → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → CS.scope k ≡ sc
            → Adm (binds (CS.src k) (CS.connAt k) sc) → pendRows (full sc) o (CS.connAt k ++ [ ix 1 ]) ≈ Frozen k
            → Within Ri sc (CS.connAt k ++ [ ix 1 ]) (pendRows (full sc) o (CS.connAt k ++ [ ix 1 ])) → Sound Ri (Frozen k)
-           → Bursts k E → Thru D (CS.connAt k)
+           → Bursts k E → Thru D (CS.connAt k ++ [ ix 0 ])
            → SrcH sc D k (pend o (CS.connAt k ++ [ ix 1 ])) E (Burst (bef (CS.connAt k ++ [ ix 1 ])) k)
 
 -- A connect's parts read again under fields they do not read.
