@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; head-≡; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
+open import adequacy.Cursor using (SlotsMv; slots-mv; takes; Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; head-≡; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
 open import adequacy.Cursor.Show using (thru-owes)
 open import adequacy.Floor.Keys using (own-bld; os; oo)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
@@ -580,7 +580,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-take ki))
     sh (s-took fl g ni oa tp hk dm nf m sd) env ef lo = s-took fl (λ {q} o → g {q} (dn o)) (λ t → nm (ni t)) (owe-sh oa (lo-p lo)) (td tp) hk (λ t → th (dm t)) nf m sd
     sh (s-flat {op = op} ji sy jn m sd bh) env ef lo =
-      s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env (lo-p lo′)) (kill-out op) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
+      s-flat ji (sh sy env ef lo′) (joined-sh (bound sy env (lo-p lo′)) (kill-out op) (slots-mv op) jn env ef (λ i ki → lo (k-kid (k-lane i ki)))) m sd
              (behind-bef {C = C} bh (flat-f sy jn env ef (lo-p lo)))
       where lo′ = λ {κ} (ki : KeyIn _ κ) → lo (k-kid (k-outer ki))
     sh {sc = sc} (s-conn {k = k} {o = o} {b = b} {β = β} refl pt bs bb ss tn fl m) env ef lo = s-conn refl pt bs′ bb′ (λ t → src-sh (ss t) env ef lo) tn′ fl′ m
@@ -614,11 +614,11 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
                (λ na → proj₁ (ic na) , call-sh {k = k} {o = o} {b = b} (proj₁ (ic na)) (lo-p lo)) af lv
 
     joined-sh : ∀ {Γ} {sc : Scope Γ} {Rl} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
-              → (∀ {q e} → Due C O q e → p ≼ q) → (∀ {q q′} → Kill P q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′) → Joined sc Rl C P O d n qu ls
+              → (∀ {q e} → Due C O q e → p ≼ q) → (∀ {q q′} → Kill P q q′ → Σ A λ a′ → O q′ (out a′) × q ≺ q′) → SlotsMv P O → Joined sc Rl C P O d n qu ls
               → Env (full sc) C p → EnvL (full sc) C p → (∀ {l} → l ∈ ls → Lo l (at p)) → Joined sc Rl (bef p) P O d n qu ls
-    joined-sh {P = P} {O} ob kr (joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) env ef lo =
+    joined-sh {P = P} {O} ob kr mv (joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) env ef lo =
       joined (begun-sh (λ k o → ob (proj₁ (proj₂ (kr k)) , tt , o)) lb bg env ef lo) (waiting-sh {P = P} {O = O} {vs = vs} {ws = ws} lb ah wt)
-             (whole-sh {P = P} {vs = vs} {ws = ws} ob wh) (od-sh {O = O} ob od) (ahead-sh {P = P} {vs = vs} {ws = ws} lb ah) ao en li sl
+             (whole-sh {P = P} {vs = vs} {ws = ws} ob wh) (od-sh {O = O} ob od) (ahead-sh {P = P} {vs = vs} {ws = ws} lb ah) ao en li (mv (λ {y} → dn {y}) (λ x o → ob (x , tt , o)) sl)
       where
         lb : LBnd C p P vs
         lb iv kl ln v ow = begun-b {O = O} bg iv kl ln v ow en env (λ i → lo-p (lo i))

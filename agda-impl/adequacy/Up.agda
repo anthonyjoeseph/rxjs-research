@@ -36,7 +36,7 @@ open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼
 open _≃_
 open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn; AttOwed; InCall; AttFin)
+open import adequacy.Cursor using (SlotsMv; slots-mv; Cur; Dom; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn; AttOwed; InCall; AttFin)
 open import adequacy.Cursor.Tear using (c-abs; by; husk-of; NoIsle; NoIsleL; Settles; sync-pend)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; Unread; un-dead; un-torn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
@@ -201,7 +201,7 @@ module Past (p : Pos) where
         owe-up (o-cut n)  = o-cut (nm n)
         owe-up (o-over n) = o-over (nm n)
     up (s-flat {sc = sc} {op = op} {f = f} ji sy jn m so bh) sd nr nh =
-      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (kill-up op (off-rg so no)) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) jn) m so (behind-up bh)
+      s-flat ji (up sy so no nh) (joined-up (off-rg so no) (kill-up op (off-rg so no)) (λ r → nr (proj₁ r)) nh (Lanes.lane-rows sc f ji op (joined-li jn)) (slots-mv op) jn) m so (behind-up bh)
       where no = λ r → nr (proj₁ r)
     up (s-conn {k = k} refl pt bs bb ss tn fl m) sd nr nh =
       s-conn refl pt (λ t → up (bs t) (Parts.sb pt) nb (bind-nh {k = k} (off-rg (Parts.ss pt) ns) nh)) (λ t → behind-up (bb t))
@@ -244,10 +244,11 @@ module Past (p : Pos) where
 
     joined-up : ∀ {Γ} {sc : Scope Γ} {Rl : Pos → Rgn} {A B} {P : Pol A B} {O : EmissionSet A} {d n qu ls}
               → Off O → (∀ {q q′} → Kill P q q′ → Owes (bef p) q′ → Owes (aft p) q′) → (∀ {q} → ¬ Rl q p) → ¬ VHot (full sc) p
-              → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k)
+              → (∀ {q a k e} → O q (out a) → Lane P q a k e → Rl q k) → SlotsMv P O
               → Joined sc Rl (bef p) P O d n qu ls → Joined sc Rl (aft p) P O d n qu ls
-    joined-up {P = P} {O = O} oo ku nl nh rl (joined bg wt wh od ah ao en li sl) =
-      joined (begun-up ku (λ _ → nl) nh bg) (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li sl
+    joined-up {P = P} {O = O} oo ku nl nh rl mv (joined bg wt wh od ah ao en li sl) =
+      joined (begun-up ku (λ _ → nl) nh bg) (wait-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah′ wt) (whole-up oo wh) (od-up oo od) ah′ ao en li
+             (mv (λ {y} t → ≺→≼ {p} {y} t) (λ x o → in-off oo x tt o) sl)
       where
         open Book {P = P} {O = O}
         ah′ = ahead-up (λ iv lc → λ { refl → nl (rl (begun-out bg iv) lc) }) ah
@@ -507,7 +508,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up {p = p} (f-outer {op = op} {f = f} {c = c} {Rg = Rg₀} {E = E} fr ji jn m so bh) _ rp nr nh =
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → nr y _) (λ _ _ _ → nl)))) nh
-    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) (Past.kill-up p op (nr-off nr)) nl nh rl jn) m so (Past.behind-up p bh) , mv
+    in Cr′ , f-outer fr′ ji (Past.joined-up p (nr-off nr) (Past.kill-up p op (nr-off nr)) nl nh rl (slots-mv op) jn) m so (Past.behind-up p bh) , mv
     where
       nl : ∀ {q} → ¬ JRl (scopeOf c) Rg₀ op f E q p
       nl r = proj₂ rp (proj₂ r)
@@ -517,9 +518,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
     let (Cr′ , fr′ , mv) = fr-up fr tt (proj₁ rp)
                              (nr-≈ (proj₂ m) (nr-tr (join-nr op (λ a → ⟦ f a ⟧ (full (scopeOf c))) rl (λ y → no (Sound.rg so y _)) (λ y ln v _ → hole y ln v)))) nh
     in Cr′ , f-lanes fr′ ji (up sy so no nh) (begun-up ku nb₁ nh lf) y₀ (nm nq) ru (h-live st le (λ k → ku k (uk k)) (λ l nk → owes-up (λ { refl → hole y₀ l tt }) (ue l nk))) (begun-up ku nb₂ nh rt) cnt
-                     (wait-up (λ i lc → λ { refl → hole (val i) lc _ }) ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl sl , mv
+                     (wait-up (λ i lc → λ { refl → hole (val i) lc _ }) ah′ wt) (whole-up (off-rg so no) wh) (od-up (off-rg so no) od) ah′ ao en li m so sd (behind-up bh) dl (slots-mv op (λ {y} t → ≺→≼ {p} {y} t) (λ x o → in-off (off-rg so no) x tt o) sl) , mv
     where
-      open Past p using (up; begun-up; nm; owes-up; off-rg; behind-up; kill-up; module Book)
+      open Past p using (up; begun-up; nm; owes-up; off-rg; in-off; behind-up; kill-up; module Book)
       no : ¬ JRo (scopeOf c) Rg₀ op f O p
       no r = proj₂ r (proj₂ rp)
       ku = kill-up op (off-rg so no)

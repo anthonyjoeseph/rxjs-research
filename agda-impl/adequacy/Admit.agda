@@ -10,7 +10,7 @@ module adequacy.Admit where
 open import Data.Bool using (T; true; false; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
-open import Data.Nat using (suc; _<ᵇ_; _<?_; _+_; _∸_; _≤_; _<_)
+open import Data.Nat using (zero; suc; _<ᵇ_; _<?_; _+_; _∸_; _≤_; _<_)
 open import Data.Nat.Properties using (+-comm; +-identityʳ; <ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; <-irrefl; ≤-antisym; <-≤-trans; ≤-trans;
                                       m≤n+m; m≤m+n; m+n≤o⇒m≤o∸n; m+n∸n≡m)
 open import Data.List using ([]; _∷_; [_]; _++_; reverse; length)
@@ -29,8 +29,9 @@ open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Pos; ix; Timeline; _≟ᵖ_)
-open import denotation.EmissionSet using (EmissionSet; Den; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values)
-open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≺-absurd; ≼-≺-≺; ≼-trans)
+open import denotation.EmissionSet using (EmissionSet; Den; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values; module Exhaust)
+open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≺-absurd; ≼-≺-≺; ≼-trans; ≼-antisym)
+open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside)
@@ -57,6 +58,60 @@ begun-nq : ∀ {Γ} {sc} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n q
          → Begun {Γ} sc Rl C P O vs ls n → (q , a) ∈ vs → ¬ Owes C q
 begun-nq (more _ nq _ _ _) (here refl) = nq
 begun-nq (more _ _ _ _ bg) (there i)   = begun-nq bg i
+
+-- Not owed at `p`: passed before it.
+before : ∀ p {q} → ¬ Owes (bef p) q → q ≺ p
+before p {q} nq with ≼-or-≻ p q
+... | inj₁ pq = ⊥-elim (nq pq)
+... | inj₂ qp = qp
+
+-- No lane running: every begun lane ended where passed.
+dead-ends : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {F : A → Den B} {O : EmissionSet A} {vs ls n q a}
+          → Begun sc Rl C (polF exhaustᶠ F O) O vs ls n → n ≡ 0 → (q , a) ∈ vs → Σ Pos λ c → LaneOf F q a c end × ¬ Owes C c
+dead-ends (more {b = true} _ _ _ _ _) () _
+dead-ends (more {b = false} _ _ _ (l-dead (h-end lc nc _) _ _ _) _) _ (here refl) = _ , lc , nc
+dead-ends (more {b = false} _ _ _ (l-dead (h-kill () _ _) _ _ _) _) _ (here refl)
+dead-ends (more {b = false} _ _ _ _ bg) z (there i) = dead-ends bg z i
+
+-- A lane running: a begun lane unended.
+live-of : ∀ {Γ} {sc : Scope Γ} {Rl C A B} {P : Pol A B} {O : EmissionSet A} {vs ls n}
+        → Begun sc Rl C P O vs ls n → ¬ n ≡ 0 → Σ Pos λ q → Σ A λ a → (q , a) ∈ vs × Unended C P q a
+live-of none nz = ⊥-elim (nz refl)
+live-of (more {q = q} {a = a} {b = true} _ _ _ (l-live (h-live _ _ _ ue) _ _) _) _ = q , a , here refl , ue
+live-of (more {b = false} _ _ _ _ bg) nz with live-of bg nz
+... | q , a , i , ue = q , a , there i , ue
+
+-- An exhaust's cursor: at a value, the lane last run is one.
+module ExCur {A B : Set} (F : A → Den B) (O : EmissionSet A) (fn : ∀ {k e e′} → O k e → O k e′ → e ≡ e′) where
+  open Exhaust F O using (cur₀; run; drop) renaming (Cur to XCur)
+  open Values O using (Next)
+
+  cur-val : ∀ {x q} → XCur x q → Σ A λ b → O x (out b)
+  cur-val (cur₀ {a = a} y _)             = a , y
+  cur-val (run {a₂ = a₂} _ _ _ _ y _ _)  = a₂ , y
+  cur-val (drop {a₂ = a₂} _ _ _ y _ _)   = a₂ , y
+
+  -- The value before `x` is one.
+  next-fun : ∀ {q q′ x b b′} → O q (out b) → O q′ (out b′) → q ≺ x → q′ ≺ x → Next q x → Next q′ x → q ≡ q′
+  next-fun {q} {q′} y y′ lt lt′ n n′ = ≼-antisym {q} {q′} (λ q′q → n′ y q′q lt) (λ qq′ → n y′ qq′ lt′)
+
+  cur-fun : ∀ {x q q′} → XCur x q → XCur x q′ → q ≡ q′
+  cur-fun (cur₀ _ _)            (cur₀ _ _)            = refl
+  cur-fun (cur₀ _ _)            (run _ _ _ _ _ _ _)   = refl
+  cur-fun (run _ _ _ _ _ _ _)   (cur₀ _ _)            = refl
+  cur-fun (run _ _ _ _ _ _ _)   (run _ _ _ _ _ _ _)   = refl
+  cur-fun (cur₀ _ least)        (drop cu _ _ _ lt _)  = ⊥-elim (least (proj₂ (cur-val cu)) lt)
+  cur-fun (drop cu _ _ _ lt _)  (cur₀ _ least)        = ⊥-elim (least (proj₂ (cur-val cu)) lt)
+  cur-fun (run cu y l cx _ lt n) (drop cu′ y′ ul _ lt′ n′) with next-fun (proj₂ (cur-val cu)) (proj₂ (cur-val cu′)) lt lt′ n n′
+  ... | refl with cur-fun cu cu′
+  ...   | refl with fn y y′
+  ...     | refl = ⊥-elim (ul l cx)
+  cur-fun (drop cu′ y′ ul _ lt′ n′) (run cu y l cx _ lt n) with next-fun (proj₂ (cur-val cu)) (proj₂ (cur-val cu′)) lt lt′ n n′
+  ... | refl with cur-fun cu cu′
+  ...   | refl with fn y y′
+  ...     | refl = ⊥-elim (ul l cx)
+  cur-fun (drop cu _ _ _ lt n)  (drop cu′ _ _ _ lt′ n′) with next-fun (proj₂ (cur-val cu)) (proj₂ (cur-val cu′)) lt lt′ n n′
+  ... | refl = cur-fun cu cu′
 
 -- A SWITCH'S KILL at `p`: the value there kills every begun lane.  A
 -- live lane is cut, its husk what its rows show past `p`; it runs
@@ -115,7 +170,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ln  : L ≈ Lane P p a
       ru  : Runs P p
       w[] : ws ≡ []
-      sl′ : Slots P (vs ++ (p , a) ∷ []) ws (suc n)
+      sl′ : Slots P (aft p) (vs ++ (p , a) ∷ []) ws (suc n)
 
   -- THE LANE OPENED: the frames above lifted past `p`, the joiner's
   -- bookkeeping with the value begun, its lane pending in its region.
@@ -128,7 +183,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n
            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (aft p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls′ n′)
         → (∀ {vs ws} → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n → Waiting (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws q
-           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n′ p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
+           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) (bef p) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n′ p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
         → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n′) q o (reverse ls′) [] c))
                                             , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
@@ -188,12 +243,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ... | q′ , a′ , c′ , iv , rest = q′ , a′ , c′ , ∈-++⁺ˡ iv , rest
 
       ao′ : Asc (vs ++ (p , a) ∷ [])
-      ao′ = pairs-++⁺ ao ([]ᴬ ∷ᴾ []ᴾ) (tabulate λ {x} i → before {proj₁ x} (begun-nq bg i) ∷ᴬ []ᴬ)
-        where
-          before : ∀ {q′} → ¬ Owes (bef p) q′ → q′ ≺ p
-          before {q′} nq with ≼-or-≻ p q′
-          ... | inj₁ pq = ⊥-elim (nq pq)
-          ... | inj₂ qp = qp
+      ao′ = pairs-++⁺ ao ([]ᴬ ∷ᴾ []ᴾ) (tabulate λ {x} i → before p {proj₁ x} (begun-nq bg i) ∷ᴬ []ᴬ)
 
       wh′ : Whole (aft p) P E (vs ++ (p , a) ∷ []) ws
       wh′ {q′} y nq r with p ≟ᵖ q′
@@ -266,18 +316,13 @@ module _ {R : Set} (Rt : EmissionSet R) where
       nh : ¬ VHot (full sc) p
       nh = λ hv → proj₂ (JInv.ok ji) (vhot-hots (full sc) hv) (InvAt.world io row) (⊑-inside (⊑ʷ-refl p))
 
-      before : ∀ {q′} → ¬ Owes (bef p) q′ → q′ ≺ p
-      before {q′} nq with ≼-or-≻ p q′
-      ... | inj₁ pq = ⊥-elim (nq pq)
-      ... | inj₂ qp = qp
-
       -- the value at `p` is the next after every value begun or waiting
       nth-at : ∀ {vs ws} → Begun sc (JRl sc Rg (mergeᶠ (just m)) f E) (bef p) P E vs ls n → Waiting (bef p) P E vs ws qu
              → Whole (bef p) P E vs ws → Listed E 0 (vs ++ ws) → Nth (length (vs ++ ws)) p a
       nth-at {vs} {ws} bg′ wt′ wh′ L = nth-new L bf wi row
         where
           bf : ∀ {x} → x ∈ vs ++ ws → proj₁ x ≺ p
-          bf {x} i = [ (λ j → before {proj₁ x} (begun-nq bg′ j)) , (λ j → before {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt′)) j)))) ]′ (∈-++⁻ vs i)
+          bf {x} i = [ (λ j → before p {proj₁ x} (begun-nq bg′ j)) , (λ j → before p {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt′)) j)))) ]′ (∈-++⁻ vs i)
           wi : ∀ {q′ b} → E q′ (out b) → q′ ≺ p → (q′ , b) ∈ vs ++ ws
           wi y lt = [ ∈-++⁺ˡ , ∈-++⁺ʳ vs ]′ (wh′ y (λ o → o lt) tt)
 
@@ -288,7 +333,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
       -- A SLOT FREE: the lane opened, with room or freed.
       opening : n < m → ∀ {vs ws} → Begun sc (JRl sc Rg (mergeᶠ (just m)) f E) (bef p) P E vs ls n → Waiting (bef p) P E vs ws qu
-              → Whole (bef p) P E vs ws → Slots P vs ws n → Opening P vs ws n p a (pendRows (full sc) (f a) s)
+              → Whole (bef p) P E vs ws → Slots P (bef p) vs ws n → Opening P vs ws n p a (pendRows (full sc) (f a) s)
       opening lt _ _ _ (_ , _ , inj₂ eq) = ⊥-elim (<-irrefl eq lt)
       opening lt {vs} bg′ wt′ wh′ (L₀ , _ , inj₁ refl) = record { st = N , nth , starts ; ln = ln ; ru = N , a , nth ; w[] = refl ; sl′ = sl′ }
         where
@@ -301,7 +346,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           starts : Starts N p (Sched N) s
           starts with N <? m
           ... | yes lt′ = room lt′
-          ... | no ge   = freed (≮⇒≥ ge) (freed-k N (proj₂ (proj₂ census)) lt (≮⇒≥ ge) (cen-lo (λ {c′} → before {c′}) (proj₁ (proj₂ census))))
+          ... | no ge   = freed (≮⇒≥ ge) (freed-k N (proj₂ (proj₂ census)) lt (≮⇒≥ ge) (cen-lo (λ {c′} → before p {c′}) (proj₁ (proj₂ census))))
           back : ∀ {i s′ y e} → Sub i p s′ a → enter (F a) s′ y e → enter (F a) s y e
           back (nj , st′) x with nth-inj nj nth
           ... | refl with sub-fun (nj , st′) (nth , starts)
@@ -310,7 +355,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           ln = record { alike = (λ (x , v) → (N , s , (nth , starts) , x , g x) , v) ⇄ (λ ((_ , _ , sb , x , _) , v) → back sb x , v)
                       ; cov = [] , λ (_ , _ , sb , x , _) → inj₁ (back sb x)
                       ; voc = λ x → N , s , (nth , starts) , x , g x }
-          sl′ : Slots P (vs ++ (p , a) ∷ []) [] (suc n)
+          sl′ : Slots P (aft p) (vs ++ (p , a) ∷ []) [] (suc n)
           sl′ = subst (Listed E 0) (sym (++-identityʳ (vs ++ (p , a) ∷ []))) (nths-snoc vs L nth) , lt , inj₁ refl
 
       go : ∀ b → (n <ᵇ m) ≡ b
@@ -390,7 +435,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
           wt′ : Waiting (aft p) P E vs (ws ++ (p , a) ∷ []) (qu ++ [ a ])
           wt′ = trans (map-++ proj₂ ws ((p , a) ∷ [])) (cong (_++ [ a ]) (proj₁ wt↑))
-              , pairs-++⁺ (proj₁ (proj₂ wt↑)) ([]ᴬ ∷ᴾ []ᴾ) (tabulate λ {x} i → before {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt)) i))) ∷ᴬ []ᴬ)
+              , pairs-++⁺ (proj₁ (proj₂ wt↑)) ([]ᴬ ∷ᴾ []ᴾ) (tabulate λ {x} i → before p {proj₁ x} (proj₁ (proj₂ (proj₁ (proj₂ (proj₂ wt)) i))) ∷ᴬ []ᴬ)
               , wf′ , (λ ()) , head-snoc ws nth′ (proj₂ (proj₂ (proj₂ (proj₂ wt↑))))
 
           wh↑ : Whole (aft p) P E vs (ws ++ (p , a) ∷ [])
@@ -423,7 +468,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
           ah′ _ (j , nj , st′) | inj₂ (here refl) with nth-inj nj nth′
           ...   | refl = from-start st′
 
-          sl↑ : Slots P vs (ws ++ (p , a) ∷ []) n
+          sl↑ : Slots P (aft p) vs (ws ++ (p , a) ∷ []) n
           sl↑ = subst (Listed E 0) (++-assoc vs ws ((p , a) ∷ [])) (nths-snoc (vs ++ ws) L₀ nth₀) , proj₁ (proj₂ sl) , inj₂ taken
   rise-outer-bounded refl (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
 
@@ -439,11 +484,117 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-outer-switch refl (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
   rise-outer-switch refl (settled () _ _)
 
-  postulate
-    -- AN EXHAUST'S VALUE: its lane begun while none runs, else dropped.
-    rise-outer-exhaust : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
-                       → rise (inOuter exhaustᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
-                       → SimC Rt ⟨ inOuter exhaustᶠ f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+  -- AN EXHAUST'S LANE OPENED, none running: the value at `p` runs its
+  -- own lane, next after the last value passed, every lane begun ended
+  -- before it.
+  module ExOpen {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {E : EmissionSet A} (ji : JInv sc f E) {p a} (row : E p (out a)) where
+    F = λ a → ⟦ f a ⟧ (full sc)
+    P = polF exhaustᶠ F E
+    open Exhaust F E using (cur₀; run) renaming (Cur to XCur)
+
+    opening : ∀ {Rl vs ws ls qu} → Begun sc Rl (bef p) P E vs ls 0 → Waiting (bef p) P E vs ws qu → Whole (bef p) P E vs ws → Slots P (bef p) vs ws 0
+            → Opening P vs ws 0 p a (pendRows (full sc) (f a) (p ++ [ ix 1 ]))
+    opening {vs = vs} {ws = ws} bg wt _ sl = record { st = refl ; ln = lane-entered ji row ; ru = ru sl ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt
+                                          ; sl′ = inj₂ (p , vs , p , a , refl , (a , row) , ≺-irrefl {p} , (λ _ nk → nk) , ru sl , ended) }
+      where
+        ended : ∀ {q′ a′} → (q′ , a′) ∈ vs → Σ Pos λ c → LaneOf F q′ a′ c end × c ≺ p
+        ended i = let (c , lc , nc) = dead-ends bg refl i in c , lc , before p {c} nc
+        ru : Slots P (bef p) vs ws 0 → XCur p p
+        ru (inj₁ (_ , allo)) = cur₀ row allo
+        ru (inj₂ (x , us , q , aq , refl , (_ , xv) , nx′ , lt , cu , _)) =
+          let (c , lc , cp) = ended (∈-++⁺ʳ us (here refl))
+          in run cu (begun-out bg (∈-++⁺ʳ us (here refl))) lc cp row (before p {x} nx′)
+                 (λ {k} y xk → [ (λ pk → pk) , (λ kp → ⊥-elim (lt y (λ pk → pk kp) xk)) ]′ (≼-or-≻ p k))
+
+  -- AN EXHAUST'S VALUE: its lane begun while none runs, else dropped.
+  -- The slots hold the last value passed and the lane it last ran: with
+  -- none running the value runs its own; with one running, that lane
+  -- the last begun, the value is dropped, that lane unended at it.
+  rise-outer-exhaust : ∀ {Γ A B} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
+                     → rise (inOuter exhaustᶠ f ω d n q ls c) o (nx a) p ≡ moved k′ sh t
+                     → SimC Rt ⟨ inOuter exhaustᶠ f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′
+  rise-outer-exhaust {f = f} {n = zero} {c = c} {a = a} {p = p} refl {Cr = Cr} (flying (f-outer fr ji jn m so bh) cl (sy , row)) =
+    let (Cr′ , i , mv) = opens exhaustᶠ fr ji jn m so bh sy row (λ nl nh → Past.begun-up p (λ ()) (λ _ → nl) nh) (ExOpen.opening ji row)
+    in subst (After Rt Cr) (sym (start-open {c = c} {op = exhaustᶠ} {f = f} {a = a} {p = p} cl)) (Cr′ , aft p , i , mv)
+  rise-outer-exhaust {n = suc k} refl (flying (f-outer fr ji (joined () _ _ _ _ _ _ _ (inj₁ (refl , _))) _ _ _) _ _)
+  rise-outer-exhaust {f = f} {ω = ω} {d = d} {n = suc k} {q = qu} {ls = ls} {c = c} {o = o} {a = a} {p = p} refl {Cr = Cr}
+    (flying (f-outer {Rg = Rg} {E = E} fr ji (joined {ws = ws} bg wt wh od ah ao en li (inj₂ (x , us , q , aq , refl , (_ , xv) , nx′ , lt , cu , ue)))
+                     jm so bh) cl (sy , row)) =
+    proj₁ lifted , aft p , settled c-abs (proj₁ (proj₂ lifted)) (s-flat ji sy (joined bg↑ wt↑ wh↑ od↑ ah↑ ao en li sl↑) jm so (behind-up bh)) , proj₂ (proj₂ lifted)
+    where
+      sc = scopeOf c
+      F = λ a → ⟦ f a ⟧ (full sc)
+      P = polF exhaustᶠ F E
+      vs = us ++ (q , aq) ∷ []
+      io = JInv.io ji
+      open Exhaust F E using (cur₀; run; drop) renaming (Cur to XCur)
+      open Values E using (Next)
+      open ExCur F E (InvAt.func io) using (cur-val; next-fun; cur-fun)
+      open Past p using (nm; owes-up; behind-up; begun-up; module Book)
+      open Book {P = P} {O = E} using (ahead-up; wait-up)
+
+      here-o = Sound.rg so row _
+      nl : ∀ {q′} → ¬ JRl sc Rg exhaustᶠ f E q′ p
+      nl r = proj₂ here-o (proj₂ r)
+      rl = Lanes.lane-rows sc f ji exhaustᶠ li
+      nh : ¬ VHot (full sc) p
+      nh = λ hv → proj₂ (JInv.ok ji) (vhot-hots (full sc) hv) (InvAt.world io row) (⊑-inside (⊑ʷ-refl p))
+
+      lifted = fr-up Rt fr tt (proj₁ here-o)
+                 (nr-≈ (proj₂ jm) (nr-tr (join-nr exhaustᶠ F rl (λ y → end-at (InvAt.func io row y)) (λ _ _ _ r → nl r)))) nh
+        where
+          end-at : ∀ {b} → out b ≡ end → _
+          end-at ()
+
+      -- the lane last begun runs, unended at `p`: every one before it
+      -- ended before it
+      iq = ∈-++⁺ʳ us (here refl)
+      oq = begun-out bg iq
+      q≺p = before p {q} (begun-nq bg iq)
+      live : Unended (bef p) P q aq
+      live with live-of bg (λ ())
+      ... | q₀ , a₀ , i , u with ∈-++⁻ us i
+      ...   | inj₂ (here refl) = u
+      ...   | inj₁ j = let (c₀ , lc , cq) = ue j in ⊥-elim (u lc (λ {q′} ()) (≺-trans {c₀} {q} {p} cq q≺p))
+
+      x≺p = before p {x} nx′
+      nxt : Next x p
+      nxt {k} y xk = [ (λ pk → pk) , (λ kp → ⊥-elim (lt y (λ pk → pk kp) xk)) ]′ (≼-or-≻ p k)
+
+      -- the value at `p` does not run: the last value passed, `x`, is
+      -- next before it, and its lane is the one still running
+      no-run : ¬ XCur p p
+      no-run (cur₀ _ least) = least xv x≺p
+      no-run (drop cu′ _ _ _ lt′ _) = Join.ExhaustJ.cur-le [] cu′ lt′
+      no-run (run cu′ oq′ lc cp _ lt′ n′) with next-fun (proj₂ (cur-val cu′)) xv lt′ x≺p n′ nxt
+      ... | refl with cur-fun cu′ cu
+      ...   | refl with InvAt.func io oq′ oq
+      ...     | refl = live lc (λ {q′} ()) cp
+
+      le : ∀ {q′ a′ c′} → (q′ , a′) ∈ vs → Lane P q′ a′ c′ end → p ≡ c′ → ⊥
+      le iv lc refl = nl (rl (begun-out bg iv) lc)
+
+      bg↑ = begun-up (λ ()) (λ _ → nl) nh bg
+      ah↑ = ahead-up le ah
+      wt↑ = wait-up le ah↑ wt
+
+      wh↑ : Whole (aft p) P E vs ws
+      wh↑ {q′} y nq r with p ≟ᵖ q′
+      ... | yes refl = ⊥-elim (no-run r)
+      ... | no ne = wh y (λ o → nq (owes-up ne o)) r
+
+      od↑ : OuterDone (aft p) E d
+      od↑ = (λ t → let (c′ , y , n′) = proj₁ od t in c′ , y , nm n′)
+          , (λ y n′ → proj₂ od y (λ o → n′ (owes-up (λ { refl → end-out (InvAt.func io row y) }) o)))
+        where
+          end-out : ∀ {b} → out b ≡ end → _
+          end-out ()
+
+      sl↑ : Slots P (aft p) vs ws (suc k)
+      sl↑ = inj₂ (p , us , q , aq , refl , (a , row) , ≺-irrefl {p} , (λ _ nk → nk) , drop cu oq (λ lc → live lc (λ {q′} ())) row x≺p nxt , ue)
+  rise-outer-exhaust _ (flying (d-outer _ _ _ _) _ ())
+  rise-outer-exhaust _ (adrift fr cl _) = ⊥-elim (subst T cl (dead-closed Rt fr refl))
+  rise-outer-exhaust _ (settled () _ _)
 
   rise-outer-nx : ∀ {Γ A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n q ls} {c : Ctx R Γ B} {o a p k′ sh t}
                 → rise (inOuter op f ω d n q ls c) o (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inOuter op f ω d n q ls c , o , rising (nx a) , p ⟩ sh k′

@@ -285,8 +285,9 @@ record Pol (A B : Set) : Set₁ where
     Kill  : Pos → Pos → Set
     -- whether a value can wait for a slot
     Queues : Bool
-    -- what its slots hold of the values begun and waiting, and the live count
-    Slots : List (Pos × A) → List (Pos × A) → ℕ → Set
+    -- what its slots hold of the values begun and waiting, and the live
+    -- count, at a cursor
+    Slots : Cur → List (Pos × A) → List (Pos × A) → ℕ → Set
 open Pol public
 
 -- The values listed, numbered in the outer's order from `i`.
@@ -303,26 +304,50 @@ NoKill P q k = ∀ {q′} → Kill P q q′ → k ≼ q′
 Kept : ∀ {A B} → Pol A B → Pos → A → EmissionSet B
 Kept P q a k e = (Lane P q a k e × NoKill P q k) ⊎ Σ Pos λ r → e ≡ pin r × Lane P q a k e × NoKill P q r × T (inside r k)
 
+-- An exhaust's last value passed, at `x`, and the lane it last ran, at
+-- `q`, the last begun: every lane begun before ended before `q`.  None
+-- passed, none begun.
+ExSlots : ∀ {A B} → (A → Den B) → EmissionSet A → Cur → List (Pos × A) → Set
+ExSlots {A} f O C vs =
+    (vs ≡ [] × (∀ {k b} → O k (out b) → Owes C k))
+  ⊎ Σ Pos λ x → Σ (List (Pos × A)) λ us → Σ Pos λ q → Σ A λ a →
+      vs ≡ us ++ (q , a) ∷ [] × (Σ A λ b → O x (out b)) × (¬ Owes C x) × (∀ {k b} → O k (out b) → ¬ Owes C k → k ≼ x)
+      × Exhaust.Cur f O x q × (∀ {q′ a′} → (q′ , a′) ∈ us → Σ Pos λ c → LaneOf f q′ a′ c end × c ≺ q)
+
 polF : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → Pol A B
 polF (mergeᶠ nothing)  f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤ ; Takes = λ _ → ⊤ ; takes = λ r → r
                                     ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false
-                                    ; Slots = λ _ _ _ → ⊤ }
+                                    ; Slots = λ _ _ _ _ → ⊤ }
 polF (mergeᶠ (just m)) f O = record { Lane = Bounded.Lane m f O ; Runs = Bounded.Indexed m f O ; Takes = λ _ → ⊤ ; takes = λ _ → tt
                                     ; Start = λ q a s → Σ ℕ λ i → Bounded.Sub m f O i q s a ; Kill = λ _ _ → ⊥ ; Queues = true
-                                    ; Slots = λ vs ws n → Nths O 0 (vs ++ ws) × n ≤ m × (ws ≡ [] ⊎ n ≡ m) }
+                                    ; Slots = λ _ vs ws n → Nths O 0 (vs ++ ws) × n ≤ m × (ws ≡ [] ⊎ n ≡ m) }
 polF switchᶠ           f O = record { Lane = LaneOf f ; Runs = λ _ → ⊤ ; Takes = λ _ → ⊤ ; takes = λ r → r
                                     ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ q q′ → Σ _ λ a′ → O q′ (out a′) × q ≺ q′ ; Queues = false
-                                    ; Slots = λ _ _ _ → ⊤ }
+                                    ; Slots = λ _ _ _ _ → ⊤ }
 polF exhaustᶠ          f O = record { Lane = LaneOf f ; Runs = Exhaust.Run f O ; Takes = Exhaust.Run f O ; takes = λ r → r
                                     ; Start = λ q _ s → s ≡ q ++ [ ix 1 ] ; Kill = λ _ _ → ⊥ ; Queues = false
-                                    ; Slots = λ _ _ _ → ⊤ }
+                                    ; Slots = λ C vs _ _ → ExSlots f O C vs }
 
--- A joiner with nothing begun or queued fills no slot.
-slots-0 : ∀ {A B} op (f : A → Den B) O → Pol.Slots (polF op f O) [] [] 0
-slots-0 (mergeᶠ nothing)  f O = tt
-slots-0 (mergeᶠ (just m)) f O = tt , z≤n , inj₁ refl
-slots-0 switchᶠ           f O = tt
-slots-0 exhaustᶠ          f O = tt
+-- A joiner with nothing begun or queued, its outer's values all owed,
+-- fills no slot.
+slots-0 : ∀ {A B} op (f : A → Den B) O {C} → (∀ {k b} → O k (out b) → Owes C k) → Pol.Slots (polF op f O) C [] [] 0
+slots-0 (mergeᶠ nothing)  f O _ = tt
+slots-0 (mergeᶠ (just m)) f O _ = tt , z≤n , inj₁ refl
+slots-0 switchᶠ           f O _ = tt
+slots-0 exhaustᶠ          f O o = inj₁ (refl , o)
+
+-- The cursor moved on past none of the outer's values: the slots hold.
+SlotsMv : ∀ {A B} → Pol A B → EmissionSet A → Set
+SlotsMv P O = ∀ {C C′ vs ws n} → (∀ {y} → Owes C′ y → Owes C y) → (∀ {k b} → O k (out b) → Owes C k → Owes C′ k)
+            → Pol.Slots P C vs ws n → Pol.Slots P C′ vs ws n
+
+slots-mv : ∀ {A B} op {f : A → Den B} {O} → SlotsMv (polF op f O) O
+slots-mv (mergeᶠ nothing)  dn nv s = s
+slots-mv (mergeᶠ (just m)) dn nv s = s
+slots-mv switchᶠ           dn nv s = s
+slots-mv exhaustᶠ          dn nv (inj₁ (e , o)) = inj₁ (e , λ x → nv x (o x))
+slots-mv exhaustᶠ          dn nv (inj₂ (x , us , q , a , e , xv , nxo , lt , cu , ue)) =
+  inj₂ (x , us , q , a , e , xv , (λ o → nxo (dn o)) , (λ y nk → lt y (λ o → nk (nv y o))) , cu , ue)
 
 -- The joiner's rows, as its operator's meaning reads them.
 JoinF : ∀ {A B} → FlatOp → (A → Den B) → EmissionSet A → EmissionSet B
@@ -634,7 +659,7 @@ data Begun {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (
 data Joined {Γ A B} (sc : Scope Γ) (Rl : Pos → Rgn) (C : Cur) (P : Pol A B) (O : EmissionSet A) (d : Bool) (n : ℕ) (qu : List A)
             (ls : List (St Γ B)) : Set₁ where
   joined : ∀ {vs ws} → Begun sc Rl C P O vs ls n → Waiting C P O vs ws qu → Whole C P O vs ws → OuterDone C O d
-         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn (Hots (full sc)) Rl P O → Slots P vs ws n
+         → Ahead C P vs ws → Asc vs → Ends P O → LanesIn (Hots (full sc)) Rl P O → Slots P C vs ws n
          → Joined sc Rl C P O d n qu ls
 
 -- A scan's fold: of the values passed, the seed if none.

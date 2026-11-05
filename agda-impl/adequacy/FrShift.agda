@@ -28,7 +28,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; binds; CS; connS; flatS; takeS)
 open import adequacy.Rows using (full; Frozen; _≃_; _⇄_; ≃-refl)
 open _≃_
-open import adequacy.Cursor using (Cur; bef; Owes; Due; Pol; Kill; kill-out; Kept; Hole; h-live; polF; JoinF; joined; Behind;
+open import adequacy.Cursor using (slots-mv; Cur; bef; Owes; Due; Pol; Kill; kill-out; Kept; Hole; h-live; polF; JoinF; joined; Behind;
   Src; Sync; burst-dn; alike; Rgn; _≈_; Joined; JoinE; Begun; Whole; Ahead; Ends; Flags; ConnE)
 open import Tree using (Obs)
 open import denotation.Events using (Timeline)
@@ -222,7 +222,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rc {C = C} {c = Machine.inOuter op f ω _ _ _ ls c} {E = O} {s = s} {p}
      (f-outer {E′ = E′} fr ji jn je sd bh) hf w lo =
     let (Cr′ , fr′ , env , ef , d) = rc {s = flatS _ _ _ _ _ _ s ls} fr hf′ w lo
-    in Cr′ , f-outer fr′ ji (Shifted.joined-sh {C} {p} w (proj₂ (run hf env ef)) (kill-out op) jn env ef lol) je sd (behind-bef bh (jl env ef)) , env , ef , d
+    in Cr′ , f-outer fr′ ji (Shifted.joined-sh {C} {p} w (proj₂ (run hf env ef)) (kill-out op) (slots-mv op) jn env ef lol) je sd (behind-bef bh (jl env ef)) , env , ef , d
     where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
       lol : ∀ {l} → l ∈ ls → Lo l (at p)
@@ -240,7 +240,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     in Cr′ , f-lanes fr′ ji (shift sy w env ef loo) (Shifted.begun-sh {C} {p} w (ku ob) (λ i → lb env ef (∈-++⁺ˡ i)) bg₁ env ef lpre) y (Shifted.nm {C} {p} w nq) ru (Shifted.hole-sh {C} {p} w (ku ob) (λ l nk o → lb env ef (∈-++⁺ʳ vs₁ (here refl)) nk l tt o) hl)
                  (Shifted.begun-sh {C} {p} w (ku ob) (λ i → lb env ef (∈-++⁺ʳ vs₁ (there i))) bg₂ env ef lpost) eqn (Shifted.waiting-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} {qu = qu} (lb env ef) ah wt)
                  (Shifted.whole-sh {C} {p} w {P = P} {O = O} {vs = vs} {ws = ws} ob wh) (Shifted.od-sh {C} {p} w {O = O} ob od)
-                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef)) (λ ()) sl
+                 (Shifted.ahead-sh {C} {p} w {P = P} {vs = vs} {ws = ws} (lb env ef) ah) as en li je sd sdl (behind-bef bh (jl env ef)) (λ ())
+                 (slots-mv op (λ {y} → Shifted.dn {C} {p} w {y}) (λ x o → ob (x , tt , o)) sl)
        , env , ef , d
     where
       F = λ a → ⟦ f a ⟧ (full (scopeOf c))
