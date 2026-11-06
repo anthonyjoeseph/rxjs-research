@@ -90,8 +90,8 @@ reach-lift {E′ = E′} g lf {y} {e} {e₀} pp up (ks , h) = concatMap g ks , p
 
 -- Every row of a node at its own place.
 lift-reach : ∀ {A B} {E : EmissionSet A} {E′ : EmissionSet B} (g : Pos → List Pos) → Lifted g E E′ → (∀ {y e} → E y e → Reach E y e)
-           → ∀ {y e e₀} → E y e₀ → (∀ {r} → e ≡ pin r → e₀ ≡ pin r) → (Unpinned e → Unpinned e₀) → Reach E′ y e
-lift-reach g lf rc x pp up = reach-lift g lf pp up (rc x)
+           → ∀ {y} e {e₀} → E y e₀ → (∀ {r} → e ≡ pin r → e₀ ≡ pin r) → (Unpinned e → Unpinned e₀) → Reach E′ y e
+lift-reach g lf rc e x pp up = reach-lift g lf {e = e} pp up (rc x)
 
 ------------------------------------------------------------------------
 -- A map and a scan: each row at its source row's place.
@@ -103,10 +103,10 @@ map-lift (map-pin {q} x)  = q , _ , x , ≼-refl {q} , here refl , λ { refl →
 map-lift (map-end {q} x)  = q , _ , x , ≼-refl {q} , here refl , λ ()
 
 map-reach : ∀ {A B} {f : A → B} {E : EmissionSet A} → (∀ {y e} → E y e → Reach E y e) → ∀ {y e} → MapT f E y e → Reach (MapT f E) y e
-map-reach {f = f} {E = E} rc (map-out x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
-map-reach {f = f} {E = E} rc (map-skip x) = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
-map-reach {f = f} {E = E} rc (map-pin x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ { refl → refl }) (λ ())
-map-reach {f = f} {E = E} rc (map-end x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
+map-reach {f = f} rc (map-out {a = a} x) = lift-reach [_] map-lift rc (out (f a)) x (λ ()) (λ _ → tt)
+map-reach rc (map-skip x)          = lift-reach [_] map-lift rc skip x (λ ()) (λ _ → tt)
+map-reach rc (map-pin {r = r} x)   = lift-reach [_] map-lift rc (pin r) x (λ { refl → refl }) (λ ())
+map-reach rc (map-end x)           = lift-reach [_] map-lift rc end x (λ ()) (λ _ → tt)
 
 acc-at : ∀ {A B} {f : B → A → B} {z} {E : EmissionSet A} {q b} → Scan.Acc f z E q b → Σ A λ a → E q (out a)
 acc-at (Scan.acc₀ x _)    = _ , x
@@ -120,10 +120,10 @@ scan-lift (Scan.send {q} x)  = q , _ , x , ≼-refl {q} , here refl , λ ()
 
 scan-reach : ∀ {A B} {f : B → A → B} {z} {E : EmissionSet A} → (∀ {y e} → E y e → Reach E y e)
            → ∀ {y e} → Scan.ScanT f z E y e → Reach (Scan.ScanT f z E) y e
-scan-reach rc (Scan.sval a)  = lift-reach [_] scan-lift rc (proj₂ (acc-at a)) (λ ()) (λ _ → tt)
-scan-reach rc (Scan.sstep x) = lift-reach [_] scan-lift rc x (λ ()) (λ _ → tt)
-scan-reach rc (Scan.spin x)  = lift-reach [_] scan-lift rc x (λ { refl → refl }) (λ ())
-scan-reach rc (Scan.send x)  = lift-reach [_] scan-lift rc x (λ ()) (λ _ → tt)
+scan-reach rc (Scan.sval {b = b} a) = lift-reach [_] scan-lift rc (out b) (proj₂ (acc-at a)) (λ ()) (λ _ → tt)
+scan-reach rc (Scan.sstep x) = lift-reach [_] scan-lift rc skip x (λ ()) (λ _ → tt)
+scan-reach rc (Scan.spin {r = r} x) = lift-reach [_] scan-lift rc (pin r) x (λ { refl → refl }) (λ ())
+scan-reach rc (Scan.send x)  = lift-reach [_] scan-lift rc end x (λ ()) (λ _ → tt)
 
 ------------------------------------------------------------------------
 -- A take: a failure's rows a label under the failing value.
@@ -180,12 +180,12 @@ under-reach {E = E} {E′} g lf flat {q} {a} {l} {e} x₀ (ks , h) = concatMap g
 take-reach : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} → (∀ {y e} → E y e → Reach E y e)
            → (∀ {y e l ys e′} → E y e → E (y ++ l ∷ ys) e′ → ⊥)
            → ∀ {y e} → TakeWhile.TakeT incl keep E y e → Reach (TakeWhile.TakeT incl keep E) y e
-take-reach rc fl (TakeWhile.pass x _ _)   = lift-reach tk take-lift rc x (λ ()) (λ _ → tt)
+take-reach rc fl (TakeWhile.pass {a = a} x _ _) = lift-reach tk take-lift rc (out a) x (λ ()) (λ _ → tt)
 take-reach rc fl (TakeWhile.fail x _ _ _) = under-reach tk take-lift fl x (rc x)
 take-reach rc fl (TakeWhile.stop x _ _)   = under-reach tk take-lift fl x (rc x)
-take-reach rc fl (TakeWhile.step x _)     = lift-reach tk take-lift rc x (λ ()) (λ _ → tt)
-take-reach rc fl (TakeWhile.tend x _)     = lift-reach tk take-lift rc x (λ ()) (λ _ → tt)
-take-reach rc fl (TakeWhile.left x _ _)   = lift-reach tk take-lift rc x (λ { refl → refl }) (λ ())
+take-reach rc fl (TakeWhile.step x _)     = lift-reach tk take-lift rc skip x (λ ()) (λ _ → tt)
+take-reach rc fl (TakeWhile.tend x _)     = lift-reach tk take-lift rc end x (λ ()) (λ _ → tt)
+take-reach rc fl (TakeWhile.left {r = r} x _ _) = lift-reach tk take-lift rc (pin r) x (λ { refl → refl }) (λ ())
 
 ------------------------------------------------------------------------
 -- Its source's region: what excludes the source's children excludes the
