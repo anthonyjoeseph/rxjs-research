@@ -6,8 +6,9 @@ open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; [_,_]′)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs)
@@ -24,9 +25,9 @@ open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; Frozen)
 open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Open; notT; Under; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
-  Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_;
+  Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Sealed; SealedL; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_;
   h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined;
-  l-dead; l-live; more; none; s-cold; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map;
+  l-dead; l-live; more; none; s-cold; s-coldx; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map;
   s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend;
   src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
 
@@ -61,9 +62,9 @@ sh-up : ∀ {Γ X B} {sc : Scope Γ} {D D₁} {k : CS Γ X} {o} {E₁ : Emission
 sh-up hk u sf = sh-dead hk (upa-of u) sf (λ {c} _ → up-ward {c = c} u)
 
 -- A live source's body: its source not closed, it ends past all the body
--- reached.
+-- reached; closed, at the row its flags froze.
 live-open : ∀ {Γ X B} {C} {k : CS Γ X} {β : EmissionSet B} → Flags C k β → T (CS.srcLive k) → Open k C
-live-open {C = C} {k = k} fl l nc fz t cr = notT (CS.closed k) nc (Flags.unshut fl l fz (λ o → owes-onward C o t cr))
+live-open {C = C} {k = k} fl l = (λ nc fz t cr → notT (CS.closed k) nc (Flags.unshut fl l fz (λ o → owes-onward C o t cr))) , (λ cl → proj₁ (Flags.shut fl cl))
 
 -- A cursor moved on: a source's closure read from it.
 srch-adv : ∀ {Γ X B} {sc : Scope Γ} {C D} {k : CS Γ X} {o} {E : EmissionSet B} {P} → Dom C D → SrcH sc D k o E P → SrcH sc C k o E P
@@ -81,9 +82,9 @@ up-∅ = up (λ _ _ ()) (λ t → t)
 
 mutual
   husk-of : ∀ {Γ} {sc : Scope Γ} {Rg C A} {s : St Γ A} {E} → Sync sc Rg C s E → Σ Pts (Husk sc C s E)
-  husk-of (s-cold _ _ _ _)          = _ , h-blank tt
-  husk-of (s-of _ _)                = _ , h-blank tt
-  husk-of (s-done _ _)              = _ , h-blank tt
+  husk-of (s-cold _ _ _ _)          = _ , h-blank tt tt₁
+  husk-of (s-of _ _)                = _ , h-blank tt tt₁
+  husk-of (s-done _ _)              = _ , h-blank tt tt₁
   husk-of (s-map sy m _)            = _ , h-map (proj₂ (husk-of sy)) (up-∘ up-map (up-≈ m))
   husk-of (s-scan sy _ m _)         = _ , h-scan (proj₂ (husk-of sy)) (up-∘ up-scan (up-≈ m))
   husk-of (s-cut sy)                = _ , h-cut (proj₂ (husk-of sy)) up-id
@@ -97,10 +98,11 @@ mutual
   husk-of (s-conn {k = k} sc pt bs bh ss tn fl ce) =
     by (CS.srcLive k) (λ l → _ , h-conn (proj₂ (src-husk sc pt (ss l) (bh l) fl ce))
                                        (unbind {k = k} sc (proj₂ (husk-of (bs l))))
-                                       (conn-up-body sc pt (ss l) (bh l) fl ce) (live-open fl l) (inj₂ sc))
-                      (λ nl → _ , h-conn (srch-adv (Torn.dom (tn nl)) (Torn.sh (tn nl))) (Torn.bh (tn nl)) (up-adv (Torn.dom (tn nl)) (Torn.bu (tn nl))) (Torn.opn (tn nl)) (inj₂ sc))
-  husk-of (s-join _ _ _ _ _)        = _ , h-blank tt
-  husk-of (s-joinx _ _)             = _ , h-blank tt
+                                       (conn-up-body sc pt (ss l) (bh l) fl ce) (live-open fl l) sc)
+                      (λ nl → _ , h-conn (srch-adv (Torn.dom (tn nl)) (Torn.sh (tn nl))) (Torn.bh (tn nl)) (up-adv (Torn.dom (tn nl)) (Torn.bu (tn nl))) (Torn.opn (tn nl)) sc)
+  husk-of (s-join _ _ _ _ _)        = _ , h-blank tt tt₁
+  husk-of (s-joinx _ _)             = _ , h-blank tt tt₁
+  husk-of (s-coldx _ _)             = _ , h-blank tt tt₁
 
   src-husk : ∀ {Γ X B} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} → CS.scope k ≡ sc → (pt : Parts sc Rg k β)
            → Src sc (Parts.Rs pt) C k o → Behind C β → Flags C k β → ConnE (CS.connAt k) (Frozen k) β E → Σ Pts (SrcH sc C k o E)
@@ -131,12 +133,12 @@ mutual
 -- One node's state in from what still runs around it.
 peel-take : ∀ {Γ} {sc : Scope Γ} {D} {A} {i} {keep : A → Bool} {w s E Q} → Husk sc D (takeS i keep w s) E Q
           → Σ Pts λ Q′ → Σ Cur λ D₁ → Σ (EmissionSet A) λ E₁ → Husk sc D₁ s E₁ Q′ × Up D₁ E₁ D E × Q ⊑ Q′
-peel-take {D = D} (h-blank q) = _ , D , ∅E , h-blank q , up-∅ , ⊑-refl
+peel-take {D = D} (h-blank q z) = _ , D , ∅E , h-blank q z , up-∅ , ⊑-refl
 peel-take (h-take hk u) = _ , _ , _ , hk , u , ⊑-refl
 
 peel-cut : ∀ {Γ} {sc : Scope Γ} {D} {A} {l a} {s : St Γ A} {E Q} → Husk sc D (cutS l a s) E Q
          → Σ Pts λ Q′ → Σ Cur λ D₁ → Σ (EmissionSet A) λ E₁ → Husk sc D₁ s E₁ Q′ × Up D₁ E₁ D E × Q ⊑ Q′
-peel-cut {D = D} (h-blank q) = _ , D , ∅E , h-blank q , up-∅ , ⊑-refl
+peel-cut {D = D} (h-blank q z) = _ , D , ∅E , h-blank q z , up-∅ , ⊑-refl
 peel-cut (h-cut hk u)  = _ , _ , _ , hk , u , ⊑-refl
 
 -- A SUBJECT LEFT AT ONCE: turning a part's subscribers off keeps it
@@ -167,9 +169,33 @@ mutual
   quiet-offIf true  {s} q = quiet-off {s = s} q
   quiet-offIf false     q = q
 
+-- TURNING OFF KEEPS EVERY CONNECT SEALED.
+mutual
+  sealed-off : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (off s)
+  sealed-off {s = pend _ _}               _                = tt₁
+  sealed-off {s = coldS _ _}              _                = tt₁
+  sealed-off {s = ofS _ _ _}              _                = tt₁
+  sealed-off {s = doneS}                  _                = tt₁
+  sealed-off {s = mapS _ s}               z                = sealed-off {s = s} z
+  sealed-off {s = scanS _ _ s}            z                = sealed-off {s = s} z
+  sealed-off {s = cutS _ _ s}             z                = sealed-off {s = s} z
+  sealed-off {s = lnS _ s}                z                = sealed-off {s = s} z
+  sealed-off {s = takeS _ _ _ s}          z                = sealed-off {s = s} z
+  sealed-off {s = flatS _ _ _ _ _ _ o ls} (zo , zl)        = sealed-off {s = o} zo , sealed-offL {ls = ls} zl
+  sealed-off {s = connS k _ b}            (e , fz , zo , zb) = e , fz , sealed-offIf (CS.srcAtt k) zo , sealed-off {s = b} zb
+  sealed-off {s = joinS _ _ _ _}          _                = tt₁
+
+  sealed-offL : ∀ {Γ A} {sc : Scope Γ} {ls : List (St Γ A)} → SealedL sc ls → SealedL sc (offL ls)
+  sealed-offL {ls = []}     _        = tt₁
+  sealed-offL {ls = l ∷ ls} (z , zl) = sealed-off {s = l} z , sealed-offL {ls = ls} zl
+
+  sealed-offIf : ∀ {Γ A} {sc : Scope Γ} b {s : St Γ A} → Sealed sc s → Sealed sc (offIf b s)
+  sealed-offIf true  {s} z = sealed-off {s = s} z
+  sealed-offIf false     z = z
+
 mutual
   off-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} → Husk sc D s E P → Husk sc D (off s) E P
-  off-husk {s = s} (h-blank q) = h-blank (quiet-off {s = s} q)
+  off-husk {s = s} (h-blank q z) = h-blank (quiet-off {s = s} q) (sealed-off {s = s} z)
   off-husk (h-map hk u)     = h-map (off-husk hk) u
   off-husk (h-scan hk u)    = h-scan (off-husk hk) u
   off-husk (h-cut hk u)     = h-cut (off-husk hk) u
@@ -245,6 +271,58 @@ mutual
   quiet-unsubIf true  {s} q = quiet-unsub {s = s} q
   quiet-unsubIf false     q = q
 
+-- TEARING DOWN KEEPS EVERY CONNECT SEALED: none's flags or scope move.
+mutual
+  sealed-unsub : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (proj₁ (unsub s))
+  sealed-unsub {s = pend _ _}               _                = tt₁
+  sealed-unsub {s = coldS true _}           _                = tt₁
+  sealed-unsub {s = coldS false _}          _                = tt₁
+  sealed-unsub {s = ofS _ _ _}              _                = tt₁
+  sealed-unsub {s = doneS}                  _                = tt₁
+  sealed-unsub {s = mapS _ s}               z                = sealed-unsub {s = s} z
+  sealed-unsub {s = scanS _ _ s}            z                = sealed-unsub {s = s} z
+  sealed-unsub {s = cutS _ _ _}             z                = z
+  sealed-unsub {s = lnS _ _}                z                = z
+  sealed-unsub {s = takeS _ _ _ s}          z                = sealed-cut {s = s} z
+  sealed-unsub {s = flatS _ _ _ _ _ _ o ls} (zo , zl)        = sealed-cut {s = o} zo , sealed-kill {ls = ls} zl
+  sealed-unsub {s = connS k _ b}            (e , fz , zo , zb) = e , fz , sealed-unsubIf (CS.srcAtt k) zo , sealed-unsub {s = b} zb
+  sealed-unsub {s = joinS _ _ _ _}          _                = tt₁
+
+  sealed-cut : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (proj₁ (cut s))
+  sealed-cut {s = cutS _ attached s}  z = sealed-unsub {s = s} z
+  sealed-cut {s = cutS _ (attAt _) s} z = sealed-off {s = s} z
+  sealed-cut {s = pend _ _}           z = z
+  sealed-cut {s = coldS _ _}          z = z
+  sealed-cut {s = ofS _ _ _}          z = z
+  sealed-cut {s = doneS}              z = z
+  sealed-cut {s = mapS _ _}           z = z
+  sealed-cut {s = scanS _ _ _}        z = z
+  sealed-cut {s = lnS _ _}            z = z
+  sealed-cut {s = takeS _ _ _ _}      z = z
+  sealed-cut {s = flatS _ _ _ _ _ _ _ _} z = z
+  sealed-cut {s = connS _ _ _}        z = z
+  sealed-cut {s = joinS _ _ _ _}      z = z
+
+  sealed-kill : ∀ {Γ A} {sc : Scope Γ} {ls : List (St Γ A)} → SealedL sc ls → SealedL sc (proj₁ (killAll ls))
+  sealed-kill {ls = []}                          _        = tt₁
+  sealed-kill {ls = lnS true s ∷ ls}              (z , zl) = sealed-cut {s = s} z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = lnS false _ ∷ ls}             (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = pend _ _ ∷ ls}                (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = coldS _ _ ∷ ls}               (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = ofS _ _ _ ∷ ls}               (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = doneS ∷ ls}                   (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = mapS _ _ ∷ ls}                (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = scanS _ _ _ ∷ ls}             (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = cutS _ _ _ ∷ ls}              (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = takeS _ _ _ _ ∷ ls}           (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = flatS _ _ _ _ _ _ _ _ ∷ ls}   (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = connS _ _ _ ∷ ls}             (z , zl) = z , sealed-kill {ls = ls} zl
+  sealed-kill {ls = joinS _ _ _ _ ∷ ls}           (z , zl) = z , sealed-kill {ls = ls} zl
+
+  sealed-unsubIf : ∀ {Γ A} {sc : Scope Γ} b {s : St Γ A} → Sealed sc s → Sealed sc (proj₁ (unsubIf b s))
+  sealed-unsubIf true  {s} z = sealed-unsub {s = s} z
+  sealed-unsubIf false     z = z
+
 -- UNSUBSCRIBING keeps every isle: it never reaches a source in its
 -- subscribe call.
 -- An unsubscribe its flag withholds.
@@ -253,7 +331,7 @@ unsubIf-off false _ = refl
 
 mutual
   unsub-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} → Husk sc D s E P → Σ Pts λ P′ → Husk sc D (proj₁ (unsub s)) E P′ × P ⊑ P′
-  unsub-husk {s = s} (h-blank q) = _ , h-blank (quiet-unsub {s = s} q) , ⊑-refl
+  unsub-husk {s = s} (h-blank q z) = _ , h-blank (quiet-unsub {s = s} q) (sealed-unsub {s = s} z) , ⊑-refl
   unsub-husk (h-map hk u)     = let (_ , h , le) = unsub-husk hk in _ , h-map h u , le
   unsub-husk (h-scan hk u)    = let (_ , h , le) = unsub-husk hk in _ , h-scan h u , le
   unsub-husk (h-cut hk u)     = _ , h-cut hk u , ⊑-refl
@@ -263,7 +341,7 @@ mutual
   unsub-husk (h-conn sh bh u op se) = let (_ , h , le) = srch-unsub sh ; (_ , g , le′) = unsub-husk bh in _ , h-conn h g u op se , ∪-⊑ le le′
 
   cut-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} → Husk sc D s E P → Σ Pts λ P′ → Husk sc D (proj₁ (cut s)) E P′ × P ⊑ P′
-  cut-husk {s = s} (h-blank q)        = _ , h-blank (quiet-cut {s = s} q) , ⊑-refl
+  cut-husk {s = s} (h-blank q z)      = _ , h-blank (quiet-cut {s = s} q) (sealed-cut {s = s} z) , ⊑-refl
   cut-husk (h-cut {a = attached} hk u) = let (_ , h , le) = unsub-husk hk in _ , h-cut h u , le
   cut-husk (h-cut {a = attAt _} hk u)  = _ , h-cut (off-husk hk) u , ⊑-refl
   cut-husk hk@(h-map _ _)              = _ , hk , ⊑-refl
@@ -275,7 +353,7 @@ mutual
 
   kill-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {ls : List (St Γ A)} {E P} → HuskL sc D ls E P → Σ Pts λ P′ → HuskL sc D (proj₁ (killAll ls)) E P′ × P ⊑ P′
   kill-husk hl-none                            = _ , hl-none , ⊑-refl
-  kill-husk (hl-more {l = l} (h-blank q) u hl) = kill-blank l q u hl
+  kill-husk (hl-more {l = l} (h-blank q z) u hl) = kill-blank l q z u hl
   kill-husk (hl-more (h-ln {b = true} hk w) u hl) = let (_ , h , le) = cut-husk hk ; (_ , g , le′) = kill-husk hl in _ , hl-more (h-ln h w) u g , ∪-⊑ le le′
   kill-husk (hl-more hk@(h-ln {b = false} _ _) u hl) = kill-keep hk u hl
   kill-husk (hl-more hk@(h-map _ _) u hl)      = kill-keep hk u hl
@@ -290,21 +368,21 @@ mutual
             → Σ Pts λ P′ → HuskL sc D (l ∷ proj₁ (killAll ls)) E P′ × (P ∪ᵖ Q) ⊑ P′
   kill-keep hk u hl = let (_ , g , le) = kill-husk hl in _ , hl-more hk u g , ∪-⊑ ⊑-refl le
 
-  kill-blank : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} (l : St Γ A) {ls E₁ E Q} → Quiet l → Up D₁ E₁ D E → HuskL sc D ls E Q
+  kill-blank : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} (l : St Γ A) {ls E₁ E Q} → Quiet l → Sealed sc l → Up D₁ E₁ D E → HuskL sc D ls E Q
              → Σ Pts λ P′ → HuskL sc D (proj₁ (killAll (l ∷ ls))) E P′ × (∅ᵖ ∪ᵖ Q) ⊑ P′
-  kill-blank (lnS true s)        q u hl = let (_ , g , le) = kill-husk hl in _ , hl-more (h-blank (quiet-cut {s = s} q)) u g , ∪-⊑ ⊑-refl le
-  kill-blank (lnS false _)       q u hl = kill-keep (h-blank q) u hl
-  kill-blank (pend _ _)          q u hl = kill-keep (h-blank q) u hl
-  kill-blank (coldS _ _)         q u hl = kill-keep (h-blank q) u hl
-  kill-blank (ofS _ _ _)         q u hl = kill-keep (h-blank q) u hl
-  kill-blank doneS               q u hl = kill-keep (h-blank q) u hl
-  kill-blank (mapS _ _)          q u hl = kill-keep (h-blank q) u hl
-  kill-blank (scanS _ _ _)       q u hl = kill-keep (h-blank q) u hl
-  kill-blank (cutS _ _ _)        q u hl = kill-keep (h-blank q) u hl
-  kill-blank (takeS _ _ _ _)     q u hl = kill-keep (h-blank q) u hl
-  kill-blank (flatS _ _ _ _ _ _ _ _) q u hl = kill-keep (h-blank q) u hl
-  kill-blank (connS _ _ _)       q u hl = kill-keep (h-blank q) u hl
-  kill-blank (joinS _ _ _ _)     q u hl = kill-keep (h-blank q) u hl
+  kill-blank (lnS true s)        q z u hl = let (_ , g , le) = kill-husk hl in _ , hl-more (h-blank (quiet-cut {s = s} q) (sealed-cut {s = s} z)) u g , ∪-⊑ ⊑-refl le
+  kill-blank (lnS false _)       q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (pend _ _)          q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (coldS _ _)         q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (ofS _ _ _)         q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank doneS               q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (mapS _ _)          q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (scanS _ _ _)       q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (cutS _ _ _)        q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (takeS _ _ _ _)     q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (flatS _ _ _ _ _ _ _ _) q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (connS _ _ _)       q z u hl = kill-keep (h-blank q z) u hl
+  kill-blank (joinS _ _ _ _)     q z u hl = kill-keep (h-blank q z) u hl
 
   unsubIf-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} b → Husk sc D s E P → Σ Pts λ P′ → Husk sc D (proj₁ (unsubIf b s)) E P′ × P ⊑ P′
   unsubIf-husk true  hk = unsub-husk hk

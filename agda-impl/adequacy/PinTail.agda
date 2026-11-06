@@ -38,7 +38,7 @@ open import adequacy.Rows using (full; Frozen)
 open import adequacy.Cursor using (takes; Cur; Behind; Flags; ConnE; bef; aft; Owes; Beneath; Pts; _∪ᵖ_; Burst; Held; held-dn; TailP;
   tailp; Sync; Src; Sound; NoFail; Pol; Lane; Runs; Start; Kept; polF; JoinF; JInv; Hole; Dom;
   Thru; Up; NoKill; h-live; h-end; h-kill; l-live; l-dead; Begun; none; more; Parts; joined;
-  src-pend; src-on; src-shut; Torn; cov; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take;
+  src-pend; src-on; src-shut; Torn; cov; s-cold; s-coldx; s-of; s-done; s-map; s-scan; s-cut; s-take;
   s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Cursor.Tear using (by; husk-of; src-husk; begun-husk)
 open import adequacy.Cursor.Show using (flat-up-lane; pin-law)
@@ -135,6 +135,7 @@ mutual
   pin-tail {sc = sc} (s-join {x = x} en _ _ _ _) =
     ptl (proj₁ (cov en)) λ e o _ → [ (λ t → ⊥-elim (hot-nopin sc x t)) , inj₂ ]′ (proj₂ (cov en) e)
   pin-tail (s-joinx _ (ks , f))  = ptl ks λ x o _ → inj₂ (f x o)
+  pin-tail (s-coldx _ (ks , f))  = ptl ks λ x o _ → inj₂ (f x o)
 
   -- A connect's pins: its body's, its burst's, and those of its source's
   -- it keeps.

@@ -37,7 +37,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Scope; scopeOf; plug; unbound; binds; CS; coldS; ofS; takeS; flatS; connS)
 open import adequacy.Rows using (full; pendRows; Frozen; _≃_; _⇄_; ≃-sym; ≃-trans)
 open _≃_
-open import adequacy.Cursor using (SlotsMv; slots-mv; takes; Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; head-≡; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
+open import adequacy.Cursor using (SlotsMv; slots-mv; takes; Cur; origin; bef; aft; Thru; Owes; Due; Unfed; Pol; Lane; Runs; Kill; kill-out; Hole; OuterDone; Waiting; head-≡; NoKill; Kept; polF; JoinF; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Spent; Folded; fd-none; fd-last; Whole; Ahead; Joined; joined; Flags; Src; src-pend; src-on; src-shut; OweAt; o-cp; o-cut; o-over; NoFail; Behind; Fin; fin-dn; tail-dn; _≈_; cov; Subd; SubdAt; subd; TailP; tailp; tailp-dn; Pts; _∪ᵖ_; Under; Burst; Torn; Husk; HuskL; SrcH; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; sh-dead; sh-isle; sh-islec; sh-pend; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; AttOwed; InCall)
 open import adequacy.Cursor.Show using (thru-owes)
 open import adequacy.Floor.Keys using (own-bld; os; oo)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
@@ -355,7 +355,7 @@ flat-lag {op = op} {F} {O} {C} {p = p} (lag ko fo) ob (kl , fl) lb wh ah =
 
 mutual
   husk-f : ∀ {Γ} {sc : Scope Γ} {A} {s : St Γ A} {D E P p} → Husk sc D s E P → LoP s p → PLag p P
-  husk-f (h-blank _)    lo = [] , λ ()
+  husk-f (h-blank _ _)  lo = [] , λ ()
   husk-f (h-map hk _)   lo = husk-f hk (λ ki → lo (k-kid (k-map ki)))
   husk-f (h-scan hk _)  lo = husk-f hk (λ ki → lo (k-kid (k-scan ki)))
   husk-f (h-cut hk _)   lo = husk-f hk (λ ki → lo (k-kid (k-cut ki)))
@@ -393,6 +393,7 @@ mutual
   few (s-conn refl _ bs _ ss tn fl (m , _)) env ef lo = lag-≈ m (lag-at (λ r → _ , proj₁ r) (conn-f bs ss tn fl env ef lo))
   few (s-join {j = j} {x = x} en _ _ _ _) env ef lo = lag-≈ en (ef x j)
   few {C = C} (s-joinx _ fn) env ef lo = fin-lag {C = C} fn
+  few {C = C} (s-coldx _ fn) env ef lo = fin-lag {C = C} fn
 
   -- A connect's: its body's, a source step's first effect, the source
   -- passed at `p`; torn, within what its parts still run.
@@ -600,6 +601,7 @@ module Shifted {C : Cur} {p : Pos} (op : Owes C p) where
            ⇄ [ (λ i → let r = from d (inj₁ i) in proj₁ r , proj₁ (proj₂ r) , join-b {sc = sc} d ap env (lo-p lo) r)
              , (λ u → let r = from d (inj₂ (unfed-dn (lookup (full sc) x) u)) in proj₁ r , proj₁ (proj₂ r) , proj₂ (proj₂ u)) ]′
     sh (s-joinx sp fn)     env ef lo = s-joinx (spent sp) (fd fn)
+    sh (s-coldx sp fn)     env ef lo = s-coldx (spent sp) (fd fn)
 
     src-sh : ∀ {Γ X B} {Rg} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B}
            → Src (CS.scope k) Rg C k o → Env (full (CS.scope k)) C p → EnvL (full (CS.scope k)) C p → Lo (connS k o b) (at p)

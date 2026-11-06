@@ -11,6 +11,7 @@ module adequacy.Up where
 open import Data.Bool using (Bool; T; true; false; not; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ʳ; ∈-++⁺ˡ; ∈-map⁺)
 open import Data.List.Relation.Unary.AllPairs using () renaming (_∷_ to _∷ᴾ_)
@@ -39,11 +40,11 @@ open import adequacy.Cursor using (SlotsMv; slots-mv; Cur; bef; aft; Behind; Fin
   Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound;
   vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none;
   fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt;
-  o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
+  o-cp; o-cut; o-over; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn;
   NoFail; TailP; tailp-dn; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan;
   h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec;
-  sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; burst-dn)
+  sh-pend; Quiet; QuietL; Sealed; SealedL; ⊑-trans; ∪-⊑; ⊑-refl; burst-dn)
 open import adequacy.Cursor.Tear using (by; NoIsle; NoIsleL; Settles; sync-pend)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; Unread; un-dead; un-torn)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps)
@@ -222,6 +223,7 @@ module Past (p : Pos) where
            ⇄ λ { (inj₁ i) → let (y , v , o) = from d (inj₁ i) in y , v , in-rg sd nr y v o
                ; (inj₂ u) → let (y , v , _) = from d (inj₂ (unfed-bef (lookup (full sc) x) u)) in y , v , proj₂ (proj₂ u) }
     up {E = E} (s-joinx sp fn) sd nr nh = s-joinx (spent-up {E = E} sp) (fin-up fn)
+    up {E = E} (s-coldx sp fn) sd nr nh = s-coldx (spent-up {E = E} sp) (fin-up fn)
 
     src-up : ∀ {Γ X} {sc : Scope Γ} {Rs : Rgn} {k : CS Γ X} {o}
            → Src sc Rs (bef p) k o → Sound Rs (adequacy.Rows.Frozen k) → ¬ Rs p → ¬ VHot (full sc) p → Src sc Rs (aft p) k o
@@ -277,7 +279,7 @@ srch-owe (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc ad
 
 husk-owe : ∀ {Γ X B} {sc : Scope Γ} {D} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {E P x}
          → Husk sc D (connS k o b) E P → Husk sc D (connS (record k { owedAt = x }) o b) E P
-husk-owe (h-blank q)      = h-blank q
+husk-owe (h-blank q z)    = h-blank q z
 husk-owe (h-conn sh hb u oz iz) = h-conn (srch-owe sh) hb u oz iz
 
 -- A connect's rows before a body row: its body's before it, and its
@@ -313,8 +315,29 @@ mutual
   quiet-feedL []       _        = tt
   quiet-feedL (l ∷ ls) (q , ql) = quiet-feed l q , quiet-feedL ls ql
 
+  sealed-feed : ∀ {Γ X A} {sc : Scope Γ} {i : X ∈ Γ} {p e} (s : St Γ A) → Sealed sc s → Sealed sc (feed i p e s)
+  sealed-feed {i = i} (joinS _ true x _) _ with same? i x
+  ... | just refl = tt₁
+  ... | nothing   = tt₁
+  sealed-feed (joinS _ false _ _)      _                  = tt₁
+  sealed-feed (pend _ _)               _                  = tt₁
+  sealed-feed (coldS _ _)              _                  = tt₁
+  sealed-feed (ofS _ _ _)              _                  = tt₁
+  sealed-feed doneS                    _                  = tt₁
+  sealed-feed (mapS _ s)               z                  = sealed-feed s z
+  sealed-feed (scanS _ _ s)            z                  = sealed-feed s z
+  sealed-feed (cutS _ _ s)             z                  = sealed-feed s z
+  sealed-feed (lnS _ s)                z                  = sealed-feed s z
+  sealed-feed (takeS _ _ _ s)          z                  = sealed-feed s z
+  sealed-feed (flatS _ _ _ _ _ _ o ls) (zo , zl)          = sealed-feed o zo , sealed-feedL ls zl
+  sealed-feed (connS _ o b)            (e , fz , zo , zb) = e , fz , sealed-feed o zo , sealed-feed b zb
+
+  sealed-feedL : ∀ {Γ X A} {sc : Scope Γ} {i : X ∈ Γ} {p e} (ls : List (St Γ A)) → SealedL sc ls → SealedL sc (feedL i p e ls)
+  sealed-feedL []       _        = tt₁
+  sealed-feedL (l ∷ ls) (z , zl) = sealed-feed l z , sealed-feedL ls zl
+
   feed-husk : ∀ {Γ} {sc : Scope Γ} {D} {X A} {i : X ∈ Γ} {p e} {s : St Γ A} {E P} → Husk sc D s E P → NoIsle s → Husk sc D (feed i p e s) E P
-  feed-husk {s = s} (h-blank q) _        = h-blank (quiet-feed s q)
+  feed-husk {s = s} (h-blank q z) _      = h-blank (quiet-feed s q) (sealed-feed s z)
   feed-husk (h-map hk u)     ni             = h-map (feed-husk hk ni) u
   feed-husk (h-scan hk u)    ni             = h-scan (feed-husk hk ni) u
   feed-husk (h-cut hk u)     ni             = h-cut (feed-husk hk ni) u
@@ -480,9 +503,6 @@ conn-vis (Connecting.body x , _) _ = x
 conn-vis (Connecting.burst _ _ , _) ()
 conn-vis (Connecting.echo _ _ _ _ , _) ()
 conn-vis (Connecting.kept _ _ _ _ , _) ()
-
-or-shut : ∀ {x y} → T x → x ∨ y ≡ false → ⊥
-or-shut {true} _ ()
 
 torn : ∀ {ℓ} {b} {X : Set ℓ} → T (not b) → T b → X
 torn {b = true}  () _

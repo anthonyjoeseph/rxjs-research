@@ -32,9 +32,11 @@ open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; _<ᵖ_; ins
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
-  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust)
+  LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust; module Joiner)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; GoodEnv; world-after; ok-step)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step)
+open import denotation.Laws.JoinInv using (module JoinerI; module Join; module SwitchI; switch-cut-up)
+open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.ColdInv using (slot; slot-last; burst-lb)
@@ -48,7 +50,7 @@ open _≃_
 open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
   JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
   Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
-  o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
+  o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Floor.Keys using (at-after)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
@@ -385,6 +387,7 @@ mutual
     conn-b {C = C} (λ t envb → bound (bs t) envb (λ ki → lo (k-kid (k-body ki)))) (λ t → src-b (ss t) env lo) fl env (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp _) env lo r = ⊥-elim (sp r)
+  bound (s-coldx sp _) env lo r = ⊥-elim (sp r)
 
   took-b : ∀ {Γ Rg C A} {i} {keep : A → Bool} {w} {s : St Γ A} {Es r p q e}
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r → Sound Rg Es → LoP (takeS i keep w s) p
@@ -459,11 +462,35 @@ behind-pend : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → CS.scope k ≡ sc
 behind-pend {C = C} {k = k} refl (ok , a) ow =
   behind-past C ow (pend-past (CS.scope k) (CS.src k) a (ok-step {Hots (full (CS.scope k))} (CS.connAt k) ok))
 
+-- A joiner's rows, untruncated, lie in its world: past where it was
+-- subscribed.
+module JoinerPast {A B} {H : Pos → Set} {q} (ok : Ok H q) (f′ : A → Den B) (fi : ∀ a → InvD H (f′ a)) {O : EmissionSet A} (Io : InvAt H q O)
+                  (Rn : Pos → Set) (Ct : Pos → Pos → Set) (cut-up : ∀ {q k y} → Ct q k → k ≼ y → Ct q y)
+                  (uncut : ∀ {q′ a k r} → O q′ (out a) → W⁼ H (q′ ++ [ ix 1 ]) r → T (inside r k) → Ct q′ k → ¬ Ct q′ r → ⊥) where
+  open JoinerI ok f′ fi Io Rn Ct cut-up uncut using (vw)
+  open Joiner f′ O Rn Ct using (JoinT; Done)
+  open Join ok f′ fi Io using (module View)
+  open View Done (λ q′ _ y → Rn q′ × ¬ Ct q′ y) using (world-v; real-v)
+
+  run-past : ∀ {y e} → JoinT y e → q ≺ y
+  run-past x = world-after (world-v (vw x)) (real-v (vw x))
+
 -- A joiner subscribed at `q`: every row past `q`, its outer's and every
 -- lane's, each lane subscribed past its value.
-postulate
-  join-past : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {q} → Adm sc → Ok (Hots (full sc)) q
-            → ∀ {k e} → JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q) k e → q ≺ k
+join-past : ∀ {Γ A B} (sc : Scope Γ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {q} → Adm sc → Ok (Hots (full sc)) q
+          → ∀ {k e} → JoinF op (λ a → ⟦ f a ⟧ (full sc)) (pendRows (full sc) s q) k e → q ≺ k
+join-past sc op f s {q} ad ok x = go op x
+  where
+  F  = λ a → ⟦ f a ⟧ (full sc)
+  fi = λ a → inv-⟦⟧ (f a) (full sc) (good-full sc ad)
+  Io = inv-⟦⟧ s (full sc) (good-full sc ad) _ ok
+  go : ∀ op {k e} → JoinF op F (pendRows (full sc) s q) k e → q ≺ k
+  go (mergeᶠ nothing)  x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) x
+  go switchᶠ           x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (λ _ → ⊤) (Switch.Cut F (pendRows (full sc) s q))
+                             (λ {q′} {k} {y} → switch-cut-up F (pendRows (full sc) s q) {q′} {k} {y})
+                             (λ {q′} {a} {k} {r} → SwitchI.uncut ok F fi Io {q′} {a} {k} {r}) x
+  go exhaustᶠ          x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (Exhaust.Run F (pendRows (full sc) s q)) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) x
+  go (mergeᶠ (just m)) x = world-after (BoundedI.world-v ok m F fi Io (BoundedI.vw ok m F fi Io x)) (BoundedI.real-v ok m F fi Io (BoundedI.vw ok m F fi Io x))
 
 -- A source's rows a body row at `p` reads: few, by what the source has
 -- passed, or none yet, its subscription not before `p`.
