@@ -8,6 +8,7 @@
 -- reads every closed subject in scope as ended at or before `q`.
 module adequacy.Ended where
 
+open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 open import Data.Bool using (Bool; true; false; T; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
@@ -291,29 +292,32 @@ module _ {κ : Key} where
 -- A step keeps it: a silent step's at the key given, a shown step's at
 -- the clock it moves to.
 
+↑ : Set → Set₁
+↑ X = Lift (lsuc lzero) X
+
 module _ {R : Set} where
-  SE : Key → Stepped R → Set
-  SE κ (moved k [] _)              = ConfE κ k
-  SE κ (moved k (_ ∷ _) _)         = ConfE (Clock k) k
+  SE : Key → Stepped R → Set₁
+  SE κ (moved k [] _)              = ↑ (ConfE κ k)
+  SE κ (moved k (_ ∷ _) _)         = ↑ (ConfE (Clock k) k)
   SE κ (starting x p k)            = ∀ l → ConfE κ (k l)
-  SE κ (turn gone)                 = ⊤
+  SE κ (turn gone)                 = ↑ ⊤
   SE κ (turn (leaf b l cl dv st))  = (∀ e l′ b′ p′ → ConfE κ (dv e l′ b′ p′)) × (∀ l′ → ConfE κ (st l′))
-  SE κ quiet                       = ⊤
+  SE κ quiet                       = ↑ ⊤
 
   module _ {κ : Key} where
     begin-e : ∀ {Γ A} (c : Ctx R Γ A) (o : PureObs Γ A) p → CtxE κ c → SE κ (begin c o p)
     begin-e c (cold x)          p hc = λ l → hc , tt
-    begin-e c empty             p hc = hc , tt
-    begin-e c (of xs)           p hc = hc , tt
-    begin-e c (map f s)         p hc = hc , tt
-    begin-e c (scan f z s)      p hc = hc , tt
-    begin-e c (takeWhile i q s) p hc = hc , tt
-    begin-e c (flatMap op f s)  p hc = (tt , hc) , tt
-    begin-e c (connect s b)     p hc = ((λ ()) , tt , hc) , tt
+    begin-e c empty             p hc = lift (hc , tt)
+    begin-e c (of xs)           p hc = lift (hc , tt)
+    begin-e c (map f s)         p hc = lift (hc , tt)
+    begin-e c (scan f z s)      p hc = lift (hc , tt)
+    begin-e c (takeWhile i q s) p hc = lift (hc , tt)
+    begin-e c (flatMap op f s)  p hc = lift ((tt , hc) , tt)
+    begin-e c (connect s b)     p hc = lift (((λ ()) , tt , hc) , tt)
     begin-e c (connected x)     p hc with closedUp c x
-    ... | true  = hc , tt
-    ... | false = hc , tt
-    begin-e c (defer l)         p hc = hc , tt
+    ... | true  = lift (hc , tt)
+    ... | false = lift (hc , tt)
+    begin-e c (defer l)         p hc = lift (hc , tt)
 
     start-e : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxE κ c → StE κ o → LE κ ls
             → ConfE κ (start c op f ω d n q o ls a p)
@@ -328,92 +332,92 @@ module _ {R : Set} where
 
     admit-e : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxE κ c → StE κ o → LE κ ls
             → SE κ (admit c op f ω d n q o ls a p)
-    admit-e c (mergeᶠ nothing)  f ω d n q o ls a p hc ho hl = start-e c _ f ω d n q o ls a p hc ho hl
+    admit-e c (mergeᶠ nothing)  f ω d n q o ls a p hc ho hl = lift (start-e c _ f ω d n q o ls a p hc ho hl)
     admit-e c (mergeᶠ (just m)) f ω d n q o ls a p hc ho hl with n <ᵇ m
-    ... | true  = start-e c _ f ω d n q o ls a p hc ho hl
-    ... | false = hc , (ho , hl)
+    ... | true  = lift (start-e c _ f ω d n q o ls a p hc ho hl)
+    ... | false = lift (hc , (ho , hl))
     admit-e c switchᶠ           f ω d n q o ls a p hc ho hl with killAll ls | killAll-e ls hl
-    ... | ls′ , t | hl′ = start-e c _ f ω d 0 q o ls′ a p hc ho hl′
+    ... | ls′ , t | hl′ = lift (start-e c _ f ω d 0 q o ls′ a p hc ho hl′)
     admit-e c exhaustᶠ          f ω d n q o ls a p hc ho hl with n ≡ᵇ 0
-    ... | true  = start-e c _ f ω d n q o ls a p hc ho hl
-    ... | false = hc , (ho , hl)
+    ... | true  = lift (start-e c _ f ω d n q o ls a p hc ho hl)
+    ... | false = lift (hc , (ho , hl))
 
     -- A rise: the root's shows, at the clock it moves to; any other, at a
     -- key no earlier than where it is.
     rise-e : ∀ {Γ A} (c : Ctx R Γ A) s (e : Ev A) p → StE (at p) s → Lo (plug c s) (after p)
            → CtxE κ c → StE κ s → at p ⊑ κ → SE κ (rise c s e p)
-    rise-e top s e p hs₀ fl hc hs hp = tt , st-mono s (clock-abs top s p (lo-weaken (at p) (after p) fl (at-after₀ p))) hs₀
-    rise-e (inMap f c)         s e      p _ _ hc hs hp = hc , hs
-    rise-e (inScan f z c)      s (nx a) p _ _ hc hs hp = hc , hs
-    rise-e (inScan f z c)      s cp     p _ _ hc hs hp = hc , hs
-    rise-e (inCut l a c)       s e      p _ _ hc hs hp = hc , hs
-    rise-e (inLn b c)          s e      p _ _ hc hs hp = hc , hs
+    rise-e top s e p hs₀ fl hc hs hp = lift (tt , st-mono s (clock-abs top s p (lo-weaken (at p) (after p) fl (at-after₀ p))) hs₀)
+    rise-e (inMap f c)         s e      p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inScan f z c)      s (nx a) p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inScan f z c)      s cp     p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inCut l a c)       s e      p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inLn b c)          s e      p _ _ hc hs hp = lift (hc , hs)
     rise-e (inTake i q free c) s (nx a) p _ _ hc hs hp with q a | i
-    ... | true  | _     = hc , hs
-    ... | false | true  = hc , hs
-    ... | false | false = hc , hs
-    rise-e (inTake i q free c)       s cp p _ _ hc hs hp = hc , hs
-    rise-e (inTake i q (cpAt r) c)   s e  p _ _ hc hs hp = hc , hs
-    rise-e (inTake i q (cutAt r) c)  s e  p _ _ hc hs hp = hc , hs
-    rise-e (inTake i q (overAt r) c) s e  p _ _ hc hs hp = hc , hs
+    ... | true  | _     = lift (hc , hs)
+    ... | false | true  = lift (hc , hs)
+    ... | false | false = lift (hc , hs)
+    rise-e (inTake i q free c)       s cp p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inTake i q (cpAt r) c)   s e  p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inTake i q (cutAt r) c)  s e  p _ _ hc hs hp = lift (hc , hs)
+    rise-e (inTake i q (overAt r) c) s e  p _ _ hc hs hp = lift (hc , hs)
     rise-e (inOuter op f ω d n q ls c) o (nx a) p _ _ (hl , hc) ho hp = admit-e c op f ω d n q o ls a p hc ho hl
-    rise-e (inOuter op f ω d n q ls c) o cp     p _ _ (hl , hc) ho hp = hc , (ho , hl)
+    rise-e (inOuter op f ω d n q ls c) o cp     p _ _ (hl , hc) ho hp = lift (hc , (ho , hl))
     rise-e (inLanes op f ω d n q o pre post c) s (nx b) p _ _ (ho , hpr , hpo , hc) hs hp with alive s
-    ... | true  = hc , (ho , le-ʳ++ pre hpr (hs , hpo))
-    ... | false = hc , (ho , le-ʳ++ pre hpr (hs , hpo))
+    ... | true  = lift (hc , (ho , le-ʳ++ pre hpr (hs , hpo)))
+    ... | false = lift (hc , (ho , le-ʳ++ pre hpr (hs , hpo)))
     rise-e (inLanes op f ω d n q o pre post c) s cp     p _ _ (ho , hpr , hpo , hc) hs hp with alive s
-    ... | true  = dequeue-e c op f ω d _ q o (pre ʳ++ ended s ∷ post) p hc ho (le-ʳ++ pre hpr (ended-e s hs , hpo))
-    ... | false = hc , (ho , le-ʳ++ pre hpr (hs , hpo))
-    rise-e (inSrc k b c) s (nx a) p _ _ (hk , hb , hc) hs hp = hc , (hk , hs , feed-e (here refl) p (nx a) b hb)
-    rise-e (inSrc k b c) s cp     p _ _ (hk , hb , hc) hs hp = hc , (shut-e p k hk hp , hs , feed-e (here refl) p cp b hb)
+    ... | true  = lift (dequeue-e c op f ω d _ q o (pre ʳ++ ended s ∷ post) p hc ho (le-ʳ++ pre hpr (ended-e s hs , hpo)))
+    ... | false = lift (hc , (ho , le-ʳ++ pre hpr (hs , hpo)))
+    rise-e (inSrc k b c) s (nx a) p _ _ (hk , hb , hc) hs hp = lift (hc , (hk , hs , feed-e (here refl) p (nx a) b hb))
+    rise-e (inSrc k b c) s cp     p _ _ (hk , hb , hc) hs hp = lift (hc , (shut-e p k hk hp , hs , feed-e (here refl) p cp b hb))
     rise-e (inBody k o c) s (nx b) p _ _ (hk , ho , hc) hs hp with CS.srcLive k
-    ... | true  = hc , (hk , ho , hs)
-    ... | false = hc , (hk , ho , hs)
+    ... | true  = lift (hc , (hk , ho , hs))
+    ... | false = lift (hc , (hk , ho , hs))
     rise-e (inBody k o c) s cp     p _ _ (hk , ho , hc) hs hp with CS.srcLive k
-    ... | true  = hc , (hk , ho , hs)
-    ... | false = hc , (hk , ho , hs)
+    ... | true  = lift (hc , (hk , ho , hs))
+    ... | false = lift (hc , (hk , ho , hs))
 
     run-e : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} → Marked s m → ∀ r → CtxE κ c → StE κ s → SE κ (run c s m r)
     run-e c (ofK i p xs) r hc hs with closed c | xs
-    ... | true  | _       = hc , tt
-    ... | false | []      = hc , tt
-    ... | false | x ∷ xs′ = hc , tt
+    ... | true  | _       = lift (hc , tt)
+    ... | false | []      = lift (hc , tt)
+    ... | false | x ∷ xs′ = lift (hc , tt)
     run-e c (attK l p s) r hc hs with unsubIf (not l) s | unsubIf-e (not l) s hs
-    ... | s′ , t | h = hc , h
-    run-e c (conK (cs cl sl sa (just p) as ow ca ea sr sc) o b _ (inj₁ refl)) r hc (hk , ho , hb) = (hk , hb , hc) , ho
-    run-e c (conK (cs cl sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) r hc hs = hc , hs
+    ... | s′ , t | h = lift (hc , h)
+    run-e c (conK (cs cl sl sa (just p) as ow ca ea sr sc) o b _ (inj₁ refl)) r hc (hk , ho , hb) = lift ((hk , hb , hc) , ho)
+    run-e c (conK (cs cl sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) r hc hs = lift (hc , hs)
     run-e c (conK (cs cl sl sa ba (just p) ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc (hk , ho , hb)
       with unsubIf (not sl ∨ closed c) o | unsubIf-e (not sl ∨ closed c) o ho
-    ... | o′ , t | h = hc , (hk , h , hb)
-    run-e c (conK (cs cl sl sa ba nothing ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc hs = hc , hs
+    ... | o′ , t | h = lift (hc , (hk , h , hb))
+    run-e c (conK (cs cl sl sa ba nothing ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc hs = lift (hc , hs)
     run-e c (conK (cs cl sl sa ba as (just p) ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc (hk , ho , hb)
       with unsubIf sa o | unsubIf-e sa o ho
-    ... | o′ , t | h = hc , (hk , h , hb)
-    run-e c (conK (cs cl sl sa ba as nothing ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc hs = hc , hs
-    run-e c (joinK j g x q (nx a) ib) r hc hs = hc , tt
-    run-e c (joinK j g x q cp ib)     r hc hs = hc , tt
+    ... | o′ , t | h = lift (hc , (hk , h , hb))
+    run-e c (conK (cs cl sl sa ba as nothing ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc hs = lift (hc , hs)
+    run-e c (joinK j g x q (nx a) ib) r hc hs = lift (hc , tt)
+    run-e c (joinK j g x q cp ib)     r hc hs = lift (hc , tt)
     run-e c (leafK b l) r hc hs = (λ e l′ b′ p′ → hc , tt) , (λ l′ → hc , tt)
-    run-e c (stopK i q p s) r hc hs = hc , hs
+    run-e c (stopK i q p s) r hc hs = lift (hc , hs)
     run-e c (cutK i q p s) r hc hs with cut s | cut-e s hs
-    ... | s′ , t | h = hc , h
+    ... | s′ , t | h = lift (hc , h)
 
   module _ (o : PureObs [] R) where
     step-e : ∀ {rs} (k : Conf R) → Path (load o) rs k → ∀ κ → Clock k ⊑ κ → ConfE (Clock k) k → SE κ (Machine.step k)
     step-e ⟨ c , s , rising e , p ⟩ pth κ le (hc , hs) = rise-e c s e p hs (floor o pth tt) (ctx-mono c le hc) (st-mono s le hs) le
     step-e ⟨ c , pend o′ q , subscribing , p ⟩ pth κ le (hc , _) = begin-e c o′ q (ctx-mono c le hc)
-    step-e ⟨ c , coldS b l , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
-    step-e ⟨ c , ofS i q xs , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
-    step-e ⟨ c , doneS , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
-    step-e ⟨ c , mapS f s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
-    step-e ⟨ c , scanS f z s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
-    step-e ⟨ c , cutS l a s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
-    step-e ⟨ c , lnS b s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
-    step-e ⟨ c , takeS i q w s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
-    step-e ⟨ c , flatS op f ω d n q o′ ls , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono (flatS op f ω d n q o′ ls) le hs
-    step-e ⟨ c , connS k o′ b , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono (connS k o′ b) le hs
-    step-e ⟨ c , joinS j g x ib , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
+    step-e ⟨ c , coldS b l , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , tt)
+    step-e ⟨ c , ofS i q xs , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , tt)
+    step-e ⟨ c , doneS , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , tt)
+    step-e ⟨ c , mapS f s , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono s le hs)
+    step-e ⟨ c , scanS f z s , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono s le hs)
+    step-e ⟨ c , cutS l a s , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono s le hs)
+    step-e ⟨ c , lnS b s , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono s le hs)
+    step-e ⟨ c , takeS i q w s , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono s le hs)
+    step-e ⟨ c , flatS op f ω d n q o′ ls , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono (flatS op f ω d n q o′ ls) le hs)
+    step-e ⟨ c , connS k o′ b , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , st-mono (connS k o′ b) le hs)
+    step-e ⟨ c , joinS j g x ib , subscribing , p ⟩ pth κ le (hc , hs) = lift (ctx-mono c le hc , tt)
     step-e ⟨ c , s , absorbed , p ⟩ pth κ le (hc , hs) with search top (plug c s) in fd
-    ... | nothing = tt
+    ... | nothing = lift (tt)
     ... | just (found (_ , _ , c′ , s′) m κ′)
       with unplug-e c′ (subst (StE κ) (sym (found-plug c s fd)) (plug-e c (ctx-mono c le hc) (st-mono s le hs)))
     ...   | hc′ , hs′ = run-e c′ (found-mark c s fd) p hc′ hs′
@@ -436,7 +440,7 @@ module _ {R : Set} where
   played-e (leaf true overT false dv st) (d , s) refl = s overT
 
   took-silent : ∀ {κ} (x : Stepped R) → SE κ x → ∀ {t k′} → took x ≡ silent t k′ → ConfE κ k′
-  took-silent (moved k [] _)               h refl = h
+  took-silent (moved k [] _)               (lift h) refl = h
   took-silent (moved k ((p , nx a) ∷ _) _) _ ()
   took-silent (moved k ((p , cp) ∷ _) _)   _ ()
   took-silent (starting x p k) f refl = f _
@@ -445,7 +449,7 @@ module _ {R : Set} where
 
   took-value : ∀ {κ} (x : Stepped R) → SE κ x → ∀ {t p a k′} → took x ≡ value t p a k′ → ConfE (Clock k′) k′
   took-value (moved k [] _)               _ ()
-  took-value (moved k ((p , nx a) ∷ _) _) h refl = h
+  took-value (moved k ((p , nx a) ∷ _) _) (lift h) refl = h
   took-value (moved k ((p , cp) ∷ _) _)   _ ()
   took-value (starting x p k) _ ()
   took-value (turn pk) _ e = ⊥-elim (played-val pk e)
