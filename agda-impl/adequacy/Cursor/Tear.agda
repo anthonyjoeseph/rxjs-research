@@ -169,6 +169,30 @@ mutual
   quiet-offIf true  {s} q = quiet-off {s = s} q
   quiet-offIf false     q = q
 
+-- TURNING OFF KEEPS EVERY CONNECT SEALED.
+mutual
+  sealed-off : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (off s)
+  sealed-off {s = pend _ _}               _                = tt₁
+  sealed-off {s = coldS _ _}              _                = tt₁
+  sealed-off {s = ofS _ _ _}              _                = tt₁
+  sealed-off {s = doneS}                  _                = tt₁
+  sealed-off {s = mapS _ s}               z                = sealed-off {s = s} z
+  sealed-off {s = scanS _ _ s}            z                = sealed-off {s = s} z
+  sealed-off {s = cutS _ _ s}             z                = sealed-off {s = s} z
+  sealed-off {s = lnS _ s}                z                = sealed-off {s = s} z
+  sealed-off {s = takeS _ _ _ s}          z                = sealed-off {s = s} z
+  sealed-off {s = flatS _ _ _ _ _ _ o ls} (zo , zl)        = sealed-off {s = o} zo , sealed-offL {ls = ls} zl
+  sealed-off {s = connS k _ b}            (e , fz , zo , zb) = e , fz , sealed-offIf (CS.srcAtt k) zo , sealed-off {s = b} zb
+  sealed-off {s = joinS _ _ _ _}          _                = tt₁
+
+  sealed-offL : ∀ {Γ A} {sc : Scope Γ} {ls : List (St Γ A)} → SealedL sc ls → SealedL sc (offL ls)
+  sealed-offL {ls = []}     _        = tt₁
+  sealed-offL {ls = l ∷ ls} (z , zl) = sealed-off {s = l} z , sealed-offL {ls = ls} zl
+
+  sealed-offIf : ∀ {Γ A} {sc : Scope Γ} b {s : St Γ A} → Sealed sc s → Sealed sc (offIf b s)
+  sealed-offIf true  {s} z = sealed-off {s = s} z
+  sealed-offIf false     z = z
+
 mutual
   off-husk : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E P} → Husk sc D s E P → Husk sc D (off s) E P
   off-husk {s = s} (h-blank q z) = h-blank (quiet-off {s = s} q) (sealed-off {s = s} z)
@@ -247,31 +271,7 @@ mutual
   quiet-unsubIf true  {s} q = quiet-unsub {s = s} q
   quiet-unsubIf false     q = q
 
--- TEARING DOWN, OR TURNING OFF, KEEPS EVERY CONNECT SEALED: none's flags
--- or scope move.
-mutual
-  sealed-off : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (off s)
-  sealed-off {s = pend _ _}               _                = tt₁
-  sealed-off {s = coldS _ _}              _                = tt₁
-  sealed-off {s = ofS _ _ _}              _                = tt₁
-  sealed-off {s = doneS}                  _                = tt₁
-  sealed-off {s = mapS _ s}               z                = sealed-off {s = s} z
-  sealed-off {s = scanS _ _ s}            z                = sealed-off {s = s} z
-  sealed-off {s = cutS _ _ s}             z                = sealed-off {s = s} z
-  sealed-off {s = lnS _ s}                z                = sealed-off {s = s} z
-  sealed-off {s = takeS _ _ _ s}          z                = sealed-off {s = s} z
-  sealed-off {s = flatS _ _ _ _ _ _ o ls} (zo , zl)        = sealed-off {s = o} zo , sealed-offL {ls = ls} zl
-  sealed-off {s = connS k _ b}            (e , fz , zo , zb) = e , fz , sealed-offIf (CS.srcAtt k) zo , sealed-off {s = b} zb
-  sealed-off {s = joinS _ _ _ _}          _                = tt₁
-
-  sealed-offL : ∀ {Γ A} {sc : Scope Γ} {ls : List (St Γ A)} → SealedL sc ls → SealedL sc (offL ls)
-  sealed-offL {ls = []}     _        = tt₁
-  sealed-offL {ls = l ∷ ls} (z , zl) = sealed-off {s = l} z , sealed-offL {ls = ls} zl
-
-  sealed-offIf : ∀ {Γ A} {sc : Scope Γ} b {s : St Γ A} → Sealed sc s → Sealed sc (offIf b s)
-  sealed-offIf true  {s} z = sealed-off {s = s} z
-  sealed-offIf false     z = z
-
+-- TEARING DOWN KEEPS EVERY CONNECT SEALED: none's flags or scope move.
 mutual
   sealed-unsub : ∀ {Γ A} {sc : Scope Γ} {s : St Γ A} → Sealed sc s → Sealed sc (proj₁ (unsub s))
   sealed-unsub {s = pend _ _}               _                = tt₁
