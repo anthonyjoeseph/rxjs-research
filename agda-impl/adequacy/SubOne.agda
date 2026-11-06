@@ -30,7 +30,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; 
 open import denotation.Laws.Modulus using (≺-absurd; ≺-irrefl; ≺-ext; ≺→≼; ≼-refl; ≼-≺-≺; ≼-or-≻; ≼-false; entered-reach)
 open import denotation.Laws.Worlds using (Ok; plain-ix; plain-last; here; InvAt; Hots; ⊑-inside; inside-⊑; world-after)
 open import denotation.Laws using (inv-⟦⟧; defer-lim)
-open import denotation.Laws.Worlds using (W; W⁼; Plain; inW; step; nest-in; nest⁼; world-anc⁼; apart; sib; leads; ok-step) renaming (⊑-refl to ⊑ʷ-refl; _⊑_ to _⊑ʷ_)
+open import denotation.Laws.Worlds using (W; W⁼; Plain; inW; nest-in; nest⁼; world-anc⁼; apart; sib; leads; ok-step) renaming (⊑-refl to ⊑ʷ-refl; _⊑_ to _⊑ʷ_; step to wstep)
 open import denotation.EmissionSet using (DeferT) renaming (guard to dg; body to db)
 open import Tree using (Later; defer)
 open import Data.List.Properties using (∷ʳ-injectiveʳ)
@@ -236,6 +236,7 @@ module Entry {Γ A} (sc : Scope Γ) (s : Obs Timeline Γ A) (q : Pos) (ok : Ok (
         → Within Rg sc q (Truncate N) → N ≈ Truncate N × Sound Rg S × Within Rg sc q S
   entry nr pl wi = trunc-≈ nr , within-sound {sc = sc} Io wi′ , wi′
     where
+      wi′ : Within Rg sc q S
       wi′ = proj₁ wi , λ wy ex → proj₂ wi wy (excl-anchor (placed-trunc pl) ex)
 
   map-entry : ∀ {B} {f : A → B} {Rg : Rgn} → Within Rg sc q (Truncate (MapT f S))
@@ -282,9 +283,9 @@ module DeferEntry {Γ A} (sc : Scope Γ) (l : Later Timeline Γ A) (q : Pos) (ok
 
   -- The guard's children's worlds lead nothing of the body's world.
   guard-apart : ∀ {y l′ w} → W⁼ H (q ++ [ ix 1 ]) y → Plain l′ → W⁼ H ((q ++ [ ix 0 ]) ++ [ l′ ]) w → w ⊑ʷ y → ⊥
-  guard-apart wy pl v le = leads (proj₁ ok) (proj₂ ok) (nest-in (step here plain-ix) w0) nb nr wy le
+  guard-apart wy pl v le = leads (proj₁ ok) (proj₂ ok) (nest-in (wstep here plain-ix) w0) nb nr wy le
     where
-      w0 = nest⁼ (inW (step here pl)) v
+      w0 = nest⁼ (inW (wstep here pl)) v
       nb : W⁼ H (q ++ [ ix 1 ]) _ → ⊥
       nb u = apart (proj₁ ok) (world-anc⁼ w0) (world-anc⁼ u)
       nr : _ ⊑ʷ (q ++ [ ix 1 ]) → ⊥
@@ -297,7 +298,7 @@ module DeferEntry {Γ A} (sc : Scope Γ) (l : Later Timeline Γ A) (q : Pos) (ok
   excl-d wy ex (db x) pl v le = ex x pl v le
 
   into-w : ∀ {y} → W⁼ H (q ++ [ ix 1 ]) y → W H q y
-  into-w = nest-in (step here plain-ix)
+  into-w = nest-in (wstep here plain-ix)
 
   entry : ∀ {Rg : Rgn} → Within Rg sc q D → B ≈ D × Within Rg sc (q ++ [ ix 1 ]) B
   entry wi = record { alike = (λ (x , v) → into x , v) ⇄ vis-b ; cov = [ q ++ [ ix 0 ] ] , cv ; voc = into }
