@@ -149,8 +149,8 @@ jobs:
       - name: make cursor-check
         run: make cursor-check
 
-  # The simultaneous spec over the elaboration.  The selftest gates; the
-  # spec itself is informational until tier 1 of PROOF-STATE is settled.
+  # The simultaneous spec over the elaboration: no seed may refute it, and
+  # the selftest proves the check can fire.
   spec-check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -171,7 +171,6 @@ jobs:
         run: make spec-check-selftest
 
       - name: make spec-check
-        continue-on-error: true
         run: make spec-check
 
   # The oracle: every drawn program, on all three Agda engines,
