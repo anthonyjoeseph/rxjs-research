@@ -75,7 +75,7 @@ settle-cold : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {l : Tape A} {P E : Emission
             → (∀ {r e} → InE (tapeE l) r e → Owes C r × Rg r) → Sync sc Rg C (coldS true l) E
 settle-cold {C = C} tk m to′ from′ ow =
   s-cold tk (≃-trans (≃-sym (due-≈ {C = C} m)) ((λ (r , v , _) → to′ r , v , tt) ⇄ (λ (r , v , _) → from′ r , v , proj₁ (ow r))))
-         (tail-≈ m ([] , λ r _ → inj₁ (to′ r)))
+         (tail-≈ {C = C} m ([] , λ r _ → inj₁ (to′ r)))
          (λ r → proj₁ (ow r) , voc m (from′ r) , proj₂ (ow r))
 
 cold-sync : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} (x : Timeline A) q (ok : Ok (Hots (full sc)) q) (ad : Adm sc) → Owes C q
@@ -94,7 +94,7 @@ cold-sync {sc = sc} {Rg} {C} x q ok ad ow eq wi = settle-cold (open-ticked q m (
     from′ y = let y′ = subst (λ ev → InE ev _ _) (open-tape q m) y in y′ , cold-reach q m (proj₁ ok) y′
 
     owr : ∀ {r e} → InE (tapeE (opening q m)) r e → Owes C r × Rg r
-    owr y = owed ow (from′ y) , proj₂ wi (InvAt.world Io (from′ y)) (λ y₁ pl w le → InvAt.under Io y₁ (from′ y) pl w le)
+    owr y = owed {C = C} ow (from′ y) , proj₂ wi (InvAt.world Io (from′ y)) (λ y₁ pl w le → InvAt.under Io y₁ (from′ y) pl w le)
 
 ------------------------------------------------------------------------
 -- A step played
