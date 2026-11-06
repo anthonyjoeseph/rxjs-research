@@ -181,8 +181,8 @@ take-reach : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} → (∀ {y 
            → (∀ {y e l ys e′} → E y e → E (y ++ l ∷ ys) e′ → ⊥)
            → ∀ {y e} → TakeWhile.TakeT incl keep E y e → Reach (TakeWhile.TakeT incl keep E) y e
 take-reach rc fl (TakeWhile.pass {a = a} x _ _) = lift-reach tk take-lift rc (out a) x (λ ()) (λ _ → tt)
-take-reach rc fl (TakeWhile.fail x _ _ _) = under-reach tk take-lift fl x (rc x)
-take-reach rc fl (TakeWhile.stop x _ _)   = under-reach tk take-lift fl x (rc x)
+take-reach rc fl (TakeWhile.fail {a = a} x _ _ _) = under-reach tk take-lift fl {l = ix 0} {e = out a} x (rc x)
+take-reach rc fl (TakeWhile.stop x _ _)   = under-reach tk take-lift fl {l = last} {e = end} x (rc x)
 take-reach rc fl (TakeWhile.step x _)     = lift-reach tk take-lift rc skip x (λ ()) (λ _ → tt)
 take-reach rc fl (TakeWhile.tend x _)     = lift-reach tk take-lift rc end x (λ ()) (λ _ → tt)
 take-reach rc fl (TakeWhile.left {r = r} x _ _) = lift-reach tk take-lift rc (pin r) x (λ { refl → refl }) (λ ())
