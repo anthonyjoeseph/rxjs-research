@@ -14,13 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE JOINER'S PAST
-
-A joiner subscribed at `q`: every row of its meaning lies past `q`.
-Settled by a body over `pend-past` and each lane's subscription key.
-
-Members: `join-past`.
-
 #### THE CONNECT STEPPED
 
 A joiner of a completed subject joined, and a joiner's inbox run,
