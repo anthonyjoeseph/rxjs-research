@@ -146,8 +146,9 @@ private
   insert x []       = [ x ]
   insert (q , e) ((k , d) ∷ ys) = if q <ᵖ k then (q , e) ∷ (k , d) ∷ ys else (k , d) ∷ insert (q , e) ys
 
-  sort : ∀ {A} → List (Row A) → List (Row A)
-  sort = foldr insert []
+-- Rows in position order: the order a reader meets them.
+sort : ∀ {A} → List (Row A) → List (Row A)
+sort = foldr insert []
 
 ------------------------------------------------------------------------
 -- The operators

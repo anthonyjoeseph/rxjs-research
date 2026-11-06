@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache entry-check cursor-check oracle oracle-build bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache entry-check cursor-check spec-check spec-check-selftest oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest find find-prose postulates notify split \
@@ -42,6 +42,8 @@ help:
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
 	@echo "  entry-check   probe: every node's reading stays inside its entry (CI only)"
 	@echo "  cursor-check  probe: every live node owes its entry past one cursor (CI only)"
+	@echo "  spec-check    the simultaneous spec, decided per seed over the elaboration (CI only)"
+	@echo "  spec-check-selftest  every statement's sabotage is caught (CI only)"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
@@ -160,6 +162,34 @@ cursor-check: $(CURSOR_BIN)
 	  if echo "$$out" | grep -q '^cursor-check: FAIL '; then \
 	    echo "cursor-check: RED — a node strayed from its entry past the cursor"; exit 1; fi; \
 	  echo "cursor-check: GREEN"
+
+# THE SIMULTANEOUS SPEC, TESTED: `left-to-right`, `coherent` and `batchable`
+# decided per seed over the elaboration (quickcheck/Spec-Check.agda).  One
+# run, logged, serves both targets: `spec-check-selftest` is red when a
+# sabotage goes uncaught, `spec-check` when a seed refutes a statement.
+SPEC_BIN := $(SRC)/_cli/Spec-Check
+SPEC_LOG := $(SRC)/_cli/spec-check.log
+
+$(SPEC_BIN): $(AGDA_SRC)
+	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Spec-Check.agda
+	@touch $@
+
+$(SPEC_LOG): $(SPEC_BIN)
+	@$(SPEC_BIN) > $@
+
+spec-check-selftest: $(SPEC_LOG)
+	@grep '^spec-check: selftest ' $(SPEC_LOG); \
+	  test $$(grep -c '^spec-check: selftest .* fires on ' $(SPEC_LOG)) -eq 3 \
+	    || { echo "spec-check-selftest: RED — a sabotage went uncaught, or the run died"; exit 1; }; \
+	  echo "spec-check-selftest: GREEN"
+
+spec-check: $(SPEC_LOG)
+	@cat $(SPEC_LOG); \
+	  grep -q '^spec-check: done ' $(SPEC_LOG) \
+	    || { echo "spec-check: RED — the run never reached its closing line"; exit 1; }; \
+	  if grep -q '^spec-check: FAIL ' $(SPEC_LOG); then \
+	    echo "spec-check: RED — a seed refutes the spec"; exit 1; fi; \
+	  echo "spec-check: GREEN"
 
 # The wiring law's mechanised check (see CLAUDE.md, "the wiring law: NEVER
 # LEAVE A PROOF HANGING").  Pure textual analysis of the tree, no Agda
