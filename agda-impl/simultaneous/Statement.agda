@@ -51,7 +51,7 @@ open import Data.Unit using (⊤)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 
-open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root)
+open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Silent; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After; cursor)
 open import simultaneous.InstEmit using (InstEmit)
@@ -60,7 +60,7 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; Rooted; stamped; closed)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root using (E; IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (E; IE; elaborate; batchSimultaneous)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))

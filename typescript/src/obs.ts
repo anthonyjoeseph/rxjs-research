@@ -132,7 +132,7 @@ const play = (
     }),
   );
 
-const cold = (
+export const cold = (
   sch: SchedulerLike,
   frames: [number, Value[]][],
   completes: boolean,
@@ -144,10 +144,10 @@ const cold = (
       : concat(play(sch, frames, false), play(sch, frames, true).pipe(repeat()))
     : concat(play(sch, frames, false), completes ? EMPTY : NEVER);
 
-const flatMapOf = (
+export const flatMapOf = <A, B>(
   op: FlatOp,
-  lane: (a: Value) => Observable<Value>,
-): ((s: Observable<Value>) => Observable<Value>) => {
+  lane: (a: A) => Observable<B>,
+): ((s: Observable<A>) => Observable<B>) => {
   switch (op[0]) {
     case "merge":
       return op.length === 2 ? mergeMap(lane, op[1]) : mergeMap(lane);

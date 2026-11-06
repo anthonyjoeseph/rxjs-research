@@ -35,7 +35,7 @@ open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; empty; map; flatMap; of; mergeᶠ)
-open import denotation.Events using (Pos; Timeline; root; _≟ᵖ_)
+open import denotation.Events using (Pos; Timeline; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.SObs using (module Elaborate)
@@ -46,7 +46,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- Listings
