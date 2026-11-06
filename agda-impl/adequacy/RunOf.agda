@@ -109,7 +109,7 @@ after-end {j = j} L (late _ _) (late _ _) qy = ≺-irrefl {j ++ [ last ]} qy
 -- An inbox entry lies past what leads the inbox.
 inb-≺ : ∀ {A} {q} {ib : List (Pos × Evᴹ A)} {y e} → All (λ u → q ≺ proj₁ u) ib → Inbox ib y e → q ≺ y
 inb-≺ (h ∷ᴬ _)  this     = h
-inb-≺ (_ ∷ᴬ hs) (that m) = inb-≺ hs m
+inb-≺ {q = q} (_ ∷ᴬ hs) (that m) = inb-≺ {q = q} hs m
 
 -- A row still unfed past a value's rejoined row: its source row is not
 -- the value's, which no row of a lawful source lies under.
@@ -139,11 +139,11 @@ join-nx {sc = sc} {j = j} {x} {q} {a} {ib} {E} (s-join en du (hd ∷ᴾ ap) bh a
     pick : ∀ {y e} → q ≺ y → Inbox ((q , nx a) ∷ ib) y e ⊎ Due (bef q) (Unfed (bef q) d j) y e → Inbox ib y e ⊎ Due (aft q) (Unfed (aft q) d j) y e
     pick o (inj₁ this)     = ⊥-elim (≺-irrefl {q} o)
     pick o (inj₁ (that m)) = inj₁ m
-    pick o (inj₂ u)        = inj₂ (lift eq L y₀ u o)
+    pick o (inj₂ u)        = inj₂ (lift {j = j} {k₀ = k₀} eq L y₀ u o)
 
     du′ : Due (aft q) E ≃ (λ y e → Inbox ib y e ⊎ Due (aft q) (Unfed (aft q) d j) y e)
     du′ = (λ (r , v , o) → pick o (to du (r , v , ≺→≼ {q} o)))
-        ⇄ λ { (inj₁ m) → proj₁ (from du (inj₁ (that m))) , proj₁ (proj₂ (from du (inj₁ (that m)))) , inb-≺ hd m
+        ⇄ λ { (inj₁ m) → proj₁ (from du (inj₁ (that m))) , proj₁ (proj₂ (from du (inj₁ (that m)))) , inb-≺ {q = q} hd m
             ; (inj₂ u) → proj₁ (from du (inj₂ (Past.unfed-bef q d u))) , proj₁ (proj₂ u) , proj₂ (proj₂ u) }
 
     bh′ : ∀ {u y e} → u ∈ ib → Due (aft q) (Unfed (aft q) d j) y e → proj₁ u ≺ y
