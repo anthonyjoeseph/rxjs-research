@@ -149,6 +149,31 @@ jobs:
       - name: make cursor-check
         run: make cursor-check
 
+  # The simultaneous spec over the elaboration.  The selftest gates; the
+  # spec itself is informational until tier 1 of PROOF-STATE is settled.
+  spec-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      - name: make spec-check-selftest
+        run: make spec-check-selftest
+
+      - name: make spec-check
+        continue-on-error: true
+        run: make spec-check
+
   # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
   oracle:

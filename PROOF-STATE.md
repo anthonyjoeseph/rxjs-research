@@ -14,7 +14,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-## Tier 1 — the simultaneous spec
+## Tier 1 — the elaboration
+
+**The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes `left-to-right`, `coherent` or `batchable`.
+
+### Ledger
+
+## Tier 2 — the simultaneous spec
 
 **The spec:** batchSimultaneous groups what plain rxjs delivers by instant, in order, read off the emission set.
 

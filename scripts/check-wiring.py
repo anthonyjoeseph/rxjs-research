@@ -955,6 +955,8 @@ MODULE_ROOTS = {
                                ("main",)),
     "quickcheck.Cursor-Check": ("the cursor probe — `make cursor-check`",
                                 ("main",)),
+    "quickcheck.Spec-Check": ("the simultaneous spec, tested — `make spec-check`",
+                              ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
