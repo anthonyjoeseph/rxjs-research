@@ -187,7 +187,7 @@ settle-of : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {P E : Emi
           → (∀ {r e} → InE (ofᴱ q i xs) r e → Owes C r) → Sync sc Rg C (ofS i q xs) E
 settle-of {Γ} {sc} {Rg} {C} {A} {i} {q} {xs} {P} {E} m to from ow =
   s-of (≃-trans (≃-sym (due-≈ {C = C} m)) (to′ ⇄ from′))
-       (tail-≈ m ([] , λ r _ → inj₁ (to r)))
+       (tail-≈ {C = C} m ([] , λ r _ → inj₁ (to r)))
   where
     to′ : ∀ {r e} → Due C P r e → Due origin (InE (ofᴱ q i xs)) r e
     to′ (r , v , _) = to r , v , tt
