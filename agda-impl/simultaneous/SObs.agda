@@ -58,7 +58,7 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
 open import denotation.Events using (Timeline)
-open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; valuesOf)
+open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
 
 SObs : List Set → Set → Set₁
 SObs = Obs Timeline
@@ -79,13 +79,6 @@ data Part : Set where
 -- closing of each outer value.
 data Branch : Set where
   outerB laneB closeB : Branch
-
--- What the batcher reads: the run, the end of its subscribe burst, its
--- completion.
-data BIn (A : Set) : Set where
-  item  : A → BIn A
-  btick : BIn A
-  bdone : BIn A
 
 -- A flatMap's bookkeeping, as its scan simulates it.
 record Flat : Set where
@@ -276,8 +269,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     stopUnless (Flat.bracket s ∨ Flat.handoff s ∨ (isZero (Flat.queue s) ∧ isZero (Flat.active s))) n
       (record s { finished = true })
   onMark op s stop       n = stopUnless (Flat.bracket s ∨ Flat.handoff s) n s
-  onMark op s begin      n = s , instEmit (mark begin) n ∷ []
-  onMark op s over       n = s , instEmit (mark over) n ∷ []
+  onMark op s m          n = s , instEmit (mark m) n ∷ []
 
   react : ∀ {B} → FlatOp → Out B → IE B → Out B
   react op (s , _) (instEmit (value b) n) = s , instEmit (value b) n ∷ []
@@ -342,8 +334,13 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   restamp (n , _) (instEmit (mark begin) m) = m , instEmit (mark begin) m
   restamp (n , _) (instEmit ev _)           = n , instEmit ev n
 
+  -- The run, then the end of its subscribe burst, then its completion,
+  -- each told by a mark: a batcher reads the elaborated program as the
+  -- source of its own scan, subscribed where the program alone would be,
+  -- so the names it mints are the program's own.
   elaborate : ∀ {Γ A} → Obs C Γ A → E (L.map IE Γ) (IE A)
-  elaborate o = map proj₂ (scan restamp (name , marked begin) (elab (λ i → i) o))
+  elaborate o = map proj₂ (scan restamp (name , marked begin)
+    (concatˢ (merge (elab (λ i → i) o) (of (marked subscribed ∷ []))) (of (marked completed ∷ []))))
 
   ------------------------------------------------------------------------
   -- The batcher
@@ -371,19 +368,20 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     ... | false = record b { routes = Batching.routes b ∸ 1 } , []
 
     marking : ∀ {A} → Bool → Mark → N → Batching A N → Step A
-    marking true begin n b = onBegin n b
-    marking true over  n b = now b
-    marking true stop  n b = onStop b
-    marking _    _     _ b = b , []
+    marking _    subscribed n b = now (record b { late = true })
+    marking _    completed  n b = now b
+    marking true begin      n b = onBegin n b
+    marking true over       n b = now b
+    marking true stop       n b = onStop b
+    marking _    _          _ b = b , []
 
-    bstep : ∀ {A} → Step A → BIn (IE A) → Step A
-    bstep (b , _) btick                          = now (record b { late = true })
-    bstep (b , _) bdone                          = now b
-    bstep (b , _) (item (instEmit (value a) _))  = record b { held = Batching.held b ∷ʳ a } , []
-    bstep (b , _) (item (instEmit (mark m) n))   = marking (Batching.late b) m n b
+    bstep : ∀ {A} → Step A → IE A → Step A
+    bstep (b , _) (instEmit (value a) _) = record b { held = Batching.held b ∷ʳ a } , []
+    bstep (b , _) (instEmit (mark m) n)  = marking (Batching.late b) m n b
 
   -- The subscribe burst is one batch, released when it is over; after
-  -- it, an instant's batch is released when its routes are.
+  -- it, an instant's batch is released when its routes are.  The run is
+  -- read as the scan's source, so it is subscribed where it would be
+  -- alone.
   batchSimultaneous : ∀ {Γ A} → E Γ (IE A) → E Γ (IE (List A))
-  batchSimultaneous s = each proj₂ (scan bstep (batching false name [] 0 , [])
-    (concatˢ (merge (map item s) (of (btick ∷ []))) (of (bdone ∷ []))))
+  batchSimultaneous s = each proj₂ (scan bstep (batching false name [] 0 , []) s)

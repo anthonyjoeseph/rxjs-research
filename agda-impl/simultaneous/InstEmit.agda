@@ -20,6 +20,8 @@ data Mark : Set where
   begin over stop : Mark
   -- one flatMap's own, consumed by its scan
   outerOpen outerClose laneStart laneDone burstEnd outerDone : Mark
+  -- the whole run's, sent at the top and read by the batcher
+  subscribed completed : Mark
 
 data InstEvent (A : Set) : Set where
   value : A → InstEvent A
