@@ -196,7 +196,7 @@ settle-of {Γ} {sc} {Rg} {C} {A} {i} {q} {xs} {P} {E} m to from ow =
     from′ (r , v , _) = from r , v , ow r
 
 -- An of's rows: finitely many, each under its subscription.
-of-rows : ∀ {A} → Pos → ℕ → List A → List Pos
+of-rows : ∀ {A : Set} → Pos → ℕ → List A → List Pos
 of-rows p i []       = [ p ++ [ last ] ]
 of-rows p i (_ ∷ xs) = (p ++ [ ix i ]) ∷ of-rows p (suc i) xs
 
