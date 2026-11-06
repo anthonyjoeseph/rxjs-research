@@ -14,36 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE CONNECT STEPPED
-
-A joiner of a completed subject joined, and a joiner's inbox run,
-each keeping `Inv`. Open: whether its entry, owed under `last` or at its
-inbox's head, lands clear of its scope's hots. Settled when each is a body.
-
-Members: `sub-joined`, `run-join-nx`, `run-join-cp`.
-
-#### THE COLD STEPPED
-
-A cold entered at its timeline, and each turn of its tape, keep `Inv`:
-`s-cold`'s tape rows owed, in the entry and in the region. Open: whether
-a stall or a frame's close moves nothing owed. Settled when each is a body.
-
-Members: `sub-cold`, `abs-leaf`.
-
-#### THE FOLD AND THE TAKE
-
-A scan or take entered: its fold or test over no value passed. Settled
-when each is a body.
-
-Members: `sub-scan`, `sub-take`.
-
-#### THE ENTRIES
-
-Believed: a subscription's entry is its program's meaning there, and an
-of's next delivers its next row. Settled when each is a body.
-
-Members: `sub-empty`, `sub-of`, `sub-map`, `sub-defer`, `run-of-nx`, `run-of-end`.
-
 ## Tier 1 — the simultaneous spec
 
 **The spec:** batchSimultaneous groups what plain rxjs delivers by instant, in order, read off the emission set.

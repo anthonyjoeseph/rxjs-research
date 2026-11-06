@@ -9,14 +9,14 @@
 module adequacy.Ended where
 
 open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_; _∧_; _∨_)
+open import Data.Bool using (true; false; T; not; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
+open import Data.List using (List; []; _∷_; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (_<ᵇ_; _≡ᵇ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst)
@@ -30,7 +30,7 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
                     CS; cs; attAt; attached; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive;
                     search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ)
+open import operation.Key using (Key; at; after; at-<ᴷ)
 open import adequacy.Least using (Lo)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-plug)
 open import adequacy.Path using (Path; []; tau; val; _▸_; _⊑_; ⊑-trans)

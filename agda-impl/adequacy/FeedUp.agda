@@ -45,10 +45,10 @@ open import adequacy.Walk using (sync-≈; dead-closed)
 open import adequacy.Enter using (module Lanes)
 open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; ConnE; _≈_; Kill; Owes; Due; Unfed; Rgn; Sound; vis; LaneSt;
   l-live; l-dead; h-live; h-end; h-kill; Begun; none; more; Lane; Joined; joined; Flags; Src;
-  src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan;
-  s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Pol; SlotsMv; slots-mv; Subd; Torn;
-  notT; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed;
-  InCall; AttFin; alike; voc; ⊑-trans; ∪-⊑; ⊑-refl; burst-dn)
+  src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-coldx; s-of; s-done; s-map;
+  s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Pol; SlotsMv; slots-mv; Subd;
+  Torn; notT; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed; InCall;
+  AttFin; alike; voc; burst-dn)
 open import adequacy.Cursor.Tear using (c-abs; husk-of; NoIsle; NoIsleL; Settles)
 open import adequacy.Cursor.Frame using (Fr; owes; f-src; f-srcc; f-srcp; d-src; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; unread-at)
