@@ -39,7 +39,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; unbound; binds; CS; ofS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (full; pendRows; Inbox; _≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; bef; Owes; Onward; Dom; Up; SubdAt; Due; Unfed; Adm; Flags; InCall; Within; _≈_;
+open import adequacy.Cursor using (Cur; origin; bef; Owes; Onward; Dom; Up; SubdAt; Due; Unfed; Adm; Flags; InCall; Within; _≈_;
   Sync; s-join; s-of; tail-≈)
 open import adequacy.Cursor.Tear using (c-abs)
 open import adequacy.Cursor.Show using (owes-onward; up-ward; call-owes; call-onward)
