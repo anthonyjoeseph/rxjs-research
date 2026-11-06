@@ -103,10 +103,10 @@ map-lift (map-pin {q} x)  = q , _ , x , ≼-refl {q} , here refl , λ { refl →
 map-lift (map-end {q} x)  = q , _ , x , ≼-refl {q} , here refl , λ ()
 
 map-reach : ∀ {A B} {f : A → B} {E : EmissionSet A} → (∀ {y e} → E y e → Reach E y e) → ∀ {y e} → MapT f E y e → Reach (MapT f E) y e
-map-reach rc (map-out x)  = lift-reach [_] map-lift rc x (λ ()) (λ _ → tt)
-map-reach rc (map-skip x) = lift-reach [_] map-lift rc x (λ ()) (λ _ → tt)
-map-reach rc (map-pin x)  = lift-reach [_] map-lift rc x (λ { refl → refl }) (λ ())
-map-reach rc (map-end x)  = lift-reach [_] map-lift rc x (λ ()) (λ _ → tt)
+map-reach {f = f} {E = E} rc (map-out x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
+map-reach {f = f} {E = E} rc (map-skip x) = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
+map-reach {f = f} {E = E} rc (map-pin x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ { refl → refl }) (λ ())
+map-reach {f = f} {E = E} rc (map-end x)  = lift-reach {E = E} {E′ = MapT f E} [_] (map-lift {f = f} {E = E}) rc x (λ ()) (λ _ → tt)
 
 acc-at : ∀ {A B} {f : B → A → B} {z} {E : EmissionSet A} {q b} → Scan.Acc f z E q b → Σ A λ a → E q (out a)
 acc-at (Scan.acc₀ x _)    = _ , x
@@ -234,7 +234,7 @@ module Entry {Γ A} (sc : Scope Γ) (s : Obs Timeline Γ A) (q : Pos) (ok : Ok (
 
   entry : ∀ {B} {N : EmissionSet B} {Rg : Rgn} → (∀ {y e} → N y e → Reach N y e) → Placed (Hots (full sc)) S N
         → Within Rg sc q (Truncate N) → N ≈ Truncate N × Sound Rg S × Within Rg sc q S
-  entry nr pl wi = trunc-≈ nr , within-sound {sc = sc} Io wi′ , wi′
+  entry {Rg = Rg} nr pl wi = trunc-≈ nr , within-sound {sc = sc} Io wi′ , wi′
     where
       wi′ : Within Rg sc q S
       wi′ = proj₁ wi , λ wy ex → proj₂ wi wy (excl-anchor (placed-trunc pl) ex)
