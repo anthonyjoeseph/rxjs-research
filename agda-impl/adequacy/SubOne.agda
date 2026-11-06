@@ -234,10 +234,10 @@ module Entry {Γ A} (sc : Scope Γ) (s : Obs Timeline Γ A) (q : Pos) (ok : Ok (
 
   entry : ∀ {B} {N : EmissionSet B} {Rg : Rgn} → (∀ {y e} → N y e → Reach N y e) → Placed (Hots (full sc)) S N
         → Within Rg sc q (Truncate N) → N ≈ Truncate N × Sound Rg S × Within Rg sc q S
-  entry {Rg = Rg} nr pl wi = trunc-≈ nr , within-sound {sc = sc} Io wi′ , wi′
+  entry {N = N} {Rg = Rg} nr pl wi = trunc-≈ nr , within-sound {sc = sc} Io wi′ , wi′
     where
       wi′ : Within Rg sc q S
-      wi′ = proj₁ wi , λ wy ex → proj₂ wi wy (excl-anchor (placed-trunc pl) ex)
+      wi′ = proj₁ wi , λ wy ex → proj₂ wi wy (excl-anchor {E′ = Truncate N} (placed-trunc pl) ex)
 
   map-entry : ∀ {B} {f : A → B} {Rg : Rgn} → Within Rg sc q (Truncate (MapT f S))
             → MapT f S ≈ Truncate (MapT f S) × Sound Rg S × Within Rg sc q S
