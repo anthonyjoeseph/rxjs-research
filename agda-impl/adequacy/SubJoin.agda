@@ -185,9 +185,15 @@ join-late {t = t} {q} {c′} B te cq = to , from
 settle-of : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {P E : EmissionSet A}
           → P ≈ E → (∀ {r e} → P r e → InE (ofᴱ q i xs) r e) → (∀ {r e} → InE (ofᴱ q i xs) r e → P r e)
           → (∀ {r e} → InE (ofᴱ q i xs) r e → Owes C r) → Sync sc Rg C (ofS i q xs) E
-settle-of {C = C} m to from ow =
-  s-of (≃-trans (≃-sym (due-≈ {C = C} m)) ((λ (r , v , _) → to r , v , tt) ⇄ (λ (r , v , _) → from r , v , ow r)))
+settle-of {Γ} {sc} {Rg} {C} {A} {i} {q} {xs} {P} {E} m to from ow =
+  s-of (≃-trans (≃-sym (due-≈ {C = C} m)) (to′ ⇄ from′))
        (tail-≈ m ([] , λ r _ → inj₁ (to r)))
+  where
+    to′ : ∀ {r e} → Due C P r e → Due origin (InE (ofᴱ q i xs)) r e
+    to′ (r , v , _) = to r , v , tt
+
+    from′ : ∀ {r e} → Due origin (InE (ofᴱ q i xs)) r e → Due C P r e
+    from′ (r , v , _) = from r , v , ow r
 
 -- An of's rows: finitely many, each under its subscription.
 of-rows : ∀ {A} → Pos → ℕ → List A → List Pos
