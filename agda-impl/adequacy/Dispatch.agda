@@ -22,8 +22,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Events using (Timeline; Pos; ix; last; timelineAt; emit; stall; close)
-open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; at-out; at-end; _≺_; _≼_)
-open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; entered-reach; ticks)
+open import denotation.EmissionSet using (EmissionSet; out; module TakeWhile; ⟦_⟧; at-out; at-end; _≺_; _≼_)
+open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
 open import operation.Key using (at; after)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
@@ -35,10 +35,10 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this)
 open _≃_
-open import adequacy.Cursor using (Cur; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; notT; s-of; s-join; s-joinx; s-took; subd; o-cp)
-open import adequacy.Cursor.Tear using (c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
+open import adequacy.Cursor using (Cur; aft; NoFail; Sound; tailp-dn; ≈-refl; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; notT; s-of; s-join; s-joinx; s-took; subd; o-cp)
+open import adequacy.Cursor.Tear using (husk-of; c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
 open import adequacy.Cursor.Frame using (Fr; Hold; owes; dead; lane; lanecut; pnd; Rest; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
-open import adequacy.Cursor.Rise using (Inv; settled; pending; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
+open import adequacy.Cursor.Rise using (Inv; settled; pending; flying; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
 open import adequacy.Path using (Path)
 open import adequacy.Isle.Step using (found-clear; found-con)
 open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; con-owed; Off; closed-off)
@@ -53,7 +53,9 @@ open import adequacy.FrShift using (fr-shift; rc; hr; HR)
 open import adequacy.Few using (lag; owes-call)
 open import adequacy.Apart.Floor using (floor)
 open import denotation.Laws.BoundedInv using (first-child)
-open import adequacy.Up using (rise-body-nx; rise-body-cp)
+open import adequacy.Up using (NoRow; rise-body-nx; rise-body-cp)
+open import adequacy.PinTail using (took-tail)
+open import denotation.Laws.ColdInv using (slot-last)
 open import adequacy.FeedUp using (rise-src-nx; rise-src-cp)
 open import adequacy.Admit using (rise-outer-nx)
 open import adequacy.Settle using (rise-outer-cp; rise-lane-nx)
@@ -278,6 +280,19 @@ none-spent sy () r | just _
 ------------------------------------------------------------------------
 -- The steps over a root's entry
 
+-- A takeWhile failing at `p`, inclusive: nothing of it at `p`, its
+-- failing value leaving under `p`'s first effect.
+fail-nr : ∀ {A} {keep : A → Bool} {Rg Es p a} → Sound Rg Es → Es p (out a) → keep a ≡ false → NoFail (bef p) keep Es
+        → NoRow (TakeWhile.TakeT true keep Es) p
+fail-nr sd row kf nf (TakeWhile.pass y kt _) v with Sound.fn sd y row v tt
+... | refl = subst T kf kt
+fail-nr sd row kf nf (TakeWhile.fail {q} y nk _ _) _ = nf y nk (≺-ext q [])
+fail-nr sd row kf nf (TakeWhile.stop {q} y nk _) _ = nf y nk (≺-ext q [])
+fail-nr sd row kf nf (TakeWhile.step _ _) ()
+fail-nr sd row kf nf (TakeWhile.tend y _) v with Sound.fn sd y row v tt
+... | ()
+fail-nr sd row kf nf (TakeWhile.left _ _ _) ()
+
 module Over {R : Set} (Rt : EmissionSet R) where
 
   postulate
@@ -305,13 +320,6 @@ module Over {R : Set} (Rt : EmissionSet R) where
                → Inv Rt Cr C ⟨ c , pend (connected x) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ c , ofS 0 q [] , absorbed , q ⟩
 
     --------------------------------------------------------------------
-    -- RISES that read their frame's bookkeeping.
-    -- A TAKEWHILE'S FIRST FAILURE, INCLUSIVE: the row leaves under `ix 0`,
-    -- and what is above moves past `p`, which needs no row but this one
-    -- at `p`.
-    rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false
-                    → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
-    --------------------------------------------------------------------
     -- MARK RUNS, the hole's cursor just before what they deliver.
     run-of-nx     : ∀ {Cr Γ A} {c : Ctx R Γ A} {i q x xs r} → closed c ≡ false
                   → Inv Rt Cr (bef (q ⊕ [ ix i ])) ⟨ c , ofS i q (x ∷ xs) , absorbed , r ⟩
@@ -331,6 +339,41 @@ module Over {R : Set} (Rt : EmissionSet R) where
                   → search top (plug c s) ≡ just (found (Γ , A , c′ , coldS b l) leafM κ)
                   → Driver.took R (run c′ (coldS b l) leafM p) ≡ Driver.silent t k′
                   → SimC Rt ⟨ c , s , absorbed , p ⟩ [] k′
+
+  ----------------------------------------------------------------------
+  -- A TAKEWHILE'S FIRST FAILURE, INCLUSIVE: the row leaves under `ix 0`,
+  -- its first effect, and the frames above move onto it past `p`, where
+  -- the take shows nothing; no position lies between.  The frames are
+  -- re-cursored under the whole tree's floor, the run's.
+  rise-take-failᵢ : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a p} → w a ≡ false → Lo (plug c (takeS true w free s)) (after p)
+                  → SimC Rt ⟨ inTake true w free c , s , rising (nx a) , p ⟩ [] ⟨ c , takeS true w (cpAt p) s , rising (nx a) , p ⊕ [ ix 0 ] ⟩
+  rise-take-failᵢ {w = w} {c = c} {s = s} {a = a} {p = p} wa fl (flying (f-take {E = Es} {E′ = E′} fr nf eq sd) cl (sy , row)) =
+    let (Cr′ , fr′ , _ , _ , d) = rc Rt {s = takeS true w free s} fr (hr λ _ _ → lag [ p ] (λ _ o yp → here (at-p o yp)) , bnd) (≺→≼ {p} {p ⊕ [ ix 0 ]} p0)
+                                    (lo-weaken (at (p ⊕ [ ix 0 ])) (after p) fl (at-after p [ ix 0 ]))
+    in Cr′ , bef (p ⊕ [ ix 0 ]) ,
+       flying fr′ cl (s-took (a , row , nk , λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) gone (λ _ → ≺-irrefl {p ⊕ [ ix 0 ]}) (o-cp (slot-last p 0))
+                             (tailp-dn {C = bef p} {C′ = aft (p ⊕ [ ix 0 ])} (λ {y} t → gone {y} t) (took-tail sy row nk nf)) (proj₂ (husk-of sy))
+                             (λ {r} t → ≼-trans {r} {p} {p ⊕ [ ix 0 ]} t (≺→≼ {p} {p ⊕ [ ix 0 ]} p0))
+                             (λ {r′} t (q , _ , y , nk′ , qr) → nf y nk′ (≺-≼-≺ {q} {r′} {p} qr t)) eq sd
+                    , proj₁ (to (alike eq) (TakeWhile.fail row nk (λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) tt , _))) ,
+       silent (vis-≃ d)
+    where
+      p0 : p ≺ (p ⊕ [ ix 0 ])
+      p0 = ≺-ext p []
+      nk : T (not (w a))
+      nk = subst (λ b → T (not b)) (sym wa) tt
+      at-p : ∀ {y} → p ≼ y → y ≺ (p ⊕ [ ix 0 ]) → y ≡ p
+      at-p {y} o yp = ≼-antisym {y} {p} (λ py → first-child p py yp) o
+      gone : ∀ {q} → (p ⊕ [ ix 0 ]) ≺ q → p ≼ q
+      gone {q} t = ≺→≼ {p} {q} (≺-trans {p} {p ⊕ [ ix 0 ]} {q} p0 t)
+      bnd : ∀ {q e} → Due (bef p) E′ q e → (p ⊕ [ ix 0 ]) ≼ q
+      bnd {q} (y , v , o) yp with at-p {q} o yp
+      ... | refl = let (y′ , v′) = from (alike eq) (y , v) in fail-nr sd row wa nf y′ v′
+  rise-take-failᵢ wa fl (flying (f-took _ _ _ _ _ _ _ _ _ _) _ ())
+  rise-take-failᵢ wa fl (flying (d-take _ _) _ ())
+  rise-take-failᵢ wa fl (adrift (f-took _ _ _ _ () _ _ _ _ _) _ _)
+  rise-take-failᵢ wa fl {Cr} {C} (adrift (d-take fr u) cl (Q , hk , le)) = Cr , C , adrift fr cl (Q , h-take hk u , le) , silent ≃-refl
+  rise-take-failᵢ wa fl (settled () _ _)
 
   ----------------------------------------------------------------------
   -- A SUBSCRIPTION OWED, whichever way the invariant holds it: pending,
@@ -662,32 +705,33 @@ module Over {R : Set} (Rt : EmissionSet R) where
   body-cp false lv refl = rise-bodyx Rt lv
 
   -- A rise, by its frame.
-  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → rise c s e p ≡ moved k′ sh t → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
-  rise-sim top                       s e      p refl = rise-top Rt
-  rise-sim (inMap f c)               s e      p refl = rise-map Rt
-  rise-sim (inScan f z c)            s (nx a) p refl = rise-scan-nx Rt
-  rise-sim (inScan f z c)            s cp     p refl = rise-scan-cp Rt
-  rise-sim (inCut true a c)          s e      p refl = rise-cut Rt
-  rise-sim (inCut false a c)         s e      p refl = rise-cutx Rt
-  rise-sim (inLn b c)                s e      p refl = rise-ln Rt
-  rise-sim (inTake i w free c)       s (nx a) p eq with w a in wa | i | eq
+  rise-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (s : St Γ A) e p → Lo (plug c s) (after p) → rise c s e p ≡ moved k′ sh t
+           → SimC Rt ⟨ c , s , rising e , p ⟩ sh k′
+  rise-sim top                       s e      p fl refl = rise-top Rt
+  rise-sim (inMap f c)               s e      p fl refl = rise-map Rt
+  rise-sim (inScan f z c)            s (nx a) p fl refl = rise-scan-nx Rt
+  rise-sim (inScan f z c)            s cp     p fl refl = rise-scan-cp Rt
+  rise-sim (inCut true a c)          s e      p fl refl = rise-cut Rt
+  rise-sim (inCut false a c)         s e      p fl refl = rise-cutx Rt
+  rise-sim (inLn b c)                s e      p fl refl = rise-ln Rt
+  rise-sim (inTake i w free c)       s (nx a) p fl eq with w a in wa | i | eq
   ... | true  | _     | refl = rise-take-pass Rt wa
-  ... | false | true  | refl = rise-take-failᵢ wa
+  ... | false | true  | refl = rise-take-failᵢ wa fl
   ... | false | false | refl = rise-take-fail Rt wa
-  rise-sim (inTake i w free c)       s cp     p refl = rise-take-cp Rt
-  rise-sim (inTake i w (cpAt r) c)   s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (cutAt r) c)  s e      p refl = rise-took Rt (λ ())
-  rise-sim (inTake i w (overAt r) c) s e      p refl = rise-took Rt (λ ())
-  rise-sim (inOuter op f ω d n q ls c) o (nx a) p eq   = rise-outer-nx Rt eq
-  rise-sim (inOuter op f ω d n q ls c) o cp     p eq   = rise-outer-cp Rt eq
-  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p eq = rise-lane-nx Rt eq
-  rise-sim (inLanes op f ω d n q o pre post c) s cp     p eq = rise-lane-cp Rt eq
-  rise-sim (inSrc k b c)             s (nx a) p eq   = rise-src-nx Rt eq
-  rise-sim (inSrc k b c)             s cp     p eq   = rise-src-cp Rt eq
-  rise-sim (inBody k o c)            s (nx b) p eq with CS.srcLive k in lv | eq
+  rise-sim (inTake i w free c)       s cp     p fl refl = rise-take-cp Rt
+  rise-sim (inTake i w (cpAt r) c)   s e      p fl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (cutAt r) c)  s e      p fl refl = rise-took Rt (λ ())
+  rise-sim (inTake i w (overAt r) c) s e      p fl refl = rise-took Rt (λ ())
+  rise-sim (inOuter op f ω d n q ls c) o (nx a) p fl eq   = rise-outer-nx Rt eq
+  rise-sim (inOuter op f ω d n q ls c) o cp     p fl eq   = rise-outer-cp Rt eq
+  rise-sim (inLanes op f ω d n q o pre post c) s (nx b) p fl eq = rise-lane-nx Rt eq
+  rise-sim (inLanes op f ω d n q o pre post c) s cp     p fl eq = rise-lane-cp Rt eq
+  rise-sim (inSrc k b c)             s (nx a) p fl eq   = rise-src-nx Rt eq
+  rise-sim (inSrc k b c)             s cp     p fl eq   = rise-src-cp Rt eq
+  rise-sim (inBody k o c)            s (nx b) p fl eq with CS.srcLive k in lv | eq
   ... | true  | refl = rise-body-nx Rt lv
   ... | false | refl = rise-bodyx Rt lv
-  rise-sim (inBody k o c)            s cp     p eq   = body-cp (CS.srcLive k) refl eq
+  rise-sim (inBody k o c)            s cp     p fl eq   = body-cp (CS.srcLive k) refl eq
 
   -- A joiner subscribed, by its subject's end.
   join-mv : ∀ {Γ A} (c : Ctx R Γ A) (x : A ∈ Γ) q {p} → Mv (stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩)
@@ -716,7 +760,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   -- Subscribing to a node already running: nothing to do.  A mark run
   -- reads the run's path.
   reach : ∀ {o₀ : PureObs [] R} {rs} (k : Conf R) → Path (load o₀) rs k → Reach k
-  reach ⟨ c , s , rising e , p ⟩                        _   = within (rise-mv c s e p) (rise-sim c s e p)
+  reach {o₀ = o₀} ⟨ c , s , rising e , p ⟩              pth = within (rise-mv c s e p) (rise-sim c s e p (floor o₀ pth tt))
   reach {o₀ = o₀} ⟨ c , pend o q , subscribing , p ⟩ pth with pend-focus o₀ pth
   ... | _ , refl = reach-pend c o q q (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) (floor o₀ pth tt) (at-after q [ ix 0 ]))
   reach ⟨ c , coldS b l , subscribing , p ⟩             _   = within tt λ { refl → keeps Rt λ i → i }
