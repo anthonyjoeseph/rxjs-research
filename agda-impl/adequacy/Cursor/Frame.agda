@@ -183,11 +183,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
     d-src   : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D D₁ Db Rg′ P N Qb β E E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′ → UpA D₁ E D E′
             → P ⊑ (Under N ∪ᵖ Qb) → NoIsle b → T (CS.srcAtt k) ⊎ T (CS.closed k)
-            → (∀ {c′} → Hots (full (scopeOf c)) c′ → Onward D c′ → Onward D₁ c′) → Open k Db → InScope k (scopeOf c) Db
+            → (∀ {c′} → Hots (full (scopeOf c)) c′ → Onward D c′ → Onward D₁ c′) → Open k Db → InScope k (scopeOf c)
             → Fr Cr C Rg′ (inSrc k b c) (dead D₁ N) E
     d-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C D D₁ Rg′ P N Ps E E′}
             → Unread Cr C D E′ E c k P → SrcH (scopeOf c) D k o E′ Ps → Up D₁ E D E′
-            → P ⊑ (Ps ∪ᵖ N) → Open k D₁ → InScope k (scopeOf c) D₁ → Fr Cr C Rg′ (inBody k o c) (dead D₁ N) E
+            → P ⊑ (Ps ∪ᵖ N) → Open k D₁ → InScope k (scopeOf c) → Fr Cr C Rg′ (inBody k o c) (dead D₁ N) E
     -- an isle: its source in step at its own cursor, its burst showing
     -- in its connect's entry
     f-isle  : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D Db Ri Ci P Qb β E′}
@@ -195,18 +195,18 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
             → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k → InCall Ci k
             → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ])
-            → NoIsle b → Open k Db → InScope k (scopeOf c) Db → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
+            → NoIsle b → Open k Db → InScope k (scopeOf c) → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D D₁ Db Ci Rg′ P N Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
             → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Dom Ci D₁ → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → AttOwed k → InCall Ci k
-            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → Open k Db → InScope k (scopeOf c) Db
+            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → Open k Db → InScope k (scopeOf c)
             → Fr Cr C Rg′ (inSrc k b c) (dead D₁ N) (Frozen k)
     -- an isle's source not yet subscribed: its cursor at where it will be
     f-islep : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D Db Ri P Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst (bef (CS.connAt k ++ [ ix 1 ])) k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing
             → CS.scope k ≡ scopeOf c → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c)) → Sound Ri (Frozen k)
-            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → NoIsle b → Open k Db → InScope k (scopeOf c) Db
+            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → NoIsle b → Open k Db → InScope k (scopeOf c)
             → Fr Cr (bef (CS.connAt k ++ [ ix 1 ])) Ri (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) (Frozen k)

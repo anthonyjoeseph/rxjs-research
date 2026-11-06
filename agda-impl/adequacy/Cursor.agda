@@ -45,6 +45,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.Unit using (⊤; tt)
+open import Data.Unit.Polymorphic using () renaming (⊤ to ⊤₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 open import Relation.Nullary using (¬_)
 
@@ -550,17 +551,18 @@ record UpA {A B} (D : Cur) (E : EmissionSet A) (D′ : Cur) (E′ : EmissionSet 
   field
     lift : Lifts D E D′ E′
 
--- A connect's body, read under the scope it was bound in, or never read.
-InScope : ∀ {Γ X} → CS Γ X → Scope Γ → Cur → Set₁
-InScope k sc D = D ≡ origin ⊎ CS.scope k ≡ sc
+-- A connect's body, read under the scope it was bound in.
+InScope : ∀ {Γ X} → CS Γ X → Scope Γ → Set₁
+InScope k sc = CS.scope k ≡ sc
 
 -- Every position `D` has reached lies at or before `c`.
 Onward : Cur → Pos → Set
 Onward D c = ∀ {r} → Thru D r → r ≼ c
 
--- A connect's source, not closed, ends past what `D` has reached.
+-- A connect's source's end: not closed, past what `D` has reached;
+-- closed, the row it ended at.
 Open : ∀ {Γ X} → CS Γ X → Cur → Set
-Open k D = T (not (CS.closed k)) → ∀ {c} → Frozen k c end → Onward D c
+Open k D = (T (not (CS.closed k)) → ∀ {c} → Frozen k c end → Onward D c) × (T (CS.closed k) → Frozen k (CS.endAt k) end)
 
 -- An unattached source's cursor: within its subscribe call, reaching
 -- nothing past the slot after it.
@@ -613,6 +615,24 @@ Quiet _                        = ⊤
 
 QuietL []       = ⊤
 QuietL (l ∷ ls) = Quiet l × QuietL ls
+
+-- A part's connects, each read under the scope it was bound in, and each
+-- closed one at the row its source ended at.
+SealedL : ∀ {Γ A} → Scope Γ → List (St Γ A) → Set₁
+
+Sealed : ∀ {Γ A} → Scope Γ → St Γ A → Set₁
+Sealed sc (mapS _ s)               = Sealed sc s
+Sealed sc (scanS _ _ s)            = Sealed sc s
+Sealed sc (cutS _ _ s)             = Sealed sc s
+Sealed sc (lnS _ s)                = Sealed sc s
+Sealed sc (takeS _ _ _ s)          = Sealed sc s
+Sealed sc (flatS _ _ _ _ _ _ o ls) = Sealed sc o × SealedL sc ls
+Sealed sc (connS k o b)            = CS.scope k ≡ sc × (T (CS.closed k) → Frozen k (CS.endAt k) end) × Sealed sc o
+                                     × Sealed (binds (CS.src k) (CS.connAt k) (CS.scope k)) b
+Sealed sc _                        = ⊤₁
+
+SealedL sc []       = ⊤₁
+SealedL sc (l ∷ ls) = Sealed sc l × SealedL sc ls
 
 -- A PART NO LIVE NODE READS: no entry ties it, only where it may still
 -- run on, cursor-free.  Its isles are the one thing in it still in step.
@@ -739,6 +759,8 @@ data Sync where
   s-cold : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {l} {E : EmissionSet A}
          → Ticked l → Due C E ≃ Due origin (InE (tapeE l)) → Tail C E (InE (tapeE l))
          → (∀ {y e} → InE (tapeE l) y e → Owes C y × E y e × Rg y) → Sync sc Rg C (coldS true l) E
+  -- a cold leaf completed: nothing left to owe
+  s-coldx : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {l : Tape A} {E} → Spent C E → Fin C E → Sync sc Rg C (coldS false l) E
   -- an of: what it has left is what its entry owes
   s-of   : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {E}
          → Due C E ≃ Due origin (InE (ofᴱ q i xs)) → Tail C E (InE (ofᴱ q i xs)) → Sync sc Rg C (ofS i q xs) E
@@ -809,7 +831,7 @@ data Src where
 
 data Husk where
   -- nothing in it still in step
-  h-blank : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E} → Quiet s → Husk sc D s E ∅ᵖ
+  h-blank : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E} → Quiet s → Sealed sc s → Husk sc D s E ∅ᵖ
   h-map   : ∀ {Γ} {sc : Scope Γ} {D D₁} {A B} {f : A → B} {s E₁ E P} → Husk sc D₁ s E₁ P → Up D₁ E₁ D E → Husk sc D (mapS f s) E P
   h-scan  : ∀ {Γ} {sc : Scope Γ} {D D₁} {A B} {f : B → A → B} {z s E₁ E P} → Husk sc D₁ s E₁ P → Up D₁ E₁ D E → Husk sc D (scanS f z s) E P
   h-cut   : ∀ {Γ} {sc : Scope Γ} {D D₁} {A} {l a} {s : St Γ A} {E₁ E P} → Husk sc D₁ s E₁ P → Up D₁ E₁ D E → Husk sc D (cutS l a s) E P
@@ -818,7 +840,7 @@ data Husk where
   h-flat  : ∀ {Γ} {sc : Scope Γ} {D D₁} {A B} {op} {f : A → Obs Timeline Γ B} {ω} {d n qu o ls O E P Q}
           → Husk sc D₁ o O P → Up D₁ O D E → HuskL sc D ls E Q → Husk sc D (flatS op f ω d n qu o ls) E (P ∪ᵖ Q)
   h-conn  : ∀ {Γ} {sc : Scope Γ} {D D₁} {X B} {k : CS Γ X} {o} {b : St (X ∷ Γ) B} {β E P Q}
-          → SrcH sc D k o E P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D₁ b β Q → Up D₁ β D E → Open k D₁ → InScope k sc D₁
+          → SrcH sc D k o E P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) D₁ b β Q → Up D₁ β D E → Open k D₁ → InScope k sc
           → Husk sc D (connS k o b) E (P ∪ᵖ Q)
 
 data HuskL where

@@ -10,7 +10,9 @@ module denotation.Laws.ColdInv where
 
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using () renaming (here to hd; there to th)
 open import Data.List.Properties using (++-conicalˡ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.Nat using (zero; suc; _+_; _≤_; _<_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; +-suc; +-monoʳ-≤; m≤m+n; m<m+n)
@@ -22,8 +24,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Events using (Pos; Label; ix; sub; last; Time; tick; From; done; quiet; at; Frame; emit; stall; close;
   module Frame∞; module From∞; Timeline; timelineAt; <ᵖ-ix; <ᵖ-part; ix-<)
-open import denotation.Events using (frames; burst; start)
-open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
+open import denotation.Events using (Events; frames; burst; start)
+open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
@@ -34,6 +36,14 @@ slot r i = Equivalence.from T-≡ (<ᵖ-part r [] [] (<ᵖ-ix i))
 
 slot-last : ∀ r i → (r ++ [ ix i ]) ≺ (r ++ [ last ])
 slot-last r i = Equivalence.from T-≡ (<ᵖ-part r [] [] refl)
+
+-- A stream's positions up to a row of it.
+upTo : ∀ {A} {ev : Events A} {y e} → InE ev y e → List Pos
+upTo (at-out {k})    = k ∷ []
+upTo (at-skip {k})   = k ∷ []
+upTo (at-end {k})    = k ∷ []
+upTo (on-out {k} x)  = k ∷ upTo x
+upTo (on-skip {k} x) = k ∷ upTo x
 
 private
   -- A reachable position before a timer's later tick.
@@ -174,6 +184,31 @@ private
       la-f τ e quiet       re _  ()     _
       la-f τ e (at t′ _ b) re ok xc     x      = la-b τ (ix (τ + t′) ∷ sub e ∷ []) 0 b (timer-real τ e re ok) ≤-refl xc x
 
+    -- Every row before another lies in the stream up to it.
+    mutual
+      pre-b : ∀ {t q y e e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → (x : InE (burst τ r i b) q e) → InE (burst τ r i b) y e′ → y ≺ q → y ∈ upTo x
+      pre-b τ r i (emit a k) rr le at-out      at-out       _  = hd refl
+      pre-b {y = y} τ r i (emit a k) rr le at-out (on-out x′) yq = ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x′) yq)
+      pre-b τ r i (emit a k) rr le (on-out x)  at-out       _  = hd refl
+      pre-b τ r i (emit a k) rr le (on-out x)  (on-out x′)  yq = th (pre-b τ r (suc i) k rr le x x′ yq)
+      pre-b τ r i (stall k)  rr le at-skip     at-skip      _  = hd refl
+      pre-b {y = y} τ r i (stall k) rr le at-skip (on-skip x′) yq =
+        ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) (Frame∞.force k) rr le x′) yq)
+      pre-b τ r i (stall k)  rr le (on-skip x) at-skip      _  = hd refl
+      pre-b τ r i (stall k)  rr le (on-skip x) (on-skip x′) yq = th (pre-b τ r (suc i) (Frame∞.force k) rr le x x′ yq)
+      pre-b τ r i (close k)  rr le at-skip     at-skip      _  = hd refl
+      pre-b {y = y} τ r i (close k) rr le at-skip (on-skip x′) yq =
+        ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ last ]) {y} (slot-last r i)
+          (lb-f τ (r ++ [ last ]) (From∞.force k) (real-snoc r plain-last rr) (close-ok r rr le (From∞.force k)) x′) yq)
+      pre-b τ r i (close k)  rr le (on-skip x) at-skip      _  = hd refl
+      pre-b τ r i (close k)  rr le (on-skip x) (on-skip x′) yq =
+        th (pre-f τ (r ++ [ last ]) (From∞.force k) (real-snoc r plain-last rr) (close-ok r rr le (From∞.force k)) x x′ yq)
+
+      pre-f : ∀ {t q y e₁ e₂} τ e (m : From A t) → Real e → FrOk τ e m → (x : InE (frames τ e m) q e₁) → InE (frames τ e m) y e₂ → y ≺ q → y ∈ upTo x
+      pre-f τ e done        re _  at-end at-end _  = hd refl
+      pre-f τ e quiet       re _  ()     _      _
+      pre-f τ e (at t′ _ b) re ok x      x′     yq = pre-b τ (ix (τ + t′) ∷ sub e ∷ []) 0 b (timer-real τ e re ok) ≤-refl x x′ yq
+
     -- The subscription's own stream.
     module S (rp : Real p) where
       root : Root p
@@ -199,6 +234,12 @@ private
       la (at (suc n) le b) xc x = la-f (tick p) (p ++ [ last ]) (at (suc n) le b) (real-snoc p plain-last rp) (late-ok n {le} {b}) xc x
       la done              xc x = la-f {0} (tick p) (p ++ [ last ]) done (real-snoc p plain-last rp) tt xc x
       la quiet             xc x = la-f {0} (tick p) (p ++ [ last ]) quiet (real-snoc p plain-last rp) tt xc x
+
+      pre : ∀ (m : From A 0) {q y e e′} (x : InE (start p m) q e) → InE (start p m) y e′ → y ≺ q → y ∈ upTo x
+      pre (at zero _ b)     x x′ yq = pre-b (tick p) p 0 b rp (m≤m+n (tick p) 0) x x′ yq
+      pre (at (suc n) le b) x x′ yq = pre-f (tick p) (p ++ [ last ]) (at (suc n) le b) (real-snoc p plain-last rp) (late-ok n {le} {b}) x x′ yq
+      pre done              x x′ yq = pre-f {0} (tick p) (p ++ [ last ]) done (real-snoc p plain-last rp) tt x x′ yq
+      pre quiet             x x′ yq = pre-f {0} (tick p) (p ++ [ last ]) quiet (real-snoc p plain-last rp) tt x x′ yq
 
     wo : ∀ {y e} → Row y e → W H p y
     wo (_ , _ , (w , _ , _) , pl , refl , _) = step w pl
@@ -272,3 +313,12 @@ cold-inv {A} {H} c p (rp , dj) = record
 -- next slot.
 burst-lb : ∀ {A t y e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → InE (burst τ r i b) y e′ → (r ++ [ ix i ]) ≼ y
 burst-lb {A} = CI.lb-b {A} (λ _ → ⊥) []
+
+-- A cold stream from a reachable subscription: finitely many rows before
+-- each.
+cold-reach : ∀ {A} p (m : From A 0) → Real p → ∀ {q e} (x : InE (start p m) q e) → Reach (InE (start p m)) q e
+cold-reach {A} p m rp x = upTo x , λ x′ yq _ → CI.S.pre {A} (λ _ → ⊥) p rp m x x′ yq
+
+-- The next frame's root, past a reachable burst's end.
+next-real : ∀ τ {t′} r → Real r → tick r < τ + t′ → Real (ix (τ + t′) ∷ sub (r ++ [ last ]) ∷ [])
+next-real τ r rr lt = CI.timer-real {⊤} (λ _ → ⊥) [] τ (r ++ [ last ]) (real-snoc r plain-last rr) (subst (_< τ + _) (sym (tick-snoc r rr)) lt)

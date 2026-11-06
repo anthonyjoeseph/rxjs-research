@@ -13,7 +13,8 @@ module adequacy.SubJoin where
 open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.Nat using (ℕ; suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
@@ -27,19 +28,19 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (connected)
-open import denotation.Events using (Pos; ix; sub; last; _<ᵖ_; <ᵖ-split; <ᵖ-down; <ᵖ-part)
+open import denotation.Events using (Pos; ix; sub; last; _<ᵖ_; <ᵖ-split; <ᵖ-down; <ᵖ-part; ofᴱ)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; end; pin; Bare; Unpinned; Dep; Few; Reach; enter; ⟦_⟧; Den; hot;
-  coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_)
+  coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_; _≼_; Truncate; InE; at-end; at-out; on-out)
 open import denotation.Read using (Visible)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; entered-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; ≺-ext; entered-few)
 open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step)
 open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (module Machine)
-open Machine using (Ctx; Scope; binds; CS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
+open Machine using (Ctx; Scope; unbound; binds; CS; ofS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (full; pendRows; Inbox; _≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Cur; origin; bef; Owes; Onward; Dom; Up; SubdAt; Due; Unfed; Adm; Flags; InCall; Within; _≈_;
-  s-join)
+open import adequacy.Cursor using (Cur; bef; Owes; Onward; Dom; Up; SubdAt; Due; Unfed; Adm; Flags; InCall; Within; _≈_;
+  Sync; s-join; s-of; tail-≈)
 open import adequacy.Cursor.Tear using (c-abs)
 open import adequacy.Cursor.Show using (owes-onward; up-ward; call-owes; call-onward)
 open import adequacy.Cursor.Frame using (Fr; Unread; un-dead; un-torn; Need; owes; dead; lane; lanecut; pnd;
@@ -48,6 +49,8 @@ open import adequacy.Cursor.Frame using (Fr; Unread; un-dead; un-torn; Need; owe
 open import adequacy.Cursor.Rise using (Inv; settled)
 open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (owes?; owes-≼; good-full)
+open import adequacy.Ended using (endUp)
+open import adequacy.SubOne using (dep-un)
 
 ------------------------------------------------------------------------
 -- A hot's ends: each still owed, or past all a cursor has reached.
@@ -73,10 +76,6 @@ ends-hot (coldAt _ ∷ᴬ ρ) (here refl) _ _   = tt
 ends-hot (hot _ ∷ᴬ ρ)    (there x)   f e   = ends-hot ρ x (λ h → f (inj₂ h)) e
 ends-hot (coldAt _ ∷ᴬ ρ) (there x)   f e   = ends-hot ρ x f e
 
-onto-origin : ∀ {A} (d : Den A) → Onto origin d
-onto-origin (hot t)    _ ()
-onto-origin (coldAt _) = tt
-
 shut-onto : ∀ C {A} {d : Den A} → Shut C d → Onto C d
 shut-onto C {d = d} = ends-imp d (λ {c} o → owes-onward C {c} o)
 
@@ -95,12 +94,6 @@ record Bind {A} (t : EmissionSet A) : Set where
     law : Lawful t
     few : ∀ {q e} → t q e → Unpinned e → Few t q
 open Bind
-
-dep-un : ∀ {A} {q} {e : Ev A} → Unpinned e → ∀ {k e′} → Dep q e k e′
-dep-un {e = out _} _ = tt
-dep-un {e = skip}  _ = tt
-dep-un {e = end}   _ = tt
-dep-un {e = pin _} ()
 
 bind : ∀ {Γ A} (sc : Scope Γ) (x : A ∈ Γ) → Adm sc → Σ (EmissionSet A) λ t → lookup (full sc) x ≡ hot t × Bind t
 bind (binds o p sc) (here refl) (ok , a) = _ , refl , record { law = lw ; few = fw }
@@ -152,6 +145,67 @@ rejoin-reach {t = t} {j} B (late {c} x cj) _ = [] , pick
     pick (heard {k} y jk)   _ _ = ⊥-elim (≼-trans {k} {c} {j} (Lawful.proper (law B) x y) cj jk)
     pick (ended {k} y jk)   _ _ = ⊥-elim (≼-trans {k} {c} {j} (Lawful.proper (law B) x y) cj jk)
     pick (late _ _)         l _ = ⊥-elim (≺-irrefl {j ++ [ last ]} l)
+
+------------------------------------------------------------------------
+-- A JOINER OF AN ENDED SUBJECT: what it owes is its own end, under
+-- `last`.  The subject's end lies at or before where it subscribed, so
+-- rejoining it shows nothing past the subscription and its end late.
+
+-- A binder's raw end at `c`: the end row its source's entry holds.
+RawEnd : ∀ {Γ A} → Scope Γ → A ∈ Γ → Pos → Set
+RawEnd unbound         ()
+RawEnd (binds o p sc) (here refl) c = pendRows (full sc) o (p ++ [ ix 1 ]) c end
+RawEnd (binds o p sc) (there x)   c = RawEnd sc x c
+
+-- A raw end is its binder's end: none lies before it, an end being no pin.
+bind-end : ∀ {Γ A} (sc : Scope Γ) (x : A ∈ Γ) (adm : Adm sc) → ∀ {c} → RawEnd sc x c → proj₁ (bind sc x adm) c end
+bind-end (binds o p sc) (here refl) (ok , a) r = r , λ r₂ lt → no-pin (proj₁ (proj₂ (InvAt.quiet I r₂ r lt)))
+  where
+    I = inv-⟦⟧ o (full sc) (good-full sc a) (p ++ [ ix 1 ]) (ok-step p ok)
+    no-pin : ∀ {A} {r} → _≡_ {A = Ev A} end (pin r) → ⊥
+    no-pin ()
+bind-end (binds o p sc) (there x) (_ , a) r = bind-end sc x a r
+
+-- Rejoined at `q`, a hot ended at or before `q` shows its end, under
+-- `last`, and nothing else.
+join-late : ∀ {A} {t : EmissionSet A} {q c′} → Bind t → t c′ end → c′ ≼ q
+          → (∀ {r e} → Truncate (Rejoin q t) r e → InE (ofᴱ q 0 []) r e) × (∀ {r e} → InE (ofᴱ q 0 []) r e → Truncate (Rejoin q t) r e)
+join-late {t = t} {q} {c′} B te cq = to , from
+  where
+    to : ∀ {r e} → Truncate (Rejoin q t) r e → InE (ofᴱ q 0 []) r e
+    to (shown {k} y _ qk , _) = ⊥-elim (≼-trans {k} {c′} {q} (Lawful.proper (law B) te y) cq qk)
+    to (heard {k} y qk , _)   = ⊥-elim (≼-trans {k} {c′} {q} (Lawful.proper (law B) te y) cq qk)
+    to (ended {k} y qk , _)   = ⊥-elim (≼-trans {k} {c′} {q} (Lawful.proper (law B) te y) cq qk)
+    to (late _ _ , _)         = at-end
+
+    from : ∀ {r e} → InE (ofᴱ q 0 []) r e → Truncate (Rejoin q t) r e
+    from at-end = late te cq , rejoin-reach B (late te cq) tt
+
+-- An of whose entry is its program's: what it has left is all it owes.
+settle-of : ∀ {Γ} {sc : Scope Γ} {Rg} {C} {A} {i q} {xs : List A} {P E : EmissionSet A}
+          → P ≈ E → (∀ {r e} → P r e → InE (ofᴱ q i xs) r e) → (∀ {r e} → InE (ofᴱ q i xs) r e → P r e)
+          → (∀ {r e} → InE (ofᴱ q i xs) r e → Owes C r) → Sync sc Rg C (ofS i q xs) E
+settle-of {C = C} m to from ow =
+  s-of (≃-trans (≃-sym (due-≈ {C = C} m)) ((λ (r , v , _) → to r , v , tt) ⇄ (λ (r , v , _) → from r , v , ow r)))
+       (tail-≈ m ([] , λ r _ → inj₁ (to r)))
+
+-- An of's rows: finitely many, each under its subscription.
+of-rows : ∀ {A} → Pos → ℕ → List A → List Pos
+of-rows p i []       = [ p ++ [ last ] ]
+of-rows p i (_ ∷ xs) = (p ++ [ ix i ]) ∷ of-rows p (suc i) xs
+
+of-in : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → y ∈ of-rows p i xs
+of-in p i []       at-end     = here refl
+of-in p i (_ ∷ xs) at-out     = here refl
+of-in p i (_ ∷ xs) (on-out r) = there (of-in p (suc i) xs r)
+
+of-reach : ∀ {A} p i (xs : List A) {y e} → Reach (InE (ofᴱ p i xs)) y e
+of-reach p i xs = of-rows p i xs , λ r _ _ → of-in p i xs r
+
+of-owes : ∀ C {A} p i (xs : List A) → Owes C p → ∀ {y e} → InE (ofᴱ p i xs) y e → Owes C y
+of-owes C p i []       ow at-end     = owes-≼ C {p} {p ++ [ last ]} ow (≺→≼ {p} {p ++ [ last ]} (≺-ext p []))
+of-owes C p i (_ ∷ xs) ow at-out     = owes-≼ C {p} {p ++ [ ix i ]} ow (≺→≼ {p} {p ++ [ ix i ]} (≺-ext p []))
+of-owes C p i (_ ∷ xs) ow (on-out r) = of-owes C p (suc i) xs ow r
 
 ------------------------------------------------------------------------
 -- What a joiner subscribed at `j` owes: what its subject still feeds it.
@@ -273,9 +327,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     past-up {c = inSrc k _ c} (d-src u _ _ _ _ _ _ ps _ _) x cu =
       ends-hot (full (scopeOf c)) x ps (unread-past u x cu)
     past-up {c = inBody k _ c} (d-body _ _ _ _ op _) (here refl) cu r =
-      op (subst (λ b → T (not b)) (sym cu) tt) (proj₁ r)
-    past-up {c = inBody k _ c} (d-body _ _ _ _ _ (inj₁ refl)) (there x) cu = onto-origin (lookup (full (CS.scope k)) x)
-    past-up {c = inBody k _ c} (d-body u _ ub _ _ (inj₂ sc)) (there x) cu =
+      proj₁ op (subst (λ b → T (not b)) (sym cu) tt) (proj₁ r)
+    past-up {c = inBody k _ c} (d-body u _ ub _ _ sc) (there x) cu =
       subst (λ s → Onto _ (lookup (full s) x)) (sym sc) (up-onto ub (unread-past u x cu))
     past-up fr@(f-isle _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = live-onto fr tt x cu
     past-up {c = inSrc k _ c} (f-islec u _ _ _ _ _ _ _ dm _ sd _ ic _ th _ _) x cu =
@@ -301,3 +354,57 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | t , lk , B =
     settled c-abs fr (s-join eq (≃-trans (≃-sym (due-≈ {C = C} eq)) (join-due (lookup (full (scopeOf c)) x) lk B ow (shut-up fr tt x cu)))
                        []ᴾ (λ ()) adm)
+
+  -- THE ENDED SUBJECTS ABOVE A HOLE: each the engine has closed holds its
+  -- raw end where the engine says it ended.  A binder whose source runs
+  -- reads it off its flags; a connect no live node reads, off its open
+  -- bound.
+  mutual
+    ended-up : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E
+             → ∀ {X} (x : X ∈ Γ) → closedUp c x ≡ true → RawEnd (scopeOf c) x (endUp c x)
+    ended-up (f-top _) () _
+    ended-up (f-map fr _ _) x cu                     = ended-up fr x cu
+    ended-up (f-scan fr _ _ _) x cu                  = ended-up fr x cu
+    ended-up (f-cut fr) x cu                         = ended-up fr x cu
+    ended-up (f-take fr _ _ _) x cu                  = ended-up fr x cu
+    ended-up (f-took fr _ _ _ _ _ _ _ _ _) x cu      = ended-up fr x cu
+    ended-up (f-outer fr _ _ _ _ _) x cu             = ended-up fr x cu
+    ended-up (f-lanes fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = ended-up fr x cu
+    ended-up (f-lane fr) x cu                        = ended-up fr x cu
+    ended-up (f-lnct fr) x cu                        = ended-up fr x cu
+    ended-up (f-src fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = ended-up fr x cu
+    ended-up (f-srcc fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = ended-up fr x cu
+    ended-up (f-srcp fr _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = ended-up fr x cu
+    ended-up (f-body _ _ _ _ _ _ fl _) (here refl) cu = proj₁ (Flags.shut fl (subst T (sym cu) tt))
+    ended-up (f-body fr sc _ _ _ _ _ _) (there x) cu =
+      subst (λ s → RawEnd s x _) (sym sc) (ended-up fr x cu)
+    ended-up (d-map fr _) x cu                       = ended-up fr x cu
+    ended-up (d-scan fr _) x cu                      = ended-up fr x cu
+    ended-up (d-cut fr _) x cu                       = ended-up fr x cu
+    ended-up (d-ln fr _) x cu                        = ended-up fr x cu
+    ended-up (d-take fr _) x cu                      = ended-up fr x cu
+    ended-up (d-outer fr _ _ _) x cu                 = ended-up fr x cu
+    ended-up (d-lanes fr _ _ _ _ _ _) x cu           = ended-up fr x cu
+    ended-up (d-src u _ _ _ _ _ _ _ _ _) x cu        = unread-ended u x cu
+    ended-up (d-body _ _ _ _ op _) (here refl) cu    = proj₂ op (subst T (sym cu) tt)
+    ended-up (d-body u _ _ _ _ sc) (there x) cu =
+      subst (λ s → RawEnd s x _) (sym sc) (unread-ended u x cu)
+    ended-up (f-isle u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = unread-ended u x cu
+    ended-up (f-islec u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = unread-ended u x cu
+    ended-up (f-islep u _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) x cu = unread-ended u x cu
+
+    unread-ended : ∀ {Cr C D Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {E β : EmissionSet B} {P}
+                 → Unread Rt Cr C D E β c k P → ∀ {A} (x : A ∈ Γ) → closedUp c x ≡ true → RawEnd (scopeOf c) x (endUp c x)
+    unread-ended (un-dead fr) x cu = ended-up fr x cu
+    unread-ended (un-torn fr _ _ _ _ _ _ _) x cu = ended-up fr x cu
+
+  -- A JOINER OF AN ENDED SUBJECT, read off its pending frame.
+  joined-pend : ∀ {Cr C Rg Γ A} {c : Ctx R Γ A} {x : A ∈ Γ} {q E} → Fr Rt Cr C Rg c owes E → ∀ {c′} → RawEnd (scopeOf c) x c′ → c′ ≼ q
+              → Owes C q × Ok (Hots (full (scopeOf c))) q × Adm (scopeOf c) × pendRows (full (scopeOf c)) (connected x) q ≈ E × Within Rg (scopeOf c) q (pendRows (full (scopeOf c)) (connected x) q)
+              → Inv Rt Cr C ⟨ c , ofS 0 q [] , absorbed , q ⟩
+  joined-pend {C = C} {c = c} {x = x} {q = q} fr re cq (ow , ok , adm , eq , wi) with bind (scopeOf c) x adm | bind-end (scopeOf c) x adm re
+  ... | t , lk , B | te =
+    settled c-abs fr (settle-of eq (λ r → proj₁ jl (subst (λ d → enter d q _ _) lk r))
+                                   (λ r → subst (λ d → enter d q _ _) (sym lk) (proj₂ jl r))
+                                   (λ { at-end → owes-≼ C {q} {q ++ [ last ]} ow (≺→≼ {q} {q ++ [ last ]} (≺-ext q [])) }))
+    where jl = join-late B te cq

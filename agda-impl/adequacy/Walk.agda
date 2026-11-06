@@ -12,6 +12,7 @@ open import Data.List using (List; []; _∷_; _++_; reverse; _ʳ++_)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Unit using (tt)
+open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
@@ -23,7 +24,7 @@ open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; absorbed; Scope; unbound; binds; CS; scopeOf; plug; lnS; cutS; mapS; scanS; takeS; flatS; connS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; closed; free; cpAt; cutAt; overAt)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans)
-open import adequacy.Cursor using (Up; up; UpA; upa; Open; InScope; origin; Dom; Thru; Lane; NoKill; Cur; Rgn; SubdAt; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; sh-pend; voc; BurstsAt; bursts)
+open import adequacy.Cursor using (Up; up; UpA; upa; Open; InScope; origin; Dom; Thru; Lane; NoKill; Cur; Rgn; SubdAt; notT; Owes; Due; Spent; _≈_; alike; ≈-refl; ≈-trans; fin-≈; tail-≈; Pol; Runs; Hole; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; bump; joined; Sync; Sound; src-pend; src-on; src-shut; s-cold; s-coldx; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Torn; Pts; ∅ᵖ; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; ∪-⊑; under-⊑; ∅-⊑; tailp-⊑; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; Quiet; QuietL; Sealed; SealedL; sh-pend; voc; BurstsAt; bursts)
 open import adequacy.Cursor.Tear using (c-abs; NoIsle; Clear; Pending)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-∘; upa-∘; upa-of; thru-no)
 open import adequacy.PinLift using (reach-≈)
@@ -55,7 +56,7 @@ srch-≈ m (sh-pend na nc ba an sc adm pe wn ss bu nr) = sh-pend na nc ba an sc 
 
 -- A part no live node reads, read through an alike entry.
 husk-≈ : ∀ {Γ} {sc : Scope Γ} {D} {A} {s : St Γ A} {E E′ : EmissionSet A} {P} → E ≈ E′ → Husk sc D s E P → Husk sc D s E′ P
-husk-≈ m (h-blank q)          = h-blank q
+husk-≈ m (h-blank q z)        = h-blank q z
 husk-≈ m (h-map hk u)         = h-map hk (up-∘ u (up-≈ m))
 husk-≈ m (h-scan hk u)        = h-scan hk (up-∘ u (up-≈ m))
 husk-≈ m (h-cut hk u)         = h-cut hk (up-∘ u (up-≈ m))
@@ -85,6 +86,7 @@ sync-≈ (s-flat ji sy j (pn , eq) sd bh) e = s-flat ji sy j (pn , ≈-trans eq 
 sync-≈ (s-conn sc pt b bb o tn fl (eq , cl)) e = s-conn sc pt b bb o (λ nl → torn-≈ e (tn nl)) fl (≈-trans eq e , cl)
 sync-≈ {C = C} (s-join eq d ap lt a) e = s-join (≈-trans eq e) (≃-trans (≃-sym (due-≈ {C = C} e)) d) ap lt a
 sync-≈ {C = C} (s-joinx sp fn) e = s-joinx (spent-≈ {C = C} sp e) (fin-≈ {C = C} e fn)
+sync-≈ {C = C} (s-coldx sp fn) e = s-coldx (spent-≈ {C = C} sp e) (fin-≈ {C = C} e fn)
 
 ------------------------------------------------------------------------
 -- A joiner's begun lanes, cut at one lane and put back.
@@ -134,16 +136,21 @@ hl-unrev (x ∷ pre) h with hl-unrev pre h
   _ , _ , hl-more hx ux ha , hr , ⊑-trans le (pt-⊑ λ { (inj₁ a) → inj₁ (inj₂ a) ; (inj₂ (inj₁ x)) → inj₁ (inj₁ x) ; (inj₂ (inj₂ r)) → inj₂ r })
 
 -- A list of states nothing in step runs in.
-hl-blank : ∀ {Γ} {sc : Scope Γ} {D} {A} (ls : List (St Γ A)) {E} → QuietL ls → Σ Pts λ Q → HuskL sc D ls E Q × Q ⊑ ∅ᵖ
-hl-blank []       _        = _ , hl-none , ⊑-refl
-hl-blank (l ∷ ls) (q , ql) with hl-blank ls ql
-... | Q , h , le = _ , hl-more (h-blank q) up-id h , ⊑-trans (∪-⊑ ⊑-refl le) (pt-⊑ λ { (inj₁ ()) ; (inj₂ ()) })
+hl-blank : ∀ {Γ} {sc : Scope Γ} {D} {A} (ls : List (St Γ A)) {E} → QuietL ls → SealedL sc ls → Σ Pts λ Q → HuskL sc D ls E Q × Q ⊑ ∅ᵖ
+hl-blank []       _        _        = _ , hl-none , ⊑-refl
+hl-blank (l ∷ ls) (q , ql) (z , zl) with hl-blank ls ql zl
+... | Q , h , le = _ , hl-more (h-blank q z) up-id h , ⊑-trans (∪-⊑ ⊑-refl le) (pt-⊑ λ { (inj₁ ()) ; (inj₂ ()) })
 
 -- A list of states nothing in step runs in, cut at one of them.
 quiet-split : ∀ {Γ A} (pre : List (St Γ A)) {s post} → QuietL (pre ʳ++ s ∷ post) → QuietL pre × Quiet s × QuietL post
 quiet-split []        (q , ql) = tt , q , ql
 quiet-split (x ∷ pre) {s} {post} ql with quiet-split pre {x} {s ∷ post} ql
 ... | qa , qx , (qs , qb) = (qx , qa) , qs , qb
+
+sealed-split : ∀ {Γ A} {sc : Scope Γ} (pre : List (St Γ A)) {s post} → SealedL sc (pre ʳ++ s ∷ post) → SealedL sc pre × Sealed sc s × SealedL sc post
+sealed-split []        (z , zl) = tt₁ , z , zl
+sealed-split (x ∷ pre) {s} {post} zl with sealed-split pre {x} {s ∷ post} zl
+... | za , zx , (zs , zb) = (zx , za) , zs , zb
 
 -- A dead lane's hole, its tail within more.
 hole-⊑ : ∀ {A B} {C} {P : Pol A B} {q a Ph Q E} → Hole C P q a Ph E false → Ph ⊑ Q → Hole C P q a Q E false
@@ -250,7 +257,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     climb (f-islep u hb ub le na nc ba an sc adm ss bu nr _ oz iz) (_ , refl , pe , wn) = unread-up u (sh-pend na nc ba an sc adm pe wn ss bu nr) hb ub le oz iz
 
     unread-up : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {o b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps
-              → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c) Db
+              → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c)
               → Top Cr c (connS k o b)
     unread-up (un-dead fr) sh hb u le oz iz = climb fr (_ , h-conn sh hb u oz iz , le)
     unread-up {D = D} {Db = Db} (un-torn fr sc pt nl fl eq tp dm) sh hb u le oz _ =
@@ -327,21 +334,21 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- Down through a part no live node reads.
   src-dead : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {s b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k s E Ps
            → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → NoIsle b
-           → Open k Db → InScope k (scopeOf c) Db → Res Cr (inSrc k b c) s
+           → Open k Db → InScope k (scopeOf c) → Res Cr (inSrc k b c) s
   src-dead {C = C} u (sh-dead hk us f pz) hb ub le nb oz iz              = C , dead _ _ , nowhere , _ , d-src u hb ub us le nb f pz oz iz , (_ , hk , ⊑-refl)
   src-dead u (sh-isle na nc sy bh sd ss ao ic bu nr) hb ub le nb oz iz = _ , owes , _ , _ , f-isle u hb ub le na nc bh sd ss ao ic bu nr nb oz iz , sy
   src-dead {C = C} u (sh-islec na cl sp tp hk dm bh sd ao ic bu nr) hb ub le _ oz iz = C , dead _ _ , nowhere , _ , f-islec u hb ub le na cl sp tp dm bh sd ao ic bu nr oz iz , (_ , hk , ⊑-refl)
   src-dead u (sh-pend na nc ba an sc adm pe wn ss bu nr) hb ub le nb oz iz = _ , pnd _ , _ , _ , f-islep u hb ub le na nc ba an sc adm ss bu nr nb oz iz , (_ , refl , pe , wn)
 
   body-dead : ∀ {Cr C D Db Γ X B} {E : EmissionSet B} {c : Ctx R Γ B} {k : CS Γ X} {o b β P Ps Qb} → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps
-            → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c) Db
+            → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c)
             → Res Cr (inBody k o c) b
   body-dead {C = C} u sh hb ub le oz iz = C , dead _ _ , nowhere , _ , d-body u sh ub le oz iz , (_ , hb , ⊑-refl)
 
   down-map : ∀ {Cr Γ A B} {f : A → B} {c : Ctx R Γ B} {s} → Res Cr c (mapS f s) → Res Cr (inMap f c) s
   down-map (C , owes , _ , _ , fr , s-map sy me sd)            = C , owes , _ , _ , f-map fr me sd , sy
   down-map (C , dead D P , _ , _ , fr , (Q , h-map hk u , le))  = C , dead _ P , nowhere , _ , d-map fr u , (Q , hk , le)
-  down-map (C , dead D P , _ , _ , fr , (Q , h-blank q , le))   = C , dead D P , nowhere , none′ , d-map fr up-none , (Q , h-blank q , le)
+  down-map (C , dead D P , _ , _ , fr , (Q , h-blank q z , le))   = C , dead D P , nowhere , none′ , d-map fr up-none , (Q , h-blank q z , le)
   down-map (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-map (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-map (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -349,7 +356,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-scan : ∀ {Cr Γ A B} {f : B → A → B} {z} {c : Ctx R Γ B} {s} → Res Cr c (scanS f z s) → Res Cr (inScan f z c) s
   down-scan (C , owes , _ , _ , fr , s-scan sy fd eq sd)         = C , owes , _ , _ , f-scan fr fd eq sd , sy
   down-scan (C , dead D P , _ , _ , fr , (Q , h-scan hk u , le)) = C , dead _ P , nowhere , _ , d-scan fr u , (Q , hk , le)
-  down-scan (C , dead D P , _ , _ , fr , (Q , h-blank q , le))   = C , dead D P , nowhere , none′ , d-scan fr up-none , (Q , h-blank q , le)
+  down-scan (C , dead D P , _ , _ , fr , (Q , h-blank q z , le))   = C , dead D P , nowhere , none′ , d-scan fr up-none , (Q , h-blank q z , le)
   down-scan (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-scan (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-scan (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -357,7 +364,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-cut : ∀ {Cr Γ A} {l a} {c : Ctx R Γ A} {s} → Res Cr c (cutS l a s) → Res Cr (inCut l a c) s
   down-cut (C , owes , _ , _ , fr , s-cut sy)                    = C , owes , _ , _ , f-cut fr , sy
   down-cut (C , dead D P , _ , _ , fr , (Q , h-cut hk u , le))   = C , dead _ P , nowhere , _ , d-cut fr u , (Q , hk , le)
-  down-cut (C , dead D P , _ , _ , fr , (Q , h-blank q , le))    = C , dead D P , nowhere , none′ , d-cut fr up-none , (Q , h-blank q , le)
+  down-cut (C , dead D P , _ , _ , fr , (Q , h-blank q z , le))    = C , dead D P , nowhere , none′ , d-cut fr up-none , (Q , h-blank q z , le)
   down-cut (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-cut (C , lanecut b D P , _ , _ , fr , (_ , _ , refl , h)) = C , onoff b D P , _ , _ , f-lnct fr , lh-hold b h
   down-cut (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -365,7 +372,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-ln : ∀ {Cr Γ A} {b} {c : Ctx R Γ A} {s} → Res Cr c (lnS b s) → Res Cr (inLn b c) s
   down-ln (_ , owes , _ , _ , _ , ())
   down-ln (C , dead D P , _ , _ , fr , (Q , h-ln hk u , le))   = C , dead _ P , nowhere , _ , d-ln fr u , (Q , hk , le)
-  down-ln (C , dead D P , _ , _ , fr , (Q , h-blank q , le))   = C , dead D P , nowhere , none′ , d-ln fr up-none , (Q , h-blank q , le)
+  down-ln (C , dead D P , _ , _ , fr , (Q , h-blank q z , le))   = C , dead D P , nowhere , none′ , d-ln fr up-none , (Q , h-blank q z , le)
   down-ln (C , lane b D P , _ , _ , fr , (at , l , refl , h))  = C , lanecut b D P , _ , _ , f-lane fr , (at , l , refl , h)
   down-ln (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-ln (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -374,7 +381,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   down-take (C , owes , _ , _ , fr , s-take sy nf eq sd)                  = C , owes , _ , _ , f-take fr nf eq sd , sy
   down-take (C , owes , _ , _ , fr , s-took fl nr fz ow tp hk dm nf eq sd) = C , dead _ _ , nowhere , _ , f-took fr fl nr fz ow tp dm nf eq sd , (_ , hk , ⊑-refl)
   down-take (C , dead D P , _ , _ , fr , (Q , h-take hk u , le))          = C , dead _ P , nowhere , _ , d-take fr u , (Q , hk , le)
-  down-take (C , dead D P , _ , _ , fr , (Q , h-blank q , le))            = C , dead D P , nowhere , none′ , d-take fr up-none , (Q , h-blank q , le)
+  down-take (C , dead D P , _ , _ , fr , (Q , h-blank q z , le))            = C , dead D P , nowhere , none′ , d-take fr up-none , (Q , h-blank q z , le)
   down-take (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-take (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-take (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -383,8 +390,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
              → Res Cr c (flatS op f ω d n qu s ls) → Res Cr (inOuter op f ω d n qu ls c) s
   down-outer (C , owes , _ , _ , fr , s-flat ji sy j eq sd bh)      = C , owes , _ , _ , f-outer fr ji j eq sd bh , sy
   down-outer (C , dead D P , _ , _ , fr , (Q , h-flat ho u hl , le)) = C , dead _ _ , nowhere , _ , d-outer fr u hl le , (_ , ho , ⊑-refl)
-  down-outer {ls = ls} (C , dead D P , _ , _ , fr , (Q , h-blank (qo , ql) , le)) with hl-blank ls ql
-  ... | _ , hl , _ = C , dead D ∅ᵖ , nowhere , none′ , d-outer fr up-none hl (⊑-trans le ∅-⊑) , (_ , h-blank qo , ⊑-refl)
+  down-outer {ls = ls} (C , dead D P , _ , _ , fr , (Q , h-blank (qo , ql) (zo , zl) , le)) with hl-blank ls ql zl
+  ... | _ , hl , _ = C , dead D ∅ᵖ , nowhere , none′ , d-outer fr up-none hl (⊑-trans le ∅-⊑) , (_ , h-blank qo zo , ⊑-refl)
   down-outer (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-outer (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-outer (_ , pnd _ , _ , _ , _ , (_ , () , _))
@@ -397,35 +404,35 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ...   | _ , _ , _ , hl , hd , sd , dl = C , lane _ _ _ , _ , _ , f-lanes fr ji sy lf o nq r hl rt cnt wt wh od ah ao en li eq so sd bh dl sl , hd
   down-lanes {pre = pre} (C , dead D P , _ , _ , fr , (Q , h-flat ho uo hl , le)) with hl-unrev pre hl
   ... | _ , _ , ha , hl-more hs us hb , le′ = C , dead _ _ , nowhere , _ , d-lanes fr ho uo ha hb us (⊑-trans le (∪-⊑ ⊑-refl le′)) , (_ , hs , ⊑-refl)
-  down-lanes {pre = pre} {post = post} {s = s} (C , dead D P , _ , _ , fr , (Q , h-blank (qo , ql) , le)) with quiet-split pre {s} {post} ql
-  ... | qa , qs , qb with hl-blank pre qa | hl-blank post qb
-  ...   | _ , ha , _ | _ , hb , _ = C , dead D ∅ᵖ , nowhere , none′ , d-lanes fr (h-blank {D = D} qo) (up-none {D = D}) ha hb up-none (⊑-trans le ∅-⊑) , (_ , h-blank qs , ⊑-refl)
+  down-lanes {pre = pre} {post = post} {s = s} (C , dead D P , _ , _ , fr , (Q , h-blank (qo , ql) (zo , zl) , le)) with quiet-split pre {s} {post} ql | sealed-split pre {s} {post} zl
+  ... | qa , qs , qb | za , zs , zb with hl-blank pre qa za | hl-blank post qb zb
+  ...   | _ , ha , _ | _ , hb , _ = C , dead D ∅ᵖ , nowhere , none′ , d-lanes fr (h-blank {D = D} qo zo) (up-none {D = D}) ha hb up-none (⊑-trans le ∅-⊑) , (_ , h-blank qs zs , ⊑-refl)
   down-lanes (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-lanes (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
   down-src : ∀ {Cr Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s} → (Pending s → ⊥) → NoIsle b → Res Cr c (connS k s b) → Res Cr (inSrc k b c) s
   down-src {k = k} np nb (C , owes , _ , _ , fr , s-conn sc pt bs bb os tn fl eq) with live? (CS.srcLive k)
-  ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl nb (Torn.opn t) (inj₂ sc)
+  ... | inj₂ nl = let t = tn nl in src-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl nb (Torn.opn t) sc
   ... | inj₁ lv with os lv
   ...   | src-on nc sy bh sd af ao ic _   = C , owes , _ , _ , f-src fr sc pt lv nc (bs lv) (bb lv) fl ≈-refl eq bh sd af ao ic nb , sy
   ...   | src-shut cl sp tp hk dm bh sd ic af _ = C , dead _ _ , nowhere , _ , f-srcc fr sc pt lv cl sp tp dm bh sd ic af (bs lv) (bb lv) fl eq , (_ , hk , ⊑-refl)
   ...   | src-pend _ _ _ _ _ _ _ _ _    = ⊥-elim (np tt)
   down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-conn sh hb u oz iz , le)) = src-dead (un-dead fr) sh hb u le nb oz iz
-  down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-blank (f , qs , qb) , le)) =
-    C , dead D ∅ᵖ , nowhere , none′ , d-src (un-dead fr) (h-blank {D = origin} qb) up-nil (upa-of up-none) (⊑-trans le ∅-⊑) nb f (λ _ o → o) (λ _ _ ()) (inj₁ refl) , (_ , h-blank qs , ⊑-refl)
+  down-src _ nb (C , dead D P , _ , _ , fr , (Q , h-blank (f , qs , qb) (e , fz , zs , zb) , le)) =
+    C , dead D ∅ᵖ , nowhere , none′ , d-src (un-dead fr) (h-blank {D = origin} qb zb) up-nil (upa-of up-none) (⊑-trans le ∅-⊑) nb f (λ _ o → o) ((λ _ _ ()) , fz) e , (_ , h-blank qs zs , ⊑-refl)
   down-src _ _ (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-src _ _ (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-src _ _ (_ , pnd _ , _ , _ , _ , (_ , () , _))
 
   down-body : ∀ {Cr Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {s} → Res Cr c (connS k o s) → Res Cr (inBody k o c) s
   down-body {k = k} {s = s} (C , owes , _ , _ , fr , s-conn sc pt bs bb os tn fl eq) with live? (CS.srcLive k)
-  ... | inj₂ nl = let t = tn nl in body-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl (Torn.opn t) (inj₂ sc)
+  ... | inj₂ nl = let t = tn nl in body-dead (un-torn fr sc pt nl fl eq (Torn.tl t) (Torn.dom t)) (Torn.sh t) (Torn.bh t) (Torn.bu t) ⊑-refl (Torn.opn t) sc
   ... | inj₁ lv = C , owes , _ , _ , f-body fr sc pt lv (os lv) (bb lv) fl eq , subst (λ x → Sync (binds (CS.src k) (CS.connAt k) x) _ C s _) (sym sc) (bs lv)
   down-body (C , dead D P , _ , _ , fr , (Q , h-conn sh hb u oz iz , le)) = body-dead (un-dead fr) sh hb u le oz iz
-  down-body (C , dead D P , _ , _ , fr , (Q , h-blank (f , qo , qs) , le)) =
-    C , dead origin ∅ᵖ , nowhere , none′ , d-body (un-dead fr) (sh-dead (h-blank {D = origin} qo) upa-nil f (λ _ _ ())) up-nil (⊑-trans le ∅-⊑) (λ _ _ ()) (inj₁ refl)
-      , (_ , h-blank qs , ⊑-refl)
+  down-body (C , dead D P , _ , _ , fr , (Q , h-blank (f , qo , qs) (e , fz , zo , zs) , le)) =
+    C , dead origin ∅ᵖ , nowhere , none′ , d-body (un-dead fr) (sh-dead (h-blank {D = origin} qo zo) upa-nil f (λ _ _ ())) up-nil (⊑-trans le ∅-⊑) ((λ _ _ ()) , fz) e
+      , (_ , h-blank qs zs , ⊑-refl)
   down-body (_ , lane _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-body (_ , lanecut _ _ _ , _ , _ , _ , (_ , _ , () , _))
   down-body (_ , pnd _ , _ , _ , _ , (_ , () , _))

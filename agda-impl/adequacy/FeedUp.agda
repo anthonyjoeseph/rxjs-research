@@ -45,7 +45,7 @@ open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
 open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; ConnE; _≈_; Kill; Owes; Due; Unfed; Rgn; Sound; vis; LaneSt;
   l-live; l-dead; h-live; h-end; h-kill; Begun; none; more; Lane; Joined; joined; Flags; Src;
-  src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-of; s-done; s-map; s-scan;
+  src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Pol; SlotsMv; slots-mv; Subd; Torn;
   notT; Husk; sh-dead; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed;
   InCall; AttFin; alike; voc; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn)
@@ -338,6 +338,7 @@ module Walk (p : Pos) where
     ... | nothing   = join-keep sd nr (keep-cls (FedAt.only fa x sx)) en d ap hd adm
     ... | just refl = fed-at sd nr (subst (λ y → FedAt sc y p _) (same-eq i x sx) fa) en d ap hd adm
     fup {E = E} (s-joinx sp fn) sd nr fa ni = s-joinx (spent-up {E = E} sp) (fin-up fn)
+    fup {E = E} (s-coldx sp fn) sd nr fa ni = s-coldx (spent-up {E = E} sp) (fin-up fn)
 
     fsrc : ∀ {Γ X Y} {sc : Scope Γ} {Rs : Rgn} {i : X ∈ Γ} {e : Evᴹ X} {k : CS Γ Y} {o}
          → Src sc Rs (bef p) k o → Sound Rs (Frozen k) → ¬ Rs p → FedAt sc i p e → NoIsle o → Src sc Rs (aft p) k (feed i p e o)

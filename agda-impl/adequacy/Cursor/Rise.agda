@@ -64,7 +64,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- A connect no live node reads, settled where it is read.
   unread-at : ∀ {Cr C D Db Γ X B} {c : Ctx R Γ B} {k : CS Γ X} {o b E P Ps Qb β p}
             → Unread Rt Cr C D E β c k P → SrcH (scopeOf c) D k o E Ps → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb
-            → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c) Db
+            → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → Open k Db → InScope k (scopeOf c)
             → Inv Cr C ⟨ c , connS k o b , absorbed , p ⟩
   unread-at (un-dead fr) sh hb bu le op is = settled c-abs fr (_ , h-conn sh hb bu op is , le)
   unread-at {C = C} {D = D} {Db = Db} (un-torn fr sc pt nl fl eq tp dm) sh hb bu le op _ =

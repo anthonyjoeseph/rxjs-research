@@ -50,7 +50,7 @@ open _≃_
 open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
   JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
   Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
-  o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-of; s-done; s-map; s-scan;
+  o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Floor.Keys using (at-after)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
@@ -387,6 +387,7 @@ mutual
     conn-b {C = C} (λ t envb → bound (bs t) envb (λ ki → lo (k-kid (k-body ki)))) (λ t → src-b (ss t) env lo) fl env (y , v′) ow
   bound {sc = sc} (s-join _ d ap _ _) env lo r = join-b {sc = sc} d ap env lo r
   bound (s-joinx sp _) env lo r = ⊥-elim (sp r)
+  bound (s-coldx sp _) env lo r = ⊥-elim (sp r)
 
   took-b : ∀ {Γ Rg C A} {i} {keep : A → Bool} {w} {s : St Γ A} {Es r p q e}
          → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C w r → Sound Rg Es → LoP (takeS i keep w s) p
