@@ -584,16 +584,16 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   sub-scan : ∀ {Cr C Γ A B} {c : Ctx R Γ B} {f : B → A → B} {z s q p}
            → Inv Rt Cr C ⟨ c , pend (scan f z s) q , subscribing , p ⟩ → Inv Rt Cr C ⟨ inScan f z c , pend s q , subscribing , q ⟩
-  sub-scan {c = c} {s = s} {q} i with pend-view i
+  sub-scan {C = C} {c = c} {s = s} {q} i with pend-view i
   ... | _ , _ , fr , ow , ok , ad , eq , wi with Entry.scan-entry (scopeOf c) s q ok ad wi
-  ...   | m , sd , wi′ = pending (f-scan fr (fd-none (Entry.owed (scopeOf c) s q ok ad ow)) (≈-trans m eq) sd) (ow , ok , ad , ≈-refl , wi′)
+  ...   | m , sd , wi′ = pending (f-scan fr (fd-none (Entry.owed (scopeOf c) s q ok ad {C = C} ow)) (≈-trans m eq) sd) (ow , ok , ad , ≈-refl , wi′)
 
   sub-take : ∀ {Cr C Γ A} {c : Ctx R Γ A} {i} {w : A → Bool} {s q p}
            → Inv Rt Cr C ⟨ c , pend (takeWhile i w s) q , subscribing , p ⟩
            → Inv Rt Cr C ⟨ inCut true (attAt q) (inTake i w free c) , pend s q , subscribing , q ⟩
-  sub-take {c = c} {s = s} {q} iv with pend-view iv
+  sub-take {C = C} {c = c} {s = s} {q} iv with pend-view iv
   ... | _ , _ , fr , ow , ok , ad , eq , wi with Entry.take-entry (scopeOf c) s q ok ad wi
-  ...   | m , sd , wi′ = pending (f-cut (f-take fr (λ x _ → Entry.owed (scopeOf c) s q ok ad ow x) (≈-trans m eq) sd)) (ow , ok , ad , ≈-refl , wi′)
+  ...   | m , sd , wi′ = pending (f-cut (f-take fr (λ x _ → Entry.owed (scopeOf c) s q ok ad {C = C} ow x) (≈-trans m eq) sd)) (ow , ok , ad , ≈-refl , wi′)
 
   ----------------------------------------------------------------------
   -- THE SEARCH: the tree zipped up at the root's cursor, and unzipped
@@ -871,7 +871,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
   join-sim : ∀ {Γ A} {k′ : Conf R} {sh t} (c : Ctx R Γ A) (x : A ∈ Γ) q p → (closedUp c x ≡ true → endUp c x ≼ q)
            → stepᴹ ⟨ c , pend (connected x) q , subscribing , p ⟩ ≡ moved k′ sh t → SimC Rt ⟨ c , pend (connected x) q , subscribing , p ⟩ sh k′
   join-sim c x q p eb eq with closedUp c x in cu | eq
-  ... | true  | refl = keeps Rt (sub-joined cu (eb cu))
+  ... | true  | refl = keeps Rt (sub-joined cu (eb refl))
   ... | false | refl = keeps Rt (sub-join cu)
 
   reach-pend : ∀ {Γ A} (c : Ctx R Γ A) (o : Obs Timeline Γ A) q p → Lo (plug c (pend o q)) (at (q ⊕ [ ix 0 ]))

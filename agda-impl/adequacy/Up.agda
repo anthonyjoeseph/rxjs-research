@@ -504,9 +504,6 @@ conn-vis (Connecting.burst _ _ , _) ()
 conn-vis (Connecting.echo _ _ _ _ , _) ()
 conn-vis (Connecting.kept _ _ _ _ , _) ()
 
-or-shut : ∀ {x y} → T x → x ∨ y ≡ false → ⊥
-or-shut {true} _ ()
-
 torn : ∀ {ℓ} {b} {X : Set ℓ} → T (not b) → T b → X
 torn {b = true}  () _
 torn {b = false} _  ()
