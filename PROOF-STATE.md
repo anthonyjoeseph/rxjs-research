@@ -23,13 +23,11 @@ Members: `join-past`.
 
 #### THE CONNECT STEPPED
 
-A joiner joined, a source's or body's rise, its own
-marks, a joiner's next and a take's failure, each keeping `Inv`. Open:
-whether every entry lands a region apart from its siblings' and clear of
-its scope's hots, so the rest moves past `p`. Settled when each is a body.
+A joiner of a completed subject joined, and a joiner's inbox run,
+each keeping `Inv`. Open: whether its entry, owed under `last` or at its
+inbox's head, lands clear of its scope's hots. Settled when each is a body.
 
-Members: `sub-joined`, `run-join-nx`, `run-join-cp`, `rise-take-failᵢ`,
-`feed-up`.
+Members: `sub-joined`, `run-join-nx`, `run-join-cp`.
 
 #### THE COLD STEPPED
 

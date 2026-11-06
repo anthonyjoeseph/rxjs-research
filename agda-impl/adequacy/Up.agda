@@ -23,26 +23,32 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 open import Data.Maybe using (just; nothing)
 
-open import denotation.Events using (Pos; ix; Timeline)
-open import Tree using (Obs)
+open import denotation.Events using (Pos; ix)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Proper; ⟦_⟧; MapT; map-out; map-end; map-skip; map-pin; module Scan; _≺_; Den; hot; coldAt; DenEnv; shown; heard; ended; late;
-  module TakeWhile; module Connecting; Reach; Truncate)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; ⟦_⟧; MapT; map-out; map-end; map-skip; map-pin; module Scan; _≺_;
+  Den; hot; coldAt; DenEnv; shown; heard; ended; late; module TakeWhile; module Connecting;
+  Reach; Truncate)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym)
 open import denotation.Laws.Worlds using (Hots)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; feedL; rise; moved; shutAt; absorbed; same?; joinS; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
 open _≃_
-open import adequacy.Walk using (sync-≈)
 open import adequacy.Enter using (module Lanes)
-open import adequacy.Cursor using (SlotsMv; slots-mv; Cur; Dom; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; voc; FewBefore; ConnE; _≈_; Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound; vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none; fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt; o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn; NoFail; TailP; tailp-dn; Subd; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan; h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec; sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; under-⊑; burst-dn; AttOwed; InCall; AttFin)
-open import adequacy.Cursor.Tear using (c-abs; by; husk-of; NoIsle; NoIsleL; Settles; sync-pend)
+open import adequacy.Cursor using (SlotsMv; slots-mv; Cur; bef; aft; Behind; Fin; Tail; fin-dn; tail-dn; alike; FewBefore; _≈_;
+  Pol; Kill; kill-out; Ahead; Whole; OuterDone; head-≡; Owes; Due; Spent; Unfed; Rgn; Sound;
+  vis; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; none; more; Folded; fd-none;
+  fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt;
+  o-cp; o-cut; o-over; Sync; s-cold; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
+  s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn;
+  NoFail; TailP; tailp-dn; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan;
+  h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec;
+  sh-pend; Quiet; QuietL; ⊑-trans; ∪-⊑; ⊑-refl; burst-dn)
+open import adequacy.Cursor.Tear using (by; NoIsle; NoIsleL; Settles; sync-pend)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep; Unread; un-dead; un-torn)
-open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps; unread-at)
+open import adequacy.Cursor.Rise using (Inv; RT; settled; flying; adrift; SimC; keeps)
 open import adequacy.Bound using (join-row; owes?; few-src)
 open import adequacy.Regions using (lane-sole)
-open import adequacy.PinTail using (end-tail)
 
 -- A visible row of a binder in scope at `p`.
 VHot : ∀ {Γ} → DenEnv Γ → Pos → Set
@@ -588,144 +594,6 @@ module _ {R : Set} (Rt : EmissionSet R) where
   fr-up (d-src _ _ _ _ _ _ _ pz oz iz) ()
   fr-up (d-body _ _ _ _ oz iz) ()
 
-  postulate
-    -- A BINDER'S ROW FED: the joiners of the innermost binder take its
-    -- row at `p` into their inboxes; the body, apart from `p`, owes the
-    -- same past it.
-    -- A feed appends at `p ⊕ [ sub j ]` and the inbox stays ascending:
-    -- the source's row is a lawful hot, none below another.
-    -- RECOVERY: git show 1745f869 restores rejoin-mono, good-full and lawful-at.
-    feed-up : ∀ {Γ X B} {sc : Scope Γ} {o : Obs Timeline Γ X} {q Rb} {b : St (X ∷ Γ) B} {β e p}
-            → Sync (binds o q sc) Rb (bef p) b β → Sound Rb β → ¬ Rb p
-            → Proper (pendRows (full sc) o (q ++ [ ix 1 ])) p (toEv e) → ¬ VHot (full sc) p
-            → Sync (binds o q sc) Rb (aft p) (feed (here refl) p e b) β
-
-  -- What a running source's row at `p` leaves of its connect.
-  module Fed {Cr Γ X B} {k : CS Γ X} {c : Ctx R Γ B} {Rg E E′ β} {e : Evᴹ X} {p}
-             (fr : Fr Rt Cr (bef p) Rg c owes E′) (sc : CS.scope k ≡ scopeOf c) (pt : Parts (scopeOf c) Rg k β)
-             (lv : T (CS.srcLive k)) (fz : E ≈ Frozen k) (eq : ConnE (CS.connAt k) (Frozen k) β E′)
-             (row : E p (toEv e)) where
-
-    fk : Frozen k p (toEv e)
-    fk = voc fz row
-
-    rs : Parts.Rs pt p
-    rs = Sound.rg (Parts.ss pt) fk (vis e)
-
-    nr : NoRow E′ p
-    nr y v = let (cy , v′) = from (alike (proj₁ eq)) (y , v) in Parts.apart pt (Sound.rg (Parts.sb pt) (conn-vis cy v′) v′) rs
-
-    nh : ¬ VHot (full (scopeOf c)) p
-    nh hv = Parts.clear-s pt (vhot-hots (full (scopeOf c)) hv) rs
-
-    -- the frames above, past `p`
-    lifted : Σ Cur λ Cr′ → Fr Rt Cr′ (aft p) Rg c owes E′ × Moves (RT Rt Cr) [] (RT Rt Cr′)
-    lifted = fr-up fr tt (Parts.s⊆ pt rs) nr nh
-
-    Cr↑ : Cur
-    Cr↑ = proj₁ lifted
-
-    fr↑ : Fr Rt Cr↑ (aft p) Rg c owes E′
-    fr↑ = proj₁ (proj₂ lifted)
-
-    moves : Moves (RT Rt Cr) [] (RT Rt Cr↑)
-    moves = proj₂ (proj₂ lifted)
-
-    -- the body, fed
-    body : ∀ {b} → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (bef p) b β
-         → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (aft p) (feed (here refl) p e b) β
-    body sy = feed-up sy (Parts.sb pt) (λ r → Parts.apart pt r rs)
-                (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) p (toEv e)) sc fk
-                , λ ce → Sound.ends (Parts.ss pt) (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) _ end) (sym sc) ce) fk (vis e))
-                nh
-
-    -- the body's end not at `p`, passed past it, passed before it
-    bend : ∀ {c} → β c end → ¬ Owes (aft p) c → ¬ Owes (bef p) c
-    bend {c} y n o = n (Past.owes-up p (λ { refl → Parts.apart pt (Sound.rg (Parts.sb pt) y tt) rs }) o)
-
-    -- a value: the source runs on, unclosed
-    flags-on : T (not (CS.closed k)) → (toEv e ≡ end → ⊥) → Flags (bef p) k β → Flags (aft p) k β
-    flags-on nc ne fl = record
-      { shut   = λ t → torn nc t
-      ; unshut = λ t {c} y n → Flags.unshut fl t y λ pc → n (≼-≢ {p} {c} pc λ { refl → ne (Sound.fn (Parts.ss pt) fk y (vis e) _) })
-      ; torn   = λ nt → torn nt lv
-      ; owed   = λ x → proj₁ (Flags.owed fl x) , Past.nm p (proj₂ (Flags.owed fl x))
-      ; ended  = λ t y n → Flags.ended fl t y (bend y n)
-      ; owing  = Flags.owing fl }
-
-    -- its end: closed where it fell, owing nothing past it
-    flags-shut : toEv e ≡ end → Flags (bef p) k β → Flags (aft p) (record k { closed = true ; endAt = p }) β
-    flags-shut ee fl = record { shut = λ _ → subst (Frozen k p) ee fk , ≺-irrefl {p} ; unshut = λ _ _ _ → _ ; torn = λ nt → torn nt lv
-                              ; owed = λ x → proj₁ (Flags.owed fl x) , Past.nm p (proj₂ (Flags.owed fl x))
-                              ; ended = λ t y n → Flags.ended fl t y (bend y n) ; owing = Flags.owing fl }
-
-    src-done : ∀ {s P D} → toEv e ≡ end → TailP (aft p) (Frozen k) P → Husk (scopeOf c) D s (Frozen k) P → Dom (aft p) D → Behind (bef p) (Frozen k)
-             → Subd (scopeOf c) (bef p) k → (T (not (CS.srcAtt k)) → AttOwed k × InCall (bef p) k) → AttFin k
-             → Src (scopeOf c) (Parts.Rs pt) (aft p) (record k { closed = true ; endAt = p }) s
-    src-done ee tp hk dm bh sd ic af =
-      src-shut _ (λ (y , v , py) → Sound.ends (Parts.ss pt) (subst (Frozen k p) ee fk) y v py) tp hk dm (Past.behind-up p bh) (Past.subd-up p sd) ic af lv
-
   -- What a step leaves, at the root's cursor `Cr` before it.
   After : Cur → Conf R → Set₁
   After Cr k = Σ Cur λ Cr′ → Σ Cur λ C′ → Inv Rt Cr′ C′ k × Moves (RT Rt Cr) [] (RT Rt Cr′)
-
-  rise-src-nx : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s a p k′ sh t}
-              → rise (inSrc k b c) s (nx a) p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising (nx a) , p ⟩ sh k′
-  rise-src-nx {a = a} {p = p} refl (flying (f-src fr sc pt lv nc bs bb fl fz eq bh sd af ao ic _) cl (sy , row)) =
-    let open Fed {e = nx a} fr sc pt lv fz eq row
-    in Cr↑ , aft p , settled c-abs fr↑ (s-conn sc pt (λ _ → body bs) (λ _ → Past.behind-up p bb)
-                                              (λ _ → src-on nc (sync-≈ sy fz) (Past.behind-up p bh) (Past.subd-up p sd) af ao ic lv)
-                                              (λ nl → ⊥-elim (notT _ nl lv)) (flags-on nc (λ ()) fl) eq)
-     , moves
-  -- an isle's source runs on, its body read by none
-  rise-src-nx {k = k} {a = a} {p = p} refl (flying (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni oz iz) _ (sy , _)) =
-    _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao ic bu nr) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) ub (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) oz iz
-    , silent ≃-refl
-  rise-src-nx refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-nx refl (flying (d-src _ _ _ _ _ _ _ pz oz iz) _ ())
-  rise-src-nx refl (flying (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ())
-  rise-src-nx refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ())
-  rise-src-nx refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
-  rise-src-nx refl (adrift (f-islec _ _ _ _ _ cl _ _ _ _ _ _ _ _ _ oz iz) cl′ _) = ⊥-elim (or-shut cl cl′)
-  rise-src-nx {a = a} {p = p} refl (adrift (d-src u hb ub ud le ni f pz oz iz) _ (Q , hk , le′)) =
-    _ , _ , unread-at Rt u (sh-dead hk ud f pz) (feed-husk {i = here refl} {p = p} {e = nx a} hb ni) ub (⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl)) oz iz
-    , silent ≃-refl
-  rise-src-nx refl (settled () _ _)
-
-  -- Its end: the connect closed where it fell, while it runs.
-  rise-src-cp : ∀ {Γ X B} {k : CS Γ X} {b} {c : Ctx R Γ B} {s p k′ sh t}
-              → rise (inSrc k b c) s cp p ≡ moved k′ sh t → SimC Rt ⟨ inSrc k b c , s , rising cp , p ⟩ sh k′
-  rise-src-cp {k = k} {b} {c} {s} {p} refl (flying (f-src fr sc pt lv nc bs bb fl fz eq bh sd af ao ic _) cl (sy , row)) =
-    let open Fed {e = cp} fr sc pt lv fz eq row
-        sy′ = sync-≈ sy fz
-    in Cr↑ , aft p
-     , subst (λ k″ → Inv Rt Cr↑ (aft p) ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩) (sym (shut-live {k = k} {p} lv))
-             (settled c-abs fr↑ (s-conn sc (re-parts refl refl pt) (λ _ → body bs) (λ _ → Past.behind-up p bb)
-                                        (λ _ → src-done refl (end-tail sy′ (Parts.ss pt) fk (≺-irrefl {p})) (proj₂ (husk-of sy′)) (λ t → t) bh sd (λ na → ao na , ic na) af)
-                                        (λ nl → ⊥-elim (notT _ nl lv)) (flags-shut refl fl) eq))
-     , moves
-  -- an isle's source ends inside its subscribe call: still an isle
-  rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (flying (f-isle u hb ub le na nc bh sd ss ao ic bu nr ni oz iz) _ (sy , row)) =
-    shut-by {k = k} {p} (λ k″ → After Cr ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩)
-      (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u)
-                        (sh-islec na tt (λ (y , v , py) → Sound.ends ss row y v py) (end-tail sy ss row (≺-irrefl {p})) (proj₂ (husk-of sy)) (λ t → t)
-                                  (Past.behind-up p bh) (Past.subd-up p sd) ao ic bu nr)
-                        fed ub (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) (λ ()) iz , silent ≃-refl)
-      (λ _ → _ , _ , unread-at Rt u (sh-isle na nc sy (Past.behind-up p bh) (Past.subd-up p sd) ss ao ic bu nr) fed ub (burst-dn {C = bef p} {C′ = aft p} {k = k} (λ {y} → Past.dn p {y}) le) oz iz , silent ≃-refl)
-    where fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
-  rise-src-cp refl (flying (f-srcc _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (f-srcp _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _ ())
-  rise-src-cp refl (flying (d-src _ _ _ _ _ _ _ pz oz iz) _ ())
-  rise-src-cp refl (flying (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ())
-  rise-src-cp refl (flying (f-islep _ _ _ _ _ _ _ _ _ _ _ _ _ _ oz iz) _ ())
-  rise-src-cp refl (adrift (f-srcc _ _ _ _ cl _ _ _ _ _ _ _ _ _ _ _) cl′ _)  = ⊥-elim (or-shut cl cl′)
-  rise-src-cp refl (adrift (f-islec _ _ _ _ _ cl _ _ _ _ _ _ _ _ _ oz iz) cl′ _) = ⊥-elim (or-shut cl cl′)
-  rise-src-cp {k = k} {b} {c} {s} {p} refl {Cr = Cr} (adrift (d-src u hb ub ud le ni f pz oz iz) _ (Q , hk , le′)) =
-    shut-by {k = k} {p} (λ k″ → After Cr ⟨ c , connS k″ s (feed (here refl) p cp b) , absorbed , p ⟩)
-      (λ lt → _ , _ , unread-at Rt (unread-live Rt lt u) (sh-dead hk ud (inj₂ tt) pz) fed ub le″ (λ ()) iz , silent ≃-refl)
-      (λ _ → _ , _ , unread-at Rt u (sh-dead hk ud f pz) fed ub le″ oz iz , silent ≃-refl)
-    where
-      fed = feed-husk {i = here refl} {p = p} {e = cp} hb ni
-      le″ = ⊑-trans le (∪-⊑ (under-⊑ le′) ⊑-refl)
-  rise-src-cp refl (settled () _ _)
