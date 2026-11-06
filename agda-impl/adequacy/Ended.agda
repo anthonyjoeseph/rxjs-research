@@ -401,9 +401,9 @@ module _ {R : Set} where
     step-e : ∀ {rs} (k : Conf R) → Path (load o) rs k → ∀ κ → Clock k ⊑ κ → ConfE (Clock k) k → SE κ (Machine.step k)
     step-e ⟨ c , s , rising e , p ⟩ pth κ le (hc , hs) = rise-e c s e p hs (floor o pth tt) (ctx-mono c le hc) (st-mono s le hs) le
     step-e ⟨ c , pend o′ q , subscribing , p ⟩ pth κ le (hc , _) = begin-e c o′ q (ctx-mono c le hc)
-    step-e (⟨ c , coldS b l , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
-    step-e (⟨ c , ofS i q xs , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
-    step-e (⟨ c , doneS , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
+    step-e ⟨ c , coldS b l , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
+    step-e ⟨ c , ofS i q xs , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
+    step-e ⟨ c , doneS , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , tt
     step-e ⟨ c , mapS f s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
     step-e ⟨ c , scanS f z s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
     step-e ⟨ c , cutS l a s , subscribing , p ⟩ pth κ le (hc , hs) = ctx-mono c le hc , st-mono s le hs
