@@ -11,29 +11,31 @@ open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _<?_; s≤s; z≤n)
 open import Data.Nat.Induction using (<-wellFounded)
+open import Data.List.Properties using (++-assoc)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-pred; <-≤-trans; ≤-<-trans; n≮0; m≤n⇒m≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; subst₂; sym; trans)
 open import Relation.Nullary using (Dec; yes; no)
 
 open import denotation.Events using (Pos; root; _≟ᵖ_)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; _≼_)
-open import denotation.Laws.Modulus using (≼-antisym)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; _≼_; _≺_; Seen)
+open import denotation.Laws.Modulus using (≼-antisym; ≼-or-≻; ≺-trans; ≺-irrefl; ≺-≼-≺)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Read using (Run; Meets; loud; cursor; []; _∷_)
+open import denotation.Read using (Run; Meets; Visible; loud; cursor; []; _∷_)
 import denotation.Read as Read
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
 open import operation.Key using (Key; at; _<ᴷ_; clash)
 open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Lowest; Beyond; into; back; _≃_; ≃-sym; ≃-trans; []; tau; val; fin)
 open _≃_
-open import adequacy.Simulation using (Simulation; quiet-root; module Along; Aimed; aimed)
+open import adequacy.Simulation using (Simulation; sound; quiet-root; module Along; Aimed; aimed)
 open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
 open import adequacy.Lighten using (still-lightens)
 open import adequacy.Floor using (clock-mono)
@@ -86,6 +88,49 @@ still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (ks ++ anc ks
   where
     go : ∀ {k} → Acc _<_ (W (ks ++ anc ks) p k) → Path (load o) rs k → Acc (Still (ks ++ anc ks)) k
     go (acc r) pth = acc λ st → go (r (still-lowers o pth m ks cov st)) (pth ▸τ proj₁ st)
+
+-- Whether a row lies past a cursor.
+after? : ∀ c x → Dec (Read.After c x)
+after? nothing  x = yes tt
+after? (just c) x with ≼-or-≻ x c
+... | inj₁ xc = no λ cx → ≺-irrefl {c} (≺-≼-≺ {c} {x} {c} cx xc)
+... | inj₂ cx = yes cx
+
+after-trans : ∀ c {p x} → Read.After c p → p ≺ x → Read.After c x
+after-trans nothing  _ _ = tt
+after-trans (just c) {p} {x} ap px = ≺-trans {c} {p} {x} ap px
+
+-- Of `xs`, those past a cursor.
+past : Maybe Pos → List Pos → ℕ
+past c []       = 0
+past c (x ∷ xs) with after? c x
+... | yes _ = suc (past c xs)
+... | no _  = past c xs
+
+past-mono : ∀ c {p} → Read.After c p → ∀ xs → past (just p) xs ≤ past c xs
+past-mono c a [] = z≤n
+past-mono c {p} a (x ∷ xs) with after? (just p) x | after? c x
+... | yes _  | yes _  = s≤s (past-mono c a xs)
+... | yes px | no ¬cx = ⊥-elim (¬cx (after-trans c a px))
+... | no _   | yes _  = m≤n⇒m≤1+n (past-mono c a xs)
+... | no _   | no _   = past-mono c a xs
+
+-- A cursor moving onto a listed row past it: fewer past it.
+past-drop : ∀ c {p xs} → Read.After c p → p ∈ xs → past (just p) xs < past c xs
+past-drop c {p} {_ ∷ xs} a (here refl) with after? (just p) p | after? c p
+... | yes pp | _     = ⊥-elim (≺-irrefl {p} pp)
+... | no _   | yes _ = s≤s (past-mono c a xs)
+... | no _   | no ¬a = ⊥-elim (¬a a)
+past-drop c {p} {x ∷ xs} a (there m) with after? (just p) x | after? c x
+... | yes _  | yes _  = s≤s (past-drop c a m)
+... | yes px | no ¬cx = ⊥-elim (¬cx (after-trans c a px))
+... | no _   | yes _  = m≤n⇒m≤1+n (past-drop c a m)
+... | no _   | no _   = past-drop c a m
+
+-- What a run shows next, at or before `q`.
+data Toward {R : Set} (k : Conf R) (q : Pos) : Set₁ where
+  shows : ∀ {p a k′} → Path k [ (p , nx a) ] k′ → p ≼ q → Toward k q
+  ends  : ∀ {p} → Steps k [ (p , cp) ] → p ≼ q → Toward k q
 
 module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
   open Simulation S using (I; T; i₀; t₀; dry) renaming (tau to simτ; val to simval; fin to simfin)
@@ -146,7 +191,7 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     silent-finite : ∀ {rs k p e} → Path (load o) rs k → Aimed o (cursor nothing (conv rs)) p e → Acc _⇜_ k
     silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m ks₀ listed₀) pth₀
       where
-        few = proj₂ (proj₁ (proj₁ m))
+        few = proj₂ (proj₁ m)
 
         ks₀ : List Pos
         ks₀ = p ∷ proj₁ few
@@ -182,7 +227,7 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     progress {rs} pth m =
       let (i , r) = along nothing pth i₀ t₀
           h = last {c = nothing} (conv rs) m
-      in next (cursor nothing (conv rs)) i r h (silent-finite pth (aimed S h))
+      in next (cursor nothing (conv rs)) i r h (silent-finite pth (aimed S {c = cursor nothing (conv rs)} h))
 
     -- Shown what was met so far, a run shows what is met next.
     go : ∀ {rs₀ k} → Path (load o) rs₀ k → Run t nothing (conv rs₀) → ∀ rs → Run t (cursor nothing (conv rs₀)) rs
@@ -197,3 +242,90 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
 
   complete : ∀ {rs} → Meets t rs → Σ _ λ rs′ → Steps (load o) rs′ × conv rs′ ≡ rs
   complete {rs} m = go [] [] rs m
+
+  private
+    func : ∀ {y e e′} → t y e → t y e′ → e ≡ e′
+    func tp tq = InvAt.func (inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())) tp tq
+
+    path-steps : ∀ {k : Conf R} {rs k′} → Path k rs k′ → Steps k rs
+    path-steps []          = []
+    path-steps (tau e pth) = tau e (path-steps pth)
+    path-steps (val e pth) = val e (path-steps pth)
+
+    cur-last : ∀ (rs : Shownᴹ R) p x → cursor nothing (conv (rs ++ [ (p , x) ])) ≡ just p
+    cur-last rs p x = trans (cong (cursor nothing) (conv-++ rs _)) (cursor-++ nothing (conv rs) _)
+
+    -- From a state on the run, a run shows next a row at or before any
+    -- visible row owed.
+    toward : ∀ {k} c {q e} → (i : I k) → Vis (T i) ≃ Vis (Beyond t c) → t q e → Visible e → Read.After c q → Acc _⇜_ k → Toward k q
+    toward {k} c {q} {e} i r tq vi aq (acc rec) = on (Driver.step R k) refl
+      where
+        seen : Vis (T i) q e
+        seen = from r (back c tq aq , vi)
+
+        on : ∀ x → Driver.step R k ≡ x → Toward k q
+        on (Driver.silent τ k′) eq with simτ i eq
+        ... | i′ , q′ with toward c i′ (≃-trans {t = Vis (T i′)} {u = Vis (T i)} {v = Vis (Beyond t c)} (≃-sym q′) r) tq vi aq (rec (τ , eq))
+        ...   | shows pth le = shows (tau eq pth) le
+        ...   | ends st le   = ends (tau eq st) le
+        on (Driver.value τ p a k′) eq = shows (val eq []) (proj₂ (proj₁ (proj₂ (simval i eq))) seen)
+        on (Driver.complete p) eq     = ends (fin eq) (proj₂ (simfin i eq) seen)
+        on Driver.drained eq          = ⊥-elim (dry i eq seen)
+
+    toward-from : ∀ {rs k q e} → Path (load o) rs k → Seen t q e → Visible e → Read.After (cursor nothing (conv rs)) q → Toward k q
+    toward-from {rs} pth s vi aq =
+      let (i , r) = along nothing pth i₀ t₀
+      in toward (cursor nothing (conv rs)) i r (proj₁ (proj₁ s)) vi aq (silent-finite pth (s , vi , aq))
+
+    -- A run met short of a visible row past it has not ended.
+    unfinished : ∀ {k c rs q e} → Steps k rs → Run t c (conv rs) → t q e → Visible e → Read.After (cursor c (conv rs)) q → Σ _ (Path k rs)
+    unfinished []         _       _  _  _  = _ , []
+    unfinished (tau e st) m       tq vi aq = let (_ , pth) = unfinished st m tq vi aq in _ , tau e pth
+    unfinished (val e st) (_ ∷ m) tq vi aq = let (_ , pth) = unfinished st m tq vi aq in _ , val e pth
+    unfinished (fin e)    (h ∷ _) tq vi aq = ⊥-elim (loud vi (quiet-root o (proj₁ (proj₁ (proj₁ h))) tq aq))
+
+    -- Driven toward a reached visible row, a run shows it after finitely
+    -- many more: each show at or before it, the rows before it few.
+    module Toward-to {q e} (s : Seen t q e) (vi : Visible e) where
+      tq : t q e
+      tq = proj₁ (proj₁ s)
+
+      ks : List Pos
+      ks = proj₁ (proj₂ s)
+
+      few : ∀ {k e′} → t k e′ → k ≺ q → k ∈ ks
+      few = proj₂ (proj₂ s)
+
+      ended : ∀ {rs p} → p ≼ q → Meets t (conv rs ++ [ (p , end) ]) → Σ _ λ rs′ → Meets t (conv rs ++ rs′ ++ [ (q , e) ])
+      ended {rs} {p} pq m with p ≟ᵖ q | last {c = nothing} (conv rs) m
+      ... | yes refl | h = [] , subst (λ e′ → Meets t (conv rs ++ [ (p , e′) ])) (func (proj₁ (proj₁ (proj₁ h))) tq) m
+      ... | no ne    | h = ⊥-elim (loud vi (quiet-root o (proj₁ (proj₁ (proj₁ h))) tq (≼-≢ pq ne)))
+
+      mutual
+        toward-met : ∀ {rs k} c → cursor nothing (conv rs) ≡ c → Path (load o) rs k → Read.After c q → Acc _<_ (past c ks)
+                   → Σ _ λ rs′ → Meets t (conv rs ++ rs′ ++ [ (q , e) ])
+        toward-met {rs} c ec pth aq (acc rec) with toward-from pth s vi (subst (λ c → Read.After c q) (sym ec) aq)
+        ... | shows {p} {a} pth′ pq =
+          shown c ec pth pth′ rec pq (p ≟ᵖ q) (subst (Meets t) (conv-++ rs [ (p , nx a) ]) (sound S (path-steps (pth ▸ pth′))))
+        ... | ends {p} st pq = ended {rs} pq (subst (Meets t) (conv-++ rs [ (p , cp) ]) (sound S (then pth st)))
+
+        shown : ∀ {rs k p a k′} c → cursor nothing (conv rs) ≡ c → Path (load o) rs k → Path k [ (p , nx a) ] k′
+              → (∀ {y} → y < past c ks → Acc _<_ y) → p ≼ q → Dec (p ≡ q)
+              → Meets t (conv rs ++ [ (p , out a) ]) → Σ _ λ rs′ → Meets t (conv rs ++ rs′ ++ [ (q , e) ])
+        shown {rs} {a = a} _ _ _ _ _ _ (yes refl) m =
+          [] , subst (λ e′ → Meets t (conv rs ++ [ (q , e′) ])) (func (proj₁ (proj₁ (proj₁ (last {c = nothing} (conv rs) m)))) tq) m
+        shown {rs} {p = p} {a} c ec pth pth′ rec pq (no ne) m with last {c = nothing} (conv rs) m
+        ... | ((((tp , _) , _) , _ , ap , _)) =
+          let pq′ = ≼-≢ pq ne
+              (rs″ , m′) = toward-met (just p) (cur-last rs p (nx a)) (pth ▸ pth′) pq′
+                             (rec (past-drop c (subst (λ c → Read.After c p) ec ap) (few tp pq′)))
+          in (p , out a) ∷ rs″ ,
+             subst (Meets t) (trans (cong (_++ (rs″ ++ [ (q , e) ])) (conv-++ rs [ (p , nx a) ])) (++-assoc (conv rs) [ (p , out a) ] (rs″ ++ [ (q , e) ]))) m′
+
+  -- A REACHED ROW IS MET: a visible row of the program, past what a reader
+  -- has met, the reader meets in time.
+  reach : ∀ {rs q e} → Meets t rs → Seen t q e → Visible e → Read.After (cursor nothing rs) q
+        → Σ _ λ rs′ → Meets t (rs ++ rs′ ++ [ (q , e) ])
+  reach m s vi aq with complete m
+  ... | rs₀ , st , refl with unfinished st m (proj₁ (proj₁ s)) vi aq
+  ...   | _ , pth = Toward-to.toward-met s vi _ refl pth aq (<-wellFounded _)
