@@ -50,12 +50,12 @@ open import Data.Unit using (⊤; tt)
 open import denotation.Events using (last; root)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import denotation.EmissionSet using (enter)
-open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
+open import denotation.Read using () renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs)
 open Machine using (⟨_,_,_,_⟩; rising; nx; cp; St; load; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (conv; back)
 open import adequacy.Simulated using (cursor)
-open import adequacy.Simulation using (Simulation; module Along)
+open import adequacy.Simulation using (Simulation; module Along; Aimed)
 open import adequacy.Path using (Path)
 open import adequacy.Cursor using (Due)
 open import adequacy.Cursor.Frame using (Fly)
@@ -692,12 +692,11 @@ module Outer {R} (o : PureObs [] R) where
   under : ∀ {Cr q p e} → Lifted Cr q → Due Cr Rt p e → RowUnder o (q ++ [ ix 0 ]) p
   under {q = q} (r , _ , tr , z , cl , refl) (tp , vp , ow) = pick tr (zs-under z) (λ t v → clear cl t v (≼-refl {q}) (zs-past z)) tp vp ow
 
-  -- The row met next, owed at the cursor the run reaches.
-  met : ∀ {rs k p e} (pth : Path (load o) rs k) → Meets Rt (conv rs ++ [ (p , e) ])
+  -- The row a run is headed for, owed at the cursor the run reaches.
+  met : ∀ {rs k p e} (pth : Path (load o) rs k) → Aimed o (cursorᴿ nothing (conv rs)) p e
       → Due (proj₁ (proj₁ (Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))))) Rt p e
-  met {rs} pth m with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
-                    | Along.met-next (cursor o) {c = nothing} (conv rs) m
-  ... | (Cr , _) , r | ((tp , _) , _) , vi , ap , _ = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
+  met {rs} pth (((tp , _) , _) , vi , ap) with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
+  ... | (Cr , _) , r = proj₁ (from r (back (cursorᴿ nothing (conv rs)) tp ap , vi))
 
 -- A busy step's floor, at the step.
 flo : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q}
@@ -730,7 +729,7 @@ guard-src o {q = q} pth bz du il@(Lift.isled u _ _ _ _ _ _ _ _ _ _ _ _ _ eq _ _)
 -- first child, at or before the row met next.
 outer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n qu ls} {c : Ctx R Γ B} {s a q p e}
             → Path (load o) rs ⟨ inOuter op f ω d n qu ls c , s , rising (nx a) , q ⟩
-            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → Aimed o (cursorᴿ nothing (conv rs)) p e
             → RowUnder o (q ++ [ ix 0 ]) p
 outer-guard o {op = op} {f} {ω} {d} {n} {qu} {ls} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
@@ -743,7 +742,7 @@ outer-guard o pth m | (_ , _ , adrift fr cl _ , _) , _ | _ = ⊥-elim (subst T c
 -- row a level down, under it, at or before the row met next.
 echo-guard : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q p e}
            → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩
-           → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+           → Aimed o (cursorᴿ nothing (conv rs)) p e
            → RowUnder o (q ++ [ ix 0 ]) p
 echo-guard o {k = k} {b} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
@@ -811,7 +810,7 @@ defer-pend o {c = c} {l} {q} {C = C} pth du (Rg , E , fr , ow , ok , ad , pe , w
 -- run subscribes has a row under its guard, at or before the row met next.
 defer-guard : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {l q p e}
             → Path (load o) rs ⟨ c , pend (defer l) q , subscribing , q ⟩
-            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → Aimed o (cursorᴿ nothing (conv rs)) p e
             → RowUnder o (q ++ [ ix 0 ]) p
 defer-guard o pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
@@ -821,7 +820,7 @@ defer-guard o pth m
 -- has a row under its first child, at or before the row met next.
 lanes-guard : ∀ {R} (o : PureObs [] R) {rs Γ A B} {op} {f : A → Obs Timeline Γ B} {ω d n a qu} {o′ : St Γ A} {pre post} {c : Ctx R Γ B} {s q p e}
             → Path (load o) rs ⟨ inLanes op f ω d n (a ∷ qu) o′ pre post c , s , rising cp , q ⟩
-            → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+            → Aimed o (cursorᴿ nothing (conv rs)) p e
             → RowUnder o (q ++ [ ix 0 ]) p
 lanes-guard o {op = op} {f} {ω} {d} {n} {a} {qu} {o′} {pre} {post} {c} {s} pth m
   with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | Outer.met o pth m
@@ -838,7 +837,7 @@ Gd o q (inLanes op f ω d n (a ∷ qu) o′ pre post c) cp     p = RowUnder o (q
 Gd o q _                                            _      p = ⊤
 
 gd : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s ε q p e}
-   → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+   → Path (load o) rs ⟨ c , s , rising ε , q ⟩ → Aimed o (cursorᴿ nothing (conv rs)) p e
    → Gd o q c ε p
 gd o {c = top}                                   pth m = tt
 gd o {c = inMap _ _}                             pth m = tt

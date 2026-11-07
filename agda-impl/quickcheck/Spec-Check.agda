@@ -43,7 +43,7 @@ open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; em
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Statement using (batchedObs; values; joined; batchesOut; grouped; outs; named)
+open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ)

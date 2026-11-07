@@ -29,11 +29,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE BATCHER
 
 Untried: the batcher releases each instant's values the moment that
-instant is over, and completes when what it batches does. Hardest: the
+instant is over, read off the elaborated run's rows. Hardest: the
 bracket and route protocol through every flatMap policy and connect.
-Settled when each is a body over the elaborated run.
+Settled when `batchable` is a body over the elaborated run and the
+completion mark is shown last.
 
-Members: `batchable`, `batcher-ends`.
+Members: `batchable`, `completed-last`.
 
 #### THE ERASURE
 
@@ -59,3 +60,11 @@ frame or a timer cascade, as `instantOf` reads it. Settled when
 `positioned` is a body by induction over the tree.
 
 Members: `positioned`.
+
+#### THE LAYERS
+
+Untried: a run of a `scan`, or of an `each`, read back as a run of its
+source, completing exactly when it does. Generic in the source; settled
+when each is a body over the denotation's `scan` and joiner rows.
+
+Members: `scan-ends-out`, `scan-ends-in`, `each-ends-out`, `each-ends-in`.
