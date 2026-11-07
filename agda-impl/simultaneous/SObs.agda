@@ -45,15 +45,16 @@ open import Relation.Binary.Definitions using (DecidableEquality)
 module simultaneous.SObs where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
-open import Data.List using (List; []; _∷_; _∷ʳ_)
+open import Data.List using (List; []; _∷_; _∷ʳ_; _++_; concat)
+open import Data.List.Properties using (++-identityʳ)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _∸_; _<ᵇ_)
-open import Data.Product using (_×_; _,_; proj₂)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
@@ -345,10 +346,11 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   ------------------------------------------------------------------------
   -- The batcher
 
-  private
-    Step : Set → Set
-    Step A = Batching A N × List (IE (List A))
+  -- The batcher's state, and what its last step released.
+  Step : Set → Set
+  Step A = Batching A N × List (IE (List A))
 
+  private
     release : ∀ {A} → Batching A N → List (IE (List A))
     release b with Batching.held b
     ... | []     = []
@@ -375,13 +377,63 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     marking true stop       n b = onStop b
     marking _    _          _ b = b , []
 
-    bstep : ∀ {A} → Step A → IE A → Step A
-    bstep (b , _) (instEmit (value a) _) = record b { held = Batching.held b ∷ʳ a } , []
-    bstep (b , _) (instEmit (mark m) n)  = marking (Batching.late b) m n b
+  bstep : ∀ {A} → Step A → IE A → Step A
+  bstep (b , _) (instEmit (value a) _) = record b { held = Batching.held b ∷ʳ a } , []
+  bstep (b , _) (instEmit (mark m) n)  = marking (Batching.late b) m n b
+
+  bstart : ∀ {A} → Step A
+  bstart = batching false name [] 0 , []
+
+  -- The values batches carry, in order.
+  unbatched : ∀ {A} → List (IE (List A)) → List A
+  unbatched es = concat (concat (L.map valuesOf es))
+
+  private
+    release-vals : ∀ {A} (b : Batching A N) → unbatched (release b) ≡ Batching.held b
+    release-vals b with Batching.held b
+    ... | []     = refl
+    ... | v ∷ vs = ++-identityʳ (v ∷ vs)
+
+    now-held : ∀ {A} (b : Batching A N) → unbatched (proj₂ (now b)) ++ Batching.held (proj₁ (now b)) ≡ Batching.held b ++ []
+    now-held b = cong (_++ []) (release-vals b)
+
+    kept : ∀ {A} (b : Batching A N) → Batching.held b ≡ Batching.held b ++ []
+    kept b = sym (++-identityʳ (Batching.held b))
+
+    mark-held : ∀ {A} l m n (b : Batching A N)
+              → unbatched (proj₂ (marking l m n b)) ++ Batching.held (proj₁ (marking l m n b)) ≡ Batching.held b ++ []
+    mark-held _     subscribed n b = now-held (record b { late = true })
+    mark-held _     completed  n b = now-held b
+    mark-held true  begin      n b with does (n ≟ Batching.at b)
+    ... | true  = kept b
+    ... | false = now-held b
+    mark-held false begin      n b = kept b
+    mark-held true  over       n b = now-held b
+    mark-held false over       n b = kept b
+    mark-held true  stop       n b with isZero (Batching.routes b ∸ 1)
+    ... | true  = now-held b
+    ... | false = kept b
+    mark-held false stop       n b = kept b
+    mark-held _     outerOpen  n b = kept b
+    mark-held _     outerClose n b = kept b
+    mark-held _     laneStart  n b = kept b
+    mark-held _     laneDone   n b = kept b
+    mark-held _     burstEnd   n b = kept b
+    mark-held _     outerDone  n b = kept b
+
+  -- What a step releases, then holds, is what was held, then the emit's
+  -- values.
+  bstep-held : ∀ {A} (s : Step A) v → unbatched (proj₂ (bstep s v)) ++ Batching.held (proj₁ (bstep s v)) ≡ Batching.held (proj₁ s) ++ valuesOf v
+  bstep-held s       (instEmit (value a) _) = refl
+  bstep-held (b , _) (instEmit (mark m) n)  = mark-held (Batching.late b) m n b
+
+  -- A completion releases everything held.
+  completed-held : ∀ {A} (s : Step A) n → Batching.held (proj₁ (bstep s (instEmit (mark completed) n))) ≡ []
+  completed-held s n = refl
 
   -- The subscribe burst is one batch, released when it is over; after
   -- it, an instant's batch is released when its routes are.  The run is
   -- read as the scan's source, so it is subscribed where it would be
   -- alone.
   batchSimultaneous : ∀ {Γ A} → E Γ (IE A) → E Γ (IE (List A))
-  batchSimultaneous s = each proj₂ (scan bstep (batching false name [] 0 , []) s)
+  batchSimultaneous s = each proj₂ (scan bstep bstart s)
