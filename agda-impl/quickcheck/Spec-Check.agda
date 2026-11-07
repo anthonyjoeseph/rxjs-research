@@ -18,6 +18,10 @@
 -- replaced by `empty`, the elaborated emits all restamped to one name,
 -- every batch delivered twice.  A sabotage no seed catches is a checker
 -- that cannot fire.  A probe for `make spec-check`: no proof reads it.
+--
+-- THE PINNED PROGRAMS: Anthony's examples, each with the batches it must
+-- deliver, written out.  The statements say the batcher agrees with the
+-- elaboration's instants; a pin says the instants are the intended ones.
 module quickcheck.Spec-Check where
 
 open import Agda.Builtin.IO using (IO)
@@ -26,16 +30,16 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _≡ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; empty; map; flatMap; of; mergeᶠ)
-open import denotation.Events using (Pos; Timeline; root; _≟ᵖ_; fresh)
+open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
+open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.SObs using (module Elaborate)
@@ -143,6 +147,70 @@ private
   doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedObs o))
 
 ------------------------------------------------------------------------
+-- The pinned programs
+
+private
+  over : ∀ {A t} → From∞ A t
+  over .From∞.force = done
+
+  -- `timer(1).pipe(mergeMap(() => of(3, 4)))`: one async step, whose
+  -- synchronous cascade is one instant
+  -- [3, 4]
+  timerOf : Obs Timeline [] ℕ
+  timerOf = flatMap (mergeᶠ nothing) (λ _ → of (3 ∷ 4 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over)))))
+
+  -- a raw source: next(1), next(2) as it is subscribed, then one timer
+  -- callback calling next(3), next(4): every async `next` is an instant
+  -- [1, 2] [3] [4]
+  raw : Obs Timeline [] ℕ
+  raw = cold (fixed (at 0 z≤n (emit 1 (emit 2 (close λ where
+    .From∞.force → at 2 (s≤s z≤n) (emit 3 (emit 4 (close over))))))))
+
+  -- `raw.pipe(mergeMap(e => of(e, e + 1, e + 2)))`
+  -- [1, 2, 3, 2, 3, 4] [3, 4, 5] [4, 5, 6]
+  spread : Obs Timeline [] ℕ
+  spread = flatMap (mergeᶠ nothing) (λ e → of (e ∷ e + 1 ∷ e + 2 ∷ [])) raw
+
+  pins : List (String × Obs Timeline [] ℕ × List (List ℕ))
+  pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
+       ∷ ("raw" , raw , (1 ∷ 2 ∷ []) ∷ (3 ∷ []) ∷ (4 ∷ []) ∷ [])
+       ∷ ("spread" , spread , (1 ∷ 2 ∷ 3 ∷ 2 ∷ 3 ∷ 4 ∷ []) ∷ (3 ∷ 4 ∷ 5 ∷ []) ∷ (4 ∷ 5 ∷ 6 ∷ []) ∷ [])
+       ∷ []
+
+  pinBudget : ℕ
+  pinBudget = 10
+
+  eqAll : List (List ℕ) → List (List ℕ) → Bool
+  eqAll []       []       = true
+  eqAll (a ∷ as) (b ∷ bs) = eqℕs a b ∧ eqAll as bs
+  eqAll _        _        = false
+
+  showBatch : List ℕ → String
+  showBatch []       = "[]"
+  showBatch (a ∷ as) = "[" +++ showℕ a +++ go as
+    where
+      go : List ℕ → String
+      go []       = "]"
+      go (b ∷ bs) = ", " +++ showℕ b +++ go bs
+
+  showBatches : List (List ℕ) → String
+  showBatches []       = "(none)"
+  showBatches (b ∷ []) = showBatch b
+  showBatches (b ∷ bs) = showBatch b +++ " " +++ showBatches bs
+
+  pinLine : String × Obs Timeline [] ℕ × List (List ℕ) → String
+  pinLine (s , o , want) with whole (listT pinBudget (batchedObs o) [] root)
+  ... | nothing = "spec-check: FAIL pinned " +++ s +++ " cut by its budget"
+  ... | just rb with mapL proj₂ (batchesOut rb)
+  ...   | got with eqAll got want
+  ...     | true  = "spec-check: pinned " +++ s +++ " batches " +++ showBatches got
+  ...     | false = "spec-check: FAIL pinned " +++ s +++ " batches " +++ showBatches got +++ ", wanted " +++ showBatches want
+
+  pinned : List (String × Obs Timeline [] ℕ × List (List ℕ)) → IO Unit
+  pinned []       = putStrLn "spec-check: pinned programs checked"
+  pinned (p ∷ ps) = putStrLn (pinLine p) >>= λ _ → pinned ps
+
+------------------------------------------------------------------------
 -- The report
 
 record Tally : Set where
@@ -201,4 +269,4 @@ private
     putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds)))
 
 main : IO Unit
-main = selftest >>= λ _ → report seeds
+main = selftest >>= λ _ → pinned pins >>= λ _ → report seeds

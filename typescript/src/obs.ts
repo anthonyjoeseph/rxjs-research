@@ -116,6 +116,10 @@ export const evalTm = (tm: Tm, th: Value[]): Value => {
 // A scripted cold: frames at offsets from subscription.  Frame 0 is
 // synchronous; each later one is a timer set where the frame before it
 // ends, as `quickcheck.Clock.fromTimeline` plays it.
+// A cold is a primitive source: a later frame stands for one timer
+// callback calling `next` once per value, so each value is an emission
+// of its own.  `timer` then `from` is only how rxjs plays that here; it
+// is not a timer whose one emission cascades into the values.
 // One play of the frames. A replay starts a tick after the last frame,
 // as `quickcheck.Code.scriptML` restarts, so it is never synchronous.
 const play = (
@@ -132,7 +136,7 @@ const play = (
     }),
   );
 
-export const cold = (
+const cold = (
   sch: SchedulerLike,
   frames: [number, Value[]][],
   completes: boolean,
@@ -144,10 +148,10 @@ export const cold = (
       : concat(play(sch, frames, false), play(sch, frames, true).pipe(repeat()))
     : concat(play(sch, frames, false), completes ? EMPTY : NEVER);
 
-export const flatMapOf = <A, B>(
+const flatMapOf = (
   op: FlatOp,
-  lane: (a: A) => Observable<B>,
-): ((s: Observable<A>) => Observable<B>) => {
+  lane: (a: Value) => Observable<Value>,
+): ((s: Observable<Value>) => Observable<Value>) => {
   switch (op[0]) {
     case "merge":
       return op.length === 2 ? mergeMap(lane, op[1]) : mergeMap(lane);
