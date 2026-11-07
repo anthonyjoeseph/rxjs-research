@@ -7,8 +7,9 @@
 -- leave open.
 --
 -- `left-to-right`: the batches, joined back up, are the plain run's
--- values, in order.  Elaborating every program to `empty` is trivially
--- batched, and fails it.
+-- values, in order, and the batched run completes exactly when the plain
+-- one does, all its values out.  Elaborating every program to `empty` is
+-- trivially batched, and fails it.
 --
 -- `coherent`: two emits share a provenance exactly when they sit in one
 -- instant, valueless ones too, both the elaborated run's and the
@@ -46,6 +47,7 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
@@ -138,10 +140,16 @@ FiniteInstants t = ∀ {q e} → Seen t q e → Exits t q
 ------------------------------------------------------------------------
 -- The three relations, between emission sets
 
+-- The rows met include the completion.
+Ends : ∀ {A} → List (Pos × Ev A) → Set
+Ends rs = Any (λ r → proj₂ r ≡ end) rs
+
 Joins : ∀ {A} → EmissionSet (IE (List A)) → EmissionSet A → Set
 Joins b e =
   (∀ {rs} → Met b rs → Σ _ λ rs′ → Met e rs′ × Prefix _≡_ (joined rs) (values rs′)) ×
-  (FiniteInstants e → ∀ {rs′} → Met e rs′ → Σ _ λ rs → Met b rs × Prefix _≡_ (values rs′) (joined rs))
+  (FiniteInstants e → ∀ {rs′} → Met e rs′ → Σ _ λ rs → Met b rs × Prefix _≡_ (values rs′) (joined rs)) ×
+  (∀ {rs} → Met b rs → Ends rs → Σ _ λ rs′ → Met e rs′ × Ends rs′ × joined rs ≡ values rs′) ×
+  (∀ {rs′} → Met e rs′ → Ends rs′ → Σ _ λ rs → Met b rs × Ends rs × values rs′ ≡ joined rs)
 
 Batches : ∀ {A} → EmissionSet (IE (List A)) → EmissionSet (IE A) → Set
 Batches b x =
