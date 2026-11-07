@@ -26,13 +26,31 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SPEC
+#### THE BATCHER
 
-Untried: batches joined are the plain values, each batch is one instant,
-and it leaves the moment its instant is over. Settled when each is a body
-over the emission set.
+Untried: the batcher releases each instant's values the moment that
+instant is over, and completes when what it batches does. Hardest: the
+bracket and route protocol through every flatMap policy and connect.
+Settled when each is a body over the elaborated run.
 
-Members: `left-to-right`, `coherent`, `batchable`.
+Members: `batchable`, `batcher-ends`.
+
+#### THE ERASURE
+
+Untried: the elaborated run, marks dropped, is the plain run, values and
+completion, and its instants are finite when the plain run's are.
+Switch, exhaust and the bounded queue are the real cases. Settled when
+each is a body by operator.
+
+Members: `erases`, `settles`.
+
+#### THE NAMES
+
+Untried: each async cold step mints one name and its whole cascade
+carries it, so names agree exactly when instants do. Settled when
+`coherent` is a body over a restamp invariant and `positioned`.
+
+Members: `coherent`.
 
 #### THE INSTANTS
 
