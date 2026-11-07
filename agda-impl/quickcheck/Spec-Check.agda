@@ -40,7 +40,7 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
-open import denotation.EmissionSet using (Ev)
+open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Statement using (batchedObs; values; joined; batchesOut; grouped; outs; named)
@@ -95,9 +95,15 @@ private
 agreeᵇ : ∀ {A} → Rows (IE A) → Bool
 agreeᵇ rs = allPairsᵇ sameInstant (mapL named (outs rs))
 
+-- `Statement.Ends`
+endsᵇ : ∀ {A} → Rows A → Bool
+endsᵇ []                = false
+endsᵇ ((_ , end) ∷ _)   = true
+endsᵇ (_ ∷ rs)          = endsᵇ rs
+
 -- `Statement.Joins`, over a whole run
 joinsᵇ : Rows (IE (List ℕ)) → Rows ℕ → Bool
-joinsᵇ b e = eqℕs (joined b) (values e)
+joinsᵇ b e = eqℕs (joined b) (values e) ∧ iff (endsᵇ b) (endsᵇ e)
 
 -- `Statement.Batches`, over a whole run: the run is over, so `ov` holds
 batchesᵇ : Rows (IE (List ℕ)) → Rows (IE ℕ) → Bool

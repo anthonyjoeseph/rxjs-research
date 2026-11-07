@@ -7,8 +7,9 @@
 -- leave open.
 --
 -- `left-to-right`: the batches, joined back up, are the plain run's
--- values, in order.  Elaborating every program to `empty` is trivially
--- batched, and fails it.
+-- values, in order, and the batched run completes exactly when the plain
+-- one does, all its values out.  Elaborating every program to `empty` is
+-- trivially batched, and fails it.
 --
 -- `coherent`: two emits share a provenance exactly when they sit in one
 -- instant, valueless ones too, both the elaborated run's and the
@@ -22,10 +23,13 @@
 -- instant it was released in, to pass `coherent`, fails it.
 --
 -- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
--- subscriber sees (a skip, a pin) still runs in some instant, so a run is over,
--- and an instant left, by every row past it.  Those are read off the
+-- subscriber sees (a skip, a pin) still runs in some instant, so an
+-- instant is left by every row past it.  Those are read off the
 -- emission set directly, over its reached rows (`Seen`), never through a
 -- reader.
+--
+-- AN INSTANT OVER IS ENOUGH, THE RUN NEED NOT BE: a batch is released
+-- the moment its instant is, though work no subscriber sees runs on.
 --
 -- EACH IS TWO DIRECTIONS OVER PREFIXES, since a run need not end: what
 -- has come out is within what the spec allows, and everything the spec
@@ -45,18 +49,19 @@ open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; Σ; _,_; proj₂)
+open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_) renaming (sym to ≡-sym; trans to ≡-trans)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
-open import denotation.EmissionSet using (Ev; out; end; Silent; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After; cursor)
-open import simultaneous.InstEmit using (InstEmit)
+open import simultaneous.InstEmit using (InstEmit; valuesOf)
 open import simultaneous.SObs using (SObs; module Elaborate)
 import simultaneous.Spec as Spec
+import simultaneous.Flatten as F
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; Rooted; stamped; closed)
 
@@ -99,8 +104,12 @@ batchesOut rs = stamped (values rs)
 joined : ∀ {A} → List (Pos × Ev (IE (List A))) → List A
 joined rs = concat (L.map proj₂ (batchesOut rs))
 
+-- The values an elaborated run carries, marks dropped.
+vals : ∀ {A} → List (Pos × Ev (IE A)) → List A
+vals rs = L.map proj₂ (stamped (values rs))
+
 -- The spec's grouping of the values met, its last group kept only once
--- the run is over.
+-- its instant is over.
 grouped : ∀ {A} → Bool → List (Pos × Ev (IE A)) → List (Pos × List A)
 grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 
@@ -108,19 +117,20 @@ grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 Spent : ∀ {A} → EmissionSet A → Maybe Pos → Set
 Spent t c = Σ (List Pos) λ ks → ∀ {k e} → t k e → After c k → k ∈ ks × Proper t k e
 
--- Past `c`, nothing a subscriber is shown.
-Quiet : ∀ {A} → EmissionSet A → Maybe Pos → Set
-Quiet t c = ∀ {k e} → t k e → After c k → Silent e
+-- The instant the last value met belongs to.
+lastInstant : ∀ {A} → List (Pos × Ev (IE A)) → Maybe Pos
+lastInstant rs = L.last (L.map proj₁ (stamped (values rs)))
 
--- What was shown reaches the run's end: its completion, or past it only
--- finitely much unseen work.
-Over : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Set
-Over t rs = Any (λ r → proj₂ r ≡ end) rs ⊎ (Spent t (cursor nothing rs) × Quiet t (cursor nothing rs))
+-- Past what was met, no value of instant `i`.
+Left : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Maybe Pos → Set
+Left t rs nothing  = ⊤
+Left t rs (just i) = ∀ {k x} → t k (out x) → After (cursor nothing rs) k → InstEmit.instant x ≡ i → valuesOf x ≡ []
 
--- A grouping may keep its last group only once the run is over.
-Closes : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Bool → Set
+-- A grouping may keep its last group only once its instant is over, run
+-- over or not: batching shows what plain rxjs shows, as it shows it.
+Closes : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Bool → Set
 Closes t rs false = ⊤
-Closes t rs true  = Over t rs
+Closes t rs true  = Left t rs (lastInstant rs)
 
 -- Past the row at `q`, the run leaves `q`'s instant: a reached row of
 -- another instant or the completion, or finitely many rows after.
@@ -135,10 +145,16 @@ FiniteInstants t = ∀ {q e} → Seen t q e → Exits t q
 ------------------------------------------------------------------------
 -- The three relations, between emission sets
 
+-- The rows met include the completion.
+Ends : ∀ {A} → List (Pos × Ev A) → Set
+Ends rs = Any (λ r → proj₂ r ≡ end) rs
+
 Joins : ∀ {A} → EmissionSet (IE (List A)) → EmissionSet A → Set
 Joins b e =
   (∀ {rs} → Met b rs → Σ _ λ rs′ → Met e rs′ × Prefix _≡_ (joined rs) (values rs′)) ×
-  (FiniteInstants e → ∀ {rs′} → Met e rs′ → Σ _ λ rs → Met b rs × Prefix _≡_ (values rs′) (joined rs))
+  (FiniteInstants e → ∀ {rs′} → Met e rs′ → Σ _ λ rs → Met b rs × Prefix _≡_ (values rs′) (joined rs)) ×
+  (∀ {rs} → Met b rs → Ends rs → Σ _ λ rs′ → Met e rs′ × Ends rs′ × joined rs ≡ values rs′) ×
+  (∀ {rs′} → Met e rs′ → Ends rs′ → Σ _ λ rs → Met b rs × Ends rs × values rs′ ≡ joined rs)
 
 Batches : ∀ {A} → EmissionSet (IE (List A)) → EmissionSet (IE A) → Set
 Batches b x =
@@ -157,6 +173,35 @@ InstantsAgree : ∀ {A} → EmissionSet (IE A) → Set
 InstantsAgree x = ∀ {rs} → Met x rs → AllPairs SameInstant (L.map named (outs rs))
 
 ------------------------------------------------------------------------
+-- The pieces `left-to-right` is assembled from
+
+-- THE ERASURE: the elaborated run, marks dropped, is the plain run:
+-- the same values in order, and complete exactly when it is.
+Erases : ∀ {A} → EmissionSet (IE A) → EmissionSet A → Set
+Erases x e =
+  (∀ {rx} → Met x rx → Σ _ λ rs′ → Met e rs′ × Prefix _≡_ (vals rx) (values rs′)) ×
+  (∀ {rs′} → Met e rs′ → Σ _ λ rx → Met x rx × Prefix _≡_ (values rs′) (vals rx)) ×
+  (∀ {rx} → Met x rx → Ends rx → Σ _ λ rs′ → Met e rs′ × Ends rs′ × vals rx ≡ values rs′) ×
+  (∀ {rs′} → Met e rs′ → Ends rs′ → Σ _ λ rx → Met x rx × Ends rx × values rs′ ≡ vals rx)
+
+-- The batcher completes exactly when what it batches does, all of it out.
+EndsWith : ∀ {A} → EmissionSet (IE (List A)) → EmissionSet (IE A) → Set
+EndsWith b x =
+  (∀ {rs} → Met b rs → Ends rs → Σ _ λ rx → Met x rx × Ends rx × joined rs ≡ vals rx) ×
+  (∀ {rx} → Met x rx → Ends rx → Σ _ λ rs → Met b rs × Ends rs × vals rx ≡ joined rs)
+
+-- When the plain run's instants are finite, whatever of the elaborated run
+-- was met runs on until the instant of its last value is over.
+Settles : ∀ {A} → EmissionSet (IE A) → EmissionSet A → Set
+Settles x e = FiniteInstants e → ∀ {rx} → Met x rx →
+  Σ _ λ rx′ → Met x rx′ × Closes x rx′ true × Prefix _≡_ (vals rx) (vals rx′)
+
+postulate
+  erases       : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
+  batcher-ends : ∀ {A} (o : SObs [] A) → EndsWith (batched o) (elaborated o)
+  settles      : ∀ {A} (o : SObs [] A) → Settles (elaborated o) (events o)
+
+------------------------------------------------------------------------
 -- The statements: each the root case
 
 Left-To-Right : Set₁
@@ -172,7 +217,40 @@ Positioned : Set₁
 Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
 postulate
-  left-to-right : Left-To-Right
   coherent      : Coherent
   batchable     : Batchable
   positioned    : Positioned
+
+-- The batches, joined, are within the elaborated run's values, and those
+-- are the plain run's; the batches closed, they reach as far.
+left-to-right : Left-To-Right
+left-to-right o = early , late , ends-out , ends-in
+  where
+    open F _≟ᵖ_ using (prefix-trans; prefix-≡; prefix-map; prefix-concat; joined-closed; joined-batches)
+
+    -- what a prefix of the grouping joins to
+    joined-within : ∀ {A} (rs : List (Pos × Ev (IE (List A)))) {ov} rx →
+                    Prefix _≡_ (batchesOut rs) (grouped ov rx) → Prefix _≡_ (joined rs) (vals rx)
+    joined-within rs {ov} rx p = prefix-trans (prefix-concat (prefix-map proj₂ p)) (joined-closed ov (stamped (values rx)))
+
+    early : ∀ {rs} → Met (batched o) rs → Σ _ λ rs′ → Met (events o) rs′ × Prefix _≡_ (joined rs) (values rs′)
+    early {rs} m with proj₁ (batchable o) m
+    ... | rx , ov , mx , _ , p with proj₁ (erases o) mx
+    ...   | rs′ , me , q = rs′ , me , prefix-trans (joined-within rs rx p) q
+
+    late : FiniteInstants (events o) → ∀ {rs′} → Met (events o) rs′ → Σ _ λ rs → Met (batched o) rs × Prefix _≡_ (values rs′) (joined rs)
+    late fin m with proj₁ (proj₂ (erases o)) m
+    ... | rx , mx , p with settles o fin mx
+    ...   | rx′ , mx′ , cl , q with proj₂ (batchable o) {ov = true} mx′ cl
+    ...     | rs , mb , r = rs , mb , prefix-trans p (prefix-trans q
+                (prefix-trans (prefix-≡ (≡-sym (joined-batches (stamped (values rx′))))) (prefix-concat (prefix-map proj₂ r))))
+
+    ends-out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rs′ → Met (events o) rs′ × Ends rs′ × joined rs ≡ values rs′
+    ends-out m en with proj₁ (batcher-ends o) m en
+    ... | rx , mx , ex , eq with proj₁ (proj₂ (proj₂ (erases o))) mx ex
+    ...   | rs′ , me , es , eq′ = rs′ , me , es , ≡-trans eq eq′
+
+    ends-in : ∀ {rs′} → Met (events o) rs′ → Ends rs′ → Σ _ λ rs → Met (batched o) rs × Ends rs × values rs′ ≡ joined rs
+    ends-in m en with proj₂ (proj₂ (proj₂ (erases o))) m en
+    ... | rx , mx , ex , eq with proj₂ (batcher-ends o) mx ex
+    ...   | rs , mb , eb , eq′ = rs , mb , eb , ≡-trans eq eq′
