@@ -46,8 +46,8 @@ stamped : ∀ {N A} → List (InstEmit N A) → List (N × A)
 stamped []       = []
 stamped (x ∷ xs) = map (λ a → instant x , a) (valuesOf x) ++ stamped xs
 
--- A grouping read off a prefix, its last group kept only once the run is
--- over: until then that instant may still be running.
+-- A grouping read off a prefix, its last group kept only once its
+-- instant is over: until then it may still grow.
 closed : ∀ {X : Set} → Bool → List X → List X
 closed true  xs           = xs
 closed false []           = []

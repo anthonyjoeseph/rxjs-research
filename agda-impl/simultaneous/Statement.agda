@@ -22,10 +22,13 @@
 -- instant it was released in, to pass `coherent`, fails it.
 --
 -- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
--- subscriber sees (a skip, a pin) still runs in some instant, so a run is over,
--- and an instant left, by every row past it.  Those are read off the
+-- subscriber sees (a skip, a pin) still runs in some instant, so an
+-- instant is left by every row past it.  Those are read off the
 -- emission set directly, over its reached rows (`Seen`), never through a
 -- reader.
+--
+-- AN INSTANT OVER IS ENOUGH, THE RUN NEED NOT BE: a batch is released
+-- the moment its instant is, though work no subscriber sees runs on.
 --
 -- EACH IS TWO DIRECTIONS OVER PREFIXES, since a run need not end: what
 -- has come out is within what the spec allows, and everything the spec
@@ -43,18 +46,17 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; Σ; _,_; proj₂)
+open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
-open import denotation.EmissionSet using (Ev; out; end; Silent; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After; cursor)
-open import simultaneous.InstEmit using (InstEmit)
+open import simultaneous.InstEmit using (InstEmit; valuesOf)
 open import simultaneous.SObs using (SObs; module Elaborate)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
@@ -100,7 +102,7 @@ joined : ∀ {A} → List (Pos × Ev (IE (List A))) → List A
 joined rs = concat (L.map proj₂ (batchesOut rs))
 
 -- The spec's grouping of the values met, its last group kept only once
--- the run is over.
+-- its instant is over.
 grouped : ∀ {A} → Bool → List (Pos × Ev (IE A)) → List (Pos × List A)
 grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 
@@ -108,19 +110,20 @@ grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 Spent : ∀ {A} → EmissionSet A → Maybe Pos → Set
 Spent t c = Σ (List Pos) λ ks → ∀ {k e} → t k e → After c k → k ∈ ks × Proper t k e
 
--- Past `c`, nothing a subscriber is shown.
-Quiet : ∀ {A} → EmissionSet A → Maybe Pos → Set
-Quiet t c = ∀ {k e} → t k e → After c k → Silent e
+-- The instant the last value met belongs to.
+lastInstant : ∀ {A} → List (Pos × Ev (IE A)) → Maybe Pos
+lastInstant rs = L.last (L.map proj₁ (stamped (values rs)))
 
--- What was shown reaches the run's end: its completion, or past it only
--- finitely much unseen work.
-Over : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Set
-Over t rs = Any (λ r → proj₂ r ≡ end) rs ⊎ (Spent t (cursor nothing rs) × Quiet t (cursor nothing rs))
+-- Past what was met, no value of instant `i`.
+Left : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Maybe Pos → Set
+Left t rs nothing  = ⊤
+Left t rs (just i) = ∀ {k x} → t k (out x) → After (cursor nothing rs) k → InstEmit.instant x ≡ i → valuesOf x ≡ []
 
--- A grouping may keep its last group only once the run is over.
-Closes : ∀ {A} → EmissionSet A → List (Pos × Ev A) → Bool → Set
+-- A grouping may keep its last group only once its instant is over, run
+-- over or not: batching shows what plain rxjs shows, as it shows it.
+Closes : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Bool → Set
 Closes t rs false = ⊤
-Closes t rs true  = Over t rs
+Closes t rs true  = Left t rs (lastInstant rs)
 
 -- Past the row at `q`, the run leaves `q`'s instant: a reached row of
 -- another instant or the completion, or finitely many rows after.
