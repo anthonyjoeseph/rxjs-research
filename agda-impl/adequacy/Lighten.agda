@@ -24,7 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; root; ix; last; <ᵖ-part; <ᵖ-ix; _≟ᵖ_; emit; stall; close; From∞; Frame)
 open import denotation.EmissionSet using (enter; ⟦_⟧; _≼_)
-open import denotation.Read using (Meets) renaming (cursor to cursorᴿ)
+open import denotation.Read using () renaming (cursor to cursorᴿ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
@@ -38,7 +38,7 @@ open import adequacy.Path using (Path; Still)
 open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
 open import adequacy.Floor using (fed-ahead)
-open import adequacy.Simulation using (Simulation; module Along)
+open import adequacy.Simulation using (Simulation; module Along; Aimed)
 open import adequacy.Cursor.Rise using (settled)
 import adequacy.Walk as Walk
 open import adequacy.Walk using (due-≈)
@@ -76,12 +76,11 @@ true-stable false nn = ⊥-elim (nn λ ())
 -- before it.
 mark-short : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q p e Γ′ A′} {c′ : Ctx R Γ′ A′} {s′ mk u}
            → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-           → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+           → Aimed o (cursorᴿ nothing (conv rs)) p e
            → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , s′) mk (at u)) → at p <ᴷ at u ≡ false
 mark-short {R} o {rs} {c = c} {s} {p = p} {u = u} pth m fd
-  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o))
-     | Along.met-next (cursor o) {c = nothing} (conv rs) m
-... | (Cr , C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap , _ with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
+  with Along.along (cursor o) nothing pth (Simulation.i₀ (cursor o)) (Simulation.t₀ (cursor o)) | m
+... | (Cr , C , settled _ fr h , _) , r | ((tp , _) , _) , vi , ap with Walk.climb (enter (⟦ o ⟧ []ᴬ) root) fr h
 ...   | _ , _ , eq , sy =
   trans (at-<ᴷ p u)
     (≼-false {u} {p} (bound sy (λ ()) (lo-p (proj₂ (found-least {t = plug c s} fd)))
@@ -106,7 +105,7 @@ private
           eq = solve-∀
 
 
-module Begun {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]))
+module Begun {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv rs)) p e)
              (ks : List Pos) (cov : ∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
              {Γ A} (c : Ctx R Γ A) (q : Pos) where
   private
@@ -160,7 +159,7 @@ module Begun {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ)
 -- never still.
 lightens-begin : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q k′ p e}
                → Path (load o) rs ⟨ c , s , subscribing , q ⟩
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+               → Aimed o (cursorᴿ nothing (conv rs)) p e
                → ∀ ks → (∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
                → Still (ks ++ anc ks) k′ ⟨ c , s , subscribing , q ⟩
                → Wᶜ (ks ++ anc ks) p (at q) k′ < Wᶜ (ks ++ anc ks) p (at q) ⟨ c , s , subscribing , q ⟩
@@ -304,7 +303,7 @@ climb-le (rising _)  = ≤-refl
 climb-le subscribing = z≤n
 climb-le absorbed    = z≤n
 
-module Rose {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]))
+module Rose {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv rs)) p e)
             (ks : List Pos) (cov : ∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
             (q : Pos) where
   private
@@ -452,7 +451,7 @@ own-owed (cs _ _ _ (just _) (just _) nothing _ _ _ _) o b (there (there ()))
 
 -- A MARK RUN, WEIGHED AT ITS KEY: the least mark run spends its own
 -- weight, and what it leaves weighs less, its climb included.
-module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ]))
+module Run {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv rs)) p e)
            (ks : List Pos) (cov : ∀ {q′ e′} → enter (⟦ o ⟧ []ᴬ) root q′ e′ → q′ ≼ p → q′ ∈ ks)
            (q : Pos) where
   private
@@ -608,7 +607,7 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Meets (enter (⟦ o ⟧ []ᴬ) r
 
 -- STILL STEPS LIGHTEN, WEIGHED AT THE CLOCK THEY START FROM.
 still-lightens : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-               → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+               → Aimed o (cursorᴿ nothing (conv rs)) p e
                → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
                → Still (ks ++ anc ks) k′ k → Wᶜ (ks ++ anc ks) p (Clock k) k′ < W (ks ++ anc ks) p k
 still-lightens o {k = ⟨ c , s , rising ε , q ⟩} pth m ks cov (st@(_ , eq) , kept) =

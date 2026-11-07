@@ -33,7 +33,7 @@ open Machine using (Conf; load; nx; cp; absorbed) renaming (Shown to Shownᴹ)
 open import operation.Key using (Key; at; _<ᴷ_; clash)
 open import adequacy.Rows using (≼-≢; Steps; conv; Vis; Lowest; Beyond; into; back; _≃_; ≃-sym; ≃-trans; []; tau; val; fin)
 open _≃_
-open import adequacy.Simulation using (Simulation; quiet-root; module Along)
+open import adequacy.Simulation using (Simulation; quiet-root; module Along; Aimed; aimed)
 open import adequacy.Weight using (Clock; W; Wᶜ-kept; anc)
 open import adequacy.Lighten using (still-lightens)
 open import adequacy.Floor using (clock-mono)
@@ -70,7 +70,7 @@ ahead-drop {κ} {κ′} {qs = r ∷ _} h (there m) p n with κ′ <ᴷ at r in e
 -- STILL STEPS LIGHTEN: a still step's clock leaves every listed row ahead
 -- that was, so no mark weighs more at the clock it ends on.
 still-lowers : ∀ {R} (o : PureObs [] R) {rs k k′ p e} → Path (load o) rs k
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → Aimed o (cursor nothing (conv rs)) p e
              → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks)
              → Still (ks ++ anc ks) k′ k → W (ks ++ anc ks) p k′ < W (ks ++ anc ks) p k
 still-lowers o {k′ = k′} {p} pth m ks cov (st , kept) =
@@ -80,7 +80,7 @@ still-lowers o {k′ = k′} {p} pth m ks cov (st , kept) =
 -- clock passes no row at or before it, nor any ancestor of one, takes
 -- finitely many steps.
 still-finite : ∀ {R} (o : PureObs [] R) {rs k p e} → Path (load o) rs k
-             → Meets (enter (⟦ o ⟧ []ᴬ) root) (conv rs ++ [ (p , e) ])
+             → Aimed o (cursor nothing (conv rs)) p e
              → ∀ ks → (∀ {q e′} → enter (⟦ o ⟧ []ᴬ) root q e′ → q ≼ p → q ∈ ks) → Acc (Still (ks ++ anc ks)) k
 still-finite o {rs} {k} {p} pth₀ m ks cov = go (<-wellFounded (W (ks ++ anc ks) p k)) pth₀
   where
@@ -143,10 +143,10 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     --   an of's run as a full `≃` on rows, as do the subscribes and the climbs,
     --   so most silent steps drop no row and the measure never moves; a
     --   strengthened `Moves.silent` tracking dropped rows would fuel nothing.
-    silent-finite : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Acc _⇜_ k
+    silent-finite : ∀ {rs k p e} → Path (load o) rs k → Aimed o (cursor nothing (conv rs)) p e → Acc _⇜_ k
     silent-finite {rs} {k₀} {p} {e} pth₀ m = fuel _ ≤-refl (still-finite o pth₀ m ks₀ listed₀) pth₀
       where
-        few = proj₂ (proj₁ (last {c = nothing} (conv rs) m))
+        few = proj₂ (proj₁ (proj₁ m))
 
         ks₀ : List Pos
         ks₀ = p ∷ proj₁ few
@@ -181,7 +181,8 @@ module _ {R : Set} (o : PureObs [] R) (S : Simulation o) where
     progress : ∀ {rs k p e} → Path (load o) rs k → Meets t (conv rs ++ [ (p , e) ]) → Next k p e
     progress {rs} pth m =
       let (i , r) = along nothing pth i₀ t₀
-      in next (cursor nothing (conv rs)) i r (last {c = nothing} (conv rs) m) (silent-finite pth m)
+          h = last {c = nothing} (conv rs) m
+      in next (cursor nothing (conv rs)) i r h (silent-finite pth (aimed S h))
 
     -- Shown what was met so far, a run shows what is met next.
     go : ∀ {rs₀ k} → Path (load o) rs₀ k → Run t nothing (conv rs₀) → ∀ rs → Run t (cursor nothing (conv rs₀)) rs

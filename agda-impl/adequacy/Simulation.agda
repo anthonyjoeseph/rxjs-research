@@ -120,3 +120,12 @@ module Along {R : Set} {o : PureObs [] R} (S : Simulation o) where
   met-next : ∀ {c} xs {p e} → Run t c (xs ++ [ (p , e) ]) → Owed (cursor c xs) p e
   met-next []       (h ∷ []) = h
   met-next (_ ∷ xs) (_ ∷ m)  = met-next xs m
+
+-- A row a run is headed for: reached, told, past `c`; not necessarily the
+-- next one met.
+Aimed : ∀ {R} → PureObs [] R → Maybe Pos → Pos → Ev R → Set
+Aimed o c p e = Seen (enter (⟦ o ⟧ []ᴬ) root) p e × Visible e × Read.After c p
+
+-- The row met next is one a run is headed for.
+aimed : ∀ {R} {o : PureObs [] R} (S : Simulation o) {c p e} → Along.Owed S c p e → Aimed o c p e
+aimed S (s , v , a , _) = s , v , a
