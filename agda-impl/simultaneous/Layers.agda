@@ -154,11 +154,11 @@ scan-in f z s = ScanLayer.in-go f z s (ScanLayer.none)
 ------------------------------------------------------------------------
 -- Runs
 
-to≺ : ∀ {x y} → x <ᵖ y ≡ true → x ≺ y
-to≺ = Equivalence.from T-≡
+to≺ : ∀ x y → x <ᵖ y ≡ true → x ≺ y
+to≺ _ _ = Equivalence.from T-≡
 
-from≺ : ∀ {x y} → x ≺ y → x <ᵖ y ≡ true
-from≺ = Equivalence.to T-≡
+from≺ : ∀ x y → x ≺ y → x <ᵖ y ≡ true
+from≺ _ _ = Equivalence.to T-≡
 
 ≼-false : ∀ {x y} → x ≼ y → y <ᵖ x ≡ false
 ≼-false {x} {y} h with y <ᵖ x
@@ -167,7 +167,7 @@ from≺ = Equivalence.to T-≡
 
 ≼-split : ∀ {x y} → x ≼ y → x ≺ y ⊎ x ≡ y
 ≼-split {x} {y} h with <ᵖ-split x y (≼-false {x} {y} h)
-... | inj₁ lt = inj₁ (to≺ lt)
+... | inj₁ lt = inj₁ (to≺ x y lt)
 ... | inj₂ eq = inj₂ eq
 
 run-++ : ∀ {A} {t : EmissionSet A} {c xs ys} → Run t c xs → Run t (cursor c xs) ys → Run t c (xs ++ ys)
@@ -314,12 +314,12 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
   -- What lies under a row of the source lies before the rows past it.
   past-under : ∀ {q e q′ e′} → S q e → S q′ e′ → q ≺ q′ → ∀ ys → (q ++ ys) ≺ q′
-  past-under {q} {q′ = q′} x x′ lt ys = to≺ (<ᵖ-apart q q′ ys (from≺ lt) λ zs eq → ext-absurd x x′ lt eq)
+  past-under {q} {q′ = q′} x x′ lt ys = to≺ (q ++ ys) q′ (<ᵖ-apart q q′ ys (from≺ q q′ lt) λ zs eq → ext-absurd x x′ lt eq)
 
   none-under : ∀ {q e y e′} ys → S q e → S y e′ → q ≺ y → y ≼ q ++ ys → ⊥
   none-under {q} {y = y} ys x x′ lt le with ≼-split {y} {q ++ ys} le
   ... | inj₂ eq = ext-absurd x x′ lt eq
-  ... | inj₁ lt′ = ext-absurd x x′ lt (proj₂ (<ᵖ-between q y ys (from≺ lt) (from≺ lt′)))
+  ... | inj₁ lt′ = ext-absurd x x′ lt (proj₂ (<ᵖ-between q y ys (from≺ q y lt) (from≺ y (q ++ ys) lt′)))
 
   vis-end : ∀ {q e c} → S q e → Visible e → S c end → q ≼ c
   vis-end x vi y cq = pinby-vis vi (InvAt.quiet IS y x cq)
@@ -482,8 +482,8 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
       in-rest : ∀ i xs {k′ e′} → InE (ofᴱ p (suc i) xs) k′ e′ → (p ++ [ ix i ]) ≺ k′
       in-rest i xs y with of-idx p (suc i) xs y
-      ... | inj₁ (j , le , refl) = to≺ (<ᵖ-part p {ix i} {ix j} [] [] (ix-< le))
-      ... | inj₂ refl            = to≺ (<ᵖ-part p {ix i} {last} [] [] refl)
+      ... | inj₁ (j , le , refl) = to≺ (p ++ [ ix i ]) (p ++ [ ix j ]) (<ᵖ-part p {ix i} {ix j} [] [] (ix-< le))
+      ... | inj₂ refl            = to≺ (p ++ [ ix i ]) (p ++ [ last ]) (<ᵖ-part p {ix i} {last} [] [] refl)
 
       go : ∀ {c} i xs → (∀ {k e} → InE (ofᴱ p i xs) k e → InE (ofᴱ p 0 (f a)) k e) → J c i xs
          → Σ _ λ rows → Run E c rows × values rows ≡ xs × Inv (just q) (cursor c rows)
