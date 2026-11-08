@@ -365,14 +365,14 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   arrive switchᶠ          n s = cut (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
   arrive exhaustᶠ         n s = s , []
 
-  -- A lane ended holding `k` routes: handed to the queued lane rxjs
-  -- subscribes next, carried on by the flatMap's own completion, or
-  -- stopped here, with any it was handed.
+  -- A lane ended holding `k` routes: held for the queued lane rxjs
+  -- subscribes next, or for the flatMap's own completion, which carries
+  -- them; else stopped here, with any it was handed.
   ended : ∀ {B} → ℕ → N → Flat N → Out B
   ended k n s with isZero (Flat.queue s)
   ... | false = record s { held = Flat.held s + k } , []
   ... | true with Flat.finished s ∧ isZero (Flat.active s)
-  ...   | true  = s , []
+  ...   | true  = record s { held = Flat.held s + k } , []
   ...   | false = cut (k + Flat.held s) n (record s { held = 0 })
 
   -- A queued lane's burst is over: the routes it was handed stop.

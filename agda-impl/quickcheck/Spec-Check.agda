@@ -291,7 +291,8 @@ heldOf n o with whole (listT n (elaborate o) [] root)
 ... | nothing = []
 ... | just rx with whole (listT n (elab (λ i → i) o) [] root)
 ...   | just ex = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
-                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (heldᵇ (root , 0) ex) "held-elab" [])
+                  ++ unless (heldᵇ (root , 0) rx) "held-top"
+                       (unless (heldᵇ (root , 0) ex) "held-elab" (unless (shutᵇ (root , 0) [] [] (outs ex)) "held-elab-shut" []))
 ...   | nothing = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
                   ++ unless (heldᵇ (root , 0) rx) "held-top" []
 
