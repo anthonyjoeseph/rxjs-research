@@ -54,7 +54,9 @@
 --
 -- AN OVER ENDS EVERY ROUTE OF ITS INSTANT, so what a lane sends of the
 -- instant past another lane's over is dropped: a stop of a parked route
--- released once its connect is over, a begin of a reader joining there.
+-- released once its connect is over, a begin of a reader joining there,
+-- another lane's copy of the over, and the scan's own cuts.  A lane ends
+-- handing on at most the routes the scan counts of the lanes.
 -- A stop of a branch the scan counts no route of is dropped likewise.
 --
 -- The plumbing is `connect`: a source subscribes after its body, so
@@ -73,7 +75,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
@@ -342,9 +344,10 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- Routes cut: parked while a connect in scope holds a route of the
   -- instant, else stopped.
   cut : ∀ {B} → ℕ → N → Flat N → Out B
-  cut k n s with anyHolds (Flat.at s) (Flat.live s)
-  ... | true  = record s { parked = Flat.parked s + k } , []
-  ... | false = s , stops k n
+  cut k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = s , []
+  ... | false | true  = record s { parked = Flat.parked s + k } , []
+  ... | false | false = s , stops k n
 
   -- A connect in scope moved: parked routes stop once none holds one.
   unpark : ∀ {B} → N → Flat N → Out B
@@ -415,10 +418,16 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   ... | true  = s , []
   ... | false = entered b n s , instEmit (mark begin) n ∷ []
 
+  -- The instant's first over ends its routes; any later one is a copy.
+  overed : ∀ {B} → N → Flat N → Out B
+  overed n s with Flat.spent s
+  ... | true  = s , []
+  ... | false = record (anew (Flat.at s) s) { spent = true } , instEmit (mark over) n ∷ []
+
   onMark : ∀ {B} → FlatOp → Branch → Flat N → Mark → N → Out B
   onMark op b s begin      n = begun b n s
   onMark op b s stop       n = stopped b n s (if Flat.spent s then 0 else share b s)
-  onMark op b s over       n = record (anew (Flat.at s) s) { spent = true } , instEmit (mark over) n ∷ []
+  onMark op b s over       n = overed n s
   onMark op b s carry      n = record s { acc = suc (Flat.acc s) } , []
   onMark op b s outerOpen  n = arrive op n s
   onMark op b s outerClose n = s , []
@@ -427,7 +436,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
              ; queue = if Flat.popping s then Flat.queue s ∸ 1 else Flat.queue s
              ; popping = false ; dead = false } , []
   onMark op b s laneDone   n =
-    ended (Flat.acc s) n
+    ended (Flat.acc s ⊓ Flat.lanes s) n
       (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
                 ; popping = not (isZero (Flat.queue s)) ; dead = true })
   onMark op b s burstEnd   n = burstOver (isZero (Flat.held s) ∨ Flat.dead s) n s
