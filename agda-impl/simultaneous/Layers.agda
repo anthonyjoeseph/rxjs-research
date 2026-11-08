@@ -230,9 +230,11 @@ prefix-end (_ ∷ run) (refl ∷ p) (there h) = cong (_ ∷_) (prefix-end run p 
 
 ends-last : ∀ {A} {t : EmissionSet A} {c} ys {y} → Run t c (ys ++ [ y ]) → Ends (ys ++ [ y ]) → proj₂ y ≡ end
 ends-last []       _ (here eq) = eq
-ends-last (_ ∷ ys) ((((x , _) , _) , _) ∷ run) (here refl) with run-past-end x run | ys
-... | () | []
-... | () | _ ∷ _
+ends-last (_ ∷ ys) ((((x , _) , _) , _) ∷ run) (here refl) = ⊥-elim (snoc-nonempty ys (run-past-end x run))
+  where
+    snoc-nonempty : ∀ {B : Set} (zs : List B) {z} → zs ++ [ z ] ≡ [] → ⊥
+    snoc-nonempty []      ()
+    snoc-nonempty (_ ∷ _) ()
 ends-last (_ ∷ ys) (_ ∷ run) (there h) = ends-last ys run h
 
 prefix-values : ∀ {A} {xs ys : List (Pos × Ev A)} → Prefix _≡_ xs ys → Prefix _≡_ (values xs) (values ys)
@@ -342,7 +344,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   ... | inj₂ eq           = last ∷ [] , trans eq (++-assoc q [ ix 1 ] [ last ])
 
   lane-≼ : ∀ {q xs k e} → InE (ofᴱ (ln q) 0 xs) k e → q ≼ k
-  lane-≼ {q} {k = k} y with lane-at y
+  lane-≼ {q} {xs} {k = k} y with lane-at {q} {xs} y
   ... | ys , eq = ≺→≼ {q} {k} (subst (q ≺_) (sym eq) (≺-ext q ys))
 
   -- A row told of the each, by the source row it hangs under.
@@ -381,11 +383,11 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   vend-src (vend x) = x
 
   vis-under : ∀ {k q e} → Vis k q e → q ≼ k
-  vis-under (vlane _ y)   = lane-≼ y
+  vis-under (vlane {q} {a} _ y) = lane-≼ {q} {f a} y
   vis-under (vend {c} _)  = ≼-refl {c}
 
   vis-before : ∀ {k q e q′ e′} → Vis k q e → S q′ e′ → q ≺ q′ → k ≺ q′
-  vis-before {q′ = q′} (vlane x y) x′ lt with lane-at y
+  vis-before {q′ = q′} (vlane {q} {a} x y) x′ lt with lane-at {q} {f a} y
   ... | ys , eq = subst (_≺ q′) (sym eq) (past-under x x′ lt (ix 1 ∷ ys))
   vis-before (vend _) _ lt = lt
 
@@ -450,22 +452,22 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
       -- A merge row before a row anchored at `q` hangs under a source row at or before `q`.
       reachE : ∀ {k e} → Vis k q e → Reach M.JoinT k e
-      reachE {k} v = ks , pick
+      reachE {k} {e} v = ks , pick
         where
           anc : ∀ {q′ e′ k′} → S q′ e′ → q′ ≼ k′ → k′ ≺ k → q′ ≼ q
           anc {q′} {k′ = k′} x le kk qq = ≺-absurd {k} {k′} (≺-≼-≺ {k} {q′} {k′} (vis-before v x qq) le) kk
 
-          pick : ∀ {k′ e′} → M.JoinT k′ e′ → k′ ≺ k → Dep k _ k′ e′ → k′ ∈ ks
-          pick (M.val {q′} x) kk _ = val-in x (anc x (≺→≼ {q′} {q′ ++ [ ix 0 ]} (≺-ext q′ [])) kk)
-          pick (M.step {q′} x) kk _ = row-in x (anc x (≼-refl {q′}) kk)
-          pick (M.opin {q′} x) kk _ = row-in x (anc x (≼-refl {q′}) kk)
-          pick (M.oend {q′} x _) kk _ = row-in x (anc x (≼-refl {q′}) kk)
-          pick (M.opass {q′} x _) kk _ = row-in x (anc x (≼-refl {q′}) kk)
-          pick (M.lane x _ ((y , _) , _) _ _) kk _ = lane-in x (anc x (lane-≼ y) kk) y
-          pick (M.lend x _ ((y , _) , _) _ _ _) kk _ = lane-in x (anc x (lane-≼ y) kk) y
-          pick (M.lpass x _ ((y , _) , _) _ _ _) kk _ = lane-in x (anc x (lane-≼ y) kk) y
+          pick : ∀ {k′ e′} → M.JoinT k′ e′ → k′ ≺ k → Dep k e k′ e′ → k′ ∈ ks
+          pick {k′} (M.val {q′} x) kk _ = val-in x (anc {k′ = k′} x (≺→≼ {q′} {q′ ++ [ ix 0 ]} (≺-ext q′ [])) kk)
+          pick {k′} (M.step {q′} x) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
+          pick {k′} (M.opin {q′} x) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
+          pick {k′} (M.oend {q′} x _) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
+          pick {k′} (M.opass {q′} x _) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
+          pick {k′} (M.lane {q′} {a′} x _ ((y , _) , _) _ _) kk _ = lane-in x (anc {k′ = k′} x (lane-≼ {q′} {f a′} y) kk) y
+          pick {k′} (M.lend {q′} {a′} x _ ((y , _) , _) _ _ _) kk _ = lane-in x (anc {k′ = k′} x (lane-≼ {q′} {f a′} y) kk) y
+          pick {k′} (M.lpass {q′} {a′} x _ ((y , _) , _) _ _ _) kk _ = lane-in x (anc {k′ = k′} x (lane-≼ {q′} {f a′} y) kk) y
           pick (M.hand _ _ _ _ ()) _ _
-          pick (M.left x _ ((y , _) , _) _ _) kk _ = lane-in x (anc x (lane-≼ y) kk) y
+          pick {k′} (M.left {q′} {a′} x _ ((y , _) , _) _ _) kk _ = lane-in x (anc {k′ = k′} x (lane-≼ {q′} {f a′} y) kk) y
           pick (M.run () _) _ _
           pick (M.rend () _ _) _ _
           pick (M.rpass () _ _) _ _
@@ -483,12 +485,12 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       at-i : ∀ i {q′ e′} → S q′ e′ → q ≺ q′ → (p ++ [ ix i ]) ≺ q′
       at-i i {q′} x′ lt = subst (_≺ q′) (sym (++-assoc q [ ix 1 ] [ ix i ])) (past-under sq x′ lt (ix 1 ∷ ix i ∷ []))
 
-      in-rest : ∀ i xs {k′ e′} → InE (ofᴱ p (suc i) xs) k′ e′ → (p ++ [ ix i ]) ≺ k′
+      in-rest : ∀ i (xs : List Y) {k′ e′} → InE (ofᴱ p (suc i) xs) k′ e′ → (p ++ [ ix i ]) ≺ k′
       in-rest i xs y with of-idx p (suc i) xs y
       ... | inj₁ (j , le , refl) = to≺ (p ++ [ ix i ]) (p ++ [ ix j ]) (<ᵖ-part p {ix i} {ix j} [] [] (ix-< le))
       ... | inj₂ refl            = to≺ (p ++ [ ix i ]) (p ++ [ last ]) (<ᵖ-part p {ix i} {last} [] [] refl)
 
-      go : ∀ {c} i xs → (∀ {k e} → InE (ofᴱ p i xs) k e → InE (ofᴱ p 0 (f a)) k e) → J c i xs
+      go : ∀ {c} i (xs : List Y) → (∀ {k e} → InE (ofᴱ p i xs) k e → InE (ofᴱ p 0 (f a)) k e) → J c i xs
          → Σ _ λ rows → Run E c rows × values rows ≡ xs × Inv (just q) (cursor c rows)
       go {c} i [] _ (j₁ , j₂ , _) = [] , [] , refl , λ v → fin v , j₂ v
         where
@@ -514,13 +516,13 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
           v : Vis k q (out x)
           v = vlane sq (emb at-out)
           row : E k (out x)
-          row = M.lane sq tt ((emb at-out , of-reach p 0 (f a)) , ≺-ext p []) (λ ()) tt , reachE qin v
+          row = M.lane sq tt ((emb at-out , of-reach p 0 (f a) {k} {out x}) , ≺-ext p []) (λ ()) tt , reachE qin v
           mn : ∀ {k′ e′} → E k′ e′ → Visible e′ → After c k′ → k ≼ k′
-          mn y vi ak with vis y vi
+          mn {k′} y vi ak with vis y vi
           ... | q′ , v′ with j₁ v′ ak
           ...   | inj₁ (refl , b , refl , at-out)    = ≼-refl {k}
-          ...   | inj₁ (refl , b , refl , on-out y′) = ≺→≼ {k} {_} (in-rest i xs y′)
-          ...   | inj₂ lt = ≺→≼ {k} {_} (≺-≼-≺ {k} {q′} (at-i i (proj₁ (proj₂ (vis-anc v′))) lt) (vis-under v′))
+          ...   | inj₁ (refl , b , refl , on-out y′) = ≺→≼ {k} {k′} (in-rest i xs y′)
+          ...   | inj₂ lt = ≺→≼ {k} {k′} (≺-≼-≺ {k} {q′} {k′} (at-i i (proj₁ (proj₂ (vis-anc v′))) lt) (vis-under v′))
 
     -- The source run read lane by lane.
     each-go : ∀ {cS cE sc} → (∀ {r} → r ∈ sc → r ∈ whole) → Inv cS cE → Run S cS sc
@@ -551,13 +553,13 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       where
         lane-ended : ∀ {q′ a′} → S q′ (out a′) → q′ ≺ c → Ended (LaneOf F q′ a′) c
         lane-ended {q′} {a′} x′ lt =
-          ln q′ ++ [ last ] , ((of-end-row (ln q′) 0 (f a′) , of-reach (ln q′) 0 (f a′)) , ≺-ext (ln q′) []) ,
+          ln q′ ++ [ last ] , ((of-end-row (ln q′) 0 (f a′) , of-reach (ln q′) 0 (f a′) {ln q′ ++ [ last ]} {end}) , ≺-ext (ln q′) []) ,
           ≺→≼ {ln q′ ++ [ last ]} {c} (subst (_≺ c) (sym (++-assoc q′ [ ix 1 ] [ last ])) (past-under x′ x lt (ix 1 ∷ last ∷ [])))
         row : E c end
         row = M.oend x ((c , x , ≼-refl {c}) , λ x′ _ lt _ → lane-ended x′ lt) , reachE (sub (here refl)) (vend x)
         mn : ∀ {k′ e′} → E k′ e′ → Visible e′ → After cE k′ → c ≼ k′
-        mn y vi ak with vis y vi
-        ... | q′ , v′ = ≼-trans {c} {q′} {_} (lst (proj₁ (proj₂ (vis-anc v′))) (proj₂ (proj₂ (vis-anc v′))) (proj₁ (inv v′) ak)) (vis-under v′)
+        mn {k′} y vi ak with vis y vi
+        ... | q′ , v′ = ≼-trans {c} {q′} {k′} (lst (proj₁ (proj₂ (vis-anc v′))) (proj₂ (proj₂ (vis-anc v′))) (proj₁ (inv v′) ak)) (vis-under v′)
         inv-end : Inv (just c) (just c)
         inv-end {k} {q′} v = fwd v , λ lt → ≺-≼-≺ {c} {q′} {k} lt (vis-under v)
           where
