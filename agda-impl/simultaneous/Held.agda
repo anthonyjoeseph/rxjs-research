@@ -2,14 +2,16 @@
 
 -- EVERY ELABORATED STREAM KEEPS ITS ROUTES, former by former.  A stream
 -- subscribed at `p` HOLDS (`Held`) when its begins are named for their
--- instants, none lies in a burst it is exempt for, every value, stop,
--- over and end outside those bursts finds the count holding a route of
--- its own instant, and its dead instants stay dead (`Shut`).
+-- instants, every value, stop, over and end outside the bursts it is
+-- exempt for finds the count holding a route of its own instant, and its
+-- dead instants stay dead (`Shut`).
 --
 -- THE EXEMPT BURSTS are the subscribe bursts of the stream itself and of
 -- every connect it reads under, each within its own instant: what runs
 -- there runs synchronously under the subscription, so whatever route
--- covers it is held above, by the row that subscribed.
+-- covers it is held above, by the row that subscribed.  A begin may lie
+-- there: a reader subscribed inside an async instant joins the routes its
+-- source holds at the first emit it meets, in that same instant.
 --
 -- AN INSTANT'S NAME IS READ OFF THE INSTANT: the cold's step at `I`
 -- renders under a lane at `I ++ [ ix 1 ]`, where `mint` is subscribed, and
@@ -27,7 +29,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup)
 open import Data.List.Relation.Unary.Any using (Any)
-open import Data.Empty using (⊥)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_)
@@ -79,7 +80,6 @@ data Carried {A : Set} : Ev (IE A) → Set where
 record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
   field
     named   : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
-    late    : ∀ {y n} → t y (out (instEmit (mark begin) n)) → Ex cs y → ⊥
     covered : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
     shut    : Shut t

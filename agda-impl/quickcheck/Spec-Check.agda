@@ -42,12 +42,13 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
-open import denotation.EmissionSet using (Ev; end)
+open import denotation.EmissionSet using (Ev; out; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; mark)
 import simultaneous.InstEmit as M
 open import simultaneous.SObs using (Batching; module Elaborate)
 open import simultaneous.Protocol using (nameStep; subStep)
+open import simultaneous.Held using (nameOf)
 open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
@@ -55,7 +56,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elab; elaborate; Step; bstep; bstart; Routes; count)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -251,11 +252,31 @@ private
       (unless (subFirstᵇ es) "sub-first" (unless (subOneᵇ false es) "sub-one" (unless (subAsyncᵇ false es) "sub-async"
         (unless (overLastᵇ [] es) "over-last" (unless (doneLastᵇ false es) "done-last" [])))))))
 
+  -- `simultaneous.Held.Held` of the stream subscribed at the root: every
+  -- begin named for its instant, and every other row past the subscribe
+  -- frame met with a route of its own instant counted.
+  heldᵇ : Routes → Rows (IE ℕ) → Bool
+  heldᵇ K []                   = true
+  heldᵇ K ((q , out x) ∷ rs)   = row ∧ heldᵇ (count K x) rs
+    where
+      covered = does (instantOf q ≟ᵖ root) ∨ (does (proj₁ K ≟ᵖ nameOf q) ∧ not (proj₂ K ≡ᵇ 0))
+      row = if isBegin x then does (InstEmit.instant x ≟ᵖ nameOf q) else covered
+  heldᵇ K ((q , end) ∷ rs)     =
+    (does (instantOf q ≟ᵖ root) ∨ (does (proj₁ K ≟ᵖ nameOf q) ∧ not (proj₂ K ≡ᵇ 0))) ∧ heldᵇ K rs
+  heldᵇ K (_ ∷ rs)             = heldᵇ K rs
+
 -- The leaves a seed's elaborated run refutes; nothing when cut.
 protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
 protocolOf n x with whole (listT n x [] root)
 ... | just rx = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
 ... | nothing = []
+
+-- `Held` refuted at the top and at the program's own elaborated stream;
+-- nothing when cut.
+heldOf : ℕ → Obs Timeline [] ℕ → List String
+heldOf n o with whole (listT n (elaborate o) [] root) | whole (listT n (elab (λ i → i) o) [] root)
+... | just rx | just ex = unless (heldᵇ (root , 0) rx) "held-top" (unless (heldᵇ (root , 0) ex) "held-elab" [])
+... | _       | _       = []
 
 ------------------------------------------------------------------------
 -- One seed
@@ -464,7 +485,7 @@ private
 
   protoReport : List ℕ → IO Unit
   protoReport []          = putStrLn "spec-check: protocol checked"
-  protoReport (seed ∷ ss) with protocolOf (budget seed) (elaborate (plainOf seed))
+  protoReport (seed ∷ ss) with protocolOf (budget seed) (elaborate (plainOf seed)) ++ heldOf (budget seed) (plainOf seed)
   ... | []     = protoReport ss
   ... | f ∷ fs = putStrLn ("spec-check: FAIL protocol seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
                  >>= λ _ → protoReport ss
