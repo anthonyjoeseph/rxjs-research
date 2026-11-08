@@ -35,8 +35,8 @@ cuts and closer under every policy, then the connect join and the
 defer limit. Settled when each former's leaf is a body.
 
 Members: `held-flatMap`, `held-connect`, `held-connected`, `held-lim`,
-`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-scan`,
-`held-cold`, `held-of`, `held-empty`.
+`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
+`held-of`, `held-empty`.
 
 #### THE ROUTES
 

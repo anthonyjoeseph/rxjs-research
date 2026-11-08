@@ -33,6 +33,7 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
+open import denotation.Laws.Worlds using (Ok)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
 
@@ -74,6 +75,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
     shut    : Shut t
 
--- Held at every subscription, exempt for its own burst and `cs`.
-HeldD : ∀ {A} → Den (IE A) → List Pos → Set
-HeldD d cs = ∀ p → Held (enter d p) (p ∷ cs)
+-- Held at every admissible subscription, exempt for its own burst and
+-- `cs`.
+HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
+HeldD H d cs = ∀ p → Ok H p → Held (enter d p) (p ∷ cs)

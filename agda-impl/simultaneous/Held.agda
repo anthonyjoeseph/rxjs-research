@@ -24,9 +24,13 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD)
+open import denotation.Laws.Worlds using (Hots; GoodEnv)
 open import simultaneous.HeldMap using (held-map-den)
+open import simultaneous.HeldScan using (held-scan-den)
+open import simultaneous.InstEmit using (begin)
+open import Data.Product using (_,_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; elab; annotate; marked)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -47,7 +51,7 @@ record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
     env   : DenEnv Θ
     at    : Pos
     outer : List Pos
-    held  : HeldD (ev m src env) outer
+    held  : HeldD (Hots env) (ev m src env) outer
     under : ∀ {c} → c ∈ at ∷ outer → c ∈ cs
     is    : d ≡ hot (Proper (enter (ev m (annotate src) env) (at ++ [ ix 1 ])))
 
@@ -59,7 +63,7 @@ EnvHeld {Γ} ρ env cs = ∀ {X} (i : X ∈ Γ) → Bound (lookup env (ρ (∈-m
 -- elaborated tree its meaning unfolds to.
 record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor ih
-  field holds : ∀ (env : DenEnv Δ) cs → EnvHeld ρ env cs → HeldD (ev m (elab ρ o) env) cs
+  field holds : ∀ (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ o) env) cs
 
 ------------------------------------------------------------------------
 -- The formers
@@ -70,7 +74,6 @@ postulate
   held-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
   held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
   held-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
-  held-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
   held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
   held-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
                  → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
@@ -79,8 +82,12 @@ postulate
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
-held-map nothing  ρ f s (ih h) = ih λ env cs eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs eh)
-held-map (just n) ρ f s (ih h) = ih λ env cs eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs eh)
+held-map nothing  ρ f s (ih h) = ih λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
+held-map (just n) ρ f s (ih h) = ih λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh)
+
+held-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
+held-scan nothing  ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
+held-scan (just n) ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh)
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
