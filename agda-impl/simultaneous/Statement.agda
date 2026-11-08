@@ -98,13 +98,13 @@ spec o = sound , complete , ends-out , ends-in
             Σ _ λ rs′ → Σ Bool λ ov → Met (ranked (events o)) rs′ × Closes [_] (events o) rs′ ov ×
             Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴰ rs′))
     sound {rs} m with proj₁ (batchable o) m
-    ... | rx , ov , mx , cl , p with proj₁ (erases o) mx cl
+    ... | rx , ov , mx , cl , p with proj₁ (erases o) {ov = ov} mx cl
     ...   | rs′ , me , cl′ , eq = rs′ , ov , me , cl′ , subst (λ ys → Prefix _≡_ (stampedᴮ rs) (grouped ov ys)) eq p
 
     complete : ∀ {rs′ ov} → Met (ranked (events o)) rs′ → Closes [_] (events o) rs′ ov →
                Σ _ λ rs → Met (ranked (batched o)) rs × Prefix _≡_ (grouped ov (stampedᴰ rs′)) (stampedᴮ rs)
-    complete {rs′} {ov} m cl with proj₁ (proj₂ (erases o)) m cl
-    ... | rx , mx , clx , eq with proj₂ (batchable o) mx clx
+    complete {rs′} {ov} m cl with proj₁ (proj₂ (erases o)) {ov = ov} m cl
+    ... | rx , mx , clx , eq with proj₂ (batchable o) {ov = ov} mx clx
     ...   | rs , mb , p = rs , mb , subst (λ ys → Prefix _≡_ (grouped ov ys) (stampedᴮ rs)) (sym eq) p
 
     ends-out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rs′ → Met (events o) rs′ × Ends rs′ × joined rs ≡ values rs′
