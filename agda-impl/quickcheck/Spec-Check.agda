@@ -271,12 +271,16 @@ protocolOf n x with whole (listT n x [] root)
 ... | just rx = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
 ... | nothing = []
 
--- `Held` refuted at the top and at the program's own elaborated stream;
--- nothing when cut.
+-- The protocol's leaves and `Held` refuted, at the top and at the
+-- program's own elaborated stream; nothing when cut.
 heldOf : ℕ → Obs Timeline [] ℕ → List String
-heldOf n o with whole (listT n (elaborate o) [] root) | whole (listT n (elab (λ i → i) o) [] root)
-... | just rx | just ex = unless (heldᵇ (root , 0) rx) "held-top" (unless (heldᵇ (root , 0) ex) "held-elab" [])
-... | _       | _       = []
+heldOf n o with whole (listT n (elaborate o) [] root)
+... | nothing = []
+... | just rx with whole (listT n (elab (λ i → i) o) [] root)
+...   | just ex = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
+                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (heldᵇ (root , 0) ex) "held-elab" [])
+...   | nothing = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
+                  ++ unless (heldᵇ (root , 0) rx) "held-top" []
 
 ------------------------------------------------------------------------
 -- One seed
@@ -485,7 +489,7 @@ private
 
   protoReport : List ℕ → IO Unit
   protoReport []          = putStrLn "spec-check: protocol checked"
-  protoReport (seed ∷ ss) with protocolOf (budget seed) (elaborate (plainOf seed)) ++ heldOf (budget seed) (plainOf seed)
+  protoReport (seed ∷ ss) with heldOf (budget seed) (plainOf seed)
   ... | []     = protoReport ss
   ... | f ∷ fs = putStrLn ("spec-check: FAIL protocol seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
                  >>= λ _ → protoReport ss
