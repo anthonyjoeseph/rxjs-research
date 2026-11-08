@@ -19,10 +19,10 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Nullary using (does)
 open import simultaneous.Routed using (Routing; r-begin; r-over; r-subscribed; r-completed)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _⊓_; z≤n; s≤s; _<ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; +-suc; n≤1+n; ∸-monoˡ-≤; 0∸n≡0; ⊓-zeroʳ; +-identityʳ)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; +-suc; n≤1+n; ∸-monoˡ-≤; 0∸n≡0; ⊓-zeroʳ; +-identityʳ; m+n∸m≡n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat.Tactic.RingSolver using (solve-∀)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
@@ -410,3 +410,150 @@ react-sent op o (just (inj₁ (b , instEmit (value v) n))) (there i)   = none i
 react-sent op o (just (inj₁ (b , instEmit (mark m) n)))  i = onMark-sent op b m n (proj₁ o) i
 react-sent op o (just (inj₂ (j , r)))                    i = unpark-sent root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }) i
 react-sent op o nothing                                  i = none i
+
+------------------------------------------------------------------------
+-- Exactly the counters
+
+-- An input no closer sends: a begin through it.
+NoCB : ∀ {B} → Maybe (Input B) → Set
+NoCB x = ∀ {n} → x ≡ just (inj₁ (closeB , instEmit (mark begin) n)) → ⊥
+
+private
+  dec-o : ∀ {k} a b c d j → a ≡ suc j → k ≡ suc j + b + c + d → k ∸ 1 ≡ (a ∸ 1) + b + c + d
+  dec-o a b c d j refl e = cong (_∸ 1) e
+
+  same-o : ∀ {k} a b c d → a ≡ 0 → k ≡ 0 + b + c + d → k ≡ a + b + c + d
+  same-o a b c d refl e = e
+
+  same-l : ∀ {k} a b c d → b ≡ 0 → k ≡ a + 0 + c + d → k ≡ a + b + c + d
+  same-l a b c d refl e = e
+
+  lane-suc : ∀ a j c d → a + suc j + c + d ≡ suc (a + j + c + d)
+  lane-suc = solve-∀
+
+  dec-l : ∀ {k} a b c d j → b ≡ suc j → k ≡ a + suc j + c + d → k ∸ 1 ≡ a + (b ∸ 1) + c + d
+  dec-l a b c d j refl e = cong (_∸ 1) (trans e (lane-suc a j c d))
+
+  moved : ∀ {K} k t → K ≡ k + t → K ∸ k ≡ t
+  moved k t refl = m+n∸m≡n k t
+
+  zero-l : ∀ a b → a + b ≡ 0 → a ≡ 0 × b ≡ 0
+  zero-l zero zero refl = refl , refl
+
+  spent-tot : ∀ {c s} → Inv c s → Flat.spent s ≡ true → tot s ≡ 0
+  spent-tot (live sp _) e with () ← trans (sym e) sp
+  spent-tot (dead _ z)  _ = z
+
+-- `k` routes cut from a state `s′` splitting `s`'s routes off.
+cut-exact : ∀ {B c s} k n s′ → Inv c s → proj₂ c ≡ tot s → Flat.spent s′ ≡ Flat.spent s → k + tot s′ ≡ tot s
+          → proj₂ (after c (cut {B} k n s′)) ≡ tot (proj₁ (cut {B} k n s′))
+cut-exact {c = c} {s} k n s′ i e es et with Flat.spent s′ in sp′ | anyHolds (Flat.at s′) (Flat.live s′)
+... | true  | _     = trans e (trans z₀ (sym (proj₂ (zero-l k (tot s′) (trans et z₀)))))
+  where z₀ = spent-tot i (sym es)
+cut-exact {c = c} {s} k n s′ i e es et | false | true =
+  trans e (trans (sym et) (sym (park (Flat.outer s′) (Flat.lanes s′) (Flat.held s′) (Flat.parked s′) k)))
+cut-exact {c = c} {s} k n s′ i e es et | false | false =
+  trans (cong proj₂ (stops-after (proj₁ c) (proj₂ c) k n)) (moved k (tot s′) (trans e (sym et)))
+
+-- A route added: a branch's begin, of the instant or a new one.
+begun-exact : ∀ {B} b n {c} s → (b ≡ closeB → ⊥) → Inv c s → proj₂ c ≡ tot s
+            → proj₂ (after c (begun {B} b n s)) ≡ tot (proj₁ (begun {B} b n s))
+begun-exact b n s nc (live sp le) e with n ≟ᵖ Flat.at s
+... | no ne with n ≟ᵖ Flat.at s
+...   | yes eq = ⊥-elim (ne eq)
+...   | no _ with n ≟ᵖ Flat.at s
+...     | yes eq = ⊥-elim (ne eq)
+...     | no _ = new b nc
+  where
+    new : ∀ b → (b ≡ closeB → ⊥) → 1 ≡ tot (bump b suc (anew n s))
+    new outerB _  = refl
+    new laneB  _  = refl
+    new closeB nc = ⊥-elim (nc refl)
+begun-exact b n s nc (live sp le) e | yes refl rewrite sp with Flat.at s ≟ᵖ Flat.at s
+... | no ne = ⊥-elim (ne refl)
+... | yes _ with Flat.at s ≟ᵖ Flat.at s
+...   | no ne = ⊥-elim (ne refl)
+...   | yes _ = more b nc
+  where
+    more : ∀ b → (b ≡ closeB → ⊥) → suc (proj₂ _) ≡ tot (bump b suc s)
+    more outerB _  = cong suc e
+    more laneB  _  = trans (cong suc e) (sym (lane-suc (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s)))
+    more closeB nc = ⊥-elim (nc refl)
+begun-exact b n s nc (dead sp z) e with n ≟ᵖ Flat.at s
+... | no ne with n ≟ᵖ Flat.at s
+...   | yes eq = ⊥-elim (ne eq)
+...   | no _ = new b nc
+  where
+    new : ∀ b → (b ≡ closeB → ⊥) → 1 ≡ tot (bump b suc (anew n s))
+    new outerB _  = refl
+    new laneB  _  = refl
+    new closeB nc = ⊥-elim (nc refl)
+begun-exact b n s nc (dead sp z) e | yes refl rewrite sp = e
+
+stopped-exact : ∀ {B} b n s {c} → Inv c s → proj₂ c ≡ tot s
+              → proj₂ (after c (stopped {B} b n s (if Flat.spent s then 0 else share b s)))
+                ≡ tot (proj₁ (stopped {B} b n s (if Flat.spent s then 0 else share b s)))
+stopped-exact b n s (dead sp z) e rewrite sp = e
+stopped-exact outerB n s (live sp le) e rewrite sp with Flat.outer s in eq
+... | zero  = same-o (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) eq e
+... | suc j = dec-o (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) j eq e
+stopped-exact laneB n s (live sp le) e rewrite sp with Flat.lanes s in eq
+... | zero  = same-l (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) eq e
+... | suc j = dec-l (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) j eq e
+stopped-exact closeB n s (live sp le) e rewrite sp = e
+
+overed-exact : ∀ {B} n s {c} → Inv c s → proj₂ c ≡ tot s → proj₂ (after c (overed {B} n s)) ≡ tot (proj₁ (overed {B} n s))
+overed-exact n s (live sp le) e rewrite sp = refl
+overed-exact n s (dead sp z) e rewrite sp = e
+
+arrive-exact : ∀ {B} op n s {c} → Inv c s → proj₂ c ≡ tot s → proj₂ (after c (arrive {B} op n s)) ≡ tot (proj₁ (arrive {B} op n s))
+arrive-exact (mergeᶠ (just j)) n s i e with Flat.active s <ᵇ j
+... | true  = e
+... | false = e
+arrive-exact (mergeᶠ nothing) n s i e = e
+arrive-exact switchᶠ n s i e =
+  cut-exact (Flat.lanes s) n _ i e refl (lanes₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))
+arrive-exact exhaustᶠ n s i e = e
+
+ended-exact : ∀ {B c s} s₁ k n → Inv c s → proj₂ c ≡ tot s → Flat.spent s₁ ≡ Flat.spent s → k + tot s₁ ≡ tot s
+            → proj₂ (after c (ended {B} k n s₁)) ≡ tot (proj₁ (ended {B} k n s₁))
+ended-exact s₁ k n i e es et with Flat.queue s₁
+... | suc _ = trans e (trans (sym et) (sym (holdₖ (Flat.outer s₁) (Flat.lanes s₁) (Flat.held s₁) (Flat.parked s₁) k)))
+... | zero with Flat.finished s₁ | Flat.active s₁
+...   | true  | zero  = trans e (trans (sym et) (sym (holdₖ (Flat.outer s₁) (Flat.lanes s₁) (Flat.held s₁) (Flat.parked s₁) k)))
+...   | true  | suc _ = cut-exact (k + Flat.held s₁) n _ i e es (trans (cut₀ k (Flat.outer s₁) (Flat.lanes s₁) (Flat.held s₁) (Flat.parked s₁)) et)
+...   | false | _     = cut-exact (k + Flat.held s₁) n _ i e es (trans (cut₀ k (Flat.outer s₁) (Flat.lanes s₁) (Flat.held s₁) (Flat.parked s₁)) et)
+
+onMark-exact : ∀ {B} op b m n s {c} → (m ≡ begin → b ≡ closeB → ⊥) → Inv c s → proj₂ c ≡ tot s
+             → proj₂ (after c (onMark {B} op b s m n)) ≡ tot (proj₁ (onMark {B} op b s m n))
+onMark-exact op b begin      n s nc i e = begun-exact b n s (nc refl) i e
+onMark-exact op b stop       n s nc i e = stopped-exact b n s i e
+onMark-exact op b over       n s nc i e = overed-exact n s i e
+onMark-exact op b carry      n s nc i e = e
+onMark-exact op b outerOpen  n s nc i e = arrive-exact op n s i e
+onMark-exact op b outerClose n s nc i e = e
+onMark-exact op b laneStart  n s nc i e = e
+onMark-exact op b laneDone   n s nc i e =
+  ended-exact (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
+                        ; popping = not (isZero (Flat.queue s)) ; dead = true }) _ n i e refl
+    (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s))
+onMark-exact op b burstEnd   n s nc i e with isZero (Flat.held s) ∨ Flat.dead s
+... | true  = e
+... | false = cut-exact (Flat.held s) n _ i e refl (hold₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))
+onMark-exact op b outerDone  n s nc i e with isZero (Flat.active s) ∧ isZero (Flat.queue s)
+... | true  = e
+... | false = cut-exact (Flat.outer s) n _ i e refl (outer₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))
+onMark-exact op b subscribed n s nc i e = e
+onMark-exact op b completed  n s nc i e = e
+
+-- THE SCAN'S COUNT OF WHAT IT SENT IS ITS COUNTERS, unless a closer
+-- begins.
+react-exact : ∀ {B} op (o : Out B) x {c} → NoCB x → Inv c (proj₁ o) → proj₂ c ≡ tot (proj₁ o)
+            → proj₂ (after c (react op o x)) ≡ tot (proj₁ (react op o x))
+react-exact op o (just (inj₁ (b , instEmit (value v) n))) nc i e = e
+react-exact op o (just (inj₁ (b , instEmit (mark m) n)))  nc i e = onMark-exact op b m n (proj₁ o) (λ { refl refl → nc refl }) i e
+react-exact op o (just (inj₂ (j , r)))                    nc i e with anyHolds (Flat.at (proj₁ o)) (Flat.live (proj₁ o))
+... | true  = e
+... | false = trans (cong proj₂ (stops-after (proj₁ _) (proj₂ _) (Flat.parked (proj₁ o)) root))
+                    (moved (Flat.parked (proj₁ o)) _ (trans e (sym (unpark₀ (Flat.outer (proj₁ o)) (Flat.lanes (proj₁ o)) (Flat.held (proj₁ o)) (Flat.parked (proj₁ o))))))
+react-exact op o nothing                                  nc i e = e
