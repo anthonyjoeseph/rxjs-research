@@ -26,17 +26,26 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE HELD STREAMS
+
+Untried: every elaborated stream names its begins for their instants,
+counts a route of its own instant under every row outside the bursts it
+is exempt for, and keeps dead instants dead. Hardest: flatMap's parked
+cuts and closer under every policy, then the connect join and the
+defer limit. Settled when each former's leaf is a body.
+
+Members: `held-flatMap`, `held-connect`, `held-connected`, `held-lim`,
+`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-scan`,
+`held-map`, `held-cold`, `held-of`, `held-empty`.
+
 #### THE ROUTES
 
-Untried: once the top's exact count holds no route of an instant, no
-value of it follows; an instant's values precede its overs; the run
-leaves an instant once nothing of it is held; a closed instant's batch
-meets a releasing mark before any value. Hardest: a per-stream count
-invariant through every flatMap policy, connect join and parked cut, and
-the liveness `releases` asks for. Settled when `shut` is a body by
-former.
+Untried: an instant's values precede its overs; the run leaves an
+instant once nothing of it is held; a closed instant's batch meets a
+releasing mark before any value. Hardest: the liveness `releases` asks
+for.
 
-Members: `shut`, `over-last`, `flush-closes`, `releases`.
+Members: `over-last`, `flush-closes`, `releases`.
 
 #### THE BURST
 
