@@ -33,7 +33,7 @@ their instant, a new instant only after the last is over, the run
 leaving an instant once nothing of it is held. Hardest: the bracket and
 route protocol through every flatMap policy and connect.
 
-Members: `good-run`, `flush-closes`, `closes-flush`, `completed-last`.
+Members: `good-run`, `flush-closes`, `closes-flush`.
 
 #### THE ERASURE
 
