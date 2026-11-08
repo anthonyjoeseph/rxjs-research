@@ -246,10 +246,32 @@ private
       (flatMap (mergeᶠ (just 1)) (λ v → if v ≡ᵇ 1 then connected (here refl) else of (v * 10 ∷ []))
         (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ [])) (connected (here refl)))))
 
+  -- Every early reader of `h` cut while a lane reading it late is yet to
+  -- meet its next emit:
+  -- `timer(1).pipe(mergeMap(() => of(1, 2, 3)), connect(h => merge(
+  --    h.pipe(takeWhile(v => v < 2), mergeMap(() => h)), h.pipe(takeWhile(v => v < 2)))))`
+  -- [1, 2, 3]
+  lazyCut : Obs Timeline [] ℕ
+  lazyCut = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))
+    (merge (flatMap (mergeᶠ nothing) (λ _ → connected (here refl)) (takeWhile false (λ v → v <ᵇ 2) (connected (here refl))))
+           (takeWhile false (λ v → v <ᵇ 2) (connected (here refl))))
+
+  -- The same, the late reader a queued lane, queued an instant before:
+  -- `timer(3).pipe(mergeMap(() => of(1, 2, 3)), connect(h => merge(h.pipe(takeWhile(v => v < 2)),
+  --    timer(1).pipe(mergeMap(() => of(0, 1)), concatMap(x => x === 0 ? h.pipe(takeWhile(v => v < 2)) : h)))))`
+  -- [1, 1, 3]
+  queueCut : Obs Timeline [] ℕ
+  queueCut = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 3 z≤n (emit 0 (close over))))))
+    (merge (takeWhile false (λ v → v <ᵇ 2) (connected (here refl)))
+      (flatMap (mergeᶠ (just 1)) (λ x → if x ≡ᵇ 0 then takeWhile false (λ v → v <ᵇ 2) (connected (here refl)) else connected (here refl))
+        (flatMap (mergeᶠ nothing) (λ _ → of (0 ∷ 1 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))))
+
   pins : List (String × Obs Timeline [] ℕ × List (List ℕ))
   pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
        ∷ ("cut-shared" , cutShared , (2 ∷ 3 ∷ 3 ∷ []) ∷ [])
        ∷ ("end-handed" , endHanded , (5 ∷ 20 ∷ []) ∷ [])
+       ∷ ("lazy-cut" , lazyCut , (1 ∷ 2 ∷ 3 ∷ []) ∷ [])
+       ∷ ("queue-cut" , queueCut , (1 ∷ 1 ∷ 3 ∷ []) ∷ [])
        ∷ ("raw" , raw , (1 ∷ 2 ∷ []) ∷ (3 ∷ []) ∷ (4 ∷ []) ∷ [])
        ∷ ("spread" , spread , (1 ∷ 2 ∷ 3 ∷ 2 ∷ 3 ∷ 4 ∷ []) ∷ (3 ∷ 4 ∷ 5 ∷ []) ∷ (4 ∷ 5 ∷ 6 ∷ []) ∷ [])
        ∷ []
