@@ -316,7 +316,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   past-under : ∀ {q e q′ e′} → S q e → S q′ e′ → q ≺ q′ → ∀ ys → (q ++ ys) ≺ q′
   past-under {q} {q′ = q′} x x′ lt ys = to≺ (q ++ ys) q′ (<ᵖ-apart q q′ ys (from≺ q q′ lt) λ zs eq → ext-absurd x x′ lt eq)
 
-  none-under : ∀ {q e y e′} ys → S q e → S y e′ → q ≺ y → y ≼ q ++ ys → ⊥
+  none-under : ∀ {q e y e′} ys → S q e → S y e′ → q ≺ y → y ≼ (q ++ ys) → ⊥
   none-under {q} {y = y} ys x x′ lt le with ≼-split {y} {q ++ ys} le
   ... | inj₂ eq = ext-absurd x x′ lt eq
   ... | inj₁ lt′ = ext-absurd x x′ lt (proj₂ (<ᵖ-between q y ys (from≺ q y lt) (from≺ y (q ++ ys) lt′)))
