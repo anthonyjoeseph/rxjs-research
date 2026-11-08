@@ -296,6 +296,14 @@ private
   currentᵇ K ((q , end) ∷ rs)   = ((proj₂ K ≡ᵇ 0) ∨ does (proj₁ K ≟ᵖ nameOf q)) ∧ currentᵇ K rs
   currentᵇ K (_ ∷ rs)           = currentᵇ K rs
 
+  -- A whole run left silent holds no route: its last row is its end, or
+  -- finds every route closed.
+  closesᵇ : Routes → Rows (IE ℕ) → Bool
+  closesᵇ K []                 = proj₂ K ≡ᵇ 0
+  closesᵇ K ((q , out x) ∷ rs) = closesᵇ (count K x) rs
+  closesᵇ K ((q , end) ∷ rs)   = true
+  closesᵇ K (_ ∷ rs)           = closesᵇ K rs
+
   phaseᵇ : Rows (IE ℕ) → Bool
   phaseᵇ []                 = true
   phaseᵇ ((q , out x) ∷ rs) = row ∧ phaseᵇ rs
@@ -321,9 +329,11 @@ heldOf n o with whole (listT n (elaborate o) [] root)
                   ++ unless (heldᵇ (root , 0) rx) "held-top"
                        (unless (heldᵇ (root , 0) ex) "held-elab" (unless (shutᵇ (root , 0) [] [] (outs ex)) "held-elab-shut"
                          (unless (phaseᵇ rx) "held-top-phase" (unless (phaseᵇ ex) "held-elab-phase"
-                           (unless (currentᵇ (root , 0) rx) "held-top-current" (unless (currentᵇ (root , 0) ex) "held-elab-current" []))))))
+                           (unless (currentᵇ (root , 0) rx) "held-top-current" (unless (currentᵇ (root , 0) ex) "held-elab-current"
+                             (unless (closesᵇ (root , 0) rx) "held-top-closes" (unless (closesᵇ (root , 0) ex) "held-elab-closes" []))))))))
 ...   | nothing = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
-                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (phaseᵇ rx) "held-top-phase" (unless (currentᵇ (root , 0) rx) "held-top-current" []))
+                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (phaseᵇ rx) "held-top-phase" (unless (currentᵇ (root , 0) rx) "held-top-current"
+                       (unless (closesᵇ (root , 0) rx) "held-top-closes" [])))
 
 ------------------------------------------------------------------------
 -- One seed
