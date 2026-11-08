@@ -48,8 +48,11 @@ Members: `outer-current`, `lanes-current`, `held-current`, `parked-current`, `va
 
 Untried: the run leaves an
 instant once nothing of it is held; a closed instant's batch meets a
-releasing mark before any value. Hardest: the liveness `releases` asks
-for.
+releasing mark before any value. Hardest: `releases`, a liveness fact:
+a held batch means a route of its instant open at the top, and an open
+route reaches its stop or over, or the run its completion or a later
+begin. A completion's routes stop at the first flatMap that outlives
+it, or at the top's own completion.
 
 Members: `flush-closes`, `releases`.
 
