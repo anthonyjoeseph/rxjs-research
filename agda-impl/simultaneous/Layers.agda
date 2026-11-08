@@ -338,12 +338,12 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   seenS {e = skip}  _ ()
   seenS {e = pin _} _ ()
 
-  lane-at : ∀ {q xs k e} → InE (ofᴱ (ln q) 0 xs) k e → Σ Pos λ ys → k ≡ q ++ ix 1 ∷ ys
+  lane-at : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → Σ Pos λ ys → k ≡ q ++ ix 1 ∷ ys
   lane-at {q} {xs} y with of-idx (ln q) 0 xs y
   ... | inj₁ (j , _ , eq) = ix j ∷ [] , trans eq (++-assoc q [ ix 1 ] [ ix j ])
   ... | inj₂ eq           = last ∷ [] , trans eq (++-assoc q [ ix 1 ] [ last ])
 
-  lane-≼ : ∀ {q xs k e} → InE (ofᴱ (ln q) 0 xs) k e → q ≼ k
+  lane-≼ : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → q ≼ k
   lane-≼ {q} {xs} {k = k} y with lane-at {q} {xs} y
   ... | ys , eq = ≺→≼ {q} {k} (subst (q ≺_) (sym eq) (≺-ext q ys))
 
