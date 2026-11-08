@@ -19,7 +19,7 @@ open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Nat using (_<_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ++-identityʳ; ++-conicalˡ; ∷-injective; ∷-injectiveˡ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_; []; lookup)
@@ -28,10 +28,11 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; Label; ix; sub; last; tick; inside; inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
-open import denotation.EmissionSet using (Ev; end; pin; Silent; held; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; held; Unpinned; Dep; Few; Rejoin; shown; heard; ended; late; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false; entered-few)
 
 -- A label that opens no subscription.
 data Plain : Label → Set where
@@ -138,9 +139,34 @@ Hots []           = λ _ → ⊥
 Hots (hot t ∷ ρ)  = Hots ρ ⊕ t
 Hots (coldAt _ ∷ ρ) = Hots ρ
 
--- A LAWFUL ENVIRONMENT: every handle keeps the invariant.
+-- A HANG SHOWS: past a position, a reader that reaches few rows before it
+-- finds few rows of any kind there.  A row with infinitely many rows
+-- before it is cut, so only an infinite chain of rows, each cut for the
+-- ones below it, could hide a hang from the reader.
+Shows : ∀ {A} → EmissionSet A → Set
+Shows X = ∀ {v} → (Σ (List Pos) λ ks → ∀ {k e} → X k e → Few X k → k ≺ v → k ∈ ks) → ¬ ¬ Few X v
+
+-- Anything but a pin waits on every row before it.
+full : ∀ {X q} {e : Ev X} → Unpinned e → ∀ {k e′} → Dep q e k e′
+full {e = out _} _ = tt
+full {e = skip}  _ = tt
+full {e = end}   _ = tt
+full {e = pin _} ()
+
+-- A joined hot pins nothing, so each row it shows has few before it.
+hot-shows : ∀ {A} (t : EmissionSet A) p → Shows (enter (hot t) p)
+hot-shows t p (ks , h) ¬f = ¬f (ks , λ x lt → h x (entered-few (hot t) p (full (un (proj₁ x))) x) lt)
+  where
+    un : ∀ {q e} → Rejoin p t q e → Unpinned e
+    un (shown {e = out _} _ _ _) = tt
+    un (shown {e = skip} _ _ _)  = tt
+    un (heard _ _)               = tt
+    un (ended _ _)               = tt
+    un (late _ _)                = tt
+
+-- A LAWFUL ENVIRONMENT: every handle keeps the invariant, and shows its hangs.
 GoodEnv : ∀ {Γ} → DenEnv Γ → Set₁
-GoodEnv {Γ} ρ = ∀ {A} (i : A ∈ Γ) → InvD (Hots ρ) (lookup ρ i)
+GoodEnv {Γ} ρ = ∀ {A} (i : A ∈ Γ) → InvD (Hots ρ) (lookup ρ i) × (∀ p → Shows (enter (lookup ρ i) p))
 
 ------------------------------------------------------------------------
 -- Reachability

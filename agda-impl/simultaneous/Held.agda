@@ -24,13 +24,15 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
-open import denotation.Laws.Worlds using (Hots; GoodEnv)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
-open import simultaneous.HeldConnect using (held-conn; early-snoc; Shows)
+open import simultaneous.HeldConnect using (held-conn; early-snoc)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Ok; InvD; Lawful; TimerRoot; _⊕_; plain-untimed; plain-ix)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
+open import denotation.Laws.Shows using (k-shows)
+open import denotation.Laws.ShowsEv using (sk-⟦⟧; sk-approx)
 open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
@@ -127,13 +129,11 @@ widen b = record
   ; held = Bound.held b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
 
 -- EVERY HANG SHOWS: past a position, a reader reaching few rows before
--- it finds few rows there.  A row cut for an infinite wait has a row below
--- it cut too; the doubt is an infinite chain of rows, each cut for the
--- next one down, read past by a row that waits on none of them.  A hot
--- source's rows are rejoined unpinned, so only a program's own pins chain.
-postulate
-  shows-ev : ∀ m {Δ X} (A′ : Obs Timeline Δ X) (env : DenEnv Δ) → GoodEnv env → ∀ p → Ok (Hots env) p
-           → Shows (enter (ev m A′ env) p)
+-- it finds few rows there, for every size of the reach.
+shows-ev : ∀ m {Δ X} (A′ : Obs Timeline Δ X) (env : DenEnv Δ) → GoodEnv env → ∀ p → Ok (Hots env) p
+         → Shows (enter (ev m A′ env) p)
+shows-ev nothing  A′ env g p ok = k-shows λ n → sk-⟦⟧ n A′ env g p ok
+shows-ev (just k) A′ env g p ok = k-shows λ n → sk-approx n k A′ env g p ok
 
 -- A connect shows its body, read over its source made hot.
 conn-ev : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) cs → GoodEnv env

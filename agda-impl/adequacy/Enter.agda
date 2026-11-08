@@ -282,17 +282,13 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
   module Bo (m : ℕ) where
     open BoundedI (JInv.ok ji) m f′ (JInv.fi ji) Io
       using (V; v-o; v-val; v-l; vw; lr; Lr; lr-row; lr-hand; Rel; apart; queued-in; rel; child-in; nest-under; row-not-c; lane-end;
-             module LK; LI; sub-fun; row-w; s-w; seat*; seat′)
+             module LK; LI; sub-fun; row-w; s-w; seat*; seat′) renaming (sub-same to same)
     open J.View (Bounded.Done m f′ O) (λ _ _ _ → ⊤) using (o-nout)
     open Nths O using (nth-inj; nth-val)
 
     Sub : ℕ → Pos → Pos → A → Set
     Sub = Bounded.Sub m f′ O
 
-    same : ∀ {i i′ q′ s₁ s₂ a a′} → Sub i q′ s₁ a → Sub i′ q′ s₂ a′ → s₁ ≡ s₂
-    same sb sb′ with nth-inj (proj₁ sb) (proj₁ sb′)
-    ... | refl with sub-fun sb sb′
-    ...   | _ , _ , eq = eq
 
     -- Under a lane's queued end's second child, against the lane.
     nu⁼ : ∀ {j qj sj aj c x l w y} → Sub j qj sj aj → After (f′ aj) sj c end → Bounded.Queued m f′ O c → Lr aj sj x → Plain l
@@ -368,7 +364,7 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
   -- A lane's rows lie past its start.
   past : ∀ op {q′ a s′ r e} → Start (polF op f′ O) q′ a s′ → Lane (polF op f′ O) q′ a r e → enter (f′ a) s′ r e × s′ ≺ r
   past (mergeᶠ nothing)  refl l = l
-  past (mergeᶠ (just m)) (_ , sb) (_ , _ , sb′ , ac) with Bo.same m sb sb′
+  past (mergeᶠ (just m)) (_ , sb) (_ , _ , sb′ , ac) with BoundedI.sub-same (JInv.ok ji) m f′ (JInv.fi ji) Io sb sb′
   ... | refl = ac
   past switchᶠ           refl l = l
   past exhaustᶠ          refl l = l

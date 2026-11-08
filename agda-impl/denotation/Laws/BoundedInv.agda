@@ -178,6 +178,11 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   sub-fun (nq , st) (nq′ , st′) with nth-fun nq nq′
   ... | refl = refl , out-inj (fu (nth-val nq) (nth-val nq′)) , starts-fun st st′
 
+  -- One value, one lane: whatever its index.
+  sub-same : ∀ {i i′ q s s′ a a′} → Sub i q s a → Sub i′ q s′ a′ → s ≡ s′
+  sub-same sb sb′ with nth-inj (proj₁ sb) (proj₁ sb′)
+  ... | refl = proj₂ (proj₂ (sub-fun sb sb′))
+
   ------------------------------------------------------------------------
   -- Where a lane sits
 

@@ -381,20 +381,20 @@ limit {A} {c = c} ch k p r = top
 Aft : ∀ {A} → (Pos → Set) → Den A → Set
 Aft R s = ∀ p → R p → ∀ {y e} → enter s (p ++ [ ix 1 ]) y e → (p ++ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ++ [ ix 1 ]) ≼ r)
 
+-- One of `ks`, and the rest.
+pick : ∀ {P : Pos → Set} {ks} → Any P ks
+     → Σ Pos λ x → P x × Σ (List Pos) λ ks′ → suc (length ks′) ≡ length ks × (∀ {b} → Any (b ⊑_) ks → b ⊑ x ⊎ Any (b ⊑_) ks′)
+pick {ks = x ∷ ks} (here px) = x , px , ks , refl , λ { (here b) → inj₁ b ; (there a) → inj₂ a }
+pick {ks = y ∷ ks} (there a) with pick a
+... | x , px , ks′ , eq , sp = x , px , y ∷ ks′ , cong suc eq , λ
+  { (here b) → inj₂ (here b)
+  ; (there a′) → map₂ there (sp a′) }
+
+-- Under the guard: before the body.
+under-guard : ∀ p {b} → (p ++ [ ix 0 ]) ⊑ b → b ≺ (p ++ [ ix 1 ])
+under-guard p (zs , refl) = subst (_≺ (p ++ [ ix 1 ])) (sym (++-assoc p [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p zs [] refl))
+
 private
-  -- One of `ks`, and the rest.
-  pick : ∀ {P : Pos → Set} {ks} → Any P ks
-       → Σ Pos λ x → P x × Σ (List Pos) λ ks′ → suc (length ks′) ≡ length ks × (∀ {b} → Any (b ⊑_) ks → b ⊑ x ⊎ Any (b ⊑_) ks′)
-  pick {ks = x ∷ ks} (here px) = x , px , ks , refl , λ { (here b) → inj₁ b ; (there a) → inj₂ a }
-  pick {ks = y ∷ ks} (there a) with pick a
-  ... | x , px , ks′ , eq , sp = x , px , y ∷ ks′ , cong suc eq , λ
-    { (here b) → inj₂ (here b)
-    ; (there a′) → map₂ there (sp a′) }
-
-  -- Under the guard: before the body.
-  under-guard : ∀ p {b} → (p ++ [ ix 0 ]) ⊑ b → b ≺ (p ++ [ ix 1 ])
-  under-guard p (zs , refl) = subst (_≺ (p ++ [ ix 1 ])) (sym (++-assoc p [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p zs [] refl))
-
   ix-past : ∀ p j → (p ++ [ ix 1 ]) ≼ (p ++ [ ix (suc j) ])
   ix-past p zero    = ≼-refl {p ++ [ ix 1 ]}
   ix-past p (suc j) = ≺→≼ {p ++ [ ix 1 ]} {p ++ [ ix (suc (suc j)) ]} (Equivalence.from T-≡ (<ᵖ-part p [] [] refl))

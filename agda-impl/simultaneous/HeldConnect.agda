@@ -26,7 +26,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; 
 open import Relation.Nullary using (¬_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
-open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Real; TimerRoot; _⊕_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans;
+open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; Real; TimerRoot; _⊕_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans;
   ⊑-inside; world-after; world-after⁼; in-world)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
@@ -120,13 +120,6 @@ vis-dep : ∀ {A} {q} {e : Ev A} → Visible e → ∀ {k e′} → denotation.E
 vis-dep {e = out _} _ = tt
 vis-dep {e = end}   _ = tt
 
--- A HANG SHOWS: past a position, a reader that reaches few rows before it
--- finds few rows of any kind there.  A row with infinitely many rows
--- before it is cut, so only an infinite chain of rows, each cut for the
--- ones below it, could hide a hang from the reader.
-Shows : ∀ {A} → EmissionSet A → Set
-Shows X = ∀ {v} → (Σ (List Pos) λ ks → ∀ {k e} → X k e → Few X k → k ≺ v → k ∈ ks) → ¬ ¬ Few X v
-
 -- One step past each keeps the order.
 shift : ∀ z′ z → (z′ ++ [ ix 0 ]) ≺ (z ++ [ ix 0 ]) → z′ ≺ z
 shift z′ z lt with z′ <ᵖ z in e
@@ -135,13 +128,6 @@ shift z′ z lt with z′ <ᵖ z in e
 
 next : ∀ z′ z → z′ ≺ z → (z′ ++ [ ix 0 ]) ≺ (z ++ [ ix 0 ])
 next z′ z lt = Equivalence.from T-≡ (<ᵖ-next z′ z (ix 0) (Equivalence.to T-≡ lt))
-
--- Anything but a pin waits on every row before it.
-full : ∀ {X q} {e : Ev X} → Unpinned e → ∀ {k e′} → Dep q e k e′
-full {e = out _} _ = tt
-full {e = skip}  _ = tt
-full {e = end}   _ = tt
-full {e = pin _} ()
 
 module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
                (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) (p : Pos) (ok : Ok H p)

@@ -8,7 +8,7 @@
 -- pin.
 module denotation.Laws.TakeInv where
 
-open import Data.Bool using (Bool; T; true; false; not)
+open import Data.Bool using (Bool; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_])
@@ -22,15 +22,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; <ᵖ-part; <ᵖ-split; <ᵖ-apart)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; module TakeWhile; module Op)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻; ≼-≺-≺)
+open import denotation.Laws.Modulus using (T-not; ≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻; ≼-≺-≺)
 open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD; ⊑-refl;
   ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼; PinBy)
 
 private
-  T-not : ∀ {b} → T b → T (not b) → ⊥
-  T-not {true}  _ ()
-  T-not {false} ()
-
   module TI {A H p} (incl : Bool) (keep : A → Bool) {t : EmissionSet A} (I : InvAt H p t) where
     open TakeWhile incl keep t
 

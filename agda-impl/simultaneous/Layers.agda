@@ -27,14 +27,15 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _�
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
 open import Tree using (Obs; scan; map; of; mergeᶠ)
-open import denotation.Events using (Timeline; Pos; root; fresh; _≟ᵖ_; _<ᵖ_; ix; last; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<; <ᵖ-split)
+open import denotation.Events using (Timeline; Pos; root; fresh; _≟ᵖ_; _<ᵖ_; ix; last; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge; module Bounded; module Values; MapT; map-out; map-end; map-skip; map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.Worlds using (InvAt; PinBy)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-end; of-end-row; of-idx)
-open import denotation.Laws.Modulus using (≼-false; ≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
+open import denotation.Laws.Modulus using (≼-split; ≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼;
+  ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
 open import denotation.Laws.Fold using (fold)
 open import adequacy.SubOne using (scan-reach; map-reach; lift-in)
 open import adequacy.SubJoin using (of-rows; of-in; of-reach)
@@ -181,10 +182,6 @@ to≺ _ _ = Equivalence.from T-≡
 from≺ : ∀ x y → x ≺ y → x <ᵖ y ≡ true
 from≺ _ _ = Equivalence.to T-≡
 
-≼-split : ∀ {x y} → x ≼ y → x ≺ y ⊎ x ≡ y
-≼-split {x} {y} h with <ᵖ-split x y (≼-false {x} {y} h)
-... | inj₁ lt = inj₁ (to≺ x y lt)
-... | inj₂ eq = inj₂ eq
 
 run-++ : ∀ {A} {t : EmissionSet A} {c xs ys} → Run t c xs → Run t (cursor c xs) ys → Run t c (xs ++ ys)
 run-++ []        r = r
