@@ -28,12 +28,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE HANG SHOWS
 
-Untried: a connect's rows before a position few of its rows precede are
-read, so no hidden hang cuts them. Suspect under nested truncation: an
-infinite chain of rows each cut for the next one down, read past by a
-later row. Settled by a body over `Reach`, or a program refuting it.
+Untried: past a position, a reader reaching few rows before it finds few
+rows there. Suspect under nested truncation: an infinite chain of pins,
+each cut for the next one down, read past by a later row. Settled by a
+body by operator over `Reach`, or a program refuting it.
 
-Members: `conn-seen`.
+Members: `shows-ev`.
 
 #### THE HELD STREAMS
 
@@ -47,9 +47,9 @@ before a later instant's first row; then which rows the source meets
 former's leaf is a body.
 
 Members: `start-current`, `value-open`, `over-open`, `end-open`,
-`comb-shut`, `walk`, `inv-past`, `step-local`, `m-rows`, `lane-ends`,
+`comb-shut`, `walk`, `step-local`, `m-rows`, `lane-ends`,
 `close-ends`, `lane-named`, `lane-early`, `lane-late`,
-`close-marks`, `comb-held`, `held-connected`, `held-lim`,
+`close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
 `held-of`, `held-empty`.
 

@@ -13,7 +13,11 @@ module simultaneous.FlatSim where
 open import Data.Bool using (true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.List using ([])
 import Data.List as L
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Relation.Nullary using (does)
+open import simultaneous.Routed using (Routing; r-begin; r-over; r-subscribed; r-completed)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _⊓_; z≤n; s≤s; _<ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; +-suc; n≤1+n; ∸-monoˡ-≤; 0∸n≡0; ⊓-zeroʳ; +-identityʳ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -307,3 +311,102 @@ react-inv op o (just (inj₁ (b , instEmit (value v) n))) (dead sp z)  = dead sp
 react-inv op o (just (inj₁ (b , instEmit (mark m) n)))  i = onMark-inv op b m n (proj₁ o) i
 react-inv op o (just (inj₂ (j , r)))                    i = unpark-hand (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }) root refl refl refl i
 react-inv op o nothing                                  i = i
+
+------------------------------------------------------------------------
+-- What the scan sends
+
+-- WHAT THE SCAN SENDS is a stop, or what it read: a value, or a mark read
+-- above every flatMap.
+data Sent {B} (x : Maybe (Input B)) : IE B → Set where
+  passed  : ∀ {b v n} → x ≡ just (inj₁ (b , instEmit (value v) n)) → Sent x (instEmit (value v) n)
+  routed  : ∀ {b m n} → Routing m → x ≡ just (inj₁ (b , instEmit (mark m) n)) → Sent x (instEmit (mark m) n)
+  minted  : ∀ {n} → Sent x (instEmit (mark stop) n)
+
+private
+  none : ∀ {A P : Set} {v : A} → v ∈ [] → P
+  none ()
+
+  stops-sent : ∀ {B} {x : Maybe (Input B)} k n {v} → v ∈ stops {B} k n → Sent x v
+  stops-sent (suc k) n (here refl) = minted
+  stops-sent (suc k) n (there i)   = stops-sent k n i
+
+  cut-sent : ∀ {B} {x : Maybe (Input B)} k n s {v} → v ∈ proj₂ (cut {B} k n s) → Sent x v
+  cut-sent k n s i with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = none i
+  ... | false | true  = none i
+  ... | false | false = stops-sent k n i
+
+  unpark-sent : ∀ {B} {x : Maybe (Input B)} n s {v} → v ∈ proj₂ (unpark {B} n s) → Sent x v
+  unpark-sent n s i with anyHolds (Flat.at s) (Flat.live s)
+  ... | true  = none i
+  ... | false = stops-sent (Flat.parked s) n i
+
+  arrive-sent : ∀ {B} {x : Maybe (Input B)} op n s {v} → v ∈ proj₂ (arrive {B} op n s) → Sent x v
+  arrive-sent (mergeᶠ (just k)) n s i with Flat.active s <ᵇ k
+  ... | true  = none i
+  ... | false = none i
+  arrive-sent (mergeᶠ nothing) n s i = none i
+  arrive-sent switchᶠ n s i = cut-sent (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }) i
+  arrive-sent exhaustᶠ n s i = none i
+
+  ended-sent : ∀ {B} {x : Maybe (Input B)} k n s {v} → v ∈ proj₂ (ended {B} k n s) → Sent x v
+  ended-sent k n s i with Flat.queue s
+  ... | suc _ = none i
+  ... | zero with Flat.finished s | Flat.active s
+  ...   | true  | zero  = none i
+  ...   | true  | suc _ = cut-sent (k + Flat.held s) n (record s { held = 0 }) i
+  ...   | false | _     = cut-sent (k + Flat.held s) n (record s { held = 0 }) i
+
+  burst-sent : ∀ {B} {x : Maybe (Input B)} h n s {v} → v ∈ proj₂ (burstOver {B} h n s) → Sent x v
+  burst-sent true  n s i = none i
+  burst-sent false n s i = cut-sent (Flat.held s) n (record s { held = 0 }) i
+
+  left-sent : ∀ {B} {x : Maybe (Input B)} n s {v} → v ∈ proj₂ (left {B} n s) → Sent x v
+  left-sent n s i with isZero (Flat.active s) ∧ isZero (Flat.queue s)
+  ... | true  = none i
+  ... | false = cut-sent (Flat.outer s) n (record s { outer = 0 }) i
+
+  begun-sent : ∀ {B b} n s {v} → v ∈ proj₂ (begun {B} b n s) → Sent (just (inj₁ (b , instEmit (mark begin) n))) v
+  begun-sent {b = b} n s i with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
+  ... | true  = none i
+  ... | false with i
+  ...   | here refl = routed r-begin refl
+  ...   | there j   = none j
+
+  stopped-sent : ∀ {B} {x : Maybe (Input B)} b n s k {v} → v ∈ proj₂ (stopped {B} b n s k) → Sent x v
+  stopped-sent b n s zero    i         = none i
+  stopped-sent b n s (suc k) (here refl) = minted
+  stopped-sent b n s (suc k) (there i)   = none i
+
+  overed-sent : ∀ {B b} n s {v} → v ∈ proj₂ (overed {B} n s) → Sent (just (inj₁ (b , instEmit (mark over) n))) v
+  overed-sent n s i with Flat.spent s
+  ... | true  = none i
+  ... | false with i
+  ...   | here refl = routed r-over refl
+  ...   | there j   = none j
+
+  onMark-sent : ∀ {B} op b m n s {v} → v ∈ proj₂ (onMark {B} op b s m n) → Sent (just (inj₁ (b , instEmit (mark m) n))) v
+  onMark-sent op b begin      n s i = begun-sent n s i
+  onMark-sent op b stop       n s i = stopped-sent b n s (if Flat.spent s then 0 else share b s) i
+  onMark-sent op b over       n s i = overed-sent n s i
+  onMark-sent op b carry      n s i = none i
+  onMark-sent op b outerOpen  n s i = arrive-sent op n s i
+  onMark-sent op b outerClose n s i = none i
+  onMark-sent op b laneStart  n s i = none i
+  onMark-sent op b laneDone   n s i =
+    ended-sent (Flat.acc s ⊓ Flat.lanes s) n
+      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
+                ; popping = not (isZero (Flat.queue s)) ; dead = true }) i
+  onMark-sent op b burstEnd   n s i = burst-sent (isZero (Flat.held s) ∨ Flat.dead s) n s i
+  onMark-sent op b outerDone  n s i = left-sent n (record s { finished = true }) i
+  onMark-sent op b subscribed n s (here refl) = routed r-subscribed refl
+  onMark-sent op b subscribed n s (there i)   = none i
+  onMark-sent op b completed  n s (here refl) = routed r-completed refl
+  onMark-sent op b completed  n s (there i)   = none i
+
+react-sent : ∀ {B} op (o : Out B) x {v} → v ∈ proj₂ (react op o x) → Sent x v
+react-sent op o (just (inj₁ (b , instEmit (value v) n))) (here refl) = passed refl
+react-sent op o (just (inj₁ (b , instEmit (value v) n))) (there i)   = none i
+react-sent op o (just (inj₁ (b , instEmit (mark m) n)))  i = onMark-sent op b m n (proj₁ o) i
+react-sent op o (just (inj₂ (j , r)))                    i = unpark-sent root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }) i
+react-sent op o nothing                                  i = none i

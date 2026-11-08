@@ -11,7 +11,7 @@ module simultaneous.Relabel where
 open import Data.List using (List; []; _∷_; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
@@ -22,7 +22,6 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.Maybe using (Maybe)
 
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
-open import Data.List.Membership.DecPropositional _≟ᵖ_ using (_∈?_)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
 open import denotation.Read using (Visible; After; cursor)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
@@ -166,7 +165,7 @@ held-same {t = t} {t′} {cs} row end-row back fwd H = record
           λ ty vy ay yw → fwd F ty yw λ (_ , t′y , vv) → later t′y (vv vy) (subst (λ c → After c _) (sym (cursor≈ eq _)) ay) yw)
       where
         few : Few t w
-        few = proj₁ F , λ {k} tk kw → decidable-stable (k ∈? proj₁ F) λ nm → fwd F tk kw λ (_ , t′k , _) → nm (proj₂ F t′k kw)
+        few = proj₁ F , λ {k} tk kw → decidable-stable (any? (k ≟ᵖ_) (proj₁ F)) λ nm → fwd F tk kw λ (_ , t′k , _) → nm (proj₂ F t′k kw)
 
     routing : ∀ {y m n} → t′ y (out (instEmit (mark m) n)) → Routing m
     routing x with row x

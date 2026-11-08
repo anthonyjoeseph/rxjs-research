@@ -17,21 +17,24 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Data.Unit using (⊤)
 open import denotation.Read using (Run; _∷_; Visible)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; scan)
+open import Tree using (Obs; FlatOp)
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; DenEnv; ⟦_⟧; approx)
-open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; _⊑_)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
+open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
 open import simultaneous.SObs using (Flat; flat; module Elaborate)
-open import simultaneous.Relations using (Met; values)
+open import simultaneous.Relations using (Met; values; values-++)
+open import Data.List.Properties using (foldl-++; ++-assoc)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.FlatSim using (Inv)
+open import simultaneous.FlatSim using (Inv; inv₀; react-inv)
 open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
@@ -82,6 +85,16 @@ record RunHeld {A : Set} (cs : List Pos) (rs : List (Pos × Ev (IE A))) : Set wh
             → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
     shut    : ShutRun rs
 
+-- What a run holds, its prefixes hold.
+runs-prefix : ∀ {A cs} {rs : List (Pos × Ev (IE A))} ext → RunHeld cs (rs ++ ext) → RunHeld cs rs
+runs-prefix {rs = rs} ext h = record
+  { covered = λ r₁ r₂ eq → RunHeld.covered h r₁ (r₂ ++ ext) (ext-eq r₁ r₂ eq)
+  ; exact   = λ r₁ r₂ eq → RunHeld.exact h r₁ (r₂ ++ ext) (ext-eq r₁ r₂ eq)
+  ; shut    = λ r₁ r₂ eq z bq vy iq → RunHeld.shut h r₁ (r₂ ++ ext) (trans (cong (_++ ext) eq) (++-assoc r₁ r₂ ext)) z bq (∈-++⁺ˡ vy) iq }
+  where
+    ext-eq : ∀ r₁ {y} r₂ → rs ≡ r₁ ++ y ∷ r₂ → rs ++ ext ≡ r₁ ++ y ∷ (r₂ ++ ext)
+    ext-eq r₁ {y} r₂ eq = trans (cong (_++ ext) eq) (++-assoc r₁ (y ∷ r₂) ext)
+
 -- Held is its rows' facts and every run's.
 held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y)
@@ -118,6 +131,34 @@ past op o ((q , out x) ∷ rx) = past op (react op o x) rx
 past op o ((q , end) ∷ rx)   = o
 past op o ((q , skip) ∷ rx)  = past op o rx
 past op o ((q , pin _) ∷ rx) = past op o rx
+
+-- A ROW A RUN OF THE SOURCE LAYS OUT: a step's output under the row it
+-- read, or the source's end.
+data Laid {B} (op : FlatOp) (o : Out B) (rx : List (Pos × Ev (Maybe (Input B)))) : Pos → Ev (IE B) → Set where
+  laid  : ∀ rx₁ {q x} rx₂ {j v} → rx ≡ rx₁ ++ (q , out x) ∷ rx₂ → v ∈ proj₂ (react op (past op o rx₁) x)
+        → Laid op o rx (q ++ ix 1 ∷ ix j ∷ []) (out v)
+  ended : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Laid op o rx q end
+
+lay-in : ∀ {B} q j (xs : List (IE B)) {y e} → (y , e) ∈ lay q j xs
+       → Σ ℕ λ j′ → Σ (IE B) λ v → y ≡ q ++ ix 1 ∷ ix j′ ∷ [] × e ≡ out v × v ∈ xs
+lay-in q j (x ∷ xs) (here refl) = j , x , refl , refl , here refl
+lay-in q j (x ∷ xs) (there i) with lay-in q (suc j) xs i
+... | j′ , v , ey , ee , vi = j′ , v , ey , ee , there vi
+
+laid-in : ∀ {B} op (o : Out B) rx {y e} → (y , e) ∈ outRows op o rx → Laid op o rx y e
+laid-in op o ((q , out x) ∷ rx) i with ∈-++⁻ (lay q 0 (proj₂ (react op o x))) i
+... | inj₁ li with lay-in q 0 _ li
+...   | j′ , v , refl , refl , vi = laid [] rx refl vi
+laid-in op o ((q , out x) ∷ rx) i | inj₂ ri with laid-in op (react op o x) rx ri
+... | laid rx₁ rx₂ refl vi = laid ((q , out x) ∷ rx₁) rx₂ refl vi
+... | ended rx₁ rx₂ refl   = ended ((q , out x) ∷ rx₁) rx₂ refl
+laid-in op o ((q , end) ∷ rx) (here refl) = ended [] rx refl
+laid-in op o ((q , skip) ∷ rx) i with laid-in op o rx i
+... | laid rx₁ rx₂ refl vi = laid ((q , skip) ∷ rx₁) rx₂ refl vi
+... | ended rx₁ rx₂ refl   = ended ((q , skip) ∷ rx₁) rx₂ refl
+laid-in op o ((q , pin r) ∷ rx) i with laid-in op o rx i
+... | laid rx₁ rx₂ refl vi = laid ((q , pin r) ∷ rx₁) rx₂ refl vi
+... | ended rx₁ rx₂ refl   = ended ((q , pin r) ∷ rx₁) rx₂ refl
 
 -- What one row owes, given the count before it.
 record Local {B : Set} (cs : List Pos) (c : Routes) (y : Pos) (e : Ev (IE B)) : Set where
@@ -158,6 +199,30 @@ run-row (_ ∷ r₁) (_ ∷ rn)            = run-row r₁ rn
 local-end : ∀ {B cs c y} → (¬ Ex cs y → Σ ℕ λ k → c ≡ (nameOf y , suc k)) → Local {B} cs c y end
 local-end cov = record { carried = λ { c-end → cov } ; stops = λ () }
 
+-- A step's outputs, laid out, count as the step sent them.
+values-lay : ∀ {B} q j (xs : List (IE B)) → values (lay q j xs) ≡ xs
+values-lay q j []       = refl
+values-lay q j (x ∷ xs) = cong (x ∷_) (values-lay q (suc j) xs)
+
+from-++ : ∀ {B} c (r₁ r₂ : List (Pos × Ev (IE B))) → from c (r₁ ++ r₂) ≡ from (from c r₁) r₂
+from-++ c r₁ r₂ = trans (cong (L.foldl count c) (values-++ r₁ r₂)) (foldl-++ count c (values r₁) (values r₂))
+
+-- THE SCAN'S COUNT OF WHAT IT SENT IS THE ONE IT KEEPS: each step keeps
+-- its counters within what it has sent.
+inv-from : ∀ {B} op (o : Out B) c rx → Inv c (proj₁ o) → Inv (from c (outRows op o rx)) (proj₁ (past op o rx))
+inv-from op o c []                 i = i
+inv-from op o c ((q , out x) ∷ rx) i =
+  subst (λ c′ → Inv c′ (proj₁ (past op (react op o x) rx))) (sym (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx)))
+    (inv-from op (react op o x) (from c (lay q 0 (proj₂ (react op o x)))) rx
+      (subst (λ c′ → Inv c′ (proj₁ (react op o x))) (cong (L.foldl count c) (sym (values-lay q 0 (proj₂ (react op o x)))))
+        (react-inv op o x i)))
+inv-from op o c ((q , end) ∷ rx)   i = i
+inv-from op o c ((q , skip) ∷ rx)  i = inv-from op o c rx i
+inv-from op o c ((q , pin _) ∷ rx) i = inv-from op o c rx i
+
+inv-past : ∀ {B} op rx → Inv (from r₀ (outRows {B} op init rx)) (proj₁ (past op init rx))
+inv-past op rx = inv-from op init r₀ rx inv₀
+
 postulate
   -- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
   -- from the count the outputs before them leave, and the end.
@@ -166,8 +231,6 @@ postulate
           → Locals cs (from c (outRows op o rx₁)) (lay q 0 (proj₂ (react op (past op o rx₁) x))))
        → (∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local {B} cs (from c (outRows op o rx₁)) q end)
        → Locals cs c (outRows op o rx)
-  -- The scan's count of what it sent is the one it keeps.
-  inv-past : ∀ {B} op rx → Inv (from r₀ (outRows {B} op init rx)) (proj₁ (past op init rx))
   -- ONE STEP'S OUTPUTS OWE WHAT THEY SHOULD when the routes open at its
   -- row are of the row's instant, a begin it reads is named for it, and
   -- a value or a live over it reads finds a route.
@@ -191,8 +254,3 @@ record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : 
     late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (instantOf q) × opos (instantOf q) ⊑ q
     runs   : ∀ {rx} → Met M rx → RunHeld cs (outRows op init rx)
 
--- THE SCANNED STREAM HOLDS what its source promises: a run met of it is
--- laid out from a run met of the source, a prefix of what that run lays.
-postulate
-  comb-held : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P cs → GoodEnv ρ → Ok (Hots ρ) P
-            → CombIn op (enter (ev m s ρ) P) cs → Held (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) cs
