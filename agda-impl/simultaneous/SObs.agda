@@ -52,6 +52,10 @@
 -- So the scan watches every connect in scope, and a route it would stop
 -- waits instead until none of them holds a route of the instant.
 --
+-- AN OVER ENDS EVERY ROUTE OF ITS INSTANT, so a stop a lane sends past
+-- another lane's over, a parked route released once its connect is
+-- over, stops nothing the flatMap still counts and is dropped.
+--
 -- The plumbing is `connect`: a source subscribes after its body, so
 -- nested connects put the outer's readers in the order rxjs would meet
 -- them, and a choice among programs is a choice among `connected`
@@ -382,6 +386,19 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   bump closeB f s = s
   bump trackB f s = s
 
+  -- The routes a branch holds of the instant, as the scan counts them.
+  share : Branch → Flat N → ℕ
+  share outerB s = Flat.outer s
+  share laneB  s = Flat.lanes s
+  share closeB s = 0
+  share trackB s = 0
+
+  -- A branch's stop, unless the branch holds no route the scan counts: a
+  -- route an over has ended is stopped by no one.
+  stopped : ∀ {B} → Branch → N → Flat N → ℕ → Out B
+  stopped b n s zero    = s , []
+  stopped b n s (suc _) = bump b (_∸ 1) s , instEmit (mark stop) n ∷ []
+
   anew : N → Flat N → Flat N
   anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; acc = 0 ; parked = 0 }
 
@@ -392,7 +409,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   onMark : ∀ {B} → FlatOp → Branch → Flat N → Mark → N → Out B
   onMark op b s begin      n = entered b n s , instEmit (mark begin) n ∷ []
-  onMark op b s stop       n = bump b (_∸ 1) s , instEmit (mark stop) n ∷ []
+  onMark op b s stop       n = stopped b n s (share b s)
   onMark op b s over       n = anew (Flat.at s) s , instEmit (mark over) n ∷ []
   onMark op b s carry      n = record s { acc = suc (Flat.acc s) } , []
   onMark op b s outerOpen  n = arrive op n s
