@@ -12,7 +12,7 @@ open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; _∷ʳ_; concat; concatMap)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 import Data.List as L
-open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; concat-++; foldl-++)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; concat-++)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 import Data.Sum
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -28,6 +28,7 @@ open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; comple
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
+open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; lb-snoc; ss-snoc; module Leaves)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
 import simultaneous.Flatten as F
@@ -197,11 +198,6 @@ cont : ∀ {A : Set} → List (Pos × List A) → List (Pos × A) → List (Pos 
 cont []             xs = batchSimultaneousᴰ xs
 cont ((i , vs) ∷ _) xs = batchFrom i vs xs
 
--- The next value, if any, is of another instant.
-Fresh : ∀ {A : Set} → Pos → List (Pos × A) → Set
-Fresh i []            = ⊤
-Fresh i ((j , _) ∷ _) = i ≢ j
-
 -- A value is of the instant held.
 Named : ∀ {A : Set} → Batching A Pos → IE A → Set
 Named b (instEmit (value _) n) = n ≡ Batching.at b
@@ -319,22 +315,6 @@ postulate
 ------------------------------------------------------------------------
 -- The protocol, stream by stream
 
-nameStep : ∀ {A : Set} → Pos → IE A → Pos
-nameStep a (instEmit (mark Marks.begin) n) = n
-nameStep a (instEmit _ _)                  = a
-
--- The name of the last begin, `a` if none.
-lastBegin : ∀ {A : Set} → Pos → List (IE A) → Pos
-lastBegin a xs = L.foldl nameStep a xs
-
-subStep : ∀ {A : Set} → Bool → IE A → Bool
-subStep b (instEmit (mark Marks.subscribed) _) = true
-subStep b (instEmit _ _)                       = b
-
--- The subscribe burst is over.
-seenSub : ∀ {A : Set} → List (IE A) → Bool
-seenSub xs = L.foldl subStep false xs
-
 NameOk : ∀ {A : Set} → Pos → IE A → Set
 NameOk a (instEmit (value _) n) = n ≡ a
 NameOk a (instEmit (mark _) _)  = ⊤
@@ -372,31 +352,13 @@ stamps-of o {rx} mx with map-back proj₂ (scan restamp stamp₀ (concatˢ (sour
 ...   | kx , _ , eqs , _ =
   subst (Stamps root) (sym (trans eqm (cong (L.map proj₂) eqs))) (stamps-restamp root (marked Marks.begin) (values kx))
 
-lb-snoc : ∀ {A : Set} (xs : List (IE A)) w → lastBegin root (xs ++ [ w ]) ≡ nameStep (lastBegin root xs) w
-lb-snoc xs w = foldl-++ nameStep root xs [ w ]
-
-ss-snoc : ∀ {A : Set} (xs : List (IE A)) w → seenSub (xs ++ [ w ]) ≡ subStep (seenSub xs) w
-ss-snoc xs w = foldl-++ subStep false xs [ w ]
-
--- THE RUN'S PROTOCOL, ONE MARK AT A TIME: begins only past the subscribe
--- burst, which ends once; past each release of an instant, the next value
--- of another; no value past the completion.
+-- PAST THE LAST ROUTE'S STOP, the next value is of another instant: the
+-- one release the run's positions alone do not give, since a stop's name
+-- is not its route's.
 postulate
-  begin-late    : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.begin) n ∷ ys → seenSub xs ≡ true
-  sub-once      : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.subscribed) n ∷ ys → seenSub xs ≡ false
-  sub-fresh     : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.subscribed) n ∷ ys → Fresh root (stamped ys)
-  begin-fresh   : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.begin) n ∷ ys → n ≢ lastBegin root xs → Fresh (lastBegin root xs) (stamped ys)
-  over-fresh    : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.over) n ∷ ys → seenSub xs ≡ true → Fresh (lastBegin root xs) (stamped ys)
   stop-fresh    : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
                 → values rx ≡ xs ++ instEmit (mark Marks.stop) n ∷ ys → seenSub xs ≡ true
                 → Batching.routes (proj₁ (after bstart xs)) ≤ 1 → Fresh (lastBegin root xs) (stamped ys)
-  completed-end : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark completed) n ∷ ys → stamped ys ≡ []
 
 true≢false : true ≢ false
 true≢false ()
@@ -414,6 +376,8 @@ begin-step a h r rel n with n ≟ᵖ a
 -- The batcher walks the run, its state the run's so far: named by the last
 -- begin, late once the burst is over, and at the root until then.
 module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
+  open Leaves o mx using (begin-late; sub-once; sub-fresh; begin-fresh; over-fresh; completed-end)
+
   ws = values rx
 
   fresh-at : ∀ {a L} (ys : List (IE A)) → a ≡ L → Fresh L (stamped ys) → Fresh a (stamped ys)
@@ -428,12 +392,12 @@ module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
       continue s xs w ys eq es st (trans nk (sym ea) , inj₁ refl) ea el e0
     go s@(batching true a h r , rel) xs (w@(instEmit (mark Marks.begin) n) ∷ ys) eq es ea el e0 (_ , st) with begin-step a h r rel n
     ... | ea′ , el′ , c =
-      continue s xs w ys eq es st (tt , Data.Sum.[ (λ ne → inj₂ (fresh-at ys ea (begin-fresh o mx xs n ys eq (λ e → ne (trans e (sym ea)))))) , inj₁ ] c)
+      continue s xs w ys eq es st (tt , Data.Sum.[ (λ ne → inj₂ (fresh-at ys ea (begin-fresh xs n ys eq (λ e → ne (trans e (sym ea)))))) , inj₁ ] c)
         ea′ (trans el′ el) (λ f → ⊥-elim (true≢false (trans el f)))
     go s@(batching false a h r , rel) xs (w@(instEmit (mark Marks.begin) n) ∷ ys) eq es ea el e0 (_ , st) =
-      ⊥-elim (true≢false (trans (sym (begin-late o mx xs n ys eq)) (sym el)))
+      ⊥-elim (true≢false (trans (sym (begin-late xs n ys eq)) (sym el)))
     go s@(batching true a h r , rel) xs (w@(instEmit (mark Marks.over) n) ∷ ys) eq es ea el e0 (_ , st) =
-      continue s xs w ys eq es st (tt , inj₂ (fresh-at ys ea (over-fresh o mx xs n ys eq (sym el)))) ea el e0
+      continue s xs w ys eq es st (tt , inj₂ (fresh-at ys ea (over-fresh xs n ys eq (sym el)))) ea el e0
     go s@(batching false a h r , rel) xs (w@(instEmit (mark Marks.over) n) ∷ ys) eq es ea el e0 (_ , st) =
       continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching true a h zero , rel) xs (w@(instEmit (mark Marks.stop) n) ∷ ys) eq es ea el e0 (_ , st) =
@@ -447,9 +411,9 @@ module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
     go s@(batching false a h r , rel) xs (w@(instEmit (mark Marks.stop) n) ∷ ys) eq es ea el e0 (_ , st) =
       continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.subscribed) n) ∷ ys) eq es ea el e0 (_ , st) =
-      continue s xs w ys eq es st (tt , inj₂ (fresh-at ys (trans ea (e0 (sub-once o mx xs n ys eq))) (sub-fresh o mx xs n ys eq))) ea refl (λ ())
+      continue s xs w ys eq es st (tt , inj₂ (fresh-at ys (trans ea (e0 (sub-once xs n ys eq))) (sub-fresh xs n ys eq))) ea refl (λ ())
     go s@(batching l a h r , rel) xs (w@(instEmit (mark completed) n) ∷ ys) eq es ea el e0 (_ , st) =
-      continue s xs w ys eq es st (tt , inj₂ (subst (Fresh a) (sym (completed-end o mx xs n ys eq)) tt)) ea el e0
+      continue s xs w ys eq es st (tt , inj₂ (subst (Fresh a) (sym (completed-end xs n ys eq)) tt)) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.outerOpen) _) ∷ ys) eq es ea el e0 (_ , st)  = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.outerClose) _) ∷ ys) eq es ea el e0 (_ , st) = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.laneStart) _) ∷ ys) eq es ea el e0 (_ , st)  = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0

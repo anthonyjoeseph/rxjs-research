@@ -28,20 +28,20 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROUTES
 
-Untried: past each release of an instant — a new begin, an over, the
-last route's stop — the next value is of another instant, and the run
-leaves an instant once nothing of it is held. Hardest: the bracket and
-route protocol through every flatMap policy and connect.
+Untried: past the last route's stop no value of its instant follows, an
+instant's values precede its overs, and the run leaves an instant once
+nothing of it is held. Hardest: the route count through every flatMap
+policy and connect, and the finiteness `Exits` asks for.
 
-Members: `stop-fresh`, `over-fresh`, `begin-fresh`, `flush-closes`, `closes-flush`.
+Members: `stop-fresh`, `over-last`, `flush-closes`, `closes-flush`.
 
 #### THE BURST
 
-Untried: begins only past the subscribe burst, which ends once and is
-followed by a begin before any value; nothing past the completion. Needs
-the marks each former's elaboration can emit, and where.
+Untried: the subscribe mark sits once, before every begin, and every
+row past it is async; every value precedes the completion. Needs where
+`merge` and `concatˢ` place the top-level marks.
 
-Members: `begin-late`, `sub-once`, `sub-fresh`, `completed-end`.
+Members: `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE ERASURE
 
@@ -55,10 +55,11 @@ Members: `erases`, `settles`.
 #### THE NAMES
 
 Untried: each async cold step mints one name and its whole cascade
-carries it, so names agree exactly when instants do. Settled when
-`coherent` is a body over a restamp invariant and `positioned`.
+carries it, so every emit is named for its instant and one instant's
+begins alike. Settled when `named` and `one-name` are bodies over a
+restamp invariant, and `coherent` a body over them.
 
-Members: `coherent`.
+Members: `coherent`, `named`, `one-name`.
 
 #### THE INSTANTS
 
@@ -66,4 +67,4 @@ Whether every position the emission set gives lies under the subscribe
 frame or a timer cascade, as `instantOf` reads it. Settled when
 `positioned` is a body by induction over the tree.
 
-Members: `positioned`.
+Members: `positioned`, `rooted`.
