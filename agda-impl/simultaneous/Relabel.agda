@@ -25,7 +25,9 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; ove
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing)
+open import simultaneous.Routed using (Held; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
+open import simultaneous.Readings using (instantOf)
+open import denotation.Laws.Worlds using (_⊑_)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
 
@@ -105,10 +107,21 @@ carried-same ev-end              c-end   = c-end
 
 held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)} {cs}
           → (∀ {y x′} → t′ y (out x′) → Σ (IE A) λ x → t y (out x) × Same x′ x)
+          → (∀ {y} → t′ y end → t y end)
           → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs)
           → Held t cs → Held t′ cs
-held-same {t = t} {t′} {cs} row back H = record { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut }
+held-same {t = t} {t′} {cs} row end-row back H = record
+  { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
+  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late }
   where
+    early : ∀ {y a n} → t′ y (out (instEmit (value a) n)) → Early y
+    early x with row x
+    ... | _ , y , same-value = Held.early H y
+
+    late : ∀ {y n} → t′ y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y
+    late x with row x
+    ... | _ , y , same-mark = Held.late H y
+
     named : ∀ {y n} → t′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y
     named x with row x
     ... | _ , y , same-mark = Held.named H y

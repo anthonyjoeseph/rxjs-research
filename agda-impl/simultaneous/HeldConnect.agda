@@ -29,7 +29,11 @@ open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Sync; Ex)
+open import simultaneous.Routed using (Held; Sync; Ex; Early; Before; Valued; opos)
+open import denotation.Events using (<ᵖ-apart)
+open import Data.Bool.Properties using (T-≡)
+open import Data.List.Properties using (++-assoc)
+open import Function.Bundles using (Equivalence)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
 
 open import simultaneous.SObs using (module Elaborate)
@@ -49,6 +53,18 @@ inst-snoc (ix i ∷ sub _ ∷ [])         l       _ nt = ⊥-elim (nt tt)
 inst-snoc (ix i ∷ ix _ ∷ _ ∷ _)       l       _ _ = refl
 inst-snoc (ix i ∷ last ∷ _ ∷ _)       l       _ _ = refl
 inst-snoc (ix i ∷ sub _ ∷ _ ∷ _)      l       _ _ = refl
+
+-- What lies before an over, all it causes does.
+before-ext : ∀ {y o} zs → Before y o → Before (y ++ zs) o
+before-ext {y} {o} zs (lt , ns) =
+  Equivalence.from T-≡ (<ᵖ-apart y o zs (Equivalence.to T-≡ lt) λ ys e → ns (ys , e)) ,
+  λ { (ws , e) → ns (zs ++ ws , trans e (++-assoc y zs ws)) }
+
+-- A subscription early in its instant subscribes its parts early.
+early-snoc : ∀ {p} l → Real p → (TimerRoot p → ⊥) → Early p → Early (p ++ [ l ])
+early-snoc {p} l rp nt ep v =
+  subst (λ I → Before (p ++ [ l ]) (opos I)) (sym eq) (before-ext [ l ] (ep (subst Valued eq v)))
+  where eq = inst-snoc p l rp nt
 
 ⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
 ⊑-≼ {x} ([] , refl) yx = ≼-refl {x} (subst (λ z → z ≺ x) (++-[] x) yx)
@@ -75,7 +91,10 @@ held-ex wd H = record
   ; covered = λ m r₁ r₂ e c nx → Held.covered H m r₁ r₂ e c (λ x → nx (wd x))
   ; exact   = Held.exact H
   ; routing = Held.routing H
-  ; shut    = Held.shut H }
+  ; shut    = Held.shut H
+  ; early   = Held.early H
+  ; ends    = Held.ends H
+  ; late    = Held.late H }
 
 ------------------------------------------------------------------------
 -- Runs
@@ -172,7 +191,7 @@ held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
             (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) p (ok : Ok H p) (nt : TimerRoot p → ⊥) cs
           → Held (enter (F (hot (Proper (enter s (p ++ [ ix 1 ]))))) (p ++ [ ix 0 ])) ((p ++ [ ix 0 ]) ∷ p ∷ cs)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok nt cs h = held-same row back′ (held-ex ex h)
+held-conn s F Is IF p ok nt cs h = held-same row end-row back′ (held-ex ex h)
   where
     open ConnRun s F Is IF p ok
 
@@ -182,6 +201,9 @@ held-conn s F Is IF p ok nt cs h = held-same row back′ (held-ex ex h)
 
     row : ∀ {y x′} → C y (out x′) → Σ _ λ x → Connect.β s F p y (out x) × Same x′ x
     row (Connecting.body y , _) = _ , y , same-refl _
+
+    end-row : ∀ {y} → C y end → Connect.β s F p y end
+    end-row (Connecting.body y , _) = y
 
     back′ : ∀ {rs′} → Met C rs′ → Σ _ λ rs → Met (Connect.β s F p) rs × Rows≈ rs′ rs
     back′ m = _ , back m , rows-refl m

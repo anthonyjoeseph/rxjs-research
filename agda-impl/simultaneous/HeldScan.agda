@@ -86,7 +86,7 @@ same-scanIE st (instEmit (mark _) _)  refl = same-mark
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
               → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok nt = held-same row back′ (h p ok nt)
+held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ (h p ok nt ep)
   where
     module Sr = ScanRun (scanIE f) z d p
     module Mr = MapRun proj₂ (Op.scan (scanIE f) z d) p
@@ -95,6 +95,10 @@ held-scan-den f z d cs h p ok nt = held-same row back′ (h p ok nt)
     row m with Mr.unmap m
     ... | out _ , (Scan.sval ac , _) , refl with Sr.accv ac
     ...   | c , x , y , eq = x , y , same-scanIE c x eq
+
+    end-row : ∀ {y} → Mr.M y end → Sr.S y end
+    end-row m with Mr.unmap m
+    ... | end , (Scan.send y , _) , refl = y
 
     rows : ∀ {sc rx} → Sr.ScanRows sc rx → Rows≈ (mapRows proj₂ sc) rx
     rows Sr.[]                       = []

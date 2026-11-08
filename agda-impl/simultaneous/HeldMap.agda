@@ -95,13 +95,17 @@ rows-mapIE (_∷_ {e = skip}  (_ , () , _) _)
 rows-mapIE (_∷_ {e = pin _} (_ , () , _) _)
 
 held-map-den : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) {W} cs → HeldD W d cs → HeldD W (Op.map (mapIE f) d) cs
-held-map-den f d cs h p ok nt = held-same row back′ (h p ok nt)
+held-map-den f d cs h p ok nt ep = held-same row end-row back′ (h p ok nt ep)
   where
     open MapRun (mapIE f) d p
 
     row : ∀ {y x′} → M y (out x′) → Σ _ λ x → S y (out x) × Same x′ x
     row m with unmap m
     ... | out x , y , refl = x , y , same-mapIE x
+
+    end-row : ∀ {y} → M y end → S y end
+    end-row m with unmap m
+    ... | end , y , refl = y
 
     back′ : ∀ {rs′} → Met M rs′ → Σ _ λ rs → Met S rs × Rows≈ rs′ rs
     back′ m with back m
