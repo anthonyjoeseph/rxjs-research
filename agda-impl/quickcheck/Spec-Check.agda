@@ -27,12 +27,12 @@ module quickcheck.Spec-Check where
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_)
 open import IO.Primitive.Finite using (putStrLn)
@@ -41,8 +41,11 @@ open import Relation.Nullary using (does)
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev; end)
-open import simultaneous.Readings using (instantOf)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.Readings using (instantOf; stamped)
+open import simultaneous.InstEmit using (instEmit; mark)
+import simultaneous.InstEmit as M
+open import simultaneous.SObs using (Batching; module Elaborate)
+open import simultaneous.Batcher using (lastBegin; seenSub; after)
 open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
@@ -50,7 +53,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; bstart)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -110,6 +113,47 @@ batchesᵇ : Rows (IE (List ℕ)) → Rows (IE ℕ) → Bool
 batchesᵇ b x = eqBatches (batchesOut b) (grouped true x)
 
 ------------------------------------------------------------------------
+-- The protocol `good-run` walks, decided at every emit
+
+private
+  freshᵇ : ∀ {A : Set} → Pos → List (Pos × A) → Bool
+  freshᵇ i []            = true
+  freshᵇ i ((j , _) ∷ _) = not (does (i ≟ᵖ j))
+
+  nil : ∀ {X : Set} → List X → Bool
+  nil [] = true
+  nil _  = false
+
+  unless : Bool → String → List String → List String
+  unless true  _ r = r
+  unless false s r = s ∷ r
+
+  -- The leaves of `simultaneous.Batcher` refuted at the emit `w`, past
+  -- `xs`, before `ys`.
+  leafAt : List (IE ℕ) → IE ℕ → List (IE ℕ) → List String
+  leafAt xs (instEmit (mark M.begin) n) ys =
+    let a = lastBegin root xs in
+    unless (seenSub xs) "begin-late" (unless (does (n ≟ᵖ a) ∨ freshᵇ a (stamped ys)) "begin-fresh" [])
+  leafAt xs (instEmit (mark M.subscribed) n) ys =
+    unless (not (seenSub xs)) "sub-once" (unless (freshᵇ root (stamped ys)) "sub-fresh" [])
+  leafAt xs (instEmit (mark M.over) n) ys =
+    unless (not (seenSub xs) ∨ freshᵇ (lastBegin root xs) (stamped ys)) "over-fresh" []
+  leafAt xs (instEmit (mark M.stop) n) ys =
+    unless (not (seenSub xs) ∨ not (Batching.routes (proj₁ (after bstart xs)) ≤ᵇ 1) ∨ freshᵇ (lastBegin root xs) (stamped ys)) "stop-fresh" []
+  leafAt xs (instEmit (mark M.completed) n) ys = unless (nil (stamped ys)) "completed-end" []
+  leafAt xs _ ys = []
+
+  protocol : List (IE ℕ) → List (IE ℕ) → List String
+  protocol xs []       = []
+  protocol xs (w ∷ ys) = leafAt xs w ys ++ protocol (xs ++ [ w ]) ys
+
+-- The leaves a seed's elaborated run refutes; nothing when cut.
+protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
+protocolOf n x with whole (listT n x [] root)
+... | just rx = protocol [] (values rx)
+... | nothing = []
+
+------------------------------------------------------------------------
 -- One seed
 
 -- A seed's three programs: plain, elaborated, batched.
@@ -151,6 +195,10 @@ private
   emptied seed   = let o = plainOf seed in three o (elaborate o) empty
   unstamped seed = let o = plainOf seed in three o (map restamp (elaborate o)) (batchedObs o)
   doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedObs o))
+
+  -- The protocol's sabotage: every emit twice, the subscribe mark too.
+  protoTwice : ℕ → Obs Timeline [] (IE ℕ)
+  protoTwice seed = flatMap (mergeᶠ nothing) (λ e → of (twice e)) (elaborate (plainOf seed))
 
 ------------------------------------------------------------------------
 -- The pinned programs
@@ -261,6 +309,19 @@ private
   seeds : List ℕ
   seeds = upTo 300
 
+  protoFails : (ℕ → Obs Timeline [] (IE ℕ)) → List ℕ → ℕ
+  protoFails mk []          = 0
+  protoFails mk (seed ∷ ss) with protocolOf (budget seed) (mk seed)
+  ... | []    = protoFails mk ss
+  ... | _ ∷ _ = suc (protoFails mk ss)
+
+  protoReport : List ℕ → IO Unit
+  protoReport []          = putStrLn "spec-check: protocol checked"
+  protoReport (seed ∷ ss) with protocolOf (budget seed) (elaborate (plainOf seed))
+  ... | []     = protoReport ss
+  ... | f ∷ fs = putStrLn ("spec-check: FAIL protocol seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
+                 >>= λ _ → protoReport ss
+
   report : List ℕ → IO Unit
   report []          = putStrLn ("spec-check: done " +++ showTally (tallyOf real seeds))
   report (seed ∷ ss) with fails (judge (budget seed) (real seed))
@@ -272,7 +333,8 @@ private
   selftest =
     putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied seeds))) >>= λ _ →
     putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped seeds))) >>= λ _ →
-    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds)))
+    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds))) >>= λ _ →
+    putStrLn (fires "protocol" (protoFails protoTwice seeds))
 
 main : IO Unit
-main = selftest >>= λ _ → pinned pins >>= λ _ → report seeds
+main = selftest >>= λ _ → pinned pins >>= λ _ → protoReport seeds >>= λ _ → report seeds
