@@ -237,10 +237,10 @@ ends-last (_ ∷ ys) (_ ∷ run) (there h) = ends-last ys run h
 
 prefix-values : ∀ {A} {xs ys : List (Pos × Ev A)} → Prefix _≡_ xs ys → Prefix _≡_ (values xs) (values ys)
 prefix-values [] = []
-prefix-values (_∷_ {x = (_ , out _)} refl p) = refl ∷ prefix-values p
-prefix-values (_∷_ {x = (_ , skip)}  refl p) = prefix-values p
-prefix-values (_∷_ {x = (_ , end)}   refl p) = prefix-values p
-prefix-values (_∷_ {x = (_ , pin _)} refl p) = prefix-values p
+prefix-values (_∷_ {a = (_ , out _)} refl p) = refl ∷ prefix-values p
+prefix-values (_∷_ {a = (_ , skip)}  refl p) = prefix-values p
+prefix-values (_∷_ {a = (_ , end)}   refl p) = prefix-values p
+prefix-values (_∷_ {a = (_ , pin _)} refl p) = prefix-values p
 
 prefix-refl : ∀ {A : Set} (xs : List A) → Prefix _≡_ xs xs
 prefix-refl []       = []
