@@ -29,11 +29,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ROUTES
 
 Untried: past the last route's stop no value of its instant follows, an
-instant's values precede its overs, and the run leaves an instant once
-nothing of it is held. Hardest: the route count through every flatMap
-policy and connect, and the finiteness `Exits` asks for.
+instant's values precede its overs, the run leaves an instant once nothing
+of it is held, and a closed instant's batch meets a releasing mark before
+any value. Hardest: the route count through every flatMap policy and
+connect, and the liveness `Exits` and `releases` ask for.
 
-Members: `stop-fresh`, `over-last`, `flush-closes`, `closes-flush`.
+Members: `stop-fresh`, `over-last`, `flush-closes`, `releases`.
 
 #### THE BURST
 
