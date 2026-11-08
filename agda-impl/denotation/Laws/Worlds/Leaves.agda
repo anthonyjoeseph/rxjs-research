@@ -21,7 +21,7 @@ open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; 
   on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan; DeferT; guard;
   body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-antisym; ≺-ext; LimD)
-open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans)
+open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; TimerRoot; plain-untimed; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans)
 
 ------------------------------------------------------------------------
 -- The leaves keep it
@@ -48,6 +48,7 @@ private
     ; under = λ x y pl v le → un (sh x) (sh y) pl v le
     ; quiet = qu
     ; pinned = λ x → ⊥-elim (np x)
+    ; untimed = λ x → ut (sh x)
     }
     where
       ne : ∀ {l₁ l₂ l} → p ++ [ l₂ ] ≡ (p ++ [ l₁ ]) ++ [ l ] → ⊥
@@ -56,6 +57,9 @@ private
 
       un : ∀ {q y w l} → Below p q → Below p y → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
       un (_ , pl₁ , refl) (_ , pl₂ , refl) pl v le = sib (real-snoc p pl₁ r) pl₂ (⊑-snoc⁺ p) ne v le
+
+      ut : ∀ {y} → Below p y → TimerRoot y → ⊥
+      ut (_ , pl , refl) = plain-untimed p pl
 
       wo : ∀ {y} → Below p y → W H p y
       wo (_ , pl , refl) = step here pl
@@ -85,6 +89,7 @@ private
     ; under = λ x y pl v le → InvAt.under I (proj₂ (bk x)) (proj₂ (bk y)) pl v le
     ; quiet = λ c y cy → let (r , eq , lt) = InvAt.quiet I (be c) (proj₂ (bk y)) cy in r , bs y eq , lt
     ; pinned = λ x → InvAt.pinned I (bp x)
+    ; untimed = λ x → InvAt.untimed I (proj₂ (bk x))
     }
 
   of-below : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → Below p y
@@ -268,7 +273,7 @@ scan-inv f z {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
 defer-inv : ∀ {A H} {s : Den A} → InvD H s → InvD H (Op.defer s)
 defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x′ → fu (view x) (view x′) ; flat = λ x x′ → fl (view x) (view x′)
   ; burst = λ c y cy → bu (view c) (view y) cy ; under = λ x y → un (view x) (view y) ; quiet = λ c y cy → qu (view c) (view y) cy
-  ; pinned = pn }
+  ; pinned = pn ; untimed = ut }
   where
     I = inv (p ++ [ ix 1 ]) (ok-step p ok)
     B = enter s (p ++ [ ix 1 ])
@@ -290,6 +295,10 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x
     wo : ∀ {y e} → Truncate (DeferT s p) y e → W H p y
     wo (guard , _)  = step here plain-ix
     wo (body x , _) = shrink (InvAt.world I x)
+
+    ut : ∀ {y e} → Truncate (DeferT s p) y e → TimerRoot y → ⊥
+    ut (guard , _)  = plain-untimed p plain-ix
+    ut (body x , _) = InvAt.untimed I x
 
     re : ∀ {y e} → Truncate (DeferT s p) y e → Real y
     re (guard , _)  = real-snoc p plain-ix (proj₁ ok)
@@ -359,6 +368,7 @@ lim-inv inv p ok = record
   ; under = λ { (from N l , _) (from M m , _) pl v le → InvAt.under (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) pl v le }
   ; quiet = λ { (from N l , _) (from M m , _) cy → InvAt.quiet (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) cy }
   ; pinned = λ { (from N l , _) → InvAt.pinned (I N) (l N ≤-refl) }
+  ; untimed = λ { (from N l , _) → InvAt.untimed (I N) (l N ≤-refl) }
   }
   where
     I = λ n → inv n p ok

@@ -54,6 +54,7 @@ open import simultaneous.Relations using (events; elaborated; batched; Met; valu
   Joins; Batches; InstantsAgree; Erases; Settles)
 open import simultaneous.Batcher using (batcher-ends)
 open import simultaneous.Closing using (batches)
+open import simultaneous.Protocol using (row-rooted)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE)
 
@@ -78,7 +79,9 @@ Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
 postulate
   coherent      : Coherent
-  positioned    : Positioned
+
+positioned : Positioned
+positioned o s = row-rooted o (proj₁ (proj₁ s))
 
 batchable : Batchable
 batchable = batches

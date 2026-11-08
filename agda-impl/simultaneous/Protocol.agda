@@ -17,21 +17,24 @@ open import Data.List.Properties using (foldl-++; ∷-injectiveʳ; ∷-injective
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ʳ; ∈-++⁺ˡ)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (suc)
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
 open import denotation.Events using (Pos; Timeline; Label; ix; sub; last; root; fresh; _≟ᵖ_; <ᵖ-between; <ᵖ-below)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_; enter; ⟦_⟧)
+open import denotation.Laws using (inv-⟦⟧)
+open import denotation.Laws.Worlds using (W; InvAt; TimerRoot; Plain; plain-ix; plain-last; step; timer; join; here; inW)
 open import denotation.Read using (Run; _∷_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; module Elaborate)
-open import simultaneous.Readings using (Rooted; in-frame; in-cascade; ix-ns; last-ns; instantOf; stamped)
+open import simultaneous.Readings using (Rooted; NotSub; in-frame; in-cascade; ix-ns; last-ns; instantOf; stamped)
 open import simultaneous.Relations using (Met; values; elaborated)
 open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; to≺; from≺)
 
@@ -254,13 +257,48 @@ module Split {A : Set} where
 ------------------------------------------------------------------------
 -- The positions of an elaborated program's emits
 
--- THE INSTANT STRUCTURE: every position lies under the subscribe frame or
--- a timer cascade; every emit is named for its instant, and the begins of
--- one instant name it alike; the subscribe mark sits once, before every
+-- Every row of a program run from the root lies under the subscribe
+-- frame or one step of a timer cascade: in the root's world, a timer
+-- fires past tick 0, and no row sits at a timer's root.
+private
+  Cascade : Pos → Set
+  Cascade x = Σ ℕ λ t → Σ Pos λ e → x ≡ ix (suc t) ∷ sub e ∷ []
+
+  rooted-ext : ∀ {x} l ys → Rooted x ⊎ Cascade x → Rooted (x ++ l ∷ ys)
+  rooted-ext l ys (inj₁ (in-frame ns))  = in-frame ns
+  rooted-ext l ys (inj₁ in-cascade)     = in-cascade
+  rooted-ext l ys (inj₂ (_ , _ , refl)) = in-cascade
+
+  plain-ns : ∀ {l} → Plain l → NotSub l
+  plain-ns plain-ix   = ix-ns
+  plain-ns plain-last = last-ns
+
+  world-rooted : ∀ {x} → W (λ _ → ⊥) root x → Rooted x ⊎ Cascade x
+  world-rooted (step here pl)                = inj₁ (in-frame (plain-ns pl))
+  world-rooted (step {l = l} (inW w) _)      = inj₁ (rooted-ext l [] (world-rooted w))
+  world-rooted (timer zero _ ())
+  world-rooted (timer (suc t) _ _)           = inj₂ (t , _ , refl)
+  world-rooted (join (inj₁ ()) _ _)
+  world-rooted (join {e = e} (inj₂ u) _ _)   = inj₁ (rooted-ext (sub e) [] (world-rooted u))
+
+row-rooted : ∀ {A} (o : SObs [] A) {k e} → enter (⟦ o ⟧ []ᴬ) root k e → Rooted k
+row-rooted o x = go (InvAt.world I x) (InvAt.untimed I x)
+  where
+    I = inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())
+
+    go : ∀ {k} → W (λ _ → ⊥) root k → (TimerRoot k → ⊥) → Rooted k
+    go w nt with world-rooted w
+    ... | inj₁ r              = r
+    ... | inj₂ (_ , _ , refl) = ⊥-elim (nt tt)
+
+rooted : ∀ {A} (o : SObs [] A) {k e} → elaborated o k e → Rooted k
+rooted o = row-rooted (elaborate o)
+
+-- THE INSTANT STRUCTURE: every emit is named for its instant, and the
+-- begins of one instant name it alike; the subscribe mark sits once, before every
 -- begin, every value past it async; an instant's values precede its overs,
 -- and every value precedes the completion.
 postulate
-  rooted    : ∀ {A} (o : SObs [] A) {k e} → elaborated o k e → Rooted k
   named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
   one-name  : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
             → elaborated o k′ (out (instEmit (mark Marks.begin) n′)) → instantOf k ≡ instantOf k′ → n ≡ n′

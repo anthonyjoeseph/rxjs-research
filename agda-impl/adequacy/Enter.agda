@@ -432,7 +432,7 @@ conn₀ s q sc = cs false true false (just q) nothing nothing q root s sc
 w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ++ [ ix 0 ] → (s ≡ x ++ [ ix 0 ] → ⊥) → W⁼ H s x
 w-down here eq ne = ⊥-elim (ne eq)
 w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (∷ʳ-injectiveˡ x′ x eq) w
-w-down {x = x} (inW (timer t _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
+w-down {x = x} (inW (timer t _ _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
 ... | ()
 w-down {x = x} (inW (join {h} _ _ _)) eq _ with ∷ʳ-injectiveʳ h x eq
 ... | ()

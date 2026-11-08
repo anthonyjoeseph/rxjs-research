@@ -61,11 +61,3 @@ begins alike. Settled when `named` and `one-name` are bodies over a
 restamp invariant, and `coherent` a body over them.
 
 Members: `coherent`, `named`, `one-name`.
-
-#### THE INSTANTS
-
-Whether every position the emission set gives lies under the subscribe
-frame or a timer cascade, as `instantOf` reads it. Settled when
-`positioned` is a body by induction over the tree.
-
-Members: `positioned`, `rooted`.

@@ -29,7 +29,7 @@ open import denotation.Events using (Pos; ix; inside; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate;
   module Joiner; module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
-open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; PinBy)
+open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; PinBy)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 
 out≢skip : ∀ {A} {a : A} → out a ≡ skip → ⊥
@@ -219,6 +219,11 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
     world-v (v-val x refl) = step (inW (wo x)) plain-ix
     world-v (v-lane x l _) = nest-in (sw x) (inW (lw x l))
 
+    untimed-v : ∀ {y e} → V y e → TimerRoot y → ⊥
+    untimed-v (v-o x _)          = InvAt.untimed Io x
+    untimed-v (v-val {q} x refl) = plain-untimed q plain-ix
+    untimed-v (v-lane x l _)     = InvAt.untimed (LI x) (proj₁ l)
+
     real-v : ∀ {y e} → V y e → Real y
     real-v (v-o x _)          = re x
     real-v (v-val {q} x refl) = real-snoc q plain-ix (re x)
@@ -326,6 +331,7 @@ module Join {A B : Set} {H : Pos → Set} {p : Pos} (ok : Ok H p) (f : A → Den
       ; under = λ x y pl v le → under-v (vw x) (vw y) pl v le
       ; quiet = λ c y cy → quiet-v en (vw c) (vw y) cy
       ; pinned = λ x → pinned-v (vw x)
+      ; untimed = λ x → untimed-v (vw x)
       }
 
 -- A joiner, given its policy: a cut only ever grows, and never falls

@@ -5,7 +5,7 @@
 --
 -- A subscription at `p` places its rows in its WORLD: below `p` a plain
 -- label at a time; at a timer's root `ix t ∷ sub e ∷ []`, for a timer
--- created at `e` in the world; and where a hot row `h` is joined at `e` in
+-- created at `e` in the world, firing past `e`'s tick; and where a hot row `h` is joined at `e` in
 -- the world, at `h ++ [ sub e ]`.  The world is what lets a connect's
 -- source and body be told apart: neither's rows lie in the other's world.
 --
@@ -17,18 +17,19 @@ module denotation.Laws.Worlds where
 
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
+open import Data.Nat using (_<_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ++-identityʳ; ++-conicalˡ; ∷-injective; ∷-injectiveˡ; ∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_; []; lookup)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.Events using (Pos; Label; ix; sub; last; inside; inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
+open import denotation.Events using (Pos; Label; ix; sub; last; tick; inside; inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
 open import denotation.EmissionSet using (Ev; end; pin; Silent; held; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false)
 
@@ -41,7 +42,7 @@ mutual
   -- The world of a subscription at `p` under hot rows `H`, `p` excluded.
   data W (H : Pos → Set) (p : Pos) : Pos → Set where
     step  : ∀ {x l} → W⁼ H p x → Plain l → W H p (x ++ [ l ])
-    timer : ∀ {e} t → W⁼ H p e → W H p (ix t ∷ sub e ∷ [])
+    timer : ∀ {e} t → W⁼ H p e → tick e < t → W H p (ix t ∷ sub e ∷ [])
     join  : ∀ {h e} → H h ⊎ W H p h → W⁼ H p e → e ≺ h → W H p (h ++ [ sub e ])
 
   -- The world with `p` itself.
@@ -73,10 +74,18 @@ Ok H p = Real p × Disj H p
 _⊕_ : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Set
 _⊕_ {A} H t q = Σ (Ev A) (t q) ⊎ H q
 
--- A LAWFUL HOT: reachable rows, none below another, none past an end.
+-- A TIMER'S ROOT, where a cold's later frame hangs: never a row, which
+-- lies one label below it.
+TimerRoot : Pos → Set
+TimerRoot (_ ∷ sub _ ∷ []) = ⊤
+TimerRoot _                = ⊥
+
+-- A LAWFUL HOT: reachable rows two labels deep, none below another, none
+-- past an end.
 record Lawful {A} (t : EmissionSet A) : Set where
   field
     real   : ∀ {y e} → t y e → Real y
+    deep   : ∀ {l e} → t (l ∷ []) e → ⊥
     func   : ∀ {y e e′} → t y e → t y e′ → e ≡ e′
     flat   : ∀ {y e l ys e′} → t y e → t (y ++ l ∷ ys) e′ → ⊥
     proper : ∀ {c y e} → t c end → t y e → y ≼ c
@@ -117,6 +126,7 @@ record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
     under : ∀ {q y w l e e′} → X q e → X y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
     quiet : ∀ {c y e} → X c end → X y e → c ≺ y → PinBy c e
     pinned : ∀ {y r} → X y (pin r) → W⁼ H p r × T (inside r y)
+    untimed : ∀ {y e} → X y e → TimerRoot y → ⊥
 
 -- At every admissible subscription.
 InvD : ∀ {A} → (Pos → Set) → Den A → Set
@@ -194,10 +204,30 @@ snoc≢[] : ∀ (x : Pos) {l : Label} → x ++ [ l ] ≡ [] → ⊥
 snoc≢[] []      ()
 snoc≢[] (_ ∷ _) ()
 
+-- One plain label down is no timer's root.
+plain-untimed : ∀ x {l} → Plain l → TimerRoot (x ++ [ l ]) → ⊥
+plain-untimed []                      plain-ix   ()
+plain-untimed []                      plain-last ()
+plain-untimed (_ ∷ [])                plain-ix   ()
+plain-untimed (_ ∷ [])                plain-last ()
+plain-untimed (_ ∷ sub _ ∷ [])        _          ()
+plain-untimed (_ ∷ sub _ ∷ _ ∷ _)     _          ()
+plain-untimed (_ ∷ ix _ ∷ _)          _          ()
+plain-untimed (_ ∷ last ∷ _)          _          ()
+
+-- A timer's root closing in `sub e` is one label and that `sub`.
+sub-untimed : ∀ x {e} → TimerRoot (x ++ [ sub e ]) → Σ Label λ l → x ≡ l ∷ []
+sub-untimed []       ()
+sub-untimed (l ∷ []) _ = l , refl
+sub-untimed (_ ∷ sub _ ∷ [])    ()
+sub-untimed (_ ∷ sub _ ∷ _ ∷ _) ()
+sub-untimed (_ ∷ ix _ ∷ _)      ()
+sub-untimed (_ ∷ last ∷ _)      ()
+
 private
   w-nonempty : ∀ {H p y} → W H p y → y ≡ [] → ⊥
   w-nonempty (step {x} _ _)   eq = snoc≢[] x eq
-  w-nonempty (timer _ _)      ()
+  w-nonempty (timer _ _ _)    ()
   w-nonempty (join {h} _ _ _) eq = snoc≢[] h eq
 
 -- The empty position is in a world only as its subscription.
@@ -216,7 +246,7 @@ mutual
   world-after {p = p} (step {x} {l} (inW w) _) r with real-init x [ l ] r
   ... | inj₁ eq = ⊥-elim (w-nonempty w eq)
   ... | inj₂ rx = ≺-trans {p} {x} {x ++ [ l ]} (world-after w rx) (≺-ext x [])
-  world-after {p = p} (timer {e} t w) (re , lt , _) = ≼-≺-≺ {p} {e} {ix t ∷ sub e ∷ []} (world-after⁼ w re) lt
+  world-after {p = p} (timer {e} t w _) (re , lt , _) = ≼-≺-≺ {p} {e} {ix t ∷ sub e ∷ []} (world-after⁼ w re) lt
   world-after {p = p} (join {h} {e} _ w eh) r =
     ≼-≺-≺ {p} {e} {h ++ [ sub e ]} (world-after⁼ w (real-last h r)) (≺-trans {e} {h} {h ++ [ sub e ]} eh (≺-ext h []))
 
@@ -224,11 +254,20 @@ mutual
   world-after⁼ {p = p} here    r = ≼-refl {p}
   world-after⁼ {p = p} {y} (inW w) r = ≺→≼ {p} {y} (world-after w r)
 
+-- A reachable world position is two labels deep.
+w-deep : ∀ {H p y} → (p ≡ [] → ⊥) → W H p y → Real y → (Σ Label λ l → y ≡ l ∷ []) → ⊥
+w-deep np (step {[]} here _)      _  _        = np refl
+w-deep np (step {[]} (inW w) _)   _  _        = w-nonempty w refl
+w-deep np (step {_ ∷ x} _ _)      _  (_ , eq) = snoc≢[] x (proj₂ (∷-injective eq))
+w-deep np (timer _ _ _)           _  (_ , ())
+w-deep np (join {[]} _ _ _)       ()
+w-deep np (join {_ ∷ h} _ _ _)    _  (_ , eq) = snoc≢[] h (proj₂ (∷-injective eq))
+
 -- The world one tick down lies in the world.
 mutual
   shrink : ∀ {H p i w} → W H (p ++ [ ix i ]) w → W H p w
   shrink (step w l)           = step (inW (shrink⁼ w)) l
-  shrink (timer t w)          = timer t (inW (shrink⁼ w))
+  shrink (timer t w lt)       = timer t (inW (shrink⁼ w)) lt
   shrink (join (inj₁ h) w eh) = join (inj₁ h) (inW (shrink⁼ w)) eh
   shrink (join (inj₂ v) w eh) = join (inj₂ (shrink v)) (inW (shrink⁼ w)) eh
 
@@ -240,7 +279,7 @@ mutual
 mutual
   nest : ∀ {H p a w} → W⁼ H p a → W H a w → W H p w
   nest pa (step w l)           = step (nest⁼ pa w) l
-  nest pa (timer t w)          = timer t (nest⁼ pa w)
+  nest pa (timer t w lt)       = timer t (nest⁼ pa w) lt
   nest pa (join (inj₁ h) w eh) = join (inj₁ h) (nest⁼ pa w) eh
   nest pa (join (inj₂ v) w eh) = join (inj₂ (nest pa v)) (nest⁼ pa w) eh
 
@@ -256,7 +295,7 @@ nest-in pa (inW v) = nest (inW pa) v
 mutual
   narrow : ∀ {B H p i w} {t : EmissionSet B} → (∀ {h e} → t h e → W H p h) → W (H ⊕ t) (p ++ [ ix i ]) w → W H p w
   narrow tw (step w l)                     = step (inW (narrow⁼ tw w)) l
-  narrow tw (timer k w)                    = timer k (inW (narrow⁼ tw w))
+  narrow tw (timer k w lt)                 = timer k (inW (narrow⁼ tw w)) lt
   narrow tw (join (inj₁ (inj₁ (_ , x))) w eh) = join (inj₂ (tw x)) (inW (narrow⁼ tw w)) eh
   narrow tw (join (inj₁ (inj₂ h)) w eh)    = join (inj₁ h) (inW (narrow⁼ tw w)) eh
   narrow tw (join (inj₂ v) w eh)           = join (inj₂ (narrow tw v)) (inW (narrow⁼ tw w)) eh
@@ -423,7 +462,7 @@ anc-≼ {a} {c} (up {b} x pb) r with parent-real pb r
 mutual
   world-anc : ∀ {H p w} → W H p w → Anc p w
   world-anc (step w pl)       = up (world-anc⁼ w) (plain pl refl)
-  world-anc (timer t w)       = up (world-anc⁼ w) (named (ix t ∷ []) refl)
+  world-anc (timer t w _)     = up (world-anc⁼ w) (named (ix t ∷ []) refl)
   world-anc (join {h} _ w _)  = up (world-anc⁼ w) (named h refl)
 
   world-anc⁼ : ∀ {H p w} → W⁼ H p w → Anc p w
@@ -504,9 +543,9 @@ mutual
   lead′ (step {x′} v pl) le with ⊑-snoc x′ le
   ... | inj₁ le′  = lead v le′
   ... | inj₂ refl = l-in (step v pl)
-  lead′ (timer t v) le with ⊑-snoc (ix t ∷ []) le
+  lead′ (timer t v lt) le with ⊑-snoc (ix t ∷ []) le
   ... | inj₁ le′  = l-tick le′
-  ... | inj₂ refl = l-in (timer t v)
+  ... | inj₂ refl = l-in (timer t v lt)
   lead′ (join {h} (inj₁ hh) v eh) le with ⊑-snoc h le
   ... | inj₁ le′  = l-hot hh le′
   ... | inj₂ refl = l-in (join (inj₁ hh) v eh)
@@ -533,7 +572,7 @@ data Shape (H : Pos → Set) (a w : Pos) : Set where
 shape : ∀ {H a w} → W⁼ H a w → Shape H a w
 shape here                    = sh-root refl
 shape (inW (step v pl))       = sh-plain v pl refl
-shape (inW (timer t v))       = sh-sub {x = ix t ∷ []} v refl
+shape (inW (timer t v _))     = sh-sub {x = ix t ∷ []} v refl
 shape (inW (join v e eh))     = sh-sub e refl
 
 -- One plain label below a world position: the subscription, or its parent
@@ -572,7 +611,7 @@ apart-w {H} {q₁} {q₂} {l₁} {l₂} p₁ p₂ ne n₁ n₂ = go
     ... | sh-root eq              = n₁ (subst (W⁼ H b) (∷ʳ-injectiveˡ x q₁ eq) v)
     ... | sh-plain {x′} v′ _ eq   = go (subst (W⁼ H a) (∷ʳ-injectiveˡ x′ x (sym eq)) v′) v
     ... | sh-sub {x′} _ eq        = plain-sub pl (∷ʳ-injectiveʳ x x′ eq)
-    go u (inW (timer {e} t v)) with shape u
+    go u (inW (timer {e} t v _)) with shape u
     ... | sh-root eq              = plain-sub p₁ (sym (∷ʳ-injectiveʳ (ix t ∷ []) q₁ eq))
     ... | sh-plain {x′} _ pl eq   = plain-sub pl (sym (∷ʳ-injectiveʳ (ix t ∷ []) x′ eq))
     ... | sh-sub {x′} v′ eq       = go (subst (W⁼ H a) (sym (same-sub {ix t ∷ []} {x′} eq)) v′) v
@@ -606,7 +645,7 @@ cyc {a = a} {w} ra rw wa aw = ≺-irrefl {w} (≼-≺-≺ {w} {a} {w} (world-aft
 -- How a world position closing in `sub e` is reached.
 data Named (H : Pos → Set) (p h e : Pos) : Set where
   n-root  : h ++ [ sub e ] ≡ p → Named H p h e
-  n-timer : ∀ {t} → h ≡ ix t ∷ [] → W⁼ H p e → Named H p h e
+  n-timer : ∀ {t} → h ≡ ix t ∷ [] → W⁼ H p e → tick e < t → Named H p h e
   n-join  : H h ⊎ W H p h → W⁼ H p e → e ≺ h → Named H p h e
 
 named-view : ∀ {H p h e} → W⁼ H p (h ++ [ sub e ]) → Named H p h e
@@ -615,21 +654,21 @@ named-view {H} {p} {h} {e} u = go u refl
     go : ∀ {w} → W⁼ H p w → w ≡ h ++ [ sub e ] → Named H p h e
     go here eq = n-root (sym eq)
     go (inW (step {x} _ pl)) eq = ⊥-elim (plain-sub pl (∷ʳ-injectiveʳ x h eq))
-    go (inW (timer t v)) eq with ∷ʳ-injectiveˡ (ix t ∷ []) h eq | same-sub {ix t ∷ []} {h} eq
-    ... | hq | refl = n-timer (sym hq) v
+    go (inW (timer t v lt)) eq with ∷ʳ-injectiveˡ (ix t ∷ []) h eq | same-sub {ix t ∷ []} {h} eq
+    ... | hq | refl = n-timer (sym hq) v lt
     go (inW (join {h′} j v eh)) eq with ∷ʳ-injectiveˡ h′ h eq | same-sub {h′} {h} eq
     ... | refl | refl = n-join j v eh
 
 named-e : ∀ {H p h e} → Named H p h e → (h ++ [ sub e ] ≡ p → ⊥) → W⁼ H p e
 named-e (n-root eq)     nr = ⊥-elim (nr eq)
-named-e (n-timer _ v)   _  = v
+named-e (n-timer _ v _) _  = v
 named-e (n-join _ v _)  _  = v
 
 -- More hot rows, the same world.
 mutual
   widen : ∀ {B H p w} (t : EmissionSet B) → W H p w → W (H ⊕ t) p w
   widen t (step w l)           = step (widen⁼ t w) l
-  widen t (timer i w)          = timer i (widen⁼ t w)
+  widen t (timer i w lt)       = timer i (widen⁼ t w) lt
   widen t (join (inj₁ h) w eh) = join (inj₁ (inj₂ h)) (widen⁼ t w) eh
   widen t (join (inj₂ v) w eh) = join (inj₂ (widen t v)) (widen⁼ t w) eh
 
@@ -652,12 +691,12 @@ private
     ... | inj₁ refl | _       = ⊥-elim (nonempty⁼ (λ { refl → ra }) v)
     ... | inj₂ _    | inj₁ eq = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) eq pa) (step v pl))
     ... | inj₂ rx   | inj₂ u′ = step (unwiden⁼ dj ra pa rx v u′) pl
-    unwiden {H = H} dj ra pa rw (timer {e} t v) u =
-      timer t (unwiden⁼ dj ra pa (proj₁ rw) v (named-e (named-view {h = ix t ∷ []} (inW u)) λ eq → cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (timer t v)))
+    unwiden {H = H} dj ra pa rw (timer {e} t v lt) u =
+      timer t (unwiden⁼ dj ra pa (proj₁ rw) v (named-e (named-view {h = ix t ∷ []} (inW u)) λ eq → cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (timer t v lt))) lt
     unwiden {H = H} {t = t′} dj ra pa rw (join {h} {e} hj v eh) u with named-view {h = h} (inW u) | real-init h _ rw
     ... | n-root eq       | _      = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (join hj v eh))
     ... | _               | inj₁ refl = ⊥-elim rw
-    ... | n-timer {t} refl u′ | _  = timer t (unwiden⁼ dj ra pa (proj₁ rw) v u′)
+    ... | n-timer {t} refl u′ lt | _ = timer t (unwiden⁼ dj ra pa (proj₁ rw) v u′) lt
     ... | n-join (inj₁ hh) u′ _ | _ = join (inj₁ hh) (unwiden⁼ dj ra pa (real-last h rw) v u′) eh
     ... | n-join (inj₂ uh) u′ _ | inj₂ rh with hj
     ...   | inj₁ (inj₁ (_ , th)) = ⊥-elim (dj (inj₁ (_ , th)) (widen t′ uh) (⊑-inside (⊑-refl h)))
@@ -676,12 +715,13 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
   ; under = un
   ; quiet = qu
   ; pinned = λ x → let (w⁼ , i) = pn x in widen⁼ t w⁼ , i
+  ; untimed = ut
   }
   where
     bump : ∀ {c y} → Σ Pos (λ w → W⁼ H p w × T (inside w c) × T (inside w y)) → Σ Pos (λ w → W⁼ (H ⊕ t) p w × T (inside w c) × T (inside w y))
     bump (w , w⁼ , i) = w , widen⁼ t w⁼ , i
 
-    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn)
+    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn; untimed to ut)
 
     un : ∀ {q y w l e e′} → enter d p q e → enter d p y e′ → Plain l → W⁼ (H ⊕ t) (q ++ [ l ]) w → w ⊑ y → ⊥
     un {q} {w = w} {l} x x′ pl v (zs , refl) with real-init w zs (re x′)

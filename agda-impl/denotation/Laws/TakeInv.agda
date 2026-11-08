@@ -23,7 +23,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; <ᵖ-part; <ᵖ-split; <ᵖ-apart)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; module TakeWhile; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-false; ≼-or-≻; ≼-≺-≺)
-open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD; ⊑-refl;
+open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; plain-last; W; W⁼; step; here; inW; real-snoc; Real; InvAt; InvD; ⊑-refl;
   ⊑-snoc⁺; ⊑-snoc; ⊑-inside; inside-⊑; conv; ext≢; same-lead; flat-under; _⊑_; w-up; nest⁼; PinBy)
 
 private
@@ -78,6 +78,10 @@ private
     wo : ∀ {y e} → Vw y e → W H p y
     wo (sm x _)            = InvAt.world I x
     wo (sh x _ _ k refl)   = step (inW (InvAt.world I x)) (sh-plain k)
+
+    ut : ∀ {y e} → Vw y e → TimerRoot y → ⊥
+    ut (sm x _)                  = InvAt.untimed I x
+    ut (sh {q = q} x _ _ k refl) = plain-untimed q (sh-plain k)
 
     re : ∀ {y e} → Vw y e → Real y
     re (sm x _)                  = InvAt.real I x
@@ -184,5 +188,6 @@ takeWhile-inv i keep inv p ok = record
   ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
   ; quiet = λ c y cy → qu (view (proj₁ c)) (view (proj₁ y)) cy
   ; pinned = λ x → pn (view (proj₁ x))
+  ; untimed = λ x → ut (view (proj₁ x))
   }
   where open TI i keep (inv p ok)
