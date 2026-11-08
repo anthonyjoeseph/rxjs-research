@@ -24,9 +24,8 @@
 --
 -- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
 -- subscriber sees (a skip, a pin) still runs in some instant, so an
--- instant is left by every row past it.  Those are read off the
--- emission set directly, over its reached rows (`Seen`), never through a
--- reader.
+-- instant ends where its rows run out.  Those are read off the emission
+-- set directly, never through a reader.
 --
 -- AN INSTANT OVER IS ENOUGH, THE RUN NEED NOT BE: a batch is released
 -- the moment its instant is, though work no subscriber sees runs on.

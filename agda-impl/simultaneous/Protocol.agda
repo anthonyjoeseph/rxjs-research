@@ -257,7 +257,7 @@ module Split {A : Set} where
 -- THE INSTANT STRUCTURE: every position lies under the subscribe frame or
 -- a timer cascade; every emit is named for its instant, and the begins of
 -- one instant name it alike; the subscribe mark sits once, before every
--- begin, everything past it async; an instant's values precede its overs,
+-- begin, every value past it async; an instant's values precede its overs,
 -- and every value precedes the completion.
 postulate
   rooted    : ∀ {A} (o : SObs [] A) {k e} → elaborated o k e → Rooted k
@@ -268,7 +268,8 @@ postulate
             → Σ Pos λ ks → Σ Pos λ m → elaborated o ks (out (instEmit (mark Marks.subscribed) m)) × ks ≺ k
   sub-one   : ∀ {A} (o : SObs [] A) {k k′ m m′} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
             → elaborated o k′ (out (instEmit (mark Marks.subscribed) m′)) → k ≡ k′
-  sub-async : ∀ {A} (o : SObs [] A) {ks m k e} → elaborated o ks (out (instEmit (mark Marks.subscribed) m)) → elaborated o k e → ks ≺ k → Async k
+  sub-async : ∀ {A} (o : SObs [] A) {ks m k a j} → elaborated o ks (out (instEmit (mark Marks.subscribed) m))
+            → elaborated o k (out (instEmit (value a) j)) → ks ≺ k → Async k
   over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
             → elaborated o ko (out (instEmit (mark Marks.over) m)) → instantOf kv ≡ instantOf ko → kv ≺ ko
   done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))

@@ -16,13 +16,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (sym to ≡-sym; trans to ≡-trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong) renaming (sym to ≡-sym; trans to ≡-trans)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
-open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After; cursor)
 open import simultaneous.InstEmit using (InstEmit; valuesOf)
 open import simultaneous.SObs using (SObs; module Elaborate)
@@ -88,10 +87,6 @@ vals rs = L.map proj₂ (stamped (values rs))
 grouped : ∀ {A} → Bool → List (Pos × Ev (IE A)) → List (Pos × List A)
 grouped ov rs = closed ov (batchSimultaneousᴰ (stamped (values rs)))
 
--- Past `c`, finitely many rows, each reached once those before it are.
-Spent : ∀ {A} → EmissionSet A → Maybe Pos → Set
-Spent t c = Σ (List Pos) λ ks → ∀ {k e} → t k e → After c k → k ∈ ks × Proper t k e
-
 -- The instant the last value met belongs to.
 lastInstant : ∀ {A} → List (Pos × Ev (IE A)) → Maybe Pos
 lastInstant rs = L.last (L.map proj₁ (stamped (values rs)))
@@ -101,11 +96,11 @@ Left : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Maybe Pos 
 Left t rs nothing  = ⊤
 Left t rs (just i) = ∀ {k x} → t k (out x) → After (cursor nothing rs) k → InstEmit.instant x ≡ i → valuesOf x ≡ []
 
--- Past the row at `q`, the run leaves `q`'s instant: a reached row of
--- another instant or the completion, or finitely many rows after.
+-- Past the row at `q`, finitely many rows of `q`'s instant: the instant
+-- ends.  Whether the run reaches anything past it is no part of it, and
+-- could not be: that is whether some later row exists at all.
 Exits : ∀ {A} → EmissionSet A → Pos → Set
-Exits {A} t q = (Σ Pos λ k → Σ (Ev A) λ e → Seen t k e × q ≺ k × (instantOf k ≢ instantOf q ⊎ e ≡ end))
-              ⊎ Spent t (just q)
+Exits t q = Σ (List Pos) λ ks → ∀ {k e} → t k e → q ≺ k → instantOf k ≡ instantOf q → k ∈ ks
 
 -- The position of the last value met.
 lastAt : ∀ {A} → List (Pos × Ev (IE A)) → Maybe Pos
