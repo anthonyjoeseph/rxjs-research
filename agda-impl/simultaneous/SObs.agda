@@ -30,9 +30,10 @@
 -- EVERY STREAM'S COUNT IS EXACT: its `begin`s less its `stop`s, so no
 -- path is stopped twice.  A reader subscribed to a `connect` mid-instant
 -- meets the instant's later emits without the `begin`s that opened it,
--- so it JOINS: before the first emit it meets, it sends one `begin` per
--- route the source holds then.  Every connect source is counted for
--- this, its count riding beside each emit.
+-- so it JOINS: before the first emit it meets, or the source's end, it
+-- sends one `begin` per route the source holds then.  Every connect
+-- source is counted for this, its count riding beside each emit and
+-- beside a last item telling its end.
 --
 -- A FLATMAP SIMULATES ITS OWN BOOKKEEPING.  Its outer is shared, read by
 -- the real flatMap and by a scan beside it; the outer's marks go around
@@ -60,7 +61,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -161,10 +162,10 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   Routes : Set
   Routes = N × ℕ
 
-  -- An emit of a connect source, beside the routes the source held
-  -- before it.
+  -- An emit of a connect source, or its end, beside the routes the
+  -- source held before it.
   AIE : Set → Set
-  AIE X = Routes × IE X
+  AIE X = Routes × Maybe (IE X)
 
   -- A `begin` adds a route, starting afresh under a new name; a `stop`
   -- takes one; an `over` ends them all.
@@ -176,11 +177,14 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   count (m , k) (instEmit (mark over) _) = m , 0
   count r       _                        = r
 
-  annStep : ∀ {A} → Routes × AIE A → IE A → Routes × AIE A
-  annStep (r , _) e = count r e , (r , e)
+  annStep : ∀ {A} → Routes × AIE A → Maybe (IE A) → Routes × AIE A
+  annStep (r , _) (just e) = count r e , (r , just e)
+  annStep (r , _) nothing  = r , (r , nothing)
 
+  -- The source read through its own subject, then its end.
   annotate : ∀ {Γ A} → E Γ (IE A) → E Γ (AIE A)
-  annotate s = map proj₂ (scan annStep ((name , 0) , ((name , 0) , marked begin)) s)
+  annotate s = map proj₂ (scan annStep ((name , 0) , ((name , 0) , nothing))
+    (connect (map just s) (concatˢ (connected (here refl)) (of (nothing ∷ [])))))
   {-# INLINE annotate #-}
 
   -- What a reader sends before the first emit it meets: a `begin` for
@@ -192,8 +196,10 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   joins (m , k) _ = replicate k (instEmit (mark begin) m)
 
   joinStep : ∀ {A} → Bool × List (IE A) → AIE A → Bool × List (IE A)
-  joinStep (true  , _) (r , e) = false , joins r e ++ e ∷ []
-  joinStep (false , _) (r , e) = false , e ∷ []
+  joinStep (true  , _) (r , just e)  = false , joins r e ++ e ∷ []
+  joinStep (true  , _) (r , nothing) = false , replicate (proj₂ r) (instEmit (mark begin) (proj₁ r))
+  joinStep (false , _) (r , just e)  = false , e ∷ []
+  joinStep (false , _) (r , nothing) = false , []
 
   reader : ∀ {Γ A} → E Γ (AIE A) → E Γ (IE A)
   reader s = each proj₂ (scan joinStep (true , []) s)
