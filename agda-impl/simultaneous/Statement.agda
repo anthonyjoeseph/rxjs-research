@@ -53,7 +53,7 @@ import simultaneous.Flatten as F
 open import simultaneous.Readings using (Rooted; stamped)
 open import simultaneous.Relations using (events; elaborated; batched; Met; values; batchesOut; joined; vals; grouped; Ends; FiniteInstants;
   Joins; Batches; InstantsAgree; Erases; Settles)
-open import simultaneous.Batcher using (batcher-ends)
+open import simultaneous.Batcher using (batcher-ends; batches)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE)
 
@@ -78,8 +78,10 @@ Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
 postulate
   coherent      : Coherent
-  batchable     : Batchable
   positioned    : Positioned
+
+batchable : Batchable
+batchable = batches
 
 -- The batches, joined, are within the elaborated run's values, and those
 -- are the plain run's; the batches closed, they reach as far.

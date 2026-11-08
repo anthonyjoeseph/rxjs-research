@@ -54,6 +54,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _∸_; _<ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
 
@@ -430,6 +431,52 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- A completion releases everything held.
   completed-held : ∀ {A} (s : Step A) n → Batching.held (proj₁ (bstep s (instEmit (mark completed) n))) ≡ []
   completed-held s n = refl
+
+  -- What is held, as the batch it would leave as.
+  pendingOf : ∀ {A : Set} → N → List A → List (N × List A)
+  pendingOf i []       = []
+  pendingOf i (v ∷ vs) = (i , v ∷ vs) ∷ []
+
+  pending : ∀ {A : Set} → Batching A N → List (N × List A)
+  pending b = pendingOf (Batching.at b) (Batching.held b)
+
+  -- Batches as emits.
+  asEmits : ∀ {A : Set} → List (N × List A) → List (IE (List A))
+  asEmits P = L.map (λ g → instEmit (value (proj₂ g)) (proj₁ g)) P
+
+  private
+    release-pending : ∀ {A : Set} (b : Batching A N) → release b ≡ asEmits (pending b)
+    release-pending b with Batching.held b
+    ... | []     = refl
+    ... | v ∷ vs = refl
+
+    flushed : ∀ {A : Set} (b : Batching A N) → (proj₂ (now b) ≡ [] × pending (proj₁ (now b)) ≡ pending b)
+                                        ⊎ (proj₂ (now b) ≡ asEmits (pending b) × pending (proj₁ (now b)) ≡ [])
+    flushed b = inj₂ (release-pending b , refl)
+
+  -- A mark either keeps what is held and releases nothing, or releases
+  -- all of it.
+  mark-step : ∀ {A : Set} l m n (b : Batching A N)
+            → (proj₂ (marking l m n b) ≡ [] × pending (proj₁ (marking l m n b)) ≡ pending b)
+            ⊎ (proj₂ (marking l m n b) ≡ asEmits (pending b) × pending (proj₁ (marking l m n b)) ≡ [])
+  mark-step _     subscribed n b = flushed (record b { late = true })
+  mark-step _     completed  n b = flushed b
+  mark-step true  begin      n b with does (n ≟ Batching.at b)
+  ... | true  = inj₁ (refl , refl)
+  ... | false = inj₂ (release-pending b , refl)
+  mark-step false begin      n b = inj₁ (refl , refl)
+  mark-step true  over       n b = flushed b
+  mark-step false over       n b = inj₁ (refl , refl)
+  mark-step true  stop       n b with isZero (Batching.routes b ∸ 1)
+  ... | true  = flushed b
+  ... | false = inj₁ (refl , refl)
+  mark-step false stop       n b = inj₁ (refl , refl)
+  mark-step _     outerOpen  n b = inj₁ (refl , refl)
+  mark-step _     outerClose n b = inj₁ (refl , refl)
+  mark-step _     laneStart  n b = inj₁ (refl , refl)
+  mark-step _     laneDone   n b = inj₁ (refl , refl)
+  mark-step _     burstEnd   n b = inj₁ (refl , refl)
+  mark-step _     outerDone  n b = inj₁ (refl , refl)
 
   -- The subscribe burst is one batch, released when it is over; after
   -- it, an instant's batch is released when its routes are.  The run is

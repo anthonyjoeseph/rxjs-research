@@ -90,17 +90,27 @@ Left : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Maybe Pos 
 Left t rs nothing  = ⊤
 Left t rs (just i) = ∀ {k x} → t k (out x) → After (cursor nothing rs) k → InstEmit.instant x ≡ i → valuesOf x ≡ []
 
--- A grouping may keep its last group only once its instant is over, run
--- over or not: batching shows what plain rxjs shows, as it shows it.
-Closes : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Bool → Set
-Closes t rs false = ⊤
-Closes t rs true  = Left t rs (lastInstant rs)
-
 -- Past the row at `q`, the run leaves `q`'s instant: a reached row of
 -- another instant or the completion, or finitely many rows after.
 Exits : ∀ {A} → EmissionSet A → Pos → Set
 Exits {A} t q = (Σ Pos λ k → Σ (Ev A) λ e → Seen t k e × q ≺ k × (instantOf k ≢ instantOf q ⊎ e ≡ end))
               ⊎ Spent t (just q)
+
+-- The position of the last value met.
+lastAt : ∀ {A} → List (Pos × Ev (IE A)) → Maybe Pos
+lastAt rs = L.last (L.concatMap (λ r → L.map (λ _ → proj₁ r) (valuesOf (proj₂ r))) (outs rs))
+
+-- The instant of the last value met is over.
+Over : ∀ {A} → EmissionSet A → Maybe Pos → Set
+Over t nothing  = ⊤
+Over t (just q) = Exits t q
+
+-- A grouping may keep its last group only once its instant is over, run
+-- over or not: no value of it is left, and the run leaves it.  An
+-- instant that never ends keeps its group, though no value is left.
+Closes : ∀ {A} → EmissionSet (IE A) → List (Pos × Ev (IE A)) → Bool → Set
+Closes t rs false = ⊤
+Closes t rs true  = Left t rs (lastInstant rs) × Over t (lastAt rs)
 
 -- Every instant a row is reached in is over.
 FiniteInstants : ∀ {A} → EmissionSet A → Set

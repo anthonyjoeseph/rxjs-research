@@ -28,13 +28,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE BATCHER
 
-Untried: the batcher releases each instant's values the moment that
-instant is over, read off the elaborated run's rows. Hardest: the
-bracket and route protocol through every flatMap policy and connect.
-Settled when `batchable` is a body over the elaborated run and the
-completion mark is shown last.
+Untried: the elaborated run as the batcher reads it — values named by
+their instant, a new instant only after the last is over, the run
+leaving an instant once nothing of it is held. Hardest: the bracket and
+route protocol through every flatMap policy and connect.
 
-Members: `batchable`, `completed-last`.
+Members: `good-run`, `flush-closes`, `closes-flush`, `completed-last`.
 
 #### THE ERASURE
 
@@ -63,8 +62,9 @@ Members: `positioned`.
 
 #### THE LAYERS
 
-Untried: a run of a `scan`, or of an `each`, read back as a run of its
-source, completing exactly when it does. Generic in the source; settled
-when each is a body over the denotation's `scan` and joiner rows.
+A run of an `each` read back as a run of its source, values prefix to
+lanes, completing exactly when it does.  Route: every visible row of the
+merge hangs under one source row; `each-in` by walking the source run,
+`each-out` from `reach`, `each-in` and determinism of a run.
 
-Members: `scan-ends-out`, `scan-ends-in`, `each-ends-out`, `each-ends-in`.
+Members: `each-out`, `each-in`.

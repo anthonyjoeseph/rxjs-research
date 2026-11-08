@@ -129,21 +129,21 @@ private
   of-func p i (x ∷ xs) (on-out r) at-out      = ⊥-elim (of-fresh p i xs r)
   of-func p i (x ∷ xs) (on-out r) (on-out r′) = of-func p (suc i) xs r r′
 
-  -- A fold has one value at a position.
-  module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
-    open Scan f z t using (Acc; acc₀; acc)
+-- A fold has one value at a position.
+module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
+  open Scan f z t using (Acc; acc₀; acc)
 
-    acc-val : ∀ {q b} → Acc q b → Σ A λ a → t q (out a)
-    acc-val (acc₀ x _)    = _ , x
-    acc-val (acc _ x _ _) = _ , x
+  acc-val : ∀ {q b} → Acc q b → Σ A λ a → t q (out a)
+  acc-val (acc₀ x _)    = _ , x
+  acc-val (acc _ x _ _) = _ , x
 
-    acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc q b → Acc q′ b′ → b ≡ b′
-    acc-func refl (acc₀ x _)       (acc₀ x′ _)      = cong (f z) (out-inj (fu x x′))
-    acc-func refl (acc₀ _ mn)      (acc a _ lt _)   = ⊥-elim (mn (proj₂ (acc-val a)) lt)
-    acc-func refl (acc a _ lt _)   (acc₀ _ mn)      = ⊥-elim (mn (proj₂ (acc-val a)) lt)
-    acc-func refl (acc {q₀} a x lt nx) (acc {q₁} a′ x′ lt′ nx′) =
-      cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
-              (out-inj (fu x x′))
+  acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc q b → Acc q′ b′ → b ≡ b′
+  acc-func refl (acc₀ x _)       (acc₀ x′ _)      = cong (f z) (out-inj (fu x x′))
+  acc-func refl (acc₀ _ mn)      (acc a _ lt _)   = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+  acc-func refl (acc a _ lt _)   (acc₀ _ mn)      = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+  acc-func refl (acc {q₀} a x lt nx) (acc {q₁} a′ x′ lt′ nx′) =
+    cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
+            (out-inj (fu x x′))
 
 -- A timeline's rows hold no pin.
 ine-pin : ∀ {A} {es : Events A} {y r} → InE es y (pin r) → ⊥
