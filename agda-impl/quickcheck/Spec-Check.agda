@@ -562,19 +562,24 @@ private
   ... | f ∷ fs = putStrLn ("spec-check: FAIL protocol seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
                  >>= λ _ → protoReport ss
 
-  report : List ℕ → IO Unit
-  report []          = putStrLn ("spec-check: done " +++ showTally (tallyOf real seeds))
-  report (seed ∷ ss) with fails (judge (budget seed) (real seed))
-  ... | []     = report ss
-  ... | f ∷ fs = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
-                 >>= λ _ → report ss
+  -- Each seed judged once: its failures printed, its verdict tallied.
+  report : Tally → List ℕ → IO Unit
+  report t []          = putStrLn ("spec-check: done " +++ showTally t)
+  report t (seed ∷ ss) = go (judge (budget seed) (real seed))
+    where
+      go : Verdict → IO Unit
+      go v with fails v
+      ... | []     = report (add v t) ss
+      ... | f ∷ fs = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
+                     >>= λ _ → report (add v t) ss
 
+  -- A sabotage need only be caught, not caught everywhere.
   selftest : IO Unit
   selftest =
-    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied seeds))) >>= λ _ →
-    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped seeds))) >>= λ _ →
-    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds))) >>= λ _ →
+    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied (upTo 100)))) >>= λ _ →
+    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped (upTo 100)))) >>= λ _ →
+    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled (upTo 100)))) >>= λ _ →
     putStrLn (fires "protocol" (protoFails protoTwice (upTo 60)))
 
 main : IO Unit
-main = selftest >>= λ _ → pinned pins >>= λ _ → protoReport seeds >>= λ _ → report seeds
+main = selftest >>= λ _ → pinned pins >>= λ _ → protoReport seeds >>= λ _ → report (tally 0 0 0 0 0) seeds

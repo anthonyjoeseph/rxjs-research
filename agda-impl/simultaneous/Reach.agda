@@ -7,9 +7,8 @@
 -- decidable, as everything read off a run's count is, may still use it.
 module simultaneous.Reach where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Maybe using (nothing; just)
+open import Data.List using ([]; _∷_; _++_; [_])
+open import Data.Maybe using (nothing)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -17,7 +16,7 @@ open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (subst; sym)
 
 open import denotation.Events using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; Seen; Few; _≺_; _≼_)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; Seen; Few; _≺_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Worlds using (InvAt)
 open import denotation.Laws.Modulus using (entered-few; few-ind)

@@ -173,6 +173,10 @@ jobs:
       - name: make spec-check
         run: make spec-check
 
+      - name: spec-check log, however the run ended
+        if: failure() || cancelled()
+        run: cat agda-impl/_cli/spec-check.log || true
+
   # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
   oracle:
