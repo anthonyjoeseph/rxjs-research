@@ -44,7 +44,7 @@ open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; c
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
-open import simultaneous.InstEmit using (instEmit; mark)
+open import simultaneous.InstEmit using (InstEmit; instEmit; mark)
 import simultaneous.InstEmit as M
 open import simultaneous.SObs using (Batching; module Elaborate)
 open import simultaneous.Protocol using (nameStep; subStep)
@@ -55,7 +55,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; Routes; count)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -149,10 +149,74 @@ private
   protocol a s st []       = []
   protocol a s st (w ∷ ys) = leafAt a s st w ys ++ protocol (nameStep a w) (subStep s w) (bstep st w) ys
 
+------------------------------------------------------------------------
+-- The positional leaves, decided over a whole run's emits in order
+
+private
+  Emits : Set
+  Emits = List (Pos × IE ℕ)
+
+  sameI : Pos → Pos → Bool
+  sameI p q = does (instantOf p ≟ᵖ instantOf q)
+
+  isVal isBegin isSub isOver isDone : IE ℕ → Bool
+  isVal (instEmit (M.value _) _) = true
+  isVal _                        = false
+  isBegin (instEmit (mark M.begin) _) = true
+  isBegin _                           = false
+  isSub (instEmit (mark M.subscribed) _) = true
+  isSub _                                = false
+  isOver (instEmit (mark M.over) _) = true
+  isOver _                          = false
+  isDone (instEmit (mark M.completed) _) = true
+  isDone _                               = false
+
+  anyᵇ : ∀ {X : Set} → (X → Bool) → List X → Bool
+  anyᵇ p []       = false
+  anyᵇ p (x ∷ xs) = p x ∨ anyᵇ p xs
+
+  -- The instants of the begins named `n`.
+  beginsOf : Pos → Emits → List Pos
+  beginsOf n []             = []
+  beginsOf n ((q , e) ∷ rs) with isBegin e ∧ does (InstEmit.instant e ≟ᵖ n)
+  ... | true  = instantOf q ∷ beginsOf n rs
+  ... | false = beginsOf n rs
+
+  -- `Shut`: at every split, the count holding no route of its instant,
+  -- no value of a begin's instant so named follows.
+  shutᵇ : Routes → Emits → Emits → Bool
+  shutᵇ K pre []       = true
+  shutᵇ K pre (r ∷ rs) = now ∧ shutᵇ (count K (proj₂ r)) (pre ++ [ r ]) rs
+    where
+      dead = beginsOf (proj₁ K) pre
+      now = not (proj₂ K ≡ᵇ 0) ∨ allᵇ (λ y → not (isVal (proj₂ y)) ∨ not (anyᵇ (sameI (proj₁ y)) dead)) (r ∷ rs)
+
+  -- each row, against every row after it
+  laterᵇ : (Pos × IE ℕ → Pos × IE ℕ → Bool) → Emits → Bool
+  laterᵇ r []       = true
+  laterᵇ r (x ∷ xs) = allᵇ (r x) xs ∧ laterᵇ r xs
+
+  -- the leaves of `simultaneous.Protocol`
+  namedᵇ oneNameᵇ subFirstᵇ subOneᵇ subAsyncᵇ overLastᵇ doneLastᵇ : Emits → Bool
+  namedᵇ = allᵇ (λ { (k , x) → sameI (InstEmit.instant x) k })
+  oneNameᵇ = laterᵇ (λ { (k , x) (k′ , x′) → not (isBegin x ∧ isBegin x′ ∧ sameI k k′) ∨ does (InstEmit.instant x ≟ᵖ InstEmit.instant x′) })
+  subFirstᵇ []             = true
+  subFirstᵇ ((_ , x) ∷ rs) = isSub x ∨ (not (isBegin x) ∧ subFirstᵇ rs)
+  subOneᵇ = laterᵇ (λ { (_ , x) (_ , x′) → not (isSub x ∧ isSub x′) })
+  subAsyncᵇ = laterᵇ (λ { (_ , x) (k′ , x′) → not (isSub x ∧ isVal x′) ∨ not (does (instantOf k′ ≟ᵖ root)) })
+  overLastᵇ = laterᵇ (λ { (k , x) (k′ , x′) → not (isOver x ∧ isVal x′ ∧ sameI k k′) })
+  doneLastᵇ = laterᵇ (λ { (_ , x) (_ , x′) → not (isDone x ∧ isVal x′) })
+
+  rowLeaves : Emits → List String
+  rowLeaves es =
+    unless (shutᵇ (root , 0) [] es) "shut" (unless (namedᵇ es) "named" (unless (oneNameᵇ es) "one-name"
+      (unless (subFirstᵇ es) "sub-first" (unless (subOneᵇ es) "sub-one" (unless (subAsyncᵇ es) "sub-async"
+        (unless (overLastᵇ es) "over-last" (unless (doneLastᵇ es) "done-last" [])))))))
+
 -- The leaves a seed's elaborated run refutes; nothing when cut.
 protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
 protocolOf n x with whole (listT n x [] root)
-... | just rx = protocol root false bstart (values rx)
+... | just rx = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
 ... | nothing = []
 
 ------------------------------------------------------------------------
