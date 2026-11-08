@@ -175,43 +175,81 @@ private
   anyᵇ p []       = false
   anyᵇ p (x ∷ xs) = p x ∨ anyᵇ p xs
 
-  -- The instants of the begins named `n`.
-  beginsOf : Pos → Emits → List Pos
-  beginsOf n []             = []
-  beginsOf n ((q , e) ∷ rs) with isBegin e ∧ does (InstEmit.instant e ≟ᵖ n)
-  ... | true  = instantOf q ∷ beginsOf n rs
-  ... | false = beginsOf n rs
+  memᵇ : Pos → List Pos → Bool
+  memᵇ i = anyᵇ (λ j → does (i ≟ᵖ j))
 
-  -- `Shut`: at every split, the count holding no route of its instant,
-  -- no value of a begin's instant so named follows.
-  shutᵇ : Routes → Emits → Emits → Bool
-  shutᵇ K pre []       = true
-  shutᵇ K pre (r ∷ rs) = now ∧ shutᵇ (count K (proj₂ r)) (pre ++ [ r ]) rs
+  -- Each pass below is one walk of the run, its state carried along.
+
+  -- The instants of the begins named `n`, by name.
+  Begun : Set
+  Begun = List (Pos × List Pos)
+
+  begunOf : Pos → Begun → List Pos
+  begunOf n []              = []
+  begunOf n ((m , is) ∷ bs) = if does (n ≟ᵖ m) then is else begunOf n bs
+
+  addBegun : Pos → Pos → Begun → Begun
+  addBegun n i []              = (n , i ∷ []) ∷ []
+  addBegun n i ((m , is) ∷ bs) =
+    if does (n ≟ᵖ m) then (m , i ∷ is) ∷ bs else (m , is) ∷ addBegun n i bs
+
+  union : List Pos → List Pos → List Pos
+  union []       ks = ks
+  union (i ∷ is) ks = if memᵇ i ks then union is ks else union is (i ∷ ks)
+
+  -- `Shut`: at every split where the count holds no route, the instants of
+  -- the begins named for the count are dead, and no value of one follows.
+  shutᵇ : Routes → Begun → List Pos → Emits → Bool
+  shutᵇ K bs dead []             = true
+  shutᵇ K bs dead ((q , e) ∷ rs) =
+    not (isVal e ∧ memᵇ (instantOf q) dead′) ∧ shutᵇ (count K e) bs′ dead′ rs
     where
-      dead = beginsOf (proj₁ K) pre
-      now = not (proj₂ K ≡ᵇ 0) ∨ allᵇ (λ y → not (isVal (proj₂ y)) ∨ not (anyᵇ (sameI (proj₁ y)) dead)) (r ∷ rs)
+      dead′ = if proj₂ K ≡ᵇ 0 then union (begunOf (proj₁ K) bs) dead else dead
+      bs′   = if isBegin e then addBegun (InstEmit.instant e) (instantOf q) bs else bs
 
-  -- each row, against every row after it
-  laterᵇ : (Pos × IE ℕ → Pos × IE ℕ → Bool) → Emits → Bool
-  laterᵇ r []       = true
-  laterᵇ r (x ∷ xs) = allᵇ (r x) xs ∧ laterᵇ r xs
+  -- One instant's begins share a name: the first begin's, by instant.
+  oneNameᵇ : List (Pos × Pos) → Emits → Bool
+  oneNameᵇ seen []             = true
+  oneNameᵇ seen ((k , x) ∷ rs) with isBegin x
+  ... | false = oneNameᵇ seen rs
+  ... | true  = agrees seen ∧ oneNameᵇ ((instantOf k , InstEmit.instant x) ∷ seen) rs
+    where
+      agrees : List (Pos × Pos) → Bool
+      agrees []            = true
+      agrees ((i , n) ∷ ss) = (not (does (i ≟ᵖ instantOf k)) ∨ does (n ≟ᵖ InstEmit.instant x)) ∧ agrees ss
+
+  -- No value of an instant past one of its overs.
+  overLastᵇ : List Pos → Emits → Bool
+  overLastᵇ overs []             = true
+  overLastᵇ overs ((k , x) ∷ rs) =
+    not (isVal x ∧ memᵇ (instantOf k) overs)
+    ∧ overLastᵇ (if isOver x then instantOf k ∷ overs else overs) rs
 
   -- the leaves of `simultaneous.Protocol`
-  namedᵇ oneNameᵇ subFirstᵇ subOneᵇ subAsyncᵇ overLastᵇ doneLastᵇ : Emits → Bool
+  namedᵇ subFirstᵇ : Emits → Bool
   namedᵇ = allᵇ (λ { (k , x) → sameI (InstEmit.instant x) k })
-  oneNameᵇ = laterᵇ (λ { (k , x) (k′ , x′) → not (isBegin x ∧ isBegin x′ ∧ sameI k k′) ∨ does (InstEmit.instant x ≟ᵖ InstEmit.instant x′) })
   subFirstᵇ []             = true
   subFirstᵇ ((_ , x) ∷ rs) = isSub x ∨ (not (isBegin x) ∧ subFirstᵇ rs)
-  subOneᵇ = laterᵇ (λ { (_ , x) (_ , x′) → not (isSub x ∧ isSub x′) })
-  subAsyncᵇ = laterᵇ (λ { (_ , x) (k′ , x′) → not (isSub x ∧ isVal x′) ∨ not (does (instantOf k′ ≟ᵖ root)) })
-  overLastᵇ = laterᵇ (λ { (k , x) (k′ , x′) → not (isOver x ∧ isVal x′ ∧ sameI k k′) })
-  doneLastᵇ = laterᵇ (λ { (_ , x) (_ , x′) → not (isDone x ∧ isVal x′) })
+
+  -- Past the subscribe mark: no second one, and no value of the root
+  -- instant.
+  subOneᵇ subAsyncᵇ : Bool → Emits → Bool
+  subOneᵇ s []             = true
+  subOneᵇ s ((_ , x) ∷ rs) = not (s ∧ isSub x) ∧ subOneᵇ (s ∨ isSub x) rs
+  subAsyncᵇ s []             = true
+  subAsyncᵇ s ((k , x) ∷ rs) =
+    not (s ∧ isVal x ∧ does (instantOf k ≟ᵖ root)) ∧ subAsyncᵇ (s ∨ isSub x) rs
+
+  -- No value past the completion mark.
+  doneLastᵇ : Bool → Emits → Bool
+  doneLastᵇ d []             = true
+  doneLastᵇ d ((_ , x) ∷ rs) = not (d ∧ isVal x) ∧ doneLastᵇ (d ∨ isDone x) rs
 
   rowLeaves : Emits → List String
   rowLeaves es =
-    unless (shutᵇ (root , 0) [] es) "shut" (unless (namedᵇ es) "named" (unless (oneNameᵇ es) "one-name"
-      (unless (subFirstᵇ es) "sub-first" (unless (subOneᵇ es) "sub-one" (unless (subAsyncᵇ es) "sub-async"
-        (unless (overLastᵇ es) "over-last" (unless (doneLastᵇ es) "done-last" [])))))))
+    unless (shutᵇ (root , 0) [] [] es) "shut" (unless (namedᵇ es) "named" (unless (oneNameᵇ [] es) "one-name"
+      (unless (subFirstᵇ es) "sub-first" (unless (subOneᵇ false es) "sub-one" (unless (subAsyncᵇ false es) "sub-async"
+        (unless (overLastᵇ [] es) "over-last" (unless (doneLastᵇ false es) "done-last" [])))))))
 
 -- The leaves a seed's elaborated run refutes; nothing when cut.
 protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
