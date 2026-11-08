@@ -18,9 +18,12 @@ open import adequacy.Adequacy using (adequacy)
 open import denotation.Laws using (compositional; map-fusion)
 
 -- THE SIMULTANEOUS SPEC: an author's program, elaborated with
--- `batchSimultaneous` on top, groups what plain rxjs delivers by instant,
--- in order, releasing each batch the moment its instant is over.
-open import simultaneous.Statement using (left-to-right; coherent; batchable; positioned)
+-- `batchSimultaneous` on top, batches the way the stamps batch — each
+-- batch stamped with the instant it leaves in is the spec's grouping of
+-- the plain run's values stamped the same way.
+-- THE INSTANTS: every position a program reaches lies under the subscribe
+-- frame or one timer cascade, so a stamp counts instants.
+open import simultaneous.Statement using (spec; positioned)
 
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.

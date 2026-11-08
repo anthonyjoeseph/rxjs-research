@@ -1,109 +1,111 @@
 {-# OPTIONS --guardedness #-}
 
--- THE SIMULTANEOUS SPEC, over the emission set: elaborate the author's
--- program, put `batchSimultaneous` on top, and what comes out is what
--- plain rxjs delivers, grouped by instant, released the moment each
--- instant is over.  Three statements, each closing a cheat the others
--- leave open.
+-- THE SIMULTANEOUS SPEC, over the emission set, in one statement:
+-- elaborate the author's program, put `batchSimultaneous` on top, and the
+-- batched run, each batch stamped with the instant it leaves in, is the
+-- spec's grouping of the plain run, each value stamped with the instant
+-- it leaves in.  The stamps are the denotation's own
+-- (`simultaneous.Relations`): no program can read one, and the
+-- elaboration's names appear nowhere, so the batcher is held to a
+-- property of stamps it never sees.
 --
--- `left-to-right`: the batches, joined back up, are the plain run's
--- values, in order, and the batched run completes exactly when the plain
--- one does, all its values out.  Elaborating every program to `empty` is
--- trivially batched, and fails it.
+-- WHAT ONE EQUATION CLOSES.  Elaborating every program to `empty` fails
+-- it: the grouping is not empty.  Stamping every emit alike fails it:
+-- one batch where the grouping has one per instant.  Releasing a batch
+-- late fails it: a batch released in the next instant carries that
+-- instant's stamp, and no row of the grouping does.  Restamping a batch
+-- to its release instant cannot be written: the stamp is read off the
+-- batch's own position.  Holding a value to a later instant inside the
+-- elaboration fails it: the plain run's stamps are the plain program's,
+-- which the elaboration never touches.
 --
--- `coherent`: two emits share a provenance exactly when they sit in one
--- instant, valueless ones too, both the elaborated run's and the
--- batcher's.  Stamping every emit alike, or each apart, fails it on the
--- elaborated run; on the batcher's, it pins a batch to the moment its
--- instant is over, since a batch released late sits in an instant that
--- is not its own.
---
--- `batchable`: the batches, each with its provenance, are the spec's
--- grouping of the elaborated run's values.  A batch restamped to the
--- instant it was released in, to pass `coherent`, fails it.
+-- WHAT IT DOES NOT PIN: where inside its instant a batch leaves, past the
+-- instant's last value.  The batcher releases when its instant is over,
+-- and the equation asks only that the batch leave within it, after its
+-- last value.
 --
 -- AN INSTANT'S END IS A FACT OF THE ROWS, NOT OF WHAT IS SHOWN: work no
 -- subscriber sees (a skip, a pin) still runs in some instant, so an
--- instant is left by every row past it.  Those are read off the
--- emission set directly, over its reached rows (`Seen`), never through a
--- reader.
+-- instant is left by every row past it.  Those are read off the emission
+-- set directly, over its reached rows (`Seen`), never through a reader.
 --
--- AN INSTANT OVER IS ENOUGH, THE RUN NEED NOT BE: a batch is released
--- the moment its instant is, though work no subscriber sees runs on.
---
--- EACH IS TWO DIRECTIONS OVER PREFIXES, since a run need not end: what
--- has come out is within what the spec allows, and everything the spec
--- allows comes out eventually.  A prefix is what a subscriber is shown
--- first (`denotation.Read.Meets`), the reader adequacy reads by.  Only
--- `left-to-right`'s second half needs the plain run's instants finite: an
--- instant that never ends is never released, so `ones` batched shows
--- nothing, as specified.
+-- EACH DIRECTION IS OVER PREFIXES, since a run need not end: what has
+-- come out is within what the grouping allows, and everything the
+-- grouping allows, once its instant is over, comes out.  A prefix is what
+-- a subscriber is shown first (`denotation.Read.Meets`), the reader
+-- adequacy reads by.
 module simultaneous.Statement where
 
-open import Data.Bool using (true)
-open import Data.List using (List; [])
+open import Data.Bool using (Bool)
+open import Data.List using ([_])
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_) renaming (sym to ≡-sym; trans to ≡-trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym) renaming (trans to ≡-trans)
 
-open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
-open import denotation.EmissionSet using (Ev; Seen)
-open import simultaneous.SObs using (SObs; module Elaborate)
-import simultaneous.Flatten as F
-open import simultaneous.Readings using (Rooted; stamped)
-open import simultaneous.Relations using (events; elaborated; batched; Met; values; batchesOut; joined; vals; grouped; Ends; FiniteInstants;
-  Joins; Batches; InstantsAgree; Erases; Settles)
+open import denotation.EmissionSet using (Seen)
+open import simultaneous.SObs using (SObs)
+open import simultaneous.Readings using (Rooted)
+open import simultaneous.Relations using (events; elaborated; batched; Met; ranked; Closes; Ends; joined; values;
+  stampedᴰ; stampedᴮ; grouped; Groups; Erases; Batches)
 open import simultaneous.Batcher using (batcher-ends)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE)
-
-postulate
-  erases       : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
-  settles      : ∀ {A} (o : SObs [] A) → Settles (elaborated o) (events o)
-
 ------------------------------------------------------------------------
--- The statements: each the root case
+-- The pieces
 
-Left-To-Right : Set₁
-Left-To-Right = ∀ {A} (o : SObs [] A) → Joins (batched o) (events o)
+-- THE ERASURE: the elaboration adds no instant and holds no value, so a
+-- prefix of the elaborated run erases to a prefix of the plain one with
+-- the same stamped values, and an instant over on one side is over on
+-- the other.  Switch, exhaust and the bounded queue are the real cases.
+--
+-- THE BATCHER: the batcher groups by the names the elaboration mints,
+-- and the names agree with the instants — each async cold step mints one
+-- and its whole cascade carries it — so grouping by name is grouping by
+-- stamp, and each group is released the moment its instant is over,
+-- through every flatMap policy and connect.  The names agreeing with the
+-- instants is the lemma the body needs first, and it is stated for no
+-- one until the body exists.
+--
+-- RECOVERY: git show d9f6134:agda-impl/simultaneous/Statement.agda
+--   restores `coherent`, the names-agree-with-instants statement, over
+--   `InstantsAgree` in `simultaneous/Relations.agda` at that sha.
+postulate
+  erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
+  batchable : ∀ {A} (o : SObs [] A) → Batches (batched o) (elaborated o)
 
-Coherent : Set₁
-Coherent = ∀ {A} (o : SObs [] A) → InstantsAgree (elaborated o) × InstantsAgree (batched o)
-
-Batchable : Set₁
-Batchable = ∀ {A} (o : SObs [] A) → Batches (batched o) (elaborated o)
-
+-- THE INSTANTS: every position a program reaches lies under the subscribe
+-- frame or one timer cascade, which is what makes `instantOf` read an
+-- instant, and a stamp count them.
 Positioned : Set₁
 Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
 postulate
-  coherent      : Coherent
-  batchable     : Batchable
-  positioned    : Positioned
+  positioned : Positioned
 
--- The batches, joined, are within the elaborated run's values, and those
--- are the plain run's; the batches closed, they reach as far.
-left-to-right : Left-To-Right
-left-to-right o = early , late , ends-out , ends-in
+------------------------------------------------------------------------
+-- The statement
+
+Spec : Set₁
+Spec = ∀ {A} (o : SObs [] A) → Groups (batched o) (events o)
+
+-- A batched prefix is within the grouping of an elaborated prefix, which
+-- erases, stamp for stamp, to a plain one; and back.  At the end, the
+-- values: the batcher ends with the elaborated run, which ends with the
+-- plain one.
+spec : Spec
+spec o = sound , complete , ends-out , ends-in
   where
-    open F _≟ᵖ_ using (prefix-trans; prefix-≡; prefix-map; prefix-concat; joined-closed; joined-batches)
+    sound : ∀ {rs} → Met (ranked (batched o)) rs →
+            Σ _ λ rs′ → Σ Bool λ ov → Met (ranked (events o)) rs′ × Closes [_] (events o) rs′ ov ×
+            Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴰ rs′))
+    sound {rs} m with proj₁ (batchable o) m
+    ... | rx , ov , mx , cl , p with proj₁ (erases o) mx cl
+    ...   | rs′ , me , cl′ , eq = rs′ , ov , me , cl′ , subst (λ ys → Prefix _≡_ (stampedᴮ rs) (grouped ov ys)) eq p
 
-    -- what a prefix of the grouping joins to
-    joined-within : ∀ {A} (rs : List (Pos × Ev (IE (List A)))) {ov} rx →
-                    Prefix _≡_ (batchesOut rs) (grouped ov rx) → Prefix _≡_ (joined rs) (vals rx)
-    joined-within rs {ov} rx p = prefix-trans (prefix-concat (prefix-map proj₂ p)) (joined-closed ov (stamped (values rx)))
-
-    early : ∀ {rs} → Met (batched o) rs → Σ _ λ rs′ → Met (events o) rs′ × Prefix _≡_ (joined rs) (values rs′)
-    early {rs} m with proj₁ (batchable o) m
-    ... | rx , ov , mx , _ , p with proj₁ (erases o) mx
-    ...   | rs′ , me , q = rs′ , me , prefix-trans (joined-within rs rx p) q
-
-    late : FiniteInstants (events o) → ∀ {rs′} → Met (events o) rs′ → Σ _ λ rs → Met (batched o) rs × Prefix _≡_ (values rs′) (joined rs)
-    late fin m with proj₁ (proj₂ (erases o)) m
-    ... | rx , mx , p with settles o fin mx
-    ...   | rx′ , mx′ , cl , q with proj₂ (batchable o) {ov = true} mx′ cl
-    ...     | rs , mb , r = rs , mb , prefix-trans p (prefix-trans q
-                (prefix-trans (prefix-≡ (≡-sym (joined-batches (stamped (values rx′))))) (prefix-concat (prefix-map proj₂ r))))
+    complete : ∀ {rs′ ov} → Met (ranked (events o)) rs′ → Closes [_] (events o) rs′ ov →
+               Σ _ λ rs → Met (ranked (batched o)) rs × Prefix _≡_ (grouped ov (stampedᴰ rs′)) (stampedᴮ rs)
+    complete {rs′} {ov} m cl with proj₁ (proj₂ (erases o)) m cl
+    ... | rx , mx , clx , eq with proj₂ (batchable o) mx clx
+    ...   | rs , mb , p = rs , mb , subst (λ ys → Prefix _≡_ (grouped ov ys) (stampedᴮ rs)) (sym eq) p
 
     ends-out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rs′ → Met (events o) rs′ × Ends rs′ × joined rs ≡ values rs′
     ends-out m en with proj₁ (batcher-ends o) m en

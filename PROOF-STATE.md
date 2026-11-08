@@ -16,42 +16,38 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ## Tier 1 — the elaboration
 
-**The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes `left-to-right`, `coherent` or `batchable`.
+**The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
 
 ### Ledger
 
 ## Tier 2 — the simultaneous spec
 
-**The spec:** batchSimultaneous groups what plain rxjs delivers by instant, in order, read off the emission set.
+**The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
 
 ### Ledger
 
 #### THE BATCHER
 
 Untried: the batcher releases each instant's values the moment that
-instant is over, read off the elaborated run's rows. Hardest: the
-bracket and route protocol through every flatMap policy and connect.
-Settled when `batchable` is a body over the elaborated run and the
-completion mark is shown last.
+instant is over, read off the elaborated run's rows stamped by rank, not
+by the names it mints. Hardest: the bracket and route protocol through
+every flatMap policy and connect, and that the names agree with the
+instants — each async cold step mints one and its whole cascade carries
+it — so grouping by name is grouping by stamp. Settled when `batchable`
+is a body over the elaborated run, a restamp invariant and `positioned`,
+and the completion mark is shown last.
 
 Members: `batchable`, `completed-last`.
 
 #### THE ERASURE
 
-Untried: the elaborated run, marks dropped, is the plain run, values and
-completion, and its instants are finite when the plain run's are.
+Untried: the elaborated run, marks dropped, is the plain run stamp for
+stamp — the elaboration adds no instant, so the ranks agree — with an
+instant over on one side over on the other, and completing together.
 Switch, exhaust and the bounded queue are the real cases. Settled when
 each is a body by operator.
 
-Members: `erases`, `settles`.
-
-#### THE NAMES
-
-Untried: each async cold step mints one name and its whole cascade
-carries it, so names agree exactly when instants do. Settled when
-`coherent` is a body over a restamp invariant and `positioned`.
-
-Members: `coherent`.
+Members: `erases`.
 
 #### THE INSTANTS
 
