@@ -101,7 +101,7 @@ data Part : Set where
 -- What a flatMap's scan reads: the outer, the real flatMap, and the
 -- closing of each outer value.
 data Branch : Set where
-  outerB laneB closeB trackB : Branch
+  outerB laneB closeB : Branch
 
 -- A flatMap's bookkeeping, as its scan simulates it, for the instant
 -- named `at`.
@@ -387,14 +387,12 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   bump outerB f s = record s { outer = f (Flat.outer s) }
   bump laneB  f s = record s { lanes = f (Flat.lanes s) }
   bump closeB f s = s
-  bump trackB f s = s
 
   -- The routes a branch holds of the instant, as the scan counts them.
   share : Branch → Flat N → ℕ
   share outerB s = Flat.outer s
   share laneB  s = Flat.lanes s
   share closeB s = 0
-  share trackB s = 0
 
   -- A branch's stop, unless the branch holds no route the scan counts: a
   -- route an over has ended is stopped by no one.
@@ -439,27 +437,37 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   Input : Set → Set
   Input B = (Branch × IE B) ⊎ (ℕ × Routes)
 
-  react : ∀ {B} → FlatOp → Out B → Input B → Out B
-  react op (s , _) (inj₁ (b , instEmit (value v) n)) = s , instEmit (value v) n ∷ []
-  react op (s , _) (inj₁ (b , instEmit (mark m) n))  = onMark op b s m n
-  react op (s , _) (inj₂ (i , r))                    = unpark name (record s { live = setAt i r (Flat.live s) })
+  react : ∀ {B} → FlatOp → Out B → Maybe (Input B) → Out B
+  react op (s , _) (just (inj₁ (b , instEmit (value v) n))) = s , instEmit (value v) n ∷ []
+  react op (s , _) (just (inj₁ (b , instEmit (mark m) n)))  = onMark op b s m n
+  react op (s , _) (just (inj₂ (i , r)))                    = unpark name (record s { live = setAt i r (Flat.live s) })
+  react op (s , _) nothing                                  = s , []
 
   branch : ∀ {Δ A B} → Branch → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   branch outerB = map opening (connected (there (there (here refl))))
   branch laneB  = connected (here refl)
   branch closeB = connected (there (here refl))
-  branch trackB = empty
+
+  going : ∀ {X : Set} → Maybe X → Bool
+  going (just _) = true
+  going nothing  = false
+
+  -- The flatMap's own branches, then a last item telling they are done.
+  own : ∀ {Δ A B} → E (IE B ∷ IE B ∷ IE A ∷ Δ) (Maybe (Input B))
+  own = concatˢ (flatMap (mergeᶠ nothing) (λ b → map (λ e → just (inj₁ (b , e))) (branch b)) (of (outerB ∷ laneB ∷ closeB ∷ [])))
+                (of (nothing ∷ []))
 
   -- The connects in scope are watched first, before any reader the
-  -- flatMap's own outer subscribes.
-  tagged : ∀ {Δ A B} → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → Branch → E (IE B ∷ IE B ∷ IE A ∷ Δ) (Input B)
-  tagged tk trackB = map inj₂ tk
-  tagged tk b      = map (λ e → inj₁ (b , e)) (branch b)
+  -- flatMap's own outer subscribes, and only until its own branches are
+  -- done: a connect outliving the flatMap never holds it open.
+  fed : ∀ {Δ A B} → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → Bool → E (IE B ∷ IE B ∷ IE A ∷ Δ) (Maybe (Input B))
+  fed tk true  = map (λ x → just (inj₂ x)) tk
+  fed tk false = own
 
   combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   combined op tk = each proj₂
     (scan (react op) (flat name 0 0 false false false false 0 0 0 0 0 [] , [])
-      (flatMap (mergeᶠ nothing) (tagged tk) (of (trackB ∷ outerB ∷ laneB ∷ closeB ∷ []))))
+      (takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))))
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
   -- then by `closer`: the order the nested connects subscribe them in.

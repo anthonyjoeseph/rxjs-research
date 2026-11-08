@@ -406,8 +406,23 @@ private
       (flatMap (mergeᶠ (just 1)) (λ x → if x ≡ᵇ 0 then takeWhile false (λ v → v <ᵇ 2) (connected (here refl)) else connected (here refl))
         (flatMap (mergeᶠ nothing) (λ _ → of (0 ∷ 1 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))))
 
+  -- A connect's body done before its source, its completion handing the
+  -- concat on within the same instant: with `src` sending 0 at 1 and
+  -- completing at 3,
+  -- `of(0, 1).pipe(concatMap(v => v === 0
+  --    ? src.pipe(connect(h => h.pipe(takeWhile(v => v < 0, true), mergeMap(() => of(5)))))
+  --    : of(7)))`
+  -- [5, 7]
+  heldOpen : Obs Timeline [] ℕ
+  heldOpen = flatMap (mergeᶠ (just 1)) (λ v → if v ≡ᵇ 0 then body else of (7 ∷ [])) (of (0 ∷ 1 ∷ []))
+    where
+      body : Obs Timeline [] ℕ
+      body = connect (cold (fixed (at 1 z≤n (emit 0 (close λ where .From∞.force → at 3 (s≤s (s≤s z≤n)) (close over))))))
+        (flatMap (mergeᶠ nothing) (λ _ → of (5 ∷ [])) (takeWhile true (λ v → v <ᵇ 0) (connected (here refl))))
+
   pins : List (String × Obs Timeline [] ℕ × List (List ℕ))
   pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
+       ∷ ("held-open" , heldOpen , (5 ∷ 7 ∷ []) ∷ [])
        ∷ ("cut-shared" , cutShared , (2 ∷ 3 ∷ 3 ∷ []) ∷ [])
        ∷ ("end-handed" , endHanded , (5 ∷ 20 ∷ []) ∷ [])
        ∷ ("lazy-cut" , lazyCut , (1 ∷ 2 ∷ 3 ∷ []) ∷ [])
