@@ -10,6 +10,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-conicalʳ; foldl-++)
@@ -20,19 +21,21 @@ open import Data.Unit using (⊤; tt)
 open import Data.Nat using (zero; suc; _≤_; _∸_; z≤n; s≤s)
 open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
 open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
 open import Tree using (scan)
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
+open import denotation.EmissionSet using (Ev; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
-open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; module Leaves)
+open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; module Leaves; module Split)
+open import simultaneous.Shut using (r₀; shut)
 import simultaneous.Flatten as F
 open F _≟ᵖ_ using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
 open import simultaneous.Relations using (Met; values; values-++; batchesOut; grouped; Closes; Batches; elaborated; batched)
-open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in)
+open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row)
 open import simultaneous.Batcher using (released; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
@@ -104,9 +107,6 @@ closes-flush o {rx} mx cl with pending-one (proj₁ (after bstart (values rx)))
 
 ------------------------------------------------------------------------
 -- The batcher's routes are the run's count
-
-r₀ : Routes
-r₀ = root , 0
 
 -- The batcher's routes and instant, as the count reads them; none open
 -- during the burst.
@@ -204,14 +204,37 @@ module Count {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
   ...   | inj₁ fs                    = inj₁ (f , subst (λ b → FitsRun b ws) (ss-snoc pre w) fs)
   ...   | inj₂ (c₁ , c₂ , m , refl) = inj₂ (w ∷ c₁ , c₂ , m , refl)
 
--- A DEAD INSTANT STAYS DEAD: past the subscribe burst, once the run's
--- count holds no route of its instant, no value of that instant follows.
--- Every route of a live instant reaches the top as a begin and leaves
--- it as a stop only once nothing below can carry the instant on; a cut
--- route waits while a connect in scope still holds one.
-postulate
-  top-shut : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs ys → values rx ≡ xs ++ ys → seenSub xs ≡ true
-           → proj₂ (L.foldl count r₀ xs) ≡ 0 → ∀ {a} → instEmit (value a) (proj₁ (L.foldl count r₀ xs)) ∈ ys → ⊥
+-- A run split where its values split.
+split-at : ∀ {X : Set} (rs : List (Pos × Ev X)) xs ys → values rs ≡ xs ++ ys
+         → Σ _ λ r₁ → Σ _ λ r₂ → rs ≡ r₁ ++ r₂ × values r₁ ≡ xs × values r₂ ≡ ys
+split-at rs []       ys e = [] , rs , refl , refl , e
+split-at rs (x ∷ xs) ys e with Split.split rs [] x (xs ++ ys) e
+... | r₁ , r₂ , k , refl , e₁ , e₂ with split-at r₂ xs ys e₂
+...   | s₁ , s₂ , refl , f₁ , f₂ =
+  r₁ ++ (k , out x) ∷ s₁ , s₂ , sym (++-assoc r₁ ((k , out x) ∷ s₁) s₂) ,
+  trans (values-++ r₁ ((k , out x) ∷ s₁)) (cong₂ _++_ e₁ (cong (x ∷_) f₁)) , f₂
+
+-- A row met is a row.
+row-of : ∀ {A : Set} (o : SObs [] A) {rs k x} → Met (elaborated o) rs → (k , x) ∈ rs → elaborated o k x
+row-of o mx h = proj₁ (run-row mx h)
+
+-- PAST THE SUBSCRIBE BURST, A DEAD INSTANT STAYS DEAD at the top: the
+-- count's instant is its last begin's, named for the begin's position,
+-- or the subscribe frame, which no value past the burst is of.
+top-shut : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs ys → values rx ≡ xs ++ ys → seenSub xs ≡ true
+         → proj₂ (L.foldl count r₀ xs) ≡ 0 → ∀ {a} → instEmit (value a) (proj₁ (L.foldl count r₀ xs)) ∈ ys → ⊥
+top-shut o {rx} mx xs ys e s z {a} v with split-at rx xs ys e
+... | r₁ , r₂ , refl , refl , refl with Split.val-in r₂ v | lb-view root (values r₁)
+...   | y , ym | inj₂ hb with Split.val-in r₁ (subst (λ i → instEmit (mark Marks.begin) i ∈ values r₁) (count-name r₀ (values r₁)) hb)
+...     | q , qm = shut o mx r₁ r₂ refl z qm ym (trans (sym (named o (row-of o mx (∈-++⁺ʳ r₁ ym)))) (named o (row-of o mx (∈-++⁺ˡ qm))))
+top-shut o {rx} mx xs ys e s z {a} v | r₁ , r₂ , refl , refl , refl | y , ym | inj₁ e₀ with seen-sub false (values r₁) s
+... | inj₁ ()
+... | inj₂ (m , hm) with Split.val-in r₁ hm | ∈-∃++ ym
+...   | ks , km | r₂a , r₂b , refl =
+  Leaves.async-name o mx (row-of o mx (∈-++⁺ʳ r₁ ym))
+    (sub-async o (row-of o mx (∈-++⁺ˡ km)) (row-of o mx (∈-++⁺ʳ r₁ ym))
+      (Split.run-before (r₁ ++ r₂a) (subst (Met (elaborated o)) (sym (++-assoc r₁ r₂a _)) mx) (∈-++⁺ˡ km)))
+    (trans (sym (count-name r₀ (values r₁))) e₀)
 
 -- PAST THE LAST ROUTE'S STOP, the next value is of another instant: the
 -- batcher's routes are the run's count, which the stop empties.
@@ -227,7 +250,7 @@ stop-fresh o {rx} mx xs n ys e s le with Count.fits o mx [] xs (instEmit (mark M
       (trans (sym (stamped-++ c₂ (instEmit (mark Marks.stop) n ∷ ys)))
         (Leaves.completed-end o mx c₁ m (c₂ ++ instEmit (mark Marks.stop) n ∷ ys) (trans e (++-assoc c₁ _ _))))
 ... | inj₁ fs with tally-run bstart r₀ xs (refl , refl , λ _ → refl) fs
-...   | er , _ , _ = fresh-all (lastBegin root xs) ys λ v eq → top-shut o mx (xs ++ [ w ]) ys e′ s′ z′ (named v eq)
+...   | er , _ , _ = fresh-all (lastBegin root xs) ys λ v eq → top-shut o mx (xs ++ [ w ]) ys e′ s′ z′ (renamed v eq)
   where
     w = instEmit (mark Marks.stop) n
     K = L.foldl count r₀ xs
@@ -239,8 +262,8 @@ stop-fresh o {rx} mx xs n ys e s le with Count.fits o mx [] xs (instEmit (mark M
     s′ = trans (ss-snoc xs w) s
     z′ : proj₂ (L.foldl count r₀ (xs ++ [ w ])) ≡ 0
     z′ = trans (cong proj₂ split) (m≤n⇒m∸n≡0 (subst (_≤ 1) er le))
-    named : ∀ {a j} → instEmit (value a) j ∈ ys → lastBegin root xs ≡ j → instEmit (value a) (proj₁ (L.foldl count r₀ (xs ++ [ w ]))) ∈ ys
-    named {a} v eq = subst (λ i → instEmit (value a) i ∈ ys) (trans (sym eq) (trans (count-name r₀ xs) (sym (cong proj₁ split)))) v
+    renamed : ∀ {a j} → instEmit (value a) j ∈ ys → lastBegin root xs ≡ j → instEmit (value a) (proj₁ (L.foldl count r₀ (xs ++ [ w ]))) ∈ ys
+    renamed {a} v eq = subst (λ i → instEmit (value a) i ∈ ys) (trans (sym eq) (trans (count-name r₀ xs) (sym (cong proj₁ split)))) v
 
 true≢false : true ≢ false
 true≢false ()
