@@ -36,7 +36,7 @@ defer limit. Settled when each former's leaf is a body.
 
 Members: `held-flatMap`, `held-connect`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-scan`,
-`held-map`, `held-cold`, `held-of`, `held-empty`.
+`held-cold`, `held-of`, `held-empty`.
 
 #### THE ROUTES
 

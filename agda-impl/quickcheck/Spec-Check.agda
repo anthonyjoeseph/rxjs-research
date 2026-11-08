@@ -48,7 +48,7 @@ open import simultaneous.InstEmit using (InstEmit; instEmit; mark)
 import simultaneous.InstEmit as M
 open import simultaneous.SObs using (Batching; module Elaborate)
 open import simultaneous.Protocol using (nameStep; subStep)
-open import simultaneous.Held using (nameOf)
+open import simultaneous.Routed using (nameOf)
 open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
