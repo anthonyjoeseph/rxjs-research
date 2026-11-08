@@ -37,7 +37,7 @@
 module simultaneous.Statement where
 
 open import Data.Bool using (Bool)
-open import Data.List using ([_])
+open import Data.List using ([]; [_])
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym) renaming (trans to ≡-trans)

@@ -100,7 +100,7 @@ values rs = L.map proj₂ (outs rs)
 -- Each value the rows of a stamped run carry, at its position, with its
 -- stamp: a plain row carries its one value, an InstEmit row what its emit
 -- does, a mark nothing.
-carried : ∀ {A B} → (A → List B) → List (Pos × Ev (ℕ × A)) → List (Pos × ℕ × B)
+carried : ∀ {A B : Set} → (A → List B) → List (Pos × Ev (ℕ × A)) → List (Pos × ℕ × B)
 carried f []                       = []
 carried f ((q , out (n , a)) ∷ rs) = L.map (λ b → q , n , b) (f a) ++ carried f rs
 carried f (_ ∷ rs)                 = carried f rs
@@ -141,22 +141,22 @@ Exits {A} t q = (Σ Pos λ k → Σ (Ev A) λ e → Seen t k e × q ≺ k × (in
               ⊎ Spent t (just q)
 
 -- Past `q`, no value of `q`'s instant.
-Left : ∀ {A B} → (A → List B) → EmissionSet A → Pos → Set
+Left : ∀ {A B : Set} → (A → List B) → EmissionSet A → Pos → Set
 Left f t q = ∀ {k a} → t k (out a) → q ≺ k → instantOf k ≡ instantOf q → f a ≡ []
 
 -- The instant of the value at `q` is over: nothing of it is left to
 -- show, and the run leaves it.
-Over : ∀ {A B} → (A → List B) → EmissionSet A → Maybe Pos → Set
+Over : ∀ {A B : Set} → (A → List B) → EmissionSet A → Maybe Pos → Set
 Over f t nothing  = ⊤
 Over f t (just q) = Left f t q × Exits t q
 
 -- The position of the last value met.
-lastValue : ∀ {A B} → (A → List B) → List (Pos × Ev (ℕ × A)) → Maybe Pos
+lastValue : ∀ {A B : Set} → (A → List B) → List (Pos × Ev (ℕ × A)) → Maybe Pos
 lastValue f rs = L.last (L.map proj₁ (carried f rs))
 
 -- A grouping may keep its last group only once its instant is over, run
 -- over or not: batching shows what plain rxjs shows, as it shows it.
-Closes : ∀ {A B} → (A → List B) → EmissionSet A → List (Pos × Ev (ℕ × A)) → Bool → Set
+Closes : ∀ {A B : Set} → (A → List B) → EmissionSet A → List (Pos × Ev (ℕ × A)) → Bool → Set
 Closes f t rs false = ⊤
 Closes f t rs true  = Over f t (lastValue f rs)
 
