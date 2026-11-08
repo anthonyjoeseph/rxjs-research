@@ -95,7 +95,7 @@ rows-mapIE (_∷_ {e = skip}  (_ , () , _) _)
 rows-mapIE (_∷_ {e = pin _} (_ , () , _) _)
 
 held-map-den : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) {W} cs → HeldD W d cs → HeldD W (Op.map (mapIE f) d) cs
-held-map-den f d cs h p ok = held-same row back′ (h p ok)
+held-map-den f d cs h p ok nt = held-same row back′ (h p ok nt)
   where
     open MapRun (mapIE f) d p
 

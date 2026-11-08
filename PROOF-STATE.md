@@ -31,10 +31,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Untried: every elaborated stream names its begins for their instants,
 counts a route of its own instant under every row outside the bursts it
 is exempt for, and keeps dead instants dead. Hardest: flatMap's parked
-cuts and closer under every policy, then the connect join and the
+cuts and closer under every policy, then a reader's joins and the
 defer limit. Settled when each former's leaf is a body.
 
-Members: `held-flatMap`, `held-connect`, `held-connected`, `held-lim`,
+Members: `held-flatMap`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
 `held-of`, `held-empty`.
 

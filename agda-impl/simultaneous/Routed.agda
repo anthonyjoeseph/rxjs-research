@@ -33,7 +33,8 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import denotation.Laws.Worlds using (Ok)
+open import denotation.Laws.Worlds using (Ok; TimerRoot)
+open import Data.Empty using (⊥)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
 
@@ -76,6 +77,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     shut    : Shut t
 
 -- Held at every admissible subscription, exempt for its own burst and
--- `cs`.
+-- `cs`.  No subscription is made at a timer's root, where a burst would
+-- have no instant of its own.
 HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
-HeldD H d cs = ∀ p → Ok H p → Held (enter d p) (p ∷ cs)
+HeldD H d cs = ∀ p → Ok H p → (TimerRoot p → ⊥) → Held (enter d p) (p ∷ cs)
