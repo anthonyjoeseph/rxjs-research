@@ -23,6 +23,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; [_]; _++_; concat; length)
 import Data.List as L
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
+open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.AllPairs using (AllPairs)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (Any)
