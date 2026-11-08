@@ -17,9 +17,9 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix)
-open import denotation.EmissionSet using (Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
+open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
 open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
@@ -33,10 +33,10 @@ open import denotation.Laws.Worlds using (Ok; InvD; Lawful; TimerRoot; _⊕_; pl
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import simultaneous.InstEmit using (begin)
-open import Data.Product using (_,_)
+open import simultaneous.InstEmit using (begin; valuesOf)
+open import Data.Product using (_×_; _,_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; elab; annotate; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -81,8 +81,6 @@ postulate
   held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
   held-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
   held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
-  held-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
-                 → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
@@ -131,6 +129,55 @@ held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok nt →
                                 ; under = λ i → i ; is = refl }
          ; (there i)   → widen (eh i) })
       (p ++ [ ix 0 ]) ok₀ (plain-untimed p plain-ix)
+
+-- A FLATMAP'S SCAN HOLDS, read past the three connects that share its
+-- outer: the outer at `p ++ [ ix 1 ]`, the closer, then the real
+-- flatMap, each made hot.  What it reads: the connects in scope, the
+-- outer, the lanes and the closer.
+module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
+                (s : Obs Timeline Γ A) (env : DenEnv Δ) (p : Pos) where
+
+  g : A → Obs Timeline (IE B ∷ IE A ∷ Δ) (IE B)
+  g a = elab (λ i → there (there (ρ i))) (f a)
+
+  tk : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)
+  tk = trackers Γ 0 (λ i → there (there (there (ρ i))))
+
+  real : Obs Timeline (IE B ∷ IE A ∷ Δ) (IE B)
+  real = flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))
+
+  p₀ p₀₀ : Pos
+  p₀  = p ++ [ ix 0 ]
+  p₀₀ = p₀ ++ [ ix 0 ]
+
+  σ₁ : EmissionSet (IE A)
+  σ₁ = Proper (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ]))
+
+  σ₂ : EmissionSet (IE B)
+  σ₂ = Proper (enter (ev m closer (hot σ₁ ∷ env)) (p₀ ++ [ ix 1 ]))
+
+  σ₃ : EmissionSet (IE B)
+  σ₃ = Proper (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 1 ]))
+
+  scanned : EmissionSet (IE B)
+  scanned = enter (ev m (combined op tk) (hot σ₃ ∷ hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 0 ])
+
+postulate
+  held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
+              (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ s) env) cs
+            → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
+            → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥)
+            → Held (FlatHots.scanned m ρ op f s env p)
+                   ((FlatHots.p₀₀ m ρ op f s env p ++ [ ix 0 ]) ∷ FlatHots.p₀₀ m ρ op f s env p ∷ FlatHots.p₀ m ρ op f s env p ∷ p ∷ cs)
+
+held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
+             → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
+held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok nt →
+  conn-ev m (elab ρ s) _ env cs g p ok nt λ L₁ ok₁ →
+    conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ++ [ ix 0 ]) ok₁ (plain-untimed p plain-ix) λ L₂ ok₂ →
+      conn-ev m (FlatHots.real m ρ op f s env p) _ _ ((p ++ [ ix 0 ]) ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ g))
+        ((p ++ [ ix 0 ]) ++ [ ix 0 ]) ok₂ (plain-untimed (p ++ [ ix 0 ]) plain-ix) λ _ _ →
+        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.

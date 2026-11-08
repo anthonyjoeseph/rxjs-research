@@ -34,7 +34,7 @@ is exempt for, and keeps dead instants dead. Hardest: flatMap's parked
 cuts and closer under every policy, then a reader's joins and the
 defer limit. Settled when each former's leaf is a body.
 
-Members: `held-flatMap`, `held-connected`, `held-lim`,
+Members: `held-comb`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
 `held-of`, `held-empty`.
 
