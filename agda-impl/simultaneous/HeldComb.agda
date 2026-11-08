@@ -99,8 +99,6 @@ held-runs nm rt ea en lt rh = record
 
 record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : List Pos) : Set where
   field
-    -- A row's instant is the instant of everything laid under it.
-    stable : ∀ {q e} → M q e → ∀ zs → instantOf (q ++ zs) ≡ instantOf q
     named  : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
     early  : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
     ends   : ∀ {q} → M q end → Early q

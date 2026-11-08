@@ -37,8 +37,22 @@ open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
-  Input; react; going; fed)
-open import simultaneous.HeldComb using (ev; CombIn; comb-held)
+  Input; react; going; fed; opening)
+open import simultaneous.HeldComb using (ev; CombIn; RunHeld; outRows; comb-held; init)
+open import simultaneous.SObs using (outerB; laneB; closeB)
+open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
+open import simultaneous.Routed using (nameOf; nm; Valued; opos; Before)
+open import simultaneous.Readings using (instantOf)
+open import simultaneous.Relations using (Met)
+open import simultaneous.HeldConnect using (inst-snoc; before-ext)
+open import denotation.Read using (Visible)
+open import denotation.EmissionSet using (Ev; out; end)
+open import denotation.Events using (sub; last)
+open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans; ⊑-snoc⁺)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (tt)
+open import Data.Empty using (⊥-elim)
+open import Relation.Binary.PropositionalEquality using (trans; sym; cong; subst)
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
 
@@ -176,27 +190,135 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   M : EmissionSet (Maybe (Input B))
   M = enter (ev m src env′) P
 
--- WHAT THE SCAN'S SOURCE PROMISES, read past the three connects: the
--- connects in scope, the outer, the lanes and the closer, each holding.
-postulate
-  comb-in : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
-            (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ s) env) cs
-          → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-          → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥) → Early p
-          → let open FlatHots m ρ op f s env p in
-            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots env′) P → Early P
-          → CombIn op M (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
+-- Either reading is lawful.
+inv-ev : ∀ m {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → InvD (Hots ρ) (ev m o ρ)
+inv-ev nothing  o ρ g = inv-⟦⟧ o ρ g
+inv-ev (just n) o ρ g = inv-approx n o ρ g
+
+-- What a hot reader re-keys keeps its instant.
+inst-sub : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {q e} → X q e → ∀ w → instantOf (q ++ [ sub w ]) ≡ instantOf q
+inst-sub I x w = inst-snoc _ (sub w) (InvAt.real I x) (InvAt.untimed I x)
+
+-- Four labels deep, a position's instant is fixed.
+inst-P : ∀ p zs → instantOf ((((p ++ [ ix 0 ]) ++ [ ix 0 ]) ++ [ ix 0 ]) ++ zs) ≡ instantOf (((p ++ [ ix 0 ]) ++ [ ix 0 ]) ++ [ ix 0 ])
+inst-P []                      zs = refl
+inst-P (ix _ ∷ [])             zs = refl
+inst-P (ix _ ∷ ix _ ∷ _)       zs = refl
+inst-P (ix _ ∷ last ∷ _)       zs = refl
+inst-P (ix _ ∷ sub _ ∷ [])     zs = refl
+inst-P (ix _ ∷ sub _ ∷ _ ∷ _)  zs = refl
+inst-P (sub _ ∷ _)             zs = refl
+inst-P (last ∷ _)              zs = refl
+
+-- Under a position of the same instant, a step is as early.
+early-inst : ∀ {y} zs → instantOf (y ++ zs) ≡ instantOf y → Early y → Early (y ++ zs)
+early-inst {y} zs eq ey = subst (λ I → Valued I → Before (y ++ zs) (opos I)) (sym eq) (λ v → before-ext zs (ey v))
+
+-- Over a re-keyed row, an over keeps its place.
+late-sub : ∀ {q} w → instantOf (q ++ [ sub w ]) ≡ instantOf q → Valued (instantOf q) × opos (instantOf q) ⊑ q
+         → Valued (instantOf (q ++ [ sub w ])) × opos (instantOf (q ++ [ sub w ])) ⊑ (q ++ [ sub w ])
+late-sub {q} w eq (v , o) = subst (λ I → Valued I × opos I ⊑ (q ++ [ sub w ])) (sym eq) (v , ⊑-trans o (⊑-snoc⁺ q))
+
+-- An opened outer row is a mark it was, unless it opens.
+open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
+open-mark {x = instEmit (value _) _} refl no = ⊥-elim (no refl)
+open-mark {x = instEmit (mark _) _}  refl _  = refl
+
+open-value : ∀ {A B} {x : IE A} {a n} → opening {B = B} x ≡ instEmit (value a) n → ⊥
+open-value {x = instEmit (value _) _} ()
+open-value {x = instEmit (mark _) _}  ()
+
+-- What the closer sends: a bracket's close, then the outer's end.
+data Closing {B : Set} : IE B → Set where
+  c-close : ∀ {n} → Closing (instEmit (mark outerClose) n)
+  c-done  : ∀ {n} → Closing (instEmit (mark outerDone) n)
+
+closing-mark : ∀ {B} {m n} → Closing {B} (instEmit (mark m) n) → (m ≡ outerClose → ⊥) → (m ≡ outerDone → ⊥) → ⊥
+closing-mark c-close a _ = a refl
+closing-mark c-done  _ b = b refl
+
+closing-value : ∀ {B} {a n} → Closing {B} (instEmit (value a) n) → ⊥
+closing-value ()
+
+-- WHAT THE SCAN'S SOURCE MEETS, read past the three connects: a
+-- tracker's report, a branch's row re-keyed where the branch's reader
+-- subscribed it, or the end, under the scan's own subscription.
+module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
+               (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
+               (hs : HeldD (Hots env) (ev m (elab ρ s) env) cs) (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
+               (p : Pos) (ok : Ok (Hots env) p) (nt : TimerRoot p → ⊥) (ep : Early p)
+               (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
+               (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
+               (ok₂ : Ok (Hots (hot (FlatHots.σ₂ m ρ op f s env p) ∷ hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀₀ m ρ op f s env p))
+               (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
+               (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
+  open FlatHots m ρ op f s env p
+
+  data MRow : Pos → Ev (Maybe (Input B)) → Set where
+    tracker : ∀ {q x} → MRow q (out (just (inj₂ x)))
+    outer   : ∀ {q w x y} → σ₁ q (out x) → opening x ≡ y → MRow (q ++ [ sub w ]) (out (just (inj₁ (outerB , y))))
+    lane    : ∀ {q w x} → σ₃ q (out x) → MRow (q ++ [ sub w ]) (out (just (inj₁ (laneB , x))))
+    close   : ∀ {q w x} → σ₂ q (out x) → MRow (q ++ [ sub w ]) (out (just (inj₁ (closeB , x))))
+    done    : ∀ {zs} → MRow (P ++ zs) end
+
+  postulate
+    -- Every row the scan's source meets is one of these.
+    m-rows      : ∀ {q e} → M q e → Visible e → MRow q e
+    -- The lanes' rows: begins named for their instants, values before
+    -- their over, overs at it.
+    lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
+    lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
+    lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (instantOf q) × opos (instantOf q) ⊑ q
+    close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
+    -- THE SCAN'S COUNTERS TRACK THE BRANCHES: every run of the source
+    -- lays out outputs that hold.
+    comb-runs   : ∀ {rx} → Met M rx → RunHeld (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs) (outRows op init rx)
+
+  I₁ : InvAt (Hots env) (p ++ [ ix 1 ]) (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ]))
+  I₁ = inv-ev m (elab ρ s) env gd (p ++ [ ix 1 ]) (ok-step p ok)
+
+  I₃ : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 1 ]) (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 1 ]))
+  I₃ = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env) (good-cons L₂ (good-cons L₁ gd)) (p₀₀ ++ [ ix 1 ]) (ok-step p₀₀ ok₂)
+
+  H₁ : Held (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ])) ((p ++ [ ix 1 ]) ∷ cs)
+  H₁ = hs (p ++ [ ix 1 ]) (ok-step p ok) (plain-untimed p plain-ix) (early-snoc (ix 1) (proj₁ ok) nt ep)
+
+  named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
+  named x with m-rows x tt
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) =
+    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (inst-sub I₁ (proj₁ y) w)))
+  ... | lane {w = w} y  = trans (lane-named y) (cong nm (sym (inst-sub I₃ (proj₁ y) w)))
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  early : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
+  early x with m-rows x tt
+  ... | outer y eq = ⊥-elim (open-value eq)
+  ... | lane {w = w} y = early-inst [ sub w ] (inst-sub I₃ (proj₁ y) w) (lane-early y)
+  ... | close y = ⊥-elim (closing-value (close-marks y))
+
+  ends : ∀ {q} → M q end → Early q
+  ends x with m-rows x tt
+  ... | done {zs} = early-inst zs (inst-P p zs) ep₃
+
+  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (instantOf q) × opos (instantOf q) ⊑ q
+  late x with m-rows x tt
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-sub w (inst-sub I₁ (proj₁ y) w) (Held.late H₁ (proj₁ y))
+  ... | lane {w = w} y = late-sub w (inst-sub I₃ (proj₁ y) w) (lane-late y)
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  comb : CombIn op M (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
+  comb = record { named = named ; early = early ; ends = ends ; late = late ; runs = comb-runs }
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
             (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ s) env) cs
           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
           → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥) → Early p
           → let open FlatHots m ρ op f s env p in
-            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots env′) P → Early P
+            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) p₀₀ → Ok (Hots env′) P → Early P
           → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
-held-comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₃ ep₃ =
+held-comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃ =
   comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) ok₃
-    (comb-in m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₃ ep₃)
+    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃)
   where open FlatHots m ρ op f s env p using (src; env′; P)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
@@ -206,7 +328,7 @@ held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok nt ep →
     conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ++ [ ix 0 ]) ok₁ (plain-untimed p plain-ix) ep₁ λ L₂ ok₂ ep₂ →
       conn-ev m (FlatHots.real m ρ op f s env p) _ _ ((p ++ [ ix 0 ]) ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ g))
         ((p ++ [ ix 0 ]) ++ [ ix 0 ]) ok₂ (plain-untimed (p ++ [ ix 0 ]) plain-ix) ep₂ λ L₃ ok₃ ep₃ →
-        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt ep L₁ L₂ L₃ ok₃ ep₃
+        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
