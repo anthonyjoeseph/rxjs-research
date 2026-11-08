@@ -11,7 +11,7 @@
 -- the same elaboration, and nothing in it can do more with a name than
 -- compare it.  A name is drawn from `mint`, a leaf that emits a name no
 -- other subscription has.
---
+
 -- AN INSTANT IS NAMED WHERE IT STARTS.  Every instant after the
 -- subscribe burst is one async step of one cold.  The cold mints there
 -- and sends `begin` under the minted name, ahead of the step itself;
@@ -26,7 +26,7 @@
 -- completes.  A completion is no mark: the routes a stream holds when it
 -- completes are carried on by whatever reads it, and stopped by the
 -- first flatMap that outlives it.
---
+
 -- EVERY STREAM'S COUNT IS EXACT: its `begin`s less its `stop`s, so no
 -- path is stopped twice.  A reader subscribed to a `connect` mid-instant
 -- meets the instant's later emits without the `begin`s that opened it,
@@ -45,7 +45,7 @@
 -- lane's routes cover, complete, carrying them, or neither, which stops
 -- them.  The outer's routes stop at its end unless the flatMap ends with
 -- it, and a switch stops its lane's.
---
+
 -- A CUT ROUTE IS PARKED WHILE THE INSTANT CAN STILL COME BACK.  Past a
 -- cut, the instant reaches the flatMap again only through a lane reading
 -- a connect late, and only while that connect still holds a route of it.
