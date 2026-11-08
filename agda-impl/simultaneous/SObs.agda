@@ -52,9 +52,10 @@
 -- So the scan watches every connect in scope, and a route it would stop
 -- waits instead until none of them holds a route of the instant.
 --
--- AN OVER ENDS EVERY ROUTE OF ITS INSTANT, so a stop a lane sends past
--- another lane's over, a parked route released once its connect is
--- over, stops nothing the flatMap still counts and is dropped.
+-- AN OVER ENDS EVERY ROUTE OF ITS INSTANT, so what a lane sends of the
+-- instant past another lane's over is dropped: a stop of a parked route
+-- released once its connect is over, a begin of a reader joining there.
+-- A stop of a branch the scan counts no route of is dropped likewise.
 --
 -- The plumbing is `connect`: a source subscribes after its body, so
 -- nested connects put the outer's readers in the order rxjs would meet
@@ -112,6 +113,8 @@ record Flat (N : Set) : Set where
     -- the outer completed; the next lane started is a queued one; the
     -- last lane started has ended
     finished popping dead : Bool
+    -- the instant's over has passed
+    spent : Bool
     -- routes open through the outer and through the lanes; routes of an
     -- ended lane covering a queued lane's burst; routes the lane now
     -- ending holds; routes cut, waiting on the connects in scope
@@ -400,17 +403,24 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   stopped b n s (suc _) = bump b (_∸ 1) s , instEmit (mark stop) n ∷ []
 
   anew : N → Flat N → Flat N
-  anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; acc = 0 ; parked = 0 }
+  anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; acc = 0 ; parked = 0 ; spent = false }
 
   entered : Branch → N → Flat N → Flat N
   entered b n s with does (n ≟ Flat.at s)
   ... | true  = bump b suc s
   ... | false = bump b suc (anew n s)
 
+  -- A begin of the instant past its over is a reader joining routes that
+  -- are already ended: nothing to count.
+  begun : ∀ {B} → Branch → N → Flat N → Out B
+  begun b n s with does (n ≟ Flat.at s) ∧ Flat.spent s
+  ... | true  = s , []
+  ... | false = entered b n s , instEmit (mark begin) n ∷ []
+
   onMark : ∀ {B} → FlatOp → Branch → Flat N → Mark → N → Out B
-  onMark op b s begin      n = entered b n s , instEmit (mark begin) n ∷ []
-  onMark op b s stop       n = stopped b n s (share b s)
-  onMark op b s over       n = anew (Flat.at s) s , instEmit (mark over) n ∷ []
+  onMark op b s begin      n = begun b n s
+  onMark op b s stop       n = stopped b n s (if Flat.spent s then 0 else share b s)
+  onMark op b s over       n = record (anew (Flat.at s) s) { spent = true } , instEmit (mark over) n ∷ []
   onMark op b s carry      n = record s { acc = suc (Flat.acc s) } , []
   onMark op b s outerOpen  n = arrive op n s
   onMark op b s outerClose n = s , []
@@ -448,7 +458,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   combined op tk = each proj₂
-    (scan (react op) (flat name 0 0 false false false 0 0 0 0 0 [] , [])
+    (scan (react op) (flat name 0 0 false false false false 0 0 0 0 0 [] , [])
       (flatMap (mergeᶠ nothing) (tagged tk) (of (trackB ∷ outerB ∷ laneB ∷ closeB ∷ []))))
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
