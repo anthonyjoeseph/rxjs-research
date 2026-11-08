@@ -26,6 +26,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE HANG SHOWS
+
+Untried: a connect's rows before a position few of its rows precede are
+read, so no hidden hang cuts them. Suspect under nested truncation: an
+infinite chain of rows each cut for the next one down, read past by a
+later row. Settled by a body over `Reach`, or a program refuting it.
+
+Members: `conn-seen`.
+
 #### THE HELD STREAMS
 
 Untried: every elaborated stream names its begins for their instants,

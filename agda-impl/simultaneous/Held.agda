@@ -373,7 +373,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
           (inst-lay (proj₁ (run-row rx₁ mt)))
 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
-      fin rx₁ rx₂ refl = local-end (end-open rx₁ mt) (start-current rx₁ mt tt)
+      fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
 
   comb : CombIn op M (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
   comb = record { named = named ; early = early ; ends = ends ; late = late ; runs = comb-runs }

@@ -39,7 +39,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix; sub; last; inside)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
+open import denotation.Read using (Visible; After; cursor)
+open import Data.Maybe using (nothing)
+open import Data.List.Membership.Propositional using (_∈_)
 open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
@@ -105,6 +108,15 @@ data Routing : Mark → Set where
   r-subscribed : Routing subscribed
   r-completed  : Routing completed
 
+-- IDLE BETWEEN ROWS: wherever a run met, not ended, has nothing told of
+-- before a position few rows precede, the count holds no route or routes
+-- of that position's instant.  A route never waits past its instant for
+-- a row; a hang before it has infinitely many rows before it.
+Idle : ∀ {A} → EmissionSet (IE A) → Set
+Idle t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few t w → After (cursor nothing rs) w
+       → (∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+       → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
+
 -- A stop finds a route to stop even inside an exempt burst: no route is
 -- stopped twice.
 record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
@@ -119,7 +131,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
     ends    : ∀ {y} → t y end → Early y
     late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y
-    current : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → proj₂ (cnt r₁) ≡ 0 ⊎ proj₁ (cnt r₁) ≡ nameOf y
+    idle    : Idle t
 
 -- Held at every admissible subscription, exempt for its own burst and
 -- `cs`.  No subscription is made at a timer's root, where a burst would

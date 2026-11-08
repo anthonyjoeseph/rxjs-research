@@ -18,15 +18,19 @@ open import Data.Sum using (_⊎_)
 open import Data.Bool using (true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
 open import Relation.Nullary using (¬_; does)
+open import Relation.Nullary.Decidable using (decidable-stable)
+open import Data.Maybe using (Maybe)
 
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end)
+open import Data.List.Membership.DecPropositional _≟ᵖ_ using (_∈?_)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
+open import denotation.Read using (Visible; After; cursor)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
+open import simultaneous.Routed using (Held; Idle; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
 open import simultaneous.Readings using (instantOf)
 open import denotation.Laws.Worlds using (_⊑_)
 
@@ -97,6 +101,16 @@ mem≈ (ev-out s ∷ _) (here refl) = _ , here refl , s
 mem≈ (_ ∷ eq)       (there m)   with mem≈ eq m
 ... | x , m′ , s = x , there m′ , s
 
+cursor≈ : ∀ {A B : Set} {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs
+        → ∀ (c : Maybe Pos) → cursor c rs′ ≡ cursor c rs
+cursor≈ []       c = refl
+cursor≈ (_ ∷ eq) c = cursor≈ eq _
+
+end≈ : ∀ {A B : Set} {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs
+     → ∀ {c} → (c , end) ∈ rs → (c , end) ∈ rs′
+end≈ (ev-end ∷ _) (here refl) = here refl
+end≈ (_ ∷ eq)     (there m)   = there (end≈ eq m)
+
 carried-same : ∀ {A B : Set} {e′ : Ev (IE B)} {e : Ev (IE A)} → EvSame e′ e → Carried e′ → Carried e
 carried-same (ev-out same-value) c-value = c-value
 carried-same (ev-out same-mark)  c-stop  = c-stop
@@ -110,10 +124,11 @@ held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
           → (∀ {y x′} → t′ y (out x′) → Σ (IE A) λ x → t y (out x) × Same x′ x)
           → (∀ {y} → t′ y end → t y end)
           → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs)
+          → (∀ {w} → Few t′ w → ∀ {k e} → t k e → k ≺ w → ¬ ¬ Σ _ λ e′ → t′ k e′ × (Visible e → Visible e′))
           → Held t cs → Held t′ cs
-held-same {t = t} {t′} {cs} row end-row back H = record
+held-same {t = t} {t′} {cs} row end-row back fwd H = record
   { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
-  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late ; current = current }
+  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late ; idle = idle }
   where
     early : ∀ {y a n} → t′ y (out (instEmit (value a) n)) → Early y
     early x with row x
@@ -143,13 +158,15 @@ held-same {t = t} {t′} {cs} row end-row back H = record
     ...     | _ , r₂₀ , refl , ev-out same-mark =
       subst (λ r → Σ _ λ k → proj₂ r ≡ _) (sym (cnt-same e₁)) (Held.exact H run r₁ r₂₀ refl)
 
-    current : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′
-          → proj₂ (cnt r₁′) ≡ 0 ⊎ proj₁ (cnt r₁′) ≡ nameOf y
-    current m r₁′ r₂′ e with back m
-    ... | rs , run , eq with split≈ eq r₁′ _ e
-    ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
-    ...     | _ , r₂₀ , refl , s =
-      subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ _) (sym (cnt-same e₁)) (Held.current H run r₁ r₂₀ refl)
+    idle : Idle t′
+    idle m ne {w} F aw later with back m
+    ... | rs , run , eq =
+      subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf w) (sym (cnt-same eq))
+        (Held.idle H run (λ ce → ne (end≈ eq ce)) few (subst (λ c → After c w) (cursor≈ eq _) aw)
+          λ ty vy ay yw → fwd F ty yw λ (_ , t′y , vv) → later t′y (vv vy) (subst (λ c → After c _) (sym (cursor≈ eq _)) ay) yw)
+      where
+        few : Few t w
+        few = proj₁ F , λ {k} tk kw → decidable-stable (k ∈? proj₁ F) λ nm → fwd F tk kw λ (_ , t′k , _) → nm (proj₂ F t′k kw)
 
     routing : ∀ {y m n} → t′ y (out (instEmit (mark m) n)) → Routing m
     routing x with row x

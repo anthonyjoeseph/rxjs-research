@@ -10,10 +10,11 @@ module simultaneous.HeldScan where
 open import Data.List using (List; []; _∷_)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Unit using (tt)
+open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; module Op; module Scan; _≼_)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; module Scan; _≼_; _≺_; Few)
 open import denotation.Read using (Run; []; _∷_; Visible; After)
 open import denotation.Laws.Modulus using (entered-reach; entered-few)
 open import denotation.Laws.Fold using (fold)
@@ -86,7 +87,7 @@ same-scanIE st (instEmit (mark _) _)  refl = same-mark
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
               → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ (h p ok nt ep)
+held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ fwd (h p ok nt ep)
   where
     module Sr = ScanRun (scanIE f) z d p
     module Mr = MapRun proj₂ (Op.scan (scanIE f) z d) p
@@ -104,6 +105,13 @@ held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ (h p ok nt e
     rows Sr.[]                       = []
     rows (Sr.so-out {c = c} {x} eq Sr.∷ rel) = ev-out (same-scanIE c x eq) ∷ rows rel
     rows (Sr.so-end Sr.∷ rel)           = ev-end ∷ rows rel
+
+    -- Every source row is the scan's, its value classically folded.
+    fwd : ∀ {w} → Few Mr.M w → ∀ {k e} → Sr.S k e → k ≺ w → ¬ ¬ Σ _ λ e′ → Mr.M k e′ × (Visible e → Visible e′)
+    fwd _ {e = out _} x _ no = fold (scanIE f) z Sr.S (entered-few d p tt x) x λ (_ , ac) → no (_ , Mr.lift (Sr.toSc (Scan.sval ac)) , λ _ → tt)
+    fwd _ {e = skip}  x _ no = no (_ , Mr.lift (Sr.toSc (Scan.sstep x)) , λ ())
+    fwd _ {e = pin _} x _ no = no (_ , Mr.lift (Sr.toSc (Scan.spin x)) , λ ())
+    fwd _ {e = end}   x _ no = no (_ , Mr.lift (Sr.toSc (Scan.send x)) , λ _ → tt)
 
     back′ : ∀ {rs′} → Met Mr.M rs′ → Σ _ λ rs → Met Sr.S rs × Rows≈ rs′ rs
     back′ m with Mr.back m

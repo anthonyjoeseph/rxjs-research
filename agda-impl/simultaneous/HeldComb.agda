@@ -34,7 +34,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv)
 open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing)
+open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count; Out; Input; react; each)
 
@@ -80,7 +80,6 @@ record RunHeld {A : Set} (cs : List Pos) (rs : List (Pos × Ev (IE A))) : Set wh
             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
     exact   : ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
             → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
-    current : ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → proj₂ (cnt r₁) ≡ 0 ⊎ proj₁ (cnt r₁) ≡ nameOf y
     shut    : ShutRun rs
 
 -- Held is its rows' facts and every run's.
@@ -90,9 +89,10 @@ held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y a n} → t y (out (instEmit (value a) n)) → Early y)
           → (∀ {y} → t y end → Early y)
           → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y)
+          → Idle t
           → (∀ {rs} → Met t rs → RunHeld cs rs)
           → Held t cs
-held-runs nm rt ea en lt rh = record
+held-runs nm rt ea en lt id rh = record
   { named = nm
   ; covered = λ m → RunHeld.covered (rh m)
   ; exact = λ m → RunHeld.exact (rh m)
@@ -101,7 +101,7 @@ held-runs nm rt ea en lt rh = record
   ; early = ea
   ; ends = en
   ; late = lt
-  ; current = λ m → RunHeld.current (rh m)
+  ; idle = id
   }
 
 ------------------------------------------------------------------------
@@ -124,7 +124,6 @@ record Local {B : Set} (cs : List Pos) (c : Routes) (y : Pos) (e : Ev (IE B)) : 
   field
     carried : Carried e → ¬ Ex cs y → Σ ℕ λ k → c ≡ (nameOf y , suc k)
     stops   : ∀ {n} → e ≡ out (instEmit (mark stop) n) → Σ ℕ λ k → proj₂ c ≡ suc k
-    current : proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf y
 
 -- What every row of a list owes, each from the count the rows before it
 -- leave.
@@ -145,7 +144,6 @@ locals-runs : ∀ {B cs} {rs : List (Pos × Ev (IE B))} → Locals cs r₀ rs �
 locals-runs {cs = cs} L sh = record
   { covered = λ r₁ r₂ eq → Local.carried (at r₁ r₂ eq)
   ; exact   = λ r₁ r₂ eq → Local.stops (at r₁ r₂ eq) refl
-  ; current = λ r₁ r₂ eq → Local.current (at r₁ r₂ eq)
   ; shut    = sh }
   where
     at : ∀ r₁ {y e} r₂ → _ ≡ r₁ ++ (y , e) ∷ r₂ → Local cs (cnt r₁) y e
@@ -157,9 +155,8 @@ run-row []       ((sn , vi , _) ∷ _) = proj₁ (proj₁ sn) , vi
 run-row (_ ∷ r₁) (_ ∷ rn)            = run-row r₁ rn
 
 -- The end owes a route of its instant.
-local-end : ∀ {B cs c y} → (¬ Ex cs y → Σ ℕ λ k → c ≡ (nameOf y , suc k)) → (proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf y)
-          → Local {B} cs c y end
-local-end cov cur = record { carried = λ { c-end → cov } ; stops = λ () ; current = cur }
+local-end : ∀ {B cs c y} → (¬ Ex cs y → Σ ℕ λ k → c ≡ (nameOf y , suc k)) → Local {B} cs c y end
+local-end cov = record { carried = λ { c-end → cov } ; stops = λ () }
 
 postulate
   -- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,

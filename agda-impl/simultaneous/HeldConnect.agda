@@ -20,7 +20,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Events using (Pos; ix; sub; last; Timeline; root; fresh; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
-  module Connect; module Connecting)
+  module Connect; module Connecting; Few; Reach)
+open import Relation.Nullary using (¬_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
 open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Real; TimerRoot; _⊕_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans)
@@ -95,7 +96,7 @@ held-ex wd H = record
   ; early   = Held.early H
   ; ends    = Held.ends H
   ; late    = Held.late H
-  ; current = Held.current H }
+  ; idle    = Held.idle H }
 
 ------------------------------------------------------------------------
 -- Runs
@@ -164,6 +165,14 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   lift (echo _ _ _ _ , _) () _ _
   lift (kept _ _ _ _ , _) () _ _
 
+  -- A HANG SHOWS: no row of the connect before a position few of its rows
+  -- precede waits on infinitely many.  A row cut for an infinite wait has
+  -- one below it that is cut too, and rxjs blocks at the first; the doubt
+  -- is an infinite chain of rows each cut for the next one down, read past
+  -- by a later row that waits on none of them.
+  postulate
+    conn-seen : ∀ {w} → Few C w → ∀ {k e} → ConnT k e → k ≺ w → Reach ConnT k e
+
   -- Every run met of the connect is met of its body.
   back : ∀ {c rs} → Run C c rs → Run β c rs
   back [] = []
@@ -192,7 +201,7 @@ held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
             (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) p (ok : Ok H p) (nt : TimerRoot p → ⊥) cs
           → Held (enter (F (hot (Proper (enter s (p ++ [ ix 1 ]))))) (p ++ [ ix 0 ])) ((p ++ [ ix 0 ]) ∷ p ∷ cs)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok nt cs h = held-same row end-row back′ (held-ex ex h)
+held-conn s F Is IF p ok nt cs h = held-same row end-row back′ fwd (held-ex ex h)
   where
     open ConnRun s F Is IF p ok
 
@@ -208,3 +217,6 @@ held-conn s F Is IF p ok nt cs h = held-same row end-row back′ (held-ex ex h)
 
     back′ : ∀ {rs′} → Met C rs′ → Σ _ λ rs → Met (Connect.β s F p) rs × Rows≈ rs′ rs
     back′ m = _ , back m , rows-refl m
+
+    fwd : ∀ {w} → Few C w → ∀ {k e} → Connect.β s F p k e → k ≺ w → ¬ ¬ Σ _ λ e′ → C k e′ × (Visible e → Visible e′)
+    fwd F x kw no = no (_ , (Connecting.body x , conn-seen F (Connecting.body x) kw) , λ v → v)
