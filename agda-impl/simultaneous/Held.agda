@@ -38,7 +38,15 @@ open import Data.Product using (_×_; _,_; proj₁)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
   Input; react; going; fed; opening)
-open import simultaneous.HeldComb using (ev; CombIn; RunHeld; outRows; comb-held; init)
+open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; comb-held; init; from; past; lay; Local; Locals;
+  locals-runs; local-end; run-row; walk; inv-past; step-local)
+open import simultaneous.Shut using (r₀)
+open import simultaneous.SObs using (Flat)
+open import simultaneous.Routed using (Ex)
+open import Data.List.Properties using (++-assoc)
+open import Relation.Nullary using (¬_)
+open import Data.Sum using (_⊎_)
+open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import simultaneous.Routed using (nameOf; nm; Valued; opos; Before)
@@ -48,7 +56,7 @@ open import simultaneous.HeldConnect using (inst-snoc; before-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
 open import denotation.Events using (sub; last)
-open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans; ⊑-snoc⁺)
+open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans; ⊑-snoc⁺; real-snoc)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -270,9 +278,25 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
     lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (instantOf q) × opos (instantOf q) ⊑ q
     close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
-    -- THE SCAN'S COUNTERS TRACK THE BRANCHES: every run of the source
-    -- lays out outputs that hold.
-    comb-runs   : ∀ {rx} → Met M rx → RunHeld (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs) (outRows op init rx)
+
+  cs′ : List Pos
+  cs′ = P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs
+
+  -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met:
+  -- the routes open at a row are of its instant; a value read, a live
+  -- over read, and the end find one open unless exempt; and a dead
+  -- instant stays dead.
+  postulate
+    start-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                  → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
+    value-open    : ∀ rx₁ {q b a n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (value a) n)))) ∷ rx₂) → ¬ Ex cs′ q
+                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
+    over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
+                  → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
+                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
+    end-open      : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
+                  → Σ ℕ λ k → from r₀ (outRows op init rx₁) ≡ (nameOf q , suc k)
+    comb-shut     : ∀ {rx} → Met M rx → ShutRun (outRows op init rx)
 
   I₁ : InvAt (Hots env) (p ++ [ ix 1 ]) (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ]))
   I₁ = inv-ev m (elab ρ s) env gd (p ++ [ ix 1 ]) (ok-step p ok)
@@ -305,6 +329,31 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-sub w (inst-sub I₁ (proj₁ y) w) (Held.late H₁ (proj₁ y))
   ... | lane {w = w} y = late-sub w (inst-sub I₃ (proj₁ y) w) (lane-late y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  IM : InvAt (Hots env′) P M
+  IM = inv-ev m src env′ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) P ok₃
+
+  -- An output laid under a row is of the row's instant.
+  inst-lay : ∀ {q e} → M q e → ∀ j → instantOf (q ++ ix 1 ∷ ix j ∷ []) ≡ instantOf q
+  inst-lay {q} x j =
+    trans (cong instantOf (sym (++-assoc q [ ix 1 ] [ ix j ])))
+      (trans (inst-snoc (q ++ [ ix 1 ]) (ix j) (real-snoc q plain-ix (InvAt.real IM x)) (plain-untimed q plain-ix))
+             (inst-snoc q (ix 1) (InvAt.real IM x) (InvAt.untimed IM x)))
+
+  comb-runs : ∀ {rx} → Met M rx → RunHeld cs′ (outRows op init rx)
+  comb-runs {rx} mt = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
+    where
+      step : ∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
+           → Locals cs′ (from r₀ (outRows op init rx₁)) (lay q 0 (proj₂ (react op (past op init rx₁) x)))
+      step rx₁ {q} {x} rx₂ refl =
+        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt tt)
+          (λ { refl → named (proj₁ (run-row rx₁ mt)) })
+          (λ { refl ne → value-open rx₁ mt ne })
+          (λ { refl sp ne → over-open rx₁ mt sp ne })
+          (inst-lay (proj₁ (run-row rx₁ mt)))
+
+      fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
+      fin rx₁ rx₂ refl = local-end (end-open rx₁ mt) (start-current rx₁ mt tt)
 
   comb : CombIn op M (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
   comb = record { named = named ; early = early ; ends = ends ; late = late ; runs = comb-runs }

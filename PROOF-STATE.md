@@ -31,13 +31,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Untried: every elaborated stream names its begins for their instants,
 counts a route of its own instant under every row outside the bursts it
 is exempt for, and keeps dead instants dead. Hardest: flatMap's scan
-source (`comb-runs`): its counters must track each branch's open routes
-of the current instant, which needs a branch's routes closed before a
-later instant's first row; then which rows the source meets
+source (`start-current`): its counters must track each branch's open
+routes of the current instant, which needs a branch's routes closed
+before a later instant's first row; then which rows the source meets
 (`m-rows`), a reader's joins and the defer limit. Settled when each
 former's leaf is a body.
 
-Members: `comb-runs`, `m-rows`, `lane-named`, `lane-early`, `lane-late`,
+Members: `start-current`, `value-open`, `over-open`, `end-open`,
+`comb-shut`, `walk`, `inv-past`, `step-local`, `m-rows`, `lane-named`, `lane-early`, `lane-late`,
 `close-marks`, `comb-held`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
 `held-of`, `held-empty`.
