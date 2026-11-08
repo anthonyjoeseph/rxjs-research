@@ -28,13 +28,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROUTES
 
-Untried: past the last route's stop no value of its instant follows, an
-instant's values precede its overs, the run leaves an instant once nothing
-of it is held, and a closed instant's batch meets a releasing mark before
-any value. Hardest: the route count through every flatMap policy and
-connect, and the liveness `Exits` and `releases` ask for.
+Untried: once the top's exact count holds no route of an instant, no
+value of it follows; an instant's values precede its overs; the run
+leaves an instant once nothing of it is held; a closed instant's batch
+meets a releasing mark before any value. Hardest: a per-stream count
+invariant through every flatMap policy, connect join and parked cut, and
+the liveness `releases` asks for. Settled when `top-shut` is a body over
+it.
 
-Members: `stop-fresh`, `over-last`, `flush-closes`, `releases`.
+Members: `top-shut`, `over-last`, `flush-closes`, `releases`.
 
 #### THE BURST
 

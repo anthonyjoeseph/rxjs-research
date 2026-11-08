@@ -6,16 +6,19 @@
 module simultaneous.Closing where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
+import Data.List as L
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
+open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-conicalʳ; foldl-++)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 import Data.Sum
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
-open import Data.Nat using (zero; suc; _≤_; z≤n; s≤s)
+open import Data.Unit using (⊤; tt)
+open import Data.Nat using (zero; suc; _≤_; _∸_; z≤n; s≤s)
+open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; sym; trans; subst)
 
@@ -25,7 +28,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; completed)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
-open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; lb-snoc; ss-snoc; module Leaves)
+open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; module Leaves)
 import simultaneous.Flatten as F
 open F _≟ᵖ_ using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
 open import simultaneous.Relations using (Met; values; values-++; batchesOut; grouped; Closes; Batches; elaborated; batched)
@@ -33,7 +36,7 @@ open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in)
 open import simultaneous.Batcher using (released; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; pending; asEmits; mark-step)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; pending; asEmits; mark-step; Routes; count)
 
 ------------------------------------------------------------------------
 -- The protocol, read off the elaborated run
@@ -99,13 +102,145 @@ closes-flush o {rx} mx cl with pending-one (proj₁ (after bstart (values rx)))
 ... | inj₂ (g , e) with releases o mx cl (λ e′ → one≢[] (trans (sym e) e′))
 ...   | ext , mx′ , r = ext , mx′ , released-pending _ r (λ e′ → one≢[] (trans (sym e) e′))
 
--- PAST THE LAST ROUTE'S STOP, the next value is of another instant: the
--- one release the run's positions alone do not give, since a stop's name
--- is not its route's.
+------------------------------------------------------------------------
+-- The batcher's routes are the run's count
+
+r₀ : Routes
+r₀ = root , 0
+
+-- The batcher's routes and instant, as the count reads them; none open
+-- during the burst.
+Tally : ∀ {A : Set} → Step A → Routes → Set
+Tally (b , _) (m , k) = Batching.routes b ≡ k × Batching.at b ≡ m × (Batching.late b ≡ false → k ≡ 0)
+
+-- What the count needs of an emit, the burst flag `b` before it: a begin
+-- past the burst, the subscribe mark during it, no completion.
+Fits : ∀ {A : Set} → Bool → IE A → Set
+Fits b (instEmit (mark Marks.begin) _)      = b ≡ true
+Fits b (instEmit (mark Marks.subscribed) _) = b ≡ false
+Fits b (instEmit (mark completed) _)        = ⊥
+Fits b (instEmit _ _)                       = ⊤
+
+FitsRun : ∀ {A : Set} → Bool → List (IE A) → Set
+FitsRun b []       = ⊤
+FitsRun b (w ∷ ws) = Fits b w × FitsRun (subStep b w) ws
+
+tally-step : ∀ {A : Set} (s : Step A) r w → Tally s r → Fits (Batching.late (proj₁ s)) w
+           → Tally (bstep s w) (count r w) × Batching.late (proj₁ (bstep s w)) ≡ subStep (Batching.late (proj₁ s)) w
+tally-step (batching l a h k , rel) _ (instEmit (value _) _) (refl , refl , z) f = (refl , refl , z) , refl
+tally-step (batching true a h k , rel) _ (instEmit (mark Marks.begin) n) (refl , refl , z) f with n ≟ᵖ a
+... | yes refl = (refl , refl , λ ()) , refl
+... | no _     = (refl , refl , λ ()) , refl
+tally-step (batching false a h k , rel) _ (instEmit (mark Marks.begin) n) (refl , refl , z) ()
+tally-step (batching true a h zero , rel) _ (instEmit (mark Marks.stop) n) (refl , refl , z) f = (refl , refl , λ ()) , refl
+tally-step (batching true a h (suc zero) , rel) _ (instEmit (mark Marks.stop) n) (refl , refl , z) f = (refl , refl , λ ()) , refl
+tally-step (batching true a h (suc (suc k)) , rel) _ (instEmit (mark Marks.stop) n) (refl , refl , z) f = (refl , refl , λ ()) , refl
+tally-step (batching false a h k , rel) _ (instEmit (mark Marks.stop) n) (refl , refl , z) f with z refl
+... | refl = (refl , refl , λ _ → refl) , refl
+tally-step (batching true a h k , rel) _ (instEmit (mark Marks.over) n) (refl , refl , z) f = (refl , refl , λ ()) , refl
+tally-step (batching false a h k , rel) _ (instEmit (mark Marks.over) n) (refl , refl , z) f with z refl
+... | refl = (refl , refl , λ _ → refl) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.subscribed) n) (refl , refl , z) f with z f
+... | refl = (refl , refl , λ ()) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark completed) n) (refl , refl , z) ()
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerOpen) n) (refl , refl , z) f  = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerClose) n) (refl , refl , z) f = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.laneStart) n) (refl , refl , z) f  = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.carry) n) (refl , refl , z) f      = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.laneDone) n) (refl , refl , z) f   = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.burstEnd) n) (refl , refl , z) f   = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerDone) n) (refl , refl , z) f  = (refl , refl , z) , refl
+
+tally-run : ∀ {A : Set} (s : Step A) r (xs : List (IE A)) → Tally s r → FitsRun (Batching.late (proj₁ s)) xs
+          → Tally (after s xs) (L.foldl count r xs)
+tally-run s r []       t _        = t
+tally-run s r (w ∷ ws) t (f , fs) with tally-step s r w t f
+... | t′ , e = tally-run (bstep s w) (count r w) ws t′ (subst (λ b → FitsRun b ws) (sym e) fs)
+
+-- The count's instant is the last begin's.
+count-name : ∀ {A : Set} (r : Routes) (xs : List (IE A)) → L.foldl nameStep (proj₁ r) xs ≡ proj₁ (L.foldl count r xs)
+count-name r       []                                     = refl
+count-name (m , k) (instEmit (mark Marks.begin) n ∷ xs) with n ≟ᵖ m
+... | yes refl = count-name (n , suc k) xs
+... | no _     = count-name (n , 1) xs
+count-name (m , k) (instEmit (mark Marks.stop) _ ∷ xs)  = count-name (m , k ∸ 1) xs
+count-name (m , k) (instEmit (mark Marks.over) _ ∷ xs)  = count-name (m , 0) xs
+count-name r       (instEmit (value _) _ ∷ xs)            = count-name r xs
+count-name r       (instEmit (mark Marks.subscribed) _ ∷ xs) = count-name r xs
+count-name r       (instEmit (mark completed) _ ∷ xs)        = count-name r xs
+count-name r       (instEmit (mark Marks.outerOpen) _ ∷ xs)  = count-name r xs
+count-name r       (instEmit (mark Marks.outerClose) _ ∷ xs) = count-name r xs
+count-name r       (instEmit (mark Marks.laneStart) _ ∷ xs)  = count-name r xs
+count-name r       (instEmit (mark Marks.carry) _ ∷ xs)      = count-name r xs
+count-name r       (instEmit (mark Marks.laneDone) _ ∷ xs)   = count-name r xs
+count-name r       (instEmit (mark Marks.burstEnd) _ ∷ xs)   = count-name r xs
+count-name r       (instEmit (mark Marks.outerDone) _ ∷ xs)  = count-name r xs
+
+-- The run meets what the count needs, up to its completion.
+module Count {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
+  open Leaves o mx using (begin-late; sub-once)
+
+  fit : ∀ pre w rest → values rx ≡ pre ++ w ∷ rest → Fits (seenSub pre) w ⊎ Σ Pos λ m → w ≡ instEmit (mark completed) m
+  fit pre (instEmit (mark Marks.begin) n) rest e      = inj₁ (begin-late pre n rest e)
+  fit pre (instEmit (mark Marks.subscribed) n) rest e = inj₁ (sub-once pre n rest e)
+  fit pre (instEmit (mark completed) n) rest e        = inj₂ (n , refl)
+  fit pre (instEmit (value _) _) rest e               = inj₁ tt
+  fit pre (instEmit (mark Marks.stop) _) rest e       = inj₁ tt
+  fit pre (instEmit (mark Marks.over) _) rest e       = inj₁ tt
+  fit pre (instEmit (mark Marks.outerOpen) _) rest e  = inj₁ tt
+  fit pre (instEmit (mark Marks.outerClose) _) rest e = inj₁ tt
+  fit pre (instEmit (mark Marks.laneStart) _) rest e  = inj₁ tt
+  fit pre (instEmit (mark Marks.carry) _) rest e      = inj₁ tt
+  fit pre (instEmit (mark Marks.laneDone) _) rest e   = inj₁ tt
+  fit pre (instEmit (mark Marks.burstEnd) _) rest e   = inj₁ tt
+  fit pre (instEmit (mark Marks.outerDone) _) rest e  = inj₁ tt
+
+  fits : ∀ pre xs ys → values rx ≡ pre ++ xs ++ ys
+       → FitsRun (seenSub pre) xs ⊎ Σ (List (IE A)) λ c₁ → Σ (List (IE A)) λ c₂ → Σ Pos λ m → xs ≡ c₁ ++ instEmit (mark completed) m ∷ c₂
+  fits pre []       ys e = inj₁ tt
+  fits pre (w ∷ ws) ys e with fit pre w (ws ++ ys) e
+  ... | inj₂ (m , refl) = inj₂ ([] , ws , m , refl)
+  ... | inj₁ f with fits (pre ++ [ w ]) ws ys (trans e (sym (++-assoc pre [ w ] (ws ++ ys))))
+  ...   | inj₁ fs                    = inj₁ (f , subst (λ b → FitsRun b ws) (ss-snoc pre w) fs)
+  ...   | inj₂ (c₁ , c₂ , m , refl) = inj₂ (w ∷ c₁ , c₂ , m , refl)
+
+-- A DEAD INSTANT STAYS DEAD: past the subscribe burst, once the run's
+-- count holds no route of its instant, no value of that instant follows.
+-- Every route of a live instant reaches the top as a begin and leaves
+-- it as a stop only once nothing below can carry the instant on; a cut
+-- route waits while a connect in scope still holds one.
 postulate
-  stop-fresh    : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
-                → values rx ≡ xs ++ instEmit (mark Marks.stop) n ∷ ys → seenSub xs ≡ true
-                → Batching.routes (proj₁ (after bstart xs)) ≤ 1 → Fresh (lastBegin root xs) (stamped ys)
+  top-shut : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs ys → values rx ≡ xs ++ ys → seenSub xs ≡ true
+           → proj₂ (L.foldl count r₀ xs) ≡ 0 → ∀ {a} → instEmit (value a) (proj₁ (L.foldl count r₀ xs)) ∈ ys → ⊥
+
+-- PAST THE LAST ROUTE'S STOP, the next value is of another instant: the
+-- batcher's routes are the run's count, which the stop empties.
+stop-fresh : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ xs n ys
+           → values rx ≡ xs ++ instEmit (mark Marks.stop) n ∷ ys → seenSub xs ≡ true
+           → Batching.routes (proj₁ (after bstart xs)) ≤ 1 → Fresh (lastBegin root xs) (stamped ys)
+stop-fresh o {rx} mx xs n ys e s le with Count.fits o mx [] xs (instEmit (mark Marks.stop) n ∷ ys) e
+... | inj₂ (c₁ , c₂ , m , refl) =
+  subst (Fresh (lastBegin root (c₁ ++ instEmit (mark completed) m ∷ c₂))) (sym gone) tt
+  where
+    gone : stamped ys ≡ []
+    gone = ++-conicalʳ (stamped c₂) (stamped ys)
+      (trans (sym (stamped-++ c₂ (instEmit (mark Marks.stop) n ∷ ys)))
+        (Leaves.completed-end o mx c₁ m (c₂ ++ instEmit (mark Marks.stop) n ∷ ys) (trans e (++-assoc c₁ _ _))))
+... | inj₁ fs with tally-run bstart r₀ xs (refl , refl , λ _ → refl) fs
+...   | er , _ , _ = fresh-all (lastBegin root xs) ys λ v eq → top-shut o mx (xs ++ [ w ]) ys e′ s′ z′ (named v eq)
+  where
+    w = instEmit (mark Marks.stop) n
+    K = L.foldl count r₀ xs
+    split : L.foldl count r₀ (xs ++ [ w ]) ≡ count K w
+    split = foldl-++ count r₀ xs [ w ]
+    e′ : values rx ≡ (xs ++ [ w ]) ++ ys
+    e′ = trans e (sym (++-assoc xs [ w ] ys))
+    s′ : seenSub (xs ++ [ w ]) ≡ true
+    s′ = trans (ss-snoc xs w) s
+    z′ : proj₂ (L.foldl count r₀ (xs ++ [ w ])) ≡ 0
+    z′ = trans (cong proj₂ split) (m≤n⇒m∸n≡0 (subst (_≤ 1) er le))
+    named : ∀ {a j} → instEmit (value a) j ∈ ys → lastBegin root xs ≡ j → instEmit (value a) (proj₁ (L.foldl count r₀ (xs ++ [ w ]))) ∈ ys
+    named {a} v eq = subst (λ i → instEmit (value a) i ∈ ys) (trans (sym eq) (trans (count-name r₀ xs) (sym (cong proj₁ split)))) v
 
 true≢false : true ≢ false
 true≢false ()
