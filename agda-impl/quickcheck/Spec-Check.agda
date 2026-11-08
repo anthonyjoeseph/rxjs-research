@@ -2,10 +2,18 @@
 
 -- THE SIMULTANEOUS SPEC, TESTED.  Each generated program is listed three
 -- ways, each subscribed at the root: its plain emission set, its
--- elaborated program's, and the batcher's on top.  The three statements
--- of `simultaneous.Statement` are decided over those listings, through
--- the statement's own readings (`joined`, `batchesOut`, `grouped`,
--- `named`), so the check and the claim cannot drift apart.
+-- elaborated program's, and the batcher's on top.  Decided over those
+-- listings: that the batches joined are the plain run's values, that the
+-- batcher's grouping by the names the elaboration mints is the spec's
+-- grouping of the elaborated run by those names, and that the names
+-- agree with the instants pairwise.  Those are the route to `batchable`
+-- and `erases` in `simultaneous.Statement`, read here by the
+-- elaboration's names rather than the spec's stamps.
+--
+-- OWED: deciding `Groups` itself.  A stamp is a count of instants over a
+-- whole listing, so on an uncut listing it is computable, and the check
+-- then compares the batched listing against the plain one directly, the
+-- elaborated listing dropping out.
 --
 -- A WHOLE RUN, NOT ITS PREFIXES.  Each statement is two directions over
 -- prefixes; on a run listed to its end, uncut, both directions say the
@@ -41,9 +49,12 @@ open import Relation.Nullary using (does)
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev; end)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (instantOf; stamped)
+open import simultaneous.InstEmit using (InstEmit)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
+import simultaneous.Spec as Grouping
+open Grouping _≟ᵖ_ using (batchSimultaneousᴰ)
+open import simultaneous.Relations using (batchedObs; values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ)
@@ -87,27 +98,40 @@ private
   allPairsᵇ r []       = true
   allPairsᵇ r (x ∷ xs) = allᵇ (r x) xs ∧ allPairsᵇ r xs
 
-  -- `Statement.SameInstant`
+  -- the batches met, each with the name it carries
+  batchesOut : ∀ {A} → Rows (IE (List A)) → List (Pos × List A)
+  batchesOut rs = stamped (values rs)
+
+  -- the spec's grouping of an elaborated run's values by name, the run
+  -- over, so the last group is kept
+  groupedᴺ : ∀ {A} → Rows (IE A) → List (Pos × List A)
+  groupedᴺ rs = batchSimultaneousᴰ (stamped (values rs))
+
+  -- an emit at its position, read as its position and its name
+  named : ∀ {A} → Pos × IE A → Pos × Pos
+  named (p , x) = p , InstEmit.instant x
+
+  -- names equal exactly when instants are
   sameInstant : Pos × Pos → Pos × Pos → Bool
   sameInstant (p , i) (q , j) = iff (does (i ≟ᵖ j)) (does (instantOf p ≟ᵖ instantOf q))
 
--- `Statement.InstantsAgree`
+-- every pair of emits met agrees
 agreeᵇ : ∀ {A} → Rows (IE A) → Bool
 agreeᵇ rs = allPairsᵇ sameInstant (mapL named (outs rs))
 
--- `Statement.Ends`
+-- `Relations.Ends`
 endsᵇ : ∀ {A} → Rows A → Bool
 endsᵇ []                = false
 endsᵇ ((_ , end) ∷ _)   = true
 endsᵇ (_ ∷ rs)          = endsᵇ rs
 
--- `Statement.Joins`, over a whole run
+-- the batches joined are the plain run's values, over a whole run
 joinsᵇ : Rows (IE (List ℕ)) → Rows ℕ → Bool
 joinsᵇ b e = eqℕs (joined b) (values e) ∧ iff (endsᵇ b) (endsᵇ e)
 
--- `Statement.Batches`, over a whole run: the run is over, so `ov` holds
+-- the batches are the grouping by name, over a whole run
 batchesᵇ : Rows (IE (List ℕ)) → Rows (IE ℕ) → Bool
-batchesᵇ b x = eqBatches (batchesOut b) (grouped true x)
+batchesᵇ b x = eqBatches (batchesOut b) (groupedᴺ x)
 
 ------------------------------------------------------------------------
 -- One seed
