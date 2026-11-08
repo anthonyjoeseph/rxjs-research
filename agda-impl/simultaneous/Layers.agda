@@ -377,6 +377,9 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   vis-anc (vlane x _) = _ , x , tt
   vis-anc (vend x)    = _ , x , tt
 
+  vend-src : ∀ {k q} → Vis k q end → S q end
+  vend-src (vend x) = x
+
   vis-under : ∀ {k q e} → Vis k q e → q ≼ k
   vis-under (vlane _ y)   = lane-≼ y
   vis-under (vend {c} _)  = ≼-refl {c}
@@ -612,8 +615,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       pre = subst (Prefix _≡_ (values rl)) eq (prefix-values longer)
 
       ends : Ends rl → Ends sl × values rl ≡ concatMap f (values sl)
-      ends h with ends-last ys m h | v
-      ... | refl | vend _ = ++⁺ʳ rs″ (here refl) , trans (cong values (prefix-end mE longer h)) eq
+      ends h = ++⁺ʳ rs″ (here (fuS x₀ (vend-src (subst (Vis k q) (ends-last ys m h) v)))) , trans (cong values (prefix-end mE longer h)) eq
 
 each-out : ∀ {X Y} (f : X → List Y) (s : Obs Timeline [] X) {rs} → Met (at (each f s)) rs
          → Σ _ λ sc → Met (at s) sc × Prefix _≡_ (values rs) (concatMap f (values sc))
