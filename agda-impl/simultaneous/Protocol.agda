@@ -86,6 +86,7 @@ sub-view (instEmit (mark Marks.laneStart) _)  = inj₂ λ _ → refl
 sub-view (instEmit (mark Marks.laneDone) _)   = inj₂ λ _ → refl
 sub-view (instEmit (mark Marks.burstEnd) _)   = inj₂ λ _ → refl
 sub-view (instEmit (mark Marks.outerDone) _)  = inj₂ λ _ → refl
+sub-view (instEmit (mark Marks.carry) _)      = inj₂ λ _ → refl
 sub-view (instEmit (mark Marks.completed) _)  = inj₂ λ _ → refl
 
 -- An emit is a begin, or leaves the name alone.
@@ -101,6 +102,7 @@ begin-view (instEmit (mark Marks.laneStart) _)  = inj₂ λ _ → refl
 begin-view (instEmit (mark Marks.laneDone) _)   = inj₂ λ _ → refl
 begin-view (instEmit (mark Marks.burstEnd) _)   = inj₂ λ _ → refl
 begin-view (instEmit (mark Marks.outerDone) _)  = inj₂ λ _ → refl
+begin-view (instEmit (mark Marks.carry) _)      = inj₂ λ _ → refl
 begin-view (instEmit (mark Marks.completed) _)  = inj₂ λ _ → refl
 
 stays-seen : ∀ {A : Set} (xs : List (IE A)) → L.foldl subStep true xs ≡ true

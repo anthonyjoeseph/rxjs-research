@@ -19,7 +19,7 @@ data Mark : Set where
   -- read above every flatMap
   begin over stop : Mark
   -- one flatMap's own, consumed by its scan
-  outerOpen outerClose laneStart laneDone burstEnd outerDone : Mark
+  outerOpen outerClose laneStart carry laneDone burstEnd outerDone : Mark
   -- the whole run's, sent at the top and read by the batcher
   subscribed completed : Mark
 

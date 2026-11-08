@@ -319,6 +319,7 @@ restamp-ok a e (instEmit (mark Marks.laneStart) _)  = refl , refl
 restamp-ok a e (instEmit (mark Marks.laneDone) _)   = refl , refl
 restamp-ok a e (instEmit (mark Marks.burstEnd) _)   = refl , refl
 restamp-ok a e (instEmit (mark Marks.outerDone) _)  = refl , refl
+restamp-ok a e (instEmit (mark Marks.carry) _)      = refl , refl
 restamp-ok a e (instEmit (mark Marks.subscribed) _) = refl , refl
 restamp-ok a e (instEmit (mark completed) _)        = refl , refl
 
