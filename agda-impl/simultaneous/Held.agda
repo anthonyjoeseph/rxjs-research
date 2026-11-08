@@ -42,7 +42,8 @@ open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; Routes; elab; 
   Input; react; going; fed; opening)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
-open import simultaneous.FlatSim using (react-sent; passed; routed; minted)
+open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
+open import simultaneous.HeldComb using (exact-past; inv-at)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Routed using (valued; Idle; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
 open import Relation.Nullary.Decidable using (decidable-stable)
@@ -322,8 +323,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- over read, and the end find one open unless exempt; and a dead
   -- instant stays dead.
   postulate
-    start-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                  → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
+    flat-current  : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                  → tot (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     value-open    : ∀ rx₁ {q b a n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (value a) n)))) ∷ rx₂) → ¬ Ex cs′ q
                   → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
     over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
@@ -336,6 +337,20 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- a position few rows precede, the routes it counts are of that
     -- position's instant, or none.
     scan-idle     : Idle scanned
+
+  -- No closer's row begins a route.
+  no-cb : ∀ {q n} → MRow q (out (just (inj₁ (closeB , instEmit (mark begin) n)))) → ⊥
+  no-cb (close y) = closing-mark (close-marks y) (λ ()) (λ ())
+
+  nocb : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → ∀ r₁ {q′ x} r₂ → rx₁ ≡ r₁ ++ (q′ , out x) ∷ r₂ → NoCB x
+  nocb rx₁ {q} {e} {rx₂} mt r₁ {q′} r₂ refl refl =
+    no-cb (m-rows (proj₁ (run-row r₁ (subst (Met M) (++-assoc r₁ ((q′ , _) ∷ r₂) ((q , e) ∷ rx₂)) mt))) tt)
+
+  start-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
+  start-current rx₁ mt v with flat-current rx₁ mt v
+  ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
+  ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
   I₁ : InvAt (Hots env) (p ++ [ ix 1 ]) (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ]))
   I₁ = inv-ev m (elab ρ s) env gd (p ++ [ ix 1 ]) (ok-step p ok)

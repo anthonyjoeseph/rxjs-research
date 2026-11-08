@@ -469,13 +469,13 @@ begun-exact b n s nc (live sp le) e with n ≟ᵖ Flat.at s
     new outerB _  = refl
     new laneB  _  = refl
     new closeB nc = ⊥-elim (nc refl)
-begun-exact b n s nc (live sp le) e | yes refl rewrite sp with Flat.at s ≟ᵖ Flat.at s
+begun-exact b n {c} s nc (live sp le) e | yes refl rewrite sp with Flat.at s ≟ᵖ Flat.at s
 ... | no ne = ⊥-elim (ne refl)
 ... | yes _ with Flat.at s ≟ᵖ Flat.at s
 ...   | no ne = ⊥-elim (ne refl)
 ...   | yes _ = more b nc
   where
-    more : ∀ b → (b ≡ closeB → ⊥) → suc (proj₂ _) ≡ tot (bump b suc s)
+    more : ∀ b → (b ≡ closeB → ⊥) → suc (proj₂ c) ≡ tot (bump b suc s)
     more outerB _  = cong suc e
     more laneB  _  = trans (cong suc e) (sym (lane-suc (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s)))
     more closeB nc = ⊥-elim (nc refl)
@@ -546,14 +546,18 @@ onMark-exact op b outerDone  n s nc i e with isZero (Flat.active s) ∧ isZero (
 onMark-exact op b subscribed n s nc i e = e
 onMark-exact op b completed  n s nc i e = e
 
+unpark-exact : ∀ {B c} s₁ n → proj₂ c ≡ tot s₁ → proj₂ (after c (unpark {B} n s₁)) ≡ tot (proj₁ (unpark {B} n s₁))
+unpark-exact {c = c} s₁ n e with anyHolds (Flat.at s₁) (Flat.live s₁)
+... | true  = e
+... | false = trans (cong proj₂ (stops-after (proj₁ c) (proj₂ c) (Flat.parked s₁) n))
+                    (moved (Flat.parked s₁) _ (trans e (sym (unpark₀ (Flat.outer s₁) (Flat.lanes s₁) (Flat.held s₁) (Flat.parked s₁)))))
+
 -- THE SCAN'S COUNT OF WHAT IT SENT IS ITS COUNTERS, unless a closer
 -- begins.
 react-exact : ∀ {B} op (o : Out B) x {c} → NoCB x → Inv c (proj₁ o) → proj₂ c ≡ tot (proj₁ o)
             → proj₂ (after c (react op o x)) ≡ tot (proj₁ (react op o x))
 react-exact op o (just (inj₁ (b , instEmit (value v) n))) nc i e = e
 react-exact op o (just (inj₁ (b , instEmit (mark m) n)))  nc i e = onMark-exact op b m n (proj₁ o) (λ { refl refl → nc refl }) i e
-react-exact op o (just (inj₂ (j , r)))                    nc i e with anyHolds (Flat.at (proj₁ o)) (Flat.live (proj₁ o))
-... | true  = e
-... | false = trans (cong proj₂ (stops-after (proj₁ _) (proj₂ _) (Flat.parked (proj₁ o)) root))
-                    (moved (Flat.parked (proj₁ o)) _ (trans e (sym (unpark₀ (Flat.outer (proj₁ o)) (Flat.lanes (proj₁ o)) (Flat.held (proj₁ o)) (Flat.parked (proj₁ o))))))
+react-exact op o (just (inj₂ (j , r)))                    nc i e =
+  unpark-exact (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }) root e
 react-exact op o nothing                                  nc i e = e

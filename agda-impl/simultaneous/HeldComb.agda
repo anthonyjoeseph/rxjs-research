@@ -34,7 +34,7 @@ open import Data.List.Properties using (foldl-++; ++-assoc)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.FlatSim using (Inv; inv₀; react-inv)
+open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
 open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
@@ -222,6 +222,31 @@ inv-from op o c ((q , pin _) ∷ rx) i = inv-from op o c rx i
 
 inv-past : ∀ {B} op rx → Inv (from r₀ (outRows {B} op init rx)) (proj₁ (past op init rx))
 inv-past op rx = inv-from op init r₀ rx inv₀
+
+-- The count's instant is the scan's.
+inv-at : ∀ {c s} → Inv c s → proj₁ c ≡ Flat.at s
+inv-at (live _ _) = refl
+inv-at (dead _ _) = refl
+
+-- THE SCAN'S COUNT OF WHAT IT SENT IS EXACTLY ITS COUNTERS, so long as
+-- no closer begins a route.
+exact-from : ∀ {B} op (o : Out B) c rx → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂ → NoCB x)
+           → Inv c (proj₁ o) → proj₂ c ≡ tot (proj₁ o) → proj₂ (from c (outRows op o rx)) ≡ tot (proj₁ (past op o rx))
+exact-from op o c []                 nc i e = e
+exact-from op o c ((q , out x) ∷ rx) nc i e =
+  trans (cong proj₂ (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx)))
+    (exact-from op (react op o x) (from c (lay q 0 (proj₂ (react op o x)))) rx
+      (λ rx₁ rx₂ eq → nc ((q , out x) ∷ rx₁) rx₂ (cong (_ ∷_) eq))
+      (subst (λ c′ → Inv c′ (proj₁ (react op o x))) cv (react-inv op o x i))
+      (subst (λ c′ → proj₂ c′ ≡ tot (proj₁ (react op o x))) cv (react-exact op o x (nc [] rx refl) i e)))
+  where cv = cong (L.foldl count c) (sym (values-lay q 0 (proj₂ (react op o x))))
+exact-from op o c ((q , end) ∷ rx)   nc i e = e
+exact-from op o c ((q , skip) ∷ rx)  nc i e = exact-from op o c rx (λ rx₁ rx₂ eq → nc ((q , skip) ∷ rx₁) rx₂ (cong (_ ∷_) eq)) i e
+exact-from op o c ((q , pin r) ∷ rx) nc i e = exact-from op o c rx (λ rx₁ rx₂ eq → nc ((q , pin r) ∷ rx₁) rx₂ (cong (_ ∷_) eq)) i e
+
+exact-past : ∀ {B} op rx → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂ → NoCB x)
+           → proj₂ (from r₀ (outRows {B} op init rx)) ≡ tot (proj₁ (past op init rx))
+exact-past op rx nc = exact-from op init r₀ rx nc inv₀ refl
 
 postulate
   -- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
