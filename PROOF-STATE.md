@@ -26,14 +26,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE BATCHER
+#### THE ROUTES
 
-Untried: the elaborated run as the batcher reads it — values named by
-their instant, a new instant only after the last is over, the run
-leaving an instant once nothing of it is held. Hardest: the bracket and
+Untried: past each release of an instant — a new begin, an over, the
+last route's stop — the next value is of another instant, and the run
+leaves an instant once nothing of it is held. Hardest: the bracket and
 route protocol through every flatMap policy and connect.
 
-Members: `good-run`, `flush-closes`, `closes-flush`.
+Members: `stop-fresh`, `over-fresh`, `begin-fresh`, `flush-closes`, `closes-flush`.
+
+#### THE BURST
+
+Untried: begins only past the subscribe burst, which ends once and is
+followed by a begin before any value; nothing past the completion. Needs
+the marks each former's elaboration can emit, and where.
+
+Members: `begin-late`, `sub-once`, `sub-fresh`, `completed-end`.
 
 #### THE ERASURE
 
