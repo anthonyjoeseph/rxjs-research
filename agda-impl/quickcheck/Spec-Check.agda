@@ -45,8 +45,7 @@ open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (instEmit; mark)
 import simultaneous.InstEmit as M
 open import simultaneous.SObs using (Batching; module Elaborate)
-open import simultaneous.Batcher using (after)
-open import simultaneous.Protocol using (lastBegin; seenSub)
+open import simultaneous.Protocol using (nameStep; subStep)
 open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
@@ -54,7 +53,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; bstart)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -129,29 +128,29 @@ private
   unless true  _ r = r
   unless false s r = s ∷ r
 
-  -- The leaves of `simultaneous.Batcher` refuted at the emit `w`, past
-  -- `xs`, before `ys`.
-  leafAt : List (IE ℕ) → IE ℕ → List (IE ℕ) → List String
-  leafAt xs (instEmit (mark M.begin) n) ys =
-    let a = lastBegin root xs in
-    unless (seenSub xs) "begin-late" (unless (does (n ≟ᵖ a) ∨ freshᵇ a (stamped ys)) "begin-fresh" [])
-  leafAt xs (instEmit (mark M.subscribed) n) ys =
-    unless (not (seenSub xs)) "sub-once" (unless (freshᵇ root (stamped ys)) "sub-fresh" [])
-  leafAt xs (instEmit (mark M.over) n) ys =
-    unless (not (seenSub xs) ∨ freshᵇ (lastBegin root xs) (stamped ys)) "over-fresh" []
-  leafAt xs (instEmit (mark M.stop) n) ys =
-    unless (not (seenSub xs) ∨ not (Batching.routes (proj₁ (after bstart xs)) ≤ᵇ 1) ∨ freshᵇ (lastBegin root xs) (stamped ys)) "stop-fresh" []
-  leafAt xs (instEmit (mark M.completed) n) ys = unless (nil (stamped ys)) "completed-end" []
-  leafAt xs _ ys = []
+  -- The leaves of `simultaneous.Closing` refuted at the emit `w`, the walk
+  -- named `a`, past the burst when `s`, in batcher state `st`, before `ys`.
+  leafAt : Pos → Bool → Step ℕ → IE ℕ → List (IE ℕ) → List String
+  leafAt a s st (instEmit (mark M.begin) n) ys =
+    unless s "begin-late" (unless (does (n ≟ᵖ a) ∨ freshᵇ a (stamped ys)) "begin-fresh" [])
+  leafAt a s st (instEmit (mark M.subscribed) n) ys =
+    unless (not s) "sub-once" (unless (freshᵇ root (stamped ys)) "sub-fresh" [])
+  leafAt a s st (instEmit (mark M.over) n) ys =
+    unless (not s ∨ freshᵇ a (stamped ys)) "over-fresh" []
+  leafAt a s st (instEmit (mark M.stop) n) ys =
+    unless (not s ∨ not (Batching.routes (proj₁ st) ≤ᵇ 1) ∨ freshᵇ a (stamped ys)) "stop-fresh" []
+  leafAt a s st (instEmit (mark M.completed) n) ys = unless (nil (stamped ys)) "completed-end" []
+  leafAt a s st _ ys = []
 
-  protocol : List (IE ℕ) → List (IE ℕ) → List String
-  protocol xs []       = []
-  protocol xs (w ∷ ys) = leafAt xs w ys ++ protocol (xs ++ [ w ]) ys
+  -- One pass, the walk's state carried along.
+  protocol : Pos → Bool → Step ℕ → List (IE ℕ) → List String
+  protocol a s st []       = []
+  protocol a s st (w ∷ ys) = leafAt a s st w ys ++ protocol (nameStep a w) (subStep s w) (bstep st w) ys
 
 -- The leaves a seed's elaborated run refutes; nothing when cut.
 protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
 protocolOf n x with whole (listT n x [] root)
-... | just rx = protocol [] (values rx)
+... | just rx = protocol root false bstart (values rx)
 ... | nothing = []
 
 ------------------------------------------------------------------------
@@ -335,7 +334,7 @@ private
     putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied seeds))) >>= λ _ →
     putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped seeds))) >>= λ _ →
     putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds))) >>= λ _ →
-    putStrLn (fires "protocol" (protoFails protoTwice seeds))
+    putStrLn (fires "protocol" (protoFails protoTwice (upTo 60)))
 
 main : IO Unit
 main = selftest >>= λ _ → pinned pins >>= λ _ → protoReport seeds >>= λ _ → report seeds
