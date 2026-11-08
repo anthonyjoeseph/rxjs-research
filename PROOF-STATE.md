@@ -59,12 +59,3 @@ frame or a timer cascade, as `instantOf` reads it. Settled when
 `positioned` is a body by induction over the tree.
 
 Members: `positioned`.
-
-#### THE LAYERS
-
-A run of an `each` read back as a run of its source, values prefix to
-lanes, completing exactly when it does.  Route: every visible row of the
-merge hangs under one source row; `each-in` by walking the source run,
-`each-out` from `reach`, `each-in` and determinism of a run.
-
-Members: `each-out`, `each-in`.

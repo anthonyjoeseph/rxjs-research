@@ -30,7 +30,8 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
 import simultaneous.Flatten as F
 open F _≟ᵖ_ using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
-open import simultaneous.Relations using (Met; outs; values; values-++; joined; vals; batchesOut; grouped; Closes; Batches; Ends; EndsWith; elaborated; batched)
+open import simultaneous.Relations using (Met; values; values-++; joined; vals; batchesOut; grouped; Closes; Batches; Ends; EndsWith;
+  elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;

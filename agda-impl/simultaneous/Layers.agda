@@ -16,7 +16,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Bool using (true; false)
+open import Data.Bool using (true)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Unit using (tt)
@@ -31,8 +31,8 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; 
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (InvAt; PinBy)
-open import denotation.Laws.Worlds.Leaves using (module AccF; of-end; of-end-row; of-idx; ine-pin)
-open import denotation.Laws.Modulus using (≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
+open import denotation.Laws.Worlds.Leaves using (module AccF; of-end; of-end-row; of-idx)
+open import denotation.Laws.Modulus using (≼-false; ≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
 open import denotation.Laws.Fold using (fold)
 open import adequacy.SubOne using (scan-reach; lift-in)
 open import adequacy.SubJoin using (of-rows; of-in; of-reach)
@@ -46,6 +46,10 @@ open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (each)
 -- A closed program's emission set, subscribed at the root.
 at : ∀ {A} → Obs Timeline [] A → EmissionSet A
 at s = enter (⟦ s ⟧ []) root
+
+-- A closed program has one row at a position.
+at-func : ∀ {A} (s : Obs Timeline [] A) {y e e′} → at s y e → at s y e′ → e ≡ e′
+at-func s = InvAt.func (inv-⟦⟧ s [] (λ ()) root (tt , λ ()))
 
 -- The states a fold passes through, one per value.
 scans : ∀ {A B : Set} → (B → A → B) → B → List A → List B
@@ -68,10 +72,7 @@ module ScanLayer {A B : Set} (f : B → A → B) (z : B) (s : Obs Timeline [] A)
   S  = at s
   Sc = at (scan f z s)
 
-  fu : ∀ {y e e′} → S y e → S y e′ → e ≡ e′
-  fu = InvAt.func (inv-⟦⟧ s [] (λ ()) root (tt , λ ()))
-
-  open AccF f z {S} fu using (acc-val; acc-func)
+  open AccF f z {S} (at-func s) using (acc-val; acc-func)
 
   toSc : ∀ {y e} → ScanT y e → Sc y e
   toSc x = x , scan-reach (entered-reach (⟦ s ⟧ []) root) x
@@ -160,11 +161,6 @@ to≺ _ _ = Equivalence.from T-≡
 from≺ : ∀ x y → x ≺ y → x <ᵖ y ≡ true
 from≺ _ _ = Equivalence.to T-≡
 
-≼-false : ∀ {x y} → x ≼ y → y <ᵖ x ≡ false
-≼-false {x} {y} h with y <ᵖ x
-... | true  = ⊥-elim (h tt)
-... | false = refl
-
 ≼-split : ∀ {x y} → x ≼ y → x ≺ y ⊎ x ≡ y
 ≼-split {x} {y} h with <ᵖ-split x y (≼-false {x} {y} h)
 ... | inj₁ lt = inj₁ (to≺ x y lt)
@@ -244,10 +240,6 @@ prefix-values (_∷_ {a = (_ , skip)}  refl p) = prefix-values p
 prefix-values (_∷_ {a = (_ , end)}   refl p) = prefix-values p
 prefix-values (_∷_ {a = (_ , pin _)} refl p) = prefix-values p
 
-prefix-refl : ∀ {A : Set} (xs : List A) → Prefix _≡_ xs xs
-prefix-refl []       = []
-prefix-refl (_ ∷ xs) = refl ∷ prefix-refl xs
-
 prefix-split : ∀ {A : Set} {xs ys : List A} → Prefix _≡_ xs ys → xs ≡ ys ⊎ Σ A λ z → Σ (List A) λ zs → ys ≡ xs ++ z ∷ zs
 prefix-split {ys = []}     []       = inj₁ refl
 prefix-split {ys = z ∷ zs} []       = inj₂ (z , zs , refl)
@@ -288,13 +280,6 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   module M = Merge F S
 
   IS = inv-⟦⟧ s [] (λ ()) root (tt , λ ())
-  IE = inv-⟦⟧ (each f s) [] (λ ()) root (tt , λ ())
-
-  fuS : ∀ {y e e′} → S y e → S y e′ → e ≡ e′
-  fuS = InvAt.func IS
-
-  fuE : ∀ {y e e′} → E y e → E y e′ → e ≡ e′
-  fuE = InvAt.func IE
 
   ln : Pos → Pos
   ln q = q ++ [ ix 1 ]
@@ -329,7 +314,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   val-end : ∀ {q a c} → S q (out a) → S c end → q ≺ c
   val-end {q} {c = c} x y with ≼-split {q} {c} (vis-end x tt y)
   ... | inj₁ lt   = lt
-  ... | inj₂ refl with fuS x y
+  ... | inj₂ refl with (at-func s) x y
   ...   | ()
 
   seenS : ∀ {q e} → S q e → Visible e → Seen S q e
@@ -431,24 +416,24 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       in-whole m r = ∈-++⁺ʳ (concatMap _ ksS) (∈-concatMap⁺ rowsOf (any-map (λ { refl → r }) m))
 
       row-in : ∀ {q′ e′} → S q′ e′ → q′ ≼ q → q′ ∈ ks
-      row-in {e′ = out _} x le = in-whole (run-has fuS mw x tt tt le qin) (here refl)
-      row-in {e′ = end}   x le = in-whole (run-has fuS mw x tt tt le qin) (here refl)
+      row-in {e′ = out _} x le = in-whole (run-has (at-func s) mw x tt tt le qin) (here refl)
+      row-in {e′ = end}   x le = in-whole (run-has (at-func s) mw x tt tt le qin) (here refl)
       row-in {q′} {e′ = skip} x le with ≼-split {q′} {q} le
       ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ++ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
-      ... | inj₂ refl = ⊥-elim (skip-vis (fuS x x₀) vi₀)
+      ... | inj₂ refl = ⊥-elim (skip-vis ((at-func s) x x₀) vi₀)
         where skip-vis : ∀ {e : Ev X} → skip ≡ e → Visible e → ⊥
               skip-vis refl ()
       row-in {q′} {e′ = pin r} x le with ≼-split {q′} {q} le
       ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ++ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
-      ... | inj₂ refl = ⊥-elim (pin-vis (fuS x x₀) vi₀)
+      ... | inj₂ refl = ⊥-elim (pin-vis ((at-func s) x x₀) vi₀)
         where pin-vis : ∀ {e : Ev X} → pin r ≡ e → Visible e → ⊥
               pin-vis refl ()
 
       val-in : ∀ {q′ a′} → S q′ (out a′) → q′ ≼ q → (q′ ++ [ ix 0 ]) ∈ ks
-      val-in x le = in-whole (run-has fuS mw x tt tt le qin) (there (here refl))
+      val-in x le = in-whole (run-has (at-func s) mw x tt tt le qin) (there (here refl))
 
       lane-in : ∀ {q′ a′ k′ e′} → S q′ (out a′) → q′ ≼ q → InE (ofᴱ (ln q′) 0 (f a′)) k′ e′ → k′ ∈ ks
-      lane-in {q′} {a′} x le y = in-whole (run-has fuS mw x tt tt le qin) (there (there (of-in (ln q′) 0 (f a′) y)))
+      lane-in {q′} {a′} x le y = in-whole (run-has (at-func s) mw x tt tt le qin) (there (there (of-in (ln q′) 0 (f a′) y)))
 
       -- A merge row before a row anchored at `q` hangs under a source row at or before `q`.
       reachE : ∀ {k e} → Vis k q e → Reach M.JoinT k e
@@ -534,9 +519,9 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
         j₁ : ∀ {k q′ e} → Vis k q′ e → After cE k → (q′ ≡ q × Σ Y λ b → e ≡ out b × InE (ofᴱ (ln q) 0 (f a)) k (out b)) ⊎ q ≺ q′
         j₁ v ak with ≼-split {q} {_} (lst (proj₁ (proj₂ (vis-anc v))) (proj₂ (proj₂ (vis-anc v))) (proj₁ (inv v) ak))
         ... | inj₁ lt = inj₂ lt
-        j₁ (vlane x′ y) ak | inj₂ refl with fuS x′ x
+        j₁ (vlane x′ y) ak | inj₂ refl with (at-func s) x′ x
         ... | refl = inj₁ (refl , _ , refl , y)
-        j₁ (vend x′) ak | inj₂ refl with fuS x x′
+        j₁ (vend x′) ak | inj₂ refl with (at-func s) x x′
         ... | ()
         j₂ : ∀ {k q′ e} → Vis k q′ e → q ≺ q′ → After cE k
         j₂ v lt = proj₂ (inv v) (after-≺ cS aft lt)
@@ -569,7 +554,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
             ... | inj₁ le with ≼-split {q′} {c} le
             ...   | inj₁ lt = ⊥-elim (≺-absurd {c} {k} ck (vis-before v x lt))
             fwd (vend _)     ck | inj₁ _ | inj₂ refl = ⊥-elim (≺-irrefl {c} ck)
-            fwd (vlane x′ _) ck | inj₁ _ | inj₂ refl with fuS x′ x
+            fwd (vlane x′ _) ck | inj₁ _ | inj₂ refl with (at-func s) x′ x
             ... | ()
     each-go _ _ (_∷_ {e = skip}  (_ , () , _) _)
     each-go _ _ (_∷_ {e = pin _} (_ , () , _) _)
@@ -594,10 +579,10 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       rl = ys ++ [ (k , e) ]
 
       longer : Prefix _≡_ rl rs′
-      longer with run-det fuE m mE
+      longer with run-det (at-func (each f s)) m mE
       ... | inj₁ pr = pr
       ... | inj₂ pr with prefix-split pr
-      ...   | inj₁ eq′ = subst (Prefix _≡_ rl) (sym eq′) (prefix-refl rl)
+      ...   | inj₁ eq′ = subst (Prefix _≡_ rl) (sym eq′) (subst (λ w → Prefix _≡_ w rl) eq′ pr)
       ...   | inj₂ ((kz , ez) , zs , eq′) with run-tail rs′ (subst (Run E nothing) eq′ m)
       ...     | tl@((((xz , _) , _) , viz , az , _) ∷ tl′) with vis xz viz
       ...       | qz , vz =
@@ -617,7 +602,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       pre = subst (Prefix _≡_ (values rl)) eq (prefix-values longer)
 
       ends : Ends rl → Ends sl × values rl ≡ concatMap f (values sl)
-      ends h = ++⁺ʳ rs″ (here (fuS x₀ (vend-src (subst (Vis k q) (ends-last ys m h) v)))) , trans (cong values (prefix-end mE longer h)) eq
+      ends h = ++⁺ʳ rs″ (here ((at-func s) x₀ (vend-src (subst (Vis k q) (ends-last ys m h) v)))) , trans (cong values (prefix-end mE longer h)) eq
 
 each-out : ∀ {X Y} (f : X → List Y) (s : Obs Timeline [] X) {rs} → Met (at (each f s)) rs
          → Σ _ λ sc → Met (at s) sc × Prefix _≡_ (values rs) (concatMap f (values sc))
