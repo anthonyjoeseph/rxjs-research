@@ -14,6 +14,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_)
 open import Data.Bool using (true; false)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
 open import Relation.Nullary using (¬_; does)
@@ -112,7 +113,7 @@ held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
           → Held t cs → Held t′ cs
 held-same {t = t} {t′} {cs} row end-row back H = record
   { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
-  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late }
+  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late ; current = current }
   where
     early : ∀ {y a n} → t′ y (out (instEmit (value a) n)) → Early y
     early x with row x
@@ -141,6 +142,14 @@ held-same {t = t} {t′} {cs} row end-row back H = record
     ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
     ...     | _ , r₂₀ , refl , ev-out same-mark =
       subst (λ r → Σ _ λ k → proj₂ r ≡ _) (sym (cnt-same e₁)) (Held.exact H run r₁ r₂₀ refl)
+
+    current : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′
+          → proj₂ (cnt r₁′) ≡ 0 ⊎ proj₁ (cnt r₁′) ≡ nameOf y
+    current m r₁′ r₂′ e with back m
+    ... | rs , run , eq with split≈ eq r₁′ _ e
+    ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
+    ...     | _ , r₂₀ , refl , s =
+      subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ _) (sym (cnt-same e₁)) (Held.current H run r₁ r₂₀ refl)
 
     routing : ∀ {y m n} → t′ y (out (instEmit (mark m) n)) → Routing m
     routing x with row x

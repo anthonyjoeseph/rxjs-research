@@ -5,6 +5,11 @@
 -- end outside the bursts it is exempt for finds the count holding a route
 -- of its own instant, and its dead instants stay dead (`Shut`).
 --
+-- NO ROUTE OUTLIVES ITS INSTANT: every row finds the count holding no
+-- route, or routes of its own instant.  An instant's routes are stopped,
+-- ended by its over, or carried by an end within it; a reader watching
+-- the stream never sees a route of a past instant still open.
+--
 -- THE EXEMPT BURSTS are the subscribe bursts of the stream itself and of
 -- every connect it reads under, each within its own instant: what runs
 -- there runs synchronously under the subscription, so whatever route
@@ -28,7 +33,8 @@ open import Data.Nat using (ℕ; suc)
 open import Data.List using (List; []; _∷_; _++_)
 import Data.List as L
 open import Data.List.Relation.Unary.Any using (Any)
-open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
@@ -113,6 +119,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
     ends    : ∀ {y} → t y end → Early y
     late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y
+    current : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → proj₂ (cnt r₁) ≡ 0 ⊎ proj₁ (cnt r₁) ≡ nameOf y
 
 -- Held at every admissible subscription, exempt for its own burst and
 -- `cs`.  No subscription is made at a timer's root, where a burst would

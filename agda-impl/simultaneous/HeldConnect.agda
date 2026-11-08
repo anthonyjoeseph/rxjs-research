@@ -94,7 +94,8 @@ held-ex wd H = record
   ; shut    = Held.shut H
   ; early   = Held.early H
   ; ends    = Held.ends H
-  ; late    = Held.late H }
+  ; late    = Held.late H
+  ; current = Held.current H }
 
 ------------------------------------------------------------------------
 -- Runs

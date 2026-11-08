@@ -288,6 +288,14 @@ private
   earlyᵇ : Pos → Bool
   earlyᵇ q = not (valuedᵇ (instantOf q)) ∨ ((q <ᵖ opos (instantOf q)) ∧ not (inside q (opos (instantOf q))))
 
+  -- No route outlives its instant: every row finds no route counted, or
+  -- routes of its own instant.
+  currentᵇ : Routes → Rows (IE ℕ) → Bool
+  currentᵇ K []                 = true
+  currentᵇ K ((q , out x) ∷ rs) = ((proj₂ K ≡ᵇ 0) ∨ does (proj₁ K ≟ᵖ nameOf q)) ∧ currentᵇ (count K x) rs
+  currentᵇ K ((q , end) ∷ rs)   = ((proj₂ K ≡ᵇ 0) ∨ does (proj₁ K ≟ᵖ nameOf q)) ∧ currentᵇ K rs
+  currentᵇ K (_ ∷ rs)           = currentᵇ K rs
+
   phaseᵇ : Rows (IE ℕ) → Bool
   phaseᵇ []                 = true
   phaseᵇ ((q , out x) ∷ rs) = row ∧ phaseᵇ rs
@@ -312,9 +320,10 @@ heldOf n o with whole (listT n (elaborate o) [] root)
 ...   | just ex = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
                   ++ unless (heldᵇ (root , 0) rx) "held-top"
                        (unless (heldᵇ (root , 0) ex) "held-elab" (unless (shutᵇ (root , 0) [] [] (outs ex)) "held-elab-shut"
-                         (unless (phaseᵇ rx) "held-top-phase" (unless (phaseᵇ ex) "held-elab-phase" []))))
+                         (unless (phaseᵇ rx) "held-top-phase" (unless (phaseᵇ ex) "held-elab-phase"
+                           (unless (currentᵇ (root , 0) rx) "held-top-current" (unless (currentᵇ (root , 0) ex) "held-elab-current" []))))))
 ...   | nothing = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
-                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (phaseᵇ rx) "held-top-phase" [])
+                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (phaseᵇ rx) "held-top-phase" (unless (currentᵇ (root , 0) rx) "held-top-current" []))
 
 ------------------------------------------------------------------------
 -- One seed
