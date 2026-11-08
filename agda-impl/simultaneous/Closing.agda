@@ -40,6 +40,13 @@ open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bs
 
 -- THE RUN IS CLOSED WHERE NOTHING IS HELD: past every release, no value
 -- of the instant released, and the run leaves it.
+--
+-- An instant that never ends never reaches its release: the batcher
+-- releases only once every route of the instant is closed, and every row
+-- a synchronous loop makes, its subscriptions' skips included, lies under
+-- the value whose cascade it is, before that value's `over` and before
+-- its route's `stop`.  So past a release only finitely many rows of the
+-- instant remain.
 postulate
   flush-closes : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → pending (proj₁ (after bstart (values rx))) ≡ []
                → Closes (elaborated o) rx true
