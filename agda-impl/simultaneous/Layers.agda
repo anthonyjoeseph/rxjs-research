@@ -222,15 +222,15 @@ run-det fu (_∷_ {q = q₁} {e = e₁} h₁@(((x₁ , _) , _) , vi₁ , a₁ , 
 -- Nothing is met past an end, so a run that ends is every run it begins.
 prefix-end : ∀ {A} {t : EmissionSet A} {c xs ys} → Run t c ys → Prefix _≡_ xs ys → Ends xs → xs ≡ ys
 prefix-end _ [] ()
-prefix-end (((x , _) , _) ∷ run) (refl ∷ []) (here refl) with run-past-end x run
+prefix-end ((((x , _) , _) , _) ∷ run) (refl ∷ []) (here refl) with run-past-end x run
 ... | refl = refl
-prefix-end (((x , _) , _) ∷ run) (refl ∷ (_ ∷ _)) (here refl) with run-past-end x run
+prefix-end ((((x , _) , _) , _) ∷ run) (refl ∷ (_ ∷ _)) (here refl) with run-past-end x run
 ... | ()
 prefix-end (_ ∷ run) (refl ∷ p) (there h) = cong (_ ∷_) (prefix-end run p h)
 
 ends-last : ∀ {A} {t : EmissionSet A} {c} ys {y} → Run t c (ys ++ [ y ]) → Ends (ys ++ [ y ]) → proj₂ y ≡ end
 ends-last []       _ (here eq) = eq
-ends-last (_ ∷ ys) (((x , _) , _) ∷ run) (here refl) with run-past-end x run | ys
+ends-last (_ ∷ ys) ((((x , _) , _) , _) ∷ run) (here refl) with run-past-end x run | ys
 ... | () | []
 ... | () | _ ∷ _
 ends-last (_ ∷ ys) (_ ∷ run) (there h) = ends-last ys run h
