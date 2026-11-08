@@ -171,6 +171,17 @@ private
   isOver _                          = false
   isDone (instEmit (mark M.completed) _) = true
   isDone _                               = false
+  isStop isInner : IE ℕ → Bool
+  isStop (instEmit (mark M.stop) _) = true
+  isStop _                          = false
+  isInner (instEmit (mark M.outerOpen) _)  = true
+  isInner (instEmit (mark M.outerClose) _) = true
+  isInner (instEmit (mark M.laneStart) _)  = true
+  isInner (instEmit (mark M.carry) _)      = true
+  isInner (instEmit (mark M.laneDone) _)   = true
+  isInner (instEmit (mark M.burstEnd) _)   = true
+  isInner (instEmit (mark M.outerDone) _)  = true
+  isInner _                                = false
 
   anyᵇ : ∀ {X : Set} → (X → Bool) → List X → Bool
   anyᵇ p []       = false
@@ -253,14 +264,16 @@ private
         (unless (overLastᵇ [] es) "over-last" (unless (doneLastᵇ false es) "done-last" [])))))))
 
   -- `simultaneous.Held.Held` of the stream subscribed at the root: every
-  -- begin named for its instant, and every other row past the subscribe
-  -- frame met with a route of its own instant counted.
+  -- begin named for its instant, every other row past the subscribe
+  -- frame met with a route of its own instant counted, every stop with a
+  -- route, and no flatMap's own mark.
   heldᵇ : Routes → Rows (IE ℕ) → Bool
   heldᵇ K []                   = true
   heldᵇ K ((q , out x) ∷ rs)   = row ∧ heldᵇ (count K x) rs
     where
       covered = does (instantOf q ≟ᵖ root) ∨ (does (proj₁ K ≟ᵖ nameOf q) ∧ not (proj₂ K ≡ᵇ 0))
-      row = if isBegin x then does (InstEmit.instant x ≟ᵖ nameOf q) else covered
+      exact = not (isStop x) ∨ not (proj₂ K ≡ᵇ 0)
+      row = exact ∧ not (isInner x) ∧ (if isBegin x then does (InstEmit.instant x ≟ᵖ nameOf q) else covered)
   heldᵇ K ((q , end) ∷ rs)     =
     (does (instantOf q ≟ᵖ root) ∨ (does (proj₁ K ≟ᵖ nameOf q) ∧ not (proj₂ K ≡ᵇ 0))) ∧ heldᵇ K rs
   heldᵇ K (_ ∷ rs)             = heldᵇ K rs

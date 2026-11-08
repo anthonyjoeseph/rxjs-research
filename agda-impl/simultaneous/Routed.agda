@@ -22,13 +22,13 @@ open import Data.List using (List; []; _∷_; _++_)
 import Data.List as L
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Nat using (ℕ; suc)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix; sub; last; inside)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
+open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met; values)
@@ -69,11 +69,24 @@ data Carried {A : Set} : Ev (IE A) → Set where
   c-over  : ∀ {n} → Carried (out (instEmit (mark over) n))
   c-end   : Carried end
 
+-- A mark read above a flatMap: never one a flatMap's scan consumes.
+data Routing : Mark → Set where
+  r-begin      : Routing begin
+  r-stop       : Routing stop
+  r-over       : Routing over
+  r-subscribed : Routing subscribed
+  r-completed  : Routing completed
+
+-- A stop finds a route to stop even inside an exempt burst: no route is
+-- stopped twice.
 record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
   field
     named   : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
     covered : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+    exact   : ∀ {rs} → Met t rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
+            → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
+    routing : ∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m
     shut    : Shut t
 
 -- Held at every admissible subscription, exempt for its own burst and

@@ -73,6 +73,8 @@ held-ex : ∀ {A} {t : EmissionSet (IE A)} {cs cs′} → (∀ {y} → Ex cs′ 
 held-ex wd H = record
   { named   = Held.named H
   ; covered = λ m r₁ r₂ e c nx → Held.covered H m r₁ r₂ e c (λ x → nx (wd x))
+  ; exact   = Held.exact H
+  ; routing = Held.routing H
   ; shut    = Held.shut H }
 
 ------------------------------------------------------------------------

@@ -25,7 +25,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; ove
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf)
+open import simultaneous.Routed using (Held; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
 
@@ -107,7 +107,7 @@ held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
           → (∀ {y x′} → t′ y (out x′) → Σ (IE A) λ x → t y (out x) × Same x′ x)
           → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs)
           → Held t cs → Held t′ cs
-held-same {t = t} {t′} {cs} row back H = record { named = named ; covered = covered ; shut = shut }
+held-same {t = t} {t′} {cs} row back H = record { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut }
   where
     named : ∀ {y n} → t′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y
     named x with row x
@@ -120,6 +120,18 @@ held-same {t = t} {t′} {cs} row back H = record { named = named ; covered = co
     ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
     ...     | _ , r₂₀ , refl , s =
       subst (λ r → Σ _ λ k → r ≡ _) (sym (cnt-same e₁)) (Held.covered H run r₁ r₂₀ refl (carried-same s c) nx)
+
+    exact : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y n} r₂′ → rs′ ≡ r₁′ ++ (y , out (instEmit (mark stop) n)) ∷ r₂′
+          → Σ ℕ λ k → proj₂ (cnt r₁′) ≡ suc k
+    exact m r₁′ r₂′ e with back m
+    ... | rs , run , eq with split≈ eq r₁′ _ e
+    ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
+    ...     | _ , r₂₀ , refl , ev-out same-mark =
+      subst (λ r → Σ _ λ k → proj₂ r ≡ _) (sym (cnt-same e₁)) (Held.exact H run r₁ r₂₀ refl)
+
+    routing : ∀ {y m n} → t′ y (out (instEmit (mark m) n)) → Routing m
+    routing x with row x
+    ... | _ , y , same-mark = Held.routing H y
 
     shut : Shut t′
     shut m r₁′ r₂′ e z bq vy iq with back m
