@@ -30,7 +30,7 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
 import simultaneous.Flatten as F
 open F _≟ᵖ_ using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
-open import simultaneous.Relations using (Met; outs; values; joined; vals; batchesOut; grouped; Closes; Batches; Ends; EndsWith; elaborated; batched)
+open import simultaneous.Relations using (Met; outs; values; values-++; joined; vals; batchesOut; grouped; Closes; Batches; Ends; EndsWith; elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
@@ -279,16 +279,6 @@ released-++ : ∀ {A : Set} (s : Step A) u v → released s (u ++ v) ≡ release
 released-++ s []       v = refl
 released-++ s (w ∷ u) v = trans (cong (proj₂ (bstep s w) ++_) (released-++ (bstep s w) u v))
                                 (sym (++-assoc (proj₂ (bstep s w)) (released (bstep s w) u) _))
-
-outs-++ : ∀ {A : Set} (xs ys : List (Pos × Ev A)) → outs (xs ++ ys) ≡ outs xs ++ outs ys
-outs-++ []                  ys = refl
-outs-++ ((q , emit a) ∷ xs) ys = cong ((q , a) ∷_) (outs-++ xs ys)
-outs-++ ((q , skip) ∷ xs)   ys = outs-++ xs ys
-outs-++ ((q , end) ∷ xs)    ys = outs-++ xs ys
-outs-++ ((q , pin _) ∷ xs)  ys = outs-++ xs ys
-
-values-++ : ∀ {A : Set} (xs ys : List (Pos × Ev A)) → values (xs ++ ys) ≡ values xs ++ values ys
-values-++ xs ys = trans (cong (L.map proj₂) (outs-++ xs ys)) (map-++ proj₂ (outs xs) (outs ys))
 
 ------------------------------------------------------------------------
 -- The protocol, read off the elaborated run
