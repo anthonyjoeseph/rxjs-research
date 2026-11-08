@@ -26,8 +26,8 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _�
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
 open import Tree using (Obs; scan)
-open import denotation.Events using (Timeline; Pos; root; fresh; _≟ᵖ_; _<ᵖ_; ix; last; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<; <ᵖ-split)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; ofᴱ; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge)
+open import denotation.Events using (Timeline; Pos; root; fresh; _≟ᵖ_; _<ᵖ_; ix; last; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<; <ᵖ-split)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (InvAt; PinBy)
@@ -585,14 +585,14 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   ...         | rs″ , mS with Over.each-go (rs″ ++ [ (q , e₀) ]) mS (λ r → r) (λ _ → (λ _ → tt) , (λ _ → tt)) mS
   ...           | rs′ , mE , eq , en , inv = rs″ ++ [ (q , e₀) ] , mS , pre , ends
     where
-      sc = rs″ ++ [ (q , e₀) ]
-      rs = ys ++ [ (k , e) ]
+      sl = rs″ ++ [ (q , e₀) ]
+      rl = ys ++ [ (k , e) ]
 
-      longer : Prefix _≡_ rs rs′
+      longer : Prefix _≡_ rl rs′
       longer with run-det fuE m mE
       ... | inj₁ pr = pr
       ... | inj₂ pr with prefix-split pr
-      ...   | inj₁ eq′ = subst (Prefix _≡_ rs) (sym eq′) (prefix-refl rs)
+      ...   | inj₁ eq′ = subst (Prefix _≡_ rl) (sym eq′) (prefix-refl rl)
       ...   | inj₂ ((kz , ez) , zs , eq′) with run-tail rs′ (subst (Run E nothing) eq′ m)
       ...     | tl@((((xz , _) , _) , viz , az , _) ∷ tl′) with vis xz viz
       ...       | qz , vz =
@@ -608,10 +608,10 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
           in-tail (here refl) = ≼-refl {kz}
           in-tail (there m′)  = ≺→≼ {kz} {k} (run-after tl′ m′)
 
-      pre : Prefix _≡_ (values rs) (concatMap f (values sc))
-      pre = subst (Prefix _≡_ (values rs)) eq (prefix-values longer)
+      pre : Prefix _≡_ (values rl) (concatMap f (values sl))
+      pre = subst (Prefix _≡_ (values rl)) eq (prefix-values longer)
 
-      ends : Ends rs → Ends sc × values rs ≡ concatMap f (values sc)
+      ends : Ends rl → Ends sl × values rl ≡ concatMap f (values sl)
       ends h with ends-last ys m h | v
       ... | refl | vend _ = ++⁺ʳ rs″ (here refl) , trans (cong values (prefix-end mE longer h)) eq
 
