@@ -30,7 +30,10 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_; enter;
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (W; InvAt; TimerRoot; Plain; plain-ix; plain-last; step; timer; join; here; inW)
 open import denotation.Read using (Run; _∷_)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-≼-≺)
+open import simultaneous.Routed using (Held; Valued; opos)
+open import simultaneous.Held using (held)
+open import simultaneous.HeldConnect using (⊑-≼)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; module Elaborate)
@@ -298,8 +301,8 @@ rooted o = row-rooted (elaborate o)
 
 -- THE INSTANT STRUCTURE: every emit is named for its instant, and the
 -- begins of one instant name it alike; the subscribe mark sits once, before every
--- begin, every value past it async; an instant's values precede its overs,
--- and every value precedes the completion.
+-- begin, every value past it async, and every value precedes the
+-- completion.
 postulate
   named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
   one-name  : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
@@ -310,10 +313,15 @@ postulate
             → elaborated o k′ (out (instEmit (mark Marks.subscribed) m′)) → k ≡ k′
   sub-async : ∀ {A} (o : SObs [] A) {ks m k a j} → elaborated o ks (out (instEmit (mark Marks.subscribed) m))
             → elaborated o k (out (instEmit (value a) j)) → ks ≺ k → Async k
-  over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
-            → elaborated o ko (out (instEmit (mark Marks.over) m)) → instantOf kv ≡ instantOf ko → kv ≺ ko
   done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))
             → elaborated o kc (out (instEmit (mark Marks.completed) m)) → kv ≺ kc
+
+-- An instant's values precede its overs: the value lies before where
+-- the over is sent from, the over at or under it.
+over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
+          → elaborated o ko (out (instEmit (mark Marks.over) m)) → instantOf kv ≡ instantOf ko → kv ≺ ko
+over-last o {kv} xv xo eq with Held.late (held o) xo
+... | v , oo = ≺-≼-≺ {kv} (subst (λ I → kv ≺ opos I) eq (proj₁ (Held.early (held o) xv (subst Valued (sym eq) v)))) (⊑-≼ oo)
 
 ------------------------------------------------------------------------
 -- The protocol, one mark at a time

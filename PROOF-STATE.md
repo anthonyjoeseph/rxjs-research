@@ -40,12 +40,12 @@ Members: `held-comb`, `held-connected`, `held-lim`,
 
 #### THE ROUTES
 
-Untried: an instant's values precede its overs; the run leaves an
+Untried: the run leaves an
 instant once nothing of it is held; a closed instant's batch meets a
 releasing mark before any value. Hardest: the liveness `releases` asks
 for.
 
-Members: `over-last`, `flush-closes`, `releases`.
+Members: `flush-closes`, `releases`.
 
 #### THE BURST
 
