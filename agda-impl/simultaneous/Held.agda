@@ -257,17 +257,25 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                (p : Pos) (ok : Ok (Hots env) p) (nt : TimerRoot p → ⊥) (ep : Early p)
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
+               (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀ m ρ op f s env p))
                (ok₂ : Ok (Hots (hot (FlatHots.σ₂ m ρ op f s env p) ∷ hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀₀ m ρ op f s env p))
                (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
+
+  -- Where a branch's reader ends: past its source's end.
+  data BEnd : Pos → Set where
+    b-outer : ∀ {c w} → σ₁ c end → BEnd (c ++ [ sub w ])
+    b-lane  : ∀ {c w} → σ₃ c end → BEnd (c ++ [ sub w ])
+    b-close : ∀ {c w} → σ₂ c end → BEnd (c ++ [ sub w ])
 
   data MRow : Pos → Ev (Maybe (Input B)) → Set where
     tracker : ∀ {q x} → MRow q (out (just (inj₂ x)))
     outer   : ∀ {q w x y} → σ₁ q (out x) → opening x ≡ y → MRow (q ++ [ sub w ]) (out (just (inj₁ (outerB , y))))
     lane    : ∀ {q w x} → σ₃ q (out x) → MRow (q ++ [ sub w ]) (out (just (inj₁ (laneB , x))))
     close   : ∀ {q w x} → σ₂ q (out x) → MRow (q ++ [ sub w ]) (out (just (inj₁ (closeB , x))))
-    done    : ∀ {zs} → MRow (P ++ zs) end
+    under   : ∀ {zs} → MRow (P ++ zs) end
+    done    : ∀ {c zs} → BEnd c → instantOf (c ++ zs) ≡ instantOf c → MRow (c ++ zs) end
 
   postulate
     -- Every row the scan's source meets is one of these.
@@ -278,6 +286,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
     lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (instantOf q) × opos (instantOf q) ⊑ q
     close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
+    -- A lane's and the closer's ends lie before their step's over.
+    lane-ends   : ∀ {q} → σ₃ q end → Early q
+    close-ends  : ∀ {q} → σ₂ q end → Early q
 
   cs′ : List Pos
   cs′ = P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs
@@ -301,6 +312,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   I₁ : InvAt (Hots env) (p ++ [ ix 1 ]) (enter (ev m (elab ρ s) env) (p ++ [ ix 1 ]))
   I₁ = inv-ev m (elab ρ s) env gd (p ++ [ ix 1 ]) (ok-step p ok)
 
+  I₂ : InvAt (Hots (hot σ₁ ∷ env)) (p₀ ++ [ ix 1 ]) (enter (ev m (closer {B = B}) (hot σ₁ ∷ env)) (p₀ ++ [ ix 1 ]))
+  I₂ = inv-ev m (closer {B = B}) (hot σ₁ ∷ env) (good-cons L₁ gd) (p₀ ++ [ ix 1 ]) (ok-step p₀ ok₁)
+
   I₃ : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 1 ]) (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ++ [ ix 1 ]))
   I₃ = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env) (good-cons L₂ (good-cons L₁ gd)) (p₀₀ ++ [ ix 1 ]) (ok-step p₀₀ ok₂)
 
@@ -322,7 +336,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   ends : ∀ {q} → M q end → Early q
   ends x with m-rows x tt
-  ... | done {zs} = early-inst zs (inst-P p zs) ep₃
+  ... | under {zs} = early-inst zs (inst-P p zs) ep₃
+  ... | done {zs = zs} b eq = early-inst zs eq (bend b)
+    where
+      bend : ∀ {c} → BEnd c → Early c
+      bend (b-outer {w = w} y) = early-inst [ sub w ] (inst-sub I₁ (proj₁ y) w) (Held.ends H₁ (proj₁ y))
+      bend (b-lane {w = w} y)  = early-inst [ sub w ] (inst-sub I₃ (proj₁ y) w) (lane-ends y)
+      bend (b-close {w = w} y) = early-inst [ sub w ] (inst-sub I₂ (proj₁ y) w) (close-ends y)
 
   late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (instantOf q) × opos (instantOf q) ⊑ q
   late x with m-rows x tt
@@ -363,11 +383,11 @@ held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ)
           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
           → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥) → Early p
           → let open FlatHots m ρ op f s env p in
-            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) p₀₀ → Ok (Hots env′) P → Early P
+            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₁ ∷ env)) p₀ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) p₀₀ → Ok (Hots env′) P → Early P
           → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
-held-comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃ =
+held-comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
   comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) ok₃
-    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃)
+    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where open FlatHots m ρ op f s env p using (src; env′; P)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
@@ -377,7 +397,7 @@ held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok nt ep →
     conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ++ [ ix 0 ]) ok₁ (plain-untimed p plain-ix) ep₁ λ L₂ ok₂ ep₂ →
       conn-ev m (FlatHots.real m ρ op f s env p) _ _ ((p ++ [ ix 0 ]) ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ g))
         ((p ++ [ ix 0 ]) ++ [ ix 0 ]) ok₂ (plain-untimed (p ++ [ ix 0 ]) plain-ix) ep₂ λ L₃ ok₃ ep₃ →
-        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt ep L₁ L₂ L₃ ok₂ ok₃ ep₃
+        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.

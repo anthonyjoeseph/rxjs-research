@@ -38,7 +38,8 @@ before a later instant's first row; then which rows the source meets
 former's leaf is a body.
 
 Members: `start-current`, `value-open`, `over-open`, `end-open`,
-`comb-shut`, `walk`, `inv-past`, `step-local`, `m-rows`, `lane-named`, `lane-early`, `lane-late`,
+`comb-shut`, `walk`, `inv-past`, `step-local`, `m-rows`, `lane-ends`,
+`close-ends`, `lane-named`, `lane-early`, `lane-late`,
 `close-marks`, `comb-held`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `held-cold`,
 `held-of`, `held-empty`.
