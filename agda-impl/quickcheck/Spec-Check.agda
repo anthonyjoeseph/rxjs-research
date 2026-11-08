@@ -41,14 +41,14 @@ open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
-open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
+open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh; ix; sub; _<ᵖ_; inside)
 open import denotation.EmissionSet using (Ev; out; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; mark)
 import simultaneous.InstEmit as M
 open import simultaneous.SObs using (Batching; module Elaborate)
 open import simultaneous.Protocol using (nameStep; subStep)
-open import simultaneous.Routed using (nameOf)
+open import simultaneous.Routed using (nameOf; opos)
 open import simultaneous.Relations using (batchedObs; values; joined; batchesOut; grouped; outs; named)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
@@ -278,6 +278,25 @@ private
     (does (instantOf q ≟ᵖ root) ∨ (does (proj₁ K ≟ᵖ nameOf q) ∧ not (proj₂ K ≡ᵇ 0))) ∧ heldᵇ K rs
   heldᵇ K (_ ∷ rs)             = heldᵇ K rs
 
+  -- `Held`'s phase fields: in a value step, every value and end before
+  -- the over's position and none of it under it; every over in a value
+  -- step, at or under that position.
+  valuedᵇ : Pos → Bool
+  valuedᵇ (ix _ ∷ sub _ ∷ ix _ ∷ []) = true
+  valuedᵇ _                         = false
+
+  earlyᵇ : Pos → Bool
+  earlyᵇ q = not (valuedᵇ (instantOf q)) ∨ ((q <ᵖ opos (instantOf q)) ∧ not (inside q (opos (instantOf q))))
+
+  phaseᵇ : Rows (IE ℕ) → Bool
+  phaseᵇ []                 = true
+  phaseᵇ ((q , out x) ∷ rs) = row ∧ phaseᵇ rs
+    where
+      row = if isVal x then earlyᵇ q
+            else (not (isOver x) ∨ (valuedᵇ (instantOf q) ∧ inside (opos (instantOf q)) q))
+  phaseᵇ ((q , end) ∷ rs)   = earlyᵇ q ∧ phaseᵇ rs
+  phaseᵇ (_ ∷ rs)           = phaseᵇ rs
+
 -- The leaves a seed's elaborated run refutes; nothing when cut.
 protocolOf : ℕ → Obs Timeline [] (IE ℕ) → List String
 protocolOf n x with whole (listT n x [] root)
@@ -292,9 +311,10 @@ heldOf n o with whole (listT n (elaborate o) [] root)
 ... | just rx with whole (listT n (elab (λ i → i) o) [] root)
 ...   | just ex = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
                   ++ unless (heldᵇ (root , 0) rx) "held-top"
-                       (unless (heldᵇ (root , 0) ex) "held-elab" (unless (shutᵇ (root , 0) [] [] (outs ex)) "held-elab-shut" []))
+                       (unless (heldᵇ (root , 0) ex) "held-elab" (unless (shutᵇ (root , 0) [] [] (outs ex)) "held-elab-shut"
+                         (unless (phaseᵇ rx) "held-top-phase" (unless (phaseᵇ ex) "held-elab-phase" []))))
 ...   | nothing = protocol root false bstart (values rx) ++ rowLeaves (outs rx)
-                  ++ unless (heldᵇ (root , 0) rx) "held-top" []
+                  ++ unless (heldᵇ (root , 0) rx) "held-top" (unless (phaseᵇ rx) "held-top-phase" [])
 
 ------------------------------------------------------------------------
 -- One seed
