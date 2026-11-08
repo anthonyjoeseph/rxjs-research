@@ -134,6 +134,10 @@ record Batching (A : Set) (N : Set) : Set where
     held   : List A
     routes : ℕ
 
+isZero : ℕ → Bool
+isZero zero    = true
+isZero (suc _) = false
+
 private
   isTick : ∀ {A} → Tag A → Bool
   isTick tick = true
@@ -142,10 +146,6 @@ private
   isLane : Part → Bool
   isLane lanePart  = true
   isLane burstPart = false
-
-  isZero : ℕ → Bool
-  isZero zero    = true
-  isZero (suc _) = false
 
   ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ
   ext ρ (here p)  = here p
