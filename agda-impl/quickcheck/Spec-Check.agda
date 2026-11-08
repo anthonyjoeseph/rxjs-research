@@ -29,8 +29,10 @@ open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
 open import Data.List using (List; []; _∷_; _++_; [_]; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
@@ -38,7 +40,7 @@ open import IO.Primitive.Core using (_>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
+open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile)
 open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
@@ -225,8 +227,17 @@ private
   spread : Obs Timeline [] ℕ
   spread = flatMap (mergeᶠ nothing) (λ e → of (e ∷ e + 1 ∷ e + 2 ∷ [])) raw
 
+  -- `timerOf`, shared, its outer cut while lanes it started read on:
+  -- `timer(1).pipe(mergeMap(() => of(1, 2, 3)),
+  --    connect(h => h.pipe(takeWhile(v => v < 3), mergeMap(() => h))))`
+  -- [2, 3, 3]
+  cutShared : Obs Timeline [] ℕ
+  cutShared = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))
+    (flatMap (mergeᶠ nothing) (λ _ → connected (here refl)) (takeWhile false (λ v → v <ᵇ 3) (connected (here refl))))
+
   pins : List (String × Obs Timeline [] ℕ × List (List ℕ))
   pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
+       ∷ ("cut-shared" , cutShared , (2 ∷ 3 ∷ 3 ∷ []) ∷ [])
        ∷ ("raw" , raw , (1 ∷ 2 ∷ []) ∷ (3 ∷ []) ∷ (4 ∷ []) ∷ [])
        ∷ ("spread" , spread , (1 ∷ 2 ∷ 3 ∷ 2 ∷ 3 ∷ 4 ∷ []) ∷ (3 ∷ 4 ∷ 5 ∷ []) ∷ (4 ∷ 5 ∷ 6 ∷ []) ∷ [])
        ∷ []
