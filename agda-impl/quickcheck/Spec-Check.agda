@@ -10,10 +10,13 @@
 -- and `erases` in `simultaneous.Statement`, read here by the
 -- elaboration's names rather than the spec's stamps.
 --
--- OWED: deciding `Groups` itself.  A stamp is a count of instants over a
--- whole listing, so on an uncut listing it is computable, and the check
--- then compares the batched listing against the plain one directly, the
--- elaborated listing dropping out.
+-- `Groups` ITSELF, DECIDED: a stamp is a count of instants over a whole
+-- listing, so on an uncut one it is computable, and `grouping` compares
+-- the batched listing against the plain one directly, each batch stamped
+-- by the instant its row leaves in.  A batch released past its instant
+-- carries a later stamp; no statement above sees that.  `erasing` is
+-- `simultaneous.Statement.erases` on its own: the elaborated values,
+-- marks dropped, are the plain ones stamp for stamp.
 --
 -- A WHOLE RUN, NOT ITS PREFIXES.  Each statement is two directions over
 -- prefixes; on a run listed to its end, uncut, both directions say the
@@ -24,7 +27,8 @@
 -- THE SELFTEST: each statement is decided again against a sabotage made
 -- to break it alone, built over the same elaboration: the batcher
 -- replaced by `empty`, the elaborated emits all restamped to one name,
--- every batch delivered twice.  A sabotage no seed catches is a checker
+-- every batch delivered twice, and one async instant of marks alone added
+-- beside the elaborated run and beside the batched one.  A sabotage no seed catches is a checker
 -- that cannot fire; it needs only to fire, so it runs over fewer seeds.
 -- A probe for `make spec-check`: no proof reads it.
 --
@@ -36,11 +40,12 @@ module quickcheck.Spec-Check where
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; upTo; length; deduplicate; filter) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
+open import Relation.Nullary.Decidable using (T?)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -48,17 +53,19 @@ open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
 open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
-open import Relation.Nullary using (does)
+open import Relation.Nullary using (does; ¬?)
+import Data.Nat
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
 open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh)
-open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_)
+open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
-open import simultaneous.InstEmit using (InstEmit)
+open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin)
 open import simultaneous.SObs using (module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟ᵖ_ using (batchSimultaneousᴰ)
+open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupStamps)
 open import simultaneous.Relations using (batchedObs; values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
@@ -80,6 +87,42 @@ whole nothing  = nothing
 whole (just l) with short l
 ... | true  = nothing
 ... | false = just (sort (proper (rows l)))
+
+-- Every row of an uncut listing, met or not: what a stamp counts over.
+everyRow : ∀ {A} → Maybe (Listed A) → Rows A
+everyRow nothing  = []
+everyRow (just l) = rows l
+
+-- A listing read both ways.
+Both : Set → Set
+Both A = Rows A × Rows A
+
+both : ∀ {A} → Maybe (Listed A) → Maybe (Both A)
+both l with whole l
+... | nothing = nothing
+... | just rs = just (rs , everyRow l)
+
+------------------------------------------------------------------------
+-- Stamps
+
+-- `Relations.Rank`: the instants of the rows before `q`, its own
+-- excluded, counted once each.
+rankIn : ∀ {A} → Rows A → Pos → ℕ
+rankIn all q = length (deduplicate _≟ⁱ_ (filter (λ i → ¬? (i ≟ⁱ instantOf q)) (mapL (λ r → instantOf (proj₁ r)) (filter (λ r → T? (proj₁ r <ᵖ q)) all))))
+
+-- `Relations.stampedᴰ`: the plain run's values, each with its stamp.
+stampsᴰ : Both ℕ → List (ℕ × ℕ)
+stampsᴰ (met , all) = mapL (λ { (q , a) → rankIn all q , a }) (outs met)
+
+-- `Relations.stampedᴮ`: an elaborated run's values, marks dropped, or a
+-- batched run's batches, each with the stamp of the row carrying it.
+stampsᴮ : ∀ {A : Set} → Both (IE A) → List (ℕ × A)
+stampsᴮ {A} (met , all) = go (outs met)
+  where
+    go : List (Pos × IE A) → List (ℕ × A)
+    go []                                = []
+    go ((q , instEmit (value a) _) ∷ xs) = (rankIn all q , a) ∷ go xs
+    go (_ ∷ xs)                          = go xs
 
 ------------------------------------------------------------------------
 -- The three statements, decided over whole runs
@@ -138,6 +181,27 @@ joinsᵇ b e = eqℕs (joined b) (values e) ∧ iff (endsᵇ b) (endsᵇ e)
 batchesᵇ : Rows (IE (List ℕ)) → Rows (IE ℕ) → Bool
 batchesᵇ b x = eqBatches (batchesOut b) (groupedᴺ x)
 
+private
+  eqStamped : List (ℕ × ℕ) → List (ℕ × ℕ) → Bool
+  eqStamped []              []              = true
+  eqStamped ((m , a) ∷ xs) ((n , b) ∷ ys) = (m ≡ᵇ n) ∧ (a ≡ᵇ b) ∧ eqStamped xs ys
+  eqStamped _               _               = false
+
+  eqGroups : List (ℕ × List ℕ) → List (ℕ × List ℕ) → Bool
+  eqGroups []              []              = true
+  eqGroups ((m , as) ∷ xs) ((n , bs) ∷ ys) = (m ≡ᵇ n) ∧ eqℕs as bs ∧ eqGroups xs ys
+  eqGroups _               _               = false
+
+-- `erases`, over a whole run: the elaborated values are the plain ones,
+-- stamp for stamp
+erasesᵇ : Both (IE ℕ) → Both ℕ → Bool
+erasesᵇ x e = eqStamped (stampsᴮ x) (stampsᴰ e)
+
+-- `Groups`, over a whole run: the batches, each stamped by its row, are
+-- the plain run's grouping by stamp
+groupsᵇ : Both (IE (List ℕ)) → Both ℕ → Bool
+groupsᵇ b e = eqGroups (stampsᴮ b) (groupStamps (stampsᴰ e))
+
 ------------------------------------------------------------------------
 -- One seed
 
@@ -151,12 +215,14 @@ record Three : Set₁ where
 
 data Verdict : Set where
   skipped : Verdict
-  -- left-to-right, coherent, batchable
-  checked : Bool → Bool → Bool → Verdict
+  -- left-to-right, coherent, batchable, erasing, grouping
+  checked : Bool → Bool → Bool → Bool → Bool → Verdict
 
 judge : ℕ → Three → Verdict
-judge n (three o x b) with whole (listT n o [] root) | whole (listT n x [] root) | whole (listT n b [] root)
-... | just ro | just rx | just rb = checked (joinsᵇ rb ro) (agreeᵇ rx ∧ agreeᵇ rb) (batchesᵇ rb rx)
+judge n (three o x b) with both (listT n o [] root) | both (listT n x [] root) | both (listT n b [] root)
+... | just ro | just rx | just rb =
+  checked (joinsᵇ (proj₁ rb) (proj₁ ro)) (agreeᵇ (proj₁ rx) ∧ agreeᵇ (proj₁ rb)) (batchesᵇ (proj₁ rb) (proj₁ rx))
+          (erasesᵇ rx ro) (groupsᵇ rb ro)
 ... | _       | _       | _       = skipped
 
 private
@@ -175,11 +241,20 @@ private
   twice : ∀ {A : Set} → A → List A
   twice a = a ∷ a ∷ []
 
+  ended : ∀ {X t} → From∞ X t
+  ended .From∞.force = done
+
+  -- One async instant holding a mark alone.
+  spare : ∀ {A} → Obs Timeline [] (IE A)
+  spare = cold (fixed (at 1 z≤n (emit (instEmit (mark begin) root) (close ended))))
+
   -- The sabotages, each aimed at one statement.
-  emptied unstamped doubled : ℕ → Three
+  emptied unstamped doubled shiftedˣ shiftedᵇ : ℕ → Three
   emptied seed   = let o = plainOf seed in three o (elaborate o) empty
   unstamped seed = let o = plainOf seed in three o (map restamp (elaborate o)) (batchedObs o)
   doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedObs o))
+  shiftedˣ seed  = let o = plainOf seed in three o (merge (elaborate o) spare) (batchedObs o)
+  shiftedᵇ seed  = let o = plainOf seed in three o (elaborate o) (merge (batchedObs o) spare)
 
 ------------------------------------------------------------------------
 -- The pinned programs
@@ -310,7 +385,7 @@ private
 record Tally : Set where
   constructor tally
   field
-    seen skip l2r coh bat : ℕ
+    seen skip l2r coh bat era grp : ℕ
 
 private
   bump : Bool → ℕ → ℕ
@@ -318,12 +393,12 @@ private
   bump false k = suc k
 
   add : Verdict → Tally → Tally
-  add skipped         (tally s k l c b) = tally (suc s) (suc k) l c b
-  add (checked x y z) (tally s k l c b) = tally (suc s) k (bump x l) (bump y c) (bump z b)
+  add skipped             (tally s k l c b r g) = tally (suc s) (suc k) l c b r g
+  add (checked x y z u w) (tally s k l c b r g) = tally (suc s) k (bump x l) (bump y c) (bump z b) (bump u r) (bump w g)
 
   fails : Verdict → List String
-  fails skipped         = []
-  fails (checked x y z) = name x "left-to-right" (name y "coherent" (name z "batchable" []))
+  fails skipped             = []
+  fails (checked x y z u w) = name x "left-to-right" (name y "coherent" (name z "batchable" (name u "erasing" (name w "grouping" []))))
     where
       name : Bool → String → List String → List String
       name true  _ r = r
@@ -334,7 +409,7 @@ private
   words (s ∷ ss) = " " +++ s +++ words ss
 
   tallyOf : (ℕ → Three) → List ℕ → Tally
-  tallyOf mk []          = tally 0 0 0 0 0
+  tallyOf mk []          = tally 0 0 0 0 0 0 0
   tallyOf mk (seed ∷ ss) = add (judge (budget seed) (mk seed)) (tallyOf mk ss)
 
   -- a line as each seed starts, so a run cut short shows how far it got
@@ -343,9 +418,10 @@ private
   progress seed = putStrLn ("spec-check: seed " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed))
 
   showTally : Tally → String
-  showTally (tally s k l c b) =
+  showTally (tally s k l c b r g) =
     showℕ (s Data.Nat.∸ k) +++ " checked, " +++ showℕ k +++ " skipped; failing: left-to-right "
     +++ showℕ l +++ ", coherent " +++ showℕ c +++ ", batchable " +++ showℕ b
+    +++ ", erasing " +++ showℕ r +++ ", grouping " +++ showℕ g
 
   fires : String → ℕ → String
   fires s 0 = "spec-check: selftest " +++ s +++ " SILENT"
@@ -372,7 +448,9 @@ private
   selftest =
     putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied sabotaged))) >>= λ _ →
     putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped sabotaged))) >>= λ _ →
-    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled sabotaged)))
+    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled sabotaged))) >>= λ _ →
+    putStrLn (fires "erasing" (Tally.era (tallyOf shiftedˣ sabotaged))) >>= λ _ →
+    putStrLn (fires "grouping" (Tally.grp (tallyOf shiftedᵇ sabotaged)))
 
 main : IO Unit
-main = hSetBuffering stdout lineBuffering >>= λ _ → pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0) >>= λ _ → selftest
+main = hSetBuffering stdout lineBuffering >>= λ _ → pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0 0 0) >>= λ _ → selftest
