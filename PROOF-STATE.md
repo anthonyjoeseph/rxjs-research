@@ -61,6 +61,7 @@ counters (`lanes-current`, `parked-current`): each is the `idle` of
 what holds the routes, the lanes' and the connects' in scope, read at a
 row of the scan's source; that needs a run of the source projected onto
 each branch's run. Then `m-rows`, a reader's joins and the defer limit.
+The cold's runs (`cold-covered`) need its rows' order, not their shape.
 Settled when each former's leaf is a body.
 
 Members: `outer-current`, `lanes-current`, `held-current`,
@@ -68,7 +69,8 @@ Members: `outer-current`, `lanes-current`, `held-current`,
 `walk`, `step-local`, `m-rows`, `lane-ends`, `close-ends`, `lane-named`,
 `lane-early`, `lane-late`, `close-marks`, `scan-idle`, `comb-run`,
 `held-connected`, `held-lim`, `held-top`, `held-next`, `held-⊥`,
-`held-takeWhile`, `held-cold`, `held-of`, `held-empty`.
+`held-takeWhile`, `cold-rows`, `cold-covered`, `cold-shut`,
+`cold-idle`, `held-of`, `held-empty`.
 
 #### THE RELEASE
 

@@ -40,7 +40,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -74,6 +74,12 @@ open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (trans; sym; cong; subst)
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
+open import Data.Bool using (T)
+open import denotation.Position using (isLt; cmpPath)
+open import denotation.Simultaneity using (reflⁱ)
+open import denotation.EmissionSet using (_≺_)
+open import simultaneous.Routed using (cnt; Carried)
+open import simultaneous.HeldComb using (ShutRun)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -109,15 +115,84 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 -- EACH ELABORATED FORMER HOLDS when its children do, under the meaning
 -- and under every approximant alike.
 
--- A cold's async value ends in its own over.  Its async completion is an
--- instant of its own, even straight after a value: it mints a name, and
--- the cold's end carries that route (`simultaneous.Routed.Carried`).
 postulate
-  held-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
   held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
   held-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
   held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
+
+-- THE COLD'S ROWS, subscribed at `p`: its synchronous values and end lie
+-- in the subscribe burst, named `root`.  Each async step at `I` renders
+-- under its lane at `I ∙ [ ix 1 ]`: a value step's `of` sends begin,
+-- value and over beneath `nm I ⊕ [ ix 0 ]`, the over at `opos I`.  A
+-- completion is an instant of its own, even straight after a value: its
+-- begin lies where a value step's does, under the name one queued lane
+-- further down, and the cold's end carries that route
+-- (`simultaneous.Routed.Carried`) from where the step's lane completes.
+data ColdRow {A : Set} (p : Pos) : Pos → Ev (IE A) → Set where
+  now-value  : ∀ zs {a} → ColdRow p (p ⊕ zs) (out (instEmit (value a) root))
+  now-end    : ∀ zs → ColdRow p (p ⊕ zs) end
+  step-begin : ∀ {t e l} → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
+                                     (out (instEmit (mark begin) (nm (cascade t e l ∙ []))))
+  step-value : ∀ {t e i a} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
+                                       (out (instEmit (value a) (nm (cascade t e (ix i) ∙ []))))
+  step-over  : ∀ {t e i} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
+                                     (out (instEmit (mark over) (nm (cascade t e (ix i) ∙ []))))
+  step-end   : ∀ {t e} → ColdRow p (cascade t e last ∙ (ix 1 ∷ last ∷ [])) end
+
+-- A step's route opens at its begin and nothing comes between: what the
+-- cold's runs ask needs the order of its rows, which `ColdRow` does not
+-- carry.
+postulate
+  cold-rows    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {y e}
+               → enter (ev m (coldˢ c) env) p y e → Visible e → ColdRow p y e
+  cold-covered : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs
+               → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex [ p ] y
+               → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
+  cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
+
+private
+  same-≺ : ∀ i x y → T (isLt (cmpPath x y)) → (i ∙ x) ≺ (i ∙ y)
+  same-≺ i x y h rewrite reflⁱ i = h
+
+-- WHAT EACH ROW OF THE COLD HOLDS, read off its shape.
+module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t y e → Visible e → ColdRow p y e) where
+
+  named : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
+  named x with row x tt
+  ... | step-begin = refl
+
+  routing : ∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m
+  routing x with row x tt
+  ... | step-begin = r-begin
+  ... | step-over  = r-over
+
+  early : Early p → ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
+  early ep x with row x tt
+  ... | now-value zs = early-inst zs ep
+  ... | step-value {t} {e} {i} = λ _ → same-≺ (cascade t e (ix i)) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []) tt , λ { (_ , ()) }
+
+  ends : Early p → ∀ {y} → t y end → Early y
+  ends ep x with row x tt
+  ... | now-end zs = early-inst zs ep
+  ... | step-end   = λ ()
+
+  late : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
+  late x with row x tt
+  ... | step-over = valued , [] , refl
+
+  no-stop : ∀ {y n} → t y (out (instEmit (mark stop) n)) → ⊥
+  no-stop x with row x tt
+  ... | ()
+
+held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
+held-cold m ρ c = ih λ env cs g eh p ok ep →
+  let open ColdHeld p (enter (ev m (elab ρ (cold c)) env) p) (cold-rows m c env p) in
+  held-runs named routing (early ep) (ends ep) late (cold-idle m c env p) λ mt → record
+    { covered = λ r₁ r₂ eq cr ne → cold-covered m c env p mt r₁ r₂ eq cr λ { (here s) → ne (here s) ; (there ()) }
+    ; exact   = λ r₁ r₂ eq → ⊥-elim (no-stop (proj₁ (run-row r₁ (subst (Met _) eq mt))))
+    ; shut    = cold-shut m c env p mt }
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
 held-map nothing  ρ f s (ih h) = ih λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
