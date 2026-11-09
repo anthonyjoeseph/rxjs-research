@@ -57,9 +57,9 @@ open import simultaneous.Closing using (batches)
 -- the other.  Switch, exhaust and the bounded queue are the real cases.
 -- The batcher's half is `simultaneous.Closing`.
 --
--- REFUTED: e10449e erases, and `Groups` with it, as ranked: a run with no
---   row in the subscribe frame ranks its values one below its elaboration,
---   whose subscribed mark always lies there.
+-- REFUTED: e10449e erases, and `Groups` with it, with a rank counting only
+--   instants holding rows: a run with no row in the subscribe frame ranks
+--   its values one below its elaboration, whose subscribed mark lies there.
 postulate
   erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
 

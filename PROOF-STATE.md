@@ -34,11 +34,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Refuted as ranked: a run silent at subscription ranks its values one
-below its elaboration, which always has frame rows. Counting the frame
-as passed by every run, `make spec-check` finds no counterexample.
-Awaiting Anthony's ruling on that restatement of `Rank`; then a body by
-operator, switch, exhaust and the bounded queue the real cases.
+Probed, unproven: the elaborated run, marks dropped, is the plain run
+stamp for stamp — the elaboration adds no instant, and both count the
+subscribe frame — with an instant over on one side over on the other,
+and completing together. Switch, exhaust and the bounded queue are the
+real cases. Settled when each is a body by operator.
 
 Members: `erases`.
 

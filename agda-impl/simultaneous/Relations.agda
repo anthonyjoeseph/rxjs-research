@@ -12,9 +12,10 @@
 -- with the elaboration's.  What the three runs share is the sequence of
 -- instants: the elaboration adds no async step, so instant for instant
 -- they pass through the same ones in the same order.  A row's stamp is
--- the number of instants before its own, counted over every row of its
--- run, shown or not: a reader meeting a row stamped 3 has, in any of the
--- three runs, passed three instants.  Nothing in a program can read a
+-- the number of instants before its own: the subscribe frame, which
+-- every run passes whether or not it has a row there, and those any row
+-- of its run lies in, shown or not.  A reader meeting a row stamped 3
+-- has, in any of the three runs, passed three instants.  Nothing in a program can read a
 -- stamp, and the elaboration carries names of its own that no relation
 -- here reads.
 module simultaneous.Relations where
@@ -36,7 +37,7 @@ open import Function using (_⇔_)
 open import Data.List.Properties using (map-++)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
-open import denotation.Position using (_≟ᵖ_; Pos; Instant; _<ⁱ_; root)
+open import denotation.Position using (_≟ᵖ_; Pos; Instant; _<ⁱ_; root; frame)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
@@ -66,14 +67,14 @@ batched o = enter (⟦ batchedObs o ⟧ []) root
 ------------------------------------------------------------------------
 -- Stamps
 
--- The instants before `k`'s: those some row before `k` lies in, other
--- than `k`'s own.
 -- Instants in order.
 _≺ⁱ_ : Instant → Instant → Set
 i ≺ⁱ j = T (i <ⁱ j)
 
+-- The instants before `k`'s, other than its own: the subscribe frame,
+-- and those some row before `k` lies in.
 Before : ∀ {A} → EmissionSet A → Pos → Instant → Set
-Before t k i = i ≢ instantOf k × Σ Pos λ k′ → Σ _ λ e → t k′ e × k′ ≺ k × instantOf k′ ≡ i
+Before t k i = i ≢ instantOf k × (i ≡ frame ⊎ Σ Pos λ k′ → Σ _ λ e → t k′ e × k′ ≺ k × instantOf k′ ≡ i)
 
 -- `k`'s instant is the n-th the run passes through: the instants before
 -- it, listed in order, are n.

@@ -58,7 +58,7 @@ import Data.Nat
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
 open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh)
-open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_)
+open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_; frame)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin)
@@ -105,10 +105,10 @@ both l with whole l
 ------------------------------------------------------------------------
 -- Stamps
 
--- `Relations.Rank`: the instants of the rows before `q`, its own
--- excluded, counted once each.
+-- `Relations.Rank`: the subscribe frame and the instants of the rows
+-- before `q`, its own excluded, counted once each.
 rankIn : ∀ {A} → Rows A → Pos → ℕ
-rankIn all q = length (deduplicate _≟ⁱ_ (filter (λ i → ¬? (i ≟ⁱ instantOf q)) (mapL (λ r → instantOf (proj₁ r)) (filter (λ r → T? (proj₁ r <ᵖ q)) all))))
+rankIn all q = length (deduplicate _≟ⁱ_ (filter (λ i → ¬? (i ≟ⁱ instantOf q)) (frame ∷ mapL (λ r → instantOf (proj₁ r)) (filter (λ r → T? (proj₁ r <ᵖ q)) all))))
 
 -- `Relations.stampedᴰ`: the plain run's values, each with its stamp.
 stampsᴰ : Both ℕ → List (ℕ × ℕ)
