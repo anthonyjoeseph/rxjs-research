@@ -11,7 +11,7 @@
 -- the same elaboration, and nothing in it can do more with a name than
 -- compare it.  A name is drawn from `mint`, a leaf that emits a name no
 -- other subscription has.
---
+
 -- AN INSTANT IS NAMED WHERE IT STARTS.  Every instant after the
 -- subscribe burst is one async step of one cold.  The cold mints there
 -- and sends `begin` under the minted name, ahead of the step itself;
@@ -23,18 +23,41 @@
 -- ends in `over` (the cold's step returned, so the whole cascade is
 -- done) or `stop` (the path was cut first).  The batcher releases at the
 -- first `over`, or when every route has stopped, or when the run
--- completes.  A completion is no mark: the path it ends is carried on by
--- whatever reads it, and stopped by the first flatMap that outlives it.
+-- completes.  A completion is no mark: the routes a stream holds when it
+-- completes are carried on by whatever reads it, and stopped by the
+-- first flatMap that outlives it.
+
+-- EVERY STREAM'S COUNT IS EXACT: its `begin`s less its `stop`s, so no
+-- path is stopped twice.  A reader subscribed to a `connect` mid-instant
+-- meets the instant's later emits without the `begin`s that opened it,
+-- so it JOINS: before the first emit it meets, or the source's end, it
+-- sends one `begin` per route the source holds then.  Every connect
+-- source is counted for this, its count riding beside each emit and
+-- beside a last item telling its end.
 --
 -- A FLATMAP SIMULATES ITS OWN BOOKKEEPING.  Its outer is shared, read by
 -- the real flatMap and by a scan beside it; the outer's marks go around
 -- the real flatMap, so a switch, an exhaust or a queue never swallows
--- one.  Each lane reports its start, its end and the end of its
--- subscribe burst; each outer value is bracketed; and from those the
--- scan knows what the real flatMap does when a lane ends: subscribe a
--- queued lane, complete, or neither, which stops the route.  A `stop`
--- from below, met inside a bracket or a handed-off burst, is part of the
--- route that opened it, and is dropped.
+-- one.  Each lane reports its start, the routes it holds as it ends, its
+-- end and the end of its subscribe burst; each outer value opens a
+-- bracket; and from those the scan knows what the real flatMap does
+-- when a lane ends: subscribe a queued lane, whose burst the ended
+-- lane's routes cover, complete, carrying them, or neither, which stops
+-- them.  The outer's routes stop at its end unless the flatMap ends with
+-- it, and a switch stops its lane's.
+
+-- A CUT ROUTE IS PARKED WHILE THE INSTANT CAN STILL COME BACK.  Past a
+-- cut, the instant reaches the flatMap again only through a lane reading
+-- a connect late, and only while that connect still holds a route of it.
+-- So the scan watches every connect in scope, and a route it would stop
+-- waits instead until none of them holds a route of the instant.
+--
+-- AN OVER ENDS EVERY ROUTE OF ITS INSTANT, so what a lane sends of the
+-- instant past another lane's over is dropped: a stop of a parked route
+-- released once its connect is over, a begin of a reader joining there,
+-- another lane's copy of the over, and the scan's own cuts.  A lane ends
+-- handing on at most the routes the scan counts of the lanes.
+-- A stop of a branch the scan counts no route of is dropped likewise.
 --
 -- The plumbing is `connect`: a source subscribes after its body, so
 -- nested connects put the outer's readers in the order rxjs would meet
@@ -45,21 +68,22 @@ open import Relation.Binary.Definitions using (DecidableEquality)
 module simultaneous.SObs where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
-open import Data.List using (List; []; _∷_; _∷ʳ_; _++_; concat)
+open import Data.List using (List; []; _∷_; _∷ʳ_; _++_; concat; replicate)
 open import Data.List.Properties using (++-identityʳ)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _∸_; _<ᵇ_)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
 open import denotation.Events using (Timeline)
-open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
+open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
 
 SObs : List Set → Set → Set₁
 SObs = Obs Timeline
@@ -81,15 +105,24 @@ data Part : Set where
 data Branch : Set where
   outerB laneB closeB : Branch
 
--- A flatMap's bookkeeping, as its scan simulates it.
-record Flat : Set where
+-- A flatMap's bookkeeping, as its scan simulates it, for the instant
+-- named `at`.
+record Flat (N : Set) : Set where
   constructor flat
   field
+    at : N
     active queue : ℕ
-    -- the outer completed; an outer value is being read; a queued lane
-    -- carries a route through its subscribe burst; the next lane started
-    -- is a queued one; the last lane started has ended
-    finished bracket handoff popping dead : Bool
+    -- the outer completed; the next lane started is a queued one; the
+    -- last lane started has ended
+    finished popping dead : Bool
+    -- the instant's over has passed
+    spent : Bool
+    -- routes open through the outer and through the lanes; routes of an
+    -- ended lane covering a queued lane's burst; routes the lane now
+    -- ending holds; routes cut, waiting on the connects in scope
+    outer lanes held acc parked : ℕ
+    -- each connect in scope, by index: the routes it holds
+    live : List (N × ℕ)
 
 -- The batcher's state: past the subscribe burst, the open instant, its
 -- values, its routes still open.
@@ -101,6 +134,10 @@ record Batching (A : Set) (N : Set) : Set where
     held   : List A
     routes : ℕ
 
+isZero : ℕ → Bool
+isZero zero    = true
+isZero (suc _) = false
+
 private
   isTick : ∀ {A} → Tag A → Bool
   isTick tick = true
@@ -109,10 +146,6 @@ private
   isLane : Part → Bool
   isLane lanePart  = true
   isLane burstPart = false
-
-  isZero : ℕ → Bool
-  isZero zero    = true
-  isZero (suc _) = false
 
   ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ
   ext ρ (here p)  = here p
@@ -138,6 +171,65 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   each : ∀ {Γ X Y} → (X → List Y) → E Γ X → E Γ Y
   each f s = flatMap (mergeᶠ nothing) (λ x → of (f x)) s
+
+  ------------------------------------------------------------------------
+  -- Routes
+
+  -- A stream's open routes, of the instant it last began.
+  Routes : Set
+  Routes = N × ℕ
+
+  -- An emit of a connect source, or its end, beside the routes the
+  -- source held before it.
+  AIE : Set → Set
+  AIE X = Routes × Maybe (IE X)
+
+  -- A `begin` adds a route, starting afresh under a new name; a `stop`
+  -- takes one; an `over` ends them all.
+  count : ∀ {A} → Routes → IE A → Routes
+  count (m , k) (instEmit (mark begin) n) with does (n ≟ m)
+  ... | true  = m , suc k
+  ... | false = n , 1
+  count (m , k) (instEmit (mark stop) _) = m , k ∸ 1
+  count (m , k) (instEmit (mark over) _) = m , 0
+  count r       _                        = r
+
+  annStep : ∀ {A} → Routes × AIE A → Maybe (IE A) → Routes × AIE A
+  annStep (r , _) (just e) = count r e , (r , just e)
+  annStep (r , _) nothing  = r , (r , nothing)
+
+  -- The source read through its own subject, then its end.
+  annotate : ∀ {Γ A} → E Γ (IE A) → E Γ (AIE A)
+  annotate s = map proj₂ (scan annStep ((name , 0) , ((name , 0) , nothing))
+    (connect (map just s) (concatˢ (connected (here refl)) (of (nothing ∷ [])))))
+  {-# INLINE annotate #-}
+
+  -- What a reader sends before the first emit it meets: a `begin` for
+  -- each route the source holds of that emit's instant.
+  joins : ∀ {A} → Routes → IE A → List (IE A)
+  joins (m , k) (instEmit (mark begin) n) with does (n ≟ m)
+  ... | true  = replicate k (instEmit (mark begin) m)
+  ... | false = []
+  joins (m , k) _ = replicate k (instEmit (mark begin) m)
+
+  joinStep : ∀ {A} → Bool × List (IE A) → AIE A → Bool × List (IE A)
+  joinStep (true  , _) (r , just e)  = false , joins r e ++ e ∷ []
+  joinStep (true  , _) (r , nothing) = false , replicate (proj₂ r) (instEmit (mark begin) (proj₁ r))
+  joinStep (false , _) (r , just e)  = false , e ∷ []
+  joinStep (false , _) (r , nothing) = false , []
+
+  reader : ∀ {Γ A} → E Γ (AIE A) → E Γ (IE A)
+  reader s = each proj₂ (scan joinStep (true , []) s)
+
+  -- The routes a connect holds past an emit, or past its end.
+  past : ∀ {X} → AIE X → Routes
+  past (r , just e)  = count r e
+  past (r , nothing) = proj₁ r , 0
+
+  -- Every connect in scope, from index `i`, telling the routes it holds.
+  trackers : ∀ {Δ} (Γ : List Set) → ℕ → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → E Δ (ℕ × Routes)
+  trackers []      i ρ = empty
+  trackers (X ∷ Γ) i ρ = merge (map (λ a → i , past a) (connected (ρ (here refl)))) (trackers Γ (suc i) (λ j → ρ (there j)))
 
   ------------------------------------------------------------------------
   -- The leaves and the one-to-one formers
@@ -215,83 +307,183 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   framed : ∀ {Θ B} → Part → E (IE B ∷ Θ) (IE B)
   framed k = flatMap (mergeᶠ (just 1)) (piece k) (of (0 ∷ 1 ∷ 2 ∷ []))
 
+  -- A lane counts its routes, and tells them as it ends.
+  laneStep : ∀ {A} → Routes × List (IE A) → IE A → Routes × List (IE A)
+  laneStep (r , _) (instEmit (mark laneDone) n) = r , replicate (proj₂ r) (marked carry) ++ instEmit (mark laneDone) n ∷ []
+  laneStep (r , _) e = count r e , e ∷ []
+
+  counted : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
+  counted s = each proj₂ (scan laneStep ((name , 0) , []) s)
+
   -- The lane, gated to its own part, under its subject.
   laneˢ : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
   laneˢ x = flatMap (mergeᶠ nothing)
-    (λ k → connect (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (framed k))
+    (λ k → connect (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (counted (framed k)))
     (of (lanePart ∷ burstPart ∷ []))
   {-# INLINE laneˢ #-}
 
   Out : Set → Set
-  Out B = Flat × List (IE B)
+  Out B = Flat N × List (IE B)
 
-  -- How the flatMap takes an outer value.
-  arrive : FlatOp → Flat → Flat
-  arrive (mergeᶠ (just k)) s with Flat.active s <ᵇ k
-  ... | true  = s
-  ... | false = record s { queue = suc (Flat.queue s) }
-  arrive (mergeᶠ nothing) s = s
-  arrive switchᶠ          s = record s { active = 0 }
-  arrive exhaustᶠ         s = s
+  stops : ∀ {B} → ℕ → N → List (IE B)
+  stops k n = replicate k (instEmit (mark stop) n)
 
-  stopUnless : ∀ {B} → Bool → N → Flat → Out B
-  stopUnless true  n s = s , []
-  stopUnless false n s = s , instEmit (mark stop) n ∷ []
+  holds : N → Routes → Bool
+  holds n (m , k) = does (m ≟ n) ∧ not (isZero k)
 
-  -- A lane ended outside a bracket, and the route through it with it:
-  -- handed to the queued lane rxjs subscribes next, carried on by the
-  -- flatMap's own completion, or stopped here.
-  verdict : ∀ {B} → N → Flat → Out B
-  verdict n s with isZero (Flat.queue s)
-  ... | false = record s { handoff = true } , []
-  ... | true  = stopUnless (Flat.finished s ∧ isZero (Flat.active s)) n (record s { handoff = false })
+  anyHolds : N → List Routes → Bool
+  anyHolds n []      = false
+  anyHolds n (r ∷ σ) = holds n r ∨ anyHolds n σ
 
-  settle : ∀ {B} → Bool → N → Flat → Out B
-  settle true  n s = s , []
-  settle false n s = verdict n s
+  setAt : ℕ → Routes → List Routes → List Routes
+  setAt zero    r []      = r ∷ []
+  setAt zero    r (_ ∷ σ) = r ∷ σ
+  setAt (suc i) r []      = (name , 0) ∷ setAt i r []
+  setAt (suc i) r (x ∷ σ) = x ∷ setAt i r σ
 
-  -- A handed-off lane's burst is over: the route stops here if it lives.
-  burstOver : ∀ {B} → Bool → N → Flat → Out B
-  burstOver true  n s = record s { handoff = false } , instEmit (mark stop) n ∷ []
-  burstOver false n s = s , []
+  -- Routes cut: parked while a connect in scope holds a route of the
+  -- instant, else stopped.
+  cut : ∀ {B} → ℕ → N → Flat N → Out B
+  cut k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = s , []
+  ... | false | true  = record s { parked = Flat.parked s + k } , []
+  ... | false | false = s , stops k n
 
-  onMark : ∀ {B} → FlatOp → Flat → Mark → N → Out B
-  onMark op s outerOpen  n = arrive op (record s { bracket = true }) , []
-  onMark op s outerClose n = record s { bracket = false } , []
-  onMark op s laneStart  n =
+  -- A connect in scope moved: parked routes stop once none holds one.
+  unpark : ∀ {B} → N → Flat N → Out B
+  unpark n s with anyHolds (Flat.at s) (Flat.live s)
+  ... | true  = s , []
+  ... | false = record s { parked = 0 } , stops (Flat.parked s) n
+
+  -- How the flatMap takes an outer value: a switch stops its lane's
+  -- routes.
+  arrive : ∀ {B} → FlatOp → N → Flat N → Out B
+  arrive (mergeᶠ (just k)) n s with Flat.active s <ᵇ k
+  ... | true  = s , []
+  ... | false = record s { queue = suc (Flat.queue s) } , []
+  arrive (mergeᶠ nothing) n s = s , []
+  arrive switchᶠ          n s = cut (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
+  arrive exhaustᶠ         n s = s , []
+
+  -- A lane ended holding `k` routes: held for the queued lane rxjs
+  -- subscribes next, or for the flatMap's own completion, which carries
+  -- them; else stopped here, with any it was handed.
+  ended : ∀ {B} → ℕ → N → Flat N → Out B
+  ended k n s with isZero (Flat.queue s)
+  ... | false = record s { held = Flat.held s + k } , []
+  ... | true with Flat.finished s ∧ isZero (Flat.active s)
+  ...   | true  = record s { held = Flat.held s + k } , []
+  ...   | false = cut (k + Flat.held s) n (record s { held = 0 })
+
+  -- A queued lane's burst is over: the routes it was handed stop.
+  burstOver : ∀ {B} → Bool → N → Flat N → Out B
+  burstOver true  n s = s , []
+  burstOver false n s = cut (Flat.held s) n (record s { held = 0 })
+
+  -- The outer ended: its routes stop, unless the flatMap ends with it.
+  left : ∀ {B} → N → Flat N → Out B
+  left n s with isZero (Flat.active s) ∧ isZero (Flat.queue s)
+  ... | true  = s , []
+  ... | false = cut (Flat.outer s) n (record s { outer = 0 })
+
+  bump : Branch → (ℕ → ℕ) → Flat N → Flat N
+  bump outerB f s = record s { outer = f (Flat.outer s) }
+  bump laneB  f s = record s { lanes = f (Flat.lanes s) }
+  bump closeB f s = s
+
+  -- The routes a branch holds of the instant, as the scan counts them.
+  share : Branch → Flat N → ℕ
+  share outerB s = Flat.outer s
+  share laneB  s = Flat.lanes s
+  share closeB s = 0
+
+  -- A branch's stop, unless the branch holds no route the scan counts: a
+  -- route an over has ended is stopped by no one.
+  stopped : ∀ {B} → Branch → N → Flat N → ℕ → Out B
+  stopped b n s zero    = s , []
+  stopped b n s (suc _) = bump b (_∸ 1) s , instEmit (mark stop) n ∷ []
+
+  anew : N → Flat N → Flat N
+  anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; acc = 0 ; parked = 0 ; spent = false }
+
+  entered : Branch → N → Flat N → Flat N
+  entered b n s with does (n ≟ Flat.at s)
+  ... | true  = bump b suc s
+  ... | false = bump b suc (anew n s)
+
+  -- A begin of the instant past its over is a reader joining routes that
+  -- are already ended: nothing to count.
+  begun : ∀ {B} → Branch → N → Flat N → Out B
+  begun b n s with does (n ≟ Flat.at s) ∧ Flat.spent s
+  ... | true  = s , []
+  ... | false = entered b n s , instEmit (mark begin) n ∷ []
+
+  -- The instant's first over ends its routes; any later one is a copy.
+  overed : ∀ {B} → N → Flat N → Out B
+  overed n s with Flat.spent s
+  ... | true  = s , []
+  ... | false = record (anew (Flat.at s) s) { spent = true } , instEmit (mark over) n ∷ []
+
+  onMark : ∀ {B} → FlatOp → Branch → Flat N → Mark → N → Out B
+  onMark op b s begin      n = begun b n s
+  onMark op b s stop       n = stopped b n s (if Flat.spent s then 0 else share b s)
+  onMark op b s over       n = overed n s
+  onMark op b s carry      n = record s { acc = suc (Flat.acc s) } , []
+  onMark op b s outerOpen  n = arrive op n s
+  onMark op b s outerClose n = s , []
+  onMark op b s laneStart  n =
     record s { active = suc (Flat.active s)
              ; queue = if Flat.popping s then Flat.queue s ∸ 1 else Flat.queue s
              ; popping = false ; dead = false } , []
-  onMark op s laneDone   n =
-    settle (Flat.bracket s) n
-      (record s { active = Flat.active s ∸ 1 ; popping = not (isZero (Flat.queue s)) ; dead = true })
-  onMark op s burstEnd   n = burstOver (Flat.handoff s ∧ not (Flat.dead s)) n s
-  onMark op s outerDone  n =
-    stopUnless (Flat.bracket s ∨ Flat.handoff s ∨ (isZero (Flat.queue s) ∧ isZero (Flat.active s))) n
-      (record s { finished = true })
-  onMark op s stop       n = stopUnless (Flat.bracket s ∨ Flat.handoff s) n s
-  onMark op s m          n = s , instEmit (mark m) n ∷ []
+  onMark op b s laneDone   n =
+    ended (Flat.acc s ⊓ Flat.lanes s) n
+      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
+                ; popping = not (isZero (Flat.queue s)) ; dead = true })
+  onMark op b s burstEnd   n = burstOver (isZero (Flat.held s) ∨ Flat.dead s) n s
+  onMark op b s outerDone  n = left n (record s { finished = true })
+  onMark op b s m          n = s , instEmit (mark m) n ∷ []
 
-  react : ∀ {B} → FlatOp → Out B → IE B → Out B
-  react op (s , _) (instEmit (value b) n) = s , instEmit (value b) n ∷ []
-  react op (s , _) (instEmit (mark m) n)  = onMark op s m n
+  Input : Set → Set
+  Input B = (Branch × IE B) ⊎ (ℕ × Routes)
+
+  react : ∀ {B} → FlatOp → Out B → Maybe (Input B) → Out B
+  react op (s , _) (just (inj₁ (b , instEmit (value v) n))) = s , instEmit (value v) n ∷ []
+  react op (s , _) (just (inj₁ (b , instEmit (mark m) n)))  = onMark op b s m n
+  react op (s , _) (just (inj₂ (i , r)))                    = unpark name (record s { live = setAt i r (Flat.live s) })
+  react op (s , _) nothing                                  = s , []
 
   branch : ∀ {Δ A B} → Branch → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   branch outerB = map opening (connected (there (there (here refl))))
   branch laneB  = connected (here refl)
   branch closeB = connected (there (here refl))
 
-  combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
-  combined op = each proj₂
-    (scan (react op) (flat 0 0 false false false false false , [])
-      (flatMap (mergeᶠ nothing) branch (of (outerB ∷ laneB ∷ closeB ∷ []))))
+  going : ∀ {X : Set} → Maybe X → Bool
+  going (just _) = true
+  going nothing  = false
+
+  -- The flatMap's own branches, then a last item telling they are done.
+  own : ∀ {Δ A B} → E (IE B ∷ IE B ∷ IE A ∷ Δ) (Maybe (Input B))
+  own = concatˢ (flatMap (mergeᶠ nothing) (λ b → map (λ e → just (inj₁ (b , e))) (branch b)) (of (outerB ∷ laneB ∷ closeB ∷ [])))
+                (of (nothing ∷ []))
+
+  -- The connects in scope are watched first, before any reader the
+  -- flatMap's own outer subscribes, and only until its own branches are
+  -- done: a connect outliving the flatMap never holds it open.
+  fed : ∀ {Δ A B} → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → Bool → E (IE B ∷ IE B ∷ IE A ∷ Δ) (Maybe (Input B))
+  fed tk true  = map (λ x → just (inj₂ x)) tk
+  fed tk false = own
+
+  combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
+  combined op tk = each proj₂
+    (scan (react op) (flat name 0 0 false false false false 0 0 0 0 0 [] , [])
+      (takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))))
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
   -- then by `closer`: the order the nested connects subscribe them in.
-  flatMapˢ : ∀ {Δ A B} → FlatOp → (A → E (IE B ∷ IE A ∷ Δ) (IE B)) → E Δ (IE A) → E Δ (IE B)
-  flatMapˢ op g s =
+  flatMapˢ : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → (A → E (IE B ∷ IE A ∷ Δ) (IE B)) → E Δ (IE A) → E Δ (IE B)
+  flatMapˢ op tk g s =
     connect s (connect closer
-      (connect (flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))) (combined op)))
+      (connect (flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))) (combined op tk)))
   {-# INLINE flatMapˢ #-}
 
   ------------------------------------------------------------------------
@@ -315,19 +507,20 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   --   postulate, or a definition without `INLINE`, in place of any
   --   constructor fails termination at every clause, `connect`'s included.
   mutual
-    elab : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map IE Γ → X ∈ Δ) → Obs C Γ A → E Δ (IE A)
+    elab : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Obs C Γ A → E Δ (IE A)
     elab ρ (cold c)          = coldˢ c
     elab ρ empty             = empty
     elab ρ (of xs)           = ofˢ xs
     elab ρ (map f s)         = mapˢ f (elab ρ s)
     elab ρ (scan f z s)      = scanˢ f z (elab ρ s)
     elab ρ (takeWhile i p s) = takeWhileˢ i p (elab ρ s)
-    elab ρ (flatMap op f s)  = flatMapˢ op (λ a → elab (λ i → there (there (ρ i))) (f a)) (elab ρ s)
-    elab ρ (connect s b)     = connect (elab ρ s) (elab (ext ρ) b)
-    elab ρ (connected i)     = connected (ρ (∈-map⁺ IE i))
+    elab {Γ} ρ (flatMap op f s) =
+      flatMapˢ op (trackers Γ 0 (λ i → there (there (there (ρ i))))) (λ a → elab (λ i → there (there (ρ i))) (f a)) (elab ρ s)
+    elab ρ (connect s b)     = connect (annotate (elab ρ s)) (elab (ext ρ) b)
+    elab ρ (connected i)     = reader (connected (ρ (∈-map⁺ AIE i)))
     elab ρ (defer l)         = defer (elabˡ ρ l)
 
-    elabˡ : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map IE Γ → X ∈ Δ) → Later C Γ A → Later C Δ (IE A)
+    elabˡ : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Later C Γ A → Later C Δ (IE A)
     elabˡ ρ l .Later.force = elab ρ (Later.force l)
 
   -- Every emit under the name of the last `begin` before it.
@@ -339,7 +532,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- each told by a mark: a batcher reads the elaborated program as the
   -- source of its own scan, subscribed where the program alone would be,
   -- so the names it mints are the program's own.
-  elaborate : ∀ {Γ A} → Obs C Γ A → E (L.map IE Γ) (IE A)
+  elaborate : ∀ {Γ A} → Obs C Γ A → E (L.map AIE Γ) (IE A)
   elaborate o = map proj₂ (scan restamp (name , marked begin)
     (concatˢ (merge (elab (λ i → i) o) (of (marked subscribed ∷ []))) (of (marked completed ∷ []))))
 
@@ -417,6 +610,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     mark-held _     outerOpen  n b = kept b
     mark-held _     outerClose n b = kept b
     mark-held _     laneStart  n b = kept b
+    mark-held _     carry      n b = kept b
     mark-held _     laneDone   n b = kept b
     mark-held _     burstEnd   n b = kept b
     mark-held _     outerDone  n b = kept b
@@ -430,6 +624,14 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- A completion releases everything held.
   completed-held : ∀ {A} (s : Step A) n → Batching.held (proj₁ (bstep s (instEmit (mark completed) n))) ≡ []
   completed-held s n = refl
+
+  -- What is held, as the batch it would leave as.
+  pendingOf : ∀ {A : Set} → N → List A → List (N × List A)
+  pendingOf i []       = []
+  pendingOf i (v ∷ vs) = (i , v ∷ vs) ∷ []
+
+  pending : ∀ {A : Set} → Batching A N → List (N × List A)
+  pending b = pendingOf (Batching.at b) (Batching.held b)
 
   -- The subscribe burst is one batch, released when it is over; after
   -- it, an instant's batch is released when its routes are.  The run is
