@@ -23,6 +23,14 @@ open import denotation.Laws using (compositional; map-fusion)
 -- the plain run's values stamped the same way.
 open import simultaneous.Statement using (spec)
 
+-- THE INSTANT IS THE TIMESTAMP: an effect runs in its cause's instant, a
+-- cascade's instant is shared only beneath its root, two firings are
+-- never one instant, instants order the subscribe frame first then by
+-- tick then by creator, a cascade fires after its creator, and an
+-- instant is an interval of positions.
+open import denotation.Simultaneity using (effect-instant; cascade-own; frame-own; cascade-inj;
+  frame-first; later-tick; same-tick; after-creator; between)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)

@@ -38,6 +38,7 @@ open import simultaneous.Routed using (Held; Valued; opos)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
 open import simultaneous.Readings using (instantOf; stamped)
+open import denotation.Simultaneity using (between)
 open import simultaneous.Relations using (Met; values; elaborated)
 open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; to≺; from≺)
 
@@ -161,13 +162,6 @@ private
       pb : p ≺ a ⊎ p ≡ a → p ≺ b
       pb (inj₁ lt)   = ≺-trans {p} {a} {b} lt ab
       pb (inj₂ refl) = ab
-
--- AN INSTANT IS AN INTERVAL: a position between two of one instant is
--- of it.  The order is lexicographic with the instant first
--- (`denotation.Position`), so this is a fact about `cmpInstant` alone:
--- transitive and irreflexive.
-postulate
-  between : ∀ {a b c : Pos} → a ≺ b → b ≺ c → instantOf a ≡ instantOf c → instantOf b ≡ instantOf a
 
 ------------------------------------------------------------------------
 -- A run, split at an emit
@@ -314,7 +308,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
 
   -- A value past `k` is of an instant other than one met before `k`.
   apart : ∀ {ka k q} → ka ≺ k → k ≺ q → instantOf q ≡ instantOf ka → (instantOf k ≡ instantOf ka → ⊥) → ⊥
-  apart {ka} {k} {q} ak kq e no = no (between {ka} {k} {q} ak kq (sym e))
+  apart {ka} {k} {q} ak kq e no = no (between (from≺ ka k ak) (from≺ k q kq) (sym e))
 
   -- Past a begin of a new name, the next value is of another instant.
   begin-fresh : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.begin) n ∷ ys → n ≢ lastBegin root xs → Fresh (lastBegin root xs) (stamped ys)
