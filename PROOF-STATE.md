@@ -20,16 +20,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE ORDER
-
-Settled when `make gate` is green. The order lemmas of `denotation.Events`
-and `operation.Key`, the world invariant, adequacy's and the spec's
-position matching all read the position as a label list; each becomes a
-match on the instant or on the path. `between` is the first: an instant
-is an interval because the order compares instants first.
-
-Members: `between`.
-
 ## Tier 2 — the elaboration
 
 **The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
