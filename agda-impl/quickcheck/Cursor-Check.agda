@@ -468,7 +468,7 @@ private
         flag (not (ahead (due (rest τ (u ▸ last) (From∞.force f))))) "BEHIND"
              (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ ix i) ≟ᵖ r)) ks)) "UNLISTED" m′)
       tick (coldS b (play τ u i t′ fr)) m′ =
-        flag (not (closed c′) ∧ not (anyᵇ (λ r → does (u ▸ ix i ≟ᵖ r)) ks)) "UNLISTED" m′
+        flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ ix i) ≟ᵖ r)) ks)) "UNLISTED" m′
       tick _ m′ = m′
   marks t ks P k m = m
 
