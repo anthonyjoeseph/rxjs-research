@@ -27,7 +27,7 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhi
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
 open import operation.Key using (at; after)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening; slotOf; onward)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
                     cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
@@ -65,7 +65,7 @@ open import adequacy.SubJoin using (join-pend; joined-pend; ended-up; settle-of;
 open import adequacy.Ended using (endUp; ends-behind)
 open import adequacy.SubOne using (module Entry; module DeferEntry)
 open import adequacy.RunOf using (of-nx; of-cp; join-nx; join-cp)
-open import adequacy.Cold using (cold-sync; cold-nx; cold-cp; cold-drop; rest-ticked; stall-into; stall-back; close-into; close-back)
+open import adequacy.Cold using (cold-sync; cold-nx; emit-hit; cold-cp; cold-drop; rest-ticked; stall-into; stall-back; close-into; close-back)
 open import adequacy.Enter using (conn₀; conn-parts; conn-ok; flat-sound; flat-within; flat-joined; flat-jinv)
 
 ------------------------------------------------------------------------
@@ -217,7 +217,7 @@ data Delivers {Γ A} : St Γ A → Mark → Pos → Set₁ where
   d-ofx  : ∀ {i q} → Delivers (ofS i q []) ofM (q ⊕ [ last ])
   d-join : ∀ {j x q e ib} → Delivers (joinS j true x ((q , e) ∷ ib)) joinM q
   d-stop : ∀ {i keep r s} → Delivers (takeS i keep (cpAt r) s) cpM (r ⊕ [ last ])
-  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (u ⊕ [ ix i ])
+  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (slotOf u i (emit a k))
   d-ending : ∀ {e} → Delivers (coldS true (ending e)) leafM e
 
 
@@ -242,7 +242,7 @@ delivers-owed (s-of d _)                 d-of   = proj₂ (proj₂ (from d (at-o
 delivers-owed (s-of d _)                 d-ofx  = proj₂ (proj₂ (from d (at-end , tt , tt)))
 delivers-owed (s-join _ d _ _ _)         d-join = proj₂ (proj₂ (from d (inj₁ this)))
 delivers-owed (s-took _ _ _ (o-cp ow) _ _ _ _ _ _) d-stop = ow
-delivers-owed (s-cold _ d _ _)           d-play   = proj₂ (proj₂ (from d (at-out , tt , tt)))
+delivers-owed (s-cold _ d _ _)           d-play   = proj₂ (proj₂ (from d (emit-hit , tt , tt)))
 delivers-owed (s-cold _ d _ _)           d-ending = proj₂ (proj₂ (from d (at-end , tt , tt)))
 
 -- No list entry, switch or pending program delivers.
@@ -524,8 +524,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   -- A cold's next value, or its end, delivered.
   run-cold-nx : ∀ {Cr Γ A} {c : Ctx R Γ A} {τ u i t a} {k : Frame A t} {r} → closed c ≡ false
-              → Inv Rt Cr (bef (u ⊕ [ ix i ])) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
-              → Inv Rt Cr (bef (u ⊕ [ ix i ])) ⟨ c , coldS true (play τ u (suc i) t k) , rising (nx a) , u ⊕ [ ix i ] ⟩
+              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
+              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (onward τ u i t k) , rising (nx a) , slotOf u i (emit a k) ⟩
   run-cold-nx cl (settled {N = owes}          _ fr h)              = flying fr cl (cold-nx h)
   run-cold-nx cl (settled {N = dead _ _}      _ fr h)              = adrift fr cl (rest-cold h)
   run-cold-nx cl (settled {N = lane _ _ _}    _ fr (_ , _ , () , _))

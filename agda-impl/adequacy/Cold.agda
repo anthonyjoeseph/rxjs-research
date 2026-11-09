@@ -28,8 +28,8 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; end; _≺_; In
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺)
 open import denotation.Laws.Worlds using (Ok; Hots; InvAt; Real)
-open import denotation.Laws.ColdInv using (slot; burst-lb; cold-reach; next-real)
-open import operation.PureObservable using (module Machine; Tape; play; ending; opening; rest) renaming (over to tapeOver)
+open import denotation.Laws.ColdInv using (slot; burst-lb; cold-reach; next-real; fin-ticked; fin-lb)
+open import operation.PureObservable using (module Machine; Tape; play; ending; opening; rest; slotOf; onward) renaming (over to tapeOver)
 open Machine using (Scope; coldS)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; full; pendRows; tapeE)
 open import adequacy.Cursor using (origin; bef; aft; Owes; Due; Sync; s-cold; s-coldx; Ticked; Within; Adm; _≈_; voc; tail-≈)
@@ -99,33 +99,72 @@ cold-sync {sc = sc} {Rg} {C} x q ok ad ow eq wi = settle-cold (open-ticked q m (
 ------------------------------------------------------------------------
 -- A step played
 
--- A value delivered: the cursor past it owes the frame's rest.
-cold-nx : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {τ u i t a} {k : Frame A t} {E : EmissionSet A}
-        → Sync sc Rg (bef (u ++ [ ix i ])) (coldS true (play τ u i t (emit a k))) E
-        → Sync sc Rg (aft (u ++ [ ix i ])) (coldS true (play τ u (suc i) t k)) E × E (u ++ [ ix i ]) (out a)
-cold-nx {Rg = Rg} {τ = τ} {u} {i} {t} {a} {k} {E} (s-cold tk@(ru , le) du (ks , tl) tw) =
-  s-cold tk du′ (ks , tl′) tw′ , proj₁ (from du (at-out , tt , tt))
+-- A value delivered at `p`: the cursor past it owes what the tape leaves,
+-- every row of which lies past `p`.
+out-step : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {l l′ : Tape A} {p a} {E : EmissionSet A}
+         → (Ticked l → Ticked l′) → InE (tapeE l) p (out a)
+         → (∀ {y e} → InE (tapeE l′) y e → InE (tapeE l) y e)
+         → (∀ {y e} → InE (tapeE l) y e → p ≺ y → InE (tapeE l′) y e)
+         → (Ticked l → ∀ {y e} → InE (tapeE l′) y e → p ≺ y)
+         → Sync sc Rg (bef p) (coldS true l) E
+         → Sync sc Rg (aft p) (coldS true l′) E × E p (out a)
+out-step {Rg = Rg} {l′ = l′} {p} {E = E} tk′ hit into peel past (s-cold tk du (ks , tl) tw) =
+  s-cold (tk′ tk) du′ (ks , tl′) tw′ , proj₁ (from du (hit , tt , tt))
   where
-    p = u ++ [ ix i ]
-
-    past : ∀ {y e} → InE (burst τ u (suc i) k) y e → p ≺ y
-    past {y} r = ≺-≼-≺ {p} {u ++ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
-
-    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → p ≺ y → InE (burst τ u (suc i) k) y e
-    peel at-out     pp = ⊥-elim (≺-irrefl {p} pp)
-    peel (on-out r) _  = r
-
-    du′ : Due (aft p) E ≃ Due origin (InE (burst τ u (suc i) k))
+    du′ : Due (aft p) E ≃ Due origin (InE (tapeE l′))
     du′ = (λ (r , v , pk) → peel (proj₁ (to du (r , v , ≺→≼ {p} pk))) pk , v , tt)
-        ⇄ (λ (r , v , _) → proj₁ (from du (on-out r , v , tt)) , proj₁ (proj₂ (from du (on-out r , v , tt))) , past r)
+        ⇄ (λ (r , v , _) → proj₁ (from du (into r , v , tt)) , proj₁ (proj₂ (from du (into r , v , tt))) , past tk r)
 
-    tl′ : ∀ {y e} → E y e → p ≺ y → InE (burst τ u (suc i) k) y e ⊎ y ∈ ks
+    tl′ : ∀ {y e} → E y e → p ≺ y → InE (tapeE l′) y e ⊎ y ∈ ks
     tl′ r pk with tl r (≺→≼ {p} pk)
     ... | inj₁ r′ = inj₁ (peel r′ pk)
     ... | inj₂ m  = inj₂ m
 
-    tw′ : ∀ {y e} → InE (burst τ u (suc i) k) y e → p ≺ y × E y e × Rg y
-    tw′ r = let (_ , ey , g) = tw (on-out r) in past r , ey , g
+    tw′ : ∀ {y e} → InE (tapeE l′) y e → p ≺ y × E y e × Rg y
+    tw′ r = let (_ , ey , g) = tw (into r) in past tk r , ey , g
+
+-- A value the tape shows, at its slot.
+emit-hit : ∀ {A τ u i t a} {k : Frame A t} → InE (tapeE (play τ u i t (emit a k))) (slotOf u i (emit a k)) (out a)
+emit-hit {k = emit _ _} = at-out
+emit-hit {k = stall _}  = at-out
+emit-hit {k = close _}  = at-out
+
+-- A value delivered: the cursor past it owes the frame's rest, or, its
+-- frame closing straight after, what follows the frame.
+cold-nx : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {τ u i t a} {k : Frame A t} {E : EmissionSet A}
+        → Sync sc Rg (bef (slotOf u i (emit a k))) (coldS true (play τ u i t (emit a k))) E
+        → Sync sc Rg (aft (slotOf u i (emit a k))) (coldS true (onward τ u i t k)) E × E (slotOf u i (emit a k)) (out a)
+cold-nx {τ = τ} {u} {i} {t} {a} {k = k@(emit _ _)} = out-step (λ tk → tk) at-out on-out peel past
+  where
+    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ++ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
+    peel at-out     pp = ⊥-elim (≺-irrefl {u ++ [ ix i ]} pp)
+    peel (on-out r) _  = r
+
+    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ++ [ ix i ]) ≺ y
+    past (ru , le) {y} r = ≺-≼-≺ {u ++ [ ix i ]} {u ++ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
+cold-nx {τ = τ} {u} {i} {t} {a} {k = k@(stall _)} = out-step (λ tk → tk) at-out on-out peel past
+  where
+    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ++ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
+    peel at-out     pp = ⊥-elim (≺-irrefl {u ++ [ ix i ]} pp)
+    peel (on-out r) _  = r
+
+    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ++ [ ix i ]) ≺ y
+    past (ru , le) {y} r = ≺-≼-≺ {u ++ [ ix i ]} {u ++ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
+cold-nx {τ = τ} {u} {i} {t} {a} {k = close k} =
+  out-step (λ (ru , le) → let (ru′ , le′) = fin-ticked {τ} {t} u ru le in rest-ticked τ (u ++ [ last ]) ru′ le′ (From∞.force k)) at-out into peel past
+  where
+    p = (u ++ [ last ]) ++ [ ix 0 ]
+    e₂ = (u ++ [ last ]) ++ [ last ]
+
+    into : ∀ {y e} → InE (tapeE (rest τ e₂ (From∞.force k))) y e → InE (burst τ u i (emit a (close k))) y e
+    into r = on-out (subst (λ ev → InE ev _ _) (rest-frames τ e₂ (From∞.force k)) r)
+
+    peel : ∀ {y e} → InE (burst τ u i (emit a (close k))) y e → p ≺ y → InE (tapeE (rest τ e₂ (From∞.force k))) y e
+    peel at-out     pp = ⊥-elim (≺-irrefl {p} pp)
+    peel (on-out r) _  = subst (λ ev → InE ev _ _) (sym (rest-frames τ e₂ (From∞.force k))) r
+
+    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (tapeE (rest τ e₂ (From∞.force k))) y e → p ≺ y
+    past (ru , le) r = fin-lb τ u (From∞.force k) ru le (subst (λ ev → InE ev _ _) (rest-frames τ e₂ (From∞.force k)) r)
 
 -- Its end delivered: the cursor past it owes nothing.
 cold-cp : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {e} {E : EmissionSet A}

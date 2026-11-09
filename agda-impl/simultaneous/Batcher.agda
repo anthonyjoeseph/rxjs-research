@@ -21,7 +21,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; sym; trans; subst; module ≡-Reasoning)
 
 open import Tree using (scan; map; merge; of)
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; skip; end; pin) renaming (out to emit)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
@@ -34,7 +34,7 @@ open import simultaneous.Prefixes using (prefix-++)
 open import simultaneous.Relations using (Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
   pending; asEmits; mark-step; restamp; marked; concatˢ; elab; E)
 
 ------------------------------------------------------------------------

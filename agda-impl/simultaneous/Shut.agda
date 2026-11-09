@@ -16,14 +16,14 @@ open import Data.Empty using (⊥)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Events using (Timeline; root; fresh; _≟ᵖ_)
+open import denotation.Events using (Timeline; root; fresh; finals; _≟ᵖ_)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin)
 open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met; values; elaborated)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
 
 -- No route yet.
 r₀ : Routes
