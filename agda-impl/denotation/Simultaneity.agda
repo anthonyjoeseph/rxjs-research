@@ -1,7 +1,6 @@
 -- THE INSTANT IS THE TIMESTAMP.  What the denotation says about
 -- simultaneity, as facts about positions alone (`denotation.Position`):
--- two rows are simultaneous exactly when their instants are equal, and
--- these laws say when that is.  None of them is about a program: every
+-- when two rows are `Simultaneous`.  None of them is about a program: every
 -- operator places a row by `_⊕_` under its cause, and every timer's step
 -- by `fired`, so they hold of every emission set by construction.
 --
@@ -26,15 +25,26 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
-open import denotation.Position using (Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; nested; fired; _▸_;
+open import denotation.Position using (Pos; Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; nested; fired; _▸_;
   tickᴿ; lt; eq; gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ⁱ_; _<ᵖ_)
 
 ------------------------------------------------------------------------
 -- When two positions are simultaneous
 
+-- SIMULTANEOUS: in one instant.  An instant is one call the outside world
+-- makes into a subscriber — the subscribe frame, or one `next`/`complete`
+-- from an async callback — and everything that runs before that call
+-- returns shares it.  A subscribe frame's `complete()` is in its burst;
+-- an async source's own `complete()` is its own instant, even straight
+-- after a value; two calls in one `setTimeout` are two instants.  So an
+-- async `3` piped through `take(1), endWith(9)` gives `[3, 9]`, through
+-- `endWith(9)` alone `[3] [9]`.
+Simultaneous : Pos → Pos → Set
+Simultaneous p q = instant p ≡ instant q
+
 -- An effect runs in its cause's instant: a hot's delivery, a burst's
 -- step, a completion's continuation.
-effect-instant : ∀ p q → instant (p ⊕ q) ≡ instant p
+effect-instant : ∀ p q → Simultaneous (p ⊕ q) p
 effect-instant (_ ∙ _) _ = refl
 
 effect-tick : ∀ p q → tick (p ⊕ q) ≡ tick p
@@ -47,11 +57,11 @@ step-tick (nested p)  l = effect-tick p _
 step-tick (fired _ _) _ = refl
 
 -- A timer's step's instant is shared only by positions beneath that step.
-cascade-own : ∀ t e l p → instant p ≡ cascade t e l → p ≡ (fired t e ▸ l) ⊕ path p
+cascade-own : ∀ t e l p → Simultaneous p (fired t e ▸ l) → p ≡ (fired t e ▸ l) ⊕ path p
 cascade-own t e l (_ ∙ _) refl = refl
 
 -- The subscribe frame's instant is shared only by positions beneath the root.
-frame-own : ∀ p → instant p ≡ frame → p ≡ root ⊕ path p
+frame-own : ∀ p → Simultaneous p root → p ≡ root ⊕ path p
 frame-own (_ ∙ _) refl = refl
 
 -- Two async emissions share an instant only if they are one step of one
@@ -381,7 +391,7 @@ private
   f≢t : false ≡ true → ⊥
   f≢t ()
 
-between : ∀ {a b c} → a <ᵖ b ≡ true → b <ᵖ c ≡ true → instant a ≡ instant c → instant b ≡ instant a
+between : ∀ {a b c} → a <ᵖ b ≡ true → b <ᵖ c ≡ true → Simultaneous a c → Simultaneous b a
 between {i ∙ p} {j ∙ q} {_ ∙ r} ab bc refl with cmpInstant i j in ij
 ... | eq = sym (eqⁱ i j ij)
 ... | gt = ⊥-elim (f≢t ab)

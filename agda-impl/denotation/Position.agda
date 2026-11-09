@@ -10,8 +10,8 @@
 -- each async emission its own instant, shared with what it synchronously
 -- causes — named by the tick the timer fires at, the position it was
 -- created at, and the step.  Two events are simultaneous exactly when
--- their instants are equal, and nothing has to be proven about a
--- position for that reading to be right.  A cascade is not inside its
+-- their instants are equal (`denotation.Simultaneity.Simultaneous`), and
+-- nothing has to be proven about a position for that reading to be right.  A cascade is not inside its
 -- creator: its path starts afresh.
 --
 -- THE ORDER: instant first, then path.  Instants by tick, then by
