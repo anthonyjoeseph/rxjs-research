@@ -14,7 +14,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; module ≡-Reasoning)
 
 open import Tree using (scan; merge; of)
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
 open import simultaneous.InstEmit using (InstEmit; instEmit; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; module Elaborate)
@@ -22,7 +22,7 @@ open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
   restamp; marked; concatˢ; elab; E)
 
 ------------------------------------------------------------------------

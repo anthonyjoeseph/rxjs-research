@@ -47,7 +47,9 @@ else
   mkdir -p "$BIN_DIR"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
-  curl -fsSL --retry 4 --max-time 300 -o "$tmp/agda.tar.xz" "$AGDA_URL"
+  # The release host answers 504 in bursts that outlast curl's default
+  # backoff, so wait a fixed 20 s between tries.
+  curl -fsSL --retry 10 --retry-delay 20 --retry-all-errors --max-time 300 -o "$tmp/agda.tar.xz" "$AGDA_URL"
   tar -xJf "$tmp/agda.tar.xz" -C "$tmp"
   install -m 755 "$tmp/agda" "$BIN_DIR/agda"
   echo "installed $(agda --version | head -1) at $BIN_DIR/agda"

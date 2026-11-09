@@ -90,7 +90,7 @@ fromTimeline {A} ck names c = record
 
     named : Timeline A → IO Pos
     named (fixed _) = pure []
-    named fresh     = readIORef names >>= λ n → writeIORef names (suc n) >> pure (ix n ∷ [])
+    named (fresh _) = readIORef names >>= λ n → writeIORef names (suc n) >> pure (ix n ∷ [])
 
     first : Emit A → IORef Bool → From A 0 → IO ⊤
     first e off (at 0 _ b) = burst e off (λ t′ m′ → play e off t′ m′) 0 b

@@ -140,12 +140,42 @@ mutual
 -- the same one.  In `Set₁` because the leaf slot of a program tree is.
 data Timeline : Set → Set₁ where
   fixed : ∀ {A} → From A 0 → Timeline A
-  fresh : Timeline Pos
+  fresh : ∀ {A} → (Pos → A) → Timeline A
 
 timelineAt : ∀ {A} → Timeline A → Pos → From A 0
 timelineAt (fixed m) p = m
-timelineAt fresh     p = at 0 z≤n (emit p (close λ where
+timelineAt (fresh f) p = at 0 z≤n (emit (f p) (close λ where
   .From∞.force → done))
+
+-- Each value told whether its callback completes the timeline: its
+-- frame closes straight after it, onto nothing more.  Every step stays
+-- where it was.
+private
+  ends : ∀ {A t} → From A t → Bool
+  ends done = true
+  ends _    = false
+
+mutual
+  finalFrom : ∀ {A t} → From A t → From (A × Bool) t
+  finalFrom done       = done
+  finalFrom quiet      = quiet
+  finalFrom (at t le b) = at t le (finalFrame b)
+
+  finalFrame : ∀ {A t} → Frame A t → Frame (A × Bool) t
+  finalFrame (emit a (close k)) = emit (a , ends (From∞.force k)) (close (finalFrom∞ k))
+  finalFrame (emit a k)         = emit (a , false) (finalFrame k)
+  finalFrame (stall k)          = stall (finalFrame∞ k)
+  finalFrame (close k)          = close (finalFrom∞ k)
+
+  finalFrame∞ : ∀ {A t} → Frame∞ A t → Frame∞ (A × Bool) t
+  finalFrame∞ k .Frame∞.force = finalFrame (Frame∞.force k)
+
+  finalFrom∞ : ∀ {A t} → From∞ A t → From∞ (A × Bool) t
+  finalFrom∞ k .From∞.force = finalFrom (From∞.force k)
+
+finals : ∀ {A} → Timeline A → Timeline (A × Bool)
+finals (fixed m) = fixed (finalFrom m)
+finals (fresh f) = fresh (λ p → f p , true)
 
 private
   data Cmp : Set where
@@ -550,7 +580,10 @@ open Events∞
 
 -- A burst at `r` puts its i-th step at `r ++ [ ix i ]` and ends at
 -- `r ++ [ last ]`, which is also where the timer for the next frame is
--- created: after the burst and all it caused.  A frame at tick 0 is the
+-- created: after the burst and all it caused.  A close straight after a
+-- value is that value's callback going on, so the value moves under the
+-- end: it sits at `q ++ [ ix 0 ]` and the frame ends at `q ++ [ last ]`,
+-- with `q = r ++ [ last ]`, and a completion shares the value's instant.  A frame at tick 0 is the
 -- subscribe burst, rooted at the subscription itself.  A timer firing
 -- shows no step of its own: at the root a hot's rekeying under `sub`
 -- puts it after the burst below it, and at the burst's first position it
@@ -562,6 +595,9 @@ mutual
   frames τ e (at t _ b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
 
   burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
+  burst τ r i (emit a (close k)) = out ((r ++ [ last ]) ++ [ ix 0 ]) a λ where
+    .force → frames τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k)
+    .cut   → idle
   burst τ r i (emit a k) = out (r ++ [ ix i ]) a λ where
     .force → burst τ r (suc i) k
     .cut   → idle

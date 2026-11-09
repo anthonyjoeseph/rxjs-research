@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Pos; ix; last; _≟ˡ_; <ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-next; From∞; Frame; Frame∞; emit; stall; close; timelineAt)
   renaming (sub to subᴾ)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening) renaming (over to overT)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening; slotOf) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
@@ -30,7 +30,7 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
 open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-cut; k-take; k-src; k-body; Lo)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
-open import adequacy.Stamped using (frame-ahead; opening-ahead; pend-focus; inbox-asc)
+open import adequacy.Stamped using (frame-ahead; opening-ahead; slot-next; pend-focus; inbox-asc)
 open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)
 
@@ -204,7 +204,7 @@ module _ {R : Set} where
   leafs c q true  (play τ u i t (emit a f))  (here refl) lo ah refl | false = ⊑-refl
   leafs c q true  (play τ u i t (stall f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (stall f))) (coldS true (play τ u (suc i) t (Frame∞.force f))) q
-      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (u ++ [ ix (suc i) ])) (trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ ix (suc i) ])) (<ᵖ-part u [] [] (<ᵖ-ix i))))
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (slotOf u (suc i) (Frame∞.force f))) (trans (at-<ᴷ (u ++ [ ix i ]) _) (slot-next u i (Frame∞.force f))))
          ; (k-own (there ())) ; (k-kid ()) }) lo
   leafs c q true  (play τ u i t (close f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ++ [ last ]) (From∞.force f))) q

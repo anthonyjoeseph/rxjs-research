@@ -17,13 +17,13 @@ open import Data.List.Relation.Binary.Permutation.Propositional.Properties using
 open import Data.List.Relation.Binary.Sublist.Propositional using (_⊆_; ⊆-reflexive; ⊆-refl)
 open import Data.List.Relation.Binary.Sublist.Heterogeneous using (_∷ʳ_) renaming ([] to []ˢ)
 open import Data.Nat using (suc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst)
 
-open import denotation.Events using (Pos; Label; ix; last; tick; _<ᵖ_; <ᵖ-irrefl; ix-<)
-open import operation.PureObservable using (module Machine; module Driver)
+open import denotation.Events using (Pos; Label; Frame; emit; stall; close; ix; last; tick; _<ᵖ_; <ᵖ-irrefl; ix-<)
+open import operation.PureObservable using (module Machine; module Driver; baseOf; stepOf)
 open Machine using (Ctx; St; Mode; Conf; ⟨_,_,_,_⟩; plug; subscribing; absorbed; rising; Stepped)
 open import operation.Key using (at; after; _<ᴷ_; <ᴷ-irrefl; clash; <ᴷ-asym)
 open import adequacy.Stamped using (Ix)
@@ -127,7 +127,30 @@ cn-up {p} {l} = (λ c → ⊥-elim (cone-up l [] c)) , λ y ()
 sub-child : ∀ {p} l → Ix p → Sub (cn (p ++ [ l ])) (cl p)
 sub-child {p} l hp = sub-cl hp (f-cn _) (λ y c → cone-trans (pre [ l ]) c) (λ c → ⊥-elim (cone-up l [] c))
 
--- An of's or a cold's values, inside the run.
+-- A frame's step owes under its cascade `v`: a value its frame closes
+-- straight after, under the frame's end.
+base-in : ∀ {A v i w y} (fr : Frame A w) → In (tl (baseOf v fr) (stepOf i fr)) y → Σ Label λ l → Σ (List Label) λ ls → Cone (v ++ l ∷ ls) y
+base-in {v = v} {y = y} (emit _ (close _)) (inj₁ (j , _ , c)) = last , [ ix j ] , subst (λ q → Cone q y) (++-assoc v [ last ] [ ix j ]) c
+base-in {v = v} {y = y} (emit _ (close _)) (inj₂ c)           = last , [ last ] , subst (λ q → Cone q y) (++-assoc v [ last ] [ last ]) c
+base-in (emit _ (emit _ _)) (inj₁ (j , _ , c)) = ix j , [] , c
+base-in (emit _ (emit _ _)) (inj₂ c)           = last , [] , c
+base-in (emit _ (stall _))  (inj₁ (j , _ , c)) = ix j , [] , c
+base-in (emit _ (stall _))  (inj₂ c)           = last , [] , c
+base-in (stall _)           (inj₁ (j , _ , c)) = ix j , [] , c
+base-in (stall _)           (inj₂ c)           = last , [] , c
+base-in (close _)           (inj₁ (j , _ , c)) = ix j , [] , c
+base-in (close _)           (inj₂ c)           = last , [] , c
+
+-- A cold's frame, inside the run.
+sub-frame : ∀ {A p w} (fr : Frame A w) → Ix p → Sub (tl (baseOf p fr) (stepOf 0 fr)) (cl p)
+sub-frame {p = p} fr hp = sub-cl hp (f-tl _ _) (λ y iy → inc (base-in fr iy)) (λ iy → out (base-in fr iy))
+  where
+    inc : ∀ {y} → Σ Label (λ l → Σ (List Label) λ ls → Cone (p ++ l ∷ ls) y) → Cone p y
+    inc (l , ls , c) = cone-trans (pre (l ∷ ls)) c
+    out : (Σ Label λ l → Σ (List Label) λ ls → Cone (p ++ l ∷ ls) p) → ⊥
+    out (l , ls , c) = cone-up l ls c
+
+-- An of's values, inside the run.
 sub-vals : ∀ {p} i → Ix p → Sub (tl p i) (cl p)
 sub-vals {p} i hp = sub-cl hp (f-tl p i) inc out
   where

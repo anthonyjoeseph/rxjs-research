@@ -25,7 +25,8 @@
 -- to break it alone, built over the same elaboration: the batcher
 -- replaced by `empty`, the elaborated emits all restamped to one name,
 -- every batch delivered twice.  A sabotage no seed catches is a checker
--- that cannot fire.  A probe for `make spec-check`: no proof reads it.
+-- that cannot fire; it needs only to fire, so it runs over fewer seeds.
+-- A probe for `make spec-check`: no proof reads it.
 --
 -- THE PINNED PROGRAMS: Anthony's examples, each with the batches it must
 -- deliver, written out.  The statements say the batcher agrees with the
@@ -34,20 +35,23 @@ module quickcheck.Spec-Check where
 
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; not)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
 open import Data.List using (List; []; _∷_; upTo) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
+open import Data.List.Relation.Unary.Any using (here)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
-open import IO.Primitive.Core using (_>>=_)
+open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
+open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ)
-open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
+open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
+open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh; finals)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit)
@@ -61,7 +65,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -201,8 +205,66 @@ private
   spread : Obs Timeline [] ℕ
   spread = flatMap (mergeᶠ nothing) (λ e → of (e ∷ e + 1 ∷ e + 2 ∷ [])) raw
 
+  -- `timerOf`, shared, its outer cut while lanes it started read on:
+  -- `timer(1).pipe(mergeMap(() => of(1, 2, 3)),
+  --    connect(h => h.pipe(takeWhile(v => v < 3), mergeMap(() => h))))`
+  -- [2, 3, 3]
+  cutShared : Obs Timeline [] ℕ
+  cutShared = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))
+    (flatMap (mergeᶠ nothing) (λ _ → connected (here refl)) (takeWhile false (λ v → v <ᵇ 3) (connected (here refl))))
+
+  -- A late reader whose first event is its source's end, ending a lane
+  -- whose successor's burst the batch must still cover:
+  -- `timer(1).pipe(connect(h => merge(h.pipe(map(() => 5)),
+  --    h.pipe(mergeMap(() => of(1, 2)), concatMap(v => v === 1 ? h : of(v * 10))))))`
+  -- [5, 20]
+  endHanded : Obs Timeline [] ℕ
+  endHanded = connect (cold (fixed (at 1 z≤n (emit 0 (close over)))))
+    (merge (map (λ _ → 5) (connected (here refl)))
+      (flatMap (mergeᶠ (just 1)) (λ v → if v ≡ᵇ 1 then connected (here refl) else of (v * 10 ∷ []))
+        (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ [])) (connected (here refl)))))
+
+  -- Every early reader of `h` cut while a lane reading it late is yet to
+  -- meet its next emit:
+  -- `timer(1).pipe(mergeMap(() => of(1, 2, 3)), connect(h => merge(
+  --    h.pipe(takeWhile(v => v < 2), mergeMap(() => h)), h.pipe(takeWhile(v => v < 2)))))`
+  -- [1, 2, 3]
+  lazyCut : Obs Timeline [] ℕ
+  lazyCut = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))
+    (merge (flatMap (mergeᶠ nothing) (λ _ → connected (here refl)) (takeWhile false (λ v → v <ᵇ 2) (connected (here refl))))
+           (takeWhile false (λ v → v <ᵇ 2) (connected (here refl))))
+
+  -- The same, the late reader a queued lane, queued an instant before:
+  -- `timer(3).pipe(mergeMap(() => of(1, 2, 3)), connect(h => merge(h.pipe(takeWhile(v => v < 2)),
+  --    timer(1).pipe(mergeMap(() => of(0, 1)), concatMap(x => x === 0 ? h.pipe(takeWhile(v => v < 2)) : h)))))`
+  -- [1, 1, 3]
+  queueCut : Obs Timeline [] ℕ
+  queueCut = connect (flatMap (mergeᶠ nothing) (λ _ → of (1 ∷ 2 ∷ 3 ∷ [])) (cold (fixed (at 3 z≤n (emit 0 (close over))))))
+    (merge (takeWhile false (λ v → v <ᵇ 2) (connected (here refl)))
+      (flatMap (mergeᶠ (just 1)) (λ x → if x ≡ᵇ 0 then takeWhile false (λ v → v <ᵇ 2) (connected (here refl)) else connected (here refl))
+        (flatMap (mergeᶠ nothing) (λ _ → of (0 ∷ 1 ∷ [])) (cold (fixed (at 1 z≤n (emit 0 (close over))))))))
+
+  -- A connect's body done before its source, its completion handing the
+  -- concat on within the same instant: with `src` sending 0 at 1 and
+  -- completing at 3,
+  -- `of(0, 1).pipe(concatMap(v => v === 0
+  --    ? src.pipe(connect(h => h.pipe(takeWhile(v => v < 0, true), mergeMap(() => of(5)))))
+  --    : of(7)))`
+  -- [5, 7]
+  heldOpen : Obs Timeline [] ℕ
+  heldOpen = flatMap (mergeᶠ (just 1)) (λ v → if v ≡ᵇ 0 then body else of (7 ∷ [])) (of (0 ∷ 1 ∷ []))
+    where
+      body : Obs Timeline [] ℕ
+      body = connect (cold (fixed (at 1 z≤n (emit 0 (close λ where .From∞.force → at 3 (s≤s (s≤s z≤n)) (close over))))))
+        (flatMap (mergeᶠ nothing) (λ _ → of (5 ∷ [])) (takeWhile true (λ v → v <ᵇ 0) (connected (here refl))))
+
   pins : List (String × Obs Timeline [] ℕ × List (List ℕ))
   pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
+       ∷ ("held-open" , heldOpen , (5 ∷ 7 ∷ []) ∷ [])
+       ∷ ("cut-shared" , cutShared , (2 ∷ 3 ∷ 3 ∷ []) ∷ [])
+       ∷ ("end-handed" , endHanded , (5 ∷ 20 ∷ []) ∷ [])
+       ∷ ("lazy-cut" , lazyCut , (1 ∷ 2 ∷ 3 ∷ []) ∷ [])
+       ∷ ("queue-cut" , queueCut , (1 ∷ 1 ∷ 3 ∷ []) ∷ [])
        ∷ ("raw" , raw , (1 ∷ 2 ∷ []) ∷ (3 ∷ []) ∷ (4 ∷ []) ∷ [])
        ∷ ("spread" , spread , (1 ∷ 2 ∷ 3 ∷ 2 ∷ 3 ∷ 4 ∷ []) ∷ (3 ∷ 4 ∷ 5 ∷ []) ∷ (4 ∷ 5 ∷ 6 ∷ []) ∷ [])
        ∷ []
@@ -238,7 +300,7 @@ private
 
   pinned : List (String × Obs Timeline [] ℕ × List (List ℕ)) → IO Unit
   pinned []       = putStrLn "spec-check: pinned programs checked"
-  pinned (p ∷ ps) = putStrLn (pinLine p) >>= λ _ → pinned ps
+  pinned (p ∷ ps) = putStrLn ("spec-check: pinning " +++ proj₁ p) >>= λ _ → putStrLn (pinLine p) >>= λ _ → pinned ps
 
 ------------------------------------------------------------------------
 -- The report
@@ -273,6 +335,11 @@ private
   tallyOf mk []          = tally 0 0 0 0 0
   tallyOf mk (seed ∷ ss) = add (judge (budget seed) (mk seed)) (tallyOf mk ss)
 
+  -- a line as each seed starts, so a run cut short shows how far it got
+  -- and the log's timestamps show what each seed cost
+  progress : ℕ → IO Unit
+  progress seed = putStrLn ("spec-check: seed " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed))
+
   showTally : Tally → String
   showTally (tally s k l c b) =
     showℕ (s Data.Nat.∸ k) +++ " checked, " +++ showℕ k +++ " skipped; failing: left-to-right "
@@ -285,18 +352,25 @@ private
   seeds : List ℕ
   seeds = upTo 300
 
-  report : List ℕ → IO Unit
-  report []          = putStrLn ("spec-check: done " +++ showTally (tallyOf real seeds))
-  report (seed ∷ ss) with fails (judge (budget seed) (real seed))
-  ... | []     = report ss
-  ... | f ∷ fs = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
-                 >>= λ _ → report ss
+  -- a sabotage needs only to fire, so fewer seeds serve
+  sabotaged : List ℕ
+  sabotaged = upTo 100
+
+  -- each seed judged once, its failures printed as met
+  report : List ℕ → Tally → IO Unit
+  report []          t = putStrLn ("spec-check: done " +++ showTally t)
+  report (seed ∷ ss) t with judge (budget seed) (real seed)
+  ... | v = progress seed >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+    where
+      failed : List String → IO Unit
+      failed []       = return _
+      failed (f ∷ fs) = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
 
   selftest : IO Unit
   selftest =
-    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied seeds))) >>= λ _ →
-    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped seeds))) >>= λ _ →
-    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds)))
+    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied sabotaged))) >>= λ _ →
+    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped sabotaged))) >>= λ _ →
+    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled sabotaged)))
 
 main : IO Unit
-main = selftest >>= λ _ → pinned pins >>= λ _ → report seeds
+main = hSetBuffering stdout lineBuffering >>= λ _ → pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0) >>= λ _ → selftest

@@ -10,7 +10,7 @@
 -- listed completely.  A cut listing claims nothing.
 module quickcheck.Tabled.Exact where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not; if_then_else_; _∧_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥-elim)
@@ -24,18 +24,18 @@ open import Data.Nat using (zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.Events as E
 open import denotation.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
 open import denotation.EmissionSet
-  using (out; skip; end; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
+  using (out; skip; end; pin; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
   ended; late; Den; enter; After; LaneOf; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; values; fuel; horizon; walk;
+  using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; properᵇ; ends; allᵇ; _≼ᵇ_; values; fuel; horizon; walk;
   mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes; afterL;
   module MergeL; module TakeL; module ConnL; listT)
 open import quickcheck.Tabled.Exact.Base
@@ -102,6 +102,15 @@ truncate-exact {l = l} el u = record
   { sound    = λ m → sound (el u) m , mapL proj₁ (rows l) , λ x _ _ → ∈-map⁺ proj₁ (complete (el u) x)
   ; complete = λ x → complete (el u) (proj₁ x) }
 
+-- `proper` reads the end positions once; `properᵇ` reads every row.
+private
+  properᵇ-ends : ∀ {A} (rs : List (Row A)) q → allᵇ (q ≼ᵇ_) (ends rs) ≡ properᵇ rs q
+  properᵇ-ends []                 q = refl
+  properᵇ-ends ((k , end) ∷ rs)   q = cong ((q ≼ᵇ k) ∧_) (properᵇ-ends rs q)
+  properᵇ-ends ((k , out _) ∷ rs) q = properᵇ-ends rs q
+  properᵇ-ends ((k , skip) ∷ rs)  q = properᵇ-ends rs q
+  properᵇ-ends ((k , pin _) ∷ rs) q = properᵇ-ends rs q
+
 -- `EmissionSet.Proper`, the rows a hot shows.
 proper-exact : ∀ {A} {l : Listed A} {t : EmissionSet A} → Exactly l t → Exactly (hotOf l) (Proper t)
 proper-exact {A} {l} {t} el u = record { sound = s ; complete = c }
@@ -110,9 +119,9 @@ proper-exact {A} {l} {t} el u = record { sound = s ; complete = c }
     s : ∀ {q e} → (q , e) ∈ proper (rows l) → Proper t q e
     s m with cm⁻ {xs = rows l} m
     ... | ((k , e′) , m′ , h) with when⁻ h
-    ... | (pb , refl) = sound ex m′ , proper→ ex pb
+    ... | (pb , refl) = sound ex m′ , proper→ ex (trans (sym (properᵇ-ends (rows l) k)) pb)
     c : ∀ {q e} → Proper t q e → (q , e) ∈ proper (rows l)
-    c (x , h) = cm⁺ (complete ex x) (when⁺ (→proper ex h))
+    c {q} (x , h) = cm⁺ (complete ex x) (when⁺ (trans (properᵇ-ends (rows l) q) (→proper ex h)))
 
 -- `EmissionSet.Rejoin`, joining a hot at `p`.
 private

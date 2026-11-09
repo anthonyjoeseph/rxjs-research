@@ -36,7 +36,7 @@ open import Function using (_⇔_)
 open import Data.List.Properties using (map-++)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
-open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
+open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh; finals)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
 open import simultaneous.InstEmit using (valuesOf)
@@ -45,7 +45,7 @@ import simultaneous.Spec as Grouping
 open Grouping _≟_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; stamped; closed)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (E; IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (E; IE; elaborate; batchSimultaneous)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
