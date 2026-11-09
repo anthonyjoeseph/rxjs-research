@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
--- A COLD'S TICK IS AN ANCESTOR OF A ROW: an open cold's turn at
--- `u ++ [ ix i ]` leaves a row of the root's entry under it.  A stall or
+-- A COLD'S TICK IS AN ANCESTOR OF A ROW: an open cold's turn at its
+-- slot leaves a row of the root's entry under it.  A stall or
 -- a frame's close is a skip of the cold's entry there, owed where the
 -- search found it, and passes up every live frame at the same position;
 -- an emit rises, and its value climbs the frames until the root shows it,
@@ -12,7 +12,6 @@ module adequacy.TickRow where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Nat using (suc)
 open import Data.List using ([]; _∷_; [_]; _++_; map; _ʳ++_)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -33,7 +32,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; Den; ⟦_⟧; enter; 
   module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼; ≺-≼-≺)
 open import denotation.Laws.Worlds using (Hots)
-open import operation.PureObservable using (PureObs; module Machine; play)
+open import operation.PureObservable using (PureObs; module Machine; play; slotOf; onward)
 open Machine using (Ctx; St; Scope; CS; ⟨_,_,_,_⟩; plug; load; search; found; leafM; absorbed; rising; nx; closed; scopeOf;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; free; cpAt; cutAt; overAt)
@@ -242,7 +241,7 @@ module _ {R : Set} (o : PureObs [] R) where
 
   emit-step : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s q} {c′ : Ctx R Γ′ A′} {τ u i t a} {f : Frame A′ t} {κ}
             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (emit a f))) leafM κ) → closed c′ ≡ false
-            → ⟨ c′ , coldS true (play τ u (suc i) t f) , rising (nx a) , u ++ [ ix i ] ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
+            → ⟨ c′ , coldS true (onward τ u i t f) , rising (nx a) , slotOf u i (emit a f) ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
   emit-step fd cl rewrite fd | cl = _ , refl
 
   -- A TAKE'S FAILURE ENDS UNDER IT: past the failing value, the take's
@@ -323,8 +322,8 @@ module _ {R : Set} (o : PureObs [] R) where
   -- AN OPEN COLD'S TICK IS AN ANCESTOR OF A ROW of the root's entry.
   tick-below : ∀ {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {τ u i t} {fr : Frame A′ t}
              → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (u ++ [ ix i ])))
-             → closed c′ ≡ false → ¬ ¬ Below Rt (u ++ [ ix i ])
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (slotOf u i fr)))
+             → closed c′ ≡ false → ¬ ¬ Below Rt (slotOf u i fr)
   tick-below {c = c} {s} {q} {fr = emit a f} pth fd cl = climb (pth ▸τ emit-step {c = c} {s = s} {q = q} fd cl) cl
   tick-below {fr = stall f}  pth fd cl = tick-skip pth fd cl at-skip
   tick-below {fr = close f}  pth fd cl = tick-skip pth fd cl at-skip

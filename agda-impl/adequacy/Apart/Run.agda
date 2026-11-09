@@ -20,43 +20,84 @@ open import Data.List.Relation.Binary.Sublist.Propositional.Properties using (Al
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (suc; _+_; _<_; _≤_; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; +-suc; +-monoʳ-≤)
-open import Data.Product using (_,_)
+open import Data.Product using (_,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 
-open import denotation.Events using (Pos; ix; last; tick; emit; stall; close; From∞; Frame∞; done; quiet; at) renaming (sub to subᴾ)
-open import operation.PureObservable using (module Machine; play; ending; over)
+open import denotation.Events using (Pos; Frame; ix; last; tick; emit; stall; close; From∞; Frame∞; done; quiet; at) renaming (sub to subᴾ)
+open import operation.PureObservable using (module Machine; play; ending; over; baseOf; stepOf)
 open Machine using (Ctx; St; Mode; ofS; doneS; cutS; takeS; joinS; connS; coldS; cs; attAt; attached; cpAt; cutAt; overAt;
                     nx; cp; rising; absorbed; closed; unsubIf; cut; own; run; ofM; attM; bodyM; srcAttM; owedM; cpM; cutM; joinM; leafM)
 open import operation.Key using () renaming (at to atᴷ)
 open import adequacy.Stamped using (Ix; ix-⊕; StOK)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK)
 open import adequacy.Floor.Keys using (own-cls; ob)
-open import adequacy.Apart.Cone using (tag; cone-trans)
-open import adequacy.Apart.Region using (Rg; cn; tl; pt; cl; In; Sub; Keyed; f-cn; f-tl; sub-fut; sub-at; self)
+open import adequacy.Apart.Cone using (Cone; pre; tag; cone-trans)
+open import adequacy.Apart.Region using (Rg; cn; tl; pt; cl; In; Sub; Sep; Keyed; f-cn; f-tl; sub-fut; sub-at; self)
 open import adequacy.Apart.Items using (items; ibI; gI; mI; bodyR; lhs; rhs; plug-items; unsubIf-⊆; cut-⊆)
 open import adequacy.Apart.Kit using (W; bI; AS; quit; fewer; refill₀; fire; fire′; none; cl-cn; cl-tl; cl-pt; tick-ix)
 
 private
   -- The values after the next, inside it.
+  tl-tl-in : ∀ {u i y} → In (tl u (suc i)) y → In (tl u i) y
+  tl-tl-in {i = i} (inj₁ (j , le , c)) = inj₁ (j , ≤-trans (n≤1+n i) le , c)
+  tl-tl-in         (inj₂ c)            = inj₂ c
+
   tl-tl : ∀ {u i} → Sub (tl u (suc i)) (tl u i)
-  tl-tl {u} {i} = sub-fut (f-tl u (suc i)) (f-tl u i) inc (λ y o iy → o (inc y iy))
-    where
-      inc : ∀ y → In (tl u (suc i)) y → In (tl u i) y
-      inc y (inj₁ (j , le , c)) = inj₁ (j , ≤-trans (n≤1+n i) le , c)
-      inc y (inj₂ c)            = inj₂ c
+  tl-tl {u} {i} = sub-fut (f-tl u (suc i)) (f-tl u i) (λ y → tl-tl-in) (λ y o iy → o (tl-tl-in iy))
+
+  -- A frame's next step, inside its later values: a value its frame
+  -- closes straight after, under the frame's end.
+  nxt : ∀ {A u i w} (fr : Frame A w) y → In (tl (baseOf u fr) (stepOf (suc i) fr)) y → In (tl u (suc i)) y
+  nxt (emit _ (close _))  y (inj₁ (j , _ , c)) = inj₂ (cone-trans (pre [ ix j ]) c)
+  nxt (emit _ (close _))  y (inj₂ c)           = inj₂ (cone-trans (pre [ last ]) c)
+  nxt (emit _ (emit _ _)) y iy                 = iy
+  nxt (emit _ (stall _))  y iy                 = iy
+  nxt (stall _)           y iy                 = iy
+  nxt (close _)           y iy                 = iy
+
+  next-tl : ∀ {A u i w} (fr : Frame A w) → Sub (tl (baseOf u fr) (stepOf (suc i) fr)) (tl u i)
+  next-tl {u = u} {i} fr = sub-fut (f-tl _ _) (f-tl u i) (λ y iy → tl-tl-in (nxt fr y iy)) (λ y o iy → o (tl-tl-in (nxt fr y iy)))
+
+  cl-next : ∀ {A u i w} (fr : Frame A w) → Ix u → Sep (cl (u ++ [ ix i ])) (tl (baseOf u fr) (stepOf (suc i) fr))
+  cl-next {u = u} {i} fr hu = (λ y ()) , λ y iy → proj₂ (cl-tl {u} {i} hu) y (nxt fr y iy)
 
   -- The end, inside the values.
   cn-tl : ∀ {u i} → Sub (cn (u ++ [ last ])) (tl u i)
   cn-tl {u} {i} = sub-fut (f-cn _) (f-tl u i) (λ y c → inj₂ c) (λ y o c → ⊥-elim (o (inj₂ c)))
 
-  -- A timer cascade after the values, inside their end.
-  cas-tl : ∀ {u i T} → tick (u ++ [ last ]) < T → Sub (tl (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) 0) (tl u i)
-  cas-tl {u} {i} {T} lt = sub-fut (f-tl _ 0) (f-tl u i) inc (λ y o iy → o (inc y iy))
+  -- A timer cascade after the values, inside their end, its first value
+  -- under the cascade's own end when its frame closes straight after it.
+  cas-in : ∀ {A u i T w} (fr : Frame A w) → tick (u ++ [ last ]) < T
+         → ∀ y → In (tl (baseOf (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) fr) (stepOf 0 fr)) y → In (tl u i) y
+  cas-in {u = u} {T = T} fr lt = inc fr
     where
-      inc : ∀ y → In (tl (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) 0) y → In (tl u i) y
-      inc y (inj₁ (j , _ , c)) = inj₂ (cone-trans (tag [ ix j ] lt (self (u ++ [ last ]))) c)
-      inc y (inj₂ c)           = inj₂ (cone-trans (tag [ last ] lt (self (u ++ [ last ]))) c)
+      under : ∀ {i} l y → Cone (ix T ∷ subᴾ (u ++ [ last ]) ∷ l) y → In (tl u i) y
+      under l y c = inj₂ (cone-trans (tag l lt (self (u ++ [ last ]))) c)
+      inc : ∀ {A w i} (fr : Frame A w) y → In (tl (baseOf (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) fr) (stepOf 0 fr)) y → In (tl u i) y
+      inc (emit _ (close _))  y (inj₁ (_ , _ , c)) = under _ y c
+      inc (emit _ (close _))  y (inj₂ c)           = under _ y c
+      inc (emit _ (emit _ _)) y (inj₁ (_ , _ , c)) = under _ y c
+      inc (emit _ (emit _ _)) y (inj₂ c)           = under _ y c
+      inc (emit _ (stall _))  y (inj₁ (_ , _ , c)) = under _ y c
+      inc (emit _ (stall _))  y (inj₂ c)           = under _ y c
+      inc (stall _)           y (inj₁ (_ , _ , c)) = under _ y c
+      inc (stall _)           y (inj₂ c)           = under _ y c
+      inc (close _)           y (inj₁ (_ , _ , c)) = under _ y c
+      inc (close _)           y (inj₂ c)           = under _ y c
+
+  cas-tl : ∀ {A u i T w} (fr : Frame A w) → tick (u ++ [ last ]) < T
+         → Sub (tl (baseOf (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) fr) (stepOf 0 fr)) (tl u i)
+  cas-tl {u = u} {i} fr lt = sub-fut (f-tl _ _) (f-tl u i) (cas-in fr lt) (λ y o iy → o (cas-in fr lt y iy))
+
+  -- The run in a value's subtree, a timer cascade after its frame's end.
+  cl-cas : ∀ {A u T w} (fr : Frame A w) → Ix u → tick (u ++ [ last ]) < T
+         → Sep (cl (u ++ [ ix 0 ])) (tl (baseOf (ix T ∷ subᴾ (u ++ [ last ]) ∷ []) fr) (stepOf 0 fr))
+  cl-cas {u = u} fr hu lt = (λ y ()) , λ y iy → proj₂ (cl-tl {u} {0} hu) y (cas-in {i = 1} fr lt y iy)
+
+  -- Past a tick, the cascade a frame's end starts.
+  later-tick : ∀ {τ w w′} u → Ix u → suc w ≤ w′ → tick u ≤ τ + w → tick (u ++ [ last ]) < τ + w′
+  later-tick {τ} {w} {w′} u hu le hw = subst (_< τ + w′) (sym (tick-ix u [ last ] hu)) (≤-trans (s≤s hw) (subst (_≤ τ + w′) (+-suc τ w) (+-monoʳ-≤ τ le)))
 
 module _ {R : Set} where
   private
@@ -150,13 +191,29 @@ module _ {R : Set} where
   run-ap c r (leafK true (ending e)) (there ()) he kd h
   run-ap c r (leafK true over) () hs kd h
   run-ap c r (leafK true (play τ u i w fr)) (there ()) hs kd h
-  run-ap c r (leafK true (play τ u i w (emit a k))) (here refl) (hu , hw) kd h with closed c
+  run-ap c r (leafK true (play τ u i w (emit a (close k)))) (here refl) (hu , hw) kd h with closed c
+  ... | true  = quit c {t = coldS true (play τ u i w (emit a (close k)))} {t′ = coldS true over} (none _) h
+  ... | false with From∞.force k
+  ...   | done = fire-val c {t = coldS true (play τ u i w (emit a (close k)))} {t′ = coldS true (ending ((u ++ [ last ]) ++ [ last ]))}
+                   (cn ((u ++ [ last ]) ++ [ last ])) [] (ix-⊕ u _ hu) cn-tl (cl-cn (ix-⊕ u _ hu) refl) ↭-refl ↭-refl kd h
+  ...   | quiet = fire c {t = coldS true (play τ u i w (emit a (close k)))} {t′ = coldS true over} (tl (u ++ [ last ]) 0) [] []
+                    (ix-⊕ (u ++ [ last ]) _ (ix-⊕ u _ hu)) (f-tl (u ++ [ last ]) 0) (λ z c → inj₁ (0 , ≤-refl , c))
+                    (λ z o c → ⊥-elim (o (inj₁ (0 , ≤-refl , c)))) ↭-refl ↭-refl kd [] ([] ∷ []) h
+  ...   | at w′ le fr′ =
+    fire-val c {t = coldS true (play τ u i w (emit a (close k)))} {t′ = coldS true (play τ (ix (τ + w′) ∷ subᴾ ((u ++ [ last ]) ++ [ last ]) ∷ []) 0 w′ fr′)}
+      _ [] (ix-⊕ u _ hu) (cas-tl fr′ lt) (cl-cas fr′ (ix-⊕ u _ hu) lt) ↭-refl ↭-refl kd h
+    where lt = later-tick (u ++ [ last ]) (ix-⊕ u _ hu) le (subst (_≤ τ + w) (sym (tick-ix u [ last ] hu)) hw)
+  run-ap c r (leafK true (play τ u i w (emit a k@(emit _ _)))) (here refl) (hu , hw) kd h with closed c
   ... | true  = quit c {t = coldS true (play τ u i w (emit a k))} {t′ = coldS true over} (none _) h
-  ... | false = fire-val c {t = coldS true (play τ u i w (emit a k))} {t′ = coldS true (play τ u (suc i) w k)} (tl u (suc i)) [] hu tl-tl (cl-tl hu)
+  ... | false = fire-val c {t = coldS true (play τ u i w (emit a k))} {t′ = coldS true (play τ u (suc i) w k)} _ [] hu (next-tl k) (cl-next k hu)
+                  ↭-refl ↭-refl kd h
+  run-ap c r (leafK true (play τ u i w (emit a k@(stall _)))) (here refl) (hu , hw) kd h with closed c
+  ... | true  = quit c {t = coldS true (play τ u i w (emit a k))} {t′ = coldS true over} (none _) h
+  ... | false = fire-val c {t = coldS true (play τ u i w (emit a k))} {t′ = coldS true (play τ u (suc i) w k)} _ [] hu (next-tl k) (cl-next k hu)
                   ↭-refl ↭-refl kd h
   run-ap c r (leafK true (play τ u i w (stall k))) (here refl) (hu , hw) kd h with closed c
   ... | true  = quit c {t = coldS true (play τ u i w (stall k))} {t′ = coldS true over} (none _) h
-  ... | false = narrow c {t = coldS true (play τ u i w (stall k))} {t′ = coldS true (play τ u (suc i) w (Frame∞.force k))} [] ↭-refl ↭-refl tl-tl h
+  ... | false = narrow c {t = coldS true (play τ u i w (stall k))} {t′ = coldS true (play τ u (suc i) w (Frame∞.force k))} [] ↭-refl ↭-refl (next-tl (Frame∞.force k)) h
   run-ap c r (leafK true (play τ u i w (close k))) (here refl) (hu , hw) kd h with closed c
   ... | true  = quit c {t = coldS true (play τ u i w (close k))} {t′ = coldS true over} (none _) h
   ... | false with From∞.force k
@@ -164,4 +221,4 @@ module _ {R : Set} where
   ...   | quiet = quit c {t = coldS true (play τ u i w (close k))} {t′ = coldS true over} (none _) h
   ...   | at w′ le fr′ =
     narrow c {t = coldS true (play τ u i w (close k))} {t′ = coldS true (play τ (ix (τ + w′) ∷ subᴾ (u ++ [ last ]) ∷ []) 0 w′ fr′)} [] ↭-refl ↭-refl
-      (cas-tl (subst (_< τ + w′) (sym (tick-ix u [ last ] hu)) (≤-trans (s≤s hw) (subst (_≤ τ + w′) (+-suc τ w) (+-monoʳ-≤ τ le))))) h
+      (cas-tl fr′ (later-tick u hu le hw)) h

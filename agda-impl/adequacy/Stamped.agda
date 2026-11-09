@@ -27,7 +27,7 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-asym; ix-<; From; From∞; Frame; done; quiet; at; emit;
+open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-asym; ix-<; From; From∞; Frame; done; quiet; at; emit;
   stall; close; timelineAt) renaming (sub to subᴱ)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; onward) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
@@ -583,6 +583,14 @@ slot-below u i (emit _ (stall _))  = <ᵖ-below u []
 slot-below u i (stall _)           = <ᵖ-below u []
 slot-below u i (close _)           = <ᵖ-below u []
 
+-- A stall's next step lies past it.
+slot-next : ∀ {A t} u i (fr : Frame A t) → (u ++ [ ix i ]) <ᵖ slotOf u (suc i) fr ≡ true
+slot-next u i (emit _ (close _))  = subst (λ z → (u ++ [ ix i ]) <ᵖ z ≡ true) (sym (++-assoc u [ last ] [ ix 0 ])) (<ᵖ-part u {ix i} {last} [] [ ix 0 ] refl)
+slot-next u i (emit _ (emit _ _)) = <ᵖ-part u [] [] (<ᵖ-ix i)
+slot-next u i (emit _ (stall _))  = <ᵖ-part u [] [] (<ᵖ-ix i)
+slot-next u i (stall _)           = <ᵖ-part u [] [] (<ᵖ-ix i)
+slot-next u i (close _)           = <ᵖ-part u [] [] (<ᵖ-ix i)
+
 onward-ok : ∀ {A} τ u i t (k : Frame A t) → Ix u → tick u ≤ τ + t → TapeOK (onward τ u i t k)
 onward-ok τ u i t (close k)  hu ht = rest-ok τ ((u ++ [ last ]) ++ [ last ]) (From∞.force k) (ix-⊕ (u ++ [ last ]) _ (ix-⊕ u _ hu))
 onward-ok τ u i t (emit _ _) hu ht = hu , ht
@@ -660,6 +668,20 @@ frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A
 frame-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {i} {f = f} pth fd dr with stamped o pth
 ... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
 ...   | _ , (hu , ht) | here refl = next-ahead τ u i (From∞.force f) hu ht dr
+
+-- A value its frame closes straight after: the frame's next is ahead of
+-- it too.
+fin-next : ∀ {A} τ u {t} (m : From A (suc t)) {κ′} → Ix u → tick u ≤ τ + t
+         → due (rest τ ((u ++ [ last ]) ++ [ last ]) m) ≡ just κ′ → atᴷ ((u ++ [ last ]) ++ [ ix 0 ]) <ᴷ κ′ ≡ true
+fin-next τ (ix h ∷ u′) m hu ht = next-ahead τ ((ix h ∷ u′) ++ [ last ]) 0 m tt ht
+
+fin-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t a f κ κ′}
+          → Path (load o) rs ⟨ c , s , absorbed , q ⟩
+          → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t (emit a (close f)))) leafM κ)
+          → due (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
+fin-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {f = f} pth fd dr with stamped o pth
+... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
+...   | _ , (hu , ht) | here refl = fin-next τ u (From∞.force f) hu ht dr
 
 -- A JOINER'S INBOX ASCENDS: the entry behind the head is no earlier.
 inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {j g x q₀ e q₁ e₁ ib κ}
