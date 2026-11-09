@@ -5,8 +5,7 @@ module denotation.Laws.Worlds.Leaves where
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷ʳ-injectiveʳ)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; 1+n≰n; m≤m⊔n; m≤n⊔m)
 open import Data.List.Relation.Unary.All using (_∷_; [])
@@ -15,13 +14,14 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence; _∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
-open import denotation.Events using (Pos; Label; ix; last; inside; inside-++; inside-self; <ᵖ-part; <ᵖ-ix)
+open import denotation.Position using (Pos; Label; ix; last; _⊕_; inside)
+open import denotation.Events using (inside-++; inside-self; <ᵖ-part; <ᵖ-ix)
 open import denotation.Events using (ofᴱ; Events)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; Den; enter; Truncate; InE; at-out; at-end; on-out;
   on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan; DeferT; guard;
   body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-antisym; ≺-ext; LimD)
-open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; TimerRoot; plain-untimed; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans)
+open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-cancelˡ; ⊕-snoc-inj)
 
 ------------------------------------------------------------------------
 -- The leaves keep it
@@ -32,7 +32,7 @@ out-inj refl = refl
 private
   -- One plain label below `p`.
   Below : Pos → Pos → Set
-  Below p y = Σ Label λ l → Plain l × y ≡ p ++ [ l ]
+  Below p y = Σ Label λ l → Plain l × y ≡ p ⊕ [ l ]
 
   -- A READING ONE LABEL DEEP keeps the invariant: its rows are siblings,
   -- under `p` together.
@@ -48,18 +48,14 @@ private
     ; under = λ x y pl v le → un (sh x) (sh y) pl v le
     ; quiet = qu
     ; pinned = λ x → ⊥-elim (np x)
-    ; untimed = λ x → ut (sh x)
     }
     where
-      ne : ∀ {l₁ l₂ l} → p ++ [ l₂ ] ≡ (p ++ [ l₁ ]) ++ [ l ] → ⊥
-      ne {l₁} {l₂} {l} eq with ++-cancelˡ p [ l₂ ] (l₁ ∷ l ∷ []) (trans eq (++-assoc p [ l₁ ] [ l ]))
+      ne : ∀ {l₁ l₂ l} → p ⊕ [ l₂ ] ≡ (p ⊕ [ l₁ ]) ⊕ [ l ] → ⊥
+      ne {l₁} {l₂} {l} eq with ⊕-cancelˡ p [ l₂ ] (l₁ ∷ l ∷ []) (trans eq (⊕-assoc p [ l₁ ] [ l ]))
       ... | ()
 
-      un : ∀ {q y w l} → Below p q → Below p y → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
+      un : ∀ {q y w l} → Below p q → Below p y → Plain l → W⁼ H (q ⊕ [ l ]) w → w ⊑ y → ⊥
       un (_ , pl₁ , refl) (_ , pl₂ , refl) pl v le = sib (real-snoc p pl₁ r) pl₂ (⊑-snoc⁺ p) ne v le
-
-      ut : ∀ {y} → Below p y → TimerRoot y → ⊥
-      ut (_ , pl , refl) = plain-untimed p pl
 
       wo : ∀ {y} → Below p y → W H p y
       wo (_ , pl , refl) = step here pl
@@ -70,8 +66,8 @@ private
       ins : ∀ {y} → Below p y → T (inside p y)
       ins (l , _ , refl) = Equivalence.from T-≡ (inside-++ p p [ l ] (inside-self p))
 
-      fl : ∀ {y l ys} → Below p y → Below p (y ++ l ∷ ys) → ⊥
-      fl {l = l} {ys} (l₀ , _ , refl) (l′ , _ , eq) with ++-cancelˡ p (l₀ ∷ l ∷ ys) [ l′ ] (trans (sym (++-assoc p [ l₀ ] (l ∷ ys))) eq)
+      fl : ∀ {y l ys} → Below p y → Below p (y ⊕ (l ∷ ys)) → ⊥
+      fl {l = l} {ys} (l₀ , _ , refl) (l′ , _ , eq) with ⊕-cancelˡ p (l₀ ∷ l ∷ ys) [ l′ ] (trans (sym (⊕-assoc p [ l₀ ] (l ∷ ys))) eq)
       ... | ()
 
   -- A reading whose rows are another's, ends kept, keeps its invariant.
@@ -89,7 +85,6 @@ private
     ; under = λ x y pl v le → InvAt.under I (proj₂ (bk x)) (proj₂ (bk y)) pl v le
     ; quiet = λ c y cy → let (r , eq , lt) = InvAt.quiet I (be c) (proj₂ (bk y)) cy in r , bs y eq , lt
     ; pinned = λ x → InvAt.pinned I (bp x)
-    ; untimed = λ x → InvAt.untimed I (proj₂ (bk x))
     }
 
   of-below : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → Below p y
@@ -125,27 +120,27 @@ module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : �
             (out-inj (fu x x′))
 
 -- Where `of`'s end lies.
-of-end : ∀ {A} p i (xs : List A) {y} → InE (ofᴱ p i xs) y end → y ≡ p ++ [ last ]
+of-end : ∀ {A} p i (xs : List A) {y} → InE (ofᴱ p i xs) y end → y ≡ p ⊕ [ last ]
 of-end p i []       at-end     = refl
 of-end p i (x ∷ xs) (on-out r) = of-end p (suc i) xs r
 
-of-end-row : ∀ {A} p i (xs : List A) → InE (ofᴱ p i xs) (p ++ [ last ]) end
+of-end-row : ∀ {A} p i (xs : List A) → InE (ofᴱ p i xs) (p ⊕ [ last ]) end
 of-end-row p i []       = at-end
 of-end-row p i (x ∷ xs) = on-out (of-end-row p (suc i) xs)
 
 -- The rows of `of`, past the index it is at.
-of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
+of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ⊕ [ ix j ]) ⊎ y ≡ p ⊕ [ last ]
 of-idx p i []       at-end     = inj₂ refl
 of-idx p i (x ∷ xs) at-out     = inj₁ (i , ≤-refl , refl)
 of-idx p i (x ∷ xs) (on-out r) with of-idx p (suc i) xs r
 ... | inj₁ (j , le , eq) = inj₁ (j , ≤-trans (n≤1+n i) le , eq)
 ... | inj₂ eq            = inj₂ eq
 
-of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ++ [ ix i ]) e → ⊥
+of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ⊕ [ ix i ]) e → ⊥
 of-fresh p i xs r with of-idx p (suc i) xs r
-... | inj₁ (j , le , eq) with ∷ʳ-injectiveʳ p p eq
+... | inj₁ (j , le , eq) with proj₂ (⊕-snoc-inj p p eq)
 ...   | refl = 1+n≰n le
-of-fresh p i xs r | inj₂ eq with ∷ʳ-injectiveʳ p p eq
+of-fresh p i xs r | inj₂ eq with proj₂ (⊕-snoc-inj p p eq)
 ... | ()
 
 of-func : ∀ {A} p i (xs : List A) {y e e′} → InE (ofᴱ p i xs) y e → InE (ofᴱ p i xs) y e′ → e ≡ e′
@@ -162,15 +157,15 @@ ine-pin (on-skip x) = ine-pin x
 
 empty-inv : ∀ {A H} → InvD H (Op.empty {A})
 empty-inv p ok = shallow-inv ok (λ { (at-end , _) → last , plain-last , refl }) (λ { (at-end , _) (at-end , _) → refl })
-  (λ { (at-end , _) (at-end , _) cy → ⊥-elim (≺-irrefl {p ++ [ last ]} cy) }) λ { (() , _) }
+  (λ { (at-end , _) (at-end , _) cy → ⊥-elim (≺-irrefl {p ⊕ [ last ]} cy) }) λ { (() , _) }
 
 of-inv : ∀ {A H} (xs : List A) → InvD H (Op.of xs)
 of-inv xs p ok = shallow-inv ok (λ x → of-below p 0 xs (proj₁ x)) (λ x x′ → of-func p 0 xs (proj₁ x) (proj₁ x′)) qu (ine-pin ∘ proj₁)
   where
     qu : ∀ {c y e} → Truncate (InE (ofᴱ p 0 xs)) c end → Truncate (InE (ofᴱ p 0 xs)) y e → c ≺ y → _
     qu (c , _) (y , _) cy with of-end p 0 xs c | of-idx p 0 xs y
-    ... | refl | inj₁ (j , _ , refl) = ⊥-elim (≺-absurd {p ++ [ last ]} {p ++ [ ix j ]} cy (Equivalence.from T-≡ (<ᵖ-part p {ix j} {last} [] [] refl)))
-    ... | refl | inj₂ refl           = ⊥-elim (≺-irrefl {p ++ [ last ]} cy)
+    ... | refl | inj₁ (j , _ , refl) = ⊥-elim (≺-absurd {p ⊕ [ last ]} {p ⊕ [ ix j ]} cy (Equivalence.from T-≡ (<ᵖ-part p {ix j} {last} [] [] refl)))
+    ... | refl | inj₂ refl           = ⊥-elim (≺-irrefl {p ⊕ [ last ]} cy)
 
 spin-inv : ∀ {A H} → InvD H (Op.⊥ {A})
 spin-inv p ok = shallow-inv ok (λ { (spin i , _) → ix i , plain-ix , refl }) (λ x x′ → trans (spin-skip (proj₁ x)) (sym (spin-skip (proj₁ x′))))
@@ -273,32 +268,28 @@ scan-inv f z {s} inv p ok = inv-via bk be bs bp fu (inv p ok)
 defer-inv : ∀ {A H} {s : Den A} → InvD H s → InvD H (Op.defer s)
 defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x′ → fu (view x) (view x′) ; flat = λ x x′ → fl (view x) (view x′)
   ; burst = λ c y cy → bu (view c) (view y) cy ; under = λ x y → un (view x) (view y) ; quiet = λ c y cy → qu (view c) (view y) cy
-  ; pinned = pn ; untimed = ut }
+  ; pinned = pn }
   where
-    I = inv (p ++ [ ix 1 ]) (ok-step p ok)
-    B = enter s (p ++ [ ix 1 ])
+    I = inv (p ⊕ [ ix 1 ]) (ok-step p ok)
+    B = enter s (p ⊕ [ ix 1 ])
 
     View : Pos → Ev A → Set
-    View y e = (y ≡ p ++ [ ix 0 ] × e ≡ skip) ⊎ B y e
+    View y e = (y ≡ p ⊕ [ ix 0 ] × e ≡ skip) ⊎ B y e
 
     view : ∀ {y e} → Truncate (DeferT s p) y e → View y e
     view (guard , _)  = inj₁ (refl , refl)
     view (body x , _) = inj₂ x
 
-    after : ∀ {y e} → B y e → (p ++ [ ix 1 ]) ≺ y
+    after : ∀ {y e} → B y e → (p ⊕ [ ix 1 ]) ≺ y
     after x = world-after (InvAt.world I x) (InvAt.real I x)
 
     -- The guard and what lies under it come before the body's subscription.
-    early : ∀ ys → (p ++ ix 0 ∷ ys) ≺ (p ++ [ ix 1 ])
+    early : ∀ ys → (p ⊕ (ix 0 ∷ ys)) ≺ (p ⊕ [ ix 1 ])
     early ys = Equivalence.from T-≡ (<ᵖ-part p ys [] (<ᵖ-ix 0))
 
     wo : ∀ {y e} → Truncate (DeferT s p) y e → W H p y
     wo (guard , _)  = step here plain-ix
     wo (body x , _) = shrink (InvAt.world I x)
-
-    ut : ∀ {y e} → Truncate (DeferT s p) y e → TimerRoot y → ⊥
-    ut (guard , _)  = plain-untimed p plain-ix
-    ut (body x , _) = InvAt.untimed I x
 
     re : ∀ {y e} → Truncate (DeferT s p) y e → Real y
     re (guard , _)  = real-snoc p plain-ix (proj₁ ok)
@@ -306,40 +297,40 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x
 
     fu : ∀ {y e e′} → View y e → View y e′ → e ≡ e′
     fu (inj₁ (_ , refl)) (inj₁ (_ , refl)) = refl
-    fu (inj₁ (refl , _)) (inj₂ b) = ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (after b) (early []))
-    fu (inj₂ b) (inj₁ (refl , _)) = ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (after b) (early []))
+    fu (inj₁ (refl , _)) (inj₂ b) = ⊥-elim (≺-absurd {p ⊕ [ ix 1 ]} {p ⊕ [ ix 0 ]} (after b) (early []))
+    fu (inj₂ b) (inj₁ (refl , _)) = ⊥-elim (≺-absurd {p ⊕ [ ix 1 ]} {p ⊕ [ ix 0 ]} (after b) (early []))
     fu (inj₂ b) (inj₂ b′) = InvAt.func I b b′
 
-    fl : ∀ {y e l ys e′} → View y e → View (y ++ l ∷ ys) e′ → ⊥
-    fl {ys = ys} (inj₁ (refl , _)) (inj₁ (eq , _)) = ext≢ (p ++ [ ix 0 ]) ys eq
+    fl : ∀ {y e l ys e′} → View y e → View (y ⊕ (l ∷ ys)) e′ → ⊥
+    fl {ys = ys} (inj₁ (refl , _)) (inj₁ (eq , _)) = ext≢ (p ⊕ [ ix 0 ]) ys eq
     fl {l = l} {ys} (inj₁ (refl , _)) (inj₂ b) =
-      ≺-absurd {p ++ [ ix 1 ]} {(p ++ [ ix 0 ]) ++ l ∷ ys} (after b) (subst (_≺ (p ++ [ ix 1 ])) (sym (++-assoc p [ ix 0 ] (l ∷ ys))) (early (l ∷ ys)))
+      ≺-absurd {p ⊕ [ ix 1 ]} {(p ⊕ [ ix 0 ]) ⊕ (l ∷ ys)} (after b) (subst (_≺ (p ⊕ [ ix 1 ])) (sym (⊕-assoc p [ ix 0 ] (l ∷ ys))) (early (l ∷ ys)))
     fl {y} {l = l} {ys} (inj₂ b) (inj₁ (eq , _)) =
-      ≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (≺-trans {p ++ [ ix 1 ]} {y} {p ++ [ ix 0 ]} (after b) (subst (y ≺_) eq (≺-ext y ys))) (early [])
+      ≺-absurd {p ⊕ [ ix 1 ]} {p ⊕ [ ix 0 ]} (≺-trans {p ⊕ [ ix 1 ]} {y} {p ⊕ [ ix 0 ]} (after b) (subst (y ≺_) eq (≺-ext y ys))) (early [])
     fl (inj₂ b) (inj₂ b′) = InvAt.flat I b b′
 
     bu : ∀ {c y e} → View c end → View y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
     bu (inj₁ (_ , ())) _ _
     bu {c} (inj₂ b) (inj₁ (refl , _)) cy =
-      ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (≺-trans {p ++ [ ix 1 ]} {c} {p ++ [ ix 0 ]} (after b) cy) (early []))
+      ⊥-elim (≺-absurd {p ⊕ [ ix 1 ]} {p ⊕ [ ix 0 ]} (≺-trans {p ⊕ [ ix 1 ]} {c} {p ⊕ [ ix 0 ]} (after b) cy) (early []))
     bu (inj₂ b) (inj₂ b′) cy with InvAt.burst I b b′ cy
     ... | w , w⁼ , i = w , inW (shrink⁼ w⁼) , i
 
-    g0 : W H p (p ++ [ ix 0 ])
+    g0 : W H p (p ⊕ [ ix 0 ])
     g0 = step here plain-ix
 
-    rg : Real (p ++ [ ix 0 ])
+    rg : Real (p ⊕ [ ix 0 ])
     rg = real-snoc p plain-ix (proj₁ ok)
 
     -- What lies in the guard's child's world is not in the body's.
-    off : ∀ {l w} → Plain l → W⁼ H ((p ++ [ ix 0 ]) ++ [ l ]) w → W⁼ H (p ++ [ ix 1 ]) w → ⊥
+    off : ∀ {l w} → Plain l → W⁼ H ((p ⊕ [ ix 0 ]) ⊕ [ l ]) w → W⁼ H (p ⊕ [ ix 1 ]) w → ⊥
     off pl v v′ = apart (proj₁ ok) (world-anc⁼ (nest⁼ (inW (step here pl)) v)) (world-anc⁼ v′)
 
-    un : ∀ {q y w l e e′} → View q e → View y e′ → Plain l → W⁼ H (q ++ [ l ]) w → w ⊑ y → ⊥
+    un : ∀ {q y w l e e′} → View q e → View y e′ → Plain l → W⁼ H (q ⊕ [ l ]) w → w ⊑ y → ⊥
     un (inj₁ (refl , _)) (inj₁ (refl , _)) pl v le = not-up rg v le
     un (inj₁ (refl , _)) (inj₂ b) pl v le =
-      leads (proj₁ ok) (proj₂ ok) (nest-in (step (inW g0) pl) v) (off pl v) nr (inW (InvAt.world I b)) le
-      where nr : _ ⊑ (p ++ [ ix 1 ]) → ⊥
+      leads (proj₂ ok) (nest-in (step (inW g0) pl) v) (off pl v) nr (inW (InvAt.world I b)) le
+      where nr : _ ⊑ (p ⊕ [ ix 1 ]) → ⊥
             nr le′ with ⊑-snoc p le′
             ... | inj₁ wp   = not-up rg v (⊑-trans wp (⊑-snoc⁺ p))
             ... | inj₂ refl = off pl v here
@@ -350,7 +341,7 @@ defer-inv {A} {H} {s} inv p ok = record { world = wo ; real = re ; func = λ x x
     qu : ∀ {c y e} → View c end → View y e → c ≺ y → PinBy c e
     qu (inj₁ (_ , ())) _ _
     qu {c} (inj₂ b) (inj₁ (refl , _)) cy =
-      ⊥-elim (≺-absurd {p ++ [ ix 1 ]} {p ++ [ ix 0 ]} (≺-trans {p ++ [ ix 1 ]} {c} {p ++ [ ix 0 ]} (after b) cy) (early []))
+      ⊥-elim (≺-absurd {p ⊕ [ ix 1 ]} {p ⊕ [ ix 0 ]} (≺-trans {p ⊕ [ ix 1 ]} {c} {p ⊕ [ ix 0 ]} (after b) cy) (early []))
     qu (inj₂ b) (inj₂ b′) cy = InvAt.quiet I b b′ cy
 
     pn : ∀ {y r} → Truncate (DeferT s p) y (pin r) → W⁼ H p r × T (inside r y)
@@ -368,7 +359,6 @@ lim-inv inv p ok = record
   ; under = λ { (from N l , _) (from M m , _) pl v le → InvAt.under (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) pl v le }
   ; quiet = λ { (from N l , _) (from M m , _) cy → InvAt.quiet (I (N ⊔ M)) (l (N ⊔ M) (m≤m⊔n N M)) (m (N ⊔ M) (m≤n⊔m N M)) cy }
   ; pinned = λ { (from N l , _) → InvAt.pinned (I N) (l N ≤-refl) }
-  ; untimed = λ { (from N l , _) → InvAt.untimed (I N) (l N ≤-refl) }
   }
   where
     I = λ n → inv n p ok
