@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
-  Input; react; going; fed; opening)
+  Input; react; going; fed; opening; anyHolds)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
@@ -74,6 +74,10 @@ open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (trans; sym; cong; subst)
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
+open import simultaneous.Project using (Proj; proj-outs; run-prefix)
+open import denotation.EmissionSet using (skip; pin; Few; _≼_)
+open import denotation.Read using (After; cursor)
+open import Data.Nat.Properties using (0≢1+n)
 open import Data.Bool using (T)
 open import denotation.Position using (isLt; cmpPath)
 open import denotation.Simultaneity using (reflⁱ)
@@ -381,12 +385,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- a queued lane's burst, and those parked on a connect in scope.
     outer-current  : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                    → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-    lanes-current  : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                   → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     held-current   : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                    → Flat.held (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-    parked-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                   → Flat.parked (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     value-open    : ∀ rx₁ {q b a n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (value a) n)))) ∷ rx₂) → ¬ Ex cs′ q
                   → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
     over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
@@ -399,6 +399,70 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- a position few rows precede, the routes it counts are of that
     -- position's instant, or none.
     scan-idle     : Idle scanned
+
+  -- THE LANES' BRANCH OF THE SCAN'S SOURCE: a lane's row, where the lanes
+  -- show it.
+  laneTag : Ev (Maybe (Input B)) → Maybe (Ev (IE B))
+  laneTag (out (just (inj₁ (laneB , x)))) = just (out x)
+  laneTag _                              = nothing
+
+  lane-vals : ∀ {e e′} → laneTag e ≡ just e′ → Σ (IE B) λ x → e′ ≡ out x
+  lane-vals {out (just (inj₁ (laneB , x)))}  refl = x , refl
+  lane-vals {out (just (inj₁ (outerB , _)))} ()
+  lane-vals {out (just (inj₁ (closeB , _)))} ()
+  lane-vals {out (just (inj₂ _))}            ()
+  lane-vals {out nothing}                    ()
+  lane-vals {skip}                           ()
+  lane-vals {pin _}                          ()
+  lane-vals {end}                            ()
+
+  postulate
+    -- The lanes' rows a run of the source met are a run of the lanes.
+    lane-run    : ∀ {rx} → Met M rx → Σ _ λ rs → Proj laneTag rx rs × Met σ₃ rs
+    -- What the lanes tell of past those rows lies no earlier than the
+    -- source's next row: no source row lies under a lane's row.
+    lane-next   : ∀ rx₁ {q e rx₂ rs} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → Proj laneTag rx₁ rs
+                → Few σ₃ q × After (cursor nothing rs) q
+                × (∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → q ≼ y)
+    -- The lanes keep no route past its instant.
+    lane-idle   : Idle σ₃
+    -- THE LANES' COUNTER IS THE LANES' COUNT: none, or of the name the
+    -- lanes last began, with a route of it open.  A begin past the
+    -- instant's over counts there and not here, and a lane's end hands
+    -- its routes on, so the counter is at most the count.
+    lanes-count : ∀ {rx rs} → Met M rx → Proj laneTag rx rs
+                → Flat.lanes (proj₁ (past op init rx)) ≡ 0
+                ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
+
+  lanes-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+  lanes-current rx₁ mt v with lane-run (run-prefix rx₁ mt)
+  ... | rs , pr , mr with lanes-count (run-prefix rx₁ mt) pr
+  ...   | inj₁ z = inj₁ z
+  ...   | inj₂ (at≡ , k , open≡) with lane-next rx₁ mt v pr
+  ...     | fw , af , least with lane-idle mr (proj-outs lane-vals pr) fw af least
+  ...       | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
+  ...       | inj₂ nm≡  = inj₂ (trans at≡ nm≡)
+
+  postulate
+    -- ROUTES PARK ONLY ON A CONNECT HOLDING ONE: a cut parks while a
+    -- connect in scope holds a route of the instant, a tracker's row that
+    -- leaves none holding stops them, and a new instant starts none.
+    parked-live  : ∀ {rx} → Met M rx
+                 → Flat.parked (proj₁ (past op init rx)) ≡ 0
+                 ⊎ anyHolds (Flat.at (proj₁ (past op init rx))) (Flat.live (proj₁ (past op init rx))) ≡ true
+    -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
+    -- scan's rows.  Owed: the run split onto that connect's tracker, and
+    -- the binder's own `idle` (`Bound.held`) read through `annotate`.
+    live-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                 → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
+                 → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+
+  parked-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+                 → Flat.parked (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+  parked-current rx₁ mt v with parked-live (run-prefix rx₁ mt)
+  ... | inj₁ z = inj₁ z
+  ... | inj₂ h = inj₂ (live-current rx₁ mt v h)
 
   -- No closer's row begins a route.
   no-cb : ∀ {q n} → MRow q (out (just (inj₁ (closeB , instEmit (mark begin) n)))) → ⊥
