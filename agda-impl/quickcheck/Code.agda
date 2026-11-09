@@ -148,7 +148,7 @@ mutual
 
 timeline : Leaf Timeline
 timeline .scripted (script fs c l) = fixed (scriptML 0 fs fs c l)
-timeline .named                    = Events.fresh
+timeline .named                    = Events.fresh (λ p → p)
 
 ------------------------------------------------------------------------
 -- JSON, for the oracle: a node is an array headed by its constructor,

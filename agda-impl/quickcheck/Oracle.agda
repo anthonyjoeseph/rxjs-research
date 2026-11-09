@@ -82,7 +82,7 @@ ioTraceWith {t} sub u p =
     -- the leaves, each name drawn from the run's supply
     leaf : Clock → IORef ℕ → Leaf IOCold
     leaf ck names .Leaf.scripted s = fromTimeline ck names (Leaf.scripted timeline s)
-    leaf ck names .Leaf.named      = fromTimeline ck names Events.fresh
+    leaf ck names .Leaf.named      = fromTimeline ck names (Events.fresh (λ p → p))
 
     doing : ∀ {A} → IO ⊤ → IOCold A
     doing m = record { Internal = ⊤ ; create = λ e → record

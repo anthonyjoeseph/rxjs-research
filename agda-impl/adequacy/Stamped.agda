@@ -12,6 +12,7 @@ module adequacy.Stamped where
 open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; null)
+open import Data.List.Properties using (++-assoc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
@@ -26,9 +27,9 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-asym; ix-<; From; From∞; done; quiet; at; emit;
-  stall; close; timelineAt)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
+open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-asym; ix-<; From; From∞; Frame; done; quiet; at; emit;
+  stall; close; timelineAt) renaming (sub to subᴱ)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; onward) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
@@ -555,6 +556,38 @@ opening-ok p done             hp = ix-⊕ p _ hp
 opening-ok p quiet            hp = tt
 opening-ok p (at (suc t) _ b) hp = tt , ≤-refl
 
+-- A value's step: stamped where it sits, and what it leaves stamped.
+base-ix : ∀ {A t} u (fr : Frame A t) → Ix u → Ix (baseOf u fr)
+base-ix u (emit _ (close _))  hu = ix-⊕ u _ hu
+base-ix u (emit _ (emit _ _)) hu = hu
+base-ix u (emit _ (stall _))  hu = hu
+base-ix u (stall _)           hu = hu
+base-ix u (close _)           hu = hu
+
+slot-ix : ∀ {A t} u i (fr : Frame A t) → Ix u → Ix (slotOf u i fr)
+slot-ix u i fr hu = ix-⊕ (baseOf u fr) _ (base-ix u fr hu)
+
+-- A step sits under its frame's root.
+slot-tail : ∀ {A t} l us i (fr : Frame A t) → Σ Pos λ zs → slotOf (l ∷ us) i fr ≡ l ∷ zs
+slot-tail l us i (emit _ (close _))  = _ , refl
+slot-tail l us i (emit _ (emit _ _)) = _ , refl
+slot-tail l us i (emit _ (stall _))  = _ , refl
+slot-tail l us i (stall _)           = _ , refl
+slot-tail l us i (close _)           = _ , refl
+
+-- A step lies past its frame's root.
+slot-below : ∀ {A t} u i (fr : Frame A t) → u <ᵖ slotOf u i fr ≡ true
+slot-below u i (emit _ (close _))  = subst (λ z → u <ᵖ z ≡ true) (sym (++-assoc u [ last ] [ ix 0 ])) (<ᵖ-below u {last} (ix 0 ∷ []))
+slot-below u i (emit _ (emit _ _)) = <ᵖ-below u []
+slot-below u i (emit _ (stall _))  = <ᵖ-below u []
+slot-below u i (stall _)           = <ᵖ-below u []
+slot-below u i (close _)           = <ᵖ-below u []
+
+onward-ok : ∀ {A} τ u i t (k : Frame A t) → Ix u → tick u ≤ τ + t → TapeOK (onward τ u i t k)
+onward-ok τ u i t (close k)  hu ht = rest-ok τ ((u ++ [ last ]) ++ [ last ]) (From∞.force k) (ix-⊕ (u ++ [ last ]) _ (ix-⊕ u _ hu))
+onward-ok τ u i t (emit _ _) hu ht = hu , ht
+onward-ok τ u i t (stall _)  hu ht = hu , ht
+
 module _ {R : Set} where
   open Driver R using (took; played; silent; value)
 
@@ -565,7 +598,7 @@ module _ {R : Set} where
   played-ok (leaf true (play τ u i t fr) true dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true overT true dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true (play τ u i t (emit a k)) false dv st) (lift (hu , ht) , d , s) refl =
-    d (nx a) (play τ u (suc i) t k) true (u ++ [ ix i ]) (hu , ht) (ix-⊕ u _ hu)
+    d (nx a) (onward τ u i t k) true (slotOf u i (emit a k)) (onward-ok τ u i t k hu ht) (slot-ix u i (emit a k) hu)
   played-ok (leaf true (play τ u i t (stall k)) false dv st) (lift (hu , ht) , d , s) refl = s _ (hu , ht)
   played-ok (leaf true (play τ u i t (close k)) false dv st) (lift (hu , ht) , d , s) refl =
     s _ (rest-ok τ (u ++ [ last ]) (From∞.force k) (ix-⊕ u _ hu))
@@ -616,7 +649,8 @@ next-ahead : ∀ {A} τ u i {t} (m : From A (suc t)) {κ′} → Ix u → tick u
            → due (rest τ (u ++ [ last ]) m) ≡ just κ′ → atᴷ (u ++ [ ix i ]) <ᴷ κ′ ≡ true
 next-ahead τ u i done hu ht refl = trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ last ])) (<ᵖ-part u {ix i} {last} [] [] refl)
 next-ahead τ u i quiet hu ht ()
-next-ahead τ (ix h ∷ u′) i {t} (at t′ le fr) hu ht refl =
+next-ahead τ (ix h ∷ u′) i {t} (at t′ le fr) hu ht refl with slot-tail (ix (τ + t′)) (subᴱ ((ix h ∷ u′) ++ [ last ]) ∷ []) 0 fr
+... | _ , eq rewrite eq =
   trans (at-<ᴷ (ix h ∷ u′ ++ [ ix i ]) (ix (τ + t′) ∷ _)) (<ᵖ-part [] {ix h} {ix (τ + t′)} (u′ ++ [ ix i ]) _ (ix-< (≤-trans (s≤s ht) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le)))))
 
 frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t f κ κ′}
@@ -639,10 +673,11 @@ inbox-asc o {c = c} {s} {c′ = c′} {q₀ = q₀} {q₁ = q₁} pth fd with st
 -- A COLD OPENS AHEAD: a cold a run subscribes first comes due strictly
 -- after where it was subscribed.
 open-ahead : ∀ {A} q (m : From A 0) {κ} → Ix q → due (opening q m) ≡ just κ → atᴷ q <ᴷ κ ≡ true
-open-ahead q (at zero _ b) hq refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
+open-ahead q (at zero _ b) hq refl = trans (at-<ᴷ q _) (slot-below q 0 b)
 open-ahead q done hq refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
 open-ahead q quiet hq ()
-open-ahead (ix h ∷ q′) (at (suc t′) _ b) hq refl =
+open-ahead (ix h ∷ q′) (at (suc t′) _ b) hq refl with slot-tail (ix (h + suc t′)) (subᴱ ((ix h ∷ q′) ++ [ last ]) ∷ []) 0 b
+... | _ , eq rewrite eq =
   trans (at-<ᴷ (ix h ∷ q′) (ix (h + suc t′) ∷ _)) (<ᵖ-part [] {ix h} {ix (h + suc t′)} q′ _ (ix-< (m<m+n h (s≤s z≤n))))
 
 opening-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {x q κ}
