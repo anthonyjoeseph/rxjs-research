@@ -33,7 +33,8 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤)
 open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
+open import Data.List.Properties using (map-++)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
 open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
@@ -96,6 +97,16 @@ outs (_ ∷ rs)           = outs rs
 
 values : ∀ {A} → List (Pos × Ev A) → List A
 values rs = L.map proj₂ (outs rs)
+
+outs-++ : ∀ {A : Set} (xs ys : List (Pos × Ev A)) → outs (xs ++ ys) ≡ outs xs ++ outs ys
+outs-++ []                 ys = refl
+outs-++ ((q , out a) ∷ xs) ys = cong ((q , a) ∷_) (outs-++ xs ys)
+outs-++ ((q , skip) ∷ xs)  ys = outs-++ xs ys
+outs-++ ((q , end) ∷ xs)   ys = outs-++ xs ys
+outs-++ ((q , pin _) ∷ xs) ys = outs-++ xs ys
+
+values-++ : ∀ {A : Set} (xs ys : List (Pos × Ev A)) → values (xs ++ ys) ≡ values xs ++ values ys
+values-++ xs ys = ≡-trans (cong (L.map proj₂) (outs-++ xs ys)) (map-++ proj₂ (outs xs) (outs ys))
 
 -- Each value the rows of a stamped run carry, at its position, with its
 -- stamp: a plain row carries its one value, an InstEmit row what its emit

@@ -34,10 +34,9 @@ by the names it mints. Hardest: the bracket and route protocol through
 every flatMap policy and connect, and that the names agree with the
 instants — each async cold step mints one and its whole cascade carries
 it — so grouping by name is grouping by stamp. Settled when `batchable`
-is a body over the elaborated run, a restamp invariant and `positioned`,
-and the completion mark is shown last.
+is a body over the elaborated run, a restamp invariant and `positioned`.
 
-Members: `batchable`, `completed-last`.
+Members: `batchable`.
 
 #### THE ERASURE
 
@@ -56,11 +55,3 @@ frame or a timer cascade, as `instantOf` reads it. Settled when
 `positioned` is a body by induction over the tree.
 
 Members: `positioned`.
-
-#### THE LAYERS
-
-Untried: a run of a `scan`, or of an `each`, read back as a run of its
-source, completing exactly when it does. Generic in the source; settled
-when each is a body over the denotation's `scan` and joiner rows.
-
-Members: `scan-ends-out`, `scan-ends-in`, `each-ends-out`, `each-ends-in`.

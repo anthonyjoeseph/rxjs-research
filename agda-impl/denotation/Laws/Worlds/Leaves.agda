@@ -87,10 +87,6 @@ private
     ; pinned = λ x → InvAt.pinned I (bp x)
     }
 
-  of-end : ∀ {A} p i (xs : List A) {y} → InE (ofᴱ p i xs) y end → y ≡ p ++ [ last ]
-  of-end p i []       at-end     = refl
-  of-end p i (x ∷ xs) (on-out r) = of-end p (suc i) xs r
-
   of-below : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → Below p y
   of-below p i []       at-end     = last , plain-last , refl
   of-below p i (x ∷ xs) at-out     = ix i , plain-ix , refl
@@ -107,43 +103,52 @@ private
   spin-end x with spin-skip x
   ... | ()
 
-  -- The rows of `of`, past the index it is at.
-  of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
-  of-idx p i []       at-end     = inj₂ refl
-  of-idx p i (x ∷ xs) at-out     = inj₁ (i , ≤-refl , refl)
-  of-idx p i (x ∷ xs) (on-out r) with of-idx p (suc i) xs r
-  ... | inj₁ (j , le , eq) = inj₁ (j , ≤-trans (n≤1+n i) le , eq)
-  ... | inj₂ eq            = inj₂ eq
+-- A fold has one value at a position.
+module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
+  open Scan f z t using (Acc; acc₀; acc)
 
-  of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ++ [ ix i ]) e → ⊥
-  of-fresh p i xs r with of-idx p (suc i) xs r
-  ... | inj₁ (j , le , eq) with ∷ʳ-injectiveʳ p p eq
-  ...   | refl = 1+n≰n le
-  of-fresh p i xs r | inj₂ eq with ∷ʳ-injectiveʳ p p eq
-  ... | ()
+  acc-val : ∀ {q b} → Acc q b → Σ A λ a → t q (out a)
+  acc-val (acc₀ x _)    = _ , x
+  acc-val (acc _ x _ _) = _ , x
 
-  of-func : ∀ {A} p i (xs : List A) {y e e′} → InE (ofᴱ p i xs) y e → InE (ofᴱ p i xs) y e′ → e ≡ e′
-  of-func p i []       at-end     at-end      = refl
-  of-func p i (x ∷ xs) at-out     at-out      = refl
-  of-func p i (x ∷ xs) at-out     (on-out r′) = ⊥-elim (of-fresh p i xs r′)
-  of-func p i (x ∷ xs) (on-out r) at-out      = ⊥-elim (of-fresh p i xs r)
-  of-func p i (x ∷ xs) (on-out r) (on-out r′) = of-func p (suc i) xs r r′
+  acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc q b → Acc q′ b′ → b ≡ b′
+  acc-func refl (acc₀ x _)       (acc₀ x′ _)      = cong (f z) (out-inj (fu x x′))
+  acc-func refl (acc₀ _ mn)      (acc a _ lt _)   = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+  acc-func refl (acc a _ lt _)   (acc₀ _ mn)      = ⊥-elim (mn (proj₂ (acc-val a)) lt)
+  acc-func refl (acc {q₀} a x lt nx) (acc {q₁} a′ x′ lt′ nx′) =
+    cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
+            (out-inj (fu x x′))
 
-  -- A fold has one value at a position.
-  module AccF {A B : Set} (f : B → A → B) (z : B) {t : EmissionSet A} (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
-    open Scan f z t using (Acc; acc₀; acc)
+-- Where `of`'s end lies.
+of-end : ∀ {A} p i (xs : List A) {y} → InE (ofᴱ p i xs) y end → y ≡ p ++ [ last ]
+of-end p i []       at-end     = refl
+of-end p i (x ∷ xs) (on-out r) = of-end p (suc i) xs r
 
-    acc-val : ∀ {q b} → Acc q b → Σ A λ a → t q (out a)
-    acc-val (acc₀ x _)    = _ , x
-    acc-val (acc _ x _ _) = _ , x
+of-end-row : ∀ {A} p i (xs : List A) → InE (ofᴱ p i xs) (p ++ [ last ]) end
+of-end-row p i []       = at-end
+of-end-row p i (x ∷ xs) = on-out (of-end-row p (suc i) xs)
 
-    acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc q b → Acc q′ b′ → b ≡ b′
-    acc-func refl (acc₀ x _)       (acc₀ x′ _)      = cong (f z) (out-inj (fu x x′))
-    acc-func refl (acc₀ _ mn)      (acc a _ lt _)   = ⊥-elim (mn (proj₂ (acc-val a)) lt)
-    acc-func refl (acc a _ lt _)   (acc₀ _ mn)      = ⊥-elim (mn (proj₂ (acc-val a)) lt)
-    acc-func refl (acc {q₀} a x lt nx) (acc {q₁} a′ x′ lt′ nx′) =
-      cong₂ f (acc-func (≼-antisym {q₀} {q₁} (λ h → nx′ (proj₂ (acc-val a)) h lt) (λ h → nx (proj₂ (acc-val a′)) h lt′)) a a′)
-              (out-inj (fu x x′))
+-- The rows of `of`, past the index it is at.
+of-idx : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → (Σ ℕ λ j → i ≤ j × y ≡ p ++ [ ix j ]) ⊎ y ≡ p ++ [ last ]
+of-idx p i []       at-end     = inj₂ refl
+of-idx p i (x ∷ xs) at-out     = inj₁ (i , ≤-refl , refl)
+of-idx p i (x ∷ xs) (on-out r) with of-idx p (suc i) xs r
+... | inj₁ (j , le , eq) = inj₁ (j , ≤-trans (n≤1+n i) le , eq)
+... | inj₂ eq            = inj₂ eq
+
+of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ++ [ ix i ]) e → ⊥
+of-fresh p i xs r with of-idx p (suc i) xs r
+... | inj₁ (j , le , eq) with ∷ʳ-injectiveʳ p p eq
+...   | refl = 1+n≰n le
+of-fresh p i xs r | inj₂ eq with ∷ʳ-injectiveʳ p p eq
+... | ()
+
+of-func : ∀ {A} p i (xs : List A) {y e e′} → InE (ofᴱ p i xs) y e → InE (ofᴱ p i xs) y e′ → e ≡ e′
+of-func p i []       at-end     at-end      = refl
+of-func p i (x ∷ xs) at-out     at-out      = refl
+of-func p i (x ∷ xs) at-out     (on-out r′) = ⊥-elim (of-fresh p i xs r′)
+of-func p i (x ∷ xs) (on-out r) at-out      = ⊥-elim (of-fresh p i xs r)
+of-func p i (x ∷ xs) (on-out r) (on-out r′) = of-func p (suc i) xs r r′
 
 -- A timeline's rows hold no pin.
 ine-pin : ∀ {A} {es : Events A} {y r} → InE es y (pin r) → ⊥
