@@ -35,6 +35,10 @@ open import denotation.Simultaneity using (effect-instant; cascade-own; frame-ow
 -- label list, its instant leading, orders and nests as that list does.
 open import denotation.Flat using (flat-order; flat-inside; flat-onto)
 
+-- THE ENGINE SCHEDULES IN THAT ORDER: a key, `after` read as one label
+-- past every other, orders as its flat list does.
+open import operation.Key using (flat-key)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)

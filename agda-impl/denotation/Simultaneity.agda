@@ -140,6 +140,23 @@ mutual
   ... | x , y = cong₂ _∙_ (eqⁱ i j x) (eqᵗ p q y)
 
 mutual
+  reflˡ : ∀ a → cmpLabel a a ≡ eq
+  reflˡ (ix n)  = ℕ-eq n
+  reflˡ (sub p) = reflᵖ p
+  reflˡ last    = refl
+
+  reflⁱ : ∀ i → cmpInstant i i ≡ eq
+  reflⁱ frame         = refl
+  reflⁱ (cascade t e) = cong₂ lexi (ℕ-eq t) (reflᵖ e)
+
+  reflᵗ : ∀ (p : Path) → cmpPath p p ≡ eq
+  reflᵗ []      = refl
+  reflᵗ (a ∷ p) = cong₂ lexi (reflˡ a) (reflᵗ p)
+
+  reflᵖ : ∀ p → cmpPos p p ≡ eq
+  reflᵖ (i ∙ p) = cong₂ lexi (reflⁱ i) (reflᵗ p)
+
+mutual
   flipˡ : ∀ a b → cmpLabel a b ≡ lt → cmpLabel b a ≡ gt
   flipˡ (ix m)  (ix n)  h = ℕ-flip {m} {n} h
   flipˡ (ix _)  (sub _) _ = refl

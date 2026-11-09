@@ -5,15 +5,20 @@
 -- other appended.
 module operation.Key where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_)
+open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_]; _++_; map)
+open import Data.List.Properties using (++-identityʳ)
+open import Relation.Binary.Definitions using (DecidableEquality)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 open import Relation.Nullary using (does; yes; no)
 
 open import Data.Nat using (zero; suc)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import denotation.Position using (Cmp; lt; eq; gt; cmpℕ; lexi; isLt; isEq; cmpLabel; cmpInstant; cmpPos; instant; path; frame; cascade)
+open import denotation.Flat using (FLabel; cmpFL; flat; flatᵗ; Ok; Okᵗ; ok-frame; ok-cascade; []; _∷_; cmp-flatˡ; cmp-flat)
+open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Pos; Label; Instant; _∙_; ix; sub; last; _<ˡ_; _<ⁱ_; _≟ˡ_; _≟ⁱ_; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
 
 data Key : Set where
@@ -54,11 +59,98 @@ private
 -- Strictly earlier: in an earlier instant, or in the same one and
 -- earlier on the path.
 _<ᴷ_ : Key → Key → Bool
-k <ᴷ k′ with ext k | ext k′
-... | i , x | j , y = (i <ⁱ j) ∨ (does (i ≟ⁱ j) ∧ lex x y)
+k <ᴷ k′ = earlier (ext k) (ext k′)
+  where earlier : Instant × List XL → Instant × List XL → Bool
+        earlier (i , x) (j , y) = (i <ⁱ j) ∨ (does (i ≟ⁱ j) ∧ lex x y)
 
 clash : ∀ {b} → b ≡ true → b ≡ false → ⊥
 clash refl ()
+
+------------------------------------------------------------------------
+-- THE KEY ORDER IS THE FLAT ORDER WITH A TOP: a key flattened to its
+-- position's flat label list (`denotation.Flat`), with one label past
+-- every other appended for `after`, orders lexicographically as that
+-- list does.
+
+data FXL : Set where
+  flab : FLabel → FXL
+  ftop : FXL
+
+flex : List FXL → List FXL → Bool
+flex []      []      = false
+flex []      (_ ∷ _) = true
+flex (_ ∷ _) []      = false
+flex (flab a ∷ p) (flab b ∷ q) = isLt (cmpFL a b) ∨ (isEq (cmpFL a b) ∧ flex p q)
+flex (flab _ ∷ _) (ftop ∷ _)   = true
+flex (ftop ∷ _)   (flab _ ∷ _) = false
+flex (ftop ∷ p)   (ftop ∷ q)   = flex p q
+
+-- A key, `after` or not.
+keyAt : Bool → Pos → Key
+keyAt false p = at p
+keyAt true  p = after p
+
+fkey : Bool → Pos → List FXL
+fkey b p = map flab (flat p) ++ (if b then [ ftop ] else [])
+
+private
+  sfx : Bool → List XL
+  sfx b = if b then [ top ] else []
+
+  ext-keyAt : ∀ b i p → ext (keyAt b (i ∙ p)) ≡ (i , labs p ++ sfx b)
+  ext-keyAt false i p = cong (i ,_) (sym (++-identityʳ (labs p)))
+  ext-keyAt true  i p = refl
+
+  -- A comparison's `eq` is decided equality.
+  bridge : ∀ {A : Set} (c : A → A → Cmp) (d : DecidableEquality A) → (∀ a b → c a b ≡ eq → a ≡ b) → (∀ a → c a a ≡ eq)
+         → ∀ a b → isEq (c a b) ≡ does (d a b)
+  bridge c d e r a b with d a b
+  ... | yes refl rewrite r a = refl
+  ... | no ne with c a b in h
+  ...   | eq = ⊥-elim (ne (e a b h))
+  ...   | lt = refl
+  ...   | gt = refl
+
+  two : ∀ c₁ c₂ z → isLt c₁ ∨ (isEq c₁ ∧ (isLt c₂ ∨ (isEq c₂ ∧ z))) ≡ isLt (lexi c₁ c₂) ∨ (isEq (lexi c₁ c₂) ∧ z)
+  two eq _ _ = refl
+  two lt _ _ = refl
+  two gt _ _ = refl
+
+  flex-path : ∀ {p q} → Okᵗ p → Okᵗ q → ∀ b b′
+            → flex (map flab (flatᵗ p) ++ (if b then [ ftop ] else [])) (map flab (flatᵗ q) ++ (if b′ then [ ftop ] else []))
+            ≡ lex (labs p ++ sfx b) (labs q ++ sfx b′)
+  flex-path []       []       false false = refl
+  flex-path []       []       false true  = refl
+  flex-path []       []       true  false = refl
+  flex-path []       []       true  true  = refl
+  flex-path []       (_ ∷ _)  false _     = refl
+  flex-path []       (_ ∷ _)  true  _     = refl
+  flex-path (_ ∷ _)  []       _     false = refl
+  flex-path (_ ∷ _)  []       _     true  = refl
+  flex-path {a ∷ p} {c ∷ q} (x ∷ xs) (y ∷ ys) b b′ =
+    trans (cong₂ (λ k z → isLt k ∨ (isEq k ∧ z)) (cmp-flatˡ x y) (flex-path xs ys b b′))
+          (cong (λ v → isLt (cmpLabel a c) ∨ (v ∧ lex (labs p ++ sfx b) (labs q ++ sfx b′)))
+                (bridge cmpLabel _≟ˡ_ eqˡ reflˡ a c))
+
+  flex-pos : ∀ {a c} → Ok a → Ok c → ∀ b b′
+           → flex (fkey b a) (fkey b′ c)
+           ≡ (instant a <ⁱ instant c) ∨ (does (instant a ≟ⁱ instant c) ∧ lex (labs (path a) ++ sfx b) (labs (path c) ++ sfx b′))
+  flex-pos (ok-frame xs)    (ok-frame ys)    b b′ = flex-path xs ys b b′
+  flex-pos (ok-frame _)     (ok-cascade _ _) _ _  = refl
+  flex-pos (ok-cascade _ _) (ok-frame _)     _ _  = refl
+  flex-pos {cascade (suc t) e ∙ p} {cascade (suc u) d ∙ q} (ok-cascade ex ey′) (ok-cascade dx dy′) b b′ =
+    trans (cong₂ (λ k z → isLt (cmpℕ (suc t) (suc u)) ∨ (isEq (cmpℕ (suc t) (suc u)) ∧ (isLt k ∨ (isEq k ∧ z))))
+                 (cmp-flat ex dx) (flex-path ey′ dy′ b b′))
+    (trans (two (cmpℕ (suc t) (suc u)) (cmpPos e d) (lex (labs p ++ sfx b) (labs q ++ sfx b′)))
+           (cong (λ v → isLt (cmpInstant (cascade (suc t) e) (cascade (suc u) d)) ∨ (v ∧ lex (labs p ++ sfx b) (labs q ++ sfx b′)))
+                 (bridge cmpInstant _≟ⁱ_ eqⁱ reflⁱ (cascade (suc t) e) (cascade (suc u) d))))
+
+-- THE KEY ORDER IS THE FLAT ORDER WITH A TOP.
+flat-key : ∀ b b′ {a c} → Ok a → Ok c → flex (fkey b a) (fkey b′ c) ≡ keyAt b a <ᴷ keyAt b′ c
+flat-key b b′ {i ∙ p} {j ∙ q} oa oc =
+  trans (flex-pos oa oc b b′)
+        (sym (cong₂ (λ x y → (proj₁ x <ⁱ proj₁ y) ∨ (does (proj₁ x ≟ⁱ proj₁ y) ∧ lex (proj₂ x) (proj₂ y)))
+                    (ext-keyAt b i p) (ext-keyAt b′ j q)))
 
 private
   ≺-trans : ∀ a b c → a ≺ b ≡ true → b ≺ c ≡ true → a ≺ c ≡ true
