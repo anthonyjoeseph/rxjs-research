@@ -174,13 +174,18 @@ $(SPEC_BIN): $(AGDA_SRC)
 	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Spec-Check.agda
 	@touch $@
 
+# Interrupted, not killed, at its limit: the GHC runtime flushes what was
+# printed, so a run that outlives it shows how far it got.
+SPEC_LIMIT := 1800
+
 $(SPEC_LOG): $(SPEC_BIN)
-	@$(SPEC_BIN) > $@
+	@timeout -s INT $(SPEC_LIMIT) $(SPEC_BIN) > $@ \
+	  || echo "spec-check: stopped, exit $$? (124 is the $(SPEC_LIMIT) s limit)" >> $@
 
 spec-check-selftest: $(SPEC_LOG)
 	@grep '^spec-check: selftest ' $(SPEC_LOG); \
 	  test $$(grep -c '^spec-check: selftest .* fires on ' $(SPEC_LOG)) -eq 3 \
-	    || { echo "spec-check-selftest: RED — a sabotage went uncaught, or the run died"; exit 1; }; \
+	    || { cat $(SPEC_LOG); echo "spec-check-selftest: RED — a sabotage went uncaught, or the run died"; exit 1; }; \
 	  echo "spec-check-selftest: GREEN"
 
 spec-check: $(SPEC_LOG)

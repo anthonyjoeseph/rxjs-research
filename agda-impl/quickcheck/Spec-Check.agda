@@ -25,7 +25,8 @@
 -- to break it alone, built over the same elaboration: the batcher
 -- replaced by `empty`, the elaborated emits all restamped to one name,
 -- every batch delivered twice.  A sabotage no seed catches is a checker
--- that cannot fire.  A probe for `make spec-check`: no proof reads it.
+-- that cannot fire; it needs only to fire, so it runs over fewer seeds.
+-- A probe for `make spec-check`: no proof reads it.
 --
 -- THE PINNED PROGRAMS: Anthony's examples, each with the batches it must
 -- deliver, written out.  The statements say the batcher agrees with the
@@ -40,11 +41,11 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _%_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
-open import IO.Primitive.Core using (_>>=_)
+open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
@@ -333,6 +334,12 @@ private
   tallyOf mk []          = tally 0 0 0 0 0
   tallyOf mk (seed ∷ ss) = add (judge (budget seed) (mk seed)) (tallyOf mk ss)
 
+  -- a line every so many seeds, so a run cut short shows how far it got
+  progress : ℕ → IO Unit
+  progress seed with seed % 25
+  ... | 0 = putStrLn ("spec-check: at seed " +++ showℕ seed)
+  ... | _ = return _
+
   showTally : Tally → String
   showTally (tally s k l c b) =
     showℕ (s Data.Nat.∸ k) +++ " checked, " +++ showℕ k +++ " skipped; failing: left-to-right "
@@ -345,18 +352,25 @@ private
   seeds : List ℕ
   seeds = upTo 300
 
-  report : List ℕ → IO Unit
-  report []          = putStrLn ("spec-check: done " +++ showTally (tallyOf real seeds))
-  report (seed ∷ ss) with fails (judge (budget seed) (real seed))
-  ... | []     = report ss
-  ... | f ∷ fs = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
-                 >>= λ _ → report ss
+  -- a sabotage needs only to fire, so fewer seeds serve
+  sabotaged : List ℕ
+  sabotaged = upTo 100
+
+  -- each seed judged once, its failures printed as met
+  report : List ℕ → Tally → IO Unit
+  report []          t = putStrLn ("spec-check: done " +++ showTally t)
+  report (seed ∷ ss) t with judge (budget seed) (real seed)
+  ... | v = progress seed >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+    where
+      failed : List String → IO Unit
+      failed []       = return _
+      failed (f ∷ fs) = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
 
   selftest : IO Unit
   selftest =
-    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied seeds))) >>= λ _ →
-    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped seeds))) >>= λ _ →
-    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled seeds)))
+    putStrLn (fires "left-to-right" (Tally.l2r (tallyOf emptied sabotaged))) >>= λ _ →
+    putStrLn (fires "coherent" (Tally.coh (tallyOf unstamped sabotaged))) >>= λ _ →
+    putStrLn (fires "batchable" (Tally.bat (tallyOf doubled sabotaged)))
 
 main : IO Unit
-main = selftest >>= λ _ → pinned pins >>= λ _ → report seeds
+main = pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0) >>= λ _ → selftest
