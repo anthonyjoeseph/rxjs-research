@@ -104,13 +104,14 @@ open import Data.Nat.Properties using (n≤1+n)
 
 open import adequacy.IsleLift using (Zs; z₁; z+; zs-past; zl; zs-btw; zs-under; isle-pin; pn)
 
--- A position under a child has the child among its ancestors.
-under-∈ᵗ : ∀ u a xs → (u ++ [ a ]) ∈ prefixesᵗ ((u ++ [ a ]) ++ xs)
-under-∈ᵗ []      a xs = here refl
-under-∈ᵗ (b ∷ u) a xs = there (∈-map⁺ (b ∷_) (under-∈ᵗ u a xs))
+-- A position under another has it among its ancestors.
+self-∈ᵗ : ∀ l q zs → (l ∷ q) ∈ prefixesᵗ ((l ∷ q) ++ zs)
+self-∈ᵗ l []      zs = here refl
+self-∈ᵗ l (m ∷ q) zs = there (∈-map⁺ (l ∷_) (self-∈ᵗ m q zs))
 
-under-∈ : ∀ u a xs → (u ⊕ [ a ]) ∈ prefixes ((u ⊕ [ a ]) ⊕ xs)
-under-∈ (i ∙ u) a xs = ∈-map⁺ (i ∙_) (under-∈ᵗ u a xs)
+self-∈ : ∀ y zs → y ∈ prefixes (y ⊕ zs)
+self-∈ (i ∙ [])      zs = here refl
+self-∈ (i ∙ (l ∷ q)) zs = there (∈-map⁺ (i ∙_) (self-∈ᵗ l q zs))
 
 -- A row at a chain's foot, of an entry with few rows behind `q`, reaches
 -- what it depends on: those behind and the chain.
@@ -129,17 +130,17 @@ record Clr {A} (q y : Pos) (E : EmissionSet A) : Set where
   field clear : ∀ {w e} → E w e → Visible e → q ≼ w → w ≺ y → ⊥
 open Clr
 
--- A row under a child, and a row at or past the child: a row under it at
--- or before the latter.
-cap : ∀ {A} {t : EmissionSet A} {u a r e′ p e} → t r e′ → (Σ Steps λ xs → r ≡ (u ⊕ [ a ]) ⊕ xs)
-    → t p e → (u ⊕ [ a ]) ≼ p
-    → Σ Pos λ r′ → Σ (Ev A) λ e″ → t r′ e″ × r′ ≼ p × (u ⊕ [ a ]) ∈ prefixes r′
-cap {u = u} {a} {r} {e′} {p} tr (xs , refl) tp zp with ≼-or-≻ r p
-... | inj₁ rp = r , e′ , tr , rp , under-∈ u a xs
-... | inj₂ pr with <ᵖ-split (u ⊕ [ a ]) p (≼-false {u ⊕ [ a ]} {p} zp)
-...   | inj₂ refl = p , _ , tp , ≼-refl {p} , subst (λ w → (u ⊕ [ a ]) ∈ prefixes w) (⊕-identityʳ (u ⊕ [ a ])) (under-∈ u a [])
-...   | inj₁ zp′ with <ᵖ-between (u ⊕ [ a ]) p xs zp′ (Equivalence.to T-≡ pr)
-...     | zs , refl = _ , _ , tp , ≼-refl {(u ⊕ [ a ]) ⊕ zs} , under-∈ u a zs
+-- A row under a position, and a row at or past it: a row under it at or
+-- before the latter.
+cap : ∀ {A} {t : EmissionSet A} {y r e′ p e} → t r e′ → (Σ Steps λ xs → r ≡ y ⊕ xs)
+    → t p e → y ≼ p
+    → Σ Pos λ r′ → Σ (Ev A) λ e″ → t r′ e″ × r′ ≼ p × y ∈ prefixes r′
+cap {y = y} {r} {e′} {p} tr (xs , refl) tp zp with ≼-or-≻ r p
+... | inj₁ rp = r , e′ , tr , rp , self-∈ y xs
+... | inj₂ pr with <ᵖ-split y p (≼-false {y} {p} zp)
+...   | inj₂ refl = p , _ , tp , ≼-refl {p} , subst (λ w → y ∈ prefixes w) (⊕-identityʳ y) (self-∈ y [])
+...   | inj₁ zp′ with <ᵖ-between y p xs zp′ (Equivalence.to T-≡ pr)
+...     | zs , refl = _ , _ , tp , ≼-refl {y ⊕ zs} , self-∈ y zs
 
 -- Clear at `q`, a row under its first child: a row under it at or before
 -- any visible row at or past `q`.
@@ -150,7 +151,7 @@ pick {q = q} {p = p} tr u cq tp vp qp with <ᵖ-split q p (≼-false {q} {p} qp)
 ... | inj₂ refl = ⊥-elim (cq tp vp)
 ... | inj₁ qp′ with ≼-or-≻ (q ⊕ [ ix 0 ]) p
 ...   | inj₂ pz = ⊥-elim (first-child q (Equivalence.from T-≡ qp′) pz)
-...   | inj₁ zp = cap {u = q} {a = ix 0} tr u tp zp
+...   | inj₁ zp = cap {y = q ⊕ [ ix 0 ]} tr u tp zp
 
 ------------------------------------------------------------------------
 -- THE LIFT: a skip at a chain's foot, nothing visible on the chain,
@@ -722,7 +723,7 @@ guard-src : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s m q p e Cr}
           → RowUnder o (q ⊕ [ ix 0 ]) p
 guard-src o {q = q} pth bz du il@(Lift.isled u _ _ _ _ _ _ _ _ _ _ _ _ _ eq _ _)
   with isle-row (enter (⟦ o ⟧ []ᴬ) root) il (flo o pth bz)
-... | _ , _ , tr , un = cap {u = q} {a = ix 0} tr un (proj₁ du) (fb-u (enter (⟦ o ⟧ []ᴬ) root) u lo du)
+... | _ , _ , tr , un = cap {y = q ⊕ [ ix 0 ]} tr un (proj₁ du) (fb-u (enter (⟦ o ⟧ []ᴬ) root) u lo du)
   where lo = lo-p (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) (subst (λ S → Lo S (after q)) eq (floor o pth bz)) (at-after q [ ix 0 ]))
 
 -- AN OUTER'S GUARD IS MET: an outer's value rising has a row under its

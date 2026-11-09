@@ -23,7 +23,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (_,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; last; _<ᵖ_; _⊕_) renaming (sub to subᴾ)
+open import denotation.Position using (Pos; last; _<ᵖ_; _⊕_; nested) renaming (sub to subᴾ)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Ev; nx; cp; plug; feed; feedL; inbox; queued; same?)
 open import adequacy.Apart.Cone using (cone-apart)
@@ -163,7 +163,7 @@ module _ (p : Pos) where
     where
       row : ∀ js → All (Sep (bk j)) (map bk js) → All (Sep (under j)) (map under js)
       row []        []          = []
-      row (j′ ∷ js) (h ∷ hs) = ((λ y c c′ → cone-apart ne c c′) , (λ y c c′ → cone-apart (λ e → ne (sym e)) c c′)) ∷ row js hs
+      row (j′ ∷ js) (h ∷ hs) = ((λ y c c′ → cone-apart (nested p) ne c c′) , (λ y c c′ → cone-apart (nested p) (λ e → ne (sym e)) c c′)) ∷ row js hs
         where
           ne : subᴾ j ≡ subᴾ j′ → ⊥
           ne refl = proj₁ h refl

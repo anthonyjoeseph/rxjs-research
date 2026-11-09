@@ -50,7 +50,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; tick; inside; _⊕_; Path)
+open import denotation.Position using (Pos; ix; last; tick; tickᴿ; inside; _⊕_; Path)
 open import denotation.Events using (Timeline; ofᴱ)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; Few; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt;
@@ -65,7 +65,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
 open import adequacy.Rows using (_≃_; ≃-refl; ≃-trans; Vis; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots; Real; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
+open import denotation.Laws.Worlds using (Ok; Hots; Real; RealR; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -509,7 +509,7 @@ record JInv {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) (O : Emission
 -- A cold's frame played where its timeline puts it: under a reachable
 -- root, at or after the root's tick.
 Ticked : ∀ {A} → Tape A → Set
-Ticked (play τ u i t fr) = Real u × tick u ≤ τ + t
+Ticked (play τ u i t fr) = RealR u × tickᴿ u ≤ τ + t
 Ticked (ending _)        = ⊤
 Ticked tapeOver          = ⊤
 

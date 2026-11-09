@@ -193,7 +193,7 @@ no-slot {c = c} _ here eq with ⊕-injʳ c c eq
 ... | ()
 no-slot {c = c} rc (inW (step {x} w pl)) eq with ⊕-injˡ x c eq
 ... | refl = world-after⁼ w rc (≺-ext c [])
-no-slot {c = c} _ (inW (timer _ _ _)) eq = step≢root c _ (sym eq)
+no-slot {c = c} _ (inW (timer _ _ _ _)) eq = step≢root c _ (sym eq)
 no-slot {c = c} _ (inW (join {h} _ _ _)) eq with ⊕-injʳ h c eq
 ... | ()
 

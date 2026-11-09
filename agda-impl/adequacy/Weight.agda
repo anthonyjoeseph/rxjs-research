@@ -225,9 +225,10 @@ prefixesᵗ : Path → List Path
 prefixesᵗ []      = []
 prefixesᵗ (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixesᵗ q)
 
--- Each prefix of a position below its instant's root, itself included.
+-- Each prefix of a position, its instant's root and itself included: a
+-- timer's step is its instant's root.
 prefixes : Pos → List Pos
-prefixes (i ∙ q) = mapL (i ∙_) (prefixesᵗ q)
+prefixes (i ∙ q) = (i ∙ []) ∷ mapL (i ∙_) (prefixesᵗ q)
 
 -- Each listed position and its ancestors.
 anc : List Pos → List Pos

@@ -22,10 +22,10 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
 
-open import denotation.Position using (Pos; Label; ix; last; isLt; _<ˡ_; _⊕_)
+open import denotation.Position using (Pos; Label; ix; last; isLt; _<ˡ_; _⊕_; Root; nested; _▸_)
 open import denotation.Events using (Frame; emit; stall; close; ix-<)
 open import denotation.Simultaneity using (reflˡ)
-open import denotation.Laws.Worlds using (⊕-assoc)
+open import denotation.Laws.Worlds using (⊕-identityʳ)
 open import operation.PureObservable using (module Machine; module Driver; baseOf; stepOf)
 open Machine using (Ctx; St; Mode; Conf; ⟨_,_,_,_⟩; plug; subscribing; absorbed; rising; Stepped)
 open import operation.Key using (at; after; _<ᴷ_; <ᴷ-irrefl; clash; <ᴷ-asym; after-in)
@@ -89,22 +89,22 @@ private
   ne-of : ∀ {a b : Label} → a <ˡ b ≡ true → a ≢ b
   ne-of {a} lt refl = clash lt (cong isLt (reflˡ a))
 
--- A later sibling's subtree is past the run in an earlier one.
-far-sib : ∀ {p a b y} → a <ˡ b ≡ true → Cone (p ⊕ [ b ]) y
-        → (at y <ᴷ after (p ⊕ [ a ]) ≡ false) × (Cone (p ⊕ [ a ]) y → ⊥)
-far-sib {p} {a} {b} {y} ab c = <ᴷ-asym (after (p ⊕ [ a ])) (at y) (cone-after ab c) , λ c′ → cone-apart (ne-of ab) c′ c
+-- A later step's subtree is past the run in an earlier one.
+far-sib : ∀ r {a b y} → a <ˡ b ≡ true → Cone (r ▸ b) y
+        → (at y <ᴷ after (r ▸ a) ≡ false) × (Cone (r ▸ a) y → ⊥)
+far-sib r {a} {b} {y} ab c = <ᴷ-asym (after (r ▸ a)) (at y) (cone-after r ab c) , λ c′ → cone-apart r (ne-of ab) c′ c
 
 -- The run in a child, a later sibling's subtree owed.
 cl-cn : ∀ {p a b} → a <ˡ b ≡ true → Sep (cl (p ⊕ [ a ])) (cn (p ⊕ [ b ]))
-cl-cn ab = (λ y ()) , λ y c → far-sib ab c
+cl-cn {p} ab = (λ y ()) , λ y c → far-sib (nested p) ab c
 
 -- The run in a value's subtree, the later values and the end owed.
-cl-tl : ∀ {u i} → Sep (cl (u ⊕ [ ix i ])) (tl u (suc i))
-cl-tl = (λ y ()) , far
+cl-tl : ∀ {u i} → Sep (cl (u ▸ ix i)) (tl u (suc i))
+cl-tl {u} = (λ y ()) , far
   where
-    far : ∀ y → In (tl _ (suc _)) y → _
-    far y (inj₁ (j , le , c)) = far-sib (ix-< le) c
-    far y (inj₂ c)            = far-sib refl c
+    far : ∀ y → In (tl u (suc _)) y → _
+    far y (inj₁ (j , le , c)) = far-sib u (ix-< le) c
+    far y (inj₂ c)            = far-sib u refl c
 
 -- The run at a position, its after owed.
 cl-pt : ∀ {q} → Sep (cl q) (pt q)
@@ -125,37 +125,41 @@ cn-up {p} {l} = (λ c → ⊥-elim (cone-up l [] c)) , λ y ()
 sub-child : ∀ {p} l → Sub (cn (p ⊕ [ l ])) (cl p)
 sub-child {p} l = sub-cl (f-cn _) (λ y c → cone-trans (pre [ l ]) c) (λ c → ⊥-elim (cone-up l [] c))
 
--- A frame's step owes under its cascade `v`: a value its frame closes
--- straight after, under the frame's end.
-base-in : ∀ {A v i w y} (fr : Frame A w) → In (tl (baseOf v fr) (stepOf i fr)) y → Σ Label λ l → Σ (List Label) λ ls → Cone (v ⊕ (l ∷ ls)) y
-base-in {v = v} {y = y} (emit _ (close _)) (inj₁ (j , _ , c)) = last , [ ix j ] , subst (λ q → Cone q y) (⊕-assoc v [ last ] [ ix j ]) c
-base-in {v = v} {y = y} (emit _ (close _)) (inj₂ c)           = last , [ last ] , subst (λ q → Cone q y) (⊕-assoc v [ last ] [ last ]) c
-base-in (emit _ (emit _ _)) (inj₁ (j , _ , c)) = ix j , [] , c
-base-in (emit _ (emit _ _)) (inj₂ c)           = last , [] , c
-base-in (emit _ (stall _))  (inj₁ (j , _ , c)) = ix j , [] , c
-base-in (emit _ (stall _))  (inj₂ c)           = last , [] , c
-base-in (stall _)           (inj₁ (j , _ , c)) = ix j , [] , c
-base-in (stall _)           (inj₂ c)           = last , [] , c
-base-in (close _)           (inj₁ (j , _ , c)) = ix j , [] , c
-base-in (close _)           (inj₂ c)           = last , [] , c
+private
+  ext : ∀ {x y} → Cone x y → Cone (x ⊕ []) y
+  ext {x} {y} c = subst (λ q → Cone q y) (sym (⊕-identityʳ x)) c
+
+-- A frame's step owes under a step of its root `v`: a value its frame
+-- closes straight after, under the frame's end.
+base-in : ∀ {A v i w y} (fr : Frame A w) → In (tl (baseOf v fr) (stepOf i fr)) y → Σ Label λ l → Σ (List Label) λ ls → Cone (v ▸ l ⊕ ls) y
+base-in (emit _ (close _)) (inj₁ (j , _ , c)) = last , [ ix j ] , c
+base-in (emit _ (close _)) (inj₂ c)           = last , [ last ] , c
+base-in (emit _ (emit _ _)) (inj₁ (j , _ , c)) = ix j , [] , ext c
+base-in (emit _ (emit _ _)) (inj₂ c)           = last , [] , ext c
+base-in (emit _ (stall _))  (inj₁ (j , _ , c)) = ix j , [] , ext c
+base-in (emit _ (stall _))  (inj₂ c)           = last , [] , ext c
+base-in (stall _)           (inj₁ (j , _ , c)) = ix j , [] , ext c
+base-in (stall _)           (inj₂ c)           = last , [] , ext c
+base-in (close _)           (inj₁ (j , _ , c)) = ix j , [] , ext c
+base-in (close _)           (inj₂ c)           = last , [] , ext c
 
 -- A cold's frame, inside the run.
-sub-frame : ∀ {A p w} (fr : Frame A w) → Sub (tl (baseOf p fr) (stepOf 0 fr)) (cl p)
+sub-frame : ∀ {A p w} (fr : Frame A w) → Sub (tl (baseOf (nested p) fr) (stepOf 0 fr)) (cl p)
 sub-frame {p = p} fr = sub-cl (f-tl _ _) (λ y iy → inc (base-in fr iy)) (λ iy → out (base-in fr iy))
   where
-    inc : ∀ {y} → Σ Label (λ l → Σ (List Label) λ ls → Cone (p ⊕ (l ∷ ls)) y) → Cone p y
-    inc (l , ls , c) = cone-trans (pre (l ∷ ls)) c
-    out : (Σ Label λ l → Σ (List Label) λ ls → Cone (p ⊕ (l ∷ ls)) p) → ⊥
-    out (l , ls , c) = cone-up l ls c
+    inc : ∀ {y} → Σ Label (λ l → Σ (List Label) λ ls → Cone (p ⊕ [ l ] ⊕ ls) y) → Cone p y
+    inc (l , ls , c) = cone-trans (cone-trans (pre [ l ]) (pre ls)) c
+    out : (Σ Label λ l → Σ (List Label) λ ls → Cone (p ⊕ [ l ] ⊕ ls) p) → ⊥
+    out (l , ls , c) = cone-up l [] (cone-trans (pre ls) c)
 
 -- An of's values, inside the run.
-sub-vals : ∀ {p} i → Sub (tl p i) (cl p)
-sub-vals {p} i = sub-cl (f-tl p i) inc out
+sub-vals : ∀ {p} i → Sub (tl (nested p) i) (cl p)
+sub-vals {p} i = sub-cl (f-tl (nested p) i) inc out
   where
-    inc : ∀ y → In (tl p i) y → Cone p y
+    inc : ∀ y → In (tl (nested p) i) y → Cone p y
     inc y (inj₁ (j , _ , c)) = cone-trans (pre [ ix j ]) c
     inc y (inj₂ c)           = cone-trans (pre [ last ]) c
-    out : In (tl p i) p → ⊥
+    out : In (tl (nested p) i) p → ⊥
     out (inj₁ (j , _ , c)) = cone-up (ix j) [] c
     out (inj₂ c)           = cone-up last [] c
 

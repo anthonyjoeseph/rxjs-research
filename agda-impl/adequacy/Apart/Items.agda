@@ -32,8 +32,8 @@ open import Data.Empty using (⊥)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst) renaming (trans to ≡-trans)
 
-open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_)
-open import denotation.Events using (<ᵖ-part; <ᵖ-trans; <ᵖ-asym; ix-<)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_; nested; _▸_)
+open import denotation.Events using (<ᵖ-▸; <ᵖ-trans; <ᵖ-asym; ix-<)
 open import operation.PureObservable using (module Machine; Tape; play; ending; baseOf; stepOf) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; off; offL; offIf; ended)
@@ -85,7 +85,7 @@ mutual
   items (pend o q)              = []
   items (coldS b l)             = tapeI l
   items (ofS i p [])            = [ cn (p ⊕ [ last ]) ]
-  items (ofS i p (_ ∷ _))       = [ tl p i ]
+  items (ofS i p (_ ∷ _))       = [ tl (nested p) i ]
   items doneS                   = []
   items (mapS f s)              = items s
   items (scanS f z s)           = items s
@@ -324,7 +324,7 @@ mutual
   cover (coldS b (ending e))    (k-own (there ()))
   cover (coldS b overT)         (k-own ())
   cover (ofS i p [])            (k-own (here refl)) = cn (p ⊕ [ last ]) , here refl , self _
-  cover (ofS i p (_ ∷ _))       (k-own (here refl)) = tl p i , here refl , inj₁ (i , ≤-refl , self _)
+  cover (ofS i p (_ ∷ _))       (k-own (here refl)) = tl (nested p) i , here refl , inj₁ (i , ≤-refl , self _)
   cover (ofS i p [])            (k-own (there ()))
   cover (ofS i p (_ ∷ _))       (k-own (there ()))
   cover (cutS l (attAt p) s)    (k-own (here refl)) = here refl
@@ -379,14 +379,14 @@ past-of         h (inj₂ refl) k = k
 cn-keyed : ∀ {r} h → at r <ᴷ h ≡ false → Keyed h (cn r)
 cn-keyed h k y c = past-of h (cone-ge c) k
 
-tl-keyed : ∀ {u i} h → at (u ⊕ [ ix i ]) <ᴷ h ≡ false → Keyed h (tl u i)
-tl-keyed {u} {i} h k y (inj₁ (j , le , c)) = past-of {u ⊕ [ ix i ]} h (≼-trans step (cone-ge c)) k
+tl-keyed : ∀ {u i} h → at (u ▸ ix i) <ᴷ h ≡ false → Keyed h (tl u i)
+tl-keyed {u} {i} h k y (inj₁ (j , le , c)) = past-of {u ▸ ix i} h (≼-trans step (cone-ge c)) k
   where
-    step : (u ⊕ [ ix i ]) ≼ (u ⊕ [ ix j ])
+    step : (u ▸ ix i) ≼ (u ▸ ix j)
     step with m≤n⇒m<n∨m≡n le
-    ... | inj₁ lt   = inj₁ (<ᵖ-part u [] [] (ix-< lt))
+    ... | inj₁ lt   = inj₁ (<ᵖ-▸ u (ix-< lt))
     ... | inj₂ refl = inj₂ refl
-tl-keyed {u} {i} h k y (inj₂ c) = past-of {u ⊕ [ ix i ]} h (≼-trans (inj₁ (<ᵖ-part u {ix i} {last} [] [] refl)) (cone-ge c)) k
+tl-keyed {u} {i} h k y (inj₂ c) = past-of {u ▸ ix i} h (≼-trans (inj₁ (<ᵖ-▸ u {ix i} {last} refl)) (cone-ge c)) k
 
 -- A take's teardown after the end it owes.
 pt-under : ∀ p y h → at (p ⊕ y) <ᴷ h ≡ false → Keyed h (pt p)
@@ -413,11 +413,11 @@ private
 mutual
   keyed : ∀ {Γ A h} (s : St Γ A) → StOK s → Lo s h → All (Keyed h) (items s)
   keyed (pend o q)                  _ lo = []
-  keyed {h = h} (coldS b (play τ u i t fr)) _ lo = tl-keyed h (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (coldS b (play τ u i t fr)) _ lo = tl-keyed {baseOf u fr} h (lo (k-own (here refl))) ∷ []
   keyed {h = h} (coldS b (ending e))        _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []
   keyed (coldS b overT)             _ lo = []
   keyed {h = h} (ofS i p [])                _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []
-  keyed {h = h} (ofS i p (_ ∷ _))           _ lo = tl-keyed h (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (ofS i p (_ ∷ _))           _ lo = tl-keyed {nested p} h (lo (k-own (here refl))) ∷ []
   keyed doneS                       _ lo = []
   keyed (mapS f s)                  hs lo = keyed s hs (λ h → lo (k-kid (k-map h)))
   keyed (scanS f z s)               hs lo = keyed s hs (λ h → lo (k-kid (k-scan h)))

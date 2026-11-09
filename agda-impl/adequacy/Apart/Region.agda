@@ -17,7 +17,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_; Root; _▸_)
 open import denotation.Events using (<ᵖ-below; <ᵖ-irrefl; <ᵖ-split; <ᵖ-trans)
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; clash; after-past; <ᴷ-asym; at-after₀; after-in)
 open import denotation.Laws.Worlds using (⊕-identityʳ)
@@ -48,7 +48,7 @@ self q = subst (Cone q) (⊕-identityʳ q) (pre [])
 
 data Rg : Set where
   cn : Pos → Rg
-  tl : Pos → ℕ → Rg
+  tl : Root → ℕ → Rg
   pt : Pos → Rg
   bk : Pos → Rg
   cl : Pos → Rg
@@ -56,7 +56,7 @@ data Rg : Set where
 -- The positions a region can still make.
 In : Rg → Pos → Set
 In (cn r)   x = Cone r x
-In (tl u i) x = (Σ ℕ λ j → i ≤ j × Cone (u ⊕ [ ix j ]) x) ⊎ Cone (u ⊕ [ last ]) x
+In (tl u i) x = (Σ ℕ λ j → i ≤ j × Cone (u ▸ ix j) x) ⊎ Cone (u ▸ last) x
 In (pt _)   x = ⊥
 In (bk _)   x = ⊥
 In (cl _)   x = ⊥

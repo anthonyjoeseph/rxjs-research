@@ -27,14 +27,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; _<ᵖ_; inside; tick; _⊕_)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; inside; tick; tickᴿ; nested; _▸_; _⊕_)
 open import denotation.Events using (Timeline; ofᴱ; inside-self; inside-++; <ᵖ-split; <ᵖ-part; Frame; emit; stall; close; burst; module From∞)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
   LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust; module Joiner)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; Real; ⊕-assoc)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; Real; RealR; ⊕-assoc)
 open import denotation.Laws.JoinInv using (module JoinerI; module Join; module SwitchI; switch-cut-up)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -209,8 +209,8 @@ ofKey p i []      = p ⊕ [ last ]
 ofKey p i (_ ∷ _) = p ⊕ [ ix i ]
 
 of-next : ∀ {A} p i (xs : List A) → (p ⊕ [ ix i ]) ≺ ofKey p (suc i) xs
-of-next p i []      = slot-last p i
-of-next p i (_ ∷ _) = slot p i
+of-next p i []      = slot-last (nested p) i
+of-next p i (_ ∷ _) = slot (nested p) i
 
 of-lb : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → ofKey p i xs ≼ y
 of-lb p i []       at-end     = ≼-refl {p ⊕ [ last ]}
@@ -219,9 +219,9 @@ of-lb p i (x ∷ xs) {y} (on-out r) =
   ≺→≼ {p ⊕ [ ix i ]} {y} (≺-≼-≺ {p ⊕ [ ix i ]} {ofKey p (suc i) xs} {y} (of-next p i xs) (of-lb p (suc i) xs r))
 
 -- Every row of a frame lies at or after its next step.
-slot-lb : ∀ {A t y e} τ u i (fr : Frame A t) → Real u → tick u ≤ τ + t → InE (burst τ u i fr) y e → slotOf u i fr ≼ y
-slot-lb τ u i (emit a (close k)) re le at-out = ≼-refl {(u ⊕ [ last ]) ⊕ [ ix 0 ]}
-slot-lb {y = y} τ u i (emit a (close k)) re le (on-out r) = ≺→≼ {(u ⊕ [ last ]) ⊕ [ ix 0 ]} {y} (fin-lb τ u (From∞.force k) re le r)
+slot-lb : ∀ {A t y e} τ u i (fr : Frame A t) → RealR u → tickᴿ u ≤ τ + t → InE (burst τ u i fr) y e → slotOf u i fr ≼ y
+slot-lb τ u i (emit a (close k)) re le at-out = ≼-refl {u ▸ last ⊕ [ ix 0 ]}
+slot-lb {y = y} τ u i (emit a (close k)) re le (on-out r) = ≺→≼ {u ▸ last ⊕ [ ix 0 ]} {y} (fin-lb τ u (From∞.force k) re le r)
 slot-lb τ u i fr@(emit _ (emit _ _)) re le r = burst-lb τ u i fr re le r
 slot-lb τ u i fr@(emit _ (stall _))  re le r = burst-lb τ u i fr re le r
 slot-lb τ u i fr@(stall _)           re le r = burst-lb τ u i fr re le r

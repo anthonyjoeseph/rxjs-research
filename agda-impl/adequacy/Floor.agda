@@ -20,7 +20,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; cong)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; ix; last; _⊕_) renaming (sub to subᴾ)
+open import denotation.Position using (Pos; ix; last; _⊕_; _▸_) renaming (sub to subᴾ)
 open import denotation.Events using (From∞; Frame∞; emit; stall; close; timelineAt)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening; slotOf) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
@@ -191,7 +191,7 @@ module _ {R : Set} where
 
   -- A cold's turn: on at its tick, or absorbed with its next due past it.
   leafs : ∀ {Γ A} (c : Ctx R Γ A) q b (l : Tape A) {κ} → (leafM , κ) ∈ own {Γ} (coldS b l) → Lo (plug c (coldS b l)) κ
-        → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ⊕ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+        → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
         → ∀ {τ k′} → Driver.took R (run c (coldS b l) leafM q) ≡ Driver.silent τ k′ → κ ⊑ Clock k′
   leafs c q b     overT              () lo ah eq
   leafs c q false (ending e₀)        (here refl) lo ah refl = absorb c (coldS false (ending e₀)) (coldS false overT) q (λ { (k-own ()) ; (k-kid ()) }) lo
@@ -204,10 +204,10 @@ module _ {R : Set} where
   leafs c q true  (play τ u i t (emit a f))  (here refl) lo ah refl | false = ⊑-refl
   leafs c q true  (play τ u i t (stall f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (stall f))) (coldS true (play τ u (suc i) t (Frame∞.force f))) q
-      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (slotOf u (suc i) (Frame∞.force f))) (trans (at-<ᴷ (u ⊕ [ ix i ]) _) (slot-next u i (Frame∞.force f))))
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (slotOf u (suc i) (Frame∞.force f))) (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i (Frame∞.force f))))
          ; (k-own (there ())) ; (k-kid ()) }) lo
   leafs c q true  (play τ u i t (close f)) {κ} (here refl) lo ah refl | false =
-    absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ⊕ [ last ]) (From∞.force f))) q
+    absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ▸ last) (From∞.force f))) q
       (λ {κ′} h → inj₂ (<ᴷ-asym κ κ′ (ah refl (cold-key h)))) lo
 
   -- A connect's admin mark: its body subscribed where it was keyed, or
@@ -239,7 +239,7 @@ module _ {R : Set} where
   -- A MARK RUN: on at the mark's own key, or absorbed with what it owes
   -- next no earlier.
   runs : ∀ {Γ A} (c : Ctx R Γ A) q {s : St Γ A} {mk κ} → Marked s mk → (mk , κ) ∈ own s → Lo (plug c s) κ
-       → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ⊕ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+       → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
        → (∀ {j g x q₀ e q₁ e₁ ib} → s ≡ joinS j g x ((q₀ , e) ∷ (q₁ , e₁) ∷ ib) → mk ≡ joinM → at q₁ <ᴷ at q₀ ≡ false)
        → ∀ {τ k′} → Driver.took R (run c s mk q) ≡ Driver.silent τ k′ → κ ⊑ Clock k′
   runs c q (ofK i p₀ []) (here refl) lo ah asc eq with closed c

@@ -1,8 +1,8 @@
 -- WHAT SITS UNDER A POSITION: everything a subscription there can ever
 -- make — the positions below it, and every timer cascade a cold
 -- subscribed under it fires, at a tick past the one it was subscribed
--- at.  Two children of one position share nothing: a cascade under one
--- is keyed by where it was made, which only that child has.
+-- at.  Two steps of one burst share nothing: a cascade under one is
+-- keyed by where it was made, which only that step has.
 module adequacy.Apart.Cone where
 
 open import Data.Bool using (Bool; true; false)
@@ -10,18 +10,19 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.Nat using (_<_; _≤_)
 open import Data.Nat.Properties using (≤-reflexive; <⇒≤; ≤-<-trans; <-irrefl)
+open import Data.Product using (proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; Label; tick; path; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_)
-open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-trans; <ᵖ-asym; <ᵖ-irrefl)
-open import denotation.Simultaneity using (reflˡ; earlier-tick; effect-tick)
+open import denotation.Position using (Pos; Label; tick; path; instant; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_; Root; nested; fired; _▸_; tickᴿ)
+open import denotation.Events using (<ᵖ-below; <ᵖ-▸; <ᵖ-trans; <ᵖ-asym; <ᵖ-irrefl)
+open import denotation.Simultaneity using (reflˡ; earlier-tick; effect-tick; step-tick; cascade-inj)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
 open import operation.Key using (at; after; _<ᴷ_; after-lt)
 
 data Cone (r : Pos) : Pos → Set where
   pre : ∀ y → Cone r (r ⊕ y)
-  tag : ∀ {T e} y → tick e < T → Cone r e → Cone r (cascade T e ∙ y)
+  tag : ∀ {T e l} y → tick e < T → Cone r e → Cone r (cascade T e l ∙ y)
 
 ------------------------------------------------------------------------
 -- A cone is closed downward
@@ -44,7 +45,7 @@ cone-tick (tag y lt c)   = <⇒≤ (≤-<-trans (cone-tick c) lt)
 cone-ge : ∀ {r x} → Cone r x → r <ᵖ x ≡ true ⊎ r ≡ x
 cone-ge {r} (pre [])      = inj₂ (sym (⊕-identityʳ r))
 cone-ge {r} (pre (l ∷ y)) = inj₁ (<ᵖ-below r y)
-cone-ge {r} (tag {e = e} y lt c) = inj₁ (earlier-tick r e y (≤-<-trans (cone-tick c) lt))
+cone-ge {r} (tag {e = e} {l} y lt c) = inj₁ (earlier-tick r e l y (≤-<-trans (cone-tick c) lt))
 
 -- Before a cone's root, before all of it.
 cone-low : ∀ {r x} j → j <ᵖ r ≡ true → Cone r x → j <ᵖ x ≡ true
@@ -84,33 +85,36 @@ private
   snoc : ∀ p (a : Label) y → (p ⊕ [ a ]) ⊕ y ≡ p ⊕ (a ∷ y)
   snoc p a y = ⊕-assoc p [ a ] y
 
-  -- A cascade under one child is at a tick the other's instant is not.
-  cross : ∀ {p a b T e} y z → tick e < T → Cone (p ⊕ [ b ]) e → (p ⊕ [ a ]) ⊕ y ≡ (cascade T e ∙ z) → ⊥
-  cross {p} {a} {b} {T} {e} y z lt c eq =
-    <-irrefl refl (≤-<-trans (subst (_≤ tick e) (effect-tick p [ b ]) (cone-tick c)) (subst (tick e <_) tp lt))
+  stripᴿ : ∀ r {a b} y z → (r ▸ a) ⊕ y ≡ (r ▸ b) ⊕ z → a ≡ b
+  stripᴿ (nested p) {a} {b} y z e = strip p y z (trans (sym (snoc p a y)) (trans e (snoc p b z)))
+  stripᴿ (fired _ _) y z e = proj₂ (proj₂ (cascade-inj (cong instant e)))
+
+  -- A cascade under one step is at a tick the other's instant is not.
+  cross : ∀ r {a b T e l} y z → tick e < T → Cone (r ▸ b) e → (r ▸ a) ⊕ y ≡ (cascade T e l ∙ z) → ⊥
+  cross r {a} {b} {T} {e} y z lt c eq =
+    <-irrefl refl (≤-<-trans (subst (_≤ tick e) (step-tick r b) (cone-tick c)) (subst (tick e <_) tp lt))
     where
-      tp : T ≡ tick p
-      tp = trans (sym (cong tick eq)) (trans (effect-tick (p ⊕ [ a ]) y) (effect-tick p [ a ]))
+      tp : T ≡ tickᴿ r
+      tp = trans (sym (cong tick eq)) (trans (effect-tick (r ▸ a) y) (step-tick r a))
 
-  apart : ∀ {p a b x x′} → a ≢ b → Cone (p ⊕ [ a ]) x → Cone (p ⊕ [ b ]) x′ → x ≡ x′ → ⊥
-  apart {p} {a} {b} ne (pre y) (pre z) eq =
-    ne (strip p y z (trans (sym (snoc p a y)) (trans eq (snoc p b z))))
-  apart ne (pre y) (tag z lt c) eq = cross y z lt c eq
-  apart ne (tag y lt c) (pre z) eq = cross z y lt c (sym eq)
-  apart ne (tag y lt c) (tag z lt′ c′) refl = apart ne c c′ refl
+  apart : ∀ r {a b x x′} → a ≢ b → Cone (r ▸ a) x → Cone (r ▸ b) x′ → x ≡ x′ → ⊥
+  apart r ne (pre y) (pre z) eq = ne (stripᴿ r y z eq)
+  apart r ne (pre y) (tag z lt c) eq = cross r y z lt c eq
+  apart r ne (tag y lt c) (pre z) eq = cross r z y lt c (sym eq)
+  apart r ne (tag y lt c) (tag z lt′ c′) refl = apart r ne c c′ refl
 
-cone-apart : ∀ {p a b x} → a ≢ b → Cone (p ⊕ [ a ]) x → Cone (p ⊕ [ b ]) x → ⊥
-cone-apart ne c c′ = apart ne c c′ refl
+cone-apart : ∀ r {a b x} → a ≢ b → Cone (r ▸ a) x → Cone (r ▸ b) x → ⊥
+cone-apart r ne c c′ = apart r ne c c′ refl
 
--- A later sibling's subtree is past an earlier one's.
-cone-after : ∀ {p a b y} → a <ˡ b ≡ true → Cone (p ⊕ [ b ]) y → after (p ⊕ [ a ]) <ᴷ at y ≡ true
-cone-after {p} {a} {b} {y} ab c = cone-past (p ⊕ [ a ]) y lt (λ c′ → cone-apart ne c′ c)
+-- A later step's subtree is past an earlier one's.
+cone-after : ∀ r {a b y} → a <ˡ b ≡ true → Cone (r ▸ b) y → after (r ▸ a) <ᴷ at y ≡ true
+cone-after r {a} {b} {y} ab c = cone-past (r ▸ a) y lt (λ c′ → cone-apart r ne c′ c)
   where
     ne : a ≢ b
     ne refl = clash (cong isLt (reflˡ a)) ab
-    ab′ : (p ⊕ (a ∷ [])) <ᵖ (p ⊕ (b ∷ [])) ≡ true
-    ab′ = <ᵖ-part p [] [] ab
-    lt : (p ⊕ [ a ]) <ᵖ y ≡ true
+    ab′ : (r ▸ a) <ᵖ (r ▸ b) ≡ true
+    ab′ = <ᵖ-▸ r ab
+    lt : (r ▸ a) <ᵖ y ≡ true
     lt with cone-ge c
-    ... | inj₁ by   = <ᵖ-trans (p ⊕ [ a ]) (p ⊕ [ b ]) y ab′ by
+    ... | inj₁ by   = <ᵖ-trans (r ▸ a) (r ▸ b) y ab′ by
     ... | inj₂ refl = ab′

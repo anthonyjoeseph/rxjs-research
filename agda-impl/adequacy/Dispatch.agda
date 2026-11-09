@@ -22,7 +22,7 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; _⊕_)
+open import denotation.Position using (Pos; ix; last; _⊕_; nested; _▸_)
 open import denotation.Events using (Timeline; timelineAt; Frame; emit; stall; close; module From∞)
 open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhile; ⟦_⟧; InE; at-out; at-end; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
@@ -323,7 +323,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
     let (Cr′ , fr′ , _ , _ , d) = rc Rt {s = takeS true w free s} fr (hr λ _ _ → lag [ p ] (λ _ o yp → here (at-p o yp)) , bnd) (≺→≼ {p} {p ⊕ [ ix 0 ]} p0)
                                     (lo-weaken (at (p ⊕ [ ix 0 ])) (after p) fl (at-after p [ ix 0 ]))
     in Cr′ , bef (p ⊕ [ ix 0 ]) ,
-       flying fr′ cl (s-took (a , row , nk , λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) gone (λ _ → ≺-irrefl {p ⊕ [ ix 0 ]}) (o-cp (slot-last p 0))
+       flying fr′ cl (s-took (a , row , nk , λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) gone (λ _ → ≺-irrefl {p ⊕ [ ix 0 ]}) (o-cp (slot-last (nested p) 0))
                              (tailp-dn {C = bef p} {C′ = aft (p ⊕ [ ix 0 ])} (λ {y} t → gone {y} t) (took-tail sy row nk nf)) (proj₂ (husk-of sy))
                              (λ {r} t → ≼-trans {r} {p} {p ⊕ [ ix 0 ]} t (≺→≼ {p} {p ⊕ [ ix 0 ]} p0))
                              (λ {r′} t (q , _ , y , nk′ , qr) → nf y nk′ (≺-≼-≺ {q} {r′} {p} qr t)) eq sd
@@ -776,10 +776,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
     ... | false | refl = λ iv → stepped cl (least fd d-play iv) (run-cold-nx cl) rest-cold
     abs-leaf {c′ = c′} {b = true} {play τ u i t (stall k)} fd eq with closed c′ in cl | eq
     ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-cold)
-    ... | false | refl = refocused (focus fd) (cold-skip (u ⊕ [ ix i ]) (λ tk → tk) stall-into stall-back)
+    ... | false | refl = refocused (focus fd) (cold-skip (u ▸ ix i) (λ tk → tk) stall-into stall-back)
     abs-leaf {c′ = c′} {b = true} {play τ u i t (close k)} fd eq with closed c′ in cl | eq
     ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-cold)
-    ... | false | refl = refocused (focus fd) (cold-skip (u ⊕ [ ix i ]) (λ (ru , le) → rest-ticked τ u ru le (From∞.force k)) close-into close-back)
+    ... | false | refl = refocused (focus fd) (cold-skip (u ▸ ix i) (λ (ru , le) → rest-ticked τ u ru le (From∞.force k)) close-into close-back)
 
     abs-cut : ∀ {Γ A} {c′ : Ctx R Γ A} {j} {w : A → Bool} {r s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , takeS j w (cutAt r) s₀) cutM κ)
