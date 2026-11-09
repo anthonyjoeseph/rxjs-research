@@ -34,7 +34,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_; nested; _▸_)
 open import denotation.Events using (<ᵖ-▸; <ᵖ-trans; <ᵖ-asym; ix-<)
-open import operation.PureObservable using (module Machine; Tape; play; ending; baseOf; stepOf) renaming (over to overT)
+open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; off; offL; offIf; ended)
 open import operation.Key using (Key; at; after; never; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-asym; at-after)
@@ -48,7 +48,7 @@ open import adequacy.Apart.Region using (Rg; cn; tl; pt; bk; In; Sep; sep-sym; N
 -- A node's regions
 
 tapeI : ∀ {A} → Tape A → List Rg
-tapeI (play τ u i t fr) = [ tl (baseOf u fr) (stepOf i fr) ]
+tapeI (play τ u i t fr) = [ tl u i ]
 tapeI (ending e)        = [ cn e ]
 tapeI overT             = []
 
@@ -318,7 +318,7 @@ private
 
 mutual
   cover : ∀ {Γ A} (s : St Γ A) {κ} → KeyIn s κ → Covers (items s) κ
-  cover (coldS b (play τ u i t fr)) (k-own (here refl)) = tl (baseOf u fr) (stepOf i fr) , here refl , inj₁ (stepOf i fr , ≤-refl , self _)
+  cover (coldS b (play τ u i t fr)) (k-own (here refl)) = tl u i , here refl , inj₁ (i , ≤-refl , self _)
   cover (coldS b (play τ u i t fr)) (k-own (there ()))
   cover (coldS b (ending e))    (k-own (here refl)) = cn e , here refl , self e
   cover (coldS b (ending e))    (k-own (there ()))
@@ -413,7 +413,7 @@ private
 mutual
   keyed : ∀ {Γ A h} (s : St Γ A) → StOK s → Lo s h → All (Keyed h) (items s)
   keyed (pend o q)                  _ lo = []
-  keyed {h = h} (coldS b (play τ u i t fr)) _ lo = tl-keyed {baseOf u fr} h (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (coldS b (play τ u i t fr)) _ lo = tl-keyed {u} h (lo (k-own (here refl))) ∷ []
   keyed {h = h} (coldS b (ending e))        _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []
   keyed (coldS b overT)             _ lo = []
   keyed {h = h} (ofS i p [])                _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []

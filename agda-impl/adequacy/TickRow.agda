@@ -18,6 +18,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
+open import Data.Nat using (suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -25,14 +26,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; root; _⊕_) renaming (Path to Steps)
+open import denotation.Position using (Pos; ix; last; root; _⊕_; _▸_) renaming (Path to Steps)
 open import denotation.Events using (Timeline; Frame; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; Den; ⟦_⟧; enter; out; skip; end; _≺_; Reach; Dep; InE; at-skip; map-skip;
   map-end; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded;
   module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼; ≺-≼-≺)
 open import denotation.Laws.Worlds using (Hots; ⊕-assoc; ⊕-identityʳ)
-open import operation.PureObservable using (PureObs; module Machine; play; slotOf; onward)
+open import operation.PureObservable using (PureObs; module Machine; play)
 open Machine using (Ctx; St; Scope; CS; ⟨_,_,_,_⟩; plug; load; search; found; leafM; absorbed; rising; nx; closed; scopeOf;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; free; cpAt; cutAt; overAt)
@@ -241,7 +242,7 @@ module _ {R : Set} (o : PureObs [] R) where
 
   emit-step : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s q} {c′ : Ctx R Γ′ A′} {τ u i t a} {f : Frame A′ t} {κ}
             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (emit a f))) leafM κ) → closed c′ ≡ false
-            → ⟨ c′ , coldS true (onward τ u i t f) , rising (nx a) , slotOf u i (emit a f) ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
+            → ⟨ c′ , coldS true (play τ u (suc i) t f) , rising (nx a) , u ▸ ix i ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
   emit-step fd cl rewrite fd | cl = _ , refl
 
   -- A TAKE'S FAILURE ENDS UNDER IT: past the failing value, the take's
@@ -322,8 +323,8 @@ module _ {R : Set} (o : PureObs [] R) where
   -- AN OPEN COLD'S TICK IS AN ANCESTOR OF A ROW of the root's entry.
   tick-below : ∀ {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {τ u i t} {fr : Frame A′ t}
              → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (slotOf u i fr)))
-             → closed c′ ≡ false → ¬ ¬ Below Rt (slotOf u i fr)
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (u ▸ ix i)))
+             → closed c′ ≡ false → ¬ ¬ Below Rt (u ▸ ix i)
   tick-below {c = c} {s} {q} {fr = emit a f} pth fd cl = climb (pth ▸τ emit-step {c = c} {s = s} {q = q} fd cl) cl
   tick-below {fr = stall f}  pth fd cl = tick-skip pth fd cl at-skip
   tick-below {fr = close f}  pth fd cl = tick-skip pth fd cl at-skip

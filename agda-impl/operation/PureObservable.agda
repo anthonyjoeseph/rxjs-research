@@ -67,21 +67,8 @@ data Tape (A : Set) : Set₁ where
   ending : Pos → Tape A
   over   : Tape A
 
--- Where a frame's step sits: its slot, or, for a value its frame closes
--- straight after, under the frame's end, as the denotation places it.
-baseOf : ∀ {A t} → Root → Frame A t → Root
-baseOf u (emit _ (close _)) = nested (u ▸ last)
-baseOf u _                  = u
-
-stepOf : ∀ {A t} → ℕ → Frame A t → ℕ
-stepOf i (emit _ (close _)) = 0
-stepOf i _                  = i
-
-slotOf : ∀ {A t} → Root → ℕ → Frame A t → Pos
-slotOf u i fr = baseOf u fr ▸ ix (stepOf i fr)
-
 due : ∀ {A} → Tape A → Maybe Key
-due (play τ u i t fr) = just (atᴷ (slotOf u i fr))
+due (play τ u i t fr) = just (atᴷ (u ▸ ix i))
 due (ending e)        = just (atᴷ e)
 due over              = nothing
 
@@ -99,12 +86,6 @@ rest : ∀ {A t} → Time → Pos → From A t → Tape A
 rest τ e done        = ending e
 rest τ e quiet       = over
 rest τ e (at t _ fr) = play τ (fired (τ + t) e) 0 t fr
-
--- What a value's step leaves: the frame's next step, or, its frame
--- closing straight after, the close taken with it and what follows.
-onward : ∀ {A} → Time → Root → ℕ → (t : Time) → Frame A t → Tape A
-onward τ u i t (close k) = rest τ (u ▸ last ⊕ [ last ]) (From∞.force k)
-onward τ u i t k         = play τ u (suc i) t k
 
 -- A timeline subscribed at `p`: frame 0 played in place, or its frames
 -- after it.
@@ -139,7 +120,7 @@ module Driver (R : Set) where
   played (leaf false l cl dv st) = silent 0 (st over)
   played (leaf true l true dv st) = silent 0 (st over)
   played (leaf true (play τ u i t (emit a k)) false dv st) =
-    silent (tickᴿ u) (dv (nx a) (onward τ u i t k) true (slotOf u i (emit a k)))
+    silent (tickᴿ u) (dv (nx a) (play τ u (suc i) t k) true (u ▸ ix i))
   played (leaf true (play τ u i t (stall k)) false dv st) = silent (tickᴿ u) (st (play τ u (suc i) t (Frame∞.force k)))
   played (leaf true (play τ u i t (close k)) false dv st) = silent (tickᴿ u) (st (rest τ (u ▸ last) (From∞.force k)))
   played (leaf true over false dv st) = silent 0 (st over)

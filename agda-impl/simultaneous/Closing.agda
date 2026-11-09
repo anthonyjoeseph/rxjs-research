@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; con
 
 open import Tree using (scan)
 open import denotation.Position using (Pos; root; _∙_; _≟ᵖ_)
-open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
@@ -44,7 +44,7 @@ open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run
 open import simultaneous.Batcher using (released; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate; Step; bstep; bstart; pending; asEmits; mark-step; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; pending; asEmits; mark-step; Routes; count)
 
 ------------------------------------------------------------------------
 -- The protocol, read off the elaborated run

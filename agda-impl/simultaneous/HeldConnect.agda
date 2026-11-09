@@ -21,7 +21,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import denotation.Position using (Pos; Path; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; _<ᵖ_)
-open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
 open import Relation.Nullary using (¬_)
@@ -40,7 +40,7 @@ open import Function.Bundles using (Equivalence)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
 
 open import simultaneous.SObs using (module Elaborate)
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE)
 
 ------------------------------------------------------------------------
 -- Positions

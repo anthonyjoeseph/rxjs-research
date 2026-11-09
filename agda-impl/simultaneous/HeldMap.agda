@@ -13,7 +13,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_)
-open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; map-out; map-end; map-skip;
   map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible)
@@ -25,7 +25,7 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (HeldD)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; mapIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; mapIE)
 
 ------------------------------------------------------------------------
 -- Rows

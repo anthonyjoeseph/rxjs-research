@@ -28,7 +28,7 @@ open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhi
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
 open import operation.Key using (at; after; at-after)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening; slotOf; onward)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
                     cut; cpM; cutM; CS; cs; closedUp; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
@@ -218,7 +218,7 @@ data Delivers {Γ A} : St Γ A → Mark → Pos → Set₁ where
   d-ofx  : ∀ {i q} → Delivers (ofS i q []) ofM (q ⊕ [ last ])
   d-join : ∀ {j x q e ib} → Delivers (joinS j true x ((q , e) ∷ ib)) joinM q
   d-stop : ∀ {i keep r s} → Delivers (takeS i keep (cpAt r) s) cpM (r ⊕ [ last ])
-  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (slotOf u i (emit a k))
+  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (u ▸ ix i)
   d-ending : ∀ {e} → Delivers (coldS true (ending e)) leafM e
 
 
@@ -525,8 +525,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   -- A cold's next value, or its end, delivered.
   run-cold-nx : ∀ {Cr Γ A} {c : Ctx R Γ A} {τ u i t a} {k : Frame A t} {r} → closed c ≡ false
-              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
-              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (onward τ u i t k) , rising (nx a) , slotOf u i (emit a k) ⟩
+              → Inv Rt Cr (bef (u ▸ ix i)) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
+              → Inv Rt Cr (bef (u ▸ ix i)) ⟨ c , coldS true (play τ u (suc i) t k) , rising (nx a) , u ▸ ix i ⟩
   run-cold-nx cl (settled {N = owes}          _ fr h)              = flying fr cl (cold-nx h)
   run-cold-nx cl (settled {N = dead _ _}      _ fr h)              = adrift fr cl (rest-cold h)
   run-cold-nx cl (settled {N = lane _ _ _}    _ fr (_ , _ , () , _))

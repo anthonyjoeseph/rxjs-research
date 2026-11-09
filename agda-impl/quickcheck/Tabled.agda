@@ -252,10 +252,10 @@ module ScanL {A B : Set} (f : B → A → B) (z : B) (o : Listed A) where
   mutual
     levels : ℕ → List (Pos × A) → List (Pos × A × List B) → List (Pos × A × List B)
     levels zero    vs cur = []
-    levels (suc k) vs cur = cur ++ onward k (after vs) cur
+    levels (suc k) vs cur = cur ++ play k (after vs) (suc cur)  
 
-    onward : ℕ → List (Pos × A) → List (Pos × A × List B) → List (Pos × A × List B)
-    onward k vs cur = levels k vs (mapL (step cur) vs)
+    play : ℕ (suc →) List (Pos × A) → List (Pos × A × List B) → List (Pos × A × List B)
+    play k vs (suc cur) = levels k vs (mapL (step cur) vs)
 
   table : List (Pos × A × List B)
   table = levels (length vals) (nths 0) (mapL opening (nths 0))

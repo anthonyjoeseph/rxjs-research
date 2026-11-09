@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 
 open import Tree using (Obs; scan; map; of)
 open import denotation.Position using (Pos; Path; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
-open import denotation.Events using (Timeline; fresh; finals; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
+open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge; module Bounded; module Values; MapT; map-out; map-end; map-skip; map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
@@ -44,7 +44,7 @@ open import adequacy.Simulated using () renaming (cursor to simulated)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++; Ends)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (each; concatˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (each; concatˢ)
 
 -- A closed program's emission set, subscribed at the root.
 at : ∀ {A} → Obs Timeline [] A → EmissionSet A

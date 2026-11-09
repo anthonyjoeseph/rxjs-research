@@ -27,11 +27,9 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
 open import denotation.Position using (Pos; ix; last; tick; _<ᵖ_; _⊕_; _∙_; cascade; Root; nested; fired; _▸_; tickᴿ; _<ˡ_) renaming (sub to subᴱ)
-open import denotation.Simultaneity using (earlier-tick; step-tick; ℕ-eq; reflᵖ; isLt-lt)
-open import denotation.Laws.Worlds using (⊕-assoc)
-open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-▸; <ᵖ-asym; From; From∞; Frame; done; quiet; at; emit; stall; close;
-  timelineAt)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; onward) renaming (over to overT)
+open import denotation.Simultaneity using (earlier-tick; step-tick)
+open import denotation.Events using (<ᵖ-below; <ᵖ-ix; <ᵖ-▸; <ᵖ-asym; From; From∞; done; quiet; at; emit; stall; close; timelineAt)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
@@ -532,39 +530,9 @@ opening-ok p done             = tt
 opening-ok p quiet            = tt
 opening-ok p (at (suc t) _ b) = ≤-refl
 
--- A step of a timer's frame lies in one of the timer's instants.
-slot-fired : ∀ {A t} T e i (fr : Frame A t) → Σ _ λ l → Σ _ λ q → slotOf (fired T e) i fr ≡ (cascade T e l ∙ q)
-slot-fired T e i (emit _ (close _))  = _ , _ , refl
-slot-fired T e i (emit _ (emit _ _)) = _ , _ , refl
-slot-fired T e i (emit _ (stall _))  = _ , _ , refl
-slot-fired T e i (stall _)           = _ , _ , refl
-slot-fired T e i (close _)           = _ , _ , refl
-
--- A step played in place lies past where it was subscribed.
-slot-below : ∀ {A t} p i (fr : Frame A t) → p <ᵖ slotOf (nested p) i fr ≡ true
-slot-below p i (emit _ (close _))  = subst (λ z → p <ᵖ z ≡ true) (sym (⊕-assoc p [ last ] [ ix 0 ])) (<ᵖ-below p {last} (ix 0 ∷ []))
-slot-below p i (emit _ (emit _ _)) = <ᵖ-below p []
-slot-below p i (emit _ (stall _))  = <ᵖ-below p []
-slot-below p i (stall _)           = <ᵖ-below p []
-slot-below p i (close _)           = <ᵖ-below p []
-
--- A burst's later step, and anything under it, lies past an earlier.
-<ᵖ-▸⊕ : ∀ r {a b} q → a <ˡ b ≡ true → (r ▸ a) <ᵖ (r ▸ b ⊕ q) ≡ true
-<ᵖ-▸⊕ (nested p) {b = b} q h = subst (λ z → (p ⊕ [ _ ]) <ᵖ z ≡ true) (sym (⊕-assoc p [ b ] q)) (<ᵖ-part p [] q h)
-<ᵖ-▸⊕ (fired t e) q h rewrite ℕ-eq t | reflᵖ e | isLt-lt h = refl
-
--- A stall's next step lies past it.
-slot-next : ∀ {A t} u i (fr : Frame A t) → (u ▸ ix i) <ᵖ slotOf u (suc i) fr ≡ true
-slot-next u i (emit _ (close _))  = <ᵖ-▸⊕ u [ ix 0 ] refl
-slot-next u i (emit _ (emit _ _)) = <ᵖ-▸ u (<ᵖ-ix i)
-slot-next u i (emit _ (stall _))  = <ᵖ-▸ u (<ᵖ-ix i)
-slot-next u i (stall _)           = <ᵖ-▸ u (<ᵖ-ix i)
-slot-next u i (close _)           = <ᵖ-▸ u (<ᵖ-ix i)
-
-onward-ok : ∀ {A} τ u i t (k : Frame A t) → tickᴿ u ≤ τ + t → TapeOK (onward τ u i t k)
-onward-ok τ u i t (close k)  ht = rest-ok τ (u ▸ last ⊕ [ last ]) (From∞.force k)
-onward-ok τ u i t (emit _ _) ht = ht
-onward-ok τ u i t (stall _)  ht = ht
+-- A frame's next step lies past its last.
+slot-next : ∀ u i → (u ▸ ix i) <ᵖ (u ▸ ix (suc i)) ≡ true
+slot-next u i = <ᵖ-▸ u (<ᵖ-ix i)
 
 module _ {R : Set} where
   open Driver R using (took; played; silent; value)
@@ -576,7 +544,7 @@ module _ {R : Set} where
   played-ok (leaf true (play τ u i t fr) true dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true overT true dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true (play τ u i t (emit a k)) false dv st) (lift ht , d , s) refl =
-    d (nx a) (onward τ u i t k) true (slotOf u i (emit a k)) (onward-ok τ u i t k ht)
+    d (nx a) (play τ u (suc i) t k) true (u ▸ ix i) ht
   played-ok (leaf true (play τ u i t (stall k)) false dv st) (lift ht , d , s) refl = s _ ht
   played-ok (leaf true (play τ u i t (close k)) false dv st) (lift ht , d , s) refl =
     s _ (rest-ok τ (u ▸ last) (From∞.force k))
@@ -627,8 +595,7 @@ next-ahead : ∀ {A} τ u i {t} (m : From A (suc t)) {κ′} → tickᴿ u ≤ �
            → due (rest τ (u ▸ last) m) ≡ just κ′ → atᴷ (u ▸ ix i) <ᴷ κ′ ≡ true
 next-ahead τ u i done ht refl = trans (at-<ᴷ (u ▸ ix i) (u ▸ last)) (<ᵖ-▸ u refl)
 next-ahead τ u i quiet ht ()
-next-ahead τ u i {t} (at t′ le fr) ht refl with slot-fired (τ + t′) (u ▸ last) 0 fr
-... | _ , _ , eq rewrite eq =
+next-ahead τ u i {t} (at t′ le fr) ht refl =
   trans (at-<ᴷ (u ▸ ix i) _) (earlier-tick (u ▸ ix i) (u ▸ last) _ _
     (subst (_< τ + t′) (sym (step-tick u (ix i))) (≤-trans (s≤s ht) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le)))))
 
@@ -639,16 +606,6 @@ frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A
 frame-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {i} {f = f} pth fd dr with stamped o pth
 ... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
 ...   | _ , ht | here refl = next-ahead τ u i (From∞.force f) ht dr
-
--- A value its frame closes straight after: the frame's next is ahead of
--- it too.
-fin-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t a f κ κ′}
-          → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-          → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t (emit a (close f)))) leafM κ)
-          → due (rest τ (u ▸ last ⊕ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
-fin-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {t = t} {f = f} pth fd dr with stamped o pth
-... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
-...   | _ , ht | here refl = next-ahead τ (nested (u ▸ last)) 0 (From∞.force f) (subst (_≤ τ + t) (sym (step-tick u last)) ht) dr
 
 -- A JOINER'S INBOX ASCENDS: the entry behind the head is no earlier.
 inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {j g x q₀ e q₁ e₁ ib κ}
@@ -662,11 +619,10 @@ inbox-asc o {c = c} {s} {c′ = c′} {q₀ = q₀} {q₁ = q₁} pth fd with st
 -- A COLD OPENS AHEAD: a cold a run subscribes first comes due strictly
 -- after where it was subscribed.
 open-ahead : ∀ {A} q (m : From A 0) {κ} → due (opening q m) ≡ just κ → atᴷ q <ᴷ κ ≡ true
-open-ahead q (at zero _ b) refl = trans (at-<ᴷ q _) (slot-below q 0 b)
+open-ahead q (at zero _ b) refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
 open-ahead q done refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
 open-ahead q quiet ()
-open-ahead q (at (suc t′) _ b) refl with slot-fired (tick q + suc t′) (q ⊕ [ last ]) 0 b
-... | _ , _ , eq rewrite eq = trans (at-<ᴷ q _) (earlier-tick q (q ⊕ [ last ]) _ _ (m<m+n (tick q) (s≤s z≤n)))
+open-ahead q (at (suc t′) _ b) refl = trans (at-<ᴷ q _) (earlier-tick q (q ⊕ [ last ]) _ _ (m<m+n (tick q) (s≤s z≤n)))
 
 -- A SUBSCRIBING RUN IS AT ITS SUBSCRIPTION: every conf a run reaches
 -- subscribing has a pending subscription in focus, owed where the run is.

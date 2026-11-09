@@ -51,7 +51,7 @@ open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
-open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh; finals)
+open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh)
 open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
@@ -66,7 +66,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -215,10 +215,11 @@ private
     (flatMap (mergeᶠ nothing) (λ _ → connected (here refl)) (takeWhile false (λ v → v <ᵇ 3) (connected (here refl))))
 
   -- A late reader whose first event is its source's end, ending a lane
-  -- whose successor's burst the batch must still cover:
+  -- whose successor's burst the batch must still cover; the timer's
+  -- completion is an async call of its own, so its instant too:
   -- `timer(1).pipe(connect(h => merge(h.pipe(map(() => 5)),
   --    h.pipe(mergeMap(() => of(1, 2)), concatMap(v => v === 1 ? h : of(v * 10))))))`
-  -- [5, 20]
+  -- [5] [20]
   endHanded : Obs Timeline [] ℕ
   endHanded = connect (cold (fixed (at 1 z≤n (emit 0 (close over)))))
     (merge (map (λ _ → 5) (connected (here refl)))
@@ -263,7 +264,7 @@ private
   pins = ("timer-of" , timerOf , (3 ∷ 4 ∷ []) ∷ [])
        ∷ ("held-open" , heldOpen , (5 ∷ 7 ∷ []) ∷ [])
        ∷ ("cut-shared" , cutShared , (2 ∷ 3 ∷ 3 ∷ []) ∷ [])
-       ∷ ("end-handed" , endHanded , (5 ∷ 20 ∷ []) ∷ [])
+       ∷ ("end-handed" , endHanded , (5 ∷ []) ∷ (20 ∷ []) ∷ [])
        ∷ ("lazy-cut" , lazyCut , (1 ∷ 2 ∷ 3 ∷ []) ∷ [])
        ∷ ("queue-cut" , queueCut , (1 ∷ 1 ∷ 3 ∷ []) ∷ [])
        ∷ ("raw" , raw , (1 ∷ 2 ∷ []) ∷ (3 ∷ []) ∷ (4 ∷ []) ∷ [])

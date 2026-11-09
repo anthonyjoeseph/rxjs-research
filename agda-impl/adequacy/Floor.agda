@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; ix; last; _⊕_; _▸_) renaming (sub to subᴾ)
 open import denotation.Events using (From∞; Frame∞; emit; stall; close; timelineAt)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening; slotOf) renaming (over to overT)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
@@ -204,7 +204,7 @@ module _ {R : Set} where
   leafs c q true  (play τ u i t (emit a f))  (here refl) lo ah refl | false = ⊑-refl
   leafs c q true  (play τ u i t (stall f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (stall f))) (coldS true (play τ u (suc i) t (Frame∞.force f))) q
-      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (slotOf u (suc i) (Frame∞.force f))) (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i (Frame∞.force f))))
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (u ▸ ix (suc i))) (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i)))
          ; (k-own (there ())) ; (k-kid ()) }) lo
   leafs c q true  (play τ u i t (close f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ▸ last) (From∞.force f))) q

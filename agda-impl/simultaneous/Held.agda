@@ -20,7 +20,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
-open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
 open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
@@ -40,7 +40,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
   Input; react; going; fed; opening)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -109,9 +109,9 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 -- EACH ELABORATED FORMER HOLDS when its children do, under the meaning
 -- and under every approximant alike.
 
--- A cold value its frame closes straight after has no over of its own:
--- the cold's end, in the same instant, carries its route
--- (`simultaneous.Routed.Carried`).
+-- A cold's async value ends in its own over.  Its async completion is an
+-- instant of its own, even straight after a value: it mints a name, and
+-- the cold's end carries that route (`simultaneous.Routed.Carried`).
 postulate
   held-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
   held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})

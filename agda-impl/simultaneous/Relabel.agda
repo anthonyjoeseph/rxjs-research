@@ -22,7 +22,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.Maybe using (Maybe)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_)
-open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
 open import denotation.Read using (Visible; After; cursor)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
@@ -34,7 +34,7 @@ open import simultaneous.Routed using (Held; Idle; Carried; c-value; c-stop; c-o
 open import simultaneous.Readings using (rootOf)
 open import denotation.Laws.Worlds using (_⊑_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
 
 ------------------------------------------------------------------------
 -- Same marks

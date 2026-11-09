@@ -23,10 +23,10 @@ open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
 
 open import denotation.Position using (Pos; Label; ix; last; isLt; _<ˡ_; _⊕_; nested; _▸_)
-open import denotation.Events using (Frame; emit; stall; close; ix-<)
+open import denotation.Events using (ix-<)
 open import denotation.Simultaneity using (reflˡ)
 open import denotation.Laws.Worlds using (⊕-identityʳ)
-open import operation.PureObservable using (module Machine; module Driver; baseOf; stepOf)
+open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (Ctx; St; Mode; Conf; ⟨_,_,_,_⟩; plug; subscribing; absorbed; rising; Stepped)
 open import operation.Key using (at; after; _<ᴷ_; <ᴷ-irrefl; clash; <ᴷ-asym; after-in)
 open import adequacy.Apart.Cone using (Cone; pre; cone-trans; cone-up; cone-apart; cone-after)
@@ -129,28 +129,10 @@ private
   ext : ∀ {x y} → Cone x y → Cone (x ⊕ []) y
   ext {x} {y} c = subst (λ q → Cone q y) (sym (⊕-identityʳ x)) c
 
--- A frame's step owes under a step of its root `v`: a value its frame
--- closes straight after, under the frame's end.
-base-in : ∀ {A v i w y} (fr : Frame A w) → In (tl (baseOf v fr) (stepOf i fr)) y → Σ Label λ l → Σ (List Label) λ ls → Cone (v ▸ l ⊕ ls) y
-base-in (emit _ (close _)) (inj₁ (j , _ , c)) = last , [ ix j ] , c
-base-in (emit _ (close _)) (inj₂ c)           = last , [ last ] , c
-base-in (emit _ (emit _ _)) (inj₁ (j , _ , c)) = ix j , [] , ext c
-base-in (emit _ (emit _ _)) (inj₂ c)           = last , [] , ext c
-base-in (emit _ (stall _))  (inj₁ (j , _ , c)) = ix j , [] , ext c
-base-in (emit _ (stall _))  (inj₂ c)           = last , [] , ext c
-base-in (stall _)           (inj₁ (j , _ , c)) = ix j , [] , ext c
-base-in (stall _)           (inj₂ c)           = last , [] , ext c
-base-in (close _)           (inj₁ (j , _ , c)) = ix j , [] , ext c
-base-in (close _)           (inj₂ c)           = last , [] , ext c
-
--- A cold's frame, inside the run.
-sub-frame : ∀ {A p w} (fr : Frame A w) → Sub (tl (baseOf (nested p) fr) (stepOf 0 fr)) (cl p)
-sub-frame {p = p} fr = sub-cl (f-tl _ _) (λ y iy → inc (base-in fr iy)) (λ iy → out (base-in fr iy))
-  where
-    inc : ∀ {y} → Σ Label (λ l → Σ (List Label) λ ls → Cone (p ⊕ [ l ] ⊕ ls) y) → Cone p y
-    inc (l , ls , c) = cone-trans (cone-trans (pre [ l ]) (pre ls)) c
-    out : (Σ Label λ l → Σ (List Label) λ ls → Cone (p ⊕ [ l ] ⊕ ls) p) → ⊥
-    out (l , ls , c) = cone-up l [] (cone-trans (pre ls) c)
+-- A frame's step owes under a step of its root `v`.
+base-in : ∀ {v i y} → In (tl v i) y → Σ Label λ l → Σ (List Label) λ ls → Cone (v ▸ l ⊕ ls) y
+base-in (inj₁ (j , _ , c)) = ix j , [] , ext c
+base-in (inj₂ c)           = last , [] , ext c
 
 -- An of's values, inside the run.
 sub-vals : ∀ {p} i → Sub (tl (nested p) i) (cl p)
