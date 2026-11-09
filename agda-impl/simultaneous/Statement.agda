@@ -56,6 +56,10 @@ open import simultaneous.Closing using (batches)
 -- the same stamped values, and an instant over on one side is over on
 -- the other.  Switch, exhaust and the bounded queue are the real cases.
 -- The batcher's half is `simultaneous.Closing`.
+--
+-- REFUTED: e10449e erases, and `Groups` with it, as ranked: a run with no
+--   row in the subscribe frame ranks its values one below its elaboration,
+--   whose subscribed mark always lies there.
 postulate
   erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
 

@@ -32,6 +32,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE ERASURE
+
+Refuted as ranked: a run silent at subscription ranks its values one
+below its elaboration, which always has frame rows. Counting the frame
+as passed by every run, `make spec-check` finds no counterexample.
+Awaiting Anthony's ruling on that restatement of `Rank`; then a body by
+operator, switch, exhaust and the bounded queue the real cases.
+
+Members: `erases`.
+
 #### THE PROTOCOL
 
 Untried: every emit is named for its own instant, one begin and one
@@ -87,13 +97,3 @@ cover may hold positions with no row. Settled when these are bodies over
 `rooted`, the instant interval and a way to list a run's instants.
 
 Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
-
-#### THE ERASURE
-
-Untried: the elaborated run, marks dropped, is the plain run stamp for
-stamp — the elaboration adds no instant, so the ranks agree — with an
-instant over on one side over on the other, and completing together.
-Switch, exhaust and the bounded queue are the real cases. Settled when
-each is a body by operator.
-
-Members: `erases`.
