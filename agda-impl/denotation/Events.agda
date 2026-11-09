@@ -6,7 +6,7 @@ open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
-open import denotation.Position using (Time; Pos; Path; ix; sub; last; _∙_; tick; _⊕_; cascadeAt; lt; eq; gt; lexi; isLt; isEq;
+open import denotation.Position using (Time; Pos; Path; ix; sub; last; _∙_; tick; _⊕_; Root; nested; fired; _▸_; lt; eq; gt; lexi; isLt; isEq;
   cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ᵖ_; insideᵗ; inside)
 open import denotation.Simultaneity using (ℕ-lt; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
@@ -429,13 +429,15 @@ open Events∞
 ------------------------------------------------------------------------
 -- A cold leaf, placed
 
--- A burst at `r` puts its i-th step at `r ⊕ [ ix i ]` and ends at
--- `r ⊕ [ last ]`, which is also where the timer for the next frame is
+-- A burst at `r` puts its i-th step at `r ▸ ix i` and ends at
+-- `r ▸ last`, which is also where the timer for the next frame is
 -- created: after the burst and all it caused.  A close straight after a
 -- value is that value's callback going on, so the value moves under the
 -- end: it sits at `q ⊕ [ ix 0 ]` and the frame ends at `q ⊕ [ last ]`,
--- with `q = r ⊕ [ last ]`, and a completion shares the value's instant.  A frame at tick 0 is the
--- subscribe burst, rooted at the subscription itself.  A timer firing
+-- with `q = r ▸ last`, and a completion shares the value's instant.  A
+-- frame at tick 0 is the subscribe burst, `nested` at the subscription,
+-- so all of it is one instant; a later frame is `fired`, so each of its
+-- steps is an instant of its own.  A timer firing
 -- shows no step of its own: at the root a hot's rekeying under `sub`
 -- puts it after the burst below it, and at the burst's first position it
 -- ties with that step, where an event must rise.
@@ -443,24 +445,24 @@ mutual
   frames : ∀ {A t} → Time → Pos → From A t → Events A
   frames τ e done       = end e
   frames τ e quiet      = hush
-  frames τ e (at t _ b) = burst τ (cascadeAt (τ + t) e) 0 b
+  frames τ e (at t _ b) = burst τ (fired (τ + t) e) 0 b
 
-  burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
-  burst τ r i (emit a (close k)) = out (r ⊕ [ last ] ⊕ [ ix 0 ]) a λ where
-    .force → frames τ (r ⊕ [ last ] ⊕ [ last ]) (From∞.force k)
+  burst : ∀ {A t} → Time → Root → ℕ → Frame A t → Events A
+  burst τ r i (emit a (close k)) = out (r ▸ last ⊕ [ ix 0 ]) a λ where
+    .force → frames τ (r ▸ last ⊕ [ last ]) (From∞.force k)
     .cut   → idle
-  burst τ r i (emit a k) = out (r ⊕ [ ix i ]) a λ where
+  burst τ r i (emit a k) = out (r ▸ ix i) a λ where
     .force → burst τ r (suc i) k
     .cut   → idle
-  burst τ r i (stall k)  = skip (r ⊕ [ ix i ]) λ where
+  burst τ r i (stall k)  = skip (r ▸ ix i) λ where
     .force → burst τ r (suc i) (Frame∞.force k)
     .cut   → idle
-  burst τ r i (close k)  = skip (r ⊕ [ ix i ]) λ where
-    .force → frames τ (r ⊕ [ last ]) (From∞.force k)
+  burst τ r i (close k)  = skip (r ▸ ix i) λ where
+    .force → frames τ (r ▸ last) (From∞.force k)
     .cut   → idle
 
 start : ∀ {A} → Pos → From A 0 → Events A
-start p (at zero _ b) = burst (tick p) p 0 b
+start p (at zero _ b) = burst (tick p) (nested p) 0 b
 start p m             = frames (tick p) (p ⊕ [ last ]) m
 
 -- `of`'s steps from the i-th on, under the subscription at `p`.

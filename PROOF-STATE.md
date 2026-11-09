@@ -14,6 +14,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+## Tier 1 — the instant is a datum
+
+**The instant is a datum:** the subscribe frame, or one async emission (`cascade t e l`), carried in the position; everything green over it.
+
+### Ledger
+
 ## Tier 2 — the elaboration
 
 **The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
@@ -28,16 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE PROTOCOL
 
-Suspected false of today's elaboration: the instant is a whole timer
-frame, but the elaboration mints a name and an over per async value, so
-two emits of one frame carry two names and two emissions (`one-name`,
-`one-value-name`, `one-emission`). Also untried: the subscribe mark sits
-once before every begin with every value past it async, and every value
-precedes the completion. Settled when the elaboration names per frame,
-the held streams read the instant instead of `emission`, and each is a
-body over the elaboration's layers.
+Untried: every emit is named for its own instant, one begin and one
+value name per instant — the elaboration mints both per async value,
+which is per instant; the subscribe mark sits once before every begin
+with every value past it async; every value precedes the completion.
+Settled when each is a body over the elaboration's layers.
 
-Members: `named`, `one-name`, `one-value-name`, `one-emission`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
+Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE HELD STREAMS
 

@@ -3,7 +3,7 @@
 -- READING A RUN THE WAY THE SPEC DOES.
 --
 -- AN INSTANT IS A COMPONENT OF THE POSITION (`denotation.Position`): the
--- subscribe frame, or one timer's cascade.  Two rows are simultaneous
+-- subscribe frame, or one async emission.  Two rows are simultaneous
 -- exactly when their instants are equal, and nothing about a row has to
 -- be proven for that reading to be right.
 module simultaneous.Readings where
@@ -11,7 +11,7 @@ module simultaneous.Readings where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Product using (_×_; _,_)
-open import denotation.Position using (Pos; Instant; cascade; _∙_; root) renaming (instant to instantᵖ)
+open import denotation.Position using (Pos; Instant; _∙_) renaming (instant to instantᵖ)
 open import simultaneous.InstEmit using (InstEmit; valuesOf)
 
 open InstEmit using (instant)
@@ -19,12 +19,10 @@ open InstEmit using (instant)
 instantOf : Pos → Instant
 instantOf = instantᵖ
 
--- THE EMISSION a row lies in: the subscribe frame, or one step of a
--- timer's frame, finer than the instant.  The elaboration names and
--- closes routes per emission.
+-- THE EMISSION a row lies in: the root of its instant.  The elaboration
+-- names and closes routes per emission, which is per instant.
 emission : Pos → Pos
-emission (cascade t e ∙ (l ∷ _)) = cascade t e ∙ (l ∷ [])
-emission _                       = root
+emission p = instantOf p ∙ []
 
 ------------------------------------------------------------------------
 -- InstEmit streams

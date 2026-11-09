@@ -23,13 +23,14 @@ open import denotation.Laws using (compositional; map-fusion)
 -- the plain run's values stamped the same way.
 open import simultaneous.Statement using (spec)
 
--- THE INSTANT IS THE TIMESTAMP: an effect runs in its cause's instant, a
--- cascade's instant is shared only beneath its root, two firings are
--- never one instant, instants order the subscribe frame first then by
--- tick then by creator, a cascade fires after its creator, and an
--- instant is an interval of positions.
+-- THE INSTANT IS THE TIMESTAMP: the subscribe frame is one instant, and
+-- each async emission is its own.  An effect runs in its cause's
+-- instant, an async emission's instant is shared only beneath it, two
+-- async emissions are never one instant, instants order the subscribe
+-- frame first then by tick then by creator then by step, a cascade fires
+-- after its creator, and an instant is an interval of positions.
 open import denotation.Simultaneity using (effect-instant; cascade-own; frame-own; cascade-inj;
-  frame-first; later-tick; same-tick; after-creator; between)
+  frame-first; later-tick; same-tick; same-timer; after-creator; between)
 
 -- THE ORDER IS THE CALL TREE'S PRE-ORDER: a position flattened to one
 -- label list, its instant leading, orders and nests as that list does.

@@ -57,7 +57,7 @@ open import Data.Product using (_×_; _,_)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
-open import denotation.Position using (Pos; ix; last; cascadeAt; _⊕_)
+open import denotation.Position using (Pos; ix; last; fired; _▸_; _⊕_)
 open import operation.Key using (Key; _<ᴷ_)
 open import Tree using (Obs)
 
@@ -274,12 +274,13 @@ module Drive {R : Set} (lp : Loop R) (c : IO ⊤) where
   push : ∀ {A} → Leaf A → Maybe A → IO ⊤
   push l e = readIORef (Leaf.inbox l) >>= λ es → writeIORef (Leaf.inbox l) (es ++ e ∷ [])
 
-  -- Where a delivery goes: in its cold's subscribe burst, or the cascade
-  -- of the n-th arrival, created where the cold's burst ended.
+  -- Where a delivery goes: in its cold's subscribe burst, or the first
+  -- step of the cascade of the n-th arrival, created where the cold's
+  -- burst ended: each async delivery an instant of its own.
   placed : ∀ {A} → Leaf A → IO Pos
   placed l = readIORef (Leaf.burst l) >>= λ where
     (just (u , i)) → writeIORef (Leaf.burst l) (just (u , suc i)) >> pure (u ⊕ [ ix i ])
-    nothing        → readIORef (Loop.roots lp) >>= λ n → writeIORef (Loop.roots lp) (suc n) >> pure (cascadeAt (suc n) (Leaf.base l ⊕ [ last ]))
+    nothing        → readIORef (Loop.roots lp) >>= λ n → writeIORef (Loop.roots lp) (suc n) >> pure (fired (suc n) (Leaf.base l ⊕ [ last ]) ▸ ix 0)
 
   delivered : ∀ {A} → (Ev A → Leaf A → Bool → Pos → Conf R) → Leaf A → Maybe A → Pos → Conf R
   delivered dv l (just a) p = dv (nx a) l true p

@@ -24,7 +24,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
-open import denotation.Position using (Pos; root; frame; _≟ᵖ_)
+open import denotation.Position using (Pos; root; frame; _∙_; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
 open import denotation.Laws.Worlds using (here)
@@ -235,13 +235,6 @@ postulate
   done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))
             → elaborated o kc (out (instEmit (mark Marks.completed) m)) → kv ≺ kc
 
--- Two emits of one instant are of one emission: the held streams name
--- and close routes per emission (`simultaneous.Routed`), the spec reads
--- instants per frame.
-postulate
-  one-emission : ∀ {A} (o : SObs [] A) {k k′ x x′} → elaborated o k (out x) → elaborated o k′ (out x′)
-               → instantOf k ≡ instantOf k′ → emission k ≡ emission k′
-
 -- An instant's values precede its overs: the value lies before where
 -- the over is sent from, the over at or under it.
 over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
@@ -249,7 +242,7 @@ over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (inst
 over-last o {kv} xv xo eq =
   ≺-≼-≺ {kv} (subst (λ I → kv ≺ opos I) em (proj₁ (Held.early (held o) xv (subst Valued (sym em) (proj₁ lt))))) (⊑-≼ (proj₂ lt))
   where
-    em = one-emission o xv xo eq
+    em = cong (_∙ []) eq
     lt = Held.late (held o) xo
 
 ------------------------------------------------------------------------

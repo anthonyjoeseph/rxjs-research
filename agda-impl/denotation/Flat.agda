@@ -1,6 +1,6 @@
 -- THE ORDER IS THE CALL TREE'S PRE-ORDER.  Flatten a position into one
 -- list of labels — its instant as a leading tick, then for a cascade its
--- creator, then its path — and the position order is the lexicographic
+-- creator and its step, then its path — and the position order is the lexicographic
 -- order of those lists, and `inside` is a list prefix.  So the order
 -- needs no instants to be read: a merge of two runs is a sorted merge of
 -- their flat lists.
@@ -69,7 +69,7 @@ mutual
 mutual
   flat : Pos → FPos
   flat (frame ∙ p)       = fix 0 ∷ flatᵗ p
-  flat (cascade t e ∙ p) = fix t ∷ fsub (flat e) ∷ flatᵗ p
+  flat (cascade t e a ∙ p) = fix t ∷ fsub (flat e) ∷ flatˡ a ∷ flatᵗ p
 
   flatᵗ : Path → FPos
   flatᵗ []      = []
@@ -84,7 +84,7 @@ mutual
 mutual
   data Ok : Pos → Set where
     ok-frame   : ∀ {p} → Okᵗ p → Ok (frame ∙ p)
-    ok-cascade : ∀ {t e p} → Ok e → Okᵗ p → Ok (cascade (suc t) e ∙ p)
+    ok-cascade : ∀ {t e a p} → Ok e → Okˡ a → Okᵗ p → Ok (cascade (suc t) e a ∙ p)
 
   data Okᵗ : Path → Set where
     []  : Okᵗ []
@@ -96,11 +96,11 @@ mutual
     ok-last : Okˡ last
 
 -- A flat list led by a tick: tick 0 then any labels, or a later tick, a
--- creator and any labels; every `fsub` holds one such.
+-- creator, a step and any labels; every `fsub` holds one such.
 mutual
   data Flat : FPos → Set where
     flat-frame   : ∀ {p} → Flatᵗ p → Flat (fix 0 ∷ p)
-    flat-cascade : ∀ {t e p} → Flat e → Flatᵗ p → Flat (fix (suc t) ∷ fsub e ∷ p)
+    flat-cascade : ∀ {t e a p} → Flat e → Flatˡ a → Flatᵗ p → Flat (fix (suc t) ∷ fsub e ∷ a ∷ p)
 
   data Flatᵗ : FPos → Set where
     []  : Flatᵗ []
@@ -140,11 +140,12 @@ mutual
 
   cmp-flat : ∀ {a b} → Ok a → Ok b → cmpFP (flat a) (flat b) ≡ cmpPos a b
   cmp-flat (ok-frame xs)   (ok-frame ys)   = cmp-flatᵗ xs ys
-  cmp-flat (ok-frame _)    (ok-cascade _ _) = refl
-  cmp-flat (ok-cascade _ _) (ok-frame _)   = refl
-  cmp-flat {cascade (suc t) e ∙ p} {cascade (suc u) d ∙ q} (ok-cascade ex xs) (ok-cascade ey ys) =
-    trans (cong (lexi (cmpℕ (suc t) (suc u))) (cong₂ lexi (cmp-flat ex ey) (cmp-flatᵗ xs ys)))
-          (sym (lexi-assoc (cmpℕ (suc t) (suc u)) (cmpPos e d) (cmpPath p q)))
+  cmp-flat (ok-frame _)      (ok-cascade _ _ _) = refl
+  cmp-flat (ok-cascade _ _ _) (ok-frame _)     = refl
+  cmp-flat {cascade (suc t) e a ∙ p} {cascade (suc u) d b ∙ q} (ok-cascade ex xa xs) (ok-cascade ey yb ys) =
+    trans (cong (lexi (cmpℕ (suc t) (suc u))) (cong₂ lexi (cmp-flat ex ey) (cong₂ lexi (cmp-flatˡ xa yb) (cmp-flatᵗ xs ys))))
+          (sym (trans (lexi-assoc (cmpℕ (suc t) (suc u)) (lexi (cmpPos e d) (cmpLabel a b)) (cmpPath p q))
+                      (cong (lexi (cmpℕ (suc t) (suc u))) (lexi-assoc (cmpPos e d) (cmpLabel a b) (cmpPath p q)))))
 
 -- THE ORDER IS THE FLAT ORDER.
 flat-order : ∀ {a b} → Ok a → Ok b → (flat a <ᶠ flat b) ≡ (a <ᵖ b)
@@ -174,14 +175,17 @@ inside-flatᵗ {a ∷ r} {b ∷ k} (x ∷ xs) (y ∷ ys) =
 -- `INSIDE` IS A FLAT PREFIX.
 flat-inside : ∀ {r k} → Ok r → Ok k → insideᶠ (flat r) (flat k) ≡ inside r k
 flat-inside (ok-frame xs)    (ok-frame ys)    = inside-flatᵗ xs ys
-flat-inside (ok-frame _)     (ok-cascade _ _) = refl
-flat-inside (ok-cascade _ _) (ok-frame _)     = refl
-flat-inside {cascade (suc t) e ∙ r} {cascade (suc u) d ∙ k} (ok-cascade ex xs) (ok-cascade ey ys) =
-  trans (same-∧ (cmpℕ (suc t) (suc u)) (fsub (flat e) ∷ flatᵗ r) (fsub (flat d) ∷ flatᵗ k))
+flat-inside (ok-frame _)       (ok-cascade _ _ _) = refl
+flat-inside (ok-cascade _ _ _) (ok-frame _)       = refl
+flat-inside {cascade (suc t) e a ∙ r} {cascade (suc u) d b ∙ k} (ok-cascade ex xa xs) (ok-cascade ey yb ys) =
+  trans (same-∧ (cmpℕ (suc t) (suc u)) (fsub (flat e) ∷ flatˡ a ∷ flatᵗ r) (fsub (flat d) ∷ flatˡ b ∷ flatᵗ k))
   (trans (cong (isEq (cmpℕ (suc t) (suc u)) ∧_)
-           (trans (same-∧ (cmpFP (flat e) (flat d)) (flatᵗ r) (flatᵗ k))
-                  (cong₂ (λ c z → isEq c ∧ z) (cmp-flat ex ey) (inside-flatᵗ xs ys))))
-         (eq-lexi (cmpℕ (suc t) (suc u)) (cmpPos e d) (insideᵗ r k)))
+           (trans (same-∧ (cmpFP (flat e) (flat d)) (flatˡ a ∷ flatᵗ r) (flatˡ b ∷ flatᵗ k))
+                  (cong₂ (λ c z → isEq c ∧ z) (cmp-flat ex ey)
+                    (trans (same-∧ (cmpFL (flatˡ a) (flatˡ b)) (flatᵗ r) (flatᵗ k))
+                           (cong₂ (λ c z → isEq c ∧ z) (cmp-flatˡ xa yb) (inside-flatᵗ xs ys))))))
+  (trans (cong (isEq (cmpℕ (suc t) (suc u)) ∧_) (eq-lexi (cmpPos e d) (cmpLabel a b) (insideᵗ r k)))
+         (eq-lexi (cmpℕ (suc t) (suc u)) (lexi (cmpPos e d) (cmpLabel a b)) (insideᵗ r k))))
 
 ------------------------------------------------------------------------
 -- Every flat list so shaped is a position's
@@ -190,9 +194,9 @@ mutual
   flat-onto : ∀ {f} → Flat f → Σ Pos λ a → Ok a × flat a ≡ f
   flat-onto (flat-frame xs) with flat-ontoᵗ xs
   ... | p , okp , ep = (frame ∙ p) , ok-frame okp , cong (fix 0 ∷_) ep
-  flat-onto (flat-cascade {t} ex xs) with flat-onto ex | flat-ontoᵗ xs
-  ... | e , oke , ee | p , okp , ep =
-    (cascade (suc t) e ∙ p) , ok-cascade oke okp , cong₂ (λ x y → fix (suc t) ∷ fsub x ∷ y) ee ep
+  flat-onto (flat-cascade {t} ex xa xs) with flat-onto ex | flat-ontoˡ xa | flat-ontoᵗ xs
+  ... | e , oke , ee | a , oka , ea | p , okp , ep =
+    (cascade (suc t) e a ∙ p) , ok-cascade oke oka okp , cong₂ (λ x y → fix (suc t) ∷ fsub x ∷ y) ee (cong₂ _∷_ ea ep)
 
   flat-ontoᵗ : ∀ {f} → Flatᵗ f → Σ Path λ p → Okᵗ p × flatᵗ p ≡ f
   flat-ontoᵗ [] = [] , [] , refl

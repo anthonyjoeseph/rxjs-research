@@ -2,16 +2,17 @@
 -- simultaneity, as facts about positions alone (`denotation.Position`):
 -- two rows are simultaneous exactly when their instants are equal, and
 -- these laws say when that is.  None of them is about a program: every
--- operator places a row by `_⊕_` under its cause, and every cascade root
--- by `cascadeAt`, so they hold of every emission set by construction.
+-- operator places a row by `_⊕_` under its cause, and every timer's step
+-- by `fired`, so they hold of every emission set by construction.
 --
 -- Read together: two positions share an instant exactly when they lie
--- under one root, and a root is the subscription or one `cascadeAt`.  So
--- a hot's deliveries are simultaneous with the source step that caused
--- them, a burst's steps with each other, and a completion's
--- continuations with the burst it ends; and two timer firings are never
--- simultaneous.  The order puts the subscribe frame first, then
--- cascades by tick, same-tick ones in creation order as rxjs fires them,
+-- under one root, and a root is the subscription or one step of one
+-- timer's frame.  So a hot's deliveries are simultaneous with the source
+-- step that caused them, a subscribe burst's steps with each other, and a
+-- completion's continuations with the step it ends; and no two async
+-- emissions are simultaneous, not even two of one timer's frame.  The
+-- order puts the subscribe frame first, then cascades by tick, same-tick
+-- ones in creation order as rxjs fires them, a timer's steps in order,
 -- and a cascade after the position its timer was created at.
 module denotation.Simultaneity where
 
@@ -25,8 +26,8 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
-open import denotation.Position using (Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; cascadeAt; lt; eq;
-  gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ⁱ_; _<ᵖ_)
+open import denotation.Position using (Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; Root; nested; fired;
+  _▸_; tickᴿ; lt; eq; gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ⁱ_; _<ᵖ_)
 
 ------------------------------------------------------------------------
 -- When two positions are simultaneous
@@ -37,20 +38,26 @@ effect-instant : ∀ p q → instant (p ⊕ q) ≡ instant p
 effect-instant (_ ∙ _) _ = refl
 
 effect-tick : ∀ p q → tick (p ⊕ q) ≡ tick p
-effect-tick (frame ∙ _)       _ = refl
-effect-tick (cascade _ _ ∙ _) _ = refl
+effect-tick (frame ∙ _)         _ = refl
+effect-tick (cascade _ _ _ ∙ _) _ = refl
 
--- A cascade's instant is shared only by positions beneath its root.
-cascade-own : ∀ t e p → instant p ≡ cascade t e → p ≡ cascadeAt t e ⊕ path p
-cascade-own t e (_ ∙ _) refl = refl
+-- A burst's step runs when its burst does.
+step-tick : ∀ r l → tick (r ▸ l) ≡ tickᴿ r
+step-tick (nested p)  l = effect-tick p _
+step-tick (fired _ _) _ = refl
+
+-- A timer's step's instant is shared only by positions beneath that step.
+cascade-own : ∀ t e l p → instant p ≡ cascade t e l → p ≡ (fired t e ▸ l) ⊕ path p
+cascade-own t e l (_ ∙ _) refl = refl
 
 -- The subscribe frame's instant is shared only by positions beneath the root.
 frame-own : ∀ p → instant p ≡ frame → p ≡ root ⊕ path p
 frame-own (_ ∙ _) refl = refl
 
--- Two firings share an instant only if they are one firing.
-cascade-inj : ∀ {t e t′ e′} → cascade t e ≡ cascade t′ e′ → t ≡ t′ × e ≡ e′
-cascade-inj refl = refl , refl
+-- Two async emissions share an instant only if they are one step of one
+-- firing.
+cascade-inj : ∀ {t e l t′ e′ l′} → cascade t e l ≡ cascade t′ e′ l′ → t ≡ t′ × e ≡ e′ × l ≡ l′
+cascade-inj refl = refl , refl , refl
 
 ------------------------------------------------------------------------
 -- How instants are ordered
@@ -66,25 +73,28 @@ cascade-inj refl = refl , refl
 ... | true  = ⊥-elim (n≮n n (<ᵇ⇒< n n (subst T (sym h) tt)))
 
 -- The subscribe frame comes before every cascade.
-frame-first : ∀ t e → frame <ⁱ cascade t e ≡ true
-frame-first _ _ = refl
+frame-first : ∀ t e l → frame <ⁱ cascade t e l ≡ true
+frame-first _ _ _ = refl
 
 -- A later tick is later.
-later-tick : ∀ {t t′} e e′ → t < t′ → cascade t e <ⁱ cascade t′ e′ ≡ true
-later-tick e e′ h rewrite ℕ-lt h = refl
+later-tick : ∀ {t t′} e e′ l l′ → t < t′ → cascade t e l <ⁱ cascade t′ e′ l′ ≡ true
+later-tick e e′ l l′ h rewrite ℕ-lt h = refl
 
 -- Same-tick timers fire in creation order.
-same-tick : ∀ t e e′ → (cascade t e <ⁱ cascade t e′) ≡ (e <ᵖ e′)
-same-tick t e e′ rewrite ℕ-eq t = refl
+same-tick : ∀ t {e e′} l l′ → e <ᵖ e′ ≡ true → cascade t e l <ⁱ cascade t e′ l′ ≡ true
+same-tick t {e} {e′} l l′ h rewrite ℕ-eq t with cmpPos e e′
+same-tick t l l′ h | lt = refl
+same-tick t l l′ () | eq
+same-tick t l l′ () | gt
 
 -- Everything in a cascade comes after every position of an earlier tick.
-earlier-tick : ∀ p {t} e q → tick p < t → p <ᵖ (cascade t e ∙ q) ≡ true
-earlier-tick (frame ∙ _)       e q _ = refl
-earlier-tick (cascade _ _ ∙ _) e q h rewrite ℕ-lt h = refl
+earlier-tick : ∀ p {t} e l q → tick p < t → p <ᵖ (cascade t e l ∙ q) ≡ true
+earlier-tick (frame ∙ _)         e l q _ = refl
+earlier-tick (cascade _ _ _ ∙ _) e l q h rewrite ℕ-lt h = refl
 
 -- A cascade fires after the position its timer was created at.
-after-creator : ∀ {t} e → tick e < t → e <ᵖ cascadeAt t e ≡ true
-after-creator e h = earlier-tick e e [] h
+after-creator : ∀ {t} e l → tick e < t → e <ᵖ (fired t e ▸ l) ≡ true
+after-creator e l h = earlier-tick e e l [] h
 
 ------------------------------------------------------------------------
 -- The comparison is an order: `eq` is equality, `lt` flips to `gt`
@@ -131,11 +141,13 @@ mutual
   eqˡ last    last    _ = refl
 
   eqⁱ : ∀ i j → cmpInstant i j ≡ eq → i ≡ j
-  eqⁱ frame         frame         _ = refl
-  eqⁱ frame         (cascade _ _) ()
-  eqⁱ (cascade _ _) frame         ()
-  eqⁱ (cascade t e) (cascade u d) h with lexi-eq (cmpℕ t u) (cmpPos e d) h
-  ... | a , b = cong₂ cascade (ℕ-≡ {t} {u} a) (eqᵖ e d b)
+  eqⁱ frame           frame           _ = refl
+  eqⁱ frame           (cascade _ _ _) ()
+  eqⁱ (cascade _ _ _) frame           ()
+  eqⁱ (cascade t e a) (cascade u d b) h with lexi-eq (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) h
+  ... | x , y with lexi-eq (cmpPos e d) (cmpLabel a b) y
+  ...   | y₁ , y₂ with ℕ-≡ {t} {u} x | eqᵖ e d y₁ | eqˡ a b y₂
+  ...     | refl | refl | refl = refl
 
   eqᵗ : ∀ (p q : Path) → cmpPath p q ≡ eq → p ≡ q
   eqᵗ []      []      _ = refl
@@ -156,7 +168,7 @@ mutual
 
   reflⁱ : ∀ i → cmpInstant i i ≡ eq
   reflⁱ frame         = refl
-  reflⁱ (cascade t e) = cong₂ lexi (ℕ-eq t) (reflᵖ e)
+  reflⁱ (cascade t e a) = cong₂ lexi (ℕ-eq t) (cong₂ lexi (reflᵖ e) (reflˡ a))
 
   reflᵗ : ∀ (p : Path) → cmpPath p p ≡ eq
   reflᵗ []      = refl
@@ -164,6 +176,10 @@ mutual
 
   reflᵖ : ∀ p → cmpPos p p ≡ eq
   reflᵖ (i ∙ p) = cong₂ lexi (reflⁱ i) (reflᵗ p)
+
+-- A timer's steps are in order.
+same-timer : ∀ t e l l′ → (cascade t e l <ⁱ cascade t e l′) ≡ (l <ˡ l′)
+same-timer t e l l′ rewrite ℕ-eq t | reflᵖ e = refl
 
 mutual
   flipˡ : ∀ a b → cmpLabel a b ≡ lt → cmpLabel b a ≡ gt
@@ -178,13 +194,16 @@ mutual
   flipˡ last    last    ()
 
   flipⁱ : ∀ i j → cmpInstant i j ≡ lt → cmpInstant j i ≡ gt
-  flipⁱ frame         frame         ()
-  flipⁱ frame         (cascade _ _) _ = refl
-  flipⁱ (cascade _ _) frame         ()
-  flipⁱ (cascade t e) (cascade u d) h with lexi-lt (cmpℕ t u) (cmpPos e d) h
-  ... | inj₁ a = lexi-gt₁ (cmpℕ u t) (cmpPos d e) (ℕ-flip {t} {u} a)
-  ... | inj₂ (a , b) with ℕ-≡ {t} {u} a
-  ...   | refl = trans (lexi-eq₁ (cmpℕ t t) (cmpPos d e) a) (flipᵖ e d b)
+  flipⁱ frame           frame           ()
+  flipⁱ frame           (cascade _ _ _) _ = refl
+  flipⁱ (cascade _ _ _) frame           ()
+  flipⁱ (cascade t e a) (cascade u d b) h with lexi-lt (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) h
+  ... | inj₁ x = lexi-gt₁ (cmpℕ u t) (lexi (cmpPos d e) (cmpLabel b a)) (ℕ-flip {t} {u} x)
+  ... | inj₂ (x , y) with ℕ-≡ {t} {u} x
+  ...   | refl with lexi-lt (cmpPos e d) (cmpLabel a b) y
+  ...     | inj₁ z = trans (lexi-eq₁ (cmpℕ t t) _ x) (lexi-gt₁ (cmpPos d e) (cmpLabel b a) (flipᵖ e d z))
+  ...     | inj₂ (z , w) with eqᵖ e d z
+  ...       | refl = trans (lexi-eq₁ (cmpℕ t t) _ x) (trans (lexi-eq₁ (cmpPos e e) (cmpLabel b a) z) (flipˡ a b w))
 
   flipᵗ : ∀ (p q : Path) → cmpPath p q ≡ lt → cmpPath q p ≡ gt
   flipᵗ []      []      ()
@@ -275,18 +294,24 @@ mutual
   ltˡ last    last    _       () _
 
   ltⁱ : ∀ i j k → cmpInstant i j ≡ lt → cmpInstant j k ≡ lt → cmpInstant i k ≡ lt
-  ltⁱ frame         frame         _             () _
-  ltⁱ frame         (cascade _ _) frame         _  ()
-  ltⁱ frame         (cascade _ _) (cascade _ _) _  _  = refl
-  ltⁱ (cascade _ _) frame         _             () _
-  ltⁱ (cascade _ _) (cascade _ _) frame         _  ()
-  ltⁱ (cascade t e) (cascade u d) (cascade v f) h₁ h₂ =
-    lexi-trans (cmpℕ t u) (cmpℕ u v) (cmpℕ t v) (cmpPos e d) (cmpPos d f) (cmpPos e f)
+  ltⁱ frame           frame           _               () _
+  ltⁱ frame           (cascade _ _ _) frame           _  ()
+  ltⁱ frame           (cascade _ _ _) (cascade _ _ _) _  _  = refl
+  ltⁱ (cascade _ _ _) frame           _               () _
+  ltⁱ (cascade _ _ _) (cascade _ _ _) frame           _  ()
+  ltⁱ (cascade t e a) (cascade u d b) (cascade v f c) h₁ h₂ =
+    lexi-trans (cmpℕ t u) (cmpℕ u v) (cmpℕ t v)
+      (lexi (cmpPos e d) (cmpLabel a b)) (lexi (cmpPos d f) (cmpLabel b c)) (lexi (cmpPos e f) (cmpLabel a c))
       (ℕ-trans {t} {u} {v})
-      (λ a b → subst (λ z → cmpℕ t z ≡ lt) (ℕ-≡ {u} {v} b) a)
-      (λ a b → subst (λ z → cmpℕ z v ≡ lt) (sym (ℕ-≡ {t} {u} a)) b)
-      (λ a b → subst (λ z → cmpℕ z v ≡ eq) (sym (ℕ-≡ {t} {u} a)) b)
-      (λ a b → ltᵖ e d f a b) h₁ h₂
+      (λ x y → subst (λ z → cmpℕ t z ≡ lt) (ℕ-≡ {u} {v} y) x)
+      (λ x y → subst (λ z → cmpℕ z v ≡ lt) (sym (ℕ-≡ {t} {u} x)) y)
+      (λ x y → subst (λ z → cmpℕ z v ≡ eq) (sym (ℕ-≡ {t} {u} x)) y)
+      (lexi-trans (cmpPos e d) (cmpPos d f) (cmpPos e f) (cmpLabel a b) (cmpLabel b c) (cmpLabel a c)
+        (λ x y → ltᵖ e d f x y)
+        (λ x y → subst (λ z → cmpPos e z ≡ lt) (eqᵖ d f y) x)
+        (λ x y → subst (λ z → cmpPos z f ≡ lt) (sym (eqᵖ e d x)) y)
+        (λ x y → subst (λ z → cmpPos z f ≡ eq) (sym (eqᵖ e d x)) y)
+        (λ x y → ltˡ a b c x y)) h₁ h₂
 
   ltᵗ : ∀ (p q r : Path) → cmpPath p q ≡ lt → cmpPath q r ≡ lt → cmpPath p r ≡ lt
   ltᵗ []      (_ ∷ _) (_ ∷ _) _  _  = refl
@@ -323,14 +348,17 @@ mutual
   gtˡ last    last    ()
 
   gtⁱ : ∀ i j → cmpInstant i j ≡ gt → cmpInstant j i ≡ lt
-  gtⁱ frame         frame         ()
-  gtⁱ frame         (cascade _ _) ()
-  gtⁱ (cascade _ _) frame         _ = refl
-  gtⁱ (cascade t e) (cascade u d) h =
-    lexi-flip (cmpℕ t u) (cmpPos e d) (cmpℕ u t) (cmpPos d e) h
+  gtⁱ frame           frame           ()
+  gtⁱ frame           (cascade _ _ _) ()
+  gtⁱ (cascade _ _ _) frame           _ = refl
+  gtⁱ (cascade t e a) (cascade u d b) h =
+    lexi-flip (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) (cmpℕ u t) (lexi (cmpPos d e) (cmpLabel b a)) h
       (ℕ-gt {t} {u})
       (λ x → subst (λ z → cmpℕ z t ≡ eq) (ℕ-≡ {t} {u} x) (ℕ-eq t))
-      (λ x → gtᵖ e d x)
+      (λ y → lexi-flip (cmpPos e d) (cmpLabel a b) (cmpPos d e) (cmpLabel b a) y
+        (λ x → gtᵖ e d x)
+        (λ x → subst (λ z → cmpPos z e ≡ eq) (eqᵖ e d x) (reflᵖ e))
+        (λ x → gtˡ a b x))
 
   gtᵗ : ∀ (p q : Path) → cmpPath p q ≡ gt → cmpPath q p ≡ lt
   gtᵗ []      []      ()

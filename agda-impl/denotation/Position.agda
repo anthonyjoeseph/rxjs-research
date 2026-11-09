@@ -6,21 +6,26 @@
 -- a sorted merge, and nothing coordinates it.
 --
 -- THE INSTANT IS A DATUM, NOT A DECODING.  Every event lies in exactly
--- one instant: the subscribe frame, or the cascade of one timer, named by
--- the tick it fires at and the position its timer was created at.  Two
--- events are simultaneous exactly when their instants are equal, and
--- nothing has to be proven about a position for that reading to be
--- right.  A cascade is not inside its creator: its path starts afresh.
+-- one instant: the subscribe frame, or one step of a timer's frame —
+-- each async emission its own instant, shared with what it synchronously
+-- causes — named by the tick the timer fires at, the position it was
+-- created at, and the step.  Two events are simultaneous exactly when
+-- their instants are equal, and nothing has to be proven about a
+-- position for that reading to be right.  A cascade is not inside its
+-- creator: its path starts afresh.
 --
 -- THE ORDER: instant first, then path.  Instants by tick, then by
--- creator, so same-tick timers fire in creation order, as in rxjs; the
--- subscribe frame before every cascade.  Paths lexicographically, with
--- three kinds of step: `ix i`, an operator's i-th effect; `sub p`, a
+-- creator, so same-tick timers fire in creation order, as in rxjs, then
+-- by step; the subscribe frame before every cascade.  Paths
+-- lexicographically, with three kinds of step: `ix i`, an operator's i-th effect; `sub p`, a
 -- subject delivering to the subscriber that joined at `p`, so a
 -- subject's subscribers come in the order they joined; `last`, after
 -- every other effect — where a burst ends and its completion sits.
 --
--- THE MINT: `cascadeAt` is the one way a cascade's root is made, by the
+-- A BURST'S ROOT is where its steps go: `nested p`, below `p` in its
+-- instant, or `fired t e`, a timer's frame, each step its own instant.
+--
+-- THE MINT: `fired` is the one way a cascade is made, by the
 -- denotation and by both runtimes.  Only the clock differs between
 -- them: the denotation and the pure runtime know a cascade's tick from
 -- the cold's timeline; the IO runtime learns the order of arrivals, so
@@ -52,8 +57,8 @@ data Label where
   last : Label
 
 data Instant where
-  frame   : Instant                 -- the subscribe frame, tick 0
-  cascade : Time → Pos → Instant    -- a timer created at the position, firing at the tick
+  frame   : Instant                         -- the subscribe frame, tick 0
+  cascade : Time → Pos → Label → Instant    -- a step of a timer created at the position, firing at the tick
 
 data Pos where
   _∙_ : Instant → List Label → Pos
@@ -75,18 +80,29 @@ root = frame ∙ []
 
 -- When an instant runs.
 tick : Pos → Time
-tick (frame ∙ _)       = 0
-tick (cascade t _ ∙ _) = t
+tick (frame ∙ _)         = 0
+tick (cascade t _ _ ∙ _) = t
 
 -- A step below a position stays in its instant.
 infixl 5 _⊕_
 _⊕_ : Pos → Path → Pos
 (i ∙ p) ⊕ q = i ∙ (p ++ q)
 
--- THE MINT: the root of the cascade of a timer created at `e`, firing at
--- tick `t`.
-cascadeAt : Time → Pos → Pos
-cascadeAt t e = cascade t e ∙ []
+-- Where a burst's steps go.
+data Root : Set where
+  nested : Pos → Root            -- below a position, in its instant
+  fired  : Time → Pos → Root     -- THE MINT: a timer created at the position, firing at the tick
+
+-- A burst's step.
+infixl 5 _▸_
+_▸_ : Root → Label → Pos
+nested p  ▸ l = p ⊕ (l ∷ [])
+fired t e ▸ l = cascade t e l ∙ []
+
+-- When a burst runs.
+tickᴿ : Root → Time
+tickᴿ (nested p)  = tick p
+tickᴿ (fired t _) = t
 
 ------------------------------------------------------------------------
 -- Equality: all a name is read for
@@ -108,13 +124,14 @@ mutual
   last  ≟ˡ sub _ = no λ ()
 
   _≟ⁱ_ : DecidableEquality Instant
-  frame       ≟ⁱ frame       = yes refl
-  frame       ≟ⁱ cascade _ _ = no λ ()
-  cascade _ _ ≟ⁱ frame       = no λ ()
-  cascade t e ≟ⁱ cascade u d with t ℕ.≟ u | e ≟ᵖ d
-  ... | yes refl | yes refl = yes refl
-  ... | no ne    | _        = no λ { refl → ne refl }
-  ... | yes _    | no ne    = no λ { refl → ne refl }
+  frame         ≟ⁱ frame         = yes refl
+  frame         ≟ⁱ cascade _ _ _ = no λ ()
+  cascade _ _ _ ≟ⁱ frame         = no λ ()
+  cascade t e a ≟ⁱ cascade u d b with t ℕ.≟ u | e ≟ᵖ d | a ≟ˡ b
+  ... | yes refl | yes refl | yes refl = yes refl
+  ... | no ne    | _        | _        = no λ { refl → ne refl }
+  ... | yes _    | no ne    | _        = no λ { refl → ne refl }
+  ... | yes _    | yes _    | no ne    = no λ { refl → ne refl }
 
   _≟ᵗ_ : DecidableEquality Path
   []      ≟ᵗ []      = yes refl
@@ -158,10 +175,10 @@ mutual
   cmpLabel last    last    = eq
 
   cmpInstant : Instant → Instant → Cmp
-  cmpInstant frame         frame         = eq
-  cmpInstant frame         (cascade _ _) = lt
-  cmpInstant (cascade _ _) frame         = gt
-  cmpInstant (cascade t e) (cascade u d) = lexi (cmpℕ t u) (cmpPos e d)
+  cmpInstant frame           frame           = eq
+  cmpInstant frame           (cascade _ _ _) = lt
+  cmpInstant (cascade _ _ _) frame           = gt
+  cmpInstant (cascade t e a) (cascade u d b) = lexi (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b))
 
   cmpPath : Path → Path → Cmp
   cmpPath []      []      = eq

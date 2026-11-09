@@ -17,7 +17,7 @@ open import Relation.Nullary using (does; yes; no)
 open import Data.Nat using (zero; suc)
 open import denotation.Position using (Pos; Label; Instant; _∙_; _⊕_; ix; sub; last; _<ˡ_; _<ⁱ_; _<ᵖ_; _≟ˡ_; _≟ⁱ_; Cmp; lt; eq; gt;
   cmpℕ; lexi; isLt; isEq; cmpLabel; cmpInstant; cmpPath; cmpPos; instant; path; cascade)
-open import denotation.Flat using (FLabel; cmpFL; flat; flatᵗ; Ok; Okᵗ; ok-frame; ok-cascade; []; _∷_; cmp-flatˡ; cmp-flat)
+open import denotation.Flat using (FLabel; cmpFL; flat; flatᵗ; flatˡ; Ok; Okᵗ; ok-frame; ok-cascade; []; _∷_; cmp-flatˡ; cmp-flat)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ; ltˡ; ltⁱ; gtˡ; gtⁱ; isLt-lt)
 
 data Key : Set where
@@ -142,14 +142,21 @@ private
            → flex (fkey b a) (fkey b′ c)
            ≡ (instant a <ⁱ instant c) ∨ (does (instant a ≟ⁱ instant c) ∧ lex (labs (path a) ++ sfx b) (labs (path c) ++ sfx b′))
   flex-pos (ok-frame xs)    (ok-frame ys)    b b′ = flex-path xs ys b b′
-  flex-pos (ok-frame _)     (ok-cascade _ _) _ _  = refl
-  flex-pos (ok-cascade _ _) (ok-frame _)     _ _  = refl
-  flex-pos {cascade (suc t) e ∙ p} {cascade (suc u) d ∙ q} (ok-cascade ex ey′) (ok-cascade dx dy′) b b′ =
-    trans (cong₂ (λ k z → isLt (cmpℕ (suc t) (suc u)) ∨ (isEq (cmpℕ (suc t) (suc u)) ∧ (isLt k ∨ (isEq k ∧ z))))
-                 (cmp-flat ex dx) (flex-path ey′ dy′ b b′))
-    (trans (two (cmpℕ (suc t) (suc u)) (cmpPos e d) (lex (labs p ++ sfx b) (labs q ++ sfx b′)))
-           (cong (λ v → isLt (cmpInstant (cascade (suc t) e) (cascade (suc u) d)) ∨ (v ∧ lex (labs p ++ sfx b) (labs q ++ sfx b′)))
-                 (bridge cmpInstant _≟ⁱ_ eqⁱ reflⁱ (cascade (suc t) e) (cascade (suc u) d))))
+  flex-pos (ok-frame _)       (ok-cascade _ _ _) _ _  = refl
+  flex-pos (ok-cascade _ _ _) (ok-frame _)       _ _  = refl
+  flex-pos {cascade (suc t) e x ∙ p} {cascade (suc u) d y ∙ q} (ok-cascade ex xx xs) (ok-cascade dx yy ys) b b′ =
+    trans (cong (λ k → isLt K ∨ (isEq K ∧ (isLt k ∨ (isEq k ∧ (isLt (cmpFL (flatˡ x) (flatˡ y)) ∨ (isEq (cmpFL (flatˡ x) (flatˡ y)) ∧ _))))))
+                (cmp-flat ex dx))
+    (trans (cong₂ (λ k z → isLt K ∨ (isEq K ∧ (isLt E ∨ (isEq E ∧ (isLt k ∨ (isEq k ∧ z))))))
+                  (cmp-flatˡ xx yy) (flex-path xs ys b b′))
+    (trans (cong (λ z → isLt K ∨ (isEq K ∧ z)) (two E L Z))
+    (trans (two K (lexi E L) Z)
+           (cong (λ v → isLt (cmpInstant (cascade (suc t) e x) (cascade (suc u) d y)) ∨ (v ∧ Z))
+                 (bridge cmpInstant _≟ⁱ_ eqⁱ reflⁱ (cascade (suc t) e x) (cascade (suc u) d y))))))
+    where K = cmpℕ (suc t) (suc u)
+          E = cmpPos e d
+          L = cmpLabel x y
+          Z = lex (labs p ++ sfx b) (labs q ++ sfx b′)
 
 -- THE KEY ORDER IS THE FLAT ORDER WITH A TOP.
 flat-key : ∀ b b′ {a c} → Ok a → Ok c → flex (fkey b a) (fkey b′ c) ≡ keyAt b a <ᴷ keyAt b′ c
