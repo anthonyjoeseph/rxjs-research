@@ -43,10 +43,11 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _%_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
-open import Data.Product using (_×_; _,_; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
+open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
@@ -299,7 +300,7 @@ private
 
   pinned : List (String × Obs Timeline [] ℕ × List (List ℕ)) → IO Unit
   pinned []       = putStrLn "spec-check: pinned programs checked"
-  pinned (p ∷ ps) = putStrLn (pinLine p) >>= λ _ → pinned ps
+  pinned (p ∷ ps) = putStrLn ("spec-check: pinning " +++ proj₁ p) >>= λ _ → putStrLn (pinLine p) >>= λ _ → pinned ps
 
 ------------------------------------------------------------------------
 -- The report
@@ -373,4 +374,4 @@ private
     putStrLn (fires "batchable" (Tally.bat (tallyOf doubled sabotaged)))
 
 main : IO Unit
-main = pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0) >>= λ _ → selftest
+main = hSetBuffering stdout lineBuffering >>= λ _ → pinned pins >>= λ _ → report seeds (tally 0 0 0 0 0) >>= λ _ → selftest
