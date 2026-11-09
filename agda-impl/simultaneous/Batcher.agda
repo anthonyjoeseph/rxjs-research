@@ -13,15 +13,17 @@ open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; concat-
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; module ≡-Reasoning)
 
-open import Tree using (scan)
+open import Tree using (scan; merge; of)
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
 open import simultaneous.InstEmit using (InstEmit; instEmit; mark; completed; valuesOf)
+import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
-open import simultaneous.Layers using (scans; scan-ends-out; scan-ends-in; each-ends-out; each-ends-in)
+open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched)
+open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
+  restamp; marked; concatˢ; elab; E)
 
 ------------------------------------------------------------------------
 -- The fold, as lists
@@ -107,11 +109,30 @@ joined-unbatched rs = cong concat (vals-of (values rs))
 ------------------------------------------------------------------------
 -- The protocol
 
--- THE LAST EMIT IS THE COMPLETION: the elaboration concatenates the run
--- with a lone completion mark, so a completed run's last value is it.
-postulate
-  completed-last : ∀ {A} (o : SObs [] A) {rx} → Met (elaborated o) rx → Ends rx
-                 → Σ (List (IE A)) λ vs → Σ Pos λ n → values rx ≡ vs ++ [ instEmit (mark completed) n ]
+-- The elaboration's parts: the restamp's start, and the run with the end
+-- of its subscribe burst.
+stamp₀ : ∀ {A : Set} → Pos × IE A
+stamp₀ = root , marked Marks.begin
+
+sourced : ∀ {A : Set} → SObs [] A → E [] (IE A)
+sourced o = merge (elab (λ i → i) o) (of (marked Marks.subscribed ∷ []))
+
+scans-snoc : ∀ {X Y : Set} (f : Y → X → Y) z (xs : List X) x → scans f z (xs ++ [ x ]) ≡ scans f z xs ++ [ f (L.foldl f z xs) x ]
+scans-snoc f z []       x = refl
+scans-snoc f z (y ∷ xs) x = cong (f z y ∷_) (scans-snoc f (f z y) xs x)
+
+-- THE LAST EMIT IS THE COMPLETION: the elaboration is a map over a scan
+-- over a concat of the run with a lone completion mark, so a completed
+-- run's last value is that mark, restamped.
+completed-last : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Ends rx
+               → Σ (List (IE A)) λ vs → Σ Pos λ n → values rx ≡ vs ++ [ instEmit (mark completed) n ]
+completed-last o {rx} mx ex with map-back proj₂ (scan restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ [])))) mx
+... | sc , msc , eqm , enm with scan-out restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ []))) msc
+...   | kx , mk , eqs , ens with concat-last (sourced o) (marked completed) mk (ens (enm ex))
+...     | vs , eqk =
+  L.map proj₂ (scans restamp stamp₀ vs) , proj₁ (L.foldl restamp stamp₀ vs) ,
+  trans eqm (trans (cong (L.map proj₂) (trans eqs (trans (cong (scans restamp stamp₀) eqk) (scans-snoc restamp stamp₀ vs (marked completed)))))
+                   (map-++ proj₂ (scans restamp stamp₀ vs) _))
 
 ------------------------------------------------------------------------
 -- The batcher ends with what it batches
@@ -135,19 +156,21 @@ ended-released o {rx} mx ex with completed-last o mx ex
   ∎
   where open ≡-Reasoning
 
-batcher-ends : ∀ {A} (o : SObs [] A) → EndsWith (batched o) (elaborated o)
+batcher-ends : ∀ {A : Set} (o : SObs [] A) → EndsWith (batched o) (elaborated o)
 batcher-ends o = out , into
   where
+    S = scan bstep bstart (elaborate o)
+
     out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rx → Met (elaborated o) rx × Ends rx × joined rs ≡ vals rx
-    out {rs} mb eb with each-ends-out proj₂ (scan bstep bstart (elaborate o)) mb eb
-    ... | sc , ms , es , eqb with scan-ends-out bstep bstart (elaborate o) ms es
-    ...   | rx , mx , ex , eqs =
-      rx , mx , ex ,
-      trans (joined-unbatched rs) (trans (cong unbatched (trans eqb (cong (concatMap proj₂) eqs))) (ended-released o mx ex))
+    out {rs} mb eb with each-out proj₂ S mb
+    ... | sc , ms , _ , ends-e with ends-e eb | scan-out bstep bstart (elaborate o) ms
+    ...   | es , eqb | rx , mx , eqs , ends-s =
+      rx , mx , ends-s es ,
+      trans (joined-unbatched rs) (trans (cong unbatched (trans eqb (cong (concatMap proj₂) eqs))) (ended-released o mx (ends-s es)))
 
     into : ∀ {rx} → Met (elaborated o) rx → Ends rx → Σ _ λ rs → Met (batched o) rs × Ends rs × vals rx ≡ joined rs
-    into {rx} mx ex with scan-ends-in bstep bstart (elaborate o) mx ex
-    ... | sc , ms , es , eqs with each-ends-in proj₂ (scan bstep bstart (elaborate o)) ms es
-    ...   | rs , mb , eb , eqb =
-      rs , mb , eb ,
+    into {rx} mx ex with scan-in bstep bstart (elaborate o) mx
+    ... | sc , ms , eqs , ends-s with each-in proj₂ S ms
+    ...   | rs , mb , eqb , ends-e =
+      rs , mb , ends-e (ends-s ex) ,
       sym (trans (joined-unbatched rs) (trans (cong unbatched (trans eqb (cong (concatMap proj₂) eqs))) (ended-released o mx ex)))

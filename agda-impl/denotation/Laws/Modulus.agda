@@ -75,6 +75,12 @@ open import denotation.EmissionSet
 ... | true  = inj₂ tt
 ... | false = inj₁ (λ ())
 
+-- At or before is before or at.
+≼-split : ∀ {x y} → x ≼ y → x ≺ y ⊎ x ≡ y
+≼-split {x} {y} xy with <ᵖ-split x y (≼-false {x} {y} xy)
+... | inj₁ lt = inj₁ (Equivalence.from T-≡ lt)
+... | inj₂ eq = inj₂ eq
+
 -- A position comes before its extensions.
 ≺-ext : ∀ x {l} ys → x ≺ (x ++ l ∷ ys)
 ≺-ext x ys = Equivalence.from T-≡ (<ᵖ-below x ys)

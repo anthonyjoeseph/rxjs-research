@@ -32,15 +32,14 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Nat.Properties using (n≤1+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂) renaming (map to ⊎-map)
 open import Function using (_∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
-open import Relation.Nullary using (¬_; Dec; yes; no)
-open import Relation.Nullary.Decidable.Core using (¬¬-excluded-middle)
+open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
   defer)
@@ -52,6 +51,7 @@ import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus
   using (few-ind; entered-few; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; reach-via;
   AgreeTo; ⟨_⟩; upto; AgreeTo-sym; trunc-to; ~-cold; Same; LimD; _~⟨_⟩_; ~-refl)
+open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Count
   using (Cnt; DCnt; AgC; agc; ag-cnt; dcnt-pin; dcnt-pin-up; dcnt-cnt; pinned-after; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
 open import denotation.Laws.Join using (over; flatMap-causal; flatMap-ne)
@@ -171,46 +171,6 @@ scan-ag f z a = ⟨ (λ yq → SC.scan-to f z a yq , SC.scan-to f z (AgreeTo-sym
 scan-causal : ∀ {A B q} (f : B → A → B) z {s s′ : Den A} → s ~⟨ q ⟩ s′ → Op.scan f z s ~⟨ q ⟩ Op.scan f z s′
 scan-causal f z a = ~-cold λ p → scan-ag f z (a p)
 
--- A SCAN BOUNDS ITS SOURCE: a value with few rows before it has a fold,
--- from the latest value among those rows, or from none.  Which of them
--- holds a value is not decidable, but the bound is, so it is read
--- classically.
-private
-  module SN {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
-    open ES.Scan f z t using (Acc; acc₀; acc; ScanT; sval; sstep; send)
-
-    Val : Pos → Set
-    Val k = Σ A λ a → t k (out a)
-
-    -- The latest value before `w` among `ks`, or none there.
-    Latest : Pos → List Pos → Set
-    Latest w ks = (∀ {k} → k ∈ ks → Val k → k ≺ w → ⊥)
-                ⊎ Σ Pos λ v → Val v × v ≺ w × (∀ {k} → k ∈ ks → Val k → k ≺ w → k ≼ v)
-
-    latest : ∀ w ks → ¬ ¬ Latest w ks
-    latest w []       ¬L = ¬L (inj₁ λ ())
-    latest w (k ∷ ks) ¬L = latest w ks λ L → ¬¬-excluded-middle {A = Val k × k ≺ w} λ d → ¬L (add L d)
-      where
-        add : Latest w ks → Dec (Val k × k ≺ w) → Latest w (k ∷ ks)
-        add (inj₁ none) (no ¬h) = inj₁ λ { {_} (here refl) vk kw → ¬h (vk , kw) ; {_} (there m) → none m }
-        add (inj₂ (v , vv , vw , mx)) (no ¬h) =
-          inj₂ (v , vv , vw , λ { {_} (here refl) vk kw → ⊥-elim (¬h (vk , kw)) ; {_} (there m) → mx m })
-        add (inj₁ none) (yes (vk , kw)) =
-          inj₂ (k , vk , kw , λ { {_} (here refl) _ _ → ≼-refl {k} ; {_} (there m) vk′ k′w → ⊥-elim (none m vk′ k′w) })
-        add (inj₂ (v , vv , vw , mx)) (yes (vk , kw)) with ≼-or-≻ v k
-        ... | inj₁ vk≼ = inj₂ (k , vk , kw , λ { {_} (here refl) _ _ → ≼-refl {k} ; {k′} (there m) vk′ k′w → ≼-trans {k′} {v} {k} (mx m vk′ k′w) vk≼ })
-        ... | inj₂ kv  = inj₂ (v , vv , vw , λ { {_} (here refl) _ _ → ≺→≼ {k} {v} kv ; {_} (there m) → mx m })
-
-    fold : ∀ {w} → Few t w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
-    fold = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)) step
-      where
-        step : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ B (Acc v))
-             → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
-        step {w} (ks , h) ih {a} x ¬A = latest w ks λ
-          { (inj₁ none) → ¬A (f z a , acc₀ x λ y kw → none (h y kw) (_ , y) kw)
-          ; (inj₂ (v , (_ , xv) , vw , mx)) → ih xv vw xv λ
-              { (b , av) → ¬A (f b a , acc av x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
-
 scan-ne : ∀ {A B R k} (f : B → A → B) z {s s′ : Den A} → s ≈ᶜ⟨ R ∣ k ⟩ s′ → Op.scan f z s ≈ᶜ⟨ R ∣ k ⟩ Op.scan f z s′
 scan-ne {k = k} f z {s} {s′} ag p rp = trunc-ag (agc lin pn)
   where
@@ -219,7 +179,7 @@ scan-ne {k = k} f z {s} {s′} ag p rp = trunc-ag (agc lin pn)
     img d {e = skip}  x yq = seen (ES.Scan.sstep x) yq
     img d {e = end}   x yq = seen (ES.Scan.send x) yq
     img d {e = pin _} x yq = seen (ES.Scan.spin x) yq
-    img d {e = out _} x yq ¬i = SN.fold f z (enter d p) (entered-few d p tt x) x λ { (_ , ac) → seen (ES.Scan.sval ac) yq ¬i }
+    img d {e = out _} x yq ¬i = fold f z (enter d p) (entered-few d p tt x) x λ { (_ , ac) → seen (ES.Scan.sval ac) yq ¬i }
 
     lin : ∀ q → Cnt k (ES.Scan.ScanT f z (enter s p)) q ⊎ Cnt k (ES.Scan.ScanT f z (enter s′ p)) q
         → AgreeTo q (ES.Scan.ScanT f z (enter s p)) (ES.Scan.ScanT f z (enter s′ p))
