@@ -7,7 +7,7 @@
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null; deduplicate) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; [_]; foldr; length; null; deduplicate; reverse) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; lookup)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_; _≡ᵇ_; _<ᵇ_; _∸_)
@@ -94,8 +94,12 @@ ends = concatMap λ { (k , e) → when (isEnd e) k }
 properᵇ : ∀ {A} → List (Row A) → Pos → Bool
 properᵇ rs q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q ≼ᵇ c) }) rs
 
+-- `properᵇ` against the end positions, found once rather than per row.
+properAt : ∀ {A} → List Pos → List (Row A) → List (Row A)
+properAt es = concatMap λ { (q , e) → when (allᵇ (q ≼ᵇ_) es) (q , e) }
+
 proper : ∀ {A} → List (Row A) → List (Row A)
-proper rs = concatMap (λ { (q , e) → when (properᵇ rs q) (q , e) }) rs
+proper rs = properAt (ends rs) rs
 
 values : ∀ {A} → List (Row A) → List (Pos × A)
 values []                  = []
@@ -142,13 +146,28 @@ walk (suc n) (E.end k)     = if E.tick k ≤ᵇ horizon then ((k , end) ∷ []) 
 walk (suc n) E.hush        = [] ⊣ false
 
 private
-  insert : ∀ {A} → Row A → List (Row A) → List (Row A)
-  insert x []       = [ x ]
-  insert (q , e) ((k , d) ∷ ys) = if q <ᵖ k then (q , e) ∷ (k , d) ∷ ys else (k , d) ∷ insert (q , e) ys
+  -- Two runs in position order, merged; on a tie the left run's row first.
+  mergeᴿ : ∀ {A} → List (Row A) → List (Row A) → List (Row A)
+  mergeᴿ []             ys             = ys
+  mergeᴿ xs             []             = xs
+  mergeᴿ ((p , d) ∷ xs) ((q , e) ∷ ys) =
+    if q <ᵖ p then (q , e) ∷ mergeᴿ ((p , d) ∷ xs) ys else (p , d) ∷ mergeᴿ xs ((q , e) ∷ ys)
 
--- Rows in position order: the order a reader meets them.
+  pairs : ∀ {A} → List (List (Row A)) → List (List (Row A))
+  pairs (a ∷ b ∷ rs) = mergeᴿ a b ∷ pairs rs
+  pairs rs           = rs
+
+  -- Each pass halves the runs, so as many passes as rows always suffice.
+  passes : ∀ {A} → ℕ → List (List (Row A)) → List (Row A)
+  passes _       []       = []
+  passes _       (r ∷ []) = r
+  passes zero    rs       = foldr _++_ [] rs
+  passes (suc n) rs       = passes n (pairs rs)
+
+-- Rows in position order: the order a reader meets them, rows at one
+-- position last-listed first.  A stable merge of the rows reversed.
 sort : ∀ {A} → List (Row A) → List (Row A)
-sort = foldr insert []
+sort rs = passes (length rs) (mapL [_] (reverse rs))
 
 ------------------------------------------------------------------------
 -- The operators
