@@ -19,7 +19,7 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; _<_; _<ᵇ_)
-open import Data.Nat.Properties using (<⇒<ᵇ; <ᵇ⇒<; n≮n; <-asym; ≮⇒≥; ≤-antisym)
+open import Data.Nat.Properties using (<⇒<ᵇ; <ᵇ⇒<; n≮n; <-asym; <-trans; ≮⇒≥; ≤-antisym)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -195,6 +195,146 @@ mutual
 -- AN INSTANT IS AN INTERVAL OF POSITIONS: a position between two of one
 -- instant is of it.  The order compares instants first, so a position
 -- strictly inside two of one instant can be in no other.
+-- Transitive, and `gt` flips to `lt`.
+lt-ℕ : ∀ {m n} → cmpℕ m n ≡ lt → m < n
+lt-ℕ {m} {n} h with m <ᵇ n in e | n <ᵇ m
+lt-ℕ {m} {n} h  | true  | _     = <ᵇ⇒< m n (subst T (sym e) tt)
+lt-ℕ {m} {n} () | false | true
+lt-ℕ {m} {n} () | false | false
+
+gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
+gt-ℕ {m} {n} h with m <ᵇ n | n <ᵇ m in e
+gt-ℕ {m} {n} () | true  | _
+gt-ℕ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
+gt-ℕ {m} {n} () | false | false
+
+ℕ-trans : ∀ {m n k} → cmpℕ m n ≡ lt → cmpℕ n k ≡ lt → cmpℕ m k ≡ lt
+ℕ-trans {m} {n} {k} h₁ h₂ = ℕ-lt {m} {k} (<-trans (lt-ℕ {m} {n} h₁) (lt-ℕ {n} {k} h₂))
+
+ℕ-gt : ∀ {m n} → cmpℕ m n ≡ gt → cmpℕ n m ≡ lt
+ℕ-gt {m} {n} h = ℕ-lt {n} {m} (gt-ℕ {m} {n} h)
+
+lexi-l : ∀ {x y} → x ≡ lt → lexi x y ≡ lt
+lexi-l refl = refl
+
+lexi-e : ∀ {x y} → x ≡ eq → y ≡ lt → lexi x y ≡ lt
+lexi-e refl h = h
+
+lexi-gt : ∀ x y → lexi x y ≡ gt → x ≡ gt ⊎ (x ≡ eq × y ≡ gt)
+lexi-gt eq y h = inj₂ (refl , h)
+lexi-gt lt y ()
+lexi-gt gt y _ = inj₁ refl
+
+-- A lexicographic pair is transitive when its halves are.
+lexi-trans : ∀ x₁ x₂ x₃ y₁ y₂ y₃
+           → (x₁ ≡ lt → x₂ ≡ lt → x₃ ≡ lt) → (x₁ ≡ lt → x₂ ≡ eq → x₃ ≡ lt)
+           → (x₁ ≡ eq → x₂ ≡ lt → x₃ ≡ lt) → (x₁ ≡ eq → x₂ ≡ eq → x₃ ≡ eq)
+           → (y₁ ≡ lt → y₂ ≡ lt → y₃ ≡ lt)
+           → lexi x₁ y₁ ≡ lt → lexi x₂ y₂ ≡ lt → lexi x₃ y₃ ≡ lt
+lexi-trans x₁ x₂ x₃ y₁ y₂ y₃ ll le el ee yy h₁ h₂ with lexi-lt x₁ y₁ h₁ | lexi-lt x₂ y₂ h₂
+... | inj₁ a       | inj₁ b       = lexi-l (ll a b)
+... | inj₁ a       | inj₂ (b , _) = lexi-l (le a b)
+... | inj₂ (a , _) | inj₁ b       = lexi-l (el a b)
+... | inj₂ (a , u) | inj₂ (b , v) = lexi-e (ee a b) (yy u v)
+
+-- A lexicographic pair flips `gt` to `lt` when its halves do.
+lexi-flip : ∀ x y x′ y′ → lexi x y ≡ gt → (x ≡ gt → x′ ≡ lt) → (x ≡ eq → x′ ≡ eq) → (y ≡ gt → y′ ≡ lt) → lexi x′ y′ ≡ lt
+lexi-flip x y x′ y′ h g e f with lexi-gt x y h
+... | inj₁ a       = lexi-l (g a)
+... | inj₂ (a , b) = lexi-e (e a) (f b)
+
+mutual
+  ltˡ : ∀ a b c → cmpLabel a b ≡ lt → cmpLabel b c ≡ lt → cmpLabel a c ≡ lt
+  ltˡ (ix m)  (ix n)  (ix k)  h₁ h₂ = ℕ-trans {m} {n} {k} h₁ h₂
+  ltˡ (ix _)  _       (sub _) _  _  = refl
+  ltˡ (ix _)  _       last    _  _  = refl
+  ltˡ (ix _)  (sub _) (ix _)  _  ()
+  ltˡ (ix _)  last    (ix _)  _  ()
+  ltˡ (sub p) (sub q) (sub r) h₁ h₂ = ltᵖ p q r h₁ h₂
+  ltˡ (sub _) _       last    _  _  = refl
+  ltˡ (sub _) (ix _)  _       () _
+  ltˡ (sub _) (sub _) (ix _)  _  ()
+  ltˡ (sub _) last    (ix _)  _  ()
+  ltˡ (sub _) last    (sub _) _  ()
+  ltˡ last    (ix _)  _       () _
+  ltˡ last    (sub _) _       () _
+  ltˡ last    last    _       () _
+
+  ltⁱ : ∀ i j k → cmpInstant i j ≡ lt → cmpInstant j k ≡ lt → cmpInstant i k ≡ lt
+  ltⁱ frame         frame         _             () _
+  ltⁱ frame         (cascade _ _) frame         _  ()
+  ltⁱ frame         (cascade _ _) (cascade _ _) _  _  = refl
+  ltⁱ (cascade _ _) frame         _             () _
+  ltⁱ (cascade _ _) (cascade _ _) frame         _  ()
+  ltⁱ (cascade t e) (cascade u d) (cascade v f) h₁ h₂ =
+    lexi-trans (cmpℕ t u) (cmpℕ u v) (cmpℕ t v) (cmpPos e d) (cmpPos d f) (cmpPos e f)
+      (ℕ-trans {t} {u} {v})
+      (λ a b → subst (λ z → cmpℕ t z ≡ lt) (ℕ-≡ {u} {v} b) a)
+      (λ a b → subst (λ z → cmpℕ z v ≡ lt) (sym (ℕ-≡ {t} {u} a)) b)
+      (λ a b → subst (λ z → cmpℕ z v ≡ eq) (sym (ℕ-≡ {t} {u} a)) b)
+      (λ a b → ltᵖ e d f a b) h₁ h₂
+
+  ltᵗ : ∀ (p q r : Path) → cmpPath p q ≡ lt → cmpPath q r ≡ lt → cmpPath p r ≡ lt
+  ltᵗ []      (_ ∷ _) (_ ∷ _) _  _  = refl
+  ltᵗ []      []      _       () _
+  ltᵗ (_ ∷ _) []      _       () _
+  ltᵗ _       (_ ∷ _) []      _  ()
+  ltᵗ (a ∷ p) (b ∷ q) (c ∷ r) h₁ h₂ =
+    lexi-trans (cmpLabel a b) (cmpLabel b c) (cmpLabel a c) (cmpPath p q) (cmpPath q r) (cmpPath p r)
+      (λ x y → ltˡ a b c x y)
+      (λ x y → subst (λ z → cmpLabel a z ≡ lt) (eqˡ b c y) x)
+      (λ x y → subst (λ z → cmpLabel z c ≡ lt) (sym (eqˡ a b x)) y)
+      (λ x y → subst (λ z → cmpLabel z c ≡ eq) (sym (eqˡ a b x)) y)
+      (λ x y → ltᵗ p q r x y) h₁ h₂
+
+  ltᵖ : ∀ p q r → cmpPos p q ≡ lt → cmpPos q r ≡ lt → cmpPos p r ≡ lt
+  ltᵖ (i ∙ p) (j ∙ q) (k ∙ r) h₁ h₂ =
+    lexi-trans (cmpInstant i j) (cmpInstant j k) (cmpInstant i k) (cmpPath p q) (cmpPath q r) (cmpPath p r)
+      (λ x y → ltⁱ i j k x y)
+      (λ x y → subst (λ z → cmpInstant i z ≡ lt) (eqⁱ j k y) x)
+      (λ x y → subst (λ z → cmpInstant z k ≡ lt) (sym (eqⁱ i j x)) y)
+      (λ x y → subst (λ z → cmpInstant z k ≡ eq) (sym (eqⁱ i j x)) y)
+      (λ x y → ltᵗ p q r x y) h₁ h₂
+
+mutual
+  gtˡ : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
+  gtˡ (ix m)  (ix n)  h = ℕ-gt {m} {n} h
+  gtˡ (sub p) (sub q) h = gtᵖ p q h
+  gtˡ (sub _) (ix _)  _ = refl
+  gtˡ last    (ix _)  _ = refl
+  gtˡ last    (sub _) _ = refl
+  gtˡ (ix _)  (sub _) ()
+  gtˡ (ix _)  last    ()
+  gtˡ (sub _) last    ()
+  gtˡ last    last    ()
+
+  gtⁱ : ∀ i j → cmpInstant i j ≡ gt → cmpInstant j i ≡ lt
+  gtⁱ frame         frame         ()
+  gtⁱ frame         (cascade _ _) ()
+  gtⁱ (cascade _ _) frame         _ = refl
+  gtⁱ (cascade t e) (cascade u d) h =
+    lexi-flip (cmpℕ t u) (cmpPos e d) (cmpℕ u t) (cmpPos d e) h
+      (ℕ-gt {t} {u})
+      (λ x → subst (λ z → cmpℕ z t ≡ eq) (ℕ-≡ {t} {u} x) (ℕ-eq t))
+      (λ x → gtᵖ e d x)
+
+  gtᵗ : ∀ (p q : Path) → cmpPath p q ≡ gt → cmpPath q p ≡ lt
+  gtᵗ []      []      ()
+  gtᵗ []      (_ ∷ _) ()
+  gtᵗ (_ ∷ _) []      _ = refl
+  gtᵗ (a ∷ p) (b ∷ q) h =
+    lexi-flip (cmpLabel a b) (cmpPath p q) (cmpLabel b a) (cmpPath q p) h
+      (λ x → gtˡ a b x)
+      (λ x → subst (λ z → cmpLabel z a ≡ eq) (eqˡ a b x) (reflˡ a))
+      (λ x → gtᵗ p q x)
+
+  gtᵖ : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
+  gtᵖ (i ∙ p) (j ∙ q) h =
+    lexi-flip (cmpInstant i j) (cmpPath p q) (cmpInstant j i) (cmpPath q p) h
+      (λ x → gtⁱ i j x)
+      (λ x → subst (λ z → cmpInstant z i ≡ eq) (eqⁱ i j x) (reflⁱ i))
+      (λ x → gtᵗ p q x)
+
 private
   f≢t : false ≡ true → ⊥
   f≢t ()
