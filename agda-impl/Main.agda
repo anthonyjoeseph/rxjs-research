@@ -31,6 +31,10 @@ open import simultaneous.Statement using (spec)
 open import denotation.Simultaneity using (effect-instant; cascade-own; frame-own; cascade-inj;
   frame-first; later-tick; same-tick; after-creator; between)
 
+-- THE ORDER IS THE CALL TREE'S PRE-ORDER: a position flattened to one
+-- label list, its instant leading, orders and nests as that list does.
+open import denotation.Flat using (flat-order; flat-inside; flat-onto)
+
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.
 open import Tree using (merge; flatMap; ones)
