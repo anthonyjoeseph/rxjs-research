@@ -18,7 +18,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
 open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
@@ -38,7 +38,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each;
   Input; react; going; fed; opening)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)

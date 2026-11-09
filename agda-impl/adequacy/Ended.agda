@@ -434,7 +434,7 @@ module _ {R : Set} where
   played-e (leaf false l cl dv st) (d , s) refl = s overT
   played-e (leaf true (play τ u i t fr) true dv st) (d , s) refl = s overT
   played-e (leaf true overT true dv st) (d , s) refl = s overT
-  played-e (leaf true (play τ u i t (emit a k)) false dv st) (d , s) refl = d (nx a) (play τ u _ t k) true _
+  played-e (leaf true (play τ u i t (emit a k)) false dv st) (d , s) refl = d (nx a) _ true _
   played-e (leaf true (play τ u i t (stall k)) false dv st) (d , s) refl = s _
   played-e (leaf true (play τ u i t (close k)) false dv st) (d , s) refl = s _
   played-e (leaf true overT false dv st) (d , s) refl = s overT

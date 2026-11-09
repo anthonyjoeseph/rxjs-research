@@ -24,7 +24,7 @@ open import denotation.Read using (Run; _∷_; Visible)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp)
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
@@ -39,7 +39,7 @@ open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count; Out; Input; react; each)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; Out; Input; react; each)
 
 ------------------------------------------------------------------------
 -- What the scan lays out

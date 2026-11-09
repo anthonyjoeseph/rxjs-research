@@ -89,11 +89,13 @@ SObs : List Set → Set → Set₁
 SObs = Obs Timeline
 
 -- A cold's emits as its elaboration reads them: a value, its completion,
--- or the end of its subscribe burst.
+-- or the end of its subscribe burst; and a completion its last value's
+-- callback carries, read off the completion.
 data Tag (A : Set) : Set where
   val   : A → Tag A
   cdone : Tag A
   tick  : Tag A
+  carried : Tag A
 
 -- A lane is subscribed as two parts: the lane, between its start and its
 -- end, and then the end of its subscribe burst.
@@ -151,7 +153,8 @@ private
   ext ρ (here p)  = here p
   ext ρ (there i) = there (ρ i)
 
-module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (name : N) (mint : C N) where
+module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (name : N) (mint : C N)
+                 (finals : ∀ {A} → C A → C (A × Bool)) where
 
   -- What the engine runs: the author's leaves.
   E : List Set → Set → Set₁
@@ -234,22 +237,26 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   ------------------------------------------------------------------------
   -- The leaves and the one-to-one formers
 
-  phase : ∀ {A} → Bool × Tag A → Tag A → Bool × Tag A
-  phase (late , _) t = (late ∨ isTick t) , t
+  phase : ∀ {A} → Bool × Tag (A × Bool) → Tag (A × Bool) → Bool × Tag (A × Bool)
+  phase (late , val (_ , true)) cdone = late , carried
+  phase (late , _)              t     = (late ∨ isTick t) , t
 
   -- An async step mints its instant's name and sends `begin` first; a
   -- value's step ends in `over`, a completion's is carried on by the
-  -- completion itself.
-  render : ∀ {Γ A} → Bool × Tag A → E Γ (IE A)
-  render (false , val a) = of (instEmit (value a) name ∷ [])
-  render (true  , val a) =
+  -- completion itself.  A value whose callback completes its cold sends
+  -- no `over`: the completion carries the value's route on.
+  render : ∀ {Γ A} → Bool × Tag (A × Bool) → E Γ (IE A)
+  render (false , val (a , _))     = of (instEmit (value a) name ∷ [])
+  render (true  , val (a , false)) =
     flatMap (mergeᶠ nothing) (λ n → of (instEmit (mark begin) n ∷ instEmit (value a) n ∷ instEmit (mark over) n ∷ [])) (cold mint)
-  render (true  , cdone) = map (λ n → instEmit (mark begin) n) (cold mint)
-  render _               = empty
+  render (true  , val (a , true))  =
+    flatMap (mergeᶠ nothing) (λ n → of (instEmit (mark begin) n ∷ instEmit (value a) n ∷ [])) (cold mint)
+  render (true  , cdone)           = map (λ n → instEmit (mark begin) n) (cold mint)
+  render _                         = empty
 
   coldˢ : ∀ {Γ A} → C A → E Γ (IE A)
   coldˢ c = flatMap (mergeᶠ nothing) render
-    (scan phase (false , tick) (merge (concatˢ (map val (cold c)) (of (cdone ∷ []))) (of (tick ∷ []))))
+    (scan phase (false , tick) (merge (concatˢ (map val (cold (finals c))) (of (cdone ∷ []))) (of (tick ∷ []))))
   {-# INLINE coldˢ #-}
 
   ofˢ : ∀ {Γ A} → List A → E Γ (IE A)

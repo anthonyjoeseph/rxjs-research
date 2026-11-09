@@ -20,7 +20,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; _∷_)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (ℕ; suc; _≤_; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
@@ -28,21 +28,21 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; _<ᵖ_; inside; inside-self; inside-++; <ᵖ-split; <ᵖ-part)
+open import denotation.Events using (Pos; Timeline; ix; last; ofᴱ; _<ᵖ_; inside; inside-self; inside-++; <ᵖ-split; <ᵖ-part; Frame; emit; stall; close; burst; tick; module From∞)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
   LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust; module Joiner)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; Real)
 open import denotation.Laws.JoinInv using (module JoinerI; module Join; module SwitchI; switch-cut-up)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
-open import denotation.Laws.ColdInv using (slot; slot-last; burst-lb)
+open import denotation.Laws.ColdInv using (slot; slot-last; burst-lb; fin-lb)
 import denotation.Laws.Connect as LC
 open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; clash; <ᴷ-trans; ≮ᴷ-trans; <ᴷ-asym; after-lt; attach-next; past-attach)
-open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
+open import operation.PureObservable using (module Machine; Tape; play; ending; slotOf) renaming (over to tapeOver)
 open Machine using (St; Scope; unbound; binds; CS; cs; own; bodyM; cpAt; coldS; ofS; takeS; flatS; connS; joinS)
 open import adequacy.Rows using (full; pendRows; Frozen; Inbox; this; that; tapeE)
 open import adequacy.Rows using (_≃_; ≼-≢)
@@ -216,8 +216,17 @@ of-lb p i (x ∷ xs) at-out     = ≼-refl {p ++ [ ix i ]}
 of-lb p i (x ∷ xs) {y} (on-out r) =
   ≺→≼ {p ++ [ ix i ]} {y} (≺-≼-≺ {p ++ [ ix i ]} {ofKey p (suc i) xs} {y} (of-next p i xs) (of-lb p (suc i) xs r))
 
+-- Every row of a frame lies at or after its next step.
+slot-lb : ∀ {A t y e} τ u i (fr : Frame A t) → Real u → tick u ≤ τ + t → InE (burst τ u i fr) y e → slotOf u i fr ≼ y
+slot-lb τ u i (emit a (close k)) re le at-out = ≼-refl {(u ++ [ last ]) ++ [ ix 0 ]}
+slot-lb {y = y} τ u i (emit a (close k)) re le (on-out r) = ≺→≼ {(u ++ [ last ]) ++ [ ix 0 ]} {y} (fin-lb τ u (From∞.force k) re le r)
+slot-lb τ u i fr@(emit _ (emit _ _)) re le r = burst-lb τ u i fr re le r
+slot-lb τ u i fr@(emit _ (stall _))  re le r = burst-lb τ u i fr re le r
+slot-lb τ u i fr@(stall _)           re le r = burst-lb τ u i fr re le r
+slot-lb τ u i fr@(close _)           re le r = burst-lb τ u i fr re le r
+
 cold-b : ∀ {Γ A p y e} (l : Tape A) → Ticked l → LoP (coldS {Γ} true l) p → InE (tapeE l) y e → p ≼ y
-cold-b {p = p} {y} (play τ u i t fr) (re , le) lo r = tr p (u ++ [ ix i ]) y (lo (k-own (here refl))) (burst-lb τ u i fr re le r)
+cold-b {p = p} {y} (play τ u i t fr) (re , le) lo r = tr p (slotOf u i fr) y (lo (k-own (here refl))) (slot-lb τ u i fr re le r)
 cold-b (ending c) _ lo at-end = lo (k-own (here refl))
 cold-b tapeOver   _ _  ()
 

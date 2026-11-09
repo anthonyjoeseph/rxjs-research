@@ -38,7 +38,7 @@ open import Data.Sum using (_⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_; ix; sub; last; inside)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix; sub; last; inside)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
 open import denotation.Read using (Visible; After; cursor)
 open import Data.Maybe using (nothing)
@@ -51,7 +51,7 @@ open import simultaneous.Shut using (Shut; r₀)
 open import denotation.Laws.Worlds using (Ok; TimerRoot; _⊑_)
 open import Data.Empty using (⊥)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
 
 ------------------------------------------------------------------------
 -- What a stream holds

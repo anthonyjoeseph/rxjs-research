@@ -25,7 +25,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
-open import denotation.Events using (Pos; Timeline; Label; ix; sub; last; root; fresh; _≟ᵖ_; <ᵖ-between; <ᵖ-below)
+open import denotation.Events using (Pos; Timeline; Label; ix; sub; last; root; fresh; finals; _≟ᵖ_; <ᵖ-between; <ᵖ-below)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_; enter; ⟦_⟧)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (W; InvAt; TimerRoot; Plain; plain-ix; plain-last; step; timer; join; here; inW)
@@ -41,7 +41,7 @@ open import simultaneous.Readings using (Rooted; NotSub; in-frame; in-cascade; i
 open import simultaneous.Relations using (Met; values; elaborated)
 open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; to≺; from≺)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- The run as the batcher reads it

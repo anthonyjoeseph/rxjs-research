@@ -28,12 +28,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
+open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; flat; outerB; laneB; closeB; isZero; module Elaborate)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; Routes; count; Out; Input; react; onMark; begun; entered; anew; bump;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; Out; Input; react; onMark; begun; entered; anew; bump;
   share; stopped; overed; cut; unpark; arrive; ended; burstOver; left; stops; anyHolds; setAt)
 
 ------------------------------------------------------------------------

@@ -51,7 +51,7 @@ open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
-open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh)
+open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh; finals)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit)
@@ -65,7 +65,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- Listings

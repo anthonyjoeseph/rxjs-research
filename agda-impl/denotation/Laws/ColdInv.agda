@@ -26,7 +26,7 @@ open import denotation.Events using (Pos; Label; ix; sub; last; Time; tick; From
   module Frame∞; module From∞; Timeline; timelineAt; <ᵖ-ix; <ᵖ-part; ix-<)
 open import denotation.Events using (Events; frames; burst; start)
 open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
-open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-irrefl; ≺-ext)
+open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-trans; ≺-ext)
 open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 
@@ -63,11 +63,15 @@ private
   step≼ a b {y} ab by = ≺→≼ {a} {y} (≺-≼-≺ {a} {b} {y} ab by)
 
   module CI {A : Set} (H : Pos → Set) (p : Pos) where
-    -- A burst's root: the subscription, or a timer's from the end of a
-    -- burst before.
+    -- A burst's root: the subscription, a timer's from the end of a burst
+    -- before, or a burst's end, under which its last callback runs on.
     data RootI : Pos → Set where
       r-sub   : RootI p
+      r-fin   : ∀ {r} → RootI r → RootI (r ++ [ last ])
       r-timer : ∀ {T r} → RootI r → RootI (ix T ∷ sub (r ++ [ last ]) ∷ [])
+
+    data Timer : Pos → Set where
+      tm : ∀ {T r} → Timer (ix T ∷ sub (r ++ [ last ]) ∷ [])
 
     Root : Pos → Set
     Root r = W⁼ H p r × Real r × RootI r
@@ -78,19 +82,22 @@ private
 
     -- What leads a root: what leads the subscription, a root, or the end
     -- of a burst before one.
-    anc-root : ∀ {a r} → RootI r → Anc a r → Anc a p ⊎ RootI a ⊎ Σ Pos λ r′ → RootI r′ × a ≡ r′ ++ [ last ]
+    anc-root : ∀ {a r} → RootI r → Anc a r → Anc a p ⊎ Timer a ⊎ Σ Pos λ r′ → RootI r′ × a ≡ r′ ++ [ last ]
     anc-root r-sub x = inj₁ x
+    anc-root (r-fin {r} R) x with anc-view x
+    ... | inj₁ refl = inj₂ (inj₂ (r , R , refl))
+    ... | inj₂ (b , x′ , pb) with parent-fun pb (step-parent r plain-last)
+    ...   | refl = anc-root R x′
     anc-root (r-timer {T} {r} R) x with anc-view x
-    ... | inj₁ refl = inj₂ (inj₁ (r-timer R))
+    ... | inj₁ refl = inj₂ (inj₁ tm)
     ... | inj₂ (b , x′ , pb) with parent-fun pb (named (ix T ∷ []) refl)
     ...   | refl with anc-view x′
     ...     | inj₁ refl = inj₂ (inj₂ (r , R , refl))
     ...     | inj₂ (b′ , x″ , pb′) with parent-fun pb′ (step-parent r plain-last)
     ...       | refl = anc-root R x″
 
-    root-plain : ∀ {a x l} → RootI a → a ≡ x ++ [ l ] → Plain l → a ≡ p
-    root-plain r-sub _ _ = refl
-    root-plain {x = x} (r-timer {T} _) eq pl = ⊥-elim (plain-sub pl (sym (∷ʳ-injectiveʳ (ix T ∷ []) x eq)))
+    timer-plain : ∀ {a x l} → Timer a → a ≡ x ++ [ l ] → Plain l → ⊥
+    timer-plain {x = x} (tm {T}) eq pl = plain-sub pl (sym (∷ʳ-injectiveʳ (ix T ∷ []) x eq))
 
     -- The next frame lies past the end before it.
     FrOk : ∀ {t} → Time → Pos → From A t → Set
@@ -107,10 +114,33 @@ private
     timer-real : ∀ τ {t′} e → Real e → tick e < τ + t′ → Real (ix (τ + t′) ∷ sub e ∷ [])
     timer-real τ e re lt = re , before-timer e (sub e ∷ []) re lt , tt
 
+    -- A burst's end, as the root its last callback runs on under.
+    fin-root : ∀ {r} → Root r → Root (r ++ [ last ])
+    fin-root {r} (w , rr , ri) = inW (step w plain-last) , real-snoc r plain-last rr , r-fin ri
+
+    fin-le : ∀ {τ t} r → Real r → tick r ≤ τ + t → tick (r ++ [ last ]) ≤ τ + t
+    fin-le {τ} {t} r rr le = subst (_≤ τ + t) (sym (tick-snoc r rr)) le
+
+    -- The frame after a last callback lies past its end.
+    fin-ok : ∀ {τ t} r → Real r → tick r ≤ τ + t → (m : From A (suc t)) → FrOk τ ((r ++ [ last ]) ++ [ last ]) m
+    fin-ok {τ} {t} r rr le = close-ok {τ} {t} (r ++ [ last ]) (real-snoc r plain-last rr) (fin-le {τ} {t} r rr le)
+
+    fin-real : ∀ r → Real r → Real ((r ++ [ last ]) ++ [ last ])
+    fin-real r rr = real-snoc (r ++ [ last ]) plain-last (real-snoc r plain-last rr)
+
+    -- A slot before a last callback's value, which is before its end.
+    slot-fin : ∀ r i → (r ++ [ ix i ]) ≺ ((r ++ [ last ]) ++ [ ix 0 ])
+    slot-fin r i = ≺-trans {r ++ [ ix i ]} {r ++ [ last ]} {(r ++ [ last ]) ++ [ ix 0 ]} (slot-last r i) (≺-ext (r ++ [ last ]) {ix 0} [])
+
     mutual
       row-b : ∀ {t y e′} τ r i (b : Frame A t) → Root r → tick r ≤ τ + t → InE (burst τ r i b) y e′ → Row y e′
-      row-b τ r i (emit a k) R le at-out      = r , ix i , R , plain-ix , refl , λ ()
-      row-b τ r i (emit a k) R le (on-out x)  = row-b τ r (suc i) k R le x
+      row-b τ r i (emit a (close k)) R le at-out = r ++ [ last ] , ix 0 , fin-root R , plain-ix , refl , λ ()
+      row-b τ r i (emit a (close k)) R@(_ , rr , _) le (on-out x) =
+        row-f τ (r ++ [ last ]) (From∞.force k) (fin-root R) (fin-ok r rr le (From∞.force k)) x
+      row-b τ r i (emit a k@(emit _ _)) R le at-out     = r , ix i , R , plain-ix , refl , λ ()
+      row-b τ r i (emit a k@(emit _ _)) R le (on-out x) = row-b τ r (suc i) k R le x
+      row-b τ r i (emit a k@(stall _))  R le at-out     = r , ix i , R , plain-ix , refl , λ ()
+      row-b τ r i (emit a k@(stall _))  R le (on-out x) = row-b τ r (suc i) k R le x
       row-b τ r i (stall k)  R le at-skip     = r , ix i , R , plain-ix , refl , λ ()
       row-b τ r i (stall k)  R le (on-skip x) = row-b τ r (suc i) (Frame∞.force k) R le x
       row-b τ r i (close k)  R le at-skip     = r , ix i , R , plain-ix , refl , λ ()
@@ -127,8 +157,15 @@ private
     -- Every row lies at or after the stream's first.
     mutual
       lb-b : ∀ {t y e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → InE (burst τ r i b) y e′ → (r ++ [ ix i ]) ≼ y
-      lb-b τ r i (emit a k) rr le at-out      = ≼-refl {r ++ [ ix i ]}
-      lb-b {y = y} τ r i (emit a k) rr le (on-out x)  = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x)
+      lb-b τ r i (emit a (close k)) rr le at-out = ≺→≼ {r ++ [ ix i ]} {(r ++ [ last ]) ++ [ ix 0 ]} (slot-fin r i)
+      lb-b {y = y} τ r i (emit a (close k)) rr le (on-out x) =
+        step≼ (r ++ [ ix i ]) (r ++ [ last ]) {y} (slot-last r i)
+          (step≼ (r ++ [ last ]) ((r ++ [ last ]) ++ [ last ]) {y} (≺-ext (r ++ [ last ]) {last} [])
+            (lb-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x))
+      lb-b τ r i (emit a k@(emit _ _)) rr le at-out = ≼-refl {r ++ [ ix i ]}
+      lb-b {y = y} τ r i (emit a k@(emit _ _)) rr le (on-out x) = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x)
+      lb-b τ r i (emit a k@(stall _)) rr le at-out = ≼-refl {r ++ [ ix i ]}
+      lb-b {y = y} τ r i (emit a k@(stall _)) rr le (on-out x) = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x)
       lb-b τ r i (stall k)  rr le at-skip     = ≼-refl {r ++ [ ix i ]}
       lb-b {y = y} τ r i (stall k)  rr le (on-skip x) = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) (Frame∞.force k) rr le x)
       lb-b τ r i (close k)  rr le at-skip     = ≼-refl {r ++ [ ix i ]}
@@ -144,10 +181,21 @@ private
     -- One event at a position.
     mutual
       fu-b : ∀ {t y e₁ e₂} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → InE (burst τ r i b) y e₁ → InE (burst τ r i b) y e₂ → e₁ ≡ e₂
-      fu-b τ r i (emit a k) rr le at-out      at-out       = refl
-      fu-b τ r i (emit a k) rr le at-out      (on-out x′)  = ⊥-elim (lb-b τ r (suc i) k rr le x′ (slot r i))
-      fu-b τ r i (emit a k) rr le (on-out x)  at-out       = ⊥-elim (lb-b τ r (suc i) k rr le x (slot r i))
-      fu-b τ r i (emit a k) rr le (on-out x)  (on-out x′)  = fu-b τ r (suc i) k rr le x x′
+      fu-b τ r i (emit a (close k)) rr le at-out     at-out      = refl
+      fu-b τ r i (emit a (close k)) rr le at-out     (on-out x′) =
+        ⊥-elim (lb-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x′ (slot-last (r ++ [ last ]) 0))
+      fu-b τ r i (emit a (close k)) rr le (on-out x) at-out      =
+        ⊥-elim (lb-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x (slot-last (r ++ [ last ]) 0))
+      fu-b τ r i (emit a (close k)) rr le (on-out x) (on-out x′) =
+        fu-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x x′
+      fu-b τ r i (emit a k@(emit _ _)) rr le at-out     at-out      = refl
+      fu-b τ r i (emit a k@(emit _ _)) rr le at-out     (on-out x′) = ⊥-elim (lb-b τ r (suc i) k rr le x′ (slot r i))
+      fu-b τ r i (emit a k@(emit _ _)) rr le (on-out x) at-out      = ⊥-elim (lb-b τ r (suc i) k rr le x (slot r i))
+      fu-b τ r i (emit a k@(emit _ _)) rr le (on-out x) (on-out x′) = fu-b τ r (suc i) k rr le x x′
+      fu-b τ r i (emit a k@(stall _))  rr le at-out     at-out      = refl
+      fu-b τ r i (emit a k@(stall _))  rr le at-out     (on-out x′) = ⊥-elim (lb-b τ r (suc i) k rr le x′ (slot r i))
+      fu-b τ r i (emit a k@(stall _))  rr le (on-out x) at-out      = ⊥-elim (lb-b τ r (suc i) k rr le x (slot r i))
+      fu-b τ r i (emit a k@(stall _))  rr le (on-out x) (on-out x′) = fu-b τ r (suc i) k rr le x x′
       fu-b τ r i (stall k)  rr le at-skip     at-skip      = refl
       fu-b τ r i (stall k)  rr le at-skip     (on-skip x′) = ⊥-elim (lb-b τ r (suc i) (Frame∞.force k) rr le x′ (slot r i))
       fu-b τ r i (stall k)  rr le (on-skip x) at-skip      = ⊥-elim (lb-b τ r (suc i) (Frame∞.force k) rr le x (slot r i))
@@ -168,8 +216,15 @@ private
     -- Nothing follows the end.
     mutual
       la-b : ∀ {t c y e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → InE (burst τ r i b) c end → InE (burst τ r i b) y e′ → y ≼ c
-      la-b {c = c} τ r i (emit a k) rr le (on-out xc)  at-out       = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {c} (slot r i) (lb-b τ r (suc i) k rr le xc)
-      la-b τ r i (emit a k) rr le (on-out xc)  (on-out x)   = la-b τ r (suc i) k rr le xc x
+      la-b {c = c} τ r i (emit a (close k)) rr le (on-out xc) at-out =
+        step≼ ((r ++ [ last ]) ++ [ ix 0 ]) ((r ++ [ last ]) ++ [ last ]) {c} (slot-last (r ++ [ last ]) 0)
+          (lb-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) xc)
+      la-b τ r i (emit a (close k)) rr le (on-out xc) (on-out x) =
+        la-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) xc x
+      la-b {c = c} τ r i (emit a k@(emit _ _)) rr le (on-out xc) at-out     = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {c} (slot r i) (lb-b τ r (suc i) k rr le xc)
+      la-b         τ r i (emit a k@(emit _ _)) rr le (on-out xc) (on-out x) = la-b τ r (suc i) k rr le xc x
+      la-b {c = c} τ r i (emit a k@(stall _))  rr le (on-out xc) at-out     = step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {c} (slot r i) (lb-b τ r (suc i) k rr le xc)
+      la-b         τ r i (emit a k@(stall _))  rr le (on-out xc) (on-out x) = la-b τ r (suc i) k rr le xc x
       la-b {c = c} τ r i (stall k)  rr le (on-skip xc) at-skip      =
         step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {c} (slot r i) (lb-b τ r (suc i) (Frame∞.force k) rr le xc)
       la-b τ r i (stall k)  rr le (on-skip xc) (on-skip x)  = la-b τ r (suc i) (Frame∞.force k) rr le xc x
@@ -187,10 +242,21 @@ private
     -- Every row before another lies in the stream up to it.
     mutual
       pre-b : ∀ {t q y e e′} τ r i (b : Frame A t) → Real r → tick r ≤ τ + t → (x : InE (burst τ r i b) q e) → InE (burst τ r i b) y e′ → y ≺ q → y ∈ upTo x
-      pre-b τ r i (emit a k) rr le at-out      at-out       _  = hd refl
-      pre-b {y = y} τ r i (emit a k) rr le at-out (on-out x′) yq = ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x′) yq)
-      pre-b τ r i (emit a k) rr le (on-out x)  at-out       _  = hd refl
-      pre-b τ r i (emit a k) rr le (on-out x)  (on-out x′)  yq = th (pre-b τ r (suc i) k rr le x x′ yq)
+      pre-b τ r i (emit a (close k)) rr le at-out at-out _ = hd refl
+      pre-b {y = y} τ r i (emit a (close k)) rr le at-out (on-out x′) yq =
+        ⊥-elim (step≼ ((r ++ [ last ]) ++ [ ix 0 ]) ((r ++ [ last ]) ++ [ last ]) {y} (slot-last (r ++ [ last ]) 0)
+          (lb-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x′) yq)
+      pre-b τ r i (emit a (close k)) rr le (on-out x) at-out _ = hd refl
+      pre-b τ r i (emit a (close k)) rr le (on-out x) (on-out x′) yq =
+        th (pre-f τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k) (fin-real r rr) (fin-ok r rr le (From∞.force k)) x x′ yq)
+      pre-b τ r i (emit a k@(emit _ _)) rr le at-out at-out _ = hd refl
+      pre-b {y = y} τ r i (emit a k@(emit _ _)) rr le at-out (on-out x′) yq = ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x′) yq)
+      pre-b τ r i (emit a k@(emit _ _)) rr le (on-out x) at-out _ = hd refl
+      pre-b τ r i (emit a k@(emit _ _)) rr le (on-out x) (on-out x′) yq = th (pre-b τ r (suc i) k rr le x x′ yq)
+      pre-b τ r i (emit a k@(stall _)) rr le at-out at-out _ = hd refl
+      pre-b {y = y} τ r i (emit a k@(stall _)) rr le at-out (on-out x′) yq = ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) k rr le x′) yq)
+      pre-b τ r i (emit a k@(stall _)) rr le (on-out x) at-out _ = hd refl
+      pre-b τ r i (emit a k@(stall _)) rr le (on-out x) (on-out x′) yq = th (pre-b τ r (suc i) k rr le x x′ yq)
       pre-b τ r i (stall k)  rr le at-skip     at-skip      _  = hd refl
       pre-b {y = y} τ r i (stall k) rr le at-skip (on-skip x′) yq =
         ⊥-elim (step≼ (r ++ [ ix i ]) (r ++ [ ix (suc i) ]) {y} (slot r i) (lb-b τ r (suc i) (Frame∞.force k) rr le x′) yq)
@@ -250,25 +316,37 @@ private
     re : ∀ {y e} → Row y e → Real y
     re (r , _ , (_ , rr , _) , pl , refl , _) = real-snoc r pl rr
 
-    -- No row lies below another: what leads a row leads its root.
-    fl : ∀ {y y′ e e′ l ys} → Row y e → Row y′ e′ → y′ ≡ y ++ l ∷ ys → ⊥
-    fl {l = l} {ys} (r , l₀ , (w , rr , _) , pl , refl , _) (r′ , l′ , (_ , _ , form) , _ , eq′ , _) eq
-      with ⊑-snoc {r ++ [ l₀ ]} r′ (l ∷ ys , trans (sym eq′) eq)
-    ... | inj₂ e = ext≢ (r ++ [ l₀ ]) ys (trans (sym eq) (trans eq′ (sym e)))
-    ... | inj₁ le with form
-    ...   | r-sub = ⊑-≼ {r ++ [ l₀ ]} {p} le (world-after (step w pl) (real-snoc r pl rr))
-    ...   | r-timer {T} {r₀} _ with ⊑-snoc {r ++ [ l₀ ]} (ix T ∷ []) {sub (r₀ ++ [ last ])} le
-    ...     | inj₂ e2 = plain-sub pl (∷ʳ-injectiveʳ r (ix T ∷ []) e2)
-    ...     | inj₁ le2 with ⊑-snoc {r ++ [ l₀ ]} [] {ix T} le2
-    ...       | inj₂ e3 = subst Real (∷ʳ-injectiveˡ r [] e3) rr
-    ...       | inj₁ (zs , e4) = snoc≢[] r (++-conicalˡ (r ++ [ l₀ ]) zs (sym e4))
+    -- A row at a burst's end is that end.
+    row-last : ∀ {y e r} → Row y e → y ≡ r ++ [ last ] → e ≡ end
+    row-last {r = r} (r₁ , _ , _ , _ , refl , lst) eq = lst (∷ʳ-injectiveʳ r₁ r eq)
+
+    -- A row leads no root, unless it is an end: what leads a row leads its
+    -- root.
+    fl-root : ∀ {y e r} → Row y e → (e ≡ end → ⊥) → RootI r → y ⊑ r → ⊥
+    fl-root (r , l₀ , (w , rr , _) , pl , refl , _) ne r-sub le = ⊑-≼ {r ++ [ l₀ ]} {p} le (world-after (step w pl) (real-snoc r pl rr))
+    fl-root Ry ne (r-fin {r₀} R₀) le with ⊑-snoc r₀ {last} le
+    ... | inj₁ le′ = fl-root Ry ne R₀ le′
+    ... | inj₂ e   = ne (row-last Ry e)
+    fl-root (r , l₀ , (w , rr , _) , pl , refl , _) ne (r-timer {T} {r₀} _) le with ⊑-snoc {r ++ [ l₀ ]} (ix T ∷ []) {sub (r₀ ++ [ last ])} le
+    ... | inj₂ e2 = plain-sub pl (∷ʳ-injectiveʳ r (ix T ∷ []) e2)
+    ... | inj₁ le2 with ⊑-snoc {r ++ [ l₀ ]} [] {ix T} le2
+    ...   | inj₂ e3 = subst Real (∷ʳ-injectiveˡ r [] e3) rr
+    ...   | inj₁ (zs , e4) = snoc≢[] r (++-conicalˡ (r ++ [ l₀ ]) zs (sym e4))
+
+    -- No row lies below another, unless an end: what leads a row leads its
+    -- root.
+    fl : ∀ {y y′ e e′ l ys} → Row y e → (e ≡ end → ⊥) → Row y′ e′ → y′ ≡ y ++ l ∷ ys → ⊥
+    fl {y} {l = l} {ys} Ry ne (r′ , l′ , (_ , _ , form) , _ , eq′ , _) eq
+      with ⊑-snoc {y} r′ (l ∷ ys , trans (sym eq′) eq)
+    ... | inj₂ e  = ext≢ y ys (trans (sym eq) (trans eq′ (sym e)))
+    ... | inj₁ le = fl-root Ry ne form le
 
 cold-inv : ∀ {A H} (c : Timeline A) → InvD H (Op.cold c)
 cold-inv {A} {H} c p (rp , dj) = record
   { world = λ x → wo (row m (proj₁ x))
   ; real  = λ x → re (row m (proj₁ x))
   ; func  = λ x x′ → fu m (proj₁ x) (proj₁ x′)
-  ; flat  = λ x x′ → fl (row m (proj₁ x)) (row m (proj₁ x′)) refl
+  ; flat  = λ x x′ → flt (proj₁ x) (proj₁ x′)
   ; burst = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
   ; under = λ x y pl v le → un (proj₁ x) (proj₁ y) (row m (proj₁ x)) (row m (proj₁ y)) pl v le
   ; quiet = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
@@ -280,12 +358,16 @@ cold-inv {A} {H} c p (rp , dj) = record
     open CI {A} H p
     open S rp
 
+    -- Nothing follows an end, so no row lies below one.
+    flt : ∀ {y e e′ l ys} → InE (start p m) y e → InE (start p m) (y ++ l ∷ ys) e′ → ⊥
+    flt {y} {l = l} {ys} x x′ = fl (row m x) (λ { refl → la m x x′ (≺-ext y {l} ys) }) (row m x′) refl
+
     -- A row leads no root of a row after it: what leads a root is the
-    -- subscription's, a root, or an end.
-    off : ∀ {q y r e e′} → InE (start p m) q e → InE (start p m) y e′ → Row q e → Root r → r ≺ y → Anc q r → ⊥
-    off {q} {y} {r} xq xy Rq (_ , rr , ri) ry a with anc-root ri a | Rq
+    -- subscription's, a timer's, or an end.
+    off : ∀ {q y r e e′} → InE (start p m) q e → InE (start p m) y e′ → Row q e → Real r → RootI r → r ≺ y → Anc q r → ⊥
+    off {q} {y} {r} xq xy Rq rr ri ry a with anc-root ri a | Rq
     ... | inj₁ ap | _ = anc-≼ ap rp (world-after (wo Rq) (re Rq))
-    ... | inj₂ (inj₁ rq) | (r₁ , l₁ , _ , pl₁ , eq₁ , _) = ≺-irrefl {p} (subst (p ≺_) (root-plain rq eq₁ pl₁) (world-after (wo Rq) (re Rq)))
+    ... | inj₂ (inj₁ tq) | (r₁ , l₁ , _ , pl₁ , eq₁ , _) = timer-plain tq eq₁ pl₁
     ... | inj₂ (inj₂ (r′ , _ , eq)) | (r₁ , l₁ , _ , pl₁ , eq₁ , lst) with ∷ʳ-injectiveʳ r₁ r′ (trans (sym eq₁) eq)
     ...   | refl with lst refl
     ...     | refl = la m xq xy (≼-≺-≺ {q} {r} {y} (anc-≼ a rr) ry)
@@ -301,17 +383,25 @@ cold-inv {A} {H} c p (rp , dj) = record
         aq : Anc q (q ++ [ l ])
         aq = up self (plain pl refl)
 
+        -- Not at or above a root before a row.
+        gr : ∀ {r y e′} → InE (start p m) y e′ → RootI r → Real r → r ≺ y → w ⊑ r → ⊥
+        gr xy r-sub _ _ le = ⊑-≼ le (world-after wp rw)
+        gr xy (r-timer {T} {r₀} R) rr ry le with ⊑-snoc (ix T ∷ []) {sub (r₀ ++ [ last ])} le
+        ... | inj₁ le₃ = lone rp wp le₃
+        ... | inj₂ e   = off xq xy Rq rr (r-timer R) ry (anc-trans aq (world-anc⁼ (subst (W⁼ H (q ++ [ l ])) e v)))
+        gr {y = y} xy (r-fin {r₀} R) rr ry le with ⊑-snoc r₀ {last} le
+        ... | inj₂ e  = off xq xy Rq rr (r-fin R) ry (anc-trans aq (world-anc⁼ (subst (W⁼ H (q ++ [ l ])) e v)))
+        ... | inj₁ le′ with real-init r₀ (last ∷ []) rr
+        ...   | inj₁ refl = subst Real (++-conicalˡ w (proj₁ le′) (sym (proj₂ le′))) rw
+        ...   | inj₂ rr₀  = gr xy R rr₀ (≺-trans {r₀} {r₀ ++ [ last ]} {y} (≺-ext r₀ {last} []) ry) le′
+
         go : ∀ {y e′} → InE (start p m) y e′ → Row y e′ → w ⊑ y → ⊥
         go xy (r₂ , l₂ , R₂ , pl₂ , refl , _) le with ⊑-snoc r₂ le
         ... | inj₂ e with anc-view (world-anc⁼ (subst (W⁼ H (q ++ [ l ])) e v))
-        ...   | inj₁ e′ = off xq xy Rq R₂ (≺-ext r₂ {l₂} []) (subst (Anc q) (∷ʳ-injectiveˡ q r₂ e′) self)
+        ...   | inj₁ e′ = off xq xy Rq (proj₁ (proj₂ R₂)) (proj₂ (proj₂ R₂)) (≺-ext r₂ {l₂} []) (subst (Anc q) (∷ʳ-injectiveˡ q r₂ e′) self)
         ...   | inj₂ (b , a , pb) with parent-fun pb (step-parent r₂ pl₂)
-        ...     | refl = off xq xy Rq R₂ (≺-ext r₂ {l₂} []) (anc-trans aq a)
-        go xy (r₂ , l₂ , R₂ , pl₂ , refl , _) le | inj₁ le₂ with proj₂ (proj₂ R₂)
-        ... | r-sub = ⊑-≼ le₂ (world-after wp rw)
-        ... | r-timer {T} {r₀} _ with ⊑-snoc (ix T ∷ []) {sub (r₀ ++ [ last ])} le₂
-        ...   | inj₁ le₃ = lone rp wp le₃
-        ...   | inj₂ e   = off xq xy Rq R₂ (≺-ext r₂ {l₂} []) (anc-trans aq (world-anc⁼ (subst (W⁼ H (q ++ [ l ])) e v)))
+        ...     | refl = off xq xy Rq (proj₁ (proj₂ R₂)) (proj₂ (proj₂ R₂)) (≺-ext r₂ {l₂} []) (anc-trans aq a)
+        go xy (r₂ , l₂ , R₂ , pl₂ , refl , _) le | inj₁ le₂ = gr xy (proj₂ (proj₂ R₂)) (proj₁ (proj₂ R₂)) (≺-ext r₂ {l₂} []) le₂
 
 -- A frame played at or after its root's tick: every row at or after its
 -- next slot.
@@ -322,6 +412,17 @@ burst-lb {A} = CI.lb-b {A} (λ _ → ⊥) []
 -- each.
 cold-reach : ∀ {A} p (m : From A 0) → Real p → ∀ {q e} (x : InE (start p m) q e) → Reach (InE (start p m)) q e
 cold-reach {A} p m rp x = upTo x , λ x′ yq _ → CI.S.pre {A} (λ _ → ⊥) p rp m x x′ yq
+
+-- A burst's end: reachable, at its root's tick.
+fin-ticked : ∀ {τ t} u → Real u → tick u ≤ τ + t → Real (u ++ [ last ]) × tick (u ++ [ last ]) ≤ τ + t
+fin-ticked {τ} {t} u ru le = real-snoc u plain-last ru , subst (_≤ τ + t) (sym (tick-snoc u ru)) le
+
+-- A last callback's value lies before everything after it.
+fin-lb : ∀ {A t y e′} τ u (m : From A (suc t)) → Real u → tick u ≤ τ + t
+       → InE (frames τ ((u ++ [ last ]) ++ [ last ]) m) y e′ → ((u ++ [ last ]) ++ [ ix 0 ]) ≺ y
+fin-lb {A} {y = y} τ u m ru le x =
+  ≺-≼-≺ {(u ++ [ last ]) ++ [ ix 0 ]} {(u ++ [ last ]) ++ [ last ]} {y} (slot-last (u ++ [ last ]) 0)
+    (CI.lb-f {A} (λ _ → ⊥) [] τ ((u ++ [ last ]) ++ [ last ]) m (CI.fin-real {A} (λ _ → ⊥) [] u ru) (CI.fin-ok {A} (λ _ → ⊥) [] {τ} u ru le m) x)
 
 -- The next frame's root, past a reachable burst's end.
 next-real : ∀ τ {t′} r → Real r → tick r < τ + t′ → Real (ix (τ + t′) ∷ sub (r ++ [ last ]) ∷ [])

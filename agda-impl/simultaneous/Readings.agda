@@ -7,7 +7,8 @@
 -- of its own, with everything it causes synchronously: a timer firing at
 -- tick t sits under `ix t ∷ sub e ∷ []`, `e` where its timer was created,
 -- its tick never 0, and its i-th emission under `ix i` below that, its
--- completion under `last`.  The tick alone is too coarse, since two
+-- completion under `last`, with the value its callback emitted just
+-- before completing.  The tick alone is too coarse, since two
 -- timers firing at one tick are two frames; the whole position is too
 -- fine, since every event of one frame has its own.
 module simultaneous.Readings where
