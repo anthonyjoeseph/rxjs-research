@@ -108,6 +108,10 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 
 -- EACH ELABORATED FORMER HOLDS when its children do, under the meaning
 -- and under every approximant alike.
+
+-- A cold value its frame closes straight after has no over of its own:
+-- the cold's end, in the same instant, carries its route
+-- (`simultaneous.Routed.Carried`).
 postulate
   held-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
   held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
