@@ -9,7 +9,7 @@
 -- the instant on.
 module simultaneous.Shut where
 
-open import Data.List using (_++_)
+open import Data.List using ([]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Empty using (⊥)
