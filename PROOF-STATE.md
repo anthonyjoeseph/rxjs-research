@@ -54,13 +54,13 @@ Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-asy
 
 #### THE HELD STREAMS
 
-Untried: every elaborated stream names its begins for their instants,
-counts a route of its own instant under every row outside the bursts it
+Probed, unproven: every elaborated stream names its begins for their
+instants, counts a route of its own instant under every row outside the bursts it
 is exempt for, and keeps dead instants dead. Hardest: flatMap's scan
-counters (`lanes-current`, `parked-current`): each is the `idle` of
-what holds the routes, the lanes' and the connects' in scope, read at a
-row of the scan's source; that needs a run of the source projected onto
-each branch's run. Then `m-rows`, a reader's joins and the defer limit.
+counters (`lanes-current`, `parked-current`), true on every row probed,
+hand-offs and parks included: each is the `idle` of what holds the
+routes, read at a row of the scan's source; that needs a run of the
+source projected onto each branch's run. Then `m-rows`, a reader's joins and the defer limit.
 The cold's runs (`cold-covered`) need its rows' order, not their shape.
 Settled when each former's leaf is a body.
 
