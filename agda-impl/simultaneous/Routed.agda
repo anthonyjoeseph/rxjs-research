@@ -1,31 +1,31 @@
 {-# OPTIONS --guardedness #-}
 
 -- WHAT A STREAM HOLDS.  A stream subscribed at `p` HOLDS (`Held`) when
--- its begins are named for their emissions, every value, stop, over and
+-- its begins are named for their instants, every value, stop, over and
 -- end outside the bursts it is exempt for finds the count holding a route
--- of its own emission, and its dead emissions stay dead (`Shut`).  An
--- emission (`simultaneous.Readings`) is one step of a timer's frame,
--- finer than the instant.
+-- of its own instant, and its dead instants stay dead (`Shut`).  An
+-- instant's root (`simultaneous.Readings`) is shared by a whole
+-- synchronous burst: the subscribe frame, or one async emission.
 --
--- NO ROUTE OUTLIVES ITS EMISSION: every row finds the count holding no
--- route, or routes of its own emission.  An emission's routes are stopped,
+-- NO ROUTE OUTLIVES ITS INSTANT: every row finds the count holding no
+-- route, or routes of its own instant.  An instant's routes are stopped,
 -- ended by its over, or carried by an end within it; a reader watching
--- the stream never sees a route of a past emission still open.
+-- the stream never sees a route of a past instant still open.
 --
 -- THE EXEMPT BURSTS are the subscribe bursts of the stream itself and of
--- every connect it reads under, each within its own emission: what runs
+-- every connect it reads under, each within its own instant: what runs
 -- there runs synchronously under the subscription, so whatever route
 -- covers it is held above, by the row that subscribed.  A begin may lie
 -- there: a reader subscribed inside an async emission joins the routes its
--- source holds at the first emit it meets, in that same emission.
+-- source holds at the first emit it meets, in that same instant.
 --
--- AN EMISSION'S NAME IS READ OFF THE EMISSION: the cold's step at `I`
--- renders under a lane at `I ⊕ [ ix 1 ]`, where `mint` is subscribed, and
--- a completion's step one queued lane and one `of` further down.
+-- AN INSTANT'S NAME IS READ OFF ITS ROOT: the cold's step at `I` renders
+-- under a lane at `I ⊕ [ ix 1 ]`, where `mint` is subscribed, and a
+-- completion's step one queued lane and one `of` further down.
 --
 -- A VALUE STEP'S OVER IS SENT ONCE ITS VALUE'S CASCADE IS DONE, from the
 -- third row of the `of` the step renders, the value the second.  Every
--- value and end of the emission is an effect of the value or of a
+-- value and end of the instant is an effect of the value or of a
 -- subscription made in its cascade, and every over an effect of the
 -- over's row: so the over trails them all in every stream at once.
 module simultaneous.Routed where
@@ -48,7 +48,7 @@ open import Data.Maybe using (nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Readings using (emission)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
 open import denotation.Laws.Worlds using (Ok; _⊑_)
@@ -59,14 +59,14 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 ------------------------------------------------------------------------
 -- What a stream holds
 
--- The name a cold's step at emission `I` mints.
+-- The name a cold's step at instant `I` mints.
 nm : Pos → Pos
 nm (cascade t e last ∙ []) = cascade t e last ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 nm (cascade t e l ∙ [])    = cascade t e l ∙ (ix 1 ∷ [])
 nm _                       = root
 
 nameOf : Pos → Pos
-nameOf y = nm (emission y)
+nameOf y = nm (rootOf y)
 
 -- A cold's value step.
 data Valued : Pos → Set where
@@ -82,11 +82,11 @@ Before y o = y ≺ o × ¬ (y ⊑ o)
 
 -- In a value step, before its over.
 Early : Pos → Set
-Early y = Valued (emission y) → Before y (opos (emission y))
+Early y = Valued (rootOf y) → Before y (opos (rootOf y))
 
--- `y` lies in the subscribe burst at `c`, within its emission.
+-- `y` lies in the subscribe burst at `c`, within its instant.
 Sync : Pos → Pos → Set
-Sync c y = T (inside c y) × emission y ≡ emission c
+Sync c y = T (inside c y) × rootOf y ≡ rootOf c
 
 -- In one of the bursts `cs`.
 Ex : List Pos → Pos → Set
@@ -113,7 +113,7 @@ data Routing : Mark → Set where
 
 -- IDLE BETWEEN ROWS: wherever a run met, not ended, has nothing told of
 -- before a position few rows precede, the count holds no route or routes
--- of that position's emission.  A route never waits past its emission for
+-- of that position's instant.  A route never waits past its instant for
 -- a row; a hang before it has infinitely many rows before it.
 Idle : ∀ {A} → EmissionSet (IE A) → Set
 Idle t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few t w → After (cursor nothing rs) w
@@ -133,7 +133,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     shut    : Shut t
     early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
     ends    : ∀ {y} → t y end → Early y
-    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y
+    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     idle    : Idle t
 
 -- Held at every admissible subscription, exempt for its own burst and

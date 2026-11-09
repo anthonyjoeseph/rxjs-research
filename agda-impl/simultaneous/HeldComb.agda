@@ -37,7 +37,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
 open import simultaneous.Routed using (Carried; c-end)
-open import simultaneous.Readings using (emission)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; Out; Input; react; each)
@@ -75,7 +75,7 @@ outRows op o ((q , pin _) ∷ rx)  = outRows op o rx
 ShutRun : ∀ {A : Set} → List (Pos × Ev (IE A)) → Set
 ShutRun rs = ∀ r₁ r₂ → rs ≡ r₁ ++ r₂ → proj₂ (cnt r₁) ≡ 0
            → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt r₁)))) ∈ r₁
-           → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → emission y ≡ emission q → ⊥
+           → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → rootOf y ≡ rootOf q → ⊥
 
 -- What `Held` asks of one run met.
 record RunHeld {A : Set} (cs : List Pos) (rs : List (Pos × Ev (IE A))) : Set where
@@ -102,7 +102,7 @@ held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m)
           → (∀ {y a n} → t y (out (instEmit (value a) n)) → Early y)
           → (∀ {y} → t y end → Early y)
-          → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y)
+          → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y)
           → Idle t
           → (∀ {rs} → Met t rs → RunHeld cs rs)
           → Held t cs
@@ -266,7 +266,7 @@ postulate
              → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
              → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
                 → Σ ℕ λ k → proj₂ c ≡ suc k)
-             → (∀ j → emission (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ emission q)
+             → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
              → Locals cs c (lay q 0 (proj₂ (react op o x)))
 
 ------------------------------------------------------------------------
@@ -277,6 +277,6 @@ record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : 
     named  : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
     early  : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
     ends   : ∀ {q} → M q end → Early q
-    late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (emission q) × opos (emission q) ⊑ q
+    late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
     runs   : ∀ {rx} → Met M rx → RunHeld cs (outRows op init rx)
 

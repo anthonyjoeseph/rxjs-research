@@ -62,9 +62,9 @@ open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import simultaneous.Routed using (nameOf; nm; Valued; opos)
-open import simultaneous.Readings using (emission)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met)
-open import simultaneous.HeldConnect using (emission-ext)
+open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
 open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans)
@@ -226,9 +226,9 @@ inv-ev nothing  o ρ g = inv-⟦⟧ o ρ g
 inv-ev (just n) o ρ g = inv-approx n o ρ g
 
 -- Past its over, a step is as late.
-late-ext : ∀ {q} zs → Valued (emission q) × opos (emission q) ⊑ q
-         → Valued (emission (q ⊕ zs)) × opos (emission (q ⊕ zs)) ⊑ (q ⊕ zs)
-late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (emission-ext q zs)) (v , ⊑-trans o (zs , refl))
+late-ext : ∀ {q} zs → Valued (rootOf q) × opos (rootOf q) ⊑ q
+         → Valued (rootOf (q ⊕ zs)) × opos (rootOf (q ⊕ zs)) ⊑ (q ⊕ zs)
+late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (rootOf-ext q zs)) (v , ⊑-trans o (zs , refl))
 
 -- An opened outer row is a mark it was, unless it opens.
 open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
@@ -278,7 +278,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane    : ∀ {q w x} → σ₃ q (out x) → MRow (q ⊕ [ sub w ]) (out (just (inj₁ (laneB , x))))
     close   : ∀ {q w x} → σ₂ q (out x) → MRow (q ⊕ [ sub w ]) (out (just (inj₁ (closeB , x))))
     under   : ∀ {zs} → MRow (P ⊕ zs) end
-    done    : ∀ {c zs} → BEnd c → emission (c ⊕ zs) ≡ emission c → MRow (c ⊕ zs) end
+    done    : ∀ {c zs} → BEnd c → MRow (c ⊕ zs) end
 
   postulate
     -- Every row the scan's source meets is one of these.
@@ -287,7 +287,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- their over, overs at it.
     lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
     lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
-    lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (emission q) × opos (emission q) ⊑ q
+    lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
     close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
     -- A lane's and the closer's ends lie before their step's over.
     lane-ends   : ∀ {q} → σ₃ q end → Early q
@@ -359,8 +359,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
   named x with m-rows x tt
   ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
-    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (emission-ext c [ sub w ])))
-  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (emission-ext c [ sub w ])))
+    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (rootOf-ext c [ sub w ])))
+  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (rootOf-ext c [ sub w ])))
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   early : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
@@ -372,14 +372,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ends : ∀ {q} → M q end → Early q
   ends x with m-rows x tt
   ... | under {zs} = early-inst zs ep₃
-  ... | done {zs = zs} b _ = early-inst zs (bend b)
+  ... | done {zs = zs} b = early-inst zs (bend b)
     where
       bend : ∀ {c} → BEnd c → Early c
       bend (b-outer {w = w} y) = early-inst [ sub w ] (Held.ends H₁ (proj₁ y))
       bend (b-lane {w = w} y)  = early-inst [ sub w ] (lane-ends y)
       bend (b-close {w = w} y) = early-inst [ sub w ] (close-ends y)
 
-  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (emission q) × opos (emission q) ⊑ q
+  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
   late x with m-rows x tt
   ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (Held.late H₁ (proj₁ y))
   ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
@@ -398,7 +398,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
           (λ { refl → named (proj₁ (run-row rx₁ mt)) })
           (λ { refl ne → value-open rx₁ mt ne })
           (λ { refl sp ne → over-open rx₁ mt sp ne })
-          (λ j → emission-ext q (ix 1 ∷ ix j ∷ []))
+          (λ j → rootOf-ext q (ix 1 ∷ ix j ∷ []))
 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
       fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
@@ -427,7 +427,7 @@ valued-stable {cascade _ _ (ix _) ∙ (_ ∷ _)} h = ⊥-elim (h λ ())
 valued-stable {cascade _ _ (sub _) ∙ _}      h = ⊥-elim (h λ ())
 valued-stable {cascade _ _ last ∙ _}         h = ⊥-elim (h λ ())
 
-late-stable : ∀ {y} → ¬ ¬ (Valued (emission y) × opos (emission y) ⊑ y) → Valued (emission y) × opos (emission y) ⊑ y
+late-stable : ∀ {y} → ¬ ¬ (Valued (rootOf y) × opos (rootOf y) ⊑ y) → Valued (rootOf y) × opos (rootOf y) ⊑ y
 late-stable {y} h =
   valued-stable (λ k → h λ l → k (proj₁ l)) , inside-⊑ _ y (decidable-stable (T? _) λ k → h λ l → k (⊑-inside (proj₂ l)))
 
@@ -465,7 +465,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 
   named-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark begin) n)) → n ≡ nameOf y
   named-laid mx (laid rx₁ {q = c} {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
-  ... | routed _ refl = trans (CombIn.named ci mq) (cong nm (sym (emission-ext c (ix 1 ∷ ix j ∷ []))))
+  ... | routed _ refl = trans (CombIn.named ci mq) (cong nm (sym (rootOf-ext c (ix 1 ∷ ix j ∷ []))))
     where mq = proj₁ (run-row rx₁ mx)
 
   routing-laid : ∀ {rx y m n} → Met M rx → Laid op init rx y (out (instEmit (mark m) n)) → Routing m
@@ -481,7 +481,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
   ends-laid : ∀ {rx y} → Met M rx → Laid op init rx y end → Early y
   ends-laid mx (ended rx₁ rx₂ refl) = CombIn.ends ci (proj₁ (run-row rx₁ mx))
 
-  late-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y
+  late-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
   late-laid mx (laid rx₁ {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
   ... | routed _ refl = late-ext (ix 1 ∷ ix j ∷ []) (CombIn.late ci mq)
     where mq = proj₁ (run-row rx₁ mx)
@@ -498,7 +498,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
   ends : ∀ {y} → S y end → Early y
   ends x = early-stable λ ng → met-laid x tt λ (_ , mx , l) → ng (ends-laid mx l)
 
-  late : ∀ {y n} → S y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y
+  late : ∀ {y n} → S y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
   late x = late-stable λ ng → met-laid x tt λ (_ , mx , l) → ng (late-laid mx l)
 
   runs : ∀ {rs} → Met S rs → RunHeld cs rs

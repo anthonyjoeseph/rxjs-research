@@ -31,7 +31,7 @@ open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; 
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
-open import simultaneous.Readings using (emission)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Sync; Ex; Early; Before; Valued; opos)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
@@ -45,9 +45,9 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 ------------------------------------------------------------------------
 -- Positions
 
--- An effect keeps its cause's emission.
-emission-ext : ∀ p zs → emission (p ⊕ zs) ≡ emission p
-emission-ext (_ ∙ _) _ = refl
+-- An effect keeps its cause's instant.
+rootOf-ext : ∀ p zs → rootOf (p ⊕ zs) ≡ rootOf p
+rootOf-ext (_ ∙ _) _ = refl
 
 -- What lies before an over, all it causes does.
 before-ext : ∀ {y o} zs → Before y o → Before (y ⊕ zs) o
@@ -59,7 +59,7 @@ before-ext {y} {o} zs (lt , ns) =
 early-inst : ∀ {p} zs → Early p → Early (p ⊕ zs)
 early-inst {p} zs ep v =
   subst (λ I → Before (p ⊕ zs) (opos I)) (sym eq) (before-ext zs (ep (subst Valued eq v)))
-  where eq = emission-ext p zs
+  where eq = rootOf-ext p zs
 
 ⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
 ⊑-≼ {x} ([] , refl) yx = ≼-refl {x} (subst (λ z → z ≺ x) (⊕-identityʳ x) yx)
@@ -68,7 +68,7 @@ early-inst {p} zs ep v =
 -- The body's burst lies in the connect's.
 sync-body : ∀ {p y} → Sync (p ⊕ [ ix 0 ]) y → Sync p y
 sync-body {p} {y} (i , eq) =
-  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (emission-ext p [ ix 0 ])
+  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (rootOf-ext p [ ix 0 ])
   where
     inside⇒ : ∀ {x z} → x ⊑ z → inside x z ≡ true
     inside⇒ {x} {z} le with inside x z in e

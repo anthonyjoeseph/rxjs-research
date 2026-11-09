@@ -19,10 +19,10 @@ open InstEmit using (instant)
 instantOf : Pos → Instant
 instantOf = instantᵖ
 
--- THE EMISSION a row lies in: the root of its instant.  The elaboration
--- names and closes routes per emission, which is per instant.
-emission : Pos → Pos
-emission p = instantOf p ∙ []
+-- The root of a row's instant.  Every row of one synchronous burst has
+-- the same root: the elaboration names and closes routes per instant.
+rootOf : Pos → Pos
+rootOf p = instantOf p ∙ []
 
 ------------------------------------------------------------------------
 -- InstEmit streams
