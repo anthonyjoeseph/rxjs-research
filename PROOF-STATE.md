@@ -26,6 +26,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE HELD STREAMS
+
+Untried: every elaborated stream names its begins for their instants,
+counts a route of its own instant under every row outside the bursts it
+is exempt for, and keeps dead instants dead. Hardest: flatMap's scan
+counters (`lanes-current`, `parked-current`): each is the `idle` of
+what holds the routes, the lanes' and the connects' in scope, read at a
+row of the scan's source; that needs a run of the source projected onto
+each branch's run. Then `m-rows`, a reader's joins and the defer limit.
+Settled when each former's leaf is a body.
+
+Members: `outer-current`, `lanes-current`, `held-current`,
+`parked-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
+`walk`, `step-local`, `m-rows`, `lane-ends`, `close-ends`, `lane-named`,
+`lane-early`, `lane-late`, `close-marks`, `scan-idle`, `comb-run`,
+`held-connected`, `held-lim`, `held-top`, `held-next`, `held-⊥`,
+`held-takeWhile`, `held-cold`, `held-of`, `held-empty`.
+
 #### THE RELEASE
 
 Untried in this vocabulary: the batcher holds nothing exactly where the
@@ -54,14 +72,6 @@ cover may hold positions with no row. Settled when these are bodies over
 
 Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
 
-#### THE ROUTES
-
-Proven on a closed branch over the held-route tower: a dead instant
-stays dead, and an instant's values precede its overs. Settled when the
-tower is ported and these are its bodies.
-
-Members: `shut`, `over-last`.
-
 #### THE PROTOCOL
 
 Untried: every emit is named for its instant, the begins and values of
@@ -80,12 +90,3 @@ Switch, exhaust and the bounded queue are the real cases. Settled when
 each is a body by operator.
 
 Members: `erases`.
-
-#### THE INSTANTS
-
-Whether every position a program reaches lies under the subscribe frame
-or a timer cascade, as `instantOf` reads it. The world invariant says
-where a row lies, not yet that none sits at a timer's root. Settled when
-the invariant carries that, and `positioned` and `rooted` read it off.
-
-Members: `positioned`, `rooted`.

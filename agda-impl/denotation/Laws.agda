@@ -55,7 +55,7 @@ open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Count
   using (Cnt; DCnt; AgC; agc; ag-cnt; dcnt-pin; dcnt-pin-up; dcnt-cnt; pinned-after; trunc-ag; cnt-up; cnt-down; Img; em; seen; seen-under; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-sym; ≈ᶜ-trans; ≈ᶜ-mono; agree-all; limit; Aft; contract; unfold₀)
 open import denotation.Laws.Join using (over; flatMap-causal; flatMap-ne)
-open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen)
+open import denotation.Laws.Worlds using (Ok; Lawful; InvAt; InvD; Hots; GoodEnv; hot-shows; world-after; ok-step; ⊑-≼; inside-⊑; inv-widen)
 open import denotation.Laws.Worlds.Leaves using (empty-inv; of-inv; spin-inv; map-inv; scan-inv; defer-inv; lim-inv)
 open import denotation.Laws.Connect using (connect-inv)
 open import denotation.Laws.TakeInv using (takeWhile-inv)
@@ -354,8 +354,8 @@ hot-causal {q = q} a = hot-below (λ {k} kq → proj₁ (upto a {k} (≺→≼ {
 -- The environment
 
 good-cons : ∀ {Γ A} {t : EmissionSet A} {ρ : DenEnv Γ} → Lawful t → GoodEnv ρ → GoodEnv (hot t ∷ ρ)
-good-cons L g (here refl)          = lawful-hot L
-good-cons {t = t} {ρ} L g (there i) = inv-widen {t = t} {d = lookup ρ i} (g i)
+good-cons {t = t} L g (here refl)  = lawful-hot L , hot-shows t
+good-cons {t = t} {ρ} L g (there i) = inv-widen {t = t} {d = lookup ρ i} (proj₁ (g i)) , proj₂ (g i)
 
 ag-cons : ∀ {Γ A q} {d d′ : Den A} {ρ ρ′ : DenEnv Γ} → d ~⟨ q ⟩ d′ → EnvAg q ρ ρ′ → EnvAg q (d ∷ ρ) (d′ ∷ ρ′)
 ag-cons a e (here refl) = a
@@ -374,7 +374,7 @@ inv-approx n       (scan f z s)      ρ g = scan-inv f z {approx n s ρ} (inv-ap
 inv-approx n       (takeWhile i k s) ρ g = takeWhile-inv i k {approx n s ρ} (inv-approx n s ρ g)
 inv-approx n       (flatMap op f s)  ρ g = flatMap-inv op (inv-approx n s ρ g) λ a → inv-approx n (f a) ρ g
 inv-approx n       (connect s b)     ρ g = connect-inv {s = approx n s ρ} {F = λ h → approx n b (h ∷ ρ)} (inv-approx n s ρ g) λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)
-inv-approx n       (connected i)     ρ g = g i
+inv-approx n       (connected i)     ρ g = proj₁ (g i)
 inv-approx zero    (defer l)         ρ g = spin-inv
 inv-approx (suc n) (defer l)         ρ g = defer-inv (inv-approx n (Later.force l) ρ g)
 
@@ -387,7 +387,7 @@ inv-⟦⟧ (scan f z s)      ρ g = scan-inv f z {⟦ s ⟧ ρ} (inv-⟦⟧ s ρ
 inv-⟦⟧ (takeWhile i k s) ρ g = takeWhile-inv i k {⟦ s ⟧ ρ} (inv-⟦⟧ s ρ g)
 inv-⟦⟧ (flatMap op f s)  ρ g = flatMap-inv op (inv-⟦⟧ s ρ g) λ a → inv-⟦⟧ (f a) ρ g
 inv-⟦⟧ (connect s b)     ρ g = connect-inv {s = ⟦ s ⟧ ρ} {F = λ h → ⟦ b ⟧ (h ∷ ρ)} (inv-⟦⟧ s ρ g) λ {t} L → inv-⟦⟧ b (hot t ∷ ρ) (good-cons L g)
-inv-⟦⟧ (connected i)     ρ g = g i
+inv-⟦⟧ (connected i)     ρ g = proj₁ (g i)
 inv-⟦⟧ (defer l)         ρ g = lim-inv {c = λ n → approx n (defer l) ρ} λ n → inv-approx n (defer l) ρ g
 
 -- EVERY APPROXIMANT AND THE MEANING ARE CAUSAL in the environment.

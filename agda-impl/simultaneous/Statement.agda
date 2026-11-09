@@ -47,6 +47,7 @@ open import simultaneous.SObs using (SObs)
 open import simultaneous.Readings using (Rooted)
 open import simultaneous.Relations using (events; elaborated; batched; Met; ranked; Closes; Ends; joined; values;
   stampedᴰ; stampedᴮ; grouped; Groups; Erases)
+open import simultaneous.Protocol using (row-rooted)
 open import simultaneous.Batcher using (batcher-ends)
 open import simultaneous.Closing using (batches)
 
@@ -67,8 +68,8 @@ postulate
 Positioned : Set₁
 Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
 
-postulate
-  positioned : Positioned
+positioned : Positioned
+positioned o s = row-rooted o (proj₁ (proj₁ s))
 
 ------------------------------------------------------------------------
 -- The statement

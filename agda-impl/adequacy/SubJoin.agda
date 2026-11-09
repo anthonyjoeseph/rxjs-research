@@ -33,7 +33,7 @@ open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; en
   coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_; _≼_; Truncate; InE; at-end; at-out; on-out)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; ≺-ext; entered-few)
-open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step)
+open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step; w-deep; snoc≢[])
 open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; unbound; binds; CS; ofS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
@@ -102,7 +102,8 @@ bind (binds o p sc) (here refl) (ok , a) = _ , refl , record { law = lw ; few = 
     I = inv-⟦⟧ o (full sc) (good-full sc a) s (ok-step p ok)
     lw : Lawful (Proper (pendRows (full sc) o s))
     lw = record { real = λ x → InvAt.real I (proj₁ x) ; func = λ x x′ → InvAt.func I (proj₁ x) (proj₁ x′)
-                ; flat = λ x x′ → InvAt.flat I (proj₁ x) (proj₁ x′) ; proper = λ c y → proj₂ y (proj₁ c) }
+                ; flat = λ x x′ → InvAt.flat I (proj₁ x) (proj₁ x′) ; proper = λ c y → proj₂ y (proj₁ c)
+                ; deep = λ x → w-deep (snoc≢[] p) (InvAt.world I (proj₁ x)) (InvAt.real I (proj₁ x)) (_ , refl) }
     fw : ∀ {q e} → Proper (pendRows (full sc) o s) q e → Unpinned e → Few (Proper (pendRows (full sc) o s)) q
     fw r u with entered-few (⟦ o ⟧ (full sc)) s (dep-un u) (proj₁ r)
     ... | ks , h = ks , λ y lt → h (proj₁ y) lt

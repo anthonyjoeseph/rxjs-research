@@ -195,7 +195,7 @@ no-slot {c = c} _ here eq with ∷ʳ-injectiveʳ c c eq
 ... | ()
 no-slot {c = c} rc (inW (step {x} w pl)) eq with ∷ʳ-injectiveˡ x c eq
 ... | refl = world-after⁼ w rc (≺-ext c [])
-no-slot {c = c} _ (inW (timer {e} t _)) eq with ∷ʳ-injectiveʳ (ix t ∷ []) c eq
+no-slot {c = c} _ (inW (timer {e} t _ _)) eq with ∷ʳ-injectiveʳ (ix t ∷ []) c eq
 ... | ()
 no-slot {c = c} _ (inW (join {h} _ _ _)) eq with ∷ʳ-injectiveʳ h c eq
 ... | ()
