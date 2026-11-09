@@ -4,7 +4,7 @@
 -- observable keeps, and the positions a run can reach.
 --
 -- A subscription at `p` places its rows in its WORLD: below `p` a plain
--- label at a time; at a cascade's root `cascadeAt t e`, for a timer
+-- label at a time; at a timer's step `fired t e ▸ l`, for a timer
 -- created at `e` in the world, firing past `e`'s tick; and where a hot row
 -- `h` is joined at `e` in the world, at `h ⊕ [ sub e ]`.  The world is
 -- what lets a connect's source and body be told apart: neither's rows lie
@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 import denotation.Position as P
-open import denotation.Position using (Pos; Path; Label; ix; sub; last; frame; cascade; _∙_; _⊕_; root; cascadeAt; tick;
+open import denotation.Position using (Pos; Path; Label; ix; sub; last; frame; cascade; _∙_; _⊕_; root; Root; nested; fired; _▸_; tick;
   isLt; cmpInstant; insideᵗ; inside)
 open import denotation.Events using (inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
 open import denotation.Simultaneity using (eqⁱ; later-tick; lexi-l; isLt-lt)
@@ -48,7 +48,7 @@ mutual
   -- The world of a subscription at `p` under hot rows `H`, `p` excluded.
   data W (H : Pos → Set) (p : Pos) : Pos → Set where
     step  : ∀ {x l} → W⁼ H p x → Plain l → W H p (x ⊕ [ l ])
-    timer : ∀ {e} t → W⁼ H p e → tick e < t → W H p (cascadeAt t e)
+    timer : ∀ {e l} t → W⁼ H p e → tick e < t → Plain l → W H p (fired t e ▸ l)
     join  : ∀ {h e} → H h ⊎ W H p h → W⁼ H p e → e ≺ h → W H p (h ⊕ [ sub e ])
 
   -- The world with `p` itself.
@@ -61,7 +61,7 @@ mutual
   -- reachable position.
   Real : Pos → Set
   Real (frame ∙ p)       = Back root p
-  Real (cascade t e ∙ p) = Real e × tick e < t × Back (cascadeAt t e) p
+  Real (cascade t e l ∙ p) = Real e × tick e < t × Back (fired t e ▸ l) p
 
   Back : Pos → Path → Set
   Back acc []          = ⊤
@@ -114,20 +114,6 @@ PinBy c e = Σ Pos λ r → e ≡ pin r × r ≺ c
 pinby-silent : ∀ {A} {c} {e : Ev A} → PinBy c e → Silent e
 pinby-silent (_ , refl , _) = held
 
--- A TIMER'S ROOT: a cascade's root itself, where no row lies; every row
--- is a step of its cascade.
-TimerRoot : Pos → Set
-TimerRoot (cascade _ _ ∙ []) = ⊤
-TimerRoot (frame ∙ [])       = ⊥
-TimerRoot (_ ∙ (_ ∷ _))      = ⊥
-
--- A step under anything is no timer's root.
-ext-untimed : ∀ x {l ys} → TimerRoot (x ⊕ (l ∷ ys)) → ⊥
-ext-untimed (frame ∙ [])           ()
-ext-untimed (frame ∙ (_ ∷ _))      ()
-ext-untimed (cascade _ _ ∙ [])      ()
-ext-untimed (cascade _ _ ∙ (_ ∷ _)) ()
-
 -- REFUTED: 67919a90 flatMap-inv without `under`, by an outer row under a timer rooted below its own value's first child
 record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
   field
@@ -139,7 +125,6 @@ record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
     under : ∀ {q y w l e e′} → X q e → X y e′ → Plain l → W⁼ H (q ⊕ [ l ]) w → w ⊑ y → ⊥
     quiet : ∀ {c y e} → X c end → X y e → c ≺ y → PinBy c e
     pinned : ∀ {y r} → X y (pin r) → W⁼ H p r × T (inside r y)
-    untimed : ∀ {y e} → X y e → TimerRoot y → ⊥
 
 -- At every admissible subscription.
 InvD : ∀ {A} → (Pos → Set) → Den A → Set
@@ -215,9 +200,9 @@ step≢root (_ ∙ (_ ∷ _)) _ ()
 ⊑-unit {_ ∙ (_ ∷ _)} _ (_ , ())
 
 -- A timer's creator comes before its cascade.
-timer-after : ∀ e {t} → tick e < t → e ≺ cascadeAt t e
-timer-after (frame ∙ _)       _ = tt
-timer-after (cascade u d ∙ q) h = Equivalence.from T-≡ (cong isLt (lexi-l (isLt-lt (later-tick d (cascade u d ∙ q) h))))
+timer-after : ∀ e {t} l → tick e < t → e ≺ (fired t e ▸ l)
+timer-after (frame ∙ _)         _ _ = tt
+timer-after (cascade u d m ∙ q) l h = Equivalence.from T-≡ (cong isLt (lexi-l (isLt-lt (later-tick d (cascade u d m ∙ q) m l h))))
 
 ------------------------------------------------------------------------
 -- Reachability
@@ -238,7 +223,7 @@ private
   -- What a reachable position's last `sub` names is reachable.
   real-last : ∀ x {e} → Real (x ⊕ [ sub e ]) → Real e
   real-last (frame ∙ p)       r           = back-real root p r
-  real-last (cascade t e ∙ p) (_ , _ , b) = back-real (cascadeAt t e) p b
+  real-last (cascade t e l ∙ p) (_ , _ , b) = back-real (fired t e ▸ l) p b
 
   back-snoc : ∀ acc x {l} → Plain l → Back acc x → Back acc (x ++ [ l ])
   back-snoc acc []           plain-ix   b            = tt
@@ -250,12 +235,12 @@ private
 -- A reachable position's prefix is reachable.
 real-init : ∀ x ys → Real (x ⊕ ys) → Real x
 real-init (frame ∙ p)       ys r            = back-init root p ys r
-real-init (cascade t e ∙ p) ys (re , h , b) = re , h , back-init (cascadeAt t e) p ys b
+real-init (cascade t e l ∙ p) ys (re , h , b) = re , h , back-init (fired t e ▸ l) p ys b
 
 -- A reachable position one plain label down is reachable.
 real-snoc : ∀ x {l} → Plain l → Real x → Real (x ⊕ [ l ])
 real-snoc (frame ∙ p)       pl r            = back-snoc root p pl r
-real-snoc (cascade t e ∙ p) pl (re , h , b) = re , h , back-snoc (cascadeAt t e) p pl b
+real-snoc (cascade t e l ∙ p) pl (re , h , b) = re , h , back-snoc (fired t e ▸ l) p pl b
 
 private
   back-sub : ∀ acc x {e} → Back acc x → Real e → e ≺ ((acc ⊕ x) ⊕ [ sub e ]) → Back acc (x ++ [ sub e ])
@@ -267,7 +252,7 @@ private
 -- A reachable position naming an earlier reachable one is reachable.
 real-sub : ∀ x {e} → Real x → Real e → e ≺ (x ⊕ [ sub e ]) → Real (x ⊕ [ sub e ])
 real-sub (frame ∙ p)        r            re lt = back-sub root p r re lt
-real-sub (cascade t e′ ∙ p) (r′ , h , b) re lt = r′ , h , back-sub (cascadeAt t e′) p b re lt
+real-sub (cascade t e′ l ∙ p) (r′ , h , b) re lt = r′ , h , back-sub (fired t e′ ▸ l) p b re lt
 
 ------------------------------------------------------------------------
 -- The world
@@ -278,7 +263,7 @@ mutual
   world-after : ∀ {H p y} → W H p y → Real y → p ≺ y
   world-after {p = p} (step here _) r = ≺-ext p []
   world-after {p = p} (step {x} {l} (inW w) _) r = ≺-trans {p} {x} {x ⊕ [ l ]} (world-after w (real-init x [ l ] r)) (≺-ext x [])
-  world-after {p = p} (timer {e} t w h) (re , _ , _) = ≼-≺-≺ {p} {e} {cascadeAt t e} (world-after⁼ w re) (timer-after e h)
+  world-after {p = p} (timer {e} {l} t w h _) (re , _ , _) = ≼-≺-≺ {p} {e} {fired t e ▸ l} (world-after⁼ w re) (timer-after e l h)
   world-after {p = p} (join {h} {e} _ w eh) r =
     ≼-≺-≺ {p} {e} {h ⊕ [ sub e ]} (world-after⁼ w (real-last h r)) (≺-trans {e} {h} {h ⊕ [ sub e ]} eh (≺-ext h []))
 
@@ -290,7 +275,7 @@ mutual
 mutual
   shrink : ∀ {H p i w} → W H (p ⊕ [ ix i ]) w → W H p w
   shrink (step w l)           = step (inW (shrink⁼ w)) l
-  shrink (timer t w lt)       = timer t (inW (shrink⁼ w)) lt
+  shrink (timer t w lt pl)    = timer t (inW (shrink⁼ w)) lt pl
   shrink (join (inj₁ h) w eh) = join (inj₁ h) (inW (shrink⁼ w)) eh
   shrink (join (inj₂ v) w eh) = join (inj₂ (shrink v)) (inW (shrink⁼ w)) eh
 
@@ -302,7 +287,7 @@ mutual
 mutual
   nest : ∀ {H p a w} → W⁼ H p a → W H a w → W H p w
   nest pa (step w l)           = step (nest⁼ pa w) l
-  nest pa (timer t w lt)       = timer t (nest⁼ pa w) lt
+  nest pa (timer t w lt pl)    = timer t (nest⁼ pa w) lt pl
   nest pa (join (inj₁ h) w eh) = join (inj₁ h) (nest⁼ pa w) eh
   nest pa (join (inj₂ v) w eh) = join (inj₂ (nest pa v)) (nest⁼ pa w) eh
 
@@ -318,7 +303,7 @@ nest-in pa (inW v) = nest (inW pa) v
 mutual
   narrow : ∀ {B H p i w} {t : EmissionSet B} → (∀ {h e} → t h e → W H p h) → W (H ∪ʰ t) (p ⊕ [ ix i ]) w → W H p w
   narrow tw (step w l)                     = step (inW (narrow⁼ tw w)) l
-  narrow tw (timer k w lt)                 = timer k (inW (narrow⁼ tw w)) lt
+  narrow tw (timer k w lt pl)              = timer k (inW (narrow⁼ tw w)) lt pl
   narrow tw (join (inj₁ (inj₁ (_ , x))) w eh) = join (inj₂ (tw x)) (inW (narrow⁼ tw w)) eh
   narrow tw (join (inj₁ (inj₂ h)) w eh)    = join (inj₁ h) (inW (narrow⁼ tw w)) eh
   narrow tw (join (inj₂ v) w eh)           = join (inj₂ (narrow tw v)) (inW (narrow⁼ tw w)) eh
@@ -428,11 +413,11 @@ flat-under : ∀ {C H q} {X : EmissionSet C} → InvAt H q X → ∀ {k k′ a e
 flat-under {X = X} I {k} {a = a} {e′ = e′} x x′ (zs , refl) = InvAt.flat I x (subst (λ z → X z e′) (⊕-assoc k [ a ] zs) x′)
 
 -- `a` is `c`'s PARENT: `c` steps a plain label from it, names it in a
--- closing `sub`, or roots a cascade it created.
+-- closing `sub`, or is a step of a timer it created.
 data Parent (a c : Pos) : Set where
   plain : ∀ {l} → Plain l → c ≡ a ⊕ [ l ] → Parent a c
   named : ∀ h → c ≡ h ⊕ [ sub a ] → Parent a c
-  timed : ∀ t → c ≡ cascadeAt t a → Parent a c
+  timed : ∀ t {l} → c ≡ fired t a ▸ l → Parent a c
 
 step-parent : ∀ x {l} → Plain l → Parent x (x ⊕ [ l ])
 step-parent x pl = plain pl refl
@@ -475,6 +460,63 @@ anc-trans : ∀ {a b c} → Anc a b → Anc b c → Anc a c
 anc-trans x self      = x
 anc-trans x (up y pb) = up (anc-trans x y) pb
 
+------------------------------------------------------------------------
+-- A burst's root
+
+-- What a burst's steps hang from: the position they lie below, or the
+-- one their timer was created at.
+hub : Root → Pos
+hub (nested x)  = x
+hub (fired _ e) = e
+
+-- A root whose steps are reachable: a reachable position, or a timer
+-- firing past its reachable creator.
+RealR : Root → Set
+RealR (nested x)  = Real x
+RealR (fired t e) = Real e × tick e < t
+
+realR-hub : ∀ r → RealR r → Real (hub r)
+realR-hub (nested _)  rr       = rr
+realR-hub (fired _ _) (re , _) = re
+
+real-▸ : ∀ r {l} → Plain l → RealR r → Real (r ▸ l)
+real-▸ (nested x)  pl rr       = real-snoc x pl rr
+real-▸ (fired _ _) _  (re , h) = re , h , tt
+
+-- A root's steps come after what they hang from.
+hub-≺ : ∀ r l → RealR r → hub r ≺ (r ▸ l)
+hub-≺ (nested x)  l _       = ≺-ext x []
+hub-≺ (fired _ e) l (_ , h) = timer-after e l h
+
+-- A plain step's parent is its root's hub.
+step-par : ∀ r {l} → Plain l → Parent (hub r) (r ▸ l)
+step-par (nested x)  pl = plain pl refl
+step-par (fired t e) _  = timed t refl
+
+-- A root's plain step lies in the world its hub does.
+world-▸ : ∀ {H p} r {l} → W⁼ H p (hub r) → RealR r → Plain l → W H p (r ▸ l)
+world-▸ (nested _)  w _       pl = step w pl
+world-▸ (fired t _) w (_ , h) pl = timer t w h pl
+
+-- Steps are told apart by their labels.
+▸-injʳ : ∀ r r′ {a b} → r ▸ a ≡ r′ ▸ b → a ≡ b
+▸-injʳ (nested x)  (nested y)  e    = ⊕-injʳ x y e
+▸-injʳ (nested x)  (fired _ _) e    = ⊥-elim (step≢root x _ e)
+▸-injʳ (fired _ _) (nested y)  e    = ⊥-elim (step≢root y _ (sym e))
+▸-injʳ (fired _ _) (fired _ _) refl = refl
+
+-- One label below a position, a step's root is nested there.
+▸-hub : ∀ q {l} r {l′} → q ⊕ [ l ] ≡ r ▸ l′ → q ≡ hub r
+▸-hub q (nested x)  e = ⊕-injˡ q x e
+▸-hub q (fired _ _) e = ⊥-elim (step≢root q _ e)
+
+-- Leading a step: it, or leading the position its root is nested below.
+⊑-▸ : ∀ {w} r {l} → w ⊑ (r ▸ l) → w ≡ r ▸ l ⊎ Σ Pos λ x → r ≡ nested x × w ⊑ x
+⊑-▸ (nested x)  le with ⊑-snoc x le
+... | inj₁ le′ = inj₂ (x , refl , le′)
+... | inj₂ e   = inj₁ e
+⊑-▸ (fired _ _) le = inj₁ (⊑-unit _ le)
+
 private
   back-lt : ∀ acc x {e} → Back acc (x ++ [ sub e ]) → e ≺ ((acc ⊕ x) ⊕ [ sub e ])
   back-lt acc []           {e} (_ , lt , _) = subst (λ z → e ≺ (z ⊕ [ sub e ])) (sym (⊕-identityʳ acc)) lt
@@ -484,13 +526,13 @@ private
 
   real-lt : ∀ x {e} → Real (x ⊕ [ sub e ]) → e ≺ (x ⊕ [ sub e ])
   real-lt (frame ∙ p)        r           = back-lt root p r
-  real-lt (cascade t e′ ∙ p) (_ , _ , b) = back-lt (cascadeAt t e′) p b
+  real-lt (cascade t e′ l ∙ p) (_ , _ , b) = back-lt (fired t e′ ▸ l) p b
 
   -- A reachable position's parent is reachable, and before it.
   parent-real : ∀ {b c} → Parent b c → Real c → Real b × b ≺ c
   parent-real {b} (plain {l} _ refl) r            = real-init b [ l ] r , ≺-ext b []
   parent-real     (named h refl)     r            = real-last h r , real-lt h r
-  parent-real {b} (timed _ refl)     (rb , h , _) = rb , timer-after b h
+  parent-real {b} (timed _ {l} refl) (rb , h , _) = rb , timer-after b l h
 
 -- AN ANCESTOR comes no later.
 anc-≼ : ∀ {a c} → Anc a c → Real c → a ≼ c
@@ -502,7 +544,7 @@ anc-≼ {a} {c} (up {b} x pb) r with parent-real pb r
 mutual
   world-anc : ∀ {H p w} → W H p w → Anc p w
   world-anc (step w pl)       = up (world-anc⁼ w) (plain pl refl)
-  world-anc (timer t w _)     = up (world-anc⁼ w) (timed t refl)
+  world-anc (timer t w _ _)   = up (world-anc⁼ w) (timed t refl)
   world-anc (join {h} _ w _)  = up (world-anc⁼ w) (named h refl)
 
   world-anc⁼ : ∀ {H p w} → W⁼ H p w → Anc p w
@@ -549,8 +591,8 @@ mutual
   lead′ (step {x′} v pl) le with ⊑-snoc x′ le
   ... | inj₁ le′  = lead v le′
   ... | inj₂ refl = l-in (step v pl)
-  lead′ (timer t v lt) le with ⊑-unit _ le
-  ... | refl = l-in (timer t v lt)
+  lead′ (timer t v lt pl) le with ⊑-unit _ le
+  ... | refl = l-in (timer t v lt pl)
   lead′ (join {h} (inj₁ hh) v eh) le with ⊑-snoc h le
   ... | inj₁ le′  = l-hot hh le′
   ... | inj₂ refl = l-in (join (inj₁ hh) v eh)
@@ -567,18 +609,18 @@ leads dj ww nb nr bx le with lead bx le
 ... | l-hot h r = dj h ww (⊑-inside r)
 
 -- How a world position is reached: it is the subscription, one plain
--- label below a world position, names one in a closing `sub`, or roots a
--- cascade one created.
+-- label below a world position, names one in a closing `sub`, or is a
+-- step of a timer one created.
 data Shape (H : Pos → Set) (a w : Pos) : Set where
   sh-root  : w ≡ a → Shape H a w
   sh-plain : ∀ {x l} → W⁼ H a x → Plain l → w ≡ x ⊕ [ l ] → Shape H a w
   sh-sub   : ∀ {x e} → W⁼ H a e → w ≡ x ⊕ [ sub e ] → Shape H a w
-  sh-timer : ∀ {t e} → W⁼ H a e → w ≡ cascadeAt t e → Shape H a w
+  sh-timer : ∀ {t e l} → W⁼ H a e → w ≡ fired t e ▸ l → Shape H a w
 
 shape : ∀ {H a w} → W⁼ H a w → Shape H a w
 shape here                    = sh-root refl
 shape (inW (step v pl))       = sh-plain v pl refl
-shape (inW (timer t v _))     = sh-timer v refl
+shape (inW (timer t v _ _))   = sh-timer v refl
 shape (inW (join v e eh))     = sh-sub e refl
 
 -- One plain label below a world position: the subscription, or its parent
@@ -590,9 +632,9 @@ w-up {x = x} pl v with shape v
 ... | sh-sub {x′} _ eq      = ⊥-elim (plain-sub pl (⊕-injʳ x x′ eq))
 ... | sh-timer _ eq         = ⊥-elim (step≢root x _ eq)
 
--- A cascade's root in the world: the subscription, or its creator is in
+-- A timer's step in the world: the subscription, or its creator is in
 -- the world.
-timed-view : ∀ {H p t e} → W⁼ H p (cascadeAt t e) → cascadeAt t e ≡ p ⊎ W⁼ H p e
+timed-view : ∀ {H p t e l} → W⁼ H p (fired t e ▸ l) → fired t e ▸ l ≡ p ⊎ W⁼ H p e
 timed-view u with shape u
 ... | sh-root eq          = inj₁ eq
 ... | sh-plain {x} _ _ eq = ⊥-elim (step≢root x _ (sym eq))
@@ -629,7 +671,7 @@ apart-w {H} {q₁} {q₂} {l₁} {l₂} p₁ p₂ ne n₁ n₂ = go
     ... | sh-plain {x′} v′ _ eq   = go (subst (W⁼ H a) (⊕-injˡ x′ x (sym eq)) v′) v
     ... | sh-sub {x′} _ eq        = plain-sub pl (⊕-injʳ x x′ eq)
     ... | sh-timer _ eq           = step≢root x _ eq
-    go u (inW (timer t v _)) with shape u
+    go u (inW (timer t v _ _)) with shape u
     ... | sh-root eq              = step≢root q₁ _ (sym eq)
     ... | sh-plain {x′} _ _ eq    = step≢root x′ _ (sym eq)
     ... | sh-sub {x′} _ eq        = step≢root x′ _ (sym eq)
@@ -672,7 +714,7 @@ named-view {H} {p} {h} {e} u = go u refl
     go : ∀ {w} → W⁼ H p w → w ≡ h ⊕ [ sub e ] → Named H p h e
     go here eq = n-root (sym eq)
     go (inW (step {x} _ pl)) eq = ⊥-elim (plain-sub pl (⊕-injʳ x h eq))
-    go (inW (timer _ _ _)) eq = ⊥-elim (step≢root h _ (sym eq))
+    go (inW (timer _ _ _ _)) eq = ⊥-elim (step≢root h _ (sym eq))
     go (inW (join {h′} j v eh)) eq with ⊕-injˡ h′ h eq | same-sub {h′} {h} eq
     ... | refl | refl = n-join j v eh
 
@@ -684,7 +726,7 @@ named-e (n-join _ v _)  _  = v
 mutual
   widen : ∀ {B H p w} (t : EmissionSet B) → W H p w → W (H ∪ʰ t) p w
   widen t (step w l)           = step (widen⁼ t w) l
-  widen t (timer i w lt)       = timer i (widen⁼ t w) lt
+  widen t (timer i w lt pl)    = timer i (widen⁼ t w) lt pl
   widen t (join (inj₁ h) w eh) = join (inj₁ (inj₂ h)) (widen⁼ t w) eh
   widen t (join (inj₂ v) w eh) = join (inj₂ (widen t v)) (widen⁼ t w) eh
 
@@ -706,9 +748,9 @@ private
     unwiden {H = H} dj ra pa rw (step {x} v pl) u with w-up pl (inW u)
     ... | inj₁ eq = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) eq pa) (step v pl))
     ... | inj₂ u′ = step (unwiden⁼ dj ra pa (real-init x _ rw) v u′) pl
-    unwiden {H = H} dj ra pa rw (timer t v lt) u with timed-view (inW u)
-    ... | inj₁ eq = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (timer t v lt))
-    ... | inj₂ u′ = timer t (unwiden⁼ dj ra pa (proj₁ rw) v u′) lt
+    unwiden {H = H} dj ra pa rw (timer t v lt pl) u with timed-view (inW u)
+    ... | inj₁ eq = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (timer t v lt pl))
+    ... | inj₂ u′ = timer t (unwiden⁼ dj ra pa (proj₁ rw) v u′) lt pl
     unwiden {H = H} {t = t′} dj ra pa rw (join {h} {e} hj v eh) u with named-view {h = h} (inW u)
     ... | n-root eq       = ⊥-elim (cyc ra rw (subst (λ z → W⁼ H z _) (sym eq) pa) (join hj v eh))
     ... | n-join (inj₁ hh) u′ _ = join (inj₁ hh) (unwiden⁼ dj ra pa (real-last h rw) v u′) eh
@@ -729,13 +771,12 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
   ; under = un
   ; quiet = qu
   ; pinned = λ x → let (w⁼ , i) = pn x in widen⁼ t w⁼ , i
-  ; untimed = ut
   }
   where
     bump : ∀ {c y} → Σ Pos (λ w → W⁼ H p w × T (inside w c) × T (inside w y)) → Σ Pos (λ w → W⁼ (H ∪ʰ t) p w × T (inside w c) × T (inside w y))
     bump (w , w⁼ , i) = w , widen⁼ t w⁼ , i
 
-    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn; untimed to ut)
+    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn)
 
     un : ∀ {q y w l e e′} → enter d p q e → enter d p y e′ → Plain l → W⁼ (H ∪ʰ t) (q ⊕ [ l ]) w → w ⊑ y → ⊥
     un {q} {w = w} {l} x x′ pl v (zs , refl) with lead (inW (wo x′)) (zs , refl)

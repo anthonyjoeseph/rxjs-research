@@ -8,7 +8,7 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
 open import denotation.Position using (Time; Pos; Path; ix; sub; last; _∙_; tick; _⊕_; Root; nested; fired; _▸_; lt; eq; gt; lexi; isLt; isEq;
   cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ᵖ_; insideᵗ; inside)
-open import denotation.Simultaneity using (ℕ-lt; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
+open import denotation.Simultaneity using (ℕ-lt; ℕ-eq; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Nat using (_<_; _≤_; z≤n)
 open import Data.Nat.Properties using (n<1+n)
@@ -295,6 +295,11 @@ private
 
 <ᵖ-part : ∀ p {a b} ys zs → a <ˡ b ≡ true → (p ⊕ (a ∷ ys)) <ᵖ (p ⊕ (b ∷ zs)) ≡ true
 <ᵖ-part (i ∙ x) {a} {b} ys zs h = trans (within i (x ++ a ∷ ys) (x ++ b ∷ zs)) (partᵗ x ys zs h)
+
+-- A burst's steps part in order, whatever its root.
+<ᵖ-▸ : ∀ r {a b} → a <ˡ b ≡ true → (r ▸ a) <ᵖ (r ▸ b) ≡ true
+<ᵖ-▸ (nested p)  h = <ᵖ-part p [] [] h
+<ᵖ-▸ (fired t e) h rewrite ℕ-eq t | reflᵖ e | isLt-lt h = refl
 
 -- A burst's values part in order.
 <ᵖ-ix : ∀ i → ix i <ˡ ix (suc i) ≡ true
