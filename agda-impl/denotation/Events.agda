@@ -2,22 +2,19 @@
 
 module denotation.Events where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
-open import denotation.Position public
+open import denotation.Position using (Time; Pos; Path; ix; sub; last; _∙_; tick; _⊕_; cascadeAt; lt; eq; gt; lexi; isLt; isEq;
+  cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ᵖ_; insideᵗ; inside)
 open import denotation.Simultaneity using (ℕ-lt; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
-open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_; z≤n)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
+open import Data.Nat.Properties using (n<1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
-open import Relation.Binary.Definitions using (DecidableEquality)
-open import Relation.Nullary using (yes; no)
 import Data.Nat as ℕ
 
 ------------------------------------------------------------------------

@@ -5,8 +5,7 @@
 module adequacy.Floor.Keys where
 
 open import Data.Bool using (true; false)
-open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; reverse)
 open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
@@ -15,12 +14,9 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; subst)
-open import Relation.Nullary using (yes; no)
 
-open import denotation.Position using (Pos; _∙_; ix; last; _⊕_)
-open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-next; From∞; Frame; Frame∞; emit; stall; close; timelineAt)
-  renaming (sub to subᴾ)
-open import denotation.Events using (_<ᵖ_)
+open import denotation.Position using (Pos; _∙_; ix; last; _⊕_; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-asym; <ᵖ-split; <ᵖ-next)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 

@@ -15,9 +15,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (does; yes; no)
 
 open import Data.Nat using (zero; suc)
-open import Data.Product using (_,_)
-open import denotation.Position using (Pos; Label; Instant; _∙_; _⊕_; ix; sub; last; _<ˡ_; _<ⁱ_; _<ᵖ_; _≟ˡ_; _≟ⁱ_;
-  Cmp; lt; eq; gt; cmpℕ; lexi; isLt; isEq; cmpLabel; cmpInstant; cmpPath; cmpPos; instant; path; frame; cascade)
+open import denotation.Position using (Pos; Label; Instant; _∙_; _⊕_; ix; sub; last; _<ˡ_; _<ⁱ_; _<ᵖ_; _≟ˡ_; _≟ⁱ_; Cmp; lt; eq; gt;
+  cmpℕ; lexi; isLt; isEq; cmpLabel; cmpInstant; cmpPath; cmpPos; instant; path; cascade)
 open import denotation.Flat using (FLabel; cmpFL; flat; flatᵗ; Ok; Okᵗ; ok-frame; ok-cascade; []; _∷_; cmp-flatˡ; cmp-flat)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ; ltˡ; ltⁱ; gtˡ; gtⁱ; isLt-lt)
 

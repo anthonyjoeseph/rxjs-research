@@ -24,7 +24,7 @@ open import IO.Primitive.Core using (pure; _>>=_)
 open import IO.Primitive.Finite using (putStrLn)
 
 import denotation.Events as Events
-open import denotation.Events using (Time; root)
+open import denotation.Position using (Time; root)
 open import operation.PureObservable using () renaming (run to runᴾ)
 open import operation.Observable using (IORef; IOCold; Emit; Observable; subscribe; forkIO; Signal; newSignal; raise; await; newIORef; readIORef; writeIORef)
 open import quickcheck.Clock using (Clock; newClock; fire; fromTimeline)

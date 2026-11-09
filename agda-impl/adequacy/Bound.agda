@@ -11,7 +11,7 @@ module adequacy.Bound where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import Data.List.Membership.Propositional using (_∈_)

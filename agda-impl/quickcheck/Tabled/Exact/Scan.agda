@@ -18,7 +18,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet)
 open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb

@@ -26,7 +26,7 @@ open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; Unpinned; Silent; hush; held; EmissionSet; _≺_; Den; hot; Truncate; Proper; module Connect; module Op)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺; ≺-ext)
 open import denotation.Laws.Worlds
-  using (W; W⁼; step; timer; join; here; inW; plain-ix; Real; Ok; _∪ʰ_; Lawful; InvAt; InvD; ok-step;
+  using (TimerRoot; ext-untimed; W; W⁼; step; timer; join; here; inW; plain-ix; Real; Ok; _∪ʰ_; Lawful; InvAt; InvD; ok-step;
   real-snoc; shrink; shrink⁼; narrow; narrow⁼; ext≢; _⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊑-snoc;
   ⊑-inside; inside-⊑; diverge; same-lead; flat-under; world-anc; world-anc⁼; anc-≼; apart;
   anc-lead; Plain; widen⁼; nest⁼; w-up; PinBy; ⊑-unit; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ)
@@ -304,6 +304,7 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
     ; under = λ x y → un (view x) (view y)
     ; quiet = λ c y cy → qu (view c) (view y) cy
     ; pinned = λ x → pi (view x)
+    ; untimed = ut
     }
     where
       wo : ∀ {y e} → Truncate ConnT y e → W H p y
@@ -311,6 +312,12 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
       wo (burst x _ , _)    = step (inW (shrink (InvAt.world Iσ x))) plain-ix
       wo (echo x _ _ _ , _) = step (inW (shrink (InvAt.world Iσ x))) plain-ix
       wo (kept x _ _ _ , _) = step (inW (shrink (InvAt.world Iσ x))) plain-ix
+
+      ut : ∀ {y e} → Truncate ConnT y e → TimerRoot y → ⊥
+      ut (body x , _)           = InvAt.untimed Iβ x
+      ut (burst {k} x _ , _)    = ext-untimed k
+      ut (echo {k} x _ _ _ , _) = ext-untimed k
+      ut (kept {k} x _ _ _ , _) = ext-untimed k
 
       re : ∀ {y e} → Truncate ConnT y e → Real y
       re (body x , _)       = InvAt.real Iβ x

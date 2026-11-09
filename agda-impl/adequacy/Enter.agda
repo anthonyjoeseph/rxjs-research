@@ -19,7 +19,7 @@ module adequacy.Enter where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_]; _++_)
+open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Maybe using (just; nothing)

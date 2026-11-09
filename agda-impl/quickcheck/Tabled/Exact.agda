@@ -29,7 +29,8 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.Events as E
-open import denotation.Events using (Pos; Timeline; _<ᵖ_; inside; ix)
+open import denotation.Position using (tick; Pos; _<ᵖ_; inside; ix; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet
   using (out; skip; end; pin; EmissionSet; InE; at-out; at-skip; at-end; on-out; on-skip; Proper; Truncate; Rejoin;
   ended; late; Den; enter; After; LaneOf; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
@@ -52,17 +53,17 @@ open import quickcheck.Tabled.Exact.Bounded using (bounded-exact)
 
 walk-exact : ∀ {A} n (ev : E.Events A) → Exactly (walk n ev) (InE ev)
 walk-exact zero ev ()
-walk-exact (suc n) (E.out k a r) u with E.tick k Data.Nat.≤ᵇ horizon
+walk-exact (suc n) (E.out k a r) u with tick k Data.Nat.≤ᵇ horizon
 ... | true = let ih = walk-exact n (E.Events∞.force r) u in record
   { sound    = λ { (here refl) → at-out ; (there m) → on-out (sound ih m) }
   ; complete = λ { at-out → here refl ; (on-out x) → there (complete ih x) } }
 ... | false = ⊥-elim (offT u (Equivalence.from T-≡ refl))
-walk-exact (suc n) (E.skip k r) u with E.tick k Data.Nat.≤ᵇ horizon
+walk-exact (suc n) (E.skip k r) u with tick k Data.Nat.≤ᵇ horizon
 ... | true = let ih = walk-exact n (E.Events∞.force r) u in record
   { sound    = λ { (here refl) → at-skip ; (there m) → on-skip (sound ih m) }
   ; complete = λ { at-skip → here refl ; (on-skip x) → there (complete ih x) } }
 ... | false = ⊥-elim (offT u (Equivalence.from T-≡ refl))
-walk-exact (suc n) (E.end k) u with E.tick k Data.Nat.≤ᵇ horizon
+walk-exact (suc n) (E.end k) u with tick k Data.Nat.≤ᵇ horizon
 ... | true  = record { sound = λ { (here refl) → at-end ; (there ()) } ; complete = λ { at-end → here refl } }
 ... | false = ⊥-elim (offT u (Equivalence.from T-≡ refl))
 walk-exact (suc n) E.hush u = record { sound = λ () ; complete = λ () }
@@ -89,8 +90,8 @@ map-exact f {l} {t} el u = record { sound = s ; complete = c }
     c (map-end x)  = ∈-map⁺ (mapRow f) (complete ex x)
     c (Tb.map-pin x) = ∈-map⁺ (mapRow f) (complete ex x)
 
-defer-exact : ∀ {A} {s : Den A} {p} {b : Listed A} → Exactly b (enter s (p ++ [ ix 1 ]))
-  → Exactly (((p ++ [ ix 0 ] , skip) ∷ rows b) ⊣ short b) (DeferT s p)
+defer-exact : ∀ {A} {s : Den A} {p} {b : Listed A} → Exactly b (enter s (p ⊕ [ ix 1 ]))
+  → Exactly (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b) (DeferT s p)
 defer-exact eb u = record
   { sound    = λ { (here refl) → guard ; (there m) → Tb.body (sound (eb u) m) }
   ; complete = λ { guard → here refl ; (Tb.body x) → there (complete (eb u) x) } }
@@ -164,7 +165,7 @@ rejoin-exact {l = l} {t} el p u = record { sound = s ; complete = c }
 module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) (ls : List (Pos × A × Listed B))
   (u : short (mergeRows o ls) ≡ false)
   (eo : Exactly o t)
-  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
+  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ⊕ [ ix 1 ])))
   (ls-to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   where
   open Tb.Merge fD t
@@ -177,7 +178,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     uncut : ∀ {q a l} → (q , a , l) ∈ ls → short l ≡ false
     uncut m = any-off {xs = ls} (proj₂ (∨-false {short o} u)) m
 
-    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (After (fD a) (q ++ [ ix 1 ]))
+    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (After (fD a) (q ⊕ [ ix 1 ]))
     exl m = proj₂ (ls-from m) (uncut m)
 
     out-of : ∀ {q a l} → (q , a , l) ∈ ls → t q (out a)
@@ -262,7 +263,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
   complete-m (rhand () _)
 
 merge-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
-  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
+  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ⊕ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   → Exactly (mergeRows o ls) (Tb.Merge.JoinT fD t)
 merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = complete-m }
@@ -378,7 +379,7 @@ module ConnX {A B : Set} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Lis
     ... | refl = burst x (Equivalence.from T-≡ ins)
     shown-row {k} x h | inj₂ (nr , h′) = unsub-row x nr h′
 
-    unsub-in : ∀ {k e} → Tb.Unpinned e → Alive k → (k ++ [ ix 0 ] , skip) ∈ unsub (k , e)
+    unsub-in : ∀ {k e} → Tb.Unpinned e → Alive k → (k ⊕ [ ix 0 ] , skip) ∈ unsub (k , e)
     unsub-in {k} {out _} _ A = when⁺ (→alive k A)
     unsub-in {k} {skip}  _ A = when⁺ (→alive k A)
     unsub-in {k} {end}   _ A = when⁺ (→alive k A)
@@ -444,17 +445,17 @@ listT-exact n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = list
 ... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listT n (f a) ρL)) (values (rows o))} e₁
 ... | (ls , els , refl) = truncate-exact (exhaust-exact (λ a → approx n (f a) ρD) o ls (listT-exact n s ρ p eo)
   (lanes-from {ln = afterL (λ a → listT n (f a) ρL)} {D = λ a → After (approx n (f a) ρD)} (afterL-exact {ln = λ a → listT n (f a) ρL} {D = λ a → enter (approx n (f a) ρD)} (λ {a} {s′} el → listT-exact n (f a) ρ s′ el)) els) (lanes-to {ln = afterL (λ a → listT n (f a) ρL)} els))
-listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ++ [ ix 1 ])} e
-... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ++ [ ix 0 ])} e₁
+listT-exact n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listT n s ρL (p ⊕ [ ix 1 ])} e
+... | (σl , eσ , e₁) with bind⁻ {m = listT n b (hotOf σl ∷ ρL) (p ⊕ [ ix 0 ])} e₁
 ... | (βl , eβ , refl) =
   truncate-exact (conn-exact (approx n s ρD) (λ h → approx n b (h ∷ ρD)) p σl βl σx
-    (listT-exact n b ((λ p′ → truncate-exact (rejoin-exact (proper-exact σx) p′)) ∷ ρ) (p ++ [ ix 0 ]) eβ))
+    (listT-exact n b ((λ p′ → truncate-exact (rejoin-exact (proper-exact σx) p′)) ∷ ρ) (p ⊕ [ ix 0 ]) eβ))
   where
-    σx = listT-exact n s ρ (p ++ [ ix 1 ]) eσ
+    σx = listT-exact n s ρ (p ⊕ [ ix 1 ]) eσ
 listT-exact n (connected i) ρ p refl = env-lookup ρ i p
 listT-exact zero    (defer l) ρ p refl = λ ()
-listT-exact (suc n) (defer l) {ρL} ρ p e with bind⁻ {m = listT n (Later.force l) ρL (p ++ [ ix 1 ])} e
-... | (b , eb , refl) = truncate-exact (defer-exact (listT-exact n (Later.force l) ρ (p ++ [ ix 1 ]) eb))
+listT-exact (suc n) (defer l) {ρL} ρ p e with bind⁻ {m = listT n (Later.force l) ρL (p ⊕ [ ix 1 ])} e
+... | (b , eb , refl) = truncate-exact (defer-exact (listT-exact n (Later.force l) ρ (p ⊕ [ ix 1 ]) eb))
 
 -- A closed program, as the oracle lists it.
 tabled-exact : ∀ {A} n (o : Obs Timeline [] A) p {l} → listT n o [] p ≡ just l → Exactly l (enter (approx n o []) p)

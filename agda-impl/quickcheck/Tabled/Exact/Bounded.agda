@@ -26,7 +26,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; _<ᵖ_; ix; <ᵖ-trans)
+open import denotation.Events using (<ᵖ-trans)
+open import denotation.Position using (Pos; _<ᵖ_; ix; _⊕_)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After)
 open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
@@ -267,13 +268,13 @@ module BoundedX {A B : Set} (n : ℕ) (fD : A → Den B) (t : EmissionSet A) (ln
     queued→ : ∀ c → queuedᵇ G c ≡ true → Queued c
     queued→ c e with any⁻ {xs = G} e
     ... | ((j , q , a , ss) , gm , h) with any⁻ {xs = ss} h
-    ... | ((s , l) , sm , d) with ≟-true {s} {c ++ [ ix 1 ]} d
+    ... | ((s , l) , sm , d) with ≟-true {s} {c ⊕ [ ix 1 ]} d
     ... | refl = j , q , a , proj₁ (sub-of gm sm)
 
     →queued : ∀ c → Queued c → queuedᵇ G c ≡ true
     →queued c (j , q , a , N , St) =
       let (ss , gm) = found-all N ; (l , sm) = proj₂ (proj₂ (fine-all gm)) St in
-      any⁺ {xs = G} gm (any⁺ {xs = ss} sm (≟-refl (c ++ [ ix 1 ])))
+      any⁺ {xs = G} gm (any⁺ {xs = ss} sm (≟-refl (c ⊕ [ ix 1 ])))
 
     done→ : ∀ c → done G c ≡ true → Done c
     done→ c e with ∧-true {endBy (rows o) c} e

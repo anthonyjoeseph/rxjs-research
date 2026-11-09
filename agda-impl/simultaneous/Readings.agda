@@ -11,13 +11,20 @@ module simultaneous.Readings where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Product using (_×_; _,_)
-open import denotation.Position using (Pos; Instant) renaming (instant to instantᵖ)
+open import denotation.Position using (Pos; Instant; cascade; _∙_; root) renaming (instant to instantᵖ)
 open import simultaneous.InstEmit using (InstEmit; valuesOf)
 
 open InstEmit using (instant)
 
 instantOf : Pos → Instant
 instantOf = instantᵖ
+
+-- THE EMISSION a row lies in: the subscribe frame, or one step of a
+-- timer's frame, finer than the instant.  The elaboration names and
+-- closes routes per emission.
+emission : Pos → Pos
+emission (cascade t e ∙ (l ∷ _)) = cascade t e ∙ (l ∷ [])
+emission _                       = root
 
 ------------------------------------------------------------------------
 -- InstEmit streams

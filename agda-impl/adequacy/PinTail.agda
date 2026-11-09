@@ -29,7 +29,6 @@ open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≼-antisym)
-open import denotation.Laws.Worlds using (InvAt; real-snoc; plain-ix)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Laws.JoinInv using (module Join)
 open import denotation.Laws.BoundedInv using (module BoundedI)

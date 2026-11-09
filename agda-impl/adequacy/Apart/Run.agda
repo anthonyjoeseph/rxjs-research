@@ -24,7 +24,7 @@ open import Data.Product using (_,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 
-open import denotation.Position using (Pos; ix; last; tick; cascade; cascadeAt; _∙_; _⊕_)
+open import denotation.Position using (ix; last; tick; cascade; cascadeAt; _∙_; _⊕_)
 open import denotation.Events using (Frame; emit; stall; close; From∞; Frame∞; done; quiet; at)
 open import denotation.Simultaneity using (effect-tick)
 open import operation.PureObservable using (module Machine; play; ending; over; baseOf; stepOf)

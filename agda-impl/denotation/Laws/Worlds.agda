@@ -114,6 +114,20 @@ PinBy c e = Σ Pos λ r → e ≡ pin r × r ≺ c
 pinby-silent : ∀ {A} {c} {e : Ev A} → PinBy c e → Silent e
 pinby-silent (_ , refl , _) = held
 
+-- A TIMER'S ROOT: a cascade's root itself, where no row lies; every row
+-- is a step of its cascade.
+TimerRoot : Pos → Set
+TimerRoot (cascade _ _ ∙ []) = ⊤
+TimerRoot (frame ∙ [])       = ⊥
+TimerRoot (_ ∙ (_ ∷ _))      = ⊥
+
+-- A step under anything is no timer's root.
+ext-untimed : ∀ x {l ys} → TimerRoot (x ⊕ (l ∷ ys)) → ⊥
+ext-untimed (frame ∙ [])           ()
+ext-untimed (frame ∙ (_ ∷ _))      ()
+ext-untimed (cascade _ _ ∙ [])      ()
+ext-untimed (cascade _ _ ∙ (_ ∷ _)) ()
+
 -- REFUTED: 67919a90 flatMap-inv without `under`, by an outer row under a timer rooted below its own value's first child
 record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
   field
@@ -125,6 +139,7 @@ record InvAt {A} (H : Pos → Set) (p : Pos) (X : EmissionSet A) : Set where
     under : ∀ {q y w l e e′} → X q e → X y e′ → Plain l → W⁼ H (q ⊕ [ l ]) w → w ⊑ y → ⊥
     quiet : ∀ {c y e} → X c end → X y e → c ≺ y → PinBy c e
     pinned : ∀ {y r} → X y (pin r) → W⁼ H p r × T (inside r y)
+    untimed : ∀ {y e} → X y e → TimerRoot y → ⊥
 
 -- At every admissible subscription.
 InvD : ∀ {A} → (Pos → Set) → Den A → Set
@@ -714,12 +729,13 @@ inv-widen {H = H} {t} {d} inv p (r , dj) = record
   ; under = un
   ; quiet = qu
   ; pinned = λ x → let (w⁼ , i) = pn x in widen⁼ t w⁼ , i
+  ; untimed = ut
   }
   where
     bump : ∀ {c y} → Σ Pos (λ w → W⁼ H p w × T (inside w c) × T (inside w y)) → Σ Pos (λ w → W⁼ (H ∪ʰ t) p w × T (inside w c) × T (inside w y))
     bump (w , w⁼ , i) = w , widen⁼ t w⁼ , i
 
-    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn)
+    open InvAt (inv p (r , λ hh w ins → dj (inj₂ hh) (widen t w) ins)) renaming (world to wo; real to re; func to fu; flat to fl; burst to bu; under to ud; quiet to qu; pinned to pn; untimed to ut)
 
     un : ∀ {q y w l e e′} → enter d p q e → enter d p y e′ → Plain l → W⁼ (H ∪ʰ t) (q ⊕ [ l ]) w → w ⊑ y → ⊥
     un {q} {w = w} {l} x x′ pl v (zs , refl) with lead (inW (wo x′)) (zs , refl)

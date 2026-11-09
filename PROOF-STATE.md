@@ -14,12 +14,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-## Tier 1 — the instant is a datum
-
-**The instant:** a position is an instant and a path (`denotation.Position`); the gate is green again over that type, `positioned` gone.
-
-### Ledger
-
 ## Tier 2 — the elaboration
 
 **The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
@@ -31,6 +25,19 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 **The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
 
 ### Ledger
+
+#### THE PROTOCOL
+
+Suspected false of today's elaboration: the instant is a whole timer
+frame, but the elaboration mints a name and an over per async value, so
+two emits of one frame carry two names and two emissions (`one-name`,
+`one-value-name`, `one-emission`). Also untried: the subscribe mark sits
+once before every begin with every value past it async, and every value
+precedes the completion. Settled when the elaboration names per frame,
+the held streams read the instant instead of `emission`, and each is a
+body over the elaboration's layers.
+
+Members: `named`, `one-name`, `one-value-name`, `one-emission`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE HELD STREAMS
 
@@ -77,15 +84,6 @@ cover may hold positions with no row. Settled when these are bodies over
 `rooted`, the instant interval and a way to list a run's instants.
 
 Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
-
-#### THE PROTOCOL
-
-Untried: every emit is named for its instant, the begins and values of
-one instant carry one name, the subscribe mark sits once before every
-begin with every value past it async, and every value precedes the
-completion. Settled when each is a body over the elaboration's layers.
-
-Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE ERASURE
 

@@ -31,7 +31,7 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; Idle; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (emission)
 open import denotation.Laws.Worlds using (_⊑_)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
@@ -134,7 +134,7 @@ held-same {t = t} {t′} {cs} row end-row back fwd H = record
     early x with row x
     ... | _ , y , same-value = Held.early H y
 
-    late : ∀ {y n} → t′ y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y
+    late : ∀ {y n} → t′ y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y
     late x with row x
     ... | _ , y , same-mark = Held.late H y
 

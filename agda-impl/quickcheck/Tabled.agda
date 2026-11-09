@@ -15,7 +15,8 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 import denotation.Events as E
-open import denotation.Events using (Pos; Time; Timeline; timelineAt; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root)
+open import denotation.Position using (tick; Pos; Time; _<ᵖ_; _≟ᵖ_; inside; ix; sub; last; root; _⊕_)
+open import denotation.Events using (Timeline; timelineAt)
 open import denotation.Events using (start; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import Relation.Nullary using (does)
@@ -140,9 +141,9 @@ horizon = 100
 -- A stream's rows, up to the horizon.
 walk : ∀ {A} → ℕ → E.Events A → Listed A
 walk zero    _             = [] ⊣ true
-walk (suc n) (E.out k a r) = if E.tick k ≤ᵇ horizon then cons (k , out a) (walk n (E.Events∞.force r)) else [] ⊣ true
-walk (suc n) (E.skip k r)  = if E.tick k ≤ᵇ horizon then cons (k , skip) (walk n (E.Events∞.force r)) else [] ⊣ true
-walk (suc n) (E.end k)     = if E.tick k ≤ᵇ horizon then ((k , end) ∷ []) ⊣ false else [] ⊣ true
+walk (suc n) (E.out k a r) = if tick k ≤ᵇ horizon then cons (k , out a) (walk n (E.Events∞.force r)) else [] ⊣ true
+walk (suc n) (E.skip k r)  = if tick k ≤ᵇ horizon then cons (k , skip) (walk n (E.Events∞.force r)) else [] ⊣ true
+walk (suc n) (E.end k)     = if tick k ≤ᵇ horizon then ((k , end) ∷ []) ⊣ false else [] ⊣ true
 walk (suc n) E.hush        = [] ⊣ false
 
 private
@@ -183,9 +184,9 @@ mapRows f (rs ⊣ b) = mapL (mapRow f) rs ⊣ b
 
 -- `EmissionSet.Rejoin`, over a hot's rows.
 rejoinRow : ∀ {A} → Pos → Row A → List (Row A)
-rejoinRow p (q , end)   = if p <ᵖ q then [ q ++ [ sub p ] , end ] else [ p ++ [ last ] , end ]
-rejoinRow p (q , pin _) = when (p <ᵖ q) (q ++ [ sub p ] , skip)
-rejoinRow p (q , e)   = when (p <ᵖ q) (q ++ [ sub p ] , e)
+rejoinRow p (q , end)   = if p <ᵖ q then [ q ⊕ [ sub p ] , end ] else [ p ⊕ [ last ] , end ]
+rejoinRow p (q , pin _) = when (p <ᵖ q) (q ⊕ [ sub p ] , skip)
+rejoinRow p (q , e)   = when (p <ᵖ q) (q ⊕ [ sub p ] , e)
 
 rejoin : ∀ {A} → Pos → Listed A → Listed A
 rejoin p (rs ⊣ b) = concatMap (rejoinRow p) rs ⊣ b
@@ -197,7 +198,7 @@ hotOf (rs ⊣ b) = proper rs ⊣ b
 -- An outer's row at a flattening frame, given whether an end there ends
 -- the whole.
 outerRow : ∀ {A B : Set} → (Pos → Bool) → Row A → List (Row B)
-outerRow d (q , out _) = [ q ++ [ ix 0 ] , skip ]
+outerRow d (q , out _) = [ q ⊕ [ ix 0 ] , skip ]
 outerRow d (q , skip)  = [ q , skip ]
 outerRow d (q , pin r) = [ q , pin r ]
 outerRow d (c , end)   = [ c , (if d c then end else skip) ]
@@ -216,7 +217,7 @@ afterL ln a s = bind (ln a s) λ l → just (past s l)
 
 -- Each value's lane, listed at its subscription.
 lanes : ∀ {A B : Set} → (A → Pos → Maybe (Listed B)) → List (Pos × A) → Maybe (List (Pos × A × Listed B))
-lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ++ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)
+lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ⊕ [ ix 1 ])) λ l → just (proj₁ qa , proj₂ qa , l)
 
 -- `EmissionSet.Merge.JoinT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
@@ -278,7 +279,7 @@ module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (o : Listed A) where
   failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
 
   kept : Row A → List (Row A)
-  kept (q , out a) = if keep a then [ q , out a ] else when incl (q ++ [ ix 0 ] , out a) ++ [ q ++ [ last ] , end ]
+  kept (q , out a) = if keep a then [ q , out a ] else when incl (q ⊕ [ ix 0 ] , out a) ++ [ q ⊕ [ last ] , end ]
   kept r           = [ r ]
 
   takeRow : Row A → List (Row A)
@@ -384,12 +385,12 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
   -- `Bounded.Starts`, given the lanes before.
   queuedAt : ℕ → Pos → List (List Pos) → Pos → List Pos
   queuedAt i q ess c =
-    when ((q <ᵖ c) ∧ ((suc (i ∸ n) ≤ᵇ count (λ k → k ≼ᵇ c) ess) ∧ not (suc (i ∸ n) ≤ᵇ count (λ k → k <ᵖ c) ess))) (c ++ [ ix 1 ])
+    when ((q <ᵖ c) ∧ ((suc (i ∸ n) ≤ᵇ count (λ k → k ≼ᵇ c) ess) ∧ not (suc (i ∸ n) ≤ᵇ count (λ k → k <ᵖ c) ess))) (c ⊕ [ ix 1 ])
 
   starts : ℕ → Pos → List (List Pos) → List Pos
   starts i q ess =
-    if i <ᵇ n then [ q ++ [ ix 1 ] ]
-    else (if suc (i ∸ n) ≤ᵇ count (λ k → k <ᵖ q) ess then [ q ++ [ ix 1 ] ]
+    if i <ᵇ n then [ q ⊕ [ ix 1 ] ]
+    else (if suc (i ∸ n) ≤ᵇ count (λ k → k <ᵖ q) ess then [ q ⊕ [ ix 1 ] ]
     else concatMap (concatMap (queuedAt i q ess)) ess)
 
   -- A value, and its lane at each start.
@@ -422,13 +423,13 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
 
   module _ (gs : List (ℕ × Entry)) where
     queued : Pos → Bool
-    queued c = anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) ss }) gs
+    queued c = anyᵇ (λ { (_ , _ , _ , ss) → anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ⊕ [ ix 1 ])) }) ss }) gs
 
     done : Pos → Bool
     done c = endBy (rows o) c ∧ allᵇ (λ { (_ , q , _ , ss) → not (q <ᵖ c) ∨ anyᵇ (λ { (_ , l) → endBy (rows l) c }) ss }) gs
 
     laneRow : Row B → Row B
-    laneRow (c , end) = if queued c then (c ++ [ ix 0 ] , skip) else (c , (if done c then end else skip))
+    laneRow (c , end) = if queued c then (c ⊕ [ ix 0 ] , skip) else (c , (if done c then end else skip))
     laneRow r         = r
 
     boundedRows : Listed B
@@ -442,7 +443,7 @@ module BoundedL {A B : Set} (n : ℕ) (lane : A → Pos → Maybe (Listed B)) (o
 -- `EmissionSet.Connect.ConnT`.
 module ConnL {A B : Set} (p : Pos) (σ : Listed A) (β : Listed B) where
   r : Pos
-  r = p ++ [ ix 1 ]
+  r = p ⊕ [ ix 1 ]
 
   alive : Pos → Bool
   alive q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q <ᵖ c) }) (rows β)
@@ -450,11 +451,11 @@ module ConnL {A B : Set} (p : Pos) (σ : Listed A) (β : Listed B) where
   -- Unsubscribed, a source row shows only while the body runs, a pin
   -- only whose connect it subscribed while the body ran.
   unsub : Row A → List (Row B)
-  unsub (k , pin p′) = when (alive p′ ∧ inside p′ k) (k ++ [ ix 0 ] , pin p′)
-  unsub (k , _)      = when (alive k) (k ++ [ ix 0 ] , skip)
+  unsub (k , pin p′) = when (alive p′ ∧ inside p′ k) (k ⊕ [ ix 0 ] , pin p′)
+  unsub (k , _)      = when (alive k) (k ⊕ [ ix 0 ] , skip)
 
   shown : Row A → List (Row B)
-  shown (k , e) = if inside r k then [ k ++ [ ix 0 ] , pin p ] else unsub (k , e)
+  shown (k , e) = if inside r k then [ k ⊕ [ ix 0 ] , pin p ] else unsub (k , e)
 
   connRows : Listed B
   connRows = (rows β ++ concatMap shown (rows σ)) ⊣ (short σ ∨ short β)
@@ -466,7 +467,7 @@ open ConnL public using (connRows)
 -- `EmissionSet.approx`'s clauses, approximant n, subscribed at `p`.
 listT : ∀ {Γ A} → ℕ → Obs Timeline Γ A → All Listed Γ → Pos → Maybe (Listed A)
 listT n       (cold c)          ρ p = just (walk fuel (start p (timelineAt c p)))
-listT n       empty             ρ p = just ([ p ++ [ last ] , end ] ⊣ false)
+listT n       empty             ρ p = just ([ p ⊕ [ last ] , end ] ⊣ false)
 listT n       (of xs)           ρ p = just (walk fuel (ofᴱ p 0 xs))
 listT n       (map f s)         ρ p = bind (listT n s ρ p) λ l → just (mapRows f l)
 listT n       (scan f z s)      ρ p = bind (listT n s ρ p) λ l → just (scanRows f z l)
@@ -480,13 +481,13 @@ listT n       (flatMap switchᶠ f s) ρ p =
 listT n       (flatMap exhaustᶠ f s) ρ p =
   bind (listT n s ρ p) λ o → bind (lanes (afterL (λ a → listT n (f a) ρ)) (values (rows o))) λ ls → just (exhaustRows o ls)
 listT n       (connect s b)     ρ p =
-  bind (listT n s ρ (p ++ [ ix 1 ])) λ σ →
-  bind (listT n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])) λ β →
+  bind (listT n s ρ (p ⊕ [ ix 1 ])) λ σ →
+  bind (listT n b (hotOf σ ∷ ρ) (p ⊕ [ ix 0 ])) λ β →
   just (connRows p σ β)
 listT n       (connected i)     ρ p = just (rejoin p (lookup ρ i))
 listT zero    (defer l)         ρ p = just ([] ⊣ true)
 listT (suc n) (defer l)         ρ p =
-  bind (listT n (Later.force l) ρ (p ++ [ ix 1 ])) λ b → just (cons (p ++ [ ix 0 ] , skip) b)
+  bind (listT n (Later.force l) ρ (p ⊕ [ ix 1 ])) λ b → just (cons (p ⊕ [ ix 0 ] , skip) b)
 
 ------------------------------------------------------------------------
 -- The trace
@@ -499,8 +500,8 @@ traceT {A} (rs ⊣ b) = go nothing (sort (proper rs)) ▸ finish
     go : Maybe Time → List (Row A) → List (Event A)
     go t []                   = []
     go t ((q , out a) ∷ xs) with t
-    ... | just s = if s ≡ᵇ E.tick q then val a ∷ go t xs else O.tick (E.tick q) ∷ val a ∷ go (just (E.tick q)) xs
-    ... | nothing = O.tick (E.tick q) ∷ val a ∷ go (just (E.tick q)) xs
+    ... | just s = if s ≡ᵇ tick q then val a ∷ go t xs else O.tick (tick q) ∷ val a ∷ go (just (tick q)) xs
+    ... | nothing = O.tick (tick q) ∷ val a ∷ go (just (tick q)) xs
     go t (_ ∷ xs)             = go t xs
 
     finish : O.End
@@ -555,10 +556,10 @@ mutual
   parts n (takeWhile _ _ s)               ρ p = traceL n s ρ p
   parts n (flatMap (mergeᶠ (just _)) _ s) ρ p = traceL n s ρ p
   parts n (flatMap k f s)                 ρ p = traceL n s ρ p ++ lanesOf n f s ρ p
-  parts n (connect s b)                   ρ p with listT n s ρ (p ++ [ ix 1 ])
-  ... | just σ  = traceL n s ρ (p ++ [ ix 1 ]) ++ traceL n b (hotOf σ ∷ ρ) (p ++ [ ix 0 ])
-  ... | nothing = traceL n s ρ (p ++ [ ix 1 ])
-  parts (suc n) (defer l)                 ρ p = traceL n (Later.force l) ρ (p ++ [ ix 1 ])
+  parts n (connect s b)                   ρ p with listT n s ρ (p ⊕ [ ix 1 ])
+  ... | just σ  = traceL n s ρ (p ⊕ [ ix 1 ]) ++ traceL n b (hotOf σ ∷ ρ) (p ⊕ [ ix 0 ])
+  ... | nothing = traceL n s ρ (p ⊕ [ ix 1 ])
+  parts (suc n) (defer l)                 ρ p = traceL n (Later.force l) ρ (p ⊕ [ ix 1 ])
   parts _ _                               ρ p = []
 
 -- A generated program's listing, traced node by node.

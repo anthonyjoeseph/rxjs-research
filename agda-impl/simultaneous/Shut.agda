@@ -21,7 +21,7 @@ open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (emission)
 open import simultaneous.Relations using (Met; values)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
@@ -35,5 +35,5 @@ r₀ = root , 0
 Shut : ∀ {A : Set} → EmissionSet (IE A) → Set
 Shut t = ∀ {rs} → Met t rs → ∀ r₁ r₂ → rs ≡ r₁ ++ r₂ → proj₂ (L.foldl count r₀ (values r₁)) ≡ 0
        → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (L.foldl count r₀ (values r₁))))) ∈ r₁
-       → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → instantOf y ≡ instantOf q → ⊥
+       → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → emission y ≡ emission q → ⊥
 

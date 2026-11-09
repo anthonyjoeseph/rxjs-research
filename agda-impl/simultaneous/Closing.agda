@@ -32,7 +32,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; completed; value
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
-open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; module Leaves; module Split)
+open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; one-emission; sub-async; module Leaves; module Split)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Held using (shut)
 import simultaneous.Spec as Spec
@@ -236,7 +236,9 @@ top-shut : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → ∀ 
 top-shut o {rx} mx xs ys e s z {a} v with split-at rx xs ys e
 ... | r₁ , r₂ , refl , refl , refl with Split.val-in r₂ v | lb-view root (values r₁)
 ...   | y , ym | inj₂ hb with Split.val-in r₁ (subst (λ i → instEmit (mark Marks.begin) i ∈ values r₁) (count-name r₀ (values r₁)) hb)
-...     | q , qm = shut o mx r₁ r₂ refl z qm ym (trans (sym (named o (row-of o mx (∈-++⁺ʳ r₁ ym)))) (named o (row-of o mx (∈-++⁺ˡ qm))))
+...     | q , qm = shut o mx r₁ r₂ refl z qm ym
+                   (one-emission o (row-of o mx (∈-++⁺ʳ r₁ ym)) (row-of o mx (∈-++⁺ˡ qm))
+                     (trans (sym (named o (row-of o mx (∈-++⁺ʳ r₁ ym)))) (named o (row-of o mx (∈-++⁺ˡ qm)))))
 top-shut o {rx} mx xs ys e s z {a} v | r₁ , r₂ , refl , refl , refl | y , ym | inj₁ e₀ with seen-sub false (values r₁) s
 ... | inj₁ ()
 ... | inj₂ (m , hm) with Split.val-in r₁ hm | ∈-∃++ ym

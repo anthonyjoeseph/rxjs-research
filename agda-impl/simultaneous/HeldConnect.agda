@@ -20,21 +20,21 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; inside; _⊕_)
+open import denotation.Position using (Pos; Path; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; frame; cascade; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
 open import Relation.Nullary using (¬_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
-open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; Real; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc)
+open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; TimerRoot; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (emission)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Sync; Ex; Early; Before; Valued; opos)
-open import denotation.Events using (<ᵖ-apart; _<ᵖ_; <ᵖ-shift; <ᵖ-next)
+open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
@@ -45,42 +45,32 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 ------------------------------------------------------------------------
 -- Positions
 
--- A subscription past a timer's root keeps its instant one label down.
-inst-snoc : ∀ p l → Real p → (TimerRoot p → ⊥) → instantOf (p ⊕ [ l ]) ≡ instantOf p
-inst-snoc (ix i ∷ [])                 (ix _)  _ _ = refl
-inst-snoc (ix i ∷ [])                 (sub _) _ _ = refl
-inst-snoc (ix i ∷ [])                 last    _ _ = refl
-inst-snoc (ix i ∷ ix _ ∷ [])          l       _ _ = refl
-inst-snoc (ix i ∷ last ∷ [])          l       _ _ = refl
-inst-snoc (ix i ∷ sub _ ∷ [])         l       _ nt = ⊥-elim (nt tt)
-inst-snoc (ix i ∷ ix _ ∷ _ ∷ _)       l       _ _ = refl
-inst-snoc (ix i ∷ last ∷ _ ∷ _)       l       _ _ = refl
-inst-snoc (ix i ∷ sub _ ∷ _ ∷ _)      l       _ _ = refl
+-- A subscription past a timer's root keeps its emission one label down.
+emission-snoc : ∀ p l → (TimerRoot p → ⊥) → emission (p ⊕ [ l ]) ≡ emission p
+emission-snoc (frame ∙ _)             l _  = refl
+emission-snoc (cascade _ _ ∙ [])      l nt = ⊥-elim (nt tt)
+emission-snoc (cascade _ _ ∙ (_ ∷ _)) l _  = refl
 
 -- What lies before an over, all it causes does.
-before-ext : ∀ {y o} zs → Before y o → Before (y ++ zs) o
+before-ext : ∀ {y o} zs → Before y o → Before (y ⊕ zs) o
 before-ext {y} {o} zs (lt , ns) =
   Equivalence.from T-≡ (<ᵖ-apart y o zs (Equivalence.to T-≡ lt) λ ys e → ns (ys , e)) ,
   λ { (ws , e) → ns (zs ++ ws , trans e (⊕-assoc y zs ws)) }
 
--- A subscription early in its instant subscribes its parts early.
-early-snoc : ∀ {p} l → Real p → (TimerRoot p → ⊥) → Early p → Early (p ⊕ [ l ])
-early-snoc {p} l rp nt ep v =
+-- A subscription early in its emission subscribes its parts early.
+early-snoc : ∀ {p} l → (TimerRoot p → ⊥) → Early p → Early (p ⊕ [ l ])
+early-snoc {p} l nt ep v =
   subst (λ I → Before (p ⊕ [ l ]) (opos I)) (sym eq) (before-ext [ l ] (ep (subst Valued eq v)))
-  where eq = inst-snoc p l rp nt
+  where eq = emission-snoc p l nt
 
 ⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
-⊑-≼ {x} ([] , refl) yx = ≼-refl {x} (subst (λ z → z ≺ x) (++-[] x) yx)
-  where
-    ++-[] : ∀ (x : Pos) → x ++ [] ≡ x
-    ++-[] []      = refl
-    ++-[] (a ∷ x) = cong (a ∷_) (++-[] x)
+⊑-≼ {x} ([] , refl) yx = ≼-refl {x} (subst (λ z → z ≺ x) (⊕-identityʳ x) yx)
 ⊑-≼ {x} (l ∷ ys , refl) = ≺→≼ {x} (≺-ext x ys)
 
 -- The body's burst lies in the connect's.
-sync-body : ∀ {p y} → Real p → (TimerRoot p → ⊥) → Sync (p ⊕ [ ix 0 ]) y → Sync p y
-sync-body {p} {y} rp nt (i , eq) =
-  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (inst-snoc p (ix 0) rp nt)
+sync-body : ∀ {p y} → (TimerRoot p → ⊥) → Sync (p ⊕ [ ix 0 ]) y → Sync p y
+sync-body {p} {y} nt (i , eq) =
+  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (emission-snoc p (ix 0) nt)
   where
     inside⇒ : ∀ {x z} → x ⊑ z → inside x z ≡ true
     inside⇒ {x} {z} le with inside x z in e
@@ -104,15 +94,21 @@ held-ex wd H = record
 -- Runs
 
 -- A position's parent, one label up.
+upᵗ : Path → Path
+upᵗ []          = []
+upᵗ (_ ∷ [])    = []
+upᵗ (a ∷ b ∷ x) = a ∷ upᵗ (b ∷ x)
+
 up : Pos → Pos
-up []          = []
-up (_ ∷ [])    = []
-up (a ∷ b ∷ x) = a ∷ up (b ∷ x)
+up (i ∙ p) = i ∙ upᵗ p
+
+upᵗ-snoc : ∀ (y : Path) l → upᵗ (y ++ [ l ]) ≡ y
+upᵗ-snoc []          l = refl
+upᵗ-snoc (a ∷ [])    l = refl
+upᵗ-snoc (a ∷ b ∷ y) l = cong (a ∷_) (upᵗ-snoc (b ∷ y) l)
 
 up-snoc : ∀ (y : Pos) l → up (y ⊕ [ l ]) ≡ y
-up-snoc []          l = refl
-up-snoc (a ∷ [])    l = refl
-up-snoc (a ∷ b ∷ y) l = cong (a ∷_) (up-snoc (b ∷ y) l)
+up-snoc (i ∙ y) l = cong (i ∙_) (upᵗ-snoc y l)
 
 -- A visible row waits on every row before it.
 vis-dep : ∀ {A} {q} {e : Ev A} → Visible e → ∀ {k e′} → denotation.EmissionSet.Dep q e k e′
@@ -359,7 +355,7 @@ held-conn s F Is IF p ok nt cs sh h = held-same row end-row back′ fwd (held-ex
     open ConnRun s F Is IF p ok sh
 
     ex : ∀ {y} → Ex ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) y → Ex (p ∷ cs) y
-    ex (here sy) = here (sync-body (proj₁ ok) nt sy)
+    ex (here sy) = here (sync-body nt sy)
     ex (there x) = x
 
     row : ∀ {y x′} → C y (out x′) → Σ _ λ x → Connect.β s F p y (out x) × Same x′ x

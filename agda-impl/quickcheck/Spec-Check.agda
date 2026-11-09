@@ -51,7 +51,8 @@ open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
-open import denotation.Events using (Pos; Timeline; fixed; From∞; done; at; emit; close; root; _≟ᵖ_; fresh; finals)
+open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh; finals)
+open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit)
@@ -117,7 +118,7 @@ private
 
   -- names equal exactly when instants are
   sameInstant : Pos × Pos → Pos × Pos → Bool
-  sameInstant (p , i) (q , j) = iff (does (i ≟ᵖ j)) (does (instantOf p ≟ᵖ instantOf q))
+  sameInstant (p , i) (q , j) = iff (does (i ≟ᵖ j)) (does (instantOf p ≟ⁱ instantOf q))
 
 -- every pair of emits met agrees
 agreeᵇ : ∀ {A} → Rows (IE A) → Bool

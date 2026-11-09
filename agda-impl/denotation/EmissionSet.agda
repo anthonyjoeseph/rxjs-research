@@ -27,7 +27,7 @@ module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not)
 open import Data.Empty using () renaming (⊥ to Empty)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe using (just; nothing)
@@ -40,7 +40,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 import denotation.Events as E
-open import denotation.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last; start; ofᴱ; _⊕_)
+open import denotation.Position using (Pos; _<ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Events using (Timeline; timelineAt; start; ofᴱ)
 
 ------------------------------------------------------------------------
 -- Rows

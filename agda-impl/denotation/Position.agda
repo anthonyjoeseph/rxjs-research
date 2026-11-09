@@ -33,7 +33,7 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.Nat using (ℕ; _<ᵇ_)
 import Data.Nat as ℕ
 open import Relation.Binary.Definitions using (DecidableEquality)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (yes; no)
 
 Time : Set

@@ -16,7 +16,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (¬¬-excluded-middle)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (EmissionSet; out; _≺_; _≼_; Few)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≼-refl; ≼-or-≻; ≼-trans; ≺→≼; few-ind)

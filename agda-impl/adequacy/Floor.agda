@@ -20,9 +20,8 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; cong)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; ix; last; _≟ˡ_; _⊕_)
-open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-next; From∞; Frame; Frame∞; emit; stall; close; timelineAt)
-  renaming (sub to subᴾ)
+open import denotation.Position using (Pos; ix; last; _⊕_) renaming (sub to subᴾ)
+open import denotation.Events using (From∞; Frame∞; emit; stall; close; timelineAt)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening; slotOf) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;

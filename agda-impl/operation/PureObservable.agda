@@ -9,13 +9,14 @@
 module operation.PureObservable where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick; cascadeAt; _⊕_)
+open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close)
+open import denotation.Position using (Time; Pos; ix; last; tick; cascadeAt; _⊕_)
 open import operation.Key using (Key) renaming (at to atᴷ)
 
 ------------------------------------------------------------------------

@@ -39,7 +39,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
-open import denotation.Position using (Pos; ix; _≟ᵖ_; _⊕_)
+open import denotation.Position using (Pos; Path; _∙_; ix; _≟ᵖ_; _⊕_)
 open import denotation.Events using (<ᵖ-step)
 open import denotation.EmissionSet using (Ev; pin; EmissionSet; _≺_; _≼_; Few; Reach; Truncate; DeferT; guard; body; Den; enter)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≼-or-≻)
@@ -51,15 +51,20 @@ open import denotation.Laws.Modulus using (ticks; ≼-split)
 -- Prefixes
 
 -- Every position `y` extends.
+presᵗ : Path → List Path
+presᵗ []      = [] ∷ []
+presᵗ (a ∷ y) = [] ∷ L.map (a ∷_) (presᵗ y)
+
 pres : Pos → List Pos
-pres []      = [] ∷ []
-pres (a ∷ y) = [] ∷ L.map (a ∷_) (pres y)
+pres (i ∙ y) = L.map (i ∙_) (presᵗ y)
+
+presᵗ-∈ : ∀ k zs → k ∈ presᵗ (k ++ zs)
+presᵗ-∈ []      []      = here refl
+presᵗ-∈ []      (_ ∷ _) = here refl
+presᵗ-∈ (a ∷ k) zs      = there (∈-map⁺ (a ∷_) (presᵗ-∈ k zs))
 
 ⊑-pres : ∀ {k y} → k ⊑ y → k ∈ pres y
-⊑-pres {[]}    {[]}    _ = here refl
-⊑-pres {[]}    {a ∷ y} _ = here refl
-⊑-pres {a ∷ k} {[]}    (_ , ())
-⊑-pres {a ∷ k} {b ∷ y} (zs , refl) = there (∈-map⁺ (a ∷_) (⊑-pres (zs , refl)))
+⊑-pres {i ∙ k} (zs , refl) = ∈-map⁺ (i ∙_) (presᵗ-∈ k zs)
 
 -- What `v` or one of `ks` extends.
 cover : Pos → List Pos → List Pos

@@ -16,7 +16,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 
-open import denotation.Position using (Pos; root; _⊕_)
+open import denotation.Position using (Pos; root)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; Den; _≺_; _≼_; Dep; Silent; Seen)
 open import denotation.Laws.Modulus using (≼-or-≻; entered-few)
 open import denotation.Laws.Worlds using (InvAt; pinby-silent)

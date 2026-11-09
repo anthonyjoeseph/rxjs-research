@@ -17,8 +17,8 @@ open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 
-open import denotation.Position using (Pos; Path; Label; ix; sub; last; Instant; frame; cascade; _∙_;
-  Cmp; lt; eq; gt; cmpℕ; lexi; isLt; isEq; cmpLabel; cmpPath; cmpPos; insideᵗ; inside; _<ᵖ_)
+open import denotation.Position using (Pos; Path; Label; ix; sub; last; frame; cascade; _∙_; Cmp; lt; eq; gt; cmpℕ; lexi; isLt;
+  isEq; cmpLabel; cmpPath; cmpPos; insideᵗ; inside; _<ᵖ_)
 
 ------------------------------------------------------------------------
 -- Flat lists of labels, ordered and nested as lists

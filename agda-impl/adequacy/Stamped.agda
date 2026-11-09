@@ -11,7 +11,7 @@ module adequacy.Stamped where
 
 open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; null)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
@@ -26,10 +26,11 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Position using (Pos; ix; last; tick; _<ᵖ_; _⊕_; cascadeAt)
+open import denotation.Position using (Pos; ix; last; tick; _<ᵖ_; _⊕_; cascadeAt) renaming (sub to subᴱ)
 open import denotation.Simultaneity using (earlier-tick; effect-tick)
 open import denotation.Laws.Worlds using (⊕-assoc)
-open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-asym; ix-<; From; From∞; Frame; done; quiet; at; emit; stall; close; timelineAt) renaming (sub to subᴱ)
+open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-asym; From; From∞; Frame; done; quiet; at; emit; stall; close;
+  timelineAt)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; onward) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;

@@ -20,12 +20,12 @@ open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import denotation.Position using (Pos; Label; ix; last; Time; tick; _∙_; frame; cascade; cascadeAt; _⊕_)
+open import denotation.Position using (Pos; Label; ix; last; Time; tick; _∙_; frame; cascadeAt; _⊕_)
 open import denotation.Events using (From; done; quiet; at; Frame; emit; stall; close; module Frame∞; module From∞; Timeline; timelineAt; <ᵖ-ix; <ᵖ-part)
 open import denotation.Events using (Events; frames; burst; start)
 open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-trans; ≺-ext)
-open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; Anc; self; up; plain; anc-view; parent-fun; step-parent; timed; anc-trans; anc-≼; world-anc⁼; nest-in; ⊕-injˡ; ⊕-injʳ; ⊑-unit; step≢root; timer-after)
+open import denotation.Laws.Worlds using (TimerRoot; ext-untimed; Plain; plain-ix; plain-last; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; Anc; self; up; plain; anc-view; parent-fun; step-parent; timed; anc-trans; anc-≼; world-anc⁼; nest-in; ⊕-injˡ; ⊕-injʳ; ⊑-unit; step≢root; timer-after)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Simultaneity using (effect-tick)
 
@@ -332,11 +332,15 @@ cold-inv {A} {H} c p (rp , dj) = record
   ; under = λ x y pl v le → un (proj₁ x) (proj₁ y) (row m (proj₁ x)) (row m (proj₁ y)) pl v le
   ; quiet = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
   ; pinned = λ x → ⊥-elim (ine-pin (proj₁ x))
+  ; untimed = λ x → ut (row m (proj₁ x))
   }
   where
     m = timelineAt c p
     open CI {A} H p
     open S rp
+
+    ut : ∀ {y e} → Row y e → TimerRoot y → ⊥
+    ut (r , _ , _ , _ , refl , _) = ext-untimed r
 
     -- Nothing follows an end, so no row lies below one.
     flt : ∀ {y e e′ l ys} → InE (start p m) y e → InE (start p m) (y ⊕ (l ∷ ys)) e′ → ⊥

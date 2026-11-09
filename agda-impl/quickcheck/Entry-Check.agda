@@ -34,7 +34,8 @@ open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; connected; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; inside; _<ᵖ_; _≟ᵖ_; ofᴱ)
+open import denotation.Events using (Timeline; ofᴱ)
+open import denotation.Position using (Pos; ix; last; inside; _<ᵖ_; _≟ᵖ_; _⊕_)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (St; pend; coldS; ofS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Scope; unbound; binds; Owe; free; cpAt; cutAt; overAt;
@@ -92,10 +93,10 @@ module JoinL {A B : Set} (o : List (Row A)) (ls : List (Pos × List (Row B))) (b
   doneᵇ c = overᵇ c ∧ allᵇ (λ { (q , l) → not (runsᵇ q ∧ (q <ᵖ c) ∧ not (cutᵇ q c)) ∨ endBy l c }) ls
 
   endRow : Pos → Row B
-  endRow c = if handᵇ c then (c ++ [ ix 0 ] , skip) else (c , (if doneᵇ c then end else skip))
+  endRow c = if handᵇ c then (c ⊕ [ ix 0 ] , skip) else (c , (if doneᵇ c then end else skip))
 
   outerR : Row A → List (Row B)
-  outerR (q , out _) = [ q ++ [ ix 0 ] , skip ]
+  outerR (q , out _) = [ q ⊕ [ ix 0 ] , skip ]
   outerR (q , skip)  = [ q , skip ]
   outerR (q , pin r) = [ q , pin r ]
   outerR (c , end)   = [ c , (if doneᵇ c then end else skip) ]
@@ -227,20 +228,20 @@ module BoundedM {A B : Set} (m : ℕ) (ln : A → Pos → Maybe (Listed B)) (o :
   queuedAt : ℕ → Maybe Pos → List (List Pos) → Pos → List Pos
   queuedAt i w ess c =
     let k = n + i ∸ m in
-    when (arr w c ∧ (suc k ≤ᵇ count (λ k′ → k′ ≼ᵇ c) ess) ∧ not (suc k ≤ᵇ count (λ k′ → k′ <ᵖ c) ess)) (c ++ [ ix 1 ])
+    when (arr w c ∧ (suc k ≤ᵇ count (λ k′ → k′ ≼ᵇ c) ess) ∧ not (suc k ≤ᵇ count (λ k′ → k′ <ᵖ c) ess)) (c ⊕ [ ix 1 ])
 
   starts : ℕ → Maybe Pos → List (List Pos) → List Pos
   starts i w ess = if n + i <ᵇ m then room w else freed w
     where
       room : Maybe Pos → List Pos
-      room (just q) = [ q ++ [ ix 1 ] ]
+      room (just q) = [ q ⊕ [ ix 1 ] ]
       room nothing  = []
 
       queued : List Pos
       queued = concatMap (concatMap (queuedAt i w ess)) ess
 
       freed : Maybe Pos → List Pos
-      freed (just q) = if suc (n + i ∸ m) ≤ᵇ count (λ k → k <ᵖ q) ess then [ q ++ [ ix 1 ] ] else queued
+      freed (just q) = if suc (n + i ∸ m) ≤ᵇ count (λ k → k <ᵖ q) ess then [ q ⊕ [ ix 1 ] ] else queued
       freed nothing  = queued
 
   -- An item, and its lane at each start.
@@ -285,7 +286,7 @@ module BoundedM {A B : Set} (m : ℕ) (ln : A → Pos → Maybe (Listed B)) (o :
           (λ c → outerOver d (rows o) c ∧ (n + length Qu ≤ᵇ count (λ k → k ≼ᵇ c) essQ))
           (λ q → anyᵇ (λ { (q′ , _) → does (q′ ≟ᵖ q) }) (outerLanes gs))
           (λ _ _ → false)
-          (λ c → anyᵇ (λ { (_ , ss) → anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ++ [ ix 1 ])) }) ss }) gs)
+          (λ c → anyᵇ (λ { (_ , ss) → anyᵇ (λ { (s , _) → does (s ≟ᵖ (c ⊕ [ ix 1 ])) }) ss }) gs)
         ⊣ (short o ∨ shortL Ls ∨ shortItems gs)
 
 ------------------------------------------------------------------------
@@ -319,7 +320,7 @@ fullL : ∀ {Γ} → ℕ → Scope Γ → Maybe (All Listed Γ)
 fullL u unbound         = just []
 fullL u (binds o p sc) with fullL u sc
 ... | nothing = nothing
-... | just φ  with listT u o φ (p ++ [ ix 1 ])
+... | just φ  with listT u o φ (p ⊕ [ ix 1 ])
 ...   | nothing = nothing
 ...   | just F  = just (hotOf F ∷ φ)
 
@@ -328,7 +329,7 @@ private
   frozenL : ∀ {Γ A} → ℕ → CS Γ A → Maybe (Listed A)
   frozenL u k with fullL u (CS.scope k)
   ... | nothing = nothing
-  ... | just φ  = listT u (CS.src k) φ (CS.connAt k ++ [ ix 1 ])
+  ... | just φ  = listT u (CS.src k) φ (CS.connAt k ⊕ [ ix 1 ])
 
   -- A binder's rows: what its source still owes, and its end once closed,
   -- each a row of the source's frozen entry `F` before that entry's end.
@@ -341,7 +342,7 @@ private
   -- always, any other row only while the source lives and before the
   -- body's end the connect still owes.
   gated : ∀ {Γ A} → CS Γ A → Listed A → Listed A
-  gated k σ = concatMap (λ { (q , e) → when (inside (CS.connAt k ++ [ ix 1 ]) q ∨ (CS.srcLive k ∧ before (CS.owedAt k) q)) (q , e) }) (rows σ)
+  gated k σ = concatMap (λ { (q , e) → when (inside (CS.connAt k ⊕ [ ix 1 ]) q ∨ (CS.srcLive k ∧ before (CS.owedAt k) q)) (q , e) }) (rows σ)
             ⊣ short σ
     where
       before : Maybe Pos → Pos → Bool
@@ -363,7 +364,7 @@ private
 
   takeR : ∀ {A} → Bool → (A → Bool) → Owe → Listed A → Listed A
   takeR i q free      l = takeRows i q l
-  takeR i q (cpAt p)  l = (((p ++ [ last ]) , end) ∷ kept p (rows l)) ⊣ short l
+  takeR i q (cpAt p)  l = (((p ⊕ [ last ]) , end) ∷ kept p (rows l)) ⊣ short l
   takeR i q (cutAt p) l = kept p (rows l) ⊣ short l
   takeR i q (overAt p) l = kept p (rows l) ⊣ short l
 

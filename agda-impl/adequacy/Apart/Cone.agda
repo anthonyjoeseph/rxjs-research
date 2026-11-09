@@ -6,14 +6,14 @@
 module adequacy.Apart.Cone where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.Nat using (_<_; _≤_)
 open import Data.Nat.Properties using (≤-reflexive; <⇒≤; ≤-<-trans; <-irrefl)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; Label; ix; last; tick; path; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_)
+open import denotation.Position using (Pos; Label; tick; path; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_)
 open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-trans; <ᵖ-asym; <ᵖ-irrefl)
 open import denotation.Simultaneity using (reflˡ; earlier-tick; effect-tick)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)

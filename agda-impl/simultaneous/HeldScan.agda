@@ -88,7 +88,7 @@ same-scanIE st (instEmit (mark _) _)  refl = same-mark
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
               → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok ep = held-same row end-row back′ fwd (h p ok ep)
+held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ fwd (h p ok nt ep)
   where
     module Sr = ScanRun (scanIE f) z d p
     module Mr = MapRun proj₂ (Op.scan (scanIE f) z d) p

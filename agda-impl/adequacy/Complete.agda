@@ -23,7 +23,7 @@ open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst; subst₂; sym; trans)
 open import Relation.Nullary using (Dec; yes; no)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; enter; ⟦_⟧; _≼_; _≺_; Seen)
 open import denotation.Laws.Modulus using (≼-antisym; ≼-or-≻; ≺-trans; ≺-irrefl; ≺-≼-≺)
 open import denotation.Laws.Worlds using (InvAt)

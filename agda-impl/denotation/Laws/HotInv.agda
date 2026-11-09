@@ -18,7 +18,7 @@ open import denotation.Position using (Pos; sub; last; _⊕_)
 open import denotation.Events using (<ᵖ-split; <ᵖ-down)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; EmissionSet; _≺_; _≼_; hot; Rejoin; shown; heard; ended; late)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-trans; ≼-false)
-open import denotation.Laws.Worlds using (_∪ʰ_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD; _⊑_; ⊑-snoc; ⊑-inside; ext≢; not-up; nest-in; named-view; named-e; anc-≼; world-anc⁼; world-after; ⊕-assoc; ⊕-injˡ; ⊕-injʳ)
+open import denotation.Laws.Worlds using (TimerRoot; ext-untimed; _∪ʰ_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD; _⊑_; ⊑-snoc; ⊑-inside; ext≢; not-up; nest-in; named-view; named-e; anc-≼; world-anc⁼; world-after; ⊕-assoc; ⊕-injˡ; ⊕-injʳ)
 
 private
   -- A hot's row as a joiner hears it: its pin is the hot's own.
@@ -95,9 +95,14 @@ lawful-hot {H = H} {t} L p ok = record
   ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
   ; quiet = λ c y cy → ⊥-elim (bu (view (proj₁ c)) (view (proj₁ y)) cy)
   ; pinned = λ x → ⊥-elim (unpinned (view (proj₁ x)))
+  ; untimed = λ x → ut (view (proj₁ x))
   }
   where
     open HI {H = H} {p} L
+
+    ut : ∀ {y e} → Vw y e → TimerRoot y → ⊥
+    ut (jn {q} _ _ _ refl) = ext-untimed q
+    ut (lt _ _ _ refl)     = ext-untimed p
 
     re : ∀ {y e} → Vw y e → Real y
     re (jn {q} x pq _ refl) = real-sub q (Lawful.real L x) (proj₁ ok) (≺-trans {p} {q} {q ⊕ [ sub p ]} pq (≺-ext q []))

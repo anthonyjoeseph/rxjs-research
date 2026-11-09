@@ -19,17 +19,15 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
-open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_)
-open import denotation.Events using (Timeline; fresh; finals; <ᵖ-between; <ᵖ-below)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_; enter; ⟦_⟧)
-open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Laws.Worlds using (W; InvAt; Plain; plain-ix; plain-last; step; timer; join; here; inW)
+open import denotation.Position using (Pos; root; frame; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh; finals)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
+open import denotation.Laws.Worlds using (here)
 open import denotation.Read using (Run; _∷_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-≼-≺)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
@@ -38,10 +36,10 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Routed using (Held; Valued; opos)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
-open import simultaneous.Readings using (instantOf; stamped)
+open import simultaneous.Readings using (instantOf; emission; stamped)
 open import denotation.Simultaneity using (between)
 open import simultaneous.Relations using (Met; values; elaborated)
-open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; to≺; from≺)
+open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; from≺)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; elaborate)
 
@@ -152,24 +150,11 @@ none-stamped (instEmit (value a) j ∷ ys) h = ⊥-elim (h (here refl))
 none-stamped (instEmit (mark _) _ ∷ ys)  h = none-stamped ys (λ m → h (there m))
 
 ------------------------------------------------------------------------
--- An instant is an interval of positions
-
-private
-  -- What lies between two positions under `p` lies under `p`.
-  under : ∀ p {a b c ys zs} → a ≡ p ++ ys → p ≺ a ⊎ p ≡ a → a ≺ b → b ≺ c → c ≡ p ++ zs → Σ Pos λ ws → b ≡ p ++ ws
-  under p {a} {b} {c} {zs = zs} _ pa ab bc refl =
-    <ᵖ-between p b zs (from≺ p b (pb pa)) (from≺ b (p ++ zs) bc)
-    where
-      pb : p ≺ a ⊎ p ≡ a → p ≺ b
-      pb (inj₁ lt)   = ≺-trans {p} {a} {b} lt ab
-      pb (inj₂ refl) = ab
-
-------------------------------------------------------------------------
 -- A run, split at an emit
 
 -- An async position: past the subscribe frame.
 Async : Pos → Set
-Async k = instantOf k ≢ root
+Async k = instantOf k ≢ frame
 
 module Split {A : Set} where
 
@@ -229,6 +214,43 @@ module Split {A : Set} where
     ... | inj₁ h₁         = h₁
     ... | inj₂ (here refl) = ⊥-elim (≺-irrefl {k} qk)
     ... | inj₂ (there h₂)  = ⊥-elim (≺-absurd {q} {k} qk (run-past r₁ run h₂))
+
+------------------------------------------------------------------------
+-- The positions of an elaborated program's emits
+
+-- THE INSTANT STRUCTURE: every emit is named for its instant, and the
+-- begins of one instant name it alike; the subscribe mark sits once, before every
+-- begin, every value past it async, and every value precedes the
+-- completion.
+postulate
+  named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
+  one-name  : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
+            → elaborated o k′ (out (instEmit (mark Marks.begin) n′)) → instantOf k ≡ instantOf k′ → n ≡ n′
+  sub-first : ∀ {A} (o : SObs [] A) {k n} → elaborated o k (out (instEmit (mark Marks.begin) n))
+            → Σ Pos λ ks → Σ Pos λ m → elaborated o ks (out (instEmit (mark Marks.subscribed) m)) × ks ≺ k
+  sub-one   : ∀ {A} (o : SObs [] A) {k k′ m m′} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
+            → elaborated o k′ (out (instEmit (mark Marks.subscribed) m′)) → k ≡ k′
+  sub-async : ∀ {A} (o : SObs [] A) {ks m k a j} → elaborated o ks (out (instEmit (mark Marks.subscribed) m))
+            → elaborated o k (out (instEmit (value a) j)) → ks ≺ k → Async k
+  done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))
+            → elaborated o kc (out (instEmit (mark Marks.completed) m)) → kv ≺ kc
+
+-- Two emits of one instant are of one emission: the held streams name
+-- and close routes per emission (`simultaneous.Routed`), the spec reads
+-- instants per frame.
+postulate
+  one-emission : ∀ {A} (o : SObs [] A) {k k′ x x′} → elaborated o k (out x) → elaborated o k′ (out x′)
+               → instantOf k ≡ instantOf k′ → emission k ≡ emission k′
+
+-- An instant's values precede its overs: the value lies before where
+-- the over is sent from, the over at or under it.
+over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
+          → elaborated o ko (out (instEmit (mark Marks.over) m)) → instantOf kv ≡ instantOf ko → kv ≺ ko
+over-last o {kv} xv xo eq =
+  ≺-≼-≺ {kv} (subst (λ I → kv ≺ opos I) em (proj₁ (Held.early (held o) xv (subst Valued (sym em) (proj₁ lt))))) (⊑-≼ (proj₂ lt))
+  where
+    em = one-emission o xv xo eq
+    lt = Held.late (held o) xo
 
 ------------------------------------------------------------------------
 -- The protocol, one mark at a time
@@ -309,7 +331,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
 
   -- A value past `k` is of an instant other than one met before `k`.
   apart : ∀ {ka k q} → ka ≺ k → k ≺ q → instantOf q ≡ instantOf ka → (instantOf k ≡ instantOf ka → ⊥) → ⊥
-  apart {ka} {k} {q} ak kq e no = no (between (from≺ ka k ak) (from≺ k q kq) (sym e))
+  apart {ka} {k} {q} ak kq e no = no (between {ka} {k} {q} (from≺ ka k ak) (from≺ k q kq) (sym e))
 
   -- Past a begin of a new name, the next value is of another instant.
   begin-fresh : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.begin) n ∷ ys → n ≢ lastBegin root xs → Fresh (lastBegin root xs) (stamped ys)
@@ -323,7 +345,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
         past-sub xs h (begin-late xs n ys e) v (trans (sym eq) e₀)
       ... | q , y , kq | inj₂ hb with Around.prev h hb
       ...   | ka , yb , ak =
-        apart ak kq (trans (sym (named o y)) (trans (cong instantOf (sym eq)) (named o yb)))
+        apart {ka} {kb} {q} ak kq (trans (sym (named o y)) (trans (cong instantOf (sym eq)) (named o yb)))
           (λ eb → ne (one-name o (Around.row h) yb eb))
 
   -- Past an over, the next value is of another instant.
@@ -338,7 +360,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
       ... | q , y , kq | inj₂ hb with Around.prev h hb
       ...   | ka , yb , ak =
         let eA = trans (sym (named o y)) (trans (cong instantOf (sym eq)) (named o yb)) in
-        apart ak kq eA (λ eo → ≺-absurd {ko} {q} kq (over-last o y (Around.row h) (trans eA (sym eo))))
+        apart {ka} {ko} {q} ak kq eA (λ eo → ≺-absurd {ko} {q} kq (over-last o y (Around.row h) (trans eA (sym eo))))
 
   -- Nothing past the completion.
   completed-end : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.completed) n ∷ ys → stamped ys ≡ []

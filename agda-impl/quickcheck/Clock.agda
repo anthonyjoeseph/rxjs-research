@@ -19,7 +19,8 @@ open import Data.Product using (_×_; _,_; Σ)
 open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (pure; _>>=_)
 
-open import denotation.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Timeline; fixed; fresh; timelineAt; Pos; ix)
+open import denotation.Events using (From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Timeline; fixed; fresh; timelineAt)
+open import denotation.Position using (Pos; ix; root; _⊕_; Time)
 open import operation.Observable using (IORef; newIORef; readIORef; writeIORef; IOCold; Emit; fixIO′)
 
 private
@@ -89,8 +90,8 @@ fromTimeline {A} ck names c = record
         step self (now , _ , at t _ b) = after ck (t ∸ now) (unless off (burst e off (λ t′ m′ → self (t′ , suc t′ , m′)) t b))
 
     named : Timeline A → IO Pos
-    named (fixed _) = pure []
-    named (fresh _) = readIORef names >>= λ n → writeIORef names (suc n) >> pure (ix n ∷ [])
+    named (fixed _) = pure root
+    named (fresh _) = readIORef names >>= λ n → writeIORef names (suc n) >> pure (root ⊕ (ix n ∷ []))
 
     first : Emit A → IORef Bool → From A 0 → IO ⊤
     first e off (at 0 _ b) = burst e off (λ t′ m′ → play e off t′ m′) 0 b

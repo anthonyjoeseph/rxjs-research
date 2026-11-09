@@ -27,7 +27,7 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _�
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
 open import Tree using (Obs; scan; map; of)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
+open import denotation.Position using (Pos; Path; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; finals; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge; module Bounded; module Values; MapT; map-out; map-end; map-skip; map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
@@ -302,22 +302,22 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   ln q = q ⊕ [ ix 1 ]
 
   -- A row of the source under another is none.
-  sole : ∀ {q e zs e′} → S q e → S (q ++ zs) e′ → zs ≡ []
+  sole : ∀ {q e zs e′} → S q e → S (q ⊕ zs) e′ → zs ≡ []
   sole {zs = []}    _ _ = refl
   sole {zs = _ ∷ _} x y = ⊥-elim (InvAt.flat IS x y)
 
-  ext-absurd : ∀ {q e y e′ zs} → S q e → S y e′ → q ≺ y → y ≡ q ++ zs → ⊥
+  ext-absurd : ∀ {q e y e′ zs} → S q e → S y e′ → q ≺ y → y ≡ q ⊕ zs → ⊥
   ext-absurd {q} x x′ lt eq with sole x (subst (λ w → S w _) eq x′)
   ... | refl = ≺-irrefl {q} (subst (q ≺_) (trans eq (⊕-identityʳ q)) lt)
 
   -- What lies under a row of the source lies before the rows past it.
-  past-under : ∀ {q e q′ e′} → S q e → S q′ e′ → q ≺ q′ → ∀ ys → (q ++ ys) ≺ q′
-  past-under {q} {q′ = q′} x x′ lt ys = to≺ (q ++ ys) q′ (<ᵖ-apart q q′ ys (from≺ q q′ lt) λ zs eq → ext-absurd x x′ lt eq)
+  past-under : ∀ {q e q′ e′} → S q e → S q′ e′ → q ≺ q′ → ∀ ys → (q ⊕ ys) ≺ q′
+  past-under {q} {q′ = q′} x x′ lt ys = to≺ (q ⊕ ys) q′ (<ᵖ-apart q q′ ys (from≺ q q′ lt) λ zs eq → ext-absurd x x′ lt eq)
 
-  none-under : ∀ {q e y e′} ys → S q e → S y e′ → q ≺ y → y ≼ (q ++ ys) → ⊥
-  none-under {q} {y = y} ys x x′ lt le with ≼-split {y} {q ++ ys} le
+  none-under : ∀ {q e y e′} ys → S q e → S y e′ → q ≺ y → y ≼ (q ⊕ ys) → ⊥
+  none-under {q} {y = y} ys x x′ lt le with ≼-split {y} {q ⊕ ys} le
   ... | inj₂ eq = ext-absurd x x′ lt eq
-  ... | inj₁ lt′ = ext-absurd x x′ lt (proj₂ (<ᵖ-between q y ys (from≺ q y lt) (from≺ y (q ++ ys) lt′)))
+  ... | inj₁ lt′ = ext-absurd x x′ lt (proj₂ (<ᵖ-between q y ys (from≺ q y lt) (from≺ y (q ⊕ ys) lt′)))
 
   vis-end : ∀ {q e c} → S q e → Visible e → S c end → q ≼ c
   vis-end = vis-end-at s
@@ -331,7 +331,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   seenS : ∀ {q e} → S q e → Visible e → Seen S q e
   seenS = seen-at s
 
-  lane-at : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → Σ Pos λ ys → k ≡ q ++ ix 1 ∷ ys
+  lane-at : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → Σ Path λ ys → k ≡ q ⊕ (ix 1 ∷ ys)
   lane-at {q} {xs} y with of-idx (ln q) 0 xs y
   ... | inj₁ (j , _ , eq) = ix j ∷ [] , trans eq (⊕-assoc q [ ix 1 ] [ ix j ])
   ... | inj₂ eq           = last ∷ [] , trans eq (⊕-assoc q [ ix 1 ] [ last ])
@@ -790,7 +790,7 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
       past mem = past-second sub (proj₁ (run-row tl mem)) (run-after tl mem)
   ...             | vs , eqv = values as ++ vs ,
     trans (cong values eq) (trans (values-++ as ((s₁ ⊕ [ ix 0 ] , out c) ∷ zs))
-      (trans (cong (values as ++_) eqv) (sym (⊕-assoc (values as) vs [ c ]))))
+      (trans (cong (values as ++_) eqv) (sym (++-assoc (values as) vs [ c ]))))
 
 concat-last : ∀ {X} (s : Obs Timeline [] X) (c : X) {sc} → Met (at (concatˢ s (of [ c ]))) sc → Ends sc
             → Σ (List X) λ vs → values sc ≡ vs ++ [ c ]

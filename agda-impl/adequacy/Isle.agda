@@ -10,7 +10,7 @@ module adequacy.Isle where
 
 open import Data.Bool using (T; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)

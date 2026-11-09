@@ -8,7 +8,7 @@ module adequacy.Isle.Step where
 
 open import Data.Bool using (true; false; not; _∨_)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; reverse)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)

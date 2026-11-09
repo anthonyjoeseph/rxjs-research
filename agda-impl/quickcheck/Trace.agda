@@ -11,7 +11,8 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.String using (String; _++_; intersperse)
 
-open import denotation.Events using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close; Time)
+open import denotation.Events using (ML; Burst; Burst∞; ML∞; done; quiet; at; emit; stall; close)
+open import denotation.Position using (Time)
 open import quickcheck.Ty using (⟦_⟧ᵀ; showᵀ)
 open import quickcheck.Code using (Code; cold; fresh; empty; of; map; scan; takeWhile; flatMap; connect; connected; μ; var; defer; Prog)
 

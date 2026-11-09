@@ -19,7 +19,7 @@ open import Data.Product using (Σ; _,_)
 open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 
 open import Tree using (cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; Later)
-open import denotation.Position using (Pos; Label; ix; last; tick; root; cascadeAt; _⊕_)
+open import denotation.Position using (Label; ix; last; tick; root; cascadeAt; _⊕_)
 open import denotation.Events using (Frame; timelineAt; done; quiet; at)
 open import denotation.Simultaneity using (effect-tick)
 open import operation.PureObservable using (PureObs; module Machine; play; ending; over; baseOf; stepOf)
