@@ -18,7 +18,6 @@ open import Data.Bool using (T; true; false)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -30,11 +29,12 @@ open import Data.Unit using (tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import denotation.Events using (Pos; ix; inside; inside-self; <ᵖ-split)
+open import denotation.Position using (Pos; ix; inside; _⊕_; Path)
+open import denotation.Events using (inside-self; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; pin; Reach; Few; _≺_; _≼_; ⟦_⟧)
 open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl; ≺-ext; ≺-trans; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
-open import denotation.Laws.Worlds using (⊑-inside)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; ⊕-identityʳ)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; connS; mapS; scanS; cutS; lnS; takeS; flatS; binds; scopeOf;
@@ -61,16 +61,16 @@ open import adequacy.Floor.Keys using (plug-in; own-bld; os)
 ------------------------------------------------------------------------
 -- THE STEP'S FIRST-CHILD CHAIN
 
--- The first-child chain below `q`: `q ++ [ ix 0 ]`, and each first child
+-- The first-child chain below `q`: `q ⊕ [ ix 0 ]`, and each first child
 -- of one.
 data Zs (q : Pos) : Pos → Set where
-  z₁ : Zs q (q ++ [ ix 0 ])
-  z+ : ∀ {y} → Zs q y → Zs q (y ++ [ ix 0 ])
+  z₁ : Zs q (q ⊕ [ ix 0 ])
+  z+ : ∀ {y} → Zs q y → Zs q (y ⊕ [ ix 0 ])
 
 -- A chain's foot past its head.
 zs-past : ∀ {q y} → Zs q y → q ≺ y
 zs-past {q} z₁ = ≺-ext q []
-zs-past {q} (z+ {y} z) = ≺-trans {q} {y} {y ++ [ ix 0 ]} (zs-past z) (≺-ext y [])
+zs-past {q} (z+ {y} z) = ≺-trans {q} {y} {y ⊕ [ ix 0 ]} (zs-past z) (≺-ext y [])
 
 -- The positions from `q` up to, not including, the chain's foot.
 zl : ∀ {q y} → Zs q y → List Pos
@@ -89,20 +89,20 @@ zs-btw {w = w} (z+ {y} z) qw wy with ≼-or-≻ y w
 ...   | inj₂ refl = here refl
 
 -- A chain's foot lies under the first child.
-zs-under : ∀ {q y} → Zs q y → Σ Pos λ xs → y ≡ (q ++ [ ix 0 ]) ++ xs
-zs-under z₁ = [] , sym (++-identityʳ _)
+zs-under : ∀ {q y} → Zs q y → Σ Path λ xs → y ≡ (q ⊕ [ ix 0 ]) ⊕ xs
+zs-under z₁ = [] , sym (⊕-identityʳ _)
 zs-under (z+ {y} z) with zs-under z
-... | xs , refl = xs ++ [ ix 0 ] , ++-assoc _ xs [ ix 0 ]
+... | xs , refl = xs ++ [ ix 0 ] , ⊕-assoc _ xs [ ix 0 ]
 
 -- A chain's foot lies inside its head.
 zs-in : ∀ {q y} → Zs q y → T (inside q y)
 zs-in {q} z with zs-under z
-... | xs , refl = ⊑-inside {q} {(q ++ [ ix 0 ]) ++ xs} (ix 0 ∷ xs , ++-assoc q [ ix 0 ] xs)
+... | xs , refl = ⊑-inside {q} {(q ⊕ [ ix 0 ]) ⊕ xs} (ix 0 ∷ xs , ⊕-assoc q [ ix 0 ] xs)
 
 -- First children on from a chain's foot: still on it.
-zs-all : ∀ {q y} xs → Zs q y → All (_≡ ix 0) xs → Zs q (y ++ xs)
-zs-all {q} {y} []       z []ᴬ         = subst (Zs q) (sym (++-identityʳ y)) z
-zs-all {q} {y} (_ ∷ xs) z (refl ∷ a) = subst (Zs q) (++-assoc y [ ix 0 ] xs) (zs-all xs (z+ z) a)
+zs-all : ∀ {q y} xs → Zs q y → All (_≡ ix 0) xs → Zs q (y ⊕ xs)
+zs-all {q} {y} []       z []ᴬ         = subst (Zs q) (sym (⊕-identityʳ y)) z
+zs-all {q} {y} (_ ∷ xs) z (refl ∷ a) = subst (Zs q) (⊕-assoc y [ ix 0 ] xs) (zs-all xs (z+ z) a)
 
 -- Few rows before the chain's head: few before its foot, the chain
 -- itself between.
@@ -135,27 +135,27 @@ pin-dom dm (pn tr ir x rc z) = pn (dm tr) ir x rc z
 -- subscription, its burst, the source's rows before it few; past it,
 -- kept, its connect no later than the slot after the subscription.
 burst-pin : ∀ {X B} {F : EmissionSet X} {c} {E : EmissionSet B} {C D q}
-          → BurstsAt F c E → Thru D c → (∀ {r} → Thru C r → r ≼ (c ++ [ ix 2 ])) → (∀ {r} → Thru C r → r ≼ c → Thru D r)
+          → BurstsAt F c E → Thru D c → (∀ {r} → Thru C r → r ≼ (c ⊕ [ ix 2 ])) → (∀ {r} → Thru C r → r ≼ c → Thru D r)
           → Few F q → Pin C F q → Pin D E q
-burst-pin {c = c} bu tc ic dn fw (pn {y} {r} tr ir x rc z) with inside (c ++ [ ix 1 ]) y in e
+burst-pin {c = c} bu tc ic dn fw (pn {y} {r} tr ir x rc z) with inside (c ⊕ [ ix 1 ]) y in e
 ... | true  = let iw = subst T (sym e) tt in
               pn tc (in-call c y iw) (proj₁ (BurstsAt.win bu x iw (chain-few fw z))) (proj₂ (BurstsAt.win bu x iw (chain-few fw z))) (z+ z)
 ... | false = let (rc′ , w , rw) = BurstsAt.kept bu x (λ t → subst T e t) ir (ic tr) rc in
-              pn (dn tr rc′) (inside-trans r y (y ++ [ ix 0 ]) ir (⊑-inside {y} {y ++ [ ix 0 ]} ([ ix 0 ] , refl))) w rw (z+ z)
+              pn (dn tr rc′) (inside-trans r y (y ⊕ [ ix 0 ]) ir (⊑-inside {y} {y ⊕ [ ix 0 ]} ([ ix 0 ] , refl))) w rw (z+ z)
 
 -- An isle's step lies in its source's subscription: the source's attach
 -- owed is a key of the tree, so no earlier than the step; a body's mark
 -- would be one at the step itself.
 step-in : ∀ {Γ X B} {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) B} {q}
-        → (CS.connAt k ++ [ ix 1 ]) ≼ q → AttOwed k → Lo (connS k o b) (at q)
-        → T (inside (CS.connAt k ++ [ ix 1 ]) q)
+        → (CS.connAt k ⊕ [ ix 1 ]) ≼ q → AttOwed k → Lo (connS k o b) (at q)
+        → T (inside (CS.connAt k ⊕ [ ix 1 ]) q)
 step-in {k = k} {o} {b} {q} cq (inj₁ ae) lo
-  with ≮-after (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (own-bld k {o = o} {b = b} (os ae))))
+  with ≮-after (CS.connAt k ⊕ [ ix 1 ]) q (lo (k-own (own-bld k {o = o} {b = b} (os ae))))
 ... | inj₂ i  = i
-... | inj₁ qc with ≼-antisym {q} {CS.connAt k ++ [ ix 1 ]} qc cq
+... | inj₁ qc with ≼-antisym {q} {CS.connAt k ⊕ [ ix 1 ]} qc cq
 ...   | refl = Equivalence.from T-≡ (inside-self q)
 step-in {k = k} {o} {b} {q} cq (inj₂ (be , _)) lo
-  with ≼-antisym {CS.connAt k ++ [ ix 1 ]} {q} cq (≮-≼ (CS.connAt k ++ [ ix 1 ]) q (lo (k-own (body-key k {o = o} {b = b} be))))
+  with ≼-antisym {CS.connAt k ⊕ [ ix 1 ]} {q} cq (≮-≼ (CS.connAt k ⊕ [ ix 1 ]) q (lo (k-own (body-key k {o = o} {b = b} be))))
 ... | refl = Equivalence.from T-≡ (inside-self q)
 
 ------------------------------------------------------------------------
@@ -319,12 +319,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Lo (plug c (connS k o b)) (at q) → Frozen k y e → y ≡ q ⊎ Zs q y → Pin Cr Rt q
   isle-pin {c = c} {k = k} {o} {b} {y = y} {q = q} u hb le bh sd ao bu nr lof row yq with foot yq
     where
-      c₁ = CS.connAt k ++ [ ix 1 ]
+      c₁ = CS.connAt k ⊕ [ ix 1 ]
       fq : Few (Frozen k) q
       fq = thru-few (bef q) bh (≼-refl {q})
       iq : T (inside c₁ q)
       iq = step-in {k = k} {o} {b} (SubdAt.past sd {q} (≼-refl {q})) ao (λ ki → lof (plug-in c ki))
-      foot : y ≡ q ⊎ Zs q y → T (inside c₁ y) × Few (Frozen k) y × Zs q (y ++ [ ix 0 ])
+      foot : y ≡ q ⊎ Zs q y → T (inside c₁ y) × Few (Frozen k) y × Zs q (y ⊕ [ ix 0 ])
       foot (inj₁ refl) = iq , fq , z₁
       foot (inj₂ z)    = inside-trans c₁ q y iq (zs-in z) , chain-few fq z , z+ z
   ... | iy , fy , zy =

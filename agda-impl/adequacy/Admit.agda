@@ -14,7 +14,7 @@ open import Data.Nat using (zero; suc; _<ᵇ_; _<?_; _+_; _∸_; _≤_; _<_)
 open import Data.Nat.Properties using (+-comm; +-identityʳ; <ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; <-irrefl; ≤-antisym; ≤-trans; m≤n+m; m≤m+n;
   m+n≤o⇒m≤o∸n)
 open import Data.List using ([]; _∷_; [_]; _++_; reverse; length)
-open import Data.List.Properties using (reverse-involutive; ++-identityʳ; ++-assoc; map-++; length-++)
+open import Data.List.Properties using (reverse-involutive; map-++; length-++; ++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -28,13 +28,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix; Timeline; _≟ᵖ_)
+open import denotation.Position using (Pos; root; ix; _≟ᵖ_; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; Den; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values; module Exhaust)
 open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≼-trans; ≼-antisym)
 open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
-open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside)
+open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside; ⊕-assoc; ⊕-identityʳ)
   renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; lnS; cutS; cut; killAll; attached; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; subscribing; rising; absorbed; flatS; nx; attAt; pend;
@@ -158,7 +159,7 @@ module Kills (p : Pos) where
 -- The lane subscribed where its joiner's observer is open.
 start-open : ∀ {R Γ A B} {c : Ctx R Γ B} {op} {f : A → Obs Timeline Γ B} {ω d n q o ls a p} → closed c ≡ false
            → start c op f ω d n q o ls a p
-             ≡ ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c)) , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
+             ≡ ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n) q o (reverse ls) [] c)) , pend (f a) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
 start-open cl rewrite cl = refl
 
 module _ {R : Set} (Rt : EmissionSet R) where
@@ -167,7 +168,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- `p`, its rows the value's entered there, no queue, its slot taken.
   record Opening {A B} (P : Pol A B) vs ws n p a (L : EmissionSet B) : Set where
     field
-      st  : Start P p a (p ++ [ ix 1 ])
+      st  : Start P p a (p ⊕ [ ix 1 ])
       ln  : L ≈ Lane P p a
       ru  : Runs P p
       w[] : ws ≡ []
@@ -184,9 +185,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n
            → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (aft p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls′ n′)
         → (∀ {vs ws} → Begun (scopeOf c) (JRl (scopeOf c) Rg op f E) (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ls n → Waiting (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws q
-           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) (bef p) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n′ p a (pendRows (full (scopeOf c)) (f a) (p ++ [ ix 1 ])))
-        → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ++ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n′) q o (reverse ls′) [] c))
-                                            , pend (f a) (p ++ [ ix 1 ]) , subscribing , p ++ [ ix 1 ] ⟩
+           → Whole (bef p) (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) E vs ws → Slots (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) (bef p) vs ws n → Opening (polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E) vs ws n′ p a (pendRows (full (scopeOf c)) (f a) (p ⊕ [ ix 1 ])))
+        → Σ Cur λ Cr′ → Inv Rt Cr′ (aft p) ⟨ inCut true (attAt (p ⊕ [ ix 1 ])) (inLn true (inLanes op f ω d (suc n′) q o (reverse ls′) [] c))
+                                            , pend (f a) (p ⊕ [ ix 1 ]) , subscribing , p ⊕ [ ix 1 ] ⟩
                         × Moves (RT Rt Cr) [] (RT Rt Cr′)
   opens op {f = f} {d = d} {n = n} {ls = ls} {n′ = n′} {ls′ = ls′} {c = c} {a = a} {p = p} {Rg = Rg} {E = E} fr ji jn@(joined {vs = vs} {ws = ws} bg wt wh od ah ao en li sl) m so bh sy row lb opn =
     Cr↑ , pending (f-lnct (f-lane (f-lanes {D = aft p} fr↑ ji sy lf row (≺-irrefl {p}) ru (h-live st ln (λ k → proj₂ (proj₂ (kill-out op k))) ue) none (sym (+-comm n′ 1))
@@ -198,7 +199,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       open Book {P = polF op (λ a → ⟦ f a ⟧ (full (scopeOf c))) E} {O = E} using (ahead-up; wait-up)
       sc = scopeOf c
       P = polF op (λ a → ⟦ f a ⟧ (full sc)) E
-      s = p ++ [ ix 1 ]
+      s = p ⊕ [ ix 1 ]
       io = JInv.io ji
       st = Opening.st (opn bg wt wh sl)
       ln = Opening.ln (opn bg wt wh sl)
@@ -261,14 +262,14 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- An unbounded lane's rows: the value's, entered under `p`.
   lane-entered : ∀ {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {E : EmissionSet A} {a p}
-               → JInv sc f E → E p (out a) → pendRows (full sc) (f a) (p ++ [ ix 1 ]) ≈ LaneOf (λ a → ⟦ f a ⟧ (full sc)) p a
+               → JInv sc f E → E p (out a) → pendRows (full sc) (f a) (p ⊕ [ ix 1 ]) ≈ LaneOf (λ a → ⟦ f a ⟧ (full sc)) p a
   lane-entered {sc = sc} {f = f} {a = a} {p = p} ji row =
     record { alike = (λ (x , v) → (x , g x) , v) ⇄ (λ ((x , _) , v) → x , v)
            ; cov = [] , λ x → inj₁ (proj₁ x)
            ; voc = λ x → x , g x }
     where
-      I = JInv.fi ji a (p ++ [ ix 1 ]) (ok-step p (ok-in (JInv.ok ji) (InvAt.world (JInv.io ji) row) (InvAt.real (JInv.io ji) row)))
-      g : ∀ {y e} → enter (⟦ f a ⟧ (full sc)) (p ++ [ ix 1 ]) y e → _
+      I = JInv.fi ji a (p ⊕ [ ix 1 ]) (ok-step p (ok-in (JInv.ok ji) (InvAt.world (JInv.io ji) row) (InvAt.real (JInv.io ji) row)))
+      g : ∀ {y e} → enter (⟦ f a ⟧ (full sc)) (p ⊕ [ ix 1 ]) y e → _
       g x = world-after (InvAt.world I x) (InvAt.real I x)
 
   -- A MERGE'S VALUE begins its lane at once.  In a part no live node
@@ -297,7 +298,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       sc = scopeOf c
       F = λ a → ⟦ f a ⟧ (full sc)
       P = polF (mergeᶠ (just m)) F E
-      s = p ++ [ ix 1 ]
+      s = p ⊕ [ ix 1 ]
       io = JInv.io ji
       open Count (JInv.ok ji) m F (JInv.fi ji) io hiding (P)
       open Bounded m F E using (Sched; Kth; Starts; Sub; room; freed; queued)
@@ -470,7 +471,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     open Exhaust F E using (cur₀; run) renaming (Cur to XCur)
 
     opening : ∀ {Rl vs ws ls qu} → Begun sc Rl (bef p) P E vs ls 0 → Waiting (bef p) P E vs ws qu → Whole (bef p) P E vs ws → Slots P (bef p) vs ws 0
-            → Opening P vs ws 0 p a (pendRows (full sc) (f a) (p ++ [ ix 1 ]))
+            → Opening P vs ws 0 p a (pendRows (full sc) (f a) (p ⊕ [ ix 1 ]))
     opening {vs = vs} {ws = ws} bg wt _ sl = record { st = refl ; ln = lane-entered ji row ; ru = ru sl ; w[] = proj₁ (proj₂ (proj₂ (proj₂ wt))) tt
                                           ; sl′ = inj₂ (p , vs , p , a , refl , (a , row) , ≺-irrefl {p} , (λ _ nk → nk) , ru sl , ended) }
       where
@@ -544,7 +545,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       -- next before it, and its lane is the one still running
       no-run : ¬ XCur p p
       no-run (cur₀ _ least) = least xv x≺p
-      no-run (drop cu′ _ _ _ lt′ _) = Join.ExhaustJ.cur-le [] cu′ lt′
+      no-run (drop cu′ _ _ _ lt′ _) = Join.ExhaustJ.cur-le root cu′ lt′
       no-run (run cu′ oq′ lc cp _ lt′ n′) with next-fun (proj₂ (cur-val cu′)) xv lt′ x≺p n′ nxt
       ... | refl with cur-fun cu′ cu
       ...   | refl with InvAt.func io oq′ oq

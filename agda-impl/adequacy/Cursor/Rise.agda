@@ -4,13 +4,13 @@ module adequacy.Cursor.Rise where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; [_]; _++_)
+open import Data.List using ([]; [_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; subst; sym)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (ix; last)
+open import denotation.Position using (ix; last; _⊕_)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; _≺_; _≼_; MapT; map-out; map-end; module Scan; module TakeWhile)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
@@ -223,7 +223,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
   rise-take-fail {keep = keep} {a = a} {p = p} kf = keeps λ
     { (flying (f-take fr nf eq sd) cl (sy , row)) → let nk = subst (λ b → T (not b)) (sym kf) _ in
         settled c-abs fr (s-took (a , row , nk , λ (_ , _ , y , nk , qp) → nf y nk qp)
-                                 (λ pq → pq) (λ ()) (o-cp (≺→≼ {p} {p ++ [ last ]} (≺-ext p {last} [])))
+                                 (λ pq → pq) (λ ()) (o-cp (≺→≼ {p} {p ⊕ [ last ]} (≺-ext p {last} [])))
                                  (took-tail sy row nk nf) (proj₂ (husk-of sy)) (λ t → t)
                                  (λ {r′} t (q , _ , y , nk′ , qr) → nf y nk′ (≺-≼-≺ {q} {r′} {p} qr t)) eq sd)
     ; (flying (f-took _ _ _ _ _ _ _ _ _ _) _ ())
@@ -250,17 +250,17 @@ module _ {R : Set} (Rt : EmissionSet R) where
 
   -- Its completion owed, under `last` of the failing value.
   run-stop : ∀ {Cr Γ A} {i} {keep : A → Bool} {c : Ctx R Γ A} {s r p}
-           → closed c ≡ false → Inv Cr (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cpAt r) s , absorbed , p ⟩
-           → Inv Cr (bef (r Machine.⊕ [ last ])) ⟨ c , takeS i keep (cutAt r) s , rising cp , r Machine.⊕ [ last ] ⟩
+           → closed c ≡ false → Inv Cr (bef (r ⊕ [ last ])) ⟨ c , takeS i keep (cpAt r) s , absorbed , p ⟩
+           → Inv Cr (bef (r ⊕ [ last ])) ⟨ c , takeS i keep (cutAt r) s , rising cp , r ⊕ [ last ] ⟩
   run-stop {r = r} cl (settled {N = owes} _ fr h) = flying fr cl (stopped h)
     where
       stopped : ∀ {Γ A} {sc : Scope Γ} {Rg} {i} {keep : A → Bool} {s E}
-              → Sync sc Rg (bef (r ++ [ last ])) (takeS i keep (cpAt r) s) E
-              → Sync sc Rg (aft (r ++ [ last ])) (takeS i keep (cutAt r) s) E × E (r ++ [ last ]) end
+              → Sync sc Rg (bef (r ⊕ [ last ])) (takeS i keep (cpAt r) s) E
+              → Sync sc Rg (aft (r ⊕ [ last ])) (takeS i keep (cutAt r) s) E × E (r ⊕ [ last ]) end
       stopped {A = A} (s-took (a , x , nk , nf) _ fz (o-cp _) tp hk dm nf′ eq sd) =
-        s-took (a , x , nk , nf) (λ {q} lt → ≺→≼ {r} {q} (≺-trans {r} {r ++ [ last ]} {q} (≺-ext r {last} []) lt))
-               (λ t lt → fz t (≺→≼ {r ++ [ last ]} {r ++ [ ix 0 ]} lt)) (o-cut (≺-irrefl {r ++ [ last ]}))
-               (tailp-dn {C = bef (r ++ [ last ])} {C′ = aft (r ++ [ last ])} (λ {y} → ≺→≼ {r ++ [ last ]} {y}) tp) hk dm nf′ eq sd
+        s-took (a , x , nk , nf) (λ {q} lt → ≺→≼ {r} {q} (≺-trans {r} {r ⊕ [ last ]} {q} (≺-ext r {last} []) lt))
+               (λ t lt → fz t (≺→≼ {r ⊕ [ last ]} {r ⊕ [ ix 0 ]} lt)) (o-cut (≺-irrefl {r ⊕ [ last ]}))
+               (tailp-dn {C = bef (r ⊕ [ last ])} {C′ = aft (r ⊕ [ last ])} (λ {y} → ≺→≼ {r ⊕ [ last ]} {y}) tp) hk dm nf′ eq sd
         , proj₁ (to (alike eq) (TakeWhile.stop x nk nf , vis {A = A} cp))
   run-stop cl (settled {N = dead _ _} _ fr (Q , hk , le)) = adrift fr cl (let (Q′ , _ , _ , h , u , le′) = peel-take hk in Q′ , h-take h u , ⊑-trans le le′)
   run-stop _ (settled {N = lane _ _ _} _ fr (_ , _ , () , _))

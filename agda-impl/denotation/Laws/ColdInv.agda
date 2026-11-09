@@ -27,6 +27,7 @@ open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-trans; ≺-ext)
 open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; Anc; self; up; plain; anc-view; parent-fun; step-parent; timed; anc-trans; anc-≼; world-anc⁼; nest-in; ⊕-injˡ; ⊕-injʳ; ⊑-unit; step≢root; timer-after)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
+open import denotation.Simultaneity using (effect-tick)
 
 -- One slot before the next, and before the end.
 slot : ∀ r i → (r ⊕ [ ix i ]) ≺ (r ⊕ [ ix (suc i) ])
@@ -44,10 +45,6 @@ upTo (on-out {k} x)  = k ∷ upTo x
 upTo (on-skip {k} x) = k ∷ upTo x
 
 private
-  tick-snoc : ∀ r {l} → tick (r ⊕ [ l ]) ≡ tick r
-  tick-snoc (frame ∙ _)       = refl
-  tick-snoc (cascade _ _ ∙ _) = refl
-
   step≼ : ∀ a b {y} → a ≺ b → b ≼ y → a ≼ y
   step≼ a b {y} ab by = ≺→≼ {a} {y} (≺-≼-≺ {a} {b} {y} ab by)
 
@@ -98,7 +95,7 @@ private
     close-ok         r rr le done          = tt
     close-ok         r rr le quiet         = tt
     close-ok {τ} {t} r rr le (at t′ le′ _) =
-      subst (_< τ + t′) (sym (tick-snoc r)) (≤-trans (s≤s le) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le′)))
+      subst (_< τ + t′) (sym (effect-tick r _)) (≤-trans (s≤s le) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le′)))
 
     timer-real : ∀ τ {t′} e → Real e → tick e < τ + t′ → Real (cascadeAt (τ + t′) e)
     timer-real τ e re lt = re , lt , tt
@@ -108,7 +105,7 @@ private
     fin-root {r} (w , rr , ri) = inW (step w plain-last) , real-snoc r plain-last rr , r-fin ri
 
     fin-le : ∀ {τ t} r → Real r → tick r ≤ τ + t → tick (r ⊕ [ last ]) ≤ τ + t
-    fin-le {τ} {t} r rr le = subst (_≤ τ + t) (sym (tick-snoc r)) le
+    fin-le {τ} {t} r rr le = subst (_≤ τ + t) (sym (effect-tick r _)) le
 
     -- The frame after a last callback lies past its end.
     fin-ok : ∀ {τ t} r → Real r → tick r ≤ τ + t → (m : From A (suc t)) → FrOk τ ((r ⊕ [ last ]) ⊕ [ last ]) m
@@ -272,7 +269,7 @@ private
       root = here , rp , r-sub
 
       late-ok : ∀ n {le : 0 ≤ suc n} {b : Frame A (suc n)} → FrOk (tick p) (p ⊕ [ last ]) (at (suc n) le b)
-      late-ok n = subst (_< tick p + suc n) (sym (tick-snoc p)) (m<m+n (tick p) (s≤s z≤n))
+      late-ok n = subst (_< tick p + suc n) (sym (effect-tick p _)) (m<m+n (tick p) (s≤s z≤n))
 
       row : ∀ (m : From A 0) {y e} → InE (start p m) y e → Row y e
       row (at zero _ b)      x = row-b (tick p) p 0 b root (m≤m+n (tick p) 0) x
@@ -396,7 +393,7 @@ cold-reach {A} p m rp x = upTo x , λ x′ yq _ → CI.S.pre {A} (λ _ → ⊥) 
 
 -- A burst's end: reachable, at its root's tick.
 fin-ticked : ∀ {τ t} u → Real u → tick u ≤ τ + t → Real (u ⊕ [ last ]) × tick (u ⊕ [ last ]) ≤ τ + t
-fin-ticked {τ} {t} u ru le = real-snoc u plain-last ru , subst (_≤ τ + t) (sym (tick-snoc u)) le
+fin-ticked {τ} {t} u ru le = real-snoc u plain-last ru , subst (_≤ τ + t) (sym (effect-tick u _)) le
 
 -- A last callback's value lies before everything after it.
 fin-lb : ∀ {A t y e′} τ u (m : From A (suc t)) → Real u → tick u ≤ τ + t
@@ -407,4 +404,4 @@ fin-lb {A} {y = y} τ u m ru le x =
 
 -- The next frame's root, past a reachable burst's end.
 next-real : ∀ τ {t′} r → Real r → tick r < τ + t′ → Real (cascadeAt (τ + t′) (r ⊕ [ last ]))
-next-real τ r rr lt = CI.timer-real {⊤} (λ _ → ⊥) (frame ∙ []) τ (r ⊕ [ last ]) (real-snoc r plain-last rr) (subst (_< τ + _) (sym (tick-snoc r)) lt)
+next-real τ r rr lt = CI.timer-real {⊤} (λ _ → ⊥) (frame ∙ []) τ (r ⊕ [ last ]) (real-snoc r plain-last rr) (subst (_< τ + _) (sym (effect-tick r _)) lt)

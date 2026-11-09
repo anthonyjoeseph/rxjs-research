@@ -28,8 +28,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; con
 open import Relation.Nullary using (does; yes; no)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; Timeline; ix; last; _≟ᵖ_)
-open import operation.Key using (Key; at; after; _<ᴷ_)
+open import denotation.Position using (Pos; Path; _∙_; ix; last; _≟ᵖ_; _⊕_)
+open import denotation.Events using (Timeline)
+open import operation.Key using (Key; at; after; never; _<ᴷ_)
 open import operation.PureObservable using (module Machine; due)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS;
                     Conf; ⟨_,_,_,_⟩; plug; dirs; subscribing; absorbed; rising;
@@ -40,13 +41,14 @@ open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLan
 Clock : ∀ {R} → Conf R → Key
 Clock k with Conf.mode k | Machine.next k
 ... | absorbed | just κ  = κ
-... | absorbed | nothing = after []
+... | absorbed | nothing = never
 ... | _        | _       = at (Conf.pos k)
 
 -- A listed position.
 listed : List Pos → Key → Bool
 listed ks (at q)    = any (λ r → does (q ≟ᵖ r)) ks
 listed ks (after _) = false
+listed ks never     = false
 
 -- A pending subscription to `o`, `d` deep.
 syn : ∀ {Γ A} → ℕ → Obs Timeline Γ A → ℕ
@@ -87,13 +89,13 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
   wt d κ = if at P <ᴷ κ then 0 else if listed ks κ then (if C <ᴷ κ then 0 else 4 + 2 * d) else 2 + d
 
   bodyP : ℕ → Maybe Pos → ℕ
-  bodyP d (just p) = wt d (at (p ++ [ ix 1 ])) + (3 + d)
+  bodyP d (just p) = wt d (at (p ⊕ [ ix 1 ])) + (3 + d)
   bodyP d nothing  = 0
 
   -- An of's values still owed and its end.
   ofW : ∀ {A : Set} → ℕ → ℕ → Pos → List A → ℕ
-  ofW d i p []       = wt d (at (p ++ [ last ]))
-  ofW d i p (_ ∷ xs) = wt d (at (p ++ [ ix i ])) + ofW d (suc i) p xs
+  ofW d i p []       = wt d (at (p ⊕ [ last ]))
+  ofW d i p (_ ∷ xs) = wt d (at (p ⊕ [ ix i ])) + ofW d (suc i) p xs
 
   -- A connect's admin marks, owed and pending.
   connW : ∀ {Γ X} → ℕ → CS Γ X → ℕ
@@ -120,7 +122,7 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
     pot d (cutS _ attached s)      = pot (suc d) s
     pot d (lnS _ s)                = pot (suc d) s
     pot d (takeS _ _ free s)       = 2 * (2 + d) + pot (suc d) s
-    pot d (takeS _ _ (cpAt p) s)   = wt d (at (p ++ [ last ])) + (2 + d) + pot (suc d) s
+    pot d (takeS _ _ (cpAt p) s)   = wt d (at (p ⊕ [ last ])) + (2 + d) + pot (suc d) s
     pot d (takeS _ _ (cutAt _) s)  = (2 + d) + pot (suc d) s
     pot d (takeS _ _ (overAt _) s) = pot (suc d) s
     pot d (flatS _ _ _ _ _ _ o ls)   = pot (suc d) o + potL (suc d) ls
@@ -148,7 +150,7 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
   potC (inCut _ attached c)               = potC c
   potC (inLn _ c)                         = potC c
   potC (inTake _ _ free c)                = potC c + 2 * (2 + depth c)
-  potC (inTake _ _ (cpAt p) c)            = potC c + (wt (depth c) (at (p ++ [ last ])) + (2 + depth c))
+  potC (inTake _ _ (cpAt p) c)            = potC c + (wt (depth c) (at (p ⊕ [ last ])) + (2 + depth c))
   potC (inTake _ _ (cutAt _) c)           = potC c + (2 + depth c)
   potC (inTake _ _ (overAt _) c)          = potC c
   potC (inOuter _ _ _ _ _ _ ls c)           = potC c + potL (suc (depth c)) ls
@@ -170,7 +172,7 @@ module Weigh (ks : List Pos) (P : Pos) (C : Key) where
     where a3 : ∀ a b c → a + (b + c) ≡ (a + b) + c
           a3 = solve-∀
   pot-plug (inTake i q (cpAt p) c) s =
-    trans (pot-plug c (takeS i q (cpAt p) s)) (a4 (potC c) (wt (depth c) (at (p ++ [ last ]))) (2 + depth c) (pot (suc (depth c)) s))
+    trans (pot-plug c (takeS i q (cpAt p) s)) (a4 (potC c) (wt (depth c) (at (p ⊕ [ last ]))) (2 + depth c) (pot (suc (depth c)) s))
     where a4 : ∀ a b c d → a + ((b + c) + d) ≡ (a + (b + c)) + d
           a4 = solve-∀
   pot-plug (inTake i q (cutAt x) c) s = trans (pot-plug c (takeS i q (cutAt x) s)) (a3 (potC c) (2 + depth c) (pot (suc (depth c)) s))
@@ -218,10 +220,14 @@ Wᶜ ks P C k = Weigh.pot ks P C 0 (plug (Conf.ctx k) (Conf.foc k)) + climb k
 W : ∀ {R} → List Pos → Pos → Conf R → ℕ
 W ks P k = Wᶜ ks P (Clock k) k
 
--- Each non-empty prefix of a position, itself included.
+-- Each non-empty prefix of a path, itself included.
+prefixesᵗ : Path → List Path
+prefixesᵗ []      = []
+prefixesᵗ (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixesᵗ q)
+
+-- Each prefix of a position below its instant's root, itself included.
 prefixes : Pos → List Pos
-prefixes []      = []
-prefixes (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixes q)
+prefixes (i ∙ q) = mapL (i ∙_) (prefixesᵗ q)
 
 -- Each listed position and its ancestors.
 anc : List Pos → List Pos
@@ -235,12 +241,12 @@ module Mono (ks : List Pos) (P : Pos) (C₁ C₂ : Key)
     module B = Weigh ks P C₂
 
   bodyP-mono : ∀ d m → A.bodyP d m ≤ B.bodyP d m
-  bodyP-mono d (just p) = +-mono-≤ (h d (at (p ++ [ ix 1 ]))) ≤-refl
+  bodyP-mono d (just p) = +-mono-≤ (h d (at (p ⊕ [ ix 1 ]))) ≤-refl
   bodyP-mono d nothing  = z≤n
 
   ofW-mono : ∀ {X : Set} d i p (xs : List X) → A.ofW d i p xs ≤ B.ofW d i p xs
-  ofW-mono d i p []       = h d (at (p ++ [ last ]))
-  ofW-mono d i p (_ ∷ xs) = +-mono-≤ (h d (at (p ++ [ ix i ]))) (ofW-mono d (suc i) p xs)
+  ofW-mono d i p []       = h d (at (p ⊕ [ last ]))
+  ofW-mono d i p (_ ∷ xs) = +-mono-≤ (h d (at (p ⊕ [ ix i ]))) (ofW-mono d (suc i) p xs)
 
   inbox-mono : ∀ {X : Set} d (ib : List (Pos × X)) → A.inbox d ib ≤ B.inbox d ib
   inbox-mono d []             = z≤n
@@ -263,7 +269,7 @@ module Mono (ks : List Pos) (P : Pos) (C₁ C₂ : Key)
     pot-mono d (cutS _ attached s)      = pot-mono (suc d) s
     pot-mono d (lnS _ s)                = pot-mono (suc d) s
     pot-mono d (takeS _ _ free s)       = +-mono-≤ (≤-refl {2 * (2 + d)}) (pot-mono (suc d) s)
-    pot-mono d (takeS _ _ (cpAt p) s)   = +-mono-≤ (+-mono-≤ (h d (at (p ++ [ last ]))) (≤-refl {2 + d})) (pot-mono (suc d) s)
+    pot-mono d (takeS _ _ (cpAt p) s)   = +-mono-≤ (+-mono-≤ (h d (at (p ⊕ [ last ]))) (≤-refl {2 + d})) (pot-mono (suc d) s)
     pot-mono d (takeS _ _ (cutAt _) s)  = +-mono-≤ (≤-refl {2 + d}) (pot-mono (suc d) s)
     pot-mono d (takeS _ _ (overAt _) s) = pot-mono (suc d) s
     pot-mono d (flatS _ _ _ _ _ _ o ls)   = +-mono-≤ (pot-mono (suc d) o) (potL-mono (suc d) ls)
@@ -284,6 +290,9 @@ listed-∈ (r ∷ ks) q e with q ≟ᵖ r
 wt-kept : ∀ ks P {C C′} → (∀ {q} → q ∈ ks → C <ᴷ at q ≡ true → C′ <ᴷ at q ≡ true)
         → ∀ d κ → Weigh.wt ks P C′ d κ ≤ Weigh.wt ks P C d κ
 wt-kept ks P h d (after r) with at P <ᴷ after r
+... | true  = z≤n
+... | false = ≤-refl
+wt-kept ks P h d never with at P <ᴷ never
 ... | true  = z≤n
 ... | false = ≤-refl
 wt-kept ks P {C} {C′} h d (at q) with at P <ᴷ at q

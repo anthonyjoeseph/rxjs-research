@@ -28,17 +28,19 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Properties using (≤-refl; m≤n⇒m<n∨m≡n)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Empty using (⊥)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst) renaming (trans to ≡-trans)
 
-open import denotation.Events using (Pos; ix; last; _<ᵖ_; <ᵖ-part; <ᵖ-trans; <ᵖ-asym; ix-<)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_)
+open import denotation.Events using (<ᵖ-part; <ᵖ-trans; <ᵖ-asym; ix-<)
 open import operation.PureObservable using (module Machine; Tape; play; ending; baseOf; stepOf) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; plug; own; unsub; cut; killAll; unsubIf; off; offL; offIf; ended)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-asym)
+open import operation.Key using (Key; at; after; never; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-asym; at-after)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
-open import adequacy.Stamped using (Ix; ix-⊕; StOK; LOK; QOK; MOK; base-ix)
-open import adequacy.Floor.Keys using (at-after; OwnOf; ob; os; oo; own-cls; own-bld)
+open import adequacy.Stamped using (StOK; LOK; QOK)
+open import adequacy.Floor.Keys using (OwnOf; ob; os; oo; own-cls; own-bld)
 open import adequacy.Apart.Cone using (cone-ge)
 open import adequacy.Apart.Region using (Rg; cn; tl; pt; bk; In; Sep; sep-sym; NoCl; Keyed; self)
 
@@ -56,7 +58,7 @@ attI (attAt p) = [ pt p ]
 
 oweI : Owe → List Rg
 oweI free       = []
-oweI (cpAt p)   = cn (p ++ [ last ]) ∷ pt p ∷ []
+oweI (cpAt p)   = cn (p ⊕ [ last ]) ∷ pt p ∷ []
 oweI (cutAt p)  = [ pt p ]
 oweI (overAt p) = []
 
@@ -65,7 +67,7 @@ mI f (just p) = [ f p ]
 mI f nothing  = []
 
 bodyR : Pos → Rg
-bodyR p = cn (p ++ [ ix 1 ])
+bodyR p = cn (p ⊕ [ ix 1 ])
 
 csI : ∀ {Γ X} → CS Γ X → List Rg
 csI k = mI bodyR (CS.bodyAt k) ++ mI pt (CS.attSrc k) ++ mI pt (CS.owedAt k)
@@ -82,7 +84,7 @@ mutual
   items : ∀ {Γ A} → St Γ A → List Rg
   items (pend o q)              = []
   items (coldS b l)             = tapeI l
-  items (ofS i p [])            = [ cn (p ++ [ last ]) ]
+  items (ofS i p [])            = [ cn (p ⊕ [ last ]) ]
   items (ofS i p (_ ∷ _))       = [ tl p i ]
   items doneS                   = []
   items (mapS f s)              = items s
@@ -293,14 +295,17 @@ mutual
 Covers : List Rg → Key → Set
 Covers L (at y)    = Σ Rg λ R → R ∈ L × In R y
 Covers L (after y) = pt y ∈ L
+Covers L never     = ⊥
 
 covers-l : ∀ L {M} κ → Covers L κ → Covers (L ++ M) κ
 covers-l L (at y)    (R , m , i) = R , ∈-++⁺ˡ m , i
 covers-l L (after y) m           = ∈-++⁺ˡ m
+covers-l L never     ()
 
 covers-r : ∀ L {M} κ → Covers M κ → Covers (L ++ M) κ
 covers-r L (at y)    (R , m , i) = R , ∈-++⁺ʳ L m , i
 covers-r L (after y) m           = ∈-++⁺ʳ L m
+covers-r L never     ()
 
 private
   cs-cover : ∀ {Γ X} (k : CS Γ X) {m κ} → OwnOf k m κ → Covers (csI k) κ
@@ -318,14 +323,14 @@ mutual
   cover (coldS b (ending e))    (k-own (here refl)) = cn e , here refl , self e
   cover (coldS b (ending e))    (k-own (there ()))
   cover (coldS b overT)         (k-own ())
-  cover (ofS i p [])            (k-own (here refl)) = cn (p ++ [ last ]) , here refl , self _
+  cover (ofS i p [])            (k-own (here refl)) = cn (p ⊕ [ last ]) , here refl , self _
   cover (ofS i p (_ ∷ _))       (k-own (here refl)) = tl p i , here refl , inj₁ (i , ≤-refl , self _)
   cover (ofS i p [])            (k-own (there ()))
   cover (ofS i p (_ ∷ _))       (k-own (there ()))
   cover (cutS l (attAt p) s)    (k-own (here refl)) = here refl
   cover (cutS l (attAt p) s)    (k-own (there ()))
   cover (cutS l attached s)     (k-own ())
-  cover (takeS i q (cpAt p) s)  (k-own (here refl)) = cn (p ++ [ last ]) , here refl , self _
+  cover (takeS i q (cpAt p) s)  (k-own (here refl)) = cn (p ⊕ [ last ]) , here refl , self _
   cover (takeS i q (cpAt p) s)  (k-own (there ()))
   cover (takeS i q (cutAt p) s) (k-own (here refl)) = here refl
   cover (takeS i q (cutAt p) s) (k-own (there ()))
@@ -371,35 +376,35 @@ past-of : ∀ {a y} h → a ≼ y → at a <ᴷ h ≡ false → at y <ᴷ h ≡ 
 past-of {a} {y} h (inj₁ ay)   k = ≮ᴷ-trans (at y) (at a) h (≡-trans (at-<ᴷ y a) (<ᵖ-asym a y ay)) k
 past-of         h (inj₂ refl) k = k
 
-cn-keyed : ∀ {r} h → Ix r → at r <ᴷ h ≡ false → Keyed h (cn r)
-cn-keyed h hr k y c = past-of h (cone-ge hr c) k
+cn-keyed : ∀ {r} h → at r <ᴷ h ≡ false → Keyed h (cn r)
+cn-keyed h k y c = past-of h (cone-ge c) k
 
-tl-keyed : ∀ {u i} h → Ix u → at (u ++ [ ix i ]) <ᴷ h ≡ false → Keyed h (tl u i)
-tl-keyed {u} {i} h hu k y (inj₁ (j , le , c)) = past-of {u ++ [ ix i ]} h (≼-trans step (cone-ge (ix-⊕ u _ hu) c)) k
+tl-keyed : ∀ {u i} h → at (u ⊕ [ ix i ]) <ᴷ h ≡ false → Keyed h (tl u i)
+tl-keyed {u} {i} h k y (inj₁ (j , le , c)) = past-of {u ⊕ [ ix i ]} h (≼-trans step (cone-ge c)) k
   where
-    step : (u ++ [ ix i ]) ≼ (u ++ [ ix j ])
+    step : (u ⊕ [ ix i ]) ≼ (u ⊕ [ ix j ])
     step with m≤n⇒m<n∨m≡n le
     ... | inj₁ lt   = inj₁ (<ᵖ-part u [] [] (ix-< lt))
     ... | inj₂ refl = inj₂ refl
-tl-keyed {u} {i} h hu k y (inj₂ c) = past-of {u ++ [ ix i ]} h (≼-trans (inj₁ (<ᵖ-part u {ix i} {last} [] [] refl)) (cone-ge (ix-⊕ u _ hu) c)) k
+tl-keyed {u} {i} h k y (inj₂ c) = past-of {u ⊕ [ ix i ]} h (≼-trans (inj₁ (<ᵖ-part u {ix i} {last} [] [] refl)) (cone-ge c)) k
 
 -- A take's teardown after the end it owes.
-pt-under : ∀ p y h → at (p ++ y) <ᴷ h ≡ false → Keyed h (pt p)
-pt-under p y h k = ≮ᴷ-trans (after p) (at (p ++ y)) h (<ᴷ-asym (at (p ++ y)) (after p) (at-after p y)) k
+pt-under : ∀ p y h → at (p ⊕ y) <ᴷ h ≡ false → Keyed h (pt p)
+pt-under p y h k = ≮ᴷ-trans (after p) (at (p ⊕ y)) h (<ᴷ-asym (at (p ⊕ y)) (after p) (at-after p y)) k
 
 private
   ib-keyed : ∀ {A h} q (e : Ev A) ib → QOK ((q , e) ∷ ib) → at q <ᴷ h ≡ false → All (Keyed h) (ibI ((q , e) ∷ ib))
-  ib-keyed {h = h} q e []               (hq , _ , _)  k = cn-keyed h hq k ∷ []
-  ib-keyed {h = h} q e ((r , e′) ∷ ib) (hq , b , hs) k =
-    cn-keyed h hq k ∷ ib-keyed r e′ ib hs (≮ᴷ-trans (at r) (at q) h (≡-trans (at-<ᴷ r q) b) k)
+  ib-keyed {h = h} q e []               _        k = cn-keyed h k ∷ []
+  ib-keyed {h = h} q e ((r , e′) ∷ ib) (b , hs) k =
+    cn-keyed h k ∷ ib-keyed r e′ ib hs (≮ᴷ-trans (at r) (at q) h (≡-trans (at-<ᴷ r q) b) k)
 
   g-keyed : ∀ {h} g j → All (Keyed h) (gI g j)
   g-keyed true  j = tt ∷ []
   g-keyed false j = []
 
-  body-keyed : ∀ {h} mp → MOK mp → (∀ {p} → mp ≡ just p → at (p ++ [ ix 1 ]) <ᴷ h ≡ false) → All (Keyed h) (mI bodyR mp)
-  body-keyed {h} (just p) hp k = cn-keyed h (ix-⊕ p _ hp) (k refl) ∷ []
-  body-keyed nothing  _  k = []
+  body-keyed : ∀ {h} mp → (∀ {p} → mp ≡ just p → at (p ⊕ [ ix 1 ]) <ᴷ h ≡ false) → All (Keyed h) (mI bodyR mp)
+  body-keyed {h} (just p) k = cn-keyed h (k refl) ∷ []
+  body-keyed nothing      k = []
 
   pt-keyed : ∀ {h} mp → (∀ {p} → mp ≡ just p → after p <ᴷ h ≡ false) → All (Keyed h) (mI pt mp)
   pt-keyed (just p) k = k refl ∷ []
@@ -408,30 +413,30 @@ private
 mutual
   keyed : ∀ {Γ A h} (s : St Γ A) → StOK s → Lo s h → All (Keyed h) (items s)
   keyed (pend o q)                  _ lo = []
-  keyed {h = h} (coldS b (play τ u i t fr)) (hu , _) lo = tl-keyed h (base-ix u fr hu) (lo (k-own (here refl))) ∷ []
-  keyed {h = h} (coldS b (ending e))        he lo = cn-keyed h he (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (coldS b (play τ u i t fr)) _ lo = tl-keyed h (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (coldS b (ending e))        _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []
   keyed (coldS b overT)             _ lo = []
-  keyed {h = h} (ofS i p [])                hp lo = cn-keyed h (ix-⊕ p _ hp) (lo (k-own (here refl))) ∷ []
-  keyed {h = h} (ofS i p (_ ∷ _))           hp lo = tl-keyed h hp (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (ofS i p [])                _ lo = cn-keyed h (lo (k-own (here refl))) ∷ []
+  keyed {h = h} (ofS i p (_ ∷ _))           _ lo = tl-keyed h (lo (k-own (here refl))) ∷ []
   keyed doneS                       _ lo = []
   keyed (mapS f s)                  hs lo = keyed s hs (λ h → lo (k-kid (k-map h)))
   keyed (scanS f z s)               hs lo = keyed s hs (λ h → lo (k-kid (k-scan h)))
-  keyed (cutS l attached s)         (_ , hs) lo = keyed s hs (λ h → lo (k-kid (k-cut h)))
-  keyed (cutS l (attAt p) s)        (_ , hs) lo = lo (k-own (here refl)) ∷ keyed s hs (λ h → lo (k-kid (k-cut h)))
+  keyed (cutS l attached s)         hs lo = keyed s hs (λ h → lo (k-kid (k-cut h)))
+  keyed (cutS l (attAt p) s)        hs lo = lo (k-own (here refl)) ∷ keyed s hs (λ h → lo (k-kid (k-cut h)))
   keyed (lnS b s)                   hs lo = keyed s hs (λ h → lo (k-kid (k-ln h)))
-  keyed (takeS i q free s)          (_ , hs) lo = keyed s hs (λ h → lo (k-kid (k-take h)))
-  keyed {h = h} (takeS i q (cpAt p) s)      (hp , hs) lo =
-    cn-keyed h (ix-⊕ p _ hp) (lo (k-own (here refl))) ∷ pt-under p [ last ] h (lo (k-own (here refl))) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
-  keyed (takeS i q (cutAt p) s)     (_ , hs) lo = lo (k-own (here refl)) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
-  keyed (takeS i q (overAt p) s)    (_ , hs) lo = keyed s hs (λ h → lo (k-kid (k-take h)))
+  keyed (takeS i q free s)          hs lo = keyed s hs (λ h → lo (k-kid (k-take h)))
+  keyed {h = h} (takeS i q (cpAt p) s)      hs lo =
+    cn-keyed h (lo (k-own (here refl))) ∷ pt-under p [ last ] h (lo (k-own (here refl))) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
+  keyed (takeS i q (cutAt p) s)     hs lo = lo (k-own (here refl)) ∷ keyed s hs (λ h → lo (k-kid (k-take h)))
+  keyed (takeS i q (overAt p) s)    hs lo = keyed s hs (λ h → lo (k-kid (k-take h)))
   keyed (flatS op f ω d n q o ls)     (ho , hl) lo = all-++ (keyed o ho (λ h → lo (k-kid (k-outer h)))) (keyedL ls hl (λ m h → lo (k-kid (k-lane m h))))
-  keyed (connS k o b)               ((hb , _ , _) , ho , hb′ , _) lo =
-    all-++ (all-++ (body-keyed (CS.bodyAt k) hb (λ e → lo (k-own (own-bld k {o} {b} (ob e)))))
+  keyed (connS k o b)               (ho , hb′ , _) lo =
+    all-++ (all-++ (body-keyed (CS.bodyAt k) (λ e → lo (k-own (own-bld k {o} {b} (ob e)))))
                    (all-++ (pt-keyed (CS.attSrc k) (λ e → lo (k-own (own-bld k {o} {b} (os e)))))
                            (pt-keyed (CS.owedAt k) (λ e → lo (k-own (own-bld k {o} {b} (oo e)))))))
            (all-++ (keyed o ho (λ h → lo (k-kid (k-src h)))) (keyed b hb′ (λ h → lo (k-kid (k-body h)))))
   keyed (joinS j g x [])            _ lo = g-keyed g j
-  keyed (joinS j g x ((q , e) ∷ ib)) (_ , hq) lo = all-++ (ib-keyed q e ib hq (lo (k-own (here refl)))) (g-keyed g j)
+  keyed (joinS j g x ((q , e) ∷ ib)) hq lo = all-++ (ib-keyed q e ib hq (lo (k-own (here refl)))) (g-keyed g j)
 
   keyedL : ∀ {Γ A h} (ls : List (St Γ A)) → LOK ls → (∀ {s κ} → s ∈ ls → KeyIn s κ → κ <ᴷ h ≡ false) → All (Keyed h) (itemsL ls)
   keyedL []       _        lo = []

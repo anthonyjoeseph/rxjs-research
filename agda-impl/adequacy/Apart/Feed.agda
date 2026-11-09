@@ -10,7 +10,7 @@ module adequacy.Apart.Feed where
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_; map)
-open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++)
+open import Data.List.Properties using (map-++; ++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
@@ -23,10 +23,9 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (_,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Events using (Pos; last; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.Position using (Pos; last; _<ᵖ_; _⊕_) renaming (sub to subᴾ)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; CS; Ev; nx; cp; plug; feed; feedL; inbox; queued; same?)
-open import adequacy.Stamped using (Ix)
 open import adequacy.Apart.Cone using (cone-apart)
 open import adequacy.Apart.Region using (Rg; cn; bk; cl; Sep; Sub)
 open import adequacy.Apart.Items using (items; itemsL; ibI; attI; oweI; csI; lhs; plug-items; ap-⊆)
@@ -37,8 +36,8 @@ open import adequacy.Apart.Kit using (W; grow; pull; sub-child; none)
 
 -- What a joiner joined at `j` is newly owed for a step at `p`.
 newR : ∀ {A} → Pos → Pos → Ev A → List Rg
-newR j p (nx a) = if j <ᵖ p then [ cn (p ++ [ subᴾ j ]) ] else []
-newR j p cp     = [ cn (if j <ᵖ p then p ++ [ subᴾ j ] else j ++ [ last ]) ]
+newR j p (nx a) = if j <ᵖ p then [ cn (p ⊕ [ subᴾ j ]) ] else []
+newR j p cp     = [ cn (if j <ᵖ p then p ⊕ [ subᴾ j ] else j ⊕ [ last ]) ]
 
 nw : ∀ {A} → Pos → Ev A → List Pos → List Rg
 nw p e []       = []
@@ -150,7 +149,7 @@ mutual
 module _ (p : Pos) where
   private
     under : Pos → Rg
-    under j = cn (p ++ [ subᴾ j ])
+    under j = cn (p ⊕ [ subᴾ j ])
 
   nw-low : ∀ {A} (e : Ev A) js → All (λ j → j <ᵖ p ≡ true) js → nw p e js ≡ map under js
   nw-low e      []       []         = refl
@@ -158,20 +157,20 @@ module _ (p : Pos) where
   nw-low cp     (j ∷ js) (lt ∷ lts) rewrite lt = cong (under j ∷_) (nw-low cp js lts)
 
   -- Joiners at distinct positions, owed apart.
-  apart : Ix p → ∀ js → AllPairs Sep (map bk js) → AllPairs Sep (map under js)
-  apart hp []       []         = []
-  apart hp (j ∷ js) (hj ∷ hjs) = row js hj ∷ apart hp js hjs
+  apart : ∀ js → AllPairs Sep (map bk js) → AllPairs Sep (map under js)
+  apart []       []         = []
+  apart (j ∷ js) (hj ∷ hjs) = row js hj ∷ apart js hjs
     where
       row : ∀ js → All (Sep (bk j)) (map bk js) → All (Sep (under j)) (map under js)
       row []        []          = []
-      row (j′ ∷ js) (h ∷ hs) = ((λ y c c′ → cone-apart hp ne c c′) , (λ y c c′ → cone-apart hp (λ e → ne (sym e)) c c′)) ∷ row js hs
+      row (j′ ∷ js) (h ∷ hs) = ((λ y c c′ → cone-apart ne c c′) , (λ y c c′ → cone-apart (λ e → ne (sym e)) c c′)) ∷ row js hs
         where
           ne : subᴾ j ≡ subᴾ j′ → ⊥
           ne refl = proj₁ h refl
 
-  inside : Ix p → ∀ js → All (λ n → Sub n (cl p)) (map under js)
-  inside hp []       = []
-  inside hp (j ∷ js) = sub-child (subᴾ j) hp ∷ inside hp js
+  inside : ∀ js → All (λ n → Sub n (cl p)) (map under js)
+  inside []       = []
+  inside (j ∷ js) = sub-child (subᴾ j) ∷ inside js
 
   lows : ∀ js → All (Sep (cl p)) (map bk js) → All (λ j → j <ᵖ p ≡ true) js
   lows []       []       = []
@@ -180,14 +179,14 @@ module _ (p : Pos) where
 ------------------------------------------------------------------------
 -- The feed
 
-feed-ap : ∀ {R Γ X B} (c : Ctx R Γ B) (k k′ : CS Γ X) (s : St Γ X) (b : St (X ∷ Γ) B) {p} (e : Ev X) → Ix p
+feed-ap : ∀ {R Γ X B} (c : Ctx R Γ B) (k k′ : CS Γ X) (s : St Γ X) (b : St (X ∷ Γ) B) {p} (e : Ev X)
         → csI k′ ≡ csI k → W c (connS k s b) [ cl p ] → W c (connS k′ s (feed (here refl) p e b)) []
-feed-ap c k k′ s b {p} e hp ek h@(hcl ∷ hL) =
+feed-ap c k k′ s b {p} e ek h@(hcl ∷ hL) =
   grow c {t = connS k s b} {t′ = connS k′ s (feed (here refl) p e b)} p [] fresh [] (items (connS k s b)) ↭-refl perm
-    (inside p hp js) (apart p hp js (ap-⊆ sub hL)) h
+    (inside p js) (apart p js (ap-⊆ sub hL)) h
   where
     js = joiners (here refl) b
-    fresh = map (λ j → cn (p ++ [ subᴾ j ])) js
+    fresh = map (λ j → cn (p ⊕ [ subᴾ j ])) js
     L = items (plug c (connS k s b))
 
     sub : map bk js ⊆ L

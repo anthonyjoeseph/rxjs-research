@@ -39,7 +39,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
-open import denotation.Events using (Pos; ix; _≟ᵖ_; <ᵖ-step)
+open import denotation.Position using (Pos; ix; _≟ᵖ_; _⊕_)
+open import denotation.Events using (<ᵖ-step)
 open import denotation.EmissionSet using (Ev; pin; EmissionSet; _≺_; _≼_; Few; Reach; Truncate; DeferT; guard; body; Den; enter)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≼-or-≻)
 open import denotation.Laws.Worlds using (Shows; _⊑_; ⊑-refl; ⊑-≼; ⊑-cmp; conv)
@@ -218,11 +219,11 @@ sk-left {A} {n} {X} {K} Bad few-bad sub tgt {v} fc = em yes no
 -- A fan
 
 -- A trunk `O` and branches, each past its root `s` and rooted at the trunk
--- row `s ++ [ ix 0 ]`: a reader few rows into the trunk meets few branches.
+-- row `s ⊕ [ ix 0 ]`: a reader few rows into the trunk meets few branches.
 sk-fan : ∀ {B n} {Y O : EmissionSet B} (Br : Pos → EmissionSet B)
        → O ⊆ᵖ Y → (∀ {s} → Br s ⊆ᵖ Y)
        → (∀ {q e} → Y q e → ¬ ¬ (Σ (Ev B) (O q) ⊎ Σ Pos λ s → Σ (Ev B) (Br s q)))
-       → (∀ {s y e} → Br s y e → s ≺ y × Σ (Ev B) (O (s ++ [ ix 0 ])))
+       → (∀ {s y e} → Br s y e → s ≺ y × Σ (Ev B) (O (s ⊕ [ ix 0 ])))
        → ShowsK n O → (∀ s → ShowsK n (Br s)) → ShowsK n Y
 sk-fan {B} {n} {Y} {O} Br so sb c root sko skb {v} (ks , le , h) ¬f =
   sko (ks , le , λ {w} x f wv → cov-stable λ ¬c → reach f (≺→≼ {w} {v} wv) λ fy → so x λ { (_ , y) → ¬c (h y fy wv) })
@@ -248,7 +249,7 @@ sk-fan {B} {n} {Y} {O} Br so sb c root sko skb {v} (ks , le , h) ¬f =
           { (inj₁ (_ , x))     → ¬z (_ , here x)
           ; (inj₂ (s , _ , b)) → ¬z (_ , there (map⁺ (Any.map (λ { refl → b }) (at s (≺-trans {s} {y} {u} (proj₁ (root b)) yu) (proj₂ (proj₂ (root b))))))) }
           where
-            at : ∀ s → s ≺ u → ∀ {e′} → O (s ++ [ ix 0 ]) e′ → s ∈ cover u os
+            at : ∀ s → s ≺ u → ∀ {e′} → O (s ⊕ [ ix 0 ]) e′ → s ∈ cover u os
             at s su o₀ with child {s} {u} (ix 0) su
             ... | inj₁ su′ = cov-∈ {u} {os} (inj₁ su′)
             ... | inj₂ lt  = cov-∈ {u} {os} (inj₂ (lead-∈ ([ ix 0 ] , refl) (ho o₀ lt)))
@@ -267,7 +268,7 @@ sk-fan {B} {n} {Y} {O} Br so sb c root sko skb {v} (ks , le , h) ¬f =
 
 -- `y` is `z`, or its first child.
 Step : Pos → Pos → Set
-Step z y = y ≡ z ⊎ y ≡ z ++ [ ix 0 ]
+Step z y = y ≡ z ⊎ y ≡ z ⊕ [ ix 0 ]
 
 step-⊑ : ∀ {z y} → Step z y → z ⊑ y
 step-⊑ {z} (inj₁ refl) = ⊑-refl z
@@ -277,15 +278,15 @@ step-⊑     (inj₂ refl) = [ ix 0 ] , refl
 step-order : ∀ {z y z′ y′} → Step z y → Step z′ y′ → y′ ≺ y → z′ ≼ z
 step-order {z} {y} {z′} {y′} st st′ lt zz′ with st
 ... | inj₁ refl = ≺-absurd {z} {z′} zz′ (≼-≺-≺ {z′} {y′} {z} (⊑-≼ (step-⊑ st′)) lt)
-... | inj₂ refl = subst T (<ᵖ-step z z′ (Equivalence.to T-≡ zz′)) (≼-≺-≺ {z′} {y′} {z ++ [ ix 0 ]} (⊑-≼ (step-⊑ st′)) lt)
+... | inj₂ refl = subst T (<ᵖ-step z z′ (Equivalence.to T-≡ zz′)) (≼-≺-≺ {z′} {y′} {z ⊕ [ ix 0 ]} (⊑-≼ (step-⊑ st′)) lt)
 
 steps : List Pos → List Pos
-steps = L.concatMap λ z → z ∷ (z ++ [ ix 0 ]) ∷ []
+steps = L.concatMap λ z → z ∷ (z ⊕ [ ix 0 ]) ∷ []
 
 step-∈ : ∀ {z y zs} → Step z y → z ∈ zs → y ∈ steps zs
 step-∈ (inj₁ refl) (here refl) = here refl
 step-∈ (inj₂ refl) (here refl) = there (here refl)
-step-∈ {zs = z′ ∷ zs} st (there m) = ∈-++⁺ʳ (z′ ∷ (z′ ++ [ ix 0 ]) ∷ []) (step-∈ st m)
+step-∈ {zs = z′ ∷ zs} st (there m) = ∈-++⁺ʳ (z′ ∷ (z′ ⊕ [ ix 0 ]) ∷ []) (step-∈ st m)
 
 -- Each row moved at most one step down.
 sk-step : ∀ {A B n} {Y : EmissionSet A} {X : EmissionSet B}
@@ -329,10 +330,10 @@ sk-trunc = sk-closed (λ x ¬t → ¬t (_ , proj₁ x)) λ x f ¬y → ¬y (_ , 
 -- A defer's guard
 
 -- The body's rows past its subscription: the guard spends one position.
-module Guard {A : Set} (s : Den A) (p : Pos) (aft : ∀ {y e} → enter s (p ++ [ ix 1 ]) y e → (p ++ [ ix 1 ]) ≼ y) where
+module Guard {A : Set} (s : Den A) (p : Pos) (aft : ∀ {y e} → enter s (p ⊕ [ ix 1 ]) y e → (p ⊕ [ ix 1 ]) ≼ y) where
   g b₀ : Pos
-  g  = p ++ [ ix 0 ]
-  b₀ = p ++ [ ix 1 ]
+  g  = p ⊕ [ ix 0 ]
+  b₀ = p ⊕ [ ix 1 ]
 
   B : EmissionSet A
   B = enter s b₀

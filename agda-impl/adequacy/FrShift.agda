@@ -21,7 +21,7 @@ open import Data.Unit using (tt)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (EmissionSet; ⟦_⟧; _≺_)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)

@@ -8,7 +8,7 @@ module adequacy.Apart.Rise where
 
 open import Data.Bool using (true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse; null)
-open import Data.List.Properties using (++-assoc; ʳ++-defn; reverse-involutive)
+open import Data.List.Properties using (ʳ++-defn; reverse-involutive; ++-assoc)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.List.Relation.Unary.AllPairs using ([]; _∷_)
 open import Data.List.Relation.Binary.Permutation.Propositional using (_↭_; ↭-refl; ↭-trans; ↭-reflexive)
@@ -22,12 +22,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import Data.Maybe using (nothing)
-open import denotation.Events using (ix; last)
+open import denotation.Position using (ix; last; _⊕_)
 open import operation.PureObservable using (PureObs; module Machine)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; scanS; lnS; cutS; takeS; flatS; connS;
                     CS; cs; Ev; nx; cp; attAt; free; cpAt; cutAt; overAt; closed; alive; killAll; ended; shutAt; settle; absorbed; rising;
                     start; dequeue; admit; rise)
-open import adequacy.Stamped using (Ix)
 open import adequacy.Apart.Cone using () renaming (pre to under)
 open import adequacy.Apart.Region using (Rg; cn; pt; cl; sub-refl; sub-down; sub-pt; self)
 open import adequacy.Apart.Items using (items; itemsL; itemsL-++; ended-items; killAll-⊆; csI; mI; bodyR)
@@ -50,79 +49,79 @@ private
 
 module _ {R : Set} where
   -- A lane begun a level down, its cut owed inside the run.
-  start-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → Ix p
+  start-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p
            → W c (flatS op f ω d n q o ls) [ cl p ] → Apart (start c op f ω d n q o ls a p)
-  start-ap c op f ω d n q o ls a p hp h with closed c
+  start-ap c op f ω d n q o ls a p h with closed c
   ... | true  = stay c {t = flatS op f ω d n q o ls} absorbed ⊆-refl h
   ... | false = grow c {t = flatS op f ω d n q o ls} {t′ = flatS op f ω d (suc n) q o (reverse ls ʳ++ lane ∷ [])} p [ cl q′ ] [ pt q′ ] [] (items o ++ itemsL ls)
-                  ↭-refl perm (sub-down (ix 1) hp ∷ sub-pt (under [ ix 1 ]) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
+                  ↭-refl perm (sub-down (ix 1) ∷ sub-pt (under [ ix 1 ]) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
     where
-      q′ = p ++ [ ix 1 ]
+      q′ = p ⊕ [ ix 1 ]
       lane = lnS true (cutS true (attAt q′) (pend (f a) q′))
       perm : items o ++ itemsL (reverse ls ʳ++ lane ∷ []) ↭ pt q′ ∷ items o ++ itemsL ls
       perm rewrite snoc-items ls lane = ↭-trans (↭-reflexive (sym (++-assoc (items o) (itemsL ls) [ pt q′ ]))) (to-front (items o ++ itemsL ls) (pt q′))
 
-  dequeue-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls p → Ix p
+  dequeue-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls p
              → W c (flatS op f ω d n q o ls) [ cl p ] → Apart (dequeue c op f ω d n q o ls p)
-  dequeue-ap c op f ω d n []      o ls p hp h = stay c {t = flatS op f ω d n [] o ls} (settle d n true) ⊆-refl h
-  dequeue-ap c op f ω d n (a ∷ q) o ls p hp h =
-    start-ap c op f ω d n q o ls a p hp (stay c {t = flatS op f ω d n (a ∷ q) o ls} {t′ = flatS op f ω d n q o ls} (rising cp) ⊆-refl h)
+  dequeue-ap c op f ω d n []      o ls p h = stay c {t = flatS op f ω d n [] o ls} (settle d n true) ⊆-refl h
+  dequeue-ap c op f ω d n (a ∷ q) o ls p h =
+    start-ap c op f ω d n q o ls a p (stay c {t = flatS op f ω d n (a ∷ q) o ls} {t′ = flatS op f ω d n q o ls} (rising cp) ⊆-refl h)
 
-  admit-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → Ix p
+  admit-ap : ∀ {Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p
            → W c (flatS op f ω d n q o ls) [ cl p ] → AS (admit c op f ω d n q o ls a p)
-  admit-ap c (mergeᶠ nothing)  f ω d n q o ls a p hp h = start-ap c _ f ω d n q o ls a p hp h
-  admit-ap c (mergeᶠ (just m)) f ω d n q o ls a p hp h with n <ᵇ m
-  ... | true  = start-ap c _ f ω d n q o ls a p hp h
+  admit-ap c (mergeᶠ nothing)  f ω d n q o ls a p h = start-ap c _ f ω d n q o ls a p h
+  admit-ap c (mergeᶠ (just m)) f ω d n q o ls a p h with n <ᵇ m
+  ... | true  = start-ap c _ f ω d n q o ls a p h
   ... | false = quit c {t = flatS (mergeᶠ (just m)) f ω d n q o ls} {t′ = flatS (mergeᶠ (just m)) f ω d n (q ++ [ a ]) o ls} ⊆-refl h
-  admit-ap c switchᶠ           f ω d n q o ls a p hp h with killAll ls | killAll-⊆ ls
-  ... | ls′ , _ | kl = start-ap c switchᶠ f ω d 0 q o ls′ a p hp
+  admit-ap c switchᶠ           f ω d n q o ls a p h with killAll ls | killAll-⊆ ls
+  ... | ls′ , _ | kl = start-ap c switchᶠ f ω d 0 q o ls′ a p
                          (stay c {t = flatS switchᶠ f ω d n q o ls} {t′ = flatS switchᶠ f ω d 0 q o ls′} (rising cp) (⊆-++ (⊆-refl {x = items o}) kl) h)
-  admit-ap c exhaustᶠ          f ω d n q o ls a p hp h with n ≡ᵇ 0
-  ... | true  = start-ap c _ f ω d n q o ls a p hp h
+  admit-ap c exhaustᶠ          f ω d n q o ls a p h with n ≡ᵇ 0
+  ... | true  = start-ap c _ f ω d n q o ls a p h
   ... | false = drop c {t = flatS exhaustᶠ f ω d n q o ls} h
 
-  rise-ap : ∀ {Γ A} (c : Ctx R Γ A) s (e : Ev A) p → Ix p → W c s [ cl p ] → AS (rise c s e p)
-  rise-ap top s (nx a) p hp h = drop top {t = s} h
-  rise-ap top s cp     p hp h = tt
-  rise-ap (inMap f c)    s e      p hp h = h
-  rise-ap (inScan f z c) s (nx a) p hp h = stay c {t = scanS f z s} {t′ = scanS f (f z a) s} (rising (nx (f z a))) ⊆-refl h
-  rise-ap (inScan f z c) s cp     p hp h = h
-  rise-ap (inCut l a c)  s e      p hp h = stay c {t = cutS l a s} (if l then rising e else absorbed) ⊆-refl h
-  rise-ap (inLn b c)     s e      p hp h = h
-  rise-ap (inTake i q free c) s (nx a) p hp h with q a | i
+  rise-ap : ∀ {Γ A} (c : Ctx R Γ A) s (e : Ev A) p → W c s [ cl p ] → AS (rise c s e p)
+  rise-ap top s (nx a) p h = drop top {t = s} h
+  rise-ap top s cp     p h = tt
+  rise-ap (inMap f c)    s e      p h = h
+  rise-ap (inScan f z c) s (nx a) p h = stay c {t = scanS f z s} {t′ = scanS f (f z a) s} (rising (nx (f z a))) ⊆-refl h
+  rise-ap (inScan f z c) s cp     p h = h
+  rise-ap (inCut l a c)  s e      p h = stay c {t = cutS l a s} (if l then rising e else absorbed) ⊆-refl h
+  rise-ap (inLn b c)     s e      p h = h
+  rise-ap (inTake i q free c) s (nx a) p h with q a | i
   ... | true  | _     = h
   ... | false | true  =
-    grow c {t = takeS _ q free s} {t′ = takeS _ q (cpAt p) s} p [ cl (p ++ [ ix 0 ]) ] (cn (p ++ [ last ]) ∷ pt p ∷ []) [] (items s) ↭-refl ↭-refl
-      (sub-down (ix 0) hp ∷ sub-child last hp ∷ sub-pt (self p) ∷ []) ((cl-cn hp refl ∷ cl-up ∷ []) ∷ (cn-up ∷ []) ∷ [] ∷ []) h
+    grow c {t = takeS _ q free s} {t′ = takeS _ q (cpAt p) s} p [ cl (p ⊕ [ ix 0 ]) ] (cn (p ⊕ [ last ]) ∷ pt p ∷ []) [] (items s) ↭-refl ↭-refl
+      (sub-down (ix 0) ∷ sub-child last ∷ sub-pt (self p) ∷ []) ((cl-cn refl ∷ cl-up ∷ []) ∷ (cn-up ∷ []) ∷ [] ∷ []) h
   ... | false | false =
-    grow c {t = takeS _ q free s} {t′ = takeS _ q (cpAt p) s} p [] (cn (p ++ [ last ]) ∷ pt p ∷ []) [] (items s) ↭-refl ↭-refl
-      (sub-child last hp ∷ sub-pt (self p) ∷ []) ((cn-up ∷ []) ∷ [] ∷ []) h
-  rise-ap (inTake i q free c)       s cp p hp h = h
-  rise-ap (inTake i q (cpAt r) c)   s e  p hp h = drop c {t = takeS i q (cpAt r) s} h
-  rise-ap (inTake i q (cutAt r) c)  s e  p hp h = drop c {t = takeS i q (cutAt r) s} h
-  rise-ap (inTake i q (overAt r) c) s e  p hp h = drop c {t = takeS i q (overAt r) s} h
-  rise-ap (inOuter op f ω d n q ls c) o (nx a) p hp h = admit-ap c op f ω d n q o ls a p hp h
-  rise-ap (inOuter op f ω d n q ls c) o cp     p hp h =
+    grow c {t = takeS _ q free s} {t′ = takeS _ q (cpAt p) s} p [] (cn (p ⊕ [ last ]) ∷ pt p ∷ []) [] (items s) ↭-refl ↭-refl
+      (sub-child last ∷ sub-pt (self p) ∷ []) ((cn-up ∷ []) ∷ [] ∷ []) h
+  rise-ap (inTake i q free c)       s cp p h = h
+  rise-ap (inTake i q (cpAt r) c)   s e  p h = drop c {t = takeS i q (cpAt r) s} h
+  rise-ap (inTake i q (cutAt r) c)  s e  p h = drop c {t = takeS i q (cutAt r) s} h
+  rise-ap (inTake i q (overAt r) c) s e  p h = drop c {t = takeS i q (overAt r) s} h
+  rise-ap (inOuter op f ω d n q ls c) o (nx a) p h = admit-ap c op f ω d n q o ls a p h
+  rise-ap (inOuter op f ω d n q ls c) o cp     p h =
     stay c {t = flatS op f ω d n q o ls} {t′ = flatS op f ω true n q o ls} (if d then absorbed else settle true n (null q)) ⊆-refl h
-  rise-ap (inLanes op f ω d n q o pre post c) s (nx b) p hp h with alive s
+  rise-ap (inLanes op f ω d n q o pre post c) s (nx b) p h with alive s
   ... | true  = h
   ... | false = drop c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} h
-  rise-ap (inLanes op f ω d n q o pre post c) s cp     p hp h with alive s
-  ... | true  = dequeue-ap c op f ω d (pred n) q o (pre ʳ++ ended s ∷ post) p hp
+  rise-ap (inLanes op f ω d n q o pre post c) s cp     p h with alive s
+  ... | true  = dequeue-ap c op f ω d (pred n) q o (pre ʳ++ ended s ∷ post) p
                   (stay c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} {t′ = flatS op f ω d (pred n) q o (pre ʳ++ ended s ∷ post)} (rising cp)
                     (⊆-reflexive (cong (items o ++_) (mid-items pre post (ended-items s)))) h)
   ... | false = drop c {t = flatS op f ω d n q o (pre ʳ++ s ∷ post)} h
-  rise-ap (inSrc k b c) s (nx a) p hp h = feed-ap c k k s b (nx a) hp refl h
-  rise-ap (inSrc k b c) s cp     p hp h = feed-ap c k (shutAt p k) s b cp hp (shut k) h
+  rise-ap (inSrc k b c) s (nx a) p h = feed-ap c k k s b (nx a) refl h
+  rise-ap (inSrc k b c) s cp     p h = feed-ap c k (shutAt p k) s b cp (shut k) h
     where
       shut : ∀ k → csI (shutAt p k) ≡ csI k
       shut k with CS.srcLive k
       ... | true  = refl
       ... | false = refl
-  rise-ap (inBody k o c) s (nx b) p hp h with CS.srcLive k
+  rise-ap (inBody k o c) s (nx b) p h with CS.srcLive k
   ... | true  = h
   ... | false = drop c {t = connS k o s} h
-  rise-ap (inBody (cs z true sa ba as ow ca ea sr sc) o c) s cp p hp h =
+  rise-ap (inBody (cs z true sa ba as ow ca ea sr sc) o c) s cp p h =
     grow c {t = connS (cs z true sa ba as ow ca ea sr sc) o s} {t′ = connS (cs z true sa ba as (just p) ca ea sr sc) o s} p [ cl p ] [ pt p ] Ow X
       (owed Bd As Ow Rest) (owed Bd As [ pt p ] Rest) (sub-refl (cl p) ∷ sub-pt (self p) ∷ []) ((cl-pt ∷ []) ∷ [] ∷ []) h
     where
@@ -131,4 +130,4 @@ module _ {R : Set} where
       Ow = mI pt ow
       Rest = items o ++ items s
       X = (Bd ++ As) ++ Rest
-  rise-ap (inBody k@(cs z false sa ba as ow ca ea sr sc) o c) s cp p hp h = drop c {t = connS k o s} h
+  rise-ap (inBody k@(cs z false sa ba as ow ca ea sr sc) o c) s cp p h = drop c {t = connS k o s} h

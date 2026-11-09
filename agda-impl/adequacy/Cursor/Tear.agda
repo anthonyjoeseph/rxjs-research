@@ -4,7 +4,7 @@ module adequacy.Cursor.Tear where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; [_,_]′)
 open import Data.Unit using (⊤; tt)
@@ -12,7 +12,8 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix)
+open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import adequacy.Cursor.Show using (up-id; up-≈; up-map; up-scan; up-take; up-adv; up-∘; up-pre; nofail-up; unkilled-no;
   thru-sub0; upa-adv; upa-of; up-ward; owes-onward; flat-up-outer; flat-up-lane; conn-up-body;
@@ -53,7 +54,7 @@ unbind : ∀ {Γ X B} {k : CS Γ X} {sc} {D} {b : St (X ∷ Γ) B} {β Q} → CS
 unbind refl h = h
 
 -- Past its subscription: through its first child.
-subd-thru0 : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k ++ [ ix 0 ])
+subd-thru0 : ∀ {Γ X} {sc : Scope Γ} {C} {k : CS Γ X} → Subd sc C k → Thru C (CS.connAt k ⊕ [ ix 0 ])
 subd-thru0 {C = C} sd = thru-sub0 C (SubdAt.past sd)
 
 -- An attached source read as far as its reader.

@@ -24,7 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 open import Data.Maybe using (just; nothing)
 
-open import denotation.Events using (Pos; ix)
+open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; ⟦_⟧; MapT; map-out; map-end; map-skip; map-pin; module Scan; _≺_;
   Den; hot; coldAt; DenEnv; shown; heard; ended; late; module TakeWhile; module Connecting;
@@ -285,11 +285,11 @@ husk-owe (h-conn sh hb u oz iz) = h-conn (srch-owe sh) hb u oz iz
 -- A connect's rows before a body row: its body's before it, and its
 -- source's before it.
 conn-reach : ∀ {A B} {r p : Pos} {σ : EmissionSet A} {β : EmissionSet B} {e} → FewBefore σ p → Reach β p e → Reach (Connecting.ConnT r σ β) p e
-conn-reach (ks , fs) (bs , fb) = map (_++ [ ix 0 ]) ks ++ bs , λ
-  { (Connecting.body x)       lt d → ∈-++⁺ʳ (map (_++ [ ix 0 ]) ks) (fb x lt d)
-  ; (Connecting.burst x _)    lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt))
-  ; (Connecting.echo x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt))
-  ; (Connecting.kept x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_++ [ ix 0 ]) (fs x lt)) }
+conn-reach (ks , fs) (bs , fb) = map (_⊕ [ ix 0 ]) ks ++ bs , λ
+  { (Connecting.body x)       lt d → ∈-++⁺ʳ (map (_⊕ [ ix 0 ]) ks) (fb x lt d)
+  ; (Connecting.burst x _)    lt _ → ∈-++⁺ˡ (∈-map⁺ (_⊕ [ ix 0 ]) (fs x lt))
+  ; (Connecting.echo x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_⊕ [ ix 0 ]) (fs x lt))
+  ; (Connecting.kept x _ _ _) lt _ → ∈-++⁺ˡ (∈-map⁺ (_⊕ [ ix 0 ]) (fs x lt)) }
 
 -- A ROW FED TO A PART NO LIVE NODE READS, with no isle in it, keeps
 -- what it still runs: a feed reaches joiners only.
@@ -583,7 +583,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       of : Past.Off p (Frozen k)
       of y v refl = nr (proj₁ (from (alike fz) (y , v))) v
       nhb : ¬ VHot (full (binds (CS.src k) (CS.connAt k) (scopeOf c))) p
-      nhb (inj₁ (_ , (y , _) , v)) = of (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) p _) (sym sc) y) v refl
+      nhb (inj₁ (_ , (y , _) , v)) = of (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ⊕ [ ix 1 ]) p _) (sym sc) y) v refl
       nhb (inj₂ h)                 = nh h
       nr′ : NoRow E′ p
       nr′ y v = let (cy , v′) = from (alike (proj₁ eq)) (y , v) in nb (Sound.rg (Parts.sb pt) (conn-vis cy v′) v′)

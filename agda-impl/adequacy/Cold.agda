@@ -11,7 +11,7 @@ module adequacy.Cold where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_]; _++_)
+open import Data.List using ([]; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (zero; suc; _+_; _≤_; s≤s; z≤n)
@@ -22,8 +22,8 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (cold)
-open import denotation.Events using (Pos; ix; last; tick; Timeline; timelineAt; From; Frame; done; quiet; at; emit; stall; close;
-  Frame∞; From∞; module Frame∞; module From∞; frames; burst; start)
+open import denotation.Position using (Pos; ix; last; tick; _⊕_)
+open import denotation.Events using (Timeline; timelineAt; From; Frame; done; quiet; at; emit; stall; close; Frame∞; From∞; module Frame∞; module From∞; frames; burst; start)
 open import denotation.EmissionSet using (EmissionSet; out; skip; end; _≺_; InE; at-out; at-skip; at-end; on-out; on-skip)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺)
@@ -60,7 +60,7 @@ open-ticked q done             rq = tt
 open-ticked q quiet            rq = tt
 
 -- A frame closed: the next one played past its end.
-rest-ticked : ∀ {A} τ u {t} → Real u → tick u ≤ τ + t → (m : From A (suc t)) → Ticked (rest τ (u ++ [ last ]) m)
+rest-ticked : ∀ {A} τ u {t} → Real u → tick u ≤ τ + t → (m : From A (suc t)) → Ticked (rest τ (u ⊕ [ last ]) m)
 rest-ticked τ u     ru le done             = tt
 rest-ticked τ u     ru le quiet            = tt
 rest-ticked τ u {t} ru le (at t′ le′ _)    =
@@ -136,25 +136,25 @@ cold-nx : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {τ u i t a} {k : Frame A t} {E : Em
         → Sync sc Rg (aft (slotOf u i (emit a k))) (coldS true (onward τ u i t k)) E × E (slotOf u i (emit a k)) (out a)
 cold-nx {τ = τ} {u} {i} {t} {a} {k = k@(emit _ _)} = out-step (λ tk → tk) at-out on-out peel past
   where
-    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ++ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
-    peel at-out     pp = ⊥-elim (≺-irrefl {u ++ [ ix i ]} pp)
+    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ⊕ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
+    peel at-out     pp = ⊥-elim (≺-irrefl {u ⊕ [ ix i ]} pp)
     peel (on-out r) _  = r
 
-    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ++ [ ix i ]) ≺ y
-    past (ru , le) {y} r = ≺-≼-≺ {u ++ [ ix i ]} {u ++ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
+    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ⊕ [ ix i ]) ≺ y
+    past (ru , le) {y} r = ≺-≼-≺ {u ⊕ [ ix i ]} {u ⊕ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
 cold-nx {τ = τ} {u} {i} {t} {a} {k = k@(stall _)} = out-step (λ tk → tk) at-out on-out peel past
   where
-    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ++ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
-    peel at-out     pp = ⊥-elim (≺-irrefl {u ++ [ ix i ]} pp)
+    peel : ∀ {y e} → InE (burst τ u i (emit a k)) y e → (u ⊕ [ ix i ]) ≺ y → InE (burst τ u (suc i) k) y e
+    peel at-out     pp = ⊥-elim (≺-irrefl {u ⊕ [ ix i ]} pp)
     peel (on-out r) _  = r
 
-    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ++ [ ix i ]) ≺ y
-    past (ru , le) {y} r = ≺-≼-≺ {u ++ [ ix i ]} {u ++ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
+    past : Real u × tick u ≤ τ + t → ∀ {y e} → InE (burst τ u (suc i) k) y e → (u ⊕ [ ix i ]) ≺ y
+    past (ru , le) {y} r = ≺-≼-≺ {u ⊕ [ ix i ]} {u ⊕ [ ix (suc i) ]} {y} (slot u i) (burst-lb τ u (suc i) k ru le r)
 cold-nx {τ = τ} {u} {i} {t} {a} {k = close k} =
-  out-step (λ (ru , le) → let (ru′ , le′) = fin-ticked {τ} {t} u ru le in rest-ticked τ (u ++ [ last ]) ru′ le′ (From∞.force k)) at-out into peel past
+  out-step (λ (ru , le) → let (ru′ , le′) = fin-ticked {τ} {t} u ru le in rest-ticked τ (u ⊕ [ last ]) ru′ le′ (From∞.force k)) at-out into peel past
   where
-    p = (u ++ [ last ]) ++ [ ix 0 ]
-    e₂ = (u ++ [ last ]) ++ [ last ]
+    p = (u ⊕ [ last ]) ⊕ [ ix 0 ]
+    e₂ = (u ⊕ [ last ]) ⊕ [ last ]
 
     into : ∀ {y e} → InE (tapeE (rest τ e₂ (From∞.force k))) y e → InE (burst τ u i (emit a (close k))) y e
     into r = on-out (subst (λ ev → InE ev _ _) (rest-frames τ e₂ (From∞.force k)) r)
@@ -209,16 +209,16 @@ stall-into : ∀ {A τ u i t} {k : Frame∞ A t} {y e}
 stall-into r = on-skip r
 
 stall-back : ∀ {A τ u i t} {k : Frame∞ A t} {y e}
-           → InE (tapeE (play τ u i t (stall k))) y e → InE (tapeE (play τ u (suc i) t (Frame∞.force k))) y e ⊎ (y ≡ u ++ [ ix i ] × e ≡ skip)
+           → InE (tapeE (play τ u i t (stall k))) y e → InE (tapeE (play τ u (suc i) t (Frame∞.force k))) y e ⊎ (y ≡ u ⊕ [ ix i ] × e ≡ skip)
 stall-back at-skip     = inj₂ (refl , refl)
 stall-back (on-skip r) = inj₁ r
 
 -- A close: its skip dropped, the next frame on.
 close-into : ∀ {A τ u i t} {k : From∞ A (suc t)} {y e}
-           → InE (tapeE (rest τ (u ++ [ last ]) (From∞.force k))) y e → InE (tapeE (play τ u i t (close k))) y e
-close-into {τ = τ} {u} {k = k} r = on-skip (subst (λ ev → InE ev _ _) (rest-frames τ (u ++ [ last ]) (From∞.force k)) r)
+           → InE (tapeE (rest τ (u ⊕ [ last ]) (From∞.force k))) y e → InE (tapeE (play τ u i t (close k))) y e
+close-into {τ = τ} {u} {k = k} r = on-skip (subst (λ ev → InE ev _ _) (rest-frames τ (u ⊕ [ last ]) (From∞.force k)) r)
 
 close-back : ∀ {A τ u i t} {k : From∞ A (suc t)} {y e}
-           → InE (tapeE (play τ u i t (close k))) y e → InE (tapeE (rest τ (u ++ [ last ]) (From∞.force k))) y e ⊎ (y ≡ u ++ [ ix i ] × e ≡ skip)
+           → InE (tapeE (play τ u i t (close k))) y e → InE (tapeE (rest τ (u ⊕ [ last ]) (From∞.force k))) y e ⊎ (y ≡ u ⊕ [ ix i ] × e ≡ skip)
 close-back                 at-skip     = inj₂ (refl , refl)
-close-back {τ = τ} {u} {k = k} (on-skip r) = inj₁ (subst (λ ev → InE ev _ _) (sym (rest-frames τ (u ++ [ last ]) (From∞.force k))) r)
+close-back {τ = τ} {u} {k = k} (on-skip r) = inj₁ (subst (λ ev → InE ev _ _) (sym (rest-frames τ (u ⊕ [ last ]) (From∞.force k))) r)

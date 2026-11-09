@@ -23,21 +23,22 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Events using (Pos; emit; stall; close)
+open import denotation.Position using (Pos)
+open import denotation.Events using (emit; stall; close)
 open import denotation.EmissionSet using (_≼_)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; attAt; attached; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive;
                     search; found; Stepped; moved; starting; turn; quiet; Poke; gone; leaf)
-open import operation.Key using (Key; at; after; at-<ᴷ)
+open import operation.Key using (Key; at; after; at-<ᴷ; at-after₀)
 open import adequacy.Least using (Lo)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-plug)
 open import adequacy.Path using (Path; []; tau; val; _▸_; _⊑_; ⊑-trans)
 open import adequacy.Weight using (Clock)
 open import adequacy.Apart.Floor using (floor)
 open import adequacy.Floor using (clock-abs; clock-mono)
-open import adequacy.Floor.Keys using (lo-weaken; at-after₀; ⊑-refl)
+open import adequacy.Floor.Keys using (lo-weaken; ⊑-refl)
 open import adequacy.Stamped using (played-val)
 
 ------------------------------------------------------------------------

@@ -21,7 +21,8 @@ open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; ix; inside; inside-++)
+open import denotation.Position using (Pos; ix; inside; _⊕_; Path)
+open import denotation.Events using (inside-++)
 open import denotation.EmissionSet using (EmissionSet; pin; end; _≺_; Reach; module Connecting)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans)
 open import denotation.Laws.Worlds using (ok-step; Hots)
@@ -67,24 +68,24 @@ re-flags fl = record { shut = Flags.shut fl ; unshut = Flags.unshut fl ; torn = 
 
 -- Rows before the slot after a subscription: finitely many.
 Slot : ∀ {Γ X} → CS Γ X → Set
-Slot k = Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → y ≺ (CS.connAt k ++ [ ix 2 ]) → y ∈ ks
+Slot k = Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → y ≺ (CS.connAt k ⊕ [ ix 2 ]) → y ∈ ks
 
 -- A source in step up to its attach: finitely many of its rows before
 -- the slot after its subscribe call.
 att-rows : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → Sync sc Rg C o (Frozen k) → Behind C (Frozen k) → Subd sc C k
-         → Lo o (after (CS.connAt k ++ [ ix 1 ])) → Slot k
-att-rows {C = C} {k = k} sy bh sd lo with subd-env {k = k} {p = CS.connAt k ++ [ ix 2 ]} sd (≼-refl {CS.connAt k ++ [ ix 2 ]})
+         → Lo o (after (CS.connAt k ⊕ [ ix 1 ])) → Slot k
+att-rows {C = C} {k = k} sy bh sd lo with subd-env {k = k} {p = CS.connAt k ⊕ [ ix 2 ]} sd (≼-refl {CS.connAt k ⊕ [ ix 2 ]})
 ... | env , envl = before {C = C} {E = Frozen k} bh (few sy env envl (lo-att lo))
 
 -- An ended one: likewise, through what its husk still runs.
 islec-rows : ∀ {Γ X} {sc : Scope Γ} {Ci D} {k : CS Γ X} {o P} → TailP Ci (Frozen k) P → Husk sc D o (Frozen k) P → Behind Ci (Frozen k)
-           → Lo o (after (CS.connAt k ++ [ ix 1 ])) → Slot k
+           → Lo o (after (CS.connAt k ⊕ [ ix 1 ])) → Slot k
 islec-rows {Ci = Ci} {k = k} tp hk bh lo = before {C = Ci} {E = Frozen k} bh (tailp-lag {C = Ci} tp (husk-f hk (lo-att lo)))
 
 -- Finitely many of its rows inside its subscribe call.
 att-fin : ∀ {Γ X} {sc : Scope Γ} {Rg C} {k : CS Γ X} {o} → Sync sc Rg C o (Frozen k) → Behind C (Frozen k) → Subd sc C k
-        → Lo o (after (CS.connAt k ++ [ ix 1 ]))
-        → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ ks
+        → Lo o (after (CS.connAt k ⊕ [ ix 1 ]))
+        → Σ (List Pos) λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ⊕ [ ix 1 ]) y) → y ∈ ks
 att-fin {k = k} sy bh sd lo with att-rows {k = k} sy bh sd lo
 ... | ks , f = ks , λ x i → f x (in-slot (CS.connAt k) _ i)
 
@@ -98,29 +99,29 @@ isle-up {k = k} {Ci} {D₁} {D} {E} dm ic (ks , f) bu nr = upa (λ t → lift (d
   where
     c = CS.connAt k
     lift : ∀ {y r} → Thru Ci r → T (inside r y) → Frozen k y (pin r) → Reach (Frozen k) y (pin r)
-         → Σ Pos λ xs → Σ Pos λ r′ → Thru D r′ × T (inside r′ (y ++ xs)) × E (y ++ xs) (pin r′) × Reach E (y ++ xs) (pin r′)
+         → Σ Path λ xs → Σ Pos λ r′ → Thru D r′ × T (inside r′ (y ⊕ xs)) × E (y ⊕ xs) (pin r′) × Reach E (y ⊕ xs) (pin r′)
            × All (_≡ ix 0) xs
-    lift {y} {r} t i x rc with inside (c ++ [ ix 1 ]) y in iw
+    lift {y} {r} t i x rc with inside (c ⊕ [ ix 1 ]) y in iw
     ... | false =
       let (rc′ , x′ , q) = BurstsAt.kept bu x (λ t′ → subst T iw t′) i (ic t) rc
       in [ ix 0 ] , r , thru-dn D {r} {c} rc′ nr
        , Equivalence.from T-≡ (inside-++ r y [ ix 0 ] (Equivalence.to T-≡ i)) , x′ , q , refl ∷ []ᴬ
     ... | true  =
       let iw′ = subst T (sym iw) tt
-          (x′ , rc′) = BurstsAt.win bu x iw′ (ks , λ {k′} x″ lt → f x″ (≺-trans {k′} {y} {c ++ [ ix 2 ]} lt (in-slot c y iw′)))
+          (x′ , rc′) = BurstsAt.win bu x iw′ (ks , λ {k′} x″ lt → f x″ (≺-trans {k′} {y} {c ⊕ [ ix 2 ]} lt (in-slot c y iw′)))
       in [ ix 0 ] , c , nr , in-call c y iw′ , x′ , rc′ , refl ∷ []ᴬ
 
 -- An isle's reader is past wherever its parent is, at a hot of its
 -- scope: the parent is past the subscription's first slot, a hot is in
 -- no slot's world, so it is past the call.
-isle-onward : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {Ci D₁ D} → Subd sc Ci k → InCall Ci k → Thru D (CS.connAt k ++ [ ix 0 ]) → Dom Ci D₁
+isle-onward : ∀ {Γ X} {sc : Scope Γ} {k : CS Γ X} {Ci D₁ D} → Subd sc Ci k → InCall Ci k → Thru D (CS.connAt k ⊕ [ ix 0 ]) → Dom Ci D₁
             → ∀ {c} → Hots (full sc) c → Onward D c → Onward D₁ c
 isle-onward {k = k} {Ci} sd ic nr dm hc on {r} t = call-onward {r = CS.connAt k} Ci ic (proj₂ (SubdAt.hok sd)) hc (on nr) {r} (dm t)
 
 -- Attached now: already, or its attach owed just after its `ix 1`.
 att-now : ∀ {Γ X} {cl sl p ow cx ea sr sc y} sa
         → AttFin (cs {Γ} {X} cl sl sa p (just y) ow cx ea sr sc) → (T (not sa) → AttOwed (cs {Γ} {X} cl sl sa p (just y) ow cx ea sr sc))
-        → (y ≡ cx ++ [ ix 1 ] → AttFin (cs {Γ} {X} cl sl true p nothing ow cx ea sr sc)) → AttFin (cs {Γ} {X} cl sl true p nothing ow cx ea sr sc)
+        → (y ≡ cx ⊕ [ ix 1 ] → AttFin (cs {Γ} {X} cl sl true p nothing ow cx ea sr sc)) → AttFin (cs {Γ} {X} cl sl true p nothing ow cx ea sr sc)
 att-now true  af _  _ = af
 att-now false _  ao f with ao tt
 ... | inj₁ refl     = f refl
@@ -130,7 +131,7 @@ att-now false _  ao f with ao tt
 -- passed, or neither and passed.
 held-in : ∀ {Γ X} {Ci} {k : CS Γ X} {P : Pts} {bs fs ps : List Pos}
         → (∀ {y e} → Frozen k y e → ¬ Owes Ci y → y ∈ bs)
-        → (∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ fs)
+        → (∀ {y e} → Frozen k y e → T (inside (CS.connAt k ⊕ [ ix 1 ]) y) → y ∈ fs)
         → (∀ {y r} → Frozen k y (pin r) → Owes Ci y → ¬ Owes Ci r → P y ⊎ y ∈ ps)
         → ∀ {k′ e} → Frozen k k′ e → Held Ci k k′ e → P k′ ⊎ k′ ∈ bs ++ fs ++ ps
 held-in {Ci = Ci} {bs = bs} {fs} bf ff pf {k′} x h with owes? Ci k′
@@ -141,7 +142,7 @@ held-in {Ci = Ci} {bs = bs} {fs} bf ff pf {k′} x h with owes? Ci k′
 
 -- A live isle attaching: its burst in what its source still runs.
 isle-att : ∀ {Γ X} {sc : Scope Γ} {Ri Ci} {k : CS Γ X} {o} (sy : Sync sc Ri Ci o (Frozen k)) → Behind Ci (Frozen k)
-         → Σ (List Pos) (λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ++ [ ix 1 ]) y) → y ∈ ks)
+         → Σ (List Pos) (λ ks → ∀ {y e} → Frozen k y e → T (inside (CS.connAt k ⊕ [ ix 1 ]) y) → y ∈ ks)
          → (λ k′ → Σ _ λ e → Frozen k k′ e × Held Ci k k′ e) ⊑ proj₁ (husk-of sy)
 isle-att {Ci = Ci} {k = k} sy (bs , bf) (fs , ff) with pin-tail sy
 ... | ptl ps pf = bs ++ fs ++ ps , λ (_ , x , h) → held-in {Ci = Ci} {k = k} bf ff pf x h
@@ -162,12 +163,12 @@ srch-att bb lo (sh-dead hk u _ pz) with unsubIf-husk bb hk
 srch-att {D = D} {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} bb lo (sh-isle na nc sy bh sd ss (inj₁ refl) ic bu nr) with unsubIf-husk bb (proj₂ (husk-of sy))
 ... | _ , h , le = _ , sh-dead h (isle-up {k = k} (λ t → t) ic (att-rows {k = k} sy bh sd lo) bu (thru-up0 D nr)) (inj₁ tt) (isle-onward {k = k} sd ic nr (λ t → t))
                  , ⊑-trans (under-⊑ (isle-att {k = k} sy bh (att-fin {k = k} sy bh sd lo))) (under-⊑ le)
-  where k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′
+  where k = cs cl sl sa p (just (cx ⊕ [ ix 1 ])) ow cx ea sr sc′
 srch-att bb lo (sh-isle _ _ _ _ _ _ (inj₂ (_ , ())) _ _ _)
 srch-att {D = D} {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} bb lo (sh-islec _ _ _ tp hk dm bh sd (inj₁ refl) ic bu nr) with unsubIf-husk bb hk
 ... | _ , h , le = _ , sh-dead h (isle-up {k = k} dm ic (islec-rows {k = k} tp hk bh lo) bu (thru-up0 D nr)) (inj₁ tt) (isle-onward {k = k} sd ic nr dm)
                  , ⊑-trans (under-⊑ (islec-att {k = k} tp bh)) (under-⊑ le)
-  where k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′
+  where k = cs cl sl sa p (just (cx ⊕ [ ix 1 ])) ow cx ea sr sc′
 srch-att bb lo (sh-islec _ _ _ _ _ _ _ _ (inj₂ (_ , ())) _ _ _)
 srch-att bb lo (sh-pend _ _ _ () _ _ _ _ _ _ _)
 
@@ -176,11 +177,11 @@ src-att : ∀ {Γ X} {sc : Scope Γ} {Rg C} {cl sl sa p ow cx ea sr sc′} {y} {
         → Lo o (after y) → Src sc Rg C (cs cl sl sa p (just y) ow cx ea sr sc′) o → Src sc Rg C (cs cl sl true p nothing ow cx ea sr sc′) o
 src-att lo (src-pend _ _ _ () _ _ _ _ _)
 src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-on nc sy bh sd af ao _ lv) =
-  src-on nc sy bh sd (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af ao λ { refl → λ _ → att-fin {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} sy bh sd lo }) (λ ()) (λ ()) lv
+  src-on nc sy bh sd (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af ao λ { refl → λ _ → att-fin {k = cs cl sl sa p (just (cx ⊕ [ ix 1 ])) ow cx ea sr sc′} sy bh sd lo }) (λ ()) (λ ()) lv
 src-att {cl = cl} {sl} {sa} {p} {ow} {cx} {ea} {sr} {sc′} lo (src-shut cl′ sp tp hk dm bh sd ic af lv) =
   src-shut cl′ sp tp hk dm bh sd (λ ())
     (att-now {cl = cl} {sl} {p} {ow} {cx} {ea} {sr} {sc′} sa af (λ na → proj₁ (ic na))
-      λ { refl → λ _ → let (ks , f) = islec-rows {k = cs cl sl sa p (just (cx ++ [ ix 1 ])) ow cx ea sr sc′} tp hk bh lo
+      λ { refl → λ _ → let (ks , f) = islec-rows {k = cs cl sl sa p (just (cx ⊕ [ ix 1 ])) ow cx ea sr sc′} tp hk bh lo
                        in ks , λ x i → f x (in-slot cx _ i) }) lv
 
 -- A torn connect's source, attached and stopped.
@@ -241,11 +242,11 @@ owed-tl {C = C} {k = k} {β = β} {Ps = Ps} {P′} {q} sy sb qe nq (ks , fs) (ls
 -- A body's run finds no attach owed in it: the body's every attach is
 -- keyed after its own run, and no mark of the tree is keyed before it.
 body-noisle : ∀ {R Γ A X} (c : Ctx R Γ A) {k : CS Γ X} {o : St Γ X} {b : St (X ∷ Γ) A} {p}
-            → StOK (connS k o b) → G (connS k o b) → CS.bodyAt k ≡ just p → Lo (plug c (connS k o b)) (at (p ++ [ ix 1 ])) → NoIsle b
-body-noisle c {b = b} {p} (_ , _ , hb , _) (_ , ua , _ , gb) e lo = noatt-noisle b hb gb na
+            → StOK (connS k o b) → G (connS k o b) → CS.bodyAt k ≡ just p → Lo (plug c (connS k o b)) (at (p ⊕ [ ix 1 ])) → NoIsle b
+body-noisle c {b = b} {p} (_ , hb , _) (_ , ua , _ , gb) e lo = noatt-noisle b hb gb na
   where
     na : NoAttB b
-    na a = at-after-≮ (p ++ [ ix 1 ]) _ (proj₂ (ua a) e) (lo (plug-in c (k-kid (k-body (att-key a)))))
+    na a = at-after-≮ (p ⊕ [ ix 1 ]) _ (proj₂ (ua a) e) (lo (plug-in c (k-kid (k-body (att-key a)))))
 
 or-right : ∀ a {b} → T (not a) → T (a ∨ b) → T b
 or-right false _ t = t
@@ -309,18 +310,18 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- not yet subscribed, an isle born at its own cursor there; otherwise
   -- what it was.
   unread-body : ∀ {Cr C D Db Γ X B} {c : Ctx R Γ B} {cl sl sa p as ow cx ea sr sc} {o₀ q} {b : St (X ∷ Γ) B} {E β : EmissionSet B} {P Ps Qb}
-              → Unread Rt Cr C D E β c (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) P
+              → Unread Rt Cr C D E β c (cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc) P
               → SrcH (scopeOf c) D (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) E Ps
               → Husk (binds sr cx sc) Db b β Qb → Up Db β D E → P ⊑ (Ps ∪ᵖ Qb) → NoIsle b
               → Open (cs cl sl sa (just p) as ow cx ea sr sc) Db → InScope (cs cl sl sa (just p) as ow cx ea sr sc) (scopeOf c)
-              → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
+              → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ⊕ [ ix 1 ] ⟩
   unread-body {Cr} {C} {cl = cl} {sl} {sa} {p} {as} {ow} {cx} {ea} {sr} {sc} un (sh-pend na nc refl _ scp (ok , adm) pe wn ss bu nr) hb ub le nb oz iz =
-    Cr , bef (cx ++ [ ix 1 ]) ,
-    pending (f-isle un hb ub le na nc (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok) ss (inj₁ refl)
-                    (owes-call {k = k} (bef (cx ++ [ ix 1 ])) (≼-refl {cx ++ [ ix 1 ]})) bu nr nb oz iz)
-            (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
+    Cr , bef (cx ⊕ [ ix 1 ]) ,
+    pending (f-isle un hb ub le na nc (behind-pend {C = bef (cx ⊕ [ ix 1 ])} {k = k} scp (ok , adm) (≼-refl {cx ⊕ [ ix 1 ]})) (subd (λ o → o) ok) ss (inj₁ refl)
+                    (owes-call {k = k} (bef (cx ⊕ [ ix 1 ])) (≼-refl {cx ⊕ [ ix 1 ]})) bu nr nb oz iz)
+            (≼-refl {cx ⊕ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent ≃-refl
-    where k = cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc
+    where k = cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc
   unread-body un (sh-dead (h-blank () _) _ _ _) hb ub le nb _ _
   unread-body un (sh-isle _ _ sy _ _ _ _ _ _ _) hb ub le nb _ _ = ⊥-elim (sync-pend tt sy)
   unread-body un (sh-islec _ _ _ _ (h-blank () _) _ _ _ _ _ _ _) hb ub le nb _ _
@@ -330,9 +331,9 @@ module _ {R : Set} (Rt : EmissionSet R) where
   -- tree's least; an ended one is left to its husk; a torn-down one, or
   -- one in a part no live node reads, is `unread-body`'s.
   con-body : ∀ {Cr C Γ X B} {c : Ctx R Γ B} {cl sl sa p as ow cx ea sr sc} {o₀ q} {b : St (X ∷ Γ) B} {r}
-           → NoIsle b → Lo (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b)) (at (p ++ [ ix 1 ]))
+           → NoIsle b → Lo (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b)) (at (p ⊕ [ ix 1 ]))
            → Inv Rt Cr C ⟨ c , connS (cs cl sl sa (just p) as ow cx ea sr sc) (pend o₀ q) b , absorbed , r ⟩
-           → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ++ [ ix 1 ] ⟩
+           → Ran Cr ⟨ inSrc (cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc) b c , pend o₀ q , subscribing , p ⊕ [ ix 1 ] ⟩
   con-body {sl = true} {cx = cx} nb lo (settled {N = owes} c-abs fr sy@(s-conn scp pt bs bb ss tn fl eq)) with ss tt
   ... | src-on _ sy′ _ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ... | src-shut _ _ _ (h-blank () _) _ _ _ _ _ _
@@ -341,11 +342,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ...     | src-on _ sy′ _ _ _ _ _ _ = ⊥-elim (sync-pend tt sy′)
   ...     | src-shut cl′ _ _ _ _ _ _ _ _ _ = ⊥-elim (notT _ nc₀ cl′)
   ...     | src-pend {k = k} na nc refl _ (ok , adm) pe wn _ _ =
-    Cr′ , bef (cx ++ [ ix 1 ]) ,
+    Cr′ , bef (cx ⊕ [ ix 1 ]) ,
     pending (f-src fr′ scp′ (re-parts refl refl pt′) tt nc (bs′ tt) (bb′ tt) (re-flags fl′) ≈-refl eq′
-                   (behind-pend {C = bef (cx ++ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ++ [ ix 1 ]})) (subd (λ o → o) ok)
-                   (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₁ refl) (λ _ → owes-call {k = k} (bef (cx ++ [ ix 1 ])) (≼-refl {cx ++ [ ix 1 ]})) nb)
-            (≼-refl {cx ++ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
+                   (behind-pend {C = bef (cx ⊕ [ ix 1 ])} {k = k} scp′ (ok , adm) (≼-refl {cx ⊕ [ ix 1 ]})) (subd (λ o → o) ok)
+                   (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₁ refl) (λ _ → owes-call {k = k} (bef (cx ⊕ [ ix 1 ])) (≼-refl {cx ⊕ [ ix 1 ]})) nb)
+            (≼-refl {cx ⊕ [ ix 1 ]} , ok-step cx ok , adm , pe , wn) ,
     silent (vis-≃ d)
   con-body {sl = false} nb lo (settled {N = owes} c-abs fr (s-conn scp pt bs _ ss tn fl eq)) =
     unread-body (un-torn fr scp (re-parts refl refl pt) tt (re-flags fl) eq (Torn.tl (tn tt)) (Torn.dom (tn tt))) (Torn.sh (tn tt)) (Torn.bh (tn tt)) (Torn.bu (tn tt)) ⊑-refl nb (Torn.opn (tn tt)) scp

@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Ctx; St; Mode; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; search; top; found; ofS; cutS; takeS; joinS; connS; coldS)
-open import operation.Key using (at; after; _<ᴷ_)
+open import operation.Key using (at; after; never; _<ᴷ_)
 open import adequacy.Least using (Lo)
 open import adequacy.Stamped using (StOK; NotPend; stamped; plug-ok; unplug; pend-focus)
 open import adequacy.Path using (Path; []; tau; val; _▸_)
@@ -45,10 +45,9 @@ module _ {R : Set} where
 
   -- A STEP KEEPS APART.
   apart-step : ∀ (o : PureObs [] R) {rs k} → Path (load o) rs k → Apart k → Next (step k)
-  apart-step o {k = ⟨ c , s , rising e , p ⟩} pth a with stamped o pth
-  ... | _ , _ , hp , _ = rise-ap c s e p hp a
-  apart-step o {k = ⟨ c , s , subscribing , p ⟩} pth a with stamped o pth | pend-focus o pth
-  ... | _ , _ , hp , _ | o′ , refl = begin-ap c o′ p hp a
+  apart-step o {k = ⟨ c , s , rising e , p ⟩} pth a = rise-ap c s e p a
+  apart-step o {k = ⟨ c , s , subscribing , p ⟩} pth a with pend-focus o pth
+  ... | o′ , refl = begin-ap c o′ p a
   apart-step o {k = ⟨ c , s , absorbed , p ⟩} pth a with stamped o pth | search top (plug c s) in fd
   ... | _ | nothing = tt
   ... | hc , hs , _ | just (found (_ , _ , c′ , s′) m κ) with found-least {t = plug c s} fd | found-plug c s fd | found-mark c s fd
@@ -74,6 +73,7 @@ lo-of c s p (hd ∷ _) {κ} hk = past κ (cover (plug c s) hk)
     past (at y)    (bk _ , _ , ())
     past (at y)    (cl _ , _ , ())
     past (after y) m                 = proj₁ (proj₂ (lookup hd m))
+    past never     ()
 
 -- Mid-run.
 Busy : ∀ {A} → Mode A → Set

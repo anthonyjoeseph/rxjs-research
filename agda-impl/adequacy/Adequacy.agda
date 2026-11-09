@@ -12,7 +12,7 @@ open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Product using (Σ; _×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Events using (Pos; root)
+open import denotation.Position using (Pos; root)
 open import denotation.EmissionSet using (Ev; enter; ⟦_⟧)
 open import operation.PureObservable using (PureObs; module Machine)
 open Machine using (load)

@@ -28,12 +28,13 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (connected)
-open import denotation.Events using (Pos; ix; sub; last; _<ᵖ_; <ᵖ-split; <ᵖ-down; <ᵖ-part; ofᴱ)
+open import denotation.Position using (Pos; ix; sub; last; _<ᵖ_; _⊕_)
+open import denotation.Events using (<ᵖ-split; <ᵖ-down; <ᵖ-part; ofᴱ)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; end; pin; Bare; Unpinned; Dep; Few; Reach; enter; ⟦_⟧; Den; hot;
   coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_; _≼_; Truncate; InE; at-end; at-out; on-out)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; ≺-ext; entered-few)
-open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step; w-deep; snoc≢[])
+open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step)
 open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; Scope; unbound; binds; CS; ofS; ⟨_,_,_,_⟩; scopeOf; closedUp; pend; joinS; subscribing; absorbed;
@@ -98,12 +99,11 @@ open Bind
 bind : ∀ {Γ A} (sc : Scope Γ) (x : A ∈ Γ) → Adm sc → Σ (EmissionSet A) λ t → lookup (full sc) x ≡ hot t × Bind t
 bind (binds o p sc) (here refl) (ok , a) = _ , refl , record { law = lw ; few = fw }
   where
-    s = p ++ [ ix 1 ]
+    s = p ⊕ [ ix 1 ]
     I = inv-⟦⟧ o (full sc) (good-full sc a) s (ok-step p ok)
     lw : Lawful (Proper (pendRows (full sc) o s))
     lw = record { real = λ x → InvAt.real I (proj₁ x) ; func = λ x x′ → InvAt.func I (proj₁ x) (proj₁ x′)
-                ; flat = λ x x′ → InvAt.flat I (proj₁ x) (proj₁ x′) ; proper = λ c y → proj₂ y (proj₁ c)
-                ; deep = λ x → w-deep (snoc≢[] p) (InvAt.world I (proj₁ x)) (InvAt.real I (proj₁ x)) (_ , refl) }
+                ; flat = λ x x′ → InvAt.flat I (proj₁ x) (proj₁ x′) ; proper = λ c y → proj₂ y (proj₁ c) }
     fw : ∀ {q e} → Proper (pendRows (full sc) o s) q e → Unpinned e → Few (Proper (pendRows (full sc) o s)) q
     fw r u with entered-few (⟦ o ⟧ (full sc)) s (dep-un u) (proj₁ r)
     ... | ks , h = ks , λ y lt → h (proj₁ y) lt
@@ -117,22 +117,22 @@ bare-un {e = out _} _ = tt
 bare-un {e = skip}  _ = tt
 
 -- Two rows of a lawful hot, a label down in order: in order.
-lower : ∀ {A} {t : EmissionSet A} → Lawful t → ∀ {q k e e′ s} → t q e → t k e′ → (k ++ [ s ]) ≺ (q ++ [ s ]) → k ≺ q
+lower : ∀ {A} {t : EmissionSet A} → Lawful t → ∀ {q k e e′ s} → t q e → t k e′ → (k ⊕ [ s ]) ≺ (q ⊕ [ s ]) → k ≺ q
 lower {t = t} L {q} {k} {e} {e′} {s} x y lt with q <ᵖ k in qk
-... | true  = ⊥-elim (≺-absurd {k ++ [ s ]} {q ++ [ s ]} lt
+... | true  = ⊥-elim (≺-absurd {k ⊕ [ s ]} {q ⊕ [ s ]} lt
                 (Equivalence.from T-≡ (<ᵖ-down q k s s qk (λ l ls eq → Lawful.flat L x (subst (λ z → t z e′) eq y)))))
 ... | false with <ᵖ-split k q qk
 ...   | inj₁ kq   = Equivalence.from T-≡ kq
-...   | inj₂ refl = ⊥-elim (≺-irrefl {k ++ [ s ]} lt)
+...   | inj₂ refl = ⊥-elim (≺-irrefl {k ⊕ [ s ]} lt)
 
 -- A row rejoined from the hot's row at `q`: the hot's rows before `q`.
-row-reach : ∀ {A} {t : EmissionSet A} {j} → Bind t → ∀ {q e₀} → t q e₀ → Few t q → j ≺ q → ∀ {e} → Reach (Rejoin j t) (q ++ [ sub j ]) e
-row-reach {t = t} {j} B {q} x (ks , h) jq {e} = L.map (_++ [ sub j ]) ks , pick
+row-reach : ∀ {A} {t : EmissionSet A} {j} → Bind t → ∀ {q e₀} → t q e₀ → Few t q → j ≺ q → ∀ {e} → Reach (Rejoin j t) (q ⊕ [ sub j ]) e
+row-reach {t = t} {j} B {q} x (ks , h) jq {e} = L.map (_⊕ [ sub j ]) ks , pick
   where
-    pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (q ++ [ sub j ]) → Dep (q ++ [ sub j ]) e k e′ → k ∈ L.map (_++ [ sub j ]) ks
-    pick (shown y _ _)   l _ = ∈-map⁺ (_++ [ sub j ]) (h y (lower (law B) x y l))
-    pick (heard y _)     l _ = ∈-map⁺ (_++ [ sub j ]) (h y (lower (law B) x y l))
-    pick (ended y _)     l _ = ∈-map⁺ (_++ [ sub j ]) (h y (lower (law B) x y l))
+    pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (q ⊕ [ sub j ]) → Dep (q ⊕ [ sub j ]) e k e′ → k ∈ L.map (_⊕ [ sub j ]) ks
+    pick (shown y _ _)   l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
+    pick (heard y _)     l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
+    pick (ended y _)     l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
     pick (late {c} y cj) _ _ = ⊥-elim (≼-trans {q} {c} {j} (Lawful.proper (law B) y x) cj jq)
 
 rejoin-reach : ∀ {A} {t : EmissionSet A} {j} → Bind t → ∀ {q e} → Rejoin j t q e → Visible e → Reach (Rejoin j t) q e
@@ -141,11 +141,11 @@ rejoin-reach B (heard _ _) ()
 rejoin-reach B (ended x jc) _   = row-reach B x (few B x tt) jc {end}
 rejoin-reach {t = t} {j} B (late {c} x cj) _ = [] , pick
   where
-    pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (j ++ [ last ]) → Dep (j ++ [ last ]) end k e′ → k ∈ []
+    pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (j ⊕ [ last ]) → Dep (j ⊕ [ last ]) end k e′ → k ∈ []
     pick (shown {k} y _ jk) _ _ = ⊥-elim (≼-trans {k} {c} {j} (Lawful.proper (law B) x y) cj jk)
     pick (heard {k} y jk)   _ _ = ⊥-elim (≼-trans {k} {c} {j} (Lawful.proper (law B) x y) cj jk)
     pick (ended {k} y jk)   _ _ = ⊥-elim (≼-trans {k} {c} {j} (Lawful.proper (law B) x y) cj jk)
-    pick (late _ _)         l _ = ⊥-elim (≺-irrefl {j ++ [ last ]} l)
+    pick (late _ _)         l _ = ⊥-elim (≺-irrefl {j ⊕ [ last ]} l)
 
 ------------------------------------------------------------------------
 -- A JOINER OF AN ENDED SUBJECT: what it owes is its own end, under
@@ -155,14 +155,14 @@ rejoin-reach {t = t} {j} B (late {c} x cj) _ = [] , pick
 -- A binder's raw end at `c`: the end row its source's entry holds.
 RawEnd : ∀ {Γ A} → Scope Γ → A ∈ Γ → Pos → Set
 RawEnd unbound         ()
-RawEnd (binds o p sc) (here refl) c = pendRows (full sc) o (p ++ [ ix 1 ]) c end
+RawEnd (binds o p sc) (here refl) c = pendRows (full sc) o (p ⊕ [ ix 1 ]) c end
 RawEnd (binds o p sc) (there x)   c = RawEnd sc x c
 
 -- A raw end is its binder's end: none lies before it, an end being no pin.
 bind-end : ∀ {Γ A} (sc : Scope Γ) (x : A ∈ Γ) (adm : Adm sc) → ∀ {c} → RawEnd sc x c → proj₁ (bind sc x adm) c end
 bind-end (binds o p sc) (here refl) (ok , a) r = r , λ r₂ lt → no-pin (proj₁ (proj₂ (InvAt.quiet I r₂ r lt)))
   where
-    I = inv-⟦⟧ o (full sc) (good-full sc a) (p ++ [ ix 1 ]) (ok-step p ok)
+    I = inv-⟦⟧ o (full sc) (good-full sc a) (p ⊕ [ ix 1 ]) (ok-step p ok)
     no-pin : ∀ {A} {r} → _≡_ {A = Ev A} end (pin r) → ⊥
     no-pin ()
 bind-end (binds o p sc) (there x) (_ , a) r = bind-end sc x a r
@@ -198,8 +198,8 @@ settle-of {Γ} {sc} {Rg} {C} {A} {i} {q} {xs} {P} {E} m to from ow =
 
 -- An of's rows: finitely many, each under its subscription.
 of-rows : ∀ {A : Set} → Pos → ℕ → List A → List Pos
-of-rows p i []       = [ p ++ [ last ] ]
-of-rows p i (_ ∷ xs) = (p ++ [ ix i ]) ∷ of-rows p (suc i) xs
+of-rows p i []       = [ p ⊕ [ last ] ]
+of-rows p i (_ ∷ xs) = (p ⊕ [ ix i ]) ∷ of-rows p (suc i) xs
 
 of-in : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → y ∈ of-rows p i xs
 of-in p i []       at-end     = here refl
@@ -210,8 +210,8 @@ of-reach : ∀ {A} p i (xs : List A) {y e} → Reach (InE (ofᴱ p i xs)) y e
 of-reach p i xs = of-rows p i xs , λ r _ _ → of-in p i xs r
 
 of-owes : ∀ C {A} p i (xs : List A) → Owes C p → ∀ {y e} → InE (ofᴱ p i xs) y e → Owes C y
-of-owes C p i []       ow at-end     = owes-≼ C {p} {p ++ [ last ]} ow (≺→≼ {p} {p ++ [ last ]} (≺-ext p []))
-of-owes C p i (_ ∷ xs) ow at-out     = owes-≼ C {p} {p ++ [ ix i ]} ow (≺→≼ {p} {p ++ [ ix i ]} (≺-ext p []))
+of-owes C p i []       ow at-end     = owes-≼ C {p} {p ⊕ [ last ]} ow (≺→≼ {p} {p ⊕ [ last ]} (≺-ext p []))
+of-owes C p i (_ ∷ xs) ow at-out     = owes-≼ C {p} {p ⊕ [ ix i ]} ow (≺→≼ {p} {p ⊕ [ ix i ]} (≺-ext p []))
 of-owes C p i (_ ∷ xs) ow (on-out r) = of-owes C p (suc i) xs ow r
 
 ------------------------------------------------------------------------
@@ -298,11 +298,11 @@ module _ {R : Set} (Rt : EmissionSet R) where
       ends-hot (full (scopeOf c)) x (λ hc on → call-owes {r = CS.connAt k} Ci ic (proj₂ (SubdAt.hok sd)) hc (on th)) (unread-past u x cu)
     shut-up (f-islec _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) () _ _
     shut-up {c = inSrc k _ c} (f-islep u _ _ _ _ _ _ _ _ adm _ _ th _ _ _) _ x cu =
-      ends-hot (full (scopeOf c)) x (λ hc on → call-owes {r = r} (bef (r ++ [ ix 1 ])) slot (proj₂ (proj₁ adm)) hc (on th)) (unread-past u x cu)
+      ends-hot (full (scopeOf c)) x (λ hc on → call-owes {r = r} (bef (r ⊕ [ ix 1 ])) slot (proj₂ (proj₁ adm)) hc (on th)) (unread-past u x cu)
       where
         r = CS.connAt k
-        slot : InCall (bef (r ++ [ ix 1 ])) k
-        slot {s} t = ≼-trans {s} {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} t (≺→≼ {r ++ [ ix 1 ]} {r ++ [ ix 2 ]} (Equivalence.from T-≡ (<ᵖ-part r {ix 1} {ix 2} [] [] refl)))
+        slot : InCall (bef (r ⊕ [ ix 1 ])) k
+        slot {s} t = ≼-trans {s} {r ⊕ [ ix 1 ]} {r ⊕ [ ix 2 ]} t (≺→≼ {r ⊕ [ ix 1 ]} {r ⊕ [ ix 2 ]} (Equivalence.from T-≡ (<ᵖ-part r {ix 1} {ix 2} [] [] refl)))
 
     -- Past all the cursor its need reads has reached.
     past-up : ∀ {Cr C Γ A} {Rg} {c : Ctx R Γ A} {N E} → Fr Rt Cr C Rg c N E
@@ -413,5 +413,5 @@ module _ {R : Set} (Rt : EmissionSet R) where
   ... | t , lk , B | te =
     settled c-abs fr (settle-of eq (λ r → proj₁ jl (subst (λ d → enter d q _ _) lk r))
                                    (λ r → subst (λ d → enter d q _ _) (sym lk) (proj₂ jl r))
-                                   (λ { at-end → owes-≼ C {q} {q ++ [ last ]} ow (≺→≼ {q} {q ++ [ last ]} (≺-ext q [])) }))
+                                   (λ { at-end → owes-≼ C {q} {q ⊕ [ last ]} ow (≺→≼ {q} {q ⊕ [ last ]} (≺-ext q [])) }))
     where jl = join-late B te cq

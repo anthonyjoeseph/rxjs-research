@@ -10,7 +10,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Events using (root)
+open import denotation.Position using (root)
 open import denotation.EmissionSet using (EmissionSet; enter; ⟦_⟧; out; end)
 open import operation.PureObservable using (PureObs; module Machine; module Driver)
 open Machine using (Ctx; Conf; ⟨_,_,_,_⟩; rising; closed; load) renaming (Shown to Shownᴹ; step to stepᴹ)

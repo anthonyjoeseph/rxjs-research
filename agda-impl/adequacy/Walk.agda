@@ -17,7 +17,7 @@ open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.Laws.Modulus using (ticks)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import operation.PureObservable using (module Machine)

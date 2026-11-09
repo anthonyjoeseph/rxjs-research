@@ -2,7 +2,7 @@
 -- makes, or, for one that makes none, `after` a position — later than
 -- everything under it, earlier than whatever follows it.  Keys compare as
 -- positions do, a key `after p` reading as `p` with a label past every
--- other appended.
+-- other appended.  `never` is past every key: no continuation runs there.
 module operation.Key where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
@@ -11,7 +11,7 @@ open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Properties using (++-identityʳ)
 open import Relation.Binary.Definitions using (DecidableEquality)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 open import Relation.Nullary using (does; yes; no)
 
 open import Data.Nat using (zero; suc)
@@ -24,6 +24,7 @@ open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ; ltˡ; l
 data Key : Set where
   at    : Pos → Key
   after : Pos → Key
+  never : Key
 
 private
   -- A key reads as a list: its instant, then its path's labels, then for
@@ -62,6 +63,7 @@ private
   ext : Key → List XL
   ext (at (i ∙ p))    = ins i ∷ labs p
   ext (after (i ∙ p)) = ins i ∷ labs p ++ [ top ]
+  ext never           = [ top ]
 
 -- Strictly earlier: in an earlier instant, or in the same one and
 -- earlier on the path.
@@ -429,6 +431,30 @@ past-attach (i ∙ c) (j ∙ y) h with xtri (ins j) (ins i)
 ... | inj₂ (inj₁ refl) =
   same (ins j ≺ ins j) (ins j ≐ ins j) _ (≺-irrefl (ins j)) (≐-refl (ins j))
        (past-attachᵗ c y (pickf (ins j ≺ ins j) (ins j ≐ ins j) _ (≺-irrefl (ins j)) (≐-refl (ins j)) h))
+
+private
+  -- A path and all below it, before the path's after.
+  at-afterᵗ : ∀ p ys → lex (labs (p ++ ys)) (labs p ++ [ top ]) ≡ true
+  at-afterᵗ []      []      = refl
+  at-afterᵗ []      (_ ∷ _) = refl
+  at-afterᵗ (a ∷ p) ys      = same (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a)) (at-afterᵗ p ys)
+
+-- A position and all below it, before the position's after.
+at-after : ∀ p ys → at (p ⊕ ys) <ᴷ after p ≡ true
+at-after (i ∙ p) ys = same (ins i ≺ ins i) (ins i ≐ ins i) _ (≺-irrefl (ins i)) (≐-refl (ins i)) (at-afterᵗ p ys)
+
+at-after₀ : ∀ p → at p <ᴷ after p ≡ true
+at-after₀ (i ∙ p) = same (ins i ≺ ins i) (ins i ≐ ins i) _ (≺-irrefl (ins i)) (≐-refl (ins i))
+  (subst (λ z → lex (labs z) (labs p ++ [ top ]) ≡ true) (++-identityʳ p) (at-afterᵗ p []))
+
+private
+  after-inᵗ : ∀ p l ys → lex (labs (p ++ l ∷ ys) ++ [ top ]) (labs p ++ [ top ]) ≡ true
+  after-inᵗ []      l ys = refl
+  after-inᵗ (a ∷ p) l ys = same (lab a ≺ lab a) (lab a ≐ lab a) _ (≺-irrefl (lab a)) (≐-refl (lab a)) (after-inᵗ p l ys)
+
+-- Below a position, its after is earlier.
+after-in : ∀ p l ys → after (p ⊕ (l ∷ ys)) <ᴷ after p ≡ true
+after-in (i ∙ p) l ys = same (ins i ≺ ins i) (ins i ≐ ins i) _ (≺-irrefl (ins i)) (≐-refl (ins i)) (after-inᵗ p l ys)
 
 -- Strictly before, never the other way too.
 <ᴷ-asym : ∀ a b → a <ᴷ b ≡ true → b <ᴷ a ≡ false

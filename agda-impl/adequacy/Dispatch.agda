@@ -10,7 +10,7 @@ module adequacy.Dispatch where
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,15 +22,16 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Timeline; Pos; ix; last; timelineAt; Frame; emit; stall; close; module From∞)
+open import denotation.Position using (Pos; ix; last; _⊕_)
+open import denotation.Events using (Timeline; timelineAt; Frame; emit; stall; close; module From∞)
 open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhile; ⟦_⟧; InE; at-out; at-end; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
 open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
-open import operation.Key using (at; after)
+open import operation.Key using (at; after; at-after)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening; slotOf; onward)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
-                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
+                    cut; cpM; cutM; CS; cs; closedUp; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
@@ -45,7 +46,7 @@ open import adequacy.Isle.Step using (found-clear; found-con)
 open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; con-owed; Off; closed-off)
 open import adequacy.Stamped using (StOK; pend-of; pend-focus)
 open import adequacy.Isle using (G)
-open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken; at-after)
+open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
@@ -361,9 +362,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
     (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) (λ _ → owes-call {k = k} C ow) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb oz iz) refl pe wn =
-    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb oz iz
-         , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
+    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ⊕ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ⊕ [ ix 1 ]}))
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ⊕ [ ix 1 ])) (≼-refl {CS.connAt k ⊕ [ ix 1 ]})) bu nr nb oz iz
+         , ≼-refl {CS.connAt k ⊕ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
   srcp (f-scan _ _ _ _)                                         ()   _ _
@@ -686,7 +687,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
           → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
           → sh ≡ [] × Ran Rt Cr k′
   run-con {c = c} {k = cs cl sl sa (just p) as ow cx ea sr sc} {o} {b} (inj₁ refl) refl mi lo st g i
-    with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ (proj₂ st)))
+    with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ st))
   ... | ob refl | o₀ , refl = refl , con-body Rt (body-noisle c st g refl lo) lo i
   run-con {Cr} {C} {k = cs cl sl sa nothing as ow cx ea sr sc} (inj₁ refl) refl mi lo st g i = refl , Cr , C , i , silent ≃-refl
   run-con {c = c} {k = cs cl sl sa bd (just y) ow cx ea sr sc} {o} {b} (inj₂ (inj₁ refl)) refl mi lo st g i

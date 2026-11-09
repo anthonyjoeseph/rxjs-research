@@ -35,6 +35,10 @@ open import denotation.Position
 effect-instant : ∀ p q → instant (p ⊕ q) ≡ instant p
 effect-instant (_ ∙ _) _ = refl
 
+effect-tick : ∀ p q → tick (p ⊕ q) ≡ tick p
+effect-tick (frame ∙ _)       _ = refl
+effect-tick (cascade _ _ ∙ _) _ = refl
+
 -- A cascade's instant is shared only by positions beneath its root.
 cascade-own : ∀ t e p → instant p ≡ cascade t e → p ≡ cascadeAt t e ⊕ path p
 cascade-own t e (_ ∙ _) refl = refl
@@ -72,10 +76,14 @@ later-tick e e′ h rewrite ℕ-lt h = refl
 same-tick : ∀ t e e′ → (cascade t e <ⁱ cascade t e′) ≡ (e <ᵖ e′)
 same-tick t e e′ rewrite ℕ-eq t = refl
 
+-- Everything in a cascade comes after every position of an earlier tick.
+earlier-tick : ∀ p {t} e q → tick p < t → p <ᵖ (cascade t e ∙ q) ≡ true
+earlier-tick (frame ∙ _)       e q _ = refl
+earlier-tick (cascade _ _ ∙ _) e q h rewrite ℕ-lt h = refl
+
 -- A cascade fires after the position its timer was created at.
 after-creator : ∀ {t} e → tick e < t → e <ᵖ cascadeAt t e ≡ true
-after-creator (frame ∙ _)       _ = refl
-after-creator (cascade _ _ ∙ _) h rewrite ℕ-lt h = refl
+after-creator e h = earlier-tick e e [] h
 
 ------------------------------------------------------------------------
 -- The comparison is an order: `eq` is equality, `lt` flips to `gt`

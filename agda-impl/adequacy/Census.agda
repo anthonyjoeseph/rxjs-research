@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (mergeᶠ)
-open import denotation.Events using (Pos; ix)
+open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.EmissionSet using (EmissionSet; Den; out; end; _≺_; _≼_; enter; module Bounded; module Values)
 open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-trans; ≺-absurd; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; world-after)
@@ -262,7 +262,7 @@ module Count {A B H at} (ok : Ok H at) (m : ℕ) (F : A → Den B) (fi : ∀ a �
     ⊥-elim (cen-hi (λ {c′} {c″} (_ , _ , _ , _ , _ , oc) le′ lt′ → ≺-absurd {q} {c′} (past C nq oc) (≼-≺-≺ {c′} {c″} {q} le′ lt′)) cs (kth-le (Sched N) d≤ K))
   owed-start {N = N} cs _ d≤ _ (queued {c₀} _ _ _ K _) =
     let (c″ , c′ , (q′ , a′ , iv , lc , kc , oc) , le′ , le₀) = cen-find {Q = _≼ c₀} cs (kth-le (Sched N) d≤ K)
-    in q′ , a′ , c′ , iv , lc , (λ {q″} → kc {q″}) , oc , ≼-≺-≺ {c′} {c₀} {c₀ ++ [ ix 1 ]} (≼-trans {c′} {c″} {c₀} le′ le₀) (≺-ext c₀ [])
+    in q′ , a′ , c′ , iv , lc , (λ {q″} → kc {q″}) , oc , ≼-≺-≺ {c′} {c₀} {c₀ ⊕ [ ix 1 ]} (≼-trans {c′} {c″} {c₀} le′ le₀) (≺-ext c₀ [])
 
   -- Every value waiting past index `N`, every slot taken: each lane
   -- starts past an owed end, the earlier ones counted on.

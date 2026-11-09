@@ -24,7 +24,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last)
+open import denotation.Position using (Pos; ix; last; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; out; end; pin; _≺_; _≼_; enter; ⟦_⟧; shown; map-pin; module Scan;
   module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≼-antisym)
@@ -50,14 +51,14 @@ lane-pin : ∀ {Γ A B} {sc : Scope Γ} op {f : A → Obs Timeline Γ B} {O : Em
          → ∀ {q a k r} → O q (out a) → Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a k (pin r)
          → Σ Pos λ s → Start (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q a s × q ≺ s × s ≼ r
 lane-pin {sc = sc} (mergeᶠ nothing) {f} ji {q} x (l , _) =
-  q ++ [ ix 1 ] , refl , ≺-ext q [] , pin-law (real-snoc q plain-ix (InvAt.real (JInv.io ji) x)) (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
+  q ⊕ [ ix 1 ] , refl , ≺-ext q [] , pin-law (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
 lane-pin {sc = sc} switchᶠ {f} ji {q} x (l , _) =
-  q ++ [ ix 1 ] , refl , ≺-ext q [] , pin-law (real-snoc q plain-ix (InvAt.real (JInv.io ji) x)) (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
+  q ⊕ [ ix 1 ] , refl , ≺-ext q [] , pin-law (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
 lane-pin {sc = sc} exhaustᶠ {f} ji {q} x (l , _) =
-  q ++ [ ix 1 ] , refl , ≺-ext q [] , pin-law (real-snoc q plain-ix (InvAt.real (JInv.io ji) x)) (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
+  q ⊕ [ ix 1 ] , refl , ≺-ext q [] , pin-law (Join.LI (JInv.ok ji) (λ a → ⟦ f a ⟧ (full sc)) (JInv.fi ji) (JInv.io ji) x) l
 lane-pin {sc = sc} (mergeᶠ (just m)) {f} {O} ji x (i , s , sb , l , _) =
   s , (i , sb) , starts-past m (λ a → ⟦ f a ⟧ (full sc)) O (proj₂ sb)
-    , pin-law (proj₁ (BoundedI.okS (JInv.ok ji) m _ (JInv.fi ji) (JInv.io ji) sb)) (BoundedI.LI (JInv.ok ji) m _ (JInv.fi ji) (JInv.io ji) sb) l
+    , pin-law (BoundedI.LI (JInv.ok ji) m _ (JInv.fi ji) (JInv.io ji) sb) l
 
 ------------------------------------------------------------------------
 -- The pins
@@ -150,7 +151,7 @@ mutual
   -- attached one's is finitely many, and so are the rows the cursor passed.
   src-pt : ∀ {Γ X B} {Rg C} {k : CS Γ X} {o} {β E : EmissionSet B} (pt : Parts (CS.scope k) Rg k β) (sw : Src (CS.scope k) (Parts.Rs pt) C k o)
          (bb : Behind C β) (fl : Flags C k β) (ce : ConnE (CS.connAt k) (Frozen k) β E) → SrcPT C k (proj₁ (src-husk refl pt sw bb fl ce))
-  src-pt {C = C} {k = k} _ (src-pend _ _ _ _ _ _ _ ow _) _ _ _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ++ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
+  src-pt {C = C} {k = k} _ (src-pend _ _ _ _ _ _ _ ow _) _ _ _ = [] , λ x h _ → inj₁ (in-burst {C = bef (CS.connAt k ⊕ [ ix 1 ])} {k = k} x (held-dn {C = C} {C′ = bef (CS.connAt k ⊕ [ ix 1 ])} {k = k} (λ {y} q → owes-≼ C ow q) h))
   src-pt {C = C} {k = k} _ (src-on nc sy bh sd af _ _ _) _ _ _ =
     by-elim (λ h → SrcPT C k (proj₁ h)) (CS.srcAtt k) _ _
       (λ t → let (ka , fa) = af t ; (ptl kp fp) = pin-tail sy ; (kh , fh) = bh in
@@ -204,12 +205,12 @@ took-tail : ∀ {Γ} {sc : Scope Γ} {Rg} {A} {i} {keep : A → Bool} {s : St Γ
           → (sy : Sync sc Rg (aft p) s Es) → Es p (out a) → T (not (keep a)) → NoFail (bef p) keep Es
           → TailP (bef p) (TakeWhile.TakeT i keep Es) (proj₁ (husk-of sy))
 took-tail {i = i} {keep = keep} {Es = Es} {p = p} sy row nk nf with pin-tail sy
-... | ptl kp fp = tailp (p ∷ (p ++ [ ix 0 ]) ∷ (p ++ [ last ]) ∷ kp) λ where
+... | ptl kp fp = tailp (p ∷ (p ⊕ [ ix 0 ]) ∷ (p ⊕ [ last ]) ∷ kp) λ where
     (TakeWhile.pass {q} _ _ nq) o → inj₂ (here (at q nq o))
     (TakeWhile.step {q} _ nq) o   → inj₂ (here (at q nq o))
     (TakeWhile.tend {q} _ nq) o   → inj₂ (here (at q nq o))
-    (TakeWhile.fail {q} x nkq nq _) _ → inj₂ (there (here (cong (_++ [ ix 0 ]) (at q nq (nf x nkq)))))
-    (TakeWhile.stop {q} x nkq nq) _   → inj₂ (there (there (here (cong (_++ [ last ]) (at q nq (nf x nkq))))))
+    (TakeWhile.fail {q} x nkq nq _) _ → inj₂ (there (here (cong (_⊕ [ ix 0 ]) (at q nq (nf x nkq)))))
+    (TakeWhile.stop {q} x nkq nq) _   → inj₂ (there (there (here (cong (_⊕ [ last ]) (at q nq (nf x nkq))))))
     (TakeWhile.left {q} {r} x nr _) o → [ (λ pq → [ inj₁ , (λ j → inj₂ (there (there (there j)))) ]′ (fp x pq (λ pr → nr (_ , _ , row , nk , pr))))
                                         , (λ npq → inj₂ (here (≼-antisym {q} {p} npq o))) ]′ (owes? (aft p) q)
   where
