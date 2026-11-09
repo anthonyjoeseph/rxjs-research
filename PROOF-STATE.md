@@ -55,21 +55,23 @@ Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-asy
 #### THE HELD STREAMS
 
 Probed, unproven: every elaborated stream names its begins for their
-instants, counts a route of its own instant under every row outside the bursts it
-is exempt for, and keeps dead instants dead. Hardest: flatMap's scan
-counters, true on every row probed, hand-offs and parks included: each
-is the `idle` of what holds the routes, read on the scan's run split
-onto that branch (`lane-run`, `lane-next`; a tracker's split is owed). Then `m-rows`, a reader's joins and the defer limit.
-The cold's runs (`cold-covered`) need its rows' order, not their shape.
-Settled when each former's leaf is a body.
+instants, counts a route of its own instant under every row outside the
+bursts it is exempt for, and keeps dead instants dead. Hardest:
+flatMap's scan counters, true on every row probed, hand-offs and parks
+included: each is the `idle` of what holds the routes, read on the
+scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
+split is owed). Then what each branch sent, a reader's joins and the
+defer limit. The cold's runs (`cold-covered`) need its rows' order, not
+their shape. Settled when each former's leaf is a body.
 
 Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
-`lanes-count`, `held-current`, `parked-live`, `live-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
-`walk`, `step-local`, `m-rows`, `lane-ends`, `close-ends`, `lane-named`,
-`lane-early`, `lane-late`, `close-marks`, `scan-idle`, `comb-run`,
-`held-connected`, `held-lim`, `held-top`, `held-next`, `held-⊥`,
-`held-takeWhile`, `cold-rows`, `cold-covered`, `cold-shut`,
-`cold-idle`, `held-of`, `held-empty`.
+`lanes-count`, `held-current`, `parked-live`, `live-current`,
+`value-open`, `over-open`, `end-open`, `comb-shut`, `walk`,
+`step-local`, `outer-sent`, `lane-sent`, `close-sent`, `m-ends`,
+`lane-ends`, `close-ends`, `lane-named`, `lane-early`, `lane-late`,
+`close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
+`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
+`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
 
 #### THE RELEASE
 

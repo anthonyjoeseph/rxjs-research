@@ -75,7 +75,7 @@ open import Relation.Binary.PropositionalEquality using (trans; sym; cong; subst
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
 open import simultaneous.Project using (Proj; proj-outs; run-prefix)
-open import denotation.EmissionSet using (skip; pin; Few; _≼_)
+open import denotation.EmissionSet using (skip; pin; Few; _≼_; module TakeWhile)
 open import denotation.Read using (After; cursor)
 open import Data.Nat.Properties using (0≢1+n)
 open import Data.Bool using (T)
@@ -258,6 +258,15 @@ held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
 -- outer: the outer at `p ⊕ [ ix 1 ]`, the closer, then the real
 -- flatMap, each made hot.  What it reads: the connects in scope, the
 -- outer, the lanes and the closer.
+-- A source read while its items go on passes no `nothing`, under the
+-- meaning and every approximant.
+ev-none : ∀ m {Γ X} (s : Obs Timeline Γ (Maybe X)) (env : DenEnv Γ) P {q}
+        → enter (ev m (takeWhile false going s) env) P q (out nothing) → ⊥
+ev-none nothing  s env P (TakeWhile.pass _ () _ , _)
+ev-none nothing  s env P (TakeWhile.fail _ _ _ () , _)
+ev-none (just n) s env P (TakeWhile.pass _ () _ , _)
+ev-none (just n) s env P (TakeWhile.fail _ _ _ () , _)
+
 module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (s : Obs Timeline Γ A) (env : DenEnv Δ) (p : Pos) where
 
@@ -360,8 +369,30 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     done    : ∀ {c zs} → BEnd c → MRow (c ⊕ zs) end
 
   postulate
-    -- Every row the scan's source meets is one of these.
-    m-rows      : ∀ {q e} → M q e → Visible e → MRow q e
+    -- WHAT EACH BRANCH SENT, row by row: a row of the outer, the closer or
+    -- the lanes, one `sub` below where that branch shows it.
+    outer-sent : ∀ {q y} → M q (out (just (inj₁ (outerB , y))))
+               → Σ Pos λ c → Σ Pos λ w → Σ (IE A) λ x → σ₁ c (out x) × opening x ≡ y × q ≡ c ⊕ [ sub w ]
+    lane-sent  : ∀ {q x} → M q (out (just (inj₁ (laneB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₃ c (out x) × q ≡ c ⊕ [ sub w ]
+    close-sent : ∀ {q x} → M q (out (just (inj₁ (closeB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₂ c (out x) × q ≡ c ⊕ [ sub w ]
+    -- The source ends under its own subscription, or past a branch's end.
+    m-ends     : ∀ {q} → M q end → (Σ _ λ zs → q ≡ P ⊕ zs) ⊎ (Σ Pos λ c → Σ _ λ zs → BEnd c × q ≡ c ⊕ zs)
+
+  -- Every row the scan's source meets is one of these.
+  m-rows : ∀ {q e} → M q e → Visible e → MRow q e
+  m-rows {e = out (just (inj₂ _))} _ _ = tracker
+  m-rows {e = out (just (inj₁ (outerB , _)))} x _ with outer-sent x
+  ... | _ , _ , _ , y , o , refl = outer y o
+  m-rows {e = out (just (inj₁ (laneB , _)))} x _ with lane-sent x
+  ... | _ , _ , y , refl = lane y
+  m-rows {e = out (just (inj₁ (closeB , _)))} x _ with close-sent x
+  ... | _ , _ , y , refl = close y
+  m-rows {e = out nothing} x _ = ⊥-elim (ev-none m _ env′ P x)
+  m-rows {e = end} x _ with m-ends x
+  ... | inj₁ (_ , refl)     = under
+  ... | inj₂ (_ , _ , b , refl) = done b
+
+  postulate
     -- The lanes' rows: begins named for their instants, values before
     -- their over, overs at it.
     lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
