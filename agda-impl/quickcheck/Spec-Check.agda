@@ -41,7 +41,7 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _%_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _≡ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
@@ -335,11 +335,10 @@ private
   tallyOf mk []          = tally 0 0 0 0 0
   tallyOf mk (seed ∷ ss) = add (judge (budget seed) (mk seed)) (tallyOf mk ss)
 
-  -- a line every so many seeds, so a run cut short shows how far it got
+  -- a line as each seed starts, so a run cut short shows how far it got
+  -- and the log's timestamps show what each seed cost
   progress : ℕ → IO Unit
-  progress seed with seed % 25
-  ... | 0 = putStrLn ("spec-check: at seed " +++ showℕ seed)
-  ... | _ = return _
+  progress seed = putStrLn ("spec-check: seed " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed))
 
   showTally : Tally → String
   showTally (tally s k l c b) =

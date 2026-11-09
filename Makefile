@@ -174,12 +174,14 @@ $(SPEC_BIN): $(AGDA_SRC)
 	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Spec-Check.agda
 	@touch $@
 
-# Interrupted, not killed, at its limit: the GHC runtime flushes what was
-# printed, so a run that outlives it shows how far it got.
-SPEC_LIMIT := 1800
+# Stopped at its limit, every line stamped with the second it was
+# printed, so a run that outlives the limit shows how far it got and what
+# each seed cost.  `pipefail` keeps the binary's exit status.
+SPEC_LIMIT := 2400
 
 $(SPEC_LOG): $(SPEC_BIN)
-	@timeout -s INT $(SPEC_LIMIT) $(SPEC_BIN) > $@ \
+	@bash -c 'set -o pipefail; timeout -s INT $(SPEC_LIMIT) $(SPEC_BIN) \
+	  | while IFS= read -r l; do echo "$$l [t=$$(date +%s)]"; done' > $@ \
 	  || echo "spec-check: stopped, exit $$? (124 is the $(SPEC_LIMIT) s limit)" >> $@
 
 spec-check-selftest: $(SPEC_LOG)
