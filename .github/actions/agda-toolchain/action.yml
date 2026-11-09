@@ -48,6 +48,16 @@ runs:
         cabal-version: "3.8.1.0"
         cabal-update: false
 
+    # The release host answers 504 in bursts that outlast any retry budget a
+    # job can afford, so the binary it serves is fetched once and restored
+    # after; install-agda.sh skips a download whose version is already on
+    # PATH.  Keyed on the script, which pins the version.
+    - name: Cache Agda binary
+      uses: actions/cache@v4
+      with:
+        path: ~/.cabal/bin/agda
+        key: agda-bin-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
     - name: Install Agda toolchain
       shell: bash
       run: bash scripts/install-agda.sh
