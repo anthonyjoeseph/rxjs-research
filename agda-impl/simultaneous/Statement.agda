@@ -46,8 +46,9 @@ open import denotation.EmissionSet using (Seen)
 open import simultaneous.SObs using (SObs)
 open import simultaneous.Readings using (Rooted)
 open import simultaneous.Relations using (events; elaborated; batched; Met; ranked; Closes; Ends; joined; values;
-  stampedᴰ; stampedᴮ; grouped; Groups; Erases; Batches)
+  stampedᴰ; stampedᴮ; grouped; Groups; Erases)
 open import simultaneous.Batcher using (batcher-ends)
+open import simultaneous.Closing using (batches)
 
 ------------------------------------------------------------------------
 -- The pieces
@@ -56,21 +57,9 @@ open import simultaneous.Batcher using (batcher-ends)
 -- prefix of the elaborated run erases to a prefix of the plain one with
 -- the same stamped values, and an instant over on one side is over on
 -- the other.  Switch, exhaust and the bounded queue are the real cases.
---
--- THE BATCHER: the batcher groups by the names the elaboration mints,
--- and the names agree with the instants — each async cold step mints one
--- and its whole cascade carries it — so grouping by name is grouping by
--- stamp, and each group is released the moment its instant is over,
--- through every flatMap policy and connect.  The names agreeing with the
--- instants is the lemma the body needs first, and it is stated for no
--- one until the body exists.
---
--- RECOVERY: git show d9f6134:agda-impl/simultaneous/Statement.agda
---   restores `coherent`, the names-agree-with-instants statement, over
---   `InstantsAgree` in `simultaneous/Relations.agda` at that sha.
+-- The batcher's half is `simultaneous.Closing`.
 postulate
   erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
-  batchable : ∀ {A} (o : SObs [] A) → Batches (batched o) (elaborated o)
 
 -- THE INSTANTS: every position a program reaches lies under the subscribe
 -- frame or one timer cascade, which is what makes `instantOf` read an
@@ -97,14 +86,14 @@ spec o = sound , complete , ends-out , ends-in
     sound : ∀ {rs} → Met (ranked (batched o)) rs →
             Σ _ λ rs′ → Σ Bool λ ov → Met (ranked (events o)) rs′ × Closes [_] (events o) rs′ ov ×
             Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴰ rs′))
-    sound {rs} m with proj₁ (batchable o) m
+    sound {rs} m with proj₁ (batches o) m
     ... | rx , ov , mx , cl , p with proj₁ (erases o) {ov = ov} mx cl
     ...   | rs′ , me , cl′ , eq = rs′ , ov , me , cl′ , subst (λ ys → Prefix _≡_ (stampedᴮ rs) (grouped ov ys)) eq p
 
     complete : ∀ {rs′ ov} → Met (ranked (events o)) rs′ → Closes [_] (events o) rs′ ov →
                Σ _ λ rs → Met (ranked (batched o)) rs × Prefix _≡_ (grouped ov (stampedᴰ rs′)) (stampedᴮ rs)
     complete {rs′} {ov} m cl with proj₁ (proj₂ (erases o)) {ov = ov} m cl
-    ... | rx , mx , clx , eq with proj₂ (batchable o) {ov = ov} mx clx
+    ... | rx , mx , clx , eq with proj₂ (batches o) {ov = ov} mx clx
     ...   | rs , mb , p = rs , mb , subst (λ ys → Prefix _≡_ (grouped ov ys) (stampedᴮ rs)) (sym eq) p
 
     ends-out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rs′ → Met (events o) rs′ × Ends rs′ × joined rs ≡ values rs′
