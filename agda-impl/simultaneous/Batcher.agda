@@ -7,50 +7,62 @@
 -- whatever is still held.
 module simultaneous.Batcher where
 
-open import Data.List using (List; []; _∷_; _++_; [_]; concat; concatMap)
+open import Data.Bool using (false)
+open import Data.Empty using (⊥-elim)
+open import Data.List using (List; []; _∷_; _++_; [_]; _∷ʳ_; concat; concatMap)
+open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 import Data.List as L
 open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; concat-++)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; module ≡-Reasoning)
+import Data.Sum
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Unit using (⊤; tt)
+open import Relation.Nullary using (yes; no)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; sym; trans; subst; module ≡-Reasoning)
 
-open import Tree using (scan; merge; of)
+open import Tree using (scan; map; merge; of)
 open import denotation.Events using (Pos; Timeline; root; fresh; _≟ᵖ_)
-open import simultaneous.InstEmit using (InstEmit; instEmit; mark; completed; valuesOf)
+open import denotation.EmissionSet using (Ev; skip; end; pin) renaming (out to emit)
+open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; module Elaborate)
-open import simultaneous.Readings using (stamped)
+open import simultaneous.Readings using (stamped; closed)
+open import simultaneous.Protocol using (nameStep; Fresh)
+import simultaneous.Spec as Spec
+open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
+open import simultaneous.Prefixes using (prefix-++)
 open import simultaneous.Relations using (Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root fresh using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
-  restamp; marked; concatˢ; elab; E)
+  pending; asEmits; mark-step; restamp; marked; concatˢ; elab; E)
 
 ------------------------------------------------------------------------
 -- The fold, as lists
 
 -- What the batcher releases over `vs`, from `s`.
-released : ∀ {A} → Step A → List (IE A) → List (IE (List A))
+released : ∀ {A : Set} → Step A → List (IE A) → List (IE (List A))
 released s vs = concatMap proj₂ (scans bstep s vs)
 
 -- The state it ends in.
-after : ∀ {A} → Step A → List (IE A) → Step A
+after : ∀ {A : Set} → Step A → List (IE A) → Step A
 after s []       = s
 after s (v ∷ vs) = after (bstep s v) vs
 
-after-snoc : ∀ {A} (s : Step A) vs v → after s (vs ++ [ v ]) ≡ bstep (after s vs) v
+after-snoc : ∀ {A : Set} (s : Step A) vs v → after s (vs ++ [ v ]) ≡ bstep (after s vs) v
 after-snoc s []       v = refl
 after-snoc s (w ∷ vs) v = after-snoc (bstep s w) vs v
 
-unbatched-++ : ∀ {A} (xs ys : List (IE (List A))) → unbatched (xs ++ ys) ≡ unbatched xs ++ unbatched ys
+unbatched-++ : ∀ {A : Set} (xs ys : List (IE (List A))) → unbatched (xs ++ ys) ≡ unbatched xs ++ unbatched ys
 unbatched-++ xs ys = trans (cong concat (trans (cong concat (map-++ valuesOf xs ys)) (sym (concat-++ (L.map valuesOf xs) (L.map valuesOf ys)))))
                            (sym (concat-++ (concat (L.map valuesOf xs)) (concat (L.map valuesOf ys))))
 
 -- A completion carries no values.
-map-snoc : ∀ {A} (vs : List (IE A)) n → concatMap valuesOf (vs ++ [ instEmit (mark completed) n ]) ≡ concatMap valuesOf vs
+map-snoc : ∀ {A : Set} (vs : List (IE A)) n → concatMap valuesOf (vs ++ [ instEmit (mark completed) n ]) ≡ concatMap valuesOf vs
 map-snoc vs n = trans (cong concat (map-++ valuesOf vs _)) (trans (sym (concat-++ (L.map valuesOf vs) _)) (++-identityʳ _))
 
 -- Every value goes out, released or held.
-released-held : ∀ {A} (s : Step A) vs
+released-held : ∀ {A : Set} (s : Step A) vs
               → unbatched (released s vs) ++ Batching.held (proj₁ (after s vs)) ≡ Batching.held (proj₁ s) ++ concatMap valuesOf vs
 released-held s []       = sym (++-identityʳ _)
 released-held s (v ∷ vs) =
@@ -73,7 +85,7 @@ released-held s (v ∷ vs) =
   where open ≡-Reasoning
 
 -- Run from the start and closed by a completion, everything is released.
-released-all : ∀ {A} (vs : List (IE A)) n → unbatched (released bstart (vs ++ [ instEmit (mark completed) n ])) ≡ concatMap valuesOf vs
+released-all : ∀ {A : Set} (vs : List (IE A)) n → unbatched (released bstart (vs ++ [ instEmit (mark completed) n ])) ≡ concatMap valuesOf vs
 released-all vs n =
   begin
     unbatched (released bstart ws)
@@ -94,7 +106,7 @@ released-all vs n =
     held-end = trans (cong (λ s → Batching.held (proj₁ s)) (after-snoc bstart vs c)) (completed-held (after bstart vs) n)
 
 -- The values of emits, stamped then unstamped.
-vals-of : ∀ {N A} (xs : List (InstEmit N A)) → L.map proj₂ (stamped xs) ≡ concatMap valuesOf xs
+vals-of : ∀ {N A : Set} (xs : List (InstEmit N A)) → L.map proj₂ (stamped xs) ≡ concatMap valuesOf xs
 vals-of []       = refl
 vals-of (x ∷ xs) = trans (map-++ proj₂ (L.map (λ a → InstEmit.instant x , a) (valuesOf x)) (stamped xs))
                          (trans (cong (_++ L.map proj₂ (stamped xs)) (unstamp (valuesOf x))) (cong (valuesOf x ++_) (vals-of xs)))
@@ -103,7 +115,7 @@ vals-of (x ∷ xs) = trans (map-++ proj₂ (L.map (λ a → InstEmit.instant x ,
     unstamp []       = refl
     unstamp (v ∷ vs) = cong (v ∷_) (unstamp vs)
 
-joined-unbatched : ∀ {A} rs → joined {A} rs ≡ unbatched (values rs)
+joined-unbatched : ∀ {A : Set} rs → joined {A} rs ≡ unbatched (values rs)
 joined-unbatched rs = cong concat (vals-of (values rs))
 
 ------------------------------------------------------------------------
@@ -138,7 +150,7 @@ completed-last o {rx} mx ex with map-back proj₂ (scan restamp stamp₀ (concat
 -- The batcher ends with what it batches
 
 -- A completed run's values, released from the start.
-ended-released : ∀ {A} (o : SObs [] A) {rx} → Met (elaborated o) rx → Ends rx → unbatched (released bstart (values rx)) ≡ vals rx
+ended-released : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Ends rx → unbatched (released bstart (values rx)) ≡ vals rx
 ended-released o {rx} mx ex with completed-last o mx ex
 ... | vs , n , eq =
   begin
@@ -174,3 +186,152 @@ batcher-ends o = out , into
     ...   | rs , mb , eqb , ends-e =
       rs , mb , ends-e (ends-s ex) ,
       sym (trans (joined-unbatched rs) (trans (cong unbatched (trans eqb (cong (concatMap proj₂) eqs))) (ended-released o mx ex)))
+
+------------------------------------------------------------------------
+-- The batches, against the spec's grouping
+
+-- The spec's grouping, a batch perhaps already open.
+cont : ∀ {A : Set} → List (Pos × List A) → List (Pos × A) → List (Pos × List A)
+cont []             xs = batchSimultaneousᴰ xs
+cont ((i , vs) ∷ _) xs = batchFrom i vs xs
+
+-- A value is of the instant held.
+Named : ∀ {A : Set} → Batching A Pos → IE A → Set
+Named b (instEmit (value _) n) = n ≡ Batching.at b
+Named b (instEmit (mark _) _)  = ⊤
+
+-- THE ELABORATED RUN AS THE BATCHER NEEDS IT: each value of the instant
+-- held, and after a release, the next value of another instant.
+Good : ∀ {A : Set} → Step A → List (IE A) → Set
+Good s []       = ⊤
+Good s (w ∷ ws) = (Named (proj₁ s) w × (proj₂ (bstep s w) ≡ [] ⊎ Fresh (Batching.at (proj₁ s)) (stamped ws))) × Good (bstep s w) ws
+
+stamped-++ : ∀ {N A : Set} (xs ys : List (InstEmit N A)) → stamped (xs ++ ys) ≡ stamped xs ++ stamped ys
+stamped-++ []       ys = refl
+stamped-++ (x ∷ xs) ys = trans (cong (L.map (λ a → InstEmit.instant x , a) (valuesOf x) ++_) (stamped-++ xs ys))
+                               (sym (++-assoc (L.map (λ a → InstEmit.instant x , a) (valuesOf x)) (stamped xs) (stamped ys)))
+
+stamped-asEmits : ∀ {A : Set} (P : List (Pos × List A)) → stamped (asEmits P) ≡ P
+stamped-asEmits []             = refl
+stamped-asEmits ((i , vs) ∷ P) = cong ((i , vs) ∷_) (stamped-asEmits P)
+
+stamped-prefix : ∀ {N A : Set} {xs ys : List (InstEmit N A)} → Prefix _≡_ xs ys → Prefix _≡_ (stamped xs) (stamped ys)
+stamped-prefix []                  = []
+stamped-prefix {xs = x ∷ _} (refl ∷ p) = prefix-++ (L.map (λ a → InstEmit.instant x , a) (valuesOf x)) (stamped-prefix p)
+
+batchFrom-same : ∀ {A : Set} i (vs : List A) v X → batchFrom i vs ((i , v) ∷ X) ≡ batchFrom i (vs ∷ʳ v) X
+batchFrom-same i vs v X with i ≟ᵖ i
+... | yes _ = refl
+... | no ne = ⊥-elim (ne refl)
+
+batchFrom-fresh : ∀ {A : Set} i (vs : List A) X → Fresh i X → batchFrom i vs X ≡ (i , vs) ∷ batchSimultaneousᴰ X
+batchFrom-fresh i vs []            _  = refl
+batchFrom-fresh i vs ((j , v) ∷ X) ne with i ≟ᵖ j
+... | yes eq = ⊥-elim (ne eq)
+... | no _   = refl
+
+-- What is held, then nothing more: its own batch.
+cont-nil : ∀ {A : Set} (b : Batching A Pos) → pending b ≡ cont (pending b) []
+cont-nil b with Batching.held b
+... | []     = refl
+... | _ ∷ _  = refl
+
+-- A release ahead of a value of another instant closes the open batch.
+flush-eq : ∀ {A : Set} (b : Batching A Pos) X → (asEmits (pending b) ≡ [] ⊎ Fresh (Batching.at b) X)
+         → pending b ++ batchSimultaneousᴰ X ≡ cont (pending b) X
+flush-eq b X h with Batching.held b
+... | []     = refl
+... | v ∷ vs with h
+...   | inj₁ ()
+...   | inj₂ fr = sym (batchFrom-fresh (Batching.at b) (v ∷ vs) X fr)
+
+-- One step of the batcher against the grouping.
+grouped-step : ∀ {A : Set} (s : Step A) w X → Named (proj₁ s) w → (proj₂ (bstep s w) ≡ [] ⊎ Fresh (Batching.at (proj₁ s)) X)
+             → stamped (proj₂ (bstep s w)) ++ cont (pending (proj₁ (bstep s w))) X
+             ≡ cont (pending (proj₁ s)) (L.map (λ a → InstEmit.instant w , a) (valuesOf w) ++ X)
+grouped-step (b , r) (instEmit (value a) .(Batching.at b)) X refl _ with Batching.held b
+... | []     = refl
+... | v ∷ vs = sym (batchFrom-same (Batching.at b) (v ∷ vs) a X)
+grouped-step (b , r) (instEmit (mark m) n) X _ fr with mark-step (Batching.late b) m n b
+... | inj₁ (e₁ , e₂) = cong₂ (λ u P → stamped u ++ cont P X) e₁ e₂
+... | inj₂ (e₁ , e₂) =
+  trans (cong₂ (λ u P → stamped u ++ cont P X) e₁ e₂)
+        (trans (cong (_++ batchSimultaneousᴰ X) (stamped-asEmits (pending b)))
+               (flush-eq b X (Data.Sum.[ (λ e₀ → inj₁ (trans (sym e₁) e₀)) , inj₂ ] fr)))
+
+-- THE BATCHER IS THE GROUPING: what it has released, then what it holds,
+-- is the spec's grouping of every value.
+grouped-run : ∀ {A : Set} (s : Step A) ws → Good s ws
+            → stamped (released s ws) ++ pending (proj₁ (after s ws)) ≡ cont (pending (proj₁ s)) (stamped ws)
+grouped-run s []       _                  = cont-nil (proj₁ s)
+grouped-run s (w ∷ ws) ((nm , fr) , g) =
+  let s′ = bstep s w ; P = proj₂ s′ in
+  begin
+    stamped (P ++ released s′ ws) ++ pending (proj₁ (after s′ ws))
+      ≡⟨ cong (_++ pending (proj₁ (after s′ ws))) (stamped-++ P (released s′ ws)) ⟩
+    (stamped P ++ stamped (released s′ ws)) ++ pending (proj₁ (after s′ ws))
+      ≡⟨ ++-assoc (stamped P) _ _ ⟩
+    stamped P ++ (stamped (released s′ ws) ++ pending (proj₁ (after s′ ws)))
+      ≡⟨ cong (stamped P ++_) (grouped-run s′ ws g) ⟩
+    stamped P ++ cont (pending (proj₁ s′)) (stamped ws)
+      ≡⟨ grouped-step s w (stamped ws) nm fr ⟩
+    cont (pending (proj₁ s)) (stamped (w ∷ ws))
+  ∎
+  where open ≡-Reasoning
+
+-- What is held is one batch or none.
+pending-one : ∀ {A : Set} (b : Batching A Pos) → pending b ≡ [] ⊎ Σ (Pos × List A) λ g → pending b ≡ [ g ]
+pending-one b with Batching.held b
+... | []     = inj₁ refl
+... | v ∷ vs = inj₂ (_ , refl)
+
+closed-snoc : ∀ {X : Set} (xs : List X) g → closed false (xs ++ [ g ]) ≡ xs
+closed-snoc []           g = refl
+closed-snoc (x ∷ [])     g = refl
+closed-snoc (x ∷ y ∷ xs) g = cong (x ∷_) (closed-snoc (y ∷ xs) g)
+
+released-++ : ∀ {A : Set} (s : Step A) u v → released s (u ++ v) ≡ released s u ++ released (after s u) v
+released-++ s []       v = refl
+released-++ s (w ∷ u) v = trans (cong (proj₂ (bstep s w) ++_) (released-++ (bstep s w) u v))
+                                (sym (++-assoc (proj₂ (bstep s w)) (released (bstep s w) u) _))
+
+------------------------------------------------------------------------
+-- The protocol, stream by stream
+
+NameOk : ∀ {A : Set} → Pos → IE A → Set
+NameOk a (instEmit (mark Marks.begin) _) = ⊤
+NameOk a (instEmit _ n)                  = n ≡ a
+
+-- Every emit but a begin carries the name of the last begin before it.
+Stamps : ∀ {A : Set} → Pos → List (IE A) → Set
+Stamps a []       = ⊤
+Stamps a (w ∷ ws) = NameOk a w × Stamps (nameStep a w) ws
+
+restamp-ok : ∀ {A : Set} a (e : IE A) k → NameOk a (proj₂ (restamp (a , e) k)) × proj₁ (restamp (a , e) k) ≡ nameStep a (proj₂ (restamp (a , e) k))
+restamp-ok a e (instEmit (value _) _)             = refl , refl
+restamp-ok a e (instEmit (mark Marks.begin) _)      = tt , refl
+restamp-ok a e (instEmit (mark Marks.over) _)       = refl , refl
+restamp-ok a e (instEmit (mark Marks.stop) _)       = refl , refl
+restamp-ok a e (instEmit (mark Marks.outerOpen) _)  = refl , refl
+restamp-ok a e (instEmit (mark Marks.outerClose) _) = refl , refl
+restamp-ok a e (instEmit (mark Marks.laneStart) _)  = refl , refl
+restamp-ok a e (instEmit (mark Marks.laneDone) _)   = refl , refl
+restamp-ok a e (instEmit (mark Marks.burstEnd) _)   = refl , refl
+restamp-ok a e (instEmit (mark Marks.outerDone) _)  = refl , refl
+restamp-ok a e (instEmit (mark Marks.carry) _)      = refl , refl
+restamp-ok a e (instEmit (mark Marks.subscribed) _) = refl , refl
+restamp-ok a e (instEmit (mark completed) _)        = refl , refl
+
+stamps-restamp : ∀ {A : Set} a (e : IE A) ks → Stamps a (L.map proj₂ (scans restamp (a , e) ks))
+stamps-restamp a e []       = tt
+stamps-restamp a e (k ∷ ks) =
+  proj₁ (restamp-ok a e k) ,
+  subst (λ b → Stamps b (L.map proj₂ (scans restamp (restamp (a , e) k) ks))) (proj₂ (restamp-ok a e k))
+        (stamps-restamp (proj₁ (restamp (a , e) k)) (proj₂ (restamp (a , e) k)) ks)
+
+-- An elaborated run's values are named by its begins.
+stamps-of : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Stamps root (values rx)
+stamps-of o {rx} mx with map-back proj₂ (scan restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ [])))) mx
+... | sc , msc , eqm , _ with scan-out restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ []))) msc
+...   | kx , _ , eqs , _ =
+  subst (Stamps root) (sym (trans eqm (cong (L.map proj₂) eqs))) (stamps-restamp root (marked Marks.begin) (values kx))

@@ -26,17 +26,50 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE BATCHER
+#### THE RELEASE
 
-Untried: the batcher releases each instant's values the moment that
-instant is over, read off the elaborated run's rows stamped by rank, not
-by the names it mints. Hardest: the bracket and route protocol through
-every flatMap policy and connect, and that the names agree with the
-instants — each async cold step mints one and its whole cascade carries
-it — so grouping by name is grouping by stamp. Settled when `batchable`
-is a body over the elaborated run, a restamp invariant and `positioned`.
+Untried in this vocabulary: the batcher holds nothing exactly where the
+run's last instant is over — no value of it left past its last value, by
+position, and the run leaving it. The bridge from the batcher's routes
+to `Over` is open both ways. Settled when both are bodies over `shut`
+and the protocol.
 
-Members: `batchable`.
+Members: `flush-closes`, `releases`.
+
+#### THE BATCH RANK
+
+Untried: a batch leaves within its own instant, at the rank its values
+carry. Needs the layers' positions to keep instants, and the release
+mark to sit in the instant it releases. Settled when `batch-rank` is a
+body over the layers and the release protocol.
+
+Members: `batch-rank`.
+
+#### THE RANKS
+
+Untried: a met run has its ranks, and rows of one instant share a rank
+while rows of two do not. A rank cannot be computed from `Few`: its
+cover may hold positions with no row. Settled when these are bodies over
+`rooted`, the instant interval and a way to list a run's instants.
+
+Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
+
+#### THE ROUTES
+
+Proven on a closed branch over the held-route tower: a dead instant
+stays dead, and an instant's values precede its overs. Settled when the
+tower is ported and these are its bodies.
+
+Members: `shut`, `over-last`.
+
+#### THE PROTOCOL
+
+Untried: every emit is named for its instant, the begins and values of
+one instant carry one name, the subscribe mark sits once before every
+begin with every value past it async, and every value precedes the
+completion. Settled when each is a body over the elaboration's layers.
+
+Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE ERASURE
 
@@ -50,8 +83,9 @@ Members: `erases`.
 
 #### THE INSTANTS
 
-Whether every position the emission set gives lies under the subscribe
-frame or a timer cascade, as `instantOf` reads it. Settled when
-`positioned` is a body by induction over the tree.
+Whether every position a program reaches lies under the subscribe frame
+or a timer cascade, as `instantOf` reads it. The world invariant says
+where a row lies, not yet that none sits at a timer's root. Settled when
+the invariant carries that, and `positioned` and `rooted` read it off.
 
-Members: `positioned`.
+Members: `positioned`, `rooted`.
