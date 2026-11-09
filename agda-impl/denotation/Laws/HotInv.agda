@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Events using (Pos; sub; last; <ᵖ-split; <ᵖ-down)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; EmissionSet; _≺_; _≼_; hot; Rejoin; shown; heard; ended; late)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-trans; ≼-false)
-open import denotation.Laws.Worlds using (_⊕_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD;
+open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; sub-untimed; _⊕_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD;
   _⊑_; ⊑-snoc; ⊑-inside; ext≢; not-up; nest-in; named-view; named-e; anc-≼; world-anc⁼; world-after)
 
 private
@@ -96,9 +96,15 @@ lawful-hot {H = H} {t} L p ok = record
   ; under = λ x y → un (view (proj₁ x)) (view (proj₁ y))
   ; quiet = λ c y cy → ⊥-elim (bu (view (proj₁ c)) (view (proj₁ y)) cy)
   ; pinned = λ x → ⊥-elim (unpinned (view (proj₁ x)))
+  ; untimed = λ x → ut (view (proj₁ x))
   }
   where
     open HI {H = H} {p} L
+    ut : ∀ {y e} → Vw y e → TimerRoot y → ⊥
+    ut (jn {q} x _ _ refl) tr with sub-untimed q tr
+    ... | _ , refl = Lawful.deep L x
+    ut (lt _ _ _ refl)     tr = plain-untimed p plain-last tr
+
     re : ∀ {y e} → Vw y e → Real y
     re (jn {q} x pq _ refl) = real-sub q (Lawful.real L x) (proj₁ ok) (≺-trans {p} {q} {q ++ [ sub p ]} pq (≺-ext q []))
     re (lt _ _ _ refl)    = real-snoc p plain-last (proj₁ ok)

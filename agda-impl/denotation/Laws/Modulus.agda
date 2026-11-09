@@ -5,7 +5,7 @@
 -- agree, and how that bounds the unfolding, is `Laws.Count`.
 module denotation.Laws.Modulus where
 
-open import Data.Bool using (T; true; false)
+open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; _++_; [_]; length; filter)
@@ -80,6 +80,11 @@ open import denotation.EmissionSet
 ≼-split {x} {y} xy with <ᵖ-split x y (≼-false {x} {y} xy)
 ... | inj₁ lt = inj₁ (Equivalence.from T-≡ lt)
 ... | inj₂ eq = inj₂ eq
+
+-- A boolean is not both.
+T-not : ∀ {b} → T b → T (not b) → ⊥
+T-not {true}  _ ()
+T-not {false} ()
 
 -- A position comes before its extensions.
 ≺-ext : ∀ x {l} ys → x ≺ (x ++ l ∷ ys)

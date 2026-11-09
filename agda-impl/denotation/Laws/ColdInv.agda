@@ -27,7 +27,7 @@ open import denotation.Events using (Pos; Label; ix; sub; last; Time; tick; From
 open import denotation.Events using (Events; frames; burst; start)
 open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-irrefl; ≺-ext)
-open import denotation.Laws.Worlds using (Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
+open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; plain-last; plain-sub; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; snoc≢[]; Anc; self; up; plain; named; anc-view; parent-fun; step-parent; anc-trans; anc-≼; world-anc⁼; nest-in; nonempty⁼; lone)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 
 -- One slot before the next, and before the end.
@@ -121,7 +121,7 @@ private
       row-f τ r quiet         R _  ()
       row-f τ r (at t′ _ b) (w , rr , ri) ok x =
         row-b τ (ix (τ + t′) ∷ sub (r ++ [ last ]) ∷ []) 0 b
-          (inW (timer (τ + t′) (inW (step w plain-last))) , timer-real τ (r ++ [ last ]) (real-snoc r plain-last rr) ok , r-timer ri)
+          (inW (timer (τ + t′) (inW (step w plain-last)) ok) , timer-real τ (r ++ [ last ]) (real-snoc r plain-last rr) ok , r-timer ri)
           ≤-refl x
 
     -- Every row lies at or after the stream's first.
@@ -244,6 +244,9 @@ private
     wo : ∀ {y e} → Row y e → W H p y
     wo (_ , _ , (w , _ , _) , pl , refl , _) = step w pl
 
+    ut : ∀ {y e} → Row y e → TimerRoot y → ⊥
+    ut (r , _ , _ , pl , refl , _) = plain-untimed r pl
+
     re : ∀ {y e} → Row y e → Real y
     re (r , _ , (_ , rr , _) , pl , refl , _) = real-snoc r pl rr
 
@@ -270,6 +273,7 @@ cold-inv {A} {H} c p (rp , dj) = record
   ; under = λ x y pl v le → un (proj₁ x) (proj₁ y) (row m (proj₁ x)) (row m (proj₁ y)) pl v le
   ; quiet = λ ce y cy → ⊥-elim (la m (proj₁ ce) (proj₁ y) cy)
   ; pinned = λ x → ⊥-elim (ine-pin (proj₁ x))
+  ; untimed = λ x → ut (row m (proj₁ x))
   }
   where
     m = timelineAt c p

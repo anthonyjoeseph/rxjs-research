@@ -32,7 +32,8 @@ import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
 open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; module Leaves; module Split)
-open import simultaneous.Shut using (r₀; shut)
+open import simultaneous.Shut using (r₀)
+open import simultaneous.Held using (shut)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
