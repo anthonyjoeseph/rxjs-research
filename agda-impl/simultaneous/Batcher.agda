@@ -21,7 +21,8 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; sym; trans; subst; module ≡-Reasoning)
 
 open import Tree using (scan; map; merge; of)
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (Ev; skip; end; pin) renaming (out to emit)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks

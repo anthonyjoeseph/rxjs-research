@@ -13,7 +13,8 @@ open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; module Scan; _≼_; _≺_; Few)
 open import denotation.Read using (Run; []; _∷_; Visible; After)
 open import denotation.Laws.Modulus using (entered-reach; entered-few)
@@ -87,7 +88,7 @@ same-scanIE st (instEmit (mark _) _)  refl = same-mark
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
               → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ fwd (h p ok nt ep)
+held-scan-den f z d cs h p ok ep = held-same row end-row back′ fwd (h p ok ep)
   where
     module Sr = ScanRun (scanIE f) z d p
     module Mr = MapRun proj₂ (Op.scan (scanIE f) z d) p

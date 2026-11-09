@@ -11,13 +11,13 @@ module simultaneous.Readings where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Product using (_×_; _,_)
-open import denotation.Events using (Pos; Instant; instant)
+open import denotation.Position using (Pos; Instant) renaming (instant to instantᵖ)
 open import simultaneous.InstEmit using (InstEmit; valuesOf)
 
 open InstEmit using (instant)
 
 instantOf : Pos → Instant
-instantOf = instant
+instantOf = instantᵖ
 
 ------------------------------------------------------------------------
 -- InstEmit streams

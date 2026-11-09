@@ -8,7 +8,7 @@ module simultaneous.Layers where
 
 open import Data.List using (List; []; _∷_; concatMap; _++_; [_])
 import Data.List as L
-open import Data.List.Properties using (++-assoc; ++-identityʳ; ∷-injectiveʳ)
+open import Data.List.Properties using (∷-injectiveʳ; ++-assoc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-concatMap⁺; ∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
@@ -27,12 +27,13 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _�
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
 open import Tree using (Obs; scan; map; of)
-open import denotation.Events using (Timeline; Pos; root; fresh; finals; _≟ᵖ_; _<ᵖ_; ix; last; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
+open import denotation.Events using (Timeline; fresh; finals; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge; module Bounded; module Values; MapT; map-out; map-end; map-skip; map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Nth using (module Nths)
-open import denotation.Laws.Worlds using (InvAt; PinBy)
+open import denotation.Laws.Worlds using (InvAt; PinBy; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-end; of-end-row; of-idx)
 open import denotation.Laws.Modulus using (≼-split; ≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
 open import denotation.Laws.Fold using (fold)
@@ -298,7 +299,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   IS = inv-⟦⟧ s [] (λ ()) root (tt , λ ())
 
   ln : Pos → Pos
-  ln q = q ++ [ ix 1 ]
+  ln q = q ⊕ [ ix 1 ]
 
   -- A row of the source under another is none.
   sole : ∀ {q e zs e′} → S q e → S (q ++ zs) e′ → zs ≡ []
@@ -307,7 +308,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
   ext-absurd : ∀ {q e y e′ zs} → S q e → S y e′ → q ≺ y → y ≡ q ++ zs → ⊥
   ext-absurd {q} x x′ lt eq with sole x (subst (λ w → S w _) eq x′)
-  ... | refl = ≺-irrefl {q} (subst (q ≺_) (trans eq (++-identityʳ q)) lt)
+  ... | refl = ≺-irrefl {q} (subst (q ≺_) (trans eq (⊕-identityʳ q)) lt)
 
   -- What lies under a row of the source lies before the rows past it.
   past-under : ∀ {q e q′ e′} → S q e → S q′ e′ → q ≺ q′ → ∀ ys → (q ++ ys) ≺ q′
@@ -332,8 +333,8 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
   lane-at : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → Σ Pos λ ys → k ≡ q ++ ix 1 ∷ ys
   lane-at {q} {xs} y with of-idx (ln q) 0 xs y
-  ... | inj₁ (j , _ , eq) = ix j ∷ [] , trans eq (++-assoc q [ ix 1 ] [ ix j ])
-  ... | inj₂ eq           = last ∷ [] , trans eq (++-assoc q [ ix 1 ] [ last ])
+  ... | inj₁ (j , _ , eq) = ix j ∷ [] , trans eq (⊕-assoc q [ ix 1 ] [ ix j ])
+  ... | inj₂ eq           = last ∷ [] , trans eq (⊕-assoc q [ ix 1 ] [ last ])
 
   lane-≼ : ∀ {q} {xs : List Y} {k} {e : Ev Y} → InE (ofᴱ (ln q) 0 xs) k e → q ≼ k
   lane-≼ {q} {xs} {k = k} y with lane-at {q} {xs} y
@@ -346,7 +347,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
 
   lend-absurd : ∀ {q a c} → S q (out a) → InE (ofᴱ (ln q) 0 (f a)) c end → M.Done c → ⊥
   lend-absurd {q} {a} x y ((c₀ , y₀ , le) , _) with of-end (ln q) 0 (f a) y
-  ... | refl = none-under (ix 1 ∷ last ∷ []) x y₀ (val-end x y₀) (subst (c₀ ≼_) (++-assoc q [ ix 1 ] [ last ]) le)
+  ... | refl = none-under (ix 1 ∷ last ∷ []) x y₀ (val-end x y₀) (subst (c₀ ≼_) (⊕-assoc q [ ix 1 ] [ last ]) le)
 
   vis : ∀ {k e} → E k e → Visible e → Σ Pos λ q → Vis k q e
   vis (M.val _ , _) ()
@@ -406,7 +407,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
   module Over (whole : List (Pos × Ev X)) (mw : Met S whole) where
 
     rowsOf : Pos × Ev X → List Pos
-    rowsOf (q , out a) = q ∷ (q ++ [ ix 0 ]) ∷ of-rows (ln q) 0 (f a)
+    rowsOf (q , out a) = q ∷ (q ⊕ [ ix 0 ]) ∷ of-rows (ln q) 0 (f a)
     rowsOf (q , _)     = q ∷ []
 
     module _ {q e₀} (qin : (q , e₀) ∈ whole) where
@@ -417,7 +418,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
         hS  = proj₂ (proj₂ (seenS x₀ vi₀))
 
       ks : List Pos
-      ks = concatMap (λ q′ → q′ ∷ (q′ ++ [ ix 0 ]) ∷ []) ksS ++ concatMap rowsOf whole
+      ks = concatMap (λ q′ → q′ ∷ (q′ ⊕ [ ix 0 ]) ∷ []) ksS ++ concatMap rowsOf whole
 
       in-whole : ∀ {r k′} → r ∈ whole → k′ ∈ rowsOf r → k′ ∈ ks
       in-whole m r = ∈-++⁺ʳ (concatMap _ ksS) (∈-concatMap⁺ rowsOf (any-map (λ { refl → r }) m))
@@ -426,17 +427,17 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       row-in {e′ = out _} x le = in-whole (run-has (at-func s) mw x tt tt le qin) (here refl)
       row-in {e′ = end}   x le = in-whole (run-has (at-func s) mw x tt tt le qin) (here refl)
       row-in {q′} {e′ = skip} x le with ≼-split {q′} {q} le
-      ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ++ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
+      ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ⊕ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
       ... | inj₂ refl = ⊥-elim (skip-vis ((at-func s) x x₀) vi₀)
         where skip-vis : ∀ {e : Ev X} → skip ≡ e → Visible e → ⊥
               skip-vis refl ()
       row-in {q′} {e′ = pin r} x le with ≼-split {q′} {q} le
-      ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ++ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
+      ... | inj₁ lt = ∈-++⁺ˡ (lift-in (λ q′ → q′ ∷ (q′ ⊕ [ ix 0 ]) ∷ []) (here refl) (hS x lt))
       ... | inj₂ refl = ⊥-elim (pin-vis ((at-func s) x x₀) vi₀)
         where pin-vis : ∀ {e : Ev X} → pin r ≡ e → Visible e → ⊥
               pin-vis refl ()
 
-      val-in : ∀ {q′ a′} → S q′ (out a′) → q′ ≼ q → (q′ ++ [ ix 0 ]) ∈ ks
+      val-in : ∀ {q′ a′} → S q′ (out a′) → q′ ≼ q → (q′ ⊕ [ ix 0 ]) ∈ ks
       val-in x le = in-whole (run-has (at-func s) mw x tt tt le qin) (there (here refl))
 
       lane-in : ∀ {q′ a′ k′ e′} → S q′ (out a′) → q′ ≼ q → InE (ofᴱ (ln q′) 0 (f a′)) k′ e′ → k′ ∈ ks
@@ -450,7 +451,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
           anc {q′} {k′ = k′} x le kk qq = ≺-absurd {k} {k′} (≺-≼-≺ {k} {q′} {k′} (vis-before v x qq) le) kk
 
           pick : ∀ {k′ e′} → M.JoinT k′ e′ → k′ ≺ k → Dep k e k′ e′ → k′ ∈ ks
-          pick {k′} (M.val {q′} x) kk _ = val-in x (anc {k′ = k′} x (≺→≼ {q′} {q′ ++ [ ix 0 ]} (≺-ext q′ [])) kk)
+          pick {k′} (M.val {q′} x) kk _ = val-in x (anc {k′ = k′} x (≺→≼ {q′} {q′ ⊕ [ ix 0 ]} (≺-ext q′ [])) kk)
           pick {k′} (M.step {q′} x) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
           pick {k′} (M.opin {q′} x) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
           pick {k′} (M.oend {q′} x _) kk _ = row-in x (anc {k′ = k′} x (≼-refl {q′}) kk)
@@ -474,13 +475,13 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
                × (∀ {k q′ e} → Vis k q′ e → q ≺ q′ → After c k)
                × (∀ {k b} → InE (ofᴱ p i xs) k (out b) → After c k)
 
-      at-i : ∀ i {q′ e′} → S q′ e′ → q ≺ q′ → (p ++ [ ix i ]) ≺ q′
-      at-i i {q′} x′ lt = subst (_≺ q′) (sym (++-assoc q [ ix 1 ] [ ix i ])) (past-under sq x′ lt (ix 1 ∷ ix i ∷ []))
+      at-i : ∀ i {q′ e′} → S q′ e′ → q ≺ q′ → (p ⊕ [ ix i ]) ≺ q′
+      at-i i {q′} x′ lt = subst (_≺ q′) (sym (⊕-assoc q [ ix 1 ] [ ix i ])) (past-under sq x′ lt (ix 1 ∷ ix i ∷ []))
 
-      in-rest : ∀ i (xs : List Y) {k′ e′} → InE (ofᴱ p (suc i) xs) k′ e′ → (p ++ [ ix i ]) ≺ k′
+      in-rest : ∀ i (xs : List Y) {k′ e′} → InE (ofᴱ p (suc i) xs) k′ e′ → (p ⊕ [ ix i ]) ≺ k′
       in-rest i xs y with of-idx p (suc i) xs y
-      ... | inj₁ (j , le , refl) = to≺ (p ++ [ ix i ]) (p ++ [ ix j ]) (<ᵖ-part p {ix i} {ix j} [] [] (ix-< le))
-      ... | inj₂ refl            = to≺ (p ++ [ ix i ]) (p ++ [ last ]) (<ᵖ-part p {ix i} {last} [] [] refl)
+      ... | inj₁ (j , le , refl) = to≺ (p ⊕ [ ix i ]) (p ⊕ [ ix j ]) (<ᵖ-part p {ix i} {ix j} [] [] (ix-< le))
+      ... | inj₂ refl            = to≺ (p ⊕ [ ix i ]) (p ⊕ [ last ]) (<ᵖ-part p {ix i} {last} [] [] refl)
 
       go : ∀ {c} i (xs : List Y) → (∀ {k e} → InE (ofᴱ p i xs) k e → InE (ofᴱ p 0 (f a)) k e) → J c i xs
          → Σ _ λ rows → Run E c rows × values rows ≡ xs × Inv (just q) (cursor c rows)
@@ -492,7 +493,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
           ... | inj₂ lt = lt
       go {c} i (x ∷ xs) emb (j₁ , j₂ , j₃) with go (suc i) xs (λ y → emb (on-out y)) (j₁′ , j₂′ , j₃′)
         where
-          k = p ++ [ ix i ]
+          k = p ⊕ [ ix i ]
           j₁′ : ∀ {k′ q′ e} → Vis k′ q′ e → After (just k) k′ → (q′ ≡ q × Σ Y λ b → e ≡ out b × InE (ofᴱ p (suc i) xs) k′ (out b)) ⊎ q ≺ q′
           j₁′ v ak with j₁ v (after-≺ c (j₃ at-out) ak)
           ... | inj₁ (refl , b , refl , at-out)   = ⊥-elim (≺-irrefl {k} ak)
@@ -504,7 +505,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
           j₃′ y = in-rest i xs y
       ... | rows , run , eq , inv = (k , out x) ∷ rows , (seenE row tt , tt , j₃ at-out , mn) ∷ run , cong (x ∷_) eq , inv
         where
-          k = p ++ [ ix i ]
+          k = p ⊕ [ ix i ]
           v : Vis k q (out x)
           v = vlane sq (emb at-out)
           row : E k (out x)
@@ -545,8 +546,8 @@ module EachLayer {X Y : Set} (f : X → List Y) (s : Obs Timeline [] X) where
       where
         lane-ended : ∀ {q′ a′} → S q′ (out a′) → q′ ≺ c → Ended (LaneOf F q′ a′) c
         lane-ended {q′} {a′} x′ lt =
-          ln q′ ++ [ last ] , ((of-end-row (ln q′) 0 (f a′) , of-reach (ln q′) 0 (f a′) {ln q′ ++ [ last ]} {end}) , ≺-ext (ln q′) []) ,
-          ≺→≼ {ln q′ ++ [ last ]} {c} (subst (_≺ c) (sym (++-assoc q′ [ ix 1 ] [ last ])) (past-under x′ x lt (ix 1 ∷ last ∷ [])))
+          ln q′ ⊕ [ last ] , ((of-end-row (ln q′) 0 (f a′) , of-reach (ln q′) 0 (f a′) {ln q′ ⊕ [ last ]} {end}) , ≺-ext (ln q′) []) ,
+          ≺→≼ {ln q′ ⊕ [ last ]} {c} (subst (_≺ c) (sym (⊕-assoc q′ [ ix 1 ] [ last ])) (past-under x′ x lt (ix 1 ∷ last ∷ [])))
         row : E c end
         row = M.oend x ((c , x , ≼-refl {c}) , λ x′ _ lt _ → lane-ended x′ lt) , reachE (sub (here refl)) (vend x)
         mn : ∀ {k′ e′} → E k′ e′ → Visible e′ → After cE k′ → c ≼ k′
@@ -674,8 +675,8 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
   C = at (concatˢ s (of [ c ]))
 
   q₀ q₁ : Pos
-  q₀ = root ++ [ ix 0 ]
-  q₁ = root ++ [ ix 1 ]
+  q₀ = root ⊕ [ ix 0 ]
+  q₁ = root ⊕ [ ix 1 ]
 
   o-val : ∀ {q a} → O q (out a) → (q ≡ q₀ × a ≡ true) ⊎ (q ≡ q₁ × a ≡ false)
   o-val (at-out , _)                 = inj₁ (refl , refl)
@@ -704,17 +705,17 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
       ... | inj₁ (refl , _) = ⊥-elim (≺-irrefl {q₀} lt)
       ... | inj₂ (refl , _) = ≼-refl {q₁}
 
-  IM = inv-⟦⟧ s [] (λ ()) (q₀ ++ [ ix 1 ]) (tt , λ ())
+  IM = inv-⟦⟧ s [] (λ ()) (q₀ ⊕ [ ix 1 ]) (tt , λ ())
 
   -- The first lane, wherever it runs, shows nothing past an end of it.
-  first-quiet : ∀ {i s′ cE k x} → B.Sub i q₀ s′ true → enter (F true) (q₀ ++ [ ix 1 ]) cE end → enter (F true) s′ k (out x) → cE ≺ k → ⊥
+  first-quiet : ∀ {i s′ cE k x} → B.Sub i q₀ s′ true → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end → enter (F true) s′ k (out x) → cE ≺ k → ⊥
   first-quiet (nth , st) yE y lt with nth-inj nth nth₀
   first-quiet (nth , B.room _) yE y lt | refl = pinby-vis tt (InvAt.quiet IM yE y lt)
   first-quiet (nth , B.freed () _) yE y lt | refl
   first-quiet (nth , B.queued () _ _ _ _) yE y lt | refl
 
   -- An end of the first lane, the lane at its value's second child.
-  first-end : ∀ {cE} → B.Ends 0 [] cE → enter (F true) (q₀ ++ [ ix 1 ]) cE end
+  first-end : ∀ {cE} → B.Ends 0 [] cE → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end
   first-end (q , a , s′ , nth , st , (yE , _)) with nth-fun nth nth₀
   ... | refl with o-val (nth-val nth)
   ...   | inj₂ (() , _)
@@ -723,21 +724,21 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
   first-end (q , a , s′ , nth , B.queued () _ _ _ _ , (yE , _)) | refl | inj₁ (_ , refl)
 
   -- The second lane starts past an end of the first.
-  second-start : ∀ {i s₁} → B.Sub i q₁ s₁ false → Σ Pos λ cE → enter (F true) (q₀ ++ [ ix 1 ]) cE end × cE ≺ s₁
+  second-start : ∀ {i s₁} → B.Sub i q₁ s₁ false → Σ Pos λ cE → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end × cE ≺ s₁
   second-start (nth , st) with nth-inj nth nth₁
   second-start (nth , B.room (s≤s ())) | refl
   second-start (nth , B.freed _ (inj₁ (cE , e , lt))) | refl =
-    cE , first-end e , ≺-trans {cE} {q₁} {q₁ ++ [ ix 1 ]} lt (≺-ext q₁ {ix 1} [])
+    cE , first-end e , ≺-trans {cE} {q₁} {q₁ ⊕ [ ix 1 ]} lt (≺-ext q₁ {ix 1} [])
   second-start (nth , B.queued {c′} _ _ (inj₁ (cE , e , refl)) _ _) | refl = cE , first-end e , ≺-ext cE []
 
   -- Past the second lane's value, every value met is it.
-  past-second : ∀ {i s₁ k x} → B.Sub i q₁ s₁ false → C k (out x) → (s₁ ++ [ ix 0 ]) ≺ k → x ≡ c
+  past-second : ∀ {i s₁ k x} → B.Sub i q₁ s₁ false → C k (out x) → (s₁ ⊕ [ ix 0 ]) ≺ k → x ≡ c
   past-second {s₁ = s₁} {k} sub (B.lane ox _ (_ , s′ , sub′ , (y , _)) _ _ , _) lt with o-val ox
   ... | inj₂ (refl , refl) with proj₁ y
   ...   | at-out        = refl
   ...   | on-out ()
   past-second {s₁ = s₁} {k} sub (B.lane ox _ (_ , s′ , sub′ , (y , _)) _ _ , _) lt | inj₁ (refl , refl) with second-start sub
-  ... | cE , yE , ce = ⊥-elim (first-quiet sub′ yE y (≺-trans {cE} {s₁} {k} ce (≺-trans {s₁} {s₁ ++ [ ix 0 ]} {k} (≺-ext s₁ []) lt)))
+  ... | cE , yE , ce = ⊥-elim (first-quiet sub′ yE y (≺-trans {cE} {s₁} {k} ce (≺-trans {s₁} {s₁ ⊕ [ ix 0 ]} {k} (≺-ext s₁ []) lt)))
   past-second _ (B.run () _ , _) _
 
   done-of : ∀ {k} → C k end → B.Done k
@@ -767,13 +768,13 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
     where
       q₁q : q₁ ≺ qe
       q₁q with of-end root 0 bs (proj₁ xo)
-      ... | refl = ≺-≼-≺ {q₁} {root ++ [ last ]} {qe} tt c₀q
+      ... | refl = ≺-≼-≺ {q₁} {root ⊕ [ last ]} {qe} tt c₀q
   ...       | cL , (i , s₁ , sub , ((yL , _) , _)) , cLq with of-end s₁ 0 [ c ] yL
   ...         | refl with ∈-∃++ inRun
     where
-      kc = s₁ ++ [ ix 0 ]
+      kc = s₁ ⊕ [ ix 0 ]
       kcq : kc ≺ qe
-      kcq = ≺-≼-≺ {kc} {s₁ ++ [ last ]} {qe} (to≺ kc (s₁ ++ [ last ]) (<ᵖ-part s₁ {ix 0} {last} [] [] refl)) cLq
+      kcq = ≺-≼-≺ {kc} {s₁ ⊕ [ last ]} {qe} (to≺ kc (s₁ ⊕ [ last ]) (<ᵖ-part s₁ {ix 0} {last} [] [] refl)) cLq
       rowC : C kc (out c)
       rowC = B.lane x₁ (1 , false , nth₁) (i , s₁ , sub , ((at-out , of-reach s₁ 0 [ c ] {kc} {out c}) , ≺-ext s₁ [])) (λ ()) tt ,
              ks , λ {k′} y lt _ → rq y (≺-trans {k′} {kc} {qe} lt kcq) tt
@@ -781,15 +782,15 @@ module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
       inRun = run-has (at-func (concatˢ s (of [ c ]))) m rowC tt tt (≺→≼ {kc} {qe} kcq) (∈-++⁺ʳ ys (here refl))
   ...           | as , zs , eq with ends-c zs past
     where
-      kc = s₁ ++ [ ix 0 ]
+      kc = s₁ ⊕ [ ix 0 ]
       tl : Run C (just kc) zs
       tl = subst (λ w → Run C w zs) (cursor-snoc nothing as)
              (run-tail (as ++ [ (kc , out c) ]) (subst (Run C nothing) (trans eq (sym (++-assoc as [ (kc , out c) ] zs))) m))
       past : ∀ {k x} → (k , out x) ∈ zs → x ≡ c
       past mem = past-second sub (proj₁ (run-row tl mem)) (run-after tl mem)
   ...             | vs , eqv = values as ++ vs ,
-    trans (cong values eq) (trans (values-++ as ((s₁ ++ [ ix 0 ] , out c) ∷ zs))
-      (trans (cong (values as ++_) eqv) (sym (++-assoc (values as) vs [ c ]))))
+    trans (cong values eq) (trans (values-++ as ((s₁ ⊕ [ ix 0 ] , out c) ∷ zs))
+      (trans (cong (values as ++_) eqv) (sym (⊕-assoc (values as) vs [ c ]))))
 
 concat-last : ∀ {X} (s : Obs Timeline [] X) (c : X) {sc} → Met (at (concatˢ s (of [ c ]))) sc → Ends sc
             → Σ (List X) λ vs → values sc ≡ vs ++ [ c ]

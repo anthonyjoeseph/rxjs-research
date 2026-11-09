@@ -20,14 +20,14 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.Events using (Pos; ix; sub; last; Timeline; root; fresh; finals; _≟ᵖ_; inside)
+open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; inside; _⊕_)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
 open import Relation.Nullary using (¬_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
-open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; Real; TimerRoot; _⊕_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans;
-  ⊑-inside; world-after; world-after⁼; in-world)
+open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; Real; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
@@ -36,7 +36,6 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Sync; Ex; Early; Before; Valued; opos)
 open import denotation.Events using (<ᵖ-apart; _<ᵖ_; <ᵖ-shift; <ᵖ-next)
 open import Data.Bool.Properties using (T-≡)
-open import Data.List.Properties using (++-assoc)
 open import Function.Bundles using (Equivalence)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
 
@@ -47,7 +46,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 -- Positions
 
 -- A subscription past a timer's root keeps its instant one label down.
-inst-snoc : ∀ p l → Real p → (TimerRoot p → ⊥) → instantOf (p ++ [ l ]) ≡ instantOf p
+inst-snoc : ∀ p l → Real p → (TimerRoot p → ⊥) → instantOf (p ⊕ [ l ]) ≡ instantOf p
 inst-snoc (ix i ∷ [])                 (ix _)  _ _ = refl
 inst-snoc (ix i ∷ [])                 (sub _) _ _ = refl
 inst-snoc (ix i ∷ [])                 last    _ _ = refl
@@ -62,12 +61,12 @@ inst-snoc (ix i ∷ sub _ ∷ _ ∷ _)      l       _ _ = refl
 before-ext : ∀ {y o} zs → Before y o → Before (y ++ zs) o
 before-ext {y} {o} zs (lt , ns) =
   Equivalence.from T-≡ (<ᵖ-apart y o zs (Equivalence.to T-≡ lt) λ ys e → ns (ys , e)) ,
-  λ { (ws , e) → ns (zs ++ ws , trans e (++-assoc y zs ws)) }
+  λ { (ws , e) → ns (zs ++ ws , trans e (⊕-assoc y zs ws)) }
 
 -- A subscription early in its instant subscribes its parts early.
-early-snoc : ∀ {p} l → Real p → (TimerRoot p → ⊥) → Early p → Early (p ++ [ l ])
+early-snoc : ∀ {p} l → Real p → (TimerRoot p → ⊥) → Early p → Early (p ⊕ [ l ])
 early-snoc {p} l rp nt ep v =
-  subst (λ I → Before (p ++ [ l ]) (opos I)) (sym eq) (before-ext [ l ] (ep (subst Valued eq v)))
+  subst (λ I → Before (p ⊕ [ l ]) (opos I)) (sym eq) (before-ext [ l ] (ep (subst Valued eq v)))
   where eq = inst-snoc p l rp nt
 
 ⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
@@ -79,7 +78,7 @@ early-snoc {p} l rp nt ep v =
 ⊑-≼ {x} (l ∷ ys , refl) = ≺→≼ {x} (≺-ext x ys)
 
 -- The body's burst lies in the connect's.
-sync-body : ∀ {p y} → Real p → (TimerRoot p → ⊥) → Sync (p ++ [ ix 0 ]) y → Sync p y
+sync-body : ∀ {p y} → Real p → (TimerRoot p → ⊥) → Sync (p ⊕ [ ix 0 ]) y → Sync p y
 sync-body {p} {y} rp nt (i , eq) =
   subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (inst-snoc p (ix 0) rp nt)
   where
@@ -110,7 +109,7 @@ up []          = []
 up (_ ∷ [])    = []
 up (a ∷ b ∷ x) = a ∷ up (b ∷ x)
 
-up-snoc : ∀ (y : Pos) l → up (y ++ [ l ]) ≡ y
+up-snoc : ∀ (y : Pos) l → up (y ⊕ [ l ]) ≡ y
 up-snoc []          l = refl
 up-snoc (a ∷ [])    l = refl
 up-snoc (a ∷ b ∷ y) l = cong (a ∷_) (up-snoc (b ∷ y) l)
@@ -121,17 +120,17 @@ vis-dep {e = out _} _ = tt
 vis-dep {e = end}   _ = tt
 
 -- One step past each keeps the order.
-shift : ∀ z′ z → (z′ ++ [ ix 0 ]) ≺ (z ++ [ ix 0 ]) → z′ ≺ z
+shift : ∀ z′ z → (z′ ⊕ [ ix 0 ]) ≺ (z ⊕ [ ix 0 ]) → z′ ≺ z
 shift z′ z lt with z′ <ᵖ z in e
 ... | true  = tt
 ... | false = ⊥-elim (subst T (<ᵖ-shift z′ z e) lt)
 
-next : ∀ z′ z → z′ ≺ z → (z′ ++ [ ix 0 ]) ≺ (z ++ [ ix 0 ])
+next : ∀ z′ z → z′ ≺ z → (z′ ⊕ [ ix 0 ]) ≺ (z ⊕ [ ix 0 ])
 next z′ z lt = Equivalence.from T-≡ (<ᵖ-next z′ z (ix 0) (Equivalence.to T-≡ lt))
 
 module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
-               (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) (p : Pos) (ok : Ok H p)
-               (sh : Shows (enter s (p ++ [ ix 1 ]))) where
+               (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) (p : Pos) (ok : Ok H p)
+               (sh : Shows (enter s (p ⊕ [ ix 1 ]))) where
   open Connect s F p using (σ; β; r; ConnT; Alive; body; burst; echo; kept)
 
   C : EmissionSet B
@@ -140,8 +139,8 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   Iσ : InvAt H r σ
   Iσ = Is r (ok-step p ok)
 
-  Iβ : InvAt (H ⊕ Proper σ) (p ++ [ ix 0 ]) β
-  Iβ = IF (src-lawful {s = s} {F = F} Is IF p ok) (p ++ [ ix 0 ]) (body-ok {s = s} {F = F} Is IF p ok)
+  Iβ : InvAt (H ∪ʰ Proper σ) (p ⊕ [ ix 0 ]) β
+  Iβ = IF (src-lawful {s = s} {F = F} Is IF p ok) (p ⊕ [ ix 0 ]) (body-ok {s = s} {F = F} Is IF p ok)
 
   -- A visible body row lies before the body's end.
   before-end : ∀ {q e c} → β q e → Visible e → β c end → q ≼ c
@@ -154,7 +153,7 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   alive′ x v k kq ce = ≺-≼-≺ {k} kq (before-end x v ce)
 
   -- Before a visible body row, every source row shows.
-  shows : ∀ {q e} → β q e → Visible e → ∀ {y e′} → σ y e′ → (y ++ [ ix 0 ]) ≺ q → Σ (Ev B) (ConnT (y ++ [ ix 0 ]))
+  shows : ∀ {q e} → β q e → Visible e → ∀ {y e′} → σ y e′ → (y ⊕ [ ix 0 ]) ≺ q → Σ (Ev B) (ConnT (y ⊕ [ ix 0 ]))
   shows {q} x v {y} {e′} sy lt with inside r y in ins
   ... | true  = _ , burst sy (subst T (sym ins) tt)
   ... | false with e′
@@ -168,12 +167,12 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   -- A body row before a visible connect row is the connect's.
   lift : ∀ {q e} → C q e → Visible e → ∀ {k e′} → β k e′ → k ≺ q → C k e′
   lift {q} (body x , ks , rc) v {k} xk kq =
-    body xk , conn-reach {r = p} {σ = σ} {β = β} few (entered-reach (F (hot (Proper σ))) (p ++ [ ix 0 ]) xk)
+    body xk , conn-reach {r = p} {σ = σ} {β = β} few (entered-reach (F (hot (Proper σ))) (p ⊕ [ ix 0 ]) xk)
     where
-      few : Σ (List Pos) λ ys → ∀ {y e″} → σ y e″ → (y ++ [ ix 0 ]) ≺ k → y ∈ ys
+      few : Σ (List Pos) λ ys → ∀ {y e″} → σ y e″ → (y ⊕ [ ix 0 ]) ≺ k → y ∈ ys
       few = L.map up ks , λ {y} sy lt →
-        let (_ , cy) = shows x v sy (≺-trans {y ++ [ ix 0 ]} lt kq)
-        in subst (_∈ L.map up ks) (up-snoc y (ix 0)) (∈-map⁺ up (rc cy (≺-trans {y ++ [ ix 0 ]} lt kq) (vis-dep v)))
+        let (_ , cy) = shows x v sy (≺-trans {y ⊕ [ ix 0 ]} lt kq)
+        in subst (_∈ L.map up ks) (up-snoc y (ix 0)) (∈-map⁺ up (rc cy (≺-trans {y ⊕ [ ix 0 ]} lt kq) (vis-dep v)))
   lift (burst _ _ , _) () _ _
   lift (echo _ _ _ _ , _) () _ _
   lift (kept _ _ _ _ , _) () _ _
@@ -183,10 +182,10 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   σ-past {k} x = ≺-trans {p} {r} {k} (≺-ext p []) (world-after (InvAt.world Iσ x) (InvAt.real Iσ x))
 
   past-p : ∀ {k e} → ConnT k e → p ≺ k
-  past-p {k} (body x)         = ≺-trans {p} {p ++ [ ix 0 ]} {k} (≺-ext p []) (world-after (InvAt.world Iβ x) (InvAt.real Iβ x))
-  past-p (burst {k} x _)      = ≺-trans {p} {k} {k ++ [ ix 0 ]} (σ-past x) (≺-ext k [])
-  past-p (echo {k} x _ _ _)   = ≺-trans {p} {k} {k ++ [ ix 0 ]} (σ-past x) (≺-ext k [])
-  past-p (kept {k} x _ _ _)   = ≺-trans {p} {k} {k ++ [ ix 0 ]} (σ-past x) (≺-ext k [])
+  past-p {k} (body x)         = ≺-trans {p} {p ⊕ [ ix 0 ]} {k} (≺-ext p []) (world-after (InvAt.world Iβ x) (InvAt.real Iβ x))
+  past-p (burst {k} x _)      = ≺-trans {p} {k} {k ⊕ [ ix 0 ]} (σ-past x) (≺-ext k [])
+  past-p (echo {k} x _ _ _)   = ≺-trans {p} {k} {k ⊕ [ ix 0 ]} (σ-past x) (≺-ext k [])
+  past-p (kept {k} x _ _ _)   = ≺-trans {p} {k} {k ⊕ [ ix 0 ]} (σ-past x) (≺-ext k [])
 
   -- No pin of the source's or the body's is the connect's own.
   σ-pin : ∀ {k} → σ k (pin p) → ⊥
@@ -207,25 +206,25 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
     ; x@(burst _ _)    lt d → ∈-++⁺ʳ (proj₁ Rb) (h x tt lt d)
     ; x@(echo _ _ _ _) lt d → ∈-++⁺ʳ (proj₁ Rb) (h x tt lt d)
     ; x@(kept _ _ _ _) lt d → ∈-++⁺ʳ (proj₁ Rb) (h x tt lt d) }
-    where Rb = entered-reach (F (hot (Proper σ))) (p ++ [ ix 0 ]) y
+    where Rb = entered-reach (F (hot (Proper σ))) (p ⊕ [ ix 0 ]) y
 
   -- A burst row waits on the bursts before it, which the source's rows
   -- before it give.
   burst-reach : ∀ {z e′} → σ z e′ → T (inside r z) → (L : List Pos) → (∀ {z′ e″} → σ z′ e″ → z′ ≺ z → z′ ∈ L)
-              → Reach ConnT (z ++ [ ix 0 ]) (pin p)
-  burst-reach {z} x i L h = L.map (_++ [ ix 0 ]) L , cov
+              → Reach ConnT (z ⊕ [ ix 0 ]) (pin p)
+  burst-reach {z} x i L h = L.map (_⊕ [ ix 0 ]) L , cov
     where
-      ip : T (inside p (z ++ [ ix 0 ]))
+      ip : T (inside p (z ⊕ [ ix 0 ]))
       ip = ⊑-inside (⊑-trans (⊑-trans (⊑-snoc⁺ p) (inside-⊑ r z i)) (⊑-snoc⁺ z))
 
       below : ∀ {k e″} → ConnT k e″ → k ≺ p → ⊥
       below x′ kp = ≺-absurd {p} (past-p x′) kp
 
-      cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ++ [ ix 0 ]) → Dep (z ++ [ ix 0 ]) (pin p) k e″ → k ∈ L.map (_++ [ ix 0 ]) L
+      cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ⊕ [ ix 0 ]) → Dep (z ⊕ [ ix 0 ]) (pin p) k e″ → k ∈ L.map (_⊕ [ ix 0 ]) L
       cov x′@(body y) lt d with d ip
       ... | inj₁ kp   = ⊥-elim (below x′ kp)
       ... | inj₂ refl = ⊥-elim (β-pin y)
-      cov (burst {k′} y _) lt _ = ∈-map⁺ (_++ [ ix 0 ]) (h y (shift k′ z lt))
+      cov (burst {k′} y _) lt _ = ∈-map⁺ (_⊕ [ ix 0 ]) (h y (shift k′ z lt))
       cov x′@(echo _ _ _ _) lt d with d ip
       ... | inj₁ kp = ⊥-elim (below x′ kp)
       ... | inj₂ ()
@@ -245,74 +244,74 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
     inC : ∀ {k e} → ConnT k e → Reach ConnT k e → k ≺ w → k ∈ ks
     inC x rc kw = proj₂ Fw (x , rc) kw
 
-    burst-in : ∀ {z e′} → σ z e′ → (i : T (inside r z)) → (z ++ [ ix 0 ]) ≺ w → ¬ ¬ ((z ++ [ ix 0 ]) ∈ ks)
+    burst-in : ∀ {z e′} → σ z e′ → (i : T (inside r z)) → (z ⊕ [ ix 0 ]) ≺ w → ¬ ¬ ((z ⊕ [ ix 0 ]) ∈ ks)
     burst-in {z} x i zw no = sh (L.map up ks , good) λ (Ls , hs) → no (inC (burst x i) (burst-reach x i Ls hs) zw)
       where
         good : ∀ {k e} → σ k e → Few σ k → k ≺ z → k ∈ L.map up ks
         good {k} y (Lk , hk) kz = subst (_∈ L.map up ks) (up-snoc k (ix 0))
           (∈-map⁺ up (inC (burst y (in-world Iσ y kz i)) (burst-reach y (in-world Iσ y kz i) Lk hk)
-                          (≺-trans {k ++ [ ix 0 ]} {z ++ [ ix 0 ]} {w} (next k z kz) zw)))
+                          (≺-trans {k ⊕ [ ix 0 ]} {z ⊕ [ ix 0 ]} {w} (next k z kz) zw)))
 
-    echo-in : ∀ {z e′} → σ z e′ → (a : Alive z) (u : Unpinned e′) (ni : T (not (inside r z))) → (z ++ [ ix 0 ]) ≺ w
-            → (z ++ [ ix 0 ]) ∈ ks
+    echo-in : ∀ {z e′} → σ z e′ → (a : Alive z) (u : Unpinned e′) (ni : T (not (inside r z))) → (z ⊕ [ ix 0 ]) ≺ w
+            → (z ⊕ [ ix 0 ]) ∈ ks
     echo-in {z} x a u ni zw = inC (echo x a u ni) (Lσ ++ ks , cov) zw
       where
         Rz = entered-reach s r x
-        Lσ = L.map (_++ [ ix 0 ]) (proj₁ Rz)
+        Lσ = L.map (_⊕ [ ix 0 ]) (proj₁ Rz)
 
-        inLz : ∀ {z′ e″} → σ z′ e″ → z′ ≺ z → (z′ ++ [ ix 0 ]) ∈ Lσ
-        inLz {z′} y lt = ∈-map⁺ (_++ [ ix 0 ]) (proj₂ Rz y lt (full u))
+        inLz : ∀ {z′ e″} → σ z′ e″ → z′ ≺ z → (z′ ⊕ [ ix 0 ]) ∈ Lσ
+        inLz {z′} y lt = ∈-map⁺ (_⊕ [ ix 0 ]) (proj₂ Rz y lt (full u))
 
-        sd : ∀ {k e″} (x′ : ConnT k e″) → SD x′ → k ≺ (z ++ [ ix 0 ]) → k ∈ Lσ
+        sd : ∀ {k e″} (x′ : ConnT k e″) → SD x′ → k ≺ (z ⊕ [ ix 0 ]) → k ∈ Lσ
         sd (burst {k′} y _)    _ lt = inLz y (shift k′ z lt)
         sd (echo {k′} y _ _ _) _ lt = inLz y (shift k′ z lt)
         sd (kept {k′} y _ _ _) _ lt = inLz y (shift k′ z lt)
 
-        cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ++ [ ix 0 ]) → Dep (z ++ [ ix 0 ]) skip k e″ → k ∈ (Lσ ++ ks)
+        cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ⊕ [ ix 0 ]) → Dep (z ⊕ [ ix 0 ]) skip k e″ → k ∈ (Lσ ++ ks)
         cov {k} (body y) lt _ =
-          ∈-++⁺ʳ Lσ (inC (body y) (body-reach y Lσ λ {k′} x′ t lt′ _ → sd x′ t (≺-trans {k′} {k} {z ++ [ ix 0 ]} lt′ lt))
-                        (≺-trans {k} {z ++ [ ix 0 ]} {w} lt zw))
+          ∈-++⁺ʳ Lσ (inC (body y) (body-reach y Lσ λ {k′} x′ t lt′ _ → sd x′ t (≺-trans {k′} {k} {z ⊕ [ ix 0 ]} lt′ lt))
+                        (≺-trans {k} {z ⊕ [ ix 0 ]} {w} lt zw))
         cov x′@(burst _ _)    lt _ = ∈-++⁺ˡ (sd x′ tt lt)
         cov x′@(echo _ _ _ _) lt _ = ∈-++⁺ˡ (sd x′ tt lt)
         cov x′@(kept _ _ _ _) lt _ = ∈-++⁺ˡ (sd x′ tt lt)
 
-    kept-in : ∀ {z p′} → σ z (pin p′) → (a : Alive p′) (ni : T (not (inside r z))) (i : T (inside p′ z)) → (z ++ [ ix 0 ]) ≺ w
-            → (z ++ [ ix 0 ]) ∈ ks
+    kept-in : ∀ {z p′} → σ z (pin p′) → (a : Alive p′) (ni : T (not (inside r z))) (i : T (inside p′ z)) → (z ⊕ [ ix 0 ]) ≺ w
+            → (z ⊕ [ ix 0 ]) ∈ ks
     kept-in {z} {p′} x a ni i zw = inC (kept x a ni i) (Lσ ++ ks , cov) zw
       where
         Rz = entered-reach s r x
-        Lσ = L.map (_++ [ ix 0 ]) (proj₁ Rz)
+        Lσ = L.map (_⊕ [ ix 0 ]) (proj₁ Rz)
 
-        i′ : T (inside p′ (z ++ [ ix 0 ]))
+        i′ : T (inside p′ (z ⊕ [ ix 0 ]))
         i′ = ⊑-inside (⊑-trans (inside-⊑ p′ z i) (⊑-snoc⁺ z))
 
-        inLz : ∀ {z′ e″} → σ z′ e″ → z′ ≺ z → PDep p′ z′ e″ → (z′ ++ [ ix 0 ]) ∈ Lσ
-        inLz y lt pd = ∈-map⁺ (_++ [ ix 0 ]) (proj₂ Rz y lt λ _ → pd)
+        inLz : ∀ {z′ e″} → σ z′ e″ → z′ ≺ z → PDep p′ z′ e″ → (z′ ⊕ [ ix 0 ]) ∈ Lσ
+        inLz y lt pd = ∈-map⁺ (_⊕ [ ix 0 ]) (proj₂ Rz y lt λ _ → pd)
 
         -- A source row shown before a point waiting on `p′`'s past is in it.
-        sd : ∀ {k e″} (x′ : ConnT k e″) → SD x′ → k ≺ (z ++ [ ix 0 ]) → PDep p′ k e″ → k ∈ Lσ
-        sd (burst {k′} y _) _ lt (inj₁ kp)  = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ++ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
+        sd : ∀ {k e″} (x′ : ConnT k e″) → SD x′ → k ≺ (z ⊕ [ ix 0 ]) → PDep p′ k e″ → k ∈ Lσ
+        sd (burst {k′} y _) _ lt (inj₁ kp)  = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ⊕ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
         sd (burst _ _)      _ lt (inj₂ refl) = ⊥-elim (σ-pin x)
-        sd (echo {k′} y _ _ _) _ lt (inj₁ kp) = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ++ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
+        sd (echo {k′} y _ _ _) _ lt (inj₁ kp) = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ⊕ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
         sd (echo _ _ _ _)   _ lt (inj₂ ())
-        sd (kept {k′} y _ _ _) _ lt (inj₁ kp) = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ++ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
+        sd (kept {k′} y _ _ _) _ lt (inj₁ kp) = inLz y (shift k′ z lt) (inj₁ (≺-trans {k′} {k′ ⊕ [ ix 0 ]} {p′} (≺-ext k′ []) kp))
         sd (kept {k′} y _ _ _) _ lt (inj₂ refl) = inLz y (shift k′ z lt) (inj₂ refl)
 
         -- What a body row before the kept one waits on, it waits on in `p′`'s past.
-        bdep : ∀ {b e} → β b e → b ≺ (z ++ [ ix 0 ]) → PDep p′ b e → ∀ {k e″} → k ≺ b → Dep b e k e″ → PDep p′ k e″
+        bdep : ∀ {b e} → β b e → b ≺ (z ⊕ [ ix 0 ]) → PDep p′ b e → ∀ {k e″} → k ≺ b → Dep b e k e″ → PDep p′ k e″
         bdep {b} y bz (inj₁ bp)  {k} kb _ = inj₁ (≺-trans {k} {b} {p′} kb bp)
         bdep y bz (inj₂ refl) kb d = d (proj₂ (InvAt.pinned Iβ y))
 
-        cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ++ [ ix 0 ]) → Dep (z ++ [ ix 0 ]) (pin p′) k e″ → k ∈ (Lσ ++ ks)
+        cov : ∀ {k e″} → ConnT k e″ → k ≺ (z ⊕ [ ix 0 ]) → Dep (z ⊕ [ ix 0 ]) (pin p′) k e″ → k ∈ (Lσ ++ ks)
         cov {k} (body y) lt d =
-          ∈-++⁺ʳ Lσ (inC (body y) (body-reach y Lσ λ {k′} x′ t lt′ d′ → sd x′ t (≺-trans {k′} {k} {z ++ [ ix 0 ]} lt′ lt) (bdep y lt (d i′) lt′ d′))
-                        (≺-trans {k} {z ++ [ ix 0 ]} {w} lt zw))
+          ∈-++⁺ʳ Lσ (inC (body y) (body-reach y Lσ λ {k′} x′ t lt′ d′ → sd x′ t (≺-trans {k′} {k} {z ⊕ [ ix 0 ]} lt′ lt) (bdep y lt (d i′) lt′ d′))
+                        (≺-trans {k} {z ⊕ [ ix 0 ]} {w} lt zw))
         cov x′@(burst _ _)    lt d = ∈-++⁺ˡ (sd x′ tt lt (d i′))
         cov x′@(echo _ _ _ _) lt d = ∈-++⁺ˡ (sd x′ tt lt (d i′))
         cov x′@(kept _ _ _ _) lt d = ∈-++⁺ˡ (sd x′ tt lt (d i′))
 
     sd-in : ∀ {k e} (x : ConnT k e) → SD x → k ≺ w → k ∈ ks
-    sd-in (burst {k} y i)  _ kw = decidable-stable (any? ((k ++ [ ix 0 ]) ≟ᵖ_) ks) (burst-in y i kw)
+    sd-in (burst {k} y i)  _ kw = decidable-stable (any? ((k ⊕ [ ix 0 ]) ≟ᵖ_) ks) (burst-in y i kw)
     sd-in (echo y a u ni)  _ kw = echo-in y a u ni kw
     sd-in (kept y a ni i)  _ kw = kept-in y a ni i kw
 
@@ -330,7 +329,7 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   back : ∀ {c rs} → Run C c rs → Run β c rs
   back [] = []
   back ((((x@(body y , _) , pr) , _) , vi , aft , lst) ∷ run) =
-    (((y , λ ce → before-end y vi ce) , entered-few (F (hot (Proper σ))) (p ++ [ ix 0 ]) (vis-dep vi) y) , vi , aft ,
+    (((y , λ ce → before-end y vi ce) , entered-few (F (hot (Proper σ))) (p ⊕ [ ix 0 ]) (vis-dep vi) y) , vi , aft ,
       λ {k} xk vk ak kq → lst (lift x vi xk kq) vk ak kq) ∷ back run
   back (((((burst _ _ , _) , _) , _) , () , _) ∷ _)
   back (((((echo _ _ _ _ , _) , _) , _) , () , _) ∷ _)
@@ -351,15 +350,15 @@ rows-refl (_∷_ {e = skip}  (_ , () , _) _)
 rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 
 held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
-            (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) p (ok : Ok H p) (nt : TimerRoot p → ⊥) cs
-          → Shows (enter s (p ++ [ ix 1 ]))
-          → Held (enter (F (hot (Proper (enter s (p ++ [ ix 1 ]))))) (p ++ [ ix 0 ])) ((p ++ [ ix 0 ]) ∷ p ∷ cs)
+            (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) (nt : TimerRoot p → ⊥) cs
+          → Shows (enter s (p ⊕ [ ix 1 ]))
+          → Held (enter (F (hot (Proper (enter s (p ⊕ [ ix 1 ]))))) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
 held-conn s F Is IF p ok nt cs sh h = held-same row end-row back′ fwd (held-ex ex h)
   where
     open ConnRun s F Is IF p ok sh
 
-    ex : ∀ {y} → Ex ((p ++ [ ix 0 ]) ∷ p ∷ cs) y → Ex (p ∷ cs) y
+    ex : ∀ {y} → Ex ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) y → Ex (p ∷ cs) y
     ex (here sy) = here (sync-body (proj₁ ok) nt sy)
     ex (there x) = x
 

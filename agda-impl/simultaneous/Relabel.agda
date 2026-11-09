@@ -21,7 +21,8 @@ open import Relation.Nullary using (¬_; does)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.Maybe using (Maybe)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
 open import denotation.Read using (Visible; After; cursor)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;

@@ -18,7 +18,7 @@
 -- source holds at the first emit it meets, in that same instant.
 --
 -- AN INSTANT'S NAME IS READ OFF THE INSTANT: the cold's step at `I`
--- renders under a lane at `I ++ [ ix 1 ]`, where `mint` is subscribed, and
+-- renders under a lane at `I ⊕ [ ix 1 ]`, where `mint` is subscribed, and
 -- a completion's step one queued lane and one `of` further down.
 --
 -- A VALUE STEP'S OVER IS SENT ONCE ITS VALUE'S CASCADE IS DONE, from the
@@ -38,7 +38,8 @@ open import Data.Sum using (_⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix; sub; last; inside)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; inside; _⊕_)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
 open import denotation.Read using (Visible; After; cursor)
 open import Data.Maybe using (nothing)
@@ -48,7 +49,7 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import denotation.Laws.Worlds using (Ok; TimerRoot; _⊑_)
+open import denotation.Laws.Worlds using (Ok; _⊑_)
 open import Data.Empty using (⊥)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
@@ -137,4 +138,4 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
 -- `cs`.  No subscription is made at a timer's root, where a burst would
 -- have no instant of its own, nor in a value step past its value.
 HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
-HeldD H d cs = ∀ p → Ok H p → (TimerRoot p → ⊥) → Early p → Held (enter d p) (p ∷ cs)
+HeldD H d cs = ∀ p → Ok H p → Early p → Held (enter d p) (p ∷ cs)

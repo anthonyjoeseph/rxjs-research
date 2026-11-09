@@ -20,11 +20,12 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Data.Unit using (⊤)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Read using (Run; _∷_; Visible)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp)
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix)
+open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
@@ -265,7 +266,7 @@ postulate
              → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
              → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
                 → Σ ℕ λ k → proj₂ c ≡ suc k)
-             → (∀ j → instantOf (q ++ ix 1 ∷ ix j ∷ []) ≡ instantOf q)
+             → (∀ j → instantOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ instantOf q)
              → Locals cs c (lay q 0 (proj₂ (react op o x)))
 
 ------------------------------------------------------------------------

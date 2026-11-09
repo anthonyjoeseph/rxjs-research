@@ -19,7 +19,7 @@ open import Relation.Binary.Definitions using (DecidableEquality)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans)
 open import Relation.Nullary using (yes; no)
 
-open import denotation.Events using (Pos; _≟ᵖ_)
+open import denotation.Position using (Pos; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Seen)
 open import denotation.Read using (Run; []; _∷_)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
