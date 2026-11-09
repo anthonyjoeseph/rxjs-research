@@ -26,7 +26,10 @@ open import denotation.Events using (From; done; quiet; at; Frame; emit; stall; 
 open import denotation.Events using (Events; frames; burst; start)
 open import denotation.EmissionSet using (Ev; end; _≺_; _≼_; Reach; InE; at-out; at-skip; at-end; on-out; on-skip; module Op)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≺-≼-≺; ≼-≺-≺; ≺-trans; ≺-ext)
-open import denotation.Laws.Worlds using (hub; RealR; realR-hub; real-▸; hub-≺; step-par; world-▸; ▸-injʳ; ▸-hub; ⊑-▸; Plain; plain-ix; plain-last; W; W⁼; step; timer; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼; ⊑-snoc; ext≢; Anc; self; up; plain; anc-view; parent-fun; step-parent; timed; anc-trans; anc-≼; world-anc⁼; nest-in; ⊕-injˡ; ⊕-injʳ; ⊑-unit; step≢root; timer-after)
+open import denotation.Laws.Worlds using (hub; RealR; realR-hub; real-▸; hub-≺; step-par; world-▸; ▸-injʳ; ▸-hub; ⊑-▸; Plain; plain-ix;
+  plain-last; W; W⁼; step; here; inW; Real; real-snoc; real-init; InvD; world-after; _⊑_; ⊑-≼;
+  ext≢; Anc; self; up; plain; anc-view; parent-fun; anc-trans; anc-≼; world-anc⁼; nest-in;
+  timer-after)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Simultaneity using (effect-tick; step-tick)
 

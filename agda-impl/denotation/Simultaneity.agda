@@ -26,8 +26,8 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
-open import denotation.Position using (Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; Root; nested; fired;
-  _▸_; tickᴿ; lt; eq; gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ⁱ_; _<ᵖ_)
+open import denotation.Position using (Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; nested; fired; _▸_;
+  tickᴿ; lt; eq; gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ⁱ_; _<ᵖ_)
 
 ------------------------------------------------------------------------
 -- When two positions are simultaneous

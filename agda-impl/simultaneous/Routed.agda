@@ -51,7 +51,7 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (emission)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import denotation.Laws.Worlds using (Ok; TimerRoot; _⊑_)
+open import denotation.Laws.Worlds using (Ok; _⊑_)
 open import Data.Empty using (⊥)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
@@ -61,16 +61,16 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 
 -- The name a cold's step at emission `I` mints.
 nm : Pos → Pos
-nm (cascade t e ∙ (last ∷ [])) = cascade t e ∙ (last ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
-nm (cascade t e ∙ (l ∷ []))    = cascade t e ∙ (l ∷ ix 1 ∷ [])
-nm _                           = root
+nm (cascade t e last ∙ []) = cascade t e last ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+nm (cascade t e l ∙ [])    = cascade t e l ∙ (ix 1 ∷ [])
+nm _                       = root
 
 nameOf : Pos → Pos
 nameOf y = nm (emission y)
 
 -- A cold's value step.
 data Valued : Pos → Set where
-  valued : ∀ {t e i} → Valued (cascade t e ∙ (ix i ∷ []))
+  valued : ∀ {t e i} → Valued (cascade t e (ix i) ∙ [])
 
 -- Where a value step's over is sent from.
 opos : Pos → Pos
@@ -137,7 +137,6 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     idle    : Idle t
 
 -- Held at every admissible subscription, exempt for its own burst and
--- `cs`.  No subscription is made at a timer's root, where a burst would
--- have no emission of its own, nor in a value step past its value.
+-- `cs`.  No subscription is made in a value step past its value.
 HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
-HeldD H d cs = ∀ p → Ok H p → (TimerRoot p → ⊥) → Early p → Held (enter d p) (p ∷ cs)
+HeldD H d cs = ∀ p → Ok H p → Early p → Held (enter d p) (p ∷ cs)

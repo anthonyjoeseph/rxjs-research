@@ -55,7 +55,7 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Events using (Timeline; emit; close; From∞)
-open import denotation.Position using (Pos; ix; last; _<ᵖ_; _≟ᵖ_; _⊕_; root)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _≟ᵖ_; _⊕_; root; _▸_)
 open import operation.Key using (Key; at; after; never; _<ᴷ_)
 open import operation.PureObservable using (module Machine; module Driver; play; rest; due; slotOf)
 open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
@@ -465,11 +465,11 @@ private
       ahead nothing   = true
       tick : ∀ {Γ A} → St Γ A → Meas → Meas
       tick (coldS b (play τ u i t′ (close f))) m′ =
-        flag (not (ahead (due (rest τ (u ⊕ [ last ]) (From∞.force f))))) "BEHIND"
-             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ⊕ [ ix i ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
+        flag (not (ahead (due (rest τ (u ▸ last) (From∞.force f))))) "BEHIND"
+             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ ix i) ≟ᵖ r)) ks)) "UNLISTED" m′)
       tick (coldS b (play τ u i t′ (emit a (close f)))) m′ =
-        flag (not (ahead (due (rest τ ((u ⊕ [ last ]) ⊕ [ last ]) (From∞.force f))))) "BEHIND"
-             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does (((u ⊕ [ last ]) ⊕ [ ix 0 ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
+        flag (not (ahead (due (rest τ (u ▸ last ⊕ [ last ]) (From∞.force f))))) "BEHIND"
+             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ last ⊕ [ ix 0 ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
       tick (coldS b (play τ u i t′ fr)) m′ =
         flag (not (closed c′) ∧ not (anyᵇ (λ r → does (slotOf u i fr ≟ᵖ r)) ks)) "UNLISTED" m′
       tick _ m′ = m′

@@ -14,7 +14,8 @@ open import Data.Product using (proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; Label; tick; path; instant; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_; Root; nested; fired; _▸_; tickᴿ)
+open import denotation.Position using (Pos; Label; tick; path; instant; _∙_; cascade; isLt; _<ˡ_; _<ᵖ_; _⊕_; nested; fired; _▸_;
+  tickᴿ)
 open import denotation.Events using (<ᵖ-below; <ᵖ-▸; <ᵖ-trans; <ᵖ-asym; <ᵖ-irrefl)
 open import denotation.Simultaneity using (reflˡ; earlier-tick; effect-tick; step-tick; cascade-inj)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)

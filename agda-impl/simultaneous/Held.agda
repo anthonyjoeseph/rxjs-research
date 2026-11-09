@@ -26,12 +26,12 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows; ⊕-assoc)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
-open import simultaneous.HeldConnect using (held-conn; early-snoc)
+open import simultaneous.HeldConnect using (held-conn; early-inst)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
-open import denotation.Laws.Worlds using (Ok; InvD; Lawful; TimerRoot; ext-untimed; _∪ʰ_)
+open import denotation.Laws.Worlds using (Ok; InvD; Lawful; _∪ʰ_)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import denotation.Laws.Shows using (k-shows)
 open import denotation.Laws.ShowsEv using (sk-⟦⟧; sk-approx)
@@ -61,10 +61,10 @@ open import Data.Sum using (_⊎_)
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
-open import simultaneous.Routed using (nameOf; nm; Valued; opos; Before)
+open import simultaneous.Routed using (nameOf; nm; Valued; opos)
 open import simultaneous.Readings using (emission)
 open import simultaneous.Relations using (Met)
-open import simultaneous.HeldConnect using (emission-snoc; before-ext)
+open import simultaneous.HeldConnect using (emission-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
 open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans)
@@ -142,24 +142,24 @@ shows-ev (just k) A′ env g p ok = k-shows λ n → sk-approx n k A′ env g p 
 
 -- A connect shows its body, read over its source made hot.
 conn-ev : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) cs → GoodEnv env
-        → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥) → Early p
+        → ∀ p → Ok (Hots env) p → Early p
         → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
            → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ]) → Early (p ⊕ [ ix 0 ])
            → Held (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs))
         → Held (enter (ev m (connect A′ B′) env) p) (p ∷ cs)
-conn-ev nothing A′ B′ env cs g p ok nt ep k =
-  held-conn (⟦ A′ ⟧ env) (λ h → ⟦ B′ ⟧ (h ∷ env)) Is IF p ok nt cs (shows-ev nothing A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
+conn-ev nothing A′ B′ env cs g p ok ep k =
+  held-conn (⟦ A′ ⟧ env) (λ h → ⟦ B′ ⟧ (h ∷ env)) Is IF p ok cs (shows-ev nothing A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
     (k (src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) (body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok)
-       (early-snoc (ix 0) nt ep))
+       (early-inst [ ix 0 ] ep))
   where
     Is = inv-⟦⟧ A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (⟦ B′ ⟧ (hot t ∷ env))
     IF L = inv-⟦⟧ B′ (hot _ ∷ env) (good-cons L g)
-conn-ev (just n) A′ B′ env cs g p ok nt ep k =
-  held-conn (approx n A′ env) (λ h → approx n B′ (h ∷ env)) Is IF p ok nt cs (shows-ev (just n) A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
+conn-ev (just n) A′ B′ env cs g p ok ep k =
+  held-conn (approx n A′ env) (λ h → approx n B′ (h ∷ env)) Is IF p ok cs (shows-ev (just n) A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
     (k (src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
        (body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
-       (early-snoc (ix 0) nt ep))
+       (early-inst [ ix 0 ] ep))
   where
     Is = inv-approx n A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
@@ -167,13 +167,13 @@ conn-ev (just n) A′ B′ env cs g p ok nt ep k =
 
 held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
-held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok nt ep →
-  conn-ev m (annotate (elab ρ s)) _ env cs g p ok nt ep λ L ok₀ ep₀ →
+held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
+  conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep λ L ok₀ ep₀ →
     IH.holds (hb _) _ (p ∷ cs) (good-cons L g)
       (λ { (here refl) → record { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs ; held = hs env cs g eh
                                 ; under = λ i → i ; is = refl }
          ; (there i)   → widen (eh i) })
-      (p ⊕ [ ix 0 ]) ok₀ (ext-untimed p) ep₀
+      (p ⊕ [ ix 0 ]) ok₀ ep₀
 
 -- A FLATMAP'S SCAN HOLDS, read past the three connects that share its
 -- outer: the outer at `p ⊕ [ ix 1 ]`, the closer, then the real
@@ -225,31 +225,10 @@ inv-ev : ∀ m {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ �
 inv-ev nothing  o ρ g = inv-⟦⟧ o ρ g
 inv-ev (just n) o ρ g = inv-approx n o ρ g
 
--- What a hot reader re-keys keeps its emission.
-emission-sub : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {q e} → X q e → ∀ w → emission (q ⊕ [ sub w ]) ≡ emission q
-emission-sub I x w = emission-snoc _ (sub w) (InvAt.untimed I x)
-
--- Three labels deep, a position's emission is fixed.
-emission-P : ∀ p zs → emission ((((p ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ⊕ zs) ≡ emission (((p ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ⊕ [ ix 0 ])
-emission-P (frame ∙ _)             zs = refl
-emission-P (cascade _ _ ∙ [])      zs = refl
-emission-P (cascade _ _ ∙ (_ ∷ _)) zs = refl
-
--- Under a position of the same emission, a step is as early.
-early-inst : ∀ {y} zs → emission (y ⊕ zs) ≡ emission y → Early y → Early (y ⊕ zs)
-early-inst {y} zs eq ey = subst (λ I → Valued I → Before (y ⊕ zs) (opos I)) (sym eq) (λ v → before-ext zs (ey v))
-
 -- Past its over, a step is as late.
-late-ext : ∀ {q} zs → emission (q ⊕ zs) ≡ emission q → Valued (emission q) × opos (emission q) ⊑ q
+late-ext : ∀ {q} zs → Valued (emission q) × opos (emission q) ⊑ q
          → Valued (emission (q ⊕ zs)) × opos (emission (q ⊕ zs)) ⊑ (q ⊕ zs)
-late-ext {q} zs eq (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym eq) (v , ⊑-trans o (zs , refl))
-
--- An output laid under a row is of the row's emission.
-emission-lay : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {q e} → X q e → ∀ j → emission (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ emission q
-emission-lay I {q} x j =
-  trans (cong emission (sym (⊕-assoc q [ ix 1 ] [ ix j ])))
-    (trans (emission-snoc (q ⊕ [ ix 1 ]) (ix j) (ext-untimed q))
-           (emission-snoc q (ix 1) (InvAt.untimed I x)))
+late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (emission-ext q zs)) (v , ⊑-trans o (zs , refl))
 
 -- An opened outer row is a mark it was, unless it opens.
 open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
@@ -278,7 +257,7 @@ closing-value ()
 module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hs : HeldD (Hots env) (ev m (elab ρ s) env) cs) (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-               (p : Pos) (ok : Ok (Hots env) p) (nt : TimerRoot p → ⊥) (ep : Early p)
+               (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
                (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀ m ρ op f s env p))
@@ -374,45 +353,36 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
   ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
-  I₁ : InvAt (Hots env) (p ⊕ [ ix 1 ]) (enter (ev m (elab ρ s) env) (p ⊕ [ ix 1 ]))
-  I₁ = inv-ev m (elab ρ s) env gd (p ⊕ [ ix 1 ]) (ok-step p ok)
-
-  I₂ : InvAt (Hots (hot σ₁ ∷ env)) (p₀ ⊕ [ ix 1 ]) (enter (ev m (closer {B = B}) (hot σ₁ ∷ env)) (p₀ ⊕ [ ix 1 ]))
-  I₂ = inv-ev m (closer {B = B}) (hot σ₁ ∷ env) (good-cons L₁ gd) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁)
-
-  I₃ : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ⊕ [ ix 1 ]) (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ⊕ [ ix 1 ]))
-  I₃ = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env) (good-cons L₂ (good-cons L₁ gd)) (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
-
   H₁ : Held (enter (ev m (elab ρ s) env) (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
-  H₁ = hs (p ⊕ [ ix 1 ]) (ok-step p ok) (ext-untimed p) (early-snoc (ix 1) nt ep)
+  H₁ = hs (p ⊕ [ ix 1 ]) (ok-step p ok) (early-inst [ ix 1 ] ep)
 
   named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
   named x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) =
-    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (emission-sub I₁ (proj₁ y) w)))
-  ... | lane {w = w} y  = trans (lane-named y) (cong nm (sym (emission-sub I₃ (proj₁ y) w)))
+  ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
+    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (emission-ext c [ sub w ])))
+  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (emission-ext c [ sub w ])))
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   early : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
   early x with m-rows x tt
   ... | outer y eq = ⊥-elim (open-value eq)
-  ... | lane {w = w} y = early-inst [ sub w ] (emission-sub I₃ (proj₁ y) w) (lane-early y)
+  ... | lane {w = w} y = early-inst [ sub w ] (lane-early y)
   ... | close y = ⊥-elim (closing-value (close-marks y))
 
   ends : ∀ {q} → M q end → Early q
   ends x with m-rows x tt
-  ... | under {zs} = early-inst zs (emission-P p zs) ep₃
-  ... | done {zs = zs} b eq = early-inst zs eq (bend b)
+  ... | under {zs} = early-inst zs ep₃
+  ... | done {zs = zs} b _ = early-inst zs (bend b)
     where
       bend : ∀ {c} → BEnd c → Early c
-      bend (b-outer {w = w} y) = early-inst [ sub w ] (emission-sub I₁ (proj₁ y) w) (Held.ends H₁ (proj₁ y))
-      bend (b-lane {w = w} y)  = early-inst [ sub w ] (emission-sub I₃ (proj₁ y) w) (lane-ends y)
-      bend (b-close {w = w} y) = early-inst [ sub w ] (emission-sub I₂ (proj₁ y) w) (close-ends y)
+      bend (b-outer {w = w} y) = early-inst [ sub w ] (Held.ends H₁ (proj₁ y))
+      bend (b-lane {w = w} y)  = early-inst [ sub w ] (lane-ends y)
+      bend (b-close {w = w} y) = early-inst [ sub w ] (close-ends y)
 
   late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (emission q) × opos (emission q) ⊑ q
   late x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (emission-sub I₁ (proj₁ y) w) (Held.late H₁ (proj₁ y))
-  ... | lane {w = w} y = late-ext [ sub w ] (emission-sub I₃ (proj₁ y) w) (lane-late y)
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (Held.late H₁ (proj₁ y))
+  ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   IM : InvAt (Hots env′) P M
@@ -428,7 +398,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
           (λ { refl → named (proj₁ (run-row rx₁ mt)) })
           (λ { refl ne → value-open rx₁ mt ne })
           (λ { refl sp ne → over-open rx₁ mt sp ne })
-          (emission-lay IM (proj₁ (run-row rx₁ mt)))
+          (λ j → emission-ext q (ix 1 ∷ ix j ∷ []))
 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
       fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
@@ -451,12 +421,11 @@ early-stable : ∀ {y} → ¬ ¬ Early y → Early y
 early-stable h v = decidable-stable (T? _) (λ k → h λ e → k (proj₁ (e v))) , λ s → h λ e → proj₂ (e v) s
 
 valued-stable : ∀ {I} → ¬ ¬ Valued I → Valued I
-valued-stable {cascade _ _ ∙ (ix _ ∷ [])}     h = valued
+valued-stable {cascade _ _ (ix _) ∙ []}      h = valued
 valued-stable {frame ∙ _}                    h = ⊥-elim (h λ ())
-valued-stable {cascade _ _ ∙ []}             h = ⊥-elim (h λ ())
-valued-stable {cascade _ _ ∙ (ix _ ∷ _ ∷ _)} h = ⊥-elim (h λ ())
-valued-stable {cascade _ _ ∙ (sub _ ∷ _)}    h = ⊥-elim (h λ ())
-valued-stable {cascade _ _ ∙ (last ∷ _)}     h = ⊥-elim (h λ ())
+valued-stable {cascade _ _ (ix _) ∙ (_ ∷ _)} h = ⊥-elim (h λ ())
+valued-stable {cascade _ _ (sub _) ∙ _}      h = ⊥-elim (h λ ())
+valued-stable {cascade _ _ last ∙ _}         h = ⊥-elim (h λ ())
 
 late-stable : ∀ {y} → ¬ ¬ (Valued (emission y) × opos (emission y) ⊑ y) → Valued (emission y) × opos (emission y) ⊑ y
 late-stable {y} h =
@@ -495,8 +464,8 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
     k (rx , mx , laid-in op init rx (subst ((y , e) ∈_) eq (∈-++⁺ˡ (∈-++⁺ʳ rs (here refl)))))
 
   named-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark begin) n)) → n ≡ nameOf y
-  named-laid mx (laid rx₁ {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
-  ... | routed _ refl = trans (CombIn.named ci mq) (cong nm (sym (emission-lay IM mq j)))
+  named-laid mx (laid rx₁ {q = c} {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
+  ... | routed _ refl = trans (CombIn.named ci mq) (cong nm (sym (emission-ext c (ix 1 ∷ ix j ∷ []))))
     where mq = proj₁ (run-row rx₁ mx)
 
   routing-laid : ∀ {rx y m n} → Met M rx → Laid op init rx y (out (instEmit (mark m) n)) → Routing m
@@ -506,7 +475,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 
   early-laid : ∀ {rx y a n} → Met M rx → Laid op init rx y (out (instEmit (value a) n)) → Early y
   early-laid mx (laid rx₁ {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
-  ... | passed refl = early-inst (ix 1 ∷ ix j ∷ []) (emission-lay IM mq j) (CombIn.early ci mq)
+  ... | passed refl = early-inst (ix 1 ∷ ix j ∷ []) (CombIn.early ci mq)
     where mq = proj₁ (run-row rx₁ mx)
 
   ends-laid : ∀ {rx y} → Met M rx → Laid op init rx y end → Early y
@@ -514,7 +483,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 
   late-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark over) n)) → Valued (emission y) × opos (emission y) ⊑ y
   late-laid mx (laid rx₁ {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
-  ... | routed _ refl = late-ext (ix 1 ∷ ix j ∷ []) (emission-lay IM mq j) (CombIn.late ci mq)
+  ... | routed _ refl = late-ext (ix 1 ∷ ix j ∷ []) (CombIn.late ci mq)
     where mq = proj₁ (run-row rx₁ mx)
 
   named : ∀ {y n} → S y (out (instEmit (mark begin) n)) → n ≡ nameOf y
@@ -545,24 +514,24 @@ comb-held m op s ρ P cs g ok ci id = held-runs named routing early ends late id
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
             (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ s) env) cs
           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-          → ∀ p → Ok (Hots env) p → (TimerRoot p → ⊥) → Early p
+          → ∀ p → Ok (Hots env) p → Early p
           → let open FlatHots m ρ op f s env p in
             Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₁ ∷ env)) p₀ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) p₀₀ → Ok (Hots env′) P → Early P
           → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
-held-comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
+held-comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
   comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) ok₃
-    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
-    (CombSrc.scan-idle m ρ op f s env cs gd eh hs hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombSrc.scan-idle m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where open FlatHots m ρ op f s env p using (src; env′; P)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
-held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok nt ep →
-  conn-ev m (elab ρ s) _ env cs g p ok nt ep λ L₁ ok₁ ep₁ →
-    conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ⊕ [ ix 0 ]) ok₁ (ext-untimed p) ep₁ λ L₂ ok₂ ep₂ →
+held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok ep →
+  conn-ev m (elab ρ s) _ env cs g p ok ep λ L₁ ok₁ ep₁ →
+    conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ⊕ [ ix 0 ]) ok₁ ep₁ λ L₂ ok₂ ep₂ →
       conn-ev m (FlatHots.real m ρ op f s env p) _ _ ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ g))
-        ((p ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ok₂ (ext-untimed (p ⊕ [ ix 0 ])) ep₂ λ L₃ ok₃ ep₃ →
-        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok nt ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+        ((p ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ok₂ ep₂ λ L₃ ok₃ ep₃ →
+        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.

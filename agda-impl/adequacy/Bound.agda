@@ -27,14 +27,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; _<ᵖ_; inside; tick; tickᴿ; nested; _▸_; _⊕_)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; inside; tickᴿ; nested; _▸_; _⊕_)
 open import denotation.Events using (Timeline; ofᴱ; inside-self; inside-++; <ᵖ-split; <ᵖ-part; Frame; emit; stall; close; burst; module From∞)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺_; _≼_; Den; hot; coldAt; DenEnv; ⟦_⟧; Ended;
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
   LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust; module Joiner)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; Real; RealR; ⊕-assoc)
+open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; RealR; ⊕-assoc)
 open import denotation.Laws.JoinInv using (module JoinerI; module Join; module SwitchI; switch-cut-up)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws using (inv-⟦⟧; good-cons)

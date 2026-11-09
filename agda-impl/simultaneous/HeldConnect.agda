@@ -20,14 +20,14 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.Position using (Pos; Path; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; frame; cascade; _<ᵖ_)
+open import denotation.Position using (Pos; Path; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh; finals)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
 open import Relation.Nullary using (¬_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
-open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; TimerRoot; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
@@ -45,11 +45,9 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (I
 ------------------------------------------------------------------------
 -- Positions
 
--- A subscription past a timer's root keeps its emission one label down.
-emission-snoc : ∀ p l → (TimerRoot p → ⊥) → emission (p ⊕ [ l ]) ≡ emission p
-emission-snoc (frame ∙ _)             l _  = refl
-emission-snoc (cascade _ _ ∙ [])      l nt = ⊥-elim (nt tt)
-emission-snoc (cascade _ _ ∙ (_ ∷ _)) l _  = refl
+-- An effect keeps its cause's emission.
+emission-ext : ∀ p zs → emission (p ⊕ zs) ≡ emission p
+emission-ext (_ ∙ _) _ = refl
 
 -- What lies before an over, all it causes does.
 before-ext : ∀ {y o} zs → Before y o → Before (y ⊕ zs) o
@@ -57,20 +55,20 @@ before-ext {y} {o} zs (lt , ns) =
   Equivalence.from T-≡ (<ᵖ-apart y o zs (Equivalence.to T-≡ lt) λ ys e → ns (ys , e)) ,
   λ { (ws , e) → ns (zs ++ ws , trans e (⊕-assoc y zs ws)) }
 
--- A subscription early in its emission subscribes its parts early.
-early-snoc : ∀ {p} l → (TimerRoot p → ⊥) → Early p → Early (p ⊕ [ l ])
-early-snoc {p} l nt ep v =
-  subst (λ I → Before (p ⊕ [ l ]) (opos I)) (sym eq) (before-ext [ l ] (ep (subst Valued eq v)))
-  where eq = emission-snoc p l nt
+-- What an early position causes is as early.
+early-inst : ∀ {p} zs → Early p → Early (p ⊕ zs)
+early-inst {p} zs ep v =
+  subst (λ I → Before (p ⊕ zs) (opos I)) (sym eq) (before-ext zs (ep (subst Valued eq v)))
+  where eq = emission-ext p zs
 
 ⊑-≼ : ∀ {x y} → x ⊑ y → x ≼ y
 ⊑-≼ {x} ([] , refl) yx = ≼-refl {x} (subst (λ z → z ≺ x) (⊕-identityʳ x) yx)
 ⊑-≼ {x} (l ∷ ys , refl) = ≺→≼ {x} (≺-ext x ys)
 
 -- The body's burst lies in the connect's.
-sync-body : ∀ {p y} → (TimerRoot p → ⊥) → Sync (p ⊕ [ ix 0 ]) y → Sync p y
-sync-body {p} {y} nt (i , eq) =
-  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (emission-snoc p (ix 0) nt)
+sync-body : ∀ {p y} → Sync (p ⊕ [ ix 0 ]) y → Sync p y
+sync-body {p} {y} (i , eq) =
+  subst T (sym (inside⇒ (⊑-trans (⊑-snoc⁺ p) (inside-⊑ _ y i)))) tt , trans eq (emission-ext p [ ix 0 ])
   where
     inside⇒ : ∀ {x z} → x ⊑ z → inside x z ≡ true
     inside⇒ {x} {z} le with inside x z in e
@@ -346,16 +344,16 @@ rows-refl (_∷_ {e = skip}  (_ , () , _) _)
 rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 
 held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
-            (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) (nt : TimerRoot p → ⊥) cs
+            (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) cs
           → Shows (enter s (p ⊕ [ ix 1 ]))
           → Held (enter (F (hot (Proper (enter s (p ⊕ [ ix 1 ]))))) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok nt cs sh h = held-same row end-row back′ fwd (held-ex ex h)
+held-conn s F Is IF p ok cs sh h = held-same row end-row back′ fwd (held-ex ex h)
   where
     open ConnRun s F Is IF p ok sh
 
     ex : ∀ {y} → Ex ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) y → Ex (p ∷ cs) y
-    ex (here sy) = here (sync-body nt sy)
+    ex {y} (here sy) = here (sync-body {p} {y} sy)
     ex (there x) = x
 
     row : ∀ {y x′} → C y (out x′) → Σ _ λ x → Connect.β s F p y (out x) × Same x′ x

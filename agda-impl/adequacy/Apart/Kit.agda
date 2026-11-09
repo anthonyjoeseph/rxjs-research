@@ -22,7 +22,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
 
-open import denotation.Position using (Pos; Label; ix; last; isLt; _<ˡ_; _⊕_; Root; nested; _▸_)
+open import denotation.Position using (Pos; Label; ix; last; isLt; _<ˡ_; _⊕_; nested; _▸_)
 open import denotation.Events using (Frame; emit; stall; close; ix-<)
 open import denotation.Simultaneity using (reflˡ)
 open import denotation.Laws.Worlds using (⊕-identityʳ)

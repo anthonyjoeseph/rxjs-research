@@ -58,8 +58,8 @@ mutual
   showPos (i ∙ ls) = showInstant i ++ ":" ++ showPath ls
 
   showInstant : Instant → String
-  showInstant frame         = "F"
-  showInstant (cascade t e) = "c" ++ showℕ t ++ "(" ++ showPos e ++ ")"
+  showInstant frame           = "F"
+  showInstant (cascade t e l) = "c" ++ showℕ t ++ "(" ++ showPos e ++ ")" ++ showLabel l
 
   showPath : Path → String
   showPath []       = ""

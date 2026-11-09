@@ -50,7 +50,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; ix; last; tick; tickᴿ; inside; _⊕_; Path)
+open import denotation.Position using (Pos; ix; last; tickᴿ; inside; _⊕_; Path)
 open import denotation.Events using (Timeline; ofᴱ)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; _≺_; _≼_; Few; Reach; Truncate; enter; ⟦_⟧; Den; hot; coldAt;
