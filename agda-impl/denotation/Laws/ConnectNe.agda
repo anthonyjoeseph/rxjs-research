@@ -16,7 +16,7 @@ module denotation.Laws.ConnectNe where
 
 open import Data.Bool using (T; not; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _++_; [_])
+open import Data.List using ([]; [_])
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
 
-open import denotation.Events using (Pos; ix; inside)
+open import denotation.Position using (Pos; ix; inside; _⊕_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Dep; EmissionSet; _≺_; _≼_; Den; hot; enter; Proper; module Connect; module Op)
 open import denotation.Laws.Modulus
   using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; _~⟨_⟩_;
@@ -35,7 +35,7 @@ open import denotation.Laws.Count
   using (Cov; Cnt; DCnt; AgC; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cov-up; cov-down; cov-lift; child; cnt-up; cnt-down; seen; seen-under;
   dcnt-cnt; dcnt-pin; ag-cnt; trunc-ag)
 open import denotation.Laws.Worlds
-  using (W⁼; Ok; _⊕_; Lawful; InvAt; InvD; ok-step; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; ⊑-cmp; ⊑-≼; ⊑-inside;
+  using (W⁼; Ok; _∪ʰ_; Lawful; InvAt; InvD; ok-step; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; ⊑-cmp; ⊑-≼; ⊑-inside;
   inside-⊑; conv; in-world; not-up)
 import denotation.Laws.Connect as LC
 
@@ -58,17 +58,17 @@ proper-ag a = ⟨ (λ {y} yQ → proper-to a yQ , proper-to (AgreeTo-sym a) yQ) 
 private
   module Core {A B : Set} {H : Pos → Set} {n : ℕ} {s s′ : Den A} {F F′ : Den A → Den B}
               (Is : InvD H s) (Is′ : InvD H s′)
-              (IF : ∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) (IF′ : ∀ {t} → Lawful t → InvD (H ⊕ t) (F′ (hot t)))
+              (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) (IF′ : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F′ (hot t)))
               (cF′ : Causal F′)
-              (as : s ≈ᶜ⟨ Ok H ∣ n ⟩ s′) (aF : ∀ {t} → Lawful t → F (hot t) ≈ᶜ⟨ Ok (H ⊕ t) ∣ n ⟩ F′ (hot t))
+              (as : s ≈ᶜ⟨ Ok H ∣ n ⟩ s′) (aF : ∀ {t} → Lawful t → F (hot t) ≈ᶜ⟨ Ok (H ∪ʰ t) ∣ n ⟩ F′ (hot t))
               (p : Pos) (ok : Ok H p) where
 
     module C  = Connect s F p
     module C′ = Connect s′ F′ p
 
     p₀ r : Pos
-    p₀ = p ++ [ ix 0 ]
-    r  = p ++ [ ix 1 ]
+    p₀ = p ⊕ [ ix 0 ]
+    r  = p ⊕ [ ix 1 ]
 
     Iσ  = LC.Iσ {s = s} {F = F} Is IF p ok
     Iβ  = LC.Iβ {s = s} {F = F} Is IF p ok
@@ -86,8 +86,8 @@ private
     σ-ag : ∀ {z} → Cnt n C.σ z → AgreeTo z C.σ C′.σ
     σ-ag {z} b = ag-cnt aσ z (inj₁ b)
 
-    ky : ∀ k → k ≼ (k ++ [ ix 0 ])
-    ky k = ≺→≼ {k} {k ++ [ ix 0 ]} (≺-ext k [])
+    ky : ∀ k → k ≼ (k ⊕ [ ix 0 ])
+    ky k = ≺→≼ {k} {k ⊕ [ ix 0 ]} (≺-ext k [])
 
     nin : ∀ {k} → T (not (inside r k)) → T (inside r k) → ⊥
     nin {k} ni i with inside r k
@@ -107,14 +107,14 @@ private
     alive-pin {k} {p′} x al {c} ce = ≼-≺-≺ {p′} {k} {c} (⊑-≼ (inside-⊑ p′ k (proj₂ (InvAt.pinned Iσ x)))) (al ce)
 
     -- What an alive source row outside the burst shows as.
-    shown : ∀ {k e} → C.σ k e → C.Alive k → T (not (inside r k)) → Σ (Ev B) (C.ConnT (k ++ [ ix 0 ]))
+    shown : ∀ {k e} → C.σ k e → C.Alive k → T (not (inside r k)) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
     shown {e = out _}  x al ni = _ , C.echo x al tt ni
     shown {e = skip}   x al ni = _ , C.echo x al tt ni
     shown {e = end}    x al ni = _ , C.echo x al tt ni
     shown {e = pin _}  x al ni = _ , C.kept x (alive-pin x al) ni (proj₂ (InvAt.pinned Iσ x))
 
     -- A source row alive or in the burst shows one label down.
-    img : ∀ {k e} → C.σ k e → C.Alive k ⊎ T (inside r k) → Σ (Ev B) (C.ConnT (k ++ [ ix 0 ]))
+    img : ∀ {k e} → C.σ k e → C.Alive k ⊎ T (inside r k) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
     img {k} x a with inside r k in ik
     img x a          | true  = _ , C.burst x (subst T (sym ik) tt)
     img x (inj₁ al)  | false = shown x al (subst (T ∘ not) (sym ik) tt)
@@ -168,26 +168,26 @@ private
       ... | inj₁ ck = ⊥-elim (≺-irrefl {k} (≺-≼-≺ {k} {c} {k} (al (end← ce (≼-trans {c} {k} {q} ck kq))) ck))
 
     -- A row's child the row waits on, covered at a cut at or before it.
-    via-child : ∀ {y e Q j e′} (d : DCnt n C.ConnT y e) → Q ≼ y → j ≺ Q → C.ConnT (j ++ [ ix 0 ]) e′
-              → ((j ++ [ ix 0 ]) ≺ Q → Dep y e (j ++ [ ix 0 ]) e′) → Cov Q (proj₁ d) j
+    via-child : ∀ {y e Q j e′} (d : DCnt n C.ConnT y e) → Q ≼ y → j ≺ Q → C.ConnT (j ⊕ [ ix 0 ]) e′
+              → ((j ⊕ [ ix 0 ]) ≺ Q → Dep y e (j ⊕ [ ix 0 ]) e′) → Cov Q (proj₁ d) j
     via-child {y} {Q = Q} {j} (ks , le , h) Qy jQ x dp with child (ix 0) jQ
     ... | inj₁ jQ′ = inj₁ jQ′
-    ... | inj₂ lt  = cov-up (⊑-snoc⁺ j) (cov-down (h x (≺-≼-≺ {j ++ [ ix 0 ]} {Q} {y} lt Qy) (dp lt)) lt Qy)
+    ... | inj₂ lt  = cov-up (⊑-snoc⁺ j) (cov-down (h x (≺-≼-≺ {j ⊕ [ ix 0 ]} {Q} {y} lt Qy) (dp lt)) lt Qy)
 
     -- What a burst row's source row waits on: source rows in the burst.
-    dσ-burst : ∀ {k e₀} → DCnt n C.ConnT (k ++ [ ix 0 ]) (pin p) → T (inside r k) → DCnt n C.σ k e₀
+    dσ-burst : ∀ {k e₀} → DCnt n C.ConnT (k ⊕ [ ix 0 ]) (pin p) → T (inside r k) → DCnt n C.σ k e₀
     dσ-burst {k} d i = proj₁ d , proj₁ (proj₂ d) , λ xj jk _ → via-child d (ky k) jk (C.burst xj (in-world Iσ xj jk i)) λ _ _ → inj₂ refl
 
     -- An echo's: alive source rows.
-    dσ-echo : ∀ {k e₀} → DCnt n C.ConnT (k ++ [ ix 0 ]) skip → C.Alive k → DCnt n C.σ k e₀
+    dσ-echo : ∀ {k e₀} → DCnt n C.ConnT (k ⊕ [ ix 0 ]) skip → C.Alive k → DCnt n C.σ k e₀
     dσ-echo {k} d al = proj₁ d , proj₁ (proj₂ d) , λ {j} xj jk _ →
       via-child {e = skip} d (ky k) jk (proj₂ (img xj (inj₁ λ ce → ≺-trans {j} {k} jk (al ce)))) λ _ → tt
 
     -- A kept pin's: alive source rows before its connect, and its own pins.
-    dσ-kept : ∀ {k p′} → DCnt n C.ConnT (k ++ [ ix 0 ]) (pin p′) → p′ ⊑ k → C.Alive p′ → T (not (inside r k)) → DCnt n C.σ k (pin p′)
+    dσ-kept : ∀ {k p′} → DCnt n C.ConnT (k ⊕ [ ix 0 ]) (pin p′) → p′ ⊑ k → C.Alive p′ → T (not (inside r k)) → DCnt n C.σ k (pin p′)
     dσ-kept {k} {p′} d pk alp ni = proj₁ d , proj₁ (proj₂ d) , go
       where
-        p′y : p′ ≼ (k ++ [ ix 0 ])
+        p′y : p′ ≼ (k ⊕ [ ix 0 ])
         p′y = ⊑-≼ (⊑-trans pk (⊑-snoc⁺ k))
 
         go : ∀ {j e″} → C.σ j e″ → j ≺ k → Dep k (pin p′) j e″ → Cov k (proj₁ d) j
@@ -266,9 +266,9 @@ private
 
 connect-ne : ∀ {A B H k} {s s′ : Den A} {F F′ : Den A → Den B}
            → InvD H s → InvD H s′
-           → (∀ {t} → Lawful t → InvD (H ⊕ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ⊕ t) (F′ (hot t)))
+           → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F′ (hot t)))
            → Causal F → Causal F′
-           → s ≈ᶜ⟨ Ok H ∣ k ⟩ s′ → (∀ {t} → Lawful t → F (hot t) ≈ᶜ⟨ Ok (H ⊕ t) ∣ k ⟩ F′ (hot t))
+           → s ≈ᶜ⟨ Ok H ∣ k ⟩ s′ → (∀ {t} → Lawful t → F (hot t) ≈ᶜ⟨ Ok (H ∪ʰ t) ∣ k ⟩ F′ (hot t))
            → Op.connect s F ≈ᶜ⟨ Ok H ∣ k ⟩ Op.connect s′ F′
 connect-ne {H = H} {k} {s} {s′} {F} {F′} Is Is′ IF IF′ cF cF′ as aF p ok = trunc-ag go
   where
@@ -277,4 +277,4 @@ connect-ne {H = H} {k} {s} {s′} {F} {F′} Is Is′ IF IF′ cF cF′ as aF p 
     go q e (inj₂ c) = proj₂ b , proj₁ b
       where b = Core.agree {s = s′} {s} {F′} {F} Is′ Is IF′ IF cF
                   (≈ᶜ-sym {R = Ok H} {k} {s} {s′} as)
-                  (λ {t} L → ≈ᶜ-sym {R = Ok (H ⊕ t)} {k} {F (hot t)} {F′ (hot t)} (aF L)) p ok c
+                  (λ {t} L → ≈ᶜ-sym {R = Ok (H ∪ʰ t)} {k} {F (hot t)} {F′ (hot t)} (aF L)) p ok c

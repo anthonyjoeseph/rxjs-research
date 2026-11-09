@@ -21,7 +21,7 @@ open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; 
   on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan; DeferT; guard;
   body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-antisym; ≺-ext; LimD)
-open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-cancelˡ; ⊕-snoc-inj)
+open import denotation.Laws.Worlds using (InvAt; InvD; Ok; PinBy; Plain; Real; W; W⁼; _⊑_; anc-lead; apart; ext≢; here; inW; leads; nest-in; nest⁼; not-up; ok-step; plain-ix; plain-last; real-snoc; shrink; shrink⁼; sib; step; world-after; world-anc⁼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-cancelˡ; ⊕-injʳ)
 
 ------------------------------------------------------------------------
 -- The leaves keep it
@@ -138,9 +138,9 @@ of-idx p i (x ∷ xs) (on-out r) with of-idx p (suc i) xs r
 
 of-fresh : ∀ {A} p i (xs : List A) {e} → InE (ofᴱ p (suc i) xs) (p ⊕ [ ix i ]) e → ⊥
 of-fresh p i xs r with of-idx p (suc i) xs r
-... | inj₁ (j , le , eq) with proj₂ (⊕-snoc-inj p p eq)
+... | inj₁ (j , le , eq) with ⊕-injʳ p p eq
 ...   | refl = 1+n≰n le
-of-fresh p i xs r | inj₂ eq with proj₂ (⊕-snoc-inj p p eq)
+of-fresh p i xs r | inj₂ eq with ⊕-injʳ p p eq
 ... | ()
 
 of-func : ∀ {A} p i (xs : List A) {y e e′} → InE (ofᴱ p i xs) y e → InE (ofᴱ p i xs) y e′ → e ≡ e′

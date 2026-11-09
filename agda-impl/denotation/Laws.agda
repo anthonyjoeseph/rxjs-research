@@ -28,7 +28,7 @@ module denotation.Laws where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Unit using (tt)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
@@ -43,7 +43,8 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
   defer)
-open import denotation.Events using (Timeline; Pos; ix; sub; last; inside)
+open import denotation.Position using (Pos; ix; sub; last; inside; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet
   using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Few; Reach; Dep; Truncate; Rejoin; shown; heard; ended; late; guard;
   body; Den; hot; enter; DenEnv; approx; ⟦_⟧; MapT; map-out; map-skip; map-pin; map-end; module Op)
@@ -157,9 +158,9 @@ private
     take-to : ∀ {t t′ : EmissionSet A} → AgreeTo Q t t′ → ∀ {y e} → y ≼ Q → TakeT incl keep t y e → TakeT incl keep t′ y e
     take-to a {y} yQ (pass x k nf)      = pass (proj₁ (upto a {y} yQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
     take-to a     yQ (fail {q} x k nf i) = fail (proj₁ (upto a {q} qQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) qQ g)) i
-      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ ix 0 ]} {Q} (≺-ext q []) yQ)
+      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ⊕ [ ix 0 ]} {Q} (≺-ext q []) yQ)
     take-to a     yQ (stop {q} x k nf)  = stop (proj₁ (upto a {q} qQ) x) k (λ g → nf (fail-to (AgreeTo-sym a) qQ g))
-      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ++ [ last ]} {Q} (≺-ext q []) yQ)
+      where qQ = ≺→≼ {q} {Q} (≺-≼-≺ {q} {q ⊕ [ last ]} {Q} (≺-ext q []) yQ)
     take-to a {y} yQ (step x nf)        = step (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
     take-to a {y} yQ (tend x nf)        = tend (proj₁ (upto a {y} yQ) x) (λ g → nf (fail-to (AgreeTo-sym a) yQ g))
     take-to a {y} yQ (left {r = r} x nf ins) =
@@ -261,9 +262,9 @@ private
       fwd {y} d (tend x nf) = tend (proj₁ (upto a {y} (≼-refl {y})) x) (fl a nf)
         where a = at nf (dcnt-cnt {e = end} tt d)
       fwd d (fail {q} {a₀} x kp nf i) = fail (proj₁ (upto a {q} (≼-refl {q})) x) kp (fl a nf) i
-        where a = at nf (cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q [])))
+        where a = at nf (cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])))
       fwd d (stop {q} x kp nf) = stop (proj₁ (upto a {q} (≼-refl {q})) x) kp (fl a nf)
-        where a = at nf (cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ++ [ last ]} (≺-ext q [])))
+        where a = at nf (cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ⊕ [ last ]} (≺-ext q [])))
       fwd d (left x nf i) = left (proj₁ (pin-at nf i d) x) (fl (at nf (dcnt-pin i d)) nf) i
 
       bwd : ∀ {y e} → DCnt k (TakeT t) y e → TakeT t′ y e → TakeT t y e
@@ -277,10 +278,10 @@ private
         where c = dcnt-cnt {e = end} tt d
               nf = unfailed c nf′
       bwd d (fail {q} {a₀} x′ kp nf′ i) = fail (proj₂ (upto (at nf c) {q} (≼-refl {q})) x′) kp nf i
-        where c = cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q []))
+        where c = cnt-down (dcnt-cnt {e = out a₀} tt d) (≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []))
               nf = unfailed c nf′
       bwd d (stop {q} x′ kp nf′) = stop (proj₂ (upto (at nf c) {q} (≼-refl {q})) x′) kp nf
-        where c = cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ++ [ last ]} (≺-ext q []))
+        where c = cnt-down (dcnt-cnt {e = end} tt d) (≺→≼ {q} {q ⊕ [ last ]} (≺-ext q []))
               nf = unfailed c nf′
       bwd d (left x′ nf′ i) = left (proj₂ (pin-at nf i d) x′) nf i
         where nf = unfailed (dcnt-pin i d) nf′
@@ -308,13 +309,13 @@ private
   conn-to p aσ aβ {y} yQ (ES.Connecting.body x) = ES.Connecting.body (proj₁ (upto aβ {y} yQ) x)
   conn-to {Q = Q} p aσ aβ yQ (ES.Connecting.burst {k} x i) =
     ES.Connecting.burst (proj₁ (upto aσ {k} kQ) x) i
-    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ⊕ [ ix 0 ]} {Q} (≺-ext k []) yQ)
   conn-to {Q = Q} p aσ aβ yQ (ES.Connecting.echo {k} x al u ni) =
     ES.Connecting.echo (proj₁ (upto aσ {k} kQ) x) (alive-to aβ kQ al) u ni
-    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ⊕ [ ix 0 ]} {Q} (≺-ext k []) yQ)
   conn-to {Q = Q} p aσ aβ yQ (ES.Connecting.kept {k} {p′} x al ni i) =
     ES.Connecting.kept (proj₁ (upto aσ {k} kQ) x) (alive-to aβ (≼-trans {p′} {k} {Q} (⊑-≼ (inside-⊑ p′ k i)) kQ) al) ni i
-    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ++ [ ix 0 ]} {Q} (≺-ext k []) yQ)
+    where kQ = ≺→≼ {k} {Q} (≺-≼-≺ {k} {k ⊕ [ ix 0 ]} {Q} (≺-ext k []) yQ)
 
 conn-ag : ∀ {A B Q} p {σ σ′ : EmissionSet A} {β β′ : EmissionSet B} → AgreeTo Q σ σ′ → AgreeTo Q β β′
         → AgreeTo Q (ES.Connecting.ConnT p σ β) (ES.Connecting.ConnT p σ′ β′)
@@ -322,13 +323,13 @@ conn-ag p aσ aβ = ⟨ (λ yq → conn-to p aσ aβ yq , conn-to p (AgreeTo-sym
 
 connect-causal : ∀ {A B q} {s s′ : Den A} {F F′ : Den A → Den B}
                → s ~⟨ q ⟩ s′ → (∀ {t t′} → AgreeTo q t t′ → F (hot t) ~⟨ q ⟩ F′ (hot t′)) → Op.connect s F ~⟨ q ⟩ Op.connect s′ F′
-connect-causal as af = ~-cold λ p → conn-ag p (as (p ++ [ ix 1 ])) (af (proper-ag (as (p ++ [ ix 1 ]))) (p ++ [ ix 0 ]))
+connect-causal as af = ~-cold λ p → conn-ag p (as (p ⊕ [ ix 1 ])) (af (proper-ag (as (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ]))
 
 -- DEFER READS ITS BODY where it lies.
 defer-causal : ∀ {A q} {s s′ : Den A} → s ~⟨ q ⟩ s′ → Op.defer s ~⟨ q ⟩ Op.defer s′
 defer-causal a = ~-cold λ p →
-  ⟨ (λ {y} yq → (λ { guard → guard ; (body x) → body (proj₁ (upto (a (p ++ [ ix 1 ])) {y} yq) x) })
-              , (λ { guard → guard ; (body x) → body (proj₂ (upto (a (p ++ [ ix 1 ])) {y} yq) x) })) ⟩
+  ⟨ (λ {y} yq → (λ { guard → guard ; (body x) → body (proj₁ (upto (a (p ⊕ [ ix 1 ])) {y} yq) x) })
+              , (λ { guard → guard ; (body x) → body (proj₂ (upto (a (p ⊕ [ ix 1 ])) {y} yq) x) })) ⟩
 
 lim-causal : ∀ {A q} {c c′ : ℕ → Den A} → (∀ n → c n ~⟨ q ⟩ c′ n) → LimD c ~⟨ q ⟩ LimD c′
 lim-causal a = ~-cold λ p →
@@ -338,10 +339,10 @@ lim-causal a = ~-cold λ p →
 -- A JOINED HOT reads a row before the one it shows.
 private
   rejoin-below : ∀ {A q p} {t t′ : EmissionSet A} → (∀ {k e} → k ≺ q → t k e → t′ k e) → ∀ {y e} → y ≼ q → Rejoin p t y e → Rejoin p t′ y e
-  rejoin-below {q = q} {p} a yq (shown {k} x w pk) = shown (a {k} (≺-≼-≺ {k} {k ++ [ sub p ]} {q} (≺-ext k []) yq) x) w pk
-  rejoin-below {q = q} {p} a yq (heard {k} x pk)   = heard (a {k} (≺-≼-≺ {k} {k ++ [ sub p ]} {q} (≺-ext k []) yq) x) pk
-  rejoin-below {q = q} {p} a yq (ended {c} x pc)   = ended (a {c} (≺-≼-≺ {c} {c ++ [ sub p ]} {q} (≺-ext c []) yq) x) pc
-  rejoin-below {q = q} {p} a yq (late {c} x cp)    = late (a {c} (≺-≼-≺ {c} {p ++ [ last ]} {q} (≼-≺-≺ {c} {p} {p ++ [ last ]} cp (≺-ext p [])) yq) x) cp
+  rejoin-below {q = q} {p} a yq (shown {k} x w pk) = shown (a {k} (≺-≼-≺ {k} {k ⊕ [ sub p ]} {q} (≺-ext k []) yq) x) w pk
+  rejoin-below {q = q} {p} a yq (heard {k} x pk)   = heard (a {k} (≺-≼-≺ {k} {k ⊕ [ sub p ]} {q} (≺-ext k []) yq) x) pk
+  rejoin-below {q = q} {p} a yq (ended {c} x pc)   = ended (a {c} (≺-≼-≺ {c} {c ⊕ [ sub p ]} {q} (≺-ext c []) yq) x) pc
+  rejoin-below {q = q} {p} a yq (late {c} x cp)    = late (a {c} (≺-≼-≺ {c} {p ⊕ [ last ]} {q} (≼-≺-≺ {c} {p} {p ⊕ [ last ]} cp (≺-ext p [])) yq) x) cp
 
 -- What lies strictly below `q` decides a hot's rows at and below it.
 hot-below : ∀ {A q} {t t′ : EmissionSet A} → (∀ {k e} → k ≺ q → t k e → t′ k e) → (∀ {k e} → k ≺ q → t′ k e → t k e) → hot t ~⟨ q ⟩ hot t′
@@ -431,9 +432,9 @@ private
 
 -- A body's rows lie past its subscription.
 aft : ∀ {A H} (d : Den A) → InvD H d → Aft (Ok H) d
-aft d Id p ok {y} x = ≺→≼ {p ++ [ ix 1 ]} {y} (world-after (InvAt.world I x) (InvAt.real I x))
-                    , λ { refl → pinned-after I (proj₁ (ok-step p ok)) x }
-  where I = Id (p ++ [ ix 1 ]) (ok-step p ok)
+aft d Id p ok {y} x = ≺→≼ {p ⊕ [ ix 1 ]} {y} (world-after (InvAt.world I x) (InvAt.real I x))
+                    , λ { refl → pinned-after I x }
+  where I = Id (p ⊕ [ ix 1 ]) (ok-step p ok)
 
 -- THE RECURSION SETTLES: each approximant is within its index of the
 -- next.  The first unfolding replaces the spin by the guard, the body

@@ -214,6 +214,11 @@ gt-ℕ {m} {n} () | false | false
 ℕ-gt : ∀ {m n} → cmpℕ m n ≡ gt → cmpℕ n m ≡ lt
 ℕ-gt {m} {n} h = ℕ-lt {n} {m} (gt-ℕ {m} {n} h)
 
+isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
+isLt-lt {lt} _ = refl
+isLt-lt {eq} ()
+isLt-lt {gt} ()
+
 lexi-l : ∀ {x y} → x ≡ lt → lexi x y ≡ lt
 lexi-l refl = refl
 

@@ -20,8 +20,7 @@ module denotation.Laws.BoundedInv where
 
 open import Data.Bool using (T)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; _++_; [_])
-open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ; ++-identityʳ; ++-assoc)
+open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (<-cmp; <⇒≱; <⇒≤; ≤-refl; ≤-trans; n≤1+n; n<1+n; m<n⇒m<1+n; ≤-<-trans; <-trans; <-irrefl;
@@ -36,11 +35,12 @@ open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import denotation.Events using (Pos; ix; sub; last; inside; _≟ᵖ_; <ᵖ-between; <ᵖ-part; <ᵖ-split)
+open import denotation.Position using (Pos; ix; sub; last; inside; _≟ᵖ_; _⊕_)
+open import denotation.Events using (<ᵖ-between; <ᵖ-part; <ᵖ-split)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate;
   module Values; module Bounded)
 open import denotation.Laws.Modulus using (≺-trans; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; ≺-ext; ≺-irrefl; ≺-absurd; ≼-false)
-open import denotation.Laws.Worlds using (TimerRoot; plain-untimed; Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest; nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢; PinBy)
+open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest; nest⁼; nest-in; leads; w-up; not-up; sib; same-lead; flat-under; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; ext≢; PinBy; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.JoinInv using (ix01; ix10; below; module Kids; module Join)
 open import denotation.Laws.Nth using (module Nths)
@@ -49,15 +49,15 @@ end≢pin : ∀ {C} {c} → PinBy {C} c end → ⊥
 end≢pin (_ , () , _)
 
 -- Nothing lies strictly between a position and its first child.
-first-child : ∀ p {c} → p ≺ c → c ≺ (p ++ [ ix 0 ]) → ⊥
+first-child : ∀ p {c} → p ≺ c → c ≺ (p ⊕ [ ix 0 ]) → ⊥
 first-child p {c} pc cp with <ᵖ-between p c [ ix 0 ] (Equivalence.to T-≡ pc) (Equivalence.to T-≡ cp)
-... | [] , refl = ≺-irrefl {p} (subst (p ≺_) (++-identityʳ p) pc)
-... | ix zero ∷ [] , refl = ≺-irrefl {p ++ [ ix 0 ]} cp
+... | [] , refl = ≺-irrefl {p} (subst (p ≺_) (⊕-identityʳ p) pc)
+... | ix zero ∷ [] , refl = ≺-irrefl {p ⊕ [ ix 0 ]} cp
 ... | ix zero ∷ w ∷ ws , refl =
-  ≺-absurd {p ++ ix 0 ∷ w ∷ ws} {p ++ [ ix 0 ]} cp (subst ((p ++ [ ix 0 ]) ≺_) (++-assoc p [ ix 0 ] (w ∷ ws)) (≺-ext (p ++ [ ix 0 ]) ws))
-... | ix (suc j) ∷ ws , refl = ≺-absurd {p ++ ix (suc j) ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
-... | sub e ∷ ws , refl = ≺-absurd {p ++ sub e ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
-... | last ∷ ws , refl = ≺-absurd {p ++ last ∷ ws} {p ++ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
+  ≺-absurd {p ⊕ (ix 0 ∷ w ∷ ws)} {p ⊕ [ ix 0 ]} cp (subst ((p ⊕ [ ix 0 ]) ≺_) (⊕-assoc p [ ix 0 ] (w ∷ ws)) (≺-ext (p ⊕ [ ix 0 ]) ws))
+... | ix (suc j) ∷ ws , refl = ≺-absurd {p ⊕ (ix (suc j) ∷ ws)} {p ⊕ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
+... | sub e ∷ ws , refl = ≺-absurd {p ⊕ (sub e ∷ ws)} {p ⊕ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
+... | last ∷ ws , refl = ≺-absurd {p ⊕ (last ∷ ws)} {p ⊕ [ ix 0 ]} cp (Equivalence.from T-≡ (<ᵖ-part p [] ws refl))
 
 -- One end to a reading.
 end-uniq : ∀ {C H s} {X : EmissionSet C} → InvAt H s X → ∀ {c c′} → X c end → X c′ end → c ≡ c′
@@ -172,7 +172,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   starts-fun {ls = ls} (queued {c} _ _ _ K nK) (queued {c′} _ _ _ K′ nK′) with ≼-or-≻ c c′ | ≼-or-≻ c′ c
   ... | _       | inj₂ lt  = ⊥-elim (nK′ (kth-mono (λ {x} le → ≼-≺-≺ {x} {c} {c′} le lt) ls K))
   ... | inj₂ lt | _        = ⊥-elim (nK (kth-mono (λ {x} le → ≼-≺-≺ {x} {c′} {c} le lt) ls K′))
-  ... | inj₁ le | inj₁ le′ = cong (_++ [ ix 1 ]) (≼-antisym {c} {c′} le le′)
+  ... | inj₁ le | inj₁ le′ = cong (_⊕ [ ix 1 ]) (≼-antisym {c} {c′} le le′)
 
   sub-fun : ∀ {i q q′ s s′ a a′} → Sub i q s a → Sub i q′ s′ a′ → q ≡ q′ × a ≡ a′ × s ≡ s′
   sub-fun (nq , st) (nq′ , st′) with nth-fun nq nq′
@@ -189,16 +189,16 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   -- In the world, reachable, and in the world of the second child of a
   -- value no later than its own.
   data Seat (i : ℕ) (s : Pos) : Set where
-    seat′ : ∀ {k r b} → W H p s → Real s → k ≤ i → Nth k r b → W⁼ H (r ++ [ ix 1 ]) s → Seat i s
+    seat′ : ∀ {k r b} → W H p s → Real s → k ≤ i → Nth k r b → W⁼ H (r ⊕ [ ix 1 ]) s → Seat i s
 
   LIat : ∀ {s} a → W H p s → Real s → InvAt H s (enter (f a) s)
   LIat {s} a w r = fi a s (ok-in ok w r)
 
-  seat-end : ∀ {i j c a s} → j < i → Seat j s → After (f a) s c end → Seat i (c ++ [ ix 1 ])
+  seat-end : ∀ {i j c a s} → j < i → Seat j s → After (f a) s c end → Seat i (c ⊕ [ ix 1 ])
   seat-end {c = c} {a} {s} j<i (seat′ w r k≤j nr rw) ac =
     seat′ (nest-in w (inW cw)) (real-snoc c plain-ix (InvAt.real (LIat a w r) (proj₁ ac))) (≤-trans k≤j (<⇒≤ j<i)) nr (nest⁼ rw (inW cw))
     where
-      cw : W H s (c ++ [ ix 1 ])
+      cw : W H s (c ⊕ [ ix 1 ])
       cw = step (inW (InvAt.world (LIat a w r) (proj₁ ac))) plain-ix
 
   seat : ∀ {i q s a} → Acc _<_ i → Sub i q s a → Seat i s
@@ -227,7 +227,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   row-w sb x = InvAt.world (LI sb) (proj₁ x)
 
   -- An end's second child lies in its lane's world.
-  end-w : ∀ {i q s a c e} → Sub i q s a → After (f a) s c e → W H s (c ++ [ ix 1 ])
+  end-w : ∀ {i q s a c e} → Sub i q s a → After (f a) s c e → W H s (c ⊕ [ ix 1 ])
   end-w sb x = step (inW (row-w sb x)) plain-ix
 
   lane-end : ∀ {i q s a c c′} → Sub i q s a → After (f a) s c end → After (f a) s c′ end → c ≡ c′
@@ -239,17 +239,17 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   -- Lane at `s` before lane at `s′`: under distinct roots, or `s′` under
   -- an end of the first, queued at.
   data Rel (a : A) (s s′ : Pos) : Set where
-    apart : ∀ {r r′ b b′} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ++ [ ix 1 ]) s → W⁼ H (r′ ++ [ ix 1 ]) s′ → Rel a s s′
-    queued-in : ∀ {c} → After (f a) s c end → Queued c → W⁼ H (c ++ [ ix 1 ]) s′ → Rel a s s′
+    apart : ∀ {r r′ b b′} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ⊕ [ ix 1 ]) s → W⁼ H (r′ ⊕ [ ix 1 ]) s′ → Rel a s s′
+    queued-in : ∀ {c} → After (f a) s c end → Queued c → W⁼ H (c ⊕ [ ix 1 ]) s′ → Rel a s s′
 
   RelAt : ℕ → Set
   RelAt i′ = ∀ {i q s a q′ s′ a′} → i < i′ → Sub i q s a → Sub i′ q′ s′ a′ → Rel a s s′
 
-  apart-ww : ∀ {r r′ b b′ w} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ++ [ ix 1 ]) w → W⁼ H (r′ ++ [ ix 1 ]) w → ⊥
-  apart-ww {r} {r′} xr xr′ ne = kids xr xr′ plain-ix plain-ix (λ eq → ne (∷ʳ-injectiveˡ r r′ eq))
+  apart-ww : ∀ {r r′ b b′ w} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ⊕ [ ix 1 ]) w → W⁼ H (r′ ⊕ [ ix 1 ]) w → ⊥
+  apart-ww {r} {r′} xr xr′ ne = kids xr xr′ plain-ix plain-ix (λ eq → ne (⊕-injˡ r r′ eq))
 
-  apart-lead : ∀ {r r′ b b′ w y} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ++ [ ix 1 ]) w → W H (r′ ++ [ ix 1 ]) y → w ⊑ y → ⊥
-  apart-lead {r} {r′} xr xr′ ne v yw = kid-lane xr plain-ix v xr′ yw (λ eq → ne (∷ʳ-injectiveˡ r r′ eq))
+  apart-lead : ∀ {r r′ b b′ w y} → O r (out b) → O r′ (out b′) → (r ≡ r′ → ⊥) → W⁼ H (r ⊕ [ ix 1 ]) w → W H (r′ ⊕ [ ix 1 ]) y → w ⊑ y → ⊥
+  apart-lead {r} {r′} xr xr′ ne v yw = kid-lane xr plain-ix v xr′ yw (λ eq → ne (⊕-injˡ r r′ eq))
 
   -- No two lanes end at one position.
   one-end : ∀ {j₁ j₂ c} → RelAt j₂ → j₁ < j₂ → Ends j₁ (Sched j₁) c → Ends j₂ (Sched j₂) c → ⊥
@@ -260,29 +260,29 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
 
   -- Two lanes queued at one end need two earlier lanes ending there.
   same-c : ∀ {i i′ q a c} → (∀ {m} → m < i′ → RelAt m) → i < i′ → Kth (_≼ c) (Sched i′) (i′ ∸ n)
-         → Sub i q (c ++ [ ix 1 ]) a → n ≤ i → ¬ Kth (_≺ c) (Sched i) (i ∸ n) → ⊥
+         → Sub i q (c ⊕ [ ix 1 ]) a → n ≤ i → ¬ Kth (_≺ c) (Sched i) (i ∸ n) → ⊥
   same-c {i} {i′} {c = c} rec i<i′ Kc sb n≤i nK
     with subst (Kth (_≼ c) (Sched (suc i))) (+-∸-assoc 1 n≤i)
            (strip (i′ ∸ suc i) (suc i) (≤-trans n≤i (n≤1+n i)) (subst (λ m → Kth (_≼ c) (Sched m) (m ∸ n)) (sym (m∸n+n≡m i<i′)) Kc))
   ... | inj₁ ((c′ , (_ , _ , _ , n₁ , st₁ , ac₁) , le) , _) with sub-fun (n₁ , st₁) sb
-  ...   | refl , refl , refl = le (≺-trans {c} {c ++ [ ix 1 ]} {c′} (≺-ext c []) (proj₂ ac₁))
+  ...   | refl , refl , refl = le (≺-trans {c} {c ⊕ [ ix 1 ]} {c′} (≺-ext c []) (proj₂ ac₁))
   same-c {i} {i′} {c = c} rec i<i′ Kc sb n≤i nK | inj₂ K with two-at i (i ∸ n) K nK
   ... | two j₁<j₂ j₂<i e₁ e₂ = one-end (rec (<-trans j₂<i i<i′)) j₁<j₂ e₁ e₂
 
   -- A value's second child under a lane's end.
-  nb-root : ∀ {j qj sj aj c q a} → Sub j qj sj aj → After (f aj) sj c end → O q (out a) → W⁼ H (c ++ [ ix 1 ]) (q ++ [ ix 1 ]) → ⊥
+  nb-root : ∀ {j qj sj aj c q a} → Sub j qj sj aj → After (f aj) sj c end → O q (out a) → W⁼ H (c ⊕ [ ix 1 ]) (q ⊕ [ ix 1 ]) → ⊥
   nb-root {c = c} {q} {a} sbj ac xq v with seat* sbj
   ... | seat′ _ _ _ nr rw with w-up plain-ix v
-  ...   | inj₁ eq = o-lane (subst (λ z → O z (out a)) (sym (∷ʳ-injectiveˡ c q eq)) xq) (nth-val nr) (nest rw (row-w sbj ac))
+  ...   | inj₁ eq = o-lane (subst (λ z → O z (out a)) (sym (⊕-injˡ c q eq)) xq) (nth-val nr) (nest rw (row-w sbj ac))
   ...   | inj₂ v′ = U (nth-val nr) xq plain-ix (nest⁼ rw (inW (nest-in (end-w sbj ac) v′))) (⊑-refl q)
 
   -- NO LANE BEFORE LANE i′ LIES UNDER THE END i′ IS QUEUED AT.
   noback : ∀ {i′ c j qj sj aj} → (∀ {m} → m < i′ → RelAt m) → Kth (_≼ c) (Sched i′) (i′ ∸ n) → j < i′ → Sub j qj sj aj
-         → After (f aj) sj c end → ∀ i → Acc _<_ i → ∀ {q s a} → i < i′ → Sub i q s a → W⁼ H (c ++ [ ix 1 ]) s → ⊥
+         → After (f aj) sj c end → ∀ i → Acc _<_ i → ∀ {q s a} → i < i′ → Sub i q s a → W⁼ H (c ⊕ [ ix 1 ]) s → ⊥
   noback rec Kc j<i′ sbj ac i _ i<i′ (nq , room _)    v = nb-root sbj ac (nth-val nq) v
   noback rec Kc j<i′ sbj ac i _ i<i′ (nq , freed _ _) v = nb-root sbj ac (nth-val nq) v
   noback {c = c} {j} rec Kc j<i′ sbj ac i (acc rs) i<i′ sb@(nq , queued {ck} n≤i _ kck _ nK) v with w-up plain-ix v
-  ... | inj₁ eq with ∷ʳ-injectiveˡ c ck eq
+  ... | inj₁ eq with ⊕-injˡ c ck eq
   ...   | refl = same-c rec i<i′ Kc sb n≤i nK
   noback {c = c} {j} rec Kc j<i′ sbj ac i (acc rs) i<i′ sb@(nq , queued {ck} n≤i _ kck _ nK) v | inj₂ v′ with kth-lane i kck
   ... | ending {k} k<i (_ , _ , _ , nk , stk , ack) refl with <-cmp k j
@@ -299,7 +299,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   ... | queued-in e _ vk with lane-end sbj e ac
   ...   | refl = noback rec Kc j<i′ sbj ac k (rs k<i) (<-trans k<i i<i′) (nk , stk) vk
 
-  rel-root : ∀ {i i′ q s a q′ a′} → i < i′ → Sub i q s a → Nth i′ q′ a′ → Rel a s (q′ ++ [ ix 1 ])
+  rel-root : ∀ {i i′ q s a q′ a′} → i < i′ → Sub i q s a → Nth i′ q′ a′ → Rel a s (q′ ⊕ [ ix 1 ])
   rel-root {q′ = q′} i<i′ sb nq′ with seat* sb
   ... | seat′ {r = r} _ _ k≤i nr rw with r ≟ᵖ q′
   ...   | no ne    = apart (nth-val nr) (nth-val nq′) ne rw here
@@ -332,7 +332,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   -- Its own, not a queued end; or its queued end's first child.
   data Lr (a : A) (s y : Pos) : Set where
     lr-row  : ∀ {e} → After (f a) s y e → (After (f a) s y end → Queued y → ⊥) → Lr a s y
-    lr-hand : ∀ {c} → After (f a) s c end → Queued c → y ≡ c ++ [ ix 0 ] → Lr a s y
+    lr-hand : ∀ {c} → After (f a) s c end → Queued c → y ≡ c ⊕ [ ix 0 ] → Lr a s y
 
   lr-w : ∀ {i q s a y} → Sub i q s a → Lr a s y → W H s y
   lr-w sb (lr-row x _)       = row-w sb x
@@ -344,17 +344,17 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
 
   -- In the world of a value's second child.
   data InRoot (y : Pos) : Set where
-    in-root : ∀ {r b} → O r (out b) → W H (r ++ [ ix 1 ]) y → InRoot y
+    in-root : ∀ {r b} → O r (out b) → W H (r ⊕ [ ix 1 ]) y → InRoot y
 
   lr-root : ∀ {i q s a y} → Sub i q s a → Lr a s y → InRoot y
   lr-root sb l with seat* sb
   ... | seat′ _ _ _ nr rw = in-root (nth-val nr) (nest rw (lr-w sb l))
 
-  child-in : ∀ {r i q s a x l w} → W⁼ H r s → Sub i q s a → Lr a s x → Plain l → W⁼ H (x ++ [ l ]) w → W⁼ H r w
+  child-in : ∀ {r i q s a x l w} → W⁼ H r s → Sub i q s a → Lr a s x → Plain l → W⁼ H (x ⊕ [ l ]) w → W⁼ H r w
   child-in rw sb lx pl v = nest⁼ (nest⁼ rw (inW (step (inW (lr-w sb lx)) pl))) v
 
   -- One lane's rows.
-  same-flat : ∀ {i q s a y l ys} → Sub i q s a → Lr a s y → Lr a s (y ++ l ∷ ys) → ⊥
+  same-flat : ∀ {i q s a y l ys} → Sub i q s a → Lr a s y → Lr a s (y ⊕ (l ∷ ys)) → ⊥
   same-flat sb (lr-row x _) (lr-row x′ _) = InvAt.flat (LI sb) (proj₁ x) (proj₁ x′)
   same-flat {y = y} {ys = ys} sb (lr-row x nq) (lr-hand x′ Q eq) with same-lead (LI sb) (proj₁ x) (proj₁ x′) (below y ys _ eq)
   ... | refl = nq x′ Q
@@ -362,13 +362,13 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   same-flat {ys = ys} sb (lr-hand x _ refl) (lr-hand x′ _ eq) with lane-end sb x x′
   ... | refl = ext≢ _ ys eq
 
-  same-under : ∀ {i q s a x y l w} → Sub i q s a → Lr a s x → Lr a s y → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+  same-under : ∀ {i q s a x y l w} → Sub i q s a → Lr a s x → Lr a s y → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
   same-under sb (lr-row x _) (lr-row y _) pl v le = InvAt.under (LI sb) (proj₁ x) (proj₁ y) pl v le
   same-under {x = x} sb (lr-row x′ nq) (lr-hand {c} y Q refl) pl v le with ⊑-snoc c le
   ... | inj₁ wc = InvAt.under (LI sb) (proj₁ x′) (proj₁ y) pl v wc
   ... | inj₂ refl with w-up plain-ix v
   ...   | inj₂ v′ = InvAt.under (LI sb) (proj₁ x′) (proj₁ y) pl v′ (⊑-refl c)
-  ...   | inj₁ eq with ∷ʳ-injectiveˡ x c eq
+  ...   | inj₁ eq with ⊕-injˡ x c eq
   ...     | refl = nq y Q
   same-under sb (lr-hand x _ refl) (lr-row y _) pl v le = InvAt.under (LI sb) (proj₁ x) (proj₁ y) plain-ix (nest⁼ (inW (step here pl)) v) le
   same-under sb (lr-hand {c} x _ refl) (lr-hand x′ _ refl) pl v le with lane-end sb x x′
@@ -377,32 +377,32 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   -- A lane's own row, not a queued end, leads no second child of its
   -- queued end.
   row-not-c : ∀ {i q s a c y e} → Sub i q s a → After (f a) s c end → Queued c → After (f a) s y e
-            → (After (f a) s y end → Queued y → ⊥) → y ⊑ (c ++ [ ix 1 ]) → ⊥
+            → (After (f a) s y end → Queued y → ⊥) → y ⊑ (c ⊕ [ ix 1 ]) → ⊥
   row-not-c {c = c} sb ac Q x nq le with ⊑-snoc c le
   ... | inj₂ refl = InvAt.flat (LI sb) (proj₁ ac) (proj₁ x)
   ... | inj₁ yc with same-lead (LI sb) (proj₁ x) (proj₁ ac) yc
   ...   | refl = nq ac Q
 
   -- Under an end a later lane is queued at, against the end's lane.
-  nest-back : ∀ {i q s a c w y} → Sub i q s a → After (f a) s c end → W⁼ H (c ++ [ ix 1 ]) w → Lr a s y → w ⊑ y → ⊥
+  nest-back : ∀ {i q s a c w y} → Sub i q s a → After (f a) s c end → W⁼ H (c ⊕ [ ix 1 ]) w → Lr a s y → w ⊑ y → ⊥
   nest-back sb ac v (lr-row x _) le = InvAt.under (LI sb) (proj₁ ac) (proj₁ x) plain-ix v le
   nest-back {c = c} sb ac v (lr-hand x _ refl) le with lane-end sb ac x
-  ... | refl = sib (InvAt.real (LI sb) (proj₁ ac)) plain-ix (⊑-refl c) (λ eq → ix01 (∷ʳ-injectiveʳ c c eq)) v le
+  ... | refl = sib (InvAt.real (LI sb) (proj₁ ac)) plain-ix (⊑-refl c) (λ eq → ix01 (⊕-injʳ c c eq)) v le
 
-  nest-lead : ∀ {i q s a c y y′} → Sub i q s a → After (f a) s c end → Queued c → Lr a s y → W H (c ++ [ ix 1 ]) y′ → y ⊑ y′ → ⊥
+  nest-lead : ∀ {i q s a c y y′} → Sub i q s a → After (f a) s c end → Queued c → Lr a s y → W H (c ⊕ [ ix 1 ]) y′ → y ⊑ y′ → ⊥
   nest-lead {y = y} sb ac Q (lr-row x nq) yw le =
-    leads (proj₁ (okS sb)) (proj₂ (okS sb)) (row-w sb x) (λ u → InvAt.under (LI sb) (proj₁ ac) (proj₁ x) plain-ix u (⊑-refl y))
+    leads (proj₂ (okS sb)) (row-w sb x) (λ u → InvAt.under (LI sb) (proj₁ ac) (proj₁ x) plain-ix u (⊑-refl y))
           (row-not-c sb ac Q x nq) (inW yw) le
   nest-lead {c = c} sb ac Q (lr-hand x _ refl) yw le with lane-end sb ac x
-  ... | refl = LK.kid-lane sb (proj₁ ac) plain-ix here (proj₁ ac) yw (λ eq → ix01 (∷ʳ-injectiveʳ c c eq)) le
+  ... | refl = LK.kid-lane sb (proj₁ ac) plain-ix here (proj₁ ac) yw (λ eq → ix01 (⊕-injʳ c c eq)) le
 
-  nest-under : ∀ {i q s a c x l w y′} → Sub i q s a → After (f a) s c end → Queued c → Lr a s x → Plain l → W⁼ H (x ++ [ l ]) w
-             → W H (c ++ [ ix 1 ]) y′ → w ⊑ y′ → ⊥
+  nest-under : ∀ {i q s a c x l w y′} → Sub i q s a → After (f a) s c end → Queued c → Lr a s x → Plain l → W⁼ H (x ⊕ [ l ]) w
+             → W H (c ⊕ [ ix 1 ]) y′ → w ⊑ y′ → ⊥
   nest-under {c = c} {x} sb ac Q (lr-row x′ nq) pl v yw le =
     LK.kid-lane sb (proj₁ x′) pl v (proj₁ ac) yw
-      (λ eq → row-not-c sb ac Q x′ nq (subst (_⊑ (c ++ [ ix 1 ])) (sym (∷ʳ-injectiveˡ x c eq)) (⊑-snoc⁺ c))) le
+      (λ eq → row-not-c sb ac Q x′ nq (subst (_⊑ (c ⊕ [ ix 1 ])) (sym (⊕-injˡ x c eq)) (⊑-snoc⁺ c))) le
   nest-under {c = c} sb ac Q (lr-hand x _ refl) pl v yw le with lane-end sb ac x
-  ... | refl = LK.kid-lane sb (proj₁ ac) plain-ix (nest⁼ (inW (step here pl)) v) (proj₁ ac) yw (λ eq → ix01 (∷ʳ-injectiveʳ c c eq)) le
+  ... | refl = LK.kid-lane sb (proj₁ ac) plain-ix (nest⁼ (inW (step here pl)) v) (proj₁ ac) yw (λ eq → ix01 (⊕-injʳ c c eq)) le
 
   -- Two lanes, the first before the second.
   x-lead : ∀ {i q s a i′ q′ s′ a′ y y′} → Sub i q s a → Sub i′ q′ s′ a′ → Rel a s s′ → Lr a s y → Lr a′ s′ y′ → y ⊑ y′ → ⊥
@@ -414,12 +414,12 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   x-back sb sb′ (queued-in ac Q v)       l l′ = nest-back sb ac (inW (nest v (lr-w sb′ l′))) l
 
   x-under : ∀ {i q s a i′ q′ s′ a′ x y′ l w} → Sub i q s a → Sub i′ q′ s′ a′ → Rel a s s′ → Lr a s x → Lr a′ s′ y′
-          → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y′ → ⊥
+          → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y′ → ⊥
   x-under sb sb′ (apart xr xr′ ne rw rw′) lx l′ pl v = apart-lead xr xr′ ne (child-in rw sb lx pl v) (nest rw′ (lr-w sb′ l′))
   x-under sb sb′ (queued-in ac Q v₁)      lx l′ pl v = nest-under sb ac Q lx pl v (nest v₁ (lr-w sb′ l′))
 
   x-under′ : ∀ {i q s a i′ q′ s′ a′ x y l w} → Sub i q s a → Sub i′ q′ s′ a′ → Rel a s s′ → Lr a′ s′ x → Lr a s y
-           → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+           → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
   x-under′ sb sb′ (apart xr xr′ ne rw rw′) lx ly pl v = apart-lead xr′ xr (λ eq → ne (sym eq)) (child-in rw′ sb′ lx pl v) (nest rw (lr-w sb ly))
   x-under′ sb sb′ (queued-in ac Q v₁)      lx ly pl v = nest-back sb ac (child-in v₁ sb′ lx pl v) ly
 
@@ -431,11 +431,11 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
     l-work : ∀ {e} → After (f a) s y e → Work e → LEv a s y e
     l-end  : After (f a) s y end → ¬ Queued y → Done y → LEv a s y end
     l-pass : After (f a) s y end → ¬ Queued y → ¬ Done y → LEv a s y skip
-    l-hand : ∀ {c} → After (f a) s c end → Queued c → y ≡ c ++ [ ix 0 ] → LEv a s y skip
+    l-hand : ∀ {c} → After (f a) s c end → Queued c → y ≡ c ⊕ [ ix 0 ] → LEv a s y skip
 
   data V (y : Pos) : Ev B → Set where
     v-o   : ∀ {e₀ e} → O y e₀ → OEv y e₀ e → V y e
-    v-val : ∀ {q a} → O q (out a) → y ≡ q ++ [ ix 0 ] → V y skip
+    v-val : ∀ {q a} → O q (out a) → y ≡ q ⊕ [ ix 0 ] → V y skip
     v-l   : ∀ {i q s a e} → Sub i q s a → LEv a s y e → V y e
 
   vw : ∀ {y e} → JoinT y e → V y e
@@ -488,7 +488,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   ... | tri≈ _ refl _ with sub-fun sb sb′
   ...   | refl , refl , refl = l-func sb lv lv′
 
-  flat-ll : ∀ {i q s a i′ q′ s′ a′ y l ys e e′} → Sub i q s a → LEv a s y e → Sub i′ q′ s′ a′ → LEv a′ s′ (y ++ l ∷ ys) e′ → ⊥
+  flat-ll : ∀ {i q s a i′ q′ s′ a′ y l ys e e′} → Sub i q s a → LEv a s y e → Sub i′ q′ s′ a′ → LEv a′ s′ (y ⊕ (l ∷ ys)) e′ → ⊥
   flat-ll {i} {i′ = i′} {l = l} {ys} sb lv sb′ lv′ with <-cmp i i′
   ... | tri< lt _ _ = x-lead sb sb′ (rel lt sb sb′) (lr sb lv) (lr sb′ lv′) (l ∷ ys , refl)
   ... | tri> _ _ gt = x-back sb′ sb (rel gt sb′ sb) (lr sb′ lv′) (lr sb lv) (l ∷ ys , refl)
@@ -496,7 +496,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   ...   | refl , refl , refl = same-flat sb (lr sb lv) (lr sb lv′)
 
   under-ll : ∀ {i q s a i′ q′ s′ a′ x y l w e e′} → Sub i q s a → LEv a s x e → Sub i′ q′ s′ a′ → LEv a′ s′ y e′
-           → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+           → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
   under-ll {i} {i′ = i′} sb lv sb′ lv′ pl v le with <-cmp i i′
   ... | tri< lt _ _ = x-under sb sb′ (rel lt sb sb′) (lr sb lv) (lr sb′ lv′) pl v le
   ... | tri> _ _ gt = x-under′ sb′ sb (rel gt sb′ sb) (lr sb lv) (lr sb′ lv′) pl v le
@@ -508,13 +508,6 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   world-v (v-val x refl) = step (inW (wo x)) plain-ix
   world-v (v-l sb lv)    = nest-in (s-w sb) (inW (lr-w sb (lr sb lv)))
 
-  untimed-v : ∀ {y e} → V y e → TimerRoot y → ⊥
-  untimed-v (v-o x _)                          = InvAt.untimed Io x
-  untimed-v (v-val {q} x refl)                 = plain-untimed q plain-ix
-  untimed-v (v-l sb (l-work x _))              = InvAt.untimed (LI sb) (proj₁ x)
-  untimed-v (v-l sb (l-end x _ _))             = InvAt.untimed (LI sb) (proj₁ x)
-  untimed-v (v-l sb (l-pass x _ _))            = InvAt.untimed (LI sb) (proj₁ x)
-  untimed-v (v-l sb (l-hand {c} _ _ refl))     = plain-untimed c plain-ix
 
   real-v : ∀ {y e} → V y e → Real y
   real-v (v-o x _)          = re x
@@ -537,15 +530,15 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   ... | in-root xr yw = ⊥-elim (val-lane x′ xr yw)
   func-v (v-l sb lv)    (v-l sb′ lv′)   = func-ll sb lv sb′ lv′
 
-  flat-v : ∀ {y e l ys e′} → V y e → V (y ++ l ∷ ys) e′ → ⊥
+  flat-v : ∀ {y e l ys e′} → V y e → V (y ⊕ (l ∷ ys)) e′ → ⊥
   flat-v (v-o x _) (v-o x′ _) = fl x x′
   flat-v {y} {ys = ys} (v-o x ev) (v-val x′ eq) = o-lead x (o-nout ev x) x′ (below y ys _ eq)
   flat-v {l = l} {ys} (v-o x ev) (v-l sb lv) with lr-root sb (lr sb lv)
   ... | in-root xr yw = o-lane-lead x (o-nout ev x) xr yw (l ∷ ys , refl)
   flat-v {l = l} {ys} (v-val x refl) (v-o x′ _) = flat-under Io {a = ix 0} x x′ (l ∷ ys , refl)
-  flat-v {ys = ys} (v-val {q} x refl) (v-val x′ eq) = flat-under Io {a = ix 0} x x′ (below (q ++ [ ix 0 ]) ys _ eq)
+  flat-v {ys = ys} (v-val {q} x refl) (v-val x′ eq) = flat-under Io {a = ix 0} x x′ (below (q ⊕ [ ix 0 ]) ys _ eq)
   flat-v {l = l} {ys} (v-val x refl) (v-l sb lv) with lr-root sb (lr sb lv)
-  ... | in-root xr yw = kid-lane x plain-ix here xr yw (λ eq → ix01 (∷ʳ-injectiveʳ _ _ eq)) (l ∷ ys , refl)
+  ... | in-root xr yw = kid-lane x plain-ix here xr yw (λ eq → ix01 (⊕-injʳ _ _ eq)) (l ∷ ys , refl)
   flat-v {l = l} {ys} (v-l sb lv) (v-o x′ _) with lr-root sb (lr sb lv)
   ... | in-root xr yw = U xr x′ plain-ix (inW yw) (l ∷ ys , refl)
   flat-v {y} {ys = ys} (v-l sb lv) (v-val x′ eq) with lr-root sb (lr sb lv)
@@ -553,27 +546,27 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   flat-v (v-l sb lv) (v-l sb′ lv′) = flat-ll sb lv sb′ lv′
 
   -- Under a value's first child.
-  val-under : ∀ {q a w l y e′} → O q (out a) → W⁼ H ((q ++ [ ix 0 ]) ++ [ l ]) w → W⁼ H (q ++ [ ix 0 ]) w → V y e′ → w ⊑ y → ⊥
+  val-under : ∀ {q a w l y e′} → O q (out a) → W⁼ H ((q ⊕ [ ix 0 ]) ⊕ [ l ]) w → W⁼ H (q ⊕ [ ix 0 ]) w → V y e′ → w ⊑ y → ⊥
   val-under xq v v₀ (v-o oy _) le = U xq oy plain-ix v₀ le
   val-under {q} xq v v₀ (v-val {q′} xq′ refl) le with ⊑-snoc q′ le
   ... | inj₁ wq = U xq xq′ plain-ix v₀ wq
   ... | inj₂ refl with w-up plain-ix v₀
-  ...   | inj₁ eq = not-up (real-snoc q plain-ix (re xq)) v (subst (λ z → (q′ ++ [ ix 0 ]) ⊑ z) (sym eq) (⊑-refl _))
+  ...   | inj₁ eq = not-up (real-snoc q plain-ix (re xq)) v (subst (λ z → (q′ ⊕ [ ix 0 ]) ⊑ z) (sym eq) (⊑-refl _))
   ...   | inj₂ v′ = U xq xq′ plain-ix v′ (⊑-refl q′)
   val-under xq v v₀ (v-l sb lv) le with lr-root sb (lr sb lv)
-  ... | in-root xr yw = kid-lane xq plain-ix v₀ xr yw (λ eq → ix01 (∷ʳ-injectiveʳ _ _ eq)) le
+  ... | in-root xr yw = kid-lane xq plain-ix v₀ xr yw (λ eq → ix01 (⊕-injʳ _ _ eq)) le
 
-  under-v : ∀ {x y w l e e′} → V x e → V y e′ → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+  under-v : ∀ {x y w l e e′} → V x e → V y e′ → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
   under-v (v-o ox _) (v-o oy _) pl v le = U ox oy pl v le
   under-v {x} (v-o ox ev) (v-val xq refl) pl v le =
-    kid-root ox pl v xq plain-ix (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (∷ʳ-injectiveˡ x _ eq)) xq)) le
+    kid-root ox pl v xq plain-ix (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (⊕-injˡ x _ eq)) xq)) le
   under-v {x} (v-o ox ev) (v-l sb lv) pl v le with lr-root sb (lr sb lv)
-  ... | in-root xr yw = kid-lane ox pl v xr yw (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (∷ʳ-injectiveˡ x _ eq)) xr)) le
+  ... | in-root xr yw = kid-lane ox pl v xr yw (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (⊕-injˡ x _ eq)) xr)) le
   under-v (v-val xq refl) vy pl v le = val-under xq v (nest⁼ (inW (step here pl)) v) vy le
   under-v (v-l sb lv) (v-o oy _) pl v le with lr-root sb (lr sb lv)
   ... | in-root xr xw = U xr oy plain-ix (nest⁼ (inW (step (inW xw) pl)) v) le
   under-v (v-l sb lv) (v-val xq′ refl) pl v le with lr-root sb (lr sb lv)
-  ... | in-root xr xw = kid-root xr plain-ix (nest⁼ (inW (step (inW xw) pl)) v) xq′ plain-ix (λ eq → ix10 (∷ʳ-injectiveʳ _ _ eq)) le
+  ... | in-root xr xw = kid-root xr plain-ix (nest⁼ (inW (step (inW xw) pl)) v) xq′ plain-ix (λ eq → ix10 (⊕-injʳ _ _ eq)) le
   under-v (v-l sb lv) (v-l sb′ lv′) pl v le = under-ll sb lv sb′ lv′ pl v le
 
   ------------------------------------------------------------------------
@@ -604,7 +597,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   lane-burst sb ac le (l-pass x _ _) cy = row-burst sb ac le x cy
   lane-burst {c = c} {c′} sb ac le (l-hand x _ refl) cy with lane-end sb ac x
   ... | refl = c′ , inW (nest-in (s-w sb) (inW (row-w sb ac))) ,
-               ⊑-inside (conv {c′} {c′} {c} {c′ ++ [ ix 0 ]} (⊑-refl c′) le cy (⊑-snoc⁺ c′)) , ⊑-inside (⊑-snoc⁺ c′)
+               ⊑-inside (conv {c′} {c′} {c} {c′ ⊕ [ ix 0 ]} (⊑-refl c′) le cy (⊑-snoc⁺ c′)) , ⊑-inside (⊑-snoc⁺ c′)
 
   burst-v : ∀ {c y e} → V c end → V y e → c ≺ y → Σ Pos λ w → W⁼ H p w × T (inside w c) × T (inside w y)
   burst-v vc vy = go (done-v vc) vy
@@ -619,7 +612,7 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
   -- A queued lane's hand-over lies past the merge's end: no end shows at
   -- the end that frees it, and nothing lies between that end and its
   -- first child.
-  hand-after : ∀ {c c′ i q s a} → V c end → Sub i q s a → After (f a) s c′ end → Queued c′ → c′ ≼ c → c ≺ (c′ ++ [ ix 0 ]) → ⊥
+  hand-after : ∀ {c c′ i q s a} → V c end → Sub i q s a → After (f a) s c′ end → Queued c′ → c′ ≼ c → c ≺ (c′ ⊕ [ ix 0 ]) → ⊥
   hand-after {c} {c′} vc sb ac Q le cy with <ᵖ-split c′ c (≼-false {c′} {c} le)
   ... | inj₁ lt   = first-child c′ (Equivalence.from T-≡ lt) cy
   ... | inj₂ refl = at vc
@@ -664,5 +657,4 @@ module BoundedI {A B H p} (ok : Ok H p) (n : ℕ) (f : A → Den B) (fi : ∀ a 
     ; under = λ x y pl v le → under-v (vw (proj₁ x)) (vw (proj₁ y)) pl v le
     ; quiet = λ c y cy → quiet-v (vw (proj₁ c)) (vw (proj₁ y)) cy
     ; pinned = λ x → pinned-v (vw (proj₁ x))
-    ; untimed = λ x → untimed-v (vw (proj₁ x))
     }

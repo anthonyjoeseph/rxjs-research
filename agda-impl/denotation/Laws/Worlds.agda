@@ -35,7 +35,7 @@ import denotation.Position as P
 open import denotation.Position using (Pos; Path; Label; ix; sub; last; frame; cascade; _∙_; _⊕_; root; cascadeAt; tick;
   isLt; cmpInstant; insideᵗ; inside)
 open import denotation.Events using (inside-++; inside-self; inside-cons; <ᵖ-split; <ᵖ-between)
-open import denotation.Simultaneity using (eqⁱ; later-tick; lexi-l)
+open import denotation.Simultaneity using (eqⁱ; later-tick; lexi-l; isLt-lt)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; held; Unpinned; Dep; Few; Rejoin; shown; heard; ended; late; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false; entered-few)
 
@@ -181,9 +181,12 @@ GoodEnv {Γ} ρ = ∀ {A} (i : A ∈ Γ) → InvD (Hots ρ) (lookup ρ i) × (�
 ⊕-cancelˡ (i ∙ p) ys zs e = ++-cancelˡ p ys zs (proj₂ (∙-inj e))
 
 -- One label down, the position and the label are read back.
-⊕-snoc-inj : ∀ x y {a b} → x ⊕ [ a ] ≡ y ⊕ [ b ] → x ≡ y × a ≡ b
-⊕-snoc-inj (i ∙ p) (j ∙ q) e with ∙-inj e
-... | refl , e′ = cong (i ∙_) (∷ʳ-injectiveˡ p q e′) , ∷ʳ-injectiveʳ p q e′
+⊕-injˡ : ∀ x y {a b} → x ⊕ [ a ] ≡ y ⊕ [ b ] → x ≡ y
+⊕-injˡ (i ∙ p) (j ∙ q) e with ∙-inj e
+... | refl , e′ = cong (i ∙_) (∷ʳ-injectiveˡ p q e′)
+
+⊕-injʳ : ∀ x y {a b} → x ⊕ [ a ] ≡ y ⊕ [ b ] → a ≡ b
+⊕-injʳ (i ∙ p) (j ∙ q) e = ∷ʳ-injectiveʳ p q (proj₂ (∙-inj e))
 
 -- A step below a position is no instant's root.
 step≢root : ∀ x {l ys} i → x ⊕ (l ∷ ys) ≡ (i ∙ []) → ⊥
@@ -196,16 +199,10 @@ step≢root (_ ∙ (_ ∷ _)) _ ()
 ⊑-unit {_ ∙ []}      _ ((_ ∷ _) , ())
 ⊑-unit {_ ∙ (_ ∷ _)} _ (_ , ())
 
-private
-  lt-of : ∀ {c} → isLt c ≡ true → c ≡ P.lt
-  lt-of {P.lt} _ = refl
-  lt-of {P.eq} ()
-  lt-of {P.gt} ()
-
 -- A timer's creator comes before its cascade.
 timer-after : ∀ e {t} → tick e < t → e ≺ cascadeAt t e
 timer-after (frame ∙ _)       _ = tt
-timer-after (cascade u d ∙ q) h = Equivalence.from T-≡ (cong isLt (lexi-l (lt-of (later-tick d (cascade u d ∙ q) h))))
+timer-after (cascade u d ∙ q) h = Equivalence.from T-≡ (cong isLt (lexi-l (isLt-lt (later-tick d (cascade u d ∙ q) h))))
 
 ------------------------------------------------------------------------
 -- Reachability
@@ -431,10 +428,10 @@ plain-sub plain-last ()
 
 -- A position has one parent.
 parent-fun : ∀ {a b c} → Parent a c → Parent b c → a ≡ b
-parent-fun {a} {b} (plain _ e)  (plain _ e′)  = proj₁ (⊕-snoc-inj a b (trans (sym e) e′))
-parent-fun {a}     (plain pl e) (named h e′)  = ⊥-elim (plain-sub pl (proj₂ (⊕-snoc-inj a h (trans (sym e) e′))))
-parent-fun {b = b} (named h e)  (plain pl e′) = ⊥-elim (plain-sub pl (sym (proj₂ (⊕-snoc-inj h b (trans (sym e) e′)))))
-parent-fun         (named h e)  (named h′ e′) with proj₂ (⊕-snoc-inj h h′ (trans (sym e) e′))
+parent-fun {a} {b} (plain _ e)  (plain _ e′)  = ⊕-injˡ a b (trans (sym e) e′)
+parent-fun {a}     (plain pl e) (named h e′)  = ⊥-elim (plain-sub pl (⊕-injʳ a h (trans (sym e) e′)))
+parent-fun {b = b} (named h e)  (plain pl e′) = ⊥-elim (plain-sub pl (sym (⊕-injʳ h b (trans (sym e) e′))))
+parent-fun         (named h e)  (named h′ e′) with ⊕-injʳ h h′ (trans (sym e) e′)
 ... | refl = refl
 parent-fun {a}     (plain _ e)  (timed _ e′)  = ⊥-elim (step≢root a _ (trans (sym e) e′))
 parent-fun         (named h e)  (timed _ e′)  = ⊥-elim (step≢root h _ (trans (sym e) e′))
@@ -500,7 +497,7 @@ mutual
 private
   not-under : ∀ {p i j} → (i ≡ j → ⊥) → Real p → Anc (p ⊕ [ ix i ]) (p ⊕ [ ix j ]) → ⊥
   not-under {p} {i} {j} ne rp a with anc-view a
-  ... | inj₁ eq = ne (ix-inj (proj₂ (⊕-snoc-inj p p eq)))
+  ... | inj₁ eq = ne (ix-inj (⊕-injʳ p p eq))
     where ix-inj : ix i ≡ ix j → i ≡ j
           ix-inj refl = refl
   ... | inj₂ (b , x , pb) with parent-fun pb (step-parent p {ix j} plain-ix)
@@ -574,8 +571,8 @@ shape (inW (join v e eh))     = sh-sub e refl
 w-up : ∀ {H a x l} → Plain l → W⁼ H a (x ⊕ [ l ]) → a ≡ x ⊕ [ l ] ⊎ W⁼ H a x
 w-up {x = x} pl v with shape v
 ... | sh-root eq            = inj₁ (sym eq)
-... | sh-plain {x′} u _ eq  = inj₂ (subst (W⁼ _ _) (sym (proj₁ (⊕-snoc-inj x x′ eq))) u)
-... | sh-sub {x′} _ eq      = ⊥-elim (plain-sub pl (proj₂ (⊕-snoc-inj x x′ eq)))
+... | sh-plain {x′} u _ eq  = inj₂ (subst (W⁼ _ _) (sym (⊕-injˡ x x′ eq)) u)
+... | sh-sub {x′} _ eq      = ⊥-elim (plain-sub pl (⊕-injʳ x x′ eq))
 ... | sh-timer _ eq         = ⊥-elim (step≢root x _ eq)
 
 -- A cascade's root in the world: the subscription, or its creator is in
@@ -593,7 +590,7 @@ private
 
   -- Where two shapes name a closing `sub`, they name one position.
   same-sub : ∀ {x x′ e e′} → x ⊕ [ sub e ] ≡ x′ ⊕ [ sub e′ ] → e ≡ e′
-  same-sub {x} {x′} eq = sub-inj (proj₂ (⊕-snoc-inj x x′ eq))
+  same-sub {x} {x′} eq = sub-inj (⊕-injʳ x x′ eq)
 
 -- THE WORLDS OF TWO CHILDREN ARE APART when they are two, and neither
 -- child's parent lies in the other's world.
@@ -609,13 +606,13 @@ apart-w {H} {q₁} {q₂} {l₁} {l₂} p₁ p₂ ne n₁ n₂ = go
     go : ∀ {w} → W⁼ H a w → W⁼ H b w → ⊥
     go u here with shape u
     ... | sh-root eq              = ne (sym eq)
-    ... | sh-plain {x} v _ eq     = n₂ (subst (W⁼ H a) (proj₁ (⊕-snoc-inj x q₂ (sym eq))) v)
-    ... | sh-sub {x} _ eq         = plain-sub p₂ (proj₂ (⊕-snoc-inj q₂ x eq))
+    ... | sh-plain {x} v _ eq     = n₂ (subst (W⁼ H a) (⊕-injˡ x q₂ (sym eq)) v)
+    ... | sh-sub {x} _ eq         = plain-sub p₂ (⊕-injʳ q₂ x eq)
     ... | sh-timer _ eq           = step≢root q₂ _ eq
     go u (inW (step {x} v pl)) with shape u
-    ... | sh-root eq              = n₁ (subst (W⁼ H b) (proj₁ (⊕-snoc-inj x q₁ eq)) v)
-    ... | sh-plain {x′} v′ _ eq   = go (subst (W⁼ H a) (proj₁ (⊕-snoc-inj x′ x (sym eq))) v′) v
-    ... | sh-sub {x′} _ eq        = plain-sub pl (proj₂ (⊕-snoc-inj x x′ eq))
+    ... | sh-root eq              = n₁ (subst (W⁼ H b) (⊕-injˡ x q₁ eq) v)
+    ... | sh-plain {x′} v′ _ eq   = go (subst (W⁼ H a) (⊕-injˡ x′ x (sym eq)) v′) v
+    ... | sh-sub {x′} _ eq        = plain-sub pl (⊕-injʳ x x′ eq)
     ... | sh-timer _ eq           = step≢root x _ eq
     go u (inW (timer t v _)) with shape u
     ... | sh-root eq              = step≢root q₁ _ (sym eq)
@@ -623,8 +620,8 @@ apart-w {H} {q₁} {q₂} {l₁} {l₂} p₁ p₂ ne n₁ n₂ = go
     ... | sh-sub {x′} _ eq        = step≢root x′ _ (sym eq)
     ... | sh-timer v′ refl        = go v′ v
     go u (inW (join {h} {e} _ v _)) with shape u
-    ... | sh-root eq              = plain-sub p₁ (sym (proj₂ (⊕-snoc-inj h q₁ eq)))
-    ... | sh-plain {x′} _ pl eq   = plain-sub pl (sym (proj₂ (⊕-snoc-inj h x′ eq)))
+    ... | sh-root eq              = plain-sub p₁ (sym (⊕-injʳ h q₁ eq))
+    ... | sh-plain {x′} _ pl eq   = plain-sub pl (sym (⊕-injʳ h x′ eq))
     ... | sh-sub {x′} v′ eq       = go (subst (W⁼ H a) (sym (same-sub {h} {x′} eq)) v′) v
     ... | sh-timer _ eq           = step≢root h _ eq
 
@@ -659,9 +656,9 @@ named-view {H} {p} {h} {e} u = go u refl
   where
     go : ∀ {w} → W⁼ H p w → w ≡ h ⊕ [ sub e ] → Named H p h e
     go here eq = n-root (sym eq)
-    go (inW (step {x} _ pl)) eq = ⊥-elim (plain-sub pl (proj₂ (⊕-snoc-inj x h eq)))
+    go (inW (step {x} _ pl)) eq = ⊥-elim (plain-sub pl (⊕-injʳ x h eq))
     go (inW (timer _ _ _)) eq = ⊥-elim (step≢root h _ (sym eq))
-    go (inW (join {h′} j v eh)) eq with proj₁ (⊕-snoc-inj h′ h eq) | same-sub {h′} {h} eq
+    go (inW (join {h′} j v eh)) eq with ⊕-injˡ h′ h eq | same-sub {h′} {h} eq
     ... | refl | refl = n-join j v eh
 
 named-e : ∀ {H p h e} → Named H p h e → (h ⊕ [ sub e ] ≡ p → ⊥) → W⁼ H p e

@@ -9,7 +9,7 @@
 module adequacy.Rows where
 
 open import Data.Bool using (T)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Empty using (⊥-elim)
@@ -21,7 +21,8 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
 open import denotation.Events using (ofᴱ; Events; burst; hush) renaming (end to endᴱ)
-open import denotation.Events using (Pos; Timeline; ix)
+open import denotation.Events using (Timeline)
+open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Read using (Visible)
 import denotation.Read as Read
 open import denotation.Laws.Modulus using (≺-trans; ≼-or-≻; ≼-antisym)
@@ -89,12 +90,12 @@ pendRows ρ o p = enter (⟦ o ⟧ ρ) p
 -- read the rows its binders have delivered since.
 full : ∀ {Γ} → Scope Γ → DenEnv Γ
 full unbound         = []
-full (binds o p sc) = hot (Proper (pendRows (full sc) o (p ++ [ ix 1 ]))) ∷ full sc
+full (binds o p sc) = hot (Proper (pendRows (full sc) o (p ⊕ [ ix 1 ]))) ∷ full sc
 
 -- A connect's source as it was subscribed: its whole meaning, entered
 -- where the connect subscribes it.
 Frozen : ∀ {Γ A} → CS Γ A → EmissionSet A
-Frozen k = pendRows (full (CS.scope k)) (CS.src k) (CS.connAt k ++ [ ix 1 ])
+Frozen k = pendRows (full (CS.scope k)) (CS.src k) (CS.connAt k ⊕ [ ix 1 ])
 
 -- What a joiner has been fed and not shown.
 data Inbox {A : Set} : List (Pos × Evᴹ A) → EmissionSet A where

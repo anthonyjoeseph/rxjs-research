@@ -7,7 +7,7 @@ open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
 open import denotation.Position public
-open import denotation.Simultaneity using (ℕ-lt; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l)
+open import denotation.Simultaneity using (ℕ-lt; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_; z≤n)
@@ -120,11 +120,6 @@ finals (fresh f) = fresh (λ p → f p , true)
 
 -- Positions of one instant compare as their paths do.
 private
-  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
-  isLt-lt {lt} h = refl
-  isLt-lt {eq} ()
-  isLt-lt {gt} ()
-
   _<ᵗ_ : Path → Path → Bool
   p <ᵗ q = isLt (cmpPath p q)
 
