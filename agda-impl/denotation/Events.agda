@@ -6,6 +6,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
+open import denotation.Position public
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
 open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_; z≤n)
@@ -20,9 +21,6 @@ import Data.Nat as ℕ
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
-
-Time : Set
-Time = ℕ
 
 -- Frames, each a synchronous burst.  A runtime reports one, with ticks
 -- absolute.
@@ -70,67 +68,6 @@ mutual
     field force : From A t
 
 ------------------------------------------------------------------------
--- Positions
-
--- WHERE AN EVENT SITS IN THE WHOLE RUN.  A tick says when; it does not
--- say which of two simultaneous events comes first, and rxjs always
--- does.  A position is a path in the run's call tree — an event's
--- effects are its children — read in pre-order, which is execution
--- order.  So a merge is a sorted merge, and nothing coordinates it.
---
--- Three kinds of step.  `ix i`: an operator's i-th effect.  `sub p`: a
--- subject delivering to the subscriber that joined at `p`, so a subject's
--- subscribers come in the order they joined.  `last`: after every other
--- effect — where a burst ends and its completion sits.
---
--- A timer cascade at tick t is rooted at `ix t ∷ sub e ∷ []`, where `e`
--- is the position its timer was created at.  Same-tick timers therefore
--- fire in creation order, as in rxjs.
-data Label : Set where
-  ix   : ℕ → Label
-  sub  : List Label → Label
-  last : Label
-
-Pos : Set
-Pos = List Label
-
--- The root subscription: tick 0, before any timer.
-root : Pos
-root = ix 0 ∷ []
-
-tick : Pos → Time
-tick []          = 0
-tick (ix t ∷ _)  = t
-tick (sub _ ∷ _) = 0
-tick (last ∷ _)  = 0
-
--- Positions' equality: all a name is read for.
-mutual
-  _≟ˡ_ : DecidableEquality Label
-  ix m  ≟ˡ ix n  with m ℕ.≟ n
-  ... | yes refl = yes refl
-  ... | no ne    = no λ { refl → ne refl }
-  sub p ≟ˡ sub q with p ≟ᵖ q
-  ... | yes refl = yes refl
-  ... | no ne    = no λ { refl → ne refl }
-  last  ≟ˡ last  = yes refl
-  ix _  ≟ˡ sub _ = no λ ()
-  ix _  ≟ˡ last  = no λ ()
-  sub _ ≟ˡ ix _  = no λ ()
-  sub _ ≟ˡ last  = no λ ()
-  last  ≟ˡ ix _  = no λ ()
-  last  ≟ˡ sub _ = no λ ()
-
-  _≟ᵖ_ : DecidableEquality Pos
-  []      ≟ᵖ []      = yes refl
-  []      ≟ᵖ (_ ∷ _) = no λ ()
-  (_ ∷ _) ≟ᵖ []      = no λ ()
-  (a ∷ p) ≟ᵖ (b ∷ q) with a ≟ˡ b | p ≟ᵖ q
-  ... | yes refl | yes refl = yes refl
-  ... | no ne    | _        = no λ { refl → ne refl }
-  ... | yes _    | no ne    = no λ { refl → ne refl }
-
-------------------------------------------------------------------------
 -- The cold leaf
 
 -- WHAT A COLD LEAF IS: a timeline fixed relative to its subscription, or
@@ -176,53 +113,6 @@ mutual
 finals : ∀ {A} → Timeline A → Timeline (A × Bool)
 finals (fixed m) = fixed (finalFrom m)
 finals (fresh f) = fresh (λ p → f p , true)
-
-private
-  data Cmp : Set where
-    lt eq gt : Cmp
-
-  cmpℕ : ℕ → ℕ → Cmp
-  cmpℕ m n = if m <ᵇ n then lt else if n <ᵇ m then gt else eq
-
-  lexi : Cmp → Cmp → Cmp
-  lexi eq r = r
-  lexi lt _ = lt
-  lexi gt _ = gt
-
-  mutual
-    cmpLabel : Label → Label → Cmp
-    cmpLabel (ix m)  (ix n)  = cmpℕ m n
-    cmpLabel (ix _)  (sub _) = lt
-    cmpLabel (ix _)  last    = lt
-    cmpLabel (sub _) (ix _)  = gt
-    cmpLabel (sub p) (sub q) = cmpPos p q
-    cmpLabel (sub _) last    = lt
-    cmpLabel last    (ix _)  = gt
-    cmpLabel last    (sub _) = gt
-    cmpLabel last    last    = eq
-
-    cmpPos : Pos → Pos → Cmp
-    cmpPos []      []      = eq
-    cmpPos []      (_ ∷ _) = lt
-    cmpPos (_ ∷ _) []      = gt
-    cmpPos (a ∷ p) (b ∷ q) = lexi (cmpLabel a b) (cmpPos p q)
-
-  isLt : Cmp → Bool
-  isLt lt = true
-  isLt eq = false
-  isLt gt = false
-
-_<ᵖ_ : Pos → Pos → Bool
-p <ᵖ q = isLt (cmpPos p q)
-
--- `k` lies under `r`: an effect, however deep, of what sits at `r`.
-inside : Pos → Pos → Bool
-inside []      k       = true
-inside (_ ∷ _) []      = false
-inside (a ∷ r) (b ∷ k) = same (cmpLabel a b) r k
-  where same : Cmp → Pos → Pos → Bool
-        same eq r k = inside r k
-        same _  _ _ = false
 
 -- The order is an order: transitive, and led by the tick.
 private
@@ -578,12 +468,12 @@ open Events∞
 ------------------------------------------------------------------------
 -- A cold leaf, placed
 
--- A burst at `r` puts its i-th step at `r ++ [ ix i ]` and ends at
--- `r ++ [ last ]`, which is also where the timer for the next frame is
+-- A burst at `r` puts its i-th step at `r ⊕ [ ix i ]` and ends at
+-- `r ⊕ [ last ]`, which is also where the timer for the next frame is
 -- created: after the burst and all it caused.  A close straight after a
 -- value is that value's callback going on, so the value moves under the
--- end: it sits at `q ++ [ ix 0 ]` and the frame ends at `q ++ [ last ]`,
--- with `q = r ++ [ last ]`, and a completion shares the value's instant.  A frame at tick 0 is the
+-- end: it sits at `q ⊕ [ ix 0 ]` and the frame ends at `q ⊕ [ last ]`,
+-- with `q = r ⊕ [ last ]`, and a completion shares the value's instant.  A frame at tick 0 is the
 -- subscribe burst, rooted at the subscription itself.  A timer firing
 -- shows no step of its own: at the root a hot's rekeying under `sub`
 -- puts it after the burst below it, and at the burst's first position it
@@ -592,29 +482,29 @@ mutual
   frames : ∀ {A t} → Time → Pos → From A t → Events A
   frames τ e done       = end e
   frames τ e quiet      = hush
-  frames τ e (at t _ b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+  frames τ e (at t _ b) = burst τ (cascadeAt (τ + t) e) 0 b
 
   burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
-  burst τ r i (emit a (close k)) = out ((r ++ [ last ]) ++ [ ix 0 ]) a λ where
-    .force → frames τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k)
+  burst τ r i (emit a (close k)) = out (r ⊕ [ last ] ⊕ [ ix 0 ]) a λ where
+    .force → frames τ (r ⊕ [ last ] ⊕ [ last ]) (From∞.force k)
     .cut   → idle
-  burst τ r i (emit a k) = out (r ++ [ ix i ]) a λ where
+  burst τ r i (emit a k) = out (r ⊕ [ ix i ]) a λ where
     .force → burst τ r (suc i) k
     .cut   → idle
-  burst τ r i (stall k)  = skip (r ++ [ ix i ]) λ where
+  burst τ r i (stall k)  = skip (r ⊕ [ ix i ]) λ where
     .force → burst τ r (suc i) (Frame∞.force k)
     .cut   → idle
-  burst τ r i (close k)  = skip (r ++ [ ix i ]) λ where
-    .force → frames τ (r ++ [ last ]) (From∞.force k)
+  burst τ r i (close k)  = skip (r ⊕ [ ix i ]) λ where
+    .force → frames τ (r ⊕ [ last ]) (From∞.force k)
     .cut   → idle
 
 start : ∀ {A} → Pos → From A 0 → Events A
 start p (at zero _ b) = burst (tick p) p 0 b
-start p m             = frames (tick p) (p ++ [ last ]) m
+start p m             = frames (tick p) (p ⊕ [ last ]) m
 
 -- `of`'s steps from the i-th on, under the subscription at `p`.
 ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A
-ofᴱ p i []       = end (p ++ [ last ])
-ofᴱ p i (x ∷ xs) = out (p ++ [ ix i ]) x λ where
+ofᴱ p i []       = end (p ⊕ [ last ])
+ofᴱ p i (x ∷ xs) = out (p ⊕ [ ix i ]) x λ where
   .force → ofᴱ p (suc i) xs
   .cut   → idle

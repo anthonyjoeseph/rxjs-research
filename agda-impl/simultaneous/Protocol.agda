@@ -37,7 +37,7 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Routed using (Held; Valued; opos)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
-open import simultaneous.Readings using (Rooted; NotSub; in-frame; in-cascade; ix-ns; last-ns; instantOf; stamped)
+open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.Relations using (Met; values; elaborated)
 open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; to≺; from≺)
 
@@ -153,28 +153,6 @@ none-stamped (instEmit (mark _) _ ∷ ys)  h = none-stamped ys (λ m → h (ther
 -- An instant is an interval of positions
 
 private
-  cascade-form : ∀ {t e l} c → instantOf c ≡ (ix t ∷ sub e ∷ l ∷ []) → Σ Pos λ ys → c ≡ (ix t ∷ sub e ∷ l ∷ []) ++ ys
-  cascade-form (ix _ ∷ sub _ ∷ _ ∷ ys) refl = ys , refl
-  cascade-form []                    ()
-  cascade-form (ix _ ∷ [])           ()
-  cascade-form (ix _ ∷ ix _ ∷ _)     ()
-  cascade-form (ix _ ∷ last ∷ _)     ()
-  cascade-form (ix _ ∷ sub _ ∷ [])   ()
-  cascade-form (sub _ ∷ _)           ()
-  cascade-form (last ∷ _)            ()
-
-  frame-form : ∀ {c} → Rooted c → instantOf c ≡ root → Σ Label λ l → Σ Pos λ ys → c ≡ (ix 0 ∷ []) ++ l ∷ ys
-  frame-form (in-frame {l} {p} _) _ = l , p , refl
-  frame-form in-cascade           ()
-
-  frame-root : ∀ {zs} → Rooted (ix 0 ∷ zs) → instantOf (ix 0 ∷ zs) ≡ root
-  frame-root (in-frame ix-ns)   = refl
-  frame-root (in-frame last-ns) = refl
-
-  cascade-prefix : ∀ t e l p → (ix t ∷ sub e ∷ l ∷ []) ≺ (ix t ∷ sub e ∷ l ∷ p) ⊎ _≡_ {A = Pos} (ix t ∷ sub e ∷ l ∷ []) (ix t ∷ sub e ∷ l ∷ p)
-  cascade-prefix t e l []      = inj₂ refl
-  cascade-prefix t e l (x ∷ q) = inj₁ (to≺ (ix t ∷ sub e ∷ l ∷ []) (ix t ∷ sub e ∷ l ∷ x ∷ q) (<ᵖ-below (ix t ∷ sub e ∷ l ∷ []) {x} q))
-
   -- What lies between two positions under `p` lies under `p`.
   under : ∀ p {a b c ys zs} → a ≡ p ++ ys → p ≺ a ⊎ p ≡ a → a ≺ b → b ≺ c → c ≡ p ++ zs → Σ Pos λ ws → b ≡ p ++ ws
   under p {a} {b} {c} {zs = zs} _ pa ab bc refl =
@@ -184,14 +162,12 @@ private
       pb (inj₁ lt)   = ≺-trans {p} {a} {b} lt ab
       pb (inj₂ refl) = ab
 
--- An instant is an interval: a position between two of one instant is of it.
-between : ∀ {a b c} → Rooted a → Rooted b → Rooted c → a ≺ b → b ≺ c → instantOf a ≡ instantOf c → instantOf b ≡ instantOf a
-between {a} {b} {c} ra@(in-frame {l} {p} _) rb rc ab bc e with frame-form rc (trans (sym e) (frame-root ra))
-... | l′ , p′ , ec with under (ix 0 ∷ []) {a} {b} {c} {l ∷ p} refl (inj₁ (to≺ (ix 0 ∷ []) a (<ᵖ-below (ix 0 ∷ []) {l} p))) ab bc ec
-...   | ws , refl = trans (frame-root rb) (sym (frame-root ra))
-between {a} {b} {c} (in-cascade {t} {e₀} {l} {p}) rb rc ab bc e with cascade-form c (sym e)
-... | zs , ec with under (ix (suc t) ∷ sub e₀ ∷ l ∷ []) {_} {b} {c} {p} refl (cascade-prefix (suc t) e₀ l p) ab bc ec
-...   | ws , refl = refl
+-- AN INSTANT IS AN INTERVAL: a position between two of one instant is
+-- of it.  The order is lexicographic with the instant first
+-- (`denotation.Position`), so this is a fact about `cmpInstant` alone:
+-- transitive and irreflexive.
+postulate
+  between : ∀ {a b c : Pos} → a ≺ b → b ≺ c → instantOf a ≡ instantOf c → instantOf b ≡ instantOf a
 
 ------------------------------------------------------------------------
 -- A run, split at an emit
@@ -258,72 +234,6 @@ module Split {A : Set} where
     ... | inj₁ h₁         = h₁
     ... | inj₂ (here refl) = ⊥-elim (≺-irrefl {k} qk)
     ... | inj₂ (there h₂)  = ⊥-elim (≺-absurd {q} {k} qk (run-past r₁ run h₂))
-
-------------------------------------------------------------------------
--- The positions of an elaborated program's emits
-
--- Every row of a program run from the root lies under the subscribe
--- frame or one step of a timer cascade: in the root's world, a timer
--- fires past tick 0, and no row sits at a timer's root.  The world
--- invariant carries where a row lies, not yet that no row sits at a
--- timer's root.
-private
-  Cascade : Pos → Set
-  Cascade x = Σ ℕ λ t → Σ Pos λ e → x ≡ ix (suc t) ∷ sub e ∷ []
-
-  rooted-ext : ∀ {x} l ys → Rooted x ⊎ Cascade x → Rooted (x ++ l ∷ ys)
-  rooted-ext l ys (inj₁ (in-frame ns))  = in-frame ns
-  rooted-ext l ys (inj₁ in-cascade)     = in-cascade
-  rooted-ext l ys (inj₂ (_ , _ , refl)) = in-cascade
-
-  plain-ns : ∀ {l} → Plain l → NotSub l
-  plain-ns plain-ix   = ix-ns
-  plain-ns plain-last = last-ns
-
-  world-rooted : ∀ {x} → W (λ _ → ⊥) root x → Rooted x ⊎ Cascade x
-  world-rooted (step here pl)                = inj₁ (in-frame (plain-ns pl))
-  world-rooted (step {l = l} (inW w) _)      = inj₁ (rooted-ext l [] (world-rooted w))
-  world-rooted (timer zero _ ())
-  world-rooted (timer (suc t) _ _)           = inj₂ (t , _ , refl)
-  world-rooted (join (inj₁ ()) _ _)
-  world-rooted (join {e = e} (inj₂ u) _ _)   = inj₁ (rooted-ext (sub e) [] (world-rooted u))
-
-row-rooted : ∀ {A} (o : SObs [] A) {k e} → enter (⟦ o ⟧ []ᴬ) root k e → Rooted k
-row-rooted o x = go (InvAt.world I x) (InvAt.untimed I x)
-  where
-    I = inv-⟦⟧ o []ᴬ (λ ()) root (tt , λ ())
-
-    go : ∀ {k} → W (λ _ → ⊥) root k → (TimerRoot k → ⊥) → Rooted k
-    go w nt with world-rooted w
-    ... | inj₁ r              = r
-    ... | inj₂ (_ , _ , refl) = ⊥-elim (nt tt)
-
-rooted : ∀ {A} (o : SObs [] A) {k e} → elaborated o k e → Rooted k
-rooted o = row-rooted (elaborate o)
-
--- THE INSTANT STRUCTURE: every emit is named for its instant, and the
--- begins of one instant name it alike; the subscribe mark sits once, before every
--- begin, every value past it async, and every value precedes the
--- completion.
-postulate
-  named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
-  one-name  : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
-            → elaborated o k′ (out (instEmit (mark Marks.begin) n′)) → instantOf k ≡ instantOf k′ → n ≡ n′
-  sub-first : ∀ {A} (o : SObs [] A) {k n} → elaborated o k (out (instEmit (mark Marks.begin) n))
-            → Σ Pos λ ks → Σ Pos λ m → elaborated o ks (out (instEmit (mark Marks.subscribed) m)) × ks ≺ k
-  sub-one   : ∀ {A} (o : SObs [] A) {k k′ m m′} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
-            → elaborated o k′ (out (instEmit (mark Marks.subscribed) m′)) → k ≡ k′
-  sub-async : ∀ {A} (o : SObs [] A) {ks m k a j} → elaborated o ks (out (instEmit (mark Marks.subscribed) m))
-            → elaborated o k (out (instEmit (value a) j)) → ks ≺ k → Async k
-  done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))
-            → elaborated o kc (out (instEmit (mark Marks.completed) m)) → kv ≺ kc
-
--- An instant's values precede its overs: the value lies before where
--- the over is sent from, the over at or under it.
-over-last : ∀ {A} (o : SObs [] A) {kv a n ko m} → elaborated o kv (out (instEmit (value a) n))
-          → elaborated o ko (out (instEmit (mark Marks.over) m)) → instantOf kv ≡ instantOf ko → kv ≺ ko
-over-last o {kv} xv xo eq with Held.late (held o) xo
-... | v , oo = ≺-≼-≺ {kv} (subst (λ I → kv ≺ opos I) eq (proj₁ (Held.early (held o) xv (subst Valued (sym eq) v)))) (⊑-≼ oo)
 
 ------------------------------------------------------------------------
 -- The protocol, one mark at a time
@@ -403,9 +313,8 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
       ... | q , y , kq = async-name y (sub-async o (Around.row h) y kq) refl
 
   -- A value past `k` is of an instant other than one met before `k`.
-  apart : ∀ {ka k q} → ka ≺ k → k ≺ q → instantOf q ≡ instantOf ka → (Rooted ka → Rooted k → Rooted q → instantOf k ≡ instantOf ka → ⊥)
-        → Rooted ka → Rooted k → Rooted q → ⊥
-  apart {ka} {k} {q} ak kq e no ra rk rq = no ra rk rq (between ra rk rq ak kq (sym e))
+  apart : ∀ {ka k q} → ka ≺ k → k ≺ q → instantOf q ≡ instantOf ka → (instantOf k ≡ instantOf ka → ⊥) → ⊥
+  apart {ka} {k} {q} ak kq e no = no (between {ka} {k} {q} ak kq (sym e))
 
   -- Past a begin of a new name, the next value is of another instant.
   begin-fresh : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.begin) n ∷ ys → n ≢ lastBegin root xs → Fresh (lastBegin root xs) (stamped ys)
@@ -420,8 +329,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
       ... | q , y , kq | inj₂ hb with Around.prev h hb
       ...   | ka , yb , ak =
         apart ak kq (trans (sym (named o y)) (trans (cong instantOf (sym eq)) (named o yb)))
-          (λ _ _ _ eb → ne (one-name o (Around.row h) yb eb))
-          (rooted o yb) (rooted o (Around.row h)) (rooted o y)
+          (λ eb → ne (one-name o (Around.row h) yb eb))
 
   -- Past an over, the next value is of another instant.
   over-fresh : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.over) n ∷ ys → seenSub xs ≡ true → Fresh (lastBegin root xs) (stamped ys)
@@ -435,8 +343,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
       ... | q , y , kq | inj₂ hb with Around.prev h hb
       ...   | ka , yb , ak =
         let eA = trans (sym (named o y)) (trans (cong instantOf (sym eq)) (named o yb)) in
-        apart ak kq eA (λ _ _ _ eo → ≺-absurd {ko} {q} kq (over-last o y (Around.row h) (trans eA (sym eo))))
-          (rooted o yb) (rooted o (Around.row h)) (rooted o y)
+        apart ak kq eA (λ eo → ≺-absurd {ko} {q} kq (over-last o y (Around.row h) (trans eA (sym eo))))
 
   -- Nothing past the completion.
   completed-end : ∀ xs n ys → values rx ≡ xs ++ instEmit (mark Marks.completed) n ∷ ys → stamped ys ≡ []

@@ -15,7 +15,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
+open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick; cascadeAt; _⊕_)
 open import operation.Key using (Key) renaming (at to atᴷ)
 
 ------------------------------------------------------------------------
@@ -69,7 +69,7 @@ data Tape (A : Set) : Set₁ where
 -- Where a frame's step sits: its slot, or, for a value its frame closes
 -- straight after, under the frame's end, as the denotation places it.
 baseOf : ∀ {A t} → Pos → Frame A t → Pos
-baseOf u (emit _ (close _)) = u ++ [ last ]
+baseOf u (emit _ (close _)) = u ⊕ [ last ]
 baseOf u _                  = u
 
 stepOf : ∀ {A t} → ℕ → Frame A t → ℕ
@@ -77,7 +77,7 @@ stepOf i (emit _ (close _)) = 0
 stepOf i _                  = i
 
 slotOf : ∀ {A t} → Pos → ℕ → Frame A t → Pos
-slotOf u i fr = baseOf u fr ++ [ ix (stepOf i fr) ]
+slotOf u i fr = baseOf u fr ⊕ [ ix (stepOf i fr) ]
 
 due : ∀ {A} → Tape A → Maybe Key
 due (play τ u i t fr) = just (atᴷ (slotOf u i fr))
@@ -97,19 +97,19 @@ peek over                      = nothing
 rest : ∀ {A t} → Time → Pos → From A t → Tape A
 rest τ e done        = ending e
 rest τ e quiet       = over
-rest τ e (at t _ fr) = play τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 t fr
+rest τ e (at t _ fr) = play τ (cascadeAt (τ + t) e) 0 t fr
 
 -- What a value's step leaves: the frame's next step, or, its frame
 -- closing straight after, the close taken with it and what follows.
 onward : ∀ {A} → Time → Pos → ℕ → (t : Time) → Frame A t → Tape A
-onward τ u i t (close k) = rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force k)
+onward τ u i t (close k) = rest τ ((u ⊕ [ last ]) ⊕ [ last ]) (From∞.force k)
 onward τ u i t k         = play τ u (suc i) t k
 
 -- A timeline subscribed at `p`: frame 0 played in place, or its frames
 -- after it.
 opening : ∀ {A} → Pos → From A 0 → Tape A
 opening p (at zero _ b) = play (tick p) p 0 0 b
-opening p m             = rest (tick p) (p ++ [ last ]) m
+opening p m             = rest (tick p) (p ⊕ [ last ]) m
 
 -- A program the pure runtime runs: colds are timelines.
 PureObs : List Set → Set → Set₁
@@ -140,7 +140,7 @@ module Driver (R : Set) where
   played (leaf true (play τ u i t (emit a k)) false dv st) =
     silent (tick u) (dv (nx a) (onward τ u i t k) true (slotOf u i (emit a k)))
   played (leaf true (play τ u i t (stall k)) false dv st) = silent (tick u) (st (play τ u (suc i) t (Frame∞.force k)))
-  played (leaf true (play τ u i t (close k)) false dv st) = silent (tick u) (st (rest τ (u ++ [ last ]) (From∞.force k)))
+  played (leaf true (play τ u i t (close k)) false dv st) = silent (tick u) (st (rest τ (u ⊕ [ last ]) (From∞.force k)))
   played (leaf true over false dv st) = silent 0 (st over)
 
   took : Stepped R → Step

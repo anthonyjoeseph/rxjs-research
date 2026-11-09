@@ -21,9 +21,7 @@ open import denotation.Laws using (compositional; map-fusion)
 -- `batchSimultaneous` on top, batches the way the stamps batch — each
 -- batch stamped with the instant it leaves in is the spec's grouping of
 -- the plain run's values stamped the same way.
--- THE INSTANTS: every position a program reaches lies under the subscribe
--- frame or one timer cascade, so a stamp counts instants.
-open import simultaneous.Statement using (spec; positioned)
+open import simultaneous.Statement using (spec)
 
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.

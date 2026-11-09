@@ -13,7 +13,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (does; yes; no)
 
 open import Data.Nat using (zero; suc)
-open import denotation.Events using (Pos; Label; ix; sub; last; _<ᵖ_; _≟ˡ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
+open import Data.Product using (_×_; _,_)
+open import denotation.Events using (Pos; Label; Instant; _∙_; ix; sub; last; _<ˡ_; _<ⁱ_; _≟ˡ_; _≟ⁱ_; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-cons)
 
 data Key : Set where
   at    : Pos → Key
@@ -26,7 +27,7 @@ private
 
   -- A label strictly before another.
   _≺_ : XL → XL → Bool
-  lab a ≺ lab b = [ a ] <ᵖ [ b ]
+  lab a ≺ lab b = a <ˡ b
   lab _ ≺ top   = true
   top   ≺ _     = false
 
@@ -41,17 +42,20 @@ private
   lex (_ ∷ _) []      = false
   lex (a ∷ p) (b ∷ q) = (a ≺ b) ∨ ((a ≐ b) ∧ lex p q)
 
-  labs : Pos → List XL
+  labs : List Label → List XL
   labs []      = []
   labs (a ∷ p) = lab a ∷ labs p
 
-  ext : Key → List XL
-  ext (at p)    = labs p
-  ext (after p) = labs p ++ [ top ]
+  -- A key's instant, and its path with `after` read as a label past every other.
+  ext : Key → Instant × List XL
+  ext (at (i ∙ p))    = i , labs p
+  ext (after (i ∙ p)) = i , labs p ++ [ top ]
 
--- Strictly earlier.
+-- Strictly earlier: in an earlier instant, or in the same one and
+-- earlier on the path.
 _<ᴷ_ : Key → Key → Bool
-k <ᴷ k′ = lex (ext k) (ext k′)
+k <ᴷ k′ with ext k | ext k′
+... | i , x | j , y = (i <ⁱ j) ∨ (does (i ≟ⁱ j) ∧ lex x y)
 
 clash : ∀ {b} → b ≡ true → b ≡ false → ⊥
 clash refl ()

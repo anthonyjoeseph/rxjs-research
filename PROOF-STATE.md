@@ -14,13 +14,29 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-## Tier 1 — the elaboration
+## Tier 1 — the instant is a datum
+
+**The instant:** a position is an instant and a path (`denotation.Position`); the gate is green again over that type, `positioned` gone.
+
+### Ledger
+
+#### THE ORDER
+
+Settled when `make gate` is green. The order lemmas of `denotation.Events`
+and `operation.Key`, the world invariant, adequacy's and the spec's
+position matching all read the position as a label list; each becomes a
+match on the instant or on the path. `between` is the first: an instant
+is an interval because the order compares instants first.
+
+Members: `between`.
+
+## Tier 2 — the elaboration
 
 **The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
 
 ### Ledger
 
-## Tier 2 — the simultaneous spec
+## Tier 3 — the simultaneous spec
 
 **The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
 

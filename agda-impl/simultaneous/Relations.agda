@@ -19,7 +19,7 @@
 -- here reads.
 module simultaneous.Relations where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; T)
 open import Data.List using (List; []; _∷_; [_]; _++_; concat; length)
 import Data.List as L
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
@@ -36,7 +36,7 @@ open import Function using (_⇔_)
 open import Data.List.Properties using (map-++)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
-open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh; finals)
+open import denotation.Events using (_≟ᵖ_; Pos; Instant; _<ⁱ_; Timeline; root; fresh; finals)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
 open import simultaneous.InstEmit using (valuesOf)
@@ -67,13 +67,17 @@ batched o = enter (⟦ batchedObs o ⟧ []) root
 
 -- The instants before `k`'s: those some row before `k` lies in, other
 -- than `k`'s own.
-Before : ∀ {A} → EmissionSet A → Pos → Pos → Set
+-- Instants in order.
+_≺ⁱ_ : Instant → Instant → Set
+i ≺ⁱ j = T (i <ⁱ j)
+
+Before : ∀ {A} → EmissionSet A → Pos → Instant → Set
 Before t k i = i ≢ instantOf k × Σ Pos λ k′ → Σ _ λ e → t k′ e × k′ ≺ k × instantOf k′ ≡ i
 
 -- `k`'s instant is the n-th the run passes through: the instants before
 -- it, listed in order, are n.
 Rank : ∀ {A} → EmissionSet A → Pos → ℕ → Set
-Rank t k n = Σ (List Pos) λ is → AllPairs _≺_ is × length is ≡ n × (∀ {i} → i ∈ is ⇔ Before t k i)
+Rank t k n = Σ (List Instant) λ is → AllPairs _≺ⁱ_ is × length is ≡ n × (∀ {i} → i ∈ is ⇔ Before t k i)
 
 -- The run with every value row stamped by its instant's rank.
 ranked : ∀ {A} → EmissionSet A → EmissionSet (ℕ × A)
