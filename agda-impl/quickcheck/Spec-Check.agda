@@ -66,14 +66,14 @@ open import simultaneous.SObs using (module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟ᵖ_ using (batchSimultaneousᴰ)
 open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupStamps)
-open import simultaneous.Relations using (batchedObs; values; joined; outs)
+open import simultaneous.Relations using (values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; batchSimultaneous)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -226,6 +226,12 @@ judge n (three o x b) with both (listT n o [] root) | both (listT n x [] root) |
 ... | _       | _       | _       = skipped
 
 private
+  -- The batcher on top of the elaboration, as `simultaneous.Relations.batchedObs`
+  -- builds it, over a generated program: its leaves are scripted, never
+  -- fresh, so it is an author's program read plain.
+  batchedOf : ∀ {A} → Obs Timeline [] A → Obs Timeline [] (IE (List A))
+  batchedOf o = batchSimultaneous (elaborate o)
+
   plainOf : ℕ → Obs Timeline [] ℕ
   plainOf seed = toObs timeline 3 (program seed) [] [] []
 
@@ -233,7 +239,7 @@ private
   budget seed = depth 3 (program seed)
 
   real : ℕ → Three
-  real seed = let o = plainOf seed in three o (elaborate o) (batchedObs o)
+  real seed = let o = plainOf seed in three o (elaborate o) (batchedOf o)
 
   restamp : ∀ {A} → IE A → IE A
   restamp x = record x { instant = root }
@@ -251,10 +257,10 @@ private
   -- The sabotages, each aimed at one statement.
   emptied unstamped doubled shiftedˣ shiftedᵇ : ℕ → Three
   emptied seed   = let o = plainOf seed in three o (elaborate o) empty
-  unstamped seed = let o = plainOf seed in three o (map restamp (elaborate o)) (batchedObs o)
-  doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedObs o))
-  shiftedˣ seed  = let o = plainOf seed in three o (merge (elaborate o) spare) (batchedObs o)
-  shiftedᵇ seed  = let o = plainOf seed in three o (elaborate o) (merge (batchedObs o) spare)
+  unstamped seed = let o = plainOf seed in three o (map restamp (elaborate o)) (batchedOf o)
+  doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedOf o))
+  shiftedˣ seed  = let o = plainOf seed in three o (merge (elaborate o) spare) (batchedOf o)
+  shiftedᵇ seed  = let o = plainOf seed in three o (elaborate o) (merge (batchedOf o) spare)
 
 ------------------------------------------------------------------------
 -- The pinned programs
@@ -368,7 +374,7 @@ private
   showBatches (b ∷ bs) = showBatch b +++ " " +++ showBatches bs
 
   pinLine : String × Obs Timeline [] ℕ × List (List ℕ) → String
-  pinLine (s , o , want) with whole (listT pinBudget (batchedObs o) [] root)
+  pinLine (s , o , want) with whole (listT pinBudget (batchedOf o) [] root)
   ... | nothing = "spec-check: FAIL pinned " +++ s +++ " cut by its budget"
   ... | just rb with mapL proj₂ (batchesOut rb)
   ...   | got with eqAll got want

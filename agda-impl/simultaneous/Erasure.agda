@@ -42,7 +42,7 @@ open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; ranked; Rank; values; outs; vals; stampedᴮ; stampedᴰ; carried; Over; Closes; Ends; Erases;
   elaborated; events)
@@ -287,7 +287,7 @@ postulate
 
 private
   module Er {A : Set} (o : SObs [] A) =
-    Attributed {A} {IE A} {valuesOf} single-values {events o} {elaborated o} (λ {y} {e} {e′} → at-func o {y} {e} {e′}) (erasing o)
+    Attributed {A} {IE A} {valuesOf} single-values {events o} {elaborated o} (λ {y} {e} {e′} → at-func (plain o) {y} {e} {e′}) (erasing o)
 
 -- THE I-TH VALUE IS THE I-TH: before each side's end, the elaborated
 -- program's i-th value is its plain program's, at the same rank, its
@@ -327,18 +327,18 @@ module Erasing {A : Set} (o : SObs [] A) where
     E = events o
 
     funcX : ∀ {y e e′} → X y e → X y e′ → e ≡ e′
-    funcX = at-func (elaborate o)
+    funcX = at-func (elaborate (plain o))
 
     funcE : ∀ {y e e′} → E y e → E y e′ → e ≡ e′
-    funcE = at-func o
+    funcE = at-func (plain o)
 
     svE : Single {A} [_]
     svE x = inj₂ (x , refl)
 
     module EX = Enumerate {IE A} {A} {valuesOf} single-values {X} funcX
     module EE = Enumerate {A} {A} {[_]} svE {E} funcE
-    module RX = Reaching {IE A} {X} funcX (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed (elaborate o) {q})
-    module RE = Reaching {A} {E} funcE (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed o {q})
+    module RX = Reaching {IE A} {X} funcX (λ {q} {e} → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e}) (λ {q} → listed (elaborate (plain o)) {q})
+    module RE = Reaching {A} {E} funcE (λ {q} {e} → enter-few (⟦ plain o ⟧ []) root {q} {e}) (λ {q} → listed (plain o) {q})
     module NX = Nths (VX o)
     module NE = Nths (VE o)
 

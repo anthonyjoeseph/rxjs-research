@@ -34,11 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-False as stated, awaiting Anthony: a `fresh` leaf's value is its
-subscription position, and the elaboration subscribes every leaf
-deeper, so `cold (fresh id)` shows `root` plain and another position
-elaborated. Settled when `Spec` is restated for such leaves, then
-`erasing` is a body by operator: an order-keeping map of positions.
+Untried: the elaborated run carries the plain one — each elaborated
+row put on the plain row it elaborates, or ahead of all, in order,
+instant for instant, a value on its value, the end on the end. The
+elaboration subscribes every leaf deeper, so the map of positions must
+keep their order, through each cold's async instants. Switch, exhaust
+and the bounded queue are the real cases. Settled when `erasing` is a
+body by operator.
 
 Members: `erasing`.
 

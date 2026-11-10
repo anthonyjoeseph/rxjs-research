@@ -38,7 +38,7 @@ open import denotation.Laws.Modulus using (≺-trans; ≺-absurd; ≼-refl; ≼-
 open import denotation.Simultaneity using (between)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
-open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; Batching; batching; module Elaborate)
 open import simultaneous.Readings using (stamped; closed; instantOf; rootOf)
 open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; done-last; module Leaves; module Split)
 open import simultaneous.Shut using (r₀)
@@ -390,7 +390,7 @@ meet {A} o {rs} {y} {e} mx ((xy , _) , fy) vi ay with pass o mx fy
     found (inj₁ eq) = ⊥-elim (cv xy vi (≼-refl {y}) (subst (λ c → After c y) (sym eq) tt))
     found (inj₂ (c , eq)) with cursor-in nothing (rs ++ ext) eq
     ... | inj₁ ()
-    ... | inj₂ (_ , cm) with ∈-++⁻ rs (run-has (at-func (elaborate o)) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)
+    ... | inj₂ (_ , cm) with ∈-++⁻ rs (run-has (at-func (elaborate (plain o))) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)
     ...   | inj₁ m = ⊥-elim (not-past mx m ay)
     ...   | inj₂ m = ext , mx′ , m
 
@@ -545,7 +545,7 @@ postulate
 module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R : Release o rs q)
                 (xq : Σ (IE A) λ x → elaborated o q (out x)) where
   open Release R
-  open Reached (⟦ elaborate o ⟧ []ᴬ) root (inv-⟦⟧ (elaborate o) []ᴬ (λ ()) root (tt , λ ())) using (seen)
+  open Reached (⟦ elaborate (plain o) ⟧ []ᴬ) root (inv-⟦⟧ (elaborate (plain o)) []ᴬ (λ ()) root (tt , λ ())) using (seen)
 
   X = elaborated o
 
@@ -574,7 +574,7 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
   ... | yes yk = none xy qy yk
   ... | no ky with ≼-split {k} {y} ky
   ...   | inj₁ ky′ = beyond how xy ky′ iy
-  ...   | inj₂ refl with at-func (elaborate o) xk xy
+  ...   | inj₂ refl with at-func (elaborate (plain o)) xk xy
   ...     | ()
 
   left : Left valuesOf X q
@@ -643,7 +643,7 @@ releases {A} o {rx} mxr cl ne = go (lastValue valuesOf rx) refl cl
   where
     X = elaborated o
     mx = proj₂ (ranks-x o) mxr
-    open Reached (⟦ elaborate o ⟧ []ᴬ) root (inv-⟦⟧ (elaborate o) []ᴬ (λ ()) root (tt , λ ())) using (seen)
+    open Reached (⟦ elaborate (plain o) ⟧ []ᴬ) root (inv-⟦⟧ (elaborate (plain o)) []ᴬ (λ ()) root (tt , λ ())) using (seen)
 
     leave : ∀ {q} → Σ (IE A) (λ x → X q (out x)) → Exits X q → Σ _ λ ext → Met X (unrank rx ++ ext) × Gone o q (unrank rx ++ ext)
     leave _ (inj₁ (k , e , ((xk , _) , fk) , qk , ne′)) with pass o mx fk
@@ -687,7 +687,7 @@ byName ov rx = closed ov (batchSimultaneousᴰ (stamped (values rx)))
 batches : ∀ {A : Set} (o : SObs [] A) → Batches (batched o) (elaborated o)
 batches o = early , late
   where
-    S = scan bstep bstart (elaborate o)
+    S = scan bstep bstart (elaborate (plain o))
     X = elaborated o
     B = batched o
     open Relabel _≟ᵖ_ _≟_ (Carries X) using (Lab; group-rel; prefix-rel)
@@ -703,7 +703,7 @@ batches o = early , late
            × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
              ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
     early₀ {rs} mb with each-out proj₂ S mb
-    ... | sc , ms , pre , _ with scan-out bstep bstart (elaborate o) ms
+    ... | sc , ms , pre , _ with scan-out bstep bstart (elaborate (plain o)) ms
     ...   | rx , mx , eqs , _ with pending-one (proj₁ (after bstart (values rx)))
     ...     | inj₁ e = rx , mx , inj₁ (e ,
                 prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run))))
@@ -727,7 +727,7 @@ batches o = early , late
 
     -- what is met of the batched program, from what is met of the elaborated
     met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
-    met-from mx with scan-in bstep bstart (elaborate o) mx
+    met-from mx with scan-in bstep bstart (elaborate (plain o)) mx
     ... | sc , ms , eqs , _ with each-in proj₂ S ms
     ...   | rs , mb , eqb , _ = rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
 

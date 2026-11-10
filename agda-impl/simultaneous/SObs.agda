@@ -2,8 +2,13 @@
 
 -- THE AUTHOR'S PROGRAM AND ITS ELABORATION.  An `SObs` is what a user
 -- writes against srxjs: the same primitives as plain rxjs, so the same
--- tree, and its plain reading is the tree itself.  `batchSimultaneous`
--- stands only on top, applied to the elaboration, so it is not a former.
+-- tree, its leaves fixed timelines, and its plain reading (`plain`) is
+-- the tree itself.  `batchSimultaneous` stands only on top, applied to
+-- the elaboration, so it is not a former.
+--
+-- NO AUTHOR'S LEAF IS FRESH: a `fresh` leaf shows its subscription
+-- position, which the elaboration moves, so the two readings could not
+-- show the same values.  Only the elaboration mints.
 --
 -- `elaborate` is srxjs written in rxjs, one former at a time: each
 -- primitive rebuilt over InstEmits, one emit per plain emit plus marks.
@@ -82,11 +87,32 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
-open import denotation.Events using (Timeline)
+open import denotation.Events using (Timeline; From; fixed)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
 
+-- An author's cold: a timeline fixed relative to its subscription.
+data Fixed (A : Set) : Set₁ where
+  fixedˢ : From A 0 → Fixed A
+
 SObs : List Set → Set → Set₁
-SObs = Obs Timeline
+SObs = Obs Fixed
+
+-- The program as plain rxjs runs it.
+mutual
+  plain : ∀ {Γ A} → SObs Γ A → Obs Timeline Γ A
+  plain (cold (fixedˢ m))  = cold (fixed m)
+  plain empty              = empty
+  plain (of xs)            = of xs
+  plain (map f s)          = map f (plain s)
+  plain (scan f z s)       = scan f z (plain s)
+  plain (takeWhile i p s)  = takeWhile i p (plain s)
+  plain (flatMap op f s)   = flatMap op (λ a → plain (f a)) (plain s)
+  plain (connect s b)      = connect (plain s) (plain b)
+  plain (connected i)      = connected i
+  plain (defer l)          = defer (plainˡ l)
+
+  plainˡ : ∀ {Γ A} → Later Fixed Γ A → Later Timeline Γ A
+  plainˡ l .Later.force = plain (Later.force l)
 
 -- A cold's emits as its elaboration reads them: a value, its completion,
 -- or the end of its subscribe burst.

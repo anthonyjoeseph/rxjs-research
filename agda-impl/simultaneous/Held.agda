@@ -22,7 +22,7 @@ open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhil
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
@@ -751,10 +751,10 @@ held-⟦⟧ ρ (defer l)         = held-lim ρ l λ n → held-approx n ρ (defe
 -- THE BATCHER'S SOURCE HOLDS: the elaborated program, restamped, beside
 -- the subscribe and completion marks, exempt for the subscribe burst.
 postulate
-  held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) o → Held (elaborated o) (root ∷ [])
+  held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
 
 held : ∀ {A} (o : SObs [] A) → Held (elaborated o) (root ∷ [])
-held o = held-top o (held-⟦⟧ (λ i → i) o)
+held o = held-top o (held-⟦⟧ (λ i → i) (plain o))
 
 -- The elaborated program's instants stay dead.
 shut : ∀ {A : Set} (o : SObs [] A) → Shut (elaborated o)

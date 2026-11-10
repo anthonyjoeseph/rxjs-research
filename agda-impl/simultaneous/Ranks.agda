@@ -45,7 +45,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf; stamped; closed)
 open import simultaneous.Relations using (Met; values; ranked; Rank; Before; stampedᴮ; events; elaborated; batched; batchedObs)
 open import simultaneous.Instants using (_≺ⁱ_; Sorted; irrⁱ; transⁱ; triⁱ; frame-least; insertⁱ; sorted-insert; ∈-insert⁻; ∈-insert⁺; sorted-⊆; sorted-⊂; ≺-instant; instant-≺)
@@ -272,10 +272,10 @@ module _ {A : Set} {t : EmissionSet A} (few : ∀ {q e} → t q e → Visible e 
 -- The elaborated run's names agree with its ranks
 
 ranks-e : ∀ {A} (o : SObs [] A) → Ranks (events o)
-ranks-e o = ranks (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed o {q})
+ranks-e o = ranks (λ {q} {e} → enter-few (⟦ plain o ⟧ []) root {q} {e}) (λ {q} → listed (plain o) {q})
 
 ranks-x : ∀ {A} (o : SObs [] A) → Ranks (elaborated o)
-ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed (elaborate o) {q})
+ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e}) (λ {q} → listed (elaborate (plain o)) {q})
 
 ranks-b : ∀ {A} (o : SObs [] A) → Ranks (batched o)
 ranks-b o = ranks (λ {q} {e} → enter-few (⟦ batchedObs o ⟧ []) root {q} {e}) (λ {q} → listed (batchedObs o) {q})

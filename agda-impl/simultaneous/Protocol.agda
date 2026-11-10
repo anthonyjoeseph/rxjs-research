@@ -32,7 +32,7 @@ open import denotation.Read using (Run; _∷_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-≼-≺)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 import simultaneous.InstEmit as Marks
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Routed using (Held; Valued; opos)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
@@ -252,7 +252,7 @@ module Leaves {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
   open Split {IE A}
 
   X = elaborated o
-  fu = at-func (elaborate o)
+  fu = at-func (elaborate (plain o))
 
   -- The run around the emit `w`, past `xs`, before `ys`.
   record Around (xs : List (IE A)) (w : IE A) (ys : List (IE A)) : Set where

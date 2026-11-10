@@ -42,7 +42,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; stamped; closed)
@@ -52,15 +52,15 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (E; IE; e
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
-batchedObs o = batchSimultaneous (elaborate o)
+batchedObs o = batchSimultaneous (elaborate (plain o))
 
 -- A program's emission set, its elaborated program's, and the batcher's on top,
 -- each subscribed at the root.
 events : ∀ {A} → SObs [] A → EmissionSet A
-events o = enter (⟦ o ⟧ []) root
+events o = enter (⟦ plain o ⟧ []) root
 
 elaborated : ∀ {A} → SObs [] A → EmissionSet (IE A)
-elaborated o = enter (⟦ elaborate o ⟧ []) root
+elaborated o = enter (⟦ elaborate (plain o) ⟧ []) root
 
 batched : ∀ {A} → SObs [] A → EmissionSet (IE (List A))
 batched o = enter (⟦ batchedObs o ⟧ []) root
