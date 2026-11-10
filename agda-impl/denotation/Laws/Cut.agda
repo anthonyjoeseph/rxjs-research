@@ -155,17 +155,17 @@ spinIx (spin i) = i
 spinN : ∀ {A} → ℕ → Den A
 spinN N = coldAt λ p → Deep (Spin p) spinIx N
 
+-- A spin's rows run in order, and only so.
+ix-asc : ∀ p {i j} → i < j → (p ⊕ [ ix i ]) ≺ (p ⊕ [ ix j ])
+ix-asc p lt = Equivalence.from T-≡ (<ᵖ-part p [] [] (ix-< lt))
+
+ix-back : ∀ p {i j} → (p ⊕ [ ix i ]) ≺ (p ⊕ [ ix j ]) → i < j
+ix-back p {i} {j} lt with <-cmp i j
+... | tri< a _ _    = a
+... | tri≈ _ refl _ = ⊥-elim (≺-irrefl {p ⊕ [ ix i ]} lt)
+... | tri> _ _ c    = ⊥-elim (≺-irrefl {p ⊕ [ ix i ]} (≺-trans {p ⊕ [ ix i ]} {p ⊕ [ ix j ]} {p ⊕ [ ix i ]} lt (ix-asc p c)))
+
 private
-  ix-asc : ∀ p {i j} → i < j → (p ⊕ [ ix i ]) ≺ (p ⊕ [ ix j ])
-  ix-asc p lt = Equivalence.from T-≡ (<ᵖ-part p [] [] (ix-< lt))
-
-  -- A spin's rows run in order.
-  ix-back : ∀ p {i j} → (p ⊕ [ ix i ]) ≺ (p ⊕ [ ix j ]) → i < j
-  ix-back p {i} {j} lt with <-cmp i j
-  ... | tri< a _ _    = a
-  ... | tri≈ _ refl _ = ⊥-elim (≺-irrefl {p ⊕ [ ix i ]} lt)
-  ... | tri> _ _ c    = ⊥-elim (≺-irrefl {p ⊕ [ ix i ]} (≺-trans {p ⊕ [ ix i ]} {p ⊕ [ ix j ]} {p ⊕ [ ix i ]} lt (ix-asc p c)))
-
   spin-flat : ∀ {A} {p k l ys} {e e′ : Ev A} → Spin p k e → Spin p (k ⊕ (l ∷ ys)) e′ → ⊥
   spin-flat {p = p} {l = l} {ys} (spin i) x′ = go x′ refl
     where

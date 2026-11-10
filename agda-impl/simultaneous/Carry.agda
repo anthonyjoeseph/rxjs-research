@@ -25,7 +25,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.All using (lookup; [])
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷-injectiveˡ)
@@ -41,7 +41,7 @@ open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; Later; cold; empty; of; map; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; cold; empty; of; map; takeWhile; flatMap; connect; connected)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
@@ -686,6 +686,56 @@ private
   ⊑-one : ∀ q {a b} → (q ⊕ [ a ]) ⊑ (q ⊕ [ b ]) → b ≡ a
   ⊑-one (i ∙ ps) {a} {b} (zs , e) = ∷-injectiveˡ (++-cancelˡ ps [ b ] (a ∷ zs) (trans (cong path-of e) (++-assoc ps [ a ] zs)))
 
+  drop-len : ∀ (ps σ : Path) → L.drop (L.length ps) (ps ++ σ) ≡ σ
+  drop-len []       σ = refl
+  drop-len (_ ∷ ps) σ = drop-len ps σ
+
+  drop-under : ∀ q σ → L.drop (L.length (path-of q)) (path-of (q ⊕ σ)) ≡ σ
+  drop-under (i ∙ ps) σ = drop-len ps σ
+
+-- ONE LABEL UNDER EACH SUBSCRIPTION: a map held fresh grown by each
+-- plain label under the plain subscription, put on the same label under
+-- the elaborated one.
+module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
+                (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+  N : PMap
+  N x y = Σ Label λ a → Plain a × x ≡ p ⊕ [ a ] × y ≡ p′ ⊕ [ a ]
+
+  embN : Emb N
+  embN = record
+    { fun     = λ { (a , _ , refl , refl) (b , _ , e , refl) →
+                    cong (λ c → p′ ⊕ [ c ]) (⊑-one p ([] , trans e (sym (⊕-identityʳ (p ⊕ [ b ]))))) }
+    ; mono    = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → ≺-shift p p′ [ a ] [ b ] h }
+    ; reflect = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → subst (λ c → (p ⊕ [ a ]) ⊑ (p ⊕ [ c ])) (sym (⊑-one p′ h)) (⊑-refl (p ⊕ [ a ])) }
+    ; inst    = λ { (a , _ , refl , refl) (b , _ , refl , refl) →
+                    mk⇔ (λ _ → trans (instant-⊕ p [ a ]) (sym (instant-⊕ p [ b ])))
+                        (λ _ → trans (instant-⊕ p′ [ a ]) (sym (instant-⊕ p′ [ b ]))) } }
+
+  M : PMap
+  M = M₀ ∪ᴹ N
+
+  emb : Emb M
+  emb = emb-under {N = N} E₀ fr m₀ pp embN λ { (a , _ , refl , refl) → a , [] , a , [] , refl , refl }
+
+  within : Within HP M₀ M p
+  within (inj₁ m)                  = inj₁ m
+  within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
+
+  -- A position's path past one subscription, put under the other.
+  up : Pos → Pos
+  up k = p′ ⊕ L.drop (L.length (path-of p)) (path-of k)
+
+  up-⊕ : ∀ σ → up (p ⊕ σ) ≡ p′ ⊕ σ
+  up-⊕ σ = cong (p′ ⊕_) (drop-under p σ)
+
+  down : Pos → Pos
+  down l = p ⊕ L.drop (L.length (path-of p′)) (path-of l)
+
+  down-⊕ : ∀ σ → down (p′ ⊕ σ) ≡ p ⊕ σ
+  down-⊕ σ = cong (p ⊕_) (drop-under p′ σ)
+
+private
+
   -- An end one label under `q` comes after every row so labelled.
   last-max : ∀ q {a} → Plain a → (q ⊕ [ last ]) ≺ (q ⊕ [ a ]) → ⊥
   last-max q (plain-ix {i}) h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ ix i ]) h
@@ -757,34 +807,13 @@ private
   -- The values listed, carried row for row one label under each side.
   module OfRows {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
                 (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+    open OneUnder E₀ fr m₀ pp using (N; embN; M; emb; within)
+
     t : EmissionSet A
     t = Truncate (InE (Evs.ofᴱ p 0 xs))
 
     u : EmissionSet (IE A)
     u = Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))
-
-    N : PMap
-    N x y = Σ Label λ a → Plain a × x ≡ p ⊕ [ a ] × y ≡ p′ ⊕ [ a ]
-
-    embN : Emb N
-    embN = record
-      { fun     = λ { (a , _ , refl , refl) (b , _ , e , refl) →
-                      cong (λ c → p′ ⊕ [ c ]) (⊑-one p ([] , trans e (sym (⊕-identityʳ (p ⊕ [ b ]))))) }
-      ; mono    = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → ≺-shift p p′ [ a ] [ b ] h }
-      ; reflect = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → subst (λ c → (p ⊕ [ a ]) ⊑ (p ⊕ [ c ])) (sym (⊑-one p′ h)) (⊑-refl (p ⊕ [ a ])) }
-      ; inst    = λ { (a , _ , refl , refl) (b , _ , refl , refl) →
-                      mk⇔ (λ _ → trans (instant-⊕ p [ a ]) (sym (instant-⊕ p [ b ])))
-                          (λ _ → trans (instant-⊕ p′ [ a ]) (sym (instant-⊕ p′ [ b ]))) } }
-
-    M : PMap
-    M = M₀ ∪ᴹ N
-
-    emb : Emb M
-    emb = emb-under {N = N} E₀ fr m₀ pp embN λ { (a , _ , refl , refl) → a , [] , a , [] , refl , refl }
-
-    within : Within HP M₀ M p
-    within (inj₁ m)                  = inj₁ m
-    within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
 
     allT : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p 0 xs) k e → k ∈ ks
     allT = of-pos p 0 xs , of-in p 0 xs
@@ -850,8 +879,9 @@ private
   of-carried : ∀ {A HP HE M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
              → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
                × CarryAt valuesOf M HP HE (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
-  of-carried {A} {HP} {HE} xs E₀ fr m₀ pp = X.M , inj₁ , X.emb , X.within , X.carried
+  of-carried {A} {HP} {HE} xs E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
     where module X = OfRows {A} {HP} {HE} xs E₀ fr m₀ pp
+          module O = OneUnder E₀ fr m₀ pp
 
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
@@ -862,15 +892,6 @@ carry-of (just n) ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ f
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
 carry-empty nothing  ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
 carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
-
--- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
--- under a `defer`'s guard; the meaning is the approximants' limit.
-postulate
-  carry-⊥    : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → Carry (just zero) ρ (defer l)
-  carry-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-             → Carry (just n) ρ (Later.force l) → Carry (just (suc n)) ρ (defer l)
-  carry-lim  : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-             → (∀ n → Carry (just n) ρ (defer l)) → Carry nothing ρ (defer l)
 
 ------------------------------------------------------------------------
 -- The whole run

@@ -34,15 +34,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Untried: each former's elaborated run carries its plain one (`Carry`),
-extending an order embedding of positions over its own worlds. Most
-open: the embedding past a former's children, which meet the rest of
-the map only through their worlds' bases (subscription, hot rows read,
-timers started), and a concat's queued lane, re-anchored under its
-wrapper's end: flatMap first. Settled when each former's leaf is a body.
+Probed, unproven: each former's elaborated run carries its plain one
+(`Carry`), extending an order embedding of positions over its own worlds.
+Most open: a `defer`'s meaning, the approximants' limit — their carries
+choose map and image each on its own, so the statement must make them
+cohere (or choose them canonically) before the limit is a body. Then the
+embedding past a former's children, and a concat's queued lane.
+Settled when each former's leaf is a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
-`carry-cold`, `carry-takeWhile`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
+Members: `carry-connect`, `carry-flatMap`, `carry-connected`, `carry-cold`,
+`carry-takeWhile`, `carry-lim`, `carry-wrap`.
 
 #### THE PROTOCOL
 
