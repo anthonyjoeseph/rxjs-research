@@ -49,7 +49,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op)
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; _⊑_; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W; _⊑_; ⊕-identityʳ; world-after; step≢root)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent; events; elaborated)
@@ -450,24 +450,23 @@ EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (lookup en
 
 -- The map so far touches neither world.
 Fresh : (Pos → Set) → (Pos → Set) → PMap → Pos → Pos → Set
-Fresh HP HE M₀ p p′ = ∀ {x y} → M₀ x y → ¬ W⁼ HP p x × ¬ W⁼ HE p′ y
+Fresh HP HE M₀ p p′ = ∀ {x y} → M₀ x y → ¬ W HP p x × ¬ W HE p′ y
 
 -- What the map adds lies in the two worlds.
 Within : (Pos → Set) → (Pos → Set) → PMap → PMap → Pos → Pos → Set
-Within HP HE M₀ M p p′ = ∀ {x y} → M x y → M₀ x y ⊎ (W⁼ HP p x × W⁼ HE p′ y)
+Within HP HE M₀ M p p′ = ∀ {x y} → M x y → M₀ x y ⊎ (W HP p x × W HE p′ y)
 
 -- CARRIED under every environment of carried binders: subscribed at
--- admissible positions the map has not touched, the subterm extends the
--- map over its worlds, its subscription under the other's, and carries.
+-- admissible positions the map pairs, its worlds untouched, the subterm
+-- extends the map over its worlds and carries.
 -- A record, so that a statement about a former is compared by its
 -- arguments, never by the elaborated tree its meaning unfolds to.
 record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
                 → ∀ M₀ → Hom M₀ → EnvRel M₀ ρ envP envE
-                → ∀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) (Hots envE) M₀ p p′
+                → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) (Hots envE) M₀ p p′
                 → Σ PMap λ M → M₀ ⊆ᴹ M × Hom M × Within (Hots envP) (Hots envE) M₀ M p p′
-                  × (Σ Path λ δ → M p (p′ ⊕ δ))
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (ev m o envP) p) (enter (ev m (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
@@ -488,12 +487,12 @@ postulate
   carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
-carry-map nothing ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ okP okE fr →
-  let (M , ms , hm′ , wi , at , c) = h envP envE gP gE M₀ hm er p p′ okP okE fr
-  in M , ms , hm′ , wi , at , map-carry f (⟦ s ⟧ envP) (⟦ elab ρ s ⟧ envE) p p′ c
-carry-map (just n) ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ okP okE fr →
-  let (M , ms , hm′ , wi , at , c) = h envP envE gP gE M₀ hm er p p′ okP okE fr
-  in M , ms , hm′ , wi , at , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+carry-map nothing ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
+  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
+  in M , ms , hm′ , wi , map-carry f (⟦ s ⟧ envP) (⟦ elab ρ s ⟧ envE) p p′ c
+carry-map (just n) ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
+  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
+  in M , ms , hm′ , wi , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
@@ -541,10 +540,23 @@ coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 -- completion concatenated, the restamp, each rides in the core's instants
 -- and shows nothing, and the whole ends where the core does.
 postulate
-  carry-wrap : ∀ {A} (o : SObs [] A) {M} → Hom M → ∀ δ → M root (coreAt ⊕ δ)
+  carry-wrap : ∀ {A} (o : SObs [] A) {M} → Hom M → M root coreAt
              → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (enter (⟦ elab (λ i → i) (plain o) ⟧ []) coreAt) root coreAt
              → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (elaborated o) root root
 
--- The empty map.
-hom-∅ : Hom (λ _ _ → ⊥)
-hom-∅ = record { fun = λ () ; inst = λ () ; step = λ () ; joins = λ () ; split = λ _ _ () }
+-- The plain run's subscription paired with the core's: no step, no
+-- siblings, both at the subscribe instant, neither in its own world.
+At₀ : PMap
+At₀ x y = x ≡ root × y ≡ coreAt
+
+hom-At₀ : Hom At₀
+hom-At₀ = record
+  { fun   = λ { (refl , refl) (refl , refl) → refl }
+  ; inst  = λ { (refl , refl) → frame≈ }
+  ; step  = λ { {z} (e , _) → ⊥-elim (step≢root z frame e) }
+  ; joins = λ { {z} (e , _) _ → ⊥-elim (step≢root z frame e) }
+  ; split = λ { {z} _ _ (e , _) _ → ⊥-elim (step≢root z frame e) }
+  }
+
+fresh-At₀ : Fresh (λ _ → ⊥) (λ _ → ⊥) At₀ root coreAt
+fresh-At₀ (refl , refl) = (λ w → ≺-irrefl {root} (world-after w tt)) , (λ w → ≺-irrefl {coreAt} (world-after w tt))

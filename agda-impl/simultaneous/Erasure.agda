@@ -35,7 +35,7 @@ open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 open import Relation.Nullary using (Dec; yes; no)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_)
+open import denotation.Position using (Pos; root; ix; _≟ᵖ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module Values; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
@@ -54,8 +54,7 @@ open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (InvAt)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
-open import simultaneous.Carry using (Carry; carry-⟦⟧; hom-∅; coreAt; attributed; carry-wrap)
-open import denotation.Laws.Worlds using (⊕-assoc)
+open import simultaneous.Carry using (Carry; carry-⟦⟧; At₀; hom-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
 open Values using (Nth; Next; first; next)
@@ -306,11 +305,11 @@ single-values (instEmit (mark _) _)  = inj₁ refl
 --   many carriers, so no reader reaches it to put it anywhere; only rows
 --   a reader reaches are placed, each in the instant of a carrier.
 erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
-erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) (λ _ _ → ⊥) hom-∅ (λ ())
-                 root coreAt (tt , λ ()) (tt , λ ()) (λ ())
-... | M , _ , hm , _ , (δ , at) , c =
-  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (_ ++ δ) (subst (M root) (⊕-assoc root _ δ) at)
-    (carry-wrap o hm δ at c)
+erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ hom-At₀ (λ ())
+                 root coreAt (refl , refl) (tt , λ ()) (tt , λ ()) fresh-At₀
+... | M , ms , hm , _ , c =
+  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
+    (carry-wrap o hm (ms (refl , refl)) c)
 
 -- A plain row that is not a pin is at or before every end.
 unpinned-live : ∀ {A} (o : SObs [] A) {k e} → events o k e → Unpinned e → Live (events o) k
