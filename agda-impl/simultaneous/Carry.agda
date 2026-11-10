@@ -29,7 +29,13 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup; [])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Bool.Properties using (T?)
+open import Relation.Nullary using (yes; no)
+open import denotation.Position using (_<ᵖ_)
+open import denotation.Laws.Modulus using (≼-split)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Bool using (T)
@@ -111,12 +117,36 @@ instant-⊕ (i ∙ p) zs = refl
 ------------------------------------------------------------------------
 -- A subterm carried
 
+-- What an elaborated row is owed to.
+data Cause : Set where
+  row  : Pos → Cause
+  env  : Pos → Cause
+  both : Pos → Pos → Cause
+  subs : Cause
+
+-- `r` is owed to a plain row, in the image of its instant; to an
+-- environment row it lies under; to a plain row and an environment row it
+-- lies under; or to the subscribe instant.
+Owes : ∀ {A : Set} → PMap → (Pos → Set) → EmissionSet A → Pos → Cause → Pos → Set
+Owes {A} M HE t s′ (row k)    r = Σ (Ev A) (t k) × Σ Pos λ y → M k y × instantOf y ≡ instantOf r
+Owes {A} M HE t s′ (env h)    r = HE h × h ⊑ r
+Owes {A} M HE t s′ (both k h) r = Σ (Ev A) (t k) × HE h × h ⊑ r
+Owes {A} M HE t s′ subs       r = instantOf r ≡ instantOf s′
+
+-- Owed through the environment.
+Read : Cause → Set
+Read (env _)    = ⊤
+Read (both _ _) = ⊤
+Read (row _)    = ⊥
+Read subs       = ⊥
+
 -- `u`, subscribed at `s′`, carries `t`, subscribed at `s`, under the
 -- environment hot rows `HP` (plain) and `HE` (elaborated), along `M`:
 -- `simultaneous.Attribution.Attribution`'s fields, each carrier lying
 -- under the image of the row it carries, a row of `u` placed or a pin of
--- `t` homed also by an instant of an environment row, and the rows past
--- a carrier finitely many when the environment's are too.
+-- `t` homed also by an instant of an environment row.  Each row of `u` is
+-- owed to a cause, each cause owed finitely many, and a row owed through
+-- the environment lies at or before every end.
 record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE : Pos → Set) (t : EmissionSet A) (u : EmissionSet Y) (s s′ : Pos) : Set₁ where
   field
     Img     : Pos → Pos → Set
@@ -131,8 +161,12 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE : Pos → Set) (
             → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m)
               ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
     live    : ∀ {k l} → Img k l → Live t k → Live u l
-    spent   : ∀ {k l} → Img k l → Spent t (just k) → (Σ (List Pos) λ hs → ∀ {h} → HE h → l ≺ h → h ∈ hs)
-            → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
+    few     : ∀ {k l} → Img k l → Few t k
+    cause   : ∀ {r e} → u r e → Cause
+    owes    : ∀ {r e} (ur : u r e) → Owes M HE t s′ (cause ur) r
+    fib     : Cause → List Pos
+    in-fib  : ∀ {r e} (ur : u r e) → r ∈ fib (cause ur)
+    read    : ∀ {r e} (ur : u r e) → Read (cause ur) → Live u r
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pbk     : Pos → List Pos
@@ -161,6 +195,38 @@ module _ {A : Set} {M : PMap} (hm : Hom M) {t : EmissionSet A} {u : EmissionSet 
     inst-img i with ext i
     ... | y , my , σ , refl = y , my , instant-⊕ y σ
 
+    gather : (Pos → List Pos) → List Pos → List Pos
+    gather g []       = []
+    gather g (x ∷ xs) = g x ++ gather g xs
+
+    ∈-gather : ∀ {x y} (g : Pos → List Pos) xs → x ∈ xs → y ∈ g x → y ∈ gather g xs
+    ∈-gather g (x ∷ xs) (here refl) m = ∈-++⁺ˡ m
+    ∈-gather g (x ∷ xs) (there n)   m = ∈-++⁺ʳ (g x) (∈-gather g xs n m)
+
+    -- Finitely many rows before a carried row and after it: finitely
+    -- many in all.
+    rows-in : ∀ {k} → Few t k → Spent t (just k) → Σ (List Pos) λ ks → ∀ {k₁ e} → t k₁ e → k₁ ∈ ks
+    rows-in {k} (ks₁ , f₁) (ks₂ , f₂) = ks₁ ++ k ∷ ks₂ , go
+      where
+        go : ∀ {k₁ e} → t k₁ e → k₁ ∈ ks₁ ++ k ∷ ks₂
+        go {k₁} tk with T? (k₁ <ᵖ k)
+        ... | yes lt = ∈-++⁺ˡ (f₁ tk lt)
+        ... | no ge with ≼-split {k} {k₁} ge
+        ...   | inj₁ gt   = ∈-++⁺ʳ ks₁ (there (proj₁ (f₂ tk gt)))
+        ...   | inj₂ refl = ∈-++⁺ʳ ks₁ (here refl)
+
+    -- Then each row of `u` is owed to one of them or to the subscription.
+    every-row : ∀ {k l} → Img k l → Spent t (just k) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
+    every-row i sp with rows-in (few i) sp
+    ... | ks , f = gather (λ k₁ → fib (row k₁)) ks ++ fib subs , go
+      where
+        go : ∀ {r e} → u r e → r ∈ gather (λ k₁ → fib (row k₁)) ks ++ fib subs
+        go ur with cause ur | owes ur | in-fib ur
+        ... | row k₁   | (_ , tk) , _ | m = ∈-++⁺ˡ (∈-gather (λ k₂ → fib (row k₂)) ks (f tk) m)
+        ... | env h    | () , _       | _
+        ... | both _ _ | _ , () , _   | _
+        ... | subs     | _            | m = ∈-++⁺ʳ (gather (λ k₂ → fib (row k₂)) ks) m
+
   img-mono′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
   img-mono′ i i′ kk with ext i | ext i′
   ... | y , my , σ , refl | y′ , my′ , σ′ , refl =
@@ -184,7 +250,7 @@ module _ {A : Set} {M : PMap} (hm : Hom M) {t : EmissionSet A} {u : EmissionSet 
     ; img-mono = img-mono′ ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm fm)
     ; live = live
-    ; spent = λ i sp → spent i sp ([] , λ {h} ())
+    ; spent = λ i sp → let (ls , f) = every-row i sp in ls , λ ur _ → f ur
     ; bk = bk ; in-bk = in-bk ; pbk = pbk
     ; pinned = λ {k} tk lk → let (a , b) = pinned tk lk in a , homed {k} b }
     where
