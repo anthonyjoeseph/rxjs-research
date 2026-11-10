@@ -1,11 +1,13 @@
 {-# OPTIONS --guardedness #-}
 
 -- ROWS ATTRIBUTED.  An emission set `u` carries another, `t`, when each
--- of `u`'s rows is attributed to one of `t`'s, or to none, ahead of every
--- one of them: in order, instant for instant, finitely many to each, and
--- each of `t`'s rows is carried by one of `u`'s, a value by a value of
--- the same, an end by an end.  What `u` adds shows nothing, and lies in
--- an instant `t` passes through or in the subscribe frame.
+-- of `u`'s rows at or before its end is attributed to one of `t`'s, or to
+-- none, ahead of every one of them: in order, instant for instant,
+-- finitely many to each, and each of `t`'s rows at or before its end is
+-- carried by one of `u`'s, a value by a value of the same, an end by an
+-- end.  What `u` adds shows nothing, and lies in an instant `t` passes
+-- through or in the subscribe frame.  Past the ends nothing is carried:
+-- a reader is shown nothing there.
 --
 -- So `u`'s values are `t`'s, index for index, each before every end
 -- exactly when its counterpart is (`values-ut`, `values-tu`); an instant
@@ -13,6 +15,8 @@
 -- rank (`rank-ut`); and an instant is over on one side exactly when it is
 -- on the other (`over-ut`), since what `u` adds after a value is a finite
 -- tail of rows already attributed, never a value or an end of its own.
+-- Whether a run has ended past a value is decided by listing its rows
+-- (`simultaneous.Listing`): past it, finitely many.
 module simultaneous.Attribution where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -33,13 +37,15 @@ open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; yes; no)
 
-open import denotation.Position using (Pos; Instant; root; frame; _<ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; module Values)
-open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd)
+open import denotation.Position using (Pos; Instant; root; frame; _<ᵖ_; _⊕_; ix)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Few; Seen; module Values)
+open import denotation.Read using (Visible)
+open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≼-trans; ≼-≺-≺; ≺→≼; ≺-irrefl; ≺-absurd; ≺-ext)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; irrⁱ; triⁱ; frame-least; ≺-instant; instant-≺)
 open import simultaneous.Relations using (Rank; Before; Left; Exits; Over)
+open import simultaneous.Listing using (Listing)
 
 open Values using (Nth; Next; first; next)
 open Equivalence using (to; from)
@@ -135,11 +141,11 @@ record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → 
                    (t : EmissionSet A) (u : EmissionSet B) (s s′ : Pos) : Set₁ where
   field
     At     : Pos → Maybe Pos → Set
-    att    : ∀ {l e} → u l e → Σ (Maybe Pos) (At l)
+    att    : ∀ {l e} → u l e → Live u l → Σ (Maybe Pos) (At l)
     at-fun : ∀ {l x y} → At l x → At l y → x ≡ y
     at-row : ∀ {l k} → At l (just k) → Σ (Ev A) (t k)
-    img    : ∀ {k e} → t k e → Σ Pos λ l → At l (just k) × Σ (Ev B) λ e′ → u l e′ × Match ShA ShB Val e e′
-    shown  : ∀ {l e} → u l e → Shown ShB e → Σ Pos λ k → At l (just k) × Σ (Ev A) λ e₀ → t k e₀ × Match ShA ShB Val e₀ e
+    img    : ∀ {k e} → t k e → Live t k → Σ Pos λ l → At l (just k) × Σ (Ev B) λ e′ → u l e′ × Match ShA ShB Val e e′
+    shown  : ∀ {l e} → u l e → Shown ShB e → Live u l → Σ Pos λ k → At l (just k) × Σ (Ev A) λ e₀ → t k e₀ × Match ShA ShB Val e₀ e
     uniq   : ∀ {l m k e e′} → At l (just k) → At m (just k) → u l e → u m e′ → Shown ShB e → Shown ShB e′ → l ≡ m
     mono   : ∀ {l m x y} → At l x → At m y → l ≺ m → x ≤ₘ y
     inst   : ∀ {l m k n} → At l (just k) → At m (just n) → (instantOf l ≡ instantOf m ⇔ instantOf k ≡ instantOf n)
@@ -165,14 +171,90 @@ Reads : ∀ {X A : Set} → (X → List A) → A → X → Set
 Reads f a x = f x ≡ a ∷ []
 
 ------------------------------------------------------------------------
+-- Whether a run ends past a row
+
+private
+  module Past {X : Set} {t : EmissionSet X} (func : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) (listing : Listing t) where
+
+    -- The latest of a position and a list.
+    top : Pos → List Pos → Pos
+    top m []       = m
+    top m (k ∷ ks) with T? (m <ᵖ k)
+    ... | yes _ = top k ks
+    ... | no  _ = top m ks
+
+    top-≥ : ∀ m ks {k} → k ∈ m ∷ ks → k ≼ top m ks
+    top-≥ m []       (here refl) = ≼-refl {m}
+    top-≥ m (k ∷ ks) mem with T? (m <ᵖ k)
+    top-≥ m (k ∷ ks) (here refl)         | yes mk = ≼-trans {m} {k} {top k ks} (≺→≼ {m} {k} mk) (top-≥ k ks (here refl))
+    top-≥ m (k ∷ ks) (there (here refl)) | yes _  = top-≥ k ks (here refl)
+    top-≥ m (k ∷ ks) (there (there x))   | yes _  = top-≥ k ks (there x)
+    top-≥ m (k ∷ ks) (here refl)         | no _   = top-≥ m ks (here refl)
+    top-≥ m (k ∷ ks) (there (here refl)) | no km  = ≼-trans {k} {m} {top m ks} km (top-≥ m ks (here refl))
+    top-≥ m (k ∷ ks) (there (there x))   | no _   = top-≥ m ks (there x)
+
+    endOr : (e : Ev X) → e ≡ end ⊎ (e ≡ end → ⊥)
+    endOr end     = inj₁ refl
+    endOr (out _) = inj₂ λ ()
+    endOr skip    = inj₂ λ ()
+    endOr (pin _) = inj₂ λ ()
+
+    -- An end among rows listed, or none.
+    hunt : (ks : List Pos) → (∀ {k} → k ∈ ks → Σ _ (t k)) → (Σ Pos λ c → t c end) ⊎ (∀ {c} → c ∈ ks → t c end → ⊥)
+    hunt []       b = inj₂ λ ()
+    hunt (k ∷ ks) b with b (here refl)
+    ... | e , tk with endOr e
+    ...   | inj₁ refl = inj₁ (k , tk)
+    ...   | inj₂ ne with hunt ks (λ m → b (there m))
+    ...     | inj₁ c  = inj₁ c
+    ...     | inj₂ absent = inj₂ λ { (here refl) tc → ne (func tk tc) ; (there m) tc → absent m tc }
+
+    -- Past a row with finitely many rows before it, finitely many.
+    bound : ∀ {l} ks → Few t l → (∀ {r e} → t r e → l ≺ r → r ∈ ks) → Few t (top l ks ⊕ [ ix 0 ])
+    bound {l} ks (fs , few) after = fs ++ l ∷ ks , cover
+      where
+        cover : ∀ {r e} → t r e → r ≺ (top l ks ⊕ [ ix 0 ]) → r ∈ fs ++ l ∷ ks
+        cover {r} tr _ with T? (r <ᵖ l)
+        ... | yes rl = ∈-++⁺ˡ (few tr rl)
+        ... | no lr with ≼-split {l} {r} lr
+        ...   | inj₁ lr′ = ∈-++⁺ʳ fs (there (after tr lr′))
+        ...   | inj₂ refl = ∈-++⁺ʳ fs (here refl)
+
+    -- So the run ends or it does not past the row.
+    ends? : ∀ {l} ks → Few t l → (∀ {r e} → t r e → l ≺ r → r ∈ ks) → (Σ Pos λ c → t c end) ⊎ (∀ {c} → t c end → l ≺ c → ⊥)
+    ends? {l} ks fl after with listing (bound ks fl after)
+    ... | ks′ , has , back with hunt ks′ (λ m → proj₂ (back m))
+    ...   | inj₁ c  = inj₁ c
+    ...   | inj₂ absent = inj₂ λ {c} tc lc →
+      absent (has tc (≼-≺-≺ {c} {top l ks} {top l ks ⊕ [ ix 0 ]} (top-≥ l ks (there (after tc lc))) (≺-ext (top l ks) []))) tc
+
+------------------------------------------------------------------------
 -- What an attribution at the root carries over
 
+-- `t` and `u` are readings: one event at a position, every value and end
+-- reached and at or before every end, and the rows before any position
+-- listed where finitely many precede it.
 module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSet A} {u : EmissionSet X}
-                  (funcT : ∀ {y e e′} → t y e → t y e′ → e ≡ e′)
+                  (funcT : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) (funcU : ∀ {y e e′} → u y e → u y e′ → e ≡ e′)
+                  (seenT : ∀ {k e} → t k e → Visible e → Seen t k e) (seenU : ∀ {l e} → u l e → Visible e → Seen u l e)
+                  (listT : Listing t) (listU : Listing u)
                   (R : Attribution Every (One f) (Reads f) t u root root) where
   open Attribution R
 
   private
+    module PT = Past funcT listT
+    module PU = Past funcU listU
+
+    liveT : ∀ {k e} → t k e → Visible e → Live t k
+    liveT tk v = proj₂ (proj₁ (seenT tk v))
+
+    liveU : ∀ {l e} → u l e → Visible e → Live u l
+    liveU ul v = proj₂ (proj₁ (seenU ul v))
+
+    -- Before a row at or before every end, a row is too.
+    live-≺ : ∀ {Y : Set} {w : EmissionSet Y} {r m} → r ≺ m → Live w m → Live w r
+    live-≺ {r = r} {m} rm lm {c} wc = ≼-trans {r} {m} {c} (≺→≼ {r} {m} rm) (lm wc)
+
     module NU = Nths (V f u)
 
     unsome : ∀ {k m} → just k ≤ₘ just m → k ≼ m
@@ -209,7 +291,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     end-of {e₀ = pin _} tk (c , q) = ⊥-elim (q (λ ()) tt)
 
     end-back : ∀ {l} → u l end → Σ Pos λ k → At l (just k) × t k end
-    end-back ul with shown ul tt
+    end-back ul with shown ul tt (liveU ul tt)
     ... | k , ak , e₀ , tk , m = k , ak , end-of tk m
 
     val-of : ∀ {k x e₀ a} → t k e₀ → Match Every (One f) (Reads f) e₀ (out x) → f x ≡ a ∷ [] → t k (out a)
@@ -222,7 +304,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
 
     -- A carried end, and a carried value.
     end-img : ∀ {k} → t k end → Σ Pos λ l → At l (just k) × u l end
-    end-img tk with img tk
+    end-img tk with img tk (liveT tk tt)
     ... | l , al , e′ , ul , (c , _) with c tt
     ...   | refl = l , al , ul
 
@@ -230,11 +312,11 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     vt (vrow tk refl) = tk
 
     vback : ∀ {l a} → V f u l (out a) → Σ Pos λ k → At l (just k) × t k (out a)
-    vback (vrow ul fx) with shown ul (_ , fx)
+    vback (vrow ul fx) with shown ul (_ , fx) (liveU ul tt)
     ... | k , ak , e₀ , tk , m = k , ak , val-of tk m fx
 
     vimg : ∀ {k a} → t k (out a) → Σ Pos λ l → At l (just k) × V f u l (out a)
-    vimg tk with img tk
+    vimg tk with img tk (liveT tk tt)
     ... | l , al , e′ , ul , (c , _) with c tt
     ...   | x , refl , fx = l , al , vrow ul fx
 
@@ -344,40 +426,40 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     frame-before al ne = (λ eq → ne (sym (from (home al) (sym eq)))) , inj₁ refl
 
     -- An instant before a row of `u`, as `t` passes it, and back.
-    fwd : ∀ {l k J} → At l (just k) → Before u l J → Σ Instant λ I → Lands J I × Before t k I
-    fwd al (ne , inj₁ refl) = frame , inj₁ (refl , refl) , frame-before al ne
-    fwd al (ne , inj₂ (m , e , um , ml , refl)) with att um
+    fwd : ∀ {l k J} → At l (just k) → Live u l → Before u l J → Σ Instant λ I → Lands J I × Before t k I
+    fwd al lu (ne , inj₁ refl) = frame , inj₁ (refl , refl) , frame-before al ne
+    fwd al lu (ne , inj₂ (m , e , um , ml , refl)) with att um (live-≺ {w = u} ml lu)
     ... | nothing , a₀ = frame , inj₁ (early a₀ , refl) , frame-before al λ eq → ne (trans (early a₀) eq)
     ... | just m₁ , am with at-row am
     ...   | e₁ , tm₁ =
       instantOf m₁ , inj₂ (m , m₁ , e , um , am , refl , refl) ,
       ((λ eq → ne (from (inst am al) eq)) , inj₂ (m₁ , e₁ , tm₁ , below-of am al ml ne , refl))
 
-    bwd : ∀ {l k I} → At l (just k) → Before t k I → Σ Instant λ J → Before u l J × Lands J I
-    bwd al (ne , inj₁ refl) = frame , ((λ eq → ne (sym (to (home al) (sym eq)))) , inj₁ refl) , inj₁ (refl , refl)
-    bwd al (ne , inj₂ (m₁ , e₁ , tm₁ , m₁k , refl)) with img tm₁
+    bwd : ∀ {l k I} → At l (just k) → Live t k → Before t k I → Σ Instant λ J → Before u l J × Lands J I
+    bwd al lk (ne , inj₁ refl) = frame , ((λ eq → ne (sym (to (home al) (sym eq)))) , inj₁ refl) , inj₁ (refl , refl)
+    bwd al lk (ne , inj₂ (m₁ , e₁ , tm₁ , m₁k , refl)) with img tm₁ (live-≺ {w = t} m₁k lk)
     ... | m , am , e′ , um , _ =
       instantOf m , ((λ eq → ne (to (inst am al) eq)) , inj₂ (m , e′ , um , strict am al m₁k , refl)) ,
       inj₂ (m , m₁ , e′ , um , am , refl , refl)
 
   -- A row of `u` is ranked as the row it is put on.
-  rank-ut : ∀ {l k r} → At l (just k) → Rank u l r → Rank t k r
-  rank-ut {l} {k} al (is , sorted , len , iff) =
+  rank-ut : ∀ {l k r} → At l (just k) → Live u l → Rank u l r → Rank t k r
+  rank-ut {l} {k} al lu (is , sorted , len , iff) =
     mapWith is g , pairsWith is g (λ m n lt → lands-mono (L m) (L n) lt) sorted , trans (length-mapWith is g) len ,
     mk⇔ fwd′ bwd′
     where
       g : ∀ {J} → J ∈ is → Instant
-      g m = proj₁ (fwd al (to iff m))
+      g m = proj₁ (fwd al lu (to iff m))
 
       L : ∀ {J} (m : J ∈ is) → Lands J (g m)
-      L m = proj₁ (proj₂ (fwd al (to iff m)))
+      L m = proj₁ (proj₂ (fwd al lu (to iff m)))
 
       fwd′ : ∀ {I} → I ∈ mapWith is g → Before t k I
       fwd′ mem with ∈-mapWith⁻ is g mem
-      ... | J , m , refl = proj₂ (proj₂ (fwd al (to iff m)))
+      ... | J , m , refl = proj₂ (proj₂ (fwd al lu (to iff m)))
 
       bwd′ : ∀ {I} → Before t k I → I ∈ mapWith is g
-      bwd′ b with bwd al b
+      bwd′ b with bwd al (live-ut al lu) b
       ... | J , bJ , lJ = subst (_∈ mapWith is g) (lands-fun (L (from iff bJ)) lJ) (∈-mapWith⁺ is g (from iff bJ))
 
   ------------------------------------------------------------------------
@@ -392,7 +474,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     left-tu : ∀ {l k x} → At l (just k) → u l (out x) → One f x → Left [_] t k → Left f u l
     left-tu al ul (_ , fl) lt {m} {x} um lm same with sv x
     ... | inj₁ f0       = f0
-    ... | inj₂ (a , fx) with shown um (a , fx)
+    ... | inj₂ (a , fx) with shown um (a , fx) (liveU um tt)
     ...   | m₁ , am , e₀ , tm₁ , mt with lt (val-of tm₁ mt fx) (vstrict al am (vrow ul fl) (vrow um fx) lm) (to (inst am al) same)
     ...     | ()
 
@@ -419,46 +501,71 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     cond-tu al am c (inj₁ ne)   = inj₁ λ eq → ne (to (inst am al) eq)
     cond-tu al am c (inj₂ refl) = inj₂ (c tt)
 
-    exits-ut : ∀ {l k b} → At l (just k) → t k (out b) → Exits u l → Exits t k
-    exits-ut {l} al tk (inj₁ (m , e , ((um , pu) , (ks , cover)) , lm , cond)) with att um
+    -- A value of each, and an end of the other past it.
+    past-u : ∀ {l x c} → u l (out x) → u c end → l ≺ c
+    past-u {l} {x} {c} ul uc with ≼-split {l} {c} (liveU ul tt uc)
+    ... | inj₁ lc = lc
+    ... | inj₂ refl with funcU ul uc
+    ...   | ()
+
+    past-t : ∀ {k b c} → t k (out b) → t c end → k ≺ c
+    past-t {k} {b} {c} tk tc with ≼-split {k} {c} (liveT tk tt tc)
+    ... | inj₁ kc = kc
+    ... | inj₂ refl with funcT tk tc
+    ...   | ()
+
+    exits-ut : ∀ {l k x b} → At l (just k) → u l (out x) → t k (out b) → Exits u l → Exits t k
+    exits-ut {l} al ul tk (inj₁ (m , e , ((um , pu) , (ks , cover)) , lm , cond)) with att um pu
     ... | nothing , a₀ = ⊥-elim (≺-absurd {m} {l} (none-first a₀ al) lm)
     ... | just m₁ , am with at-row am
     ...   | e₁ , tm₁ = inj₁ (m₁ , e₁ , ((tm₁ , live-ut am pu) , (every bk ks , cov)) , after-of al am tk um lm cond , cond-ut al am um tm₁ cond)
       where
         cov : ∀ {r e′} → t r e′ → r ≺ m₁ → r ∈ every bk ks
-        cov tr rm with img tr
+        cov tr rm with img tr (live-≺ {w = t} rm (live-ut am pu))
         ... | r′ , ar , _ , ur , _ = ∈-every bk ks (cover ur (strict ar am rm)) (in-bk ar)
-    exits-ut {k = k} al tk (inj₂ (ks , sp)) = inj₂ (every bk ks , row)
+    exits-ut al ul tk (inj₂ (ks , sp)) with PU.ends? ks (proj₂ (seenU ul tt)) (λ ur lr → proj₁ (sp ur lr))
+    ... | inj₁ (c , uc) with end-back uc
+    ...   | c′ , ac , tc = inj₁ (c′ , end , seenT tc tt , after-of al ac tk uc (past-u ul uc) (inj₂ refl) , inj₂ refl)
+    exits-ut {l} {k} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (every bk ks , row)
       where
-        row : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks × (t r e × (∀ {c} → t c end → r ≼ c))
-        row tr kr with img tr
-        ... | r′ , ar , _ , ur , _ with sp ur (strict al ar kr)
-        ...   | mem , (_ , pr) = ∈-every bk ks mem (in-bk ar) , tr , live-ut ar pr
+        unended : ∀ {c} → t c end → ⊥
+        unended tc with end-img tc
+        ... | c₁ , _ , uc₁ = absent uc₁ (past-u ul uc₁)
 
-    exits-tu : ∀ {l k} → At l (just k) → Live t k → Exits t k → Exits u l
-    exits-tu al lk (inj₁ (m₁ , e₁ , ((tm₁ , pt) , (ks , cover)) , km₁ , cond)) with img tm₁
+        row : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks × (t r e × (∀ {c} → t c end → r ≼ c))
+        row tr kr with img tr (λ tc → ⊥-elim (unended tc))
+        ... | r′ , ar , _ , ur , _ = ∈-every bk ks (proj₁ (sp ur (strict al ar kr))) (in-bk ar) , tr , (λ tc → ⊥-elim (unended tc))
+
+    exits-tu : ∀ {l k x b} → At l (just k) → u l (out x) → t k (out b) → Exits t k → Exits u l
+    exits-tu al ul tk (inj₁ (m₁ , e₁ , ((tm₁ , pt) , (ks , cover)) , km₁ , cond)) with img tm₁ pt
     ... | m , am , e′ , um , (c , _) = inj₁ (m , e′ , ((um , live am pt) , (pre ++ every fib (m₁ ∷ ks) , cov)) , strict al am km₁ , cond-tu al am c cond)
       where
         cov : ∀ {r e″} → u r e″ → r ≺ m → r ∈ pre ++ every fib (m₁ ∷ ks)
-        cov {r} ur rm with att ur
+        cov {r} ur rm with att ur (live-≺ {w = u} rm (live am pt))
         ... | nothing , a₀ = ∈-++⁺ˡ (in-pre a₀)
         ... | just r₁ , ar with ≼-split {r₁} {m₁} (mono≼ ar am (≺→≼ {r} {m} rm))
         ...   | inj₁ lt   = ∈-++⁺ʳ pre (∈-every fib (m₁ ∷ ks) (there (cover (proj₂ (at-row ar)) lt)) (in-fib ar))
         ...   | inj₂ refl = ∈-++⁺ʳ pre (∈-every fib (m₁ ∷ ks) (here refl) (in-fib ar))
-    exits-tu {l} {k} al lk (inj₂ (ks , sp)) = inj₂ (every fib (k ∷ ks) , row)
+    exits-tu al ul tk (inj₂ (ks , sp)) with PT.ends? ks (proj₂ (seenT tk tt)) (λ tr kr → proj₁ (sp tr kr))
+    ... | inj₁ (c , tc) with end-img tc
+    ...   | c₁ , ac , uc = inj₁ (c₁ , end , seenU uc tt , strict al ac (past-t tk tc) , inj₂ refl)
+    exits-tu {l} {k} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (every fib (k ∷ ks) , row)
       where
+        unended : ∀ {c} → u c end → ⊥
+        unended uc with end-back uc
+        ... | c′ , _ , tc = absent tc (past-t tk tc)
+
         row : ∀ {r e} → u r e → l ≺ r → r ∈ every fib (k ∷ ks) × (u r e × (∀ {c} → u c end → r ≼ c))
-        row {r} ur lr with att ur
+        row {r} ur lr with att ur (λ uc → ⊥-elim (unended uc))
         ... | nothing , a₀ = ⊥-elim (≺-absurd {r} {l} (none-first a₀ al) lr)
         ... | just r₁ , ar with ≼-split {k} {r₁} (mono≼ al ar (≺→≼ {l} {r} lr))
-        ...   | inj₂ refl = ∈-every fib (k ∷ ks) (here refl) (in-fib ar) , ur , live ar lk
-        ...   | inj₁ lt with sp (proj₂ (at-row ar)) lt
-        ...     | mem , (_ , pr) = ∈-every fib (k ∷ ks) (there mem) (in-fib ar) , ur , live ar pr
+        ...   | inj₂ refl = ∈-every fib (k ∷ ks) (here refl) (in-fib ar) , ur , (λ uc → ⊥-elim (unended uc))
+        ...   | inj₁ lt   = ∈-every fib (k ∷ ks) (there (proj₁ (sp (proj₂ (at-row ar)) lt))) (in-fib ar) , ur , (λ uc → ⊥-elim (unended uc))
 
   -- A value's instant is over on one side exactly when its counterpart's
   -- is on the other.
-  over-ut : ∀ {l k x b} → At l (just k) → u l (out x) → One f x → t k (out b) → Live t k
+  over-ut : ∀ {l k x b} → At l (just k) → u l (out x) → One f x → t k (out b)
           → Over f u (just l) ⇔ Over [_] t (just k)
-  over-ut al ul ox tk lk =
-    mk⇔ (λ { (lu , eu) → left-ut al lu , exits-ut al tk eu })
-        (λ { (lt , et) → left-tu al ul ox lt , exits-tu al lk et })
+  over-ut {l} {k} {x} {b} al ul ox tk =
+    mk⇔ (λ { (lu , eu) → left-ut {l} {k} al lu , exits-ut {l} {k} {x} {b} al ul tk eu })
+        (λ { (lt , et) → left-tu {l} {k} {x} al ul ox lt , exits-tu {l} {k} {x} {b} al ul tk et })

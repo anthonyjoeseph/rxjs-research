@@ -50,6 +50,8 @@ open import simultaneous.Ranks using (unrank; ranks-x; ranks-e; instant-rank; en
 open import simultaneous.Listing using (Listing; listed)
 open import simultaneous.Layers using (at-func; run-tail; run-++; cursor-snoc; ends-last; snoc-view)
 open import simultaneous.Project using (run-prefix)
+open import denotation.Laws using (inv-⟦⟧)
+open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
@@ -273,21 +275,30 @@ single-values : ∀ {A} → Single {IE A} valuesOf
 single-values (instEmit (value a) _) = inj₂ (a , refl)
 single-values (instEmit (mark _) _)  = inj₁ refl
 
--- THE ELABORATION CARRIES THE PLAIN RUN: each elaborated row is put on
--- the plain row it elaborates, or ahead of all of them, a value on its
--- value and the end on the end, instant for instant.  The elaboration
--- adds no instant and holds no value; switch, exhaust and the bounded
--- queue are the real cases.
+-- THE ELABORATION CARRIES THE PLAIN RUN: each elaborated row at or
+-- before the end is put on the plain row it elaborates, or ahead of all
+-- of them, a value on its value and the end on the end, instant for
+-- instant.  The elaboration adds no instant and holds no value; switch,
+-- exhaust and the bounded queue are the real cases.
 --
 -- REFUTED: e10449e the ranks agreeing, with a rank counting only instants
 --   holding rows: a run with no row in the subscribe frame ranks its
 --   values one below its elaboration, whose subscribed mark lies there.
+-- DEAD ROUTE: carrying every row, past the ends too.  A connect whose
+--   body ends at once puts its source's burst pins past its end in the
+--   subscribe frame, and the elaboration's end is that frame's last row:
+--   no elaborated row lies past it to carry them in order.
 postulate
   erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
 
 private
   module Er {A : Set} (o : SObs [] A) =
-    Attributed {A} {IE A} {valuesOf} single-values {events o} {elaborated o} (λ {y} {e} {e′} → at-func (plain o) {y} {e} {e′}) (erasing o)
+    Attributed {A} {IE A} {valuesOf} single-values {events o} {elaborated o}
+      (λ {y} {e} {e′} → at-func (plain o) {y} {e} {e′}) (λ {y} {e} {e′} → at-func (elaborate (plain o)) {y} {e} {e′})
+      (λ {k} {e} → Reached.seen (⟦ plain o ⟧ []) root (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) {k} {e})
+      (λ {k} {e} → Reached.seen (⟦ elaborate (plain o) ⟧ []) root (inv-⟦⟧ (elaborate (plain o)) [] (λ ()) root (tt , λ ())) {k} {e})
+      (λ {q} → listed (plain o) {q}) (λ {q} → listed (elaborate (plain o)) {q})
+      (erasing o)
 
 -- THE I-TH VALUE IS THE I-TH: before each side's end, the elaborated
 -- program's i-th value is its plain program's, at the same rank, its
@@ -303,14 +314,14 @@ erase-e o = Er.values-tu o
 
 erase-rank : ∀ {A} (o : SObs [] A) {i k k′ a b n} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
            → Rank (elaborated o) k n → Rank (events o) k′ n
-erase-rank o {n = n} nx _ ne _ r with Er.nth-ut o nx
-... | k₀ , ak , nk = subst (λ q → Rank (events o) q n) (Nths.nth-fun (VE o) nk ne) (Er.rank-ut o ak r)
+erase-rank o {n = n} nx lx ne _ r with Er.nth-ut o nx
+... | k₀ , ak , nk = subst (λ q → Rank (events o) q n) (Nths.nth-fun (VE o) nk ne) (Er.rank-ut o ak lx r)
 
 erase-over : ∀ {A} (o : SObs [] A) {i k k′ a b} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
            → Over valuesOf (elaborated o) (just k) ⇔ Over [_] (events o) (just k′)
-erase-over o nx _ ne le with Er.nth-ut o nx | Nths.nth-val (VX o) nx | Nths.nth-val (VE o) ne
+erase-over o nx _ ne _ with Er.nth-ut o nx | Nths.nth-val (VX o) nx | Nths.nth-val (VE o) ne
 ... | k₀ , ak , nk | vrow ul fx | vrow tk refl with Nths.nth-fun (VE o) nk ne
-...   | refl = Er.over-ut o ak ul (_ , fx) tk le
+...   | refl = Er.over-ut o ak ul (_ , fx) tk
 
 erase-end : ∀ {A} (o : SObs [] A)
           → (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) ⇔ (Σ Pos λ c′ → events o c′ end × Live (events o) c′)
