@@ -33,7 +33,7 @@ open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Sync; Ex; Early; Before; Valued; opos)
+open import simultaneous.Routed using (Held; Rest; Sync; Ex; Early; Before; Valued; opos)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
@@ -86,7 +86,8 @@ held-ex wd H = record
   ; early   = Held.early H
   ; ends    = Held.ends H
   ; late    = Held.late H
-  ; idle    = Held.idle H }
+  ; idle    = Held.idle H
+  ; rest    = Held.rest H }
 
 ------------------------------------------------------------------------
 -- Runs
@@ -343,12 +344,20 @@ rows-refl (_∷_ {e = end}   (_ , _ , _) run) = ev-end ∷ rows-refl run
 rows-refl (_∷_ {e = skip}  (_ , () , _) _)
 rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 
+-- A CONNECT FINISHES ITS INSTANTS WHERE ITS BODY DOES: the source rows
+-- it re-keys under its own position, pins of its burst and echoes while
+-- its body is alive, add finitely many past a zero count.
+postulate
+  conn-rest : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
+              (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p)
+            → Shows (enter s (p ⊕ [ ix 1 ])) → Rest (Connect.β s F p) → Rest (enter (Op.connect s F) p)
+
 held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
             (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) cs
           → Shows (enter s (p ⊕ [ ix 1 ]))
           → Held (enter (F (hot (Proper (enter s (p ⊕ [ ix 1 ]))))) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok cs sh h = held-same row end-row back′ fwd (held-ex ex h)
+held-conn s F Is IF p ok cs sh h = held-same row end-row back′ fwd (conn-rest s F Is IF p ok sh) (held-ex ex h)
   where
     open ConnRun s F Is IF p ok sh
 

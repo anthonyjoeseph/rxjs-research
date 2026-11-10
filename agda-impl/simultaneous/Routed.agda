@@ -120,6 +120,14 @@ Idle t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → �
        → (∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
        → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
 
+-- PAST A ZERO COUNT, THE INSTANT FINISHES: wherever a run met leaves its
+-- count holding no route of the instant it last began, finitely many rows
+-- of that instant lie past it.  A route is held while its instant can
+-- still make a row, so a synchronous loop never runs past its stop.
+Rest : ∀ {A} → EmissionSet (IE A) → Set
+Rest t = ∀ {rs} → Met t rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+       → Σ (List Pos) λ ks → ∀ {y e} → t y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ ks
+
 -- A stop finds a route to stop even inside an exempt burst: no route is
 -- stopped twice.
 record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
@@ -135,6 +143,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     ends    : ∀ {y} → t y end → Early y
     late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     idle    : Idle t
+    rest    : Rest t
 
 -- Held at every admissible subscription, exempt for its own burst and
 -- `cs`.  No subscription is made in a value step past its value.

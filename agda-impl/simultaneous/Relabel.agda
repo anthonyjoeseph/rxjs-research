@@ -30,7 +30,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; ove
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; Idle; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
+open import simultaneous.Routed using (Held; Idle; Rest; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
 open import simultaneous.Readings using (rootOf)
 open import denotation.Laws.Worlds using (_⊑_)
 
@@ -120,15 +120,28 @@ carried-same ev-end              c-end   = c-end
 ------------------------------------------------------------------------
 -- Held carries over
 
+-- A relabelling whose every row lies where one of its source's does
+-- finishes its instants where its source does.
+rest-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
+          → (∀ {y e′} → t′ y e′ → Σ _ (t y))
+          → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs)
+          → Rest t → Rest t′
+rest-same every back R m z bq with back m
+... | rs , run , eq with mem≈ eq bq
+...   | _ , bq′ , same-mark with R run (subst (λ r → proj₂ r ≡ 0) (cnt-same eq) z)
+                                      (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ rs) (cong proj₁ (cnt-same eq)) bq′)
+...     | ks , h = ks , λ ty ay iq → h (proj₂ (every ty)) (subst (λ c → After c _) (cursor≈ eq _) ay) iq
+
 held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)} {cs}
           → (∀ {y x′} → t′ y (out x′) → Σ (IE A) λ x → t y (out x) × Same x′ x)
           → (∀ {y} → t′ y end → t y end)
           → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs)
           → (∀ {w} → Few t′ w → ∀ {k e} → t k e → k ≺ w → ¬ ¬ Σ _ λ e′ → t′ k e′ × (Visible e → Visible e′))
+          → (Rest t → Rest t′)
           → Held t cs → Held t′ cs
-held-same {t = t} {t′} {cs} row end-row back fwd H = record
+held-same {t = t} {t′} {cs} row end-row back fwd rest H = record
   { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
-  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late ; idle = idle }
+  ; early = early ; ends = λ x → Held.ends H (end-row x) ; late = late ; idle = idle ; rest = rest (Held.rest H) }
   where
     early : ∀ {y a n} → t′ y (out (instEmit (value a) n)) → Early y
     early x with row x

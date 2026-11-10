@@ -47,7 +47,7 @@ open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; 
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
 open import simultaneous.HeldComb using (exact-past; inv-at)
 open import simultaneous.Reach using (module Reached)
-open import simultaneous.Routed using (valued; Idle; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
+open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.Bool.Properties using (T?)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
@@ -155,6 +155,8 @@ postulate
                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
   cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
+  -- A cold step's rows past its over are finitely many.
+  cold-rest    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
 
 private
   same-≺ : ∀ i x y → T (isLt (cmpPath x y)) → (i ∙ x) ≺ (i ∙ y)
@@ -193,7 +195,7 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
 held-cold m ρ c = ih λ env cs g eh p ok ep →
   let open ColdHeld p (enter (ev m (elab ρ (cold c)) env) p) (cold-rows m c env p) in
-  held-runs named routing (early ep) (ends ep) late (cold-idle m c env p) λ mt → record
+  held-runs named routing (early ep) (ends ep) late (cold-idle m c env p) (cold-rest m c env p) λ mt → record
     { covered = λ r₁ r₂ eq cr ne → cold-covered m c env p mt r₁ r₂ eq cr λ { (here s) → ne (here s) ; (there ()) }
     ; exact   = λ r₁ r₂ eq → ⊥-elim (no-stop (proj₁ (run-row r₁ (subst (Met _) eq mt))))
     ; shut    = cold-shut m c env p mt }
@@ -430,6 +432,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- a position few rows precede, the routes it counts are of that
     -- position's instant, or none.
     scan-idle     : Idle scanned
+    -- PAST A ZERO COUNT THE SCAN FINISHES THE INSTANT: once its count holds
+    -- no route of the instant last begun, finitely many rows of it follow,
+    -- outer, branches and trackers together.
+    scan-rest     : Rest scanned
 
   -- THE LANES' BRANCH OF THE SCAN'S SOURCE: a lane's row, where the lanes
   -- show it.
@@ -677,8 +683,9 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 
 comb-held : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P cs → GoodEnv ρ → Ok (Hots ρ) P
           → CombIn op (enter (ev m s ρ) P) cs → Idle (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
+          → Rest (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
           → Held (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) cs
-comb-held m op s ρ P cs g ok ci id = held-runs named routing early ends late id runs
+comb-held m op s ρ P cs g ok ci id re = held-runs named routing early ends late id re runs
   where open Scanned m op s ρ P cs g ok ci
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
@@ -692,6 +699,7 @@ held-comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok�
   comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) ok₃
     (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
     (CombSrc.scan-idle m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombSrc.scan-rest m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where open FlatHots m ρ op f s env p using (src; env′; P)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s

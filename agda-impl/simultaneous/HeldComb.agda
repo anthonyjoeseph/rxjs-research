@@ -38,7 +38,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
 open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (rootOf)
-open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
+open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle; Rest)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; Out; Input; react; each)
 
@@ -104,9 +104,10 @@ held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y} → t y end → Early y)
           → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y)
           → Idle t
+          → Rest t
           → (∀ {rs} → Met t rs → RunHeld cs rs)
           → Held t cs
-held-runs nm rt ea en lt id rh = record
+held-runs nm rt ea en lt id re rh = record
   { named = nm
   ; covered = λ m → RunHeld.covered (rh m)
   ; exact = λ m → RunHeld.exact (rh m)
@@ -116,6 +117,7 @@ held-runs nm rt ea en lt id rh = record
   ; ends = en
   ; late = lt
   ; idle = id
+  ; rest = re
   }
 
 ------------------------------------------------------------------------
