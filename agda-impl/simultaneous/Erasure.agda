@@ -46,7 +46,8 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; ranked; Rank; values; outs; vals; stampedᴮ; stampedᴰ; carried; Over; Closes; Ends; Erases;
   elaborated; events)
-open import simultaneous.Ranks using (unrank; Listing; listed-x; listed-e; ranks-x; ranks-e; instant-rank; enter-few)
+open import simultaneous.Ranks using (unrank; ranks-x; ranks-e; instant-rank; enter-few)
+open import simultaneous.Listing using (Listing; listed)
 open import simultaneous.Layers using (at-func; run-tail; run-++; cursor-snoc; ends-last; snoc-view)
 open import simultaneous.Project using (run-prefix)
 
@@ -324,8 +325,8 @@ module Erasing {A : Set} (o : SObs [] A) where
 
     module EX = Enumerate {IE A} {A} {valuesOf} svX {X} funcX
     module EE = Enumerate {A} {A} {[_]} svE {E} funcE
-    module RX = Reaching {IE A} {X} funcX (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed-x o {q})
-    module RE = Reaching {A} {E} funcE (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed-e o {q})
+    module RX = Reaching {IE A} {X} funcX (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed (elaborate o) {q})
+    module RE = Reaching {A} {E} funcE (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed o {q})
     module NX = Nths (VX o)
     module NE = Nths (VE o)
 

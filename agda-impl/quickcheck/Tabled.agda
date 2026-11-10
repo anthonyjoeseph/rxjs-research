@@ -2,8 +2,9 @@
 
 -- THE EMISSION SET, LISTED: the rows `denotation.EmissionSet` gives a program, as a
 -- list, up to a horizon — what the oracle checks the emission set against rxjs
--- by.  A development tool: no proof reads it.  Each clause mirrors one of
--- the emission set's.
+-- by, and the operators' clauses list the finite cut program a rank is
+-- read off (`simultaneous.Listing`).  Each clause mirrors one of the
+-- emission set's.
 module quickcheck.Tabled where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)

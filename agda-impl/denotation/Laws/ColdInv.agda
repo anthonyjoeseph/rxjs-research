@@ -13,7 +13,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using () renaming (here to hd; there to th)
-open import Data.Nat using (zero; suc; _+_; _≤_; _<_; s≤s; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; +-suc; +-monoʳ-≤; m≤m+n; m<m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -47,6 +47,14 @@ upTo (at-skip {k})   = k ∷ []
 upTo (at-end {k})    = k ∷ []
 upTo (on-out {k} x)  = k ∷ upTo x
 upTo (on-skip {k} x) = k ∷ upTo x
+
+-- How many rows of a stream come before a row of it.
+depth : ∀ {A} {ev : Events A} {y e} → InE ev y e → ℕ
+depth at-out      = 0
+depth at-skip     = 0
+depth at-end      = 0
+depth (on-out x)  = suc (depth x)
+depth (on-skip x) = suc (depth x)
 
 private
   step≼ : ∀ a b {y} → a ≺ b → b ≼ y → a ≼ y
@@ -125,6 +133,29 @@ private
       lb-f {y = y} τ e (at t′ _ b) re ok x =
         step≼ e (fired (τ + t′) e ▸ ix 0) {y} (timer-after e (ix 0) ok)
           (lb-b τ (fired (τ + t′) e) 0 b (re , ok) ≤-refl x)
+
+    -- A deeper row lies later.
+    mutual
+      asc-b : ∀ {t y y′ e₁ e₂} τ r i (b : Frame A t) → RealR r → tickᴿ r ≤ τ + t
+            → (x : InE (burst τ r i b) y e₁) (x′ : InE (burst τ r i b) y′ e₂) → depth x < depth x′ → y ≺ y′
+      asc-b {y′ = y′} τ r i (emit a k) rr le at-out (on-out x′) _ = ≺-≼-≺ {r ▸ ix i} {r ▸ ix (suc i)} {y′} (slot r i) (lb-b τ r (suc i) k rr le x′)
+      asc-b τ r i (emit a k) rr le (on-out x) (on-out x′) (s≤s lt) = asc-b τ r (suc i) k rr le x x′ lt
+      asc-b τ r i (emit a k) rr le _          at-out      ()
+      asc-b {y′ = y′} τ r i (stall k) rr le at-skip (on-skip x′) _ =
+        ≺-≼-≺ {r ▸ ix i} {r ▸ ix (suc i)} {y′} (slot r i) (lb-b τ r (suc i) (Frame∞.force k) rr le x′)
+      asc-b τ r i (stall k) rr le (on-skip x) (on-skip x′) (s≤s lt) = asc-b τ r (suc i) (Frame∞.force k) rr le x x′ lt
+      asc-b τ r i (stall k) rr le _           at-skip      ()
+      asc-b {y′ = y′} τ r i (close k) rr le at-skip (on-skip x′) _ =
+        ≺-≼-≺ {r ▸ ix i} {r ▸ last} {y′} (slot-last r i) (lb-f τ (r ▸ last) (From∞.force k) (real-▸ r plain-last rr) (close-ok r rr le (From∞.force k)) x′)
+      asc-b τ r i (close k) rr le (on-skip x) (on-skip x′) (s≤s lt) =
+        asc-f τ (r ▸ last) (From∞.force k) (real-▸ r plain-last rr) (close-ok r rr le (From∞.force k)) x x′ lt
+      asc-b τ r i (close k) rr le _           at-skip      ()
+
+      asc-f : ∀ {t y y′ e₁ e₂} τ e (m : From A t) → Real e → FrOk τ e m
+            → (x : InE (frames τ e m) y e₁) (x′ : InE (frames τ e m) y′ e₂) → depth x < depth x′ → y ≺ y′
+      asc-f τ e done        re _  at-end at-end ()
+      asc-f τ e quiet       re _  ()     _      _
+      asc-f τ e (at t′ _ b) re ok x      x′     lt = asc-b τ (fired (τ + t′) e) 0 b (re , ok) ≤-refl x x′ lt
 
     -- One event at a position.
     mutual
@@ -219,6 +250,12 @@ private
       la (at (suc n) le b) xc x = la-f (tick p) (p ⊕ [ last ]) (at (suc n) le b) (real-snoc p plain-last rp) (late-ok n {le} {b}) xc x
       la done              xc x = la-f {0} (tick p) (p ⊕ [ last ]) done (real-snoc p plain-last rp) tt xc x
       la quiet             xc x = la-f {0} (tick p) (p ⊕ [ last ]) quiet (real-snoc p plain-last rp) tt xc x
+
+      asc : ∀ (m : From A 0) {y y′ e e′} (x : InE (start p m) y e) (x′ : InE (start p m) y′ e′) → depth x < depth x′ → y ≺ y′
+      asc (at zero _ b)     x x′ lt = asc-b (tick p) (nested p) 0 b rp (m≤m+n (tick p) 0) x x′ lt
+      asc (at (suc n) le b) x x′ lt = asc-f (tick p) (p ⊕ [ last ]) (at (suc n) le b) (real-snoc p plain-last rp) (late-ok n {le} {b}) x x′ lt
+      asc done              x x′ lt = asc-f {0} (tick p) (p ⊕ [ last ]) done (real-snoc p plain-last rp) tt x x′ lt
+      asc quiet             x x′ lt = asc-f {0} (tick p) (p ⊕ [ last ]) quiet (real-snoc p plain-last rp) tt x x′ lt
 
       pre : ∀ (m : From A 0) {q y e e′} (x : InE (start p m) q e) → InE (start p m) y e′ → y ≺ q → y ∈ upTo x
       pre (at zero _ b)     x x′ yq = pre-b (tick p) (nested p) 0 b rp (m≤m+n (tick p) 0) x x′ yq
@@ -325,6 +362,12 @@ burst-lb {A} = CI.lb-b {A} (λ _ → ⊥) (frame ∙ [])
 -- each.
 cold-reach : ∀ {A} p (m : From A 0) → Real p → ∀ {q e} (x : InE (start p m) q e) → Reach (InE (start p m)) q e
 cold-reach {A} p m rp x = upTo x , λ x′ yq _ → CI.S.pre {A} (λ _ → ⊥) p rp m x x′ yq
+
+-- A cold stream from a reachable subscription runs in order: a deeper
+-- row lies later.
+cold-asc : ∀ {A} p (m : From A 0) → Real p → ∀ {y y′ e e′} (x : InE (start p m) y e) (x′ : InE (start p m) y′ e′)
+         → depth x < depth x′ → y ≺ y′
+cold-asc {A} p m rp = CI.S.asc {A} (λ _ → ⊥) p rp m
 
 -- The next frame's root, past a reachable burst's end.
 next-real : ∀ τ {t′} r → RealR r → tickᴿ r < τ + t′ → RealR (fired (τ + t′) (r ▸ last))

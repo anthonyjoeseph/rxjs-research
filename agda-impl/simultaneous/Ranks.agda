@@ -50,6 +50,7 @@ open import simultaneous.Readings using (instantOf; stamped; closed)
 open import simultaneous.Relations using (Met; values; ranked; Rank; Before; stampedᴮ; events; elaborated; batched; batchedObs)
 open import simultaneous.Instants using (_≺ⁱ_; Sorted; irrⁱ; transⁱ; triⁱ; frame-least; insertⁱ; sorted-insert; ∈-insert⁻; ∈-insert⁺; sorted-⊆; sorted-⊂; ≺-instant; instant-≺)
 open import simultaneous.Protocol using (named)
+open import simultaneous.Listing using (Listed; Listing; listed)
 import simultaneous.Spec as Spec
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (elaborate)
@@ -139,14 +140,6 @@ carried-rel {rs = (q , pin _) ∷ _}                          (_ ∷ run)       
 
 ------------------------------------------------------------------------
 -- A rank, read off the rows before it
-
--- The rows before `q`, every one and nothing else.
-Listed : ∀ {A} → EmissionSet A → Pos → Set
-Listed t q = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ≺ q → k ∈ ks) × (∀ {k} → k ∈ ks → k ≺ q × Σ _ (t k))
-
--- Wherever finitely many rows precede, they are listed.
-Listing : ∀ {A} → EmissionSet A → Set
-Listing t = ∀ {q} → Few t q → Listed t q
 
 -- The subscribe frame and every listed position's instant, in order.
 instantsOf : List Pos → List Instant
@@ -278,22 +271,14 @@ module _ {A : Set} {t : EmissionSet A} (few : ∀ {q e} → t q e → Visible e 
 ------------------------------------------------------------------------
 -- The elaborated run's names agree with its ranks
 
--- THE ROWS OF A PROGRAM'S READING ARE LISTED: wherever finitely many
--- precede, which positions of a cover hold one is decided.  Owed operator
--- by operator, in the plain program, its elaboration and the batcher.
-postulate
-  listed-e : ∀ {A} (o : SObs [] A) → Listing (events o)
-  listed-x : ∀ {A} (o : SObs [] A) → Listing (elaborated o)
-  listed-b : ∀ {A} (o : SObs [] A) → Listing (batched o)
-
 ranks-e : ∀ {A} (o : SObs [] A) → Ranks (events o)
-ranks-e o = ranks (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed-e o {q})
+ranks-e o = ranks (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed o {q})
 
 ranks-x : ∀ {A} (o : SObs [] A) → Ranks (elaborated o)
-ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed-x o {q})
+ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed (elaborate o) {q})
 
 ranks-b : ∀ {A} (o : SObs [] A) → Ranks (batched o)
-ranks-b o = ranks (λ {q} {e} → enter-few (⟦ batchedObs o ⟧ []) root {q} {e}) (λ {q} → listed-b o {q})
+ranks-b o = ranks (λ {q} {e} → enter-few (⟦ batchedObs o ⟧ []) root {q} {e}) (λ {q} → listed (batchedObs o) {q})
 
 -- THE VALUES OF ONE INSTANT CARRY ONE NAME: each carries its instant's
 -- last begin, or the root through the subscribe burst.

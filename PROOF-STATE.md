@@ -92,12 +92,3 @@ mark to sit in the instant it releases. Settled when `batch-rank` is a
 body over the layers and the release protocol.
 
 Members: `batch-rank`.
-
-#### THE RANKS
-
-Untried: wherever finitely many rows of a program's reading precede a
-position, which positions of the cover hold a row is decided — the
-exact listing a rank is read off. Settled when each is a body operator
-by operator, through the elaboration and the batcher.
-
-Members: `listed-e`, `listed-x`, `listed-b`.
