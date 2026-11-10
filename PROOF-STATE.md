@@ -34,24 +34,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Untried: each former's elaborated run carries its plain one along a
-map of positions it extends over its own worlds, relative to the
-environment's binders (`Carry`). Most open: finiteness past a carrier
-through a connect — the body's carriers bound the source only up to the
-body's end, so `spent` may need a bound. Then switch, exhaust and the
-bounded queue; the wrapper. Settled when each former's leaf is a body.
+Untried: each former's elaborated run carries its plain one (`Carry`),
+extending an order embedding of positions over its own worlds. Most
+open: the embedding past a former's children, which meet the rest of
+the map only through their worlds' bases (subscription, hot rows read,
+timers started), and a concat's queued lane, re-anchored under its
+wrapper's end: flatMap first. Settled when each former's leaf is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
 `carry-cold`, `carry-takeWhile`, `carry-scan`, `carry-of`,
 `carry-empty`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
-
-#### THE ORDER EMBEDDING
-
-Untried: a homomorphic map of positions keeps their order and instants
-and reflects leading, by structural recursion on the position; two
-positions apart stay apart below. Settled when each is a body.
-
-Members: `hom-mono`, `hom-prefix`, `hom-inst`, `apart`.
 
 #### THE PROTOCOL
 

@@ -4,11 +4,8 @@
 -- each node of the plain program deeper, under wrappers of its own, so a
 -- plain position and its elaborated counterpart differ by inserted path.
 -- A map of positions `M` puts each plain position the run uses on the
--- elaborated subscription of the node it belongs to: step by step, a
--- label on a label of the same kind (a `sub` on the image of the
--- position it names), each after an insertion; an instant on the instant
--- of the image of its creator, at the same tick and label.  Such a map
--- (`Hom`) keeps the order and the instants, and reflects leading.
+-- elaborated subscription of the node it belongs to, keeping the order
+-- and the instants, and reflecting leading (`Emb`).
 --
 -- A subterm is carried (`CarryAt`) when every row of its plain run is
 -- carried by a row of its elaborated run lying under its position's
@@ -40,16 +37,17 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool using (T)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Path; Label; Instant; ix; sub; last; frame; cascade; _∙_; _⊕_; root; _<ˡ_)
+open import denotation.Position using (Pos; Path; ix; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt)
+open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op)
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W; _⊑_; ⊕-identityʳ; world-after; step≢root)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W; _⊑_; ⊕-identityʳ; world-after)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent; events; elaborated)
@@ -70,47 +68,43 @@ PMap = Pos → Pos → Set
 _⊆ᴹ_ : PMap → PMap → Set
 M ⊆ᴹ N = ∀ {x y} → M x y → N x y
 
--- A label on its image: a plain label on itself, a `sub` on the image of
--- the subscription it names.
-data LabelAt (M : PMap) : Label → Label → Set where
-  ix≈   : ∀ {i} → LabelAt M (ix i) (ix i)
-  last≈ : LabelAt M last last
-  sub≈  : ∀ {e e′} → M e e′ → LabelAt M (sub e) (sub e′)
-
--- An instant on its image: a cascade at the same tick and label, created
--- at the image of its creator.
-data InstAt (M : PMap) : Instant → Instant → Set where
-  frame≈   : InstAt M frame frame
-  cascade≈ : ∀ {t e e′ l} → M e e′ → InstAt M (cascade t e l) (cascade t e′ l)
-
--- Both labels name subscriptions.
-Joined : Label → Label → Set
-Joined (sub _) (sub _) = ⊤
-Joined _       _       = ⊥
-
--- A HOMOMORPHIC MAP: functional; each instant on its image; each step
--- after its parent's image, past an insertion; two `sub` siblings past
--- one insertion; any other two siblings kept apart, in order.
-record Hom (M : PMap) : Set where
+-- AN ORDER EMBEDDING: keeping the order, reflecting leading, and keeping
+-- instants apart exactly when they were.  A global law, since the
+-- elaboration does not nest as the plain run does.
+--
+-- DEAD ROUTE: a homomorphic map, each step after its parent's image past
+--   an insertion, siblings kept apart, from which these would follow by
+--   recursion on positions.  A concat's queued lane hangs, plain, under
+--   the previous lane's end; elaborated, under the end of that lane's
+--   wrapper, which in a synchronous run is the wrapper's outer end, a
+--   sibling branch of the inner lane's end.  No image of the plain end
+--   both prefixes the queued lane's and follows the first lane's
+--   subscription.
+record Emb (M : PMap) : Set where
   field
-    fun   : ∀ {x y y′} → M x y → M x y′ → y ≡ y′
-    inst  : ∀ {x y} → M x y → InstAt M (instantOf x) (instantOf y)
-    step  : ∀ {z a y} → M (z ⊕ [ a ]) y
-          → Σ Pos λ z′ → Σ Path λ w → Σ Label λ a′ → M z z′ × y ≡ z′ ⊕ (w ++ [ a′ ]) × LabelAt M a a′
-    joins : ∀ {z e d y y′} → M (z ⊕ [ sub e ]) y → M (z ⊕ [ sub d ]) y′
-          → Σ Pos λ v → Σ Label λ a → Σ Label λ b → y ≡ v ⊕ [ a ] × y′ ≡ v ⊕ [ b ]
-    split : ∀ {z a b y y′} → ¬ Joined a b → T (a <ˡ b) → M (z ⊕ [ a ]) y → M (z ⊕ [ b ]) y′ → y ≺ y′ × ¬ (y ⊑ y′)
+    mono    : ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
+    reflect : ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
+    inst    : ∀ {x x′ y y′} → M x y → M x′ y′ → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′)
 
--- THE MAP IS AN ORDER EMBEDDING, keeping instants apart exactly when
--- they were, and a position leads another's image only as it led it.
-postulate
-  hom-mono   : ∀ {M} → Hom M → ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
-  hom-prefix : ∀ {M} → Hom M → ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
-  hom-inst   : ∀ {M} → Hom M → ∀ {x x′ y y′} → M x y → M x′ y′ → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′)
+private
+  lt-of : ∀ {c} → T (isLt c) → c ≡ lt
+  lt-of {lt} _ = refl
+
+  path-apart : ∀ p q σ σ′ → cmpPath p q ≡ lt → (∀ zs → q ≡ p ++ zs → ⊥) → cmpPath (p ++ σ) (q ++ σ′) ≡ lt
+  path-apart []      q       σ σ′ h  np = ⊥-elim (np q refl)
+  path-apart (a ∷ p) (b ∷ q) σ σ′ h  np with cmpLabel a b in c
+  ... | lt = refl
+  ... | eq with eqˡ a b c
+  ...   | refl = path-apart p q σ σ′ h (λ zs e → np zs (cong (a ∷_) e))
+  path-apart (a ∷ p) (b ∷ q) σ σ′ () np | gt
 
 -- Two positions apart keep their order below them.
-postulate
-  apart : ∀ {y y′} → y ≺ y′ → ¬ (y ⊑ y′) → ∀ σ σ′ → (y ⊕ σ) ≺ (y′ ⊕ σ′)
+apart : ∀ {y y′} → y ≺ y′ → ¬ (y ⊑ y′) → ∀ σ σ′ → (y ⊕ σ) ≺ (y′ ⊕ σ′)
+apart {i ∙ p} {j ∙ q} h np σ σ′ with cmpInstant i j in c
+... | lt = tt
+... | eq with eqⁱ i j c
+...   | refl = subst (λ x → T (isLt x)) (sym (path-apart p q σ σ′ (lt-of h) (λ zs e → np (zs , cong (i ∙_) e)))) tt
+apart {i ∙ p} {j ∙ q} () np σ σ′ | gt
 
 instant-⊕ : ∀ x zs → instantOf (x ⊕ zs) ≡ instantOf x
 instant-⊕ (i ∙ p) zs = refl
@@ -201,10 +195,10 @@ private
     ...   | k-end = lb {c} bc
 
     few→ : ∀ {k} → Few a k → Few b k
-    few→ (ks , F) = ks , λ bk lt → F (proj₁ (proj₂ (fro bk))) lt
+    few→ (ks , F) = ks , λ bk kk → F (proj₁ (proj₂ (fro bk))) kk
 
     few← : ∀ {k} → Few b k → Few a k
-    few← (ks , F) = ks , λ ak lt → F (proj₁ (proj₂ (to ak))) lt
+    few← (ks , F) = ks , λ ak kk → F (proj₁ (proj₂ (to ak))) kk
 
   unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
   unp← k-out  _ = tt
@@ -335,7 +329,7 @@ map-carry g d d′ p p′ c =
 -- With no environment, a run carried along an order embedding, from a
 -- subscription its map puts under the other's, is attributed: the order,
 -- the instants and the home instant come from the map's.
-module _ {A : Set} {M : PMap} (hm : Hom M) {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos}
+module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos}
          (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥)
          (δ : Path) (at : M s (s′ ⊕ δ)) (c : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) t u s s′) where
   open CarryAt c
@@ -365,9 +359,9 @@ module _ {A : Set} {M : PMap} (hm : Hom M) {t : EmissionSet A} {u : EmissionSet 
       where
         go : ∀ {k₁ e} → t k₁ e → k₁ ∈ ks₁ ++ k ∷ ks₂
         go {k₁} tk with T? (k₁ <ᵖ k)
-        ... | yes lt = ∈-++⁺ˡ (f₁ tk lt)
+        ... | yes kk = ∈-++⁺ˡ (f₁ tk kk)
         ... | no ge with ≼-split {k} {k₁} ge
-        ...   | inj₁ gt   = ∈-++⁺ʳ ks₁ (there (proj₁ (f₂ tk gt)))
+        ...   | inj₁ kk   = ∈-++⁺ʳ ks₁ (there (proj₁ (f₂ tk kk)))
         ...   | inj₂ refl = ∈-++⁺ʳ ks₁ (here refl)
 
     -- Then each row of `u` is owed to one of them or to the subscription.
@@ -385,19 +379,19 @@ module _ {A : Set} {M : PMap} (hm : Hom M) {t : EmissionSet A} {u : EmissionSet 
   img-mono′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
   img-mono′ i i′ kk with ext i | ext i′
   ... | y , my , σ , refl | y′ , my′ , σ′ , refl =
-    apart (hom-mono hm my my′ kk) (λ yy → led-row i i′ kk (hom-prefix hm my my′ yy)) σ σ′
+    apart (Emb.mono hm my my′ kk) (λ yy → led-row i i′ kk (Emb.reflect hm my my′ yy)) σ σ′
 
   inst′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → (instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′)
   inst′ i i′ with inst-img i | inst-img i′
   ... | y , my , e | y′ , my′ , e′ = mk⇔
-    (λ ll → to (hom-inst hm my my′) (trans (sym e) (trans ll e′)))
-    (λ kk → trans e (trans (from (hom-inst hm my my′) kk) (sym e′)))
+    (λ ll → to (Emb.inst hm my my′) (trans (sym e) (trans ll e′)))
+    (λ kk → trans e (trans (from (Emb.inst hm my my′) kk) (sym e′)))
 
   home′ : ∀ {k l} → Img k l → (instantOf l ≡ instantOf s′ ⇔ instantOf k ≡ instantOf s)
   home′ i with inst-img i
   ... | y , my , e = mk⇔
-    (λ ls → to (hom-inst hm my at) (trans (sym e) (trans ls (sym (instant-⊕ s′ δ)))))
-    (λ ks → trans e (trans (from (hom-inst hm my at) ks) (instant-⊕ s′ δ)))
+    (λ ls → to (Emb.inst hm my at) (trans (sym e) (trans ls (sym (instant-⊕ s′ δ)))))
+    (λ ks → trans e (trans (from (Emb.inst hm my at) ks) (instant-⊕ s′ δ)))
 
   attributed : Attribution Every (One valuesOf) (Reads valuesOf) t u s s′
   attributed = record
@@ -464,9 +458,9 @@ Within HP HE M₀ M p p′ = ∀ {x y} → M x y → M₀ x y ⊎ (W HP p x × W
 record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
-                → ∀ M₀ → Hom M₀ → EnvRel M₀ ρ envP envE
+                → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
                 → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) (Hots envE) M₀ p p′
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Hom M × Within (Hots envP) (Hots envE) M₀ M p p′
+                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) (Hots envE) M₀ M p p′
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (ev m o envP) p) (enter (ev m (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
@@ -540,22 +534,20 @@ coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 -- completion concatenated, the restamp, each rides in the core's instants
 -- and shows nothing, and the whole ends where the core does.
 postulate
-  carry-wrap : ∀ {A} (o : SObs [] A) {M} → Hom M → M root coreAt
+  carry-wrap : ∀ {A} (o : SObs [] A) {M} → Emb M → M root coreAt
              → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (enter (⟦ elab (λ i → i) (plain o) ⟧ []) coreAt) root coreAt
              → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (elaborated o) root root
 
--- The plain run's subscription paired with the core's: no step, no
--- siblings, both at the subscribe instant, neither in its own world.
+-- The plain run's subscription paired with the core's: one pair, in
+-- neither world.
 At₀ : PMap
 At₀ x y = x ≡ root × y ≡ coreAt
 
-hom-At₀ : Hom At₀
-hom-At₀ = record
-  { fun   = λ { (refl , refl) (refl , refl) → refl }
-  ; inst  = λ { (refl , refl) → frame≈ }
-  ; step  = λ { {z} (e , _) → ⊥-elim (step≢root z frame e) }
-  ; joins = λ { {z} (e , _) _ → ⊥-elim (step≢root z frame e) }
-  ; split = λ { {z} _ _ (e , _) _ → ⊥-elim (step≢root z frame e) }
+emb-At₀ : Emb At₀
+emb-At₀ = record
+  { mono    = λ { (refl , refl) (refl , refl) rr → ⊥-elim (≺-irrefl {root} rr) }
+  ; reflect = λ { (refl , refl) (refl , refl) _ → [] , refl }
+  ; inst    = λ { (refl , refl) (refl , refl) → mk⇔ (λ _ → refl) (λ _ → refl) }
   }
 
 fresh-At₀ : Fresh (λ _ → ⊥) (λ _ → ⊥) At₀ root coreAt

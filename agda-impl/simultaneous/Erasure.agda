@@ -54,7 +54,7 @@ open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (InvAt)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
-open import simultaneous.Carry using (Carry; carry-⟦⟧; At₀; hom-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
+open import simultaneous.Carry using (Carry; carry-⟦⟧; At₀; emb-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
 open Values using (Nth; Next; first; next)
@@ -305,7 +305,7 @@ single-values (instEmit (mark _) _)  = inj₁ refl
 --   many carriers, so no reader reaches it to put it anywhere; only rows
 --   a reader reaches are placed, each in the instant of a carrier.
 erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
-erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ hom-At₀ (λ ())
+erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ())
                  root coreAt (refl , refl) (tt , λ ()) (tt , λ ()) fresh-At₀
 ... | M , ms , hm , _ , c =
   attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
