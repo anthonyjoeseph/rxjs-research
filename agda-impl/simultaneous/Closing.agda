@@ -12,6 +12,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++; ∈-++⁻; ∈-map⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
 open import Data.Bool.Properties using (T?)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
@@ -544,7 +545,7 @@ postulate
 module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R : Release o rs q)
                 (xq : Σ (IE A) λ x → elaborated o q (out x)) where
   open Release R
-  open Reached (⟦ elaborate o ⟧ []) root (inv-⟦⟧ (elaborate o) [] (λ ()) root (tt , λ ())) using (seen)
+  open Reached (⟦ elaborate o ⟧ []ᴬ) root (inv-⟦⟧ (elaborate o) []ᴬ (λ ()) root (tt , λ ())) using (seen)
 
   X = elaborated o
 
@@ -642,7 +643,7 @@ releases {A} o {rx} mxr cl ne = go (lastValue valuesOf rx) refl cl
   where
     X = elaborated o
     mx = proj₂ (ranks-x o) mxr
-    open Reached (⟦ elaborate o ⟧ []) root (inv-⟦⟧ (elaborate o) [] (λ ()) root (tt , λ ())) using (seen)
+    open Reached (⟦ elaborate o ⟧ []ᴬ) root (inv-⟦⟧ (elaborate o) []ᴬ (λ ()) root (tt , λ ())) using (seen)
 
     leave : ∀ {q} → Σ (IE A) (λ x → X q (out x)) → Exits X q → Σ _ λ ext → Met X (unrank rx ++ ext) × Gone o q (unrank rx ++ ext)
     leave _ (inj₁ (k , e , ((xk , _) , fk) , qk , ne′)) with pass o mx fk
