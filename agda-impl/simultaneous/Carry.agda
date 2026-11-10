@@ -41,13 +41,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Path; ix; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt)
+open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op;
+  Truncate; InE; at-end)
+import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
-open import denotation.Laws.Modulus using (≺-irrefl)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W; _⊑_; ⊕-identityʳ; world-after)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext; ≼-refl)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; inW; step; plain-last; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼;
+  ⊑-cmp; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent; events; elaborated)
@@ -82,6 +85,7 @@ M ⊆ᴹ N = ∀ {x y} → M x y → N x y
 --   subscription.
 record Emb (M : PMap) : Set where
   field
+    fun     : ∀ {x y y′} → M x y → M x y′ → y ≡ y′
     mono    : ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
     reflect : ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
     inst    : ∀ {x x′ y y′} → M x y → M x′ y′ → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′)
@@ -108,6 +112,107 @@ apart {i ∙ p} {j ∙ q} () np σ σ′ | gt
 
 instant-⊕ : ∀ x zs → instantOf (x ⊕ zs) ≡ instantOf x
 instant-⊕ (i ∙ p) zs = refl
+
+_∪ᴹ_ : PMap → PMap → PMap
+(M ∪ᴹ N) x y = M x y ⊎ N x y
+
+-- `x` lies at or under a position of the world with `p`.
+Below : (Pos → Set) → Pos → Pos → Set
+Below H p x = Σ Pos λ w → W⁼ H p w × w ⊑ x
+
+-- The map so far touches nothing at or under the world but the
+-- subscription itself.
+Fresh : (Pos → Set) → PMap → Pos → Set
+Fresh H M₀ p = ∀ {x y} → M₀ x y → Below H p x → x ≡ p
+
+private
+  module Under {H : Pos → Set} {M₀ N : PMap} {p p₀ p′ : Pos} (E₀ : Emb M₀) (fr : Fresh H M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) (E : Emb N)
+               (sh : ∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′)) where
+
+    -- What `N` adds lies strictly under the subscription and its image.
+    dom : ∀ {x y} → N x y → p ⊑ x × p ≺ x
+    dom n with sh n
+    ... | a , σ , _ , _ , refl , _ = (a ∷ σ , refl) , ≺-ext p σ
+
+    img : ∀ {x y} → N x y → p₀ ⊑ y × p₀ ≺ y
+    img n with sh n
+    ... | _ , _ , b , σ′ , _ , refl = ⊑-trans pp (b ∷ σ′ , refl) , ≼-≺-≺ {p₀} {p′} {p′ ⊕ (b ∷ σ′)} (⊑-≼ pp) (≺-ext p′ σ′)
+
+    -- An old position under the subscription is the subscription.
+    at : ∀ {x y} → M₀ x y → p ⊑ x → x ≡ p
+    at m px = fr m (p , here , px)
+
+    at-img : ∀ {x y} → M₀ x y → p ⊑ x → y ≡ p₀
+    at-img m px with at m px
+    ... | refl = Emb.fun E₀ m m₀
+
+    -- An old position not under the subscription is apart from it.
+    side : ∀ {x} → ¬ (p ⊑ x) → x ≡ p → ⊥
+    side np refl = np (⊑-refl p)
+
+    -- Below an image strictly under `p₀`, an old image before `p₀` stays before.
+    before : ∀ {y₀ y} → y₀ ≺ p₀ → p₀ ⊑ y → p₀ ≺ y → y₀ ≺ y
+    before {y₀} {y} yp (δ , refl) py with T? (inside y₀ p₀)
+    ... | yes i = ≼-≺-≺ {y₀} {p₀} {y} (⊑-≼ (inside-⊑ y₀ p₀ i)) py
+    ... | no ni = subst (_≺ (p₀ ⊕ δ)) (⊕-identityʳ y₀) (apart {y₀} {p₀} yp (λ q → ni (⊑-inside q)) [] δ)
+
+    mono₀ : ∀ {x₀ y₀ x y} → M₀ x₀ y₀ → N x y → x₀ ≺ x → y₀ ≺ y
+    mono₀ {x₀} {y₀} {x} {y} m n xx with T? (inside p x₀)
+    ... | yes i rewrite at-img m (inside-⊑ p x₀ i) = proj₂ (img n)
+    ... | no ni with T? (x₀ <ᵖ p)
+    ...   | yes xp = before {y₀} {y} (Emb.mono E₀ m m₀ xp) (proj₁ (img n)) (proj₂ (img n))
+    ...   | no px with ≼-split {p} {x₀} px
+    ...     | inj₂ e = ⊥-elim (side (λ q → ni (⊑-inside q)) (sym e))
+    ...     | inj₁ lt′ with dom n
+    ...       | (σ , refl) , _ =
+      ⊥-elim (≺-irrefl {x₀} (≺-trans {x₀} {p ⊕ σ} {x₀} xx
+        (subst ((p ⊕ σ) ≺_) (⊕-identityʳ x₀) (apart {p} {x₀} lt′ (λ q → ni (⊑-inside q)) σ []))))
+
+    mono₁ : ∀ {x y x₀ y₀} → N x y → M₀ x₀ y₀ → x ≺ x₀ → y ≺ y₀
+    mono₁ {x} {y} {x₀} {y₀} n m xx with T? (inside p x₀)
+    ... | yes i rewrite at m (inside-⊑ p x₀ i) = ⊥-elim (≺-irrefl {x} (≺-trans {x} {p} {x} xx (proj₂ (dom n))))
+    ... | no ni with proj₁ (img n)
+    ...   | δ , refl =
+      subst ((p₀ ⊕ δ) ≺_) (⊕-identityʳ y₀)
+        (apart {p₀} {y₀} (Emb.mono E₀ m₀ m (≺-trans {p} {x} {x₀} (proj₂ (dom n)) xx))
+               (λ q → ni (⊑-inside (Emb.reflect E₀ m₀ m q))) δ [])
+
+    reflect₀ : ∀ {x₀ y₀ x y} → M₀ x₀ y₀ → N x y → y₀ ⊑ y → x₀ ⊑ x
+    reflect₀ {x₀} {y₀} m n yy with ⊑-cmp y₀ p₀ yy (proj₁ (img n))
+    ... | inj₁ yp = ⊑-trans (Emb.reflect E₀ m m₀ yp) (proj₁ (dom n))
+    ... | inj₂ py rewrite at m (Emb.reflect E₀ m₀ m py) = proj₁ (dom n)
+
+    reflect₁ : ∀ {x y x₀ y₀} → N x y → M₀ x₀ y₀ → y ⊑ y₀ → x ⊑ x₀
+    reflect₁ {x} {y} n m yy with Emb.reflect E₀ m₀ m (⊑-trans (proj₁ (img n)) yy)
+    ... | px = ⊥-elim (⊑-≼ (subst (y ⊑_) (at-img m px) yy) (proj₂ (img n)))
+
+    inst₀ : ∀ {x₀ y₀ x y} → M₀ x₀ y₀ → N x y → (instantOf y₀ ≡ instantOf y ⇔ instantOf x₀ ≡ instantOf x)
+    inst₀ {x₀} {y₀} {x} {y} m n with proj₁ (dom n) | proj₁ (img n)
+    ... | σ , refl | δ , refl rewrite instant-⊕ p σ | instant-⊕ p₀ δ = Emb.inst E₀ m m₀
+
+    sym⇔ : ∀ {a b c d : Instant} → (a ≡ b ⇔ c ≡ d) → (b ≡ a ⇔ d ≡ c)
+    sym⇔ e = mk⇔ (λ q → sym (to e (sym q))) (λ q → sym (from e (sym q)))
+
+    emb : Emb (M₀ ∪ᴹ N)
+    emb = record
+      { fun     = λ { (inj₁ m) (inj₁ m′) → Emb.fun E₀ m m′
+                    ; (inj₂ n) (inj₂ n′) → Emb.fun E n n′
+                    ; (inj₁ m) (inj₂ n) → ⊥-elim (≺-irrefl {p} (subst (p ≺_) (at m (proj₁ (dom n))) (proj₂ (dom n))))
+                    ; (inj₂ n) (inj₁ m) → ⊥-elim (≺-irrefl {p} (subst (p ≺_) (at m (proj₁ (dom n))) (proj₂ (dom n)))) }
+      ; mono    = λ { (inj₁ m) (inj₁ m′) → Emb.mono E₀ m m′ ; (inj₂ n) (inj₂ n′) → Emb.mono E n n′
+                    ; (inj₁ m) (inj₂ n) → mono₀ m n ; (inj₂ n) (inj₁ m) → mono₁ n m }
+      ; reflect = λ { (inj₁ m) (inj₁ m′) → Emb.reflect E₀ m m′ ; (inj₂ n) (inj₂ n′) → Emb.reflect E n n′
+                    ; (inj₁ m) (inj₂ n) → reflect₀ m n ; (inj₂ n) (inj₁ m) → reflect₁ n m }
+      ; inst    = λ { (inj₁ m) (inj₁ m′) → Emb.inst E₀ m m′ ; (inj₂ n) (inj₂ n′) → Emb.inst E n n′
+                    ; (inj₁ m) (inj₂ n) → inst₀ m n ; (inj₂ n) (inj₁ m) → sym⇔ (inst₀ m n) }
+      }
+
+-- A MAP GROWN UNDER A SUBSCRIPTION it holds fresh, at an image the
+-- elaborated subscription extends: what it adds lies strictly under both.
+emb-under : ∀ {H M₀ N p p₀ p′} → Emb M₀ → Fresh H M₀ p → M₀ p p₀ → p₀ ⊑ p′ → Emb N
+          → (∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′))
+          → Emb (M₀ ∪ᴹ N)
+emb-under E₀ fr m₀ pp E sh = Under.emb E₀ fr m₀ pp E sh
 
 ------------------------------------------------------------------------
 -- A subterm carried
@@ -442,13 +547,9 @@ record Bound (M₀ : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ w
 EnvRel : ∀ {Γ Δ} → PMap → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → DenEnv Γ → DenEnv Δ → Set₁
 EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (lookup envP i) (lookup envE (ρ (∈-map⁺ AIE i)))
 
--- The map so far touches neither world.
-Fresh : (Pos → Set) → (Pos → Set) → PMap → Pos → Pos → Set
-Fresh HP HE M₀ p p′ = ∀ {x y} → M₀ x y → ¬ W HP p x × ¬ W HE p′ y
-
--- What the map adds lies in the two worlds.
-Within : (Pos → Set) → (Pos → Set) → PMap → PMap → Pos → Pos → Set
-Within HP HE M₀ M p p′ = ∀ {x y} → M x y → M₀ x y ⊎ (W HP p x × W HE p′ y)
+-- What the map adds lies in the world with the subscription.
+Within : (Pos → Set) → PMap → PMap → Pos → Set
+Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ W⁼ H p x
 
 -- CARRIED under every environment of carried binders: subscribed at
 -- admissible positions the map pairs, its worlds untouched, the subterm
@@ -459,8 +560,8 @@ record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → 
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
                 → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
-                → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) (Hots envE) M₀ p p′
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) (Hots envE) M₀ M p p′
+                → ∀ p p′ → (Σ Pos λ p₀ → M₀ p p₀ × p₀ ⊑ p′) → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
+                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (ev m o envP) p) (enter (ev m (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
@@ -470,7 +571,6 @@ record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → 
 -- do, under the meaning and under every approximant alike.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
-  carry-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
   carry-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → Carry m ρ (of xs)
   carry-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
@@ -487,6 +587,73 @@ carry-map nothing ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ 
 carry-map (just n) ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
   let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
   in M , ms , hm′ , wi , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+
+-- An end alone at `q`.
+private
+  EndAt : ∀ {X : Set} → Pos → EmissionSet X
+  EndAt q = Truncate (InE (Evs.end q))
+
+  end-row : ∀ {X : Set} q → EndAt {X} q q end
+  end-row q = at-end , [] , λ { at-end kq _ → ⊥-elim (≺-irrefl {q} kq) }
+
+  end-few : ∀ {X : Set} q → Few (EndAt {X} q) q
+  end-few q = [] , λ { (at-end , _) kq → ⊥-elim (≺-irrefl {q} kq) }
+
+  match-end : ∀ {A : Set} → Match {A = A} {B = IE A} Every (One valuesOf) (Reads valuesOf) end end
+  match-end = (λ _ → refl) , (λ ns _ → ns tt)
+
+  -- The single end, carried end on end.
+  module Ended {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+    N : PMap
+    N x y = x ≡ p ⊕ [ last ] × y ≡ p′ ⊕ [ last ]
+
+    M : PMap
+    M = M₀ ∪ᴹ N
+
+    emb : Emb M
+    emb = emb-under {N = N} E₀ fr m₀ pp
+      (record { fun     = λ { (refl , refl) (refl , refl) → refl }
+              ; mono    = λ { (refl , refl) (refl , refl) xx → ⊥-elim (≺-irrefl {p ⊕ [ last ]} xx) }
+              ; reflect = λ { (refl , refl) (refl , refl) _ → ⊑-refl (p ⊕ [ last ]) }
+              ; inst    = λ { (refl , refl) (refl , refl) → mk⇔ (λ _ → refl) (λ _ → refl) } })
+      λ { (refl , refl) → last , [] , last , [] , refl , refl }
+
+    within : Within HP M₀ M p
+    within (inj₁ m)          = inj₁ m
+    within (inj₂ (refl , _)) = inj₂ (inW (step here plain-last))
+
+    carried : CarryAt valuesOf M HP HE (EndAt {A} (p ⊕ [ last ])) (EndAt {IE A} (p′ ⊕ [ last ])) p p′
+    carried = record
+      { Img     = N
+      ; ext     = λ { (refl , refl) → p′ ⊕ [ last ] , inj₂ (refl , refl) , ⊑-refl _ }
+      ; img     = λ { (at-end , _) _ _ _ → p′ ⊕ [ last ] , (refl , refl) , end , end-row _ , end-few _ , match-end }
+      ; shown   = λ { (at-end , _) _ _ _ → p ⊕ [ last ] , (refl , refl) , end , end-row _ , match-end }
+      ; img-row = λ { (refl , refl) → end , end-row _ , tt }
+      ; img-fun = λ { (refl , refl) (refl , refl) → refl }
+      ; place   = λ { (at-end , _) _ _ → inj₁ (instant-⊕ p′ [ last ]) }
+      ; live    = λ { (refl , refl) _ (at-end , _) → ≼-refl {p′ ⊕ [ last ]} }
+      ; few     = λ { (refl , refl) → end-few _ }
+      ; cause   = λ _ → row (p ⊕ [ last ])
+      ; owes    = λ { (at-end , _) → (end , end-row _) , p′ ⊕ [ last ] , inj₂ (refl , refl) , refl }
+      ; fib     = λ _ → [ p′ ⊕ [ last ] ]
+      ; in-fib  = λ { (at-end , _) → here refl }
+      ; read    = λ _ ()
+      ; bk      = λ _ → [ p ⊕ [ last ] ]
+      ; in-bk   = λ { (refl , refl) → here refl }
+      ; pbk     = λ _ → []
+      ; pinned  = λ { (() , _) _ }
+      }
+
+  empty-carried : ∀ {A HP HE M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
+                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
+                  × CarryAt valuesOf M HP HE (EndAt {A} (p ⊕ [ last ])) (EndAt {IE A} (p′ ⊕ [ last ])) p p′
+  empty-carried {A} {HP} {HE} E₀ fr m₀ pp = X.M , inj₁ , X.emb , X.within , X.carried
+    where module X = Ended {A} {HP} {HE} E₀ fr m₀ pp
+
+-- THE EMPTY PROGRAM ends at once, on both sides.
+carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
+carry-empty nothing  ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → empty-carried e₀ fr m₀ pp
+carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → empty-carried e₀ fr m₀ pp
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
@@ -545,10 +712,11 @@ At₀ x y = x ≡ root × y ≡ coreAt
 
 emb-At₀ : Emb At₀
 emb-At₀ = record
-  { mono    = λ { (refl , refl) (refl , refl) rr → ⊥-elim (≺-irrefl {root} rr) }
+  { fun     = λ { (refl , refl) (refl , refl) → refl }
+  ; mono    = λ { (refl , refl) (refl , refl) rr → ⊥-elim (≺-irrefl {root} rr) }
   ; reflect = λ { (refl , refl) (refl , refl) _ → [] , refl }
   ; inst    = λ { (refl , refl) (refl , refl) → mk⇔ (λ _ → refl) (λ _ → refl) }
   }
 
-fresh-At₀ : Fresh (λ _ → ⊥) (λ _ → ⊥) At₀ root coreAt
-fresh-At₀ (refl , refl) = (λ w → ≺-irrefl {root} (world-after w tt)) , (λ w → ≺-irrefl {coreAt} (world-after w tt))
+fresh-At₀ : Fresh (λ _ → ⊥) At₀ root
+fresh-At₀ (refl , refl) _ = refl

@@ -306,7 +306,7 @@ single-values (instEmit (mark _) _)  = inj₁ refl
 --   a reader reaches are placed, each in the instant of a carrier.
 erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
 erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ())
-                 root coreAt (refl , refl) (tt , λ ()) (tt , λ ()) fresh-At₀
+                 root coreAt (coreAt , (refl , refl) , ([] , refl)) (tt , λ ()) (tt , λ ()) fresh-At₀
 ... | M , ms , hm , _ , c =
   attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
     (carry-wrap o hm (ms (refl , refl)) c)

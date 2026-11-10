@@ -43,7 +43,7 @@ wrapper's end: flatMap first. Settled when each former's leaf is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
 `carry-cold`, `carry-takeWhile`, `carry-scan`, `carry-of`,
-`carry-empty`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
+`carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
 
 #### THE PROTOCOL
 
