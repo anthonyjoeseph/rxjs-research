@@ -42,7 +42,7 @@ body's end, so `spent` may need a bound. Then switch, exhaust and the
 bounded queue; the wrapper. Settled when each former's leaf is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
-`carry-cold`, `carry-takeWhile`, `carry-map`, `carry-scan`, `carry-of`,
+`carry-cold`, `carry-takeWhile`, `carry-scan`, `carry-of`,
 `carry-empty`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
 
 #### THE ORDER EMBEDDING
