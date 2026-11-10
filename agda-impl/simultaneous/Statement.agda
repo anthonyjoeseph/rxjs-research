@@ -43,25 +43,11 @@ open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym) renaming (trans to ≡-trans)
 
 open import simultaneous.SObs using (SObs)
-open import simultaneous.Relations using (events; elaborated; batched; Met; ranked; Closes; Ends; joined; values;
-  stampedᴰ; stampedᴮ; grouped; Groups; Erases)
+open import simultaneous.Relations using (events; batched; Met; ranked; Closes; Ends; joined; values; stampedᴰ; stampedᴮ; grouped;
+  Groups)
 open import simultaneous.Batcher using (batcher-ends)
 open import simultaneous.Closing using (batches)
-
-------------------------------------------------------------------------
--- The pieces
-
--- THE ERASURE: the elaboration adds no instant and holds no value, so a
--- prefix of the elaborated run erases to a prefix of the plain one with
--- the same stamped values, and an instant over on one side is over on
--- the other.  Switch, exhaust and the bounded queue are the real cases.
--- The batcher's half is `simultaneous.Closing`.
---
--- REFUTED: e10449e erases, and `Groups` with it, with a rank counting only
---   instants holding rows: a run with no row in the subscribe frame ranks
---   its values one below its elaboration, whose subscribed mark lies there.
-postulate
-  erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
+open import simultaneous.Erasure using (erases)
 
 ------------------------------------------------------------------------
 -- The statement

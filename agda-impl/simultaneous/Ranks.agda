@@ -47,7 +47,7 @@ open import denotation.Read using (Run; []; _∷_; Visible)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 open import simultaneous.SObs using (SObs; module Elaborate)
 open import simultaneous.Readings using (instantOf; stamped; closed)
-open import simultaneous.Relations using (Met; values; ranked; Rank; Before; stampedᴮ; elaborated; batched; batchedObs)
+open import simultaneous.Relations using (Met; values; ranked; Rank; Before; stampedᴮ; events; elaborated; batched; batchedObs)
 open import simultaneous.Instants using (_≺ⁱ_; Sorted; irrⁱ; transⁱ; triⁱ; frame-least; insertⁱ; sorted-insert; ∈-insert⁻; ∈-insert⁺; sorted-⊆; sorted-⊂; ≺-instant; instant-≺)
 open import simultaneous.Protocol using (named)
 import simultaneous.Spec as Spec
@@ -280,10 +280,14 @@ module _ {A : Set} {t : EmissionSet A} (few : ∀ {q e} → t q e → Visible e 
 
 -- THE ROWS OF A PROGRAM'S READING ARE LISTED: wherever finitely many
 -- precede, which positions of a cover hold one is decided.  Owed operator
--- by operator, through the elaboration and the batcher.
+-- by operator, in the plain program, its elaboration and the batcher.
 postulate
+  listed-e : ∀ {A} (o : SObs [] A) → Listing (events o)
   listed-x : ∀ {A} (o : SObs [] A) → Listing (elaborated o)
   listed-b : ∀ {A} (o : SObs [] A) → Listing (batched o)
+
+ranks-e : ∀ {A} (o : SObs [] A) → Ranks (events o)
+ranks-e o = ranks (λ {q} {e} → enter-few (⟦ o ⟧ []) root {q} {e}) (λ {q} → listed-e o {q})
 
 ranks-x : ∀ {A} (o : SObs [] A) → Ranks (elaborated o)
 ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate o ⟧ []) root {q} {e}) (λ {q} → listed-x o {q})

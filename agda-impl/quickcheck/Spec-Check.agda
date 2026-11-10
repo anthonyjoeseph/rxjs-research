@@ -7,15 +7,15 @@
 -- batcher's grouping by the names the elaboration mints is the spec's
 -- grouping of the elaborated run by those names, and that the names
 -- agree with the instants pairwise.  Those are the route to `batchable`
--- and `erases` in `simultaneous.Statement`, read here by the
--- elaboration's names rather than the spec's stamps.
+-- in `simultaneous.Statement` and `erases` in `simultaneous.Erasure`,
+-- read here by the elaboration's names rather than the spec's stamps.
 --
 -- `Groups` ITSELF, DECIDED: a stamp is a count of instants over a whole
 -- listing, so on an uncut one it is computable, and `grouping` compares
 -- the batched listing against the plain one directly, each batch stamped
 -- by the instant its row leaves in.  A batch released past its instant
 -- carries a later stamp; no statement above sees that.  `erasing` is
--- `simultaneous.Statement.erases` on its own: the elaborated values,
+-- `simultaneous.Erasure.erases` on its own: the elaborated values,
 -- marks dropped, are the plain ones stamp for stamp.
 --
 -- A WHOLE RUN, NOT ITS PREFIXES.  Each statement is two directions over

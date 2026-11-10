@@ -34,13 +34,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Probed, unproven: the elaborated run, marks dropped, is the plain run
-stamp for stamp — the elaboration adds no instant, and both count the
-subscribe frame — with an instant over on one side over on the other,
-and completing together. Switch, exhaust and the bounded queue are the
-real cases. Settled when each is a body by operator.
+Probed, unproven: before each side's end, the elaborated program's i-th
+value is its plain program's, at the same rank — the elaboration adds no
+instant, and both count the subscribe frame — its instant over exactly
+when the other's is; and each side ends when the other does. Switch,
+exhaust and the bounded queue are the real cases. Settled when each is a
+body by operator.
 
-Members: `erases`.
+Members: `erase-x`, `erase-e`, `erase-rank`, `erase-over`, `erase-end`.
 
 #### THE PROTOCOL
 
@@ -99,4 +100,4 @@ position, which positions of the cover hold a row is decided — the
 exact listing a rank is read off. Settled when each is a body operator
 by operator, through the elaboration and the batcher.
 
-Members: `listed-x`, `listed-b`.
+Members: `listed-e`, `listed-x`, `listed-b`.
