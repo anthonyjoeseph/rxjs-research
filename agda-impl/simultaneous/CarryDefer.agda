@@ -374,6 +374,15 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
 --   relation, functional and monotone across rows carried at different
 --   indices.  Bounding instead each carry by depth fails at a scan, whose
 --   row reads every row before it, at any depth.
+-- DEAD ROUTE: images made coherent and nothing more.  An elaborated row is
+--   a row of the meaning only where the elaborated approximants agree,
+--   and an image's agreement is bounded by no hypothesis here: the
+--   elaborated run adds rows (marks, readers' joins) a plain cover does
+--   not count.  The bookkeeping (`fib`, `bk`, `pbk`) is one function per
+--   approximant, and a cause is read off a row of the meaning at the
+--   index its own limit names, so those must cohere across indices too.
+--   An image is not fixed by the fields either: a plain skip may sit on
+--   any unshown elaborated row of its instant.
 postulate
   carry-lim : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
             → (∀ n → Carry (just n) ρ (defer l)) → Carry nothing ρ (defer l)
