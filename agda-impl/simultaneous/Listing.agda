@@ -284,36 +284,38 @@ listC-ok N (suc n) (defer l)         u p = bind-gets (listC-ok N n (Later.force 
 
 -- WHEREVER FINITELY MANY ROWS PRECEDE, THEY ARE LISTED: those of the cut
 -- program, before the cut.
-listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
-listed o {q} (ks , few) = ks′ , cover , back
-  where
-    m = length ks
-    N = suc (suc m)
-    t = enter (⟦ o ⟧ []) root
-    c = enter (capprox N m o []) root
+-- Sealed: consumers read its type, never its body.
+opaque
+  listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
+  listed o {q} (ks , few) = ks′ , cover , back
+    where
+      m = length ks
+      N = suc (suc m)
+      t = enter (⟦ o ⟧ []) root
+      c = enter (capprox N m o []) root
 
-    ag : AgC m t c
-    ag = AgC-trans (from m o [] (λ ()) root (tt , λ ()))
-                   (AgC-sym (cut-ne {m = m} {N} ≤-refl m o [] (λ ()) root (tt , λ ())))
+      ag : AgC m t c
+      ag = AgC-trans (from m o [] (λ ()) root (tt , λ ()))
+                     (AgC-sym (cut-ne {m = m} {N} ≤-refl m o [] (λ ()) root (tt , λ ())))
 
-    cnt : Cnt m t q
-    cnt = ks , ≤-refl , λ x lt → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (few x lt))
+      cnt : Cnt m t q
+      cnt = ks , ≤-refl , λ x lt → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (few x lt))
 
-    agq = ag-cnt ag q (inj₁ cnt)
+      agq = ag-cnt ag q (inj₁ cnt)
 
-    lc = listC-ok N m o tt root
-    L  = proj₁ lc
+      lc = listC-ok N m o tt root
+      L  = proj₁ lc
 
-    ex : Exact L c
-    ex = listC-exact N m o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
+      ex : Exact L c
+      ex = listC-exact N m o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
 
-    ks′ : List Pos
-    ks′ = filter (λ k → T? (k <ᵖ q)) (mapL proj₁ (rows L))
+      ks′ : List Pos
+      ks′ = filter (λ k → T? (k <ᵖ q)) (mapL proj₁ (rows L))
 
-    cover : ∀ {k e} → t k e → k ≺ q → k ∈ ks′
-    cover {k} x kq = ∈-filter⁺ (λ k → T? (k <ᵖ q)) (∈-map⁺ proj₁ (complete ex (proj₁ (upto agq {k} (≺→≼ {k} {q} kq)) x))) kq
+      cover : ∀ {k e} → t k e → k ≺ q → k ∈ ks′
+      cover {k} x kq = ∈-filter⁺ (λ k → T? (k <ᵖ q)) (∈-map⁺ proj₁ (complete ex (proj₁ (upto agq {k} (≺→≼ {k} {q} kq)) x))) kq
 
-    back : ∀ {k} → k ∈ ks′ → k ≺ q × Σ _ (t k)
-    back mk with ∈-filter⁻ (λ k → T? (k <ᵖ q)) {xs = mapL proj₁ (rows L)} mk
-    ... | mk′ , kq with ∈-map⁻ proj₁ mk′
-    ...   | (k , e) , mr , refl = kq , e , proj₂ (upto agq {k} (≺→≼ {k} {q} kq)) (sound ex mr)
+      back : ∀ {k} → k ∈ ks′ → k ≺ q × Σ _ (t k)
+      back mk with ∈-filter⁻ (λ k → T? (k <ᵖ q)) {xs = mapL proj₁ (rows L)} mk
+      ... | mk′ , kq with ∈-map⁻ proj₁ mk′
+      ...   | (k , e) , mr , refl = kq , e , proj₂ (upto agq {k} (≺→≼ {k} {q} kq)) (sound ex mr)
