@@ -28,6 +28,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷-injectiveˡ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool.Properties using (T?)
 open import Relation.Nullary using (yes; no)
@@ -41,15 +42,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt; inside)
-open import denotation.Simultaneity using (eqˡ; eqⁱ)
+open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
+open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op;
-  Truncate; InE; at-end)
+  Truncate; Reach; InE; at-end; at-out; on-out)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext; ≼-refl)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; inW; step; plain-last; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼;
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; inW; step; Plain; plain-ix; plain-last; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼;
   ⊑-cmp; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf)
@@ -571,7 +572,6 @@ record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → 
 -- do, under the meaning and under every approximant alike.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
-  carry-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → Carry m ρ (of xs)
   carry-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
   carry-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
@@ -588,72 +588,182 @@ carry-map (just n) ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′
   let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
   in M , ms , hm′ , wi , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
 
--- An end alone at `q`.
+-- Positions one label under a common prefix.
 private
-  EndAt : ∀ {X : Set} → Pos → EmissionSet X
-  EndAt q = Truncate (InE (Evs.end q))
+  path-under : ∀ ps σ τ → cmpPath (ps ++ σ) (ps ++ τ) ≡ cmpPath σ τ
+  path-under []       σ τ = refl
+  path-under (a ∷ ps) σ τ rewrite reflˡ a = path-under ps σ τ
 
-  end-row : ∀ {X : Set} q → EndAt {X} q q end
-  end-row q = at-end , [] , λ { at-end kq _ → ⊥-elim (≺-irrefl {q} kq) }
+  cmp-under : ∀ q σ τ → cmpPos (q ⊕ σ) (q ⊕ τ) ≡ cmpPath σ τ
+  cmp-under (i ∙ ps) σ τ rewrite reflⁱ i = path-under ps σ τ
 
-  end-few : ∀ {X : Set} q → Few (EndAt {X} q) q
-  end-few q = [] , λ { (at-end , _) kq → ⊥-elim (≺-irrefl {q} kq) }
+  ≺-shift : ∀ q q′ σ τ → (q ⊕ σ) ≺ (q ⊕ τ) → (q′ ⊕ σ) ≺ (q′ ⊕ τ)
+  ≺-shift q q′ σ τ h = subst (λ c → T (isLt c)) (trans (cmp-under q σ τ) (sym (cmp-under q′ σ τ))) h
 
-  match-end : ∀ {A : Set} → Match {A = A} {B = IE A} Every (One valuesOf) (Reads valuesOf) end end
-  match-end = (λ _ → refl) , (λ ns _ → ns tt)
+  path-of : Pos → Path
+  path-of (_ ∙ ps) = ps
 
-  -- The single end, carried end on end.
-  module Ended {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+  ⊑-one : ∀ q {a b} → (q ⊕ [ a ]) ⊑ (q ⊕ [ b ]) → b ≡ a
+  ⊑-one (i ∙ ps) {a} {b} (zs , e) = ∷-injectiveˡ (++-cancelˡ ps [ b ] (a ∷ zs) (trans (cong path-of e) (++-assoc ps [ a ] zs)))
+
+  -- An end one label under `q` comes after every row so labelled.
+  last-max : ∀ q {a} → Plain a → (q ⊕ [ last ]) ≺ (q ⊕ [ a ]) → ⊥
+  last-max q (plain-ix {i}) h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ ix i ]) h
+  last-max q plain-last     h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ last ]) h
+
+  unp-pin : ∀ {X : Set} {r} → Unpinned {X} (pin r) → ⊥
+  unp-pin ()
+
+  -- What an elaborated `of` emits for a value.
+  V : ∀ {A : Set} → A → IE A
+  V x = instEmit (value x) root
+
+  -- The rows of an `of`: one label under its subscription, finitely
+  -- many, none pinned, the end last.
+  of-all : ∀ {A : Set} p i (xs : List A) → Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p i xs) k e → k ∈ ks
+  of-all p i []       = [ p ⊕ [ last ] ] , λ { at-end → here refl }
+  of-all p i (x ∷ xs) with of-all p (suc i) xs
+  ... | ks , f = (p ⊕ [ ix i ]) ∷ ks , λ { at-out → here refl ; (on-out r) → there (f r) }
+
+  of-unp : ∀ {A : Set} p i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e → Unpinned e
+  of-unp p i []       at-end     = tt
+  of-unp p i (x ∷ xs) at-out     = tt
+  of-unp p i (x ∷ xs) (on-out r) = of-unp p (suc i) xs r
+
+  of-end : ∀ {A : Set} p i (xs : List A) {c} → InE (Evs.ofᴱ p i xs) c end → c ≡ p ⊕ [ last ]
+  of-end p i []       at-end     = refl
+  of-end p i (x ∷ xs) (on-out r) = of-end p (suc i) xs r
+
+  -- Each row of the plain `of`, and of the elaborated, has its fellow
+  -- under the other subscription.
+  of-up : ∀ {A : Set} p p′ i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e
+        → Σ Label λ a → Plain a × k ≡ p ⊕ [ a ] × InE (Evs.ofᴱ p′ i (L.map V xs)) (p′ ⊕ [ a ]) (mapEv V e)
+  of-up p p′ i []       at-end     = last , plain-last , refl , at-end
+  of-up p p′ i (x ∷ xs) at-out     = ix i , plain-ix , refl , at-out
+  of-up p p′ i (x ∷ xs) (on-out r) with of-up p p′ (suc i) xs r
+  ... | a , pl , e , r′ = a , pl , e , on-out r′
+
+  of-down : ∀ {A : Set} p p′ i (xs : List A) {l e′} → InE (Evs.ofᴱ p′ i (L.map V xs)) l e′
+          → Σ Label λ a → Plain a × l ≡ p′ ⊕ [ a ] × Σ (Ev A) λ e → InE (Evs.ofᴱ p i xs) (p ⊕ [ a ]) e × e′ ≡ mapEv V e
+  of-down p p′ i []       at-end     = last , plain-last , refl , end , at-end , refl
+  of-down p p′ i (x ∷ xs) at-out     = ix i , plain-ix , refl , out x , at-out , refl
+  of-down p p′ i (x ∷ xs) (on-out r) with of-down p p′ (suc i) xs r
+  ... | a , pl , e , e₀ , r₀ , ee = a , pl , e , e₀ , on-out r₀ , ee
+
+  match-V : ∀ {A : Set} (e : Ev A) → Match Every (One valuesOf) (Reads valuesOf) e (mapEv V e)
+  match-V (out x) = (λ _ → V x , refl , refl) , λ ns → ⊥-elim (ns tt)
+  match-V end     = (λ _ → refl) , λ ns → ⊥-elim (ns tt)
+  match-V skip    = (λ ()) , λ _ ()
+  match-V (pin _) = (λ ()) , λ _ ()
+
+  -- The values listed, carried row for row one label under each side.
+  module Listed {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
+                (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+    t : EmissionSet A
+    t = Truncate (InE (Evs.ofᴱ p 0 xs))
+
+    u : EmissionSet (IE A)
+    u = Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))
+
     N : PMap
-    N x y = x ≡ p ⊕ [ last ] × y ≡ p′ ⊕ [ last ]
+    N x y = Σ Label λ a → Plain a × x ≡ p ⊕ [ a ] × y ≡ p′ ⊕ [ a ]
+
+    embN : Emb N
+    embN = record
+      { fun     = λ { (a , _ , refl , refl) (b , _ , e , refl) →
+                      cong (λ c → p′ ⊕ [ c ]) (⊑-one p ([] , trans e (sym (⊕-identityʳ (p ⊕ [ b ]))))) }
+      ; mono    = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → ≺-shift p p′ [ a ] [ b ] h }
+      ; reflect = λ { (a , _ , refl , refl) (b , _ , refl , refl) h → subst (λ c → (p ⊕ [ a ]) ⊑ (p ⊕ [ c ])) (sym (⊑-one p′ h)) (⊑-refl (p ⊕ [ a ])) }
+      ; inst    = λ { (a , _ , refl , refl) (b , _ , refl , refl) →
+                      mk⇔ (λ _ → trans (instant-⊕ p [ a ]) (sym (instant-⊕ p [ b ])))
+                          (λ _ → trans (instant-⊕ p′ [ a ]) (sym (instant-⊕ p′ [ b ]))) } }
 
     M : PMap
     M = M₀ ∪ᴹ N
 
     emb : Emb M
-    emb = emb-under {N = N} E₀ fr m₀ pp
-      (record { fun     = λ { (refl , refl) (refl , refl) → refl }
-              ; mono    = λ { (refl , refl) (refl , refl) xx → ⊥-elim (≺-irrefl {p ⊕ [ last ]} xx) }
-              ; reflect = λ { (refl , refl) (refl , refl) _ → ⊑-refl (p ⊕ [ last ]) }
-              ; inst    = λ { (refl , refl) (refl , refl) → mk⇔ (λ _ → refl) (λ _ → refl) } })
-      λ { (refl , refl) → last , [] , last , [] , refl , refl }
+    emb = emb-under {N = N} E₀ fr m₀ pp embN λ { (a , _ , refl , refl) → a , [] , a , [] , refl , refl }
 
     within : Within HP M₀ M p
-    within (inj₁ m)          = inj₁ m
-    within (inj₂ (refl , _)) = inj₂ (inW (step here plain-last))
+    within (inj₁ m)                  = inj₁ m
+    within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
 
-    carried : CarryAt valuesOf M HP HE (EndAt {A} (p ⊕ [ last ])) (EndAt {IE A} (p′ ⊕ [ last ])) p p′
+    allT : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p 0 xs) k e → k ∈ ks
+    allT = of-all p 0 xs
+
+    allU : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p′ 0 (L.map V xs)) k e → k ∈ ks
+    allU = of-all p′ 0 (L.map V xs)
+
+    reachT : ∀ {q e} → Reach (InE (Evs.ofᴱ p 0 xs)) q e
+    reachT = proj₁ allT , λ r _ _ → proj₂ allT r
+
+    reachU : ∀ {q e} → Reach (InE (Evs.ofᴱ p′ 0 (L.map V xs))) q e
+    reachU = proj₁ allU , λ r _ _ → proj₂ allU r
+
+    fewT : ∀ {k} → Few t k
+    fewT = proj₁ allT , λ r _ → proj₂ allT (proj₁ r)
+
+    fewU : ∀ {l} → Few u l
+    fewU = proj₁ allU , λ r _ → proj₂ allU (proj₁ r)
+
+    Img : Pos → Pos → Set
+    Img k l = N k l × Σ (Ev A) (t k)
+
+    img : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
+        → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Few u l × Match Every (One valuesOf) (Reads valuesOf) e e′
+    img {k} {e} tk _ _ _ with of-up p p′ 0 xs (proj₁ tk)
+    ... | a , pl , refl , r′ = p′ ⊕ [ a ] , ((a , pl , refl , refl) , e , tk) , mapEv V e , (r′ , reachU) , fewU , match-V e
+
+    shown : ∀ {l e′} → u l e′ → Shown (One valuesOf) e′ → Live u l → Few u l
+          → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e′
+    shown ul _ _ _ with of-down p p′ 0 xs (proj₁ ul)
+    ... | a , pl , refl , e , r₀ , refl = p ⊕ [ a ] , ((a , pl , refl , refl) , e , r₀ , reachT) , e , (r₀ , reachT) , match-V e
+
+    place : ∀ {m e} → u m e → instantOf m ≡ instantOf p′
+    place um with of-down p p′ 0 xs (proj₁ um)
+    ... | a , _ , refl , _ = instant-⊕ p′ [ a ]
+
+    live : ∀ {k l} → Img k l → ∀ {c} → u c end → c ≺ l → ⊥
+    live ((a , pl , _ , refl) , _) uc with of-end p′ 0 (L.map V xs) (proj₁ uc)
+    ... | refl = last-max p′ pl
+
+    carried : CarryAt valuesOf M HP HE t u p p′
     carried = record
-      { Img     = N
-      ; ext     = λ { (refl , refl) → p′ ⊕ [ last ] , inj₂ (refl , refl) , ⊑-refl _ }
-      ; img     = λ { (at-end , _) _ _ _ → p′ ⊕ [ last ] , (refl , refl) , end , end-row _ , end-few _ , match-end }
-      ; shown   = λ { (at-end , _) _ _ _ → p ⊕ [ last ] , (refl , refl) , end , end-row _ , match-end }
-      ; img-row = λ { (refl , refl) → end , end-row _ , tt }
-      ; img-fun = λ { (refl , refl) (refl , refl) → refl }
-      ; place   = λ { (at-end , _) _ _ → inj₁ (instant-⊕ p′ [ last ]) }
-      ; live    = λ { (refl , refl) _ (at-end , _) → ≼-refl {p′ ⊕ [ last ]} }
-      ; few     = λ { (refl , refl) → end-few _ }
-      ; cause   = λ _ → row (p ⊕ [ last ])
-      ; owes    = λ { (at-end , _) → (end , end-row _) , p′ ⊕ [ last ] , inj₂ (refl , refl) , refl }
-      ; fib     = λ _ → [ p′ ⊕ [ last ] ]
-      ; in-fib  = λ { (at-end , _) → here refl }
+      { Img     = Img
+      ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
+      ; img     = img
+      ; shown   = shown
+      ; img-row = λ { (_ , e , tk) → e , tk , of-unp p 0 xs (proj₁ tk) }
+      ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
+      ; place   = λ um _ _ → inj₁ (place um)
+      ; live    = λ i _ → live i
+      ; few     = λ _ → fewT
+      ; cause   = λ _ → subs
+      ; owes    = place
+      ; fib     = λ _ → proj₁ allU
+      ; in-fib  = λ ur → proj₂ allU (proj₁ ur)
       ; read    = λ _ ()
-      ; bk      = λ _ → [ p ⊕ [ last ] ]
-      ; in-bk   = λ { (refl , refl) → here refl }
+      ; bk      = λ _ → proj₁ allT
+      ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; pbk     = λ _ → []
-      ; pinned  = λ { (() , _) _ }
+      ; pinned  = λ {_} {r} tk _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
-  empty-carried : ∀ {A HP HE M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
-                  × CarryAt valuesOf M HP HE (EndAt {A} (p ⊕ [ last ])) (EndAt {IE A} (p′ ⊕ [ last ])) p p′
-  empty-carried {A} {HP} {HE} E₀ fr m₀ pp = X.M , inj₁ , X.emb , X.within , X.carried
-    where module X = Ended {A} {HP} {HE} E₀ fr m₀ pp
+  of-carried : ∀ {A HP HE M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
+             → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
+               × CarryAt valuesOf M HP HE (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
+  of-carried {A} {HP} {HE} xs E₀ fr m₀ pp = X.M , inj₁ , X.emb , X.within , X.carried
+    where module X = Listed {A} {HP} {HE} xs E₀ fr m₀ pp
 
--- THE EMPTY PROGRAM ends at once, on both sides.
+-- AN `of` lists its values one label under each subscription.
+carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
+carry-of nothing  ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried xs e₀ fr m₀ pp
+carry-of (just n) ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried xs e₀ fr m₀ pp
+
+-- THE EMPTY PROGRAM ends at once, on both sides: the empty listing.
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
-carry-empty nothing  ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → empty-carried e₀ fr m₀ pp
-carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → empty-carried e₀ fr m₀ pp
+carry-empty nothing  ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
+carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
