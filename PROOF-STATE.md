@@ -105,9 +105,10 @@ Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
 
 #### THE PASS
 
-Untried, low risk: a run meets on to every visible row up to one with
-finitely many rows before it. `listed`, `Reaching.reach` and `run-det`
-are each proven. Settled when it is a body over them.
+Untried: a run meets on to every visible row up to one with finitely
+many rows before it. `listed`, `Reaching.reach` and `run-det` are each
+proven; open is the row at the bound itself, which a listing before it
+omits. Settled when it is a body over them.
 
 Members: `pass`.
 

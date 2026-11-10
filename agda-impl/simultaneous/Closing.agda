@@ -321,8 +321,8 @@ module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
              → Batching.late (proj₁ (bstep s w)) ≡ subStep (seenSub xs) w
              → (subStep (seenSub xs) w ≡ false → nameStep (lastBegin root xs) w ≡ root)
              → Good s (w ∷ ys)
-    continue s xs w ys eq es st here ea′ el′ e0′ =
-      here ,
+    continue s xs w ys eq es st now′ ea′ el′ e0′ =
+      now′ ,
       go (bstep s w) (xs ++ [ w ]) ys (trans eq (sym (++-assoc xs [ w ] ys))) (trans (after-snoc bstart xs w) (cong (λ t → bstep t w) es))
          (trans ea′ (sym (lb-snoc xs w))) (trans el′ (sym (ss-snoc xs w)))
          (λ f → trans (lb-snoc xs w) (e0′ (trans (sym (ss-snoc xs w)) f)))
@@ -369,9 +369,11 @@ Dry : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Set
 Dry t rs = ∀ {k e} → t k e → Visible e → After (cursor nothing rs) k → ⊥
 
 -- A RUN IS MET ON PAST ANY ROW WITH FINITELY MANY BEFORE IT: some
--- extension meets every visible row up to it.  The rows up to `y` are
--- listed (`listed`); the latest visible one past the run is met as
--- `Reaching.reach` meets a row, the two runs comparable by `run-det`.
+-- extension meets every visible row up to it.  The rows before `y` are
+-- listed (`listed`) and the latest visible one past the run is met as
+-- `Reaching.reach` meets a row, the two runs comparable by `run-det`;
+-- what is open is `y` itself, whose row a listing before `y` omits — a
+-- listing up to a position just past `y`.
 postulate
   pass : ∀ {A : Set} (o : SObs [] A) {rs y} → Met (elaborated o) rs → Few (elaborated o) y
        → Σ _ λ ext → Met (elaborated o) (rs ++ ext) × Covers (elaborated o) (rs ++ ext) y
