@@ -34,7 +34,7 @@ open import denotation.Position using (Pos; _<ᵖ_; ix; last; root; _⊕_)
 open import denotation.EmissionSet
   using (out; skip; end; EmissionSet; _≺_; Few; InE; at-out; at-skip; at-end; on-out; on-skip; enter;
   After; DenEnv; ⟦_⟧; Spin; spin)
-open import denotation.Laws.Modulus using (≺→≼; upto)
+open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; upto)
 open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-trans; AgC-sym)
 open import denotation.Laws.Worlds using (⊑-refl)
 open import denotation.Laws using (from)
@@ -287,11 +287,15 @@ listC-ok N (suc n) (defer l)         u p = bind-gets (listC-ok N n (Later.force 
 -- Sealed: consumers read its type, never its body.
 opaque
   listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
-  listed o {q} (ks , few) = ks′ , cover , back
+  listed {A} o {q} (ks , few) = ks′ , cover , back
     where
+      m : ℕ
       m = length ks
+      N : ℕ
       N = suc (suc m)
+      t : EmissionSet A
       t = enter (⟦ o ⟧ []) root
+      c : EmissionSet A
       c = enter (capprox N m o []) root
 
       ag : AgC m t c
@@ -301,10 +305,13 @@ opaque
       cnt : Cnt m t q
       cnt = ks , ≤-refl , λ x lt → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (few x lt))
 
+      agq : AgreeTo q t c
       agq = ag-cnt ag q (inj₁ cnt)
 
+      lc : Gets Uncut (listC N m o [] root)
       lc = listC-ok N m o tt root
-      L  = proj₁ lc
+      L : Tb.Listed A
+      L = proj₁ lc
 
       ex : Exact L c
       ex = listC-exact N m o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
