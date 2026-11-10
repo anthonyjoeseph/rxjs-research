@@ -20,7 +20,7 @@
 -- here reads.
 module simultaneous.Relations where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; [_]; _++_; concat; length)
 import Data.List as L
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
@@ -37,7 +37,7 @@ open import Function using (_⇔_)
 open import Data.List.Properties using (map-++)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
-open import denotation.Position using (_≟ᵖ_; Pos; Instant; _<ⁱ_; root; frame)
+open import denotation.Position using (_≟ᵖ_; Pos; Instant; root; frame)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
@@ -46,6 +46,7 @@ open import simultaneous.SObs using (SObs; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; stamped; closed)
+open import simultaneous.Instants using (_≺ⁱ_)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (E; IE; elaborate; batchSimultaneous)
 
@@ -66,10 +67,6 @@ batched o = enter (⟦ batchedObs o ⟧ []) root
 
 ------------------------------------------------------------------------
 -- Stamps
-
--- Instants in order.
-_≺ⁱ_ : Instant → Instant → Set
-i ≺ⁱ j = T (i <ⁱ j)
 
 -- The instants before `k`'s, other than its own: the subscribe frame,
 -- and those some row before `k` lies in.

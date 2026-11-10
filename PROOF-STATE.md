@@ -94,9 +94,9 @@ Members: `batch-rank`.
 
 #### THE RANKS
 
-Untried: a met run has its ranks, and rows of one instant share a rank
-while rows of two do not. A rank cannot be computed from `Few`: its
-cover may hold positions with no row. Settled when these are bodies over
-`rooted`, the instant interval and a way to list a run's instants.
+Untried: wherever finitely many rows of a program's reading precede a
+position, which positions of the cover hold a row is decided — the
+exact listing a rank is read off. Settled when each is a body operator
+by operator, through the elaboration and the batcher.
 
-Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
+Members: `listed-x`, `listed-b`.
