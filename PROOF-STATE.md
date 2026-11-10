@@ -34,16 +34,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Untried: the elaborated run carries the plain one — each elaborated
-row put on the unpinned plain row it elaborates, or ahead of all, in
-order, instant for instant, a value on its value, the end on the end;
-a plain pin carried only into its instant. The
-elaboration subscribes every leaf deeper, so the map of positions must
-keep their order, through each cold's async instants. Switch, exhaust
-and the bounded queue are the real cases. Settled when `erasing` is a
-body by operator.
+Untried: each former's elaborated run carries its plain one along a
+map of positions it extends over its own worlds, relative to the
+environment's binders (`Carry`). Most open: finiteness past a carrier
+through a connect — the body's carriers bound the source only up to the
+body's end, so `spent` may need a bound. Then switch, exhaust and the
+bounded queue; the wrapper. Settled when each former's leaf is a body.
 
-Members: `erasing`.
+Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
+`carry-cold`, `carry-takeWhile`, `carry-map`, `carry-scan`, `carry-of`,
+`carry-empty`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
+
+#### THE ORDER EMBEDDING
+
+Untried: a homomorphic map of positions keeps their order and instants
+and reflects leading, by structural recursion on the position; two
+positions apart stay apart below. Settled when each is a body.
+
+Members: `hom-mono`, `hom-prefix`, `hom-inst`, `apart`.
 
 #### THE PROTOCOL
 

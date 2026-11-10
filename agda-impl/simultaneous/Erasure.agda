@@ -54,6 +54,8 @@ open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.Worlds using (InvAt)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
+open import simultaneous.Carry using (Carry; carry-⟦⟧; hom-∅; coreAt; attributed; carry-wrap)
+open import denotation.Laws.Worlds using (⊕-assoc)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
 open Values using (Nth; Next; first; next)
@@ -303,8 +305,12 @@ single-values (instEmit (mark _) _)  = inj₁ refl
 --   all: under `connect (of [1]) (λ _ → ones)` a pin lies past endlessly
 --   many carriers, so no reader reaches it to put it anywhere; only rows
 --   a reader reaches are placed, each in the instant of a carrier.
-postulate
-  erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
+erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
+erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) (λ _ _ → ⊥) hom-∅ (λ ())
+                 root coreAt (tt , λ ()) (tt , λ ()) (λ ())
+... | M , _ , hm , _ , (δ , at) , c =
+  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (_ ++ δ) (subst (M root) (⊕-assoc root _ δ) at)
+    (carry-wrap o hm δ at c)
 
 -- A plain row that is not a pin is at or before every end.
 unpinned-live : ∀ {A} (o : SObs [] A) {k e} → events o k e → Unpinned e → Live (events o) k
