@@ -10,7 +10,10 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++; ∈-++⁻; ∈-map⁻)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Maybe using (just; nothing)
+open import Data.Bool.Properties using (T?)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-conicalʳ; foldl-++)
@@ -18,62 +21,49 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 import Data.Sum
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Data.Nat using (zero; suc; _≤_; _∸_; z≤n; s≤s; _≟_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _∸_; z≤n; s≤s; _≟_)
 open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
 import Data.List.Relation.Binary.Pointwise as Pointwise
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
 open import Tree using (scan)
-open import denotation.Position using (Pos; root; _∙_; _≟ᵖ_)
+open import denotation.Position using (Pos; root; frame; _∙_; _≟ᵖ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Seen; Few; _≺_; _≼_; ⟦_⟧)
+open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
+open import denotation.Laws using (inv-⟦⟧)
+open import denotation.Laws.Modulus using (≺-trans; ≺-absurd; ≼-refl; ≼-split; ≼-trans; ≺→≼)
+open import denotation.Simultaneity using (between)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; Batching; batching; module Elaborate)
-open import simultaneous.Readings using (stamped; closed)
-open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; module Leaves; module Split)
+open import simultaneous.Readings using (stamped; closed; instantOf; rootOf)
+open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; done-last; module Leaves; module Split)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Held using (shut)
+open import simultaneous.Held using (shut; held)
+open import simultaneous.Routed using (Held; cnt)
+open import simultaneous.Reach using (module Reached)
+open import simultaneous.Project using (run-prefix)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
-open import simultaneous.Relations using (Met; values; values-++; ranked; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
+open import simultaneous.Relations using (Met; values; values-++; ranked; Left; Exits; Over; lastValue; carried; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
 open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name)
-open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row)
-open import simultaneous.Batcher using (released; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
+open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; run-has; from≺)
+open import simultaneous.Batcher using (released; released-held; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; pending; asEmits; mark-step; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; pending; pendingOf; asEmits; mark-step; Routes; count)
 
 ------------------------------------------------------------------------
 -- The protocol, read off the elaborated run
-
--- THE RUN IS CLOSED WHERE NOTHING IS HELD: past every release, no value
--- of the instant released, and the run leaves it.
---
--- An instant that never ends never reaches its release: the batcher
--- releases only once every route of the instant is closed, and every row
--- a synchronous loop makes, its subscriptions' skips included, lies under
--- the value whose cascade it is, before that value's `over` and before
--- its route's `stop`.  So past a release only finitely many rows of the
--- instant remain.
-postulate
-  flush-closes : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → pending (proj₁ (after bstart (values (unrank rx)))) ≡ []
-               → Closes valuesOf (elaborated o) rx true
 
 -- Marks only, each keeping the batch held, until one releases it.
 data Releases {A : Set} : Step A → List (IE A) → Set where
   now  : ∀ {s m n vs} → proj₂ (bstep s (instEmit (mark m) n)) ≢ [] → Releases s (instEmit (mark m) n ∷ vs)
   wait : ∀ {s m n vs} → proj₂ (bstep s (instEmit (mark m) n)) ≡ []
        → Releases (bstep s (instEmit (mark m) n)) vs → Releases s (instEmit (mark m) n ∷ vs)
-
--- A CLOSED INSTANT IS RELEASED: met on, the run reaches a mark releasing
--- what is held, with no value before it.
-postulate
-  releases : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → Closes valuesOf (elaborated o) rx true
-           → pending (proj₁ (after bstart (values (unrank rx)))) ≢ []
-           → Σ _ λ ext → Met (elaborated o) (unrank rx ++ ext) × Releases (after bstart (values (unrank rx))) (values ext)
 
 asEmits-[] : ∀ {A : Set} (P : List (Pos × List A)) → asEmits P ≡ [] → P ≡ []
 asEmits-[] []      _ = refl
@@ -101,19 +91,6 @@ released-pending (b , rel) (wait {m = m} {n} {vs} z r) ne with mark-step (Batchi
 
 one≢[] : ∀ {X : Set} {g : X} → [ g ] ≢ []
 one≢[] ()
-
--- Closed or not, what is held is released along some extension.
-Flushes : ∀ {A : Set} (o : SObs [] A) → List (Pos × Ev (IE A)) → Bool → Set
-Flushes o rx false = ⊤
-Flushes o rx true  = Σ _ λ ext → Met (elaborated o) (rx ++ ext)
-                   × Prefix _≡_ (pending (proj₁ (after bstart (values rx)))) (stamped (released (after bstart (values rx)) (values ext)))
-
-closes-flush : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → Closes valuesOf (elaborated o) rx true
-             → Flushes o (unrank rx) true
-closes-flush o {rx} mx cl with pending-one (proj₁ (after bstart (values (unrank rx))))
-... | inj₁ e = [] , subst (Met (elaborated o)) (sym (++-identityʳ (unrank rx))) (proj₂ (ranks-x o) mx) , subst (λ P → Prefix _≡_ P _) (sym e) Prefix.[]
-... | inj₂ (g , e) with releases o mx cl (λ e′ → one≢[] (trans (sym e) e′))
-...   | ext , mx′ , r = ext , mx′ , released-pending _ r (λ e′ → one≢[] (trans (sym e) e′))
 
 ------------------------------------------------------------------------
 -- The batcher's routes are the run's count
@@ -355,6 +332,346 @@ module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
 -- protocol at every mark.
 good-run : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Good bstart (values rx)
 good-run o {rx} mx = Walk.go o mx bstart [] (values rx) refl refl refl refl (λ _ → refl) (stamps-of o mx)
+
+------------------------------------------------------------------------
+-- Runs met on
+
+-- A run's cursor is no earlier than where it began.
+cursor-≽ : ∀ {A} {t : EmissionSet A} {q} xs → Run t (just q) xs → Σ Pos λ c → cursor (just q) xs ≡ just c × q ≼ c
+cursor-≽ {q = q} []          []                        = q , refl , ≼-refl {q}
+cursor-≽ {q = q} ((q′ , _) ∷ xs) ((_ , _ , aft , _) ∷ run) with cursor-≽ xs run
+... | c , eq , qc = c , eq , ≼-trans {q} {q′} {c} (≺→≼ {q} {q′} aft) qc
+
+-- No row a run met lies past its cursor.
+not-past : ∀ {A} {t : EmissionSet A} {c xs k e} → Run t c xs → (k , e) ∈ xs → After (cursor c xs) k → ⊥
+not-past {xs = (q , _) ∷ xs} (_ ∷ run) (here refl) a with cursor-≽ xs run
+... | c , eq , qc = qc (subst (λ m → After m q) eq a)
+not-past (_ ∷ run) (there m) a = not-past run m a
+
+-- A cursor is where the run began or a row it met.
+cursor-in : ∀ {A} c (xs : List (Pos × Ev A)) {y} → cursor c xs ≡ just y → c ≡ just y ⊎ Σ (Ev A) λ e → (y , e) ∈ xs
+cursor-in c []             eq = inj₁ eq
+cursor-in c ((q , e) ∷ xs) eq with cursor-in (just q) xs eq
+... | inj₁ refl     = inj₂ (e , here refl)
+... | inj₂ (e′ , m) = inj₂ (e′ , there m)
+
+cursor-cases : ∀ {A} (xs : List (Pos × Ev A)) → cursor nothing xs ≡ nothing ⊎ Σ Pos λ c → cursor nothing xs ≡ just c
+cursor-cases xs with cursor nothing xs
+... | nothing = inj₁ refl
+... | just c  = inj₂ (c , refl)
+
+-- No visible row up to `y` is left past the run.
+Covers : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Pos → Set
+Covers t rs y = ∀ {k e} → t k e → Visible e → k ≼ y → After (cursor nothing rs) k → ⊥
+
+-- No visible row is left past the run.
+Dry : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Set
+Dry t rs = ∀ {k e} → t k e → Visible e → After (cursor nothing rs) k → ⊥
+
+-- A RUN IS MET ON PAST ANY ROW WITH FINITELY MANY BEFORE IT: some
+-- extension meets every visible row up to it.  The rows up to `y` are
+-- listed (`listed`); the latest visible one past the run is met as
+-- `Reaching.reach` meets a row, the two runs comparable by `run-det`.
+postulate
+  pass : ∀ {A : Set} (o : SObs [] A) {rs y} → Met (elaborated o) rs → Few (elaborated o) y
+       → Σ _ λ ext → Met (elaborated o) (rs ++ ext) × Covers (elaborated o) (rs ++ ext) y
+
+-- A visible row past a run is met on it.
+meet : ∀ {A : Set} (o : SObs [] A) {rs y e} → Met (elaborated o) rs → Seen (elaborated o) y e → Visible e
+     → After (cursor nothing rs) y → Σ _ λ ext → Met (elaborated o) (rs ++ ext) × (y , e) ∈ ext
+meet {A} o {rs} {y} {e} mx ((xy , _) , fy) vi ay with pass o mx fy
+... | ext , mx′ , cv = found (cursor-cases (rs ++ ext))
+  where
+    found : (cursor nothing (rs ++ ext) ≡ nothing ⊎ Σ Pos λ c → cursor nothing (rs ++ ext) ≡ just c)
+          → Σ _ λ ext′ → Met (elaborated o) (rs ++ ext′) × (y , e) ∈ ext′
+    found (inj₁ eq) = ⊥-elim (cv xy vi (≼-refl {y}) (subst (λ c → After c y) (sym eq) tt))
+    found (inj₂ (c , eq)) with cursor-in nothing (rs ++ ext) eq
+    ... | inj₁ ()
+    ... | inj₂ (_ , cm) with ∈-++⁻ rs (run-has (at-func (elaborate o)) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)
+    ...   | inj₁ m = ⊥-elim (not-past mx m ay)
+    ...   | inj₂ m = ext , mx′ , m
+
+-- Rows past one with finitely many before it, finitely many, leave
+-- finitely many before any row.
+few-past : ∀ {A} {t : EmissionSet A} {q ks} → Few t q → (∀ {y e} → t y e → q ≺ y → y ∈ ks) → ∀ {b} → Few t b
+few-past {t = t} {q = q} {ks} (fs , cover) past = fs ++ q ∷ ks , λ {y} x _ → at y x
+  where
+    at : ∀ y {e} → t y e → y ∈ fs ++ q ∷ ks
+    at y x with T? (y <ᵖ q)
+    ... | yes yq = ∈-++⁺ˡ (cover x yq)
+    ... | no qy with ≼-split {q} {y} qy
+    ...   | inj₁ qy′ = ∈-++⁺ʳ fs (there (past x qy′))
+    ...   | inj₂ refl = ∈-++⁺ʳ fs (here refl)
+
+-- The latest of a list of positions, and a start.
+maxᵖ : Pos → List Pos → Pos
+maxᵖ b []       = b
+maxᵖ b (k ∷ ks) with T? (b <ᵖ k)
+... | yes _ = maxᵖ k ks
+... | no _  = maxᵖ b ks
+
+max-≽ : ∀ b ks → b ≼ maxᵖ b ks
+max-≽ b []       = ≼-refl {b}
+max-≽ b (k ∷ ks) with T? (b <ᵖ k)
+... | yes bk = ≼-trans {b} {k} {maxᵖ k ks} (≺→≼ {b} {k} bk) (max-≽ k ks)
+... | no _   = max-≽ b ks
+
+max-∈ : ∀ b ks {k} → k ∈ ks → k ≼ maxᵖ b ks
+max-∈ b (k ∷ ks) (here refl) with T? (b <ᵖ k)
+... | yes _ = max-≽ k ks
+... | no kb = ≼-trans {k} {b} {maxᵖ b ks} kb (max-≽ b ks)
+max-∈ b (k ∷ ks) (there m) with T? (b <ᵖ k)
+... | yes _ = max-∈ k ks m
+... | no _  = max-∈ b ks m
+
+------------------------------------------------------------------------
+-- The last value met
+
+last-in : ∀ {X : Set} (xs : List X) {y} → L.last xs ≡ just y → y ∈ xs
+last-in []           ()
+last-in (x ∷ [])     refl = here refl
+last-in (x ∷ y ∷ ys) e    = there (last-in (y ∷ ys) e)
+
+last-none : ∀ {X : Set} (xs : List X) → L.last xs ≡ nothing → xs ≡ []
+last-none []           _ = refl
+last-none (x ∷ [])     ()
+last-none (x ∷ y ∷ ys) e with last-none (y ∷ ys) e
+... | ()
+
+carried-in : ∀ {A B : Set} (f : A → List B) (rx : List (Pos × Ev (ℕ × A))) {q n b} → (q , n , b) ∈ carried f rx
+           → Σ A λ a → (q , out (n , a)) ∈ rx
+carried-in f ((q , out (n , a)) ∷ rx) m with ∈-++⁻ (L.map (λ b → q , n , b) (f a)) m
+... | inj₁ m₁ with ∈-map⁻ (λ b → q , n , b) m₁
+...   | _ , _ , refl = a , here refl
+carried-in f ((q , out (n , a)) ∷ rx) m | inj₂ m₂ with carried-in f rx m₂
+...   | a′ , m′ = a′ , there m′
+carried-in f ((_ , skip) ∷ rx)  m with carried-in f rx m
+... | a′ , m′ = a′ , there m′
+carried-in f ((_ , end) ∷ rx)   m with carried-in f rx m
+... | a′ , m′ = a′ , there m′
+carried-in f ((_ , pin _) ∷ rx) m with carried-in f rx m
+... | a′ , m′ = a′ , there m′
+
+-- The last value met is a row.
+last-row : ∀ {A : Set} (o : SObs [] A) {rx q} → Met (ranked (elaborated o)) rx → lastValue valuesOf rx ≡ just q
+         → Σ (IE A) λ x → elaborated o q (out x)
+last-row o {rx} mxr lv with ∈-map⁻ proj₁ (last-in (L.map proj₁ (carried valuesOf rx)) lv)
+... | (_ , _ , _) , cm , refl with carried-in valuesOf rx cm
+...   | a , rm = a , proj₁ (proj₁ (run-row mxr rm))
+
+-- No value met, nothing held.
+none-carried : ∀ {A : Set} (rx : List (Pos × Ev (ℕ × IE A))) → L.map proj₁ (carried valuesOf rx) ≡ []
+             → concatMap valuesOf (values (unrank rx)) ≡ []
+none-carried []                                         _ = refl
+none-carried ((_ , out (_ , instEmit (value _) _)) ∷ _)  ()
+none-carried ((_ , out (_ , instEmit (mark _) _)) ∷ rx)  e = none-carried rx e
+none-carried ((_ , skip) ∷ rx)                           e = none-carried rx e
+none-carried ((_ , end) ∷ rx)                            e = none-carried rx e
+none-carried ((_ , pin _) ∷ rx)                          e = none-carried rx e
+
+none-held : ∀ {A : Set} (rx : List (Pos × Ev (ℕ × IE A))) → lastValue valuesOf rx ≡ nothing
+          → pending (proj₁ (after bstart (values (unrank rx)))) ≡ []
+none-held rx lv = cong (pendingOf (Batching.at (proj₁ (after bstart (values (unrank rx))))))
+  (++-conicalʳ _ _ (trans (released-held bstart (values (unrank rx))) (none-carried rx (last-none _ lv))))
+
+------------------------------------------------------------------------
+-- The release
+
+-- Finitely many rows of `q`'s instant lie past it.
+Bounded : ∀ {A : Set} → EmissionSet A → Pos → Set
+Bounded t q = Σ (List Pos) λ ks → ∀ {y e} → t y e → q ≺ y → instantOf y ≡ instantOf q → y ∈ ks
+
+-- How a release at `k` leaves the instant of the value `q` before it,
+-- the run met through the release `rk`: at a row of another instant, at
+-- the end of the subscribe burst or the completion, or at a count
+-- holding no route of the instant last begun.
+data How {A : Set} (o : SObs [] A) (q : Pos) (rk : List (Pos × Ev (IE A))) (k : Pos) : Set where
+  apart : instantOf k ≢ instantOf q → How o q rk k
+  sub   : ∀ {m} → elaborated o k (out (instEmit (mark Marks.subscribed) m)) → instantOf q ≡ frame → How o q rk k
+  done  : ∀ {m} → elaborated o k (out (instEmit (mark completed) m)) → How o q rk k
+  emptied : ∀ {b} → proj₂ (cnt rk) ≡ 0 → (b , out (instEmit (mark Marks.begin) (proj₁ (cnt rk)))) ∈ rk → rootOf b ≡ rootOf q
+        → How o q rk k
+
+-- Where a run released the value `q`: at a mark past it, no value between.
+record Release {A : Set} (o : SObs [] A) (rs : List (Pos × Ev (IE A))) (q : Pos) : Set where
+  field
+    r₁ r₂ : List (Pos × Ev (IE A))
+    k     : Pos
+    mk    : Marks.Mark
+    nk    : Pos
+    split : rs ≡ (r₁ ++ [ (k , out (instEmit (mark mk) nk)) ]) ++ r₂
+    past  : q ≺ k
+    none  : ∀ {y a j} → elaborated o y (out (instEmit (value a) j)) → q ≺ y → y ≺ k → ⊥
+    how   : How o q (r₁ ++ [ (k , out (instEmit (mark mk) nk)) ]) k
+
+-- WHERE THE BATCH WENT: past the last value met, with nothing held, a
+-- mark of the run released it.  The batcher releases only at a mark,
+-- each release named by `marking`: a begin of a name other than the one
+-- held, of another instant (`one-name`, `named`); the subscribe mark,
+-- whose burst is the frame's; the completion; an over or the last
+-- route's stop, which leave the count at zero under the instant's begin.
+postulate
+  release-at : ∀ {A : Set} (o : SObs [] A) {rx q} → Met (ranked (elaborated o)) rx
+             → pending (proj₁ (after bstart (values (unrank rx)))) ≡ [] → lastValue valuesOf rx ≡ just q
+             → Release o (unrank rx) q
+
+-- The completion mark comes before the end: the run's last `of` is
+-- the completion's, which completes as it emits.
+postulate
+  done-end : ∀ {A : Set} (o : SObs [] A) {k m} → elaborated o k (out (instEmit (mark completed) m))
+           → Σ Pos λ c → elaborated o c end × k ≺ c
+
+-- Past the subscribe mark, finitely many rows of the subscribe frame:
+-- the mark is the frame's last emit, and what the frame does past it is
+-- the completion of the mark's own `of`.
+postulate
+  sub-rest : ∀ {A : Set} (o : SObs [] A) {k m} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
+           → Σ (List Pos) λ ks → ∀ {y e} → elaborated o y e → k ≺ y → instantOf y ≡ frame → y ∈ ks
+
+-- A VALUE WHOSE INSTANT FINISHES IS LEFT: past finitely many rows of its
+-- instant, the program reaches a row of another instant or its end, or
+-- makes no row at all.  Which, is decided by the program: every leaf's
+-- timeline forces to its next frame or to `done` or `quiet`, so the next
+-- row past a position is decided the way `listed` decides the rows
+-- before one.
+postulate
+  exits-bounded : ∀ {A : Set} (o : SObs [] A) {q x} → elaborated o q (out x) → Bounded (elaborated o) q → Exits (elaborated o) q
+
+-- PAST A RELEASE, THE INSTANT IS OVER: no value of it, and the run
+-- leaves it.
+module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R : Release o rs q)
+                (xq : Σ (IE A) λ x → elaborated o q (out x)) where
+  open Release R
+  open Reached (⟦ elaborate o ⟧ []) root (inv-⟦⟧ (elaborate o) [] (λ ()) root (tt , λ ())) using (seen)
+
+  X = elaborated o
+
+  rk : List (Pos × Ev (IE A))
+  rk = r₁ ++ [ (k , out (instEmit (mark mk) nk)) ]
+
+  mrk : Met X rk
+  mrk = run-prefix rk (subst (Met X) split mx)
+
+  xk : X k (out (instEmit (mark mk) nk))
+  xk = proj₁ (run-row mrk (∈-++⁺ʳ r₁ (here refl)))
+
+  ck : cursor nothing rk ≡ just k
+  ck = cursor-snoc nothing r₁
+
+  -- Past the release, no value of `q`'s instant.
+  beyond : ∀ {y a j} → How o q rk k → X y (out (instEmit (value a) j)) → k ≺ y → instantOf y ≡ instantOf q → ⊥
+  beyond {y} (apart ne)     xy ky iy = ne (between {q} {k} {y} (from≺ q k past) (from≺ k y ky) (sym iy))
+  beyond     (sub xs fq)    xy ky iy = sub-async o xs xy ky (trans iy fq)
+  beyond {y} (done xc)      xy ky iy = ≺-absurd {k} {y} ky (done-last o xy xc)
+  beyond {y} (emptied z bm rb) xy ky iy with meet o mrk (seen xy tt) tt (subst (λ c → After c y) (sym ck) ky)
+  ... | ext , mx′ , yin = shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
+
+  gone : ∀ {y a j} → X y (out (instEmit (value a) j)) → q ≺ y → instantOf y ≡ instantOf q → ⊥
+  gone {y} xy qy iy with T? (y <ᵖ k)
+  ... | yes yk = none xy qy yk
+  ... | no ky with ≼-split {k} {y} ky
+  ...   | inj₁ ky′ = beyond how xy ky′ iy
+  ...   | inj₂ refl with at-func (elaborate o) xk xy
+  ...     | ()
+
+  left : Left valuesOf X q
+  left {a = instEmit (mark _) _}  _  _  _  = refl
+  left {a = instEmit (value _) _} xy qy iy = ⊥-elim (gone xy qy iy)
+
+  -- Rows of `q`'s instant past `k`, finitely many, leave finitely many past `q`.
+  bounded : ∀ {ks} → (∀ {y e} → X y e → k ≺ y → instantOf y ≡ instantOf q → y ∈ ks) → Bounded X q
+  bounded {ks} h with proj₂ (seen xk tt)
+  ... | fs , cover = fs ++ k ∷ ks , λ {y} xy _ iy → at y xy iy
+    where
+      at : ∀ y {e} → X y e → instantOf y ≡ instantOf q → y ∈ fs ++ k ∷ ks
+      at y xy iy with T? (y <ᵖ k)
+      ... | yes yk = ∈-++⁺ˡ (cover xy yk)
+      ... | no ky with ≼-split {k} {y} ky
+      ...   | inj₁ ky′ = ∈-++⁺ʳ fs (there (h xy ky′ iy))
+      ...   | inj₂ refl = ∈-++⁺ʳ fs (here refl)
+
+  exits : Exits X q
+  exits = by how
+    where
+      by : How o q rk k → Exits X q
+      by (apart ne) = inj₁ (k , _ , seen xk tt , past , inj₁ ne)
+      by (done xc) with done-end o xc
+      ... | c , xe , kc = inj₁ (c , end , seen xe tt , ≺-trans {q} {k} {c} past kc , inj₂ refl)
+      by (sub xs fq) with sub-rest o xs
+      ... | ks , h = exits-bounded o (proj₂ xq) (bounded {ks} λ xy ky iy → h xy ky (trans iy fq))
+      by (emptied z bm rb) with Held.rest (held o) mrk z bm
+      ... | ks , h = exits-bounded o (proj₂ xq)
+                       (bounded {ks} λ {y} xy ky iy → h xy (subst (λ c → After c y) (sym ck) ky) (trans (cong (_∙ []) iy) (sym rb)))
+
+-- THE RUN IS CLOSED WHERE NOTHING IS HELD: past every release, no value
+-- of the instant released, and the run leaves it.
+flush-closes : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → pending (proj₁ (after bstart (values (unrank rx)))) ≡ []
+             → Closes valuesOf (elaborated o) rx true
+flush-closes o {rx} mxr e = go (lastValue valuesOf rx) refl
+  where
+    go : ∀ v → lastValue valuesOf rx ≡ v → Over valuesOf (elaborated o) v
+    go nothing  _  = tt
+    go (just q) lv = left , exits
+      where open Released o (proj₂ (ranks-x o) mxr) (release-at o mxr e lv) (last-row o mxr lv)
+
+-- Where a run met past `q` has left `q`'s instant: through a row of
+-- another instant or the end, or with no visible row left.
+data Gone {A : Set} (o : SObs [] A) (q : Pos) (rs : List (Pos × Ev (IE A))) : Set where
+  moved : ∀ {k e} → elaborated o k e → q ≺ k → (instantOf k ≢ instantOf q ⊎ e ≡ end) → Covers (elaborated o) rs k → Gone o q rs
+  dry   : Dry (elaborated o) rs → Gone o q rs
+
+-- A HELD BATCH IS RELEASED BEFORE THE RUN LEAVES ITS INSTANT, by marks
+-- only.  The run meets no value of the held instant (`Left`), and a value
+-- of another is named for a begin of its own (`Stamps`), which releases;
+-- the end follows the completion, which releases; and once no visible row
+-- is left, the instant's last over or stop has been met, which releases.
+postulate
+  release-on : ∀ {A : Set} (o : SObs [] A) {rx q ext} → Met (ranked (elaborated o)) rx → lastValue valuesOf rx ≡ just q
+             → Left valuesOf (elaborated o) q → Met (elaborated o) (unrank rx ++ ext) → Gone o q (unrank rx ++ ext)
+             → pending (proj₁ (after bstart (values (unrank rx)))) ≢ []
+             → Σ _ λ e₁ → Σ _ λ e₂ → ext ≡ e₁ ++ e₂ × Releases (after bstart (values (unrank rx))) (values e₁)
+
+-- A CLOSED INSTANT IS RELEASED: met on, the run reaches a mark releasing
+-- what is held, with no value before it.
+releases : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → Closes valuesOf (elaborated o) rx true
+         → pending (proj₁ (after bstart (values (unrank rx)))) ≢ []
+         → Σ _ λ ext → Met (elaborated o) (unrank rx ++ ext) × Releases (after bstart (values (unrank rx))) (values ext)
+releases {A} o {rx} mxr cl ne = go (lastValue valuesOf rx) refl cl
+  where
+    X = elaborated o
+    mx = proj₂ (ranks-x o) mxr
+    open Reached (⟦ elaborate o ⟧ []) root (inv-⟦⟧ (elaborate o) [] (λ ()) root (tt , λ ())) using (seen)
+
+    leave : ∀ {q} → Σ (IE A) (λ x → X q (out x)) → Exits X q → Σ _ λ ext → Met X (unrank rx ++ ext) × Gone o q (unrank rx ++ ext)
+    leave _ (inj₁ (k , e , ((xk , _) , fk) , qk , ne′)) with pass o mx fk
+    ... | ext , mx′ , cv = ext , mx′ , moved xk qk ne′ cv
+    leave {q} (_ , xq) (inj₂ (ks , h)) with pass o mx (few-past (proj₂ (seen xq tt)) (λ xy qy → proj₁ (h xy qy)) {maxᵖ q ks})
+    ... | ext , mx′ , cv = ext , mx′ , dry λ {k} xk vi ak → cv xk vi (below k xk) ak
+      where
+        below : ∀ k {e} → X k e → k ≼ maxᵖ q ks
+        below k xk with T? (q <ᵖ k)
+        ... | yes qk = max-∈ q ks (proj₁ (h xk qk))
+        ... | no kq  = ≼-trans {k} {q} {maxᵖ q ks} kq (max-≽ q ks)
+
+    go : ∀ v → lastValue valuesOf rx ≡ v → Over valuesOf X v
+       → Σ _ λ ext → Met X (unrank rx ++ ext) × Releases (after bstart (values (unrank rx))) (values ext)
+    go nothing  lv _ = ⊥-elim (ne (none-held rx lv))
+    go (just q) lv (left , ex) with leave (last-row o mxr lv) ex
+    ... | ext , mx′ , g with release-on o mxr lv left mx′ g ne
+    ...   | e₁ , e₂ , refl , r = e₁ , run-prefix (unrank rx ++ e₁) (subst (Met X) (sym (++-assoc (unrank rx) e₁ e₂)) mx′) , r
+
+-- Closed or not, what is held is released along some extension.
+Flushes : ∀ {A : Set} (o : SObs [] A) → List (Pos × Ev (IE A)) → Bool → Set
+Flushes o rx false = ⊤
+Flushes o rx true  = Σ _ λ ext → Met (elaborated o) (rx ++ ext)
+                   × Prefix _≡_ (pending (proj₁ (after bstart (values rx)))) (stamped (released (after bstart (values rx)) (values ext)))
+
+closes-flush : ∀ {A : Set} (o : SObs [] A) {rx} → Met (ranked (elaborated o)) rx → Closes valuesOf (elaborated o) rx true
+             → Flushes o (unrank rx) true
+closes-flush o {rx} mx cl with pending-one (proj₁ (after bstart (values (unrank rx))))
+... | inj₁ e = [] , subst (Met (elaborated o)) (sym (++-identityʳ (unrank rx))) (proj₂ (ranks-x o) mx) , subst (λ P → Prefix _≡_ P _) (sym e) Prefix.[]
+... | inj₂ (g , e) with releases o mx cl (λ e′ → one≢[] (trans (sym e) e′))
+...   | ext , mx′ , r = ext , mx′ , released-pending _ r (λ e′ → one≢[] (trans (sym e) e′))
 
 ------------------------------------------------------------------------
 -- The batcher batches as the spec groups

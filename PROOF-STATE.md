@@ -74,15 +74,42 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
 `cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
 
+#### THE NEXT ROW
+
+Untried: past finitely many rows of a value's instant, the program
+reaches another instant or its end, or makes no row — constructively.
+Nothing decides the row after a position; `listed` decides those before
+one. Settled when the next row past a position is decided by operator,
+each timeline forcing to its next frame, `done` or `quiet`.
+
+Members: `exits-bounded`.
+
+#### THE FINITE REST
+
+Untried: past a zero count only finitely many rows of the instant last
+begun remain — a route is held while its instant can still make a row.
+Settled when each is a body: connect's rows beyond its body's (bursts,
+echoes), the combinator scan's, a cold's.
+
+Members: `cold-rest`, `scan-rest`, `conn-rest`.
+
 #### THE RELEASE
 
-Untried in this vocabulary: the batcher holds nothing exactly where the
-run's last instant is over — no value of it left past its last value, by
-position, and the run leaving it. The bridge from the batcher's routes
-to `Over` is open both ways. Settled when both are bodies over `shut`
-and the protocol.
+Untried: the batcher releases exactly at the protocol's marks — past
+the last value with nothing held, a mark past it released it, of one of
+four kinds; a held batch is released by marks before the run leaves its
+instant. Settled when each is a body over `Walk`'s tally and the
+protocol.
 
-Members: `flush-closes`, `releases`.
+Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+
+#### THE PASS
+
+Untried, low risk: a run meets on to every visible row up to one with
+finitely many rows before it. `listed`, `Reaching.reach` and `run-det`
+are each proven. Settled when it is a body over them.
+
+Members: `pass`.
 
 #### THE BATCH RANK
 
