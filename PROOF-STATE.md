@@ -35,8 +35,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ERASURE
 
 Untried: the elaborated run carries the plain one — each elaborated
-row put on the plain row it elaborates, or ahead of all, in order,
-instant for instant, a value on its value, the end on the end. The
+row put on the unpinned plain row it elaborates, or ahead of all, in
+order, instant for instant, a value on its value, the end on the end;
+a plain pin carried only into its instant. The
 elaboration subscribes every leaf deeper, so the map of positions must
 keep their order, through each cold's async instants. Switch, exhaust
 and the bounded queue are the real cases. Settled when `erasing` is a

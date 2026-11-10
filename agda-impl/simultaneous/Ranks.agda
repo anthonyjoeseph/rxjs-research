@@ -42,7 +42,7 @@ open import Relation.Nullary using (yes; no; ¬?)
 
 open import denotation.Position using (Pos; _≟ᵖ_; Instant; frame; root; _≟ⁱ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
@@ -224,15 +224,21 @@ rank-instant {q = q} {q′} x x′ r r′ with triⁱ (instantOf q) (instantOf q
 ------------------------------------------------------------------------
 -- A reading's ranks
 
--- A visible row truncated has finitely many rows before it.
-truncate-few : ∀ {A} {X : EmissionSet A} {q e} → Truncate X q e → Visible e → Few (Truncate X) q
+-- An unpinned row truncated has finitely many rows before it.
+truncate-few : ∀ {A} {X : EmissionSet A} {q e} → Truncate X q e → Unpinned e → Few (Truncate X) q
 truncate-few {e = out _} (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
+truncate-few {e = skip}  (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
 truncate-few {e = end}   (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
 
--- So has a visible row of a reading.
-enter-few : ∀ {A} (d : Den A) p {q e} → enter d p q e → Visible e → Few (enter d p) q
+-- So has an unpinned row of a reading.
+enter-few : ∀ {A} (d : Den A) p {q e} → enter d p q e → Unpinned e → Few (enter d p) q
 enter-few (hot t)    p = truncate-few
 enter-few (coldAt f) p = truncate-few
+
+-- A visible row is unpinned.
+visible-unpinned : ∀ {A} {e : Ev A} → Visible e → Unpinned e
+visible-unpinned {e = out _} _ = tt
+visible-unpinned {e = end}   _ = tt
 
 -- A ranked row is a row.
 ranked→ : ∀ {A} {t : EmissionSet A} {q e} → ranked t q e → t q (unrankᴱ e)
@@ -272,13 +278,13 @@ module _ {A : Set} {t : EmissionSet A} (few : ∀ {q e} → t q e → Visible e 
 -- The elaborated run's names agree with its ranks
 
 ranks-e : ∀ {A} (o : SObs [] A) → Ranks (events o)
-ranks-e o = ranks (λ {q} {e} → enter-few (⟦ plain o ⟧ []) root {q} {e}) (λ {q} → listed (plain o) {q})
+ranks-e o = ranks (λ {q} {e} r v → enter-few (⟦ plain o ⟧ []) root {q} {e} r (visible-unpinned v)) (λ {q} → listed (plain o) {q})
 
 ranks-x : ∀ {A} (o : SObs [] A) → Ranks (elaborated o)
-ranks-x o = ranks (λ {q} {e} → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e}) (λ {q} → listed (elaborate (plain o)) {q})
+ranks-x o = ranks (λ {q} {e} r v → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e} r (visible-unpinned v)) (λ {q} → listed (elaborate (plain o)) {q})
 
 ranks-b : ∀ {A} (o : SObs [] A) → Ranks (batched o)
-ranks-b o = ranks (λ {q} {e} → enter-few (⟦ batchedObs o ⟧ []) root {q} {e}) (λ {q} → listed (batchedObs o) {q})
+ranks-b o = ranks (λ {q} {e} r v → enter-few (⟦ batchedObs o ⟧ []) root {q} {e} r (visible-unpinned v)) (λ {q} → listed (batchedObs o) {q})
 
 -- THE VALUES OF ONE INSTANT CARRY ONE NAME: each carries its instant's
 -- last begin, or the root through the subscribe burst.

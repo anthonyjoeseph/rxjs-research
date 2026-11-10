@@ -46,7 +46,7 @@ open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; ranked; Rank; values; outs; vals; stampedᴮ; stampedᴰ; carried; Over; Closes; Ends; Erases;
   elaborated; events)
-open import simultaneous.Ranks using (unrank; ranks-x; ranks-e; instant-rank; enter-few)
+open import simultaneous.Ranks using (unrank; ranks-x; ranks-e; instant-rank; enter-few; visible-unpinned)
 open import simultaneous.Listing using (Listing; listed)
 open import simultaneous.Layers using (at-func; run-tail; run-++; cursor-snoc; ends-last; snoc-view)
 open import simultaneous.Project using (run-prefix)
@@ -288,6 +288,11 @@ single-values (instEmit (mark _) _)  = inj₁ refl
 --   body ends at once puts its source's burst pins past its end in the
 --   subscribe frame, and the elaboration's end is that frame's last row:
 --   no elaborated row lies past it to carry them in order.
+-- DEAD ROUTE: carrying the pins in order.  Concat's elaboration
+--   subscribes a queued lane under its own readers, so a pin of a later
+--   lane's subscribe can fall past a value the plain run puts after it:
+--   no elaborated row carries it in order.  A pin is carried only into
+--   its instant, which is all a rank or an exit reads of it.
 postulate
   erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
 
@@ -297,6 +302,7 @@ private
       (λ {y} {e} {e′} → at-func (plain o) {y} {e} {e′}) (λ {y} {e} {e′} → at-func (elaborate (plain o)) {y} {e} {e′})
       (λ {k} {e} → Reached.seen (⟦ plain o ⟧ []) root (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) {k} {e})
       (λ {k} {e} → Reached.seen (⟦ elaborate (plain o) ⟧ []) root (inv-⟦⟧ (elaborate (plain o)) [] (λ ()) root (tt , λ ())) {k} {e})
+      (λ {k} {e} → enter-few (⟦ plain o ⟧ []) root {k} {e})
       (λ {q} → listed (plain o) {q}) (λ {q} → listed (elaborate (plain o)) {q})
       (erasing o)
 
@@ -348,8 +354,8 @@ module Erasing {A : Set} (o : SObs [] A) where
 
     module EX = Enumerate {IE A} {A} {valuesOf} single-values {X} funcX
     module EE = Enumerate {A} {A} {[_]} svE {E} funcE
-    module RX = Reaching {IE A} {X} funcX (λ {q} {e} → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e}) (λ {q} → listed (elaborate (plain o)) {q})
-    module RE = Reaching {A} {E} funcE (λ {q} {e} → enter-few (⟦ plain o ⟧ []) root {q} {e}) (λ {q} → listed (plain o) {q})
+    module RX = Reaching {IE A} {X} funcX (λ {q} {e} r v → enter-few (⟦ elaborate (plain o) ⟧ []) root {q} {e} r (visible-unpinned v)) (λ {q} → listed (elaborate (plain o)) {q})
+    module RE = Reaching {A} {E} funcE (λ {q} {e} r v → enter-few (⟦ plain o ⟧ []) root {q} {e} r (visible-unpinned v)) (λ {q} → listed (plain o) {q})
     module NX = Nths (VX o)
     module NE = Nths (VE o)
 
