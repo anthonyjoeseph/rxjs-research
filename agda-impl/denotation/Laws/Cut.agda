@@ -14,27 +14,26 @@
 -- `m + 2` (`Bound.cut-ag`).
 module denotation.Laws.Cut where
 
-open import Data.Bool using (Bool; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.List.Relation.Unary.All using (_∷_; lookup)
 open import Data.List.Relation.Unary.Any using (Any; here; there)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; <-≤-trans; ≮⇒≥; _<?_; <-cmp; n≮n)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
-open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Nullary using (yes; no)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Path; ix; _⊕_)
+open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Events using (Events; Timeline; timelineAt; start; <ᵖ-part; ix-<)
 open import denotation.EmissionSet
-  using (Ev; out; skip; end; pin; EmissionSet; _≺_; Dep; Reach; Truncate; Den; coldAt; hot; enter; DenEnv; approx;
+  using (Ev; out; skip; end; pin; EmissionSet; _≺_; Dep; Truncate; Den; coldAt; hot; DenEnv; approx;
   Spin; spin; InE; at-out; at-skip; at-end; on-out; on-skip; Unpinned; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; reach-via; _~⟨_⟩_; ~-refl)
 open import denotation.Laws.Count using (Cov; AgC; trunc-ag; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-refl; ≈ᶜ-mono; contract; pick)

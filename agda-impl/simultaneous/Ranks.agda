@@ -42,7 +42,7 @@ open import Relation.Nullary using (yes; no; ¬?)
 
 open import denotation.Position using (Pos; _≟ᵖ_; Instant; frame; root; _≟ⁱ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; _≺_; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 open import simultaneous.SObs using (SObs; module Elaborate)

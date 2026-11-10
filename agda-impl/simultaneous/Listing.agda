@@ -10,8 +10,7 @@
 -- cut short, so holds exactly its rows.
 module simultaneous.Listing where
 
-open import Data.Bool using (Bool; true; false; T; _∨_)
-open import Data.Empty using (⊥-elim)
+open import Data.Bool using (Bool; false; _∨_)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; applyUpTo; filter) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻)
@@ -20,12 +19,12 @@ import Data.List.Relation.Unary.All.Properties as AllP
 open import Data.List.Relation.Unary.Any using (here; there)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary.Decidable.Core using (T?)
 
 open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -33,8 +32,8 @@ import denotation.Events as Ev
 open import denotation.Events using (Events; Timeline; timelineAt; start; ofᴱ)
 open import denotation.Position using (Pos; _<ᵖ_; ix; last; root; _⊕_)
 open import denotation.EmissionSet
-  using (out; skip; end; EmissionSet; _≺_; Few; InE; at-out; at-skip; at-end; on-out; on-skip; Den; enter; After; DenEnv; approx; ⟦_⟧;
-  Spin; spin)
+  using (out; skip; end; EmissionSet; _≺_; Few; InE; at-out; at-skip; at-end; on-out; on-skip; enter;
+  After; DenEnv; ⟦_⟧; Spin; spin)
 open import denotation.Laws.Modulus using (≺→≼; upto)
 open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-trans; AgC-sym)
 open import denotation.Laws.Worlds using (⊑-refl)
