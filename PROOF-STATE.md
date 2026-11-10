@@ -34,14 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Probed, unproven: before each side's end, the elaborated program's i-th
-value is its plain program's, at the same rank — the elaboration adds no
-instant, and both count the subscribe frame — its instant over exactly
-when the other's is; and each side ends when the other does. Switch,
-exhaust and the bounded queue are the real cases. Settled when each is a
-body by operator.
+Probed, unproven: the elaborated run carries the plain one — each
+elaborated row put on the plain row it elaborates, or ahead of all,
+in order, instant for instant, a value on its value, the end on the end.
+Switch, exhaust and the bounded queue are the real cases. Settled when
+`erasing` is a body by operator.
 
-Members: `erase-x`, `erase-e`, `erase-rank`, `erase-over`, `erase-end`.
+Members: `erasing`.
 
 #### THE PROTOCOL
 
