@@ -42,7 +42,7 @@ timers started), and a concat's queued lane, re-anchored under its
 wrapper's end: flatMap first. Settled when each former's leaf is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`,
-`carry-cold`, `carry-takeWhile`, `carry-scan`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
+`carry-cold`, `carry-takeWhile`, `carry-⊥`, `carry-next`, `carry-lim`, `carry-wrap`.
 
 #### THE PROTOCOL
 

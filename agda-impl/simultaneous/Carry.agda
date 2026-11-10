@@ -41,7 +41,7 @@ open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; cold; empty; of; map; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
@@ -331,15 +331,15 @@ private
     lst← : ∀ {k} → Listed b k → Listed a k
     lst← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
 
-  unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
-  unp← k-out  _ = tt
-  unp← k-skip _ = tt
-  unp← k-end  _ = tt
+unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
+unp← k-out  _ = tt
+unp← k-skip _ = tt
+unp← k-end  _ = tt
 
-  unp→ : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e → Unpinned e′
-  unp→ k-out  _ = tt
-  unp→ k-skip _ = tt
-  unp→ k-end  _ = tt
+unp→ : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e → Unpinned e′
+unp→ k-out  _ = tt
+unp→ k-skip _ = tt
+unp→ k-end  _ = tt
 
 -- A CARRIED RUN RELABELLED ROW FOR ROW stays carried, when the labels
 -- carry what they carried.
@@ -423,13 +423,13 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
 ------------------------------------------------------------------------
 -- A map
 
-private
-  kin-map : ∀ {A B} {g : A → B} (e : Ev A) → Kin e (mapEv g e)
-  kin-map (out _) = k-out
-  kin-map skip    = k-skip
-  kin-map (pin _) = k-pin
-  kin-map end     = k-end
+kin-map : ∀ {A B} {g : A → B} (e : Ev A) → Kin e (mapEv g e)
+kin-map (out _) = k-out
+kin-map skip    = k-skip
+kin-map (pin _) = k-pin
+kin-map end     = k-end
 
+private
   sh-map : ∀ {A B} {g : A → B} (e : Ev (IE A)) → Shown (One valuesOf) (mapEv (mapIE g) e) → Shown (One valuesOf) e
   sh-map (out (instEmit (value a) _)) _       = a , refl
   sh-map (out (instEmit (mark _) _))  (_ , ())
@@ -460,6 +460,25 @@ map-carry g d d′ p p′ c =
     module E = MapRun (mapIE g) d′ p′
 
 ------------------------------------------------------------------------
+-- Carriers in order
+
+-- Along an order embedding, carriers keep the order of the rows they
+-- carry: no row lies strictly under another, so their images are apart.
+module Mono {A Y : Set} {f : Y → List A} {M : PMap} {HP HE : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+            (hm : Emb M) (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (c : CarryAt f M HP HE t u s s′) where
+  open CarryAt c
+
+  private
+    led-row : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → k ⊑ k′ → ⊥
+    led-row {k} i i′ kk ([] , refl) = ≺-irrefl {k} (subst (k ≺_) (⊕-identityʳ k) kk)
+    led-row i i′ kk (l ∷ ys , refl) = img-row i λ { (_ , tk , _) → img-row i′ λ { (_ , tk′ , _) → flat tk tk′ } }
+
+  img-mono : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
+  img-mono i i′ kk with ext i | ext i′
+  ... | y , my , σ , refl | y′ , my′ , σ′ , refl =
+    apart (Emb.mono hm my my′ kk) (λ yy → led-row i i′ kk (Emb.reflect hm my my′ yy)) σ σ′
+
+------------------------------------------------------------------------
 -- From a carried run to its attribution
 
 -- With no environment, a listed run carried along an order embedding,
@@ -473,10 +492,6 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
   open CarryAt c
 
   private
-    led-row : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → k ⊑ k′ → ⊥
-    led-row {k} i i′ kk ([] , refl) = ≺-irrefl {k} (subst (k ≺_) (⊕-identityʳ k) kk)
-    led-row i i′ kk (l ∷ ys , refl) = img-row i λ { (_ , tk , _) → img-row i′ λ { (_ , tk′ , _) → flat tk tk′ } }
-
     unpinned : ∀ {k e} → t k e → Home t k → Unpinned e
     unpinned {e = out _} _ _ = tt
     unpinned {e = skip}  _ _ = tt
@@ -544,11 +559,6 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
         ... | both _ _ | _ , () , _   | _
         ... | subs     | _            | m = ∈-++⁺ʳ (gather (λ k₂ → fib (row k₂)) ks) m
 
-  img-mono′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
-  img-mono′ i i′ kk with ext i | ext i′
-  ... | y , my , σ , refl | y′ , my′ , σ′ , refl =
-    apart (Emb.mono hm my my′ kk) (λ yy → led-row i i′ kk (Emb.reflect hm my my′ yy)) σ σ′
-
   inst′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → (instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′)
   inst′ i i′ with inst-img i | inst-img i′
   ... | y , my , e | y′ , my′ , e′ = mk⇔
@@ -564,7 +574,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
   attributed : Attribution Every (One valuesOf) (Reads valuesOf) t u s s′
   attributed = record
     { Img = Img ; img = img′ ; shown = shown ; img-row = λ i → row-at (few i) (img-row i) ; img-fun = img-fun
-    ; img-mono = img-mono′ ; inst = inst′ ; home = home′
+    ; img-mono = Mono.img-mono hm flat c ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm fm)
     ; live = live
     ; spent = λ i sp → let (ls , f) = every-row i sp in ls , λ ur _ → f ur
@@ -643,7 +653,6 @@ record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → 
 -- do, under the meaning and under every approximant alike.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
-  carry-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
   carry-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
                   → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → Carry m ρ′ (f a)) → Carry m ρ (flatMap op f s)
@@ -862,31 +871,6 @@ postulate
              → Carry (just n) ρ (Later.force l) → Carry (just (suc n)) ρ (defer l)
   carry-lim  : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
              → (∀ n → Carry (just n) ρ (defer l)) → Carry nothing ρ (defer l)
-
-carry-approx : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → Carry (just n) ρ o
-carry-approx n       ρ (cold c)          = carry-cold (just n) ρ c
-carry-approx n       ρ empty             = carry-empty (just n) ρ
-carry-approx n       ρ (of xs)           = carry-of (just n) ρ xs
-carry-approx n       ρ (map f s)         = carry-map (just n) ρ f s (carry-approx n ρ s)
-carry-approx n       ρ (scan f z s)      = carry-scan (just n) ρ f z s (carry-approx n ρ s)
-carry-approx n       ρ (takeWhile i p s) = carry-takeWhile (just n) ρ i p s (carry-approx n ρ s)
-carry-approx n       ρ (flatMap op f s)  = carry-flatMap (just n) ρ op f s (carry-approx n ρ s) λ a ρ′ → carry-approx n ρ′ (f a)
-carry-approx n       ρ (connect s b)     = carry-connect (just n) ρ s b (carry-approx n ρ s) λ ρ′ → carry-approx n ρ′ b
-carry-approx n       ρ (connected i)     = carry-connected (just n) ρ i
-carry-approx zero    ρ (defer l)         = carry-⊥ ρ l
-carry-approx (suc n) ρ (defer l)         = carry-next n ρ l (carry-approx n ρ (Later.force l))
-
-carry-⟦⟧ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → Carry nothing ρ o
-carry-⟦⟧ ρ (cold c)          = carry-cold nothing ρ c
-carry-⟦⟧ ρ empty             = carry-empty nothing ρ
-carry-⟦⟧ ρ (of xs)           = carry-of nothing ρ xs
-carry-⟦⟧ ρ (map f s)         = carry-map nothing ρ f s (carry-⟦⟧ ρ s)
-carry-⟦⟧ ρ (scan f z s)      = carry-scan nothing ρ f z s (carry-⟦⟧ ρ s)
-carry-⟦⟧ ρ (takeWhile i p s) = carry-takeWhile nothing ρ i p s (carry-⟦⟧ ρ s)
-carry-⟦⟧ ρ (flatMap op f s)  = carry-flatMap nothing ρ op f s (carry-⟦⟧ ρ s) λ a ρ′ → carry-⟦⟧ ρ′ (f a)
-carry-⟦⟧ ρ (connect s b)     = carry-connect nothing ρ s b (carry-⟦⟧ ρ s) λ ρ′ → carry-⟦⟧ ρ′ b
-carry-⟦⟧ ρ (connected i)     = carry-connected nothing ρ i
-carry-⟦⟧ ρ (defer l)         = carry-lim ρ l λ n → carry-approx n ρ (defer l)
 
 ------------------------------------------------------------------------
 -- The whole run
