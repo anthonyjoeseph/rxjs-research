@@ -39,7 +39,7 @@ open import denotation.Position using (Pos; root; ix; _≟ᵖ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module Values; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
-open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind)
+open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind; entered-reach; ≺-≼-≺)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
@@ -51,7 +51,7 @@ open import simultaneous.Listing using (Listing; listed)
 open import simultaneous.Layers using (at-func; run-tail; run-++; cursor-snoc; ends-last; snoc-view)
 open import simultaneous.Project using (run-prefix)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Laws.Worlds using (InvAt)
+open import denotation.Laws.Worlds using (InvAt; ⊑-≼; inside-⊑)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
 open import simultaneous.Carry using (Carry; carry-⟦⟧; At₀; emb-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
@@ -277,6 +277,11 @@ single-values : ∀ {A} → Single {IE A} valuesOf
 single-values (instEmit (value a) _) = inj₂ (a , refl)
 single-values (instEmit (mark _) _)  = inj₁ refl
 
+-- A pin waits on every row before its connect.
+pin-few : ∀ {A} (o : SObs [] A) {k p} → events o k (pin p) → Few (events o) p
+pin-few o {k} {p} tk with entered-reach (⟦ plain o ⟧ []) root tk | proj₂ (InvAt.pinned (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) tk)
+... | ks , F | i = ks , λ {x} tx xp → F tx (≺-≼-≺ {x} {p} {k} xp (⊑-≼ (inside-⊑ p k i))) (λ _ → inj₁ xp)
+
 -- THE ELABORATION CARRIES THE PLAIN RUN: each unpinned plain row at or
 -- before the end is carried by the elaborated row elaborating it, a
 -- value by its value and the end by the end, in order, instant for
@@ -308,7 +313,8 @@ erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads va
 erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ())
                  root coreAt (coreAt , (refl , refl) , ([] , refl)) (tt , λ ()) (tt , λ ()) fresh-At₀
 ... | M , ms , hm , _ , c =
-  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
+  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (InvAt.func (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())))
+    (listed (plain o)) (pin-few o) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
     (carry-wrap o hm (ms (refl , refl)) c)
 
 -- A plain row that is not a pin is at or before every end.

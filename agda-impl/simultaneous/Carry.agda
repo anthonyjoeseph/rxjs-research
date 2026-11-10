@@ -19,17 +19,17 @@
 module simultaneous.Carry where
 
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_]; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.All using (lookup; [])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷-injectiveˡ)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Data.Bool.Properties using (T?)
 open import Relation.Nullary using (yes; no)
 open import denotation.Position using (_<ᵖ_)
@@ -45,8 +45,8 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_; ⟦_⟧; approx; module Op;
-  Truncate; Reach; InE; at-end; at-out; on-out)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_;
+  ⟦_⟧; approx; module Op; Truncate; Reach; InE; at-end; at-out; on-out)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
@@ -59,6 +59,8 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.Attribution using (Live; Shown; Match; Attribution; Every; One; Reads)
 open import denotation.Position using (_≟ᵖ_)
+open import denotation.Laws.Shows using (∈-stable)
+open import simultaneous.Listing using (Listed; Listing)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE)
 open Equivalence using (to; from)
@@ -229,10 +231,14 @@ data Cause : Set where
 -- environment row it lies under; to a plain row and an environment row it
 -- lies under; or to the subscribe instant.
 Owes : ∀ {A : Set} → PMap → (Pos → Set) → EmissionSet A → Pos → Cause → Pos → Set
-Owes {A} M HE t s′ (row k)    r = Σ (Ev A) (t k) × Σ Pos λ y → M k y × instantOf y ≡ instantOf r
+Owes {A} M HE t s′ (row k)    r = ¬ ¬ Σ (Ev A) (t k) × Σ Pos λ y → M k y × instantOf y ≡ instantOf r
 Owes {A} M HE t s′ (env h)    r = HE h × h ⊑ r
-Owes {A} M HE t s′ (both k h) r = Σ (Ev A) (t k) × HE h × h ⊑ r
+Owes {A} M HE t s′ (both k h) r = ¬ ¬ Σ (Ev A) (t k) × HE h × h ⊑ r
 Owes {A} M HE t s′ subs       r = instantOf r ≡ instantOf s′
+
+-- An unpinned row, classically: a pin's home.
+Home : ∀ {A : Set} → EmissionSet A → Pos → Set
+Home {A} t k = ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
 
 -- Owed through the environment.
 Read : Cause → Set
@@ -248,15 +254,28 @@ Read subs       = ⊥
 -- `t` homed also by an instant of an environment row.  Each row of `u` is
 -- owed to a cause, each cause owed finitely many, and a row owed through
 -- the environment lies at or before every end.
+--
+-- A ROW IS CARRIED FROM ITS LISTING, onto a carrier listed too; a row
+-- only witnessed to exist (the carried row, a cause, a pin's home) is so
+-- classically, and a pin's home lies before its connect.  A closed run is
+-- listed wherever few rows precede (`simultaneous.Listing.listed`), and
+-- there each classical row is found among the listed ones (`attributed`).
+--
+-- DEAD ROUTE: each row from finitely many before it, outright.  A scan's
+--   row needs its source's values before it listed, and a subterm's run is
+--   not listed from few rows: a lane reading a hot past an accumulation of
+--   its rows (hidden from the subterm by a takeWhile failed early) meets a
+--   later row iff the accumulation is finite, so a scan over that lane and
+--   a timer has a row at the timer whose state decides it.
 record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE : Pos → Set) (t : EmissionSet A) (u : EmissionSet Y) (s s′ : Pos) : Set₁ where
   field
     Img     : Pos → Pos → Set
     ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
-    img     : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
-            → Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Few u l × Match Every (One f) (Reads f) e e′
+    img     : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k
+            → Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Listed u l × Match Every (One f) (Reads f) e e′
     shown   : ∀ {l e} → u l e → Shown (One f) e → Live u l → Few u l
             → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
-    img-row : ∀ {k l} → Img k l → Σ (Ev A) λ e → t k e × Unpinned e
+    img-row : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
     img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
     place   : ∀ {m e} → u m e → Live u m → Few u m
             → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m)
@@ -271,8 +290,8 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE : Pos → Set) (
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pbk     : Pos → List Pos
-    pinned  : ∀ {k p} → t k (pin p) → Live t k → (Σ Pos λ l → Σ (Ev Y) (u l) × k ∈ pbk l)
-              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → Σ (Ev A) λ e₀ → t k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k)
+    pinned  : ∀ {k p} → t k (pin p) → Live t k → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × k ∈ pbk l)
+              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
 ------------------------------------------------------------------------
@@ -306,6 +325,12 @@ private
     few← : ∀ {k} → Few b k → Few a k
     few← (ks , F) = ks , λ ak kk → F (proj₁ (proj₂ (to ak))) kk
 
+    lst→ : ∀ {k} → Listed a k → Listed b k
+    lst→ (ks , F , B) = ks , (λ bk kk → F (proj₁ (proj₂ (fro bk))) kk) , λ m → proj₁ (B m) , proj₁ (to (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (to (proj₂ (proj₂ (B m)))))
+
+    lst← : ∀ {k} → Listed b k → Listed a k
+    lst← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
+
   unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
   unp← k-out  _ = tt
   unp← k-skip _ = tt
@@ -335,12 +360,12 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     module T = Rows {a = t} {b = t′} {Rel = R} kin up down
     module U = Rows {a = u} {b = u′} {Rel = R′} kin′ up′ down′
 
-    img′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Few t′ k
-         → Σ Pos λ l → Img k l × Σ (Ev Y′) λ e₁′ → u′ l e₁′ × Few u′ l × Match Every (One f′) (Reads f′) e′ e₁′
+    img′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Listed t′ k
+         → Σ Pos λ l → Img k l × Σ (Ev Y′) λ e₁′ → u′ l e₁′ × Listed u′ l × Match Every (One f′) (Reads f′) e′ e₁′
     img′ {k} tk un lv fw with down tk
-    ... | e , tk₀ , r with img tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.few← {k} fw)
+    ... | e , tk₀ , r with img tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} fw)
     ...   | l , i , e₁ , ul , fu , m with up′ ul
-    ...     | e₁′ , ul′ , r′ = l , i , e₁′ , ul′ , U.few→ {l} fu , mt i r r′ m
+    ...     | e₁′ , ul′ , r′ = l , i , e₁′ , ul′ , U.lst→ {l} fu , mt i r r′ m
 
     shown′ : ∀ {l e₁′} → u′ l e₁′ → Shown (One f′) e₁′ → Live u′ l → Few u′ l
            → Σ Pos λ k → Img k l × Σ (Ev A′) λ e₀′ → t′ k e₀′ × Match Every (One f′) (Reads f′) e₀′ e₁′
@@ -349,33 +374,38 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ...   | k , i , e₀ , tk , m with up tk
     ...     | e₀′ , tk′ , r = k , i , e₀′ , tk′ , mt i r r′ m
 
-    img-row′ : ∀ {k l} → Img k l → Σ (Ev A′) λ e → t′ k e × Unpinned e
-    img-row′ i with img-row i
-    ... | e , tk , un with up tk
-    ...   | e′ , tk′ , r = e′ , tk′ , unp→ (kin r) un
+    up-row : ∀ {k} → Σ (Ev A) (λ e → t k e × Unpinned e) → Σ (Ev A′) λ e → t′ k e × Unpinned e
+    up-row (e , tk , un) = proj₁ (up tk) , proj₁ (proj₂ (up tk)) , unp→ (kin (proj₂ (proj₂ (up tk)))) un
+
+    img-row′ : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A′) λ e → t′ k e × Unpinned e
+    img-row′ i n = img-row i λ r → n (up-row r)
 
     owes′ : ∀ {c r} → Owes M HE t s′ c r → Owes M HE t′ s′ c r
-    owes′ {row k}    ((_ , tk) , y)  = (_ , proj₁ (proj₂ (up tk))) , y
-    owes′ {env h}    o               = o
-    owes′ {both k h} ((_ , tk) , hy) = (_ , proj₁ (proj₂ (up tk))) , hy
-    owes′ {subs}     o               = o
+    owes′ {row k}    (nr , y)  = (λ n → nr λ { (_ , tk) → n (_ , proj₁ (proj₂ (up tk))) }) , y
+    owes′ {env h}    o         = o
+    owes′ {both k h} (nr , hy) = (λ n → nr λ { (_ , tk) → n (_ , proj₁ (proj₂ (up tk))) }) , hy
+    owes′ {subs}     o         = o
 
-    homed′ : ∀ {k} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → Σ (Ev A) λ e₀ → t k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k)
-               ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
-           → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → Σ (Ev A′) λ e₀ → t′ k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k)
-               ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
-    homed′ (inj₁ e)                          = inj₁ e
-    homed′ (inj₂ (inj₁ (k₀ , e₀ , tk , un , ek))) with up tk
-    ... | e₀′ , tk′ , r = inj₂ (inj₁ (k₀ , e₀′ , tk′ , unp→ (kin r) un , ek))
-    homed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
-
-    pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → (Σ Pos λ l → Σ (Ev Y′) (u′ l) × k ∈ pbk l)
-              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → Σ (Ev A′) λ e₀ → t′ k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k)
+    pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × k ∈ pbk l)
+              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} tk lv with down tk
+    pinned′ {k} {p} tk lv with down tk
     ... | _ , tk₀ , r with kin r
     ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c}))
-    ...     | (l , (_ , ul) , m) , h = (l , (proj₁ (up′ ul) , proj₁ (proj₂ (up′ ul))) , m) , homed′ {k} h
+    ...     | (l , p′ , ul , m) , h = (l , p′ , pin-up ul , m) , homed′ {k} {p} h
+      where
+        pin-up : ∀ {l p′} → u l (pin p′) → u′ l (pin p′)
+        pin-up ul with up′ ul
+        ... | _ , ul′ , r′ with kin′ r′
+        ...   | k-pin = ul′
+
+        homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
+                   ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+               → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
+                   ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+        homed′ (inj₁ e)                         = inj₁ e
+        homed′ (inj₂ (inj₁ (k₀ , kp , hm , ek))) = inj₂ (inj₁ (k₀ , kp , (λ n → hm λ r → n (up-row r)) , ek))
+        homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
 
   carried : CarryAt f′ M HP HE t′ u′ s s′
   carried = record
@@ -432,19 +462,51 @@ map-carry g d d′ p p′ c =
 ------------------------------------------------------------------------
 -- From a carried run to its attribution
 
--- With no environment, a run carried along an order embedding, from a
--- subscription its map puts under the other's, is attributed: the order,
--- the instants and the home instant come from the map's.
+-- With no environment, a listed run carried along an order embedding,
+-- from a subscription its map puts under the other's, is attributed: the
+-- order, the instants and the home instant come from the map's, and each
+-- row it holds classically is found among those its listing holds.
 module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos}
-         (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥)
+         (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (func : ∀ {y e e′} → t y e → t y e′ → e ≡ e′)
+         (lst : Listing t) (pin-few : ∀ {k p} → t k (pin p) → Few t p)
          (δ : Path) (at : M s (s′ ⊕ δ)) (c : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) t u s s′) where
   open CarryAt c
 
   private
     led-row : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → k ⊑ k′ → ⊥
     led-row {k} i i′ kk ([] , refl) = ≺-irrefl {k} (subst (k ≺_) (⊕-identityʳ k) kk)
-    led-row i i′ kk (l ∷ ys , refl) with img-row i | img-row i′
-    ... | _ , tk , _ | _ , tk′ , _ = flat tk tk′
+    led-row i i′ kk (l ∷ ys , refl) = img-row i λ { (_ , tk , _) → img-row i′ λ { (_ , tk′ , _) → flat tk tk′ } }
+
+    unpinned : ∀ {k e} → t k e → Home t k → Unpinned e
+    unpinned {e = out _} _ _ = tt
+    unpinned {e = skip}  _ _ = tt
+    unpinned {e = end}   _ _ = tt
+    unpinned {e = pin _} tk h = ⊥-elim (h λ { (_ , tk₀ , un) → subst Unpinned (func tk₀ tk) un })
+
+    -- Past a row it holds, `t`'s next rows lie past that row's path.
+    past : ∀ {k x e} → Home t k → t x e → x ≺ (k ⊕ [ last ]) → ¬ (x ≡ k) → ¬ (x ≺ k) → ⊥
+    past {k} {x} h tx xl x≠k nxk with T? (inside k x)
+    ... | yes i with inside-⊑ k x i
+    ...   | [] , e = x≠k (trans e (⊕-identityʳ k))
+    ...   | _ ∷ _ , refl = h λ { (_ , tk , _) → flat tk tx }
+    past {k} {x} h tx xl x≠k nxk | no ni with ≼-split {k} {x} nxk
+    ...   | inj₂ e = x≠k (sym e)
+    ...   | inj₁ kx = ≺-irrefl {x} (≺-trans {x} {k ⊕ [ last ]} {x} xl
+                         (subst ((k ⊕ [ last ]) ≺_) (⊕-identityʳ x) (apart {k} {x} kx (λ q → ni (⊑-inside q)) [ last ] [])))
+
+    -- A row held classically, with few rows before it, is listed.
+    row-at : ∀ {k} → Few t k → Home t k → Σ (Ev A) λ e → t k e × Unpinned e
+    row-at {k} (ks , F) h with lst {k ⊕ [ last ]} (k ∷ ks , cov)
+      where
+        cov : ∀ {x e} → t x e → x ≺ (k ⊕ [ last ]) → x ∈ k ∷ ks
+        cov {x} tx xl with x ≟ᵖ k
+        ... | yes refl = here refl
+        ... | no x≠k with T? (x <ᵖ k)
+        ...   | yes xk = there (F tx xk)
+        ...   | no nxk = ⊥-elim (past h tx xl x≠k nxk)
+    ... | ls , G , B with any? (k ≟ᵖ_) ls
+    ...   | yes m = proj₁ (proj₂ (B m)) , proj₂ (proj₂ (B m)) , unpinned (proj₂ (proj₂ (B m))) h
+    ...   | no ¬m = ⊥-elim (h λ { (_ , tk , _) → ¬m (G tk (≺-ext k [])) })
 
     inst-img : ∀ {k l} → Img k l → Σ Pos λ y → M k y × instantOf l ≡ instantOf y
     inst-img i with ext i
@@ -477,7 +539,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
       where
         go : ∀ {r e} → u r e → r ∈ gather (λ k₁ → fib (row k₁)) ks ++ fib subs
         go ur with cause ur | owes ur | in-fib ur
-        ... | row k₁   | (_ , tk) , _ | m = ∈-++⁺ˡ (∈-gather (λ k₂ → fib (row k₂)) ks (f tk) m)
+        ... | row k₁   | nr , _       | m = ∈-++⁺ˡ (∈-gather (λ k₂ → fib (row k₂)) ks (∈-stable λ ¬i → nr λ { (_ , tk) → ¬i (f tk) }) m)
         ... | env h    | () , _       | _
         ... | both _ _ | _ , () , _   | _
         ... | subs     | _            | m = ∈-++⁺ʳ (gather (λ k₂ → fib (row k₂)) ks) m
@@ -501,24 +563,33 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
 
   attributed : Attribution Every (One valuesOf) (Reads valuesOf) t u s s′
   attributed = record
-    { Img = Img ; img = img ; shown = shown ; img-row = img-row ; img-fun = img-fun
+    { Img = Img ; img = img′ ; shown = shown ; img-row = λ i → row-at (few i) (img-row i) ; img-fun = img-fun
     ; img-mono = img-mono′ ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm fm)
     ; live = live
     ; spent = λ i sp → let (ls , f) = every-row i sp in ls , λ ur _ → f ur
     ; bk = bk ; in-bk = in-bk ; pbk = pbk
-    ; pinned = λ {k} tk lk → let (a , b) = pinned tk lk in a , homed {k} b }
+    ; pinned = pinned′ }
     where
+      img′ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
+           → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Few u l × Match Every (One valuesOf) (Reads valuesOf) e e′
+      img′ tk un lv fw with img tk un lv (lst fw)
+      ... | l , i , e′ , ul , (ls , F , _) , m = l , i , e′ , ul , (ls , F) , m
+
+      pinned′ : ∀ {k p} → t k (pin p) → Live t k → (Σ Pos λ l → Σ (Ev (IE A)) (u l) × k ∈ pbk l)
+                × (instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → t k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k)
+      pinned′ {k} {p} tk lk with pinned tk lk
+      ... | (l , p′ , ul , m) , inj₁ e = (l , (pin p′ , ul) , m) , inj₁ e
+      ... | (l , p′ , ul , m) , inj₂ (inj₁ (k₀ , kp , h , ek)) with pin-few tk
+      ...   | ks , F with row-at {k₀} (ks , λ {x} tx xk → F tx (≺-trans {x} {k₀} {p} xk kp)) h
+      ...     | e₀ , tk₀ , un = (l , (pin p′ , ul) , m) , inj₂ (k₀ , e₀ , tk₀ , un , ek)
+      pinned′ {k} {p} tk lk | (l , p′ , ul , m) , inj₂ (inj₂ (_ , () , _))
+
       placed : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m) ⊎ Σ Pos (λ h → ⊥ × instantOf h ≡ instantOf m)
              → instantOf m ≡ instantOf s′ ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
       placed (inj₁ e)             = inj₁ e
       placed (inj₂ (inj₁ kl))     = inj₂ kl
       placed (inj₂ (inj₂ (_ , () , _)))
-      homed : ∀ {k} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → Σ (Ev A) λ e₀ → t k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k) ⊎ Σ Pos (λ h → ⊥ × instantOf h ≡ instantOf k)
-            → instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → t k₀ e₀ × Unpinned e₀ × instantOf k₀ ≡ instantOf k
-      homed (inj₁ e)             = inj₁ e
-      homed (inj₂ (inj₁ k₀))     = inj₂ k₀
-      homed (inj₂ (inj₂ (_ , () , _)))
 
 ------------------------------------------------------------------------
 -- The induction
@@ -618,12 +689,30 @@ private
   V : ∀ {A : Set} → A → IE A
   V x = instEmit (value x) root
 
+  -- A run with a complete list of its rows, each a row, is listed
+  -- before every position.
+  fin-listed : ∀ {X : Set} {t : EmissionSet X} (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → (∀ {k} → k ∈ ks → Σ (Ev X) (t k))
+             → ∀ q → Listed t q
+  fin-listed ks F B q =
+    filter (λ k → T? (k <ᵖ q)) ks
+    , (λ tk kq → ∈-filter⁺ (λ k → T? (k <ᵖ q)) (F tk) kq)
+    , λ m → let (n , kq) = ∈-filter⁻ (λ k → T? (k <ᵖ q)) m in kq , B n
+
   -- The rows of an `of`: one label under its subscription, finitely
   -- many, none pinned, the end last.
-  of-all : ∀ {A : Set} p i (xs : List A) → Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p i xs) k e → k ∈ ks
-  of-all p i []       = [ p ⊕ [ last ] ] , λ { at-end → here refl }
-  of-all p i (x ∷ xs) with of-all p (suc i) xs
-  ... | ks , f = (p ⊕ [ ix i ]) ∷ ks , λ { at-out → here refl ; (on-out r) → there (f r) }
+  of-pos : ∀ {A : Set} → Pos → ℕ → List A → List Pos
+  of-pos p i []       = [ p ⊕ [ last ] ]
+  of-pos p i (_ ∷ xs) = (p ⊕ [ ix i ]) ∷ of-pos p (suc i) xs
+
+  of-in : ∀ {A : Set} p i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e → k ∈ of-pos p i xs
+  of-in p i []       at-end     = here refl
+  of-in p i (x ∷ xs) at-out     = here refl
+  of-in p i (x ∷ xs) (on-out r) = there (of-in p (suc i) xs r)
+
+  of-row : ∀ {A : Set} p i (xs : List A) {k} → k ∈ of-pos p i xs → Σ (Ev A) (InE (Evs.ofᴱ p i xs) k)
+  of-row p i []       (here refl) = end , at-end
+  of-row p i (x ∷ xs) (here refl) = out x , at-out
+  of-row p i (x ∷ xs) (there m)   = let (e , r) = of-row p (suc i) xs m in e , on-out r
 
   of-unp : ∀ {A : Set} p i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e → Unpinned e
   of-unp p i []       at-end     = tt
@@ -657,7 +746,7 @@ private
   match-V (pin _) = (λ ()) , λ _ ()
 
   -- The values listed, carried row for row one label under each side.
-  module Listed {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
+  module OfRows {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
                 (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
     t : EmissionSet A
     t = Truncate (InE (Evs.ofᴱ p 0 xs))
@@ -689,10 +778,10 @@ private
     within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
 
     allT : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p 0 xs) k e → k ∈ ks
-    allT = of-all p 0 xs
+    allT = of-pos p 0 xs , of-in p 0 xs
 
     allU : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p′ 0 (L.map V xs)) k e → k ∈ ks
-    allU = of-all p′ 0 (L.map V xs)
+    allU = of-pos p′ 0 (L.map V xs) , of-in p′ 0 (L.map V xs)
 
     reachT : ∀ {q e} → Reach (InE (Evs.ofᴱ p 0 xs)) q e
     reachT = proj₁ allT , λ r _ _ → proj₂ allT r
@@ -703,16 +792,16 @@ private
     fewT : ∀ {k} → Few t k
     fewT = proj₁ allT , λ r _ → proj₂ allT (proj₁ r)
 
-    fewU : ∀ {l} → Few u l
-    fewU = proj₁ allU , λ r _ → proj₂ allU (proj₁ r)
+    lstU : ∀ {l} → Listed u l
+    lstU {l} = fin-listed (proj₁ allU) (λ r → proj₂ allU (proj₁ r)) (λ m → let (e , r) = of-row p′ 0 (L.map V xs) m in e , r , reachU) l
 
     Img : Pos → Pos → Set
     Img k l = N k l × Σ (Ev A) (t k)
 
-    img : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
-        → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Few u l × Match Every (One valuesOf) (Reads valuesOf) e e′
+    img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k
+        → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′
     img {k} {e} tk _ _ _ with of-up p p′ 0 xs (proj₁ tk)
-    ... | a , pl , refl , r′ = p′ ⊕ [ a ] , ((a , pl , refl , refl) , e , tk) , mapEv V e , (r′ , reachU) , fewU , match-V e
+    ... | a , pl , refl , r′ = p′ ⊕ [ a ] , ((a , pl , refl , refl) , e , tk) , mapEv V e , (r′ , reachU) , lstU , match-V e
 
     shown : ∀ {l e′} → u l e′ → Shown (One valuesOf) e′ → Live u l → Few u l
           → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e′
@@ -733,7 +822,7 @@ private
       ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
       ; img     = img
       ; shown   = shown
-      ; img-row = λ { (_ , e , tk) → e , tk , of-unp p 0 xs (proj₁ tk) }
+      ; img-row = λ { (_ , e , tk) n → n (e , tk , of-unp p 0 xs (proj₁ tk)) }
       ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
@@ -753,7 +842,7 @@ private
              → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
                × CarryAt valuesOf M HP HE (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
   of-carried {A} {HP} {HE} xs E₀ fr m₀ pp = X.M , inj₁ , X.emb , X.within , X.carried
-    where module X = Listed {A} {HP} {HE} xs E₀ fr m₀ pp
+    where module X = OfRows {A} {HP} {HE} xs E₀ fr m₀ pp
 
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
