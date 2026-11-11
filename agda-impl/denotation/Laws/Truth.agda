@@ -91,6 +91,10 @@ private
 past : ∀ s i → (s ⊕ [ ix i ]) ≺ (s ⊕ [ last ])
 past s i = Equivalence.from T-≡ (<ᵖ-part s [] [] refl)
 
+-- Under one spin row, before every later one.
+below-next : ∀ s {a b z} → (s ⊕ [ ix a ]) ⊑ z → a < b → z ≺ (s ⊕ [ ix b ])
+below-next s {a} {b} (zs , refl) lt rewrite ⊕-assoc s [ ix a ] zs = Equivalence.from T-≡ (<ᵖ-part s zs [] (ix-< lt))
+
 -- Before the spin, under it, or past all of it.
 where? : ∀ s x → x ≺ (s ⊕ [ ix 0 ]) ⊎ Spun s x ⊎ (∀ i → (s ⊕ [ ix i ]) ≺ x)
 where? s x with ≼-or-≻ (s ⊕ [ ix 0 ]) x
@@ -111,9 +115,6 @@ private
   ...   | inj₁ lt   = ⊥-elim (ny (conv sw (≺→≼ {w} {y} wy) lt sz))
   ...   | inj₂ refl = ⊥-elim (ny sz)
 
-  -- Under one spin row, before every later one.
-  below-next : ∀ s {a b z} → (s ⊕ [ ix a ]) ⊑ z → a < b → z ≺ (s ⊕ [ ix b ])
-  below-next s {a} {b} (zs , refl) lt rewrite ⊕-assoc s [ ix a ] zs = Equivalence.from T-≡ (<ᵖ-part s zs [] (ix-< lt))
 
 ------------------------------------------------------------------------
 -- One approximant against the next

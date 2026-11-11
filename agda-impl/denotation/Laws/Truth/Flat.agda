@@ -16,24 +16,13 @@ open import denotation.EmissionSet using (Den; enter; module Op)
 open import denotation.Laws.Worlds using (Ok; InvD)
 open import denotation.Laws.Shows using (ShowsK)
 open import denotation.Laws.Truth using (Rel)
+open import denotation.Laws.Truth.Join using (merge-truth; switch-truth; exhaust-truth)
 
 postulate
-  merge-truth   : ∀ {A B H} {f f′ : A → Den B} {s s′ : Den A}
-                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
-                → (∀ m q → Ok H q → ShowsK m (enter s q)) → (∀ m a q → Ok H q → ShowsK m (enter (f a) q))
-                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap (mergeᶠ nothing) f s) (Op.flatMap (mergeᶠ nothing) f′ s′)
   bounded-truth : ∀ {A B H} n {f f′ : A → Den B} {s s′ : Den A}
                 → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
                 → (∀ m q → Ok H q → ShowsK m (enter s q)) → (∀ m a q → Ok H q → ShowsK m (enter (f a) q))
                 → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap (mergeᶠ (just n)) f s) (Op.flatMap (mergeᶠ (just n)) f′ s′)
-  switch-truth  : ∀ {A B H} {f f′ : A → Den B} {s s′ : Den A}
-                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
-                → (∀ m q → Ok H q → ShowsK m (enter s q)) → (∀ m a q → Ok H q → ShowsK m (enter (f a) q))
-                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap switchᶠ f s) (Op.flatMap switchᶠ f′ s′)
-  exhaust-truth : ∀ {A B H} {f f′ : A → Den B} {s s′ : Den A}
-                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
-                → (∀ m q → Ok H q → ShowsK m (enter s q)) → (∀ m a q → Ok H q → ShowsK m (enter (f a) q))
-                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap exhaustᶠ f s) (Op.flatMap exhaustᶠ f′ s′)
 
 flat-truth : ∀ {A B H} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
            → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))

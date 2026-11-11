@@ -10,14 +10,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUTHFUL APPROXIMANTS
 
-Untried: each joiner and the connect keep `Truth`. Open: whether a cut
-whose spin a joiner shows past its first shows every spin row, the
-rows between reached through the one input under it; a switch's or
-connect's hidden cuts, kept only by their pins; a bounded merge's
-schedule read where the rows are clean. Settled when each is a body.
+Untried: the bounded merge and the connect keep `Truth`, as the
+other joiners do (`denotation.Laws.Truth.Join`). Open: a bounded
+merge's schedule read where the rows are clean, its hand-offs and
+queue; a connect's hidden cuts, kept only by their pins. Settled when
+each is a body.
 
-Members: `connect-truth`, `merge-truth`, `bounded-truth`, `switch-truth`,
-`exhaust-truth`.
+Members: `connect-truth`, `bounded-truth`.
 
 ## Tier 0 — adequacy
 
