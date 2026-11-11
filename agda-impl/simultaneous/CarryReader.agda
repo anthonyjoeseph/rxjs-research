@@ -31,12 +31,13 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Tree using (connected; mergeᶠ)
-open import denotation.Position using (Pos; ix; sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
+open import denotation.Position using (Pos; Path; ix; sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few;
   Reach; Truncate; Rejoin; shown; heard; ended; late; _≺_; _≼_; approx; module Op)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-≼-≺; ≺-ext; ≺→≼; ≼-refl; ≼-trans; ≼-split; entered-few)
-open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-snoc⁺; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
+open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ;
+  W⁼; here; inW; join; step; plain-last)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
@@ -74,6 +75,26 @@ private
   -- No row of `S` lies strictly under another.
   Flat : ∀ {A} → EmissionSet A → Set
   Flat S = ∀ {y e l ys e′} → S y e → S (y ⊕ (l ∷ ys)) e′ → ⊥
+
+  -- A point one label under `z`, read under `q`: `z` is `q`, or lies
+  -- under `q`'s step.
+  split-at : ∀ q {a σ} z {b} → z ⊕ [ b ] ≡ q ⊕ (a ∷ σ) → (q ≡ z × a ≡ b) ⊎ Σ Path λ zs → z ≡ q ⊕ (a ∷ zs)
+  split-at q {a} {σ} z eq with ⊑-snoc {q ⊕ [ a ]} z (σ , trans eq (sym (⊕-assoc q [ a ] σ)))
+  ... | inj₂ e        = inj₁ (⊕-injˡ q z e , ⊕-injʳ q z e)
+  ... | inj₁ (zs , e) = inj₂ (zs , trans e (⊕-assoc q [ a ] zs))
+
+  -- A position holding rows of two hots of an apart environment: one
+  -- handle.
+  same-hot : ∀ {Γ} (env : DenEnv Γ) → Apart env → ∀ {X Y} (i : X ∈ Γ) (j : Y ∈ Γ) {t : EmissionSet X} {t′ : EmissionSet Y}
+           → lookup env i ≡ hot t → lookup env j ≡ hot t′ → ∀ {q e e′} → t q e → t′ q e′
+           → (P : ∀ {Z} → Z ∈ Γ → Set) → P i → P j
+  same-hot (hot _ ∷ _)    _        (here refl) (here refl) _    _    _  _   _ x = x
+  same-hot (hot _ ∷ ρ)    (a , _)  (here refl) (there j)   refl e′   tq tq′ _ _ = ⊥-elim (a tq (hots-at ρ j e′ tq′))
+  same-hot (hot _ ∷ ρ)    (a , _)  (there i)   (here refl) e    refl tq tq′ _ _ = ⊥-elim (a tq′ (hots-at ρ i e tq))
+  same-hot (hot _ ∷ ρ)    (_ , ap) (there i)   (there j)   e    e′   tq tq′ P x = same-hot ρ ap i j e e′ tq tq′ (λ k → P (there k)) x
+  same-hot (coldAt _ ∷ _) _        (here refl) _           ()   _    _  _   _ _
+  same-hot (coldAt _ ∷ _) _        (there _)   (here refl) _    ()   _  _   _ _
+  same-hot (coldAt _ ∷ ρ) ap       (there i)   (there j)   e    e′   tq tq′ P x = same-hot ρ ap i j e e′ tq tq′ (λ k → P (there k)) x
 
   -- Two rows of a flat set, one before the other, are apart.
   nest : ∀ {A} {S : EmissionSet A} → Flat S → ∀ {x y e e′} → S x e → S y e′ → x ≺ y → ¬ (x ⊑ y)
@@ -286,14 +307,24 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
   postulate
     reader-emb      : Emb M
-    reader-within   : Within (Hots envP) M₀ M p
-    reader-bare     : Bare M t
-    reader-joins    : Joins ρ envP envE er M
     -- THE READER HEARS WHERE THE HOT IS CARRIED INTO ITS INSTANT: a row of
     -- the hot past the subscription that is carried into its instant, the
     -- reader showing it listed, has its carrier past the image and joined
     -- there by the annotated reader, listed.
-    pb-heard        : ∀ {q l₀ e} → Proper T₀ q e → p ≺ q → C.PB q l₀ → Listed t (q ⊕ [ sub p ])
+    --
+    -- Three facts the carry does not give: the carrier past `p′` (no field
+    -- orders a `PB` carrier against the map), before the annotated end
+    -- (none against `Live`), and listed (`pinned` and `pb-few` list
+    -- nothing).  An order field against the map is read negatively, so
+    -- `carry-grow` keeps it only given where the grown points lie.
+    --
+    -- DEAD ROUTE: listing the carrier from the plain listing up to the
+    --   pin.  Pins are carried out of order (a queued lane's subscribe pin
+    --   falls past values the plain run puts after it), so the rows before
+    --   the carrier carry plain rows past the pin, which that listing does
+    --   not reach; and a pin may follow infinitely many rows, so the
+    --   carrier need not be reached at all.
+    pb-heard       : ∀ {q l₀ e} → Proper T₀ q e → p ≺ q → C.PB q l₀ → Listed t (q ⊕ [ sub p ])
                     → Σ (Ev (AIE X)) (u (l₀ ⊕ [ sub p′ ])) × Listed u (l₀ ⊕ [ sub p′ ])
 
   private
@@ -620,6 +651,69 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     { Img = Img ; ext = ext ; PB = PB ; pb-few = pb-few ; img = img ; img¬¬ = img¬¬ ; shown = shown′ ; img-row = img-row
     ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; bk = bk ; in-bk = in-bk
     ; pinned = λ { (shown _ () _ , _) } }
+
+  private
+    -- A hot row past the subscription, joined under it: in its world.
+    joinW : ∀ {q e} → Proper T₀ q e → p ≺ q → W⁼ (Hots envP) p (q ⊕ [ sub p ]) × p ≺ (q ⊕ [ sub p ])
+    joinW {q} tq pq = inW (join (inj₁ (hotP tq)) here pq) , ≺-≼-≺ {p} {q} {q ⊕ [ sub p ]} pq (sub≼ q)
+
+    -- A row of the reading lies in the subscription's world, past it.
+    rowW : ∀ {k e} → t k e → W⁼ (Hots envP) p k × p ≺ k
+    rowW (shown tq _ pq , _) = joinW tq pq
+    rowW (heard tq pq , _)   = joinW tq pq
+    rowW (ended tq pq , _)   = joinW tq pq
+    rowW (late _ _ , _)      = inW (step here plain-last) , ≺-ext p []
+
+    -- No row of the reading leads the subscription.
+    ahead : ∀ {k e} → t k e → k ⊑ p → ⊥
+    ahead {k} tk kp = ≺-irrefl {p} (≺-≼-≺ {p} {k} {p} (proj₂ (rowW tk)) (⊑-≼ {k} {p} kp))
+
+    under-row : ∀ {q′ e′ q} → Proper T₀ q′ e′ → BoundRow (er i) q → (q′ ⊕ [ sub p ]) ⊑ q → ⊥
+    under-row {q′} tq (e₁ , tr , _) (zs , e) = flatP (proj₁ tq) (subst (λ z → T₀ z e₁) (trans e (⊕-assoc q′ [ sub p ] zs)) tr)
+
+    -- No row of the reading leads a hot row.
+    under : ∀ {k e q} → t k e → BoundRow (er i) q → k ⊑ q → ⊥
+    under (shown {q′} tq _ _ , _) br kq = under-row {q′} tq br kq
+    under (heard {q′} tq _ , _)   br kq = under-row {q′} tq br kq
+    under (ended {q′} tq _ , _)   br kq = under-row {q′} tq br kq
+    under (late _ _ , _)          br kq = nh (bound-hot {ρ = ρ} envP {envE = envE} er i br) (⊑-trans (⊑-snoc⁺ p) kq)
+
+    -- A row of the reading leading a joined point is it.
+    lead : ∀ {k e} q {a} → t k e → (k ⊑ q → ⊥) → k ⊑ (q ⊕ [ a ]) → (q ⊕ [ a ]) ≡ k
+    lead q tk n kx with ⊑-snoc q kx
+    ... | inj₂ e  = sym e
+    ... | inj₁ kq = ⊥-elim (n kq)
+
+  -- What the joins add lies in the subscription's world.
+  reader-within : Within (Hots envP) M₀ M p
+  reader-within (inj₁ m) = inj₁ m
+  reader-within (inj₂ (inj₁ (q , _ , br , _ , pq , refl , _))) = inj₂ (inW (join (inj₁ (bound-hot {ρ = ρ} envP {envE = envE} er i br)) here pq))
+  reader-within (inj₂ (inj₂ (refl , _))) = inj₂ (inW (step here plain-last))
+
+  -- The map pairs nothing strictly under a row of the reading: the map
+  -- so far is fresh in the world, and a join lies on a hot row's join.
+  reader-bare : Bare M t
+  reader-bare {k} tk (inj₁ m) kx = ⊥-elim (ahead tk (subst (k ⊑_) (fr m (k , proj₁ (rowW tk) , kx)) kx))
+  reader-bare tk (inj₂ (inj₁ (q , _ , br , _ , _ , refl , _))) kx = lead q tk (under tk br) kx
+  reader-bare tk (inj₂ (inj₂ (refl , _))) kx = lead p tk (ahead tk) kx
+
+  -- A join lies on its hot row's join; a point under a hot row's step
+  -- lies in the map so far, which joins it.
+  reader-joins : Joins ρ envP envE er M
+  reader-joins i′ (inj₁ m) br eq with jn i′ m br eq
+  ... | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , le
+  reader-joins i′ (inj₂ (inj₁ (q₁ , l , br₁ , ci₁ , _ , refl , refl))) br eq with split-at _ q₁ eq
+  ... | inj₁ (refl , refl) =
+    p , refl , p′ , inj₁ m₀ , l
+      , same-hot envP ap i i′ (Bound.isP (er i)) (Bound.isP (er i′)) (proj₂ br₁) (proj₂ br) (λ k → CarryAt.Img (Bound.carried (er k)) q₁ l) ci₁
+      , ⊑-refl (l ⊕ [ sub p′ ])
+  ... | inj₂ (zs , e) with C.ext ci₁
+  ...   | y₁ , my₁ , yl with jn i′ my₁ br e
+  ...     | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , ⊑-trans le (⊑-trans yl (⊑-snoc⁺ l))
+  reader-joins i′ (inj₂ (inj₂ (refl , refl))) br eq with split-at _ p eq
+  ... | inj₁ (refl , _) = ⊥-elim (nh (bound-hot {ρ = ρ} envP {envE = envE} er i′ br) (⊑-refl p))
+  ... | inj₂ (zs , e) with jn i′ m₀ br e
+  ...   | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , ⊑-trans le (⊑-snoc⁺ p′)
 
 
 ------------------------------------------------------------------------
