@@ -20,7 +20,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import denotation.Position using (Pos; Path; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; _<ᵖ_)
+open import denotation.Position using (Pos; ix; root; _≟ᵖ_; inside; _⊕_; _∙_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
@@ -31,7 +31,7 @@ open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; 
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
-open import simultaneous.Readings using (rootOf)
+open import simultaneous.Readings using (rootOf; parent; parent-snoc)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Rest; Sync; Ex; Early; Before; Valued; opos)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
@@ -92,23 +92,6 @@ held-ex wd H = record
 ------------------------------------------------------------------------
 -- Runs
 
--- A position's parent, one label up.
-upᵗ : Path → Path
-upᵗ []          = []
-upᵗ (_ ∷ [])    = []
-upᵗ (a ∷ b ∷ x) = a ∷ upᵗ (b ∷ x)
-
-up : Pos → Pos
-up (i ∙ p) = i ∙ upᵗ p
-
-upᵗ-snoc : ∀ (y : Path) l → upᵗ (y ++ [ l ]) ≡ y
-upᵗ-snoc []          l = refl
-upᵗ-snoc (a ∷ [])    l = refl
-upᵗ-snoc (a ∷ b ∷ y) l = cong (a ∷_) (upᵗ-snoc (b ∷ y) l)
-
-up-snoc : ∀ (y : Pos) l → up (y ⊕ [ l ]) ≡ y
-up-snoc (i ∙ y) l = cong (i ∙_) (upᵗ-snoc y l)
-
 -- A visible row waits on every row before it.
 vis-dep : ∀ {A} {q} {e : Ev A} → Visible e → ∀ {k e′} → denotation.EmissionSet.Dep q e k e′
 vis-dep {e = out _} _ = tt
@@ -165,9 +148,9 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
     body xk , conn-reach {r = p} {σ = σ} {β = β} few (entered-reach (F (hot (Proper σ))) (p ⊕ [ ix 0 ]) xk)
     where
       few : Σ (List Pos) λ ys → ∀ {y e″} → σ y e″ → (y ⊕ [ ix 0 ]) ≺ k → y ∈ ys
-      few = L.map up ks , λ {y} sy lt →
+      few = L.map parent ks , λ {y} sy lt →
         let (_ , cy) = shows x v sy (≺-trans {y ⊕ [ ix 0 ]} lt kq)
-        in subst (_∈ L.map up ks) (up-snoc y (ix 0)) (∈-map⁺ up (rc cy (≺-trans {y ⊕ [ ix 0 ]} lt kq) (vis-dep v)))
+        in subst (_∈ L.map parent ks) (parent-snoc y (ix 0)) (∈-map⁺ parent (rc cy (≺-trans {y ⊕ [ ix 0 ]} lt kq) (vis-dep v)))
   lift (burst _ _ , _) () _ _
   lift (echo _ _ _ _ , _) () _ _
   lift (kept _ _ _ _ , _) () _ _
@@ -240,11 +223,11 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
     inC x rc kw = proj₂ Fw (x , rc) kw
 
     burst-in : ∀ {z e′} → σ z e′ → (i : T (inside r z)) → (z ⊕ [ ix 0 ]) ≺ w → ¬ ¬ ((z ⊕ [ ix 0 ]) ∈ ks)
-    burst-in {z} x i zw no = sh (L.map up ks , good) λ (Ls , hs) → no (inC (burst x i) (burst-reach x i Ls hs) zw)
+    burst-in {z} x i zw no = sh (L.map parent ks , good) λ (Ls , hs) → no (inC (burst x i) (burst-reach x i Ls hs) zw)
       where
-        good : ∀ {k e} → σ k e → Few σ k → k ≺ z → k ∈ L.map up ks
-        good {k} y (Lk , hk) kz = subst (_∈ L.map up ks) (up-snoc k (ix 0))
-          (∈-map⁺ up (inC (burst y (in-world Iσ y kz i)) (burst-reach y (in-world Iσ y kz i) Lk hk)
+        good : ∀ {k e} → σ k e → Few σ k → k ≺ z → k ∈ L.map parent ks
+        good {k} y (Lk , hk) kz = subst (_∈ L.map parent ks) (parent-snoc k (ix 0))
+          (∈-map⁺ parent (inC (burst y (in-world Iσ y kz i)) (burst-reach y (in-world Iσ y kz i) Lk hk)
                           (≺-trans {k ⊕ [ ix 0 ]} {z ⊕ [ ix 0 ]} {w} (next k z kz) zw)))
 
     echo-in : ∀ {z e′} → σ z e′ → (a : Alive z) (u : Unpinned e′) (ni : T (not (inside r z))) → (z ⊕ [ ix 0 ]) ≺ w
