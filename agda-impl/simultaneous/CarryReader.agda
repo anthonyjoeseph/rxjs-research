@@ -22,9 +22,9 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.All using (lookup; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Function using (Equivalence; _⇔_)
 open import Relation.Nullary using (¬_; yes; no)
@@ -45,7 +45,7 @@ open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Carry using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; EnvRel; Bound; HotsListed;
-  NotHot; BoundRow; Joins; Apart; annValues; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed↓; listed-≼; hots-at; bound-hot)
+  NotHot; BoundRow; Joins; Apart; annValues; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed↓; listed-≼; sub-listed; hots-at; bound-hot)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate)
 
@@ -102,30 +102,21 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
               × k ≡ q ⊕ [ sub p ] × l ≡ l₀ ⊕ [ sub p′ ])
           ⊎ (k ≡ p ⊕ [ last ] × l ≡ p′ ⊕ [ last ] × Σ Pos λ c₀ → Proper T₀ c₀ end × c₀ ≼ p)
 
-  -- A hot row carried into its instant, on the carrier's joined row.
+  -- A hot row carried into its instant: on the carrier's joined row, or,
+  -- the carrier trailing an annotated end, on that end joined.
   PB : Pos → Pos → Set
-  PB k l = Σ Pos λ q → Σ Pos λ l₀ → C.PB q l₀ × p ≺ q × k ≡ q ⊕ [ sub p ] × l ≡ l₀ ⊕ [ sub p′ ]
+  PB k l = Σ Pos λ q → Σ Pos λ l₀ → C.PB q l₀ × p ≺ q × k ≡ q ⊕ [ sub p ]
+           × (l ≡ l₀ ⊕ [ sub p′ ] ⊎ Σ (Ev X) (Proper T₀ q) × Σ Pos λ c′ → T₀′ c′ end × c′ ≺ l₀ × l ≡ c′ ⊕ [ sub p′ ])
 
   postulate
-    -- THE READER HEARS WHERE THE HOT IS CARRIED INTO ITS INSTANT: a row of
-    -- the hot past the subscription that is carried into its instant, the
-    -- reader showing it listed, has its carrier past the image and joined
-    -- there by the annotated reader, listed.
-    --
-    -- Three facts the carry does not give: the carrier past `p′` (no field
-    -- orders a `PB` carrier against the map), before the annotated end
-    -- (none against `Live`), and listed (`pinned` and `pb-few` list
-    -- nothing).  An order field against the map is read negatively, so
-    -- `carry-grow` keeps it only given where the grown points lie.
-    --
-    -- DEAD ROUTE: listing the carrier from the plain listing up to the
-    --   pin.  Pins are carried out of order (a queued lane's subscribe pin
-    --   falls past values the plain run puts after it), so the rows before
-    --   the carrier carry plain rows past the pin, which that listing does
-    --   not reach; and a pin may follow infinitely many rows, so the
-    --   carrier need not be reached at all.
-    pb-heard       : ∀ {q l₀ e} → Proper T₀ q e → p ≺ q → C.PB q l₀ → Listed t (q ⊕ [ sub p ])
-                    → Σ (Ev (AIE X)) (u (l₀ ⊕ [ sub p′ ])) × Listed u (l₀ ⊕ [ sub p′ ])
+    -- A HOT ROW CARRIED INTO ITS INSTANT HAS ITS CARRIER PAST THE IMAGE: a
+    -- row of the hot past the subscription, the reader showing it listed,
+    -- carried into its instant onto a row of the annotated hot, has that
+    -- row past `p′`.  No field orders a `PB` carrier against the map; an
+    -- order field against the map is read negatively, so `carry-grow`
+    -- keeps it only given where the grown points lie.
+    pb-order       : ∀ {q l₀ e e₁} → Proper T₀ q e → p ≺ q → C.PB q l₀ → T₀′ l₀ e₁ → Listed t (q ⊕ [ sub p ])
+                    → p′ ≺ l₀
 
   private
     flatP : Flat T₀
@@ -222,9 +213,67 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     late-listed : ∀ {c c′} → Proper T₀ c end → c ≼ p → C.Img c c′ → T₀′ c′ end → Listed u (p′ ⊕ [ last ])
     late-listed tc cp ci uc = [] , (λ r h → ⊥-elim (late-none (uc , (λ {c₈} → liveE ci tc {c₈})) (late-at tc ci cp) (proj₁ r) h)) , λ ()
 
-    heard-into : ∀ {q l₀ e} → Proper T₀ q e → p ≺ q → C.PB q l₀ → Listed t (q ⊕ [ sub p ]) → IntoAt Img u PB (Hots envP) p (q ⊕ [ sub p ])
-    heard-into {q} {l₀} tq pq pb L with pb-heard tq pq pb L
-    ... | ul , Lu = (l₀ ⊕ [ sub p′ ] , ul , Lu , (q , l₀ , pb , pq , refl , refl)) , inj₂ (inj₂ (q , hotP tq , sym (instant-⊕ q [ sub p ])))
+    -- Not the head's end: the tail's.
+    rest : ∀ {x js e c} → T₀′ x e → (e ≡ end → ⊥) → T₀′ c end → c ∈ x ∷ js → c ∈ js
+    rest tx ne tc (here refl) = ⊥-elim (ne (VE.func tx tc))
+    rest tx ne tc (there m)   = m
+
+    -- An annotated end among the rows listed before a row, or none before it.
+    end? : ∀ {l₀} (js : List Pos) → (∀ {k} → k ∈ js → k ≺ l₀ × Σ _ (T₀′ k)) → (∀ {c} → T₀′ c end → c ≺ l₀ → c ∈ js)
+         → (Σ Pos λ c′ → T₀′ c′ end × c′ ≺ l₀) ⊎ (∀ {c} → T₀′ c end → l₀ ≼ c)
+    end? {l₀} [] _ F = inj₂ λ {c} tc → [ (λ lc → lc) , (λ cl → ⊥-elim (∉[] (F tc cl))) ]′ (≼-or-≻ l₀ c)
+      where
+        ∉[] : ∀ {c} → c ∈ [] → ⊥
+        ∉[] ()
+    end? {l₀} (x ∷ js) B F with B (here refl)
+    ... | xl , end , tx = inj₁ (x , tx , xl)
+    ... | xl , out _ , tx = end? js (λ m → B (there m)) (λ tc cl → rest tx (λ ()) tc (F tc cl))
+    ... | xl , skip , tx = end? js (λ m → B (there m)) (λ tc cl → rest tx (λ ()) tc (F tc cl))
+    ... | xl , pin _ , tx = end? js (λ m → B (there m)) (λ tc cl → rest tx (λ ()) tc (F tc cl))
+
+    -- An annotated end carries the plain end: every live plain row lies at
+    -- or before it, few rows before.
+    end-few : ∀ {c′} → T₀′ c′ end → Σ (List Pos) λ ks → ∀ {q e} → Proper T₀ q e → q ∈ ks
+    end-few tc′ with C.shown tc′ tt (λ {c₉} → endE {_} {c₉} tc′) (fewE tc′ tt)
+    ... | k , ci , e₀ , tk , mt with end-of mt
+    ...   | refl = proj₁ (C.few ci) ++ [ k ] , pick
+      where
+        pick : ∀ {q e} → Proper T₀ q e → q ∈ proj₁ (C.few ci) ++ [ k ]
+        pick {q} (tq , lv) with ≼-split {q} {k} (lv tk)
+        ... | inj₁ qk   = ∈-++⁺ˡ (proj₂ (C.few ci) tq qk)
+        ... | inj₂ refl = ∈-++⁺ʳ (proj₁ (C.few ci)) (here refl)
+
+    -- An annotated end past a live plain row past the subscription: past the image.
+    end-past : ∀ {q e c′} → Proper T₀ q e → p ≺ q → T₀′ c′ end → p′ ≺ c′
+    end-past {q} tq pq tc′ with C.shown tc′ tt (λ {c₉} → endE {_} {c₉} tc′) (fewE tc′ tt)
+    ... | k , ci , e₀ , tk , mt with end-of mt
+    ...   | refl = after′ ci (≺-≼-≺ {p} {q} {k} pq (proj₂ tq tk))
+
+    heard-into : ∀ {q l₀ e e₁} → Proper T₀ q e → p ≺ q → C.PB q l₀ → T₀′ l₀ e₁ → Listed T₀′ l₀ → Listed t (q ⊕ [ sub p ])
+               → IntoAt Img u PB (Hots envP) p (q ⊕ [ sub p ])
+    heard-into {q} {l₀} {e₁ = e₁} tq pq pb ul L′@(ks , F , B) L = into , inj₂ (inj₂ (q , hotP tq , sym (instant-⊕ q [ sub p ])))
+      where
+        into : Σ Pos λ l → Σ (Ev (AIE X)) (u l) × Listed u l × PB (q ⊕ [ sub p ]) l
+        into = choose (end? ks (λ m → B m) (λ tc cl → F tc cl))
+          where
+          choose : (Σ Pos λ c′ → T₀′ c′ end × c′ ≺ l₀) ⊎ (∀ {c} → T₀′ c end → l₀ ≼ c)
+                 → Σ Pos λ l → Σ (Ev (AIE X)) (u l) × Listed u l × PB (q ⊕ [ sub p ]) l
+          choose (inj₂ lv) =
+            l₀ ⊕ [ sub p′ ] , (rjEv e₁ , rjRow rp pl , few-reach {e = rjEv e₁} (rejoin-few flatE ul (ks , F)))
+            , rejoin-listed flatE rp pl L′ , (q , l₀ , pb , pq , refl , inj₁ refl)
+            where
+              pl : p′ ≺ l₀
+              pl = pb-order tq pq pb ul L
+              rp : Proper T₀′ l₀ e₁
+              rp = ul , (λ {c₈} → lv {c₈})
+          choose (inj₁ (c′ , tc′ , cl)) =
+            c′ ⊕ [ sub p′ ] , (end , ended rc pc , few-reach {e = end} (rejoin-few flatE tc′ (fewE tc′ tt)))
+            , rejoin-listed flatE rc pc (sub-listed L′ cl) , (q , l₀ , pb , pq , refl , inj₂ ((_ , tq) , c′ , tc′ , cl , refl))
+            where
+              pc : p′ ≺ c′
+              pc = end-past tq pq tc′
+              rc : Proper T₀′ c′ end
+              rc = tc′ , (λ {c₈} → endE {_} {c₈} tc′)
 
     MatchR : Ev X → Ev (AIE X) → Set
     MatchR = Match Every (One annValues) (Reads annValues)
@@ -233,14 +282,33 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     ext (inj₁ (q , l₀ , br , ci , _ , pq , refl , refl)) = _ , inj₂ (inj₁ (q , l₀ , br , ci , pq , refl , refl)) , ⊑-refl _
     ext (inj₂ (refl , refl , _))                         = _ , inj₂ (inj₂ (refl , refl)) , ⊑-refl _
 
-    pb-fib : ∀ {l₀} → (Σ (List Pos) λ ks → ∀ {q} → C.PB q l₀ → q ∈ ks) → Σ (List Pos) λ ks → ∀ {k} → PB k (l₀ ⊕ [ sub p′ ]) → k ∈ ks
-    pb-fib {l₀} (ks , F) = L.map (_⊕ [ sub p ]) ks , λ { (q , l₁ , pb , _ , refl , e) → ∈-map⁺ (_⊕ [ sub p ]) (F (subst (C.PB q) (⊕-injˡ l₁ l₀ (sym e)) pb)) }
+    pb-fib : ∀ {l₀} → (Σ (List Pos) λ ks → ∀ {q} → C.PB q l₀ → q ∈ ks) → ∀ {e₀} → Proper T₀′ l₀ e₀ → (e₀ ≡ end → ⊥)
+           → Σ (List Pos) λ ks → ∀ {k} → PB k (l₀ ⊕ [ sub p′ ]) → k ∈ ks
+    pb-fib {l₀} (ks , F) r ne = L.map (_⊕ [ sub p ]) ks , mem
+      where
+        mem : ∀ {k} → PB k (l₀ ⊕ [ sub p′ ]) → k ∈ L.map (_⊕ [ sub p ]) ks
+        mem (q , l₁ , pb , _ , refl , inj₁ e) = ∈-map⁺ (_⊕ [ sub p ]) (F (subst (C.PB q) (⊕-injˡ l₁ l₀ (sym e)) pb))
+        mem (q , l₁ , pb , _ , refl , inj₂ (_ , c′ , tc′ , _ , e)) =
+          ⊥-elim (ne (VE.func (proj₁ r) (subst (λ c → T₀′ c end) (sym (⊕-injˡ l₀ c′ e)) tc′)))
+
+    -- On an end: the rows carried on it, and those trailing it.
+    pb-end : ∀ {c′} → Proper T₀′ c′ end → Σ (List Pos) λ ks → ∀ {k} → PB k (c′ ⊕ [ sub p′ ]) → k ∈ ks
+    pb-end {c′} r with C.pb-few (proj₁ r) | end-few (proj₁ r)
+    ... | ks , F | js , G = L.map (_⊕ [ sub p ]) (ks ++ js) , mem
+      where
+        mem : ∀ {k} → PB k (c′ ⊕ [ sub p′ ]) → k ∈ L.map (_⊕ [ sub p ]) (ks ++ js)
+        mem (q , l₁ , pb , _ , refl , inj₁ e) = ∈-map⁺ (_⊕ [ sub p ]) (∈-++⁺ˡ (F (subst (C.PB q) (⊕-injˡ l₁ c′ (sym e)) pb)))
+        mem (q , l₁ , pb , _ , refl , inj₂ ((_ , tq) , c₁ , _ , _ , e)) = ∈-map⁺ (_⊕ [ sub p ]) (∈-++⁺ʳ ks (G tq))
 
     pb-few : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
-    pb-few (shown r _ _ , _) = pb-fib (C.pb-few (proj₁ r))
-    pb-few (heard r _ , _)   = pb-fib (C.pb-few (proj₁ r))
-    pb-few (ended r _ , _)   = pb-fib (C.pb-few (proj₁ r))
-    pb-few (late _ _ , _)    = [] , λ { (_ , l₁ , _ , _ , _ , e) → ⊥-elim (last-sub (⊕-injʳ p′ l₁ e)) }
+    pb-few (shown {e = out _} r _ _ , _) = pb-fib (C.pb-few (proj₁ r)) r (λ ())
+    pb-few (shown {e = skip} r _ _ , _)  = pb-fib (C.pb-few (proj₁ r)) r (λ ())
+    pb-few (shown {e = end} _ () _ , _)
+    pb-few (shown {e = pin _} _ () _ , _)
+    pb-few (heard r _ , _)   = pb-fib (C.pb-few (proj₁ r)) r (λ ())
+    pb-few (ended r _ , _)   = pb-end r
+    pb-few (late _ _ , _)    = [] , λ { (_ , l₁ , _ , _ , _ , inj₁ e) → ⊥-elim (last-sub (⊕-injʳ p′ l₁ e))
+                                      ; (_ , _ , _ , _ , _ , inj₂ (_ , c₁ , _ , _ , e)) → ⊥-elim (last-sub (⊕-injʳ p′ c₁ e)) }
 
     -- What the carry makes of a hot row, and what the reader makes of its joined row.
     Carried : Pos → Ev X → Set
@@ -257,7 +325,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
       where J = joined tq pq ci ue (proj₁ L′ , proj₁ (proj₂ L′))
 
     img-shown : ∀ {q e} → Proper T₀ q e → p ≺ q → Unpinned e → Listed t (q ⊕ [ sub p ]) → Carried q e → Out (q ⊕ [ sub p ]) e
-    img-shown tq pq un L (inj₂ (es , (_ , _ , _ , pb) , _)) = inj₂ (es , heard-into tq pq pb L)
+    img-shown tq pq un L (inj₂ (es , (_ , (_ , ul) , L′ , pb) , _)) = inj₂ (es , heard-into tq pq pb ul L′ L)
     img-shown tq pq un L (inj₁ (l₀ , ci , e′ , ue , L′ , mt)) = img-joined tq pq ci ue L′ (mt-rj un mt)
 
     img-ended : ∀ {c} → Proper T₀ c end → p ≺ c → Carried c end → Out (c ⊕ [ sub p ]) end
@@ -275,8 +343,12 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → HotsListed envP k → Out k e
     img (shown {q} tq _ pq , _) un _ L lp =
       img-shown tq pq un L (C.img (proj₁ tq) un (λ {c₉} → proj₂ tq {c₉}) (lstP tq (sub≼ q) lp) (lsts (sub≼ q) lp))
-    img (heard tq pq , _) _ _ L _ =
-      inj₂ (refl , heard-into tq pq (proj₁ (proj₂ (proj₂ (proj₂ (proj₁ (C.pinned (proj₁ tq) (λ {c₉} → proj₂ tq {c₉}))))))) L)
+    img (heard {q} tq pq , _) _ _ L lp = inj₂ (refl , heard-into tq pq pb ul (ls (lstP tq (sub≼ q) lp) (lsts (sub≼ q) lp)) L)
+      where
+        P = proj₁ (C.pinned (proj₁ tq) (λ {c₉} → proj₂ tq {c₉}))
+        ul = proj₁ (proj₂ (proj₂ P))
+        pb = proj₁ (proj₂ (proj₂ (proj₂ P)))
+        ls = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
     img (ended {c} tc pc , _) _ _ _ lp =
       img-ended tc pc (C.img (proj₁ tc) tt (λ {c₉} → proj₂ tc {c₉}) (lstP tc (sub≼ c) lp) (lsts (sub≼ c) lp))
     img (late {c} tc cp , _) _ _ _ lp =

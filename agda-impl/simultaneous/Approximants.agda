@@ -33,7 +33,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
 
 open import Tree using (Obs)
-open import denotation.Position using (Pos; root; ix; instant; _≟ᵖ_; _≟ⁱ_; _<ᵖ_)
+open import denotation.Position using (Pos; root; instant; _≟ᵖ_; _≟ⁱ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; pin; Unpinned; EmissionSet; Few; Seen; Proper; _≺_; _≼_; module Values; enter; approx; ⟦_⟧)
 open import denotation.Read using (Visible)
@@ -54,7 +54,8 @@ open import simultaneous.Listing using (Listing; listedₙ)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
 open import simultaneous.Carry using (Carry; attributed)
-open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreAt; carry-wrap)
+open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreAt)
+open import simultaneous.CarryWrap using (carry-wrap)
 open import simultaneous.Carried using (carry-approx)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
@@ -301,11 +302,11 @@ erasingₙ : ∀ n {A} (o : SObs [] A)
          → Attribution Every (One valuesOf) (Reads valuesOf) (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root) root root
 erasingₙ n o with Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ()) (λ ()) tt
                     root coreAt (refl , refl) ok₀ (tt , λ ()) (λ ()) fresh-At₀
-... | M , ms , hm , _ , _ , _ , c =
-  attributed hm (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
+... | M , ms , hm , _ , _ , _ , c with carry-wrap n o hm (ms (refl , refl)) c
+...   | M′ , hm′ , δ , at′ , c′ =
+  attributed hm′ (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
     (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o)
-    (λ {k} {e} → unpinned-liveₙ n o {k} {e}) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
-    (carry-wrap n o hm (ms (refl , refl)) c)
+    (λ {k} {e} → unpinned-liveₙ n o {k} {e}) δ at′ c′
 
 private
   module Erₙ (n : ℕ) {A : Set} (o : SObs [] A) =

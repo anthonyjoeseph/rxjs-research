@@ -39,6 +39,7 @@ open import Data.Bool using (T)
 open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
+open import denotation.Laws.Shows using (∈-stable)
 
 open import Tree using (Obs; cold; map; flatMap; connect)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; sub; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath;
@@ -304,8 +305,11 @@ IntoAt {Y} Img u PB HP s k =
 -- under the image of the row it carries, a row of `u` placed or a pin of
 -- `t` homed also by an instant of an environment row.
 --
--- A ROW IS CARRIED FROM ITS LISTING, onto a carrier listed too; a row
--- only witnessed to exist (the carried row, a pin's home) is so
+-- A ROW IS CARRIED FROM ITS LISTING, onto a carrier listed too, a pin's
+-- included: under its environment's listing too, since pins are carried
+-- out of order (a queued lane's subscribe pin falls past values the plain
+-- run puts after it), so the pin's own listing does not reach the rows
+-- before its carrier.  A row only witnessed to exist (the carried row, a pin's home) is so
 -- classically, and a pin's home lies before its connect, as does whatever
 -- a carrier before the elaborated connect carries.  A closed run is
 -- listed wherever few rows precede (`simultaneous.Listing.listed`), and
@@ -362,7 +366,8 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pinned  : ∀ {k p} → t k (pin p) → Live t k
-            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p))
+            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p)
+                × (Listed t k → LP k → Listed u l))
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -376,16 +381,17 @@ data Kin {A B : Set} : Ev A → Ev B → Set where
   k-pin  : ∀ {r} → Kin (pin r) (pin r)
   k-end  : Kin end end
 
+kin-refl : ∀ {X : Set} (e : Ev X) → Kin e e
+kin-refl (out _) = k-out
+kin-refl skip    = k-skip
+kin-refl (pin _) = k-pin
+kin-refl end     = k-end
+
 private
   module Rows {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {Rel : Pos → Ev X → Ev Z → Set}
               (kn : ∀ {k e e′} → Rel k e e′ → Kin e e′)
               (to : ∀ {k e} → a k e → Σ (Ev Z) λ e′ → b k e′ × Rel k e e′)
               (fro : ∀ {k e′} → b k e′ → Σ (Ev X) λ e → a k e × Rel k e e′) where
-    live→ : ∀ {k} → Live a k → Live b k
-    live→ {k} la {c} bc with fro bc
-    ... | _ , ac , r with kn r
-    ...   | k-end = la {c} ac
-
     live← : ∀ {k} → Live b k → Live a k
     live← {k} lb {c} ac with to ac
     ... | _ , bc , r with kn r
@@ -396,9 +402,6 @@ private
 
     few← : ∀ {k} → Few b k → Few a k
     few← (ks , F) = ks , λ ak kk → F (proj₁ (proj₂ (to ak))) kk
-
-    lst→ : ∀ {k} → Listed a k → Listed b k
-    lst→ (ks , F , B) = ks , (λ bk kk → F (proj₁ (proj₂ (fro bk))) kk) , λ m → proj₁ (B m) , proj₁ (to (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (to (proj₂ (proj₂ (B m)))))
 
     lst← : ∀ {k} → Listed b k → Listed a k
     lst← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
@@ -411,12 +414,40 @@ private
     whole← : Whole b → Whole a
     whole← (ks , F , B) = ks , (λ ak → F (proj₁ (proj₂ (to ak)))) , λ m → proj₁ (fro (proj₂ (B m))) , proj₁ (proj₂ (fro (proj₂ (B m))))
 
-    whole→ : Whole a → Whole b
-    whole→ (ks , F , B) = ks , (λ bk → F (proj₁ (proj₂ (fro bk)))) , λ m → proj₁ (to (proj₂ (B m))) , proj₁ (proj₂ (to (proj₂ (B m))))
+-- A RELABELLING LIFTED ONLY AT A LISTED ROW, and refutably elsewhere: a
+-- scan's, whose state folds the rows before.
+module Lifts {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {Rel : Pos → Ev X → Ev Z → Set}
+             (kn : ∀ {k e e′} → Rel k e e′ → Kin e e′)
+             (toL : ∀ {k e} → Listed a k → a k e → Σ (Ev Z) λ e′ → b k e′ × Rel k e e′)
+             (to¬¬ : ∀ {k e} → a k e → ¬ ¬ Σ (Ev Z) λ e′ → b k e′ × Rel k e e′)
+             (to-end : ∀ {k} → a k end → b k end)
+             (fro : ∀ {k e′} → b k e′ → Σ (Ev X) λ e → a k e × Rel k e e′) where
+  live→ : ∀ {k} → Live a k → Live b k
+  live→ {k} la {c} bc with fro bc
+  ... | _ , ac , r with kn r
+  ...   | k-end = la {c} ac
 
-    near→ : ∀ {m l} → Near a m l → Near b m l
-    near→ (inj₁ lm)             = inj₁ lm
-    near→ (inj₂ ((_ , al) , L)) = inj₂ ((_ , proj₁ (proj₂ (to al))) , lst→ L)
+  live← : ∀ {k} → Live b k → Live a k
+  live← lb ac = lb (to-end ac)
+
+  few← : ∀ {k} → Few b k → Few a k
+  few← (ks , F) = ks , λ ak kk → ∈-stable λ ni → to¬¬ ak λ { (_ , bk , _) → ni (F bk kk) }
+
+  lst→ : ∀ {k} → Listed a k → Listed b k
+  lst→ (ks , F , B) = ks , (λ bk kk → F (proj₁ (proj₂ (fro bk))) kk)
+                    , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (toL (sub-listed (ks , F , B) (proj₁ (B m))) (proj₂ (proj₂ (B m)))))
+
+  lst← : ∀ {k} → Listed b k → Listed a k
+  lst← (ks , F , B) = ks , (λ ak kk → ∈-stable λ ni → to¬¬ ak λ { (_ , bk , _) → ni (F bk kk) })
+                    , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
+
+  whole→ : Whole a → Whole b
+  whole→ W = proj₁ W , (λ bk → proj₁ (proj₂ W) (proj₁ (proj₂ (fro bk))))
+           , λ m → let (_ , al) = proj₂ (proj₂ W) m in _ , proj₁ (proj₂ (toL (whole-listed W) al))
+
+  near→ : ∀ {m l} → Near a m l → Near b m l
+  near→ (inj₁ lm)             = inj₁ lm
+  near→ (inj₂ ((_ , al) , L)) = inj₂ ((_ , proj₁ (proj₂ (toL L al))) , lst→ L)
 
 unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
 unp← k-out  _ = tt
@@ -436,7 +467,9 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
   (kin : ∀ {k e e′} → R k e e′ → Kin e e′) (kin′ : ∀ {l e e′} → R′ l e e′ → Kin e e′)
   (up : ∀ {k e} → t k e → Σ (Ev A′) λ e′ → t′ k e′ × R k e e′)
   (down : ∀ {k e′} → t′ k e′ → Σ (Ev A) λ e → t k e × R k e e′)
-  (up′ : ∀ {l e} → u l e → Σ (Ev Y′) λ e′ → u′ l e′ × R′ l e e′)
+  (upL′ : ∀ {l e} → Listed u l → u l e → Σ (Ev Y′) λ e′ → u′ l e′ × R′ l e e′)
+  (up¬¬′ : ∀ {l e} → u l e → ¬ ¬ Σ (Ev Y′) λ e′ → u′ l e′ × R′ l e e′)
+  (up-end′ : ∀ {l} → u l end → u′ l end) (up-pin′ : ∀ {l r} → u l (pin r) → u′ l (pin r))
   (down′ : ∀ {l e′} → u′ l e′ → Σ (Ev Y) λ e → u l e × R′ l e e′)
   (c : CarryAt f M HP HE LP t u s s′)
   (sh : ∀ {l e e′} → R′ l e e′ → Shown (One f′) e′ → Shown (One f) e)
@@ -445,15 +478,15 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
   open CarryAt c
   private
     module T = Rows {a = t} {b = t′} {Rel = R} kin up down
-    module U = Rows {a = u} {b = u′} {Rel = R′} kin′ up′ down′
+    module U = Lifts {a = u} {b = u′} {Rel = R′} kin′ upL′ up¬¬′ up-end′ down′
 
     into′ : ∀ {k} → IntoAt Img u PB HP s k → IntoAt Img u′ PB HP s k
-    into′ ((l , (e , ul) , L , m) , h) = (l , (proj₁ (up′ ul) , proj₁ (proj₂ (up′ ul))) , U.lst→ {l} L , m) , home h
+    into′ ((l , (e , ul) , L , m) , h) = (l , (proj₁ (upL′ L ul) , proj₁ (proj₂ (upL′ L ul))) , U.lst→ {l} L , m) , home h
       where
         home : _ → _
         home (inj₁ e) = inj₁ e
         home (inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (e₀ , ul₀) , L))) =
-          inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (proj₁ (up′ ul₀) , proj₁ (proj₂ (up′ ul₀))) , U.lst→ {l₀} L))
+          inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (proj₁ (upL′ L ul₀) , proj₁ (proj₂ (upL′ L ul₀))) , U.lst→ {l₀} L))
         home (inj₂ (inj₂ h)) = inj₂ (inj₂ h)
 
     skip-up : ∀ {k e e′} → R k e e′ → e ≡ skip → e′ ≡ skip
@@ -466,14 +499,14 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     img′ {k} tk un lv fw lp with down tk
     ... | e , tk₀ , r with img tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} fw) lp
     ...   | inj₂ (es , h) = inj₂ (skip-up r es , into′ h)
-    ...   | inj₁ (l , i , e₁ , ul , fu , m) with up′ ul
+    ...   | inj₁ (l , i , e₁ , ul , fu , m) with upL′ fu ul
     ...     | e₁′ , ul′ , r′ = inj₁ (l , i , e₁′ , ul′ , U.lst→ {l} fu , mt i r r′ m)
 
     img¬¬′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Few t′ k
            → ¬ ¬ ((Σ Pos λ l → Img k l × Σ (Ev Y′) λ e₁′ → u′ l e₁′ × Match Every (One f′) (Reads f′) e′ e₁′) ⊎ e′ ≡ skip)
     img¬¬′ {k} tk un lv fw n with down tk
     ... | e , tk₀ , r = img¬¬ tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.few← {k} fw)
-      λ { (inj₁ (l , i , e₁ , ul , m)) → let (e₁′ , ul′ , r′) = up′ ul in n (inj₁ (l , i , e₁′ , ul′ , mt i r r′ m))
+      λ { (inj₁ (l , i , e₁ , ul , m)) → up¬¬′ ul λ { (e₁′ , ul′ , r′) → n (inj₁ (l , i , e₁′ , ul′ , mt i r r′ m)) }
         ; (inj₂ es) → n (inj₂ (skip-up r es)) }
 
     shown′ : ∀ {l e₁′} → u′ l e₁′ → Shown (One f′) e₁′ → Live u′ l → Few u′ l
@@ -498,19 +531,15 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
     pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k
-              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p))
+              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p)
+                  × (Listed t′ k → LP k → Listed u′ l))
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} tk lv with down tk
     ... | _ , tk₀ , r with kin r
     ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c}))
-    ...     | (l , p′ , ul , m , b) , h = (l , p′ , pin-up ul , m , b) , homed′ {k} {p} h
+    ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , λ L lp → U.lst→ {l} (ls (T.lst← {k} L) lp)) , homed′ {k} {p} h
       where
-        pin-up : ∀ {l p′} → u l (pin p′) → u′ l (pin p′)
-        pin-up ul with up′ ul
-        ... | _ , ul′ , r′ with kin′ r′
-        ...   | k-pin = ul′
-
         homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                    ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
                → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
@@ -561,7 +590,7 @@ map-carry : ∀ {A B} (g : A → B) (d : Den A) (d′ : Den (IE A)) {M HP HE LP}
 map-carry g d d′ p p′ c =
   Relabel.carried (λ _ e e′ → e′ ≡ mapEv g e) (λ _ e e′ → e′ ≡ mapEv (mapIE g) e)
     (λ { {e = e} refl → kin-map e }) (λ { {e = e} refl → kin-map e })
-    (λ tk → _ , P.lift tk , refl) P.unmap (λ ul → _ , E.lift ul , refl) E.unmap c
+    (λ tk → _ , P.lift tk , refl) P.unmap (λ _ ul → _ , E.lift ul , refl) (λ ul n → n (_ , E.lift ul , refl)) E.lift E.lift E.unmap c
     (λ { {e = e} refl sw → sh-map {g = g} e sw }) (λ { {e₀ = e₀} {e₁ = e₁} _ refl refl m → match-map {g = g} e₀ e₁ m })
   where
     module P = MapRun g d p

@@ -20,7 +20,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; sym; trans; subst; module ≡-Reasoning)
 
-open import Tree using (scan; map; merge; of)
+open import Tree using (scan; map; of)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; skip; end; pin) renaming (out to emit)
@@ -32,7 +32,7 @@ open import simultaneous.Protocol using (nameStep; Fresh)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-++)
-open import simultaneous.Relations using (Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
+open import simultaneous.Relations using (stamp₀; sourced; Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
 open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
@@ -121,14 +121,6 @@ joined-unbatched rs = cong concat (vals-of (values rs))
 
 ------------------------------------------------------------------------
 -- The protocol
-
--- The elaboration's parts: the restamp's start, and the run with the end
--- of its subscribe burst.
-stamp₀ : ∀ {A : Set} → Pos × IE A
-stamp₀ = root , marked Marks.begin
-
-sourced : ∀ {A : Set} → SObs [] A → E [] (IE A)
-sourced o = merge (elab (λ i → i) (plain o)) (of (marked Marks.subscribed ∷ []))
 
 scans-snoc : ∀ {X Y : Set} (f : Y → X → Y) z (xs : List X) x → scans f z (xs ++ [ x ]) ≡ scans f z xs ++ [ f (L.foldl f z xs) x ]
 scans-snoc f z []       x = refl

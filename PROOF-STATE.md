@@ -34,14 +34,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE HEARD PIN
 
-Probed: a hot row past a reader's subscription that its carry puts
-into its instant (`PB`) has its carrier past the elaborated
-subscription, live and listed. Suspect: a pin's carrier can trail
-values carried after it, so its listing is not the plain one's.
-Settled by a carrier for the heard skip found constructively, or a
-connect whose elaborated pin the elaborated reader never reaches.
+Probed: a hot row past a reader's subscription carried into its
+instant (`PB`) has its annotated carrier past the elaborated
+subscription. No field orders a `PB` carrier against the map, and one
+read negatively is kept by `carry-grow` only given where grown points
+lie. Settled by `PB` placed against the map, or a carrier past the
+subscription by instant.
 
-Members: `pb-heard`.
+Members: `pb-order`.
 
 #### THE ERASURE
 
@@ -52,7 +52,7 @@ positions over its own worlds; the meaning is reached through
 children, then a concat's queued lane. Settled when each former's leaf
 is a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`.
+Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-merge`, `wrap-concat`.
 
 #### THE PROTOCOL
 
