@@ -22,7 +22,7 @@ open import Relation.Nullary using (¬_; ¬?; yes; no)
 open import Tree using (Later; defer)
 open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; skip; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
+open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
@@ -102,7 +102,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; place   = λ { (spin i , _) _ _ → inj₁ (instant-⊕ p′ [ ix i ]) }
     ; live    = λ _ _ → λ { (() , _) }
     ; few     = λ { (_ , _ , spin i , _) → P.rows i , λ x kq → P.before i (proj₁ x) kq }
-    ; whole   = λ wt _ → whole wt
+    ; whole   = λ wt _ _ → whole wt
     ; bk      = λ l → [ down l ]
     ; in-bk   = λ { ((a , _ , refl , refl) , _) → here (sym (down-⊕ [ a ])) }
     ; pbk     = λ _ → []
@@ -274,8 +274,8 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   few (inj₁ (refl , refl)) = [] , λ x lt → ⊥-elim (P.none x lt)
   few (inj₂ i)             = P.few→ (C.few i)
 
-  whole : Whole P.T → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
-  whole wt lp with C.whole (P.whole← wt) lp
+  whole : Whole P.T → (∀ {c} → P.T c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
+  whole wt ne lp with C.whole (P.whole← wt) (λ x → ne (P.up x)) lp
   ... | ls , F = E.g ∷ ls , λ { (guard , _) → here refl ; (body y , _) → there (F y) }
 
   bk : Pos → List Pos

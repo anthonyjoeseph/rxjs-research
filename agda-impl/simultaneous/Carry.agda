@@ -127,7 +127,7 @@ Fresh : (Pos → Set) → PMap → Pos → Set
 Fresh H M₀ p = ∀ {x y} → M₀ x y → Below H p x → x ≡ p
 
 private
-  module Under {H : Pos → Set} {M₀ N : PMap} {p p₀ p′ : Pos} (E₀ : Emb M₀) (fr : Fresh H M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) (E : Emb N)
+  module Under {M₀ N : PMap} {p p₀ p′ : Pos} (E₀ : Emb M₀) (at : ∀ {x y} → M₀ x y → p ⊑ x → x ≡ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) (E : Emb N)
                (sh : ∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′)) where
 
     -- What `N` adds lies strictly under the subscription and its image.
@@ -138,10 +138,6 @@ private
     img : ∀ {x y} → N x y → p₀ ⊑ y × p₀ ≺ y
     img n with sh n
     ... | _ , _ , b , σ′ , _ , refl = ⊑-trans pp (b ∷ σ′ , refl) , ≼-≺-≺ {p₀} {p′} {p′ ⊕ (b ∷ σ′)} (⊑-≼ pp) (≺-ext p′ σ′)
-
-    -- An old position under the subscription is the subscription.
-    at : ∀ {x y} → M₀ x y → p ⊑ x → x ≡ p
-    at m px = fr m (p , here , px)
 
     at-img : ∀ {x y} → M₀ x y → p ⊑ x → y ≡ p₀
     at-img m px with at m px
@@ -213,7 +209,21 @@ private
 emb-under : ∀ {H M₀ N p p₀ p′} → Emb M₀ → Fresh H M₀ p → M₀ p p₀ → p₀ ⊑ p′ → Emb N
           → (∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′))
           → Emb (M₀ ∪ᴹ N)
-emb-under E₀ fr m₀ pp E sh = Under.emb E₀ fr m₀ pp E sh
+emb-under E₀ fr m₀ pp E sh = Under.emb E₀ (λ m px → fr m (_ , here , px)) m₀ pp E sh
+
+-- The same, grown under a position the map pairs nothing strictly under.
+emb-at : ∀ {M₀ N p p₀ p′} → Emb M₀ → (∀ {x y} → M₀ x y → p ⊑ x → x ≡ p) → M₀ p p₀ → p₀ ⊑ p′ → Emb N
+       → (∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′))
+       → Emb (M₀ ∪ᴹ N)
+emb-at E₀ at m₀ pp E sh = Under.emb E₀ at m₀ pp E sh
+
+-- An embedding is pairwise: any two pairs lie in one embedding.
+emb-pairs : ∀ {M} → (∀ {x y x′ y′} → M x y → M x′ y′ → Σ PMap λ K → Emb K × K x y × K x′ y′) → Emb M
+emb-pairs h = record
+  { fun     = λ m m′ → let (_ , E , k , k′) = h m m′ in Emb.fun E k k′
+  ; mono    = λ m m′ → let (_ , E , k , k′) = h m m′ in Emb.mono E k k′
+  ; reflect = λ m m′ → let (_ , E , k , k′) = h m m′ in Emb.reflect E k k′
+  ; inst    = λ m m′ → let (_ , E , k , k′) = h m m′ in Emb.inst E k k′ }
 
 ------------------------------------------------------------------------
 -- A subterm carried
@@ -253,10 +263,11 @@ Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k}
 --
 -- A ROW OF `u` IS PLACED FROM ITS LISTING, by a carrier near it: at or
 -- before it, or listed up to.  `u` HAS FEW ROWS IN ALL when `t` and the
--- environment do: a row past a carrier is not listed from the rows past
--- the row it carries, which a former hiding rows past a failure need not
--- have.  Each names a position from listings alone, so such a former
--- decides where the failure lies.
+-- environment do and `t` has no end: a row past a carrier is not listed
+-- from the rows past the row it carries, which a former hiding rows past
+-- a failure need not have; and a run with an end has its exit.  Each
+-- names a position from listings alone, so such a former decides where
+-- the failure lies.
 --
 -- DEAD ROUTE: each row from finitely many before it, outright.  A scan's
 --   row needs its source's values before it listed, and a subterm's run is
@@ -264,6 +275,11 @@ Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k}
 --   its rows (hidden from the subterm by a takeWhile failed early) meets a
 --   later row iff the accumulation is finite, so a scan over that lane and
 --   a timer has a row at the timer whose state decides it.
+--
+-- DEAD ROUTE: `whole` for a run with an end.  A takeWhile keeps its
+--   source's pins past its failure whose connect lies before it; no field
+--   lists the elaborated ones, the elaborated hot bursting for its marks
+--   too.
 record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set) (t : EmissionSet A) (u : EmissionSet Y) (s s′ : Pos) : Set₁ where
   field
     Img     : Pos → Pos → Set
@@ -281,7 +297,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
               ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
     live    : ∀ {k l} → Img k l → Live t k → Live u l
     few     : ∀ {k l} → Img k l → Few t k
-    whole   : Whole t → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
+    whole   : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pbk     : Pos → List Pos
@@ -326,6 +342,11 @@ private
 
     lst← : ∀ {k} → Listed b k → Listed a k
     lst← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
+
+    ended← : (∀ {c} → b c end → ⊥) → ∀ {c} → a c end → ⊥
+    ended← ne ac with to ac
+    ... | _ , bc , r with kn r
+    ...   | k-end = ne bc
 
     whole← : Whole b → Whole a
     whole← (ks , F , B) = ks , (λ ak → F (proj₁ (proj₂ (to ak)))) , λ m → proj₁ (fro (proj₂ (B m))) , proj₁ (proj₂ (fro (proj₂ (B m))))
@@ -425,7 +446,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; place = λ {m} um lv lm → placed′ {m} (place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.lst← {m} lm))
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
-    ; whole = λ wt lp → let (ls , F) = whole (T.whole← wt) lp in ls , λ ur → F (proj₁ (proj₂ (down′ ur)))
+    ; whole = λ wt ne lp → let (ls , F) = whole (T.whole← wt) (T.ended← ne) lp in ls , λ ur → F (proj₁ (proj₂ (down′ ur)))
     ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
@@ -586,7 +607,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
     ; img-mono = Mono.img-mono hm flat c ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm (lstU fm))
     ; live = live
-    ; spent = λ i sp → let (ls , F) = whole (whole-of (few i) sp) tt in ls , λ ur _ → F ur
+    ; spent = λ i sp ne → let (ls , F) = whole (whole-of (few i) sp) ne tt in ls , λ ur _ → F ur
     ; bk = bk ; in-bk = in-bk ; pbk = pbk
     ; pinned = pinned′ }
     where
@@ -896,7 +917,7 @@ private
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
       ; few     = λ _ → fewT
-      ; whole   = λ _ _ → proj₁ allU , λ ur → proj₂ allU (proj₁ ur)
+      ; whole   = λ _ _ _ → proj₁ allU , λ ur → proj₂ allU (proj₁ ur)
       ; bk      = λ _ → proj₁ allT
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; pbk     = λ _ → []

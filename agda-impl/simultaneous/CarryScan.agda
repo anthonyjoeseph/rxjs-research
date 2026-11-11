@@ -266,6 +266,9 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     lstS← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′ kk) })
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (down (proj₂ (proj₂ (B m)))))
 
+    endedS← : (∀ {c} → S c end → ⊥) → ∀ {c} → t c end → ⊥
+    endedS← ne tc = up tc λ { (_ , sc , k-end) → ne sc }
+
     wholeS← : Whole S → Whole t
     wholeS← (ks , F , B) = ks , (λ y → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′) })
                          , λ m → _ , proj₁ (proj₂ (down (proj₂ (B m))))
@@ -464,7 +467,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (lstU← {m} lm))
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
-    ; whole = λ wt lp → let (ls , F) = whole (wholeS← wt) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
+    ; whole = λ wt ne lp → let (ls , F) = whole (wholeS← wt) (endedS← ne) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
     ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
