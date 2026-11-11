@@ -22,7 +22,7 @@ open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 import Data.List.Relation.Unary.Any as Any
-open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (m≤m+n; ≤-refl; n≮n; m≤n⇒m<n∨m≡n)
 open import Data.Unit using (tt)
@@ -32,20 +32,21 @@ open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; yes; no)
-open import Relation.Nullary.Decidable.Core using (T?)
+open import Relation.Nullary.Decidable.Core using (T?; decidable-stable)
 
 open import Data.Bool using (Bool)
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; _∙_; ix; sub; last; instant; inside; _⊕_)
+open import denotation.Position using (Pos; _∙_; ix; sub; last; instant; inside; _⊕_; _≟ᵖ_)
 open import denotation.Events using (Timeline; ix-<; <ᵖ-part; <ᵖ-below; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; hot; DenEnv; Few; Dep; Reach; Truncate; Silent; hush; held; Spin; spin; DeferT; guard; body; MapT; map-out; map-skip; map-pin; map-end; _≺_; _≼_; enter; approx; ⟦_⟧; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; hot; DenEnv; Few; Dep; Reach; Truncate; Silent; hush; held; Spin; spin; DeferT; guard; body; MapT; map-out; map-skip; map-pin; map-end; module Scan; _≺_; _≼_; enter; approx; ⟦_⟧; module Op)
 open import denotation.Read using (Visible; loud)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-split; ≺-irrefl; ≺-trans; ticks; reach-via; entered-reach)
-open import denotation.Laws.Count using (Cov; ag-cnt; ⊑?; cov-down; dep-trans)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-split; ≺-irrefl; ≺-trans; ticks; reach-via; entered-reach; entered-few)
+open import denotation.Laws.Count using (Cov; ag-cnt; ⊑?; cov-down; dep-trans; cov-stable)
 open import denotation.Laws.Worlds using (ok-step; Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑; ⊑-trans; ⊑-cmp; ⊑-snoc; conv)
 open import denotation.Laws.Cut using (module SpinB; spinIx; ix-back)
 open import denotation.Laws.ConnectNe using (Causal)
-open import denotation.Laws using (from; inv-approx; good-cons; causal-at; aft)
+open import denotation.Laws using (from; inv-approx; good-cons; causal-at; aft; scan-ag)
+open import denotation.Laws.Fold using (fold)
 
 -- `x` opens its instant: no row of it lies before.
 Opens : ∀ {A} → EmissionSet A → Pos → Set
@@ -382,6 +383,12 @@ private
   lbl-silent l-skip hush = hush
   lbl-silent l-pin  held = held
 
+  -- Rows each on a reached row of the same kind are reached.
+  lifted : ∀ {A B} {u : EmissionSet A} {v : EmissionSet B}
+         → (src : ∀ {q e} → v q e → Ev A) → (∀ {q e} (x : v q e) → u q (src x)) → (∀ {q e} (x : v q e) → Lbl (src x) e)
+         → (∀ {k e₀} → u k e₀ → Reach u k e₀) → ∀ {q e} (x : v q e) → Reach v q e
+  lifted src row lbl re x = reach-via (λ y _ d → src y , row y , dep-lbl (lbl-sym (lbl x)) (lbl-sym (lbl y)) d) (re (row x))
+
   -- A map's row, the row it lies on, and that row's image.
   module Mapped {A B : Set} (f : A → B) where
     src : ∀ {u : EmissionSet A} {q e} → MapT f u q e → Ev A
@@ -414,9 +421,35 @@ private
     up {e₀ = pin _} x = _ , map-pin x , l-pin
     up {e₀ = end}   x = _ , map-end x , l-end
 
-    -- Over reached rows, every row is reached.
     lift : ∀ {u : EmissionSet A} → (∀ {k e₀} → u k e₀ → Reach u k e₀) → ∀ {q e} (x : MapT f u q e) → Reach (MapT f u) q e
-    lift re x = reach-via (λ y _ d → src y , row y , dep-lbl (lbl-sym (lbl x)) (lbl-sym (lbl y)) d) (re (row x))
+    lift {u} = lifted (λ {q} {e} → src {u} {q} {e}) (λ {q} {e} → row {u} {q} {e}) (λ {q} {e} → lbl {u} {q} {e})
+
+  -- A scan's row, the row it lies on, a value on the one it folds in.
+  module Scanned {A B : Set} (f : B → A → B) (z : B) where
+    final : ∀ {u : EmissionSet A} {q b} → Scan.Acc f z u q b → Σ A λ a → u q (out a)
+    final (Scan.acc₀ x _)    = _ , x
+    final (Scan.acc _ x _ _) = _ , x
+
+    src : ∀ {u : EmissionSet A} {q e} → Scan.ScanT f z u q e → Ev A
+    src (Scan.sval ac)         = out (proj₁ (final ac))
+    src (Scan.sstep _)         = skip
+    src (Scan.spin {r = r} _)  = pin r
+    src (Scan.send _)          = end
+
+    row : ∀ {u : EmissionSet A} {q e} (x : Scan.ScanT f z u q e) → u q (src x)
+    row (Scan.sval ac) = proj₂ (final ac)
+    row (Scan.sstep x) = x
+    row (Scan.spin x)  = x
+    row (Scan.send x)  = x
+
+    lbl : ∀ {u : EmissionSet A} {q e} (x : Scan.ScanT f z u q e) → Lbl (src x) e
+    lbl (Scan.sval _)  = l-out
+    lbl (Scan.sstep _) = l-skip
+    lbl (Scan.spin _)  = l-pin
+    lbl (Scan.send _)  = l-end
+
+    lift : ∀ {u : EmissionSet A} → (∀ {k e₀} → u k e₀ → Reach u k e₀) → ∀ {q e} (x : Scan.ScanT f z u q e) → Reach (Scan.ScanT f z u) q e
+    lift {u} = lifted (λ {q} {e} → src {u} {q} {e}) (λ {q} {e} → row {u} {q} {e}) (λ {q} {e} → lbl {u} {q} {e})
 
 -- A MAP KEEPS THE TRUTH: each row lies on its input's, and is reached
 -- once that one is, so a clean row lies on a clean one.
@@ -462,10 +495,6 @@ map-truth {A} {B} f {s} {s′} R p ok = record
     clean : ∀ {q e e₀} → Clean Cut (Truncate (MapT f t)) q e → Lbl e₀ e → Clean Cut t q e₀
     clean (nl , ks , h) l = nl , ks , λ y kq d → h (proj₁ (proj₂ (image y))) kq (dep-lbl l (proj₂ (proj₂ (image y))) d)
 
--- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
--- against the next.  A connect's body is read against its next under ONE
--- handle, and across the two handles by causality (`Causal`), as the
--- order modulus is (`settle`).
 -- A DEFER KEEPS THE TRUTH: its body's cuts are its own, and its guard
 -- is the same row either way.
 defer-truth : ∀ {A H} {d d′ : Den A} → InvD H d → InvD H d′ → Rel H d d′ → Rel H (Op.defer d) (Op.defer d′)
@@ -508,8 +537,93 @@ defer-truth {A} {H} {d} {d′} inv inv′ R p ok = record
     bwd {q} {e} cl (body x , _) = body y , in-body d y
       where y = proj₂ (agree q e (clean cl)) x
 
+-- A SCAN KEEPS THE TRUTH: each row lies on its input's, a value on the
+-- one it folds in.  A value reads every value before it, so the input
+-- agrees up to a clean value, whose past is all clean.  A value's fold is
+-- classical, but what it is needed for is decidable or a negation.
+scan-truth : ∀ {A B H} (f : B → A → B) z {s s′ : Den A} → Rel H s s′ → Rel H (Op.scan f z s) (Op.scan f z s′)
+scan-truth {A} {B} f z {s} {s′} R p ok = record
+  { Cut     = Cut
+  ; silent  = λ c sp x → lbl-silent (lbl (proj₁ x)) (silent c sp (row (proj₁ x)))
+  ; shows   = λ c i → shown c (shows c i)
+  ; blocked = λ c after F → blocked c after (few F)
+  ; shadow  = λ { c (Scan.spin y , _) l rs → shade (shadow c y l rs) }
+  ; agree   = λ q e cl → fwd cl , bwd cl
+  }
+  where
+    tr = R p ok
+    open Truth tr
+    open Scanned f z
+
+    t t′ : EmissionSet A
+    t  = enter s p
+    t′ = enter s′ p
+
+    S S′ : EmissionSet B
+    S  = Scan.ScanT f z t
+    S′ = Scan.ScanT f z t′
+
+    re : ∀ {k e} → t k e → Reach t k e
+    re = entered-reach s p
+
+    re′ : ∀ {k e} → t′ k e → Reach t′ k e
+    re′ = entered-reach s′ p
+
+    -- Each input row shows, a value classically.
+    image : ∀ {k e₀} → t k e₀ → ¬ ¬ (Σ (Ev B) λ e → Truncate S k e × Lbl e₀ e)
+    image {e₀ = out a} y n = fold f z t (entered-few s p tt y) y λ { (b , ac) → n (out b , (Scan.sval ac , lift re (Scan.sval ac)) , l-out) }
+    image {e₀ = skip}  y n = n (skip , (Scan.sstep y , lift re (Scan.sstep y)) , l-skip)
+    image {e₀ = pin r} y n = n (pin r , (Scan.spin y , lift re (Scan.spin y)) , l-pin)
+    image {e₀ = end}   y n = n (end , (Scan.send y , lift re (Scan.send y)) , l-end)
+
+    quiet : ∀ {k e₀} → t k e₀ → Silent e₀ → Σ (Ev B) λ e → Truncate S k e
+    quiet y hush = skip , Scan.sstep y , lift re (Scan.sstep y)
+    quiet y held = _ , Scan.spin y , lift re (Scan.spin y)
+
+    shown : ∀ {c i} → Cut c → (Σ Pos λ w → Σ (Ev A) λ e₀ → (c ⊕ [ ix i ]) ⊑ w × t w e₀)
+          → Σ Pos λ w → Σ (Ev B) λ e → (c ⊕ [ ix i ]) ⊑ w × Truncate S w e
+    shown {i = i} c (w , _ , w0 , tw) with quiet tw (silent c (i , w0) tw)
+    ... | e , m = w , e , w0 , m
+
+    shade : ∀ {c r} → (Σ Pos λ w → (c ⊕ [ ix 1 ]) ⊑ w × t w (pin r)) → Σ Pos λ w → (c ⊕ [ ix 1 ]) ⊑ w × Truncate S w (pin r)
+    shade (w , w1 , tw) = w , w1 , Scan.spin tw , lift re (Scan.spin tw)
+
+    few : ∀ {x} → Few (Truncate S) x → Few t x
+    few (ks , h) = ks , λ {k} y kx → decidable-stable (any? (k ≟ᵖ_) ks) λ n → image y λ { (_ , m , _) → n (h m kx) }
+
+    firm : ∀ {q ks k} → ¬ ¬ (Cov q ks k × ¬ Lie Cut k) → Cov q ks k × ¬ Lie Cut k
+    firm nn = cov-stable (λ n → nn λ c → n (proj₁ c)) , λ l → nn λ c → proj₂ c l
+
+    clean : ∀ {q e e₀} → Clean Cut (Truncate S) q e → Lbl e₀ e → Clean Cut t q e₀
+    clean (nl , ks , h) l = nl , ks , λ y kq d → firm λ n → image y λ { (_ , m , l′) → n (h m kq (dep-lbl l l′ d)) }
+
+    -- Up to a clean value, the input agrees.
+    upto-clean : ∀ {q a} → Clean Cut t q (out a) → AgreeTo q t t′
+    upto-clean {q} {a} cl@(nl , ks , h) = ⟨ (λ {y} {e₀} yq → at (≼-split {y} {q} yq)) ⟩
+      where
+        at : ∀ {y e₀} → y ≺ q ⊎ y ≡ q → (t y e₀ → t′ y e₀) × (t′ y e₀ → t y e₀)
+        at {y} {e₀} (inj₁ yq) = (λ x → proj₁ (agree y e₀ (clean-down tr {q} {out a} {y} {e₀} cl yq tt (proj₂ (h x yq tt)))) x) , (λ x → pull tr {q} {out a} {y} {e₀} cl x yq tt)
+        at {e₀ = e₀} (inj₂ refl) = agree q e₀ (nl , ks , λ x kq _ → h x kq tt)
+
+    fwd : ∀ {q e} → Clean Cut (Truncate S) q e → Truncate S q e → Truncate S′ q e
+    fwd {q} cl (Scan.sval {b = b} ac , _) =
+      let v = proj₁ (upto (scan-ag f z (upto-clean {a = proj₁ (final ac)} (clean {e = out b} {e₀ = out (proj₁ (final ac))} cl l-out))) {q} (≼-refl {q})) (Scan.sval ac) in v , lift re′ v
+    fwd {q} cl (Scan.sstep x , _) = let v = Scan.sstep (proj₁ (agree q skip (clean cl l-skip)) x) in v , lift re′ v
+    fwd {q} cl (Scan.spin {r = r} x , _) = let v = Scan.spin (proj₁ (agree q (pin r) (clean cl l-pin)) x) in v , lift re′ v
+    fwd {q} cl (Scan.send x , _) = let v = Scan.send (proj₁ (agree q end (clean cl l-end)) x) in v , lift re′ v
+
+    bwd : ∀ {q e} → Clean Cut (Truncate S) q e → Truncate S′ q e → Truncate S q e
+    bwd {q} cl (Scan.sval {b = b} ac , _) =
+      let v = proj₂ (upto (scan-ag f z (upto-clean {a = proj₁ (final ac)} (clean {e = out b} {e₀ = out (proj₁ (final ac))} cl l-out))) {q} (≼-refl {q})) (Scan.sval ac) in v , lift re v
+    bwd {q} cl (Scan.sstep x , _) = let v = Scan.sstep (proj₂ (agree q skip (clean cl l-skip)) x) in v , lift re v
+    bwd {q} cl (Scan.spin {r = r} x , _) = let v = Scan.spin (proj₂ (agree q (pin r) (clean cl l-pin)) x) in v , lift re v
+    bwd {q} cl (Scan.send x , _) = let v = Scan.send (proj₂ (agree q end (clean cl l-end)) x) in v , lift re v
+
+-- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
+-- against the next.  A connect's body is read against its next under ONE
+-- handle, and across the two handles by causality (`Causal`), as the
+-- order modulus is (`settle`).
 postulate
-  scan-truth    : ∀ {A B H} (f : B → A → B) z {s s′ : Den A} → Rel H s s′ → Rel H (Op.scan f z s) (Op.scan f z s′)
   take-truth    : ∀ {A H} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
                 → Rel H s s′ → Rel H (Op.takeWhile i keep s) (Op.takeWhile i keep s′)
   flat-truth    : ∀ {A B H} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
