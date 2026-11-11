@@ -34,7 +34,7 @@ open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; _≺
   shown; heard; ended; late; InE; at-out; at-end; on-out; MapT; map-out; map-end; map-skip; map-pin;
   LaneOf; module Joining; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded; module Switch; module Exhaust; module Joiner)
 open import denotation.Laws.Modulus using (≼-false; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≺-ext; ≺-trans; ≼-antisym; ≼-refl; ≼-or-≻)
-open import denotation.Laws.Worlds using (inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; ⊕-assoc)
+open import denotation.Laws.Worlds using (notT; inside-⊑; ⊑-inside; Ok; Hots; InvAt; InvD; W⁼; GoodEnv; world-after; ok-step; ⊕-assoc)
 open import denotation.Laws.JoinInv using (module JoinerI; module Join; module SwitchI; switch-cut-up)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
@@ -49,7 +49,7 @@ open import adequacy.Rows using (_≃_; ≼-≢)
 open _≃_
 open import adequacy.Cursor using (takes; Cur; origin; bef; aft; Owes; Due; Unfed; Adm; Ticked; Pol; Lane; Runs; Start; Kill; polF;
   JoinF; Whole; Ahead; h-live; h-end; h-kill; LaneSt; l-live; l-dead; Begun; more; joined;
-  Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; notT; Sound; OweAt; o-cp; o-cut;
+  Ends; Flags; Src; src-pend; src-on; src-shut; Failure; Gone; Sound; OweAt; o-cp; o-cut;
   o-over; Behind; FewBefore; few-behind; alike; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan;
   s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)

@@ -26,7 +26,7 @@ open import denotation.Position using (Pos; ix; last; _⊕_; nested; _▸_)
 open import denotation.Events using (Timeline; timelineAt; Frame; emit; stall; close; module From∞)
 open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhile; ⟦_⟧; InE; at-out; at-end; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
-open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
+open import denotation.Laws.Worlds using (notT; Ok; Hots; ok-step)
 open import operation.Key using (at; after; at-after)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
@@ -37,7 +37,7 @@ open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscri
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this; tapeE)
 open _≃_
-open import adequacy.Cursor using (Cur; aft; NoFail; Sound; tailp-dn; ≈-refl; ≈-trans; fd-none; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; Sealed; notT; s-of; s-join; s-joinx; s-took; s-cold; s-coldx; Ticked; subd; o-cp)
+open import adequacy.Cursor using (Cur; aft; NoFail; Sound; tailp-dn; ≈-refl; ≈-trans; fd-none; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; Sealed; s-of; s-join; s-joinx; s-took; s-cold; s-coldx; Ticked; subd; o-cp)
 open import adequacy.Cursor.Tear using (husk-of; c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
 open import adequacy.Cursor.Frame using (Fr; Hold; owes; dead; lane; lanecut; pnd; Rest; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; flying; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)

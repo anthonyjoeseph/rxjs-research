@@ -32,7 +32,7 @@ open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; skip; Bare; Proper; ⟦_⟧; _≺_; _≼_; Den; hot; coldAt; DenEnv; enter; module TakeWhile;
   Rejoin; shown; heard; ended; late)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym; ≼-≺-≺; ≼-or-≻)
-open import denotation.Laws.Worlds using (Lawful)
+open import denotation.Laws.Worlds using (notT; Lawful)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.JoinInv using (end≢out)
@@ -48,7 +48,7 @@ open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; ConnE; _≈_; Kil
   l-live; l-dead; h-live; h-end; h-kill; Begun; none; more; Lane; Joined; joined; Flags; Src;
   src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-coldx; s-of; s-done; s-map;
   s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Pol; SlotsMv; slots-mv; Subd;
-  Torn; notT; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed; InCall;
+  Torn; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed; InCall;
   AttFin; alike; voc; burst-dn)
 open import adequacy.Cursor.Tear using (c-abs; husk-of; NoIsle; NoIsleL; Settles)
 open import adequacy.Cursor.Frame using (Fr; owes; f-src; f-srcc; f-srcp; d-src; f-isle; f-islec; f-islep)

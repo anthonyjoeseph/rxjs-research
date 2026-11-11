@@ -25,12 +25,13 @@ open Machine using (St; Ctx; Scope; binds; CS; subscribing; absorbed;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; attached; attAt;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
 open import adequacy.Rows using (_≃_; Frozen)
-open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Open; notT; Under; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
+open import adequacy.Cursor using (Cur; Thru; Lane; Up; up; Dom; Open; Under; Subd; SubdAt; Behind; Flags; ConnE; Runs; NoKill; h-live;
   Begun; Husk; HuskL; LaneSt; Parts; Pol; Pts; Quiet; QuietL; Sealed; SealedL; Src; SrcH; Sync; Torn; _∪ᵖ_; _⊑_;
   h-blank; h-conn; h-cut; h-flat; h-ln; h-map; h-scan; h-take; hl-more; hl-none; joined;
   l-dead; l-live; more; none; s-cold; s-coldx; s-conn; s-cut; s-done; s-flat; s-join; s-joinx; s-map;
   s-of; s-scan; s-take; s-took; sh-dead; sh-isle; sh-islec; sh-pend; src-on; src-pend;
   src-shut; under-⊑; ∅ᵖ; ∪-⊑; ⊑-refl)
+open import denotation.Laws.Worlds using (notT)
 
 open _≃_
 

@@ -65,7 +65,7 @@ open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; unbound; binds; CS; Owe
                     renaming (Ev to Evᴹ; Shown to Shownᴹ)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
 open import adequacy.Rows using (_≃_; ≃-refl; ≃-trans; Vis; toEv; Inbox; full; pendRows; Frozen; tapeE)
-open import denotation.Laws.Worlds using (Ok; Hots; Real; RealR; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
+open import denotation.Laws.Worlds using (notT; Ok; Hots; Real; RealR; W; W⁼; Plain; InvAt; InvD) renaming (_⊑_ to _⊑ʷ_)
 open _≃_
 
 ------------------------------------------------------------------------
@@ -699,10 +699,6 @@ Failure keep Es r = Σ _ λ a → Es r (out a) × T (not (keep a)) × ¬ TakeWhi
 -- Passed at `r`: whatever is still owed lies at or past it.
 Gone : Cur → Pos → Set
 Gone C r = ∀ {q} → Owes C q → r ≼ q
-
-notT : ∀ b → T (not b) → T b → ⊥
-notT true  () _
-notT false _  ()
 
 -- What a takeWhile failed at `r` still owes itself: its completion, under
 -- `last`, until the cursor passes it.

@@ -30,7 +30,8 @@ open import adequacy.Rows using (full; Frozen)
 open import adequacy.Rows using (module _≃_)
 open _≃_
 open import adequacy.Cursor using (Cur; Owes; Pol; Begun; Lane; Kill; Ends; ConnE; Flags; Src; Hole; h-live; h-end; h-kill;
-  joined; alike; notT)
+  joined; alike)
+open import denotation.Laws.Worlds using (notT)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr; Unread; un-dead; un-torn;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;
   d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)

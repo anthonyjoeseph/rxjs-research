@@ -25,7 +25,7 @@ open import denotation.Position using (Pos; ix; inside; _⊕_; Path)
 open import denotation.Events using (inside-++)
 open import denotation.EmissionSet using (EmissionSet; pin; end; _≺_; Reach; module Connecting)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans)
-open import denotation.Laws.Worlds using (ok-step; Hots)
+open import denotation.Laws.Worlds using (notT; ok-step; Hots)
 open import operation.Key using (at; after; at-after-≮)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; Scope; ⟨_,_,_,_⟩; subscribing; absorbed; moved; plug; run; own; CS; cs; bodyM; srcAttM; owedM;
@@ -35,7 +35,7 @@ open _≃_
 open import adequacy.Cursor using (Cur; bef; Owes; Behind; Pts; Held; AttFin; AttOwed; TailP; tailp; Src; Sync; Subd; re-parts;
   under-⊑; tailp-⊑; ∪-⊑; Parts; Flags; Sound; Husk; SrcH; _∪ᵖ_; _⊑_; ⊑-refl; ⊑-trans; h-blank;
   h-conn; sh-dead; sh-isle; sh-islec; sh-pend; src-pend; src-on; src-shut; s-conn; Torn;
-  ≈-refl; notT; subd; SubdAt; Thru; Up; UpA; upa; Dom; Onward; Open; InScope; InCall; Bursts;
+  ≈-refl; subd; SubdAt; Thru; Up; UpA; upa; Dom; Onward; Open; InScope; InCall; Bursts;
   BurstsAt)
 open import adequacy.Cursor.Show using (conn-up-body; in-call; thru-dn; thru-up0; call-onward)
 open import adequacy.Cursor.Tear using (live-open; husk-of; src-husk; unsubIf-husk; quiet-unsubIf; sealed-unsubIf; NoIsle; c-abs; sync-pend)

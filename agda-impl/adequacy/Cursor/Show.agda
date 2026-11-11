@@ -35,8 +35,8 @@ open Machine using (Scope; CS)
 open import adequacy.Rows using (Frozen; full)
 open import adequacy.Cursor using (origin; bef; aft; Thru; Owes; Dom; Up; UpA; upa; Lifts; Onward; Bursts; _≈_; voc; NoFail; NoKill; Unkilled; Pol; Runs;
   Lane; polF; up; JoinF; JoinE; JInv; JRo; JRl; LanesIn; Sound; Behind; Parts; Flags; ConnE;
-  Src; src-pend; src-on; src-shut; bursts; BurstsAt; notT; AttFin)
-open import denotation.Laws.Worlds using (Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; world-after; world-after⁼; inside-⊑; ⊑-inside; Disj; conv; plain-last; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ; step≢root)
+  Src; src-pend; src-on; src-shut; bursts; BurstsAt; AttFin)
+open import denotation.Laws.Worlds using (notT; Hots; Real; InvAt; W⁼; here; inW; step; timer; join; real-snoc; plain-ix; real-init; world-after; world-after⁼; inside-⊑; ⊑-inside; Disj; conv; plain-last; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ; step≢root)
 open import adequacy.Bound using (next-slot; in-slot; owes?; owes-≼)
 open import adequacy.Rows using (≼-≢)
 import denotation.Laws.Worlds as W

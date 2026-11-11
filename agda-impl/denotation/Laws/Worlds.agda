@@ -16,7 +16,7 @@
 -- no hot row lies in its world: the hot was made elsewhere.
 module denotation.Laws.Worlds where
 
-open import Data.Bool using (T; true)
+open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Nat using (_<_)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -38,6 +38,11 @@ open import denotation.Events using (inside-++; inside-self; inside-cons; <ᵖ-s
 open import denotation.Simultaneity using (eqⁱ; later-tick; lexi-l; isLt-lt)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Silent; held; Unpinned; Dep; Few; Rejoin; shown; heard; ended; late; EmissionSet; _≺_; _≼_; Den; hot; coldAt; enter; DenEnv; from)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-ext; ≼-false; entered-few)
+
+-- A flag and its negation never both hold.
+notT : ∀ b → T (not b) → T b → ⊥
+notT true  () _
+notT false _  ()
 
 -- A label that opens no subscription.
 data Plain : Label → Set where

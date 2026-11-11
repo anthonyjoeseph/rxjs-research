@@ -35,7 +35,7 @@ open import denotation.Laws.Count
   using (Cov; Cnt; DCnt; AgC; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cov-up; cov-down; cov-lift; child; cnt-up; cnt-down; seen; seen-under;
   dcnt-cnt; dcnt-pin; ag-cnt; trunc-ag)
 open import denotation.Laws.Worlds
-  using (W⁼; Ok; _∪ʰ_; Lawful; InvAt; InvD; ok-step; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; ⊑-cmp; ⊑-≼; ⊑-inside;
+  using (W⁼; inW; Ok; _∪ʰ_; Lawful; InvAt; InvD; ok-step; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; ⊑-cmp; ⊑-≼; ⊑-inside;
   inside-⊑; conv; in-world; not-up)
 import denotation.Laws.Connect as LC
 
@@ -54,6 +54,64 @@ private
 
 proper-ag : ∀ {A Q} {t t′ : EmissionSet A} → AgreeTo Q t t′ → AgreeTo Q (Proper t) (Proper t′)
 proper-ag a = ⟨ (λ {y} yQ → proper-to a yQ , proper-to (AgreeTo-sym a) yQ) ⟩
+
+-- A CONNECT'S SOURCE ROWS, as it shows them: alive before a body row,
+-- one label down while the body runs or in the burst.
+module Rows {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
+            (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) (p : Pos) (ok : Ok H p) where
+  private
+    module C = Connect s F p
+
+    r : Pos
+    r = p ⊕ [ ix 1 ]
+
+    Iσ = LC.Iσ {s = s} {F = F} Is IF p ok
+    Iβ = LC.Iβ {s = s} {F = F} Is IF p ok
+
+    nin : ∀ {k} → T (not (inside r k)) → T (inside r k) → ⊥
+    nin {k} ni i with inside r k
+    ... | true  = ni
+    ... | false = i
+
+  sw : ∀ {y e} → C.σ y e → W⁼ H r y
+  sw x = inW (InvAt.world Iσ x)
+
+  -- A source row before a body row is alive.
+  alive-β : ∀ {y e k e′} → C.β y e → C.σ k e′ → k ≺ y → C.Alive k
+  alive-β {y} {k = k} b x lt {c} ce with ≼-or-≻ c k
+  ... | inj₂ kc = kc
+  ... | inj₁ ck with InvAt.burst Iβ ce b (≼-≺-≺ {c} {k} {y} ck lt)
+  ...   | w , w⁼ , ic , iy =
+    ⊥-elim (LC.body-leads {s = s} {F = F} Is IF p ok w⁼ (sw x) (conv (inside-⊑ w c ic) ck lt (inside-⊑ w y iy)))
+
+  -- A pin's connect leads it, so is alive with it.
+  alive-pin : ∀ {k p′} → C.σ k (pin p′) → C.Alive k → C.Alive p′
+  alive-pin {k} {p′} x al {c} ce = ≼-≺-≺ {p′} {k} {c} (⊑-≼ (inside-⊑ p′ k (proj₂ (InvAt.pinned Iσ x)))) (al ce)
+
+  -- What an alive source row outside the burst shows as.
+  shown : ∀ {k e} → C.σ k e → C.Alive k → T (not (inside r k)) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
+  shown {e = out _}  x al ni = _ , C.echo x al tt ni
+  shown {e = skip}   x al ni = _ , C.echo x al tt ni
+  shown {e = end}    x al ni = _ , C.echo x al tt ni
+  shown {e = pin _}  x al ni = _ , C.kept x (alive-pin x al) ni (proj₂ (InvAt.pinned Iσ x))
+
+  -- A source row alive or in the burst shows one label down.
+  img : ∀ {k e} → C.σ k e → C.Alive k ⊎ T (inside r k) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
+  img {k} x a with inside r k in ik
+  img x a          | true  = _ , C.burst x (subst T (sym ik) tt)
+  img x (inj₁ al)  | false = shown x al (subst (T ∘ not) (sym ik) tt)
+  img x (inj₂ i)   | false = ⊥-elim i
+
+  -- A source pin of a connect outside the burst is outside the burst.
+  not-in : ∀ {j k p′} → C.σ j (pin p′) → p′ ⊑ k → T (not (inside r k)) → T (not (inside r j))
+  not-in {j} {k} {p′} xj pk ni with inside r j in ij
+  ... | false = tt
+  ... | true with InvAt.pinned Iσ xj
+  ...   | w⁼ , ipj with ⊑-cmp r p′ (inside-⊑ r j (subst T (sym ij) tt)) (inside-⊑ p′ j ipj)
+  ...     | inj₁ rp′ = nin ni (⊑-inside (⊑-trans rp′ pk))
+  ...     | inj₂ p′r with ⊑-snoc p p′r
+  ...       | inj₁ p′p = ⊥-elim (not-up (proj₁ ok) w⁼ p′p)
+  ...       | inj₂ refl = nin ni (⊑-inside pk)
 
 private
   module Core {A B : Set} {H : Pos → Set} {n : ℕ} {s s′ : Den A} {F F′ : Den A → Den B}
@@ -74,62 +132,19 @@ private
     Iβ  = LC.Iβ {s = s} {F = F} Is IF p ok
     Iβ′ = LC.Iβ {s = s′} {F = F′} Is′ IF′ p ok
 
-    sw : ∀ {y e} → C.σ y e → W⁼ H r y
-    sw = LC.sw {s = s} {F = F} Is IF p ok
-
     aσ : AgC n C.σ C′.σ
     aσ = as r (ok-step p ok)
 
     aβ : AgC n C.β (enter (F′ (hot (Proper C.σ))) p₀)
     aβ = aF (LC.lawful {s = s} {F = F} Is IF p ok) p₀ (LC.ok₀ {s = s} {F = F} Is IF p ok)
 
+    open Rows {s = s} {F = F} Is IF p ok using (sw; alive-β; img; not-in)
+
     σ-ag : ∀ {z} → Cnt n C.σ z → AgreeTo z C.σ C′.σ
     σ-ag {z} b = ag-cnt aσ z (inj₁ b)
 
     ky : ∀ k → k ≼ (k ⊕ [ ix 0 ])
     ky k = ≺→≼ {k} {k ⊕ [ ix 0 ]} (≺-ext k [])
-
-    nin : ∀ {k} → T (not (inside r k)) → T (inside r k) → ⊥
-    nin {k} ni i with inside r k
-    ... | true  = ni
-    ... | false = i
-
-    -- A source row before a body row is alive.
-    alive-β : ∀ {y e k e′} → C.β y e → C.σ k e′ → k ≺ y → C.Alive k
-    alive-β {y} {k = k} b x lt {c} ce with ≼-or-≻ c k
-    ... | inj₂ kc = kc
-    ... | inj₁ ck with InvAt.burst Iβ ce b (≼-≺-≺ {c} {k} {y} ck lt)
-    ...   | w , w⁼ , ic , iy =
-      ⊥-elim (LC.body-leads {s = s} {F = F} Is IF p ok w⁼ (sw x) (conv (inside-⊑ w c ic) ck lt (inside-⊑ w y iy)))
-
-    -- A pin's connect leads it, so is alive with it.
-    alive-pin : ∀ {k p′} → C.σ k (pin p′) → C.Alive k → C.Alive p′
-    alive-pin {k} {p′} x al {c} ce = ≼-≺-≺ {p′} {k} {c} (⊑-≼ (inside-⊑ p′ k (proj₂ (InvAt.pinned Iσ x)))) (al ce)
-
-    -- What an alive source row outside the burst shows as.
-    shown : ∀ {k e} → C.σ k e → C.Alive k → T (not (inside r k)) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
-    shown {e = out _}  x al ni = _ , C.echo x al tt ni
-    shown {e = skip}   x al ni = _ , C.echo x al tt ni
-    shown {e = end}    x al ni = _ , C.echo x al tt ni
-    shown {e = pin _}  x al ni = _ , C.kept x (alive-pin x al) ni (proj₂ (InvAt.pinned Iσ x))
-
-    -- A source row alive or in the burst shows one label down.
-    img : ∀ {k e} → C.σ k e → C.Alive k ⊎ T (inside r k) → Σ (Ev B) (C.ConnT (k ⊕ [ ix 0 ]))
-    img {k} x a with inside r k in ik
-    img x a          | true  = _ , C.burst x (subst T (sym ik) tt)
-    img x (inj₁ al)  | false = shown x al (subst (T ∘ not) (sym ik) tt)
-    img x (inj₂ i)   | false = ⊥-elim i
-
-    -- A source pin of a connect outside the burst is outside the burst.
-    not-in : ∀ {j k p′} → C.σ j (pin p′) → p′ ⊑ k → T (not (inside r k)) → T (not (inside r j))
-    not-in {j} {k} {p′} xj pk ni with inside r j in ij
-    ... | false = tt
-    ... | true with InvAt.pinned Iσ xj
-    ...   | w⁼ , ipj with ⊑-cmp r p′ (inside-⊑ r j (subst T (sym ij) tt)) (inside-⊑ p′ j ipj)
-    ...     | inj₁ rp′ = nin ni (⊑-inside (⊑-trans rp′ pk))
-    ...     | inj₂ p′r with ⊑-snoc p p′r
-    ...       | inj₁ p′p = ⊥-elim (not-up (proj₁ ok) w⁼ p′p)
-    ...       | inj₂ refl = nin ni (⊑-inside pk)
 
     -- Few before a cut.
     module Lin {q : Pos} (c : Cnt n C.ConnT q) where

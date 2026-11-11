@@ -8,15 +8,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE TRUTHFUL APPROXIMANTS
-
-Untried: the connect keeps `Truth`, as every joining does
-(`denotation.Laws.Truth.Joining`). Open: a connect's hidden cuts, kept
-only by their pins, and its body read across two handles. Settled when
-it is a body.
-
-Members: `connect-truth`.
-
 ## Tier 0 — adequacy
 
 **Adequacy:** what the pure semantics shows is what a reader of the emission set meets, row by row.

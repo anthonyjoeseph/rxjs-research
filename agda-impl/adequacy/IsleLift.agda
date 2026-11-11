@@ -34,7 +34,7 @@ open import denotation.Events using (inside-self; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; pin; Reach; Few; _≺_; _≼_; ⟦_⟧)
 open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl; ≺-ext; ≺-trans; ≼-antisym)
 open import denotation.Laws.BoundedInv using (first-child)
-open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (notT; ⊑-inside; ⊕-assoc; ⊕-identityʳ)
 open import operation.Key using (at)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; plug; connS; mapS; scanS; cutS; lnS; takeS; flatS; binds; scopeOf;
@@ -42,7 +42,7 @@ open Machine using (St; Ctx; CS; plug; connS; mapS; scanS; cutS; lnS; takeS; fla
 open import adequacy.Rows using (Frozen; full; module _≃_)
 open _≃_ using (from)
 open import adequacy.Cursor using (Cur; bef; Thru; Dom; Up; UpA; upa; BurstsAt; Bursts; Behind; alike; ≈-refl; Husk; Burst;
-  Subd; SubdAt; AttOwed; _⊑_; _∪ᵖ_; Pts; Hole; h-live; h-end; h-kill; notT; Pol; Kept; Owes;
+  Subd; SubdAt; AttOwed; _⊑_; _∪ᵖ_; Pts; Hole; h-live; h-end; h-kill; Pol; Kept; Owes;
   polF)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; ⊥₁; Fr; Unread; un-dead; un-torn;
   f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body;

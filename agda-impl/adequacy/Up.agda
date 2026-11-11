@@ -30,7 +30,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; ⟦_⟧; Ma
   Den; hot; coldAt; DenEnv; shown; heard; ended; late; module TakeWhile; module Connecting;
   Reach; Truncate)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym)
-open import denotation.Laws.Worlds using (Hots)
+open import denotation.Laws.Worlds using (notT; Hots)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; Conf; ⟨_,_,_,_⟩; Scope; binds; CS; scopeOf; connS; rising; nx; cp; inBody; inSrc; feed; feedL; rise; moved; shutAt; absorbed; same?; joinS; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS) renaming (Ev to Evᴹ)
 open import adequacy.Rows using (_≃_; _⇄_; ≃-sym; ≃-trans; ≃-refl; ≼-≢; full; Frozen; pendRows; Moves; silent; toEv)
@@ -42,7 +42,7 @@ open import adequacy.Cursor using (SlotsMv; slots-mv; Cur; bef; aft; Behind; Fin
   fd-last; Joined; joined; Flags; Src; src-pend; src-on; src-shut; Parts; re-parts; OweAt;
   o-cp; o-cut; o-over; Sync; s-cold; s-coldx; s-of; s-done; s-map; s-scan; s-cut; s-take; s-took;
   s-flat; s-conn; s-join; s-joinx; Waiting; Lane; JRl; JRo; JInv; Asc; polF; JoinF; LanesIn;
-  NoFail; TailP; tailp-dn; SubdAt; subd; Torn; notT; Husk; HuskL; h-blank; h-map; h-scan;
+  NoFail; TailP; tailp-dn; SubdAt; subd; Torn; Husk; HuskL; h-blank; h-map; h-scan;
   h-cut; h-ln; h-take; h-flat; h-conn; hl-none; hl-more; SrcH; sh-dead; sh-isle; sh-islec;
   sh-pend; Quiet; QuietL; Sealed; SealedL; ⊑-trans; ∪-⊑; ⊑-refl; burst-dn)
 open import adequacy.Cursor.Tear using (by; NoIsle; NoIsleL; Settles; sync-pend)
