@@ -674,6 +674,13 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
 -- do, under every approximant.
 --
+-- A TAKEWHILE'S `place` AND `cause` ARE DECIDED by a listing of its
+-- source's elaborated run up to the source's witness: the first failing
+-- value between the row and that witness, or none.  Every other
+-- obligation is negative, so `img¬¬` pays it.  `img` lists a witness
+-- only from its plain row's listing, which `place` does not take, and
+-- `exits-ut` calls it with no row known past the one placed.
+--
 -- DEAD ROUTE: a takeWhile carried by its source's carry, the first
 --   failing value's fail and end put one label under it and under its
 --   carrier.  The map grown there stays an order embedding only if no
