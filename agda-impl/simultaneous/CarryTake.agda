@@ -772,8 +772,12 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ... | inj₁ (ur , _) = F ur
     ... | inj₂ (_ , _ , uq , ny , _) = ⊥-elim (u-fail ne uq ny)
 
-    whole′ : Whole P.T′ → (∀ {c} → P.T′ c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → Q.T′ r e → r ∈ ls
-    whole′ wt ne lp = let (ls , F) = C.whole (P.whole← ne wt) (P.ended← ne) lp in ls , pickW ne F
+    nfQ : (∀ {c} → P.T′ c end → ⊥) → ∀ {k} → ¬ Q.Failed k
+    nfQ ne (_ , _ , x , nk , _) = u-fail ne x nk
+
+    whole′ : Whole P.T′ → (∀ {c} → P.T′ c end → ⊥) → (∀ {q} → LP q) → Whole Q.T′
+    whole′ wt ne lp = let (ls , F , B) = C.whole (P.whole← ne wt) (P.ended← ne) lp in
+      ls , pickW ne F , λ m → let (e , ur) = B m in e , Q.up ur (nfQ ne) (Q.pass-of (λ { (_ , x , nk) → u-fail ne x nk }) ur)
 
     ----------------------------------------------------------------------
     -- Pins: kept with their connect unfailed, past no carried failure

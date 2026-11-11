@@ -48,7 +48,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map;
-  module Relabel; module Mono; Home; Near; Whole; IntoAt; sub-listed; few-sub; match-val; carried-val; match-end)
+  module Relabel; module Mono; Home; Near; Whole; whole-listed; IntoAt; sub-listed; few-sub; match-val; carried-val; match-end)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
 
@@ -248,6 +248,10 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     lstU→ : ∀ {l} → Listed u l → Listed S′ l
     lstU→ (ks , F , B) = ks , (λ y kk → F (proj₁ (proj₂ (downU y))) kk)
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (upL (sub-listed (ks , F , B) (proj₁ (B m))) (proj₂ (proj₂ (B m)))))
+
+    wholeU→ : Whole u → Whole S′
+    wholeU→ W = proj₁ W , (λ y → proj₁ (proj₂ W) (proj₁ (proj₂ (downU y))))
+              , λ m → let (_ , ul) = proj₂ (proj₂ W) m in _ , proj₁ (proj₂ (upL (whole-listed W) ul))
 
     live-out : ∀ {y a} → t y (out a) → Live t y
     live-out ty tc cy with InvAt.quiet It tc ty cy
@@ -449,7 +453,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (lstU← {m} lm))
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
-    ; whole = λ wt ne lp → let (ls , F) = whole (wholeS← wt) (endedS← ne) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
+    ; whole = λ wt ne lp → wholeU→ (whole (wholeS← wt) (endedS← ne) lp)
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′ }
 
 ------------------------------------------------------------------------

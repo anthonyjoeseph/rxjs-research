@@ -10,7 +10,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; applyUpTo; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-filter⁺; ∈-filter⁻; ∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-filter⁺; ∈-filter⁻; ∈-map⁺; ∈-map⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -87,8 +87,13 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
   up-in : ∀ {ks j} → p ⊕ [ ix j ] ∈ ks → p′ ⊕ [ ix j ] ∈ L.map up ks
   up-in {j = j} m = subst (_∈ L.map up _) (up-⊕ [ ix j ]) (∈-map⁺ up m)
 
-  whole : Whole t → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
-  whole (ks , F , _) = L.map up ks , λ { (spin j , _) → up-in (F (spin j , P.reach j)) }
+  whole : Whole t → Whole u
+  whole (ks , F , Bk) = L.map up ks , (λ { (spin j , _) → up-in (F (spin j , P.reach j)) }) , back
+    where
+      back : ∀ {x} → x ∈ L.map up ks → Σ (Ev (IE A)) (u x)
+      back m with ∈-map⁻ up m
+      ... | k , mk , refl with Bk mk
+      ...   | _ , (spin j , _) = skip , subst (λ y → u y skip) (sym (up-⊕ [ ix j ])) (spin j , P′.reach j)
 
   carried : CarryAt valuesOf M HP HE LP t u p p′
   carried = record
@@ -296,9 +301,10 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   few (inj₁ (refl , refl)) = [] , λ x lt → ⊥-elim (P.none x lt)
   few (inj₂ i)             = P.few→ (C.few i)
 
-  whole : Whole P.T → (∀ {c} → P.T c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
+  whole : Whole P.T → (∀ {c} → P.T c end → ⊥) → (∀ {q} → LP q) → Whole E.T
   whole wt ne lp with C.whole (P.whole← wt) (λ x → ne (P.up x)) lp
-  ... | ls , F = E.g ∷ ls , λ { (guard , _) → here refl ; (body y , _) → there (F y) }
+  ... | ls , F , Bk = E.g ∷ ls , (λ { (guard , _) → here refl ; (body y , _) → there (F y) })
+                    , λ { (here refl) → skip , E.gT ; (there m) → let (e , y) = Bk m in e , E.up y }
 
   bk : Pos → List Pos
   bk l = P.g ∷ C.bk l
