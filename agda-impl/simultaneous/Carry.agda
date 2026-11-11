@@ -660,6 +660,14 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
 --   hides.  Its replacement is the first failing value, which the source,
 --   not listed, holds only classically, while both fields name a plain
 --   position outright.
+-- DEAD ROUTE: a reader carried by its connect's `Bound`.  A rejoined row
+--   is imaged through the source's carry, whose `img` asks the source run
+--   listed before that row, while the reader's own listing holds only the
+--   rows past its subscription.  Only the connect lists the rest, by its
+--   echoes, so the listing must reach the body as an `img` hypothesis
+--   listing each environment hot before the row.  That blocks a scan: its
+--   `shown` finds earlier plain values classically, then needs each plain
+--   hot listed before them, from nothing but the elaborated hots.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
