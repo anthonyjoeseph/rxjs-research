@@ -10,13 +10,13 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; applyUpTo; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-filter⁺; ∈-filter⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-filter⁺; ∈-filter⁻; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; ¬?; yes; no)
 
 open import Tree using (Later; defer)
@@ -33,7 +33,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; CarryAt; Carry; carry; Cause; row; env; both; subs; Owes; Home; Read;
+open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; CarryAt; Carry; carry; Home; Near; Rest; Whole;
   instant-⊕; EnvRel; Bound; HotsListed; module OneUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab)
@@ -64,7 +64,7 @@ module SpinRows (q : Pos) where
 -- its label, owed to it.
 module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
                  (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
-  open OneUnder E₀ fr m₀ pp using (N; embN; M; up; up-⊕; down; down-⊕)
+  open OneUnder E₀ fr m₀ pp using (N; embN; back≺; M; up; up-⊕; down; down-⊕)
 
   private
     module P = SpinRows p
@@ -83,18 +83,15 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
   img (spin i , r) =
     p′ ⊕ [ ix i ] , ((ix i , plain-ix , refl , refl) , skip , spin i , r) , skip , (spin i , P′.reach i) , P′.listed i , (λ ()) , λ _ ()
 
-  cause : ∀ {r e} → u r e → Cause
-  cause (spin i , _) = row (p ⊕ [ ix i ])
+  -- An elaborated skip is the plain one's, put under.
+  up-in : ∀ {ks j} → p ⊕ [ ix j ] ∈ ks → p′ ⊕ [ ix j ] ∈ L.map up ks
+  up-in {j = j} m = subst (_∈ L.map up _) (up-⊕ [ ix j ]) (∈-map⁺ up m)
 
-  owes : ∀ {r e} (ur : u r e) → Owes M HE t p′ (cause ur) r
-  owes (spin i , _) = (λ n → n (skip , spin i , P.reach i)) , p′ ⊕ [ ix i ] , inj₂ (ix i , plain-ix , refl , refl) , refl
+  spent : ∀ {k l} → Img k l → Listed t k → Rest t k → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
+  spent (n , _) _ (ks , F , _) = L.map up ks , λ { (spin j , _) lr → up-in (F (spin j , P.reach j) (back≺ n (ix j , plain-ix , refl , refl) lr)) }
 
-  fib : Cause → List Pos
-  fib (row k) = [ up k ]
-  fib _       = []
-
-  in-fib : ∀ {r e} (ur : u r e) → r ∈ fib (cause ur)
-  in-fib (spin i , _) = here (sym (up-⊕ [ ix i ]))
+  whole : Whole t → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
+  whole (ks , F , _) = L.map up ks , λ { (spin j , _) → up-in (F (spin j , P.reach j)) }
 
   carried : CarryAt valuesOf M HP HE LP t u p p′
   carried = record
@@ -108,11 +105,8 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; place   = λ { (spin i , _) _ _ → inj₁ (instant-⊕ p′ [ ix i ]) }
     ; live    = λ _ _ → λ { (() , _) }
     ; few     = λ { (_ , _ , spin i , _) → P.rows i , λ x kq → P.before i (proj₁ x) kq }
-    ; cause   = cause
-    ; owes    = owes
-    ; fib     = fib
-    ; in-fib  = in-fib
-    ; read    = λ { (spin _ , _) () }
+    ; spent   = λ i lt rt _ → spent i lt rt
+    ; whole   = λ wt _ → whole wt
     ; bk      = λ l → [ down l ]
     ; in-bk   = λ { ((a , _ , refl , refl) , _) → here (sym (down-⊕ [ a ])) }
     ; pbk     = λ _ → []
@@ -137,17 +131,12 @@ carry-⊥ {A = A} ρ l = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr
 -- is put under its image.
 carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
            → M ⊆ᴹ M′ → CarryAt f M HP HE LP t u s s′ → CarryAt f M′ HP HE LP t u s s′
-carry-grow {A} {M = M} {M′} {HE = HE} {t = t} {s′ = s′} sub c = record
+carry-grow sub c = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
-  ; img-fun = img-fun ; place = place ; live = live ; few = few ; cause = cause ; owes = λ ur → grown (cause ur) (owes ur)
-  ; fib = fib ; in-fib = in-fib ; read = read ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned }
+  ; img-fun = img-fun ; place = place ; live = live ; few = few ; spent = spent ; whole = whole
+  ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned }
   where
     open CarryAt c
-    grown : ∀ c₀ {r} → Owes M HE t s′ c₀ r → Owes M′ HE t s′ c₀ r
-    grown (row _)    (h , y , m , e) = h , y , sub m , e
-    grown (env _)    o = o
-    grown (both _ _) o = o
-    grown subs       o = o
 
 env-grow : ∀ {Γ Δ} {M M′ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
          → M ⊆ᴹ M′ → EnvRel M ρ envP envE → EnvRel M′ ρ envP envE
@@ -207,9 +196,41 @@ module Side {X : Set} (d : Den X) (q : Pos)
       ...   | _  , _ , (guard , _)  = ⊥-elim (ne refl)
       ...   | kq , e , (body x , _) = kq , e , x
 
+  rest← : ∀ {k} → Rest T k → Rest B k
+  rest← {k} (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x kq → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x) kq) (λ { refl → ¬g x })) , back
+    where
+      back : ∀ {k′} → k′ ∈ filter (λ y → ¬? (y ≟ᵖ g)) ks → k ≺ k′ × Σ (Ev X) (B k′)
+      back m with ∈-filter⁻ (λ y → ¬? (y ≟ᵖ g)) m
+      ... | n , ne with Bk n
+      ...   | _  , _ , (guard , _)  = ⊥-elim (ne refl)
+      ...   | kq , e , (body x , _) = kq , e , x
+
+  -- Past the guard, the body's rows, every one.
+  rest-g : Rest T g → Whole B
+  rest-g (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x) (gb x)) (λ { refl → ¬g x })) , back
+    where
+      back : ∀ {k′} → k′ ∈ filter (λ y → ¬? (y ≟ᵖ g)) ks → Σ (Ev X) (B k′)
+      back m with ∈-filter⁻ (λ y → ¬? (y ≟ᵖ g)) m
+      ... | n , ne with Bk n
+      ...   | _ , _ , (guard , _)  = ⊥-elim (ne refl)
+      ...   | _ , e , (body x , _) = e , x
+
+  whole← : Whole T → Whole B
+  whole← (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x)) (λ { refl → ¬g x })) , back
+    where
+      back : ∀ {k′} → k′ ∈ filter (λ y → ¬? (y ≟ᵖ g)) ks → Σ (Ev X) (B k′)
+      back m with ∈-filter⁻ (λ y → ¬? (y ≟ᵖ g)) m
+      ... | n , ne with Bk n
+      ...   | _ , (guard , _)  = ⊥-elim (ne refl)
+      ...   | e , (body x , _) = e , x
+
   lst→ : ∀ {k e} → B k e → Listed B k → Listed T k
   lst→ x (ks , F , Bk) = g ∷ ks , (λ { (guard , _) _ → here refl ; (body x′ , _) kq → there (F x′ kq) })
                        , λ { (here refl) → gb x , skip , gT ; (there m) → let (kq , e , x′) = Bk m in kq , e , up x′ }
+
+  near→ : ∀ {m l} → Near B m l → Near T m l
+  near→ (inj₁ lm)           = inj₁ lm
+  near→ (inj₂ ((e , x) , L)) = inj₂ ((e , up x) , lst→ x L)
 
 -- THE GUARD CARRIES THE GUARD and the body carries the body: a carry of
 -- the body under each guard is one of the whole.
@@ -258,14 +279,14 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   img-fun (inj₁ (refl , refl)) (inj₂ i)             = ⊥-elim (C.img-row i λ { (_ , x , _) → P.¬g x })
   img-fun (inj₂ i)             (inj₁ (refl , refl)) = ⊥-elim (C.img-row i λ { (_ , x , _) → P.¬g x })
 
-  place : ∀ {m e} → E.T m e → Live E.T m → Few E.T m
-        → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m)
+  place : ∀ {m e} → E.T m e → Live E.T m → Listed E.T m
+        → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near E.T m l)
           ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
   place (guard , _) _ _ = inj₁ (instant-⊕ p′ [ ix 0 ])
-  place (body y , _) lv fw with C.place y (E.live← lv) (E.few← fw)
-  ... | inj₁ e                     = inj₁ (trans e (instant-⊕ p′ [ ix 1 ]))
-  ... | inj₂ (inj₁ (k , l , i , e)) = inj₂ (inj₁ (k , l , inj₂ i , e))
-  ... | inj₂ (inj₂ h)               = inj₂ (inj₂ h)
+  place {m} (body y , _) lv lm with C.place y (E.live← lv) (E.lst← lm)
+  ... | inj₁ e                             = inj₁ (trans e (instant-⊕ p′ [ ix 1 ]))
+  ... | inj₂ (inj₁ (k , l , i , e , n)) = inj₂ (inj₁ (k , l , inj₂ i , e , E.near→ {m} {l} n))
+  ... | inj₂ (inj₂ h)                       = inj₂ (inj₂ h)
 
   live : ∀ {k l} → Img k l → Live P.T k → Live E.T l
   live (inj₁ (refl , refl)) _  (body {y} x , _) = ≺→≼ {E.g} {y} (E.gb x)
@@ -275,30 +296,16 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   few (inj₁ (refl , refl)) = [] , λ x lt → ⊥-elim (P.none x lt)
   few (inj₂ i)             = P.few→ (C.few i)
 
-  cause : ∀ {r e} → E.T r e → Cause
-  cause (guard , _)  = row P.g
-  cause (body y , _) = C.cause y
+  -- Past the guard, the body's rows; past a body row, the body's past it.
+  spent : ∀ {k l} → Img k l → Listed P.T k → Rest P.T k → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → l ≺ r → r ∈ ls
+  spent (inj₁ (refl , refl)) _ rt lp with C.whole (P.rest-g rt) lp
+  ... | ls , F = ls , λ { (guard , _) lr → ⊥-elim (≺-irrefl {E.g} lr) ; (body y , _) _ → F y }
+  spent {k} (inj₂ i) lt rt lp with C.spent i (P.lst← {k} lt) (P.rest← {k} rt) lp
+  ... | ls , F = E.g ∷ ls , λ { (guard , _) _ → here refl ; (body y , _) lr → there (F y lr) }
 
-  owes→ : ∀ c₀ {r} → Owes M HE P.B (p′ ⊕ [ ix 1 ]) c₀ r → Owes M HE P.T p′ c₀ r
-  owes→ (row k)    (h , y , m , e) = (λ n → h λ { (e′ , x) → n (e′ , P.up x) }) , y , m , e
-  owes→ (env h)    o               = o
-  owes→ (both k h) (h₁ , o)        = (λ n → h₁ λ { (e′ , x) → n (e′ , P.up x) }) , o
-  owes→ subs       e               = trans e (instant-⊕ p′ [ ix 1 ])
-
-  owes : ∀ {r e} (ur : E.T r e) → Owes M HE P.T p′ (cause ur) r
-  owes (guard , _)  = (λ n → n (skip , P.gT)) , E.g , mg , refl
-  owes (body y , _) = owes→ (C.cause y) (C.owes y)
-
-  fib : Cause → List Pos
-  fib c₀ = E.g ∷ C.fib c₀
-
-  in-fib : ∀ {r e} (ur : E.T r e) → r ∈ fib (cause ur)
-  in-fib (guard , _)  = here refl
-  in-fib (body y , _) = there (C.in-fib y)
-
-  read : ∀ {r e} (ur : E.T r e) → Read (cause ur) → Live E.T r
-  read (guard , _) ()
-  read (body y , _) rd = E.live→ (C.read y rd)
+  whole : Whole P.T → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
+  whole wt lp with C.whole (P.whole← wt) lp
+  ... | ls , F = E.g ∷ ls , λ { (guard , _) → here refl ; (body y , _) → there (F y) }
 
   bk : Pos → List Pos
   bk l = P.g ∷ C.bk l
@@ -325,7 +332,7 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   carried : CarryAt valuesOf M HP HE LP P.T E.T p p′
   carried = record
     { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
-    ; live = live ; few = few ; cause = cause ; owes = owes ; fib = fib ; in-fib = in-fib ; read = read
+    ; live = live ; few = few ; spent = spent ; whole = whole
     ; bk = bk ; in-bk = in-bk ; pbk = C.pbk ; pinned = pinned }
 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by

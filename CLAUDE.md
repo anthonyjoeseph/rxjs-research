@@ -60,7 +60,9 @@ Standing approval for any change — impl edits, protocol changes, new operators
 
 ## The goal
 
-Every PROOF-STATE.md tier discharged: no postulates, everything typechecks. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
+Every PROOF-STATE.md tier discharged: no postulates, everything typechecks.
+
+**No classical axioms (Anthony)** — the development must compile under `--safe` when done. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
 ## Delegation — the design session directs, Sonnet workers grind
 

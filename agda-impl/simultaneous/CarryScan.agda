@@ -49,7 +49,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map;
-  module Relabel; module Mono; Owes; Home; row; env; both; subs)
+  module Relabel; module Mono; Home; Near; Rest; Whole)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
 
@@ -266,6 +266,18 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     lstS← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′ kk) })
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (down (proj₂ (proj₂ (B m)))))
 
+    restS← : ∀ {k} → Rest S k → Rest t k
+    restS← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′ kk) })
+                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (down (proj₂ (proj₂ (B m)))))
+
+    wholeS← : Whole S → Whole t
+    wholeS← (ks , F , B) = ks , (λ y → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′) })
+                         , λ m → _ , proj₁ (proj₂ (down (proj₂ (B m))))
+
+    lstU← : ∀ {l} → Listed S′ l → Listed u l
+    lstU← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → upU y λ { (_ , y′ , _) → ni (F y′ kk) })
+                       , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (downU (proj₂ (proj₂ (B m)))))
+
     lstU→ : ∀ {l} → Listed u l → Listed S′ l
     lstU→ (ks , F , B) = ks , (λ y kk → F (proj₁ (proj₂ (downU y))) kk)
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (upL (sub-listed (ks , F , B) (proj₁ (B m))) (proj₂ (proj₂ (B m)))))
@@ -427,11 +439,14 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     shown′ (E.sstep _ , _) () _ _
     shown′ (E.spin _ , _)  () _ _
 
-    owes′ : ∀ {c r} → Owes M HE t s′ c r → Owes M HE S s′ c r
-    owes′ {row k}    (nr , y)  = (λ n → nr λ { (_ , tk) → up tk λ { (_ , sk , _) → n (_ , sk) } }) , y
-    owes′ {env h}    o         = o
-    owes′ {both k h} (nr , hy) = (λ n → nr λ { (_ , tk) → up tk λ { (_ , sk , _) → n (_ , sk) } }) , hy
-    owes′ {subs}     o         = o
+    placed′ : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
+                ⊎ Σ Pos (λ h → HE h × instantOf h ≡ instantOf m)
+            → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near S′ m l)
+                ⊎ Σ Pos (λ h → HE h × instantOf h ≡ instantOf m)
+    placed′ (inj₁ e)                                          = inj₁ e
+    placed′ (inj₂ (inj₁ (k , l , i , e , inj₁ lm)))          = inj₂ (inj₁ (k , l , i , e , inj₁ lm))
+    placed′ (inj₂ (inj₁ (k , l , i , e , inj₂ ((_ , ul) , L)))) = inj₂ (inj₁ (k , l , i , e , inj₂ ((_ , proj₁ (proj₂ (upL L ul))) , lstU→ L)))
+    placed′ (inj₂ (inj₂ h))                                   = inj₂ (inj₂ h)
 
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
@@ -449,14 +464,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
     ; img-row = λ i n → img-row i λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
     ; img-fun = img-fun
-    ; place = λ {m} s₁ lv fw → place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (fewU← fw)
+    ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (lstU← {m} lm))
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
-    ; cause = λ s₁ → cause (proj₁ (proj₂ (downU s₁)))
-    ; owes = λ s₁ → owes′ (owes (proj₁ (proj₂ (downU s₁))))
-    ; fib = fib
-    ; in-fib = λ s₁ → in-fib (proj₁ (proj₂ (downU s₁)))
-    ; read = λ {r} s₁ rd → liveU→ {r} (λ {c} → read (proj₁ (proj₂ (downU s₁))) rd {c})
+    ; spent = λ {k} i lt rt lp → let (ls , F) = spent i (lstS← {k} lt) (restS← {k} rt) lp in ls , λ s₁ lr → F (proj₁ (proj₂ (downU s₁))) lr
+    ; whole = λ wt lp → let (ls , F) = whole (wholeS← wt) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
     ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
