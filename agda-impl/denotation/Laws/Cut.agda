@@ -46,8 +46,8 @@ open import denotation.Laws.Connect using (connect-inv)
 open import denotation.Laws.ConnectNe using (Causal; connect-ne)
 open import denotation.Laws.Join using (flatMap-ne; flatMap-causal)
 open import denotation.Laws
-  using (map-ne; scan-ne; takeWhile-ne; map-causal; scan-causal; takeWhile-causal; connect-causal; defer-causal; hot-causal;
-  EnvAg; ag-cons; good-cons; aft; inv-approx; causal-approx)
+  using (map-ne; scan-ne; takeWhile-ne; map-causal; scan-causal; takeWhile-causal; connect-causal;
+  defer-causal; hot-causal; EnvAg; ag-cons; good-cons; aft; inv-approx; causal-at)
 
 ------------------------------------------------------------------------
 -- A set cut at a depth
@@ -254,9 +254,6 @@ causal-capprox N (suc n) (defer l)         e = defer-causal (causal-capprox N n 
 private
   causal-cat : ∀ {Γ A B} N n (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ) → Causal (λ h → capprox N n b (h ∷ ρ))
   causal-cat N n b ρ a = causal-capprox N n b (ag-cons (hot-causal a) (λ i → ~-refl (lookup ρ i)))
-
-  causal-at : ∀ {Γ A B} n (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ) → Causal (λ h → approx n b (h ∷ ρ))
-  causal-at n b ρ a = causal-approx n b (ag-cons (hot-causal a) (λ i → ~-refl (lookup ρ i)))
 
 -- CUT PAST `m + 1` ROWS, THE PROGRAM IS WITHIN `m` of its approximant:
 -- each operator keeps the modulus, and each leaf is within it.

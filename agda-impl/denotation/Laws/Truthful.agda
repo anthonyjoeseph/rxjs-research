@@ -20,6 +20,7 @@ module denotation.Laws.Truthful where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.All using (_∷_)
 import Data.List.Relation.Unary.Any as Any
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (m≤m+n)
@@ -28,17 +29,19 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (¬_; yes; no)
 
-open import Tree using (Obs)
+open import Data.Bool using (Bool)
+open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; _∙_; ix; sub; last; instant; _⊕_)
 open import denotation.Events using (Timeline; ix-<; <ᵖ-part; <ᵖ-below; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; EmissionSet; DenEnv; Few; Silent; _≺_; _≼_; enter; approx; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; EmissionSet; Den; hot; DenEnv; Few; Dep; Silent; _≺_; _≼_; enter; approx; ⟦_⟧; module Op)
 open import denotation.Read using (Visible; loud)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻)
-open import denotation.Laws.Count using (ag-cnt; ⊑?)
-open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ)
-open import denotation.Laws using (from)
+open import denotation.Laws.Count using (Cov; ag-cnt; ⊑?)
+open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.ConnectNe using (Causal)
+open import denotation.Laws using (from; inv-approx; good-cons; causal-at)
 
 -- `x` opens its instant: no row of it lies before.
 Opens : ∀ {A} → EmissionSet A → Pos → Set
@@ -106,66 +109,127 @@ where? s x with ≼-or-≻ (s ⊕ [ ix 0 ]) x
 ------------------------------------------------------------------------
 -- One approximant against the next
 
+-- Under a row past the first of a cut's spin.
+Lie : (Pos → Set) → Pos → Set
+Lie C y = Σ Pos λ s → C s × Lies s y
+
+-- CLEAN: not past a cut's first row, nor is anything it waits on, and
+-- finitely many positions cover what it waits on.
+Clean : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Ev A → Set
+Clean C t q e = ¬ Lie C q × Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → Dep q e k e′ → Cov q ks k × ¬ Lie C k
+
 -- THE NEXT APPROXIMANT, past the cuts.  Each cut `defer` (`Cut`) spins
--- at its subscription: every row under its spin is silent; none is
--- shown if a position past the whole spin has finitely many before it;
--- every row past its first row is joined by one under its first.
--- Wherever no row past a spin's first lies at or before a few-bounded
--- `x`, the next approximant agrees up to `x`.
+-- at its subscription: every row under its spin is silent; its first row
+-- shows; none is shown if a position past the whole spin has finitely
+-- many before it.  Wherever a row is clean, the next has it too, and
+-- nothing else there.
 record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
   field
     Cut     : Pos → Set
     silent  : ∀ {s y e} → Cut s → Spun s y → t y e → Silent e
+    start   : ∀ {s} → Cut s → Σ Pos λ z → Σ (Ev A) λ e → (s ⊕ [ ix 0 ]) ⊑ z × t z e
     blocked : ∀ {s x y e} → Cut s → (∀ i → (s ⊕ [ ix i ]) ≺ x) → Few t x → Spun s y → t y e → ⊥
-    first   : ∀ {s y e} → Cut s → Lies s y → t y e → Σ Pos λ z → Σ (Ev A) λ e′ → (s ⊕ [ ix 0 ]) ⊑ z × t z e′
-    agree   : ∀ {x} → Few t x → (∀ {s y e} → Cut s → Lies s y → y ≼ x → t y e → ⊥) → AgreeTo x t t′
+    agree   : ∀ q e → Clean Cut t q e → (t q e → t′ q e) × (t′ q e → t q e)
 
 module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
   open Truth tr
 
-  -- Nothing past a spin's first row lies at or before a safe row.
   private
-    clear : ∀ {x} → Few t x → Safe t x → ∀ {s y e} → Cut s → Lies s y → y ≼ x → t y e → ⊥
-    clear {x} F safe {s} {y} c (i , l) yx ty = at safe (where? s x) (first c (i , l) ty)
+    -- Nothing at or before a safe few-bounded row lies past a cut's first.
+    clear : ∀ {x} → Few t x → Safe t x → ∀ {y} → y ≼ x → ¬ Lie Cut y
+    clear {x} F safe {y} yx (s , c , i , l) = at safe (where? s x) (start c)
       where
         at : Safe t x → x ≺ (s ⊕ [ ix 0 ]) ⊎ Spun s x ⊎ (∀ j → (s ⊕ [ ix j ]) ≺ x)
            → (Σ Pos λ z → Σ (Ev A) λ e′ → (s ⊕ [ ix 0 ]) ⊑ z × t z e′) → ⊥
         at _ (inj₁ xs) _ =
           ≺→≼ {s ⊕ [ ix 0 ]} {s ⊕ [ ix (suc i) ]} (Equivalence.from T-≡ (<ᵖ-part s [] [] (ix-< {0} {suc i} (s≤s z≤n))))
             (≼-≺-≺ {s ⊕ [ ix (suc i) ]} {x} {s ⊕ [ ix 0 ]} (≼-trans {s ⊕ [ ix (suc i) ]} {y} {x} (⊑-≼ {s ⊕ [ ix (suc i) ]} {y} l) yx) xs)
-        at _ (inj₂ (inj₂ after)) _ = blocked c after F (suc i , l) ty
+        at _ (inj₂ (inj₂ after)) (z , _ , z0 , tz) = blocked c after F (0 , z0) tz
         at (inj₂ (e₀ , tx , v)) (inj₂ (inj₁ (j , sx))) _ = loud v (silent c (j , sx) tx)
         at (inj₁ opens) (inj₂ (inj₁ (j , sx))) (z , e′ , z0 , tz) =
           opens tz (trans (trans (instant-⊑ z0) (instant-⊕ s [ ix 0 ])) (sym (trans (instant-⊑ sx) (instant-⊕ s [ ix j ]))))
             (≺-≼-≺ {z} {y} {x} (first-before s z0 l) yx)
 
+    -- With finitely many rows, nothing lies past a cut's first.
+    none : Finite t → ∀ {y} → ¬ Lie Cut y
+    none (ks , h) (s , c , _) with start c
+    ... | z , _ , z0 , tz = blocked c (past s) (ks , λ tk _ → h tk) (0 , z0) tz
+
   -- SAFE, THE NEXT: a few-bounded safe row's past is the next's.
   truth-lies : ∀ {x} → Few t x → Safe t x → AgreeTo x t t′
-  truth-lies F safe = agree F (clear F safe)
+  truth-lies {x} F@(ks , h) safe = ⟨ (λ {y} {e} yx → agree y e (clear F safe yx , ks , λ {k} tk ky _ →
+    inj₂ (Any.map (λ { refl → ⊑-refl _ }) (h tk (≺-≼-≺ {k} {y} {x} ky yx))) , clear F safe (≼-trans {k} {y} {x} (≺→≼ {k} {y} ky) yx))) ⟩
 
   -- FINITE, THE NEXT: finitely many rows reach no cut.
   truth-finite : Finite t → ∀ {y e} → (t y e → t′ y e) × (t′ y e → t y e)
-  truth-finite (ks , h) {y} = upto (agree (few y) none) (≼-refl {y})
-    where
-      few : ∀ x → Few t x
-      few x = ks , λ tk _ → h tk
+  truth-finite fin@(ks , h) {y} {e} =
+    agree y e (none fin , ks , λ tk _ _ → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (h tk)) , none fin)
 
-      none : ∀ {s y′ e′} → Cut s → Lies s y′ → y′ ≼ y → t y′ e′ → ⊥
-      none {s} c (i , l) _ ty = blocked c (past s) (few (s ⊕ [ last ])) (suc i , l) ty
+-- Nothing cut: the same rows.
+truth-refl : ∀ {A} {t : EmissionSet A} → Truth t t
+truth-refl = record
+  { Cut     = λ _ → ⊥
+  ; silent  = λ ()
+  ; start   = λ ()
+  ; blocked = λ ()
+  ; agree   = λ _ _ _ → (λ a → a) , (λ a → a)
+  }
+
+-- Every admissible subscription of `d′` is that of `d`, past its cuts.
+Rel : ∀ {A} → (Pos → Set) → Den A → Den A → Set₁
+Rel H d d′ = ∀ p → Ok H p → Truth (enter d p) (enter d′ p)
+
+-- EACH OPERATOR KEEPS THE TRUTH: a cut `defer` against its unfolding, and
+-- every operator over children each against the next.  A connect's body
+-- is read against its next under ONE handle, and across the two handles
+-- by causality (`Causal`), as the order modulus is (`settle`).
+postulate
+  spin-truth    : ∀ {A H} {d : Den A} → InvD H d → Rel H Op.⊥ (Op.defer d)
+  defer-truth   : ∀ {A H} {d d′ : Den A} → InvD H d → InvD H d′ → Rel H d d′ → Rel H (Op.defer d) (Op.defer d′)
+  map-truth     : ∀ {A B H} (f : A → B) {s s′ : Den A} → Rel H s s′ → Rel H (Op.map f s) (Op.map f s′)
+  scan-truth    : ∀ {A B H} (f : B → A → B) z {s s′ : Den A} → Rel H s s′ → Rel H (Op.scan f z s) (Op.scan f z s′)
+  take-truth    : ∀ {A H} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
+                → Rel H s s′ → Rel H (Op.takeWhile i keep s) (Op.takeWhile i keep s′)
+  flat-truth    : ∀ {A B H} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
+                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
+                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap op f s) (Op.flatMap op f′ s′)
+  connect-truth : ∀ {A B H} {s s′ : Den A} {F F′ : Den A → Den B}
+                → InvD H s → InvD H s′
+                → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F′ (hot t)))
+                → Causal F → Causal F′
+                → Rel H s s′ → (∀ {t} → Lawful t → Rel (H ∪ʰ t) (F (hot t)) (F′ (hot t)))
+                → Rel H (Op.connect s F) (Op.connect s′ F′)
 
 -- EACH APPROXIMANT IS THE NEXT, past its cuts.
 --
 -- DEAD ROUTE: an invariant on positions alone.  A connect whose source
 --   spins under burst pins makes rows the next approximant drops, so the
 --   induction must say which source cuts each operator reads.
--- DEAD ROUTE: a body reading a hot handle only after its source's cut
---   meets the cut with no row of its own, yet the next approximant shows
---   it the source's later rows: an open program's invariant carries its
---   environment's cuts, past which it claims nothing, and a connect turns
---   its source's cuts into its own by the burst or echo rows it shows.
-postulate
-  truth : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → ∀ p → Ok (Hots ρ) p
-        → Truth (enter (approx n o ρ) p) (enter (approx (suc n) o ρ) p)
+-- DEAD ROUTE: a connect's body against its next across the two handles.
+--   A body reading the handle only after its source's cut meets the cut
+--   with no row of its own, yet the next handle shows it the source's
+--   later rows.
+truth : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → Rel (Hots ρ) (approx n o ρ) (approx (suc n) o ρ)
+truth n       (cold c)          ρ g p ok = truth-refl
+truth n       empty             ρ g p ok = truth-refl
+truth n       (of xs)           ρ g p ok = truth-refl
+truth n       (map f s)         ρ g = map-truth f {approx n s ρ} {approx (suc n) s ρ} (truth n s ρ g)
+truth n       (scan f z s)      ρ g = scan-truth f z {approx n s ρ} {approx (suc n) s ρ} (truth n s ρ g)
+truth n       (takeWhile i k s) ρ g =
+  take-truth i k {approx n s ρ} {approx (suc n) s ρ} (inv-approx n s ρ g) (inv-approx (suc n) s ρ g) (truth n s ρ g)
+truth n       (flatMap op f s)  ρ g =
+  flat-truth op (inv-approx n s ρ g) (inv-approx (suc n) s ρ g) (λ a → inv-approx n (f a) ρ g) (λ a → inv-approx (suc n) (f a) ρ g)
+    (truth n s ρ g) (λ a → truth n (f a) ρ g)
+truth n       (connect s b)     ρ g =
+  connect-truth {s = approx n s ρ} {approx (suc n) s ρ} {λ h → approx n b (h ∷ ρ)} {λ h → approx (suc n) b (h ∷ ρ)}
+    (inv-approx n s ρ g) (inv-approx (suc n) s ρ g)
+    (λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)) (λ {t} L → inv-approx (suc n) b (hot t ∷ ρ) (good-cons L g))
+    (causal-at n b ρ) (causal-at (suc n) b ρ)
+    (truth n s ρ g) (λ {t} L → truth n b (hot t ∷ ρ) (good-cons L g))
+truth n       (connected i)     ρ g p ok = truth-refl
+truth zero    (defer l)         ρ g = spin-truth (inv-approx zero (Later.force l) ρ g)
+truth (suc n) (defer l)         ρ g =
+  defer-truth (inv-approx n (Later.force l) ρ g) (inv-approx (suc n) (Later.force l) ρ g) (truth n (Later.force l) ρ g)
 
 ------------------------------------------------------------------------
 -- The meaning

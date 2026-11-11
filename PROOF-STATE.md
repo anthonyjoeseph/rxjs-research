@@ -10,14 +10,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUTHFUL APPROXIMANTS
 
-Untried: each approximant is the next past its cuts (`Truth`) — a cut
-spins silent, shows nothing before a few-bounded point past it, and
-every row past its first comes with one under its first. Open: which
-cuts an open program carries from its environment — a body reading a
-hot handle late meets its source's cut with no row of its own. Settled
-when `truth` is a body by induction on the program.
+Untried: each operator keeps `Truth` — a cut spins silent, shows its
+first row and nothing a few-bounded point past it can see, and every
+clean row (`Clean`: not past a cut's first, nor anything it waits on,
+finitely covered) is the next approximant's. Riskiest: a connect, whose
+source rows past the body's end are hidden and whose pins skip infinite
+runs; then the joiners. Settled when each leaf is a body.
 
-Members: `truth`.
+Members: `connect-truth`, `flat-truth`, `take-truth`, `defer-truth`,
+`spin-truth`, `scan-truth`, `map-truth`.
 
 ## Tier 0 — adequacy
 

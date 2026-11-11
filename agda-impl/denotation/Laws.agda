@@ -421,9 +421,11 @@ private
   same-env : ∀ {Γ q} (ρ : DenEnv Γ) → EnvAg q ρ ρ
   same-env ρ i = ~-refl (lookup ρ i)
 
-  causal-at : ∀ {Γ A B} n (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ) → Causal (λ h → approx n b (h ∷ ρ))
-  causal-at n b ρ a = causal-approx n b (ag-cons (hot-causal a) (same-env ρ))
+-- An approximant's body reads its handle causally.
+causal-at : ∀ {Γ A B} n (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ) → Causal (λ h → approx n b (h ∷ ρ))
+causal-at n b ρ a = causal-approx n b (ag-cons (hot-causal a) (same-env ρ))
 
+private
   causal-in : ∀ {Γ A B} (b : Obs Timeline (A ∷ Γ) B) (ρ : DenEnv Γ) → Causal (λ h → ⟦ b ⟧ (h ∷ ρ))
   causal-in b ρ a = causal-⟦⟧ b (ag-cons (hot-causal a) (same-env ρ))
 
