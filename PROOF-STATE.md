@@ -10,13 +10,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUTHFUL APPROXIMANTS
 
-Untried: the bounded merge and the connect keep `Truth`, as the
-other joiners do (`denotation.Laws.Truth.Join`). Open: a bounded
-merge's schedule read where the rows are clean, its hand-offs and
-queue; a connect's hidden cuts, kept only by their pins. Settled when
-each is a body.
+Untried: the connect keeps `Truth`, as every joining does
+(`denotation.Laws.Truth.Joining`). Open: a connect's hidden cuts, kept
+only by their pins, and its body read across two handles. Settled when
+it is a body.
 
-Members: `connect-truth`, `bounded-truth`.
+Members: `connect-truth`.
 
 ## Tier 0 — adequacy
 

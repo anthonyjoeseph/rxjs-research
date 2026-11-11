@@ -164,17 +164,22 @@ record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
     shadow  : ∀ {s w r} → Cut s → t′ w (pin r) → Lies s w → r ⊑ s → Before Cut t r → ¬ Lie Cut r → Σ Pos λ z → (s ⊕ [ ix 1 ]) ⊑ z × t z (pin r)
     agree   : ∀ q e → Clean Cut t q e → (t q e → t′ q e) × (t′ q e → t q e)
 
+-- A row under every spin row before `x`: endlessly many before it.
+spin-few : ∀ {X} {t : EmissionSet X} {s x} → (∀ i → Σ Pos λ z → Σ (Ev X) λ e → (s ⊕ [ ix i ]) ⊑ z × t z e × z ≺ x) → Few t x → ⊥
+spin-few {X} {s = s} sh (ks , h) = n≮n (length ks) (SpinB.bound {X} s (spin (suc (length ks))) (suc (length ks)) ks ≤-refl cov)
+  where
+    cov : ∀ {k e} (y : Spin s k e) → spinIx y < suc (length ks) → Any (k ⊑_) ks
+    cov (spin j) _ with sh j
+    ... | z , _ , sz , tz , zx = Any.map (λ { refl → sz }) (h tz zx)
+
 module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
   open Truth tr
 
   private
     -- Past the whole spin, endlessly many rows before.
     blocked : ∀ {s x} → Cut s → (∀ i → (s ⊕ [ ix i ]) ≺ x) → Few t x → ⊥
-    blocked {s} {x} c after (ks , h) = n≮n (length ks) (SpinB.bound {A} s (spin (suc (length ks))) (suc (length ks)) ks ≤-refl cov)
-      where
-        cov : ∀ {k e} (y : Spin s k e) → spinIx y < suc (length ks) → Any (k ⊑_) ks
-        cov (spin j) _ with shows c j
-        ... | z , _ , sz , tz = Any.map (λ { refl → sz }) (h tz (≺-trans {z} {s ⊕ [ ix (suc j) ]} {x} (below-next s sz ≤-refl) (after (suc j))))
+    blocked {s} {x} c after = spin-few λ i → let (z , e , sz , tz) = shows c i in
+      z , e , sz , tz , ≺-trans {z} {s ⊕ [ ix (suc i) ]} {x} (below-next s sz ≤-refl) (after (suc i))
 
     -- Nothing at or before a safe few-bounded row lies past a cut's first.
     clear : ∀ {x} → Few t x → Safe t x → ∀ {y} → y ≼ x → ¬ Lie Cut y

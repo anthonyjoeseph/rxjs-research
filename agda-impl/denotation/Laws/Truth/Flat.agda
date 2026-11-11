@@ -17,12 +17,7 @@ open import denotation.Laws.Worlds using (Ok; InvD)
 open import denotation.Laws.Shows using (ShowsK)
 open import denotation.Laws.Truth using (Rel)
 open import denotation.Laws.Truth.Join using (merge-truth; switch-truth; exhaust-truth)
-
-postulate
-  bounded-truth : ∀ {A B H} n {f f′ : A → Den B} {s s′ : Den A}
-                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
-                → (∀ m q → Ok H q → ShowsK m (enter s q)) → (∀ m a q → Ok H q → ShowsK m (enter (f a) q))
-                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap (mergeᶠ (just n)) f s) (Op.flatMap (mergeᶠ (just n)) f′ s′)
+open import denotation.Laws.Truth.Bounded using (bounded-truth)
 
 flat-truth : ∀ {A B H} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
            → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
