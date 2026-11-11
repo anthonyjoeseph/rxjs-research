@@ -137,8 +137,8 @@ Match ShA ShB Val e e′ = (Shown ShA e → Carried Val e e′) × (¬ Shown ShA
 -- finitely many rows before them are carried or placed: a reader reaches
 -- no other.  A row of `u` that shows anything carries one; any other lies
 -- in the subscribe frame or in the instant of one that carries.  Past a
--- row carrying a `k` past which `t` has finitely many rows, `u` has
--- finitely many.  `bk` over-approximates, as a list, the rows `l`
+-- row carrying a `k` past which `t` has finitely many rows and no end,
+-- `u` has finitely many: what a run left without exiting asks.  `bk` over-approximates, as a list, the rows `l`
 -- carries; `pbk`, the pins.  A pin is carried into its instant: it lies
 -- in the subscribe frame, or in an instant holding an unpinned row.
 record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → B → Set)
@@ -155,7 +155,7 @@ record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → 
     home     : ∀ {k l} → Img k l → (instantOf l ≡ instantOf s′ ⇔ instantOf k ≡ instantOf s)
     place    : ∀ {m e} → u m e → Live u m → Few u m → instantOf m ≡ instantOf s′ ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
     live     : ∀ {k l} → Img k l → Live t k → Live u l
-    spent    : ∀ {k l} → Img k l → Spent t (just k) → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
+    spent    : ∀ {k l} → Img k l → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
     bk       : Pos → List Pos
     in-bk    : ∀ {k l} → Img k l → k ∈ bk l
     pbk      : Pos → List Pos
@@ -565,14 +565,17 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     exits-tu al ul tk (inj₂ (ks , sp)) with PT.ends? ks (proj₂ (seenT tk tt)) (λ tr kr → proj₁ (sp tr kr))
     ... | inj₁ (c , tc) with end-img tc
     ...   | c₁ , ac , uc = inj₁ (c₁ , end , seenU uc tt , img-mono al ac (past-t tk tc) , inj₂ refl)
-    exits-tu {k} {l} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (proj₁ (spent al (ks , sp)) , row)
+    exits-tu {k} {l} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (proj₁ (spent al (ks , sp) endless) , row)
       where
+        endless : ∀ {c} → t c end → ⊥
+        endless tc = absent tc (past-t tk tc)
+
         unended : ∀ {c} → u c end → ⊥
         unended uc with end-back uc
-        ... | c′ , _ , tc = absent tc (past-t tk tc)
+        ... | c′ , _ , tc = endless tc
 
-        row : ∀ {r e} → u r e → l ≺ r → r ∈ proj₁ (spent al (ks , sp)) × (u r e × (∀ {c} → u c end → r ≼ c))
-        row ur lr = proj₂ (spent al (ks , sp)) ur lr , ur , (λ uc → ⊥-elim (unended uc))
+        row : ∀ {r e} → u r e → l ≺ r → r ∈ proj₁ (spent al (ks , sp) endless) × (u r e × (∀ {c} → u c end → r ≼ c))
+        row ur lr = proj₂ (spent al (ks , sp) endless) ur lr , ur , (λ uc → ⊥-elim (unended uc))
 
   -- A value's instant is over on one side exactly when its counterpart's
   -- is on the other.

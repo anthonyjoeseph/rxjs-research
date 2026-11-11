@@ -22,18 +22,18 @@ open import Relation.Nullary using (¬_; ¬?; yes; no)
 open import Tree using (Later; defer)
 open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; skip; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
+open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
-open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib)
+open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib; W⁼; leads; ⊑-snoc; ⊑-≼)
 open import denotation.Laws using (aft; inv-approx)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; CarryAt; Carry; carry; Home; Near; Rest; Whole;
+open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; Home; Near; Whole;
   instant-⊕; EnvRel; Bound; HotsListed; module OneUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab)
@@ -64,7 +64,7 @@ module SpinRows (q : Pos) where
 -- its label, owed to it.
 module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
                  (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
-  open OneUnder E₀ fr m₀ pp using (N; embN; back≺; M; up; up-⊕; down; down-⊕)
+  open OneUnder E₀ fr m₀ pp using (N; embN; M; up; up-⊕; down; down-⊕)
 
   private
     module P = SpinRows p
@@ -87,9 +87,6 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
   up-in : ∀ {ks j} → p ⊕ [ ix j ] ∈ ks → p′ ⊕ [ ix j ] ∈ L.map up ks
   up-in {j = j} m = subst (_∈ L.map up _) (up-⊕ [ ix j ]) (∈-map⁺ up m)
 
-  spent : ∀ {k l} → Img k l → Listed t k → Rest t k → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
-  spent (n , _) _ (ks , F , _) = L.map up ks , λ { (spin j , _) lr → up-in (F (spin j , P.reach j) (back≺ n (ix j , plain-ix , refl , refl) lr)) }
-
   whole : Whole t → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
   whole (ks , F , _) = L.map up ks , λ { (spin j , _) → up-in (F (spin j , P.reach j)) }
 
@@ -105,8 +102,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; place   = λ { (spin i , _) _ _ → inj₁ (instant-⊕ p′ [ ix i ]) }
     ; live    = λ _ _ → λ { (() , _) }
     ; few     = λ { (_ , _ , spin i , _) → P.rows i , λ x kq → P.before i (proj₁ x) kq }
-    ; spent   = λ i lt rt _ → spent i lt rt
-    ; whole   = λ wt _ → whole wt
+    ; whole   = λ wt _ _ → whole wt
     ; bk      = λ l → [ down l ]
     ; in-bk   = λ { ((a , _ , refl , refl) , _) → here (sym (down-⊕ [ a ])) }
     ; pbk     = λ _ → []
@@ -118,9 +114,10 @@ carry-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l 
 carry-⊥ {A = A} ρ l = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → spun e₀ fr m₀ pp
   where
     spun : ∀ {HP HE LP M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
-         → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
+         → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p × Bare M (Truncate (Spin {A} p))
            × CarryAt valuesOf M HP HE LP (Truncate (Spin {A} p)) (Truncate (Spin {IE A} p′)) p p′
-    spun {HP} {HE} {LP} E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
+    spun {HP} {HE} {LP} {p = p} E₀ fr m₀ pp =
+      O.M , inj₁ , O.emb , O.within , O.bare {t = Truncate (Spin {A} p)} (λ { (spin i , _) → ix i , plain-ix , refl }) , X.carried
       where module X = SpinCarry {A} {HP} {HE} {LP} E₀ fr m₀ pp
             module O = OneUnder E₀ fr m₀ pp
 
@@ -133,7 +130,7 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
            → M ⊆ᴹ M′ → CarryAt f M HP HE LP t u s s′ → CarryAt f M′ HP HE LP t u s s′
 carry-grow sub c = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
-  ; img-fun = img-fun ; place = place ; live = live ; few = few ; spent = spent ; whole = whole
+  ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole
   ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned }
   where
     open CarryAt c
@@ -195,25 +192,6 @@ module Side {X : Set} (d : Den X) (q : Pos)
       ... | n , ne with Bk n
       ...   | _  , _ , (guard , _)  = ⊥-elim (ne refl)
       ...   | kq , e , (body x , _) = kq , e , x
-
-  rest← : ∀ {k} → Rest T k → Rest B k
-  rest← {k} (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x kq → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x) kq) (λ { refl → ¬g x })) , back
-    where
-      back : ∀ {k′} → k′ ∈ filter (λ y → ¬? (y ≟ᵖ g)) ks → k ≺ k′ × Σ (Ev X) (B k′)
-      back m with ∈-filter⁻ (λ y → ¬? (y ≟ᵖ g)) m
-      ... | n , ne with Bk n
-      ...   | _  , _ , (guard , _)  = ⊥-elim (ne refl)
-      ...   | kq , e , (body x , _) = kq , e , x
-
-  -- Past the guard, the body's rows, every one.
-  rest-g : Rest T g → Whole B
-  rest-g (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x) (gb x)) (λ { refl → ¬g x })) , back
-    where
-      back : ∀ {k′} → k′ ∈ filter (λ y → ¬? (y ≟ᵖ g)) ks → Σ (Ev X) (B k′)
-      back m with ∈-filter⁻ (λ y → ¬? (y ≟ᵖ g)) m
-      ... | n , ne with Bk n
-      ...   | _ , _ , (guard , _)  = ⊥-elim (ne refl)
-      ...   | _ , e , (body x , _) = e , x
 
   whole← : Whole T → Whole B
   whole← (ks , F , Bk) = filter (λ y → ¬? (y ≟ᵖ g)) ks , (λ x → ∈-filter⁺ (λ y → ¬? (y ≟ᵖ g)) (F (up x)) (λ { refl → ¬g x })) , back
@@ -296,15 +274,8 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   few (inj₁ (refl , refl)) = [] , λ x lt → ⊥-elim (P.none x lt)
   few (inj₂ i)             = P.few→ (C.few i)
 
-  -- Past the guard, the body's rows; past a body row, the body's past it.
-  spent : ∀ {k l} → Img k l → Listed P.T k → Rest P.T k → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → l ≺ r → r ∈ ls
-  spent (inj₁ (refl , refl)) _ rt lp with C.whole (P.rest-g rt) lp
-  ... | ls , F = ls , λ { (guard , _) lr → ⊥-elim (≺-irrefl {E.g} lr) ; (body y , _) _ → F y }
-  spent {k} (inj₂ i) lt rt lp with C.spent i (P.lst← {k} lt) (P.rest← {k} rt) lp
-  ... | ls , F = E.g ∷ ls , λ { (guard , _) _ → here refl ; (body y , _) lr → there (F y lr) }
-
-  whole : Whole P.T → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
-  whole wt lp with C.whole (P.whole← wt) lp
+  whole : Whole P.T → (∀ {c} → P.T c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → E.T r e → r ∈ ls
+  whole wt ne lp with C.whole (P.whole← wt) (λ x → ne (P.up x)) lp
   ... | ls , F = E.g ∷ ls , λ { (guard , _) → here refl ; (body y , _) → there (F y) }
 
   bk : Pos → List Pos
@@ -323,16 +294,20 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
   pinned : ∀ {k q} → P.T k (pin q) → Live P.T k
-         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × k ∈ C.pbk l)
+         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × k ∈ C.pbk l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q))
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
   pinned {k} {q} (body x , _) lv with C.pinned x (P.live← lv)
-  ... | (l , q′ , ul , m) , r = (l , q′ , E.up ul , m) , homed {k} {q} r
+  ... | (l , q′ , ul , m , b) , r = (l , q′ , E.up ul , m , b′) , homed {k} {q} r
+    where
+      b′ : ∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q
+      b′ (inj₁ (refl , refl)) _ = ≺-≼-≺ {P.g} {p ⊕ [ ix 1 ]} {q} (ticks p 0) (proj₂ (aP x) refl)
+      b′ (inj₂ i)             lq = b i lq
 
   carried : CarryAt valuesOf M HP HE LP P.T E.T p p′
   carried = record
     { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
-    ; live = live ; few = few ; spent = spent ; whole = whole
+    ; live = live ; few = few ; whole = whole
     ; bk = bk ; in-bk = in-bk ; pbk = C.pbk ; pinned = pinned }
 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by
@@ -344,7 +319,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
   where
     nexted : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
            → ∀ p p′ {p₀} → M₀ p p₀ → p₀ ⊑ p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
-           → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
+           → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (Truncate (DeferT (approx n (Later.force l) envP) p))
              × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (Truncate (DeferT (approx n (Later.force l) envP) p))
                  (Truncate (DeferT (approx n (elab ρ (Later.force l)) envE) p′)) p p′
     nexted envP envE gP gE M₀ hm er p p′ m₀ pp okP okE fr
@@ -359,14 +334,38 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
         fresh₁ (inj₂ (a , pl , refl , _)) (w , ww , wx) with (p ⊕ [ a ]) ≟ᵖ (p ⊕ [ ix 1 ])
         ... | yes e = e
         ... | no ne = ⊥-elim (sib (proj₁ okP) pl (⊑-refl p) ne ww wx)
-    ... | M , ms , hm′ , wi , c =
-      M , (λ m → ms (inj₁ m)) , hm′ , wi′
+    ... | M , ms , hm′ , wi , br , c =
+      M , (λ m → ms (inj₁ m)) , hm′ , wi′ , bare
         , NextCarry.carried (approx n (Later.force l) envP) (approx n (elab ρ (Later.force l)) envE) p p′
             (ms (inj₂ (ix 0 , plain-ix , refl , refl)))
             (aft (approx n (Later.force l) envP) (inv-approx n (Later.force l) envP gP) p okP)
             (aft (approx n (elab ρ (Later.force l)) envE) (inv-approx n (elab ρ (Later.force l)) envE gE) p′ okE) c
       where
         module O = OneUnder hm fr m₀ pp
+
+        g : Pos
+        g = p ⊕ [ ix 0 ]
+
+        g≢ : g ≡ p ⊕ [ ix 1 ] → ⊥
+        g≢ e = ≺-irrefl {g} (subst (g ≺_) (sym e) (ticks p 0))
+
+        -- Nothing the body's map adds lies under the guard.
+        g-bare : ∀ {x y} → M x y → g ⊑ x → x ≡ g
+        g-bare m gx with wi m
+        ... | inj₁ m₁ = O.bare {X = A} {t = λ k _ → k ≡ g} (λ { refl → ix 0 , plain-ix , refl }) {e = skip} refl m₁ gx
+        ... | inj₂ w  = ⊥-elim (leads (proj₂ okP) (step here plain-ix) nb nr w gx)
+          where
+            nb : W⁼ (Hots envP) (p ⊕ [ ix 1 ]) g → ⊥
+            nb ww = sib (proj₁ okP) plain-ix (⊑-refl p) g≢ ww (⊑-refl g)
+
+            nr : g ⊑ (p ⊕ [ ix 1 ]) → ⊥
+            nr r with ⊑-snoc p r
+            ... | inj₁ gp = ⊑-≼ gp (≺-ext p [])
+            ... | inj₂ e  = g≢ e
+
+        bare : Bare M (Truncate (DeferT (approx n (Later.force l) envP) p))
+        bare (guard , _)  m gx = g-bare m gx
+        bare (body x , _) m kx = br x m kx
 
         wi′ : Within (Hots envP) M₀ M p
         wi′ m with wi m

@@ -37,14 +37,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Probed, unproven: at each approximant, each former's elaborated run
 carries its plain one (`Carry`), extending an order embedding of
 positions over its own worlds; the meaning is reached through
-`never-lies`, never carried. Riskiest: a takeWhile's carry, its map
-grown under the first failing value, `place` and `spent` finding it from
-listings. Then a reader's image under its connect's echoes
-(`Bound.lists`), the embedding past a former's children, and a concat's
-queued lane. Settled when each former's leaf is a body.
+`never-lies`, never carried. Riskiest: a reader's image under its
+connect's echoes (`Bound.lists`), then the embedding past a former's
+children, and a concat's queued lane. Settled when each former's leaf is
+a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`, `carry-cold`,
-`carry-takeWhile`, `carry-wrap`.
+`carry-wrap`.
 
 #### THE PROTOCOL
 

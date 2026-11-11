@@ -300,7 +300,7 @@ erasingₙ : ∀ n {A} (o : SObs [] A)
          → Attribution Every (One valuesOf) (Reads valuesOf) (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root) root root
 erasingₙ n o with Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ())
                     root coreAt (coreAt , (refl , refl) , ([] , refl)) ok₀ (tt , λ ()) fresh-At₀
-... | M , ms , hm , _ , c =
+... | M , ms , hm , _ , _ , c =
   attributed hm (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
     (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
     (carry-wrap n o hm (ms (refl , refl)) c)
