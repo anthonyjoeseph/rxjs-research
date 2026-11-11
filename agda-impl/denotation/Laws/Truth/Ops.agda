@@ -287,7 +287,7 @@ map-truth {A} {B} f {s} {s′} R p ok = placing (record
   ; silent  = λ c sp x → lbl-silent (lbl (proj₁ x)) (silent c sp (row (proj₁ x)))
   ; shows   = λ c i → shown (shows c i)
   ; again   = λ { c (map-pin y , _) l rs i → shade (again c y l rs i) }
-  ; shadow  = λ { c (map-pin y , _) l rs bf → shade (shadow c y l rs (before bf)) }
+  ; shadow  = λ { c (map-pin y , _) l rs bf nl → shade (shadow c y l rs (before bf) nl) }
   ; agree   = λ q e cl → (λ { (x , _) → let v = via x (proj₁ (agree q (src x) (clean cl (lbl x)))) in v , lift re′ v })
                        , (λ { (x , _) → let v = via x (proj₂ (agree q (src x) (clean cl (lbl x)))) in v , lift re v })
   }) (Placed.placed (R p ok))
@@ -331,7 +331,7 @@ defer-truth {A} {H} {d} {d′} inv inv′ R p ok = placing (record
   ; silent  = λ { _ _ (guard , _) → hush ; c sp (body x , _) → silent c sp x }
   ; shows   = λ c i → shown (shows c i)
   ; again   = λ { c (body y , _) l rs i → shade (again c y l rs i) }
-  ; shadow  = λ { c (body y , _) l rs bf → shade (shadow c y l rs (before bf)) }
+  ; shadow  = λ { c (body y , _) l rs bf nl → shade (shadow c y l rs (before bf) nl) }
   ; agree   = λ q e cl → fwd cl , bwd cl
   }) (λ c → inW (shrink⁼ (Placed.placed (R (p ⊕ [ ix 1 ]) (ok-step p ok)) c)))
   where
@@ -375,7 +375,7 @@ scan-truth {A} {B} f z {s} {s′} R p ok = placing (record
   ; silent  = λ c sp x → lbl-silent (lbl (proj₁ x)) (silent c sp (row (proj₁ x)))
   ; shows   = λ c i → shown c (shows c i)
   ; again   = λ { c (Scan.spin y , _) l rs i → shade (again c y l rs i) }
-  ; shadow  = λ { c (Scan.spin y , _) l rs bf → shade (shadow c y l rs (before bf)) }
+  ; shadow  = λ { c (Scan.spin y , _) l rs bf nl → shade (shadow c y l rs (before bf) nl) }
   ; agree   = λ q e cl → fwd cl , bwd cl
   }) (Placed.placed (R p ok))
   where
@@ -459,7 +459,7 @@ take-truth {A} {H} i keep {s} {s′} Is Is′ R p ok = placing (record
   ; silent  = λ c sp x → quiet (proj₁ c) sp (proj₁ x)
   ; shows   = shown
   ; again   = λ { c (left x nf _ , _) l rc j → kept-at nf (again (proj₁ c) x l rc j) }
-  ; shadow  = λ { c (left x′ nf′ _ , _) l rc bf → kept-at (unfailed bf nf′) (shadow (proj₁ c) x′ l rc (before-in bf (unfailed bf nf′))) }
+  ; shadow  = λ { c (left x′ nf′ _ , _) l rc bf nl → kept-at (unfailed bf nf′) (shadow (proj₁ c) x′ l rc (before-in bf (unfailed bf nf′)) (unlied nl (unfailed bf nf′))) }
   ; agree   = λ q e cl → fwd cl , bwd cl
   }) (λ c → Placed.placed (R p ok) (proj₁ c))
   where
@@ -560,6 +560,10 @@ take-truth {A} {H} i keep {s} {s′} Is Is′ R p ok = placing (record
     ...   | inj₁ rc with again cc y (j , l) rc 1
     ...     | z , z1 , tz = r , rc , nf , z , z1 , tz
 
+    -- Unfailed, past no cut's first it keeps: past none.
+    unlied : ∀ {r} → ¬ Lie Cut′ r → ¬ Failed t r → ¬ Lie Cut r
+    unlied nl nf (c , cc , j , l) = nl (c , (cc , inj₁ λ f → nf (past-first c j l f)) , j , l)
+
     -- A row not past a cut's first it shows is past none.
     honest : ∀ {q e} → TakeT t q e → ¬ Lie Cut′ q → ¬ Lie Cut q
     honest x nl (c , cc , j , l) = nl (c , (cc , inj₁ λ f → nl (c , (cc , inj₂ (hidden cc x l f)) , j , l)) , j , l)
@@ -603,22 +607,22 @@ take-truth {A} {H} i keep {s} {s′} Is Is′ R p ok = placing (record
 
     -- A source row of the next past a cut's first, failed before the
     -- spin: the cut keeps the pins of a connect leading it.
-    hidden′ : ∀ {c j q e} → Cut c → (x′ : TakeT t′ q e) → ¬ Failed t (bound x′) → Before Cut′ O (bound x′)
+    hidden′ : ∀ {c j q e} → Cut c → (x′ : TakeT t′ q e) → ¬ Failed t (bound x′) → Before Cut′ O (bound x′) → ¬ Lie Cut′ q
             → (c ⊕ [ ix (suc j) ]) ⊑ spos x′ → Failed t (c ⊕ [ ix 0 ]) → Kept c
-    hidden′ {c} {j} _ (pass _ _ _)   nf _ l f = ⊥-elim (nf (past-first c j l f))
-    hidden′ {c} {j} _ (fail _ _ _ _) nf _ l f = ⊥-elim (nf (past-first c j l f))
-    hidden′ {c} {j} _ (stop _ _ _)   nf _ l f = ⊥-elim (nf (past-first c j l f))
-    hidden′ {c} {j} _ (step _ _)     nf _ l f = ⊥-elim (nf (past-first c j l f))
-    hidden′ {c} {j} _ (tend _ _)     nf _ l f = ⊥-elim (nf (past-first c j l f))
-    hidden′ {c} {j} cc (left {q} {r} y′ _ ins) nf bf l f with ⊑-cmp r (c ⊕ [ ix (suc j) ]) (inside-⊑ r q ins) l
+    hidden′ {c} {j} _ (pass _ _ _)   nf _ _ l f = ⊥-elim (nf (past-first c j l f))
+    hidden′ {c} {j} _ (fail _ _ _ _) nf _ _ l f = ⊥-elim (nf (past-first c j l f))
+    hidden′ {c} {j} _ (stop _ _ _)   nf _ _ l f = ⊥-elim (nf (past-first c j l f))
+    hidden′ {c} {j} _ (step _ _)     nf _ _ l f = ⊥-elim (nf (past-first c j l f))
+    hidden′ {c} {j} _ (tend _ _)     nf _ _ l f = ⊥-elim (nf (past-first c j l f))
+    hidden′ {c} {j} cc x′@(left {q} {r} y′ _ ins) nf bf nl l f with ⊑-cmp r (c ⊕ [ ix (suc j) ]) (inside-⊑ r q ins) l
     ... | inj₂ Sr = ⊥-elim (nf (past-first c j Sr f))
     ... | inj₁ rS with ⊑-snoc c rS
     ...   | inj₂ refl = ⊥-elim (nf (past-first c j (⊑-refl _) f))
-    ...   | inj₁ rc with shadow cc y′ (j , l) rc (before-in bf nf)
+    ...   | inj₁ rc with shadow cc y′ (j , l) rc (before-in bf nf) (unlied (λ l′ → nl (lie-up l′ (⊑-trans rc (⊑-trans (⊑-snoc⁺ c) (⊑-trans l (under x′)))))) nf)
     ...     | z , z1 , tz = r , rc , nf , z , z1 , tz
 
     honest′ : ∀ {q e} (x′ : TakeT t′ q e) → ¬ Failed t (bound x′) → Before Cut′ O (bound x′) → ¬ Lie Cut′ q → ¬ Lie Cut (spos x′)
-    honest′ x′ nf bf nl (c , cc , j , l) = nl (c , (cc , inj₁ λ f → nl (c , (cc , inj₂ (hidden′ cc x′ nf bf l f)) , j , lq)) , j , lq)
+    honest′ x′ nf bf nl (c , cc , j , l) = nl (c , (cc , inj₁ λ f → nl (c , (cc , inj₂ (hidden′ cc x′ nf bf nl l f)) , j , lq)) , j , lq)
       where lq = ⊑-trans l (under x′)
 
     seen-at : ∀ {q e ks k e₀} → (∀ {k′ e′} → O k′ e′ → k′ ≺ q → Dep q e k′ e′ → Cov q ks k′ × ¬ Lie Cut′ k′)

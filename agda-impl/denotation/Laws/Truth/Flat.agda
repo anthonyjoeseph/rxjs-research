@@ -12,12 +12,10 @@ module denotation.Laws.Truth.Flat where
 open import Data.Maybe using (just; nothing)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (Den; enter; module Op)
 open import denotation.Laws.Worlds using (Ok; InvD)
 open import denotation.Laws.Shows using (ShowsK)
 open import denotation.Laws.Truth using (Rel)
-open import Data.Nat using (ℕ)
 
 postulate
   merge-truth   : ∀ {A B H} {f f′ : A → Den B} {s s′ : Den A}

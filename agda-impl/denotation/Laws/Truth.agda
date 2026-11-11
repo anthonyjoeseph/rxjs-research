@@ -151,8 +151,8 @@ before-of {q = q} {b = b} (_ , ks , h) bq dp = ks , λ {k} x kb → let a = h x 
 -- THE NEXT APPROXIMANT, past the cuts.  Each cut `defer` (`Cut`) spins
 -- at its subscription: every row under its spin is silent, and each of
 -- its rows shows.  A pin past its first, of a connect leading the cut,
--- recurs under each; one the next shows there, clean before its connect,
--- shows under its second.  Wherever a row is clean, the next has it too,
+-- recurs under each; one the next shows there, clean before its connect
+-- and its connect past no cut's first, shows under its second.  Wherever a row is clean, the next has it too,
 -- and nothing else there.
 record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
   field
@@ -160,7 +160,7 @@ record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
     silent  : ∀ {s y e} → Cut s → Spun s y → t y e → Silent e
     shows   : ∀ {s} → Cut s → ∀ i → Σ Pos λ z → Σ (Ev A) λ e → (s ⊕ [ ix i ]) ⊑ z × t z e
     again   : ∀ {s w r} → Cut s → t w (pin r) → Lies s w → r ⊑ s → ∀ i → Σ Pos λ z → (s ⊕ [ ix i ]) ⊑ z × t z (pin r)
-    shadow  : ∀ {s w r} → Cut s → t′ w (pin r) → Lies s w → r ⊑ s → Before Cut t r → Σ Pos λ z → (s ⊕ [ ix 1 ]) ⊑ z × t z (pin r)
+    shadow  : ∀ {s w r} → Cut s → t′ w (pin r) → Lies s w → r ⊑ s → Before Cut t r → ¬ Lie Cut r → Σ Pos λ z → (s ⊕ [ ix 1 ]) ⊑ z × t z (pin r)
     agree   : ∀ q e → Clean Cut t q e → (t q e → t′ q e) × (t′ q e → t q e)
 
 module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
@@ -274,7 +274,7 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
             ...   | inj₂ Sr = ⊥-elim (nSr Sr)
             ...   | inj₁ rS with ⊑-snoc s rS
             ...     | inj₂ refl = ⊥-elim (nSr (⊑-refl _))
-            ...     | inj₁ rs with shadow c x (i , sw) rs bf
+            ...     | inj₁ rs with shadow c x (i , sw) rs bf (λ l → nq (lie-up l rq))
             ...       | z , z1 , tz = z , pin r , (s , c , 0 , z1) , tz , before (s≤s z≤n) z1 wq nSq , λ _ → inj₂ refl
 
   -- WHAT A CLEAN ROW WAITS ON IN THE NEXT, THIS ONE HAS.
@@ -342,7 +342,7 @@ spin-truth {A} {H} {d} inv p ok = placing (record
   ; silent  = λ { refl _ (spin _ , _) → hush }
   ; shows   = λ { refl i → p ⊕ [ ix i ] , skip , ⊑-refl _ , spin i , spin-reach p i }
   ; again   = λ { refl (() , _) }
-  ; shadow  = λ { refl (body x , _) _ rp _ → ⊥-elim (proj₂ (aft d inv p ok x) refl (≼-≺-≺ {_} {p} {b₀} (⊑-≼ rp) (Equivalence.from T-≡ (<ᵖ-below p [])))) }
+  ; shadow  = λ { refl (body x , _) _ rp _ _ → ⊥-elim (proj₂ (aft d inv p ok x) refl (≼-≺-≺ {_} {p} {b₀} (⊑-≼ rp) (Equivalence.from T-≡ (<ᵖ-below p [])))) }
   ; agree   = λ q e c → to c , back c
   }) (λ { refl → here })
   where

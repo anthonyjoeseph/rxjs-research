@@ -29,7 +29,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Data.Bool using (Bool; true; false; not) renaming (T to Tr)
-open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; DenEnv; Few; _≺_; enter; approx; ⟦_⟧; module Op)
