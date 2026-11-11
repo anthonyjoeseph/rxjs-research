@@ -51,8 +51,8 @@ open import denotation.Laws.Worlds using (W; W⁼; inW; Ok; InvAt; InvD; Shows; 
   conv; leads; plain-ix; world-after; inside-⊑; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ; w-up; nest; nest⁼; flat-under)
   renaming (step to wstep)
 open import denotation.Laws.JoinInv using (ix10)
-open import denotation.Laws.Truth using (Truth; Rel; Placed; placing; Spun; Lies; Lie; Pins; Clean; Before; lie-up; lies-≼; before-of; few-ag;
-  truth-lies; pins-via; where?; below-next; spin-few)
+open import denotation.Laws.Truth using (Truth; Rel; Placed; placing; Spun; Lies; Lie; Pins; Clean; Before; Hidden; lie-up; lies-≼; before-of; few-ag;
+  truth-lies; pins-via; hid-via; where?; below-next; spin-few)
 
 -- A pin reached: few before its connect.
 reach-pin : ∀ {X} {t : EmissionSet X} {y r} → T (inside r y) → Reach t y (pin r) → Few t r
@@ -881,11 +881,11 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           nq : ¬ Lie (TC x sl) q
           nq (c , ct , li) with lie-split li rq
           ... | inj₁ lr = nlL x sl rn (≼-refl {r}) nr (c , ct , lr)
-          ... | inj₂ rc with Truth.shadow (TL x sl) ct l′ li rc (beforeL x sl rn (≼-refl {r}) nr) (nlL x sl rn (≼-refl {r}) nr)
-          ...   | z , z1 , lz = proj₁ cl (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (⊑-refl c) rc , ct)
+          ... | inj₂ rc = Truth.shadow (TL x sl) ct l′ li rc (beforeL x sl rn (≼-refl {r}) nr) (nlL x sl rn (≼-refl {r}) nr)
+                            ([] , λ {z} lz sp → ⊥-elim (proj₁ cl (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (⊑-refl c) rc , ct)
                                               , z , pin r , (left x rn (mk sl (lz , after x sl lz)) nr (proj₂ (InvAt.pinned (LI x sl) lz))
                                                             , S.reach-lane fewJ x sl lz)
-                                              , 1 , z1) , li)
+                                              , sp) , li)))
           l : enter (f a) s₂ q (pin r)
           l = proj₂ (Truth.agree (TL x sl) q (pin r) (cleanL-pin x sl rn nr r⁼ nq)) l′
 
@@ -895,8 +895,8 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           nq : ¬ Lie TO.Cut q
           nq (c , cc , li) with lie-split li rq
           ... | inj₁ lr = clearO (≼-refl {r}) (c , cc , lr)
-          ... | inj₂ rc with TO.shadow cc x′ li rc beforeO (clearO (≼-refl {r}))
-          ...   | z , z1 , oz = proj₁ cl (c , (inj₁ cc , z , pin r , (opin oz , S.reach-opin fewJ oz) , 1 , z1) , li)
+          ... | inj₂ rc = TO.shadow cc x′ li rc beforeO (clearO (≼-refl {r}))
+                            ([] , λ {z} oz sp → ⊥-elim (proj₁ cl (c , (inj₁ cc , z , pin r , (opin oz , S.reach-opin fewJ oz) , sp) , li)))
           x : o q (pin r)
           x = proj₂ (TO.agree q (pin r) (cleanO-pin nq)) x′
       from (K′.lane x′ rn′ l′ nc′ _ , _) = let (_ , sl′ , (lq , aq)) = SL′.slot l′ in fromL x′ sl′ rn′ lq aq (λ ct → nc′ (cut-up′ ct (⊑-≼ rq)))
@@ -912,11 +912,10 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     ... | yes ins = Pinned.to {q} {r} ins cl , Pinned.from {q} {r} ins cl
 
     ------------------------------------------------------------------------
-    -- The next's pin past a cut, under its second spin row
+    -- The next's pin past a cut: the pins under the spin are not hidden
 
-    shadow′ : ∀ {c w r} → Cut′ c → Jt′ w (pin r) → Lies c w → r ⊑ c → Before Cut′ Jt r → ¬ Lie Cut′ r
-            → Σ Pos λ z → (c ⊕ [ ix 1 ]) ⊑ z × Jt z (pin r)
-    shadow′ {c} {w} {r} (ic , wit) (jw′ , _) li rc bf nl = go ic jw′
+    shadow′ : ∀ {c w r} → Cut′ c → Jt′ w (pin r) → Lies c w → r ⊑ c → Before Cut′ Jt r → ¬ Lie Cut′ r → ¬ Hidden Cut′ Jt c r
+    shadow′ {c} {w} {r} (ic , wit) (jw′ , _) li rc bf nl hd = go ic jw′
       where
         open AtBound bf nl
 
@@ -927,11 +926,16 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
         ...   | ρ , _ , xρ′ , ρq , ρW =
           w1 cc (proj₂ (upto agO {ρ} (≼-trans {ρ} {q} {r} ρq (val-pin′ x′ sl′ ly))) xρ′) (nest ρW (InvAt.world (LI′ x′ sl′) ly)) le
 
-        go : InCut c → K′.JoinT w (pin r) → Σ Pos λ z → (c ⊕ [ ix 1 ]) ⊑ z × Jt z (pin r)
-        go (inj₁ cc) (K′.opin x′) with TO.shadow cc x′ li rc beforeO (clearO (≼-refl {r}))
-        ... | z , z1 , oz = z , z1 , opin oz , S.reach-opin fewJ oz
-        go (inj₁ cc) (K′.lane x′ _ l′ _ _) = ⊥-elim (w1′ cc x′ l′ (proj₂ li))
-        go (inj₁ cc) (K′.left x′ _ l′ _ _) = ⊥-elim (w1′ cc x′ l′ (proj₂ li))
+        go : InCut c → K′.JoinT w (pin r) → ⊥
+        go (inj₁ cc) (K′.opin x′) = TO.shadow cc x′ li rc beforeO (clearO (≼-refl {r})) (hid-via {Y = o} {Z = Jt} im hd)
+          where
+            im : ∀ {z} → o z (pin r) → Spun c z → Jt z (pin r) × (¬ Lie Cut′ z → ¬ Lie TO.Cut z)
+            im {z} oz _ = jz , λ n (c′ , cc′ , l′) → n (c′ , (inj₁ cc′ , z , pin r , jz , lies-spun l′) , l′)
+              where
+                jz : Jt z (pin r)
+                jz = opin oz , S.reach-opin fewJ oz
+        go (inj₁ cc) (K′.lane x′ _ l′ _ _) = w1′ cc x′ l′ (proj₂ li)
+        go (inj₁ cc) (K′.left x′ _ l′ _ _) = w1′ cc x′ l′ (proj₂ li)
         go (inj₁ cc) (K′.run () _)
         go (inj₂ (q₀ , a₀ , s₀ , x₀ , sl₀ , rn , nc , cl)) jw′ = lane-case jw′
           where
@@ -951,15 +955,22 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
             nr₀ : ¬ Cut f o q₀ r
             nr₀ = unc nc (⊑-≼ rc)
 
-            mine : ∀ {q₂ a} → o′ q₂ (out a) → Ln f′ o′ q₂ a w (pin r) → Σ Pos λ z → (c ⊕ [ ix 1 ]) ⊑ z × Jt z (pin r)
-            mine x′ l′ with Truth.shadow (TL x₀ sl₀) cl (one-lane x₀ sl₀ (TL x₀ sl₀) c⁼ cl li rc ag₀ agO lanes (ends-at F₀) x′ l′) li rc
-                              (beforeL x₀ sl₀ rn (≼-refl {r}) nr₀) (nlL x₀ sl₀ rn (≼-refl {r}) nr₀)
-            ... | z , z1 , lz = z , z1 , lane x₀ rn (mk sl₀ (lz , after x₀ sl₀ lz)) (unc-in x₀ sl₀ c⁼ nc (⊑-trans (⊑-snoc⁺ c) z1)) tt
-                              , S.reach-lane fewJ x₀ sl₀ lz
+            -- A lane pin under the spin: the joining's, past the joining's
+            -- cut wherever past the lane's.
+            im : ∀ {z} → enter (f a₀) s₀ z (pin r) → Spun c z → Jt z (pin r) × (¬ Lie Cut′ z → ¬ Lie (TC x₀ sl₀) z)
+            im {z} lz (_ , cz) = jz , λ n (c′ , ct′ , l′) →
+                n (c′ , (inj₂ (q₀ , a₀ , s₀ , x₀ , sl₀ , rn , uncut-under x₀ sl₀ nc c⁼ (lies-⊑ l′) (⊑-trans (⊑-snoc⁺ c) cz) , ct′) , z , pin r , jz , lies-spun l′) , l′)
+              where
+                jz : Jt z (pin r)
+                jz = lane x₀ rn (mk sl₀ (lz , after x₀ sl₀ lz)) (unc-in x₀ sl₀ c⁼ nc (⊑-trans (⊑-snoc⁺ c) cz)) tt , S.reach-lane fewJ x₀ sl₀ lz
 
-            lane-case : K′.JoinT w (pin r) → Σ Pos λ z → (c ⊕ [ ix 1 ]) ⊑ z × Jt z (pin r)
+            mine : ∀ {q₂ a} → o′ q₂ (out a) → Ln f′ o′ q₂ a w (pin r) → ⊥
+            mine x′ l′ = Truth.shadow (TL x₀ sl₀) cl (one-lane x₀ sl₀ (TL x₀ sl₀) c⁼ cl li rc ag₀ agO lanes (ends-at F₀) x′ l′) li rc
+                           (beforeL x₀ sl₀ rn (≼-refl {r}) nr₀) (nlL x₀ sl₀ rn (≼-refl {r}) nr₀) (hid-via {Y = enter (f a₀) s₀} {Z = Jt} im hd)
+
+            lane-case : K′.JoinT w (pin r) → ⊥
             lane-case (K′.opin y′) =
-              let (ρ , _ , xρ , ρq₀ , ρW) = seat x₀ sl₀ in ⊥-elim (InvAt.under Io′ (proj₁ (upto ag₀ {ρ} ρq₀) xρ) y′ plain-ix (nest⁼ ρW c⁼) cw)
+              let (ρ , _ , xρ , ρq₀ , ρW) = seat x₀ sl₀ in InvAt.under Io′ (proj₁ (upto ag₀ {ρ} ρq₀) xρ) y′ plain-ix (nest⁼ ρW c⁼) cw
             lane-case (K′.lane x′ _ l′ _ _) = mine x′ l′
             lane-case (K′.left x′ _ l′ _ _) = mine x′ l′
             lane-case (K′.run () _)

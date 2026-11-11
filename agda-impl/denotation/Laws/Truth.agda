@@ -163,6 +163,22 @@ Lie C y = Σ Pos λ s → C s × Lies s y
 Clean : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Ev A → Set
 Clean C t q e = ¬ Lie C q × Σ (List Pos) λ ks → ∀ {k e′} → t k e′ → k ≺ q → Dep q e k e′ → Cov q ks k × ¬ Lie C k
 
+-- Finitely many positions cover the pins of `r` under the spin of `s`,
+-- none past a cut's first.
+Hidden : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Pos → Set
+Hidden C t s r = Σ (List Pos) λ ks → ∀ {k} → t k (pin r) → Spun s k → Any (k ⊑_) ks × ¬ Lie C k
+
+-- Each pin on a pin of the other, past a cut here only where past one
+-- there: hidden there, hidden here.
+hid-via : ∀ {A B} {C D : Pos → Set} {Y : EmissionSet A} {Z : EmissionSet B} {s r}
+        → (∀ {k} → Y k (pin r) → Spun s k → Z k (pin r) × (¬ Lie D k → ¬ Lie C k)) → Hidden D Z s r → Hidden C Y s r
+hid-via f (ks , h) = ks , λ y sp → proj₁ (h (proj₁ (f y sp)) sp) , proj₂ (f y sp) (proj₂ (h (proj₁ (f y sp)) sp))
+
+-- Covered by `ks` before `q`: by `q` and `ks`.
+cov-any : ∀ {q ks k} → Cov q ks k → Any (k ⊑_) (q ∷ ks)
+cov-any (inj₁ kq) = here kq
+cov-any (inj₂ a)  = there a
+
 -- Clean before `r`: finitely many positions cover the rows before it,
 -- none past a cut's first.
 Before : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Set
@@ -188,9 +204,10 @@ before-of {q = q} {b = b} (_ , ks , h) bq dp = ks , λ {k} x kb → let a = h x 
 -- at its subscription: every row under its spin is silent, its first row
 -- shows, and so does each later one few rows precede the next of.  A pin
 -- past its first, of a connect leading the cut, recurs under each with
--- few pins of that connect before the next; one the next shows there,
--- clean before its connect and its connect past no cut's first, shows
--- under its second.  Wherever a row is clean, the next has it too, and
+-- few pins of that connect before the next; where the next shows one
+-- there, clean before its connect and its connect past no cut's first,
+-- this one's pins of it under the spin are not hidden (`Hidden`): past
+-- one cut, a cut inside it may spin endlessly many.  Wherever a row is clean, the next has it too, and
 -- nothing else there.
 record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
   field
@@ -200,7 +217,7 @@ record Truth {A : Set} (t t′ : EmissionSet A) : Set₁ where
     shows   : ∀ {s} → Cut s → ∀ i → Few t (s ⊕ [ ix (suc i) ]) → Σ Pos λ z → Σ (Ev A) λ e → (s ⊕ [ ix i ]) ⊑ z × t z e
     again   : ∀ {s w r} → Cut s → t w (pin r) → Lies s w → r ⊑ s → ∀ i → Pins t r (s ⊕ [ ix (suc i) ])
             → Σ Pos λ z → (s ⊕ [ ix i ]) ⊑ z × t z (pin r)
-    shadow  : ∀ {s w r} → Cut s → t′ w (pin r) → Lies s w → r ⊑ s → Before Cut t r → ¬ Lie Cut r → Σ Pos λ z → (s ⊕ [ ix 1 ]) ⊑ z × t z (pin r)
+    shadow  : ∀ {s w r} → Cut s → t′ w (pin r) → Lies s w → r ⊑ s → Before Cut t r → ¬ Lie Cut r → ¬ Hidden Cut t s r
     agree   : ∀ q e → Clean Cut t q e → (t q e → t′ q e) × (t′ q e → t q e)
 
 -- A row under every spin row before `x`: endlessly many before it.
@@ -258,10 +275,8 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
       ... | cv , nk = cov-down cv kw (≺→≼ {w} {q} wq) , nk
 
   private
-    -- A row of the next past a cut's first, that a row not past it waits
-    -- on: that row waits on one of these past it too.
-    dirty : ∀ {q e w e′} → Clean Cut t q e → Lie Cut w → t′ w e′ → w ≺ q → Dep q e w e′
-          → Σ Pos λ z → Σ (Ev A) λ e″ → Lie Cut z × t z e″ × z ≺ q × Dep q e z e″
+    -- No clean row waits on a row of the next past a cut's first.
+    dirty : ∀ {q e w e′} → Clean Cut t q e → Lie Cut w → t′ w e′ → w ≺ q → Dep q e w e′ → ⊥
     dirty {q} {e} {w} {e′} (nq , ks , h) (s , c , i , sw) x wq d = go e e′ h x d
       where
         S : Pos
@@ -292,14 +307,17 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
         all-q : (∀ {k e″} → t k e″ → k ≺ q → Cov q ks k) → Few t (s ⊕ [ ix 2 ])
         all-q cv = third wq nlq (cov-few cv)
 
-        go : ∀ e e′ → (∀ {k e″} → t k e″ → k ≺ q → Dep q e k e″ → Cov q ks k × ¬ Lie Cut k)
-           → t′ w e′ → Dep q e w e′ → Σ Pos λ z → Σ (Ev A) λ e″ → Lie Cut z × t z e″ × z ≺ q × Dep q e z e″
-        go (out _) _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in z , _ , lz , tz , u wq nSq , tt
-        go skip    _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in z , _ , lz , tz , u wq nSq , tt
-        go end     _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in z , _ , lz , tz , u wq nSq , tt
+        -- Under the spin: before `q`.
+        spun-q : ∀ {k} → Spun s k → k ≺ q
+        spun-q {k} (j , l) = ≺-trans {k} {s ⊕ [ ix (suc j) ]} {q} (below-next s l ≤-refl) (past-spin s sw wq nlq (suc j))
+
+        go : ∀ e e′ → (∀ {k e″} → t k e″ → k ≺ q → Dep q e k e″ → Cov q ks k × ¬ Lie Cut k) → t′ w e′ → Dep q e w e′ → ⊥
+        go (out _) _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in proj₂ (h tz (u wq nSq) tt) lz
+        go skip    _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in proj₂ (h tz (u wq nSq) tt) lz
+        go end     _ h _ _ = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq tt)) in proj₂ (h tz (u wq nSq) tt) lz
         go (pin r) e′ h x d with T? (inside r q)
         ... | no ni = let (z , _ , lz , tz , u) = one (all-q λ y kq → proj₁ (h y kq λ ins → ⊥-elim (ni ins))) in
-                      z , _ , lz , tz , u wq nSq , λ ins → ⊥-elim (ni ins)
+                      proj₂ (h tz (u wq nSq) λ ins → ⊥-elim (ni ins)) lz
         ... | yes ins = by (d ins) x
           where
             rq : r ⊑ q
@@ -311,11 +329,11 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
             bf : Before Cut t r
             bf = ks , λ {k} y kr → let a = h y (≺-≼-≺ {k} {r} {q} kr (⊑-≼ rq)) (λ _ → inj₁ kr) in cov-down (proj₁ a) kr (⊑-≼ rq) , proj₂ a
 
-            early : w ≺ r → Σ Pos λ z → Σ (Ev A) λ e″ → Lie Cut z × t z e″ × z ≺ q × Dep q (pin r) z e″
+            early : w ≺ r → ⊥
             early wr = let (z , _ , lz , tz , u) = one (third wr (λ { (j , l) → nlq (j , ⊑-trans l rq) }) (cov-few λ y kr → proj₁ (proj₂ bf y kr))) in
-                       z , _ , lz , tz , u wq nSq , λ _ → inj₁ (u wr nSr)
+                       proj₂ (h tz (u wq nSq) λ _ → inj₁ (u wr nSr)) lz
 
-            by : w ≺ r ⊎ e′ ≡ pin r → t′ w e′ → Σ Pos λ z → Σ (Ev A) λ e″ → Lie Cut z × t z e″ × z ≺ q × Dep q (pin r) z e″
+            by : w ≺ r ⊎ e′ ≡ pin r → t′ w e′ → ⊥
             by (inj₁ wr)   _ = early wr
             by (inj₂ refl) x with ≼-or-≻ r w
             ... | inj₂ wr = early wr
@@ -323,16 +341,15 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
             ...   | inj₂ Sr = ⊥-elim (nSr Sr)
             ...   | inj₁ rS with ⊑-snoc s rS
             ...     | inj₂ refl = ⊥-elim (nSr (⊑-refl _))
-            ...     | inj₁ rs with shadow c x (i , sw) rs bf (λ l → nq (lie-up l rq))
-            ...       | z , z1 , tz = z , pin r , (s , c , 0 , z1) , tz , before (s≤s z≤n) z1 wq nSq , λ _ → inj₂ refl
+            ...     | inj₁ rs = shadow c x (i , sw) rs bf (λ l → nq (lie-up l rq))
+                          (q ∷ ks , λ tk sp → let a = h tk (spun-q sp) (λ _ → inj₂ refl) in cov-any (proj₁ a) , proj₂ a)
 
   -- WHAT A CLEAN ROW WAITS ON IN THE NEXT, THIS ONE HAS.
   pull : ∀ {q e w e′} → Clean Cut t q e → t′ w e′ → w ≺ q → Dep q e w e′ → t w e′
   pull {q} {e} {w} {e′} cl@(nq , ks , h) x wq d = proj₂ (agree w e′ (clean-down cl wq d nw)) x
     where
       nw : ¬ Lie Cut w
-      nw lw with dirty cl lw x wq d
-      ... | z , _ , lz , tz , zq , dz = proj₂ (h tz zq dz) lz
+      nw lw = dirty cl lw x wq d
 
 -- Nothing cut: the same rows.
 truth-refl : ∀ {A} {t : EmissionSet A} → Truth t t
@@ -393,7 +410,7 @@ spin-truth {A} {H} {d} inv p ok = placing (record
   ; first   = λ { refl → p ⊕ [ ix 0 ] , skip , ⊑-refl _ , spin 0 , spin-reach p 0 }
   ; shows   = λ { refl i _ → p ⊕ [ ix i ] , skip , ⊑-refl _ , spin i , spin-reach p i }
   ; again   = λ { refl (() , _) }
-  ; shadow  = λ { refl (body x , _) _ rp _ _ → ⊥-elim (proj₂ (aft d inv p ok x) refl (≼-≺-≺ {_} {p} {b₀} (⊑-≼ rp) (Equivalence.from T-≡ (<ᵖ-below p [])))) }
+  ; shadow  = λ { refl (body x , _) _ rp _ _ _ → ⊥-elim (proj₂ (aft d inv p ok x) refl (≼-≺-≺ {_} {p} {b₀} (⊑-≼ rp) (Equivalence.from T-≡ (<ᵖ-below p [])))) }
   ; agree   = λ q e c → to c , back c
   }) (λ { refl → here })
   where
