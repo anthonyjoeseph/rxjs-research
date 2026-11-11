@@ -53,7 +53,8 @@ open import simultaneous.Ranks using (enter-few; visible-unpinned)
 open import simultaneous.Listing using (Listing; listedₙ)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
-open import simultaneous.Carry using (Carry; At₀; emb-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
+open import simultaneous.Carry using (Carry; attributed)
+open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreAt; carry-wrap)
 open import simultaneous.Carried using (carry-approx)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
@@ -302,7 +303,8 @@ erasingₙ n o with Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] 
                     root coreAt (coreAt , (refl , refl) , ([] , refl)) ok₀ (tt , λ ()) fresh-At₀
 ... | M , ms , hm , _ , _ , c =
   attributed hm (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
-    (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
+    (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o)
+    (λ {k} {e} → unpinned-liveₙ n o {k} {e}) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
     (carry-wrap n o hm (ms (refl , refl)) c)
 
 private
