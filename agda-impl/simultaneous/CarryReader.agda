@@ -14,8 +14,8 @@
 -- (`simultaneous.Carry.Joins`), so the map stays an embedding.
 module simultaneous.CarryReader where
 
-open import Data.Bool using (true)
-open import Data.Bool.Properties using (T?)
+open import Data.Bool using (T; true)
+open import Data.Bool.Properties using (T?; T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; filter)
 import Data.List as L
@@ -27,16 +27,17 @@ open import Data.Maybe using (nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
+open import Function using (Equivalence; _⇔_)
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Tree using (connected; mergeᶠ)
 open import denotation.Position using (Pos; Path; ix; sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
-open import denotation.Events using (Timeline; fresh)
+open import denotation.Events using (Timeline; fresh; <ᵖ-part; <ᵖ-between)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few;
   Reach; Truncate; Rejoin; shown; heard; ended; late; _≺_; _≼_; approx; module Op)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-≼-≺; ≺-ext; ≺→≼; ≼-refl; ≼-trans; ≼-split; entered-few)
-open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ;
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; ≼-≺-≺; ≺-trans; ≺-≼-≺; ≺-ext; ≺→≼; ≼-refl; ≼-trans; ≼-split; entered-few)
+open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-cmp; ext≢; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ;
   W⁼; here; inW; join; step; plain-last)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (module Elaborate)
@@ -306,7 +307,6 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   PB k l = Σ Pos λ q → Σ Pos λ l₀ → C.PB q l₀ × p ≺ q × k ≡ q ⊕ [ sub p ] × l ≡ l₀ ⊕ [ sub p′ ]
 
   postulate
-    reader-emb      : Emb M
     -- THE READER HEARS WHERE THE HOT IS CARRIED INTO ITS INSTANT: a row of
     -- the hot past the subscription that is carried into its instant, the
     -- reader showing it listed, has its carrier past the image and joined
@@ -714,6 +714,268 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   ... | inj₁ (refl , _) = ⊥-elim (nh (bound-hot {ρ = ρ} envP {envE = envE} er i′ br) (⊑-refl p))
   ... | inj₂ (zs , e) with jn i′ m₀ br e
   ...   | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , ⊑-trans le (⊑-snoc⁺ p′)
+
+  private
+    →T : ∀ {b} → b ≡ true → T b
+    →T = Equivalence.from T-≡
+
+    cmp3 : ∀ x y → x ≺ y ⊎ x ≡ y ⊎ y ≺ x
+    cmp3 x y with ≼-or-≻ x y
+    ... | inj₂ yx = inj₂ (inj₂ yx)
+    ... | inj₁ xy with ≼-split {x} {y} xy
+    ...   | inj₁ lt = inj₁ lt
+    ...   | inj₂ eq = inj₂ (inj₁ eq)
+
+    -- Siblings keep their labels' order, whatever lies under them.
+    sibs : ∀ q {e e′} ys zs → e ≺ e′ → (q ⊕ (sub e ∷ ys)) ≺ (q ⊕ (sub e′ ∷ zs))
+    sibs q ys zs h = →T (<ᵖ-part q ys zs (Equivalence.to T-≡ h))
+
+    sib-below : ∀ l {e e′ y} → e ≺ e′ → (l ⊕ [ sub e ]) ⊑ y → y ≺ (l ⊕ [ sub e′ ])
+    sib-below l {e} {e′} h (τ , refl) = subst (_≺ (l ⊕ [ sub e′ ])) (sym (⊕-assoc l [ sub e ] τ)) (sibs l τ [] h)
+
+    sib-above : ∀ l {e e′ y} → e ≺ e′ → (l ⊕ [ sub e′ ]) ⊑ y → (l ⊕ [ sub e ]) ≺ y
+    sib-above l {e} {e′} h (τ , refl) = subst ((l ⊕ [ sub e ]) ≺_) (sym (⊕-assoc l [ sub e′ ] τ)) (sibs l [] τ h)
+
+    -- Past a position and before a point under it: under it.
+    between : ∀ {q x} ys → q ≺ x → x ≺ (q ⊕ ys) → q ⊑ x
+    between {q} {x} ys qx xq = <ᵖ-between q x ys (Equivalence.to T-≡ qx) (Equivalence.to T-≡ xq)
+
+    snoc-up : ∀ x {a} → (x ⊕ [ a ]) ⊑ x → ⊥
+    snoc-up x {a} (zs , e) = ext≢ x zs (sym (trans e (⊕-assoc x [ a ] zs)))
+
+    sib-eq : ∀ x {a b} → (x ⊕ [ a ]) ⊑ (x ⊕ [ b ]) → a ≡ b
+    sib-eq x le with ⊑-snoc x le
+    ... | inj₁ up = ⊥-elim (snoc-up x up)
+    ... | inj₂ e  = ⊕-injʳ x x e
+
+    sib-sub : ∀ x {e e′} → (x ⊕ [ sub e ]) ⊑ (x ⊕ [ sub e′ ]) → e ≡ e′
+    sib-sub x le with sib-eq x le
+    ... | refl = refl
+
+    -- Before an apart position: so is everything under it.
+    past : ∀ {a b c} → a ≺ b → ¬ (a ⊑ b) → a ⊑ c → c ≺ b
+    past {a} {b} ab nab (σ , refl) = subst ((a ⊕ σ) ≺_) (⊕-identityʳ b) (apart {a} {b} ab nab σ [])
+
+    -- The map so far holds no point at or under a point of the world past
+    -- the subscription.
+    stale : ∀ {x y w} → M₀ x y → W⁼ (Hots envP) p w × p ≺ w → w ⊑ x → ⊥
+    stale {w = w} m (v , pw) wx with fr m (w , v , wx)
+    ... | refl = ≺-irrefl {p} (≺-≼-≺ {p} {w} {p} pw (⊑-≼ wx))
+
+    lateW : W⁼ (Hots envP) p (p ⊕ [ last ]) × p ≺ (p ⊕ [ last ])
+    lateW = inW (step here plain-last) , ≺-ext p []
+
+    fresh-R : ∀ {x y y′} → M₀ x y → R x y′ → ⊥
+    fresh-R m (inj₁ (_ , _ , br , _ , pq , refl , _)) = stale m (joinW (proj₂ br) pq) (⊑-refl _)
+    fresh-R m (inj₂ (refl , _))                      = stale m lateW (⊑-refl _)
+
+    stale-sub : ∀ {q x y σ} → BoundRow (er i) q → p ≺ q → M₀ x y → x ≡ q ⊕ (sub p ∷ σ) → ⊥
+    stale-sub {q} {σ = σ} br pq m e = stale m (joinW (proj₂ br) pq) (σ , trans e (sym (⊕-assoc q [ sub p ] σ)))
+
+    hotB : ∀ {q} → BoundRow (er i) q → p ⊑ q → ⊥
+    hotB br = nh (bound-hot {ρ = ρ} envP {envE = envE} er i br)
+
+    -- A point paired with the subscription's image is the subscription.
+    same-join : ∀ {e e′} → M₀ e e′ → e′ ≡ p′ → e ≡ p
+    same-join {e} me refl with cmp3 e p
+    ... | inj₁ ep        = ⊥-elim (≺-irrefl {p′} (Emb.mono hm me m₀ ep))
+    ... | inj₂ (inj₁ eq) = eq
+    ... | inj₂ (inj₂ pe) = ⊥-elim (≺-irrefl {p′} (Emb.mono hm m₀ me pe))
+
+    -- A point of the map so far under a hot row's step: a reader's join,
+    -- under the row's carrier joined at the reader's image.
+    under-q : ∀ {q l x y a σ} → BoundRow (er i) q → C.Img q l → M₀ x y → x ≡ q ⊕ (a ∷ σ)
+            → Σ Pos λ e → a ≡ sub e × Σ Pos λ e′ → M₀ e e′ × (l ⊕ [ sub e′ ]) ⊑ y
+    under-q br ci m eq with jn i m br eq
+    ... | e , ae , e′ , me , L , ci′ , le with C.img-fun ci ci′
+    ...   | refl = e , ae , e′ , me , le
+
+    q-lead : ∀ {q l x y} → BoundRow (er i) q → C.Img q l → M₀ x y → q ⊑ x
+           → x ≡ q ⊎ Σ Pos λ e′ → (l ⊕ [ sub e′ ]) ⊑ y × Σ Pos λ e → M₀ e e′ × Σ Path λ σ → x ≡ q ⊕ (sub e ∷ σ)
+    q-lead {q} br ci m ([] , e) = inj₁ (trans e (⊕-identityʳ q))
+    q-lead br ci m (a ∷ σ , e) with under-q br ci m e
+    ... | e₀ , refl , e₀′ , me , le = inj₂ (e₀′ , le , e₀ , me , σ , e)
+
+    -- The map so far holds no other reader's join at this one's image.
+    j-hit : ∀ {q x y e e′ σ} → BoundRow (er i) q → p ≺ q → M₀ x y → M₀ e e′ → x ≡ q ⊕ (sub e ∷ σ) → e′ ≡ p′ → ⊥
+    j-hit br pq m me ex ep with same-join me ep
+    ... | refl = stale-sub br pq m ex
+
+    flat-lead : ∀ {q₁ q₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → q₁ ≺ q₂ → ¬ (q₁ ⊑ q₂)
+    flat-lead br₁ br₂ = nest {S = T₀} flatP (proj₁ (proj₂ br₁)) (proj₁ (proj₂ br₂))
+
+    -- Carriers of rows in order are apart.
+    img-apart : ∀ {q₁ q₂ l₁ l₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → C.Img q₁ l₁ → C.Img q₂ l₂ → q₁ ≺ q₂ → ¬ (l₁ ⊑ l₂)
+    img-apart {q₁} {q₂} br₁ br₂ ci₁ ci₂ qq ll with C.ext ci₁ | C.ext ci₂
+    ... | y₁ , my₁ , yl₁ | y₂ , my₂ , yl₂ with ⊑-cmp y₁ y₂ (⊑-trans yl₁ ll) yl₂
+    ...   | inj₁ yy = flat-lead br₁ br₂ qq (Emb.reflect hm my₁ my₂ yy)
+    ...   | inj₂ yy = ⊑-≼ {y₂} {y₁} yy (Emb.mono hm my₁ my₂ qq)
+
+    img-eq : ∀ {q₁ q₂ l₁ l₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → C.Img q₁ l₁ → C.Img q₂ l₂ → l₁ ⊑ l₂ → q₁ ≡ q₂
+    img-eq {q₁} {q₂} {l₁} {l₂} br₁ br₂ ci₁ ci₂ ll with cmp3 q₁ q₂
+    ... | inj₁ qq        = ⊥-elim (img-apart br₁ br₂ ci₁ ci₂ qq ll)
+    ... | inj₂ (inj₁ e)  = e
+    ... | inj₂ (inj₂ qq) = ⊥-elim (⊑-≼ {l₁} {l₂} ll (CM.img-mono ci₂ ci₁ qq))
+
+    -- A carrier past the subscription is apart from its image.
+    p′-l : ∀ {q l} → BoundRow (er i) q → C.Img q l → p ≺ q → ¬ (p′ ⊑ l)
+    p′-l {q} br ci pq pl with C.ext ci
+    ... | y , my , yl with ⊑-cmp y p′ yl pl
+    ...   | inj₁ yp = ≺-irrefl {p} (≺-≼-≺ {p} {q} {p} pq (⊑-≼ (Emb.reflect hm my m₀ yp)))
+    ...   | inj₂ py = hotB br (Emb.reflect hm m₀ my py)
+
+    -- Order: two joins; a join and the late end; a point of the map so
+    -- far and a join or the late end.
+    j-j : ∀ {q₁ q₂ l₁ l₂} → BoundRow (er i) q₁ → C.Img q₁ l₁ → BoundRow (er i) q₂ → C.Img q₂ l₂
+        → (q₁ ⊕ [ sub p ]) ≺ (q₂ ⊕ [ sub p ]) → (l₁ ⊕ [ sub p′ ]) ≺ (l₂ ⊕ [ sub p′ ])
+    j-j {q₁} {q₂} {l₁} {l₂} br₁ ci₁ br₂ ci₂ h =
+      apart {l₁} {l₂} (CM.img-mono ci₁ ci₂ qq) (img-apart br₁ br₂ ci₁ ci₂ qq) [ sub p′ ] [ sub p′ ]
+      where qq = back q₁ q₂ h (flat-lead br₂ br₁)
+
+    l-j : ∀ {q} → BoundRow (er i) q → p ≺ q → (p ⊕ [ last ]) ≺ (q ⊕ [ sub p ])
+    l-j {q} br pq = apart {p} {q} pq (hotB br) [ last ] [ sub p ]
+
+    l-j′ : ∀ {q l} → BoundRow (er i) q → C.Img q l → p ≺ q → (p′ ⊕ [ last ]) ≺ (l ⊕ [ sub p′ ])
+    l-j′ {q} {l} br ci pq = apart {p′} {l} (after′ ci pq) (p′-l br ci pq) [ last ] [ sub p′ ]
+
+    m-j : ∀ {x y q l} → M₀ x y → BoundRow (er i) q → C.Img q l → p ≺ q → x ≺ (q ⊕ [ sub p ]) → y ≺ (l ⊕ [ sub p′ ])
+    m-j {x} {y} {q} {l} m br ci pq h with C.ext ci
+    ... | yq , myq , yl with cmp3 x q
+    ...   | inj₁ xq = ≺-≼-≺ {y} {yq} {l ⊕ [ sub p′ ]} (Emb.mono hm m myq xq) (⊑-≼ (⊑-trans yl (⊑-snoc⁺ l)))
+    ...   | inj₂ (inj₁ refl) = ≼-≺-≺ {y} {l} {l ⊕ [ sub p′ ]} (⊑-≼ (subst (_⊑ l) (Emb.fun hm myq m) yl)) (≺-ext l [])
+    ...   | inj₂ (inj₂ qx) with between [ sub p ] qx h
+    ...     | [] , e = ⊥-elim (≺-irrefl {q} (subst (q ≺_) (trans e (⊕-identityʳ q)) qx))
+    ...     | a ∷ σ , e with under-q br ci m e
+    ...       | e₀ , refl , e₀′ , me , le with cmp3 e₀ p
+    ...         | inj₁ ep        = sib-below l (Emb.mono hm me m₀ ep) le
+    ...         | inj₂ (inj₁ ep) = ⊥-elim (stale-sub br pq m (subst (λ z → x ≡ q ⊕ (sub z ∷ σ)) ep e))
+    ...         | inj₂ (inj₂ pe) = ⊥-elim (≺-absurd {q ⊕ (sub e₀ ∷ σ)} {q ⊕ [ sub p ]} (subst (_≺ (q ⊕ [ sub p ])) e h) (sibs q [] σ pe))
+
+    j-m : ∀ {x y q l} → M₀ x y → BoundRow (er i) q → C.Img q l → p ≺ q → (q ⊕ [ sub p ]) ≺ x → (l ⊕ [ sub p′ ]) ≺ y
+    j-m {x} {y} {q} {l} m br ci pq h with C.ext ci
+    ... | yq , myq , yl with cmp3 x q
+    ...   | inj₁ xq = ⊥-elim (≺-irrefl {x} (≺-trans {x} {q} {x} xq (≺-trans {q} {q ⊕ [ sub p ]} {x} (≺-ext q []) h)))
+    ...   | inj₂ (inj₁ refl) = ⊥-elim (≺-absurd {x ⊕ [ sub p ]} {x} h (≺-ext x {sub p} []))
+    ...   | inj₂ (inj₂ qx) with ⊑? q x
+    ...     | no nq = past {yq} {y} {l ⊕ [ sub p′ ]} (Emb.mono hm myq m qx) (λ yy → nq (Emb.reflect hm myq m yy)) (⊑-trans yl (⊑-snoc⁺ l))
+    ...     | yes ([] , e) = ⊥-elim (≺-irrefl {q} (subst (q ≺_) (trans e (⊕-identityʳ q)) qx))
+    ...     | yes (a ∷ σ , e) with under-q br ci m e
+    ...       | e₀ , refl , e₀′ , me , le with cmp3 e₀ p
+    ...         | inj₁ ep        = ⊥-elim (≺-absurd {q ⊕ [ sub p ]} {q ⊕ (sub e₀ ∷ σ)} (subst ((q ⊕ [ sub p ]) ≺_) e h) (sibs q σ [] ep))
+    ...         | inj₂ (inj₁ ep) = ⊥-elim (stale-sub br pq m (subst (λ z → x ≡ q ⊕ (sub z ∷ σ)) ep e))
+    ...         | inj₂ (inj₂ pe) = sib-above l (Emb.mono hm m₀ me pe) le
+
+    m-l : ∀ {x y} → M₀ x y → x ≺ (p ⊕ [ last ]) → y ≺ (p′ ⊕ [ last ])
+    m-l {x} {y} m h with cmp3 x p
+    ... | inj₁ xp        = ≺-trans {y} {p′} {p′ ⊕ [ last ]} (Emb.mono hm m m₀ xp) (≺-ext p′ [])
+    ... | inj₂ (inj₁ refl) = subst (_≺ (p′ ⊕ [ last ])) (Emb.fun hm m₀ m) (≺-ext p′ [])
+    ... | inj₂ (inj₂ px) = ⊥-elim (≺-irrefl {p} (subst (p ≺_) (fr m (p , here , between [ last ] px h)) px))
+
+    l-m : ∀ {x y} → M₀ x y → (p ⊕ [ last ]) ≺ x → (p′ ⊕ [ last ]) ≺ y
+    l-m {x} {y} m h with cmp3 x p
+    ... | inj₁ xp        = ⊥-elim (≺-absurd {p} {x} (≺-trans {p} {p ⊕ [ last ]} {x} (≺-ext p []) h) xp)
+    ... | inj₂ (inj₁ refl) = ⊥-elim (≺-absurd {x ⊕ [ last ]} {x} h (≺-ext x {last} []))
+    ... | inj₂ (inj₂ px) with ⊑? p x
+    ...   | yes px′ = ⊥-elim (≺-irrefl {p} (subst (p ≺_) (fr m (p , here , px′)) px))
+    ...   | no np   = past {p′} {y} {p′ ⊕ [ last ]} (Emb.mono hm m₀ m px) (λ yy → np (Emb.reflect hm m₀ m yy)) (⊑-snoc⁺ p′)
+
+    -- Reflection, the same cases.
+    j-jr : ∀ {q₁ q₂ l₁ l₂} → BoundRow (er i) q₁ → C.Img q₁ l₁ → BoundRow (er i) q₂ → C.Img q₂ l₂
+         → (l₁ ⊕ [ sub p′ ]) ⊑ (l₂ ⊕ [ sub p′ ]) → (q₁ ⊕ [ sub p ]) ⊑ (q₂ ⊕ [ sub p ])
+    j-jr {q₁} {q₂} {l₁} {l₂} br₁ ci₁ br₂ ci₂ h with ⊑-snoc l₂ h
+    ... | inj₂ e with img-eq br₁ br₂ ci₁ ci₂ (subst (l₁ ⊑_) (⊕-injˡ l₁ l₂ e) (⊑-refl l₁))
+    ...   | refl = ⊑-refl _
+    j-jr {q₁} {q₂} {l₁} {l₂} br₁ ci₁ br₂ ci₂ h | inj₁ up with img-eq br₁ br₂ ci₁ ci₂ (⊑-trans (⊑-snoc⁺ l₁) up)
+    ...   | refl = ⊥-elim (snoc-up l₁ (subst ((l₁ ⊕ [ sub p′ ]) ⊑_) (sym (C.img-fun ci₁ ci₂)) up))
+
+    j-lr : ∀ {q l} → C.Img q l → p ≺ q → (l ⊕ [ sub p′ ]) ⊑ (p′ ⊕ [ last ]) → ⊥
+    j-lr {q} {l} ci pq h with ⊑-snoc p′ h
+    ... | inj₂ e  = last-sub (sym (⊕-injʳ l p′ e))
+    ... | inj₁ up = ⊑-≼ {l} {p′} (⊑-trans (⊑-snoc⁺ l) up) (after′ ci pq)
+
+    l-jr : ∀ {q l} → BoundRow (er i) q → C.Img q l → p ≺ q → (p′ ⊕ [ last ]) ⊑ (l ⊕ [ sub p′ ]) → ⊥
+    l-jr {q} {l} br ci pq h with ⊑-snoc l h
+    ... | inj₂ e  = last-sub (⊕-injʳ p′ l e)
+    ... | inj₁ up = p′-l br ci pq (⊑-trans (⊑-snoc⁺ p′) up)
+
+    m-jr : ∀ {x y q l} → M₀ x y → BoundRow (er i) q → C.Img q l → p ≺ q → y ⊑ (l ⊕ [ sub p′ ]) → x ⊑ (q ⊕ [ sub p ])
+    m-jr {x} {y} {q} {l} m br ci pq h with C.ext ci
+    ... | yq , myq , yl with ⊑-snoc l h
+    ...   | inj₂ refl with q-lead br ci m (Emb.reflect hm myq m (⊑-trans yl (⊑-snoc⁺ l)))
+    ...     | inj₁ refl = ⊑-snoc⁺ x
+    ...     | inj₂ (e′ , le , e₀ , me , σ , ex) = ⊥-elim (j-hit br pq m me ex (sib-sub l le))
+    m-jr {x} {y} {q} {l} m br ci pq h | yq , myq , yl | inj₁ yl′ with ⊑-cmp y yq yl′ yl
+    ...     | inj₁ yy = ⊑-trans (Emb.reflect hm m myq yy) (⊑-snoc⁺ q)
+    ...     | inj₂ yy with q-lead br ci m (Emb.reflect hm myq m yy)
+    ...       | inj₁ refl = ⊑-snoc⁺ x
+    ...       | inj₂ (_ , le , _) = ⊥-elim (snoc-up l (⊑-trans le yl′))
+
+    j-mr : ∀ {x y q l} → M₀ x y → BoundRow (er i) q → C.Img q l → p ≺ q → (l ⊕ [ sub p′ ]) ⊑ y → ⊥
+    j-mr {x} {y} {q} {l} m br ci pq h with C.ext ci
+    ... | yq , myq , yl with q-lead br ci m (Emb.reflect hm myq m (⊑-trans yl (⊑-trans (⊑-snoc⁺ l) h)))
+    ...   | inj₁ refl = snoc-up l (⊑-trans h (subst (_⊑ l) (Emb.fun hm myq m) yl))
+    ...   | inj₂ (e′ , le , e₀ , me , σ , ex) with ⊑-cmp (l ⊕ [ sub e′ ]) (l ⊕ [ sub p′ ]) le h
+    ...     | inj₁ ll = j-hit br pq m me ex (sib-sub l ll)
+    ...     | inj₂ ll = j-hit br pq m me ex (sym (sib-sub l ll))
+
+    m-lr : ∀ {x y} → M₀ x y → y ⊑ (p′ ⊕ [ last ]) → x ⊑ (p ⊕ [ last ])
+    m-lr {x} {y} m h with ⊑-snoc p′ h
+    ... | inj₁ yp   = ⊑-trans (Emb.reflect hm m m₀ yp) (⊑-snoc⁺ p)
+    ... | inj₂ refl with fr m (p , here , Emb.reflect hm m₀ m (⊑-snoc⁺ p′))
+    ...   | refl = ⊥-elim (ext≢ p′ [] (sym (Emb.fun hm m₀ m)))
+
+    l-mr : ∀ {x y} → M₀ x y → (p′ ⊕ [ last ]) ⊑ y → ⊥
+    l-mr {x} {y} m h with fr m (p , here , Emb.reflect hm m₀ m (⊑-trans (⊑-snoc⁺ p′) h))
+    ... | refl = snoc-up p′ (subst ((p′ ⊕ [ last ]) ⊑_) (sym (Emb.fun hm m₀ m)) h)
+
+    -- Each point's instants are those of a point of the map so far.
+    base : ∀ {x y} → M x y → Σ Pos λ x₁ → Σ Pos λ y₁ → M₀ x₁ y₁ × instantOf x ≡ instantOf x₁ × instantOf y ≡ instantOf y₁
+    base (inj₁ m) = _ , _ , m , refl , refl
+    base (inj₂ (inj₁ (q , l , br , ci , pq , refl , refl))) with C.ext ci
+    ... | yq , myq , (δ , refl) = q , yq , myq , instant-⊕ q [ sub p ] , trans (instant-⊕ (yq ⊕ δ) [ sub p′ ]) (instant-⊕ yq δ)
+    base (inj₂ (inj₂ (refl , refl))) = p , p′ , m₀ , instant-⊕ p [ last ] , instant-⊕ p′ [ last ]
+
+    fun′ : ∀ {x y y′} → M x y → M x y′ → y ≡ y′
+    fun′ (inj₁ m) (inj₁ m′) = Emb.fun hm m m′
+    fun′ (inj₁ m) (inj₂ r)  = ⊥-elim (fresh-R m r)
+    fun′ (inj₂ r) (inj₁ m)  = ⊥-elim (fresh-R m r)
+    fun′ (inj₂ (inj₁ (q₁ , _ , _ , ci₁ , _ , e₁ , refl))) (inj₂ (inj₁ (q₂ , _ , _ , ci₂ , _ , e₂ , refl))) with ⊕-injˡ q₁ q₂ (trans (sym e₁) e₂)
+    ... | refl = cong (_⊕ [ sub p′ ]) (C.img-fun ci₁ ci₂)
+    fun′ (inj₂ (inj₁ (q₁ , _ , _ , _ , _ , e₁ , _))) (inj₂ (inj₂ (e₂ , _))) = ⊥-elim (last-sub (⊕-injʳ p q₁ (trans (sym e₂) e₁)))
+    fun′ (inj₂ (inj₂ (e₁ , _))) (inj₂ (inj₁ (q₂ , _ , _ , _ , _ , e₂ , _))) = ⊥-elim (last-sub (⊕-injʳ p q₂ (trans (sym e₁) e₂)))
+    fun′ (inj₂ (inj₂ (_ , refl))) (inj₂ (inj₂ (_ , refl))) = refl
+
+    mono′ : ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
+    mono′ (inj₁ m) (inj₁ m′) h = Emb.mono hm m m′ h
+    mono′ (inj₁ m) (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) h = m-j m br ci pq h
+    mono′ (inj₁ m) (inj₂ (inj₂ (refl , refl))) h = m-l m h
+    mono′ (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) (inj₁ m) h = j-m m br ci pq h
+    mono′ (inj₂ (inj₂ (refl , refl))) (inj₁ m) h = l-m m h
+    mono′ (inj₂ (inj₁ (_ , _ , br₁ , ci₁ , _ , refl , refl))) (inj₂ (inj₁ (_ , _ , br₂ , ci₂ , _ , refl , refl))) h = j-j br₁ ci₁ br₂ ci₂ h
+    mono′ (inj₂ (inj₁ (q , _ , br , _ , pq , refl , refl))) (inj₂ (inj₂ (refl , refl))) h = ⊥-elim (≺-absurd {q ⊕ [ sub p ]} {p ⊕ [ last ]} h (l-j br pq))
+    mono′ (inj₂ (inj₂ (refl , refl))) (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) _ = l-j′ br ci pq
+    mono′ (inj₂ (inj₂ (refl , refl))) (inj₂ (inj₂ (refl , refl))) h = ⊥-elim (≺-irrefl {p ⊕ [ last ]} h)
+
+    reflect′ : ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
+    reflect′ (inj₁ m) (inj₁ m′) h = Emb.reflect hm m m′ h
+    reflect′ (inj₁ m) (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) h = m-jr m br ci pq h
+    reflect′ (inj₁ m) (inj₂ (inj₂ (refl , refl))) h = m-lr m h
+    reflect′ (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) (inj₁ m) h = ⊥-elim (j-mr m br ci pq h)
+    reflect′ (inj₂ (inj₂ (refl , refl))) (inj₁ m) h = ⊥-elim (l-mr m h)
+    reflect′ (inj₂ (inj₁ (_ , _ , br₁ , ci₁ , _ , refl , refl))) (inj₂ (inj₁ (_ , _ , br₂ , ci₂ , _ , refl , refl))) h = j-jr br₁ ci₁ br₂ ci₂ h
+    reflect′ (inj₂ (inj₁ (_ , _ , _ , ci , pq , refl , refl))) (inj₂ (inj₂ (refl , refl))) h = ⊥-elim (j-lr ci pq h)
+    reflect′ (inj₂ (inj₂ (refl , refl))) (inj₂ (inj₁ (_ , _ , br , ci , pq , refl , refl))) h = ⊥-elim (l-jr br ci pq h)
+    reflect′ (inj₂ (inj₂ (refl , refl))) (inj₂ (inj₂ (refl , refl))) _ = ⊑-refl _
+
+    inst′ : ∀ {x x′ y y′} → M x y → M x′ y′ → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′)
+    inst′ a b with base a | base b
+    ... | _ , _ , m₁ , ex , ey | _ , _ , m₂ , ex′ , ey′ rewrite ex | ex′ | ey | ey′ = Emb.inst hm m₁ m₂
+
+  -- THE JOINS KEEP THE EMBEDDING: the map so far holds nothing in the
+  -- subscription's world, a hot row's joins lie in their subscriptions'
+  -- order (`Joins`), and the hot's carriers are apart.
+  reader-emb : Emb M
+  reader-emb = record { fun = fun′ ; mono = mono′ ; reflect = reflect′ ; inst = inst′ }
 
 
 ------------------------------------------------------------------------

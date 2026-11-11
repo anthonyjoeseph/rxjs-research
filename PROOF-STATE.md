@@ -53,7 +53,7 @@ children, then a concat's queued lane. Settled when each former's leaf
 is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`,
-`read-post`, `reader-emb`.
+`read-post`.
 
 #### THE PROTOCOL
 
