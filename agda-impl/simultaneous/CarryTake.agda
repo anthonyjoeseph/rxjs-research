@@ -25,10 +25,10 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (takeWhile)
-open import denotation.Position using (Pos; Path; Label; ix; sub; last; _∙_; _⊕_; root; _≟ᵖ_; inside)
+open import denotation.Position using (Pos; Label; ix; sub; last; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Truncate; Reach; Few; _≺_; _≼_;
   module TakeWhile; module Op; approx)
@@ -44,7 +44,7 @@ open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
 open import simultaneous.Carry using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Carry; carry; Bare; Within; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; listed↓; IntoAt; Grown; joins-grow)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
@@ -89,22 +89,6 @@ private
   ixs-row : ∀ {b r} q → r ∈ ixs b q → r ≡ q ⊕ [ ix 0 ] × T b
   ixs-row {true} q (here refl) = refl , tt
 
-  -- The position a row lies one label under.
-  dropLast : Path → Path
-  dropLast []           = []
-  dropLast (_ ∷ [])     = []
-  dropLast (x ∷ y ∷ ys) = x ∷ dropLast (y ∷ ys)
-
-  dropLast-snoc : ∀ ps a → dropLast (ps ++ [ a ]) ≡ ps
-  dropLast-snoc []           a = refl
-  dropLast-snoc (x ∷ [])     a = refl
-  dropLast-snoc (x ∷ y ∷ ys) a = cong (x ∷_) (dropLast-snoc (y ∷ ys) a)
-
-  initP : Pos → Pos
-  initP (i ∙ ps) = i ∙ dropLast ps
-
-  initP-snoc : ∀ q a → initP (q ⊕ [ a ]) ≡ q
-  initP-snoc (i ∙ ps) a = cong (i ∙_) (dropLast-snoc ps a)
 
   -- Instants are convex: between two rows of one instant, that instant.
   between : ∀ {m f l} → m ≺ f → f ≺ l → instantOf l ≡ instantOf m → instantOf f ≡ instantOf m
@@ -609,15 +593,15 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     live′ (inj₂ (cut tk nk nf i ul lb refl refl)) _ = Q.live-cut (firstQ tk nk nf i ul) (lab-plain lb)
 
     bk′ : Pos → List Pos
-    bk′ l = C.bk l ++ L.map (λ k → k ⊕ [ ix 0 ]) (C.bk (initP l)) ++ L.map (λ k → k ⊕ [ last ]) (C.bk (initP l))
+    bk′ l = C.bk l ++ L.map (λ k → k ⊕ [ ix 0 ]) (C.bk (parent l)) ++ L.map (λ k → k ⊕ [ last ]) (C.bk (parent l))
 
     in-bk′ : ∀ {k l} → Img′ k l → k ∈ bk′ l
     in-bk′ (inj₁ (i , _)) = ∈-++⁺ˡ (C.in-bk i)
     in-bk′ (inj₂ (cut {k₀} {l₀} _ _ _ i _ (inj₁ (refl , _)) refl refl)) =
-      ∈-++⁺ʳ (C.bk (l₀ ⊕ [ ix 0 ])) (∈-++⁺ˡ (∈-map⁺ (λ k → k ⊕ [ ix 0 ]) (subst (λ z → k₀ ∈ C.bk z) (sym (initP-snoc l₀ (ix 0))) (C.in-bk i))))
+      ∈-++⁺ʳ (C.bk (l₀ ⊕ [ ix 0 ])) (∈-++⁺ˡ (∈-map⁺ (λ k → k ⊕ [ ix 0 ]) (subst (λ z → k₀ ∈ C.bk z) (sym (parent-snoc l₀ (ix 0))) (C.in-bk i))))
     in-bk′ (inj₂ (cut {k₀} {l₀} _ _ _ i _ (inj₂ refl) refl refl)) =
-      ∈-++⁺ʳ (C.bk (l₀ ⊕ [ last ])) (∈-++⁺ʳ (L.map (λ k → k ⊕ [ ix 0 ]) (C.bk (initP (l₀ ⊕ [ last ]))))
-        (∈-map⁺ (λ k → k ⊕ [ last ]) (subst (λ z → k₀ ∈ C.bk z) (sym (initP-snoc l₀ last)) (C.in-bk i))))
+      ∈-++⁺ʳ (C.bk (l₀ ⊕ [ last ])) (∈-++⁺ʳ (L.map (λ k → k ⊕ [ ix 0 ]) (C.bk (parent (l₀ ⊕ [ last ]))))
+        (∈-map⁺ (λ k → k ⊕ [ last ]) (subst (λ z → k₀ ∈ C.bk z) (sym (parent-snoc l₀ last)) (C.in-bk i))))
 
     -- A skip carried into its instant keeps a carrier: its own, before
     -- the failure, or the end cut under the first failing value.

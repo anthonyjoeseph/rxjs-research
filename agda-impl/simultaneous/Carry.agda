@@ -52,7 +52,7 @@ import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-inside;
-  inside-⊑; ∙-inj)
+  inside-⊑; ∙-inj; InvAt)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
@@ -742,7 +742,7 @@ listed↓ (coldAt _ ∷ ρ) xy R       = listed↓ ρ xy R
 
 -- A connect's binder: the source, read hot past the connect at `at` in
 -- the plain run and at `at′` annotated in the elaborated, carried along
--- the map.
+-- the map, each reading keeping the invariant.
 record Bound (M₀ : PMap) (LP : Pos → Set) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
     {Θ Θ′}  : List Set
@@ -755,6 +755,8 @@ record Bound (M₀ : PMap) (LP : Pos → Set) {X : Set} (d : Den X) (d′ : Den 
     lists   : ∀ {q} → LP q → HotsListed envP q
     carried : CarryAt annValues M₀ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx m src envP) (at ⊕ [ ix 1 ]))
                 (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])) (at ⊕ [ ix 1 ]) (at′ ⊕ [ ix 1 ])
+    invP    : InvAt (Hots envP) (at ⊕ [ ix 1 ]) (enter (approx m src envP) (at ⊕ [ ix 1 ]))
+    invE    : InvAt (Hots envE) (at′ ⊕ [ ix 1 ]) (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ]))
     isP     : d ≡ hot (Proper (enter (approx m src envP) (at ⊕ [ ix 1 ])))
     isE     : d′ ≡ hot (Proper (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])))
 

@@ -11,7 +11,8 @@ module simultaneous.Readings where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Product using (_×_; _,_)
-open import denotation.Position using (Pos; Instant; _∙_) renaming (instant to instantᵖ)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import denotation.Position using (Pos; Instant; _∙_; _⊕_) renaming (instant to instantᵖ)
 open import simultaneous.InstEmit using (InstEmit; valuesOf)
 
 open InstEmit using (instant)
@@ -39,3 +40,15 @@ closed true  xs           = xs
 closed false []           = []
 closed false (x ∷ [])     = []
 closed false (x ∷ y ∷ xs) = x ∷ closed false (y ∷ xs)
+
+closed-snoc : ∀ {X : Set} (xs : List X) a → closed false (xs ++ a ∷ []) ≡ xs
+closed-snoc []           a = refl
+closed-snoc (x ∷ [])     a = refl
+closed-snoc (x ∷ y ∷ xs) a = cong (x ∷_) (closed-snoc (y ∷ xs) a)
+
+-- A position's parent, one label up.
+parent : Pos → Pos
+parent (i ∙ ps) = i ∙ closed false ps
+
+parent-snoc : ∀ (y : Pos) l → parent (y ⊕ (l ∷ [])) ≡ y
+parent-snoc (i ∙ ps) l = cong (i ∙_) (closed-snoc ps l)

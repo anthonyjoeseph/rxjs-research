@@ -141,7 +141,7 @@ carry-grow sub c = record
 env-grow : ∀ {Γ Δ} {M M′ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
          → M ⊆ᴹ M′ → EnvRel M ρ envP envE → EnvRel M′ ρ envP envE
 env-grow sub er i = record { m = m ; src = src ; σ = σ ; envP = envP ; envE = envE ; at = at ; at′ = at′
-                            ; lists = lists ; carried = carry-grow sub carried ; isP = isP ; isE = isE }
+                            ; lists = lists ; carried = carry-grow sub carried ; invP = invP ; invE = invE ; isP = isP ; isE = isE }
   where open Bound (er i)
 
 ------------------------------------------------------------------------
