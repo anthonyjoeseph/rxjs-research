@@ -650,6 +650,16 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
 -- do, under every approximant.
+--
+-- DEAD ROUTE: a takeWhile carried by its source's carry, the first
+--   failing value's fail and end put one label under it and under its
+--   carrier.  The map grown there stays an order embedding only if no
+--   pair lies strictly under a source value row.  The block is `place`
+--   and `cause`: an elaborated row before the failure, in the failing
+--   instant, may be placed or caused by the source at a row the failure
+--   hides.  Its replacement is the first failing value, which the source,
+--   not listed, holds only classically, while both fields name a plain
+--   position outright.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
