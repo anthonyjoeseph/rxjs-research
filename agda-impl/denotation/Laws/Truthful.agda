@@ -40,15 +40,14 @@ open import denotation.Laws.ConnectNe using (Causal)
 open import denotation.Laws using (from; inv-approx; good-cons; causal-at)
 open import denotation.Laws.Truth using (Finite; Rel; Safe; few-ag; safe-ag; spin-truth; truth-finite; truth-lies; placed-refl; Placed)
 open import denotation.Laws.Truth.Ops using (defer-truth; map-truth; scan-truth; take-truth)
+open import denotation.Laws.Truth.Flat using (flat-truth)
+open import denotation.Laws.ShowsEv using (sk-approx)
 
 -- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
 -- against the next.  A connect's body is read against its next under ONE
 -- handle, and across the two handles by causality (`Causal`), as the
 -- order modulus is (`settle`).
 postulate
-  flat-truth    : ∀ {A B H} (op : FlatOp) {f f′ : A → Den B} {s s′ : Den A}
-                → InvD H s → InvD H s′ → (∀ a → InvD H (f a)) → (∀ a → InvD H (f′ a))
-                → Rel H s s′ → (∀ a → Rel H (f a) (f′ a)) → Rel H (Op.flatMap op f s) (Op.flatMap op f′ s′)
   connect-truth : ∀ {A B H} {s s′ : Den A} {F F′ : Den A → Den B}
                 → InvD H s → InvD H s′
                 → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F′ (hot t)))
@@ -75,6 +74,7 @@ truth n       (takeWhile i k s) ρ g =
   take-truth i k {approx n s ρ} {approx (suc n) s ρ} (inv-approx n s ρ g) (inv-approx (suc n) s ρ g) (truth n s ρ g)
 truth n       (flatMap op f s)  ρ g =
   flat-truth op (inv-approx n s ρ g) (inv-approx (suc n) s ρ g) (λ a → inv-approx n (f a) ρ g) (λ a → inv-approx (suc n) (f a) ρ g)
+    (λ m q okq → sk-approx m n s ρ g q okq) (λ m a q okq → sk-approx m n (f a) ρ g q okq)
     (truth n s ρ g) (λ a → truth n (f a) ρ g)
 truth n       (connect s b)     ρ g =
   connect-truth {s = approx n s ρ} {approx (suc n) s ρ} {λ h → approx n b (h ∷ ρ)} {λ h → approx (suc n) b (h ∷ ρ)}
