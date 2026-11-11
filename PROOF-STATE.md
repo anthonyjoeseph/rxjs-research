@@ -34,11 +34,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE HEARD PIN
 
-Untried: a hot row past a reader's subscription that its carry puts
+Probed: a hot row past a reader's subscription that its carry puts
 into its instant (`PB`) has its carrier past the elaborated
-subscription, joined there and listed. Suspect: nothing orders a `PB`
-carrier the way `ext` orders an image. Settled by that order, or by a
-connect whose elaborated pin falls before the subscription.
+subscription, live and listed. Suspect: a pin's carrier can trail
+values carried after it, so its listing is not the plain one's.
+Settled by a carrier for the heard skip found constructively, or a
+connect whose elaborated pin the elaborated reader never reaches.
 
 Members: `pb-heard`.
 
@@ -52,8 +53,7 @@ children, then a concat's queued lane. Settled when each former's leaf
 is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`,
-`read-post`, `reader-emb`, `reader-within`, `reader-bare`,
-`reader-joins`.
+`read-post`.
 
 #### THE PROTOCOL
 
