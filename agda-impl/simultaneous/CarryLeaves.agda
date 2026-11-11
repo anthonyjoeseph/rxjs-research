@@ -1,7 +1,7 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE LEAVES CARRY: rows one label under each subscription (`of`, the
--- empty program), and the wrapper over the elaborated core.
+-- empty program).
 module simultaneous.CarryLeaves where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Bool.Properties using (T?)
 open import denotation.Position using (_<ᵖ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.Bool using (T)
 open import Function using (mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
@@ -25,14 +25,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (empty; of; map)
 open import denotation.Position using (_≟ᵖ_; Pos; Path; Label; ix; last; _∙_; _⊕_; root; cmpPath; cmpPos; isLt)
 open import denotation.Simultaneity using (reflˡ; reflⁱ)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; enter; Few; _≺_; approx; Truncate; Reach;
-  InE; at-end; at-out; on-out)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; Truncate; Reach; InE; at-end;
+  at-out; on-out)
 import denotation.Events as Evs
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.HeldMap using (mapEv)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (here; inW; step; Plain; plain-ix; plain-last; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-≼; ⊑-trans; ⊑-snoc⁺)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
@@ -248,6 +248,8 @@ private
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; PB      = λ _ _ → ⊥
       ; pb-few  = λ _ → [] , λ ()
+      ; pb-img  = λ ()
+      ; pb-past = λ ()
       ; pinned  = λ {_} {r} tk _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
@@ -279,16 +281,6 @@ carry-empty n ρ = carry λ envP envE _ _ M₀ e₀ er jn _ p p′ m₀ _ _ nh f
 -- the first lane of its concat and the first of its merge.
 coreAt : Pos
 coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
-
--- THE WRAPPER CARRIES THE CORE, at each approximant: the subscribe mark merged in, the
--- completion concatenated, the restamp, each rides in the core's instants
--- and shows nothing, and the whole ends where the core does.
-postulate
-  carry-wrap : ∀ n {A} (o : SObs [] A) {M} → Emb M → M root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root)
-                 (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root)
-                 (enter (approx n (elaborate (plain o)) []) root) root root
 
 -- The plain run's subscription paired with the core's: one pair, in
 -- neither world.

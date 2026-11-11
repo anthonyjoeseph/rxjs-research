@@ -32,27 +32,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE HEARD PIN
-
-Probed: a hot row past a reader's subscription that its carry puts
-into its instant (`PB`) has its carrier past the elaborated
-subscription, live and listed. Suspect: a pin's carrier can trail
-values carried after it, so its listing is not the plain one's.
-Settled by a carrier for the heard skip found constructively, or a
-connect whose elaborated pin the elaborated reader never reaches.
-
-Members: `pb-heard`.
-
 #### THE ERASURE
 
-Probed, unproven: at each approximant, each former's elaborated run
-carries its plain one (`Carry`), extending an order embedding of
-positions over its own worlds; the meaning is reached through
-`never-lies`, never carried. Riskiest: the embedding past a former's
-children, then a concat's queued lane. Settled when each former's leaf
-is a body.
+Suspected false: `wrap-merge` under a synchronous hang past the core's
+end — plain ends, the merge's end lies past infinitely many rows (rxjs
+agrees), so the spec's completion clause fails too; awaits Anthony's
+ruling. Otherwise probed, unproven: each former's elaborated run
+carries its plain one (`Carry`) along an order embedding. Settled when
+each former's leaf is a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`.
+Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-merge`, `wrap-concat`.
 
 #### THE PROTOCOL
 

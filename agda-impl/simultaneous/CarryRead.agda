@@ -44,7 +44,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (few-¬¬listed)
-open import simultaneous.Carry using (PMap; CarryAt; annValues; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near)
+open import simultaneous.Carry using (PMap; CarryAt; annValues; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
 open import simultaneous.ReadRows using (module Rows; step-just; step-none; of-shown; of-marks; up; up-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; joinStep)
@@ -229,6 +229,8 @@ private
       ; ext     = λ { (l , i , p) → let (y , my , yl) = ext i in y , my , ⊑-trans yl (hang-⊑ (pt-hang p)) }
       ; PB      = PB′
       ; pb-few  = pb-few′
+      ; pb-img  = λ { (_ , pb , _) (_ , i , _) → pb-img pb i }
+      ; pb-past = λ { (_ , pb , p , (_ , x)) tk lv _ m xk nxk → ahead-over (pb-past pb tk lv x m xk nxk) (hang-⊑ (pt-hang p)) }
       ; img     = img′
       ; img¬¬   = img¬¬′
       ; shown   = λ y sh lv fw → shown′ (proj₁ y) sh lv fw
