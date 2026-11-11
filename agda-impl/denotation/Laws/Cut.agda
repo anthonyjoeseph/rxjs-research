@@ -176,10 +176,11 @@ private
   spin-at : ∀ {A} {p k} {e : Ev A} (x : Spin p k e) j → j ≤ spinIx x → Σ Pos λ k′ → Σ (Ev A) λ e′ → Σ (Spin p k′ e′) λ z → spinIx z ≡ j
   spin-at {p = p} (spin i) j _ = p ⊕ [ ix j ] , skip , spin j , refl
 
-  module SpinB {A : Set} (p : Pos) = Bound {A} (Spin p) spinIx (λ { (spin i) (spin j) lt → ix-asc p lt }) spin-flat spin-at
-
   module ColdB {A : Set} (c : Timeline A) (p : Pos) (rp : Real p) (flat : ∀ {k e l ys e′} → InE (start p (timelineAt c p)) k e → InE (start p (timelineAt c p)) (k ⊕ (l ∷ ys)) e′ → ⊥) =
     Bound {A} (InE (start p (timelineAt c p))) depth (cold-asc p (timelineAt c p) rp) flat row-at
+
+-- A spin's rows, counted by index.
+module SpinB {A : Set} (p : Pos) = Bound {A} (Spin p) spinIx (λ { (spin i) (spin j) lt → ix-asc p lt }) spin-flat spin-at
 
 -- Cut past `m + 1` rows, a cold stream is within `m`.
 coldN-ne : ∀ {A H m N} (c : Timeline A) → suc (suc m) ≤ N → coldN N c ≈ᶜ⟨ Ok H ∣ m ⟩ Op.cold c

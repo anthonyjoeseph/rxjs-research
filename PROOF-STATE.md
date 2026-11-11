@@ -18,7 +18,7 @@ source rows past the body's end are hidden and whose pins skip infinite
 runs; then the joiners. Settled when each leaf is a body.
 
 Members: `connect-truth`, `flat-truth`, `take-truth`, `defer-truth`,
-`spin-truth`, `scan-truth`, `map-truth`.
+`scan-truth`, `map-truth`.
 
 ## Tier 0 — adequacy
 

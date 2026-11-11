@@ -22,8 +22,10 @@ open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 import Data.List.Relation.Unary.Any as Any
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using (m≤m+n)
+open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat.Properties using (m≤m+n; ≤-refl; n≮n; m≤n⇒m<n∨m≡n)
+open import Data.Unit using (tt)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
@@ -35,13 +37,14 @@ open import Data.Bool using (Bool)
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; _∙_; ix; sub; last; instant; _⊕_)
 open import denotation.Events using (Timeline; ix-<; <ᵖ-part; <ᵖ-below; <ᵖ-apart)
-open import denotation.EmissionSet using (Ev; EmissionSet; Den; hot; DenEnv; Few; Dep; Silent; _≺_; _≼_; enter; approx; ⟦_⟧; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; hot; DenEnv; Few; Dep; Reach; Truncate; Silent; hush; Spin; spin; DeferT; guard; body; _≺_; _≼_; enter; approx; ⟦_⟧; module Op)
 open import denotation.Read using (Visible; loud)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; AgreeTo-trans; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-split; ≺-irrefl; ≺-trans; ticks)
 open import denotation.Laws.Count using (Cov; ag-cnt; ⊑?)
-open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑)
+open import denotation.Laws.Cut using (module SpinB; spinIx; ix-back)
 open import denotation.Laws.ConnectNe using (Causal)
-open import denotation.Laws using (from; inv-approx; good-cons; causal-at)
+open import denotation.Laws using (from; inv-approx; good-cons; causal-at; aft)
 
 -- `x` opens its instant: no row of it lies before.
 Opens : ∀ {A} → EmissionSet A → Pos → Set
@@ -179,12 +182,77 @@ truth-refl = record
 Rel : ∀ {A} → (Pos → Set) → Den A → Den A → Set₁
 Rel H d d′ = ∀ p → Ok H p → Truth (enter d p) (enter d′ p)
 
--- EACH OPERATOR KEEPS THE TRUTH: a cut `defer` against its unfolding, and
--- every operator over children each against the next.  A connect's body
--- is read against its next under ONE handle, and across the two handles
--- by causality (`Causal`), as the order modulus is (`settle`).
+------------------------------------------------------------------------
+-- A cut against its unfolding
+
+private
+  -- The spin's rows before its `i`-th.
+  spins : Pos → ℕ → List Pos
+  spins p zero    = []
+  spins p (suc i) = (p ⊕ [ ix i ]) ∷ spins p i
+
+  spins-∈ : ∀ p {i j} → j < i → (p ⊕ [ ix j ]) ∈ spins p i
+  spins-∈ p {suc i} {j} (s≤s le) with m≤n⇒m<n∨m≡n le
+  ... | inj₁ lt   = there (spins-∈ p lt)
+  ... | inj₂ refl = here refl
+
+  spin-reach : ∀ {A} p i → Reach (Spin {A} p) (p ⊕ [ ix i ]) skip
+  spin-reach p i = spins p i , λ { (spin j) lt _ → spins-∈ p (ix-back p lt) }
+
+  -- Past the whole spin, endlessly many rows before.
+  endless : ∀ {A} p {x} → (∀ i → (p ⊕ [ ix i ]) ≺ x) → ¬ Few (Truncate (Spin {A} p)) x
+  endless {A} p after (ks , h) = n≮n (length ks) (SpinB.bound {A} p (spin (suc (length ks))) (suc (length ks)) ks ≤-refl cov)
+    where
+      cov : ∀ {k e} (y : Spin p k e) → spinIx y < suc (length ks) → Any (k ⊑_) ks
+      cov (spin j) _ = Any.map (λ { refl → ⊑-refl _ }) (h (spin j , spin-reach p j) (after j))
+
+-- A CUT IS ITS SPIN: the unfolding's guard is the spin's first row, and
+-- its body lies at or past the second, which every row past it waits on.
+spin-truth : ∀ {A H} {d : Den A} → InvD H d → Rel H Op.⊥ (Op.defer d)
+spin-truth {A} {H} {d} inv p ok = record
+  { Cut     = _≡ p
+  ; silent  = λ { refl _ (spin _ , _) → hush }
+  ; start   = λ { refl → p ⊕ [ ix 0 ] , skip , ⊑-refl _ , spin 0 , spin-reach p 0 }
+  ; blocked = λ { refl after F _ _ → endless p after F }
+  ; agree   = λ q e c → to c , back c
+  }
+  where
+    b₀ : Pos
+    b₀ = p ⊕ [ ix 1 ]
+
+    guarded : Reach (DeferT d p) (p ⊕ [ ix 0 ]) skip
+    guarded = [] , λ { guard lt _ → ⊥-elim (≺-irrefl {p ⊕ [ ix 0 ]} lt)
+                     ; (body {y} x) lt _ → ⊥-elim (proj₁ (aft d inv p ok x) (≺-trans {y} {p ⊕ [ ix 0 ]} {b₀} lt (ticks p 0))) }
+
+    to : ∀ {q e} → Clean (_≡ p) (Truncate (Spin p)) q e → Truncate (Spin p) q e → Truncate (DeferT d p) q e
+    to _        (spin zero , _)    = guard , guarded
+    to (nl , _) (spin (suc j) , _) = ⊥-elim (nl (p , refl , j , ⊑-refl _))
+
+    back : ∀ {q e} → Clean (_≡ p) (Truncate (Spin p)) q e → Truncate (DeferT d p) q e → Truncate (Spin p) q e
+    back _ (guard , _) = spin 0 , spin-reach p 0
+    back {q} {e} (nl , ks , h) (body x , _) = waits (aft d inv p ok x)
+      where
+        under : b₀ ⊑ q → ⊥
+        under l = nl (p , refl , 0 , l)
+
+        dep : ∀ {e′} → (∀ {r} → e′ ≡ pin r → b₀ ≼ r) → Dep q e′ b₀ skip
+        dep {e′ = out _} _ = tt
+        dep {e′ = skip}  _ = tt
+        dep {e′ = end}   _ = tt
+        dep {e′ = pin r} br i with ≼-split {b₀} {r} (br refl)
+        ... | inj₁ lt   = inj₁ lt
+        ... | inj₂ refl = ⊥-elim (under (inside-⊑ b₀ q i))
+
+        waits : b₀ ≼ q × (∀ {r} → e ≡ pin r → b₀ ≼ r) → Truncate (Spin p) q e
+        waits (bq , br) with ≼-split {b₀} {q} bq
+        ... | inj₂ refl = ⊥-elim (under (⊑-refl _))
+        ... | inj₁ lt   = ⊥-elim (proj₂ (h (spin 1 , spin-reach p 1) lt (dep br)) (p , refl , 0 , ⊑-refl _))
+
+-- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
+-- against the next.  A connect's body is read against its next under ONE
+-- handle, and across the two handles by causality (`Causal`), as the
+-- order modulus is (`settle`).
 postulate
-  spin-truth    : ∀ {A H} {d : Den A} → InvD H d → Rel H Op.⊥ (Op.defer d)
   defer-truth   : ∀ {A H} {d d′ : Den A} → InvD H d → InvD H d′ → Rel H d d′ → Rel H (Op.defer d) (Op.defer d′)
   map-truth     : ∀ {A B H} (f : A → B) {s s′ : Den A} → Rel H s s′ → Rel H (Op.map f s) (Op.map f s′)
   scan-truth    : ∀ {A B H} (f : B → A → B) z {s s′ : Den A} → Rel H s s′ → Rel H (Op.scan f z s) (Op.scan f z s′)
