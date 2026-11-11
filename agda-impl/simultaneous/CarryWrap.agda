@@ -178,6 +178,13 @@ module Restamp {X : Set} (d : Den (IE X)) (p′ : Pos) {H : Pos → Set} (Iu : I
 -- THE CONCAT CARRIES THE MERGE: the completion mark's lane is queued
 -- until the merge ends and subscribed past it, so the end moves past the
 -- mark; every other row stays where the merge's was.
+--
+-- SUSPECTED FALSE, the merge's end: a core ending and then hanging
+-- synchronously (a connect whose body ends before its source's endless
+-- subscribe burst, each source row a pin past the core's end) ends in
+-- plain, but the merge ends past the subscribe lane, which the hang
+-- keeps from subscribing: past infinitely many rows, so no carrier of
+-- the plain end is listed.  Real rxjs agrees on both sides.
 postulate
   wrap-merge  : ∀ n {A} (o : SObs [] A) → Wrapped n o (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) coreAt
               → Wrapped n o (enter (approx n (sourced o) []) mAt) mAt

@@ -32,25 +32,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE HEARD PIN
-
-Probed: a hot row past a reader's subscription carried into its
-instant (`PB`) has its annotated carrier past the elaborated
-subscription. No field orders a `PB` carrier against the map, and one
-read negatively is kept by `carry-grow` only given where grown points
-lie. Settled by `PB` placed against the map, or a carrier past the
-subscription by instant.
-
-Members: `pb-order`.
-
 #### THE ERASURE
 
-Probed, unproven: at each approximant, each former's elaborated run
-carries its plain one (`Carry`), extending an order embedding of
-positions over its own worlds; the meaning is reached through
-`never-lies`, never carried. Riskiest: the embedding past a former's
-children, then a concat's queued lane. Settled when each former's leaf
-is a body.
+Suspected false: `wrap-merge` under a synchronous hang past the core's
+end — plain ends, the merge's end lies past infinitely many rows (rxjs
+agrees), so the spec's completion clause fails too; awaits Anthony's
+ruling. Otherwise probed, unproven: each former's elaborated run
+carries its plain one (`Carry`) along an order embedding. Settled when
+each former's leaf is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-merge`, `wrap-concat`.
 

@@ -33,7 +33,7 @@ open import Data.Bool.Properties using (T?)
 open import Relation.Nullary using (yes; no; Dec)
 open import denotation.Position using (_<ᵖ_)
 open import denotation.Laws.Modulus using (≼-split)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool using (T)
 open import Function using (_⇔_; mk⇔; Equivalence)
@@ -51,7 +51,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
   _≺_; _≼_; approx; module Op)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-≼-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-inside;
   inside-⊑; ∙-inj; InvAt)
 open import simultaneous.SObs using (module Elaborate)
@@ -115,6 +115,19 @@ apart {i ∙ p} {j ∙ q} () np σ σ′ | gt
 
 instant-⊕ : ∀ x zs → instantOf (x ⊕ zs) ≡ instantOf x
 instant-⊕ (i ∙ p) zs = refl
+
+-- Before a position and not above it: before everything under it, and
+-- so is everything under the first.
+Ahead : Pos → Pos → Set
+Ahead y l = y ≺ l × ¬ (y ⊑ l)
+
+ahead-under : ∀ {y y′ l} → Ahead y l → y ⊑ y′ → Ahead y′ l
+ahead-under {y} {l = l} (yl , n) (σ , refl) =
+  subst ((y ⊕ σ) ≺_) (⊕-identityʳ l) (apart yl n σ []) , λ yl′ → n (⊑-trans (σ , refl) yl′)
+
+ahead-over : ∀ {y l l′} → Ahead y l → l ⊑ l′ → Ahead y l′
+ahead-over {y} {l} {l′} (yl , n) ll =
+  ≺-≼-≺ {y} {l} {l′} yl (⊑-≼ ll) , λ yl′ → [ n , (λ ly → ⊑-≼ {l} {y} ly yl) ]′ (⊑-cmp y l yl′ ll)
 
 _∪ᴹ_ : PMap → PMap → PMap
 (M ∪ᴹ N) x y = M x y ⊎ N x y
@@ -323,6 +336,11 @@ IntoAt {Y} Img u PB HP s k =
 -- classically (`img¬¬`), a row needs only few rows before it: what
 -- reading back past a carrier asks of each earlier row.
 --
+-- A ROW CARRIED INTO ITS INSTANT (`PB`) HAS NO CARRIER IN ORDER, and its
+-- carrier lies past, and apart from, the image of every point before it
+-- and not above it: a pin is carried late, never early.  A reader's
+-- subscription is such a point for the hot rows past it.
+--
 -- A ROW OF `u` IS PLACED FROM ITS LISTING, by a carrier near it: at or
 -- before it, or listed up to.  `u` HAS FEW ROWS IN ALL when `t` and the
 -- environment do and `t` has no end: a row past a carrier is not listed
@@ -348,6 +366,8 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
     PB      : Pos → Pos → Set
     pb-few  : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
+    pb-img  : ∀ {k l l′} → PB k l → Img k l′ → ⊥
+    pb-past : ∀ {k l e₀ e x y} → PB k l → t k e₀ → Live t k → u l e → M x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     img     : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → LP k
             → (Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Listed u l × Match Every (One f) (Reads f) e e′)
               ⊎ (e ≡ skip × IntoAt Img u PB HP s k)
@@ -555,7 +575,9 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
     ; whole = λ wt ne lp → U.whole→ (whole (T.whole← wt) (T.ended← ne) lp)
-    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′ }
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′
+    ; pb-img = pb-img
+    ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (T.live← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (down′ ul))) }
 
 ------------------------------------------------------------------------
 -- A map

@@ -369,7 +369,9 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; live = λ {k} {l} i lv → UL.live→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
     ; whole = λ wt ne lp → UL.whole→ (whole (wholeS← wt) (endedS← ne) lp)
-    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′ }
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
+    ; pb-img = pb-img
+    ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (liveS← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (downU s₁))) }
 
 ------------------------------------------------------------------------
 -- The former

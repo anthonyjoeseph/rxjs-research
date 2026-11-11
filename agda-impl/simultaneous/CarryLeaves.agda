@@ -248,6 +248,8 @@ private
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; PB      = λ _ _ → ⊥
       ; pb-few  = λ _ → [] , λ ()
+      ; pb-img  = λ ()
+      ; pb-past = λ ()
       ; pinned  = λ {_} {r} tk _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
