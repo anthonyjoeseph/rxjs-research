@@ -10,15 +10,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TRUTHFUL APPROXIMANTS
 
-Untried: an approximant stops short at a cut `defer` and nowhere
-else — up to a row it shows, or an instant's first row, with few
-before, it is the meaning; with few rows in all, it is all of it.
-Lies sit only in a spin's instant past its first row. Position-only
-invariants fail at a connect whose source spins under burst pins, so
-the induction must say which source cuts each operator reads. Settled
-when both are bodies by induction on the program.
+Untried: each approximant is the next past its cuts (`Truth`) — a cut
+spins silent, shows nothing before a few-bounded point past it, and
+every row past its first comes with one under its first. Open: which
+cuts an open program carries from its environment — a body reading a
+hot handle late meets its source's cut with no row of its own. Settled
+when `truth` is a body by induction on the program.
 
-Members: `never-lies`, `finite-true`.
+Members: `truth`.
 
 ## Tier 0 — adequacy
 

@@ -165,7 +165,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
 
   -- A row an approximant shows: the meaning's, its past too.
   up : ∀ n {q e} → tₙ n q e → Visible e → AgreeTo q (tₙ n) t
-  up n x v = never-lies n s [] (λ ()) root ok₀ (enter-few (approx n s []) root x (visible-unpinned v)) (inj₂ (_ , x , v))
+  up n x v = never-lies s [] (λ ()) root ok₀ n (enter-few (approx n s []) root x (visible-unpinned v)) (inj₂ (_ , x , v))
 
   -- A value's row, either way.
   value-down : ∀ {B : Set} (f : A → List B) {i k a} → Nth (V f t) i k a → Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k t (tₙ m)
@@ -225,7 +225,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
           F₁′ = proj₁ F₁ , λ {k} x kf → proj₂ F₁ x (≺-≼-≺ {k} {f₁} {k₁} kf fk₁)
 
           ag₁ : AgreeTo f₁ (tₙ n) t
-          ag₁ = never-lies n s [] (λ ()) root ok₀ F₁′ (inj₁ opens)
+          ag₁ = never-lies s [] (λ ()) root ok₀ n F₁′ (inj₁ opens)
 
           sn₁ : Seen (tₙ n) f₁ e′
           sn₁ = (xf , λ {c} xc → ≼-trans {f₁} {k₁} {c} fk₁ (pr₁ xc)) , F₁′
@@ -243,7 +243,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
     inj₂ (ks , λ {k} x qk → proj₁ (h (proj₂ eq x) qk) , proj₁ (upto (proper-ag {Q = k} ⟨ (λ {y} {e} _ → eq {y} {e}) ⟩) {k} (≼-refl {k})) (proj₂ (h (proj₂ eq x) qk)))
     where
       eq : ∀ {y e} → (tₙ n y e → t y e) × (t y e → tₙ n y e)
-      eq = finite-true n s [] (λ ()) root ok₀ (finite-of (enter-few (approx n s []) root tq tt) (λ x qk → proj₁ (h x qk)))
+      eq = finite-true s [] (λ ()) root ok₀ n (finite-of (enter-few (approx n s []) root tq tt) (λ x qk → proj₁ (h x qk)))
 
 ------------------------------------------------------------------------
 -- The erasure at each approximant
