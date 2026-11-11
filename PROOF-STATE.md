@@ -8,6 +8,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE TRUTHFUL APPROXIMANTS
+
+Untried: an approximant stops short at a cut `defer` and nowhere
+else — up to a row it shows, or an instant's first row, with few
+before, it is the meaning; with few rows in all, it is all of it.
+Lies sit only in a spin's instant past its first row. Position-only
+invariants fail at a connect whose source spins under burst pins, so
+the induction must say which source cuts each operator reads. Settled
+when both are bodies by induction on the program.
+
+Members: `never-lies`, `finite-true`.
+
 ## Tier 0 — adequacy
 
 **Adequacy:** what the pure semantics shows is what a reader of the emission set meets, row by row.
@@ -34,16 +46,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Probed, unproven: each former's elaborated run carries its plain one
-(`Carry`), extending an order embedding of positions over its own worlds.
-Most open: a `defer`'s meaning, the approximants' limit — their carries
-choose map and image each on its own, so the statement must make them
-cohere (or choose them canonically) before the limit is a body. Then the
-embedding past a former's children, and a concat's queued lane.
-Settled when each former's leaf is a body.
+Probed, unproven: at each approximant, each former's elaborated run
+carries its plain one (`Carry`), extending an order embedding of
+positions over its own worlds; the meaning is reached through
+`never-lies`, never carried. Most open: the embedding past a former's
+children, and a concat's queued lane. Settled when each former's leaf
+is a body.
 
 Members: `carry-connect`, `carry-flatMap`, `carry-connected`, `carry-cold`,
-`carry-takeWhile`, `carry-lim`, `carry-wrap`.
+`carry-takeWhile`, `carry-wrap`.
 
 #### THE PROTOCOL
 

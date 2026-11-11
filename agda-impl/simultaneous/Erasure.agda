@@ -31,17 +31,17 @@ open import Data.Bool.Properties using (T?)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Function using (_⇔_; Equivalence)
+open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 open import Relation.Nullary using (Dec; yes; no)
 
-open import denotation.Position using (Pos; root; ix; _≟ᵖ_; _<ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module Values; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Few; _≺_; _≼_; module Values; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
-open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind; entered-reach; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind)
 open import denotation.Laws.Nth using (module Nths)
-open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
+open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; ranked; Rank; values; outs; vals; stampedᴮ; stampedᴰ; carried; Over; Closes; Ends; Erases;
@@ -50,12 +50,8 @@ open import simultaneous.Ranks using (unrank; ranks-x; ranks-e; instant-rank; en
 open import simultaneous.Listing using (Listing; listed)
 open import simultaneous.Layers using (at-func; run-tail; run-++; cursor-snoc; ends-last; snoc-view)
 open import simultaneous.Project using (run-prefix)
-open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Laws.Worlds using (InvAt; ⊑-≼; inside-⊑)
-open import simultaneous.Reach using (module Reached)
-open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
-open import simultaneous.Carry using (Carry; At₀; emb-At₀; fresh-At₀; coreAt; attributed; carry-wrap)
-open import simultaneous.Carried using (carry-⟦⟧)
+open import simultaneous.Attribution using (Live; Single; V; vrow)
+open import simultaneous.Approximants using (VX; VE; single-values; erase-x; erase-e; erase-rank; erase-over; erase-end)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
 open Values using (Nth; Next; first; next)
@@ -262,103 +258,6 @@ outs-picks ((q , out a) ∷ rs) = cong ((q , a) ∷_) (outs-picks rs)
 outs-picks ((q , skip) ∷ rs)  = outs-picks rs
 outs-picks ((q , end) ∷ rs)   = outs-picks rs
 outs-picks ((q , pin _) ∷ rs) = outs-picks rs
-
-------------------------------------------------------------------------
--- The elaborated values and the plain ones, by index
-
--- An elaborated program's values, and its plain program's.
-VX : ∀ {A} → SObs [] A → EmissionSet A
-VX o = V valuesOf (elaborated o)
-
-VE : ∀ {A} → SObs [] A → EmissionSet A
-VE o = V [_] (events o)
-
--- One value or none off each elaborated emit.
-single-values : ∀ {A} → Single {IE A} valuesOf
-single-values (instEmit (value a) _) = inj₂ (a , refl)
-single-values (instEmit (mark _) _)  = inj₁ refl
-
--- A pin waits on every row before its connect.
-pin-few : ∀ {A} (o : SObs [] A) {k p} → events o k (pin p) → Few (events o) p
-pin-few o {k} {p} tk with entered-reach (⟦ plain o ⟧ []) root tk | proj₂ (InvAt.pinned (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) tk)
-... | ks , F | i = ks , λ {x} tx xp → F tx (≺-≼-≺ {x} {p} {k} xp (⊑-≼ (inside-⊑ p k i))) (λ _ → inj₁ xp)
-
--- THE ELABORATION CARRIES THE PLAIN RUN: each unpinned plain row at or
--- before the end is carried by the elaborated row elaborating it, a
--- value by its value and the end by the end, in order, instant for
--- instant.  The elaboration adds no instant and holds no value; switch,
--- exhaust and the bounded queue are the real cases.
---
--- REFUTED: e10449e the ranks agreeing, with a rank counting only instants
---   holding rows: a run with no row in the subscribe frame ranks its
---   values one below its elaboration, whose subscribed mark lies there.
--- DEAD ROUTE: carrying every row, past the ends too.  A connect whose
---   body ends at once puts its source's burst pins past its end in the
---   subscribe frame, and the elaboration's end is that frame's last row:
---   no elaborated row lies past it to carry them in order.
--- DEAD ROUTE: carrying the pins in order.  Concat's elaboration
---   subscribes a queued lane under its own readers, so a pin of a later
---   lane's subscribe can fall past a value the plain run puts after it:
---   no elaborated row carries it in order.  A pin is carried only into
---   its instant, which is all a rank or an exit reads of it.
--- REFUTED: 711567f3 finitely many elaborated rows past every plain row's
---   carrier, outright: a connect whose source is an endless synchronous
---   burst under a silent body leaves endlessly many elaborated rows past
---   each; finitely many follow only a plain row past which finitely many
---   do.
--- REFUTED: 711567f3 every elaborated row put on a plain row or ahead of
---   all: under `connect (of [1]) (λ _ → ones)` a pin lies past endlessly
---   many carriers, so no reader reaches it to put it anywhere; only rows
---   a reader reaches are placed, each in the instant of a carrier.
-erasing : ∀ {A} (o : SObs [] A) → Attribution Every (One valuesOf) (Reads valuesOf) (events o) (elaborated o) root root
-erasing o with Carry.carries (carry-⟦⟧ (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ())
-                 root coreAt (coreAt , (refl , refl) , ([] , refl)) (tt , λ ()) (tt , λ ()) fresh-At₀
-... | M , ms , hm , _ , c =
-  attributed hm (InvAt.flat (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ()))) (InvAt.func (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())))
-    (listed (plain o)) (pin-few o) (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (ms (refl , refl))
-    (carry-wrap o hm (ms (refl , refl)) c)
-
--- A plain row that is not a pin is at or before every end.
-unpinned-live : ∀ {A} (o : SObs [] A) {k e} → events o k e → Unpinned e → Live (events o) k
-unpinned-live o tk up {c} tc ck with InvAt.quiet (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) tc tk ck
-... | r , refl , _ = up
-
-private
-  module Er {A : Set} (o : SObs [] A) =
-    Attributed {A} {IE A} {valuesOf} single-values {events o} {elaborated o}
-      (λ {y} {e} {e′} → at-func (plain o) {y} {e} {e′}) (λ {y} {e} {e′} → at-func (elaborate (plain o)) {y} {e} {e′})
-      (λ {k} {e} → Reached.seen (⟦ plain o ⟧ []) root (inv-⟦⟧ (plain o) [] (λ ()) root (tt , λ ())) {k} {e})
-      (λ {k} {e} → Reached.seen (⟦ elaborate (plain o) ⟧ []) root (inv-⟦⟧ (elaborate (plain o)) [] (λ ()) root (tt , λ ())) {k} {e})
-      (λ {k} {e} → enter-few (⟦ plain o ⟧ []) root {k} {e}) (λ {k} {e} → unpinned-live o {k} {e})
-      (λ {q} → listed (plain o) {q}) (λ {q} → listed (elaborate (plain o)) {q})
-      (erasing o)
-
--- THE I-TH VALUE IS THE I-TH: before each side's end, the elaborated
--- program's i-th value is its plain program's, at the same rank, its
--- instant over exactly when the other's is; and each side reaches an end
--- exactly when the other does.
-erase-x : ∀ {A} (o : SObs [] A) {i k a} → Nth (VX o) i k a → Live (elaborated o) k
-        → Σ Pos λ k′ → Nth (VE o) i k′ a × Live (events o) k′
-erase-x o = Er.values-ut o
-
-erase-e : ∀ {A} (o : SObs [] A) {i k′ a} → Nth (VE o) i k′ a → Live (events o) k′
-        → Σ Pos λ k → Nth (VX o) i k a × Live (elaborated o) k
-erase-e o = Er.values-tu o
-
-erase-rank : ∀ {A} (o : SObs [] A) {i k k′ a b n} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
-           → Rank (elaborated o) k n → Rank (events o) k′ n
-erase-rank o {n = n} nx lx ne _ r with Er.nth-ut o nx
-... | k₀ , ak , nk = subst (λ q → Rank (events o) q n) (Nths.nth-fun (VE o) nk ne) (Er.rank-v o nx ak r)
-
-erase-over : ∀ {A} (o : SObs [] A) {i k k′ a b} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
-           → Over valuesOf (elaborated o) (just k) ⇔ Over [_] (events o) (just k′)
-erase-over o nx _ ne _ with Er.nth-ut o nx | Nths.nth-val (VX o) nx | Nths.nth-val (VE o) ne
-... | k₀ , ak , nk | vrow ul fx | vrow tk refl with Nths.nth-fun (VE o) nk ne
-...   | refl = Er.over-ut o ak ul (_ , fx) tk
-
-erase-end : ∀ {A} (o : SObs [] A)
-          → (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) ⇔ (Σ Pos λ c′ → events o c′ end × Live (events o) c′)
-erase-end o = Er.ends o
 
 -- The last values of two runs, of one index.
 data LastRel {A : Set} (o : SObs [] A) : Maybe Pos → Maybe Pos → Set where

@@ -33,11 +33,11 @@ open import denotation.Events using (Events; Timeline; timelineAt; start; ofᴱ)
 open import denotation.Position using (Pos; _<ᵖ_; ix; last; root; _⊕_)
 open import denotation.EmissionSet
   using (out; skip; end; EmissionSet; _≺_; Few; InE; at-out; at-skip; at-end; on-out; on-skip; enter;
-  After; DenEnv; ⟦_⟧; Spin; spin)
-open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; upto)
-open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-trans; AgC-sym)
+  After; DenEnv; ⟦_⟧; approx; Spin; spin)
+open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; ≼-refl; upto)
+open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-sym)
 open import denotation.Laws.Worlds using (⊑-refl)
-open import denotation.Laws using (from)
+open import denotation.Laws.Truthful using (reached; few-ag)
 open import denotation.Laws.ColdInv using (depth)
 open import denotation.Laws.Cut using (Deep; spinIx; capprox; cut-ne)
 import quickcheck.Tabled as Tb
@@ -282,25 +282,31 @@ listC-ok N (suc n) (defer l)         u p = bind-gets (listC-ok N n (Later.force 
 ------------------------------------------------------------------------
 -- A reading's rows, listed
 
--- WHEREVER FINITELY MANY ROWS PRECEDE, THEY ARE LISTED: those of the cut
--- program, before the cut.
+-- Listed rows carry across an agreement up to the cut.
+listed-ag : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → Listed t′ q → Listed t q
+listed-ag {q = q} ag (ks , cover , back) =
+  ks , (λ {k} x kq → cover (proj₁ (upto ag {k} (≺→≼ {k} {q} kq)) x) kq)
+     , λ {k} mk → proj₁ (back mk) , proj₁ (proj₂ (back mk)) , proj₂ (upto ag {k} (≺→≼ {k} {q} (proj₁ (back mk)))) (proj₂ (proj₂ (back mk)))
+
+-- WHEREVER FINITELY MANY ROWS PRECEDE, THEY ARE LISTED: at an
+-- approximant, those of its cut program, before the cut; in the meaning,
+-- those of the approximant that reaches it there.
 -- Sealed: consumers read its type, never its body.
 opaque
-  listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
-  listed {A} o {q} (ks , few) = ks′ , cover , back
+  listedₙ : ∀ {A} n (o : Obs Timeline [] A) → Listing (enter (approx n o []) root)
+  listedₙ {A} n o {q} (ks , few) = ks′ , cover , back
     where
       m : ℕ
       m = length ks
       N : ℕ
       N = suc (suc m)
       t : EmissionSet A
-      t = enter (⟦ o ⟧ []) root
+      t = enter (approx n o []) root
       c : EmissionSet A
-      c = enter (capprox N m o []) root
+      c = enter (capprox N n o []) root
 
       ag : AgC m t c
-      ag = AgC-trans (from m o [] (λ ()) root (tt , λ ()))
-                     (AgC-sym (cut-ne {m = m} {N} ≤-refl m o [] (λ ()) root (tt , λ ())))
+      ag = AgC-sym (cut-ne {m = m} {N} ≤-refl n o [] (λ ()) root (tt , λ ()))
 
       cnt : Cnt m t q
       cnt = ks , ≤-refl , λ x lt → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (few x lt))
@@ -308,13 +314,13 @@ opaque
       agq : AgreeTo q t c
       agq = ag-cnt ag q (inj₁ cnt)
 
-      lc : Gets Uncut (listC N m o [] root)
-      lc = listC-ok N m o tt root
+      lc : Gets Uncut (listC N n o [] root)
+      lc = listC-ok N n o tt root
       L : Tb.Listed A
       L = proj₁ lc
 
       ex : Exact L c
-      ex = listC-exact N m o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
+      ex = listC-exact N n o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
 
       ks′ : List Pos
       ks′ = filter (λ k → T? (k <ᵖ q)) (mapL proj₁ (rows L))
@@ -326,3 +332,7 @@ opaque
       back mk with ∈-filter⁻ (λ k → T? (k <ᵖ q)) {xs = mapL proj₁ (rows L)} mk
       ... | mk′ , kq with ∈-map⁻ proj₁ mk′
       ...   | (k , e) , mr , refl = kq , e , proj₂ (upto agq {k} (≺→≼ {k} {q} kq)) (sound ex mr)
+
+  listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
+  listed o {q} F with reached o [] (λ ()) root (tt , λ ()) F
+  ... | N , ag = listed-ag (ag N ≤-refl) (listedₙ N o (few-ag (ag N ≤-refl) (≼-refl {q}) F))

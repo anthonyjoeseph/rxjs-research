@@ -21,7 +21,6 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -35,14 +34,14 @@ open import Tree using (scan)
 open import denotation.Position using (Pos; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Dep; Few; _≺_; _≼_;
-  Unpinned; module Scan; module Op; ⟦_⟧; approx)
+  Unpinned; module Scan; module Op; approx)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; reach-via; reach-few; few-ind;
   entered-reach)
 open import denotation.Laws.Worlds using (InvAt; full)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Shows using (∈-stable)
-open import denotation.Laws using (inv-⟦⟧; inv-approx)
+open import denotation.Laws using (inv-approx)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark; begin)
 open import simultaneous.HeldMap using (mapEv; module MapRun)
@@ -471,10 +470,7 @@ scan-carry f z d d′ p p′ hm It Iu c =
     module W = MapRun proj₂ (Op.scan (scanIE f) (z , marked begin) d′) p′
 
 carry-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
-carry-scan nothing ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-  in M , ms , hm′ , wi , scan-carry f z (⟦ s ⟧ envP) (⟦ elab ρ s ⟧ envE) p p′ hm′ (inv-⟦⟧ s envP gP p okP) (inv-⟦⟧ (elab ρ s) envE gE p′ okE) c
-carry-scan (just n) ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
+carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
   let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
   in M , ms , hm′ , wi , scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c

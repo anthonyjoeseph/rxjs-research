@@ -2,8 +2,8 @@
 
 -- A `defer` IS CARRIED THROUGH ITS APPROXIMANTS.  The bottom one spins
 -- skips one label under each subscription, each carried by its fellow;
--- each further one is the body under the guard; the meaning is their
--- limit.
+-- each further one is the body under the guard.  The meaning is never
+-- carried: the erasure reaches it from the approximants' per-row facts.
 module simultaneous.CarryDefer where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -12,7 +12,6 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -121,7 +120,7 @@ module SpinCarry {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Po
     }
 
 -- THE BOTTOM APPROXIMANT shows only skips: the spin, on both sides.
-carry-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → Carry (just zero) ρ (defer l)
+carry-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → Carry zero ρ (defer l)
 carry-⊥ {A = A} ρ l = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → spun e₀ fr m₀ pp
   where
     spun : ∀ {HP HE M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
@@ -326,7 +325,7 @@ module NextCarry {A : Set} {HP HE : Pos → Set} {M : PMap} (s : Den A) (s′ : 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by
 -- the guard and the body's subscription, held fresh at the body's.
 carry-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-           → Carry (just n) ρ (Later.force l) → Carry (just (suc n)) ρ (defer l)
+           → Carry n ρ (Later.force l) → Carry (suc n) ρ (defer l)
 carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er p p′ (_ , m₀ , pp) okP okE fr →
   nexted envP envE gP gE M₀ hm er p p′ m₀ pp okP okE fr
   where
@@ -360,29 +359,3 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
         wi′ m with wi m
         ... | inj₁ m₁ = O.within m₁
         ... | inj₂ w  = inj₂ (inW (nest-in (step here plain-ix) w))
-
-------------------------------------------------------------------------
--- The limit
-
--- THE MEANING is the approximants' limit.
---
--- DEAD ROUTE: the limit from the approximants' carries alone.  Each
---   approximant's carry picks its own map and image, existentially; a row
---   of the meaning is a row of every approximant from some index on, but
---   nothing makes their images of it agree from one index to the next, so
---   no image is eventually constant, and the meaning's must be one
---   relation, functional and monotone across rows carried at different
---   indices.  Bounding instead each carry by depth fails at a scan, whose
---   row reads every row before it, at any depth.
--- DEAD ROUTE: images made coherent and nothing more.  An elaborated row is
---   a row of the meaning only where the elaborated approximants agree,
---   and an image's agreement is bounded by no hypothesis here: the
---   elaborated run adds rows (marks, readers' joins) a plain cover does
---   not count.  The bookkeeping (`fib`, `bk`, `pbk`) is one function per
---   approximant, and a cause is read off a row of the meaning at the
---   index its own limit names, so those must cohere across indices too.
---   An image is not fixed by the fields either: a plain skip may sit on
---   any unshown elaborated row of its instant.
-postulate
-  carry-lim : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-            → (∀ n → Carry (just n) ρ (defer l)) → Carry nothing ρ (defer l)

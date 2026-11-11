@@ -24,7 +24,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.All using (lookup; [])
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
@@ -46,7 +46,7 @@ open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_;
-  ⟦_⟧; approx; module Op; Truncate; Reach; InE; at-end; at-out; on-out)
+  approx; module Op; Truncate; Reach; InE; at-end; at-out; on-out)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
@@ -54,15 +54,14 @@ open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; inW; st
   ⊑-cmp; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Relations using (Spent; events; elaborated)
+open import simultaneous.Relations using (Spent)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
-open import simultaneous.HeldComb using (ev)
 open import simultaneous.Attribution using (Live; Shown; Match; Attribution; Every; One; Reads)
 open import denotation.Position using (_≟ᵖ_)
 open import denotation.Laws.Shows using (∈-stable)
 open import simultaneous.Listing using (Listed; Listing)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE; elaborate)
 open Equivalence using (to; from)
 
 ------------------------------------------------------------------------
@@ -615,16 +614,16 @@ annValues (_ , nothing) = []
 record Bound (M₀ : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
     {Θ Θ′}  : List Set
-    m       : Maybe ℕ
+    m       : ℕ
     src     : Obs Timeline Θ X
     σ       : ∀ {Y} → Y ∈ L.map AIE Θ → Y ∈ Θ′
     envP    : DenEnv Θ
     envE    : DenEnv Θ′
     at at′  : Pos
-    carried : CarryAt annValues M₀ (Hots envP) (Hots envE) (enter (ev m src envP) (at ⊕ [ ix 1 ]))
-                (enter (ev m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])) (at ⊕ [ ix 1 ]) (at′ ⊕ [ ix 1 ])
-    isP     : d ≡ hot (Proper (enter (ev m src envP) (at ⊕ [ ix 1 ])))
-    isE     : d′ ≡ hot (Proper (enter (ev m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])))
+    carried : CarryAt annValues M₀ (Hots envP) (Hots envE) (enter (approx m src envP) (at ⊕ [ ix 1 ]))
+                (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])) (at ⊕ [ ix 1 ]) (at′ ⊕ [ ix 1 ])
+    isP     : d ≡ hot (Proper (enter (approx m src envP) (at ⊕ [ ix 1 ])))
+    isE     : d′ ≡ hot (Proper (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])))
 
 EnvRel : ∀ {Γ Δ} → PMap → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → DenEnv Γ → DenEnv Δ → Set₁
 EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (lookup envP i) (lookup envE (ρ (∈-map⁺ AIE i)))
@@ -638,19 +637,19 @@ Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ W⁼ H p x
 -- extends the map over its worlds and carries.
 -- A record, so that a statement about a former is compared by its
 -- arguments, never by the elaborated tree its meaning unfolds to.
-record Carry (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
+record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
                 → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
                 → ∀ p p′ → (Σ Pos λ p₀ → M₀ p p₀ × p₀ ⊑ p′) → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
                 → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
-                  × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (ev m o envP) p) (enter (ev m (elab ρ o) envE) p′) p p′
+                  × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
 -- The formers
 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
--- do, under the meaning and under every approximant alike.
+-- do, under every approximant.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
@@ -661,10 +660,7 @@ postulate
   carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
-carry-map nothing ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-  in M , ms , hm′ , wi , map-carry f (⟦ s ⟧ envP) (⟦ elab ρ s ⟧ envE) p p′ c
-carry-map (just n) ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
+carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
   let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
   in M , ms , hm′ , wi , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
 
@@ -885,13 +881,11 @@ private
 
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
-carry-of nothing  ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried xs e₀ fr m₀ pp
-carry-of (just n) ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried xs e₀ fr m₀ pp
+carry-of n ρ xs = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried xs e₀ fr m₀ pp
 
 -- THE EMPTY PROGRAM ends at once, on both sides: the empty listing.
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
-carry-empty nothing  ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
-carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
+carry-empty n ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → of-carried [] e₀ fr m₀ pp
 
 ------------------------------------------------------------------------
 -- The whole run
@@ -901,13 +895,15 @@ carry-empty (just n) ρ = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ f
 coreAt : Pos
 coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
--- THE WRAPPER CARRIES THE CORE: the subscribe mark merged in, the
+-- THE WRAPPER CARRIES THE CORE, at each approximant: the subscribe mark merged in, the
 -- completion concatenated, the restamp, each rides in the core's instants
 -- and shows nothing, and the whole ends where the core does.
 postulate
-  carry-wrap : ∀ {A} (o : SObs [] A) {M} → Emb M → M root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (enter (⟦ elab (λ i → i) (plain o) ⟧ []) coreAt) root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (events o) (elaborated o) root root
+  carry-wrap : ∀ n {A} (o : SObs [] A) {M} → Emb M → M root coreAt
+             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (enter (approx n (plain o) []) root)
+                 (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) root coreAt
+             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (enter (approx n (plain o) []) root)
+                 (enter (approx n (elaborate (plain o)) []) root) root root
 
 -- The plain run's subscription paired with the core's: one pair, in
 -- neither world.
