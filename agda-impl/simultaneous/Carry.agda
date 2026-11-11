@@ -31,7 +31,8 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷-injectiveˡ)
 open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Data.Bool.Properties using (T?)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (yes; no; Dec)
+open import Relation.Nullary.Decidable using (_×-dec_)
 open import denotation.Position using (_<ᵖ_)
 open import denotation.Laws.Modulus using (≼-split)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -45,7 +46,7 @@ open import Tree using (Obs; cold; empty; of; map; takeWhile; flatMap; connect; 
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few; _≺_;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few; _≺_; _≼_;
   approx; module Op; Truncate; Reach; InE; at-end; at-out; on-out)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
@@ -58,7 +59,6 @@ open import simultaneous.Relations using (Spent)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.Attribution using (Live; Shown; Match; Attribution; Every; One; Reads)
 open import denotation.Position using (_≟ᵖ_)
-open import denotation.Laws.Shows using (∈-stable)
 open import simultaneous.Listing using (Listed; Listing)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE; elaborate)
@@ -219,43 +219,30 @@ emb-under E₀ fr m₀ pp E sh = Under.emb E₀ fr m₀ pp E sh
 ------------------------------------------------------------------------
 -- A subterm carried
 
--- What an elaborated row is owed to.
-data Cause : Set where
-  row  : Pos → Cause
-  env  : Pos → Cause
-  both : Pos → Pos → Cause
-  subs : Cause
-
--- `r` is owed to a plain row, in the image of its instant; to an
--- environment row it lies under; to a plain row and an environment row it
--- lies under; or to the subscribe instant.
-Owes : ∀ {A : Set} → PMap → (Pos → Set) → EmissionSet A → Pos → Cause → Pos → Set
-Owes {A} M HE t s′ (row k)    r = ¬ ¬ Σ (Ev A) (t k) × Σ Pos λ y → M k y × instantOf y ≡ instantOf r
-Owes {A} M HE t s′ (env h)    r = HE h × h ⊑ r
-Owes {A} M HE t s′ (both k h) r = ¬ ¬ Σ (Ev A) (t k) × HE h × h ⊑ r
-Owes {A} M HE t s′ subs       r = instantOf r ≡ instantOf s′
-
 -- An unpinned row, classically: a pin's home.
 Home : ∀ {A : Set} → EmissionSet A → Pos → Set
 Home {A} t k = ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
 
--- Owed through the environment.
-Read : Cause → Set
-Read (env _)    = ⊤
-Read (both _ _) = ⊤
-Read (row _)    = ⊥
-Read subs       = ⊥
+-- A carrier near a row: at or before it, or a row listed up to.
+Near : ∀ {Y : Set} → EmissionSet Y → Pos → Pos → Set
+Near {Y} u m l = l ≼ m ⊎ (Σ (Ev Y) (u l) × Listed u l)
+
+-- The rows past `k`, listed exactly.
+Rest : ∀ {A : Set} → EmissionSet A → Pos → Set
+Rest t k = Σ (List Pos) λ ks → (∀ {k′ e} → t k′ e → k ≺ k′ → k′ ∈ ks) × (∀ {k′} → k′ ∈ ks → k ≺ k′ × Σ _ (t k′))
+
+-- Every row, listed exactly.
+Whole : ∀ {A : Set} → EmissionSet A → Set
+Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k} → k ∈ ks → Σ _ (t k))
 
 -- `u`, subscribed at `s′`, carries `t`, subscribed at `s`, under the
 -- environment hot rows `HP` (plain) and `HE` (elaborated), along `M`:
 -- `simultaneous.Attribution.Attribution`'s fields, each carrier lying
 -- under the image of the row it carries, a row of `u` placed or a pin of
--- `t` homed also by an instant of an environment row.  Each row of `u` is
--- owed to a cause, each cause owed finitely many, and a row owed through
--- the environment lies at or before every end.
+-- `t` homed also by an instant of an environment row.
 --
 -- A ROW IS CARRIED FROM ITS LISTING, onto a carrier listed too; a row
--- only witnessed to exist (the carried row, a cause, a pin's home) is so
+-- only witnessed to exist (the carried row, a pin's home) is so
 -- classically, and a pin's home lies before its connect.  A closed run is
 -- listed wherever few rows precede (`simultaneous.Listing.listed`), and
 -- there each classical row is found among the listed ones (`attributed`).
@@ -267,6 +254,12 @@ Read subs       = ⊥
 -- positions before its subscription hold the hot's rows.  Carried
 -- classically (`img¬¬`), a row needs only few rows before it: what
 -- reading back past a carrier asks of each earlier row.
+--
+-- A ROW OF `u` IS PLACED FROM ITS LISTING, by a carrier near it: at or
+-- before it, or listed up to.  PAST A CARRIER `u` HAS FEW ROWS when its
+-- row's rows before and past it are listed, and the environment's
+-- everywhere; so it has in all when all of `t`'s are.  Each names a position from listings alone, so a former
+-- hiding rows past a failure decides where the failure lies.
 --
 -- DEAD ROUTE: each row from finitely many before it, outright.  A scan's
 --   row needs its source's values before it listed, and a subterm's run is
@@ -286,16 +279,14 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
             → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
     img-row : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
     img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
-    place   : ∀ {m e} → u m e → Live u m → Few u m
-            → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m)
+    place   : ∀ {m e} → u m e → Live u m → Listed u m
+            → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
               ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
     live    : ∀ {k l} → Img k l → Live t k → Live u l
     few     : ∀ {k l} → Img k l → Few t k
-    cause   : ∀ {r e} → u r e → Cause
-    owes    : ∀ {r e} (ur : u r e) → Owes M HE t s′ (cause ur) r
-    fib     : Cause → List Pos
-    in-fib  : ∀ {r e} (ur : u r e) → r ∈ fib (cause ur)
-    read    : ∀ {r e} (ur : u r e) → Read (cause ur) → Live u r
+    spent   : ∀ {k l} → Img k l → Listed t k → Rest t k → (∀ {q} → LP q)
+            → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
+    whole   : Whole t → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pbk     : Pos → List Pos
@@ -339,6 +330,16 @@ private
 
     lst← : ∀ {k} → Listed b k → Listed a k
     lst← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
+
+    rest← : ∀ {k} → Rest b k → Rest a k
+    rest← (ks , F , B) = ks , (λ ak kk → F (proj₁ (proj₂ (to ak))) kk) , λ m → proj₁ (B m) , proj₁ (fro (proj₂ (proj₂ (B m)))) , proj₁ (proj₂ (fro (proj₂ (proj₂ (B m)))))
+
+    whole← : Whole b → Whole a
+    whole← (ks , F , B) = ks , (λ ak → F (proj₁ (proj₂ (to ak)))) , λ m → proj₁ (fro (proj₂ (B m))) , proj₁ (proj₂ (fro (proj₂ (B m))))
+
+    near→ : ∀ {m l} → Near a m l → Near b m l
+    near→ (inj₁ lm)             = inj₁ lm
+    near→ (inj₂ ((_ , al) , L)) = inj₂ ((_ , proj₁ (proj₂ (to al))) , lst→ L)
 
 unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
 unp← k-out  _ = tt
@@ -395,11 +396,13 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     img-row′ : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A′) λ e → t′ k e × Unpinned e
     img-row′ i n = img-row i λ r → n (up-row r)
 
-    owes′ : ∀ {c r} → Owes M HE t s′ c r → Owes M HE t′ s′ c r
-    owes′ {row k}    (nr , y)  = (λ n → nr λ { (_ , tk) → n (_ , proj₁ (proj₂ (up tk))) }) , y
-    owes′ {env h}    o         = o
-    owes′ {both k h} (nr , hy) = (λ n → nr λ { (_ , tk) → n (_ , proj₁ (proj₂ (up tk))) }) , hy
-    owes′ {subs}     o         = o
+    placed′ : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
+                ⊎ Σ Pos (λ h → HE h × instantOf h ≡ instantOf m)
+            → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u′ m l)
+                ⊎ Σ Pos (λ h → HE h × instantOf h ≡ instantOf m)
+    placed′ (inj₁ e)                          = inj₁ e
+    placed′ {m} (inj₂ (inj₁ (k , l , i , e , n))) = inj₂ (inj₁ (k , l , i , e , U.near→ {m} {l} n))
+    placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
     pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × k ∈ pbk l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
@@ -425,14 +428,11 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
   carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
     { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun
-    ; place = λ {m} um lv fw → place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.few← {m} fw)
+    ; place = λ {m} um lv lm → placed′ {m} (place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.lst← {m} lm))
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
-    ; cause = λ ur → cause (proj₁ (proj₂ (down′ ur)))
-    ; owes = λ ur → owes′ (owes (proj₁ (proj₂ (down′ ur))))
-    ; fib = fib
-    ; in-fib = λ ur → in-fib (proj₁ (proj₂ (down′ ur)))
-    ; read = λ {r} ur rd → U.live→ {r} (λ {c} → read (proj₁ (proj₂ (down′ ur))) rd {c})
+    ; spent = λ {k} i lt rt lp → let (ls , F) = spent i (T.lst← {k} lt) (T.rest← {k} rt) lp in ls , λ ur lr → F (proj₁ (proj₂ (down′ ur))) lr
+    ; whole = λ wt lp → let (ls , F) = whole (T.whole← wt) lp in ls , λ ur → F (proj₁ (proj₂ (down′ ur)))
     ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
@@ -502,7 +502,7 @@ module Mono {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {
 -- row it holds classically is found among those its listing holds.
 module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos}
          (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (func : ∀ {y e e′} → t y e → t y e′ → e ≡ e′)
-         (lst : Listing t) (pin-few : ∀ {k p} → t k (pin p) → Few t p)
+         (lst : Listing t) (lstU : Listing u) (pin-few : ∀ {k p} → t k (pin p) → Few t p)
          (δ : Path) (at : M s (s′ ⊕ δ)) (c : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) t u s s′) where
   open CarryAt c
 
@@ -542,14 +542,6 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
     inst-img i with ext i
     ... | y , my , σ , refl = y , my , instant-⊕ y σ
 
-    gather : (Pos → List Pos) → List Pos → List Pos
-    gather g []       = []
-    gather g (x ∷ xs) = g x ++ gather g xs
-
-    ∈-gather : ∀ {x y} (g : Pos → List Pos) xs → x ∈ xs → y ∈ g x → y ∈ gather g xs
-    ∈-gather g (x ∷ xs) (here refl) m = ∈-++⁺ˡ m
-    ∈-gather g (x ∷ xs) (there n)   m = ∈-++⁺ʳ (g x) (∈-gather g xs n m)
-
     -- Finitely many rows before a carried row and after it: finitely
     -- many in all.
     rows-in : ∀ {k} → Few t k → Spent t (just k) → Σ (List Pos) λ ks → ∀ {k₁ e} → t k₁ e → k₁ ∈ ks
@@ -562,17 +554,26 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
         ...   | inj₁ kk   = ∈-++⁺ʳ ks₁ (there (proj₁ (f₂ tk kk)))
         ...   | inj₂ refl = ∈-++⁺ʳ ks₁ (here refl)
 
-    -- Then each row of `u` is owed to one of them or to the subscription.
-    every-row : ∀ {k l} → Img k l → Spent t (just k) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
-    every-row i sp with rows-in (few i) sp
-    ... | ks , f = gather (λ k₁ → fib (row k₁)) ks ++ fib subs , go
+    -- With finitely many rows in all, whether a position holds one is
+    -- decided by the listing just past it.
+    row? : (Σ (List Pos) λ ks → ∀ {k₁ e} → t k₁ e → k₁ ∈ ks) → ∀ x → Dec (Σ (Ev A) (t x))
+    row? (ks , f) x with lst {x ⊕ [ last ]} (ks , λ tx _ → f tx)
+    ... | ls , G , B with any? (x ≟ᵖ_) ls
+    ...   | yes m = yes (proj₂ (B m))
+    ...   | no ¬m = no λ { (_ , tx) → ¬m (G tx (≺-ext x [])) }
+
+    -- The rows past a carried row, listed exactly.
+    rest-of : ∀ {k} → Few t k → Spent t (just k) → Rest t k
+    rest-of {k} fw sp = filter P? (proj₁ sp) , cov , back
       where
-        go : ∀ {r e} → u r e → r ∈ gather (λ k₁ → fib (row k₁)) ks ++ fib subs
-        go ur with cause ur | owes ur | in-fib ur
-        ... | row k₁   | nr , _       | m = ∈-++⁺ˡ (∈-gather (λ k₂ → fib (row k₂)) ks (∈-stable λ ¬i → nr λ { (_ , tk) → ¬i (f tk) }) m)
-        ... | env h    | () , _       | _
-        ... | both _ _ | _ , () , _   | _
-        ... | subs     | _            | m = ∈-++⁺ʳ (gather (λ k₂ → fib (row k₂)) ks) m
+        P? : ∀ x → Dec (k ≺ x × Σ (Ev A) (t x))
+        P? x = T? (k <ᵖ x) ×-dec row? (rows-in fw sp) x
+
+        cov : ∀ {k′ e} → t k′ e → k ≺ k′ → k′ ∈ filter P? (proj₁ sp)
+        cov tk kk = ∈-filter⁺ P? (proj₁ (proj₂ sp tk kk)) (kk , _ , tk)
+
+        back : ∀ {k′} → k′ ∈ filter P? (proj₁ sp) → k ≺ k′ × Σ _ (t k′)
+        back m = proj₂ (∈-filter⁻ P? {xs = proj₁ sp} m)
 
   inst′ : ∀ {k k′ l l′} → Img k l → Img k′ l′ → (instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′)
   inst′ i i′ with inst-img i | inst-img i′
@@ -590,9 +591,9 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
   attributed = record
     { Img = Img ; img = img′ ; shown = shown ; img-row = λ i → row-at (few i) (img-row i) ; img-fun = img-fun
     ; img-mono = Mono.img-mono hm flat c ; inst = inst′ ; home = home′
-    ; place = λ {m} um lm fm → placed {m} (place um lm fm)
+    ; place = λ {m} um lm fm → placed {m} (place um lm (lstU fm))
     ; live = live
-    ; spent = λ i sp → let (ls , f) = every-row i sp in ls , λ ur _ → f ur
+    ; spent = λ i sp → spent i (lst (few i)) (rest-of (few i) sp) tt
     ; bk = bk ; in-bk = in-bk ; pbk = pbk
     ; pinned = pinned′ }
     where
@@ -610,10 +611,11 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
       ...     | e₀ , tk₀ , un = (l , (pin p′ , ul) , m) , inj₂ (k₀ , e₀ , tk₀ , un , ek)
       pinned′ {k} {p} tk lk | (l , p′ , ul , m) , inj₂ (inj₂ (_ , () , _))
 
-      placed : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m) ⊎ Σ Pos (λ h → ⊥ × instantOf h ≡ instantOf m)
+      placed : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
+               ⊎ Σ Pos (λ h → ⊥ × instantOf h ≡ instantOf m)
              → instantOf m ≡ instantOf s′ ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
-      placed (inj₁ e)             = inj₁ e
-      placed (inj₂ (inj₁ kl))     = inj₂ kl
+      placed (inj₁ e)                          = inj₁ e
+      placed (inj₂ (inj₁ (k , l , i , e , _))) = inj₂ (k , l , i , e)
       placed (inj₂ (inj₂ (_ , () , _)))
 
 ------------------------------------------------------------------------
@@ -674,22 +676,11 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
 -- do, under every approximant.
 --
--- A TAKEWHILE'S `place` AND `cause` ARE DECIDED by a listing of its
--- source's elaborated run up to the source's witness: the first failing
--- value between the row and that witness, or none.  Every other
--- obligation is negative, so `img¬¬` pays it.  `img` lists a witness
--- only from its plain row's listing, which `place` does not take, and
--- `exits-ut` calls it with no row known past the one placed.
---
--- DEAD ROUTE: a takeWhile carried by its source's carry, the first
---   failing value's fail and end put one label under it and under its
---   carrier.  The map grown there stays an order embedding only if no
---   pair lies strictly under a source value row.  The block is `place`
---   and `cause`: an elaborated row before the failure, in the failing
---   instant, may be placed or caused by the source at a row the failure
---   hides.  Its replacement is the first failing value, which the source,
---   not listed, holds only classically, while both fields name a plain
---   position outright.
+-- A TAKEWHILE'S `place` AND `spent` ARE DECIDED from listings: a row is
+-- placed near its source's witness, listed up to it, so the first
+-- failing value between them is found; past a carrier, the rows are its
+-- source's up to the first stop the rest lists, or, with none, the
+-- source's past it.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
@@ -746,6 +737,10 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
     ; inst    = λ { (a , _ , refl , refl) (b , _ , refl , refl) →
                     mk⇔ (λ _ → trans (instant-⊕ p [ a ]) (sym (instant-⊕ p [ b ])))
                         (λ _ → trans (instant-⊕ p′ [ a ]) (sym (instant-⊕ p′ [ b ]))) } }
+
+  -- Order read back across the map.
+  back≺ : ∀ {x x′ y y′} → N x y → N x′ y′ → y ≺ y′ → x ≺ x′
+  back≺ (a , _ , refl , refl) (b , _ , refl , refl) h = ≺-shift p′ p [ a ] [ b ] h
 
   M : PMap
   M = M₀ ∪ᴹ N
@@ -901,11 +896,8 @@ private
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
       ; few     = λ _ → fewT
-      ; cause   = λ _ → subs
-      ; owes    = place
-      ; fib     = λ _ → proj₁ allU
-      ; in-fib  = λ ur → proj₂ allU (proj₁ ur)
-      ; read    = λ _ ()
+      ; spent   = λ _ _ _ _ → proj₁ allU , λ ur _ → proj₂ allU (proj₁ ur)
+      ; whole   = λ _ _ → proj₁ allU , λ ur → proj₂ allU (proj₁ ur)
       ; bk      = λ _ → proj₁ allT
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; pbk     = λ _ → []
