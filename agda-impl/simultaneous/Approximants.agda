@@ -41,7 +41,7 @@ open import denotation.Laws.Worlds using (Ok; Hots; InvAt; ⊑-refl; ⊑-≼; in
 open import denotation.Laws.ConnectNe using (proper-ag)
 open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Nth using (module Nths)
-open import denotation.Laws using (from; inv-approx; inv-⟦⟧)
+open import denotation.Laws using (inv-approx; inv-⟦⟧) renaming (from to within)
 open import denotation.Laws.Truthful using (Opens; Finite; few-ag; reached; never-lies; finite-true)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
 open import simultaneous.SObs using (SObs; plain; module Elaborate)
@@ -179,7 +179,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
       L = proj₁ fin
 
       same : ∀ m → length L ≤ m → ∀ {y e} → (t y e → tₙ m y e) × (tₙ m y e → t y e)
-      same m le {y} {e} = from m s [] (λ ()) root ok₀ y e (inj₁ (L , le , λ x _ _ → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (proj₂ fin x))))
+      same m le {y} {e} = within m s [] (λ ()) root ok₀ y e (inj₁ (L , le , λ x _ _ → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (proj₂ fin x))))
 
       spent : ∀ m → length L ≤ m → ∀ {k e} → tₙ m k e → q ≺ k → k ∈ ks × Proper (tₙ m) k e
       spent m le {k} x qk with h (proj₂ (same m le) x) qk
