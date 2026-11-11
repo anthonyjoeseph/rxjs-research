@@ -34,7 +34,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; CarryAt; Carry; carry; Cause; row; env; both; subs; Owes; Home; Read;
-  instant-⊕; EnvRel; Bound; module OneUnder)
+  instant-⊕; EnvRel; Bound; HotsListed; module OneUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab)
 
@@ -62,7 +62,7 @@ module SpinRows (q : Pos) where
 
 -- Each skip of the plain spin, carried by the elaborated spin's skip at
 -- its label, owed to it.
-module SpinCarry {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
+module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
                  (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
   open OneUnder E₀ fr m₀ pp using (N; embN; M; up; up-⊕; down; down-⊕)
 
@@ -79,9 +79,8 @@ module SpinCarry {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Po
   Img : Pos → Pos → Set
   Img k l = N k l × Σ (Ev A) (t k)
 
-  img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k
-      → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′
-  img (spin i , r) _ _ _ =
+  img : ∀ {k e} → t k e → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′
+  img (spin i , r) =
     p′ ⊕ [ ix i ] , ((ix i , plain-ix , refl , refl) , skip , spin i , r) , skip , (spin i , P′.reach i) , P′.listed i , (λ ()) , λ _ ()
 
   cause : ∀ {r e} → u r e → Cause
@@ -97,11 +96,12 @@ module SpinCarry {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Po
   in-fib : ∀ {r e} (ur : u r e) → r ∈ fib (cause ur)
   in-fib (spin i , _) = here (sym (up-⊕ [ ix i ]))
 
-  carried : CarryAt valuesOf M HP HE t u p p′
+  carried : CarryAt valuesOf M HP HE LP t u p p′
   carried = record
     { Img     = Img
     ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
-    ; img     = img
+    ; img     = λ tk _ _ _ _ → img tk
+    ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (l , i , e′ , ul , m)
     ; shown   = λ { (spin _ , _) () }
     ; img-row = λ { (_ , _ , spin i , r) n → n (skip , (spin i , r) , tt) }
     ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
@@ -123,11 +123,11 @@ module SpinCarry {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Po
 carry-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → Carry zero ρ (defer l)
 carry-⊥ {A = A} ρ l = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr → spun e₀ fr m₀ pp
   where
-    spun : ∀ {HP HE M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
+    spun : ∀ {HP HE LP M₀ p p₀ p′} → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
          → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
-           × CarryAt valuesOf M HP HE (Truncate (Spin {A} p)) (Truncate (Spin {IE A} p′)) p p′
-    spun {HP} {HE} E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
-      where module X = SpinCarry {A} {HP} {HE} E₀ fr m₀ pp
+           × CarryAt valuesOf M HP HE LP (Truncate (Spin {A} p)) (Truncate (Spin {IE A} p′)) p p′
+    spun {HP} {HE} {LP} E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
+      where module X = SpinCarry {A} {HP} {HE} {LP} E₀ fr m₀ pp
             module O = OneUnder E₀ fr m₀ pp
 
 ------------------------------------------------------------------------
@@ -135,10 +135,10 @@ carry-⊥ {A = A} ρ l = carry λ _ _ _ _ _ e₀ _ p p′ (_ , m₀ , pp) _ _ fr
 
 -- A CARRY STAYS ONE along a larger map: the map is read only where a row
 -- is put under its image.
-carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
-           → M ⊆ᴹ M′ → CarryAt f M HP HE t u s s′ → CarryAt f M′ HP HE t u s s′
-carry-grow {A} {M = M} {M′} {HE = HE} {t} {s′ = s′} sub c = record
-  { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; shown = shown ; img-row = img-row
+carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+           → M ⊆ᴹ M′ → CarryAt f M HP HE LP t u s s′ → CarryAt f M′ HP HE LP t u s s′
+carry-grow {A} {M = M} {M′} {HE = HE} {t = t} {s′ = s′} sub c = record
+  { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; cause = cause ; owes = λ ur → grown (cause ur) (owes ur)
   ; fib = fib ; in-fib = in-fib ; read = read ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned }
   where
@@ -152,7 +152,7 @@ carry-grow {A} {M = M} {M′} {HE = HE} {t} {s′ = s′} sub c = record
 env-grow : ∀ {Γ Δ} {M M′ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
          → M ⊆ᴹ M′ → EnvRel M ρ envP envE → EnvRel M′ ρ envP envE
 env-grow sub er i = record { m = m ; src = src ; σ = σ ; envP = envP ; envE = envE ; at = at ; at′ = at′
-                            ; carried = carry-grow sub carried ; isP = isP ; isE = isE }
+                            ; lists = lists ; carried = carry-grow sub carried ; isP = isP ; isE = isE }
   where open Bound (er i)
 
 ------------------------------------------------------------------------
@@ -213,11 +213,11 @@ module Side {X : Set} (d : Den X) (q : Pos)
 
 -- THE GUARD CARRIES THE GUARD and the body carries the body: a carry of
 -- the body under each guard is one of the whole.
-module NextCarry {A : Set} {HP HE : Pos → Set} {M : PMap} (s : Den A) (s′ : Den (IE A)) (p p′ : Pos)
+module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′ : Den (IE A)) (p p′ : Pos)
   (mg : M (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ]))
   (aP : ∀ {y e} → enter s (p ⊕ [ ix 1 ]) y e → (p ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ⊕ [ ix 1 ]) ≼ r))
   (aE : ∀ {y e} → enter s′ (p′ ⊕ [ ix 1 ]) y e → (p′ ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p′ ⊕ [ ix 1 ]) ≼ r))
-  (c : CarryAt valuesOf M HP HE (enter s (p ⊕ [ ix 1 ])) (enter s′ (p′ ⊕ [ ix 1 ])) (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])) where
+  (c : CarryAt valuesOf M HP HE LP (enter s (p ⊕ [ ix 1 ])) (enter s′ (p′ ⊕ [ ix 1 ])) (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])) where
   private
     module P = Side s p aP
     module E = Side s′ p′ aE
@@ -230,11 +230,17 @@ module NextCarry {A : Set} {HP HE : Pos → Set} {M : PMap} (s : Den A) (s′ : 
   ext (inj₁ (refl , refl)) = E.g , mg , ⊑-refl E.g
   ext (inj₂ i)             = C.ext i
 
-  img : ∀ {k e} → P.T k e → Unpinned e → Live P.T k → Listed P.T k
+  img : ∀ {k e} → P.T k e → Unpinned e → Live P.T k → Listed P.T k → LP k
       → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Listed E.T l × Match Every (One valuesOf) (Reads valuesOf) e e′
-  img (guard , _) _ _ _ = E.g , inj₁ (refl , refl) , skip , E.gT , ([] , (λ x lt → ⊥-elim (E.none x lt)) , λ ()) , (λ ()) , λ _ ()
-  img (body x , _) un lv ls with C.img x un (P.live← lv) (P.lst← ls)
+  img (guard , _) _ _ _ _ = E.g , inj₁ (refl , refl) , skip , E.gT , ([] , (λ x lt → ⊥-elim (E.none x lt)) , λ ()) , (λ ()) , λ _ ()
+  img (body x , _) un lv ls lp with C.img x un (P.live← lv) (P.lst← ls) lp
   ... | l , i , e′ , ul , lu , m = l , inj₂ i , e′ , E.up ul , E.lst→ ul lu , m
+
+  img¬¬ : ∀ {k e} → P.T k e → Unpinned e → Live P.T k → Few P.T k
+        → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′
+  img¬¬ (guard , _) _ _ _ n = n (E.g , inj₁ (refl , refl) , skip , E.gT , (λ ()) , λ _ ())
+  img¬¬ (body x , _) un lv fw n =
+    C.img¬¬ x un (P.live← lv) (P.few← fw) λ { (l , i , e′ , ul , m) → n (l , inj₂ i , e′ , E.up ul , m) }
 
   shown : ∀ {l e} → E.T l e → Shown (One valuesOf) e → Live E.T l → Few E.T l
         → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → P.T k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
@@ -316,9 +322,9 @@ module NextCarry {A : Set} {HP HE : Pos → Set} {M : PMap} (s : Den A) (s′ : 
   pinned {k} {q} (body x , _) lv with C.pinned x (P.live← lv)
   ... | (l , q′ , ul , m) , r = (l , q′ , E.up ul , m) , homed {k} {q} r
 
-  carried : CarryAt valuesOf M HP HE P.T E.T p p′
+  carried : CarryAt valuesOf M HP HE LP P.T E.T p p′
   carried = record
-    { Img = Img ; ext = ext ; img = img ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
+    { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
     ; live = live ; few = few ; cause = cause ; owes = owes ; fib = fib ; in-fib = in-fib ; read = read
     ; bk = bk ; in-bk = in-bk ; pbk = C.pbk ; pinned = pinned }
 
@@ -332,7 +338,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
     nexted : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
            → ∀ p p′ {p₀} → M₀ p p₀ → p₀ ⊑ p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
            → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
-             × CarryAt valuesOf M (Hots envP) (Hots envE) (Truncate (DeferT (approx n (Later.force l) envP) p))
+             × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (Truncate (DeferT (approx n (Later.force l) envP) p))
                  (Truncate (DeferT (approx n (elab ρ (Later.force l)) envE) p′)) p p′
     nexted envP envE gP gE M₀ hm er p p′ m₀ pp okP okE fr
       with h envP envE gP gE O.M O.emb (env-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} inj₁ er) (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])

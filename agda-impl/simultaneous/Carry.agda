@@ -23,7 +23,7 @@ open import Data.List using (List; []; _∷_; _++_; [_]; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-filter⁺; ∈-filter⁻)
-open import Data.List.Relation.Unary.All using (lookup; [])
+open import Data.List.Relation.Unary.All using (lookup; []; _∷_)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -45,7 +45,7 @@ open import Tree using (Obs; cold; empty; of; map; takeWhile; flatMap; connect; 
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few; _≺_;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few; _≺_;
   approx; module Op; Truncate; Reach; InE; at-end; at-out; on-out)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
@@ -260,18 +260,28 @@ Read subs       = ⊥
 -- listed wherever few rows precede (`simultaneous.Listing.listed`), and
 -- there each classical row is found among the listed ones (`attributed`).
 --
+-- A ROW IS CARRIED UNDER ITS ENVIRONMENT'S LISTING (`LP`): a reader's
+-- carrier is its hot's, and the hot's carry asks the rows before the
+-- reader's subscription listed, which only the connect's echoes list.
+-- Without it a reader's image would decide which of finitely many
+-- positions before its subscription hold the hot's rows.  Carried
+-- classically (`img¬¬`), a row needs only few rows before it: what
+-- reading back past a carrier asks of each earlier row.
+--
 -- DEAD ROUTE: each row from finitely many before it, outright.  A scan's
 --   row needs its source's values before it listed, and a subterm's run is
 --   not listed from few rows: a lane reading a hot past an accumulation of
 --   its rows (hidden from the subterm by a takeWhile failed early) meets a
 --   later row iff the accumulation is finite, so a scan over that lane and
 --   a timer has a row at the timer whose state decides it.
-record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE : Pos → Set) (t : EmissionSet A) (u : EmissionSet Y) (s s′ : Pos) : Set₁ where
+record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set) (t : EmissionSet A) (u : EmissionSet Y) (s s′ : Pos) : Set₁ where
   field
     Img     : Pos → Pos → Set
     ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
-    img     : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k
+    img     : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → LP k
             → Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Listed u l × Match Every (One f) (Reads f) e e′
+    img¬¬   : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
+            → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Match Every (One f) (Reads f) e e′
     shown   : ∀ {l e} → u l e → Shown (One f) e → Live u l → Few u l
             → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
     img-row : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
@@ -342,7 +352,7 @@ unp→ k-end  _ = tt
 
 -- A CARRIED RUN RELABELLED ROW FOR ROW stays carried, when the labels
 -- carry what they carried.
-module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A′} {M : PMap} {HP HE : Pos → Set}
+module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A′} {M : PMap} {HP HE LP : Pos → Set}
   {t : EmissionSet A} {t′ : EmissionSet A′} {u : EmissionSet Y} {u′ : EmissionSet Y′} {s s′ : Pos}
   (R : Pos → Ev A → Ev A′ → Set) (R′ : Pos → Ev Y → Ev Y′ → Set)
   (kin : ∀ {k e e′} → R k e e′ → Kin e e′) (kin′ : ∀ {l e e′} → R′ l e e′ → Kin e e′)
@@ -350,7 +360,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
   (down : ∀ {k e′} → t′ k e′ → Σ (Ev A) λ e → t k e × R k e e′)
   (up′ : ∀ {l e} → u l e → Σ (Ev Y′) λ e′ → u′ l e′ × R′ l e e′)
   (down′ : ∀ {l e′} → u′ l e′ → Σ (Ev Y) λ e → u l e × R′ l e e′)
-  (c : CarryAt f M HP HE t u s s′)
+  (c : CarryAt f M HP HE LP t u s s′)
   (sh : ∀ {l e e′} → R′ l e e′ → Shown (One f′) e′ → Shown (One f) e)
   (mt : ∀ {k l e₀ e₁ e₀′ e₁′} → CarryAt.Img c k l → R k e₀ e₀′ → R′ l e₁ e₁′
       → Match Every (One f) (Reads f) e₀ e₁ → Match Every (One f′) (Reads f′) e₀′ e₁′) where
@@ -359,12 +369,18 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     module T = Rows {a = t} {b = t′} {Rel = R} kin up down
     module U = Rows {a = u} {b = u′} {Rel = R′} kin′ up′ down′
 
-    img′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Listed t′ k
+    img′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Listed t′ k → LP k
          → Σ Pos λ l → Img k l × Σ (Ev Y′) λ e₁′ → u′ l e₁′ × Listed u′ l × Match Every (One f′) (Reads f′) e′ e₁′
-    img′ {k} tk un lv fw with down tk
-    ... | e , tk₀ , r with img tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} fw)
+    img′ {k} tk un lv fw lp with down tk
+    ... | e , tk₀ , r with img tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} fw) lp
     ...   | l , i , e₁ , ul , fu , m with up′ ul
     ...     | e₁′ , ul′ , r′ = l , i , e₁′ , ul′ , U.lst→ {l} fu , mt i r r′ m
+
+    img¬¬′ : ∀ {k e′} → t′ k e′ → Unpinned e′ → Live t′ k → Few t′ k
+           → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev Y′) λ e₁′ → u′ l e₁′ × Match Every (One f′) (Reads f′) e′ e₁′
+    img¬¬′ {k} tk un lv fw n with down tk
+    ... | e , tk₀ , r = img¬¬ tk₀ (unp← (kin r) un) (T.live← {k} (λ {c} → lv {c})) (T.few← {k} fw)
+      λ { (l , i , e₁ , ul , m) → let (e₁′ , ul′ , r′) = up′ ul in n (l , i , e₁′ , ul′ , mt i r r′ m) }
 
     shown′ : ∀ {l e₁′} → u′ l e₁′ → Shown (One f′) e₁′ → Live u′ l → Few u′ l
            → Σ Pos λ k → Img k l × Σ (Ev A′) λ e₀′ → t′ k e₀′ × Match Every (One f′) (Reads f′) e₀′ e₁′
@@ -406,9 +422,9 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
         homed′ (inj₂ (inj₁ (k₀ , kp , hm , ek))) = inj₂ (inj₁ (k₀ , kp , (λ n → hm λ r → n (up-row r)) , ek))
         homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
 
-  carried : CarryAt f′ M HP HE t′ u′ s s′
+  carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
-    { Img = Img ; ext = ext ; img = img′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun
+    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun
     ; place = λ {m} um lv fw → place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.few← {m} fw)
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
@@ -446,9 +462,9 @@ private
 
 -- A MAP CARRIES what its source did: it relabels each row on both sides
 -- by the function, a value's carrier carrying its image.
-map-carry : ∀ {A B} (g : A → B) (d : Den A) (d′ : Den (IE A)) {M HP HE} p p′
-          → CarryAt valuesOf M HP HE (enter d p) (enter d′ p′) p p′
-          → CarryAt valuesOf M HP HE (enter (Op.map g d) p) (enter (Op.map (mapIE g) d′) p′) p p′
+map-carry : ∀ {A B} (g : A → B) (d : Den A) (d′ : Den (IE A)) {M HP HE LP} p p′
+          → CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′
+          → CarryAt valuesOf M HP HE LP (enter (Op.map g d) p) (enter (Op.map (mapIE g) d′) p′) p p′
 map-carry g d d′ p p′ c =
   Relabel.carried (λ _ e e′ → e′ ≡ mapEv g e) (λ _ e e′ → e′ ≡ mapEv (mapIE g) e)
     (λ { {e = e} refl → kin-map e }) (λ { {e = e} refl → kin-map e })
@@ -463,8 +479,8 @@ map-carry g d d′ p p′ c =
 
 -- Along an order embedding, carriers keep the order of the rows they
 -- carry: no row lies strictly under another, so their images are apart.
-module Mono {A Y : Set} {f : Y → List A} {M : PMap} {HP HE : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
-            (hm : Emb M) (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (c : CarryAt f M HP HE t u s s′) where
+module Mono {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+            (hm : Emb M) (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (c : CarryAt f M HP HE LP t u s s′) where
   open CarryAt c
 
   private
@@ -487,7 +503,7 @@ module Mono {A Y : Set} {f : Y → List A} {M : PMap} {HP HE : Pos → Set} {t :
 module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos}
          (flat : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥) (func : ∀ {y e e′} → t y e → t y e′ → e ≡ e′)
          (lst : Listing t) (pin-few : ∀ {k p} → t k (pin p) → Few t p)
-         (δ : Path) (at : M s (s′ ⊕ δ)) (c : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) t u s s′) where
+         (δ : Path) (at : M s (s′ ⊕ δ)) (c : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) t u s s′) where
   open CarryAt c
 
   private
@@ -582,7 +598,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
     where
       img′ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
            → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Few u l × Match Every (One valuesOf) (Reads valuesOf) e e′
-      img′ tk un lv fw with img tk un lv (lst fw)
+      img′ tk un lv fw with img tk un lv (lst fw) tt
       ... | l , i , e′ , ul , (ls , F , _) , m = l , i , e′ , ul , (ls , F) , m
 
       pinned′ : ∀ {k p} → t k (pin p) → Live t k → (Σ Pos λ l → Σ (Ev (IE A)) (u l) × k ∈ pbk l)
@@ -608,10 +624,16 @@ annValues : ∀ {X} → AIE X → List X
 annValues (_ , just x) = valuesOf x
 annValues (_ , nothing) = []
 
+-- EVERY HOT OF AN ENVIRONMENT LISTED before a position.
+HotsListed : ∀ {Γ} → DenEnv Γ → Pos → Set
+HotsListed []              q = ⊤
+HotsListed (hot t ∷ ρ)     q = Listed t q × HotsListed ρ q
+HotsListed (coldAt _ ∷ ρ)  q = HotsListed ρ q
+
 -- A connect's binder: the source, read hot past the connect at `at` in
 -- the plain run and at `at′` annotated in the elaborated, carried along
 -- the map.
-record Bound (M₀ : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
+record Bound (M₀ : PMap) (LP : Pos → Set) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
     {Θ Θ′}  : List Set
     m       : ℕ
@@ -620,13 +642,14 @@ record Bound (M₀ : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ w
     envP    : DenEnv Θ
     envE    : DenEnv Θ′
     at at′  : Pos
-    carried : CarryAt annValues M₀ (Hots envP) (Hots envE) (enter (approx m src envP) (at ⊕ [ ix 1 ]))
+    lists   : ∀ {q} → LP q → HotsListed envP q
+    carried : CarryAt annValues M₀ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx m src envP) (at ⊕ [ ix 1 ]))
                 (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])) (at ⊕ [ ix 1 ]) (at′ ⊕ [ ix 1 ])
     isP     : d ≡ hot (Proper (enter (approx m src envP) (at ⊕ [ ix 1 ])))
     isE     : d′ ≡ hot (Proper (enter (approx m (annotate (elab σ src)) envE) (at′ ⊕ [ ix 1 ])))
 
 EnvRel : ∀ {Γ Δ} → PMap → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → DenEnv Γ → DenEnv Δ → Set₁
-EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (lookup envP i) (lookup envE (ρ (∈-map⁺ AIE i)))
+EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (HotsListed envP) (lookup envP i) (lookup envE (ρ (∈-map⁺ AIE i)))
 
 -- What the map adds lies in the world with the subscription.
 Within : (Pos → Set) → PMap → PMap → Pos → Set
@@ -643,13 +666,30 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
                 → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
                 → ∀ p p′ → (Σ Pos λ p₀ → M₀ p p₀ × p₀ ⊑ p′) → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
                 → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
-                  × CarryAt valuesOf M (Hots envP) (Hots envE) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
+                  × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
 -- The formers
 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
 -- do, under every approximant.
+--
+-- A TAKEWHILE'S `place` AND `cause` ARE DECIDED by a listing of its
+-- source's elaborated run up to the source's witness: the first failing
+-- value between the row and that witness, or none.  Every other
+-- obligation is negative, so `img¬¬` pays it.  `img` lists a witness
+-- only from its plain row's listing, which `place` does not take, and
+-- `exits-ut` calls it with no row known past the one placed.
+--
+-- DEAD ROUTE: a takeWhile carried by its source's carry, the first
+--   failing value's fail and end put one label under it and under its
+--   carrier.  The map grown there stays an order embedding only if no
+--   pair lies strictly under a source value row.  The block is `place`
+--   and `cause`: an elaborated row before the failure, in the failing
+--   instant, may be placed or caused by the source at a row the failure
+--   hides.  Its replacement is the first failing value, which the source,
+--   not listed, holds only classically, while both fields name a plain
+--   position outright.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
@@ -801,7 +841,7 @@ private
   match-V (pin _) = (λ ()) , λ _ ()
 
   -- The values listed, carried row for row one label under each side.
-  module OfRows {A : Set} {HP HE : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
+  module OfRows {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (xs : List A)
                 (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
     open OneUnder E₀ fr m₀ pp using (N; embN; M; emb; within)
 
@@ -832,9 +872,8 @@ private
     Img : Pos → Pos → Set
     Img k l = N k l × Σ (Ev A) (t k)
 
-    img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k
-        → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′
-    img {k} {e} tk _ _ _ with of-up p p′ 0 xs (proj₁ tk)
+    img : ∀ {k e} → t k e → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′
+    img {k} {e} tk with of-up p p′ 0 xs (proj₁ tk)
     ... | a , pl , refl , r′ = p′ ⊕ [ a ] , ((a , pl , refl , refl) , e , tk) , mapEv V e , (r′ , reachU) , lstU , match-V e
 
     shown : ∀ {l e′} → u l e′ → Shown (One valuesOf) e′ → Live u l → Few u l
@@ -850,11 +889,12 @@ private
     live ((a , pl , _ , refl) , _) uc with of-end p′ 0 (L.map V xs) (proj₁ uc)
     ... | refl = last-max p′ pl
 
-    carried : CarryAt valuesOf M HP HE t u p p′
+    carried : CarryAt valuesOf M HP HE LP t u p p′
     carried = record
       { Img     = Img
       ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
-      ; img     = img
+      ; img     = λ tk _ _ _ _ → img tk
+      ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (l , i , e′ , ul , m)
       ; shown   = shown
       ; img-row = λ { (_ , e , tk) n → n (e , tk , of-unp p 0 xs (proj₁ tk)) }
       ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
@@ -872,11 +912,11 @@ private
       ; pinned  = λ {_} {r} tk _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
-  of-carried : ∀ {A HP HE M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
+  of-carried : ∀ {A HP HE LP M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
              → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
-               × CarryAt valuesOf M HP HE (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
-  of-carried {A} {HP} {HE} xs E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
-    where module X = OfRows {A} {HP} {HE} xs E₀ fr m₀ pp
+               × CarryAt valuesOf M HP HE LP (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
+  of-carried {A} {HP} {HE} {LP} xs E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
+    where module X = OfRows {A} {HP} {HE} {LP} xs E₀ fr m₀ pp
           module O = OneUnder E₀ fr m₀ pp
 
 -- AN `of` lists its values one label under each subscription.
@@ -900,9 +940,9 @@ coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 -- and shows nothing, and the whole ends where the core does.
 postulate
   carry-wrap : ∀ n {A} (o : SObs [] A) {M} → Emb M → M root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (enter (approx n (plain o) []) root)
+             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root)
                  (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) root coreAt
-             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (enter (approx n (plain o) []) root)
+             → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root)
                  (enter (approx n (elaborate (plain o)) []) root) root root
 
 -- The plain run's subscription paired with the core's: one pair, in

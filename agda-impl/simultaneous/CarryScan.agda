@@ -110,6 +110,11 @@ private
   ... | instEmit (value _) n , refl , refl = n , refl
   ... | instEmit (mark _) _  , refl , ()
 
+  -- The carrier of a plain value is unpinned.
+  carried-unp : ∀ {A : Set} {a : A} {e₁ : Ev (IE A)} → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁ → Unpinned e₁
+  carried-unp mt with carried-val mt
+  ... | _ , refl = tt
+
   -- The plain row carried by an end is an end.
   match-end : ∀ {A : Set} {e₀ : Ev A} → Match Every (One {X = IE A} valuesOf) (Reads valuesOf) e₀ end → e₀ ≡ end
   match-end {e₀ = out _} (cr , _) with cr tt
@@ -127,11 +132,11 @@ private
 ------------------------------------------------------------------------
 -- The scan's carrier
 
-module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE H₁ H₂ : Pos → Set}
+module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H₂ : Pos → Set}
   {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos} (hm : Emb M)
   (rch : ∀ {q e} → t q e → Reach t q e) (rchU : ∀ {q e} → u q e → Reach u q e)
   (It : InvAt H₁ s t) (Iu : InvAt H₂ s′ u)
-  (c : CarryAt valuesOf M HP HE t u s s′) where
+  (c : CarryAt valuesOf M HP HE LP t u s s′) where
   open CarryAt c
 
   private
@@ -272,13 +277,13 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE H₁ H₂ 
     ----------------------------------------------------------------------
     -- The plain values, classically carried
 
-    img-val : ∀ {x a} → t x (out a) → Listed t x → Σ Pos λ l′ → Img x l′ × Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
-    img-val tx L with img tx tt (live-out tx) L
-    ... | l , i , _ , ul , _ , mt with carried-val mt
-    ...   | n , refl = l , i , instEmit (value _) n , ul , refl
+    img-val : ∀ {x a l e₁} → Img x l → u l e₁ → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁
+            → Σ Pos λ l′ → Img x l′ × Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
+    img-val i ul mt with carried-val mt
+    ... | n , refl = _ , i , instEmit (value _) n , ul , refl
 
     img-out : ∀ {x a} → t x (out a) → ¬ ¬ Σ Pos λ l′ → Img x l′ × Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
-    img-out tx n = few-¬¬listed (few-of tt tx) λ L → n (img-val tx L)
+    img-out tx n = img¬¬ tx tt (live-out tx) (few-of tt tx) λ { (_ , i , _ , ul , mt) → n (img-val i ul mt) }
 
     img-at : ∀ {x a l′} → t x (out a) → Img x l′ → ¬ ¬ Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
     img-at tx i′ n = img-out tx λ { (l″ , i″ , y , ul , r) → n (y , subst (λ l → u l (out y)) (img-fun i″ i′) ul , r) }
@@ -363,24 +368,47 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE H₁ H₂ 
     shownU ul (E.sstep _ , _) ()
     shownU ul (E.spin _ , _)  ()
 
-    img′ : ∀ {k e} → S k e → Unpinned e → Live S k → Listed S k
-         → Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) e e′
-    img′ (P.sval ac , _) _ lv L with PF.acc-val ac
-    ... | a , tk with img tk tt (liveS← lv) (lstS← L)
-    ...   | l , i , e₁ , ul , Lu , mt with carried-val mt
-    ...     | n , refl with eacc Lu ul
-    ...       | st , eac with out-at eac ul
-    ...         | st₀ , refl =
-      l , i , out _ , (E.sval eac , reach-kin downU₀ (k-out {a = instEmit (value a) n} {b = scanIE f st₀ (instEmit (value a) n)}) (rchU ul)) , lstU→ Lu
-      , (λ _ → _ , refl , cong (_∷ []) (sym (PF.acc-func refl ac (back-at (back eac (live i (liveS← lv)) (proj₁ Lu , proj₁ (proj₂ Lu))) tk i))))
+    -- A fold's row, carried at its value's carrier: the elaborated fold
+    -- there, from a listing before it.
+    sval-at : ∀ {k l b a e₁} → P.Acc k b → Live t k → t k (out a) → Img k l → u l e₁ → Listed u l
+            → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁
+            → Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) (out b) e′
+    sval-at {a = a} ac lv tk i ul Lu mt with carried-val mt
+    ... | n , refl with eacc Lu ul
+    ...   | st , eac with out-at eac ul
+    ...     | st₀ , refl =
+      out _ , (E.sval eac , reach-kin downU₀ (k-out {a = instEmit (value a) n} {b = scanIE f st₀ (instEmit (value a) n)}) (rchU ul)) , lstU→ Lu
+      , (λ _ → _ , refl , cong (_∷ []) (sym (PF.acc-func refl ac (back-at (back eac (live i lv) (proj₁ Lu , proj₁ (proj₂ Lu))) tk i))))
       , λ ns → ⊥-elim (ns tt)
-    img′ (P.sstep x , _) _ lv L with img x tt (liveS← lv) (lstS← L)
+
+    send-at : ∀ {l e₁} → u l e₁ → Match Every (One valuesOf) (Reads valuesOf) end e₁
+            → Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Match Every (One stateValues) (Reads stateValues) end e′
+    send-at ul (cr , _) with cr tt
+    ... | refl = end , (E.send ul , reach-kin downU₀ k-end (rchU ul)) , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
+
+    img′ : ∀ {k e} → S k e → Unpinned e → Live S k → Listed S k → LP k
+         → Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) e e′
+    img′ (P.sval ac , _) _ lv L lp with PF.acc-val ac
+    ... | a , tk with img tk tt (liveS← lv) (lstS← L) lp
+    ...   | l , i , e₁ , ul , Lu , mt = l , i , sval-at ac (liveS← lv) tk i ul Lu mt
+    img′ (P.sstep x , _) _ lv L lp with img x tt (liveS← lv) (lstS← L) lp
     ... | l , i , e₁ , ul , Lu , (_ , ns) with upL Lu ul
     ...   | e₁′ , s₁ , _ = l , i , e₁′ , s₁ , lstU→ Lu , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw)
-    img′ (P.send x , _) _ lv L with img x tt (liveS← lv) (lstS← L)
+    img′ (P.send x , _) _ lv L lp with img x tt (liveS← lv) (lstS← L) lp
     ... | l , i , e₁ , ul , Lu , (cr , _) with cr tt
     ...   | refl = l , i , end , (E.send ul , reach-kin downU₀ k-end (rchU ul)) , lstU→ Lu , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
-    img′ (P.spin _ , _) () _ _
+    img′ (P.spin _ , _) () _ _ _
+
+    img¬¬′ : ∀ {k e} → S k e → Unpinned e → Live S k → Few S k
+           → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Match Every (One stateValues) (Reads stateValues) e e′
+    img¬¬′ (P.sval ac , _) _ lv _ n with PF.acc-val ac
+    ... | a , tk = img¬¬ tk tt (liveS← lv) (few-of tt tk) λ { (l , i , e₁ , ul , mt) →
+      few-¬¬listed (few-ofU (carried-unp mt) ul) λ Lu → let (e′ , s₁ , _ , m) = sval-at ac (liveS← lv) tk i ul Lu mt in n (l , i , e′ , s₁ , m) }
+    img¬¬′ (P.sstep x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (l , i , e₁ , ul , (_ , ns)) →
+      upU ul λ { (e₁′ , s₁ , _) → n (l , i , e₁′ , s₁ , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw)) } }
+    img¬¬′ (P.send x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (l , i , e₁ , ul , m) →
+      let (e′ , s₁ , m′) = send-at ul m in n (l , i , e′ , s₁ , m′) }
+    img¬¬′ (P.spin _ , _) () _ _
 
     shown′ : ∀ {l e} → S′ l e → Shown (One stateValues) e → Live S′ l → Few S′ l
            → Σ Pos λ k → Img k l × Σ (Ev B) λ e₀ → S k e₀ × Match Every (One stateValues) (Reads stateValues) e₀ e
@@ -416,9 +444,9 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE H₁ H₂ 
     ... | (l , p′ , ul , m) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
     ... | (l , p′ , ul , m) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m) , inj₂ (inj₂ hh)
 
-  scanned : CarryAt stateValues M HP HE S S′ s s′
+  scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
-    { Img = Img ; ext = ext ; img = img′ ; shown = shown′
+    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
     ; img-row = λ i n → img-row i λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
     ; img-fun = img-fun
     ; place = λ {m} s₁ lv fw → place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (fewU← fw)
@@ -456,10 +484,10 @@ private
 
 -- THE ELABORATED SCAN CARRIES the plain one: its state's emit, projected,
 -- carries the plain fold.
-scan-carry : ∀ {A B} (f : B → A → B) z (d : Den A) (d′ : Den (IE A)) {M HP HE H₁ H₂} p p′ → Emb M
+scan-carry : ∀ {A B} (f : B → A → B) z (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ → Emb M
            → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′)
-           → CarryAt valuesOf M HP HE (enter d p) (enter d′ p′) p p′
-           → CarryAt valuesOf M HP HE (enter (Op.scan f z d) p) (enter (Op.map proj₂ (Op.scan (scanIE f) (z , marked begin) d′)) p′) p p′
+           → CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′
+           → CarryAt valuesOf M HP HE LP (enter (Op.scan f z d) p) (enter (Op.map proj₂ (Op.scan (scanIE f) (z , marked begin) d′)) p′) p p′
 scan-carry f z d d′ p p′ hm It Iu c =
   Relabel.carried (λ _ e e′ → e′ ≡ e) (λ _ e e′ → e′ ≡ mapEv proj₂ e)
     (λ { {e = e} refl → kin-refl e }) (λ { {e = e} refl → kin-map e })
