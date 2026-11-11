@@ -19,23 +19,20 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Bool.Properties using (T?)
-open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable)
-open import Relation.Nullary.Decidable.Core using (¬¬-excluded-middle)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 
 open import Tree using (scan)
 open import denotation.Position using (Pos; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Dep; Few; _≺_; _≼_;
-  Unpinned; module Scan; module Op; approx)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; reach-via; reach-few; few-ind;
-  entered-reach)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Few; _≺_; _≼_; Unpinned;
+  module Scan; module Op; approx)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; reach-few; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; full)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import denotation.Laws.Fold using (fold)
@@ -47,8 +44,9 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
+open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map;
-  module Relabel; module Mono; Home; Near; Whole; IntoAt; sub-listed; few-sub; match-val; carried-val; match-end)
+  module Relabel; module Mono; Home; Near; Whole; whole-listed; IntoAt; sub-listed; few-sub; match-val; carried-val; match-end)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
 
@@ -60,32 +58,6 @@ stateValues x = valuesOf (proj₂ x)
 -- Rows of a set and of an operator over it
 
 private
-  -- What a row of `b` waits on, a row of `a` it came from waits on.
-  dep : ∀ {X Y : Set} {q k} {e₀ e : Ev X} {e₀′ e′ : Ev Y} → Kin e₀ e₀′ → Kin e e′ → Dep q e₀′ k e′ → Dep q e₀ k e
-  dep k-out  _ _ = tt
-  dep k-skip _ _ = tt
-  dep k-end  _ _ = tt
-  dep k-pin  kn d i with d i
-  ... | inj₁ kr = inj₁ kr
-  ... | inj₂ refl with kn
-  ...   | k-pin = inj₂ refl
-
-  -- Each row of `b` from a row of `a` of its kind: what a row of `b`
-  -- waits on is as few as what its row of `a` does.
-  reach-kin : ∀ {X Y : Set} {a : EmissionSet X} {b : EmissionSet Y} → (∀ {k e′} → b k e′ → Σ (Ev X) λ e → a k e × Kin e e′)
-            → ∀ {q e e′} → Kin e e′ → Reach a q e → Reach b q e′
-  reach-kin dn kq = reach-via (λ y _ d → let (e , x , kn) = dn y in e , x , dep kq kn d)
-
-  -- Few rows before a row, classically listed.
-  few-¬¬listed : ∀ {X : Set} {a : EmissionSet X} {q} → Few a q → ¬ ¬ Listed a q
-  few-¬¬listed {X} {a} {q} (ks , F) n = go ks λ ls G B → n (ls , (λ y kq → G (F y kq) kq (_ , y)) , B)
-    where
-      go : ∀ ks → (∀ ls → (∀ {k} → k ∈ ks → k ≺ q → Σ (Ev X) (a k) → k ∈ ls) → (∀ {k} → k ∈ ls → k ≺ q × Σ (Ev X) (a k)) → ⊥) → ⊥
-      go []       κ = κ [] (λ ()) (λ ())
-      go (k ∷ ks) κ = go ks λ ls G B → ¬¬-excluded-middle {A = k ≺ q × Σ (Ev X) (a k)} λ
-        { (yes h) → κ (k ∷ ls) (λ { (here refl) _ _ → here refl ; (there m) kq r → there (G m kq r) }) (λ { (here refl) → h ; (there m) → B m })
-        ; (no ¬h) → κ ls (λ { (here refl) kq r → ⊥-elim (¬h (kq , r)) ; (there m) → G m }) B }
-
   -- The carrier of a plain value is unpinned.
   carried-unp : ∀ {A : Set} {a : A} {e₁ : Ev (IE A)} → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁ → Unpinned e₁
   carried-unp mt with carried-val mt
@@ -112,6 +84,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     module E = Scan (scanIE f) (z , marked begin) u
     module PF = AccF f z (λ {y} {e} {e′} → InvAt.func It {y} {e} {e′})
     module EF = AccF (scanIE f) (z , marked begin) (λ {y} {e} {e′} → InvAt.func Iu {y} {e} {e′})
+    module EL = ListedFold (scanIE f) (z , marked begin) (λ {y} {e} {e′} → InvAt.func Iu {y} {e} {e′})
 
   img-mono : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
   img-mono = Mono.img-mono hm (λ {y} {e} {l} {ys} {e′} → InvAt.flat It {y} {e} {l} {ys} {e′}) c
@@ -166,48 +139,8 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     upU {e = pin r} x n = n (pin r , (E.spin x , reach-kin downU₀ k-pin (rchU x)) , k-pin)
     upU {e = end}   x n = n (end , (E.send x , reach-kin downU₀ k-end (rchU x)) , k-end)
 
-    -- The latest value among rows listed before `w`, decided: each comes
-    -- with its event, which is the only one there.
-    Latest : Pos → List Pos → Set
-    Latest w ks = (∀ {k y} → k ∈ ks → u k (out y) → ⊥)
-                ⊎ Σ Pos λ v → Σ (IE A) (λ y → u v (out y)) × v ≺ w × (∀ {k y} → k ∈ ks → u k (out y) → k ≼ v)
-
-    keep : ∀ {w k ks} → Latest w ks → (∀ {y} → u k (out y) → ⊥) → Latest w (k ∷ ks)
-    keep (inj₁ none) nk = inj₁ λ { (here refl) uy → nk uy ; (there m) → none m }
-    keep (inj₂ (v , vy , vw , mx)) nk = inj₂ (v , vy , vw , λ { (here refl) uy → ⊥-elim (nk uy) ; (there m) → mx m })
-
-    latest : ∀ {w} ks → (∀ {k} → k ∈ ks → k ≺ w × Σ (Ev (IE A)) (u k)) → Latest w ks
-    latest []       B = inj₁ λ ()
-    latest (k ∷ ks) B with latest ks (λ m → B (there m)) | B (here refl)
-    ... | inj₁ none | kw , out y , uk =
-      inj₂ (k , (y , uk) , kw , λ { (here refl) _ → ≼-refl {k} ; (there m) uy → ⊥-elim (none m uy) })
-    ... | inj₂ (v , vy , vw , mx) | kw , out y , uk with ≼-or-≻ v k
-    ...   | inj₁ vk = inj₂ (k , (y , uk) , kw , λ { (here refl) _ → ≼-refl {k} ; {k′} (there m) uy → ≼-trans {k′} {v} {k} (mx m uy) vk })
-    ...   | inj₂ kv = inj₂ (v , vy , vw , λ { (here refl) _ → ≺→≼ {k} {v} kv ; (there m) → mx m })
-    latest (k ∷ ks) B | L | kw , skip , uk = keep L λ uy → not-out (funcU uk uy)
-      where not-out : ∀ {y} → skip ≡ out y → ⊥
-            not-out ()
-    latest (k ∷ ks) B | L | kw , end , uk = keep L λ uy → not-out (funcU uk uy)
-      where not-out : ∀ {y} → end ≡ out y → ⊥
-            not-out ()
-    latest (k ∷ ks) B | L | kw , pin _ , uk = keep L λ uy → not-out (funcU uk uy)
-      where not-out : ∀ {r y} → pin r ≡ out y → ⊥
-            not-out ()
-
-    -- THE ELABORATED FOLD, from a listing: from the latest value before
-    -- the row, or from none.
-    eacc : ∀ {w} → Listed u w → ∀ {x} → u w (out x) → Σ (B × IE B) (E.Acc w)
-    eacc L = few-ind {t = u} (λ w → Listed u w → ∀ {x} → u w (out x) → Σ (B × IE B) (E.Acc w)) step (proj₁ L , proj₁ (proj₂ L)) L
-      where
-        step : ∀ {w} → Few u w → (∀ {v e} → u v e → v ≺ w → Listed u v → ∀ {x} → u v (out x) → Σ (B × IE B) (E.Acc v))
-             → Listed u w → ∀ {x} → u w (out x) → Σ (B × IE B) (E.Acc w)
-        step {w} _ ih (ks , F , B) {x} ux with latest ks B
-        ... | inj₁ none = _ , E.acc₀ ux (λ uy kw → none (F uy kw) uy)
-        ... | inj₂ (v , (y , uv) , vw , mx) with ih uv vw (sub-listed (ks , F , B) vw) uv
-        ...   | st , av = _ , E.acc av ux vw (λ uy vk kw → mx (F uy kw) uy vk)
-
     upL : ∀ {l e} → Listed u l → u l e → Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Kin e e′
-    upL {e = out y} L x = out _ , (E.sval (proj₂ (eacc L x)) , reach-kin downU₀ (k-out {a = y} {b = proj₁ (eacc L x)}) (rchU x)) , k-out
+    upL {e = out y} L x = out _ , (E.sval (proj₂ (EL.fold-listed L x)) , reach-kin downU₀ (k-out {a = y} {b = proj₁ (EL.fold-listed L x)}) (rchU x)) , k-out
     upL {e = skip}  L x = skip , (E.sstep x , reach-kin downU₀ k-skip (rchU x)) , k-skip
     upL {e = pin r} L x = pin r , (E.spin x , reach-kin downU₀ k-pin (rchU x)) , k-pin
     upL {e = end}   L x = end , (E.send x , reach-kin downU₀ k-end (rchU x)) , k-end
@@ -248,6 +181,10 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     lstU→ : ∀ {l} → Listed u l → Listed S′ l
     lstU→ (ks , F , B) = ks , (λ y kk → F (proj₁ (proj₂ (downU y))) kk)
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (upL (sub-listed (ks , F , B) (proj₁ (B m))) (proj₂ (proj₂ (B m)))))
+
+    wholeU→ : Whole u → Whole S′
+    wholeU→ W = proj₁ W , (λ y → proj₁ (proj₂ W) (proj₁ (proj₂ (downU y))))
+              , λ m → let (_ , ul) = proj₂ (proj₂ W) m in _ , proj₁ (proj₂ (upL (whole-listed W) ul))
 
     live-out : ∀ {y a} → t y (out a) → Live t y
     live-out ty tc cy with InvAt.quiet It tc ty cy
@@ -350,7 +287,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
             → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁
             → Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) (out b) e′
     sval-at {a = a} ac lv tk i ul Lu mt with carried-val mt
-    ... | n , refl with eacc Lu ul
+    ... | n , refl with EL.fold-listed Lu ul
     ...   | st , eac with out-at eac ul
     ...     | st₀ , refl =
       out _ , (E.sval eac , reach-kin downU₀ (k-out {a = instEmit (value a) n} {b = scanIE f st₀ (instEmit (value a) n)}) (rchU ul)) , lstU→ Lu
@@ -449,7 +386,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (lstU← {m} lm))
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
-    ; whole = λ wt ne lp → let (ls , F) = whole (wholeS← wt) (endedS← ne) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
+    ; whole = λ wt ne lp → wholeU→ (whole (wholeS← wt) (endedS← ne) lp)
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′ }
 
 ------------------------------------------------------------------------

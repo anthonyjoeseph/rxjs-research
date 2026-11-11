@@ -241,6 +241,13 @@ Near {Y} u m l = l ≼ m ⊎ (Σ (Ev Y) (u l) × Listed u l)
 Whole : ∀ {A : Set} → EmissionSet A → Set
 Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k} → k ∈ ks → Σ _ (t k))
 
+-- Every row listed: those before any position listed.
+whole-listed : ∀ {X : Set} {a : EmissionSet X} → Whole a → ∀ {v} → Listed a v
+whole-listed (ks , F , B) {v} =
+  filter (λ k → T? (k <ᵖ v)) ks
+  , (λ y kv → ∈-filter⁺ (λ k → T? (k <ᵖ v)) (F y) kv)
+  , λ m → let (m′ , kv) = ∈-filter⁻ (λ k → T? (k <ᵖ v)) m in kv , B m′
+
 -- The rows listed before a row listed before.
 sub-listed : ∀ {X : Set} {a : EmissionSet X} {w v} → Listed a w → v ≺ w → Listed a v
 sub-listed {w = w} {v} (ks , F , B) vw =
@@ -351,7 +358,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
               ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
     live    : ∀ {k l} → Img k l → Live t k → Live u l
     few     : ∀ {k l} → Img k l → Few t k
-    whole   : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Σ (List Pos) λ ls → ∀ {r e} → u r e → r ∈ ls
+    whole   : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pinned  : ∀ {k p} → t k (pin p) → Live t k
@@ -403,6 +410,9 @@ private
 
     whole← : Whole b → Whole a
     whole← (ks , F , B) = ks , (λ ak → F (proj₁ (proj₂ (to ak)))) , λ m → proj₁ (fro (proj₂ (B m))) , proj₁ (proj₂ (fro (proj₂ (B m))))
+
+    whole→ : Whole a → Whole b
+    whole→ (ks , F , B) = ks , (λ bk → F (proj₁ (proj₂ (fro bk)))) , λ m → proj₁ (to (proj₂ (B m))) , proj₁ (proj₂ (to (proj₂ (B m))))
 
     near→ : ∀ {m l} → Near a m l → Near b m l
     near→ (inj₁ lm)             = inj₁ lm
@@ -515,7 +525,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; place = λ {m} um lv lm → placed′ {m} (place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.lst← {m} lm))
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
-    ; whole = λ wt ne lp → let (ls , F) = whole (T.whole← wt) (T.ended← ne) lp in ls , λ ur → F (proj₁ (proj₂ (down′ ur)))
+    ; whole = λ wt ne lp → U.whole→ (whole (T.whole← wt) (T.ended← ne) lp)
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
@@ -676,7 +686,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
     ; img-mono = Mono.img-mono hm flat c ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm (lstU fm))
     ; live = live
-    ; spent = λ i sp ne → let (ls , F) = whole (whole-of (few i) sp) ne tt in ls , λ ur _ → F ur
+    ; spent = λ i sp ne → let (ls , F , _) = whole (whole-of (few i) sp) ne tt in ls , λ ur _ → F ur
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few
     ; pinned = pinned′ }
     where

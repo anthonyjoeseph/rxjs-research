@@ -6,6 +6,8 @@ open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; 1+n≰n; m≤m⊔n; m≤n⊔m)
 open import Data.List.Relation.Unary.All using (_∷_; [])
@@ -17,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Position using (Pos; Label; ix; last; _⊕_; inside)
 open import denotation.Events using (inside-++; inside-self; <ᵖ-part; <ᵖ-ix)
 open import denotation.Events using (ofᴱ; Events)
-open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; Den; enter; Truncate; InE; at-out; at-end; on-out;
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; EmissionSet; _≺_; Den; enter; Truncate; Reach; InE; at-out; at-end; on-out;
   on-skip; spin; MapT; map-out; map-skip; map-end; map-pin; Spin; module Scan; DeferT; guard;
   body; from; module Op)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-antisym; ≺-ext; LimD)
@@ -149,6 +151,24 @@ of-func p i (x ∷ xs) at-out     at-out      = refl
 of-func p i (x ∷ xs) at-out     (on-out r′) = ⊥-elim (of-fresh p i xs r′)
 of-func p i (x ∷ xs) (on-out r) at-out      = ⊥-elim (of-fresh p i xs r)
 of-func p i (x ∷ xs) (on-out r) (on-out r′) = of-func p (suc i) xs r r′
+
+-- An of's rows: finitely many, each under its subscription.
+of-rows : ∀ {A : Set} → Pos → ℕ → List A → List Pos
+of-rows p i []       = [ p ⊕ [ last ] ]
+of-rows p i (_ ∷ xs) = (p ⊕ [ ix i ]) ∷ of-rows p (suc i) xs
+
+of-in : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → y ∈ of-rows p i xs
+of-in p i []       at-end     = here refl
+of-in p i (_ ∷ xs) at-out     = here refl
+of-in p i (_ ∷ xs) (on-out r) = there (of-in p (suc i) xs r)
+
+of-row : ∀ {A : Set} p i (xs : List A) {k} → k ∈ of-rows p i xs → Σ (Ev A) (InE (ofᴱ p i xs) k)
+of-row p i []       (here refl) = end , at-end
+of-row p i (x ∷ xs) (here refl) = out x , at-out
+of-row p i (x ∷ xs) (there m)   = let (e , r) = of-row p (suc i) xs m in e , on-out r
+
+of-reach : ∀ {A} p i (xs : List A) {y e} → Reach (InE (ofᴱ p i xs)) y e
+of-reach p i xs = of-rows p i xs , λ r _ _ → of-in p i xs r
 
 -- A timeline's rows hold no pin.
 ine-pin : ∀ {A} {es : Events A} {y r} → InE es y (pin r) → ⊥

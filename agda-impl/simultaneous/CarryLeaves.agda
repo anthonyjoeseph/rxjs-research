@@ -10,10 +10,10 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Properties using (++-assoc; ++-cancelˡ; ∷-injectiveˡ)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Bool.Properties using (T?)
 open import denotation.Position using (_<ᵖ_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -37,6 +37,7 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
+open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
 open import simultaneous.Carry using (Bare; Carry; CarryAt; Emb; Fresh; PMap; Within; _∪ᴹ_; _⊆ᴹ_; carry; emb-under; instant-⊕; NotHot; Grown; joins-grow)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE; elaborate)
@@ -150,20 +151,6 @@ private
 
   -- The rows of an `of`: one label under its subscription, finitely
   -- many, none pinned, the end last.
-  of-pos : ∀ {A : Set} → Pos → ℕ → List A → List Pos
-  of-pos p i []       = [ p ⊕ [ last ] ]
-  of-pos p i (_ ∷ xs) = (p ⊕ [ ix i ]) ∷ of-pos p (suc i) xs
-
-  of-in : ∀ {A : Set} p i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e → k ∈ of-pos p i xs
-  of-in p i []       at-end     = here refl
-  of-in p i (x ∷ xs) at-out     = here refl
-  of-in p i (x ∷ xs) (on-out r) = there (of-in p (suc i) xs r)
-
-  of-row : ∀ {A : Set} p i (xs : List A) {k} → k ∈ of-pos p i xs → Σ (Ev A) (InE (Evs.ofᴱ p i xs) k)
-  of-row p i []       (here refl) = end , at-end
-  of-row p i (x ∷ xs) (here refl) = out x , at-out
-  of-row p i (x ∷ xs) (there m)   = let (e , r) = of-row p (suc i) xs m in e , on-out r
-
   of-unp : ∀ {A : Set} p i (xs : List A) {k e} → InE (Evs.ofᴱ p i xs) k e → Unpinned e
   of-unp p i []       at-end     = tt
   of-unp p i (x ∷ xs) at-out     = tt
@@ -207,10 +194,10 @@ private
     u = Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))
 
     allT : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p 0 xs) k e → k ∈ ks
-    allT = of-pos p 0 xs , of-in p 0 xs
+    allT = of-rows p 0 xs , of-in p 0 xs
 
     allU : Σ (List Pos) λ ks → ∀ {k e} → InE (Evs.ofᴱ p′ 0 (L.map V xs)) k e → k ∈ ks
-    allU = of-pos p′ 0 (L.map V xs) , of-in p′ 0 (L.map V xs)
+    allU = of-rows p′ 0 (L.map V xs) , of-in p′ 0 (L.map V xs)
 
     reachT : ∀ {q e} → Reach (InE (Evs.ofᴱ p 0 xs)) q e
     reachT = proj₁ allT , λ r _ _ → proj₂ allT r
@@ -256,7 +243,7 @@ private
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
       ; few     = λ _ → fewT
-      ; whole   = λ _ _ _ → proj₁ allU , λ ur → proj₂ allU (proj₁ ur)
+      ; whole   = λ _ _ _ → proj₁ allU , (λ ur → proj₂ allU (proj₁ ur)) , λ m → let (e , r) = of-row p′ 0 (L.map V xs) m in e , r , reachU
       ; bk      = λ _ → proj₁ allT
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }
       ; PB      = λ _ _ → ⊥
