@@ -38,7 +38,7 @@ open import denotation.Laws.Count using (ag-cnt)
 open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; ⊑-refl)
 open import denotation.Laws.ConnectNe using (Causal)
 open import denotation.Laws using (from; inv-approx; good-cons; causal-at)
-open import denotation.Laws.Truth using (Finite; Rel; Safe; few-ag; safe-ag; spin-truth; truth-finite; truth-lies; truth-refl)
+open import denotation.Laws.Truth using (Finite; Rel; Safe; few-ag; safe-ag; spin-truth; truth-finite; truth-lies; placed-refl; Placed)
 open import denotation.Laws.Truth.Ops using (defer-truth; map-truth; scan-truth; take-truth)
 
 -- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
@@ -66,9 +66,9 @@ postulate
 --   with no row of its own, yet the next handle shows it the source's
 --   later rows.
 truth : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → Rel (Hots ρ) (approx n o ρ) (approx (suc n) o ρ)
-truth n       (cold c)          ρ g p ok = truth-refl
-truth n       empty             ρ g p ok = truth-refl
-truth n       (of xs)           ρ g p ok = truth-refl
+truth n       (cold c)          ρ g p ok = placed-refl
+truth n       empty             ρ g p ok = placed-refl
+truth n       (of xs)           ρ g p ok = placed-refl
 truth n       (map f s)         ρ g = map-truth f {approx n s ρ} {approx (suc n) s ρ} (truth n s ρ g)
 truth n       (scan f z s)      ρ g = scan-truth f z {approx n s ρ} {approx (suc n) s ρ} (truth n s ρ g)
 truth n       (takeWhile i k s) ρ g =
@@ -82,7 +82,7 @@ truth n       (connect s b)     ρ g =
     (λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)) (λ {t} L → inv-approx (suc n) b (hot t ∷ ρ) (good-cons L g))
     (causal-at n b ρ) (causal-at (suc n) b ρ)
     (truth n s ρ g) (λ {t} L → truth n b (hot t ∷ ρ) (good-cons L g))
-truth n       (connected i)     ρ g p ok = truth-refl
+truth n       (connected i)     ρ g p ok = placed-refl
 truth zero    (defer l)         ρ g = spin-truth (inv-approx zero (Later.force l) ρ g)
 truth (suc n) (defer l)         ρ g =
   defer-truth (inv-approx n (Later.force l) ρ g) (inv-approx (suc n) (Later.force l) ρ g) (truth n (Later.force l) ρ g)
@@ -119,7 +119,7 @@ module _ {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) (g : GoodEnv ρ) (p : P
     ... | h′ , s′ , ag = proj₂ (few-ag ag′ (≼-refl {x}) (ks , h′)) , safe-ag ag′ s′ , AgreeTo-trans ag ag′
       where
         ag′ : AgreeTo x (T (k + n)) (T (suc k + n))
-        ag′ = truth-lies (truth (k + n) o ρ g p ok) (ks , h′) s′
+        ag′ = truth-lies (Placed.tr (truth (k + n) o ρ g p ok)) (ks , h′) s′
 
     -- Down the approximants from a finite `n`-th, the same rows.
     finer : ∀ n (ks : List Pos) → (∀ {y e} → T n y e → y ∈ ks)
@@ -129,7 +129,7 @@ module _ {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) (g : GoodEnv ρ) (p : P
     ... | h′ , eq = (λ x → h′ (proj₂ step x)) , (λ x → proj₁ step (proj₁ eq x)) , (λ x → proj₂ eq (proj₂ step x))
       where
         step : ∀ {y e} → (T (k + n) y e → T (suc k + n) y e) × (T (suc k + n) y e → T (k + n) y e)
-        step = truth-finite (truth (k + n) o ρ g p ok) (ks , h′)
+        step = truth-finite (Placed.tr (truth (k + n) o ρ g p ok)) (ks , h′)
 
   -- NEVER A LIE, at a row shown or an instant's first.
   never-lies : ∀ n {x} → Few (T n) x → Safe (T n) x → AgreeTo x (T n) M

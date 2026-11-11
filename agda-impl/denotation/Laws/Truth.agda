@@ -35,7 +35,7 @@ open import denotation.Read using (Visible; loud)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-split; ≺-irrefl; ≺-trans;
   ticks)
 open import denotation.Laws.Count using (Cov; ⊑?; cov-down; dep-trans)
-open import denotation.Laws.Worlds using (Ok; InvD; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑; ⊑-trans; ⊑-cmp; ⊑-snoc; conv)
+open import denotation.Laws.Worlds using (W⁼; here; Ok; InvD; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑; ⊑-trans; ⊑-cmp; ⊑-snoc; conv)
 open import denotation.Laws.Cut using (module SpinB; spinIx; ix-back)
 open import denotation.Laws using (from; aft)
 
@@ -296,9 +296,21 @@ truth-refl = record
   ; agree   = λ _ _ _ → (λ a → a) , (λ a → a)
   }
 
+-- PLACED: a truth whose every cut is subscribed in the world of the
+-- reading at `p`.
+record Placed {A : Set} (H : Pos → Set) (p : Pos) (t t′ : EmissionSet A) : Set₁ where
+  constructor placing
+  field
+    tr     : Truth t t′
+    placed : ∀ {s} → Truth.Cut tr s → W⁼ H p s
+
+-- Nothing cut, placed anywhere.
+placed-refl : ∀ {A H p} {t : EmissionSet A} → Placed H p t t
+placed-refl = placing truth-refl λ ()
+
 -- Every admissible subscription of `d′` is that of `d`, past its cuts.
 Rel : ∀ {A} → (Pos → Set) → Den A → Den A → Set₁
-Rel H d d′ = ∀ p → Ok H p → Truth (enter d p) (enter d′ p)
+Rel H d d′ = ∀ p → Ok H p → Placed H p (enter d p) (enter d′ p)
 
 ------------------------------------------------------------------------
 -- A cut against its unfolding
@@ -325,14 +337,14 @@ guarded d inv p ok = [] , λ { guard lt _ → ⊥-elim (≺-irrefl {p ⊕ [ ix 0
 -- A CUT IS ITS SPIN: the unfolding's guard is the spin's first row, and
 -- its body lies at or past the second, which every row past it waits on.
 spin-truth : ∀ {A H} {d : Den A} → InvD H d → Rel H Op.⊥ (Op.defer d)
-spin-truth {A} {H} {d} inv p ok = record
+spin-truth {A} {H} {d} inv p ok = placing (record
   { Cut     = _≡ p
   ; silent  = λ { refl _ (spin _ , _) → hush }
   ; shows   = λ { refl i → p ⊕ [ ix i ] , skip , ⊑-refl _ , spin i , spin-reach p i }
   ; again   = λ { refl (() , _) }
   ; shadow  = λ { refl (body x , _) _ rp _ → ⊥-elim (proj₂ (aft d inv p ok x) refl (≼-≺-≺ {_} {p} {b₀} (⊑-≼ rp) (Equivalence.from T-≡ (<ᵖ-below p [])))) }
   ; agree   = λ q e c → to c , back c
-  }
+  }) (λ { refl → here })
   where
     b₀ : Pos
     b₀ = p ⊕ [ ix 1 ]

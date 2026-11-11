@@ -29,11 +29,11 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; 
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺→≼; ≼-refl; ≼-trans; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; ≼-split; ≺-irrefl; ≺-trans;
   reach-via; entered-reach; entered-few; few-ind; ≺-ext)
 open import denotation.Laws.Count using (Cov; cov-down; cov-stable; em)
-open import denotation.Laws.Worlds using (ok-step; InvD; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑; ⊑-trans; ⊑-cmp; ⊑-snoc;
+open import denotation.Laws.Worlds using (inW; shrink⁼; ok-step; InvD; _⊑_; ⊑-refl; ⊑-≼; ⊕-assoc; ⊕-identityʳ; inside-⊑; ⊑-trans; ⊑-cmp; ⊑-snoc;
   ⊑-snoc⁺; conv; InvAt)
 open import denotation.Laws using (from; scan-ag)
 open import denotation.Laws.Fold using (fold)
-open import denotation.Laws.Truth using (Before; Clean; Lie; Rel; Spun; Truth; before-down; before-of; clean-down; clean-of; guarded; lie-up; pull; where?)
+open import denotation.Laws.Truth using (Before; Clean; Lie; Placed; placing; Rel; Spun; Truth; before-down; before-of; clean-down; clean-of; guarded; lie-up; pull; where?)
 
 ------------------------------------------------------------------------
 -- Operators that relabel rows where they lie
@@ -282,7 +282,7 @@ private
 -- A MAP KEEPS THE TRUTH: each row lies on its input's, and is reached
 -- once that one is, so a clean row lies on a clean one.
 map-truth : ∀ {A B H} (f : A → B) {s s′ : Den A} → Rel H s s′ → Rel H (Op.map f s) (Op.map f s′)
-map-truth {A} {B} f {s} {s′} R p ok = record
+map-truth {A} {B} f {s} {s′} R p ok = placing (record
   { Cut     = Cut
   ; silent  = λ c sp x → lbl-silent (lbl (proj₁ x)) (silent c sp (row (proj₁ x)))
   ; shows   = λ c i → shown (shows c i)
@@ -290,9 +290,9 @@ map-truth {A} {B} f {s} {s′} R p ok = record
   ; shadow  = λ { c (map-pin y , _) l rs bf → shade (shadow c y l rs (before bf)) }
   ; agree   = λ q e cl → (λ { (x , _) → let v = via x (proj₁ (agree q (src x) (clean cl (lbl x)))) in v , lift re′ v })
                        , (λ { (x , _) → let v = via x (proj₂ (agree q (src x) (clean cl (lbl x)))) in v , lift re v })
-  }
+  }) (Placed.placed (R p ok))
   where
-    open Truth (R p ok)
+    open Truth (Placed.tr (R p ok))
     open Mapped f
 
     t t′ : EmissionSet A
@@ -326,16 +326,16 @@ map-truth {A} {B} f {s} {s′} R p ok = record
 -- A DEFER KEEPS THE TRUTH: its body's cuts are its own, and its guard
 -- is the same row either way.
 defer-truth : ∀ {A H} {d d′ : Den A} → InvD H d → InvD H d′ → Rel H d d′ → Rel H (Op.defer d) (Op.defer d′)
-defer-truth {A} {H} {d} {d′} inv inv′ R p ok = record
+defer-truth {A} {H} {d} {d′} inv inv′ R p ok = placing (record
   { Cut     = Cut
   ; silent  = λ { _ _ (guard , _) → hush ; c sp (body x , _) → silent c sp x }
   ; shows   = λ c i → shown (shows c i)
   ; again   = λ { c (body y , _) l rs i → shade (again c y l rs i) }
   ; shadow  = λ { c (body y , _) l rs bf → shade (shadow c y l rs (before bf)) }
   ; agree   = λ q e cl → fwd cl , bwd cl
-  }
+  }) (λ c → inW (shrink⁼ (Placed.placed (R (p ⊕ [ ix 1 ]) (ok-step p ok)) c)))
   where
-    open Truth (R (p ⊕ [ ix 1 ]) (ok-step p ok))
+    open Truth (Placed.tr (R (p ⊕ [ ix 1 ]) (ok-step p ok)))
 
     -- A body row waits on the guard and on body rows.
     in-body : ∀ (e : Den A) {k e₀} → enter e (p ⊕ [ ix 1 ]) k e₀ → Reach (DeferT e p) k e₀
@@ -370,16 +370,16 @@ defer-truth {A} {H} {d} {d′} inv inv′ R p ok = record
 -- agrees up to a clean value, whose past is all clean.  A value's fold is
 -- classical, but what it is needed for is decidable or a negation.
 scan-truth : ∀ {A B H} (f : B → A → B) z {s s′ : Den A} → Rel H s s′ → Rel H (Op.scan f z s) (Op.scan f z s′)
-scan-truth {A} {B} f z {s} {s′} R p ok = record
+scan-truth {A} {B} f z {s} {s′} R p ok = placing (record
   { Cut     = Cut
   ; silent  = λ c sp x → lbl-silent (lbl (proj₁ x)) (silent c sp (row (proj₁ x)))
   ; shows   = λ c i → shown c (shows c i)
   ; again   = λ { c (Scan.spin y , _) l rs i → shade (again c y l rs i) }
   ; shadow  = λ { c (Scan.spin y , _) l rs bf → shade (shadow c y l rs (before bf)) }
   ; agree   = λ q e cl → fwd cl , bwd cl
-  }
+  }) (Placed.placed (R p ok))
   where
-    tr = R p ok
+    tr = Placed.tr (R p ok)
     open Truth tr
     open Scanned f z
 
@@ -454,16 +454,16 @@ scan-truth {A} {B} f z {s} {s′} R p ok = record
 -- not decidable, but what it is needed for is a negation.
 take-truth : ∀ {A H} (i : Bool) (keep : A → Bool) {s s′ : Den A} → InvD H s → InvD H s′
            → Rel H s s′ → Rel H (Op.takeWhile i keep s) (Op.takeWhile i keep s′)
-take-truth {A} {H} i keep {s} {s′} Is Is′ R p ok = record
+take-truth {A} {H} i keep {s} {s′} Is Is′ R p ok = placing (record
   { Cut     = Cut′
   ; silent  = λ c sp x → quiet (proj₁ c) sp (proj₁ x)
   ; shows   = shown
   ; again   = λ { c (left x nf _ , _) l rc j → kept-at nf (again (proj₁ c) x l rc j) }
   ; shadow  = λ { c (left x′ nf′ _ , _) l rc bf → kept-at (unfailed bf nf′) (shadow (proj₁ c) x′ l rc (before-in bf (unfailed bf nf′))) }
   ; agree   = λ q e cl → fwd cl , bwd cl
-  }
+  }) (λ c → Placed.placed (R p ok) (proj₁ c))
   where
-    tr = R p ok
+    tr = Placed.tr (R p ok)
     open Truth tr
     open Taken i keep
     open TakeWhile i keep using (TakeT; Failed; pass; fail; stop; step; tend; left)
