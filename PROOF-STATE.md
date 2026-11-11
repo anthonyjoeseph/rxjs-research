@@ -52,8 +52,7 @@ positions over its own worlds; the meaning is reached through
 children, then a concat's queued lane. Settled when each former's leaf
 is a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`,
-`read-post`.
+Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`.
 
 #### THE PROTOCOL
 

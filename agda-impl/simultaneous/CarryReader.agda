@@ -806,7 +806,7 @@ private
           → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter dP p) × Joins ρ envP envE er M
             × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′
   read-at {M₀ = M₀} {ρ} {envP} {envE} hm er jn ap i m₀ okP okE nh fr refl refl Iu =
-    R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , read-post {d′ = hot (Proper (HotOf′ (er i)))} Iu R.reader-rejoined
+    R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined
     where module R = Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
 
 -- A READER of a bound hot carries it.
