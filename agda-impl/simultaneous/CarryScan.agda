@@ -475,6 +475,14 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
 -- The former
 
 private
+  -- A scan's row is its source's.
+  scan-row : ∀ {A B : Set} {f : B → A → B} {z : B} {t : EmissionSet A} {q e} → Scan.ScanT f z t q e → Σ (Ev A) (t q)
+  scan-row (Scan.sval (Scan.acc₀ x _))    = _ , x
+  scan-row (Scan.sval (Scan.acc _ x _ _)) = _ , x
+  scan-row (Scan.sstep x)                 = _ , x
+  scan-row (Scan.spin x)                  = _ , x
+  scan-row (Scan.send x)                  = _ , x
+
   kin-refl : ∀ {X : Set} (e : Ev X) → Kin e e
   kin-refl (out _) = k-out
   kin-refl skip    = k-skip
@@ -511,6 +519,6 @@ scan-carry f z d d′ p p′ hm It Iu c =
 
 carry-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
 carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-  in M , ms , hm′ , wi , scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
+  let (M , ms , hm′ , wi , br , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
+  in M , ms , hm′ , wi , (λ tk → br (proj₂ (scan-row (proj₁ tk)))) , scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c

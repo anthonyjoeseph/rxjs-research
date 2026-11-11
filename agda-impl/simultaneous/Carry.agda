@@ -657,6 +657,11 @@ EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (HotsListe
 Within : (Pos → Set) → PMap → PMap → Pos → Set
 Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ W⁼ H p x
 
+-- The map pairs nothing strictly under a row: what a former putting a
+-- row under another's position grows the map by.
+Bare : ∀ {A : Set} → PMap → EmissionSet A → Set
+Bare M t = ∀ {k e x y} → t k e → M x y → k ⊑ x → x ≡ k
+
 -- CARRIED under every environment of carried binders: subscribed at
 -- admissible positions the map pairs, its worlds untouched, the subterm
 -- extends the map over its worlds and carries.
@@ -667,7 +672,7 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
                 → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
                 → ∀ p p′ → (Σ Pos λ p₀ → M₀ p p₀ × p₀ ⊑ p′) → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p
+                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p)
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
@@ -692,8 +697,8 @@ postulate
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
 carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-  in M , ms , hm′ , wi , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+  let (M , ms , hm′ , wi , br , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
+  in M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
 
 -- Positions one label under a common prefix.
 private
@@ -751,6 +756,13 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
   within : Within HP M₀ M p
   within (inj₁ m)                  = inj₁ m
   within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
+
+  -- Rows one label under the subscription have nothing paired under them.
+  bare : ∀ {X : Set} {t : EmissionSet X} → (∀ {k e} → t k e → Σ Label λ a → Plain a × k ≡ p ⊕ [ a ]) → Bare M t
+  bare sh tk (inj₁ m) kx with sh tk
+  ... | a , pl , refl = ⊥-elim (⊑-≼ (subst ((p ⊕ [ a ]) ⊑_) (fr m (p ⊕ [ a ] , inW (step here pl) , kx)) kx) (≺-ext p []))
+  bare sh tk (inj₂ (b , _ , refl , _)) kx with sh tk
+  ... | a , pl , refl = cong (λ c → p ⊕ [ c ]) (⊑-one p kx)
 
   -- A position's path past one subscription, put under the other.
   up : Pos → Pos
@@ -905,11 +917,13 @@ private
       }
 
   of-carried : ∀ {A HP HE LP M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′
-             → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p
+             → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p × Bare M (Truncate (InE (Evs.ofᴱ p 0 xs)))
                × CarryAt valuesOf M HP HE LP (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
-  of-carried {A} {HP} {HE} {LP} xs E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , X.carried
+  of-carried {A} {HP} {HE} {LP} {p = p} xs E₀ fr m₀ pp = O.M , inj₁ , O.emb , O.within , O.bare {t = Truncate (InE (Evs.ofᴱ p 0 xs))} (λ {k} {e} tk → of-shape {k} {e} (proj₁ tk)) , X.carried
     where module X = OfRows {A} {HP} {HE} {LP} xs E₀ fr m₀ pp
           module O = OneUnder E₀ fr m₀ pp
+          of-shape : ∀ {k e} → InE (Evs.ofᴱ p 0 xs) k e → Σ Label λ a → Plain a × k ≡ p ⊕ [ a ]
+          of-shape r = let (a , pl , e , _) = of-up p p 0 xs r in a , pl , e
 
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
