@@ -100,6 +100,11 @@ module _ {X : Set} {Q : Pos} {t t′ : EmissionSet X} (ag : AgreeTo Q t t′) wh
   seen-ag : ∀ {k e} → k ≼ Q → Seen t k e → Seen t′ k e
   seen-ag {k} kQ (pr , F) = proj₁ (upto (proper-ag ag) {k} kQ) pr , few-ag ag kQ F
 
+-- A value's own row.
+value-row : ∀ {X B : Set} {u : EmissionSet X} (f : X → List B) {i k a} → Nth (V f u) i k a → Σ X λ x → u k (out x) × f x ≡ a ∷ []
+value-row {u = u} f n with Nths.nth-val (V f u) n
+... | vrow r fx = _ , r , fx
+
 ------------------------------------------------------------------------
 -- Finitely many rows, and an instant's first
 
@@ -162,6 +167,15 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
   up : ∀ n {q e} → tₙ n q e → Visible e → AgreeTo q (tₙ n) t
   up n x v = never-lies n s [] (λ ()) root ok₀ (enter-few (approx n s []) root x (visible-unpinned v)) (inj₂ (_ , x , v))
 
+  -- A value's row, either way.
+  value-down : ∀ {B : Set} (f : A → List B) {i k a} → Nth (V f t) i k a → Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k t (tₙ m)
+  value-down f n with Nths.nth-val (V f t) n
+  ... | vrow r _ = down r tt
+
+  value-up : ∀ {B : Set} (f : A → List B) n {i k a} → Nth (V f (tₙ n)) i k a → AgreeTo k (tₙ n) t
+  value-up f n nk with Nths.nth-val (V f (tₙ n)) nk
+  ... | vrow r _ = up n r tt
+
   private
     left-down : ∀ {B : Set} (f : A → List B) {q} → Left f t q → ∀ m → Left f (tₙ m) q
     left-down f lf m {k} x qk ik = lf (proj₁ (upto (up m x tt) {k} (≼-refl {k})) x) qk ik
@@ -169,9 +183,9 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
   -- AN INSTANT OVER IN THE MEANING is over in every deep enough approximant.
   over-down : ∀ {B : Set} (f : A → List B) {q x} → t q (out x) → Over f t (just q)
             → Σ ℕ λ N → ∀ m → N ≤ m → Over f (tₙ m) (just q)
-  over-down f tq (lf , inj₁ (k , e , sn , qk , d)) with reach (proj₂ sn)
-  ... | N , ag = N , λ m le → left-down f lf m , inj₁ (k , e , seen-ag (ag m le) (≼-refl {k}) sn , qk , d)
-  over-down f {q} tq (lf , inj₂ (ks , h)) = length L , λ m le → left-down f lf m , inj₂ (ks , spent m le)
+  over-down f {q} tq (lf , inj₁ (k , e , sn , qk , d)) with reach (proj₂ sn)
+  ... | N , ag = N , λ m le → left-down f {q} lf m , inj₁ (k , e , seen-ag (ag m le) (≼-refl {k}) sn , qk , d)
+  over-down f {q} tq (lf , inj₂ (ks , h)) = length L , λ m le → left-down f {q} lf m , inj₂ (ks , spent m le)
     where
       fin : Finite t
       fin = finite-of (enter-few (⟦ s ⟧ []) root tq tt) (λ x qk → proj₁ (h x qk))
@@ -184,7 +198,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
 
       spent : ∀ m → length L ≤ m → ∀ {k e} → tₙ m k e → q ≺ k → k ∈ ks × Proper (tₙ m) k e
       spent m le {k} x qk with h (proj₂ (same m le) x) qk
-      ... | mk , pr = mk , proj₁ (upto (proper-ag ⟨ (λ _ → same m le) ⟩) {k} (≼-refl {k})) pr
+      ... | mk , pr = mk , proj₁ (upto (proper-ag {Q = k} ⟨ (λ {y} {e} _ → same m le {y} {e}) ⟩) {k} (≼-refl {k})) pr
 
   -- AN INSTANT OVER IN AN APPROXIMANT is over in the meaning.
   over-up : ∀ {B : Set} (f : A → List B) n {q x} → tₙ n q (out x) → Over f (tₙ n) (just q) → Over f t (just q)
@@ -226,7 +240,7 @@ module Toward {A : Set} (s : Obs Timeline [] A) where
           left {k} x qk ik = lf (proj₂ (upto ag₁ {k} (≺→≼ {k} {f₁} (instant-≺ k f₁ (subst (_≺ⁱ instant f₁) (sym ik) later)))) x) qk ik
   over-up f n {q} tq (lf , inj₂ (ks , h)) =
     (λ x qk ik → lf (proj₂ eq x) qk ik) ,
-    inj₂ (ks , λ {k} x qk → proj₁ (h (proj₂ eq x) qk) , proj₁ (upto (proper-ag ⟨ (λ _ → eq) ⟩) {k} (≼-refl {k})) (proj₂ (h (proj₂ eq x) qk)))
+    inj₂ (ks , λ {k} x qk → proj₁ (h (proj₂ eq x) qk) , proj₁ (upto (proper-ag {Q = k} ⟨ (λ {y} {e} _ → eq {y} {e}) ⟩) {k} (≼-refl {k})) (proj₂ (h (proj₂ eq x) qk)))
     where
       eq : ∀ {y e} → (tₙ n y e → t y e) × (t y e → tₙ n y e)
       eq = finite-true n s [] (λ ()) root ok₀ (finite-of (enter-few (approx n s []) root tq tt) (λ x qk → proj₁ (h x qk)))
@@ -324,68 +338,110 @@ module _ {A : Set} (o : SObs [] A) where
     past₂ : ∀ N₁ N₂ → N₁ ≤ N₁ ⊔ N₂ × N₂ ≤ N₁ ⊔ N₂
     past₂ N₁ N₂ = m≤m⊔n N₁ N₂ , m≤n⊔m N₁ N₂
 
-  erase-x : ∀ {i k a} → Nth (VX o) i k a → Live (elaborated o) k → Σ Pos λ k′ → Nth (VE o) i k′ a × Live (events o) k′
-  erase-x {k = k} nx lx with Nths.nth-val (VX o) nx
-  ... | vrow r _ with TX.down r tt
-  ...   | N , ag with Erₙ.values-ut N o (nth-ag (ag N ≤-refl) valuesOf (≼-refl {k}) nx) (live-ag (ag N ≤-refl) (≼-refl {k}) lx)
-  ...     | k′ , ne , le with Nths.nth-val (V [_] (TE.tₙ N)) ne
-  ...       | vrow r′ refl = k′ , nth-ag (TE.up N r′ tt) [_] (≼-refl {k′}) ne , live-ag (TE.up N r′ tt) (≼-refl {k′}) le
+  opaque
+    erase-x : ∀ {i k a} → Nth (VX o) i k a → Live (elaborated o) k → Σ Pos λ k′ → Nth (VE o) i k′ a × Live (events o) k′
+    erase-x {i} {k} {a} nx lx = carry (TX.value-down valuesOf nx)
+      where
+        carry : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k (elaborated o) (TX.tₙ m)) → Σ Pos λ k′ → Nth (VE o) i k′ a × Live (events o) k′
+        carry (N , ag) = back (Erₙ.values-ut N o (nth-ag (ag N ≤-refl) valuesOf (≼-refl {k}) nx) (live-ag (ag N ≤-refl) (≼-refl {k}) lx))
+          where
+            back : (Σ Pos λ k′ → Nth (V [_] (TE.tₙ N)) i k′ a × Live (TE.tₙ N) k′) → Σ Pos λ k′ → Nth (VE o) i k′ a × Live (events o) k′
+            back (k′ , ne , le) = k′ , nth-ag (TE.value-up [_] N ne) [_] (≼-refl {k′}) ne , live-ag (TE.value-up [_] N ne) (≼-refl {k′}) le
 
-  erase-e : ∀ {i k′ a} → Nth (VE o) i k′ a → Live (events o) k′ → Σ Pos λ k → Nth (VX o) i k a × Live (elaborated o) k
-  erase-e {k′ = k′} ne le with Nths.nth-val (VE o) ne
-  ... | vrow r refl with TE.down r tt
-  ...   | N , ag with Erₙ.values-tu N o (nth-ag (ag N ≤-refl) [_] (≼-refl {k′}) ne) (live-ag (ag N ≤-refl) (≼-refl {k′}) le)
-  ...     | k , nx , lx with Nths.nth-val (V valuesOf (TX.tₙ N)) nx
-  ...       | vrow r′ _ = k , nth-ag (TX.up N r′ tt) valuesOf (≼-refl {k}) nx , live-ag (TX.up N r′ tt) (≼-refl {k}) lx
+    erase-e : ∀ {i k′ a} → Nth (VE o) i k′ a → Live (events o) k′ → Σ Pos λ k → Nth (VX o) i k a × Live (elaborated o) k
+    erase-e {i} {k′} {a} ne le = carry (TE.value-down [_] ne)
+      where
+        carry : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k′ (events o) (TE.tₙ m)) → Σ Pos λ k → Nth (VX o) i k a × Live (elaborated o) k
+        carry (N , ag) = back (Erₙ.values-tu N o (nth-ag (ag N ≤-refl) [_] (≼-refl {k′}) ne) (live-ag (ag N ≤-refl) (≼-refl {k′}) le))
+          where
+            back : (Σ Pos λ k → Nth (V valuesOf (TX.tₙ N)) i k a × Live (TX.tₙ N) k) → Σ Pos λ k → Nth (VX o) i k a × Live (elaborated o) k
+            back (k , nx , lx) = k , nth-ag (TX.value-up valuesOf N nx) valuesOf (≼-refl {k}) nx , live-ag (TX.value-up valuesOf N nx) (≼-refl {k}) lx
 
-  erase-rank : ∀ {i k k′ a b n} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
-             → Rank (elaborated o) k n → Rank (events o) k′ n
-  erase-rank {k = k} {k′} {n = n} nx _ ne _ r with Nths.nth-val (VX o) nx | Nths.nth-val (VE o) ne
-  ... | vrow rx _ | vrow re refl with TX.down rx tt | TE.down re tt
-  ...   | N₁ , agX | N₂ , agE = at (agX (N₁ ⊔ N₂) (proj₁ (past₂ N₁ N₂))) (agE (N₁ ⊔ N₂) (proj₂ (past₂ N₁ N₂)))
-    where
-      at : ∀ {m} → AgreeTo k (elaborated o) (TX.tₙ m) → AgreeTo k′ (events o) (TE.tₙ m) → Rank (events o) k′ n
-      at {m} aX aE with Erₙ.nth-ut m o (nth-ag aX valuesOf (≼-refl {k}) nx)
-      ... | k₀ , ak , nk with Nths.nth-fun (V [_] (TE.tₙ m)) nk (nth-ag aE [_] (≼-refl {k′}) ne)
-      ...   | refl = rank-ag (AgreeTo-sym aE) (≼-refl {k′}) (Erₙ.rank-v m o (nth-ag aX valuesOf (≼-refl {k}) nx) ak (rank-ag aX (≼-refl {k}) r))
+    erase-rank : ∀ {i k k′ a b n} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
+               → Rank (elaborated o) k n → Rank (events o) k′ n
+    erase-rank {i} {k} {k′} {a} {b} {n} nx _ ne _ r = both (TX.value-down valuesOf nx) (TE.value-down [_] ne)
+      where
+        at : ∀ m → AgreeTo k (elaborated o) (TX.tₙ m) → AgreeTo k′ (events o) (TE.tₙ m) → Rank (events o) k′ n
+        at m aX aE =
+          rank-ag (AgreeTo-sym aE) (≼-refl {k′})
+            (subst (λ q → Rank (TE.tₙ m) q n) (Nths.nth-fun (V [_] (TE.tₙ m)) (proj₂ (proj₂ r₀)) nem)
+              (Erₙ.rank-v m o nxm (proj₁ (proj₂ r₀)) (rank-ag aX (≼-refl {k}) r)))
+          where
+            nxm : Nth (V valuesOf (TX.tₙ m)) i k a
+            nxm = nth-ag aX valuesOf (≼-refl {k}) nx
+            nem : Nth (V [_] (TE.tₙ m)) i k′ b
+            nem = nth-ag aE [_] (≼-refl {k′}) ne
+            r₀ : Σ Pos λ k₀ → Attribution.Img (erasingₙ m o) k₀ k × Nth (V [_] (TE.tₙ m)) i k₀ a
+            r₀ = Erₙ.nth-ut m o nxm
 
-  erase-over : ∀ {i k k′ a b} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
+        both : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k (elaborated o) (TX.tₙ m)) → (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k′ (events o) (TE.tₙ m))
+             → Rank (events o) k′ n
+        both (N₁ , agX) (N₂ , agE) = at (N₁ ⊔ N₂) (agX (N₁ ⊔ N₂) (proj₁ (past₂ N₁ N₂))) (agE (N₁ ⊔ N₂) (proj₂ (past₂ N₁ N₂)))
+
+    erase-over : ∀ {i k k′ a b} → Nth (VX o) i k a → Live (elaborated o) k → Nth (VE o) i k′ b → Live (events o) k′
+               → Over valuesOf (elaborated o) (just k) ⇔ Over [_] (events o) (just k′)
+    erase-over {i} {k} {k′} {a} {b} nx _ ne _ = both (TX.value-down valuesOf nx) (TE.value-down [_] ne)
+      where
+        at : ∀ m → AgreeTo k (elaborated o) (TX.tₙ m) → AgreeTo k′ (events o) (TE.tₙ m)
+           → Over valuesOf (TX.tₙ m) (just k) ⇔ Over [_] (TE.tₙ m) (just k′)
+        at m aX aE =
+          subst (λ q → Over valuesOf (TX.tₙ m) (just k) ⇔ Over [_] (TE.tₙ m) (just q)) (Nths.nth-fun (V [_] (TE.tₙ m)) (proj₂ (proj₂ r₀)) nem)
+            (Erₙ.over-ut m o (proj₁ (proj₂ r₀)) (proj₁ (proj₂ vx)) (_ , proj₂ (proj₂ vx)) (proj₁ (proj₂ (value-row [_] (proj₂ (proj₂ r₀))))))
+          where
+            nxm : Nth (V valuesOf (TX.tₙ m)) i k a
+            nxm = nth-ag aX valuesOf (≼-refl {k}) nx
+            nem : Nth (V [_] (TE.tₙ m)) i k′ b
+            nem = nth-ag aE [_] (≼-refl {k′}) ne
+            r₀ : Σ Pos λ k₀ → Attribution.Img (erasingₙ m o) k₀ k × Nth (V [_] (TE.tₙ m)) i k₀ a
+            r₀ = Erₙ.nth-ut m o nxm
+            vx : Σ (IE A) λ x → TX.tₙ m k (out x) × valuesOf x ≡ a ∷ []
+            vx = value-row valuesOf nxm
+
+        both : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k (elaborated o) (TX.tₙ m)) → (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo k′ (events o) (TE.tₙ m))
              → Over valuesOf (elaborated o) (just k) ⇔ Over [_] (events o) (just k′)
-  erase-over {k = k} {k′} nx _ ne _ with Nths.nth-val (VX o) nx | Nths.nth-val (VE o) ne
-  ... | vrow {x = x} rx fx | vrow re refl with TX.down rx tt | TE.down re tt
-  ...   | N₁ , agX | N₂ , agE = mk⇔ to′ from′
-    where
-      at : ∀ {m} → AgreeTo k (elaborated o) (TX.tₙ m) → AgreeTo k′ (events o) (TE.tₙ m)
-         → Over valuesOf (TX.tₙ m) (just k) ⇔ Over [_] (TE.tₙ m) (just k′)
-      at {m} aX aE with Erₙ.nth-ut m o (nth-ag aX valuesOf (≼-refl {k}) nx)
-      ... | k₀ , ak , nk with Nths.nth-fun (V [_] (TE.tₙ m)) nk (nth-ag aE [_] (≼-refl {k′}) ne)
-      ...   | refl = Erₙ.over-ut m o ak (proj₁ (upto aX {k} (≼-refl {k})) rx) (_ , fx) (proj₁ (upto aE {k′} (≼-refl {k′})) re)
+        both (N₁ , agX) (N₂ , agE) = mk⇔ to′ from′
+          where
+            -- Past both values' depths and a third.
+            deep : ∀ N₃ → Σ ℕ λ m → N₁ ≤ m × N₂ ≤ m × N₃ ≤ m
+            deep N₃ = (N₁ ⊔ N₂) ⊔ N₃ , ≤-trans (proj₁ (past₂ N₁ N₂)) (m≤m⊔n (N₁ ⊔ N₂) N₃) , ≤-trans (proj₂ (past₂ N₁ N₂)) (m≤m⊔n (N₁ ⊔ N₂) N₃) , m≤n⊔m (N₁ ⊔ N₂) N₃
 
-      -- Past both values' depths and a third.
-      deep : ∀ N₃ → let m = (N₁ ⊔ N₂) ⊔ N₃ in N₁ ≤ m × N₂ ≤ m × N₃ ≤ m
-      deep N₃ = ≤-trans (proj₁ (past₂ N₁ N₂)) (m≤m⊔n (N₁ ⊔ N₂) N₃) , ≤-trans (proj₂ (past₂ N₁ N₂)) (m≤m⊔n (N₁ ⊔ N₂) N₃) , m≤n⊔m (N₁ ⊔ N₂) N₃
+            to-at : (Σ ℕ λ N → ∀ m → N ≤ m → Over valuesOf (TX.tₙ m) (just k)) → Over [_] (events o) (just k′)
+            to-at (N₃ , od) = go (deep N₃)
+              where
+                go : (Σ ℕ λ m → N₁ ≤ m × N₂ ≤ m × N₃ ≤ m) → Over [_] (events o) (just k′)
+                go (m , l₁ , l₂ , l₃) =
+                  TE.over-up [_] m (proj₁ (upto (agE m l₂) {k′} (≼-refl {k′})) (proj₁ (proj₂ (value-row [_] ne)))) (to (at m (agX m l₁) (agE m l₂)) (od m l₃))
 
-      to′ : Over valuesOf (elaborated o) (just k) → Over [_] (events o) (just k′)
-      to′ ov with TX.over-down valuesOf rx ov
-      ... | N₃ , od with deep N₃
-      ...   | l₁ , l₂ , l₃ =
-        TE.over-up [_] ((N₁ ⊔ N₂) ⊔ N₃) (proj₁ (upto (agE _ l₂) {k′} (≼-refl {k′})) re) (to (at (agX _ l₁) (agE _ l₂)) (od _ l₃))
+            from-at : (Σ ℕ λ N → ∀ m → N ≤ m → Over [_] (TE.tₙ m) (just k′)) → Over valuesOf (elaborated o) (just k)
+            from-at (N₃ , od) = go (deep N₃)
+              where
+                go : (Σ ℕ λ m → N₁ ≤ m × N₂ ≤ m × N₃ ≤ m) → Over valuesOf (elaborated o) (just k)
+                go (m , l₁ , l₂ , l₃) =
+                  TX.over-up valuesOf m (proj₁ (upto (agX m l₁) {k} (≼-refl {k})) (proj₁ (proj₂ (value-row valuesOf nx)))) (from (at m (agX m l₁) (agE m l₂)) (od m l₃))
 
-      from′ : Over [_] (events o) (just k′) → Over valuesOf (elaborated o) (just k)
-      from′ ov with TE.over-down [_] re ov
-      ... | N₃ , od with deep N₃
-      ...   | l₁ , l₂ , l₃ =
-        TX.over-up valuesOf ((N₁ ⊔ N₂) ⊔ N₃) (proj₁ (upto (agX _ l₁) {k} (≼-refl {k})) rx) (from (at (agX _ l₁) (agE _ l₂)) (od _ l₃))
+            to′ : Over valuesOf (elaborated o) (just k) → Over [_] (events o) (just k′)
+            to′ ov = to-at (TX.over-down valuesOf (proj₁ (proj₂ (value-row valuesOf nx))) ov)
 
-  erase-end : (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) ⇔ (Σ Pos λ c′ → events o c′ end × Live (events o) c′)
-  erase-end = mk⇔ to′ from′
-    where
-      to′ : (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) → Σ Pos λ c′ → events o c′ end × Live (events o) c′
-      to′ (c , xc , lc) with TX.down xc tt
-      ... | N , ag with to (Erₙ.ends N o) (c , proj₁ (upto (ag N ≤-refl) {c} (≼-refl {c})) xc , live-ag (ag N ≤-refl) (≼-refl {c}) lc)
-      ...   | c′ , ec′ , lc′ = c′ , proj₁ (upto (TE.up N ec′ tt) {c′} (≼-refl {c′})) ec′ , live-ag (TE.up N ec′ tt) (≼-refl {c′}) lc′
+            from′ : Over [_] (events o) (just k′) → Over valuesOf (elaborated o) (just k)
+            from′ ov = from-at (TE.over-down [_] (proj₁ (proj₂ (value-row [_] ne))) ov)
 
-      from′ : (Σ Pos λ c′ → events o c′ end × Live (events o) c′) → Σ Pos λ c → elaborated o c end × Live (elaborated o) c
-      from′ (c′ , ec′ , lc′) with TE.down ec′ tt
-      ... | N , ag with from (Erₙ.ends N o) (c′ , proj₁ (upto (ag N ≤-refl) {c′} (≼-refl {c′})) ec′ , live-ag (ag N ≤-refl) (≼-refl {c′}) lc′)
-      ...   | c , xc , lc = c , proj₁ (upto (TX.up N xc tt) {c} (≼-refl {c})) xc , live-ag (TX.up N xc tt) (≼-refl {c}) lc
+    erase-end : (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) ⇔ (Σ Pos λ c′ → events o c′ end × Live (events o) c′)
+    erase-end = mk⇔ to′ from′
+      where
+        to′ : (Σ Pos λ c → elaborated o c end × Live (elaborated o) c) → Σ Pos λ c′ → events o c′ end × Live (events o) c′
+        to′ (c , xc , lc) = carry (TX.down xc tt)
+          where
+            carry : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo c (elaborated o) (TX.tₙ m)) → Σ Pos λ c′ → events o c′ end × Live (events o) c′
+            carry (N , ag) = back (to (Erₙ.ends N o) (c , proj₁ (upto (ag N ≤-refl) {c} (≼-refl {c})) xc , live-ag (ag N ≤-refl) (≼-refl {c}) lc))
+              where
+                back : (Σ Pos λ c′ → TE.tₙ N c′ end × Live (TE.tₙ N) c′) → Σ Pos λ c′ → events o c′ end × Live (events o) c′
+                back (c′ , ec′ , lc′) = c′ , proj₁ (upto (TE.up N ec′ tt) {c′} (≼-refl {c′})) ec′ , live-ag (TE.up N ec′ tt) (≼-refl {c′}) lc′
+
+        from′ : (Σ Pos λ c′ → events o c′ end × Live (events o) c′) → Σ Pos λ c → elaborated o c end × Live (elaborated o) c
+        from′ (c′ , ec′ , lc′) = carry (TE.down ec′ tt)
+          where
+            carry : (Σ ℕ λ N → ∀ m → N ≤ m → AgreeTo c′ (events o) (TE.tₙ m)) → Σ Pos λ c → elaborated o c end × Live (elaborated o) c
+            carry (N , ag) = back (from (Erₙ.ends N o) (c′ , proj₁ (upto (ag N ≤-refl) {c′} (≼-refl {c′})) ec′ , live-ag (ag N ≤-refl) (≼-refl {c′}) lc′))
+              where
+                back : (Σ Pos λ c → TX.tₙ N c end × Live (TX.tₙ N) c) → Σ Pos λ c → elaborated o c end × Live (elaborated o) c
+                back (c , xc , lc) = c , proj₁ (upto (TX.up N xc tt) {c} (≼-refl {c})) xc , live-ag (TX.up N xc tt) (≼-refl {c}) lc
