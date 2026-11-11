@@ -14,10 +14,11 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.Position using (root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Carry using (Carry; carry-cold; carry-empty; carry-of; carry-map; carry-takeWhile; carry-flatMap; carry-connect;
+open import simultaneous.Carry using (Carry; carry-cold; carry-empty; carry-of; carry-map; carry-flatMap; carry-connect;
   carry-connected)
 open import simultaneous.CarryDefer using (carry-⊥; carry-next)
 open import simultaneous.CarryScan using (carry-scan)
+open import simultaneous.CarryTake using (carry-takeWhile)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (AIE)
 

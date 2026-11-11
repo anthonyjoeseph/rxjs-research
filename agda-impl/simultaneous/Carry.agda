@@ -41,7 +41,7 @@ open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; cold; empty; of; map; takeWhile; flatMap; connect; connected)
+open import Tree using (Obs; cold; empty; of; map; flatMap; connect; connected)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; cmpPos; isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ; reflˡ; reflⁱ)
 open import denotation.Events using (Timeline; fresh)
@@ -239,6 +239,45 @@ Near {Y} u m l = l ≼ m ⊎ (Σ (Ev Y) (u l) × Listed u l)
 -- Every row, listed exactly.
 Whole : ∀ {A : Set} → EmissionSet A → Set
 Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k} → k ∈ ks → Σ _ (t k))
+
+-- The rows listed before a row listed before.
+sub-listed : ∀ {X : Set} {a : EmissionSet X} {w v} → Listed a w → v ≺ w → Listed a v
+sub-listed {w = w} {v} (ks , F , B) vw =
+  filter (λ k → T? (k <ᵖ v)) ks
+  , (λ {k} y kv → ∈-filter⁺ (λ k → T? (k <ᵖ v)) (F y (≺-trans {k} {v} {w} kv vw)) kv)
+  , λ m → let (m′ , kv) = ∈-filter⁻ (λ k → T? (k <ᵖ v)) m in kv , proj₂ (B m′)
+
+listed-≼ : ∀ {X : Set} {a : EmissionSet X} {w v} → Listed a w → v ≼ w → Listed a v
+listed-≼ {w = w} {v} L vw with ≼-split {v} {w} vw
+... | inj₁ v≺w  = sub-listed L v≺w
+... | inj₂ refl = L
+
+few-sub : ∀ {X : Set} {a : EmissionSet X} {w v} → Few a w → v ≺ w → Few a v
+few-sub {w = w} {v} (ks , F) vw = ks , λ {k} y kv → F y (≺-trans {k} {v} {w} kv vw)
+
+-- The plain row a carrier shows a value of is that value.
+match-val : ∀ {A : Set} {e₀ : Ev A} {a} {n : Pos} → Match Every (One valuesOf) (Reads valuesOf) e₀ (out (instEmit (value a) n)) → e₀ ≡ out a
+match-val {e₀ = out _} (cr , _) with cr tt
+... | _ , refl , refl = refl
+match-val {e₀ = end}   (cr , _) with cr tt
+... | ()
+match-val {e₀ = skip}  (_ , ns) = ⊥-elim (ns (λ ()) (_ , refl))
+match-val {e₀ = pin _} (_ , ns) = ⊥-elim (ns (λ ()) (_ , refl))
+
+-- The carrier of a plain value shows it.
+carried-val : ∀ {A : Set} {a : A} {e₁ : Ev (IE A)} → Match Every (One valuesOf) (Reads valuesOf) (out a) e₁
+            → Σ Pos λ n → e₁ ≡ out (instEmit (value a) n)
+carried-val (cr , _) with cr tt
+... | instEmit (value _) n , refl , refl = n , refl
+... | instEmit (mark _) _  , refl , ()
+
+-- The plain row carried by an end is an end.
+match-end : ∀ {A : Set} {e₀ : Ev A} → Match Every (One {X = IE A} valuesOf) (Reads valuesOf) e₀ end → e₀ ≡ end
+match-end {e₀ = out _} (cr , _) with cr tt
+... | _ , () , _
+match-end {e₀ = end}   _        = refl
+match-end {e₀ = skip}  (_ , ns) = ⊥-elim (ns (λ ()) tt)
+match-end {e₀ = pin _} (_ , ns) = ⊥-elim (ns (λ ()) tt)
 
 -- `u`, subscribed at `s′`, carries `t`, subscribed at `s`, under the
 -- environment hot rows `HP` (plain) and `HE` (elaborated), along `M`:
@@ -646,6 +685,11 @@ HotsListed []              q = ⊤
 HotsListed (hot t ∷ ρ)     q = Listed t q × HotsListed ρ q
 HotsListed (coldAt _ ∷ ρ)  q = HotsListed ρ q
 
+listed↓ : ∀ {Γ} (ρ : DenEnv Γ) {x y} → x ≼ y → HotsListed ρ y → HotsListed ρ x
+listed↓ []             _  _       = tt
+listed↓ (hot t ∷ ρ)    xy (L , R) = listed-≼ L xy , listed↓ ρ xy R
+listed↓ (coldAt _ ∷ ρ) xy R       = listed↓ ρ xy R
+
 -- A connect's binder: the source, read hot past the connect at `at` in
 -- the plain run and at `at′` annotated in the elaborated, carried along
 -- the map.
@@ -694,14 +738,8 @@ record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
 
 -- EACH ELABORATED FORMER CARRIES its plain counterpart when its children
 -- do, under every approximant.
---
--- A TAKEWHILE'S `place` AND `whole` ARE DECIDED from listings: a row is
--- placed near its source's witness, listed up to it, so the first
--- failing value between them is found; its rows in all are its source's
--- up to the failure the plain run lists, or, with none, all its source's.
 postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
-  carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
   carry-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
                   → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → Carry m ρ′ (f a)) → Carry m ρ (flatMap op f s)
   carry-connect   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
@@ -738,11 +776,8 @@ private
   drop-under : ∀ q σ → L.drop (L.length (path-of q)) (path-of (q ⊕ σ)) ≡ σ
   drop-under (i ∙ ps) σ = drop-len ps σ
 
--- ONE LABEL UNDER EACH SUBSCRIPTION: a map held fresh grown by each
--- plain label under the plain subscription, put on the same label under
--- the elaborated one.
-module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
-                (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+-- Each plain label under one position, put on the same label under another.
+module OneAt (p p′ : Pos) where
   N : PMap
   N x y = Σ Label λ a → Plain a × x ≡ p ⊕ [ a ] × y ≡ p′ ⊕ [ a ]
 
@@ -755,6 +790,13 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
     ; inst    = λ { (a , _ , refl , refl) (b , _ , refl , refl) →
                     mk⇔ (λ _ → trans (instant-⊕ p [ a ]) (sym (instant-⊕ p [ b ])))
                         (λ _ → trans (instant-⊕ p′ [ a ]) (sym (instant-⊕ p′ [ b ]))) } }
+
+-- ONE LABEL UNDER EACH SUBSCRIPTION: a map held fresh grown by each
+-- plain label under the plain subscription, put on the same label under
+-- the elaborated one.
+module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
+                (E₀ : Emb M₀) (fr : Fresh HP M₀ p) (m₀ : M₀ p p₀) (pp : p₀ ⊑ p′) where
+  open OneAt p p′ public
 
   M : PMap
   M = M₀ ∪ᴹ N
@@ -786,13 +828,15 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
   down-⊕ : ∀ σ → down (p′ ⊕ σ) ≡ p ⊕ σ
   down-⊕ σ = cong (p ⊕_) (drop-under p′ σ)
 
+-- An end one label under `q` comes after every row so labelled.
+last-max : ∀ q {a} → Plain a → (q ⊕ [ last ]) ≺ (q ⊕ [ a ]) → ⊥
+last-max q (plain-ix {i}) h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ ix i ]) h
+last-max q plain-last     h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ last ]) h
+
+ix-last : ∀ q → (q ⊕ [ ix 0 ]) ≺ (q ⊕ [ last ])
+ix-last q = subst (λ c → T (isLt c)) (sym (cmp-under q [ ix 0 ] [ last ])) tt
+
 private
-
-  -- An end one label under `q` comes after every row so labelled.
-  last-max : ∀ q {a} → Plain a → (q ⊕ [ last ]) ≺ (q ⊕ [ a ]) → ⊥
-  last-max q (plain-ix {i}) h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ ix i ]) h
-  last-max q plain-last     h = subst (λ c → T (isLt c)) (cmp-under q [ last ] [ last ]) h
-
   unp-pin : ∀ {X : Set} {r} → Unpinned {X} (pin r) → ⊥
   unp-pin ()
 
