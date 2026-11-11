@@ -1,23 +1,22 @@
 {-# OPTIONS --guardedness #-}
 
--- EVERY POSITION IS STAMPED: every position a run keeps begins with a
--- tick, and every cold's cascade is stamped no later than its frame.
--- No step of the engine makes a position but by extending one it holds,
--- or by a frame's cascade at its own tick; so the stamp holds of every
--- conf a run reaches, live subtree or not.  Likewise a run subscribing
--- has its pending subscription in focus: a connect's source stays
--- pending until its body's run subscribes it.
+-- EVERY COLD IS STAMPED NO LATER THAN ITS FRAME: a cold's tape plays
+-- from a root whose tick is at most the frame's, and a joiner's inbox is
+-- in position order.  No step of the engine makes a tape but by playing
+-- on from one it holds, or by a frame's cascade at its own tick; so this
+-- holds of every conf a run reaches, live subtree or not.  Likewise a run
+-- subscribing has its pending subscription in focus: a connect's source
+-- stays pending until its body's run subscribes it.
 module adequacy.Stamped where
 
 open import Data.Bool using (true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; null)
-open import Data.List.Properties using (++-assoc)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (zero; suc; _+_; _≤_; _<ᵇ_; _≡ᵇ_; s≤s; z≤n)
+open import Data.Nat using (zero; suc; _+_; _≤_; _<_; _<ᵇ_; _≡ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; +-monoʳ-≤; m<m+n; +-identityʳ; +-suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
@@ -27,9 +26,10 @@ open import Level using (Lift; lift) renaming (suc to lsuc; zero to lzero)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect;
   connected; defer)
-open import denotation.Events using (Pos; ix; last; tick; _<ᵖ_; <ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-asym; ix-<; From; From∞; Frame; done; quiet; at; emit;
-  stall; close; timelineAt) renaming (sub to subᴱ)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; onward) renaming (over to overT)
+open import denotation.Position using (Pos; ix; last; tick; _<ᵖ_; _⊕_; _∙_; cascade; Root; nested; fired; _▸_; tickᴿ; _<ˡ_) renaming (sub to subᴱ)
+open import denotation.Simultaneity using (earlier-tick; step-tick)
+open import denotation.Events using (<ᵖ-below; <ᵖ-ix; <ᵖ-▸; <ᵖ-asym; From; From∞; done; quiet; at; emit; stall; close; timelineAt)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Att; attAt; attached; Owe; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
                     unsub; cut; killAll; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; same?; rise; run; begin; start; dequeue; admit; ended; shutAt; closed; closedUp; alive; settle;
@@ -41,34 +41,10 @@ open import adequacy.Path using (Path; []; tau; val)
 ------------------------------------------------------------------------
 -- The stamp
 
-Ix : Pos → Set
-Ix (ix _ ∷ _) = ⊤
-Ix _          = ⊥
-
-ix-⊕ : ∀ p q → Ix p → Ix (p ++ q)
-ix-⊕ (ix _ ∷ _) q _ = tt
-
 TapeOK : ∀ {A} → Tape A → Set
-TapeOK (play τ u i t fr) = Ix u × tick u ≤ τ + t
-TapeOK (ending e)        = Ix e
+TapeOK (play τ u i t fr) = tickᴿ u ≤ τ + t
+TapeOK (ending e)        = ⊤
 TapeOK overT             = ⊤
-
-MOK : Maybe Pos → Set
-MOK (just p) = Ix p
-MOK nothing  = ⊤
-
-AttOK : Att → Set
-AttOK attached  = ⊤
-AttOK (attAt p) = Ix p
-
-OweOK : Owe → Set
-OweOK free       = ⊤
-OweOK (cpAt p)   = Ix p
-OweOK (cutAt p)  = Ix p
-OweOK (overAt p) = Ix p
-
-CSOK : ∀ {Γ X} → CS Γ X → Set
-CSOK k = MOK (CS.bodyAt k) × MOK (CS.attSrc k) × MOK (CS.owedAt k)
 
 -- An entry no earlier than the one before it.
 Behind : ∀ {A} → Pos → List (Pos × Ev A) → Set
@@ -78,7 +54,7 @@ Behind q ((r , _) ∷ _) = r <ᵖ q ≡ false
 -- An inbox stamped and in position order.
 QOK : ∀ {A} → List (Pos × Ev A) → Set
 QOK []             = ⊤
-QOK ((q , _) ∷ ib) = Ix q × Behind q ib × QOK ib
+QOK ((q , _) ∷ ib) = Behind q ib × QOK ib
 
 -- A pending subscription, at a position.
 IsPend : ∀ {Γ A} → St Γ A → Pos → Set
@@ -92,7 +68,7 @@ NotPend _          = ⊤
 -- A connect whose body is yet to run keeps its source pending where that
 -- run subscribes it.
 BodyOK : ∀ {Γ A} → Maybe Pos → St Γ A → Set
-BodyOK (just p) o = IsPend o (p ++ [ ix 1 ])
+BodyOK (just p) o = IsPend o (p ⊕ [ ix 1 ])
 BodyOK nothing  o = ⊤
 
 Unbodied : Maybe Pos → Set
@@ -106,18 +82,18 @@ ModeOK _           s p = ⊤
 
 mutual
   StOK : ∀ {Γ A} → St Γ A → Set
-  StOK (pend o q)             = Ix q
+  StOK (pend o q)             = ⊤
   StOK (coldS b l)            = TapeOK l
-  StOK (ofS i p xs)           = Ix p
+  StOK (ofS i p xs)           = ⊤
   StOK doneS                  = ⊤
   StOK (mapS f s)             = StOK s
   StOK (scanS f z s)          = StOK s
-  StOK (cutS l a s)           = AttOK a × StOK s
+  StOK (cutS l a s)           = StOK s
   StOK (lnS b s)              = StOK s
-  StOK (takeS i q w s)        = OweOK w × StOK s
+  StOK (takeS i q w s)        = StOK s
   StOK (flatS op f ω d n q o ls) = StOK o × LOK ls
-  StOK (connS k o b)          = CSOK k × StOK o × StOK b × BodyOK (CS.bodyAt k) o
-  StOK (joinS j g x ib)       = Ix j × QOK ib
+  StOK (connS k o b)          = StOK o × StOK b × BodyOK (CS.bodyAt k) o
+  StOK (joinS j g x ib)       = QOK ib
 
   LOK : ∀ {Γ A} → List (St Γ A) → Set
   LOK []       = ⊤
@@ -127,16 +103,16 @@ CtxOK : ∀ {R Γ A} → Ctx R Γ A → Set
 CtxOK top                               = ⊤
 CtxOK (inMap f c)                       = CtxOK c
 CtxOK (inScan f z c)                    = CtxOK c
-CtxOK (inCut l a c)                     = AttOK a × CtxOK c
+CtxOK (inCut l a c)                     = CtxOK c
 CtxOK (inLn b c)                        = CtxOK c
-CtxOK (inTake i p w c)                  = OweOK w × CtxOK c
+CtxOK (inTake i p w c)                  = CtxOK c
 CtxOK (inOuter op f ω d n q ls c)         = LOK ls × CtxOK c
 CtxOK (inLanes op f ω d n q o pre post c) = StOK o × LOK pre × LOK post × CtxOK c
-CtxOK (inSrc k b c)                     = CSOK k × StOK b × CtxOK c × Unbodied (CS.bodyAt k)
-CtxOK (inBody k o c)                    = CSOK k × StOK o × CtxOK c × BodyOK (CS.bodyAt k) o
+CtxOK (inSrc k b c)                     = StOK b × CtxOK c × Unbodied (CS.bodyAt k)
+CtxOK (inBody k o c)                    = StOK o × CtxOK c × BodyOK (CS.bodyAt k) o
 
 ConfOK : ∀ {R} → Conf R → Set
-ConfOK ⟨ c , s , m , p ⟩ = CtxOK c × StOK s × Ix p × ModeOK m s p
+ConfOK ⟨ c , s , m , p ⟩ = CtxOK c × StOK s × ModeOK m s p
 
 ------------------------------------------------------------------------
 -- Pending subscriptions
@@ -209,7 +185,7 @@ body-unbodied (just p) s np h = pend-not s h np
 
 body-unsub : ∀ {Γ A} m (o : St Γ A) → BodyOK m o → BodyOK m (proj₁ (unsub o))
 body-unsub nothing  o h = tt
-body-unsub (just p) o h = is-pend o h (λ o′ → IsPend (proj₁ (unsub o′)) (p ++ [ ix 1 ])) (λ _ → refl)
+body-unsub (just p) o h = is-pend o h (λ o′ → IsPend (proj₁ (unsub o′)) (p ⊕ [ ix 1 ])) (λ _ → refl)
 
 body-unsubIf : ∀ {Γ A} b m (o : St Γ A) → BodyOK m o → BodyOK m (proj₁ (unsubIf b o))
 body-unsubIf true  m o h = body-unsub m o h
@@ -218,11 +194,11 @@ body-unsubIf false m o h = h
 body-offIf : ∀ {Γ A} b m (o : St Γ A) → BodyOK m o → BodyOK m (offIf b o)
 body-offIf false m        o h = h
 body-offIf true  nothing  o h = tt
-body-offIf true  (just p) o h = is-pend o h (λ o′ → IsPend (off o′) (p ++ [ ix 1 ])) (λ _ → refl)
+body-offIf true  (just p) o h = is-pend o h (λ o′ → IsPend (off o′) (p ⊕ [ ix 1 ])) (λ _ → refl)
 
 body-feed : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) m (o : St Γ A) → BodyOK m o → BodyOK m (feed i p e o)
 body-feed i p e nothing  o h = tt
-body-feed i p e (just r) o h = is-pend o h (λ o′ → IsPend (feed i p e o′) (r ++ [ ix 1 ])) (λ _ → refl)
+body-feed i p e (just r) o h = is-pend o h (λ o′ → IsPend (feed i p e o′) (r ⊕ [ ix 1 ])) (λ _ → refl)
 
 mode-if : ∀ {Γ A} b {x y : Mode A} {s : St Γ A} {p} → ModeOK x s p → ModeOK y s p → ModeOK (if b then x else y) s p
 mode-if true  hx hy = hx
@@ -246,42 +222,40 @@ behind-inbox r (q , e) ((r′ , e′) ∷ ib) hb hv with r′ <ᵖ q
 ... | true  = hb
 ... | false = hv
 
-qok-inbox : ∀ {A} (v : Pos × Ev A) ib → Ix (proj₁ v) → QOK ib → QOK (inbox v ib)
-qok-inbox v       []              hv _             = hv , tt , tt
-qok-inbox (q , e) ((r , e′) ∷ ib) hv (h , hb , hs) with r <ᵖ q in lt
-... | true  = h , behind-inbox r (q , e) ib hb (<ᵖ-asym r q lt) , qok-inbox (q , e) ib hv hs
-... | false = hv , lt , h , hb , hs
+qok-inbox : ∀ {A} (v : Pos × Ev A) ib → QOK ib → QOK (inbox v ib)
+qok-inbox v       []              _         = tt , tt
+qok-inbox (q , e) ((r , e′) ∷ ib) (hb , hs) with r <ᵖ q in lt
+... | true  = behind-inbox r (q , e) ib hb (<ᵖ-asym r q lt) , qok-inbox (q , e) ib hs
+... | false = lt , hb , hs
 
 plug-ok : ∀ {R Γ A} (c : Ctx R Γ A) {s} → CtxOK c → StOK s → StOK (plug c s)
 plug-ok top                               hc                    hs = hs
 plug-ok (inMap f c)                       hc                    hs = plug-ok c hc hs
 plug-ok (inScan f z c)                    hc                    hs = plug-ok c hc hs
-plug-ok (inCut l a c)                     (ha , hc)             hs = plug-ok c hc (ha , hs)
+plug-ok (inCut l a c)                     hc                    hs = plug-ok c hc hs
 plug-ok (inLn b c)                        hc                    hs = plug-ok c hc hs
-plug-ok (inTake i p w c)                  (hw , hc)             hs = plug-ok c hc (hw , hs)
+plug-ok (inTake i p w c)                  hc                    hs = plug-ok c hc hs
 plug-ok (inOuter op f ω d n q ls c)         (hl , hc)             hs = plug-ok c hc (hs , hl)
 plug-ok (inLanes op f ω d n q o pre post c) (ho , hpr , hpo , hc) hs = plug-ok c hc (ho , lok-ʳ++ pre hpr (hs , hpo))
-plug-ok (inSrc k b c)                     (hk , hb , hc , hu)   hs = plug-ok c hc (hk , hs , hb , unbodied-ok (CS.bodyAt k) _ hu)
-plug-ok (inBody k o c)                    (hk , ho , hc , hbo)  hs = plug-ok c hc (hk , ho , hs , hbo)
+plug-ok (inSrc k b c)                     (hb , hc , hu)        hs = plug-ok c hc (hs , hb , unbodied-ok (CS.bodyAt k) _ hu)
+plug-ok (inBody k o c)                    (ho , hc , hbo)       hs = plug-ok c hc (ho , hs , hbo)
 
 unplug : ∀ {R Γ A} (c : Ctx R Γ A) {s} → NotPend s → StOK (plug c s) → CtxOK c × StOK s
 unplug top                               np h = tt , h
 unplug (inMap f c)                       np h = unplug c tt h
 unplug (inScan f z c)                    np h = unplug c tt h
-unplug (inCut l a c)                     np h with unplug c tt h
-... | hc , (ha , hs) = (ha , hc) , hs
+unplug (inCut l a c)                     np h = unplug c tt h
 unplug (inLn b c)                        np h = unplug c tt h
-unplug (inTake i p w c)                  np h with unplug c tt h
-... | hc , (hw , hs) = (hw , hc) , hs
+unplug (inTake i p w c)                  np h = unplug c tt h
 unplug (inOuter op f ω d n q ls c)         np h with unplug c tt h
 ... | hc , (hs , hl) = (hl , hc) , hs
 unplug (inLanes op f ω d n q o pre post c) np h with unplug c tt h
 ... | hc , (ho , hl) with lok-ʳ++⁻ pre hl
 ...   | hpr , (hs , hpo) = (ho , hpr , hpo , hc) , hs
 unplug (inSrc k b c) {s}                 np h with unplug c tt h
-... | hc , (hk , hs , hb , hbo) = (hk , hb , hc , body-unbodied (CS.bodyAt k) s np hbo) , hs
+... | hc , (hs , hb , hbo) = (hb , hc , body-unbodied (CS.bodyAt k) s np hbo) , hs
 unplug (inBody k o c)                    np h with unplug c tt h
-... | hc , (hk , ho , hs , hbo) = (hk , ho , hc , hbo) , hs
+... | hc , (ho , hs , hbo) = (ho , hc , hbo) , hs
 
 ------------------------------------------------------------------------
 -- Teardown and feed keep the stamp
@@ -292,10 +266,10 @@ mutual
   unsub-ok (coldS false l)         h          = h
   unsub-ok (mapS f s)              h          = unsub-ok s h
   unsub-ok (scanS f z s)           h          = unsub-ok s h
-  unsub-ok (takeS i p w s)         (hw , hs)  = hw , cut-ok s hs
+  unsub-ok (takeS i p w s)         hs         = cut-ok s hs
   unsub-ok (flatS op f ω d n q o ls) (ho , hl)  = cut-ok o ho , killAll-ok ls hl
-  unsub-ok (connS k o b)           (hk , ho , hb , hbo) = hk , unsubIf-ok (CS.srcAtt k) o ho , unsub-ok b hb , body-unsubIf (CS.srcAtt k) (CS.bodyAt k) o hbo
-  unsub-ok (joinS j g x ib)        (hj , _)   = hj , tt
+  unsub-ok (connS k o b)           (ho , hb , hbo) = unsubIf-ok (CS.srcAtt k) o ho , unsub-ok b hb , body-unsubIf (CS.srcAtt k) (CS.bodyAt k) o hbo
+  unsub-ok (joinS j g x ib)        _          = tt
   unsub-ok (pend o q)              h          = h
   unsub-ok (ofS i p xs)            h          = h
   unsub-ok doneS                   h          = h
@@ -303,8 +277,8 @@ mutual
   unsub-ok (lnS b s)               h          = h
 
   cut-ok : ∀ {Γ A} (s : St Γ A) → StOK s → StOK (proj₁ (cut s))
-  cut-ok (cutS l attached s)  (ha , hs) = tt , unsub-ok s hs
-  cut-ok (cutS l (attAt p) s) (ha , hs) = ha , off-ok s hs
+  cut-ok (cutS l attached s)  hs = unsub-ok s hs
+  cut-ok (cutS l (attAt p) s) hs = off-ok s hs
   cut-ok (pend o q)              h = h
   cut-ok (coldS b l)             h = h
   cut-ok (ofS i p xs)            h = h
@@ -340,12 +314,12 @@ mutual
   off-ok : ∀ {Γ A} (s : St Γ A) → StOK s → StOK (off s)
   off-ok (mapS f s)              h          = off-ok s h
   off-ok (scanS f z s)           h          = off-ok s h
-  off-ok (cutS l a s)            (ha , hs)  = ha , off-ok s hs
+  off-ok (cutS l a s)            h          = off-ok s h
   off-ok (lnS b s)               h          = off-ok s h
-  off-ok (takeS i p w s)         (hw , hs)  = hw , off-ok s hs
+  off-ok (takeS i p w s)         h          = off-ok s h
   off-ok (flatS op f ω d n q o ls) (ho , hl)  = off-ok o ho , offL-ok ls hl
-  off-ok (connS k o b)           (hk , ho , hb , hbo) = hk , offIf-ok (CS.srcAtt k) o ho , off-ok b hb , body-offIf (CS.srcAtt k) (CS.bodyAt k) o hbo
-  off-ok (joinS j g x ib)        (hj , _)   = hj , tt
+  off-ok (connS k o b)           (ho , hb , hbo) = offIf-ok (CS.srcAtt k) o ho , off-ok b hb , body-offIf (CS.srcAtt k) (CS.bodyAt k) o hbo
+  off-ok (joinS j g x ib)        _          = tt
   off-ok (pend o q)              h          = h
   off-ok (coldS b l)             h          = h
   off-ok (ofS i p xs)            h          = h
@@ -359,35 +333,35 @@ mutual
   offIf-ok true  s h = off-ok s h
   offIf-ok false s h = h
 
-queued-ok : ∀ {A} j p (e : Ev A) ib → Ix j → Ix p → QOK ib → QOK (queued j p e ib)
-queued-ok j p (nx a) ib hj hp hb with j <ᵖ p
-... | true  = qok-inbox _ ib (ix-⊕ p _ hp) hb
+queued-ok : ∀ {A} j p (e : Ev A) ib → QOK ib → QOK (queued j p e ib)
+queued-ok j p (nx a) ib hb with j <ᵖ p
+... | true  = qok-inbox _ ib hb
 ... | false = hb
-queued-ok j p cp ib hj hp hb with j <ᵖ p
-... | true  = qok-inbox _ ib (ix-⊕ p _ hp) hb
-... | false = qok-inbox _ ib (ix-⊕ j _ hj) hb
+queued-ok j p cp ib hb with j <ᵖ p
+... | true  = qok-inbox _ ib hb
+... | false = qok-inbox _ ib hb
 
 mutual
-  feed-ok : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) → Ix p → StOK s → StOK (feed i p e s)
-  feed-ok i p e (joinS j true x ib) hp (hj , hb) with same? i x
-  ... | just refl = hj , queued-ok j p e ib hj hp hb
-  ... | nothing   = hj , hb
-  feed-ok i p e (joinS j false x ib)    hp h          = h
-  feed-ok i p e (mapS f s)              hp h          = feed-ok i p e s hp h
-  feed-ok i p e (scanS f z s)           hp h          = feed-ok i p e s hp h
-  feed-ok i p e (cutS l a s)            hp (ha , hs)  = ha , feed-ok i p e s hp hs
-  feed-ok i p e (lnS b s)               hp h          = feed-ok i p e s hp h
-  feed-ok i p e (takeS v q w s)         hp (hw , hs)  = hw , feed-ok i p e s hp hs
-  feed-ok i p e (flatS op f ω d n q o ls) hp (ho , hl)  = feed-ok i p e o hp ho , feedL-ok i p e ls hp hl
-  feed-ok i p e (connS k o b)           hp (hk , ho , hb , hbo) = hk , feed-ok i p e o hp ho , feed-ok (there i) p e b hp hb , body-feed i p e (CS.bodyAt k) o hbo
-  feed-ok i p e (pend o q)              hp h          = h
-  feed-ok i p e (coldS b l)             hp h          = h
-  feed-ok i p e (ofS j q xs)            hp h          = h
-  feed-ok i p e doneS                   hp h          = h
+  feed-ok : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) → StOK s → StOK (feed i p e s)
+  feed-ok i p e (joinS j true x ib) hb with same? i x
+  ... | just refl = queued-ok j p e ib hb
+  ... | nothing   = hb
+  feed-ok i p e (joinS j false x ib)    h          = h
+  feed-ok i p e (mapS f s)              h          = feed-ok i p e s h
+  feed-ok i p e (scanS f z s)           h          = feed-ok i p e s h
+  feed-ok i p e (cutS l a s)            h          = feed-ok i p e s h
+  feed-ok i p e (lnS b s)               h          = feed-ok i p e s h
+  feed-ok i p e (takeS v q w s)         h          = feed-ok i p e s h
+  feed-ok i p e (flatS op f ω d n q o ls) (ho , hl) = feed-ok i p e o ho , feedL-ok i p e ls hl
+  feed-ok i p e (connS k o b)           (ho , hb , hbo) = feed-ok i p e o ho , feed-ok (there i) p e b hb , body-feed i p e (CS.bodyAt k) o hbo
+  feed-ok i p e (pend o q)              h          = h
+  feed-ok i p e (coldS b l)             h          = h
+  feed-ok i p e (ofS j q xs)            h          = h
+  feed-ok i p e doneS                   h          = h
 
-  feedL-ok : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (ls : List (St Γ A)) → Ix p → LOK ls → LOK (feedL i p e ls)
-  feedL-ok i p e []       hp _        = tt
-  feedL-ok i p e (s ∷ ls) hp (h , hs) = feed-ok i p e s hp h , feedL-ok i p e ls hp hs
+  feedL-ok : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (ls : List (St Γ A)) → LOK ls → LOK (feedL i p e ls)
+  feedL-ok i p e []       _        = tt
+  feedL-ok i p e (s ∷ ls) (h , hs) = feed-ok i p e s h , feedL-ok i p e ls hs
 
 ended-ok : ∀ {Γ B} (s : St Γ B) → StOK s → StOK (ended s)
 ended-ok (lnS b (cutS l a s))    h = h
@@ -424,107 +398,107 @@ ended-ok (joinS j g x ib)        h = h
 
 SOK : ∀ {R} → Stepped R → Set₁
 SOK (moved k _ _)              = ↑ (ConfOK k)
-SOK (starting x p k)           = ↑ (Ix p) × (∀ l → TapeOK l → ConfOK (k l))
+SOK (starting x p k)           = ∀ l → TapeOK l → ConfOK (k l)
 SOK (turn gone)                = ↑ ⊤
-SOK (turn (leaf b l cl dv st)) = ↑ (TapeOK l) × (∀ e l′ b′ p′ → TapeOK l′ → Ix p′ → ConfOK (dv e l′ b′ p′)) × (∀ l′ → TapeOK l′ → ConfOK (st l′))
+SOK (turn (leaf b l cl dv st)) = ↑ (TapeOK l) × (∀ e l′ b′ p′ → TapeOK l′ → ConfOK (dv e l′ b′ p′)) × (∀ l′ → TapeOK l′ → ConfOK (st l′))
 SOK quiet                      = ↑ ⊤
 
-begin-ok : ∀ {R Γ A} (c : Ctx R Γ A) (o : PureObs Γ A) p → CtxOK c → Ix p → SOK (begin c o p)
-begin-ok c (cold x)          p hc hp = lift hp , λ l hl → hc , hl , hp , tt
-begin-ok c empty             p hc hp = lift (hc , hp , hp , tt)
-begin-ok c (of xs)           p hc hp = lift (hc , hp , hp , tt)
-begin-ok c (map f s)         p hc hp = lift (hc , hp , hp , refl)
-begin-ok c (scan f z s)      p hc hp = lift (hc , hp , hp , refl)
-begin-ok c (takeWhile i q s) p hc hp = lift ((hp , tt , hc) , hp , hp , refl)
-begin-ok c (flatMap op f s)  p hc hp = lift ((hp , tt , hc) , hp , hp , refl)
-begin-ok c (connect s b)     p hc hp = lift (((hp , tt , tt) , ix-⊕ p _ hp , hc , refl) , ix-⊕ p _ hp , ix-⊕ p _ hp , refl)
-begin-ok c (connected x)     p hc hp with closedUp c x
-... | true  = lift (hc , hp , hp , tt)
-... | false = lift (hc , (hp , tt) , hp , tt)
-begin-ok c (defer l)         p hc hp = lift (hc , ix-⊕ p _ hp , ix-⊕ p _ hp , refl)
+begin-ok : ∀ {R Γ A} (c : Ctx R Γ A) (o : PureObs Γ A) p → CtxOK c → SOK (begin c o p)
+begin-ok c (cold x)          p hc = λ l hl → hc , hl , tt
+begin-ok c empty             p hc = lift (hc , tt , tt)
+begin-ok c (of xs)           p hc = lift (hc , tt , tt)
+begin-ok c (map f s)         p hc = lift (hc , tt , refl)
+begin-ok c (scan f z s)      p hc = lift (hc , tt , refl)
+begin-ok c (takeWhile i q s) p hc = lift (hc , tt , refl)
+begin-ok c (flatMap op f s)  p hc = lift ((tt , hc) , tt , refl)
+begin-ok c (connect s b)     p hc = lift ((tt , hc , refl) , tt , refl)
+begin-ok c (connected x)     p hc with closedUp c x
+... | true  = lift (hc , tt , tt)
+... | false = lift (hc , tt , tt)
+begin-ok c (defer l)         p hc = lift (hc , tt , refl)
 
-start-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxOK c → StOK o → LOK ls → Ix p
+start-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxOK c → StOK o → LOK ls
          → ConfOK (start c op f ω d n q o ls a p)
-start-ok c op f ω d n q o ls a p hc ho hl hp with closed c
-... | true  = hc , (ho , hl) , hp , tt
-... | false = (ix-⊕ p _ hp , ho , lok-ʳ++ ls hl tt , tt , hc) , ix-⊕ p _ hp , ix-⊕ p _ hp , refl
+start-ok c op f ω d n q o ls a p hc ho hl with closed c
+... | true  = hc , (ho , hl) , tt
+... | false = (ho , lok-ʳ++ ls hl tt , tt , hc) , tt , refl
 
-dequeue-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls p → CtxOK c → StOK o → LOK ls → Ix p
+dequeue-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls p → CtxOK c → StOK o → LOK ls
            → ConfOK (dequeue c op f ω d n q o ls p)
-dequeue-ok c op f ω d n []      o ls p hc ho hl hp = hc , (ho , hl) , hp , mode-if (d ∧ (n ≡ᵇ 0) ∧ true) tt tt
-dequeue-ok c op f ω d n (a ∷ q) o ls p hc ho hl hp = start-ok c op f ω d n q o ls a p hc ho hl hp
+dequeue-ok c op f ω d n []      o ls p hc ho hl = hc , (ho , hl) , mode-if (d ∧ (n ≡ᵇ 0) ∧ true) tt tt
+dequeue-ok c op f ω d n (a ∷ q) o ls p hc ho hl = start-ok c op f ω d n q o ls a p hc ho hl
 
-admit-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxOK c → StOK o → LOK ls → Ix p
+admit-ok : ∀ {R Γ A B} (c : Ctx R Γ B) op (f : A → PureObs Γ B) ω d n q o ls a p → CtxOK c → StOK o → LOK ls
          → SOK (admit c op f ω d n q o ls a p)
-admit-ok c (mergeᶠ nothing)  f ω d n q o ls a p hc ho hl hp = lift (start-ok c _ f ω d n q o ls a p hc ho hl hp)
-admit-ok c (mergeᶠ (just m)) f ω d n q o ls a p hc ho hl hp with n <ᵇ m
-... | true  = lift (start-ok c _ f ω d n q o ls a p hc ho hl hp)
-... | false = lift (hc , (ho , hl) , hp , tt)
-admit-ok c switchᶠ           f ω d n q o ls a p hc ho hl hp with killAll ls | killAll-ok ls hl
-... | ls′ , t | hl′ = lift (start-ok c _ f ω d 0 q o ls′ a p hc ho hl′ hp)
-admit-ok c exhaustᶠ          f ω d n q o ls a p hc ho hl hp with n ≡ᵇ 0
-... | true  = lift (start-ok c _ f ω d n q o ls a p hc ho hl hp)
-... | false = lift (hc , (ho , hl) , hp , tt)
+admit-ok c (mergeᶠ nothing)  f ω d n q o ls a p hc ho hl = lift (start-ok c _ f ω d n q o ls a p hc ho hl)
+admit-ok c (mergeᶠ (just m)) f ω d n q o ls a p hc ho hl with n <ᵇ m
+... | true  = lift (start-ok c _ f ω d n q o ls a p hc ho hl)
+... | false = lift (hc , (ho , hl) , tt)
+admit-ok c switchᶠ           f ω d n q o ls a p hc ho hl with killAll ls | killAll-ok ls hl
+... | ls′ , t | hl′ = lift (start-ok c _ f ω d 0 q o ls′ a p hc ho hl′)
+admit-ok c exhaustᶠ          f ω d n q o ls a p hc ho hl with n ≡ᵇ 0
+... | true  = lift (start-ok c _ f ω d n q o ls a p hc ho hl)
+... | false = lift (hc , (ho , hl) , tt)
 
-rise-ok : ∀ {R Γ A} (c : Ctx R Γ A) s (e : Ev A) p → CtxOK c → StOK s → Ix p → SOK (rise c s e p)
-rise-ok top                 s e      p hc hs hp = lift (tt , hs , hp , tt)
-rise-ok (inMap f c)         s e      p hc hs hp = lift (hc , hs , hp , tt)
-rise-ok (inScan f z c)      s (nx a) p hc hs hp = lift (hc , hs , hp , tt)
-rise-ok (inScan f z c)      s cp     p hc hs hp = lift (hc , hs , hp , tt)
-rise-ok (inCut l a c)       s e      p (ha , hc) hs hp = lift (hc , (ha , hs) , hp , mode-if l tt tt)
-rise-ok (inLn b c)          s e      p hc hs hp = lift (hc , hs , hp , tt)
-rise-ok (inTake i q free c) s (nx a) p (_ , hc) hs hp with q a | i
-... | true  | _     = lift (hc , (tt , hs) , hp , tt)
-... | false | true  = lift (hc , (hp , hs) , ix-⊕ p _ hp , tt)
-... | false | false = lift (hc , (hp , hs) , hp , tt)
-rise-ok (inTake i q free c)       s cp p (_ , hc)  hs hp = lift (hc , (tt , hs) , hp , tt)
-rise-ok (inTake i q (cpAt r) c)   s e  p (hw , hc) hs hp = lift (hc , (hw , hs) , hp , tt)
-rise-ok (inTake i q (cutAt r) c)  s e  p (hw , hc) hs hp = lift (hc , (hw , hs) , hp , tt)
-rise-ok (inTake i q (overAt r) c) s e  p (hw , hc) hs hp = lift (hc , (hw , hs) , hp , tt)
-rise-ok (inOuter op f ω d n q ls c) o (nx a) p (hl , hc) ho hp = admit-ok c op f ω d n q o ls a p hc ho hl hp
-rise-ok (inOuter op f ω d n q ls c) o cp     p (hl , hc) ho hp = lift (hc , (ho , hl) , hp , mode-if d tt (mode-if (true ∧ (n ≡ᵇ 0) ∧ null q) tt tt))
-rise-ok (inLanes op f ω d n q o pre post c) s (nx b) p (ho , hpr , hpo , hc) hs hp with alive s
-... | true  = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , hp , tt)
-... | false = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , hp , tt)
-rise-ok (inLanes op f ω d n q o pre post c) s cp     p (ho , hpr , hpo , hc) hs hp with alive s
-... | true  = lift (dequeue-ok c op f ω d _ q o (pre ʳ++ ended s ∷ post) p hc ho (lok-ʳ++ pre hpr (ended-ok s hs , hpo)) hp)
-... | false = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , hp , tt)
-rise-ok (inSrc k b c) s (nx a) p (hk , hb , hc , hu) hs hp = lift (hc , (hk , hs , feed-ok (here refl) p (nx a) b hp hb , unbodied-ok (CS.bodyAt k) s hu) , hp , tt)
-rise-ok (inSrc (cs cl true sa ba as ow ca ea sr sc) b c)  s cp p (hk , hb , hc , hu) hs hp = lift (hc , (hk , hs , feed-ok (here refl) p cp b hp hb , unbodied-ok ba s hu) , hp , tt)
-rise-ok (inSrc (cs cl false sa ba as ow ca ea sr sc) b c) s cp p (hk , hb , hc , hu) hs hp = lift (hc , (hk , hs , feed-ok (here refl) p cp b hp hb , unbodied-ok ba s hu) , hp , tt)
-rise-ok (inBody (cs cl true sa ba as ow ca ea sr sc) o c)  s (nx b) p (hk , ho , hc , hbo) hs hp = lift (hc , (hk , ho , hs , hbo) , hp , tt)
-rise-ok (inBody (cs cl false sa ba as ow ca ea sr sc) o c) s (nx b) p (hk , ho , hc , hbo) hs hp = lift (hc , (hk , ho , hs , hbo) , hp , tt)
-rise-ok (inBody (cs cl true sa ba as ow ca ea sr sc) o c)  s cp p ((hba , has , _) , ho , hc , hbo) hs hp = lift (hc , ((hba , has , hp) , ho , hs , hbo) , hp , tt)
-rise-ok (inBody (cs cl false sa ba as ow ca ea sr sc) o c) s cp p (hk , ho , hc , hbo) hs hp = lift (hc , (hk , ho , hs , hbo) , hp , tt)
+rise-ok : ∀ {R Γ A} (c : Ctx R Γ A) s (e : Ev A) p → CtxOK c → StOK s → SOK (rise c s e p)
+rise-ok top                 s e      p hc hs = lift (tt , hs , tt)
+rise-ok (inMap f c)         s e      p hc hs = lift (hc , hs , tt)
+rise-ok (inScan f z c)      s (nx a) p hc hs = lift (hc , hs , tt)
+rise-ok (inScan f z c)      s cp     p hc hs = lift (hc , hs , tt)
+rise-ok (inCut l a c)       s e      p hc hs = lift (hc , hs , mode-if l tt tt)
+rise-ok (inLn b c)          s e      p hc hs = lift (hc , hs , tt)
+rise-ok (inTake i q free c) s (nx a) p hc hs with q a | i
+... | true  | _     = lift (hc , hs , tt)
+... | false | true  = lift (hc , hs , tt)
+... | false | false = lift (hc , hs , tt)
+rise-ok (inTake i q free c)       s cp p hc hs = lift (hc , hs , tt)
+rise-ok (inTake i q (cpAt r) c)   s e  p hc hs = lift (hc , hs , tt)
+rise-ok (inTake i q (cutAt r) c)  s e  p hc hs = lift (hc , hs , tt)
+rise-ok (inTake i q (overAt r) c) s e  p hc hs = lift (hc , hs , tt)
+rise-ok (inOuter op f ω d n q ls c) o (nx a) p (hl , hc) ho = admit-ok c op f ω d n q o ls a p hc ho hl
+rise-ok (inOuter op f ω d n q ls c) o cp     p (hl , hc) ho = lift (hc , (ho , hl) , mode-if d tt (mode-if (true ∧ (n ≡ᵇ 0) ∧ null q) tt tt))
+rise-ok (inLanes op f ω d n q o pre post c) s (nx b) p (ho , hpr , hpo , hc) hs with alive s
+... | true  = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , tt)
+... | false = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , tt)
+rise-ok (inLanes op f ω d n q o pre post c) s cp     p (ho , hpr , hpo , hc) hs with alive s
+... | true  = lift (dequeue-ok c op f ω d _ q o (pre ʳ++ ended s ∷ post) p hc ho (lok-ʳ++ pre hpr (ended-ok s hs , hpo)))
+... | false = lift (hc , (ho , lok-ʳ++ pre hpr (hs , hpo)) , tt)
+rise-ok (inSrc k b c) s (nx a) p (hb , hc , hu) hs = lift (hc , (hs , feed-ok (here refl) p (nx a) b hb , unbodied-ok (CS.bodyAt k) s hu) , tt)
+rise-ok (inSrc (cs cl true sa ba as ow ca ea sr sc) b c)  s cp p (hb , hc , hu) hs = lift (hc , (hs , feed-ok (here refl) p cp b hb , unbodied-ok ba s hu) , tt)
+rise-ok (inSrc (cs cl false sa ba as ow ca ea sr sc) b c) s cp p (hb , hc , hu) hs = lift (hc , (hs , feed-ok (here refl) p cp b hb , unbodied-ok ba s hu) , tt)
+rise-ok (inBody (cs cl true sa ba as ow ca ea sr sc) o c)  s (nx b) p (ho , hc , hbo) hs = lift (hc , (ho , hs , hbo) , tt)
+rise-ok (inBody (cs cl false sa ba as ow ca ea sr sc) o c) s (nx b) p (ho , hc , hbo) hs = lift (hc , (ho , hs , hbo) , tt)
+rise-ok (inBody (cs cl true sa ba as ow ca ea sr sc) o c)  s cp p (ho , hc , hbo) hs = lift (hc , (ho , hs , hbo) , tt)
+rise-ok (inBody (cs cl false sa ba as ow ca ea sr sc) o c) s cp p (ho , hc , hbo) hs = lift (hc , (ho , hs , hbo) , tt)
 
-run-ok : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} → Marked s m → ∀ r → CtxOK c → StOK s → Ix r → SOK (run c s m r)
-run-ok c (ofK i p xs) r hc hs hr with closed c | xs
-... | true  | _       = lift (hc , tt , hs , tt)
-... | false | []      = lift (hc , tt , ix-⊕ p _ hs , tt)
-... | false | x ∷ xs′ = lift (hc , hs , ix-⊕ p _ hs , tt)
-run-ok c (attK l p s) r hc (hp , hs) hr with unsubIf (not l) s | unsubIf-ok (not l) s hs
-... | s′ , t | h = lift (hc , (tt , h) , hp , tt)
-run-ok c (conK (cs cl sl sa (just p) as ow ca ea sr sc) o b _ (inj₁ refl)) r hc ((hp , has , how) , ho , hb , hbo) hr =
-  lift (((tt , ix-⊕ p _ hp , how) , hb , hc , tt) , ho , ix-⊕ p _ hp , hbo)
-run-ok c (conK (cs cl sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) r hc hs hr = lift (hc , hs , hr , tt)
-run-ok c (conK (cs cl sl sa ba (just p) ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc ((hba , hp , how) , ho , hb , hbo) hr
+run-ok : ∀ {R Γ A} (c : Ctx R Γ A) {s : St Γ A} {m} → Marked s m → ∀ r → CtxOK c → StOK s → SOK (run c s m r)
+run-ok c (ofK i p xs) r hc hs with closed c | xs
+... | true  | _       = lift (hc , tt , tt)
+... | false | []      = lift (hc , tt , tt)
+... | false | x ∷ xs′ = lift (hc , tt , tt)
+run-ok c (attK l p s) r hc hs with unsubIf (not l) s | unsubIf-ok (not l) s hs
+... | s′ , t | h = lift (hc , h , tt)
+run-ok c (conK (cs cl sl sa (just p) as ow ca ea sr sc) o b _ (inj₁ refl)) r hc (ho , hb , hbo) =
+  lift ((hb , hc , tt) , ho , hbo)
+run-ok c (conK (cs cl sl sa nothing as ow ca ea sr sc) o b _ (inj₁ refl)) r hc hs = lift (hc , hs , tt)
+run-ok c (conK (cs cl sl sa ba (just p) ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc (ho , hb , hbo)
   with unsubIf (not sl ∨ closed c) o | unsubIf-ok (not sl ∨ closed c) o ho | body-unsubIf (not sl ∨ closed c) ba o hbo
-... | o′ , t | h | hbo′ = lift (hc , ((hba , tt , how) , h , hb , hbo′) , hp , tt)
-run-ok c (conK (cs cl sl sa ba nothing ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc hs hr = lift (hc , hs , hr , tt)
-run-ok c (conK (cs cl sl sa ba as (just p) ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc ((hba , has , hp) , ho , hb , hbo) hr
+... | o′ , t | h | hbo′ = lift (hc , (h , hb , hbo′) , tt)
+run-ok c (conK (cs cl sl sa ba nothing ow ca ea sr sc) o b _ (inj₂ (inj₁ refl))) r hc hs = lift (hc , hs , tt)
+run-ok c (conK (cs cl sl sa ba as (just p) ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc (ho , hb , hbo)
   with unsubIf sa o | unsubIf-ok sa o ho | body-unsubIf sa ba o hbo
-... | o′ , t | h | hbo′ = lift (hc , ((hba , has , tt) , h , hb , hbo′) , hp , tt)
-run-ok c (conK (cs cl sl sa ba as nothing ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc hs hr = lift (hc , hs , hr , tt)
-run-ok c (joinK j g x q (nx a) ib) r hc (hj , hq , _ , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
-run-ok c (joinK j g x q cp ib)     r hc (hj , hq , _ , hb) hr = lift (hc , (hj , hb) , hq , mode-if (g ∧ not (closed c)) tt tt)
-run-ok c (leafK b l) r hc hl hr = lift hl , (λ e l′ b′ p′ hl′ hp′ → hc , hl′ , hp′ , mode-if (not (closed c)) tt tt) , (λ l′ hl′ → hc , hl′ , hr , tt)
-run-ok c (stopK i q p s) r hc (hp , hs) hr = lift (hc , (hp , hs) , ix-⊕ p _ hp , mode-if (not (closed c)) tt tt)
-run-ok c (cutK i q p s) r hc (hp , hs) hr with cut s | cut-ok s hs
-... | s′ , t | h = lift (hc , (hp , h) , hp , tt)
+... | o′ , t | h | hbo′ = lift (hc , (h , hb , hbo′) , tt)
+run-ok c (conK (cs cl sl sa ba as nothing ca ea sr sc) o b _ (inj₂ (inj₂ refl))) r hc hs = lift (hc , hs , tt)
+run-ok c (joinK j g x q (nx a) ib) r hc (_ , hb) = lift (hc , hb , mode-if (g ∧ not (closed c)) tt tt)
+run-ok c (joinK j g x q cp ib)     r hc (_ , hb) = lift (hc , hb , mode-if (g ∧ not (closed c)) tt tt)
+run-ok c (leafK b l) r hc hl = lift hl , (λ e l′ b′ p′ hl′ → hc , hl′ , mode-if (not (closed c)) tt tt) , (λ l′ hl′ → hc , hl′ , tt)
+run-ok c (stopK i q p s) r hc hs = lift (hc , hs , mode-if (not (closed c)) tt tt)
+run-ok c (cutK i q p s) r hc hs with cut s | cut-ok s hs
+... | s′ , t | h = lift (hc , h , tt)
 
 step-ok : ∀ {R} (k : Conf R) → ConfOK k → SOK (Machine.step k)
-step-ok ⟨ c , s , rising e , p ⟩ (hc , hs , hp , _) = rise-ok c s e p hc hs hp
-step-ok ⟨ c , pend o q , subscribing , p ⟩ (hc , hq , hp , _) = begin-ok c o q hc hq
+step-ok ⟨ c , s , rising e , p ⟩ (hc , hs , _) = rise-ok c s e p hc hs
+step-ok ⟨ c , pend o q , subscribing , p ⟩ (hc , _ , _) = begin-ok c o q hc
 step-ok ⟨ c , coldS b l , subscribing , p ⟩ h = lift h
 step-ok ⟨ c , ofS i q xs , subscribing , p ⟩ h = lift h
 step-ok ⟨ c , doneS , subscribing , p ⟩ h = lift h
@@ -536,80 +510,44 @@ step-ok ⟨ c , takeS i q w s , subscribing , p ⟩ h = lift h
 step-ok ⟨ c , flatS op f ω d n q o ls , subscribing , p ⟩ h = lift h
 step-ok ⟨ c , connS k o b , subscribing , p ⟩ h = lift h
 step-ok ⟨ c , joinS j g x ib , subscribing , p ⟩ h = lift h
-step-ok ⟨ c , s , absorbed , p ⟩ (hc , hs , hp , _) with search top (plug c s) in fd
+step-ok ⟨ c , s , absorbed , p ⟩ (hc , hs , _) with search top (plug c s) in fd
 ... | nothing = lift tt
 ... | just (found (_ , _ , c′ , s′) m κ)
   with unplug c′ (own-notpend s′ (proj₁ (found-least {t = plug c s} fd))) (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs))
-...   | hc′ , hs′ = run-ok c′ (found-mark c s fd) p hc′ hs′ hp
+...   | hc′ , hs′ = run-ok c′ (found-mark c s fd) p hc′ hs′
 
 ------------------------------------------------------------------------
 -- The runtime's tapes
 
-rest-ok : ∀ {A t} τ e (m : From A t) → Ix e → TapeOK (rest τ e m)
-rest-ok τ e done          he = he
-rest-ok τ e quiet         he = tt
-rest-ok τ e (at t′ _ fr)  he = tt , ≤-refl
+rest-ok : ∀ {A t} τ e (m : From A t) → TapeOK (rest τ e m)
+rest-ok τ e done         = tt
+rest-ok τ e quiet        = tt
+rest-ok τ e (at t′ _ fr) = ≤-refl
 
-opening-ok : ∀ {A} p (m : From A 0) → Ix p → TapeOK (opening p m)
-opening-ok p (at zero _ b)    hp = hp , ≤-reflexive (sym (+-identityʳ (tick p)))
-opening-ok p done             hp = ix-⊕ p _ hp
-opening-ok p quiet            hp = tt
-opening-ok p (at (suc t) _ b) hp = tt , ≤-refl
+opening-ok : ∀ {A} p (m : From A 0) → TapeOK (opening p m)
+opening-ok p (at zero _ b)    = ≤-reflexive (sym (+-identityʳ (tick p)))
+opening-ok p done             = tt
+opening-ok p quiet            = tt
+opening-ok p (at (suc t) _ b) = ≤-refl
 
--- A value's step: stamped where it sits, and what it leaves stamped.
-base-ix : ∀ {A t} u (fr : Frame A t) → Ix u → Ix (baseOf u fr)
-base-ix u (emit _ (close _))  hu = ix-⊕ u _ hu
-base-ix u (emit _ (emit _ _)) hu = hu
-base-ix u (emit _ (stall _))  hu = hu
-base-ix u (stall _)           hu = hu
-base-ix u (close _)           hu = hu
-
-slot-ix : ∀ {A t} u i (fr : Frame A t) → Ix u → Ix (slotOf u i fr)
-slot-ix u i fr hu = ix-⊕ (baseOf u fr) _ (base-ix u fr hu)
-
--- A step sits under its frame's root.
-slot-tail : ∀ {A t} l us i (fr : Frame A t) → Σ Pos λ zs → slotOf (l ∷ us) i fr ≡ l ∷ zs
-slot-tail l us i (emit _ (close _))  = _ , refl
-slot-tail l us i (emit _ (emit _ _)) = _ , refl
-slot-tail l us i (emit _ (stall _))  = _ , refl
-slot-tail l us i (stall _)           = _ , refl
-slot-tail l us i (close _)           = _ , refl
-
--- A step lies past its frame's root.
-slot-below : ∀ {A t} u i (fr : Frame A t) → u <ᵖ slotOf u i fr ≡ true
-slot-below u i (emit _ (close _))  = subst (λ z → u <ᵖ z ≡ true) (sym (++-assoc u [ last ] [ ix 0 ])) (<ᵖ-below u {last} (ix 0 ∷ []))
-slot-below u i (emit _ (emit _ _)) = <ᵖ-below u []
-slot-below u i (emit _ (stall _))  = <ᵖ-below u []
-slot-below u i (stall _)           = <ᵖ-below u []
-slot-below u i (close _)           = <ᵖ-below u []
-
--- A stall's next step lies past it.
-slot-next : ∀ {A t} u i (fr : Frame A t) → (u ++ [ ix i ]) <ᵖ slotOf u (suc i) fr ≡ true
-slot-next u i (emit _ (close _))  = subst (λ z → (u ++ [ ix i ]) <ᵖ z ≡ true) (sym (++-assoc u [ last ] [ ix 0 ])) (<ᵖ-part u {ix i} {last} [] [ ix 0 ] refl)
-slot-next u i (emit _ (emit _ _)) = <ᵖ-part u [] [] (<ᵖ-ix i)
-slot-next u i (emit _ (stall _))  = <ᵖ-part u [] [] (<ᵖ-ix i)
-slot-next u i (stall _)           = <ᵖ-part u [] [] (<ᵖ-ix i)
-slot-next u i (close _)           = <ᵖ-part u [] [] (<ᵖ-ix i)
-
-onward-ok : ∀ {A} τ u i t (k : Frame A t) → Ix u → tick u ≤ τ + t → TapeOK (onward τ u i t k)
-onward-ok τ u i t (close k)  hu ht = rest-ok τ ((u ++ [ last ]) ++ [ last ]) (From∞.force k) (ix-⊕ (u ++ [ last ]) _ (ix-⊕ u _ hu))
-onward-ok τ u i t (emit _ _) hu ht = hu , ht
-onward-ok τ u i t (stall _)  hu ht = hu , ht
+-- A frame's next step lies past its last.
+slot-next : ∀ u i → (u ▸ ix i) <ᵖ (u ▸ ix (suc i)) ≡ true
+slot-next u i = <ᵖ-▸ u (<ᵖ-ix i)
 
 module _ {R : Set} where
   open Driver R using (took; played; silent; value)
 
   played-ok : (pk : Poke R) → SOK (turn pk) → ∀ {t k′} → played pk ≡ silent t k′ → ConfOK k′
   played-ok gone _ ()
-  played-ok (leaf true (ending e) cl dv st) (lift he , d , s) refl = d cp overT false e tt he
+  played-ok (leaf true (ending e) cl dv st) (_ , d , s) refl = d cp overT false e tt
   played-ok (leaf false l cl dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true (play τ u i t fr) true dv st) (_ , d , s) refl = s overT tt
   played-ok (leaf true overT true dv st) (_ , d , s) refl = s overT tt
-  played-ok (leaf true (play τ u i t (emit a k)) false dv st) (lift (hu , ht) , d , s) refl =
-    d (nx a) (onward τ u i t k) true (slotOf u i (emit a k)) (onward-ok τ u i t k hu ht) (slot-ix u i (emit a k) hu)
-  played-ok (leaf true (play τ u i t (stall k)) false dv st) (lift (hu , ht) , d , s) refl = s _ (hu , ht)
-  played-ok (leaf true (play τ u i t (close k)) false dv st) (lift (hu , ht) , d , s) refl =
-    s _ (rest-ok τ (u ++ [ last ]) (From∞.force k) (ix-⊕ u _ hu))
+  played-ok (leaf true (play τ u i t (emit a k)) false dv st) (lift ht , d , s) refl =
+    d (nx a) (play τ u (suc i) t k) true (u ▸ ix i) ht
+  played-ok (leaf true (play τ u i t (stall k)) false dv st) (lift ht , d , s) refl = s _ ht
+  played-ok (leaf true (play τ u i t (close k)) false dv st) (lift ht , d , s) refl =
+    s _ (rest-ok τ (u ▸ last) (From∞.force k))
   played-ok (leaf true overT false dv st) (_ , d , s) refl = s overT tt
 
   played-val : (pk : Poke R) → ∀ {t p a k′} → played pk ≡ value t p a k′ → ⊥
@@ -627,7 +565,7 @@ module _ {R : Set} where
   took-silent (moved k [] _)               (lift h) refl = h
   took-silent (moved k ((p , nx a) ∷ _) _) _ ()
   took-silent (moved k ((p , cp) ∷ _) _)   _ ()
-  took-silent (starting x p k) (lift hp , f) refl = f _ (opening-ok p (timelineAt x p) hp)
+  took-silent (starting x p k) f refl = f _ (opening-ok p (timelineAt x p))
   took-silent (turn pk) h e = played-ok pk h e
   took-silent quiet _ ()
 
@@ -646,42 +584,28 @@ module _ {R : Set} where
 
 -- EVERY CONF A RUN REACHES IS STAMPED.
 stamped : ∀ {R} (o : PureObs [] R) {rs k} → Path (load o) rs k → ConfOK k
-stamped o pth = path-ok (tt , tt , tt , refl) pth
+stamped o pth = path-ok (tt , tt , refl) pth
 
 ------------------------------------------------------------------------
 -- Consequences
 
 -- A COLD'S NEXT FRAME IS AHEAD: a cold closing its frame comes due next
 -- strictly after the due it played.
-next-ahead : ∀ {A} τ u i {t} (m : From A (suc t)) {κ′} → Ix u → tick u ≤ τ + t
-           → due (rest τ (u ++ [ last ]) m) ≡ just κ′ → atᴷ (u ++ [ ix i ]) <ᴷ κ′ ≡ true
-next-ahead τ u i done hu ht refl = trans (at-<ᴷ (u ++ [ ix i ]) (u ++ [ last ])) (<ᵖ-part u {ix i} {last} [] [] refl)
-next-ahead τ u i quiet hu ht ()
-next-ahead τ (ix h ∷ u′) i {t} (at t′ le fr) hu ht refl with slot-tail (ix (τ + t′)) (subᴱ ((ix h ∷ u′) ++ [ last ]) ∷ []) 0 fr
-... | _ , eq rewrite eq =
-  trans (at-<ᴷ (ix h ∷ u′ ++ [ ix i ]) (ix (τ + t′) ∷ _)) (<ᵖ-part [] {ix h} {ix (τ + t′)} (u′ ++ [ ix i ]) _ (ix-< (≤-trans (s≤s ht) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le)))))
+next-ahead : ∀ {A} τ u i {t} (m : From A (suc t)) {κ′} → tickᴿ u ≤ τ + t
+           → due (rest τ (u ▸ last) m) ≡ just κ′ → atᴷ (u ▸ ix i) <ᴷ κ′ ≡ true
+next-ahead τ u i done ht refl = trans (at-<ᴷ (u ▸ ix i) (u ▸ last)) (<ᵖ-▸ u refl)
+next-ahead τ u i quiet ht ()
+next-ahead τ u i {t} (at t′ le fr) ht refl =
+  trans (at-<ᴷ (u ▸ ix i) _) (earlier-tick (u ▸ ix i) (u ▸ last) _ _
+    (subst (_< τ + t′) (sym (step-tick u (ix i))) (≤-trans (s≤s ht) (subst (_≤ τ + t′) (+-suc τ t) (+-monoʳ-≤ τ le)))))
 
 frame-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t f κ κ′}
             → Path (load o) rs ⟨ c , s , absorbed , q ⟩
             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t (close f))) leafM κ)
-            → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
+            → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
 frame-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {i} {f = f} pth fd dr with stamped o pth
 ... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
-...   | _ , (hu , ht) | here refl = next-ahead τ u i (From∞.force f) hu ht dr
-
--- A value its frame closes straight after: the frame's next is ahead of
--- it too.
-fin-next : ∀ {A} τ u {t} (m : From A (suc t)) {κ′} → Ix u → tick u ≤ τ + t
-         → due (rest τ ((u ++ [ last ]) ++ [ last ]) m) ≡ just κ′ → atᴷ ((u ++ [ last ]) ++ [ ix 0 ]) <ᴷ κ′ ≡ true
-fin-next τ (ix h ∷ u′) m hu ht = next-ahead τ ((ix h ∷ u′) ++ [ last ]) 0 m tt ht
-
-fin-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {b τ u i t a f κ κ′}
-          → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-          → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS b (play τ u i t (emit a (close f)))) leafM κ)
-          → due (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true
-fin-ahead o {c = c} {s} {c′ = c′} {τ = τ} {u} {f = f} pth fd dr with stamped o pth
-... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs)) | proj₁ (found-least {t = plug c s} fd)
-...   | _ , (hu , ht) | here refl = fin-next τ u (From∞.force f) hu ht dr
+...   | _ , ht | here refl = next-ahead τ u i (From∞.force f) ht dr
 
 -- A JOINER'S INBOX ASCENDS: the entry behind the head is no earlier.
 inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {j g x q₀ e q₁ e₁ ib κ}
@@ -690,27 +614,19 @@ inbox-asc : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A�
           → atᴷ q₁ <ᴷ atᴷ q₀ ≡ false
 inbox-asc o {c = c} {s} {c′ = c′} {q₀ = q₀} {q₁ = q₁} pth fd with stamped o pth
 ... | hc , hs , _ with unplug c′ tt (subst StOK (sym (found-plug c s fd)) (plug-ok c hc hs))
-...   | _ , (_ , (_ , b , _)) = trans (at-<ᴷ q₁ q₀) b
+...   | _ , (b , _) = trans (at-<ᴷ q₁ q₀) b
 
 -- A COLD OPENS AHEAD: a cold a run subscribes first comes due strictly
 -- after where it was subscribed.
-open-ahead : ∀ {A} q (m : From A 0) {κ} → Ix q → due (opening q m) ≡ just κ → atᴷ q <ᴷ κ ≡ true
-open-ahead q (at zero _ b) hq refl = trans (at-<ᴷ q _) (slot-below q 0 b)
-open-ahead q done hq refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
-open-ahead q quiet hq ()
-open-ahead (ix h ∷ q′) (at (suc t′) _ b) hq refl with slot-tail (ix (h + suc t′)) (subᴱ ((ix h ∷ q′) ++ [ last ]) ∷ []) 0 b
-... | _ , eq rewrite eq =
-  trans (at-<ᴷ (ix h ∷ q′) (ix (h + suc t′) ∷ _)) (<ᵖ-part [] {ix h} {ix (h + suc t′)} q′ _ (ix-< (m<m+n h (s≤s z≤n))))
-
-opening-ahead : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {x q κ}
-              → Path (load o) rs ⟨ c , pend (cold x) q , subscribing , q ⟩
-              → due (opening q (timelineAt x q)) ≡ just κ → atᴷ q <ᴷ κ ≡ true
-opening-ahead o {x = x} {q} pth dk with stamped o pth
-... | _ , hq , _ = open-ahead q (timelineAt x q) hq dk
+open-ahead : ∀ {A} q (m : From A 0) {κ} → due (opening q m) ≡ just κ → atᴷ q <ᴷ κ ≡ true
+open-ahead q (at zero _ b) refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
+open-ahead q done refl = trans (at-<ᴷ q _) (<ᵖ-below q [])
+open-ahead q quiet ()
+open-ahead q (at (suc t′) _ b) refl = trans (at-<ᴷ q _) (earlier-tick q (q ⊕ [ last ]) _ _ (m<m+n (tick q) (s≤s z≤n)))
 
 -- A SUBSCRIBING RUN IS AT ITS SUBSCRIPTION: every conf a run reaches
 -- subscribing has a pending subscription in focus, owed where the run is.
 pend-focus : ∀ {R} (o : PureObs [] R) {rs Γ A} {c : Ctx R Γ A} {s q}
            → Path (load o) rs ⟨ c , s , subscribing , q ⟩ → Σ (PureObs Γ A) λ o′ → s ≡ pend o′ q
 pend-focus o {s = s} pth with stamped o pth
-... | _ , _ , _ , hm = pend-of s hm
+... | _ , _ , hm = pend-of s hm

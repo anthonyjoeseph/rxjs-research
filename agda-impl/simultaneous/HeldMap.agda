@@ -8,11 +8,12 @@ module simultaneous.HeldMap where
 
 open import Data.List using (List; []; _∷_)
 import Data.List as L
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; map-out; map-end; map-skip;
   map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible)
@@ -22,9 +23,9 @@ open import simultaneous.InstEmit using (instEmit; value; mark)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (HeldD)
-open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
+open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same; rest-same)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; mapIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; mapIE)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -95,7 +96,9 @@ rows-mapIE (_∷_ {e = skip}  (_ , () , _) _)
 rows-mapIE (_∷_ {e = pin _} (_ , () , _) _)
 
 held-map-den : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) {W} cs → HeldD W d cs → HeldD W (Op.map (mapIE f) d) cs
-held-map-den f d cs h p ok nt ep = held-same row end-row back′ (λ _ {k} {e} x _ no → no (_ , lift x , visible-map {g = mapIE f} e)) (h p ok nt ep)
+held-map-den f d cs h p ok ep =
+  held-same row end-row back′ (λ _ {k} {e} x _ no → no (_ , lift x , visible-map {g = mapIE f} e))
+    (rest-same (λ m → proj₁ (unmap m) , proj₁ (proj₂ (unmap m))) back′) (h p ok ep)
   where
     open MapRun (mapIE f) d p
 

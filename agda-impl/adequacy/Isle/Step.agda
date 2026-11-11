@@ -8,7 +8,7 @@ module adequacy.Isle.Step where
 
 open import Data.Bool using (true; false; not; _∨_)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; reverse)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
@@ -19,7 +19,8 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; ix; emit; stall; close)
+open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Events using (emit; stall; close)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; attAt; free; cpAt; cutAt; overAt; Ev; nx; cp; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising;
@@ -196,16 +197,16 @@ kc x k k′ o b fa fl fe (al , up , go , gb) =
 -- A body run: its source subscribed, owing its attach.  The body owes
 -- none, every one keyed after the body's run and no later than it.
 body-ig : ∀ {R Γ X B} (c : Ctx R Γ B) {cl sl sa p as ow cx ea sr sc} {o : St Γ X} {b : St (X ∷ Γ) B}
-        → Lo (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) o b)) (at (p ++ [ ix 1 ])) → ClearA c
+        → Lo (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) o b)) (at (p ⊕ [ ix 1 ])) → ClearA c
         → G (plug c (connS (cs cl sl sa (just p) as ow cx ea sr sc) o b))
-        → Lo (plug c (connS (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) o b)) (after (p ++ [ ix 1 ]))
-        → Ig ⟨ inSrc (cs cl sl sa nothing (just (p ++ [ ix 1 ])) ow cx ea sr sc) b c , o , subscribing , p ++ [ ix 1 ] ⟩
+        → Lo (plug c (connS (cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc) o b)) (after (p ⊕ [ ix 1 ]))
+        → Ig ⟨ inSrc (cs cl sl sa nothing (just (p ⊕ [ ix 1 ])) ow cx ea sr sc) b c , o , subscribing , p ⊕ [ ix 1 ] ⟩
 body-ig c {p = p} {o = o} {b} lo ca g fl = (nb , ca) , gd-swap c ca g gx sw
   where
     gh = g-hole c g
     up = proj₁ (proj₂ gh)
     nb : NoAttB b
-    nb a = at-after-≮ (p ++ [ ix 1 ]) _ (proj₂ (up a) refl) (lo (plug-in c (k-kid (k-body (att-key a)))))
+    nb a = at-after-≮ (p ⊕ [ ix 1 ]) _ (proj₂ (up a) refl) (lo (plug-in c (k-kid (k-body (att-key a)))))
     gx = inj₂ (inj₂ (_ , refl)) , (λ {_} a → (λ {_} ki → proj₁ (up a) ki) , λ ()) , proj₁ (proj₂ (proj₂ gh)) , proj₂ (proj₂ (proj₂ gh))
     sw : Swap c _ _
     sw (a-here refl) = inj₂ fl

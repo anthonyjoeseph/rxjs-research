@@ -21,9 +21,24 @@ open import denotation.Laws using (compositional; map-fusion)
 -- `batchSimultaneous` on top, batches the way the stamps batch — each
 -- batch stamped with the instant it leaves in is the spec's grouping of
 -- the plain run's values stamped the same way.
--- THE INSTANTS: every position a program reaches lies under the subscribe
--- frame or one timer cascade, so a stamp counts instants.
-open import simultaneous.Statement using (spec; positioned)
+open import simultaneous.Statement using (spec)
+
+-- THE INSTANT IS THE TIMESTAMP: the subscribe frame is one instant, and
+-- each async emission is its own.  An effect runs in its cause's
+-- instant, an async emission's instant is shared only beneath it, two
+-- async emissions are never one instant, instants order the subscribe
+-- frame first then by tick then by creator then by step, a cascade fires
+-- after its creator, and an instant is an interval of positions.
+open import denotation.Simultaneity using (effect-instant; cascade-own; frame-own; cascade-inj;
+  frame-first; later-tick; same-tick; same-timer; after-creator; between)
+
+-- THE ORDER IS THE CALL TREE'S PRE-ORDER: a position flattened to one
+-- label list, its instant leading, orders and nests as that list does.
+open import denotation.Flat using (flat-order; flat-inside; flat-onto)
+
+-- THE ENGINE SCHEDULES IN THAT ORDER: a key, `after` read as one label
+-- past every other, orders as its flat list does.
+open import operation.Key using (flat-key)
 
 -- THE LIBRARY: what a user writes programs with, beyond the primitives
 -- the theorem's statement already reaches.

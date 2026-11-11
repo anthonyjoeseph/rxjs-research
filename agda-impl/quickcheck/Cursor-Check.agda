@@ -54,9 +54,10 @@ open import IO.Primitive.Finite using (putStrLn)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; Timeline; ix; last; _<ᵖ_; _≟ᵖ_; emit; close; From∞)
-open import operation.Key using (Key; at; after; _<ᴷ_)
-open import operation.PureObservable using (module Machine; module Driver; play; rest; due; slotOf)
+open import denotation.Events using (Timeline; close; From∞)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _≟ᵖ_; root; _▸_)
+open import operation.Key using (Key; at; after; never; _<ᴷ_)
+open import operation.PureObservable using (module Machine; module Driver; play; rest; due)
 open Machine using (St; Ev; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS; pend; CS; Scope;
                     Conf; ⟨_,_,_,_⟩; plug; dirs; scopeOf; subscribing; absorbed; rising; load; nx; cp;
                     Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
@@ -170,6 +171,7 @@ private
   showKey : Key → String
   showKey (at p)    = "at " +++ showPos p
   showKey (after p) = "after " +++ showPos p
+  showKey never     = "never"
 
   showCursor : Maybe Pos → String
   showCursor nothing  = "none"
@@ -463,13 +465,10 @@ private
       ahead nothing   = true
       tick : ∀ {Γ A} → St Γ A → Meas → Meas
       tick (coldS b (play τ u i t′ (close f))) m′ =
-        flag (not (ahead (due (rest τ (u ++ [ last ]) (From∞.force f))))) "BEHIND"
-             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ++ [ ix i ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
-      tick (coldS b (play τ u i t′ (emit a (close f)))) m′ =
-        flag (not (ahead (due (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f))))) "BEHIND"
-             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does (((u ++ [ last ]) ++ [ ix 0 ]) ≟ᵖ r)) ks)) "UNLISTED" m′)
+        flag (not (ahead (due (rest τ (u ▸ last) (From∞.force f))))) "BEHIND"
+             (flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ ix i) ≟ᵖ r)) ks)) "UNLISTED" m′)
       tick (coldS b (play τ u i t′ fr)) m′ =
-        flag (not (closed c′) ∧ not (anyᵇ (λ r → does (slotOf u i fr ≟ᵖ r)) ks)) "UNLISTED" m′
+        flag (not (closed c′) ∧ not (anyᵇ (λ r → does ((u ▸ ix i) ≟ᵖ r)) ks)) "UNLISTED" m′
       tick _ m′ = m′
   marks t ks P k m = m
 
@@ -486,7 +485,7 @@ private
 -- listing is cut short.
 measure : ℕ → ℕ → Maybe Meas
 measure n seed with program seed
-... | p with listT (depth 3 p) (toObs timeline 3 p [] [] []) [] (ix 0 ∷ [])
+... | p with listT (depth 3 p) (toObs timeline 3 p [] [] []) [] root
 ...   | nothing = nothing
 ...   | just l  =
   if short l then nothing

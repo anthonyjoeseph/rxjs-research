@@ -12,7 +12,7 @@ open import Data.Product using (_×_; _,_)
 open import Data.Empty using (⊥)
 open import Data.Unit using (⊤)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Seen; Silent; hush; held)
 
 -- Past a cursor; with none, anywhere.

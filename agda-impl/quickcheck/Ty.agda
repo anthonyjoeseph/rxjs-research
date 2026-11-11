@@ -16,7 +16,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Relation.Nullary using (does)
 
-open import denotation.Events using (Pos; Label; ix; sub; last; _≟ᵖ_)
+open import denotation.Position using (Pos; Path; Instant; frame; cascade; _∙_; Label; ix; sub; last; _≟ᵖ_)
 
 infixr 5 _×ᵗ_ _+ᵗ_
 
@@ -55,8 +55,15 @@ eqᵀ nameᵗ     p        q        = does (p ≟ᵖ q)
 -- number-quoting never reaches inside a name.
 mutual
   showPos : Pos → String
-  showPos []       = ""
-  showPos (l ∷ ls) = showLabel l ++ "." ++ showPos ls
+  showPos (i ∙ ls) = showInstant i ++ ":" ++ showPath ls
+
+  showInstant : Instant → String
+  showInstant frame           = "F"
+  showInstant (cascade t e l) = "c" ++ showℕ t ++ "(" ++ showPos e ++ ")" ++ showLabel l
+
+  showPath : Path → String
+  showPath []       = ""
+  showPath (l ∷ ls) = showLabel l ++ "." ++ showPath ls
 
   showLabel : Label → String
   showLabel (ix n)  = "i" ++ showℕ n

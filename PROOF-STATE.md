@@ -14,45 +14,104 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-## Tier 1 — the elaboration
+## Tier 1 — the instant is a datum
+
+**The instant is a datum:** the subscribe frame, or one async emission (`cascade t e l`), carried in the position; everything green over it.
+
+### Ledger
+
+## Tier 2 — the elaboration
 
 **The elaboration:** `elaborate` makes `make spec-check` green: no seed refutes the batches joined, the grouping by name, or names agreeing with instants.
 
 ### Ledger
 
-## Tier 2 — the simultaneous spec
+## Tier 3 — the simultaneous spec
 
 **The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
 
 ### Ledger
 
+#### THE ERASURE
+
+Probed, unproven: at each approximant, each former's elaborated run
+carries its plain one (`Carry`), extending an order embedding of
+positions over its own worlds; the meaning is reached through
+`never-lies`, never carried. Most open: the embedding past a former's
+children, and a concat's queued lane. Settled when each former's leaf
+is a body.
+
+Members: `carry-connect`, `carry-flatMap`, `carry-connected`, `carry-cold`,
+`carry-takeWhile`, `carry-wrap`.
+
+#### THE PROTOCOL
+
+Untried: every emit is named for its own instant, one begin and one
+value name per instant — the elaboration mints both per async value,
+which is per instant; the subscribe mark sits once before every begin
+with every value past it async; every value precedes the completion.
+Settled when each is a body over the elaboration's layers.
+
+Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
+
 #### THE HELD STREAMS
 
-Untried: every elaborated stream names its begins for their instants,
-counts a route of its own instant under every row outside the bursts it
-is exempt for, and keeps dead instants dead. Hardest: flatMap's scan
-counters (`lanes-current`, `parked-current`): each is the `idle` of
-what holds the routes, the lanes' and the connects' in scope, read at a
-row of the scan's source; that needs a run of the source projected onto
-each branch's run. Then `m-rows`, a reader's joins and the defer limit.
-Settled when each former's leaf is a body.
+Probed, unproven: every elaborated stream names its begins for their
+instants, counts a route of its own instant under every row outside the
+bursts it is exempt for, and keeps dead instants dead. Hardest:
+flatMap's scan counters, true on every row probed, hand-offs and parks
+included: each is the `idle` of what holds the routes, read on the
+scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
+split is owed). Then what each branch sent, a reader's joins and the
+defer limit. The cold's runs (`cold-covered`) need its rows' order, not
+their shape. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lanes-current`, `held-current`,
-`parked-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
-`walk`, `step-local`, `m-rows`, `lane-ends`, `close-ends`, `lane-named`,
-`lane-early`, `lane-late`, `close-marks`, `scan-idle`, `comb-run`,
-`held-connected`, `held-lim`, `held-top`, `held-next`, `held-⊥`,
-`held-takeWhile`, `held-cold`, `held-of`, `held-empty`.
+Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
+`lanes-count`, `held-current`, `parked-live`, `live-current`,
+`value-open`, `over-open`, `end-open`, `comb-shut`, `walk`,
+`step-local`, `outer-sent`, `lane-sent`, `close-sent`, `m-ends`,
+`lane-ends`, `close-ends`, `lane-named`, `lane-early`, `lane-late`,
+`close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
+`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
+`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
+
+#### THE NEXT ROW
+
+Untried: past finitely many rows of a value's instant, the program
+reaches another instant or its end, or makes no row — constructively.
+Nothing decides the row after a position; `listed` decides those before
+one. Settled when the next row past a position is decided by operator,
+each timeline forcing to its next frame, `done` or `quiet`.
+
+Members: `exits-bounded`.
+
+#### THE FINITE REST
+
+Untried: past a zero count only finitely many rows of the instant last
+begun remain — a route is held while its instant can still make a row.
+Settled when each is a body: connect's rows beyond its body's (bursts,
+echoes), the combinator scan's, a cold's.
+
+Members: `cold-rest`, `scan-rest`, `conn-rest`.
 
 #### THE RELEASE
 
-Untried in this vocabulary: the batcher holds nothing exactly where the
-run's last instant is over — no value of it left past its last value, by
-position, and the run leaving it. The bridge from the batcher's routes
-to `Over` is open both ways. Settled when both are bodies over `shut`
-and the protocol.
+Untried: the batcher releases exactly at the protocol's marks — past
+the last value with nothing held, a mark past it released it, of one of
+four kinds; a held batch is released by marks before the run leaves its
+instant. Settled when each is a body over `Walk`'s tally and the
+protocol.
 
-Members: `flush-closes`, `releases`.
+Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+
+#### THE PASS
+
+Untried: a run meets on to every visible row up to one with finitely
+many rows before it. `listed`, `Reaching.reach` and `run-det` are each
+proven; open is the row at the bound itself, which a listing before it
+omits. Settled when it is a body over them.
+
+Members: `pass`.
 
 #### THE BATCH RANK
 
@@ -62,31 +121,3 @@ mark to sit in the instant it releases. Settled when `batch-rank` is a
 body over the layers and the release protocol.
 
 Members: `batch-rank`.
-
-#### THE RANKS
-
-Untried: a met run has its ranks, and rows of one instant share a rank
-while rows of two do not. A rank cannot be computed from `Few`: its
-cover may hold positions with no row. Settled when these are bodies over
-`rooted`, the instant interval and a way to list a run's instants.
-
-Members: `ranks-x`, `ranks-b`, `instant-rank`, `rank-instant`.
-
-#### THE PROTOCOL
-
-Untried: every emit is named for its instant, the begins and values of
-one instant carry one name, the subscribe mark sits once before every
-begin with every value past it async, and every value precedes the
-completion. Settled when each is a body over the elaboration's layers.
-
-Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
-
-#### THE ERASURE
-
-Untried: the elaborated run, marks dropped, is the plain run stamp for
-stamp — the elaboration adds no instant, so the ranks agree — with an
-instant over on one side over on the other, and completing together.
-Switch, exhaust and the bounded queue are the real cases. Settled when
-each is a body by operator.
-
-Members: `erases`.

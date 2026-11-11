@@ -5,9 +5,8 @@
 module adequacy.Floor.Keys where
 
 open import Data.Bool using (true; false)
-open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; reverse)
-open import Data.List.Properties using (ʳ++-defn; ++-identityʳ)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_; reverse)
+open import Data.List.Properties using (ʳ++-defn)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -15,58 +14,42 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; subst)
-open import Relation.Nullary using (yes; no)
 
-open import denotation.Events using (Pos; ix; last; _≟ˡ_; <ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-next; From∞; Frame; Frame∞; emit; stall; close; timelineAt)
-  renaming (sub to subᴾ)
-open import denotation.Events using (_<ᵖ_)
+open import denotation.Position using (Pos; _∙_; ix; last; _⊕_; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.Events using (<ᵖ-below; <ᵖ-part; <ᵖ-asym; <ᵖ-split; <ᵖ-next)
 open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; off; offL; offIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-irrefl; <ᴷ-asym)
+open import operation.Key using (Key; at; after; never; _<ᴷ_; at-<ᴷ; ≮ᴷ-trans; <ᴷ-irrefl; <ᴷ-asym)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-map; k-scan; k-cut; k-ln; k-take; k-outer; k-lane; k-src; k-body; Lo)
 open import adequacy.Path using (_⊑_; ⊑i)
+open import denotation.Laws.Worlds using (⊕-identityʳ)
 
 ------------------------------------------------------------------------
 -- Keys
 
 -- No key past the last.
-top-max : ∀ κ → after [] <ᴷ κ ≡ false
-top-max (at [])        = refl
-top-max (at (_ ∷ _))   = refl
-top-max (after [])     = refl
-top-max (after (_ ∷ _)) = refl
-
--- A position and all below it, before the position's after.
-at-after : ∀ p ys → at (p ++ ys) <ᴷ after p ≡ true
-at-after []      []      = refl
-at-after []      (_ ∷ _) = refl
-at-after (a ∷ p) ys with a ≟ˡ a
-... | yes _ rewrite <ᵖ-irrefl [ a ] = at-after p ys
-... | no ¬e = ⊥-elim (¬e refl)
-
-at-after₀ : ∀ p → at p <ᴷ after p ≡ true
-at-after₀ []      = refl
-at-after₀ (a ∷ p) with a ≟ˡ a
-... | yes _ rewrite <ᵖ-irrefl [ a ] = at-after₀ p
-... | no ¬e = ⊥-elim (¬e refl)
+top-max : ∀ κ → never <ᴷ κ ≡ false
+top-max (at (_ ∙ _))    = refl
+top-max (after (_ ∙ _)) = refl
+top-max never           = refl
 
 -- A position below another, not before it.
-ext-le : ∀ p ys → at (p ++ ys) <ᴷ at p ≡ false
-ext-le p []       rewrite ++-identityʳ p = <ᴷ-irrefl (at p)
-ext-le p (l ∷ ys) = trans (at-<ᴷ (p ++ l ∷ ys) p) (<ᵖ-asym p (p ++ l ∷ ys) (<ᵖ-below p ys))
+ext-le : ∀ p ys → at (p ⊕ ys) <ᴷ at p ≡ false
+ext-le p []       rewrite ⊕-identityʳ p = <ᴷ-irrefl (at p)
+ext-le p (l ∷ ys) = trans (at-<ᴷ (p ⊕ (l ∷ ys)) p) (<ᵖ-asym p (p ⊕ (l ∷ ys)) (<ᵖ-below p ys))
 
-ext-⊑ : ∀ p ys → at p ⊑ at (p ++ ys)
+ext-⊑ : ∀ p ys → at p ⊑ at (p ⊕ ys)
 ext-⊑ p ys = ⊑i (ext-le p ys)
 
 ⊑-refl : ∀ {κ} → κ ⊑ κ
 ⊑-refl {κ} = ⊑i (<ᴷ-irrefl κ)
 
 -- A child below its position.
-below : ∀ q {l} → at q <ᴷ at (q ++ [ l ]) ≡ true
+below : ∀ q {l} → at q <ᴷ at (q ⊕ [ l ]) ≡ true
 below q = trans (at-<ᴷ q _) (<ᵖ-below q [])
 
 ------------------------------------------------------------------------
@@ -103,7 +86,7 @@ own-take (overAt p) = refl
 
 -- A connect's own marks, by kind.
 data OwnOf {Γ X} (k : CS Γ X) : Mark → Key → Set where
-  ob : ∀ {p} → CS.bodyAt k ≡ just p → OwnOf k bodyM (at (p ++ [ ix 1 ]))
+  ob : ∀ {p} → CS.bodyAt k ≡ just p → OwnOf k bodyM (at (p ⊕ [ ix 1 ]))
   os : ∀ {p} → CS.attSrc k ≡ just p → OwnOf k srcAttM (after p)
   oo : ∀ {p} → CS.owedAt k ≡ just p → OwnOf k owedM (after p)
 
@@ -400,21 +383,21 @@ inbox-key j (q , e) ((r , e′) ∷ ib) (k-own (there ()))  | false
 inbox-key j (q , e) ((r , e′) ∷ ib) (k-kid ())          | false
 
 queued-key : ∀ {Γ A} j p (e : Ev A) {g} {x : A ∈ Γ} ib {κ} → KeyIn (joinS j g x (queued j p e ib)) κ
-           → KeyIn (joinS j g x ib) κ ⊎ at (p ++ [ ix 0 ]) <ᴷ κ ≡ true
+           → KeyIn (joinS j g x ib) κ ⊎ at (p ⊕ [ ix 0 ]) <ᴷ κ ≡ true
 queued-key j p (nx a) ib h with j <ᵖ p
 ... | false = inj₁ h
 ... | true with inbox-key j _ ib h
 ...   | inj₁ h′   = inj₁ h′
-...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
+...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ⊕ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
 queued-key j p cp ib h with j <ᵖ p in e | inbox-key j _ ib h
 ... | _     | inj₁ h′   = inj₁ h′
-... | true  | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
+... | true  | inj₂ refl = inj₂ (trans (at-<ᴷ (p ⊕ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
 ... | false | inj₂ refl with <ᵖ-split p j e
-...   | inj₁ lt   = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-next p j last lt))
-...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ++ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
+...   | inj₁ lt   = inj₂ (trans (at-<ᴷ (p ⊕ [ ix 0 ]) _) (<ᵖ-next p j last lt))
+...   | inj₂ refl = inj₂ (trans (at-<ᴷ (p ⊕ [ ix 0 ]) _) (<ᵖ-part p [] [] refl))
 
 mutual
-  feed-key : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) {κ} → KeyIn (feed i p e s) κ → KeyIn s κ ⊎ at (p ++ [ ix 0 ]) <ᴷ κ ≡ true
+  feed-key : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (s : St Γ A) {κ} → KeyIn (feed i p e s) κ → KeyIn s κ ⊎ at (p ⊕ [ ix 0 ]) <ᴷ κ ≡ true
   feed-key i p e (joinS j true x ib) h with Machine.same? i x
   ... | just refl = queued-key j p e ib h
   ... | nothing   = inj₁ h
@@ -455,7 +438,7 @@ mutual
   feed-key i p e doneS        h = inj₁ h
 
   feedL-key : ∀ {Γ X A} (i : X ∈ Γ) p (e : Ev X) (ls : List (St Γ A)) {x κ} → x ∈ feedL i p e ls → KeyIn x κ
-            → (Σ _ λ y → y ∈ ls × KeyIn y κ) ⊎ at (p ++ [ ix 0 ]) <ᴷ κ ≡ true
+            → (Σ _ λ y → y ∈ ls × KeyIn y κ) ⊎ at (p ⊕ [ ix 0 ]) <ᴷ κ ≡ true
   feedL-key i p e (s ∷ ls) (here refl) h with feed-key i p e s h
   ... | inj₁ h′ = inj₁ (s , here refl , h′)
   ... | inj₂ lt = inj₂ lt

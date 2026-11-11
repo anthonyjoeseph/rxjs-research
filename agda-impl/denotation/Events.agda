@@ -2,27 +2,23 @@
 
 module denotation.Events where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.List using (List; _∷_; []; _++_; [_])
 open import Data.Product using (_×_; _,_; Σ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_)
+open import denotation.Position using (Time; Pos; Path; ix; sub; last; _∙_; tick; _⊕_; Root; nested; fired; _▸_; lt; eq; gt; lexi; isLt; isEq;
+  cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ᵖ_; insideᵗ; inside)
+open import denotation.Simultaneity using (ℕ-lt; ℕ-eq; reflˡ; reflⁱ; reflᵖ; eqˡ; eqⁱ; eqᵖ; ltˡ; ltⁱ; ltᵖ; gtᵖ; lexi-l; isLt-lt)
 open import Level using (Lift; 0ℓ) renaming (suc to lsuc)
-open import Data.Bool using (T)
 open import Data.Nat using (_<_; _≤_; z≤n)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ; ≮⇒≥; ≤-antisym; <-trans; n≮n; n<1+n)
+open import Data.Nat.Properties using (n<1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
-open import Relation.Binary.Definitions using (DecidableEquality)
-open import Relation.Nullary using (yes; no)
 import Data.Nat as ℕ
 
 ------------------------------------------------------------------------
 -- Timelines: what a cold leaf says, and what a runtime reports
-
-Time : Set
-Time = ℕ
 
 -- Frames, each a synchronous burst.  A runtime reports one, with ticks
 -- absolute.
@@ -70,67 +66,6 @@ mutual
     field force : From A t
 
 ------------------------------------------------------------------------
--- Positions
-
--- WHERE AN EVENT SITS IN THE WHOLE RUN.  A tick says when; it does not
--- say which of two simultaneous events comes first, and rxjs always
--- does.  A position is a path in the run's call tree — an event's
--- effects are its children — read in pre-order, which is execution
--- order.  So a merge is a sorted merge, and nothing coordinates it.
---
--- Three kinds of step.  `ix i`: an operator's i-th effect.  `sub p`: a
--- subject delivering to the subscriber that joined at `p`, so a subject's
--- subscribers come in the order they joined.  `last`: after every other
--- effect — where a burst ends and its completion sits.
---
--- A timer cascade at tick t is rooted at `ix t ∷ sub e ∷ []`, where `e`
--- is the position its timer was created at.  Same-tick timers therefore
--- fire in creation order, as in rxjs.
-data Label : Set where
-  ix   : ℕ → Label
-  sub  : List Label → Label
-  last : Label
-
-Pos : Set
-Pos = List Label
-
--- The root subscription: tick 0, before any timer.
-root : Pos
-root = ix 0 ∷ []
-
-tick : Pos → Time
-tick []          = 0
-tick (ix t ∷ _)  = t
-tick (sub _ ∷ _) = 0
-tick (last ∷ _)  = 0
-
--- Positions' equality: all a name is read for.
-mutual
-  _≟ˡ_ : DecidableEquality Label
-  ix m  ≟ˡ ix n  with m ℕ.≟ n
-  ... | yes refl = yes refl
-  ... | no ne    = no λ { refl → ne refl }
-  sub p ≟ˡ sub q with p ≟ᵖ q
-  ... | yes refl = yes refl
-  ... | no ne    = no λ { refl → ne refl }
-  last  ≟ˡ last  = yes refl
-  ix _  ≟ˡ sub _ = no λ ()
-  ix _  ≟ˡ last  = no λ ()
-  sub _ ≟ˡ ix _  = no λ ()
-  sub _ ≟ˡ last  = no λ ()
-  last  ≟ˡ ix _  = no λ ()
-  last  ≟ˡ sub _ = no λ ()
-
-  _≟ᵖ_ : DecidableEquality Pos
-  []      ≟ᵖ []      = yes refl
-  []      ≟ᵖ (_ ∷ _) = no λ ()
-  (_ ∷ _) ≟ᵖ []      = no λ ()
-  (a ∷ p) ≟ᵖ (b ∷ q) with a ≟ˡ b | p ≟ᵖ q
-  ... | yes refl | yes refl = yes refl
-  ... | no ne    | _        = no λ { refl → ne refl }
-  ... | yes _    | no ne    = no λ { refl → ne refl }
-
-------------------------------------------------------------------------
 -- The cold leaf
 
 -- WHAT A COLD LEAF IS: a timeline fixed relative to its subscription, or
@@ -147,220 +82,25 @@ timelineAt (fixed m) p = m
 timelineAt (fresh f) p = at 0 z≤n (emit (f p) (close λ where
   .From∞.force → done))
 
--- Each value told whether its callback completes the timeline: its
--- frame closes straight after it, onto nothing more.  Every step stays
--- where it was.
+------------------------------------------------------------------------
+-- The order, a position at a time
+
+-- Positions of one instant compare as their paths do.
 private
-  ends : ∀ {A t} → From A t → Bool
-  ends done = true
-  ends _    = false
+  _<ᵗ_ : Path → Path → Bool
+  p <ᵗ q = isLt (cmpPath p q)
 
-mutual
-  finalFrom : ∀ {A t} → From A t → From (A × Bool) t
-  finalFrom done       = done
-  finalFrom quiet      = quiet
-  finalFrom (at t le b) = at t le (finalFrame b)
+  one : ∀ i x y → cmpPos (i ∙ x) (i ∙ y) ≡ cmpPath x y
+  one i x y = cong (λ c → lexi c (cmpPath x y)) (reflⁱ i)
 
-  finalFrame : ∀ {A t} → Frame A t → Frame (A × Bool) t
-  finalFrame (emit a (close k)) = emit (a , ends (From∞.force k)) (close (finalFrom∞ k))
-  finalFrame (emit a k)         = emit (a , false) (finalFrame k)
-  finalFrame (stall k)          = stall (finalFrame∞ k)
-  finalFrame (close k)          = close (finalFrom∞ k)
-
-  finalFrame∞ : ∀ {A t} → Frame∞ A t → Frame∞ (A × Bool) t
-  finalFrame∞ k .Frame∞.force = finalFrame (Frame∞.force k)
-
-  finalFrom∞ : ∀ {A t} → From∞ A t → From∞ (A × Bool) t
-  finalFrom∞ k .From∞.force = finalFrom (From∞.force k)
-
-finals : ∀ {A} → Timeline A → Timeline (A × Bool)
-finals (fixed m) = fixed (finalFrom m)
-finals (fresh f) = fresh (λ p → f p , true)
-
-private
-  data Cmp : Set where
-    lt eq gt : Cmp
-
-  cmpℕ : ℕ → ℕ → Cmp
-  cmpℕ m n = if m <ᵇ n then lt else if n <ᵇ m then gt else eq
-
-  lexi : Cmp → Cmp → Cmp
-  lexi eq r = r
-  lexi lt _ = lt
-  lexi gt _ = gt
-
-  mutual
-    cmpLabel : Label → Label → Cmp
-    cmpLabel (ix m)  (ix n)  = cmpℕ m n
-    cmpLabel (ix _)  (sub _) = lt
-    cmpLabel (ix _)  last    = lt
-    cmpLabel (sub _) (ix _)  = gt
-    cmpLabel (sub p) (sub q) = cmpPos p q
-    cmpLabel (sub _) last    = lt
-    cmpLabel last    (ix _)  = gt
-    cmpLabel last    (sub _) = gt
-    cmpLabel last    last    = eq
-
-    cmpPos : Pos → Pos → Cmp
-    cmpPos []      []      = eq
-    cmpPos []      (_ ∷ _) = lt
-    cmpPos (_ ∷ _) []      = gt
-    cmpPos (a ∷ p) (b ∷ q) = lexi (cmpLabel a b) (cmpPos p q)
-
-  isLt : Cmp → Bool
-  isLt lt = true
-  isLt eq = false
-  isLt gt = false
-
-_<ᵖ_ : Pos → Pos → Bool
-p <ᵖ q = isLt (cmpPos p q)
-
--- `k` lies under `r`: an effect, however deep, of what sits at `r`.
-inside : Pos → Pos → Bool
-inside []      k       = true
-inside (_ ∷ _) []      = false
-inside (a ∷ r) (b ∷ k) = same (cmpLabel a b) r k
-  where same : Cmp → Pos → Pos → Bool
-        same eq r k = inside r k
-        same _  _ _ = false
-
--- The order is an order: transitive, and led by the tick.
-private
-  lt-ℕ : ∀ {m n} → cmpℕ m n ≡ lt → m < n
-  lt-ℕ {m} {n} h with m <ᵇ n in e | n <ᵇ m
-  lt-ℕ {m} {n} h  | true  | _     = <ᵇ⇒< m n (subst T (sym e) tt)
-  lt-ℕ {m} {n} () | false | true
-  lt-ℕ {m} {n} () | false | false
-
-  ℕ-lt : ∀ {m n} → m < n → cmpℕ m n ≡ lt
-  ℕ-lt {m} {n} l with m <ᵇ n in e
-  ... | true  = refl
-  ... | false with subst T e (<⇒<ᵇ l)
-  ...   | ()
-
-  eq-ℕ : ∀ {m n} → cmpℕ m n ≡ eq → m ≡ n
-  eq-ℕ {m} {n} h with m <ᵇ n in e₁ | n <ᵇ m in e₂
-  eq-ℕ {m} {n} () | true  | _
-  eq-ℕ {m} {n} () | false | true
-  eq-ℕ {m} {n} h  | false | false =
-    ≤-antisym (≮⇒≥ λ l → subst T e₂ (<⇒<ᵇ l)) (≮⇒≥ λ l → subst T e₁ (<⇒<ᵇ l))
-
-  lexi-lt : ∀ c r → lexi c r ≡ lt → c ≡ lt ⊎ (c ≡ eq × r ≡ lt)
-  lexi-lt lt r h = inj₁ refl
-  lexi-lt eq r h = inj₂ (refl , h)
-  lexi-lt gt r ()
-
-  lexi-eq : ∀ c r → lexi c r ≡ eq → c ≡ eq × r ≡ eq
-  lexi-eq lt r ()
-  lexi-eq eq r h = refl , h
-  lexi-eq gt r ()
-
-  mutual
-    eq-label : ∀ a b → cmpLabel a b ≡ eq → a ≡ b
-    eq-label (ix m)  (ix n)  h = cong ix (eq-ℕ {m} {n} h)
-    eq-label (sub p) (sub q) h = cong sub (eq-pos p q h)
-    eq-label last    last    h = refl
-    eq-label (ix _)  (sub _) ()
-    eq-label (ix _)  last    ()
-    eq-label (sub _) (ix _)  ()
-    eq-label (sub _) last    ()
-    eq-label last    (ix _)  ()
-    eq-label last    (sub _) ()
-
-    eq-pos : ∀ p q → cmpPos p q ≡ eq → p ≡ q
-    eq-pos []      []      h = refl
-    eq-pos []      (_ ∷ _) ()
-    eq-pos (_ ∷ _) []      ()
-    eq-pos (a ∷ p) (b ∷ q) h with lexi-eq (cmpLabel a b) (cmpPos p q) h
-    ... | x , y = cong₂ _∷_ (eq-label a b x) (eq-pos p q y)
-
-  mutual
-    lt-label : ∀ a b c → cmpLabel a b ≡ lt → cmpLabel b c ≡ lt → cmpLabel a c ≡ lt
-    lt-label (ix m)  (ix n)  (ix k)  h₁ h₂ = ℕ-lt {m} {k} (<-trans (lt-ℕ {m} {n} h₁) (lt-ℕ {n} {k} h₂))
-    lt-label (ix _)  _       (sub _) _  _  = refl
-    lt-label (ix _)  _       last    _  _  = refl
-    lt-label (ix _)  (sub _) (ix _)  _  ()
-    lt-label (ix _)  last    (ix _)  _  ()
-    lt-label (sub p) (sub q) (sub r) h₁ h₂ = lt-pos p q r h₁ h₂
-    lt-label (sub _) _       last    _  _  = refl
-    lt-label (sub _) (ix _)  _       () _
-    lt-label (sub _) (sub _) (ix _)  _  ()
-    lt-label (sub _) last    (ix _)  _  ()
-    lt-label (sub _) last    (sub _) _  ()
-    lt-label last    (ix _)  _       () _
-    lt-label last    (sub _) _       () _
-    lt-label last    last    _       () _
-
-    lt-pos : ∀ p q r → cmpPos p q ≡ lt → cmpPos q r ≡ lt → cmpPos p r ≡ lt
-    lt-pos []      (_ ∷ _) (_ ∷ _) _  _  = refl
-    lt-pos []      []      _       () _
-    lt-pos (_ ∷ _) []      _       () _
-    lt-pos _       (_ ∷ _) []      _  ()
-    lt-pos (a ∷ p) (b ∷ q) (c ∷ r) h₁ h₂
-      with lexi-lt (cmpLabel a b) (cmpPos p q) h₁ | lexi-lt (cmpLabel b c) (cmpPos q r) h₂
-    ... | inj₁ x       | inj₁ y       rewrite lt-label a b c x y = refl
-    ... | inj₁ x       | inj₂ (y , _) rewrite subst (λ z → cmpLabel a z ≡ lt) (eq-label b c y) x = refl
-    ... | inj₂ (x , _) | inj₁ y       rewrite subst (λ z → cmpLabel z c ≡ lt) (sym (eq-label a b x)) y = refl
-    ... | inj₂ (x , u) | inj₂ (y , v)
-      rewrite subst (λ z → cmpLabel z c ≡ eq) (sym (eq-label a b x)) y | lt-pos p q r u v = refl
-
-  refl-ℕ : ∀ m → cmpℕ m m ≡ eq
-  refl-ℕ m with m <ᵇ m in e
-  ... | true  = ⊥-elim (n≮n m (<ᵇ⇒< m m (subst T (sym e) tt)))
-  ... | false = refl
-
-  mutual
-    refl-label : ∀ a → cmpLabel a a ≡ eq
-    refl-label (ix m)  = refl-ℕ m
-    refl-label (sub p) = refl-pos p
-    refl-label last    = refl
-
-    refl-pos : ∀ p → cmpPos p p ≡ eq
-    refl-pos []      = refl
-    refl-pos (a ∷ p) rewrite refl-label a = refl-pos p
-
-  isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
-  isLt-lt {lt} h = refl
-  isLt-lt {eq} ()
-  isLt-lt {gt} ()
-
-  gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
-  gt-ℕ {m} {n} h with m <ᵇ n | n <ᵇ m in e
-  gt-ℕ {m} {n} () | true  | _
-  gt-ℕ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
-  gt-ℕ {m} {n} () | false | false
-
-  lexi-gt : ∀ c r → lexi c r ≡ gt → c ≡ gt ⊎ (c ≡ eq × r ≡ gt)
-  lexi-gt lt r ()
-  lexi-gt eq r h = inj₂ (refl , h)
-  lexi-gt gt r h = inj₁ refl
-
-  mutual
-    flip-label : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
-    flip-label (ix m)  (ix n)  h = ℕ-lt {n} {m} (gt-ℕ {m} {n} h)
-    flip-label (sub p) (sub q) h = flip-pos p q h
-    flip-label (sub _) (ix _)  h = refl
-    flip-label last    (ix _)  h = refl
-    flip-label last    (sub _) h = refl
-    flip-label (ix _)  (sub _) ()
-    flip-label (ix _)  last    ()
-    flip-label (sub _) last    ()
-    flip-label last    last    ()
-
-    flip-pos : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
-    flip-pos []      []      ()
-    flip-pos []      (_ ∷ _) ()
-    flip-pos (_ ∷ _) []      h = refl
-    flip-pos (a ∷ p) (b ∷ q) h with lexi-gt (cmpLabel a b) (cmpPos p q) h
-    ... | inj₁ x rewrite flip-label a b x = refl
-    ... | inj₂ (x , y)
-      rewrite subst (λ z → cmpLabel z a ≡ eq) (eq-label a b x) (refl-label a) | flip-pos p q y = refl
+  within : ∀ i x y → (i ∙ x) <ᵖ (i ∙ y) ≡ x <ᵗ y
+  within i x y = cong isLt (one i x y)
 
 <ᵖ-trans : ∀ p q r → p <ᵖ q ≡ true → q <ᵖ r ≡ true → p <ᵖ r ≡ true
-<ᵖ-trans p q r h₁ h₂ rewrite lt-pos p q r (isLt-lt h₁) (isLt-lt h₂) = refl
+<ᵖ-trans p q r h₁ h₂ = cong isLt (ltᵖ p q r (isLt-lt {cmpPos p q} h₁) (isLt-lt {cmpPos q r} h₂))
 
 <ᵖ-irrefl : ∀ p → p <ᵖ p ≡ false
-<ᵖ-irrefl p rewrite refl-pos p = refl
+<ᵖ-irrefl p = cong isLt (reflᵖ p)
 
 <ᵖ-asym : ∀ p q → p <ᵖ q ≡ true → q <ᵖ p ≡ false
 <ᵖ-asym p q h with q <ᵖ p in e
@@ -371,13 +111,16 @@ private
 <ᵖ-split : ∀ p q → q <ᵖ p ≡ false → p <ᵖ q ≡ true ⊎ p ≡ q
 <ᵖ-split p q h with cmpPos p q in c
 ... | lt = inj₁ refl
-... | eq = inj₂ (eq-pos p q c)
-... | gt with () ← trans (sym h) (cong isLt (flip-pos p q c))
+... | eq = inj₂ (eqᵖ p q c)
+... | gt with () ← trans (sym h) (cong isLt (gtᵖ p q c))
+
+------------------------------------------------------------------------
+-- The same, along a path
 
 private
-  past : ∀ p → cmpPos (p ++ [ ix 0 ]) [] ≡ gt
-  past []      = refl
-  past (_ ∷ _) = refl
+  pastᵗ : ∀ (p : Path) → cmpPath (p ++ [ ix 0 ]) [] ≡ gt
+  pastᵗ []      = refl
+  pastᵗ (_ ∷ _) = refl
 
   top : ∀ a → isLt (lexi (cmpLabel a (ix 0)) gt) ≡ false
   top (ix m) with 0 <ᵇ m
@@ -386,134 +129,217 @@ private
   top (sub _) = refl
   top last    = refl
 
+  shiftᵗ : ∀ (p q : Path) → p <ᵗ q ≡ false → (p ++ [ ix 0 ]) <ᵗ (q ++ [ ix 0 ]) ≡ false
+  shiftᵗ []      []      h = refl
+  shiftᵗ (a ∷ p) []      h rewrite pastᵗ p = top a
+  shiftᵗ (a ∷ p) (b ∷ q) h with cmpLabel a b
+  ... | eq = shiftᵗ p q h
+  ... | gt = refl
+
+  stepᵗ : ∀ (p q : Path) → p <ᵗ q ≡ true → q <ᵗ (p ++ [ ix 0 ]) ≡ false
+  stepᵗ []      []                ()
+  stepᵗ []      (ix zero ∷ [])    h = refl
+  stepᵗ []      (ix zero ∷ _ ∷ _) h = refl
+  stepᵗ []      (ix (suc _) ∷ _)  h = refl
+  stepᵗ []      (sub _ ∷ _)       h = refl
+  stepᵗ []      (last ∷ _)        h = refl
+  stepᵗ (a ∷ p) []                ()
+  stepᵗ (a ∷ p) (b ∷ q)           h with cmpLabel a b in c | cmpLabel b a in d
+  ... | lt | lt with () ← trans (sym (reflˡ a)) (ltˡ a b a c d)
+  ... | lt | eq with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel a z ≡ lt) (eqˡ b a d) c)
+  ... | lt | gt = refl
+  ... | eq | lt with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eqˡ a b c)) d)
+  ... | eq | eq = stepᵗ p q h
+  ... | eq | gt with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eqˡ a b c)) d)
+  ... | gt | _  with () ← h
+
+  belowᵗ : ∀ (p : Path) {l} ys → p <ᵗ (p ++ l ∷ ys) ≡ true
+  belowᵗ []      ys = refl
+  belowᵗ (a ∷ p) {l} ys = trans (cong (λ c → isLt (lexi c (cmpPath p (p ++ l ∷ ys)))) (reflˡ a)) (belowᵗ p ys)
+
+  partᵗ : ∀ (p : Path) {a b} ys zs → a <ˡ b ≡ true → (p ++ a ∷ ys) <ᵗ (p ++ b ∷ zs) ≡ true
+  partᵗ [] {a} {b} ys zs h = cong isLt (lexi-l {cmpLabel a b} {cmpPath ys zs} (isLt-lt {cmpLabel a b} h))
+  partᵗ (x ∷ p) {a} {b} ys zs h =
+    trans (cong (λ c → isLt (lexi c (cmpPath (p ++ a ∷ ys) (p ++ b ∷ zs)))) (reflˡ x)) (partᵗ p ys zs h)
+
+  downᵗ : ∀ (k h : Path) x y → k <ᵗ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ [ x ]) <ᵗ (h ++ [ y ]) ≡ true
+  downᵗ []      []      x y () ne
+  downᵗ []      (l ∷ h) x y _  ne = ⊥-elim (ne l h refl)
+  downᵗ (a ∷ k) []      x y () ne
+  downᵗ (a ∷ k) (b ∷ h) x y kh ne with cmpLabel a b in c
+  ... | lt = refl
+  ... | eq = downᵗ k h x y kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eqˡ a b c)) e))
+  ... | gt with () ← kh
+
+  overᵗ : ∀ (k h : Path) ys → (k ++ [ ix 0 ]) <ᵗ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ ys) <ᵗ h ≡ true
+  overᵗ []      []      ys () ne
+  overᵗ []      (l ∷ h) ys _  ne = ⊥-elim (ne l h refl)
+  overᵗ (a ∷ k) []      ys () ne
+  overᵗ (a ∷ k) (b ∷ h) ys kh ne with cmpLabel a b in c
+  ... | lt = refl
+  ... | eq = overᵗ k h ys kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eqˡ a b c)) e))
+  ... | gt with () ← kh
+
+  nextᵗ : ∀ (p q : Path) y → p <ᵗ q ≡ true → (p ++ [ ix 0 ]) <ᵗ (q ++ [ y ]) ≡ true
+  nextᵗ []      []                  y ()
+  nextᵗ []      (ix zero ∷ [])      y h = refl
+  nextᵗ []      (ix zero ∷ _ ∷ _)   y h = refl
+  nextᵗ []      (ix (suc _) ∷ _)    y h = refl
+  nextᵗ []      (sub _ ∷ _)         y h = refl
+  nextᵗ []      (last ∷ _)          y h = refl
+  nextᵗ (a ∷ p) []                  y ()
+  nextᵗ (a ∷ p) (b ∷ q)             y h with cmpLabel a b
+  ... | lt = refl
+  ... | eq = nextᵗ p q y h
+  ... | gt with () ← h
+
+  apartᵗ : ∀ (p q y : Path) → p <ᵗ q ≡ true → (∀ ys → q ≡ p ++ ys → ⊥) → (p ++ y) <ᵗ q ≡ true
+  apartᵗ []      []      y () ne
+  apartᵗ []      (b ∷ q) y _  ne = ⊥-elim (ne (b ∷ q) refl)
+  apartᵗ (a ∷ p) []      y () ne
+  apartᵗ (a ∷ p) (b ∷ q) y h  ne with cmpLabel a b in c
+  ... | lt = refl
+  ... | eq = apartᵗ p q y h (λ ys e → ne ys (cong₂ _∷_ (sym (eqˡ a b c)) e))
+  ... | gt with () ← h
+
+  betweenᵗ : ∀ (p q ys : Path) → p <ᵗ q ≡ true → q <ᵗ (p ++ ys) ≡ true → Σ Path (λ zs → q ≡ p ++ zs)
+  betweenᵗ []      q       ys _ _  = q , refl
+  betweenᵗ (a ∷ p) []      ys () _
+  betweenᵗ (a ∷ p) (b ∷ q) ys h h′ with cmpLabel a b in c | cmpLabel b a in d
+  ... | lt | lt with () ← trans (sym (reflˡ a)) (ltˡ a b a c d)
+  ... | lt | eq with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel a z ≡ lt) (eqˡ b a d) c)
+  ... | lt | gt with () ← h′
+  ... | eq | lt with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eqˡ a b c)) d)
+  ... | eq | gt with () ← trans (sym (reflˡ a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eqˡ a b c)) d)
+  ... | gt | _  with () ← h
+  ... | eq | eq with betweenᵗ p q ys h h′
+  ...   | zs , e = zs , cong₂ _∷_ (sym (eqˡ a b c)) e
+
+  inside-++ᵗ : ∀ (r k ys : Path) → insideᵗ r k ≡ true → insideᵗ r (k ++ ys) ≡ true
+  inside-++ᵗ []      k       ys i = refl
+  inside-++ᵗ (a ∷ r) []      ys ()
+  inside-++ᵗ (a ∷ r) (b ∷ k) ys i with cmpLabel a b
+  ... | lt with () ← i
+  ... | eq = inside-++ᵗ r k ys i
+  ... | gt with () ← i
+
+  inside-selfᵗ : ∀ (r : Path) → insideᵗ r r ≡ true
+  inside-selfᵗ []      = refl
+  inside-selfᵗ (a ∷ r) = trans (cong (λ c → isEq c ∧ insideᵗ r r) (reflˡ a)) (inside-selfᵗ r)
+
+  -- Two instants that compare `eq` are one, and none compares `lt` both ways.
+  same-or : ∀ i j → cmpInstant i j ≡ lt → cmpInstant j i ≡ lt → ⊥
+  same-or i j c d with () ← trans (sym (reflⁱ i)) (ltⁱ i j i c d)
+
+  lt-eq : ∀ i j → cmpInstant i j ≡ lt → cmpInstant j i ≡ eq → ⊥
+  lt-eq i j c d with () ← trans (sym (reflⁱ i)) (subst (λ z → cmpInstant i z ≡ lt) (eqⁱ j i d) c)
+
+  eq-gt : ∀ i j → cmpInstant i j ≡ eq → cmpInstant j i ≡ gt → ⊥
+  eq-gt i j c d with () ← trans (sym (reflⁱ i)) (subst (λ z → cmpInstant z i ≡ gt) (sym (eqⁱ i j c)) d)
+
+------------------------------------------------------------------------
+-- The same, between positions
+
 -- What is no earlier stays so a step past each.
-<ᵖ-shift : ∀ p q → p <ᵖ q ≡ false → (p ++ [ ix 0 ]) <ᵖ (q ++ [ ix 0 ]) ≡ false
-<ᵖ-shift []      []      h = refl
-<ᵖ-shift (a ∷ p) []      h rewrite past p = top a
-<ᵖ-shift (a ∷ p) (b ∷ q) h with cmpLabel a b
-... | eq = <ᵖ-shift p q h
+<ᵖ-shift : ∀ p q → p <ᵖ q ≡ false → (p ⊕ [ ix 0 ]) <ᵖ (q ⊕ [ ix 0 ]) ≡ false
+<ᵖ-shift (i ∙ x) (j ∙ y) h with cmpInstant i j
+... | lt with () ← h
+... | eq = shiftᵗ x y h
 ... | gt = refl
 
 -- Nothing lies strictly between a position and the one just past it.
-<ᵖ-step : ∀ p q → p <ᵖ q ≡ true → q <ᵖ (p ++ [ ix 0 ]) ≡ false
-<ᵖ-step []      []                ()
-<ᵖ-step []      (ix zero ∷ [])    h = refl
-<ᵖ-step []      (ix zero ∷ _ ∷ _) h = refl
-<ᵖ-step []      (ix (suc _) ∷ _)  h = refl
-<ᵖ-step []      (sub _ ∷ _)       h = refl
-<ᵖ-step []      (last ∷ _)        h = refl
-<ᵖ-step (a ∷ p) []                ()
-<ᵖ-step (a ∷ p) (b ∷ q)           h with cmpLabel a b in c | cmpLabel b a in d
-... | lt | lt with () ← trans (sym (refl-label a)) (lt-label a b a c d)
-... | lt | eq with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel a z ≡ lt) (eq-label b a d) c)
+<ᵖ-step : ∀ p q → p <ᵖ q ≡ true → q <ᵖ (p ⊕ [ ix 0 ]) ≡ false
+<ᵖ-step (i ∙ x) (j ∙ y) h with cmpInstant i j in c | cmpInstant j i in d
+... | lt | lt = ⊥-elim (same-or i j c d)
+... | lt | eq = ⊥-elim (lt-eq i j c d)
 ... | lt | gt = refl
-... | eq | lt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eq-label a b c)) d)
-... | eq | eq = <ᵖ-step p q h
-... | eq | gt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eq-label a b c)) d)
+... | eq | lt = ⊥-elim (lt-eq j i d c)
+... | eq | eq = stepᵗ x y h
+... | eq | gt = ⊥-elim (eq-gt i j c d)
 ... | gt | _  with () ← h
 
 -- A position is before every position below it, and of two positions
 -- that part at one label, the earlier label's is the earlier.
-<ᵖ-below : ∀ p {l} ys → p <ᵖ (p ++ l ∷ ys) ≡ true
-<ᵖ-below []      ys = refl
-<ᵖ-below (a ∷ p) ys rewrite refl-label a = <ᵖ-below p ys
+<ᵖ-below : ∀ p {l} ys → p <ᵖ (p ⊕ (l ∷ ys)) ≡ true
+<ᵖ-below (i ∙ x) {l} ys = trans (within i x (x ++ l ∷ ys)) (belowᵗ x ys)
 
--- A shared first label leaves the order to the rest.
-<ᵖ-cons : ∀ a p q → (a ∷ p) <ᵖ (a ∷ q) ≡ p <ᵖ q
-<ᵖ-cons a p q rewrite refl-label a = refl
+<ᵖ-part : ∀ p {a b} ys zs → a <ˡ b ≡ true → (p ⊕ (a ∷ ys)) <ᵖ (p ⊕ (b ∷ zs)) ≡ true
+<ᵖ-part (i ∙ x) {a} {b} ys zs h = trans (within i (x ++ a ∷ ys) (x ++ b ∷ zs)) (partᵗ x ys zs h)
 
-<ᵖ-part : ∀ p {a b} ys zs → (a ∷ []) <ᵖ (b ∷ []) ≡ true → (p ++ a ∷ ys) <ᵖ (p ++ b ∷ zs) ≡ true
-<ᵖ-part [] {a} {b} ys zs h with lexi-lt (cmpLabel a b) eq (isLt-lt h)
-... | inj₁ x rewrite x = refl
-... | inj₂ (_ , ())
-<ᵖ-part (x ∷ p) ys zs h rewrite refl-label x = <ᵖ-part p ys zs h
+-- A burst's steps part in order, whatever its root.
+<ᵖ-▸ : ∀ r {a b} → a <ˡ b ≡ true → (r ▸ a) <ᵖ (r ▸ b) ≡ true
+<ᵖ-▸ (nested p)  h = <ᵖ-part p [] [] h
+<ᵖ-▸ (fired t e) h rewrite ℕ-eq t | reflᵖ e | isLt-lt h = refl
 
 -- A burst's values part in order.
-<ᵖ-ix : ∀ i → (ix i ∷ []) <ᵖ (ix (suc i) ∷ []) ≡ true
-<ᵖ-ix i rewrite ℕ-lt {i} {suc i} (n<1+n i) = refl
+<ᵖ-ix : ∀ i → ix i <ˡ ix (suc i) ≡ true
+<ᵖ-ix i = cong isLt (ℕ-lt {i} {suc i} (n<1+n i))
 
 -- A later tick comes later.
-ix-< : ∀ {m n} → m < n → (ix m ∷ []) <ᵖ (ix n ∷ []) ≡ true
-ix-< l rewrite ℕ-lt l = refl
+ix-< : ∀ {m n} → m < n → ix m <ˡ ix n ≡ true
+ix-< {m} {n} l = cong isLt (ℕ-lt {m} {n} l)
 
 -- Positions in order and not one below the other stay in order a label
--- down; and what is past `p` is past `p ++ [ ix 0 ]` a label down.
-<ᵖ-down : ∀ k h x y → k <ᵖ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ [ x ]) <ᵖ (h ++ [ y ]) ≡ true
-<ᵖ-down []      []      x y () ne
-<ᵖ-down []      (l ∷ h) x y _  ne = ⊥-elim (ne l h refl)
-<ᵖ-down (a ∷ k) []      x y () ne
-<ᵖ-down (a ∷ k) (b ∷ h) x y kh ne with cmpLabel a b in c
+-- down; and what is past `p` is past `p ⊕ [ ix 0 ]` a label down.
+<ᵖ-down : ∀ k h x y → k <ᵖ h ≡ true → (∀ l ls → h ≡ k ⊕ (l ∷ ls) → ⊥) → (k ⊕ [ x ]) <ᵖ (h ⊕ [ y ]) ≡ true
+<ᵖ-down (i ∙ a) (j ∙ b) x y kh ne with cmpInstant i j in c
 ... | lt = refl
-... | eq = <ᵖ-down k h x y kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eq-label a b c)) e))
 ... | gt with () ← kh
+... | eq with eqⁱ i j c
+...   | refl = downᵗ a b x y kh (λ l ls e → ne l ls (cong (i ∙_) e))
 
--- Past `k ++ [ ix 0 ]` and not below `k`, past everything below `k`.
-<ᵖ-over : ∀ k h ys → (k ++ [ ix 0 ]) <ᵖ h ≡ true → (∀ l ls → h ≡ k ++ l ∷ ls → ⊥) → (k ++ ys) <ᵖ h ≡ true
-<ᵖ-over []      []      ys () ne
-<ᵖ-over []      (l ∷ h) ys _  ne = ⊥-elim (ne l h refl)
-<ᵖ-over (a ∷ k) []      ys () ne
-<ᵖ-over (a ∷ k) (b ∷ h) ys kh ne with cmpLabel a b in c
+-- Past `k ⊕ [ ix 0 ]` and not below `k`, past everything below `k`.
+<ᵖ-over : ∀ k h ys → (k ⊕ [ ix 0 ]) <ᵖ h ≡ true → (∀ l ls → h ≡ k ⊕ (l ∷ ls) → ⊥) → (k ⊕ ys) <ᵖ h ≡ true
+<ᵖ-over (i ∙ a) (j ∙ b) ys kh ne with cmpInstant i j in c
 ... | lt = refl
-... | eq = <ᵖ-over k h ys kh (λ l ls e → ne l ls (cong₂ _∷_ (sym (eq-label a b c)) e))
 ... | gt with () ← kh
+... | eq with eqⁱ i j c
+...   | refl = overᵗ a b ys kh (λ l ls e → ne l ls (cong (i ∙_) e))
 
-<ᵖ-next : ∀ p q y → p <ᵖ q ≡ true → (p ++ [ ix 0 ]) <ᵖ (q ++ [ y ]) ≡ true
-<ᵖ-next []      []                  y ()
-<ᵖ-next []      (ix zero ∷ [])      y h = refl
-<ᵖ-next []      (ix zero ∷ _ ∷ _)   y h = refl
-<ᵖ-next []      (ix (suc _) ∷ _)    y h = refl
-<ᵖ-next []      (sub _ ∷ _)         y h = refl
-<ᵖ-next []      (last ∷ _)          y h = refl
-<ᵖ-next (a ∷ p) []                  y ()
-<ᵖ-next (a ∷ p) (b ∷ q)             y h with cmpLabel a b
+<ᵖ-next : ∀ p q y → p <ᵖ q ≡ true → (p ⊕ [ ix 0 ]) <ᵖ (q ⊕ [ y ]) ≡ true
+<ᵖ-next (i ∙ a) (j ∙ b) y h with cmpInstant i j
 ... | lt = refl
-... | eq = <ᵖ-next p q y h
+... | eq = nextᵗ a b y h
 ... | gt with () ← h
 
 -- Past `p` and not under it: past everything under it.
-<ᵖ-apart : ∀ p q y → p <ᵖ q ≡ true → (∀ ys → q ≡ p ++ ys → ⊥) → (p ++ y) <ᵖ q ≡ true
-<ᵖ-apart []      []      y () ne
-<ᵖ-apart []      (b ∷ q) y _  ne = ⊥-elim (ne (b ∷ q) refl)
-<ᵖ-apart (a ∷ p) []      y () ne
-<ᵖ-apart (a ∷ p) (b ∷ q) y h  ne with cmpLabel a b in c
+<ᵖ-apart : ∀ p q y → p <ᵖ q ≡ true → (∀ ys → q ≡ p ⊕ ys → ⊥) → (p ⊕ y) <ᵖ q ≡ true
+<ᵖ-apart (i ∙ a) (j ∙ b) y h ne with cmpInstant i j in c
 ... | lt = refl
-... | eq = <ᵖ-apart p q y h (λ ys e → ne ys (cong₂ _∷_ (sym (eq-label a b c)) e))
 ... | gt with () ← h
+... | eq with eqⁱ i j c
+...   | refl = apartᵗ a b y h (λ ys e → ne ys (cong (i ∙_) e))
 
 -- Past `p` and before something under it: under it.
-<ᵖ-between : ∀ p q ys → p <ᵖ q ≡ true → q <ᵖ (p ++ ys) ≡ true → Σ Pos (λ zs → q ≡ p ++ zs)
-<ᵖ-between []      q       ys _ _  = q , refl
-<ᵖ-between (a ∷ p) []      ys () _
-<ᵖ-between (a ∷ p) (b ∷ q) ys h h′ with cmpLabel a b in c | cmpLabel b a in d
-... | lt | lt with () ← trans (sym (refl-label a)) (lt-label a b a c d)
-... | lt | eq with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel a z ≡ lt) (eq-label b a d) c)
+<ᵖ-between : ∀ p q ys → p <ᵖ q ≡ true → q <ᵖ (p ⊕ ys) ≡ true → Σ Path (λ zs → q ≡ p ⊕ zs)
+<ᵖ-between (i ∙ a) (j ∙ b) ys h h′ with cmpInstant i j in c | cmpInstant j i in d
+... | lt | lt = ⊥-elim (same-or i j c d)
+... | lt | eq = ⊥-elim (lt-eq i j c d)
 ... | lt | gt with () ← h′
-... | eq | lt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ lt) (sym (eq-label a b c)) d)
-... | eq | gt with () ← trans (sym (refl-label a)) (subst (λ z → cmpLabel z a ≡ gt) (sym (eq-label a b c)) d)
+... | eq | lt = ⊥-elim (lt-eq j i d c)
+... | eq | gt = ⊥-elim (eq-gt i j c d)
 ... | gt | _  with () ← h
-... | eq | eq with <ᵖ-between p q ys h h′
-...   | zs , e = zs , cong₂ _∷_ (sym (eq-label a b c)) e
+... | eq | eq with eqⁱ i j c
+...   | refl with betweenᵗ a b ys h h′
+...     | zs , e = zs , cong (i ∙_) e
 
 -- Under `r`, and so is everything under it.
-inside-++ : ∀ r k ys → inside r k ≡ true → inside r (k ++ ys) ≡ true
-inside-++ []      k       ys i = refl
-inside-++ (a ∷ r) []      ys ()
-inside-++ (a ∷ r) (b ∷ k) ys i with cmpLabel a b
-... | lt with () ← i
-... | eq = inside-++ r k ys i
-... | gt with () ← i
+inside-++ : ∀ r k ys → inside r k ≡ true → inside r (k ⊕ ys) ≡ true
+inside-++ (i ∙ r) (j ∙ k) ys h with cmpInstant i j
+... | lt with () ← h
+... | eq = inside-++ᵗ r k ys h
+... | gt with () ← h
 
 -- Under `r`, a label at a time.
-inside-cons : ∀ a r b k → inside (a ∷ r) (b ∷ k) ≡ true → a ≡ b × inside r k ≡ true
+inside-cons : ∀ a r b k → insideᵗ (a ∷ r) (b ∷ k) ≡ true → a ≡ b × insideᵗ r k ≡ true
 inside-cons a r b k i with cmpLabel a b in e
 ... | lt with () ← i
-... | eq = eq-label a b e , i
+... | eq = eqˡ a b e , i
 ... | gt with () ← i
 
 -- Under itself.
 inside-self : ∀ r → inside r r ≡ true
-inside-self []      = refl
-inside-self (a ∷ r) rewrite refl-label a = inside-self r
+inside-self (i ∙ r) = trans (cong (λ c → isEq c ∧ insideᵗ r r) (reflⁱ i)) (inside-selfᵗ r)
 
 ------------------------------------------------------------------------
 -- What a subscriber sees
@@ -578,13 +404,13 @@ open Events∞
 ------------------------------------------------------------------------
 -- A cold leaf, placed
 
--- A burst at `r` puts its i-th step at `r ++ [ ix i ]` and ends at
--- `r ++ [ last ]`, which is also where the timer for the next frame is
--- created: after the burst and all it caused.  A close straight after a
--- value is that value's callback going on, so the value moves under the
--- end: it sits at `q ++ [ ix 0 ]` and the frame ends at `q ++ [ last ]`,
--- with `q = r ++ [ last ]`, and a completion shares the value's instant.  A frame at tick 0 is the
--- subscribe burst, rooted at the subscription itself.  A timer firing
+-- A burst at `r` puts its i-th step at `r ▸ ix i` and ends at
+-- `r ▸ last`, which is also where the timer for the next frame is
+-- created: after the burst and all it caused.  A frame at tick 0 is the
+-- subscribe burst, `nested` at the subscription, so all of it is one
+-- instant, its completion included; a later frame is `fired`, so each of
+-- its steps is an instant of its own: every call an async callback makes
+-- into its subscriber, a completion as much as a value.  A timer firing
 -- shows no step of its own: at the root a hot's rekeying under `sub`
 -- puts it after the burst below it, and at the burst's first position it
 -- ties with that step, where an event must rise.
@@ -592,29 +418,26 @@ mutual
   frames : ∀ {A t} → Time → Pos → From A t → Events A
   frames τ e done       = end e
   frames τ e quiet      = hush
-  frames τ e (at t _ b) = burst τ (ix (τ + t) ∷ sub e ∷ []) 0 b
+  frames τ e (at t _ b) = burst τ (fired (τ + t) e) 0 b
 
-  burst : ∀ {A t} → Time → Pos → ℕ → Frame A t → Events A
-  burst τ r i (emit a (close k)) = out ((r ++ [ last ]) ++ [ ix 0 ]) a λ where
-    .force → frames τ ((r ++ [ last ]) ++ [ last ]) (From∞.force k)
-    .cut   → idle
-  burst τ r i (emit a k) = out (r ++ [ ix i ]) a λ where
+  burst : ∀ {A t} → Time → Root → ℕ → Frame A t → Events A
+  burst τ r i (emit a k) = out (r ▸ ix i) a λ where
     .force → burst τ r (suc i) k
     .cut   → idle
-  burst τ r i (stall k)  = skip (r ++ [ ix i ]) λ where
+  burst τ r i (stall k)  = skip (r ▸ ix i) λ where
     .force → burst τ r (suc i) (Frame∞.force k)
     .cut   → idle
-  burst τ r i (close k)  = skip (r ++ [ ix i ]) λ where
-    .force → frames τ (r ++ [ last ]) (From∞.force k)
+  burst τ r i (close k)  = skip (r ▸ ix i) λ where
+    .force → frames τ (r ▸ last) (From∞.force k)
     .cut   → idle
 
 start : ∀ {A} → Pos → From A 0 → Events A
-start p (at zero _ b) = burst (tick p) p 0 b
-start p m             = frames (tick p) (p ++ [ last ]) m
+start p (at zero _ b) = burst (tick p) (nested p) 0 b
+start p m             = frames (tick p) (p ⊕ [ last ]) m
 
 -- `of`'s steps from the i-th on, under the subscription at `p`.
 ofᴱ : ∀ {A} → Pos → ℕ → List A → Events A
-ofᴱ p i []       = end (p ++ [ last ])
-ofᴱ p i (x ∷ xs) = out (p ++ [ ix i ]) x λ where
+ofᴱ p i []       = end (p ⊕ [ last ])
+ofᴱ p i (x ∷ xs) = out (p ⊕ [ ix i ]) x λ where
   .force → ofᴱ p (suc i) xs
   .cut   → idle

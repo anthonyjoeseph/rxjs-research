@@ -16,14 +16,15 @@ open import Data.Empty using (⊥)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Events using (Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
 
 -- No route yet.
 r₀ : Routes
@@ -34,5 +35,5 @@ r₀ = root , 0
 Shut : ∀ {A : Set} → EmissionSet (IE A) → Set
 Shut t = ∀ {rs} → Met t rs → ∀ r₁ r₂ → rs ≡ r₁ ++ r₂ → proj₂ (L.foldl count r₀ (values r₁)) ≡ 0
        → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (L.foldl count r₀ (values r₁))))) ∈ r₁
-       → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → instantOf y ≡ instantOf q → ⊥
+       → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → rootOf y ≡ rootOf q → ⊥
 

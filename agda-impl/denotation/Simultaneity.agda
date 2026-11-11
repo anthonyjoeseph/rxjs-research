@@ -1,0 +1,398 @@
+-- THE INSTANT IS THE TIMESTAMP.  What the denotation says about
+-- simultaneity, as facts about positions alone (`denotation.Position`):
+-- when two rows are `Simultaneous`.  None of them is about a program: every
+-- operator places a row by `_⊕_` under its cause, and every timer's step
+-- by `fired`, so they hold of every emission set by construction.
+--
+-- Read together: two positions share an instant exactly when they lie
+-- under one root, and a root is the subscription or one step of one
+-- timer's frame.  So a hot's deliveries are simultaneous with the source
+-- step that caused them, a subscribe burst's steps with each other, and a
+-- completion's continuations with the step it ends; and no two async
+-- emissions are simultaneous, not even two of one timer's frame.  The
+-- order puts the subscribe frame first, then cascades by tick, same-tick
+-- ones in creation order as rxjs fires them, a timer's steps in order,
+-- and a cascade after the position its timer was created at.
+module denotation.Simultaneity where
+
+open import Data.Bool using (true; false; T)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using ([]; _∷_)
+open import Data.Nat using (_<_; _<ᵇ_)
+open import Data.Nat.Properties using (<⇒<ᵇ; <ᵇ⇒<; n≮n; <-asym; <-trans; ≮⇒≥; ≤-antisym)
+open import Data.Product using (_×_; _,_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
+
+open import denotation.Position using (Pos; Path; ix; sub; last; frame; cascade; _∙_; instant; path; root; tick; _⊕_; nested; fired; _▸_;
+  tickᴿ; lt; eq; gt; cmpℕ; lexi; isLt; cmpLabel; cmpInstant; cmpPath; cmpPos; _<ˡ_; _<ⁱ_; _<ᵖ_)
+
+------------------------------------------------------------------------
+-- When two positions are simultaneous
+
+-- SIMULTANEOUS: in one instant.  An instant is one call the outside world
+-- makes into a subscriber — the subscribe frame, or one `next`/`complete`
+-- from an async callback — and everything that runs before that call
+-- returns shares it.  A subscribe frame's `complete()` is in its burst;
+-- an async source's own `complete()` is its own instant, even straight
+-- after a value; two calls in one `setTimeout` are two instants.  So an
+-- async `3` piped through `take(1), endWith(9)` gives `[3, 9]`, through
+-- `endWith(9)` alone `[3] [9]`.
+Simultaneous : Pos → Pos → Set
+Simultaneous p q = instant p ≡ instant q
+
+-- An effect runs in its cause's instant: a hot's delivery, a burst's
+-- step, a completion's continuation.
+effect-instant : ∀ p q → Simultaneous (p ⊕ q) p
+effect-instant (_ ∙ _) _ = refl
+
+effect-tick : ∀ p q → tick (p ⊕ q) ≡ tick p
+effect-tick (frame ∙ _)         _ = refl
+effect-tick (cascade _ _ _ ∙ _) _ = refl
+
+-- A burst's step runs when its burst does.
+step-tick : ∀ r l → tick (r ▸ l) ≡ tickᴿ r
+step-tick (nested p)  l = effect-tick p _
+step-tick (fired _ _) _ = refl
+
+-- A timer's step's instant is shared only by positions beneath that step.
+cascade-own : ∀ t e l p → Simultaneous p (fired t e ▸ l) → p ≡ (fired t e ▸ l) ⊕ path p
+cascade-own t e l (_ ∙ _) refl = refl
+
+-- The subscribe frame's instant is shared only by positions beneath the root.
+frame-own : ∀ p → Simultaneous p root → p ≡ root ⊕ path p
+frame-own (_ ∙ _) refl = refl
+
+-- Two async emissions share an instant only if they are one step of one
+-- firing.
+cascade-inj : ∀ {t e l t′ e′ l′} → cascade t e l ≡ cascade t′ e′ l′ → t ≡ t′ × e ≡ e′ × l ≡ l′
+cascade-inj refl = refl , refl , refl
+
+------------------------------------------------------------------------
+-- How instants are ordered
+
+ℕ-lt : ∀ {m n} → m < n → cmpℕ m n ≡ lt
+ℕ-lt {m} {n} h with m <ᵇ n | <⇒<ᵇ h
+... | true  | _  = refl
+... | false | ()
+
+ℕ-eq : ∀ n → cmpℕ n n ≡ eq
+ℕ-eq n with n <ᵇ n in h
+... | false = refl
+... | true  = ⊥-elim (n≮n n (<ᵇ⇒< n n (subst T (sym h) tt)))
+
+-- The subscribe frame comes before every cascade.
+frame-first : ∀ t e l → frame <ⁱ cascade t e l ≡ true
+frame-first _ _ _ = refl
+
+-- A later tick is later.
+later-tick : ∀ {t t′} e e′ l l′ → t < t′ → cascade t e l <ⁱ cascade t′ e′ l′ ≡ true
+later-tick e e′ l l′ h rewrite ℕ-lt h = refl
+
+-- Same-tick timers fire in creation order.
+same-tick : ∀ t {e e′} l l′ → e <ᵖ e′ ≡ true → cascade t e l <ⁱ cascade t e′ l′ ≡ true
+same-tick t {e} {e′} l l′ h rewrite ℕ-eq t with cmpPos e e′
+same-tick t l l′ h | lt = refl
+same-tick t l l′ () | eq
+same-tick t l l′ () | gt
+
+-- Everything in a cascade comes after every position of an earlier tick.
+earlier-tick : ∀ p {t} e l q → tick p < t → p <ᵖ (cascade t e l ∙ q) ≡ true
+earlier-tick (frame ∙ _)         e l q _ = refl
+earlier-tick (cascade _ _ _ ∙ _) e l q h rewrite ℕ-lt h = refl
+
+-- A cascade fires after the position its timer was created at.
+after-creator : ∀ {t} e l → tick e < t → e <ᵖ (fired t e ▸ l) ≡ true
+after-creator e l h = earlier-tick e e l [] h
+
+------------------------------------------------------------------------
+-- The comparison is an order: `eq` is equality, `lt` flips to `gt`
+
+ℕ-≡ : ∀ {m n} → cmpℕ m n ≡ eq → m ≡ n
+ℕ-≡ {m} {n} h with m <ᵇ n in a | n <ᵇ m in b
+... | false | false = ≤-antisym (≮⇒≥ (λ l → subst T b (<⇒<ᵇ l))) (≮⇒≥ (λ l → subst T a (<⇒<ᵇ l)))
+... | false | true  = ⊥-elim (gt≢eq h) where gt≢eq : gt ≡ eq → ⊥ ; gt≢eq ()
+... | true  | _     = ⊥-elim (lt≢eq h) where lt≢eq : lt ≡ eq → ⊥ ; lt≢eq ()
+
+ℕ-flip : ∀ {m n} → cmpℕ m n ≡ lt → cmpℕ n m ≡ gt
+ℕ-flip {m} {n} h with m <ᵇ n in a | n <ᵇ m in b
+... | true  | false = refl
+... | true  | true  = ⊥-elim (<-asym (<ᵇ⇒< m n (subst T (sym a) tt)) (<ᵇ⇒< n m (subst T (sym b) tt)))
+... | false | true  = ⊥-elim (gt≢lt h) where gt≢lt : gt ≡ lt → ⊥ ; gt≢lt ()
+... | false | false = ⊥-elim (eq≢lt h) where eq≢lt : eq ≡ lt → ⊥ ; eq≢lt ()
+
+lexi-eq : ∀ x y → lexi x y ≡ eq → x ≡ eq × y ≡ eq
+lexi-eq eq y h = refl , h
+lexi-eq lt y ()
+lexi-eq gt y ()
+
+lexi-lt : ∀ x y → lexi x y ≡ lt → x ≡ lt ⊎ (x ≡ eq × y ≡ lt)
+lexi-lt lt y _ = inj₁ refl
+lexi-lt eq y h = inj₂ (refl , h)
+lexi-lt gt y ()
+
+lexi-gt₁ : ∀ x y → x ≡ gt → lexi x y ≡ gt
+lexi-gt₁ _ _ refl = refl
+
+lexi-eq₁ : ∀ x y → x ≡ eq → lexi x y ≡ y
+lexi-eq₁ _ _ refl = refl
+
+mutual
+  eqˡ : ∀ a b → cmpLabel a b ≡ eq → a ≡ b
+  eqˡ (ix m)  (ix n)  h = cong ix (ℕ-≡ {m} {n} h)
+  eqˡ (ix _)  (sub _) ()
+  eqˡ (ix _)  last    ()
+  eqˡ (sub _) (ix _)  ()
+  eqˡ (sub p) (sub q) h = cong sub (eqᵖ p q h)
+  eqˡ (sub _) last    ()
+  eqˡ last    (ix _)  ()
+  eqˡ last    (sub _) ()
+  eqˡ last    last    _ = refl
+
+  eqⁱ : ∀ i j → cmpInstant i j ≡ eq → i ≡ j
+  eqⁱ frame           frame           _ = refl
+  eqⁱ frame           (cascade _ _ _) ()
+  eqⁱ (cascade _ _ _) frame           ()
+  eqⁱ (cascade t e a) (cascade u d b) h with lexi-eq (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) h
+  ... | x , y with lexi-eq (cmpPos e d) (cmpLabel a b) y
+  ...   | y₁ , y₂ with ℕ-≡ {t} {u} x | eqᵖ e d y₁ | eqˡ a b y₂
+  ...     | refl | refl | refl = refl
+
+  eqᵗ : ∀ (p q : Path) → cmpPath p q ≡ eq → p ≡ q
+  eqᵗ []      []      _ = refl
+  eqᵗ []      (_ ∷ _) ()
+  eqᵗ (_ ∷ _) []      ()
+  eqᵗ (a ∷ p) (b ∷ q) h with lexi-eq (cmpLabel a b) (cmpPath p q) h
+  ... | x , y = cong₂ _∷_ (eqˡ a b x) (eqᵗ p q y)
+
+  eqᵖ : ∀ p q → cmpPos p q ≡ eq → p ≡ q
+  eqᵖ (i ∙ p) (j ∙ q) h with lexi-eq (cmpInstant i j) (cmpPath p q) h
+  ... | x , y = cong₂ _∙_ (eqⁱ i j x) (eqᵗ p q y)
+
+mutual
+  reflˡ : ∀ a → cmpLabel a a ≡ eq
+  reflˡ (ix n)  = ℕ-eq n
+  reflˡ (sub p) = reflᵖ p
+  reflˡ last    = refl
+
+  reflⁱ : ∀ i → cmpInstant i i ≡ eq
+  reflⁱ frame         = refl
+  reflⁱ (cascade t e a) = cong₂ lexi (ℕ-eq t) (cong₂ lexi (reflᵖ e) (reflˡ a))
+
+  reflᵗ : ∀ (p : Path) → cmpPath p p ≡ eq
+  reflᵗ []      = refl
+  reflᵗ (a ∷ p) = cong₂ lexi (reflˡ a) (reflᵗ p)
+
+  reflᵖ : ∀ p → cmpPos p p ≡ eq
+  reflᵖ (i ∙ p) = cong₂ lexi (reflⁱ i) (reflᵗ p)
+
+-- A timer's steps are in order.
+same-timer : ∀ t e l l′ → (cascade t e l <ⁱ cascade t e l′) ≡ (l <ˡ l′)
+same-timer t e l l′ rewrite ℕ-eq t | reflᵖ e = refl
+
+mutual
+  flipˡ : ∀ a b → cmpLabel a b ≡ lt → cmpLabel b a ≡ gt
+  flipˡ (ix m)  (ix n)  h = ℕ-flip {m} {n} h
+  flipˡ (ix _)  (sub _) _ = refl
+  flipˡ (ix _)  last    _ = refl
+  flipˡ (sub _) (ix _)  ()
+  flipˡ (sub p) (sub q) h = flipᵖ p q h
+  flipˡ (sub _) last    _ = refl
+  flipˡ last    (ix _)  ()
+  flipˡ last    (sub _) ()
+  flipˡ last    last    ()
+
+  flipⁱ : ∀ i j → cmpInstant i j ≡ lt → cmpInstant j i ≡ gt
+  flipⁱ frame           frame           ()
+  flipⁱ frame           (cascade _ _ _) _ = refl
+  flipⁱ (cascade _ _ _) frame           ()
+  flipⁱ (cascade t e a) (cascade u d b) h with lexi-lt (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) h
+  ... | inj₁ x = lexi-gt₁ (cmpℕ u t) (lexi (cmpPos d e) (cmpLabel b a)) (ℕ-flip {t} {u} x)
+  ... | inj₂ (x , y) with ℕ-≡ {t} {u} x
+  ...   | refl with lexi-lt (cmpPos e d) (cmpLabel a b) y
+  ...     | inj₁ z = trans (lexi-eq₁ (cmpℕ t t) _ x) (lexi-gt₁ (cmpPos d e) (cmpLabel b a) (flipᵖ e d z))
+  ...     | inj₂ (z , w) with eqᵖ e d z
+  ...       | refl = trans (lexi-eq₁ (cmpℕ t t) _ x) (trans (lexi-eq₁ (cmpPos e e) (cmpLabel b a) z) (flipˡ a b w))
+
+  flipᵗ : ∀ (p q : Path) → cmpPath p q ≡ lt → cmpPath q p ≡ gt
+  flipᵗ []      []      ()
+  flipᵗ []      (_ ∷ _) _ = refl
+  flipᵗ (_ ∷ _) []      ()
+  flipᵗ (a ∷ p) (b ∷ q) h with lexi-lt (cmpLabel a b) (cmpPath p q) h
+  ... | inj₁ x = lexi-gt₁ (cmpLabel b a) (cmpPath q p) (flipˡ a b x)
+  ... | inj₂ (x , y) with eqˡ a b x
+  ...   | refl = trans (lexi-eq₁ (cmpLabel a a) (cmpPath q p) x) (flipᵗ p q y)
+
+  flipᵖ : ∀ p q → cmpPos p q ≡ lt → cmpPos q p ≡ gt
+  flipᵖ (i ∙ p) (j ∙ q) h with lexi-lt (cmpInstant i j) (cmpPath p q) h
+  ... | inj₁ x = lexi-gt₁ (cmpInstant j i) (cmpPath q p) (flipⁱ i j x)
+  ... | inj₂ (x , y) with eqⁱ i j x
+  ...   | refl = trans (lexi-eq₁ (cmpInstant i i) (cmpPath q p) x) (flipᵗ p q y)
+
+-- AN INSTANT IS AN INTERVAL OF POSITIONS: a position between two of one
+-- instant is of it.  The order compares instants first, so a position
+-- strictly inside two of one instant can be in no other.
+-- Transitive, and `gt` flips to `lt`.
+lt-ℕ : ∀ {m n} → cmpℕ m n ≡ lt → m < n
+lt-ℕ {m} {n} h with m <ᵇ n in e | n <ᵇ m
+lt-ℕ {m} {n} h  | true  | _     = <ᵇ⇒< m n (subst T (sym e) tt)
+lt-ℕ {m} {n} () | false | true
+lt-ℕ {m} {n} () | false | false
+
+gt-ℕ : ∀ {m n} → cmpℕ m n ≡ gt → n < m
+gt-ℕ {m} {n} h with m <ᵇ n | n <ᵇ m in e
+gt-ℕ {m} {n} () | true  | _
+gt-ℕ {m} {n} h  | false | true  = <ᵇ⇒< n m (subst T (sym e) tt)
+gt-ℕ {m} {n} () | false | false
+
+ℕ-trans : ∀ {m n k} → cmpℕ m n ≡ lt → cmpℕ n k ≡ lt → cmpℕ m k ≡ lt
+ℕ-trans {m} {n} {k} h₁ h₂ = ℕ-lt {m} {k} (<-trans (lt-ℕ {m} {n} h₁) (lt-ℕ {n} {k} h₂))
+
+ℕ-gt : ∀ {m n} → cmpℕ m n ≡ gt → cmpℕ n m ≡ lt
+ℕ-gt {m} {n} h = ℕ-lt {n} {m} (gt-ℕ {m} {n} h)
+
+isLt-lt : ∀ {c} → isLt c ≡ true → c ≡ lt
+isLt-lt {lt} _ = refl
+isLt-lt {eq} ()
+isLt-lt {gt} ()
+
+lexi-l : ∀ {x y} → x ≡ lt → lexi x y ≡ lt
+lexi-l refl = refl
+
+lexi-e : ∀ {x y} → x ≡ eq → y ≡ lt → lexi x y ≡ lt
+lexi-e refl h = h
+
+lexi-gt : ∀ x y → lexi x y ≡ gt → x ≡ gt ⊎ (x ≡ eq × y ≡ gt)
+lexi-gt eq y h = inj₂ (refl , h)
+lexi-gt lt y ()
+lexi-gt gt y _ = inj₁ refl
+
+-- A lexicographic pair is transitive when its halves are.
+lexi-trans : ∀ x₁ x₂ x₃ y₁ y₂ y₃
+           → (x₁ ≡ lt → x₂ ≡ lt → x₃ ≡ lt) → (x₁ ≡ lt → x₂ ≡ eq → x₃ ≡ lt)
+           → (x₁ ≡ eq → x₂ ≡ lt → x₃ ≡ lt) → (x₁ ≡ eq → x₂ ≡ eq → x₃ ≡ eq)
+           → (y₁ ≡ lt → y₂ ≡ lt → y₃ ≡ lt)
+           → lexi x₁ y₁ ≡ lt → lexi x₂ y₂ ≡ lt → lexi x₃ y₃ ≡ lt
+lexi-trans x₁ x₂ x₃ y₁ y₂ y₃ ll le el ee yy h₁ h₂ with lexi-lt x₁ y₁ h₁ | lexi-lt x₂ y₂ h₂
+... | inj₁ a       | inj₁ b       = lexi-l (ll a b)
+... | inj₁ a       | inj₂ (b , _) = lexi-l (le a b)
+... | inj₂ (a , _) | inj₁ b       = lexi-l (el a b)
+... | inj₂ (a , u) | inj₂ (b , v) = lexi-e (ee a b) (yy u v)
+
+-- A lexicographic pair flips `gt` to `lt` when its halves do.
+lexi-flip : ∀ x y x′ y′ → lexi x y ≡ gt → (x ≡ gt → x′ ≡ lt) → (x ≡ eq → x′ ≡ eq) → (y ≡ gt → y′ ≡ lt) → lexi x′ y′ ≡ lt
+lexi-flip x y x′ y′ h g e f with lexi-gt x y h
+... | inj₁ a       = lexi-l (g a)
+... | inj₂ (a , b) = lexi-e (e a) (f b)
+
+mutual
+  ltˡ : ∀ a b c → cmpLabel a b ≡ lt → cmpLabel b c ≡ lt → cmpLabel a c ≡ lt
+  ltˡ (ix m)  (ix n)  (ix k)  h₁ h₂ = ℕ-trans {m} {n} {k} h₁ h₂
+  ltˡ (ix _)  _       (sub _) _  _  = refl
+  ltˡ (ix _)  _       last    _  _  = refl
+  ltˡ (ix _)  (sub _) (ix _)  _  ()
+  ltˡ (ix _)  last    (ix _)  _  ()
+  ltˡ (sub p) (sub q) (sub r) h₁ h₂ = ltᵖ p q r h₁ h₂
+  ltˡ (sub _) _       last    _  _  = refl
+  ltˡ (sub _) (ix _)  _       () _
+  ltˡ (sub _) (sub _) (ix _)  _  ()
+  ltˡ (sub _) last    (ix _)  _  ()
+  ltˡ (sub _) last    (sub _) _  ()
+  ltˡ last    (ix _)  _       () _
+  ltˡ last    (sub _) _       () _
+  ltˡ last    last    _       () _
+
+  ltⁱ : ∀ i j k → cmpInstant i j ≡ lt → cmpInstant j k ≡ lt → cmpInstant i k ≡ lt
+  ltⁱ frame           frame           _               () _
+  ltⁱ frame           (cascade _ _ _) frame           _  ()
+  ltⁱ frame           (cascade _ _ _) (cascade _ _ _) _  _  = refl
+  ltⁱ (cascade _ _ _) frame           _               () _
+  ltⁱ (cascade _ _ _) (cascade _ _ _) frame           _  ()
+  ltⁱ (cascade t e a) (cascade u d b) (cascade v f c) h₁ h₂ =
+    lexi-trans (cmpℕ t u) (cmpℕ u v) (cmpℕ t v)
+      (lexi (cmpPos e d) (cmpLabel a b)) (lexi (cmpPos d f) (cmpLabel b c)) (lexi (cmpPos e f) (cmpLabel a c))
+      (ℕ-trans {t} {u} {v})
+      (λ x y → subst (λ z → cmpℕ t z ≡ lt) (ℕ-≡ {u} {v} y) x)
+      (λ x y → subst (λ z → cmpℕ z v ≡ lt) (sym (ℕ-≡ {t} {u} x)) y)
+      (λ x y → subst (λ z → cmpℕ z v ≡ eq) (sym (ℕ-≡ {t} {u} x)) y)
+      (lexi-trans (cmpPos e d) (cmpPos d f) (cmpPos e f) (cmpLabel a b) (cmpLabel b c) (cmpLabel a c)
+        (λ x y → ltᵖ e d f x y)
+        (λ x y → subst (λ z → cmpPos e z ≡ lt) (eqᵖ d f y) x)
+        (λ x y → subst (λ z → cmpPos z f ≡ lt) (sym (eqᵖ e d x)) y)
+        (λ x y → subst (λ z → cmpPos z f ≡ eq) (sym (eqᵖ e d x)) y)
+        (λ x y → ltˡ a b c x y)) h₁ h₂
+
+  ltᵗ : ∀ (p q r : Path) → cmpPath p q ≡ lt → cmpPath q r ≡ lt → cmpPath p r ≡ lt
+  ltᵗ []      (_ ∷ _) (_ ∷ _) _  _  = refl
+  ltᵗ []      []      _       () _
+  ltᵗ (_ ∷ _) []      _       () _
+  ltᵗ _       (_ ∷ _) []      _  ()
+  ltᵗ (a ∷ p) (b ∷ q) (c ∷ r) h₁ h₂ =
+    lexi-trans (cmpLabel a b) (cmpLabel b c) (cmpLabel a c) (cmpPath p q) (cmpPath q r) (cmpPath p r)
+      (λ x y → ltˡ a b c x y)
+      (λ x y → subst (λ z → cmpLabel a z ≡ lt) (eqˡ b c y) x)
+      (λ x y → subst (λ z → cmpLabel z c ≡ lt) (sym (eqˡ a b x)) y)
+      (λ x y → subst (λ z → cmpLabel z c ≡ eq) (sym (eqˡ a b x)) y)
+      (λ x y → ltᵗ p q r x y) h₁ h₂
+
+  ltᵖ : ∀ p q r → cmpPos p q ≡ lt → cmpPos q r ≡ lt → cmpPos p r ≡ lt
+  ltᵖ (i ∙ p) (j ∙ q) (k ∙ r) h₁ h₂ =
+    lexi-trans (cmpInstant i j) (cmpInstant j k) (cmpInstant i k) (cmpPath p q) (cmpPath q r) (cmpPath p r)
+      (λ x y → ltⁱ i j k x y)
+      (λ x y → subst (λ z → cmpInstant i z ≡ lt) (eqⁱ j k y) x)
+      (λ x y → subst (λ z → cmpInstant z k ≡ lt) (sym (eqⁱ i j x)) y)
+      (λ x y → subst (λ z → cmpInstant z k ≡ eq) (sym (eqⁱ i j x)) y)
+      (λ x y → ltᵗ p q r x y) h₁ h₂
+
+mutual
+  gtˡ : ∀ a b → cmpLabel a b ≡ gt → cmpLabel b a ≡ lt
+  gtˡ (ix m)  (ix n)  h = ℕ-gt {m} {n} h
+  gtˡ (sub p) (sub q) h = gtᵖ p q h
+  gtˡ (sub _) (ix _)  _ = refl
+  gtˡ last    (ix _)  _ = refl
+  gtˡ last    (sub _) _ = refl
+  gtˡ (ix _)  (sub _) ()
+  gtˡ (ix _)  last    ()
+  gtˡ (sub _) last    ()
+  gtˡ last    last    ()
+
+  gtⁱ : ∀ i j → cmpInstant i j ≡ gt → cmpInstant j i ≡ lt
+  gtⁱ frame           frame           ()
+  gtⁱ frame           (cascade _ _ _) ()
+  gtⁱ (cascade _ _ _) frame           _ = refl
+  gtⁱ (cascade t e a) (cascade u d b) h =
+    lexi-flip (cmpℕ t u) (lexi (cmpPos e d) (cmpLabel a b)) (cmpℕ u t) (lexi (cmpPos d e) (cmpLabel b a)) h
+      (ℕ-gt {t} {u})
+      (λ x → subst (λ z → cmpℕ z t ≡ eq) (ℕ-≡ {t} {u} x) (ℕ-eq t))
+      (λ y → lexi-flip (cmpPos e d) (cmpLabel a b) (cmpPos d e) (cmpLabel b a) y
+        (λ x → gtᵖ e d x)
+        (λ x → subst (λ z → cmpPos z e ≡ eq) (eqᵖ e d x) (reflᵖ e))
+        (λ x → gtˡ a b x))
+
+  gtᵗ : ∀ (p q : Path) → cmpPath p q ≡ gt → cmpPath q p ≡ lt
+  gtᵗ []      []      ()
+  gtᵗ []      (_ ∷ _) ()
+  gtᵗ (_ ∷ _) []      _ = refl
+  gtᵗ (a ∷ p) (b ∷ q) h =
+    lexi-flip (cmpLabel a b) (cmpPath p q) (cmpLabel b a) (cmpPath q p) h
+      (λ x → gtˡ a b x)
+      (λ x → subst (λ z → cmpLabel z a ≡ eq) (eqˡ a b x) (reflˡ a))
+      (λ x → gtᵗ p q x)
+
+  gtᵖ : ∀ p q → cmpPos p q ≡ gt → cmpPos q p ≡ lt
+  gtᵖ (i ∙ p) (j ∙ q) h =
+    lexi-flip (cmpInstant i j) (cmpPath p q) (cmpInstant j i) (cmpPath q p) h
+      (λ x → gtⁱ i j x)
+      (λ x → subst (λ z → cmpInstant z i ≡ eq) (eqⁱ i j x) (reflⁱ i))
+      (λ x → gtᵗ p q x)
+
+private
+  f≢t : false ≡ true → ⊥
+  f≢t ()
+
+between : ∀ {a b c} → a <ᵖ b ≡ true → b <ᵖ c ≡ true → Simultaneous a c → Simultaneous b a
+between {i ∙ p} {j ∙ q} {_ ∙ r} ab bc refl with cmpInstant i j in ij
+... | eq = sym (eqⁱ i j ij)
+... | gt = ⊥-elim (f≢t ab)
+... | lt = ⊥-elim (f≢t (subst (λ x → isLt (lexi x (cmpPath q r)) ≡ true) (flipⁱ i j ij) bc))

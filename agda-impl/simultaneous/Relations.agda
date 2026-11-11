@@ -12,9 +12,10 @@
 -- with the elaboration's.  What the three runs share is the sequence of
 -- instants: the elaboration adds no async step, so instant for instant
 -- they pass through the same ones in the same order.  A row's stamp is
--- the number of instants before its own, counted over every row of its
--- run, shown or not: a reader meeting a row stamped 3 has, in any of the
--- three runs, passed three instants.  Nothing in a program can read a
+-- the number of instants before its own: the subscribe frame, which
+-- every run passes whether or not it has a row there, and those any row
+-- of its run lies in, shown or not.  A reader meeting a row stamped 3
+-- has, in any of the three runs, passed three instants.  Nothing in a program can read a
 -- stamp, and the elaboration carries names of its own that no relation
 -- here reads.
 module simultaneous.Relations where
@@ -36,28 +37,30 @@ open import Function using (_⇔_)
 open import Data.List.Properties using (map-++)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong) renaming (trans to ≡-trans)
 
-open import denotation.Events using (_≟ᵖ_; Pos; Timeline; root; fresh; finals)
+open import denotation.Position using (_≟ᵖ_; Pos; Instant; root; frame)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.SObs using (SObs; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; stamped; closed)
+open import simultaneous.Instants using (_≺ⁱ_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (E; IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (E; IE; elaborate; batchSimultaneous)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
-batchedObs o = batchSimultaneous (elaborate o)
+batchedObs o = batchSimultaneous (elaborate (plain o))
 
 -- A program's emission set, its elaborated program's, and the batcher's on top,
 -- each subscribed at the root.
 events : ∀ {A} → SObs [] A → EmissionSet A
-events o = enter (⟦ o ⟧ []) root
+events o = enter (⟦ plain o ⟧ []) root
 
 elaborated : ∀ {A} → SObs [] A → EmissionSet (IE A)
-elaborated o = enter (⟦ elaborate o ⟧ []) root
+elaborated o = enter (⟦ elaborate (plain o) ⟧ []) root
 
 batched : ∀ {A} → SObs [] A → EmissionSet (IE (List A))
 batched o = enter (⟦ batchedObs o ⟧ []) root
@@ -65,15 +68,15 @@ batched o = enter (⟦ batchedObs o ⟧ []) root
 ------------------------------------------------------------------------
 -- Stamps
 
--- The instants before `k`'s: those some row before `k` lies in, other
--- than `k`'s own.
-Before : ∀ {A} → EmissionSet A → Pos → Pos → Set
-Before t k i = i ≢ instantOf k × Σ Pos λ k′ → Σ _ λ e → t k′ e × k′ ≺ k × instantOf k′ ≡ i
+-- The instants before `k`'s, other than its own: the subscribe frame,
+-- and those some row before `k` lies in.
+Before : ∀ {A} → EmissionSet A → Pos → Instant → Set
+Before t k i = i ≢ instantOf k × (i ≡ frame ⊎ Σ Pos λ k′ → Σ _ λ e → t k′ e × k′ ≺ k × instantOf k′ ≡ i)
 
 -- `k`'s instant is the n-th the run passes through: the instants before
 -- it, listed in order, are n.
 Rank : ∀ {A} → EmissionSet A → Pos → ℕ → Set
-Rank t k n = Σ (List Pos) λ is → AllPairs _≺_ is × length is ≡ n × (∀ {i} → i ∈ is ⇔ Before t k i)
+Rank t k n = Σ (List Instant) λ is → AllPairs _≺ⁱ_ is × length is ≡ n × (∀ {i} → i ∈ is ⇔ Before t k i)
 
 -- The run with every value row stamped by its instant's rank.
 ranked : ∀ {A} → EmissionSet A → EmissionSet (ℕ × A)

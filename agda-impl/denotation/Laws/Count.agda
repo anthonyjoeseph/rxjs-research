@@ -26,7 +26,7 @@ open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (T)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; filter)
-open import Data.List.Properties using (++-assoc; ∷-injectiveˡ; ∷-injectiveʳ; filter-notAll)
+open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ; filter-notAll)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-filter⁺)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
@@ -42,12 +42,13 @@ open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable using (_⊎-dec_)
 open import Relation.Nullary.Decidable.Core using (decidable-stable; T?)
 
-open import denotation.Events using (Pos; ix; inside; _<ᵖ_; <ᵖ-split; <ᵖ-part; <ᵖ-between; _≟ˡ_)
+open import denotation.Position using (Pos; Path; ix; _∙_; _⊕_; _<ᵖ_; _≟ˡ_; _≟ⁱ_; inside)
+open import denotation.Events using (<ᵖ-split; <ᵖ-part; <ᵖ-between)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Dep; Reach; Truncate; Den; enter; Lim; from; Spin; spin; DeferT; guard; body; module Op)
 open import denotation.Laws.Modulus
   using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-false; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; reach-via; entered-reach;
   AgreeTo; ⟨_⟩; Same; LimD; ticks)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; conv; ⊑-inside; inside-⊑; InvAt; Real; real-init; nonempty⁼; world-after⁼)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; conv; ⊑-inside; inside-⊑; InvAt; real-init; world-after⁼; ∙-inj; ⊕-assoc)
 
 ------------------------------------------------------------------------
 -- Counting
@@ -78,22 +79,29 @@ cov-lift (inj₁ kw) wq = inj₁ (⊑-trans kw wq)
 cov-lift (inj₂ a)  _  = inj₂ a
 
 -- Leading is decidable, so is covering.
+private
+  ⊑?ᵗ : ∀ x y → Dec (Σ Path λ zs → y ≡ x ++ zs)
+  ⊑?ᵗ []      y       = yes (y , refl)
+  ⊑?ᵗ (a ∷ x) []      = no λ { (_ , ()) }
+  ⊑?ᵗ (a ∷ x) (b ∷ y) with a ≟ˡ b | ⊑?ᵗ x y
+  ... | no ne    | _             = no λ { (_ , eq) → ne (sym (∷-injectiveˡ eq)) }
+  ... | yes refl | no ne         = no λ { (zs , eq) → ne (zs , ∷-injectiveʳ eq) }
+  ... | yes refl | yes (zs , eq) = yes (zs , cong (a ∷_) eq)
+
 ⊑? : ∀ x y → Dec (x ⊑ y)
-⊑? []      y       = yes (y , refl)
-⊑? (a ∷ x) []      = no λ { (_ , ()) }
-⊑? (a ∷ x) (b ∷ y) with a ≟ˡ b | ⊑? x y
-... | no ne    | _             = no λ { (_ , eq) → ne (sym (∷-injectiveˡ eq)) }
-... | yes refl | no ne         = no λ { (zs , eq) → ne (zs , ∷-injectiveʳ eq) }
-... | yes refl | yes (zs , eq) = yes (zs , cong (a ∷_) eq)
+⊑? (i ∙ x) (j ∙ y) with i ≟ⁱ j | ⊑?ᵗ x y
+... | no ne    | _             = no λ { (_ , eq) → ne (sym (proj₁ (∙-inj eq))) }
+... | yes refl | no ne         = no λ { (zs , eq) → ne (zs , proj₂ (∙-inj eq)) }
+... | yes refl | yes (zs , eq) = yes (zs , cong (i ∙_) eq)
 
 cov-stable : ∀ {q ks k} → ¬ ¬ Cov q ks k → Cov q ks k
 cov-stable {q} {ks} {k} = decidable-stable (⊑? k q ⊎-dec any? (⊑? k) ks)
 
 -- Before `q`, a row's child lies before `q`, or `q` under the row.
-child : ∀ {v q} l → v ≺ q → v ⊑ q ⊎ (v ++ [ l ]) ≺ q
-child {v} {q} l vq with ≼-or-≻ q (v ++ [ l ])
+child : ∀ {v q} l → v ≺ q → v ⊑ q ⊎ (v ⊕ [ l ]) ≺ q
+child {v} {q} l vq with ≼-or-≻ q (v ⊕ [ l ])
 ... | inj₂ lt = inj₂ lt
-... | inj₁ ql with <ᵖ-split q (v ++ [ l ]) (≼-false {q} {v ++ [ l ]} ql)
+... | inj₁ ql with <ᵖ-split q (v ⊕ [ l ]) (≼-false {q} {v ⊕ [ l ]} ql)
 ...   | inj₁ lt = inj₁ (<ᵖ-between v q [ l ] (Equivalence.to T-≡ vq) lt)
 ...   | inj₂ eq = inj₁ ([ l ] , eq)
 
@@ -107,10 +115,10 @@ em p np ¬g = np (λ x → p x ¬g) ¬g
 seen : ∀ {B} {t : EmissionSet B} {Q k e} → t k e → k ≺ Q → ¬ ¬ Img t Q k
 seen {k = k} x kQ ¬i = ¬i (inj₂ (k , (_ , x) , ⊑-refl k , kQ))
 
-seen-under : ∀ {B} {t : EmissionSet B} {Q k l e} → t (k ++ [ l ]) e → k ≺ Q → ¬ ¬ Img t Q k
+seen-under : ∀ {B} {t : EmissionSet B} {Q k l e} → t (k ⊕ [ l ]) e → k ≺ Q → ¬ ¬ Img t Q k
 seen-under {k = k} {l} x kQ ¬i with child l kQ
 ... | inj₁ kQ′ = ¬i (inj₁ kQ′)
-... | inj₂ lt  = ¬i (inj₂ (k ++ [ l ] , (_ , x) , ([ l ] , refl) , lt))
+... | inj₂ lt  = ¬i (inj₂ (k ⊕ [ l ] , (_ , x) , ([ l ] , refl) , lt))
 
 -- Few before `q`, few before an earlier cut.
 cnt-down : ∀ {A n} {t : EmissionSet A} {q w} → Cnt n t q → w ≼ q → Cnt n t w
@@ -163,12 +171,10 @@ dcnt-pin-up {n = n} {u = u} {q} {r} i d im sh = proj₁ d , proj₁ (proj₂ d) 
     ... | inj₂ refl = proj₂ (proj₂ d) (sh x kq) kq (λ _ → inj₂ refl)
 
 -- A pin's connect lies in its world, so at or past the subscription.
-pinned-after : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → Real p → ∀ {y r} → X y (pin r) → p ≼ r
-pinned-after I rp {y} {r} x with InvAt.pinned I x
+pinned-after : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {y r} → X y (pin r) → p ≼ r
+pinned-after I {y} {r} x with InvAt.pinned I x
 ... | w⁼ , i with inside-⊑ r y i
-...   | zs , refl with real-init r zs (InvAt.real I x)
-...     | inj₁ refl = ⊥-elim (nonempty⁼ (λ { refl → rp }) w⁼)
-...     | inj₂ rr   = world-after⁼ w⁼ rr
+...   | zs , refl = world-after⁼ w⁼ (real-init r zs (InvAt.real I x))
 
 -- WHAT A ROW WAITS ON WAITS ON WHAT IT WAITS ON: past a pin's connect
 -- and before the pin lies only its own burst.
@@ -379,7 +385,7 @@ limit {A} {c = c} ch k p r = top
 -- Every row read at a `defer`'s body subscription lies at or past it, and
 -- so does every connect it pins.
 Aft : ∀ {A} → (Pos → Set) → Den A → Set
-Aft R s = ∀ p → R p → ∀ {y e} → enter s (p ++ [ ix 1 ]) y e → (p ++ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ++ [ ix 1 ]) ≼ r)
+Aft R s = ∀ p → R p → ∀ {y e} → enter s (p ⊕ [ ix 1 ]) y e → (p ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ⊕ [ ix 1 ]) ≼ r)
 
 -- One of `ks`, and the rest.
 pick : ∀ {P : Pos → Set} {ks} → Any P ks
@@ -391,26 +397,26 @@ pick {ks = y ∷ ks} (there a) with pick a
   ; (there a′) → map₂ there (sp a′) }
 
 -- Under the guard: before the body.
-under-guard : ∀ p {b} → (p ++ [ ix 0 ]) ⊑ b → b ≺ (p ++ [ ix 1 ])
-under-guard p (zs , refl) = subst (_≺ (p ++ [ ix 1 ])) (sym (++-assoc p [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p zs [] refl))
+under-guard : ∀ p {b} → (p ⊕ [ ix 0 ]) ⊑ b → b ≺ (p ⊕ [ ix 1 ])
+under-guard p (zs , refl) = subst (_≺ (p ⊕ [ ix 1 ])) (sym (⊕-assoc p [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p zs [] refl))
 
 private
-  ix-past : ∀ p j → (p ++ [ ix 1 ]) ≼ (p ++ [ ix (suc j) ])
-  ix-past p zero    = ≼-refl {p ++ [ ix 1 ]}
-  ix-past p (suc j) = ≺→≼ {p ++ [ ix 1 ]} {p ++ [ ix (suc (suc j)) ]} (Equivalence.from T-≡ (<ᵖ-part p [] [] refl))
+  ix-past : ∀ p j → (p ⊕ [ ix 1 ]) ≼ (p ⊕ [ ix (suc j) ])
+  ix-past p zero    = ≼-refl {p ⊕ [ ix 1 ]}
+  ix-past p (suc j) = ≺→≼ {p ⊕ [ ix 1 ]} {p ⊕ [ ix (suc (suc j)) ]} (Equivalence.from T-≡ (<ᵖ-part p [] [] refl))
 
   -- A body row waits on the guard.
-  g-dep : ∀ {A} p {q} {e : Ev A} → (∀ {r} → e ≡ pin r → (p ++ [ ix 1 ]) ≼ r) → Dep q e (p ++ [ ix 0 ]) skip
+  g-dep : ∀ {A} p {q} {e : Ev A} → (∀ {r} → e ≡ pin r → (p ⊕ [ ix 1 ]) ≼ r) → Dep q e (p ⊕ [ ix 0 ]) skip
   g-dep p {e = out _} _ = tt
   g-dep p {e = skip}  _ = tt
   g-dep p {e = end}   _ = tt
-  g-dep p {e = pin r} a _ = inj₁ (≺-≼-≺ {p ++ [ ix 0 ]} {p ++ [ ix 1 ]} {r} (ticks p 0) (a refl))
+  g-dep p {e = pin r} a _ = inj₁ (≺-≼-≺ {p ⊕ [ ix 0 ]} {p ⊕ [ ix 1 ]} {r} (ticks p 0) (a refl))
 
 -- A `defer`'s body, with its guard before it: one position fewer.
-module Guarded {A : Set} (s : Den A) (p : Pos) (aft : ∀ {y e} → enter s (p ++ [ ix 1 ]) y e → (p ++ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ++ [ ix 1 ]) ≼ r)) where
+module Guarded {A : Set} (s : Den A) (p : Pos) (aft : ∀ {y e} → enter s (p ⊕ [ ix 1 ]) y e → (p ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ⊕ [ ix 1 ]) ≼ r)) where
   g b₀ : Pos
-  g  = p ++ [ ix 0 ]
-  b₀ = p ++ [ ix 1 ]
+  g  = p ⊕ [ ix 0 ]
+  b₀ = p ⊕ [ ix 1 ]
 
   -- Before the body's subscription: no body row there.
   none-before : ∀ {y e} → enter s b₀ y e → y ≺ b₀ → ⊥
@@ -435,17 +441,17 @@ module Guarded {A : Set} (s : Den A) (p : Pos) (aft : ∀ {y e} → enter s (p +
 
 -- DEFER IS CONTRACTIVE: its guard is one position before its body, and
 -- every body row waits on it.
-contract : ∀ {A R k} {s s′ : Den A} → (∀ p → R p → R (p ++ [ ix 1 ])) → Aft R s → Aft R s′
+contract : ∀ {A R k} {s s′ : Den A} → (∀ p → R p → R (p ⊕ [ ix 1 ])) → Aft R s → Aft R s′
          → s ≈ᶜ⟨ R ∣ k ⟩ s′ → Op.defer s ≈ᶜ⟨ R ∣ suc k ⟩ Op.defer s′
 contract {R = R} {k} {s} {s′} up as as′ ag p r = trunc-ag inner
   where
-    b₀ = p ++ [ ix 1 ]
+    b₀ = p ⊕ [ ix 1 ]
     bod = ag b₀ (up p r)
 
     inner : AgC (suc k) (DeferT s p) (DeferT s′ p)
     inner q e side = to , back
       where
-        sh : Dep q e (p ++ [ ix 0 ]) skip → DCnt k (enter s b₀) q e ⊎ DCnt k (enter s′ b₀) q e
+        sh : Dep q e (p ⊕ [ ix 0 ]) skip → DCnt k (enter s b₀) q e ⊎ DCnt k (enter s′ b₀) q e
         sh gd = ⊎-map (Guarded.shrink s p (as p r) gd) (Guarded.shrink s′ p (as′ p r) gd) side
 
         to : DeferT s p q e → DeferT s′ p q e
@@ -465,7 +471,7 @@ unfold₀ {s = s} as p r q e side = to , back
     open Guarded s p (as p r) using (g; b₀; none-before)
 
     spin-reach : Reach (Spin p) g skip
-    spin-reach = [] , λ { (spin zero) lt _ → ⊥-elim (≺-irrefl {g} lt) ; (spin (suc j)) lt _ → ⊥-elim (≺→≼ {g} {p ++ [ ix (suc j) ]} (ticks p j) lt) }
+    spin-reach = [] , λ { (spin zero) lt _ → ⊥-elim (≺-irrefl {g} lt) ; (spin (suc j)) lt _ → ⊥-elim (≺→≼ {g} {p ⊕ [ ix (suc j) ]} (ticks p j) lt) }
 
     defer-reach : Reach (DeferT s p) g skip
     defer-reach = [] , λ { guard lt _ → ⊥-elim (≺-irrefl {g} lt) ; (body {y} x) lt _ → ⊥-elim (≺→≼ {g} {y} (≺-≼-≺ {g} {b₀} {y} (ticks p 0) (proj₁ (as p r x))) lt) }

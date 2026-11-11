@@ -2,7 +2,7 @@
 
 -- A FLATMAP'S SCAN HOLDS WHAT ITS SOURCE PROMISES.  The scan steps
 -- `react` over each row its source meets and lays the step's outputs
--- under that row, the `j`-th at `q ++ ix 1 ∷ ix j ∷ []`; past the
+-- under that row, the `j`-th at `q ⊕ (ix 1 ∷ ix j ∷ [])`; past the
 -- source's end it ends at the same position.  So what the scanned
 -- stream holds is read off its source's rows alone: what a begin is
 -- named, what precedes an over, and, run by run, the counts of the
@@ -20,11 +20,12 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Data.Unit using (⊤)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Read using (Run; _∷_; Visible)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp)
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
@@ -36,10 +37,10 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
 open import simultaneous.Routed using (Carried; c-end)
-open import simultaneous.Readings using (instantOf)
-open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle)
+open import simultaneous.Readings using (rootOf)
+open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle; Rest)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count; Out; Input; react; each)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; Out; Input; react; each)
 
 ------------------------------------------------------------------------
 -- What the scan lays out
@@ -56,7 +57,7 @@ init = flat root 0 0 false false false false 0 0 0 0 0 [] , []
 -- A step's outputs, laid under the row that caused them.
 lay : ∀ {B} → Pos → ℕ → List (IE B) → List (Pos × Ev (IE B))
 lay q j []       = []
-lay q j (x ∷ xs) = (q ++ ix 1 ∷ ix j ∷ [] , out x) ∷ lay q (suc j) xs
+lay q j (x ∷ xs) = (q ⊕ (ix 1 ∷ ix j ∷ []) , out x) ∷ lay q (suc j) xs
 
 -- Every output a run of the source causes, from a state, then the end.
 outRows : ∀ {B} → FlatOp → Out B → List (Pos × Ev (Maybe (Input B))) → List (Pos × Ev (IE B))
@@ -74,7 +75,7 @@ outRows op o ((q , pin _) ∷ rx)  = outRows op o rx
 ShutRun : ∀ {A : Set} → List (Pos × Ev (IE A)) → Set
 ShutRun rs = ∀ r₁ r₂ → rs ≡ r₁ ++ r₂ → proj₂ (cnt r₁) ≡ 0
            → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt r₁)))) ∈ r₁
-           → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → instantOf y ≡ instantOf q → ⊥
+           → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂ → rootOf y ≡ rootOf q → ⊥
 
 -- What `Held` asks of one run met.
 record RunHeld {A : Set} (cs : List Pos) (rs : List (Pos × Ev (IE A))) : Set where
@@ -101,11 +102,12 @@ held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m)
           → (∀ {y a n} → t y (out (instEmit (value a) n)) → Early y)
           → (∀ {y} → t y end → Early y)
-          → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y)
+          → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y)
           → Idle t
+          → Rest t
           → (∀ {rs} → Met t rs → RunHeld cs rs)
           → Held t cs
-held-runs nm rt ea en lt id rh = record
+held-runs nm rt ea en lt id re rh = record
   { named = nm
   ; covered = λ m → RunHeld.covered (rh m)
   ; exact = λ m → RunHeld.exact (rh m)
@@ -115,6 +117,7 @@ held-runs nm rt ea en lt id rh = record
   ; ends = en
   ; late = lt
   ; idle = id
+  ; rest = re
   }
 
 ------------------------------------------------------------------------
@@ -136,11 +139,11 @@ past op o ((q , pin _) ∷ rx) = past op o rx
 -- read, or the source's end.
 data Laid {B} (op : FlatOp) (o : Out B) (rx : List (Pos × Ev (Maybe (Input B)))) : Pos → Ev (IE B) → Set where
   laid  : ∀ rx₁ {q x} rx₂ {j v} → rx ≡ rx₁ ++ (q , out x) ∷ rx₂ → v ∈ proj₂ (react op (past op o rx₁) x)
-        → Laid op o rx (q ++ ix 1 ∷ ix j ∷ []) (out v)
+        → Laid op o rx (q ⊕ (ix 1 ∷ ix j ∷ [])) (out v)
   ended : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Laid op o rx q end
 
 lay-in : ∀ {B} q j (xs : List (IE B)) {y e} → (y , e) ∈ lay q j xs
-       → Σ ℕ λ j′ → Σ (IE B) λ v → y ≡ q ++ ix 1 ∷ ix j′ ∷ [] × e ≡ out v × v ∈ xs
+       → Σ ℕ λ j′ → Σ (IE B) λ v → y ≡ q ⊕ (ix 1 ∷ ix j′ ∷ []) × e ≡ out v × v ∈ xs
 lay-in q j (x ∷ xs) (here refl) = j , x , refl , refl , here refl
 lay-in q j (x ∷ xs) (there i) with lay-in q (suc j) xs i
 ... | j′ , v , ey , ee , vi = j′ , v , ey , ee , there vi
@@ -265,7 +268,7 @@ postulate
              → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
              → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
                 → Σ ℕ λ k → proj₂ c ≡ suc k)
-             → (∀ j → instantOf (q ++ ix 1 ∷ ix j ∷ []) ≡ instantOf q)
+             → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
              → Locals cs c (lay q 0 (proj₂ (react op o x)))
 
 ------------------------------------------------------------------------
@@ -276,6 +279,6 @@ record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : 
     named  : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
     early  : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
     ends   : ∀ {q} → M q end → Early q
-    late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (instantOf q) × opos (instantOf q) ⊑ q
+    late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
     runs   : ∀ {rx} → Met M rx → RunHeld cs (outRows op init rx)
 

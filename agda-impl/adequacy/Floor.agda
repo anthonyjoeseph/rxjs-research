@@ -20,22 +20,22 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; subst; cong)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; ix; last; _≟ˡ_; <ᵖ-below; <ᵖ-part; <ᵖ-ix; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-next; From∞; Frame; Frame∞; emit; stall; close; timelineAt)
-  renaming (sub to subᴾ)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening; slotOf) renaming (over to overT)
+open import denotation.Position using (Pos; ix; last; _⊕_; _▸_) renaming (sub to subᴾ)
+open import denotation.Events using (From∞; Frame∞; emit; stall; close; timelineAt)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; rest; due; opening) renaming (over to overT)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closed; closedUp; alive; unsub; cut; killAll; ended; settle; shutAt;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; feed; feedL; queued; inbox; Mark; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM; Ev)
-open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ; <ᴷ-asym)
+open import operation.Key using (at; after; _<ᴷ_; at-<ᴷ; <ᴷ-asym; at-after; at-after₀)
 open import adequacy.Least using (KeyIn; k-own; k-kid; k-cut; k-take; k-src; k-body; Lo)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
-open import adequacy.Stamped using (frame-ahead; opening-ahead; slot-next; pend-focus; inbox-asc)
+open import adequacy.Stamped using (frame-ahead; open-ahead; slot-next; pend-focus; inbox-asc)
 open import adequacy.Weight using (Clock)
 open import adequacy.Path using (_⊑_; ⊑i; ⊑-trans; Path; _⇜_)
 
 open import adequacy.Apart.Floor using (floor)
-open import adequacy.Floor.Keys using (Fewer; Into; at-after; at-after₀; cold-key; cut-in; ended-in; ext-le; ext-⊑; feed-key; fewer-same; flat-in; kill-in; lanes-in; lo-weaken; own-fewer; plug-in; same-l; shut-fewer; sub-at; top-max; unsubIf-in; ⊑-refl)
+open import adequacy.Floor.Keys using (Fewer; Into; cold-key; cut-in; ended-in; ext-le; ext-⊑; feed-key; fewer-same; flat-in; kill-in; lanes-in; lo-weaken; own-fewer; plug-in; same-l; shut-fewer; sub-at; top-max; unsubIf-in; ⊑-refl)
 
 -- Once absorbed, the clock is no earlier than a bound on every key.
 clock-abs : ∀ {R Γ A} (c : Ctx R Γ A) s r {X} → Lo (plug c s) X → X ⊑ Clock ⟨ c , s , absorbed , r ⟩
@@ -71,15 +71,15 @@ of-key i p xs       (k-kid ())
 
 -- A source's feed: every new key past the row a level down.
 fed-lo : ∀ {R Γ X B} (c : Ctx R Γ B) (k k′ : CS Γ X) (s : St Γ X) (b : St (X ∷ Γ) B) q (e : Ev X) → Fewer k′ k
-       → Lo (plug c (connS k s b)) (after q) → Lo (plug c (connS k′ s (feed (here refl) q e b))) (at (q ++ [ ix 0 ]))
-fed-lo c k k′ s b q e fw fl = sub-at c {connS k s b} {connS k′ s (feed (here refl) q e b)} {at (q ++ [ ix 0 ])} into (lo-weaken (at (q ++ [ ix 0 ])) (after q) fl (at-after q [ ix 0 ]))
+       → Lo (plug c (connS k s b)) (after q) → Lo (plug c (connS k′ s (feed (here refl) q e b))) (at (q ⊕ [ ix 0 ]))
+fed-lo c k k′ s b q e fw fl = sub-at c {connS k s b} {connS k′ s (feed (here refl) q e b)} {at (q ⊕ [ ix 0 ])} into (lo-weaken (at (q ⊕ [ ix 0 ])) (after q) fl (at-after q [ ix 0 ]))
   where
-    into : Into (at (q ++ [ ix 0 ])) (connS k s b) (connS k′ s (feed (here refl) q e b))
+    into : Into (at (q ⊕ [ ix 0 ])) (connS k s b) (connS k′ s (feed (here refl) q e b))
     into (k-own m) = inj₁ (k-own (own-fewer k k′ {s} {s} {b} {feed (here refl) q e b} fw m))
     into (k-kid (k-src h)) = inj₁ (k-kid (k-src h))
     into {κ} (k-kid (k-body h)) with feed-key (here refl) q e b h
     ... | inj₁ h′ = inj₁ (k-kid (k-body h′))
-    ... | inj₂ lt = inj₂ (<ᴷ-asym (at (q ++ [ ix 0 ])) κ lt)
+    ... | inj₂ lt = inj₂ (<ᴷ-asym (at (q ⊕ [ ix 0 ])) κ lt)
 
 -- A takeWhile's failing value: its end owed below where it fell.
 take-owe : ∀ {Γ A} {i f} (s : St Γ A) q → Into (at q) (takeS i f free s) (takeS i f (cpAt q) s)
@@ -151,9 +151,9 @@ module _ {R : Set} where
            (λ ki → inj₁ (flat-in (λ h → h) (lanes-in pre post (ended-in s)) ki)) (lo-weaken (at q) (after q) fl (at-after₀ q))
   rises (inLanes op f ω d n (a ∷ qs) o′ pre post c) s cp q fl refl | true | false = ext-⊑ q [ ix 1 ]
   rises (inSrc k b c) s (nx a) q fl refl =
-    ⊑-trans (ext-⊑ q [ ix 0 ]) (clock-abs c (connS k s (feed (here refl) q (nx a) b)) q {at (q ++ [ ix 0 ])} (fed-lo c k k s b q (nx a) (fewer-same {k = k}) fl))
+    ⊑-trans (ext-⊑ q [ ix 0 ]) (clock-abs c (connS k s (feed (here refl) q (nx a) b)) q {at (q ⊕ [ ix 0 ])} (fed-lo c k k s b q (nx a) (fewer-same {k = k}) fl))
   rises (inSrc k b c) s cp q fl refl =
-    ⊑-trans (ext-⊑ q [ ix 0 ]) (clock-abs c (connS (shutAt q k) s (feed (here refl) q cp b)) q {at (q ++ [ ix 0 ])} (fed-lo c k (shutAt q k) s b q cp (shut-fewer q k) fl))
+    ⊑-trans (ext-⊑ q [ ix 0 ]) (clock-abs c (connS (shutAt q k) s (feed (here refl) q cp b)) q {at (q ⊕ [ ix 0 ])} (fed-lo c k (shutAt q k) s b q cp (shut-fewer q k) fl))
   rises (inBody k o′ c) s (nx b) q fl eq with CS.srcLive k
   rises (inBody k o′ c) s (nx b) q fl refl | true  = ⊑-refl
   rises (inBody k o′ c) s (nx b) q fl refl | false = clock-abs c (connS k o′ s) q (lo-weaken (at q) (after q) fl (at-after₀ q))
@@ -173,7 +173,7 @@ module _ {R : Set} where
   begins o c (connect s′ b)     q pth lo refl = ext-⊑ q [ ix 0 ]
   begins o c (defer l)          q pth lo refl = ext-⊑ q [ ix 1 ]
   begins o c (cold x)           q pth lo refl =
-    absorb c (pend (cold x) q) (coldS true (opening q (timelineAt x q))) q (λ {κ} h → inj₂ (<ᴷ-asym (at q) κ (opening-ahead o pth (cold-key h)))) lo
+    absorb c (pend (cold x) q) (coldS true (opening q (timelineAt x q))) q (λ {κ} h → inj₂ (<ᴷ-asym (at q) κ (open-ahead q (timelineAt x q) (cold-key h)))) lo
   begins o c empty              q pth lo refl = absorb c (pend empty q) (ofS 0 q []) q (λ h → inj₂ (of-key 0 q [] h)) lo
   begins o c (of xs)            q pth lo refl = absorb c (pend (of xs) q) (ofS 0 q xs) q (λ h → inj₂ (of-key 0 q xs h)) lo
   begins o c (connected x)      q pth lo eq with closedUp c x
@@ -191,7 +191,7 @@ module _ {R : Set} where
 
   -- A cold's turn: on at its tick, or absorbed with its next due past it.
   leafs : ∀ {Γ A} (c : Ctx R Γ A) q b (l : Tape A) {κ} → (leafM , κ) ∈ own {Γ} (coldS b l) → Lo (plug c (coldS b l)) κ
-        → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+        → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
         → ∀ {τ k′} → Driver.took R (run c (coldS b l) leafM q) ≡ Driver.silent τ k′ → κ ⊑ Clock k′
   leafs c q b     overT              () lo ah eq
   leafs c q false (ending e₀)        (here refl) lo ah refl = absorb c (coldS false (ending e₀)) (coldS false overT) q (λ { (k-own ()) ; (k-kid ()) }) lo
@@ -204,10 +204,10 @@ module _ {R : Set} where
   leafs c q true  (play τ u i t (emit a f))  (here refl) lo ah refl | false = ⊑-refl
   leafs c q true  (play τ u i t (stall f)) {κ} (here refl) lo ah refl | false =
     absorb c (coldS true (play τ u i t (stall f))) (coldS true (play τ u (suc i) t (Frame∞.force f))) q
-      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (slotOf u (suc i) (Frame∞.force f))) (trans (at-<ᴷ (u ++ [ ix i ]) _) (slot-next u i (Frame∞.force f))))
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym κ (at (u ▸ ix (suc i))) (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i)))
          ; (k-own (there ())) ; (k-kid ()) }) lo
   leafs c q true  (play τ u i t (close f)) {κ} (here refl) lo ah refl | false =
-    absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ++ [ last ]) (From∞.force f))) q
+    absorb c (coldS true (play τ u i t (close f))) (coldS true (rest τ (u ▸ last) (From∞.force f))) q
       (λ {κ′} h → inj₂ (<ᴷ-asym κ κ′ (ah refl (cold-key h)))) lo
 
   -- A connect's admin mark: its body subscribed where it was keyed, or
@@ -239,7 +239,7 @@ module _ {R : Set} where
   -- A MARK RUN: on at the mark's own key, or absorbed with what it owes
   -- next no earlier.
   runs : ∀ {Γ A} (c : Ctx R Γ A) q {s : St Γ A} {mk κ} → Marked s mk → (mk , κ) ∈ own s → Lo (plug c s) κ
-       → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+       → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
        → (∀ {j g x q₀ e q₁ e₁ ib} → s ≡ joinS j g x ((q₀ , e) ∷ (q₁ , e₁) ∷ ib) → mk ≡ joinM → at q₁ <ᴷ at q₀ ≡ false)
        → ∀ {τ k′} → Driver.took R (run c s mk q) ≡ Driver.silent τ k′ → κ ⊑ Clock k′
   runs c q (ofK i p₀ []) (here refl) lo ah asc eq with closed c
@@ -263,8 +263,8 @@ module _ {R : Set} where
   runs c q (joinK j g x q₀ e ib) (there ()) lo ah asc eq
   runs c q (leafK b l) mi lo ah asc eq = leafs c q b l mi lo (λ e → ah (cong (coldS b) e) refl) eq
   runs c q (stopK i f r s₀) (here refl) lo ah asc refl =
-    md-at (if not (closed c) then rising cp else absorbed) c (takeS i f (cpAt r) s₀) (takeS i f (cutAt r) s₀) (r ++ [ last ])
-      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym (at (r ++ [ last ])) (after r) (at-after r [ last ])) ; (k-own (there ())) ; (k-kid (k-take h)) → inj₁ (k-kid (k-take h)) }) lo
+    md-at (if not (closed c) then rising cp else absorbed) c (takeS i f (cpAt r) s₀) (takeS i f (cutAt r) s₀) (r ⊕ [ last ])
+      (λ { (k-own (here refl)) → inj₂ (<ᴷ-asym (at (r ⊕ [ last ])) (after r) (at-after r [ last ])) ; (k-own (there ())) ; (k-kid (k-take h)) → inj₁ (k-kid (k-take h)) }) lo
   runs c q (stopK i f r s₀) (there ()) lo ah asc eq
   runs c q (cutK i f r s₀) mi lo ah asc refl =
     absorb c (takeS i f (cutAt r) s₀) (takeS i f (overAt r) (proj₁ (cut s₀))) r
@@ -298,8 +298,8 @@ clock-mono o {k = ⟨ c , s , absorbed , q ⟩}  pth (_ , eq) = absorbs o c s q 
 -- mark is due no earlier than the row a level down.
 fed-ahead : ∀ {R} (o : PureObs [] R) {rs Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {s ε q k′}
           → Path (load o) rs ⟨ inSrc k b c , s , rising ε , q ⟩ → k′ ⇜ ⟨ inSrc k b c , s , rising ε , q ⟩
-          → Clock k′ <ᴷ at (q ++ [ ix 0 ]) ≡ false
+          → Clock k′ <ᴷ at (q ⊕ [ ix 0 ]) ≡ false
 fed-ahead o {k = k} {b} {c} {s} {nx a} {q} pth (_ , refl) =
-  _⊑_.un (clock-abs c (connS k s (feed (here refl) q (nx a) b)) q {at (q ++ [ ix 0 ])} (fed-lo c k k s b q (nx a) (fewer-same {k = k}) (floor o pth tt)))
+  _⊑_.un (clock-abs c (connS k s (feed (here refl) q (nx a) b)) q {at (q ⊕ [ ix 0 ])} (fed-lo c k k s b q (nx a) (fewer-same {k = k}) (floor o pth tt)))
 fed-ahead o {k = k} {b} {c} {s} {cp} {q} pth (_ , refl) =
-  _⊑_.un (clock-abs c (connS (shutAt q k) s (feed (here refl) q cp b)) q {at (q ++ [ ix 0 ])} (fed-lo c k (shutAt q k) s b q cp (shut-fewer q k) (floor o pth tt)))
+  _⊑_.un (clock-abs c (connS (shutAt q k) s (feed (here refl) q cp b)) q {at (q ⊕ [ ix 0 ])} (fed-lo c k (shutAt q k) s b q cp (shut-fewer q k) (floor o pth tt)))

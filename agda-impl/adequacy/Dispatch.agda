@@ -10,7 +10,7 @@ module adequacy.Dispatch where
 open import Data.Bool using (Bool; true; false; if_then_else_; not; _∨_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Nat using (_≡ᵇ_; suc)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,21 +22,22 @@ open import Data.Unit.Polymorphic using () renaming (tt to tt₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; subst; cong)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Timeline; Pos; ix; last; timelineAt; Frame; emit; stall; close; module From∞)
+open import denotation.Position using (Pos; ix; last; _⊕_; nested; _▸_)
+open import denotation.Events using (Timeline; timelineAt; Frame; emit; stall; close; module From∞)
 open import denotation.EmissionSet using (EmissionSet; out; skip; module TakeWhile; ⟦_⟧; InE; at-out; at-end; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-antisym; ≼-trans; ≼-refl; entered-reach; ticks)
-open import denotation.Laws.Worlds using (Ok; Hots; ok-step)
-open import operation.Key using (at; after)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening; slotOf; onward)
+open import denotation.Laws.Worlds using (notT; Ok; Hots; ok-step)
+open import operation.Key using (at; after; at-after)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; Tape; play; ending; over; opening)
 open Machine using (St; Ctx; Conf; Scope; binds; scopeOf; ⟨_,_,_,_⟩; subscribing; absorbed; rising; load; moved; plug; search; found; Mark; ofM; attM;
                     rise; run; alive; nx; cp; attAt; attached; Torn; Stepped; quiet; admit; closed; killAll; unsubIf; unsub; free; cpAt; cutAt; overAt;
-                    cut; cpM; cutM; CS; cs; closedUp; _⊕_; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
+                    cut; cpM; cutM; CS; cs; closedUp; unbound; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; Cand; Out; bodyM; srcAttM; owedM; joinM; leafM; leaf; starting; turn;
                     pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody)
                     renaming (Shown to Shownᴹ; step to stepᴹ)
 open import adequacy.Rows using (pendRows; full; ≃-refl; Vis; _≃_; silent; Moves; this; tapeE)
 open _≃_
-open import adequacy.Cursor using (Cur; aft; NoFail; Sound; tailp-dn; ≈-refl; ≈-trans; fd-none; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; Sealed; notT; s-of; s-join; s-joinx; s-took; s-cold; s-coldx; Ticked; subd; o-cp)
+open import adequacy.Cursor using (Cur; aft; NoFail; Sound; tailp-dn; ≈-refl; ≈-trans; fd-none; Rgn; JoinE; Flags; src-pend; Within; Adm; bef; Spent; Sync; _≈_; Owes; Due; cov; alike; Pts; h-blank; h-take; Quiet; Sealed; s-of; s-join; s-joinx; s-took; s-cold; s-coldx; Ticked; subd; o-cp)
 open import adequacy.Cursor.Tear using (husk-of; c-abs; c-sub; Clear; Pending; pend-shape; sync-pend)
 open import adequacy.Cursor.Frame using (Fr; Hold; owes; dead; lane; lanecut; pnd; Rest; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Cursor.Rise using (Inv; settled; pending; flying; adrift; RT; SimC; keeps; rise-top; rise-map; rise-scan-nx; rise-scan-cp; rise-take-pass; rise-take-cp; rise-cut; rise-cutx; rise-ln; rise-took; rise-take-fail; rise-bodyx; run-stop; run-cut; run-att)
@@ -45,7 +46,7 @@ open import adequacy.Isle.Step using (found-clear; found-con)
 open import adequacy.RunCon using (vis-≃; body-noisle; Ran; con-body; con-att; con-owed; Off; closed-off)
 open import adequacy.Stamped using (StOK; pend-of; pend-focus)
 open import adequacy.Isle using (G)
-open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken; at-after)
+open import adequacy.Floor.Keys using (own-cls; ob; os; oo; plug-in; lo-weaken)
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-least; found-mark; found-plug)
 open import adequacy.Walk using (due-≈; climb; descend; refocus)
 open import adequacy.Least using (Lo; seek-none; k-kid; k-src)
@@ -217,7 +218,7 @@ data Delivers {Γ A} : St Γ A → Mark → Pos → Set₁ where
   d-ofx  : ∀ {i q} → Delivers (ofS i q []) ofM (q ⊕ [ last ])
   d-join : ∀ {j x q e ib} → Delivers (joinS j true x ((q , e) ∷ ib)) joinM q
   d-stop : ∀ {i keep r s} → Delivers (takeS i keep (cpAt r) s) cpM (r ⊕ [ last ])
-  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (slotOf u i (emit a k))
+  d-play : ∀ {τ u i t a k} → Delivers (coldS true (play τ u i t (emit a k))) leafM (u ▸ ix i)
   d-ending : ∀ {e} → Delivers (coldS true (ending e)) leafM e
 
 
@@ -322,7 +323,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
     let (Cr′ , fr′ , _ , _ , d) = rc Rt {s = takeS true w free s} fr (hr λ _ _ → lag [ p ] (λ _ o yp → here (at-p o yp)) , bnd) (≺→≼ {p} {p ⊕ [ ix 0 ]} p0)
                                     (lo-weaken (at (p ⊕ [ ix 0 ])) (after p) fl (at-after p [ ix 0 ]))
     in Cr′ , bef (p ⊕ [ ix 0 ]) ,
-       flying fr′ cl (s-took (a , row , nk , λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) gone (λ _ → ≺-irrefl {p ⊕ [ ix 0 ]}) (o-cp (slot-last p 0))
+       flying fr′ cl (s-took (a , row , nk , λ (_ , _ , y , nk′ , qp) → nf y nk′ qp) gone (λ _ → ≺-irrefl {p ⊕ [ ix 0 ]}) (o-cp (slot-last (nested p) 0))
                              (tailp-dn {C = bef p} {C′ = aft (p ⊕ [ ix 0 ])} (λ {y} t → gone {y} t) (took-tail sy row nk nf)) (proj₂ (husk-of sy))
                              (λ {r} t → ≼-trans {r} {p} {p ⊕ [ ix 0 ]} t (≺→≼ {p} {p ⊕ [ ix 0 ]} p0))
                              (λ {r′} t (q , _ , y , nk′ , qr) → nf y nk′ (≺-≼-≺ {q} {r′} {p} qr t)) eq sd
@@ -361,9 +362,9 @@ module Over {R : Set} (Rt : EmissionSet R) where
   srcp {C = C} (f-srcp {k = k} fr sc pt lv nc na ba an (ok , adm) bs bb fl fe eq ow sd nb) refl pe wn =
     (_ , _ , f-src fr sc pt lv nc bs bb fl fe eq (behind-pend {C = C} {k = k} sc (ok , adm) ow) sd (λ t → ⊥-elim (notT _ na t)) (λ _ → inj₂ (ba , an)) (λ _ → owes-call {k = k} C ow) nb , ow , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-islep {k = k} u hb ub le na nc ba an sc (ok , adm) ss bu nr nb oz iz) refl pe wn =
-    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ++ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ++ [ ix 1 ]}))
-                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ++ [ ix 1 ])) (≼-refl {CS.connAt k ++ [ ix 1 ]})) bu nr nb oz iz
-         , ≼-refl {CS.connAt k ++ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
+    (_ , _ , f-isle u hb ub le na nc (behind-pend {C = bef (CS.connAt k ⊕ [ ix 1 ])} {k = k} sc (ok , adm) (≼-refl {CS.connAt k ⊕ [ ix 1 ]}))
+                         (subd (λ o → o) ok) ss (inj₂ (ba , an)) (owes-call {k = k} (bef (CS.connAt k ⊕ [ ix 1 ])) (≼-refl {CS.connAt k ⊕ [ ix 1 ]})) bu nr nb oz iz
+         , ≼-refl {CS.connAt k ⊕ [ ix 1 ]} , ok-step (CS.connAt k) ok , adm , pe , wn)
   srcp (f-top _)                                                ()   _ _
   srcp (f-map _ _ _)                                            ()   _ _
   srcp (f-scan _ _ _ _)                                         ()   _ _
@@ -524,8 +525,8 @@ module Over {R : Set} (Rt : EmissionSet R) where
 
   -- A cold's next value, or its end, delivered.
   run-cold-nx : ∀ {Cr Γ A} {c : Ctx R Γ A} {τ u i t a} {k : Frame A t} {r} → closed c ≡ false
-              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
-              → Inv Rt Cr (bef (slotOf u i (emit a k))) ⟨ c , coldS true (onward τ u i t k) , rising (nx a) , slotOf u i (emit a k) ⟩
+              → Inv Rt Cr (bef (u ▸ ix i)) ⟨ c , coldS true (play τ u i t (emit a k)) , absorbed , r ⟩
+              → Inv Rt Cr (bef (u ▸ ix i)) ⟨ c , coldS true (play τ u (suc i) t k) , rising (nx a) , u ▸ ix i ⟩
   run-cold-nx cl (settled {N = owes}          _ fr h)              = flying fr cl (cold-nx h)
   run-cold-nx cl (settled {N = dead _ _}      _ fr h)              = adrift fr cl (rest-cold h)
   run-cold-nx cl (settled {N = lane _ _ _}    _ fr (_ , _ , () , _))
@@ -686,7 +687,7 @@ module Over {R : Set} (Rt : EmissionSet R) where
           → Inv Rt Cr C ⟨ c , connS k o b , absorbed , r ⟩
           → sh ≡ [] × Ran Rt Cr k′
   run-con {c = c} {k = cs cl sl sa (just p) as ow cx ea sr sc} {o} {b} (inj₁ refl) refl mi lo st g i
-    with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ (proj₂ st)))
+    with own-cls (cs cl sl sa (just p) as ow cx ea sr sc) {o} {b} mi | pend-of o (proj₂ (proj₂ st))
   ... | ob refl | o₀ , refl = refl , con-body Rt (body-noisle c st g refl lo) lo i
   run-con {Cr} {C} {k = cs cl sl sa nothing as ow cx ea sr sc} (inj₁ refl) refl mi lo st g i = refl , Cr , C , i , silent ≃-refl
   run-con {c = c} {k = cs cl sl sa bd (just y) ow cx ea sr sc} {o} {b} (inj₂ (inj₁ refl)) refl mi lo st g i
@@ -775,10 +776,10 @@ module Over {R : Set} (Rt : EmissionSet R) where
     ... | false | refl = λ iv → stepped cl (least fd d-play iv) (run-cold-nx cl) rest-cold
     abs-leaf {c′ = c′} {b = true} {play τ u i t (stall k)} fd eq with closed c′ in cl | eq
     ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-cold)
-    ... | false | refl = refocused (focus fd) (cold-skip (u ⊕ [ ix i ]) (λ tk → tk) stall-into stall-back)
+    ... | false | refl = refocused (focus fd) (cold-skip (u ▸ ix i) (λ tk → tk) stall-into stall-back)
     abs-leaf {c′ = c′} {b = true} {play τ u i t (close k)} fd eq with closed c′ in cl | eq
     ... | true  | refl = refocused (focus fd) (closed-keep cl (λ ()) rest-cold)
-    ... | false | refl = refocused (focus fd) (cold-skip (u ⊕ [ ix i ]) (λ (ru , le) → rest-ticked τ u ru le (From∞.force k)) close-into close-back)
+    ... | false | refl = refocused (focus fd) (cold-skip (u ▸ ix i) (λ (ru , le) → rest-ticked τ u ru le (From∞.force k)) close-into close-back)
 
     abs-cut : ∀ {Γ A} {c′ : Ctx R Γ A} {j} {w : A → Bool} {r s₀ κ k′ sh t}
             → search top (plug c s) ≡ just (found (Γ , A , c′ , takeS j w (cutAt r) s₀) cutM κ)

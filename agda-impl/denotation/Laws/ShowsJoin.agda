@@ -8,7 +8,7 @@ module denotation.Laws.ShowsJoin where
 
 open import Data.Bool using (T)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _++_; [_])
+open import Data.List using (List; []; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
@@ -17,7 +17,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; ix; inside)
+open import denotation.Position using (Pos; ix; inside; _⊕_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Few; Reach; Den; enter; Ended; LaneOf;
   module Joining; module Merge; module Switch; module Exhaust; module Bounded; module Op)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
@@ -127,11 +127,11 @@ module Fanned {A B : Set} {n : ℕ} (Lane : Pos → A → EmissionSet B) (o : Em
   src (rpass () _ _ , _)
   src (rhand () _ , _)
 
-  root : ∀ {s y e} → Br s y e → s ≺ y × Σ (Ev B) (Out (s ++ [ ix 0 ]))
+  root : ∀ {s y e} → Br s y e → s ≺ y × Σ (Ev B) (Out (s ⊕ [ ix 0 ]))
   root (lane x r l _ _ , refl)        = past x r l , _ , val x , tt
   root (lend x r l _ _ _ , refl)      = past x r l , _ , val x , tt
   root (lpass x r l _ _ _ , refl)     = past x r l , _ , val x , tt
-  root {s} (hand {c = c} x r l _ _ , refl) = ≺-trans {s} {c} {c ++ [ ix 0 ]} (past x r l) (≺-ext c []) , _ , val x , tt
+  root {s} (hand {c = c} x r l _ _ , refl) = ≺-trans {s} {c} {c ⊕ [ ix 0 ]} (past x r l) (≺-ext c []) , _ , val x , tt
   root (left x r l _ _ , refl)        = past x r l , _ , val x , tt
   root (val _ , ())
   root (step _ , ())
@@ -241,23 +241,23 @@ module Flat {A B H n} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   few-out : ∀ {c a} → o c (out a) → Few o c
   few-out {c} {a} x = entered-few d p {e = out a} (λ {k} {e′} → full {q = c} {e = out a} tt {k} {e′}) x
 
-  val-ok : ∀ {q a} → o q (out a) → Ok H (q ++ [ ix 1 ])
+  val-ok : ∀ {q a} → o q (out a) → Ok H (q ⊕ [ ix 1 ])
   val-ok {q} x = ok-step q (ok-in ok (InvAt.world Io x) (InvAt.real Io x))
 
   -- A lane at its value's second child.
   module Plain {Runs : Pos → Set} where
     past : ∀ {q a k e} → o q (out a) → Runs q → LaneOf f q a k e → q ≺ k
-    past {q} {k = k} _ _ (_ , lt) = ≺-trans {q} {q ++ [ ix 1 ]} {k} (≺-ext q []) lt
+    past {q} {k = k} _ _ (_ , lt) = ≺-trans {q} {q ⊕ [ ix 1 ]} {k} (≺-ext q []) lt
 
     reach : ∀ {q a k e} → o q (out a) → Runs q → LaneOf f q a k e → Reach (LaneOf f q a) k e
-    reach {q} {a} _ _ (y , _) with entered-reach (f a) (q ++ [ ix 1 ]) y
+    reach {q} {a} _ _ (y , _) with entered-reach (f a) (q ⊕ [ ix 1 ]) y
     ... | ks , h = ks , λ y′ lt dp → h (proj₁ y′) lt dp
 
     sk-lane : ∀ {q a} → o q (out a) → Runs q → ShowsK n (LaneOf f q a)
-    sk-lane {q} {a} x _ = sk-same (λ y ¬e → ¬e (_ , proj₁ y)) (λ y ¬l → ¬l (_ , y , after y)) (sk-f a (q ++ [ ix 1 ]) (val-ok x))
+    sk-lane {q} {a} x _ = sk-same (λ y ¬e → ¬e (_ , proj₁ y)) (λ y ¬l → ¬l (_ , y , after y)) (sk-f a (q ⊕ [ ix 1 ]) (val-ok x))
       where
-        after : ∀ {k e} → enter (f a) (q ++ [ ix 1 ]) k e → (q ++ [ ix 1 ]) ≺ k
-        after y = world-after (InvAt.world I y) (InvAt.real I y) where I = If a (q ++ [ ix 1 ]) (val-ok x)
+        after : ∀ {k e} → enter (f a) (q ⊕ [ ix 1 ]) k e → (q ⊕ [ ix 1 ]) ≺ k
+        after y = world-after (InvAt.world I y) (InvAt.real I y) where I = If a (q ⊕ [ ix 1 ]) (val-ok x)
 
   sk-merge : ShowsK n (Merge.JoinT f o)
   sk-merge = Fanned.sk-join (LaneOf f) o (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ _ → ⊥) (λ ()) (λ ()) (λ ())
@@ -295,7 +295,7 @@ module Flat {A B H n} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
     starts-past : ∀ {i q ls s} → Starts i q ls s → q ≺ s
     starts-past {q = q} (room _)    = ≺-ext q []
     starts-past {q = q} (freed _ _) = ≺-ext q []
-    starts-past {q = q} (queued {c} _ qc _ _ _) = ≺-trans {q} {c} {c ++ [ ix 1 ]} qc (≺-ext c [])
+    starts-past {q = q} (queued {c} _ qc _ _ _) = ≺-trans {q} {c} {c ⊕ [ ix 1 ]} qc (≺-ext c [])
 
 
     past : ∀ {q a k e} → o q (out a) → Indexed q → Lane q a k e → q ≺ k

@@ -9,7 +9,7 @@ open import Data.Bool using (Bool; true; false; T; not; _∧_; _∨_; if_then_el
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Empty using (⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_]; length)
+open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -22,7 +22,8 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; does; yes; no)
 
-open import denotation.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix; <ᵖ-trans; <ᵖ-irrefl)
+open import denotation.Events using (<ᵖ-trans; <ᵖ-irrefl)
+open import denotation.Position using (Pos; _<ᵖ_; _≟ᵖ_; ix; _⊕_)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _≼_)
 open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
@@ -255,15 +256,15 @@ proper→ ex e x = not-T (all⁻ e (complete ex x))
 -- Each value's lane, listed at its subscription, is exactly its lane.
 lanes-from : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} {D : A → Pos → EmissionSet B} {vs ls}
   → (∀ {a s l} → ln a s ≡ just l → Exactly l (D a s)) → lanes ln vs ≡ just ls
-  → ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ vs × Exactly l (D a (q ++ [ ix 1 ]))
+  → ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ vs × Exactly l (D a (q ⊕ [ ix 1 ]))
 lanes-from {ln = ln} {vs = vs} ih e m with mapM⁻ {xs = vs} e m
-... | ((q′ , a′) , vm , fx) with bind⁻ {m = ln a′ (q′ ++ [ ix 1 ])} fx
+... | ((q′ , a′) , vm , fx) with bind⁻ {m = ln a′ (q′ ⊕ [ ix 1 ])} fx
 ... | (l′ , el′ , refl) = vm , ih el′
 
 lanes-to : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} {vs ls} → lanes ln vs ≡ just ls
   → ∀ {q a} → (q , a) ∈ vs → Σ (Listed B) λ l → (q , a , l) ∈ ls
 lanes-to {ln = ln} {vs = vs} e {q} {a} vm with mapM⁺ {xs = vs} e vm
-... | (y , ym , fx) with bind⁻ {m = ln a (q ++ [ ix 1 ])} fx
+... | (y , ym , fx) with bind⁻ {m = ln a (q ⊕ [ ix 1 ])} fx
 ... | (l′ , _ , refl) = l′ , ym
 
 -- A lane listing read past its subscription lists the lane's rows past it.

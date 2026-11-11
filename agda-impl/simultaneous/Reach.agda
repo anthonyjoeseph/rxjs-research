@@ -15,7 +15,7 @@ open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (subst; sym)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; Seen; Few; _≺_)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Worlds using (InvAt)

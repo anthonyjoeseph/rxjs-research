@@ -10,30 +10,21 @@ module adequacy.Apart.Region where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_]; _++_)
-open import Data.List.Properties using (++-identityʳ)
+open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Relation.Nullary using (yes; no)
 
-open import denotation.Events using (Pos; ix; last; _<ᵖ_; _≟ˡ_; <ᵖ-below; <ᵖ-irrefl; <ᵖ-split; <ᵖ-trans)
-open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; clash; after-past; <ᴷ-asym)
-open import adequacy.Stamped using (Ix)
-open import adequacy.Floor.Keys using (at-after₀)
+open import denotation.Position using (Pos; ix; last; _<ᵖ_; _⊕_; Root; _▸_)
+open import denotation.Events using (<ᵖ-below; <ᵖ-irrefl; <ᵖ-split; <ᵖ-trans)
+open import operation.Key using (Key; at; after; _<ᴷ_; at-<ᴷ; <ᴷ-trans; ≮ᴷ-trans; clash; after-past; <ᴷ-asym; at-after₀; after-in)
+open import denotation.Laws.Worlds using (⊕-identityʳ)
 open import adequacy.Apart.Cone using (Cone; pre; cone-trans; cone-up; cone-low; cone-past)
 
 ------------------------------------------------------------------------
 -- Keys
-
--- Below a position, its after is earlier.
-after-in : ∀ p l ys → after (p ++ l ∷ ys) <ᴷ after p ≡ true
-after-in []      l ys = refl
-after-in (a ∷ p) l ys with a ≟ˡ a
-... | yes _ rewrite <ᵖ-irrefl [ a ] = after-in p l ys
-... | no ¬e = ⊥-elim (¬e refl)
 
 -- No earlier than a position's after: past the position.
 past-at : ∀ q y → at y <ᴷ after q ≡ false → q <ᵖ y ≡ true
@@ -47,17 +38,17 @@ past-at q y h with q <ᵖ y in e
 past-cone : ∀ q y → at y <ᴷ at q ≡ false → (Cone q y → ⊥) → at y <ᴷ after q ≡ false
 past-cone q y h ne with <ᵖ-split q y (trans (sym (at-<ᴷ y q)) h)
 ... | inj₁ qy   = <ᴷ-asym (after q) (at y) (cone-past q y qy ne)
-... | inj₂ refl = ⊥-elim (ne (subst (Cone q) (++-identityʳ q) (pre [])))
+... | inj₂ refl = ⊥-elim (ne (subst (Cone q) (⊕-identityʳ q) (pre [])))
 
 self : ∀ q → Cone q q
-self q = subst (Cone q) (++-identityʳ q) (pre [])
+self q = subst (Cone q) (⊕-identityʳ q) (pre [])
 
 ------------------------------------------------------------------------
 -- Regions
 
 data Rg : Set where
   cn : Pos → Rg
-  tl : Pos → ℕ → Rg
+  tl : Root → ℕ → Rg
   pt : Pos → Rg
   bk : Pos → Rg
   cl : Pos → Rg
@@ -65,7 +56,7 @@ data Rg : Set where
 -- The positions a region can still make.
 In : Rg → Pos → Set
 In (cn r)   x = Cone r x
-In (tl u i) x = (Σ ℕ λ j → i ≤ j × Cone (u ++ [ ix j ]) x) ⊎ Cone (u ++ [ last ]) x
+In (tl u i) x = (Σ ℕ λ j → i ≤ j × Cone (u ▸ ix j) x) ⊎ Cone (u ▸ last) x
 In (pt _)   x = ⊥
 In (bk _)   x = ⊥
 In (cl _)   x = ⊥
@@ -186,12 +177,12 @@ out-sub {y = y} (f-cn r)   inc op e c  = trans (e (inc y c)) (op (subst (Cone r)
 out-sub {y = y} (f-tl u i) inc op e iy = op (subst (In (tl u i)) (e (inc y iy)) iy)
 
 -- A fresh region inside the run's subtree, the run's own root clear.
-sub-cl : ∀ {x p} → Ix p → Fut x → (∀ y → In x y → Cone p y) → Out x p → Sub x (cl p)
-sub-cl {x} {p} hp fx inc op B nb (_ , fb) with kind B nb
+sub-cl : ∀ {x p} → Fut x → (∀ y → In x y → Cone p y) → Out x p → Sub x (cl p)
+sub-cl {x} {p} fx inc op B nb (_ , fb) with kind B nb
 ... | is-fut fB = dis-in fB (λ y ix iB → proj₂ (far-out fB fb y iB) (inc y ix))
                 , dis-in {B} {x} fx (λ y iB ix → proj₂ (far-out fB fb y iB) (inc y ix))
 ... | is-pt y refl = out-sub fx inc op (proj₂ fb) , dis-in fx (λ _ ())
-... | is-bk j refl = low-in fx (λ y ix → cone-low j hp fb (inc y ix)) , dis-in fx (λ _ ())
+... | is-bk j refl = low-in fx (λ y ix → cone-low j fb (inc y ix)) , dis-in fx (λ _ ())
 
 -- An after inside the run's subtree.
 sub-pt : ∀ {y p} → Cone p y → Sub (pt y) (cl p)
@@ -209,16 +200,16 @@ sub-bk {p} B nb (_ , fb) with kind B nb
                    , (λ e → ⊥-elim (clash (subst (λ z → z <ᵖ p ≡ true) (sym e) fb) (<ᵖ-irrefl p)))
 
 -- The run a level down.
-sub-down : ∀ {p} l → Ix p → Sub (cl (p ++ [ l ])) (cl p)
-sub-down {p} l hp B nb (_ , fb) with kind B nb
-... | is-fut fB = dis-in fB (λ _ ()) , far-in fB (λ y iB → ≮ᴷ-trans (at y) (after p) (after (p ++ [ l ])) (proj₁ (far-out fB fb y iB)) (<ᴷ-asym (after (p ++ [ l ])) (after p) (after-in p l []))
+sub-down : ∀ {p} l → Sub (cl (p ⊕ [ l ])) (cl p)
+sub-down {p} l B nb (_ , fb) with kind B nb
+... | is-fut fB = dis-in fB (λ _ ()) , far-in fB (λ y iB → ≮ᴷ-trans (at y) (after p) (after (p ⊕ [ l ])) (proj₁ (far-out fB fb y iB)) (<ᴷ-asym (after (p ⊕ [ l ])) (after p) (after-in p l []))
                                                 , λ c → proj₂ (far-out fB fb y iB) (cone-trans (pre [ l ]) c))
 ... | is-pt y refl = out , out
   where
-    out : Out (cl (p ++ [ l ])) y
-    out = ≮ᴷ-trans (after y) (after p) (after (p ++ [ l ])) (proj₁ fb) (<ᴷ-asym (after (p ++ [ l ])) (after p) (after-in p l []))
-        , λ c → ⊥-elim (cone-up l [] (subst (Cone (p ++ [ l ])) (proj₂ fb (cone-trans (pre [ l ]) c)) c))
-... | is-bk j refl = <ᵖ-trans j p (p ++ [ l ]) fb (<ᵖ-below p []) , <ᵖ-trans j p (p ++ [ l ]) fb (<ᵖ-below p [])
+    out : Out (cl (p ⊕ [ l ])) y
+    out = ≮ᴷ-trans (after y) (after p) (after (p ⊕ [ l ])) (proj₁ fb) (<ᴷ-asym (after (p ⊕ [ l ])) (after p) (after-in p l []))
+        , λ c → ⊥-elim (cone-up l [] (subst (Cone (p ⊕ [ l ])) (proj₂ fb (cone-trans (pre [ l ]) c)) c))
+... | is-bk j refl = <ᵖ-trans j p (p ⊕ [ l ]) fb (<ᵖ-below p []) , <ᵖ-trans j p (p ⊕ [ l ]) fb (<ᵖ-below p [])
 
 -- A fresh region inside another.
 sub-fut : ∀ {x z} → Fut x → Fut z → (∀ y → In x y → In z y) → (∀ y → Out z y → Out x y) → Sub x z
@@ -252,9 +243,9 @@ keyed-out (f-tl u i) k = k
 
 -- A fresh region whose least key runs at `q`, its subtree all
 -- the region's: what was separate from it is past the run.
-far-of : ∀ {R₀ q} → Ix q → Fut R₀ → (∀ y → Cone q y → In R₀ y) → (∀ y → Out R₀ y → Cone q y → y ≡ q)
+far-of : ∀ {R₀ q} → Fut R₀ → (∀ y → Cone q y → In R₀ y) → (∀ y → Out R₀ y → Cone q y → y ≡ q)
        → ∀ B → NoCl B → Keyed (at q) B → Sep R₀ B → Sep (cl q) B
-far-of {R₀} {q} hq f₀ inc oq B nb kb (h , h′) with kind B nb
+far-of {R₀} {q} f₀ inc oq B nb kb (h , h′) with kind B nb
 ... | is-fut fB = dis-in fB (λ _ ()) , far-in fB (λ y iB → past-cone q y (keyed-out fB kb y iB) (ne y iB) , ne y iB)
   where
     ne : ∀ y → In B y → Cone q y → ⊥
@@ -267,7 +258,7 @@ far-of {R₀} {q} hq f₀ inc oq B nb kb (h , h′) with kind B nb
     out = after-past y q kb (λ z e → nil z (trans (sym e) (eq (subst (Cone q) (sym e) (pre z)))))
         , eq
       where
-        nil : ∀ z → q ++ z ≡ q → z ≡ []
+        nil : ∀ z → q ⊕ z ≡ q → z ≡ []
         nil []      _ = refl
-        nil (l ∷ z) e = ⊥-elim (cone-up l z (subst (Cone (q ++ l ∷ z)) e (self (q ++ l ∷ z))))
+        nil (l ∷ z) e = ⊥-elim (cone-up l z (subst (Cone (q ⊕ (l ∷ z))) e (self (q ⊕ (l ∷ z)))))
 ... | is-bk j refl = low-out f₀ h q (inc q (self q)) , low-out f₀ h q (inc q (self q))

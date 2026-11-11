@@ -12,8 +12,7 @@ module adequacy.SubOne where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; concatMap)
-open import Data.List.Properties using (++-identityʳ)
+open import Data.List using (List; []; _∷_; [_]; concatMap)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-concatMap⁺)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
@@ -24,16 +23,16 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Label; Timeline; ix; last; inside; _<ᵖ_; <ᵖ-split; <ᵖ-step; <ᵖ-over)
+open import denotation.Position using (Pos; Label; ix; last; inside; _<ᵖ_; _⊕_)
+open import denotation.Events using (Timeline; <ᵖ-split; <ᵖ-step; <ᵖ-over)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Unpinned; Dep; PDep; Reach; Truncate; _≺_; _≼_; ⟦_⟧;
   MapT; map-out; map-skip; map-pin; map-end; module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-absurd; ≺-irrefl; ≺-ext; ≺→≼; ≼-refl; ≼-≺-≺; ≼-or-≻; ≼-false; entered-reach)
-open import denotation.Laws.Worlds using (Ok; plain-ix; plain-last; here; InvAt; Hots; ⊑-inside; inside-⊑; world-after)
+open import denotation.Laws.Worlds using (Ok; plain-ix; plain-last; here; InvAt; Hots; ⊑-inside; inside-⊑; world-after; ⊕-identityʳ; ⊕-injʳ)
 open import denotation.Laws using (inv-⟦⟧; defer-lim)
 open import denotation.Laws.Worlds using (W; W⁼; Plain; inW; nest-in; nest⁼; world-anc⁼; apart; sib; leads; ok-step) renaming (⊑-refl to ⊑ʷ-refl; _⊑_ to _⊑ʷ_; step to wstep)
 open import denotation.EmissionSet using (DeferT) renaming (guard to dg; body to db)
 open import Tree using (Later; defer)
-open import Data.List.Properties using (∷ʳ-injectiveʳ)
 open import adequacy.Cursor using (Excl)
 open import operation.PureObservable using (module Machine)
 open import adequacy.Rows using (full; pendRows; _⇄_)
@@ -130,28 +129,28 @@ scan-reach rc (Scan.send x)  = lift-reach [_] scan-lift rc end x (λ ()) (λ _ �
 
 take-lift : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} → Lifted tk E (TakeWhile.TakeT incl keep E)
 take-lift (TakeWhile.pass {q} x _ _)   = q , _ , x , ≼-refl {q} , here refl , λ ()
-take-lift (TakeWhile.fail {q} x _ _ _) = q , _ , x , ≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q []) , there (here refl) , λ ()
-take-lift (TakeWhile.stop {q} x _ _)   = q , _ , x , ≺→≼ {q} {q ++ [ last ]} (≺-ext q []) , there (there (here refl)) , λ ()
+take-lift (TakeWhile.fail {q} x _ _ _) = q , _ , x , ≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []) , there (here refl) , λ ()
+take-lift (TakeWhile.stop {q} x _ _)   = q , _ , x , ≺→≼ {q} {q ⊕ [ last ]} (≺-ext q []) , there (there (here refl)) , λ ()
 take-lift (TakeWhile.step {q} x _)     = q , _ , x , ≼-refl {q} , here refl , λ ()
 take-lift (TakeWhile.tend {q} x _)     = q , _ , x , ≼-refl {q} , here refl , λ ()
 take-lift (TakeWhile.left {q} x _ _)   = q , _ , x , ≼-refl {q} , here refl , λ { refl → refl }
 
 -- Before a label under `q`: at or before `q`, or under it.
-below-or-under : ∀ k q l → k ≺ (q ++ [ l ]) → k ≼ q ⊎ Σ Label λ l′ → Σ Pos λ ls → k ≡ q ++ l′ ∷ ls
+below-or-under : ∀ k q l → k ≺ (q ⊕ [ l ]) → k ≼ q ⊎ Σ Label λ l′ → Σ (List Label) λ ls → k ≡ q ⊕ (l′ ∷ ls)
 below-or-under k q l lt with ≼-or-≻ k q
 ... | inj₁ le = inj₁ le
 ... | inj₂ qk = inj₂ (under (inside q k) refl)
   where
-    under : ∀ b → inside q k ≡ b → Σ Label λ l′ → Σ Pos λ ls → k ≡ q ++ l′ ∷ ls
+    under : ∀ b → inside q k ≡ b → Σ Label λ l′ → Σ (List Label) λ ls → k ≡ q ⊕ (l′ ∷ ls)
     under true ins with inside-⊑ q k (subst T (sym ins) tt)
     ... | l′ ∷ ls , eq = l′ , ls , eq
-    ... | [] , eq      = ⊥-elim (≺-irrefl {q} (subst (q ≺_) (trans eq (++-identityʳ q)) qk))
-    under false ins = ⊥-elim (≺-absurd {k} {q ++ [ l ]} lt (Equivalence.from T-≡ (<ᵖ-over q k [ l ] step none)))
+    ... | [] , eq      = ⊥-elim (≺-irrefl {q} (subst (q ≺_) (trans eq (⊕-identityʳ q)) qk))
+    under false ins = ⊥-elim (≺-absurd {k} {q ⊕ [ l ]} lt (Equivalence.from T-≡ (<ᵖ-over q k [ l ] step none)))
       where
-        none : ∀ l′ ls → k ≡ q ++ l′ ∷ ls → ⊥
+        none : ∀ l′ ls → k ≡ q ⊕ (l′ ∷ ls) → ⊥
         none l′ ls eq = subst T ins (⊑-inside {q} {k} (l′ ∷ ls , eq))
-        step : (q ++ [ ix 0 ]) <ᵖ k ≡ true
-        step with <ᵖ-split (q ++ [ ix 0 ]) k (<ᵖ-step q k (Equivalence.to T-≡ qk))
+        step : (q ⊕ [ ix 0 ]) <ᵖ k ≡ true
+        step with <ᵖ-split (q ⊕ [ ix 0 ]) k (<ᵖ-step q k (Equivalence.to T-≡ qk))
         ... | inj₁ t  = t
         ... | inj₂ eq = ⊥-elim (none (ix 0) [] (sym eq))
 
@@ -163,22 +162,22 @@ at-or-before {k} {q} le with <ᵖ-split k q (≼-false {k} {q} le)
 -- A row a label under a source value, with no source row under a source
 -- row, waits on what that value waits on, and on it.
 under-reach : ∀ {A B} {E : EmissionSet A} {E′ : EmissionSet B} (g : Pos → List Pos) → Lifted g E E′
-            → (∀ {y e l ys e′} → E y e → E (y ++ l ∷ ys) e′ → ⊥)
-            → ∀ {q a l e} → E q (out a) → Reach E q (out a) → Reach E′ (q ++ [ l ]) e
+            → (∀ {y e l ys e′} → E y e → E (y ⊕ (l ∷ ys)) e′ → ⊥)
+            → ∀ {q a l e} → E q (out a) → Reach E q (out a) → Reach E′ (q ⊕ [ l ]) e
 under-reach {E = E} {E′} g lf flat {q} {a} {l} {e} x₀ (ks , h) = concatMap g (q ∷ ks) , pick
   where
-    pick : ∀ {k′ e′} → E′ k′ e′ → k′ ≺ (q ++ [ l ]) → Dep (q ++ [ l ]) e k′ e′ → k′ ∈ concatMap g (q ∷ ks)
+    pick : ∀ {k′ e′} → E′ k′ e′ → k′ ≺ (q ⊕ [ l ]) → Dep (q ⊕ [ l ]) e k′ e′ → k′ ∈ concatMap g (q ∷ ks)
     pick {k′} x ky _ with lf x
-    ... | k , _ , x′ , le , m , _ = lift-in g m (at (below-or-under k q l (≼-≺-≺ {k} {k′} {q ++ [ l ]} le ky)))
+    ... | k , _ , x′ , le , m , _ = lift-in g m (at (below-or-under k q l (≼-≺-≺ {k} {k′} {q ⊕ [ l ]} le ky)))
       where
-        at : k ≼ q ⊎ Σ Label (λ l′ → Σ Pos λ ls → k ≡ q ++ l′ ∷ ls) → k ∈ q ∷ ks
+        at : k ≼ q ⊎ Σ Label (λ l′ → Σ (List Label) λ ls → k ≡ q ⊕ (l′ ∷ ls)) → k ∈ q ∷ ks
         at (inj₁ kq) with at-or-before {k} {q} kq
         ... | inj₁ eq = here eq
         ... | inj₂ lt = there (h x′ lt tt)
         at (inj₂ (l′ , ls , eq)) = ⊥-elim (flat x₀ (subst (λ y → E y _) eq x′))
 
 take-reach : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} → (∀ {y e} → E y e → Reach E y e)
-           → (∀ {y e l ys e′} → E y e → E (y ++ l ∷ ys) e′ → ⊥)
+           → (∀ {y e l ys e′} → E y e → E (y ⊕ (l ∷ ys)) e′ → ⊥)
            → ∀ {y e} → TakeWhile.TakeT incl keep E y e → Reach (TakeWhile.TakeT incl keep E) y e
 take-reach rc fl (TakeWhile.pass {a = a} x _ _) = lift-reach tk take-lift rc (out a) x (λ ()) (λ _ → tt)
 take-reach rc fl (TakeWhile.fail {a = a} x _ _ _) = under-reach tk take-lift fl {l = ix 0} {e = out a} x (rc x)
@@ -268,40 +267,40 @@ module DeferEntry {Γ A} (sc : Scope Γ) (l : Later Timeline Γ A) (q : Pos) (ok
   b = ⟦ Later.force l ⟧ (full sc)
 
   B D : EmissionSet A
-  B = pendRows (full sc) (Later.force l) (q ++ [ ix 1 ])
+  B = pendRows (full sc) (Later.force l) (q ⊕ [ ix 1 ])
   D = pendRows (full sc) (defer l) q
 
   out-d : ∀ {r e} → D r e → DeferT b q r e
   out-d x = proj₁ (proj₁ (defer-lim l (full sc) (good-full sc ad) q ok) x)
 
   reach-d : ∀ {r e} → B r e → Reach (DeferT b q) r e
-  reach-d x with entered-reach b (q ++ [ ix 1 ]) x
-  ... | ks , h = (q ++ [ ix 0 ]) ∷ ks , λ { dg _ _ → here refl ; (db y) lt d → there (h y lt d) }
+  reach-d x with entered-reach b (q ⊕ [ ix 1 ]) x
+  ... | ks , h = (q ⊕ [ ix 0 ]) ∷ ks , λ { dg _ _ → here refl ; (db y) lt d → there (h y lt d) }
 
   into : ∀ {r e} → B r e → D r e
   into x = proj₂ (defer-lim l (full sc) (good-full sc ad) q ok) (db x , reach-d x)
 
   -- The guard's children's worlds lead nothing of the body's world.
-  guard-apart : ∀ {y l′ w} → W⁼ H (q ++ [ ix 1 ]) y → Plain l′ → W⁼ H ((q ++ [ ix 0 ]) ++ [ l′ ]) w → w ⊑ʷ y → ⊥
-  guard-apart wy pl v le = leads (proj₁ ok) (proj₂ ok) (nest-in (wstep here plain-ix) w0) nb nr wy le
+  guard-apart : ∀ {y l′ w} → W⁼ H (q ⊕ [ ix 1 ]) y → Plain l′ → W⁼ H ((q ⊕ [ ix 0 ]) ⊕ [ l′ ]) w → w ⊑ʷ y → ⊥
+  guard-apart wy pl v le = leads (proj₂ ok) (nest-in (wstep here plain-ix) w0) nb nr wy le
     where
       w0 = nest⁼ (inW (wstep here pl)) v
-      nb : W⁼ H (q ++ [ ix 1 ]) _ → ⊥
+      nb : W⁼ H (q ⊕ [ ix 1 ]) _ → ⊥
       nb u = apart (proj₁ ok) (world-anc⁼ w0) (world-anc⁼ u)
-      nr : _ ⊑ʷ (q ++ [ ix 1 ]) → ⊥
-      nr = sib (proj₁ ok) plain-ix (⊑ʷ-refl q) (λ eq → ix10 (∷ʳ-injectiveʳ q q eq)) w0
+      nr : _ ⊑ʷ (q ⊕ [ ix 1 ]) → ⊥
+      nr = sib (proj₁ ok) plain-ix (⊑ʷ-refl q) (λ eq → ix10 (⊕-injʳ q q eq)) w0
         where ix10 : ix 1 ≡ ix 0 → ⊥
               ix10 ()
 
-  excl-d : ∀ {y r e l′ w} → W⁼ H (q ++ [ ix 1 ]) y → Excl H B y → DeferT b q r e → Plain l′ → W⁼ H (r ++ [ l′ ]) w → w ⊑ʷ y → ⊥
+  excl-d : ∀ {y r e l′ w} → W⁼ H (q ⊕ [ ix 1 ]) y → Excl H B y → DeferT b q r e → Plain l′ → W⁼ H (r ⊕ [ l′ ]) w → w ⊑ʷ y → ⊥
   excl-d wy ex dg     pl v le = guard-apart wy pl v le
   excl-d wy ex (db x) pl v le = ex x pl v le
 
-  into-w : ∀ {y} → W⁼ H (q ++ [ ix 1 ]) y → W H q y
+  into-w : ∀ {y} → W⁼ H (q ⊕ [ ix 1 ]) y → W H q y
   into-w = nest-in (wstep here plain-ix)
 
-  entry : ∀ {Rg : Rgn} → Within Rg sc q D → B ≈ D × Within Rg sc (q ++ [ ix 1 ]) B
-  entry wi = record { alike = (λ (x , v) → into x , v) ⇄ vis-b ; cov = [ q ++ [ ix 0 ] ] , cv ; voc = into }
+  entry : ∀ {Rg : Rgn} → Within Rg sc q D → B ≈ D × Within Rg sc (q ⊕ [ ix 1 ]) B
+  entry wi = record { alike = (λ (x , v) → into x , v) ⇄ vis-b ; cov = [ q ⊕ [ ix 0 ] ] , cv ; voc = into }
            , proj₂ wi (into-w here) (λ x → excl-d here (excl-root Ib (proj₁ (ok-step q ok))) (out-d x))
            , λ wy ex → proj₂ wi (into-w (inW wy)) (λ x → excl-d (inW wy) ex (out-d x))
     where
@@ -309,8 +308,8 @@ module DeferEntry {Γ A} (sc : Scope Γ) (l : Later Timeline Γ A) (q : Pos) (ok
       vis-b (x , v) with out-d x
       ... | dg   = ⊥-elim v
       ... | db y = y , v
-      cv : ∀ {y e} → D y e → B y e ⊎ y ∈ [ q ++ [ ix 0 ] ]
+      cv : ∀ {y e} → D y e → B y e ⊎ y ∈ [ q ⊕ [ ix 0 ] ]
       cv x with out-d x
       ... | dg   = inj₂ (here refl)
       ... | db y = inj₁ y
-      Ib = inv-⟦⟧ (Later.force l) (full sc) (good-full sc ad) (q ++ [ ix 1 ]) (ok-step q ok)
+      Ib = inv-⟦⟧ (Later.force l) (full sc) (good-full sc ad) (q ⊕ [ ix 1 ]) (ok-step q ok)

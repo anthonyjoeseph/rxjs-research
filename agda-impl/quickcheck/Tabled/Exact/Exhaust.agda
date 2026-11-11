@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (does)
 
-open import denotation.Events using (Pos; _<ᵖ_; _≟ᵖ_; ix)
+open import denotation.Position using (Pos; _<ᵖ_; _≟ᵖ_; ix; _⊕_)
 open import denotation.EmissionSet using (out; skip; end; EmissionSet; Den; After; LaneOf)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
@@ -36,7 +36,7 @@ open import quickcheck.Tabled.Exact.Base
 module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) (ls : List (Pos × A × Listed B))
   (u : short (exhaustRows o ls) ≡ false)
   (eo : Exactly o t)
-  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
+  (ls-from : ∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ⊕ [ ix 1 ])))
   (ls-to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   where
   open Tb.Exhaust fD t
@@ -52,7 +52,7 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
     uncut : ∀ {q a l} → (q , a , l) ∈ ls → short l ≡ false
     uncut m = any-off {xs = ls} (proj₂ (∨-false {short o} u)) m
 
-    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (After (fD a) (q ++ [ ix 1 ]))
+    exl : ∀ {q a l} → (q , a , l) ∈ ls → Exact l (After (fD a) (q ⊕ [ ix 1 ]))
     exl m = proj₂ (ls-from m) (uncut m)
 
     out-of : ∀ {q a l} → (q , a , l) ∈ ls → t q (out a)
@@ -210,7 +210,7 @@ module ExhaustX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A
   complete-e (rhand () _)
 
 exhaust-exact : ∀ {A B} (fD : A → Den B) {t : EmissionSet A} (o : Listed A) (ls : List (Pos × A × Listed B)) → Exactly o t
-  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ++ [ ix 1 ])))
+  → (∀ {q a l} → (q , a , l) ∈ ls → (q , a) ∈ values (rows o) × Exactly l (After (fD a) (q ⊕ [ ix 1 ])))
   → (∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   → Exactly (exhaustRows o ls) (Tb.Exhaust.JoinT fD t)
 exhaust-exact fD {t} o ls eo from to u = record { sound = sound-e ; complete = complete-e }

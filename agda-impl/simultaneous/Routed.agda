@@ -3,7 +3,9 @@
 -- WHAT A STREAM HOLDS.  A stream subscribed at `p` HOLDS (`Held`) when
 -- its begins are named for their instants, every value, stop, over and
 -- end outside the bursts it is exempt for finds the count holding a route
--- of its own instant, and its dead instants stay dead (`Shut`).
+-- of its own instant, and its dead instants stay dead (`Shut`).  An
+-- instant's root (`simultaneous.Readings`) is shared by a whole
+-- synchronous burst: the subscribe frame, or one async emission.
 --
 -- NO ROUTE OUTLIVES ITS INSTANT: every row finds the count holding no
 -- route, or routes of its own instant.  An instant's routes are stopped,
@@ -14,12 +16,12 @@
 -- every connect it reads under, each within its own instant: what runs
 -- there runs synchronously under the subscription, so whatever route
 -- covers it is held above, by the row that subscribed.  A begin may lie
--- there: a reader subscribed inside an async instant joins the routes its
+-- there: a reader subscribed inside an async emission joins the routes its
 -- source holds at the first emit it meets, in that same instant.
 --
--- AN INSTANT'S NAME IS READ OFF THE INSTANT: the cold's step at `I`
--- renders under a lane at `I ++ [ ix 1 ]`, where `mint` is subscribed, and
--- a completion's step one queued lane and one `of` further down.
+-- AN INSTANT'S NAME IS READ OFF ITS ROOT: the cold's step at `I` renders
+-- under a lane at `I ⊕ [ ix 1 ]`, where `mint` is subscribed, and a
+-- completion's step one queued lane and one `of` further down.
 --
 -- A VALUE STEP'S OVER IS SENT ONCE ITS VALUE'S CASCADE IS DONE, from the
 -- third row of the `of` the step renders, the value the second.  Every
@@ -38,40 +40,41 @@ open import Data.Sum using (_⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_; ix; sub; last; inside)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; inside; _⊕_; cascade; _∙_)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
 open import denotation.Read using (Visible; After; cursor)
 open import Data.Maybe using (nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
 open import simultaneous.SObs using (module Elaborate)
-open import simultaneous.Readings using (instantOf)
+open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import denotation.Laws.Worlds using (Ok; TimerRoot; _⊑_)
+open import denotation.Laws.Worlds using (Ok; _⊑_)
 open import Data.Empty using (⊥)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
 
 ------------------------------------------------------------------------
 -- What a stream holds
 
 -- The name a cold's step at instant `I` mints.
 nm : Pos → Pos
-nm (ix t ∷ sub e ∷ last ∷ []) = ix t ∷ sub e ∷ last ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
-nm (ix t ∷ sub e ∷ l ∷ [])    = ix t ∷ sub e ∷ l ∷ ix 1 ∷ []
-nm _                          = root
+nm (cascade t e last ∙ []) = cascade t e last ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+nm (cascade t e l ∙ [])    = cascade t e l ∙ (ix 1 ∷ [])
+nm _                       = root
 
 nameOf : Pos → Pos
-nameOf y = nm (instantOf y)
+nameOf y = nm (rootOf y)
 
 -- A cold's value step.
 data Valued : Pos → Set where
-  valued : ∀ {t e i} → Valued (ix t ∷ sub e ∷ ix i ∷ [])
+  valued : ∀ {t e i} → Valued (cascade t e (ix i) ∙ [])
 
 -- Where a value step's over is sent from.
 opos : Pos → Pos
-opos I = nm I L.++ ix 0 ∷ ix 1 ∷ ix 2 ∷ []
+opos I = nm I ⊕ (ix 0 ∷ ix 1 ∷ ix 2 ∷ [])
 
 -- `y` and all it causes lie before `o`.
 Before : Pos → Pos → Set
@@ -79,11 +82,11 @@ Before y o = y ≺ o × ¬ (y ⊑ o)
 
 -- In a value step, before its over.
 Early : Pos → Set
-Early y = Valued (instantOf y) → Before y (opos (instantOf y))
+Early y = Valued (rootOf y) → Before y (opos (rootOf y))
 
 -- `y` lies in the subscribe burst at `c`, within its instant.
 Sync : Pos → Pos → Set
-Sync c y = T (inside c y) × instantOf y ≡ instantOf c
+Sync c y = T (inside c y) × rootOf y ≡ rootOf c
 
 -- In one of the bursts `cs`.
 Ex : List Pos → Pos → Set
@@ -117,6 +120,14 @@ Idle t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → �
        → (∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
        → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
 
+-- PAST A ZERO COUNT, THE INSTANT FINISHES: wherever a run met leaves its
+-- count holding no route of the instant it last began, finitely many rows
+-- of that instant lie past it.  A route is held while its instant can
+-- still make a row, so a synchronous loop never runs past its stop.
+Rest : ∀ {A} → EmissionSet (IE A) → Set
+Rest t = ∀ {rs} → Met t rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+       → Σ (List Pos) λ ks → ∀ {y e} → t y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ ks
+
 -- A stop finds a route to stop even inside an exempt burst: no route is
 -- stopped twice.
 record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
@@ -130,11 +141,11 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     shut    : Shut t
     early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
     ends    : ∀ {y} → t y end → Early y
-    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (instantOf y) × opos (instantOf y) ⊑ y
+    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     idle    : Idle t
+    rest    : Rest t
 
 -- Held at every admissible subscription, exempt for its own burst and
--- `cs`.  No subscription is made at a timer's root, where a burst would
--- have no instant of its own, nor in a value step past its value.
+-- `cs`.  No subscription is made in a value step past its value.
 HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
-HeldD H d cs = ∀ p → Ok H p → (TimerRoot p → ⊥) → Early p → Held (enter d p) (p ∷ cs)
+HeldD H d cs = ∀ p → Ok H p → Early p → Held (enter d p) (p ∷ cs)

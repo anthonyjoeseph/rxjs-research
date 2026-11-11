@@ -12,7 +12,7 @@ module denotation.Laws.ShowsOps where
 
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -21,8 +21,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; ix; last; inside)
 import denotation.Events as E
+open import denotation.Position using (Pos; ix; last; inside; _⊕_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; Few; Reach; Den; enter; InE;
   at-out; at-skip; at-end; on-out; on-skip; spin; MapT; map-out; map-skip; map-pin; map-end;
   module Scan; module TakeWhile; module Connect; module Op)
@@ -181,7 +181,7 @@ module Take {A H n} (i : Bool) (keep : A → Bool) (d : Den A) (p : Pos) (I : In
         where ins = proj₂ (InvAt.pinned I x)
 
   -- The failing value, the one with none before it.
-  failing : ∀ {y e} → Y₂ y e → Σ Pos λ q → Σ A (λ a → t q (out a) × T (not (keep a))) × ¬ Failed q × (y ≡ q ++ [ ix 0 ] ⊎ y ≡ q ++ [ last ])
+  failing : ∀ {y e} → Y₂ y e → Σ Pos λ q → Σ A (λ a → t q (out a) × T (not (keep a))) × ¬ Failed q × (y ≡ q ⊕ [ ix 0 ] ⊎ y ≡ q ⊕ [ last ])
   failing (fail x nk nf _ , _) = _ , (_ , x , nk) , nf , inj₁ refl
   failing (stop x nk nf , _)   = _ , (_ , x , nk) , nf , inj₂ refl
   failing (pass _ _ _ , ())
@@ -200,10 +200,10 @@ module Take {A H n} (i : Bool) (keep : A → Bool) (d : Den A) (p : Pos) (I : In
     where
       few₂ : ∀ {y e} → Y₂ y e → Few Y₂ y
       few₂ y with failing y
-      ... | q , (_ , x , nk) , nf , _ = (q ++ [ ix 0 ]) ∷ (q ++ [ last ]) ∷ [] , λ y′ _ → place (failing y′)
+      ... | q , (_ , x , nk) , nf , _ = (q ⊕ [ ix 0 ]) ∷ (q ⊕ [ last ]) ∷ [] , λ y′ _ → place (failing y′)
         where
-          place : ∀ {y′} → (Σ Pos λ q′ → Σ A (λ a → t q′ (out a) × T (not (keep a))) × ¬ Failed q′ × (y′ ≡ q′ ++ [ ix 0 ] ⊎ y′ ≡ q′ ++ [ last ]))
-                → y′ ∈ (q ++ [ ix 0 ]) ∷ (q ++ [ last ]) ∷ []
+          place : ∀ {y′} → (Σ Pos λ q′ → Σ A (λ a → t q′ (out a) × T (not (keep a))) × ¬ Failed q′ × (y′ ≡ q′ ⊕ [ ix 0 ] ⊎ y′ ≡ q′ ⊕ [ last ]))
+                → y′ ∈ (q ⊕ [ ix 0 ]) ∷ (q ⊕ [ last ]) ∷ []
           place (q′ , (_ , x′ , nk′) , nf′ , w) with first x nk nf x′ nk′ nf′
           place (q′ , _ , _ , inj₁ refl) | refl = here refl
           place (q′ , _ , _ , inj₂ refl) | refl = there (here refl)
@@ -260,7 +260,7 @@ sk-take i keep d p I sk = sk-trunc (Take.sk-takeT i keep d p I sk)
 -- connect
 
 module Conn {A B H n} (s : Den A) (F : Den A → Den B) (Is : InvD H s) (p : Pos) (ok : Ok H p)
-            (sk-s : ShowsK n (enter s (p ++ [ ix 1 ]))) (sk-b : ShowsK n (Connect.β s F p)) where
+            (sk-s : ShowsK n (enter s (p ⊕ [ ix 1 ]))) (sk-b : ShowsK n (Connect.β s F p)) where
   open Connect s F p using (σ; β; r; Alive; ConnT; body; burst; echo; kept)
 
   Iσ : InvAt H r σ
@@ -295,7 +295,7 @@ module Conn {A B H n} (s : Den A) (F : Den A → Den B) (Is : InvD H s) (p : Pos
   sk-kept = sk-left End few-end proj₁ tgt
     where
       few-end : ∀ {c} → End c → Σ (List Pos) λ L → ∀ {c′} → End c′ → c′ ≺ c → c′ ∈ L
-      few-end {c} (ended b) with entered-few (F _) (p ++ [ ix 0 ]) {e = end} (λ {k} {e′} → full {q = c} {e = end} tt {k} {e′}) b
+      few-end {c} (ended b) with entered-few (F _) (p ⊕ [ ix 0 ]) {e = end} (λ {k} {e′} → full {q = c} {e = end} tt {k} {e′}) b
       ... | ks , h = ks , λ { (ended b′) lt → h b′ lt }
 
       tgt : ∀ {k e} → Kept k e → Σ Pos λ r′ → e ≡ pin r′ × Reach σ k (pin r′) × (∀ {c} → End c → r′ ≼ c) × ¬ ¬ (Σ Pos λ c → End c × r′ ⊑ c)
@@ -364,5 +364,5 @@ module Conn {A B H n} (s : Den A) (F : Den A → Den B) (Is : InvD H s) (p : Pos
       parts x@(kept _ _ _ _)  ¬c = ¬c (inj₂ (_ , x , tt))
 
 sk-connect : ∀ {A B H n} (s : Den A) (F : Den A → Den B) → InvD H s → ∀ p → Ok H p
-           → ShowsK n (enter s (p ++ [ ix 1 ])) → ShowsK n (Connect.β s F p) → ShowsK n (enter (Op.connect s F) p)
+           → ShowsK n (enter s (p ⊕ [ ix 1 ])) → ShowsK n (Connect.β s F p) → ShowsK n (enter (Op.connect s F) p)
 sk-connect s F Is p ok sk-s sk-b = sk-trunc (Conn.sk-connT s F Is p ok sk-s sk-b)

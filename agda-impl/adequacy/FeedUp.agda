@@ -25,13 +25,14 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym; cong)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Events using (Pos; ix; sub; last; Timeline; _<ᵖ_; <ᵖ-down)
+open import denotation.Position using (Pos; ix; sub; last; _<ᵖ_; _⊕_)
+open import denotation.Events using (Timeline; <ᵖ-down)
 open import Tree using (Obs)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; pin; skip; Bare; Proper; ⟦_⟧; _≺_; _≼_; Den; hot; coldAt; DenEnv; enter; module TakeWhile;
   Rejoin; shown; heard; ended; late)
 open import denotation.Laws.Modulus using (≺→≼; ≺-trans; ≺-irrefl; ≺-ext; ≼-antisym; ≼-≺-≺; ≼-or-≻)
-open import denotation.Laws.Worlds using (Lawful)
+open import denotation.Laws.Worlds using (notT; Lawful)
 open import denotation.Laws using (inv-⟦⟧)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.JoinInv using (end≢out)
@@ -47,7 +48,7 @@ open import adequacy.Cursor using (Cur; Dom; bef; aft; Behind; ConnE; _≈_; Kil
   l-live; l-dead; h-live; h-end; h-kill; Begun; none; more; Lane; Joined; joined; Flags; Src;
   src-pend; src-on; src-shut; Parts; re-parts; Sync; s-cold; s-coldx; s-of; s-done; s-map;
   s-scan; s-cut; s-take; s-took; s-flat; s-conn; s-join; s-joinx; Pol; SlotsMv; slots-mv; Subd;
-  Torn; notT; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed; InCall;
+  Torn; Husk; sh-isle; sh-islec; o-cp; o-cut; o-over; OweAt; Adm; TailP; AttOwed; InCall;
   AttFin; alike; voc; burst-dn)
 open import adequacy.Cursor.Tear using (c-abs; husk-of; NoIsle; NoIsleL; Settles)
 open import adequacy.Cursor.Frame using (Fr; owes; f-src; f-srcc; f-srcp; d-src; f-isle; f-islec; f-islep)
@@ -184,37 +185,37 @@ module Walk (p : Pos) where
 
   -- The fed row's rejoined place: a value under `p` where the joiner
   -- joined before; an end there too, or else at once.
-  at-nx : ∀ {A} {t : EmissionSet A} {j q e′ a} → Lawful t → t p (out a) → AtP t j q e′ → j ≺ p × q ≡ p ++ [ sub j ] × e′ ≡ out a
+  at-nx : ∀ {A} {t : EmissionSet A} {j q e′ a} → Lawful t → t p (out a) → AtP t j q e′ → j ≺ p × q ≡ p ⊕ [ sub j ] × e′ ≡ out a
   at-nx L row (shown (y , refl) _ jk) = jk , refl , Lawful.func L y row
   at-nx L row (heard (y , refl) _)    = ⊥-elim (pin-out (Lawful.func L y row))
   at-nx L row (ended (y , refl) _)    = ⊥-elim (end≢out (Lawful.func L y row))
   at-nx L row (late (y , refl) _)     = ⊥-elim (end≢out (Lawful.func L y row))
 
   at-cp : ∀ {A} {t : EmissionSet A} {j q e′} → Lawful t → t p end → AtP t j q e′
-        → (j ≺ p × q ≡ p ++ [ sub j ] × e′ ≡ end) ⊎ (p ≼ j × q ≡ j ++ [ last ] × e′ ≡ end)
+        → (j ≺ p × q ≡ p ⊕ [ sub j ] × e′ ≡ end) ⊎ (p ≼ j × q ≡ j ⊕ [ last ] × e′ ≡ end)
   at-cp L row (shown (y , refl) b _) = ⊥-elim (bare-end b (Lawful.func L y row))
   at-cp L row (heard (y , refl) _)   = ⊥-elim (pin-end (Lawful.func L y row))
   at-cp L row (ended (y , refl) jc)  = inj₁ (jc , refl , refl)
   at-cp L row (late (y , refl) cj)   = inj₂ (cj , refl , refl)
 
   -- The fed row is one still unfed before `p`.
-  new-nx : ∀ {A} {d : Den A} {t j a} → d ≡ hot t → t p (out a) → j ≺ p → Due (bef p) (Unfed (bef p) d j) (p ++ [ sub j ]) (out a)
+  new-nx : ∀ {A} {d : Den A} {t j a} → d ≡ hot t → t p (out a) → j ≺ p → Due (bef p) (Unfed (bef p) d j) (p ⊕ [ sub j ]) (out a)
   new-nx refl row jk = shown (row , ≺-irrefl {p}) tt jk , tt , ≺→≼ {p} (≺-ext p [])
 
-  new-in : ∀ {A} {d : Den A} {t j} → d ≡ hot t → t p end → j ≺ p → Due (bef p) (Unfed (bef p) d j) (p ++ [ sub j ]) end
+  new-in : ∀ {A} {d : Den A} {t j} → d ≡ hot t → t p end → j ≺ p → Due (bef p) (Unfed (bef p) d j) (p ⊕ [ sub j ]) end
   new-in refl row jk = ended (row , ≺-irrefl {p}) jk , tt , ≺→≼ {p} (≺-ext p [])
 
-  new-late : ∀ {A} {d : Den A} {t j} → d ≡ hot t → t p end → p ≼ j → Due (bef p) (Unfed (bef p) d j) (j ++ [ last ]) end
+  new-late : ∀ {A} {d : Den A} {t j} → d ≡ hot t → t p end → p ≼ j → Due (bef p) (Unfed (bef p) d j) (j ⊕ [ last ]) end
   new-late {j = j} refl row pj = late (row , ≺-irrefl {p}) pj , tt , ≺→≼ {p} (≼-≺-≺ {p} {j} pj (≺-ext j []))
 
   -- Under `p`, before what lies under a later row: none lies below `p`.
-  down : ∀ {A} {t : EmissionSet A} {k e₀ e₁ j} → Lawful t → t p e₀ → t k e₁ → p ≺ k → (p ++ [ sub j ]) ≺ (k ++ [ sub j ])
+  down : ∀ {A} {t : EmissionSet A} {k e₀ e₁ j} → Lawful t → t p e₀ → t k e₁ → p ≺ k → (p ⊕ [ sub j ]) ≺ (k ⊕ [ sub j ])
   down {t = t} {k} {e₁ = e₁} {j} L row y pk =
     Equivalence.from T-≡ (<ᵖ-down p k (sub j) (sub j) (Equivalence.to T-≡ pk) (λ l ls eq → Lawful.flat L row (subst (λ z → t z e₁) eq y)))
 
   -- A value's key leads every row still unfed past `p`.
   lead-nx : ∀ {A} {d : Den A} {t j q e′ a} → d ≡ hot t → Lawful t → t p (out a) → j ≺ p
-          → Due (aft p) (Unfed (aft p) d j) q e′ → (p ++ [ sub j ]) ≺ q
+          → Due (aft p) (Unfed (aft p) d j) q e′ → (p ⊕ [ sub j ]) ≺ q
   lead-nx refl L row jk (shown (y , pk) _ _ , _)      = down L row y pk
   lead-nx refl L row jk (heard _ _ , () , _)
   lead-nx refl L row jk (ended (y , pc) _ , _)        = down L row y pc
@@ -379,7 +380,7 @@ module Walk (p : Pos) where
 -- the body, apart from `p`, owes the same past it.
 feed-up : ∀ {Γ X B} {sc : Scope Γ} {o : Obs Timeline Γ X} {q Rb} {b : St (X ∷ Γ) B} {β e p}
         → Sync (binds o q sc) Rb (bef p) b β → Sound Rb β → ¬ Rb p
-        → Proper (pendRows (full sc) o (q ++ [ ix 1 ])) p (toEv e) → ¬ VHot (full sc) p → NoIsle b
+        → Proper (pendRows (full sc) o (q ⊕ [ ix 1 ])) p (toEv e) → ¬ VHot (full sc) p → NoIsle b
         → Sync (binds o q sc) Rb (aft p) (feed (here refl) p e b) β
 feed-up {sc = sc} {o} {q} {e = e} {p} sy sd nr row nh ni = Walk.fup p sy sd nr fa ni
   where
@@ -387,7 +388,7 @@ feed-up {sc = sc} {o} {q} {e = e} {p} sy sd nr row nh ni = Walk.fup p sy sd nr f
     only (here refl) ()
     only (there x)   _ = vhot-at (full sc) x nh
     fa : FedAt (binds o q sc) (here refl) p e
-    fa = record { t = Proper (pendRows (full sc) o (q ++ [ ix 1 ])) ; at = refl ; row = row ; only = only }
+    fa = record { t = Proper (pendRows (full sc) o (q ⊕ [ ix 1 ])) ; at = refl ; row = row ; only = only }
 
 module _ {R : Set} (Rt : EmissionSet R) where
 
@@ -426,8 +427,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
     body : ∀ {b} → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (bef p) b β → NoIsle b
          → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) (aft p) (feed (here refl) p e b) β
     body sy ni = feed-up sy (Parts.sb pt) (λ r → Parts.apart pt r rs)
-                (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) p (toEv e)) sc fk
-                , λ ce → Sound.ends (Parts.ss pt) (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ++ [ ix 1 ]) _ end) (sym sc) ce) fk (vis e))
+                (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ⊕ [ ix 1 ]) p (toEv e)) sc fk
+                , λ ce → Sound.ends (Parts.ss pt) (subst (λ x → pendRows (full x) (CS.src k) (CS.connAt k ⊕ [ ix 1 ]) _ end) (sym sc) ce) fk (vis e))
                 nh ni
 
     -- the body's end not at `p`, passed past it, passed before it

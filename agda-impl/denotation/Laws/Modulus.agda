@@ -8,7 +8,7 @@ module denotation.Laws.Modulus where
 open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; _++_; [_]; length; filter)
+open import Data.List using ([]; _∷_; [_]; length; filter)
 open import Data.List.Properties using (filter-notAll)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-filter⁺)
@@ -22,7 +22,8 @@ open import Function using (_∘_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary.Decidable.Core using (T?)
 
-open import denotation.Events using (Pos; ix; _<ᵖ_; <ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-below)
+open import denotation.Events using (<ᵖ-trans; <ᵖ-irrefl; <ᵖ-asym; <ᵖ-split; <ᵖ-part; <ᵖ-below)
+open import denotation.Position using (Pos; ix; _⊕_; _<ᵖ_)
 open import denotation.EmissionSet
   using (Ev; EmissionSet; _≺_; _≼_; Few; Dep; Reach; Truncate; Den; hot; coldAt; enter; Lim; from)
 
@@ -87,7 +88,7 @@ T-not {true}  _ ()
 T-not {false} ()
 
 -- A position comes before its extensions.
-≺-ext : ∀ x {l} ys → x ≺ (x ++ l ∷ ys)
+≺-ext : ∀ x {l} ys → x ≺ (x ⊕ (l ∷ ys))
 ≺-ext x ys = Equivalence.from T-≡ (<ᵖ-below x ys)
 
 ------------------------------------------------------------------------
@@ -158,7 +159,7 @@ LimD : ∀ {A} → (ℕ → Den A) → Den A
 LimD c = coldAt λ p → Lim λ n → enter (c n) p
 
 -- The guard comes before the body.
-ticks : ∀ p j → (p ++ [ ix 0 ]) ≺ (p ++ [ ix (suc j) ])
+ticks : ∀ p j → (p ⊕ [ ix 0 ]) ≺ (p ⊕ [ ix (suc j) ])
 ticks p j = Equivalence.from T-≡ (<ᵖ-part p [] [] refl)
 
 ------------------------------------------------------------------------

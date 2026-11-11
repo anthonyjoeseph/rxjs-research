@@ -19,8 +19,7 @@ module adequacy.Enter where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_]; _++_)
-open import Data.List.Properties using (∷ʳ-injectiveˡ; ∷ʳ-injectiveʳ)
+open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.AllPairs using ([])
 open import Data.Maybe using (just; nothing)
@@ -34,14 +33,13 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect)
-open import denotation.Events using (Pos; Label; Timeline; ix; root; _≟ᵖ_)
+open import denotation.Position using (Pos; Label; ix; root; _≟ᵖ_; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; _≼_; _≺_; enter; Den; hot; ⟦_⟧; Proper; LaneOf; Ended; After; Truncate;
   module Joining; module Bounded; module Switch; module Exhaust; module Connecting)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-≺-≺; ≺-irrefl; ≺→≼; ≺-ext)
-open import denotation.Laws.Worlds using (W; W⁼; step; timer; join; here; inW; ⊑-trans; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl;
-  ⊑-≼; ⊑-snoc⁺; PinBy; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init;
-  nonempty⁼; ok-step; real-snoc; anc-lead; anc-trans; world-anc; world-anc⁼)
+open import denotation.Laws.Worlds using (W; W⁼; step; timer; join; here; inW; ⊑-trans; Plain; plain-ix; Real; Ok; Lawful; InvAt; InvD; Hots; _⊑_; ⊑-refl; ⊑-≼; ⊑-snoc⁺; PinBy; ⊑-inside; nest⁼; nest-in; narrow⁼; widen⁼; world-after; real-init; ok-step; real-snoc; anc-lead; anc-trans; world-anc; world-anc⁼; ⊕-injˡ; ⊕-injʳ; step≢root)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.HotInv using (lawful-hot)
 open import denotation.Laws.JoinInv using (module Join; ix01)
@@ -61,9 +59,8 @@ open import adequacy.Bound using (good-full; owes-≼)
 
 -- No world position leads its subscription.
 w-unled : ∀ {H p w} → Real p → W H p w → w ⊑ p → ⊥
-w-unled {w = w} rp ww (zs , refl) with real-init w zs rp
-... | inj₁ refl = nonempty⁼ (λ { refl → rp }) (inW ww)
-... | inj₂ rw   = ≺-irrefl {w} (≼-≺-≺ {w} {w ++ zs} {w} (⊑-≼ {w} {w ++ zs} (zs , refl)) (world-after ww rw))
+w-unled {w = w} rp ww (zs , refl) =
+  ≺-irrefl {w} (≼-≺-≺ {w} {w ⊕ zs} {w} (⊑-≼ {w} {w ⊕ zs} (zs , refl)) (world-after ww (real-init w zs rp)))
 
 -- A subscription lies outside what its rows subscribe below them.
 excl-root : ∀ {A H p} {E : EmissionSet A} → InvAt H p E → Real p → Excl H E p
@@ -71,7 +68,7 @@ excl-root I rp x pl v le = w-unled rp (nest-in (step (inW (InvAt.world I x)) pl)
 
 -- In the world of a row's plain child.
 Kid : ∀ {A} → (Pos → Set) → EmissionSet A → Pos → Set
-Kid {A} H E y = Σ Pos λ r → Σ (Ev A) λ e → Σ Label λ l → E r e × Plain l × W⁼ H (r ++ [ l ]) y
+Kid {A} H E y = Σ Pos λ r → Σ (Ev A) λ e → Σ Label λ l → E r e × Plain l × W⁼ H (r ⊕ [ l ]) y
 
 kid-in : ∀ {A H} {E : EmissionSet A} {s y} → Kid H E s → W H s y → Kid H E y
 kid-in (r , e , l , x , pl , w) wy = r , e , l , x , pl , nest⁼ w (inW wy)
@@ -231,8 +228,8 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
 
   -- An outer row's child's world leads no position of a value's second
   -- child's but through that child.
-  kid-lane⁼ : ∀ {x e l w q′ e″ y} → O x e → Plain l → W⁼ H (x ++ [ l ]) w → O q′ e″ → W⁼ H (q′ ++ [ ix 1 ]) y
-            → (x ++ [ l ] ≡ q′ ++ [ ix 1 ] → ⊥) → w ⊑ y → ⊥
+  kid-lane⁼ : ∀ {x e l w q′ e″ y} → O x e → Plain l → W⁼ H (x ⊕ [ l ]) w → O q′ e″ → W⁼ H (q′ ⊕ [ ix 1 ]) y
+            → (x ⊕ [ l ] ≡ q′ ⊕ [ ix 1 ] → ⊥) → w ⊑ y → ⊥
   kid-lane⁼ ox pl v oq here     ne le = J.kid-root ox pl v oq plain-ix ne le
   kid-lane⁼ ox pl v oq (inW yw) ne le = J.kid-lane ox pl v oq yw ne le
 
@@ -259,19 +256,19 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
     vw (rpass () _ _)
     vw (rhand () _)
 
-    excl : ∀ {q′ a y} → O q′ (out a) → W⁼ H (q′ ++ [ ix 1 ]) y → Excl H (LaneOf f′ q′ a) y → Excl H (Truncate JoinT) y
+    excl : ∀ {q′ a y} → O q′ (out a) → W⁼ H (q′ ⊕ [ ix 1 ]) y → Excl H (LaneOf f′ q′ a) y → Excl H (Truncate JoinT) y
     excl {q′} {a} {y} xq yw ex jr = go (proj₂ (vw (proj₁ jr)))
       where
-        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
         go {x} (v-o ox ev) pl v le =
-          kid-lane⁼ ox pl v xq yw (λ eq → o-nout ev ox (subst (λ z → O z (out a)) (sym (∷ʳ-injectiveˡ x q′ eq)) xq)) le
+          kid-lane⁼ ox pl v xq yw (λ eq → o-nout ev ox (subst (λ z → O z (out a)) (sym (⊕-injˡ x q′ eq)) xq)) le
         go (v-val {q″} xr refl) pl v le =
-          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) xq yw (λ eq → ix01 (∷ʳ-injectiveʳ q″ q′ eq)) le
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) xq yw (λ eq → ix01 (⊕-injʳ q″ q′ eq)) le
         go (v-lane {q″} xr l″ _) pl v le with q″ ≟ᵖ q′
         ... | yes refl with out-inj (InvAt.func Io xr xq)
         ...   | refl = ex l″ pl v le
         go (v-lane {q″} xr l″ _) pl v le | no ne =
-          kid-lane⁼ xr plain-ix (nest⁼ (inW (step (inW (J.lw xr l″)) pl)) v) xq yw (λ eq → ne (∷ʳ-injectiveˡ q″ q′ eq)) le
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step (inW (J.lw xr l″)) pl)) v) xq yw (λ eq → ne (⊕-injˡ q″ q′ eq)) le
 
   un-ends : ∀ {q′ a c k e} → O q′ (out a) → LaneOf f′ q′ a c end → LaneOf f′ q′ a k e → Visible e → k ≼ c
   un-ends {c = c} {k} x lc lk v with ≼-or-≻ k c
@@ -292,26 +289,26 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
 
     -- Under a lane's queued end's second child, against the lane.
     nu⁼ : ∀ {j qj sj aj c x l w y} → Sub j qj sj aj → After (f′ aj) sj c end → Bounded.Queued m f′ O c → Lr aj sj x → Plain l
-        → W⁼ H (x ++ [ l ]) w → W⁼ H (c ++ [ ix 1 ]) y → w ⊑ y → ⊥
+        → W⁼ H (x ⊕ [ l ]) w → W⁼ H (c ⊕ [ ix 1 ]) y → w ⊑ y → ⊥
     nu⁼ sb ac Q lx pl v (inW yw) le = nest-under sb ac Q lx pl v yw le
     nu⁼ {c = c} {x} sb ac Q (lr-row x′ nq) pl v here le =
       LK.kid-root sb (proj₁ x′) pl v (proj₁ ac) plain-ix
-        (λ eq → row-not-c sb ac Q x′ nq (subst (_⊑ (c ++ [ ix 1 ])) (sym (∷ʳ-injectiveˡ x c eq)) (⊑-snoc⁺ c))) le
+        (λ eq → row-not-c sb ac Q x′ nq (subst (_⊑ (c ⊕ [ ix 1 ])) (sym (⊕-injˡ x c eq)) (⊑-snoc⁺ c))) le
     nu⁼ {c = c} sb ac Q (lr-hand x _ refl) pl v here le with lane-end sb ac x
-    ... | refl = LK.kid-root sb (proj₁ ac) plain-ix (nest⁼ (inW (step here pl)) v) (proj₁ ac) plain-ix (λ eq → ix01 (∷ʳ-injectiveʳ c c eq)) le
+    ... | refl = LK.kid-root sb (proj₁ ac) plain-ix (nest⁼ (inW (step here pl)) v) (proj₁ ac) plain-ix (λ eq → ix01 (⊕-injʳ c c eq)) le
 
     excl : ∀ {i q′ s a y} → Sub i q′ s a → W⁼ H s y → Excl H (Bounded.Lane m f′ O q′ a) y → Excl H (Truncate (Bounded.JoinT m f′ O)) y
     excl {i} {q′} {s} {a} {y} sb yw ex jr with seat* sb
     ... | seat′ {r = r} _ _ _ nr rw = go (vw (proj₁ jr))
       where
-        ry : W⁼ H (r ++ [ ix 1 ]) y
+        ry : W⁼ H (r ⊕ [ ix 1 ]) y
         ry = nest⁼ rw yw
 
-        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ++ [ l ]) w → w ⊑ y → ⊥
+        go : ∀ {x e l w} → V x e → Plain l → W⁼ H (x ⊕ [ l ]) w → w ⊑ y → ⊥
         go {x} (v-o ox ev) pl v le =
-          kid-lane⁼ ox pl v (nth-val nr) ry (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (∷ʳ-injectiveˡ x r eq)) (nth-val nr))) le
+          kid-lane⁼ ox pl v (nth-val nr) ry (λ eq → o-nout ev ox (subst (λ z → O z (out _)) (sym (⊕-injˡ x r eq)) (nth-val nr))) le
         go (v-val {q″} xr refl) pl v le =
-          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) (nth-val nr) ry (λ eq → ix01 (∷ʳ-injectiveʳ q″ r eq)) le
+          kid-lane⁼ xr plain-ix (nest⁼ (inW (step here pl)) v) (nth-val nr) ry (λ eq → ix01 (⊕-injʳ q″ r eq)) le
         go (v-l {i = j} sb′ lv) pl v le with <-cmp j i
         ... | tri≈ _ refl _ with sub-fun sb′ sb
         ...   | refl , refl , refl with lr sb lv
@@ -319,11 +316,11 @@ module Lanes {Γ A B} (sc : Scope Γ) (f : A → Obs Timeline Γ B) {O : Emissio
         ...     | lr-hand ac _ refl = ex (i , s , sb , ac) plain-ix (nest⁼ (inW (step here pl)) v) le
         go (v-l {i = j} sb′ lv) pl v le | tri< lt _ _ with rel lt sb′ sb
         ... | apart xr₁ xr₂ ne rw₁ rw₂ =
-          kid-lane⁼ xr₁ plain-ix (child-in rw₁ sb′ (lr sb′ lv) pl v) xr₂ (nest⁼ rw₂ yw) (λ eq → ne (∷ʳ-injectiveˡ _ _ eq)) le
+          kid-lane⁼ xr₁ plain-ix (child-in rw₁ sb′ (lr sb′ lv) pl v) xr₂ (nest⁼ rw₂ yw) (λ eq → ne (⊕-injˡ _ _ eq)) le
         ... | queued-in ac Q v₁ = nu⁼ sb′ ac Q (lr sb′ lv) pl v (nest⁼ v₁ yw) le
         go (v-l {i = j} sb′ lv) pl v le | tri> _ _ gt with rel gt sb sb′
         ... | apart xr₁ xr₂ ne rw₁ rw₂ =
-          kid-lane⁼ xr₂ plain-ix (child-in rw₂ sb′ (lr sb′ lv) pl v) xr₁ (nest⁼ rw₁ yw) (λ eq → ne (sym (∷ʳ-injectiveˡ _ _ eq))) le
+          kid-lane⁼ xr₂ plain-ix (child-in rw₂ sb′ (lr sb′ lv) pl v) xr₁ (nest⁼ rw₁ yw) (λ eq → ne (sym (⊕-injˡ _ _ eq))) le
         ... | queued-in ac Q v₁ = ex (i , s , sb , ac) plain-ix (child-in v₁ sb′ (lr sb′ lv) pl v) le
 
     row : ∀ {q′ a k e} → Bounded.Lane m f′ O q′ a k e
@@ -425,12 +422,11 @@ conn₀ s q sc = cs false true false (just q) nothing nothing q root s sc
 
 -- A world's point one first child down, short of the world's start: its
 -- parent is in the world too.
-w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ++ [ ix 0 ] → (s ≡ x ++ [ ix 0 ] → ⊥) → W⁼ H s x
+w-down : ∀ {H s z x} → W⁼ H s z → z ≡ x ⊕ [ ix 0 ] → (s ≡ x ⊕ [ ix 0 ] → ⊥) → W⁼ H s x
 w-down here eq ne = ⊥-elim (ne eq)
-w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (∷ʳ-injectiveˡ x′ x eq) w
-w-down {x = x} (inW (timer t _ _)) eq _ with ∷ʳ-injectiveʳ [ ix t ] x eq
-... | ()
-w-down {x = x} (inW (join {h} _ _ _)) eq _ with ∷ʳ-injectiveʳ h x eq
+w-down {H} {s} {x = x} (inW (step {x′} w _)) eq _ = subst (W⁼ H s) (⊕-injˡ x′ x eq) w
+w-down {x = x} (inW (timer t _ _ _)) eq _ = ⊥-elim (step≢root x _ (sym eq))
+w-down {x = x} (inW (join {h} _ _ _)) eq _ with ⊕-injʳ h x eq
 ... | ()
 
 -- A chain's head leads its foot.
@@ -453,27 +449,27 @@ module ConnAt {Γ X B} (sc : Scope Γ) (s : Obs Timeline Γ X) (b : Obs Timeline
   IF {t} L = inv-⟦⟧ b (hot t ∷ full sc) (good-cons L (good-full sc ad))
 
   σ : EmissionSet X
-  σ = pendRows (full sc) s (q ++ [ ix 1 ])
+  σ = pendRows (full sc) s (q ⊕ [ ix 1 ])
 
   β : EmissionSet B
-  β = pendRows (full (binds s q sc)) b (q ++ [ ix 0 ])
+  β = pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ])
 
   H₀ : Pos → Set
   H₀ = Hots (full (binds s q sc))
 
-  ok₀ : Ok H₀ (q ++ [ ix 0 ])
+  ok₀ : Ok H₀ (q ⊕ [ ix 0 ])
   ok₀ = LC.ok₀ {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
 
-  Iβ : InvAt H₀ (q ++ [ ix 0 ]) β
+  Iβ : InvAt H₀ (q ⊕ [ ix 0 ]) β
   Iβ = LC.Iβ {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
 
-  Iσ : InvAt H (q ++ [ ix 1 ]) σ
+  Iσ : InvAt H (q ⊕ [ ix 1 ]) σ
   Iσ = LC.Iσ {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
 
   σw : ∀ {h e} → Proper σ h e → W H q h
   σw = LC.σ-wp {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
 
-  bl : ∀ {w x} → W⁼ H₀ (q ++ [ ix 0 ]) w → W⁼ H (q ++ [ ix 1 ]) x → w ⊑ x → ⊥
+  bl : ∀ {w x} → W⁼ H₀ (q ⊕ [ ix 0 ]) w → W⁼ H (q ⊕ [ ix 1 ]) x → w ⊑ x → ⊥
   bl = LC.body-leads {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
 
   -- The connect's rows.
@@ -481,13 +477,13 @@ module ConnAt {Γ X B} (sc : Scope Γ) (s : Obs Timeline Γ X) (b : Obs Timeline
   E = pendRows (full sc) (connect s b) q
 
   Rb Rs : Rgn
-  Rb y = W⁼ H₀ (q ++ [ ix 0 ]) y × Excl H₀ β y
-  Rs y = W⁼ H (q ++ [ ix 1 ]) y × Excl H σ y
+  Rb y = W⁼ H₀ (q ⊕ [ ix 0 ]) y × Excl H₀ β y
+  Rs y = W⁼ H (q ⊕ [ ix 1 ]) y × Excl H σ y
 
   open Connecting using (body; burst; echo; kept)
 
   -- A source row's first child's world leads no body position.
-  src-kid : ∀ {k e l v y} → σ k e → Plain l → W⁼ H ((k ++ [ ix 0 ]) ++ [ l ]) v → v ⊑ y → W⁼ H₀ (q ++ [ ix 0 ]) y → ⊥
+  src-kid : ∀ {k e l v y} → σ k e → Plain l → W⁼ H ((k ⊕ [ ix 0 ]) ⊕ [ l ]) v → v ⊑ y → W⁼ H₀ (q ⊕ [ ix 0 ]) y → ⊥
   src-kid x pl v le wy
     with LC.source-leads {s = ⟦ s ⟧ (full sc)} {F = Fb} Is IF q ok
            (inW (nest-in (step (inW (step (inW (InvAt.world Iσ x)) plain-ix)) pl) v)) wy le
@@ -508,30 +504,30 @@ module ConnAt {Γ X B} (sc : Scope Γ) (s : Obs Timeline Γ X) (b : Obs Timeline
   s-excl (_ , ex) (echo x _ _ _ , _)    pl v le = ex x plain-ix (nest⁼ (inW (step here pl)) v) le
   s-excl (_ , ex) (kept x _ _ _ , _)    pl v le = ex x plain-ix (nest⁼ (inW (step here pl)) v) le
 
-  wb : Within Rb (binds s q sc) (q ++ [ ix 0 ]) β
+  wb : Within Rb (binds s q sc) (q ⊕ [ ix 0 ]) β
   wb = (here , excl-root Iβ (proj₁ ok₀)) , λ w ex → inW w , ex
 
-  ws : Within Rs sc (q ++ [ ix 1 ]) σ
+  ws : Within Rs sc (q ⊕ [ ix 1 ]) σ
   ws = (here , excl-root Iσ (proj₁ (ok-step q ok))) , λ w ex → inW w , ex
 
 -- A CONNECT ENTERED: its body and source in regions apart and clear of
 -- the scope's hots, each within its own.
 conn-parts : ∀ {Γ X B} {sc : Scope Γ} {Rg} {s : Obs Timeline Γ X} {b : Obs Timeline (X ∷ Γ) B} {q}
            → Ok (Hots (full sc)) q → Adm sc → Within Rg sc q (pendRows (full sc) (connect s b) q)
-           → Σ (Parts sc Rg (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ++ [ ix 0 ]))) λ pt
-             → Within (Parts.Rb pt) (binds s q sc) (q ++ [ ix 0 ]) (pendRows (full (binds s q sc)) b (q ++ [ ix 0 ]))
-             × Within (Parts.Rs pt) sc (q ++ [ ix 1 ]) (pendRows (full sc) s (q ++ [ ix 1 ]))
+           → Σ (Parts sc Rg (conn₀ s q sc) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))) λ pt
+             → Within (Parts.Rb pt) (binds s q sc) (q ⊕ [ ix 0 ]) (pendRows (full (binds s q sc)) b (q ⊕ [ ix 0 ]))
+             × Within (Parts.Rs pt) sc (q ⊕ [ ix 1 ]) (pendRows (full sc) s (q ⊕ [ ix 1 ]))
 conn-parts {sc = sc} {s = s} {b} {q} ok ad (_ , wi) = pt , wb , ws
   where
     open ConnAt sc s b q ok ad
     -- a point of the body's world past the source's subscription has its
     -- chain's head in that world too: the chain never reaches `q`
-    up : ∀ {x w} → (q ++ [ ix 1 ]) ≼ x → Ze x w → W⁼ H₀ (q ++ [ ix 0 ]) w → W⁼ H₀ (q ++ [ ix 0 ]) x
+    up : ∀ {x w} → (q ⊕ [ ix 1 ]) ≼ x → Ze x w → W⁼ H₀ (q ⊕ [ ix 0 ]) w → W⁼ H₀ (q ⊕ [ ix 0 ]) x
     up px e₀ h = h
     up {x} px (e+ {w} e) h = up px e (w-down h refl ne)
-      where ne : q ++ [ ix 0 ] ≡ w ++ [ ix 0 ] → ⊥
-            ne eq with ∷ʳ-injectiveˡ q w eq
-            ... | refl = px (≼-≺-≺ {x} {q} {q ++ [ ix 1 ]} (⊑-≼ (ze-⊑ e)) (≺-ext q []))
+      where ne : q ⊕ [ ix 0 ] ≡ w ⊕ [ ix 0 ] → ⊥
+            ne eq with ⊕-injˡ q w eq
+            ... | refl = px (≼-≺-≺ {x} {q} {q ⊕ [ ix 1 ]} (⊑-≼ (ze-⊑ e)) (≺-ext q []))
     pt = record
       { Rb      = Rb
       ; Rs      = Rs
@@ -553,6 +549,6 @@ conn-parts {sc = sc} {s = s} {b} {q} ok ad (_ , wi) = pt , wb , ws
 
 -- A connect's body subscribed admissibly.
 conn-ok : ∀ {Γ X} {sc : Scope Γ} {s : Obs Timeline Γ X} {q}
-        → Ok (Hots (full sc)) q → Adm sc → Ok (Hots (full (binds s q sc))) (q ++ [ ix 0 ])
+        → Ok (Hots (full sc)) q → Adm sc → Ok (Hots (full (binds s q sc))) (q ⊕ [ ix 0 ])
 conn-ok {sc = sc} {s} {q} ok ad =
   LC.ok₀ {s = ⟦ s ⟧ (full sc)} {F = λ h → h} (inv-⟦⟧ s (full sc) (good-full sc ad)) (λ L → lawful-hot L) q ok

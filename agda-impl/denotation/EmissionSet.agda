@@ -27,7 +27,7 @@ module denotation.EmissionSet where
 
 open import Data.Bool using (Bool; T; not)
 open import Data.Empty using () renaming (⊥ to Empty)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.Maybe using (just; nothing)
@@ -40,7 +40,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 import denotation.Events as E
-open import denotation.Events using (Pos; Timeline; timelineAt; _<ᵖ_; inside; ix; sub; last; start; ofᴱ)
+open import denotation.Position using (Pos; _<ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Events using (Timeline; timelineAt; start; ofᴱ)
 
 ------------------------------------------------------------------------
 -- Rows
@@ -139,10 +140,10 @@ data Den (A : Set) : Set₁ where
 -- missed: the work was the source's, and the source shows it.  A pin is
 -- the source's too: the joiner's copy of it is a plain skip.
 data Rejoin {A : Set} (p : Pos) (t : EmissionSet A) : EmissionSet A where
-  shown : ∀ {q e} → t q e → Bare e → p ≺ q → Rejoin p t (q ++ [ sub p ]) e
-  heard : ∀ {q r} → t q (pin r) → p ≺ q → Rejoin p t (q ++ [ sub p ]) skip
-  ended : ∀ {c} → t c end → p ≺ c → Rejoin p t (c ++ [ sub p ]) end
-  late  : ∀ {c} → t c end → c ≼ p → Rejoin p t (p ++ [ last ]) end
+  shown : ∀ {q e} → t q e → Bare e → p ≺ q → Rejoin p t (q ⊕ [ sub p ]) e
+  heard : ∀ {q r} → t q (pin r) → p ≺ q → Rejoin p t (q ⊕ [ sub p ]) skip
+  ended : ∀ {c} → t c end → p ≺ c → Rejoin p t (c ⊕ [ sub p ]) end
+  late  : ∀ {c} → t c end → c ≼ p → Rejoin p t (p ⊕ [ last ]) end
 
 enter : ∀ {A} → Den A → Pos → EmissionSet A
 enter (hot t)  p = Truncate (Rejoin p t)
@@ -159,7 +160,7 @@ After d s k e = enter d s k e × s ≺ k
 
 -- No information yet: a subscription that spins and never closes.
 data Spin {A : Set} (p : Pos) : EmissionSet A where
-  spin : ∀ i → Spin p (p ++ [ ix i ]) skip
+  spin : ∀ i → Spin p (p ⊕ [ ix i ]) skip
 
 ------------------------------------------------------------------------
 -- One input
@@ -172,8 +173,8 @@ data MapT {A B : Set} (f : A → B) (t : EmissionSet A) : EmissionSet B where
 
 -- A `skip`, then the body: rxjs's own `defer`, synchronous.
 data DeferT {A : Set} (s : Den A) (p : Pos) : EmissionSet A where
-  guard : DeferT s p (p ++ [ ix 0 ]) skip
-  body  : ∀ {q e} → enter s (p ++ [ ix 1 ]) q e → DeferT s p q e
+  guard : DeferT s p (p ⊕ [ ix 0 ]) skip
+  body  : ∀ {q e} → enter s (p ⊕ [ ix 1 ]) q e → DeferT s p q e
 
 -- An input's values in position order.
 module Values {A : Set} (o : EmissionSet A) where
@@ -214,8 +215,8 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
 
   data TakeT : EmissionSet A where
     pass  : ∀ {q a} → t q (out a) → T (keep a) → ¬ Failed q → TakeT q (out a)
-    fail  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → T incl → TakeT (q ++ [ ix 0 ]) (out a)
-    stop  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → TakeT (q ++ [ last ]) end
+    fail  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → T incl → TakeT (q ⊕ [ ix 0 ]) (out a)
+    stop  : ∀ {q a} → t q (out a) → T (not (keep a)) → ¬ Failed q → TakeT (q ⊕ [ last ]) end
     step  : ∀ {q} → t q skip → ¬ Failed q → TakeT q skip
     tend  : ∀ {q} → t q end → ¬ Failed q → TakeT q end
     left  : ∀ {q r} → t q (pin r) → ¬ Failed r → T (inside r q) → TakeT q (pin r)
@@ -223,10 +224,10 @@ module TakeWhile {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A)
 ------------------------------------------------------------------------
 -- Joiners
 
--- A value `a` at `q`'s lane, read by `L` at `q ++ [ ix 1 ]`: its rows
+-- A value `a` at `q`'s lane, read by `L` at `q ⊕ [ ix 1 ]`: its rows
 -- past that subscription.
 At : ∀ {A B : Set} → (A → Pos → EmissionSet B) → Pos → A → EmissionSet B
-At L q a k e = L a (q ++ [ ix 1 ]) k e × (q ++ [ ix 1 ]) ≺ k
+At L q a k e = L a (q ⊕ [ ix 1 ]) k e × (q ⊕ [ ix 1 ]) ≺ k
 
 LaneOf : ∀ {A B : Set} → (A → Den B) → Pos → A → EmissionSet B
 LaneOf f = At (λ a → enter (f a))
@@ -236,14 +237,14 @@ Ended : ∀ {X : Set} → EmissionSet X → Pos → Set
 Ended t c = Σ Pos λ c₀ → t c₀ end × c₀ ≼ c
 
 -- A JOINER PART WAY THROUGH: what is left of the outer, `o`; each value
--- `a` at `q` it runs (`Runs q`), its first effect `q ++ [ ix 0 ]` silent,
+-- `a` at `q` it runs (`Runs q`), its first effect `q ⊕ [ ix 0 ]` silent,
 -- read as the lane `Lane q a` wherever the policy subscribes it; and the
 -- rows `Bg` of the lanes already begun, over by `c` where `Over c` holds
 -- along with the outer.  A lane counts until it is cut (`Cut q k`, closed
 -- upward in `k`); its pins stay whose connect it had subscribed by the
 -- cut.  A lane's end at `c` where
 -- `Hand c` holds hands its place to a queued lane: it shows silent at its
--- first effect `c ++ [ ix 0 ]`, the queued lane subscribing at its second.
+-- first effect `c ⊕ [ ix 0 ]`, the queued lane subscribing at its second.
 -- The whole ends where the last part does; every other end is a skip.
 module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet A) (Bg : EmissionSet B) (Over : Pos → Set)
                (Runs : Pos → Set) (Cut : Pos → Pos → Set) (Hand : Pos → Set) where
@@ -253,7 +254,7 @@ module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet
   Done c = Over c × (∀ {q a} → o q (out a) → Runs q → q ≺ c → ¬ Cut q c → Ended (Lane q a) c)
 
   data JoinT : EmissionSet B where
-    val   : ∀ {q a} → o q (out a) → JoinT (q ++ [ ix 0 ]) skip
+    val   : ∀ {q a} → o q (out a) → JoinT (q ⊕ [ ix 0 ]) skip
     step  : ∀ {q} → o q skip → JoinT q skip
     opin  : ∀ {q r} → o q (pin r) → JoinT q (pin r)
     oend  : ∀ {c} → o c end → Done c → JoinT c end
@@ -261,12 +262,12 @@ module Joining {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet
     lane  : ∀ {q a k e} → o q (out a) → Runs q → Lane q a k e → ¬ Cut q k → Work e → JoinT k e
     lend  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → Done c → JoinT c end
     lpass : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → ¬ Hand c → ¬ Done c → JoinT c skip
-    hand  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Hand c → JoinT (c ++ [ ix 0 ]) skip
+    hand  : ∀ {q a c} → o q (out a) → Runs q → Lane q a c end → ¬ Cut q c → Hand c → JoinT (c ⊕ [ ix 0 ]) skip
     left  : ∀ {q a k r} → o q (out a) → Runs q → Lane q a k (pin r) → ¬ Cut q r → T (inside r k) → JoinT k (pin r)
     run   : ∀ {k e} → Bg k e → Work e → JoinT k e
     rend  : ∀ {c} → Bg c end → ¬ Hand c → Done c → JoinT c end
     rpass : ∀ {c} → Bg c end → ¬ Hand c → ¬ Done c → JoinT c skip
-    rhand : ∀ {c} → Bg c end → Hand c → JoinT (c ++ [ ix 0 ]) skip
+    rhand : ∀ {c} → Bg c end → Hand c → JoinT (c ⊕ [ ix 0 ]) skip
 
 -- A JOINER, freshly subscribed: each lane at its value's second child,
 -- nothing begun, no hand-off, and over where its outer is.
@@ -299,10 +300,10 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
   -- Where lane i, for the value at `q`, starts, given the lanes `ls`
   -- before it: at once, or at the end that frees it.
   data Starts (i : ℕ) (q : Pos) (ls : List (Pos → Set)) : Pos → Set where
-    room   : i < n → Starts i q ls (q ++ [ ix 1 ])
-    freed  : n ≤ i → Kth (_≺ q) ls (i ∸ n) → Starts i q ls (q ++ [ ix 1 ])
+    room   : i < n → Starts i q ls (q ⊕ [ ix 1 ])
+    freed  : n ≤ i → Kth (_≺ q) ls (i ∸ n) → Starts i q ls (q ⊕ [ ix 1 ])
     queued : ∀ {c} → n ≤ i → q ≺ c → Kth (_≡ c) ls 0 → Kth (_≼ c) ls (i ∸ n)
-           → ¬ Kth (_≺ c) ls (i ∸ n) → Starts i q ls (c ++ [ ix 1 ])
+           → ¬ Kth (_≺ c) ls (i ∸ n) → Starts i q ls (c ⊕ [ ix 1 ])
 
   -- Lane i's ends, given the lanes before it.
   Ends : ℕ → List (Pos → Set) → Pos → Set
@@ -319,7 +320,7 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
 
   -- A queued lane starts past `c`.
   Queued : Pos → Set
-  Queued c = Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (c ++ [ ix 1 ]) a
+  Queued c = Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (c ⊕ [ ix 1 ]) a
 
   -- The value at `q`'s lane, wherever the schedule subscribes it.
   Lane : Pos → A → EmissionSet B
@@ -362,24 +363,24 @@ module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 ------------------------------------------------------------------------
 -- Connect
 
--- Subscribed at `p`: the body at `p ++ [ ix 0 ]` over the source made hot,
--- then the source at `r = p ++ [ ix 1 ]`.  Each source step at `k` shows
+-- Subscribed at `p`: the body at `p ⊕ [ ix 0 ]` over the source made hot,
+-- then the source at `r = p ⊕ [ ix 1 ]`.  Each source step at `k` shows
 -- silent at its first effect.  The subscribe burst is this connect's pins
 -- and runs whatever the body did; past it, a step shows only while the
 -- body runs, and the source's own pins only whose connect it subscribed
 -- while the body ran.  The body's end ends the connect.
 --
 -- Liveness is read AT `k`, never at the shown row: a body end at
--- `k ++ [ ix 0 ]` lies in the source's world, which no lawful body
+-- `k ⊕ [ ix 0 ]` lies in the source's world, which no lawful body
 -- reaches, and reading there would make the connect hang on a row past
 -- the one it produces (`connect-causal`).
 --
--- `Connecting` joins any source's rows `σ`, subscribed at `p ++ [ ix 1 ]`,
+-- `Connecting` joins any source's rows `σ`, subscribed at `p ⊕ [ ix 1 ]`,
 -- to any body's rows `β`: a connect part way through is one too.
 module Connecting {A B : Set} (p : Pos) (σ : EmissionSet A) (β : EmissionSet B) where
 
   r : Pos
-  r = p ++ [ ix 1 ]
+  r = p ⊕ [ ix 1 ]
 
   -- The body has not ended by `q`.
   Alive : Pos → Set
@@ -387,17 +388,17 @@ module Connecting {A B : Set} (p : Pos) (σ : EmissionSet A) (β : EmissionSet B
 
   data ConnT : EmissionSet B where
     body  : ∀ {k e} → β k e → ConnT k e
-    burst : ∀ {k e} → σ k e → T (inside r k) → ConnT (k ++ [ ix 0 ]) (pin p)
-    echo  : ∀ {k e} → σ k e → Alive k → Unpinned e → T (not (inside r k)) → ConnT (k ++ [ ix 0 ]) skip
-    kept  : ∀ {k p′} → σ k (pin p′) → Alive p′ → T (not (inside r k)) → T (inside p′ k) → ConnT (k ++ [ ix 0 ]) (pin p′)
+    burst : ∀ {k e} → σ k e → T (inside r k) → ConnT (k ⊕ [ ix 0 ]) (pin p)
+    echo  : ∀ {k e} → σ k e → Alive k → Unpinned e → T (not (inside r k)) → ConnT (k ⊕ [ ix 0 ]) skip
+    kept  : ∀ {k p′} → σ k (pin p′) → Alive p′ → T (not (inside r k)) → T (inside p′ k) → ConnT (k ⊕ [ ix 0 ]) (pin p′)
 
 module Connect {A B : Set} (s : Den A) (F : Den A → Den B) (p : Pos) where
 
   σ : EmissionSet A
-  σ = enter s (p ++ [ ix 1 ])
+  σ = enter s (p ⊕ [ ix 1 ])
 
   β : EmissionSet B
-  β = enter (F (hot (Proper σ))) (p ++ [ ix 0 ])
+  β = enter (F (hot (Proper σ))) (p ⊕ [ ix 0 ])
 
   open Connecting p σ β public
 
@@ -413,7 +414,7 @@ module Op where
   cold c = Den.coldAt λ p → InE (start p (timelineAt c p))
 
   empty : ∀ {A} → Den A
-  empty = Den.coldAt λ p → InE (E.end (p ++ [ last ]))
+  empty = Den.coldAt λ p → InE (E.end (p ⊕ [ last ]))
 
   of : ∀ {A} → List A → Den A
   of xs = Den.coldAt λ p → InE (ofᴱ p 0 xs)

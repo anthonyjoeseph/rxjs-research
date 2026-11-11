@@ -35,7 +35,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; ix; last; root; _<ᵖ_) renaming (sub to subᴾ)
+open import denotation.Position using (Pos; ix; last; root; _<ᵖ_; _⊕_) renaming (sub to subᴾ)
 
 -- Two connects in scope, the same one or not.
 same? : ∀ {Γ : List Set} {A B : Set} → A ∈ Γ → B ∈ Γ → Maybe (A ≡ B)
@@ -50,9 +50,6 @@ data Ev (A : Set) : Set where
 mapEv : ∀ {A B} → (A → B) → Ev A → Ev B
 mapEv f (nx a) = nx (f a)
 mapEv f cp     = cp
-
-_⊕_ : Pos → Pos → Pos
-p ⊕ q = p ++ q
 
 ------------------------------------------------------------------------
 -- States

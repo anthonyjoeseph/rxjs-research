@@ -14,7 +14,7 @@ open import Data.Unit using (⊤; tt)
 open import Data.Nat using (zero; suc; pred; _+_; _≤_)
 open import Data.Nat.Properties using (+-suc; +-comm; ≤-trans; ≤-reflexive; pred[n]≤n)
 open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_; length; map)
-open import Data.List.Properties using (ʳ++-defn; reverse-involutive; ++-assoc; length-++; ∷ʳ-injectiveˡ)
+open import Data.List.Properties using (ʳ++-defn; reverse-involutive; length-++; ++-assoc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -28,13 +28,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix; Timeline)
+open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; Den; Ended; LaneOf; _≺_; _≼_; out; end; ⟦_⟧; module Joining; module Merge;
   module Bounded; module Switch; module Exhaust; module Values)
 open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≺-trans; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
-open import denotation.Laws.Worlds using (⊑-inside; Hots) renaming (⊑-refl to ⊑ʷ-refl)
+open import denotation.Laws.Worlds using (⊑-inside; Hots; ⊕-assoc; ⊕-injˡ) renaming (⊑-refl to ⊑ʷ-refl)
 open import operation.PureObservable using (module Machine)
 open Machine using (Ctx; St; ⟨_,_,_,_⟩; scopeOf; closed; rise; moved; start; dequeue; rising; absorbed; flatS; cp; inLanes; lnS; cutS; settle)
 open import adequacy.Rows using (full; ≃-refl; silent; _≃_; Moves; ≼-≢)
@@ -104,15 +105,15 @@ NoHand switchᶠ           F O c = ⊤
 NoHand exhaustᶠ          F O c = ⊤
 
 -- A bounded lane started past `r` is for a value at or before it.
-start-at : ∀ m {A B} (F : A → Den B) (O : EmissionSet A) {i q ls s r} → Bounded.Starts m F O i q ls s → s ≡ r ++ [ ix 1 ] → q ≼ r
-start-at m F O {q = q} {r = r} (Bounded.room _)    e = eq-le {q} {r} (∷ʳ-injectiveˡ q r e)
-start-at m F O {q = q} {r = r} (Bounded.freed _ _) e = eq-le {q} {r} (∷ʳ-injectiveˡ q r e)
-start-at m F O {q = q} {r = r} (Bounded.queued {c} _ qc _ _ _) e = lt-le {q} {r} (subst (q ≺_) (∷ʳ-injectiveˡ c r e) qc)
+start-at : ∀ m {A B} (F : A → Den B) (O : EmissionSet A) {i q ls s r} → Bounded.Starts m F O i q ls s → s ≡ r ⊕ [ ix 1 ] → q ≼ r
+start-at m F O {q = q} {r = r} (Bounded.room _)    e = eq-le {q} {r} (⊕-injˡ q r e)
+start-at m F O {q = q} {r = r} (Bounded.freed _ _) e = eq-le {q} {r} (⊕-injˡ q r e)
+start-at m F O {q = q} {r = r} (Bounded.queued {c} _ qc _ _ _) e = lt-le {q} {r} (subst (q ≺_) (⊕-injˡ c r e) qc)
 
 -- No lane, for a value at or before `p`, starts at `p ⊕ [ ix 1 ]`: none
 -- handed a slot there.
 nohand : ∀ op {A B} {F : A → Den B} {O : EmissionSet A} {p}
-       → (∀ {q a} → O q (out a) → Runs (polF op F O) q → q ≼ p → Start (polF op F O) q a (p ++ [ ix 1 ]) → ⊥) → NoHand op F O p
+       → (∀ {q a} → O q (out a) → Runs (polF op F O) q → q ≼ p → Start (polF op F O) q a (p ⊕ [ ix 1 ]) → ⊥) → NoHand op F O p
 nohand (mergeᶠ nothing)  _ = tt
 nohand (mergeᶠ (just m)) {F = F} {O} g (i , q , a , sb) = g (Nths.nth-val O (proj₁ sb)) (i , a , proj₁ sb) (start-at m F O (proj₂ sb) refl) (i , sb)
 nohand switchᶠ           _ = tt
@@ -134,7 +135,7 @@ slots-pred switchᶠ           s            = s
 slots-pred exhaustᶠ          s            = s
 
 -- A killed lane started under its own value.
-ks : ∀ op {A B} {F : A → Den B} {O : EmissionSet A} {q q″ a s} → Kill (polF op F O) q q″ → Start (polF op F O) q a s → s ≡ q ++ [ ix 1 ]
+ks : ∀ op {A B} {F : A → Den B} {O : EmissionSet A} {q q″ a s} → Kill (polF op F O) q q″ → Start (polF op F O) q a s → s ≡ q ⊕ [ ix 1 ]
 ks (mergeᶠ nothing)  ()
 ks (mergeᶠ (just m)) ()
 ks switchᶠ           _  st = st
@@ -182,7 +183,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       sc = scopeOf c
       F = λ a → ⟦ f a ⟧ (full sc)
       P = polF (mergeᶠ (just m)) F O
-      s₁ = p ++ [ ix 1 ]
+      s₁ = p ⊕ [ ix 1 ]
       w = (q₁ , a₁)
       open Count (JInv.ok ji) m F (JInv.fi ji) (JInv.io ji) hiding (P)
       open Values O using (Nth)
@@ -383,12 +384,12 @@ module _ {R : Set} (Rt : EmissionSet R) where
           ...   | inj₂ (q′ , kq , nq′) = ⊥-elim (nk kq (≼-≢ {q′} {p} nq′ (λ e′ → oo (proj₁ (proj₂ (kill-out op kq))) tt (sym e′))))
 
           -- no lane takes the slot this end frees
-          free : ∀ {q a} → O q (out a) → Runs P q → q ≼ p → Start P q a (p ++ [ ix 1 ]) → ⊥
+          free : ∀ {q a} → O q (out a) → Runs P q → q ≼ p → Start P q a (p ⊕ [ ix 1 ]) → ⊥
           free {q} y r le′ st′ with wh↑ y le′ (Pol.takes P r)
           ... | inj₂ ()
           ... | inj₁ iv with dead-ends bg-0 refl iv
-          ...   | inj₁ (c′ , lc′ , nc′) = nc′ (≺-trans {p} {p ++ [ ix 1 ]} {c′} (≺-ext p []) (proj₂ (Lanes.past sc f ji op st′ lc′)))
-          ...   | inj₂ (q′ , kq , _) = oo y tt (∷ʳ-injectiveˡ p q (ks op kq st′))
+          ...   | inj₁ (c′ , lc′ , nc′) = nc′ (≺-trans {p} {p ⊕ [ ix 1 ]} {c′} (≺-ext p []) (proj₂ (Lanes.past sc f ji op st′ lc′)))
+          ...   | inj₂ (q′ , kq , _) = oo y tt (⊕-injˡ p q (ks op kq st′))
 
           shown = proj₁ (to (alike (proj₂ jm)) ((jlend op y₀ ru lc (λ k lt → uk k lt) (nohand op free) (done-mk op ov gone)
                                                 , proj₁ bh , λ tk kp _ → proj₂ bh tk (λ pk → pk kp)) , tt))

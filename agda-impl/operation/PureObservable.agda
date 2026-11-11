@@ -9,13 +9,14 @@
 module operation.PureObservable where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close; Time; Pos; ix; last; tick) renaming (sub to subᴾ)
+open import denotation.Events using (Timeline; timelineAt; ML; Burst; Burst∞; ML∞; From; Frame; Frame∞; From∞; done; quiet; at; emit; stall; close)
+open import denotation.Position using (Time; Pos; ix; last; tick; Root; nested; fired; _▸_; tickᴿ; _⊕_)
 open import operation.Key using (Key) renaming (at to atᴷ)
 
 ------------------------------------------------------------------------
@@ -59,28 +60,15 @@ module Pure (R : Set) where
     later m .ML∞.force = m
 
 -- What a started cold keeps: the frame it plays, from the tick it was
--- subscribed at, in cascade `u`, its next index; the completion it owes
+-- subscribed at, at root `u`, its next index; the completion it owes
 -- at a position; or nothing more.
 data Tape (A : Set) : Set₁ where
-  play   : Time → Pos → ℕ → (t : Time) → Frame A t → Tape A
+  play   : Time → Root → ℕ → (t : Time) → Frame A t → Tape A
   ending : Pos → Tape A
   over   : Tape A
 
--- Where a frame's step sits: its slot, or, for a value its frame closes
--- straight after, under the frame's end, as the denotation places it.
-baseOf : ∀ {A t} → Pos → Frame A t → Pos
-baseOf u (emit _ (close _)) = u ++ [ last ]
-baseOf u _                  = u
-
-stepOf : ∀ {A t} → ℕ → Frame A t → ℕ
-stepOf i (emit _ (close _)) = 0
-stepOf i _                  = i
-
-slotOf : ∀ {A t} → Pos → ℕ → Frame A t → Pos
-slotOf u i fr = baseOf u fr ++ [ ix (stepOf i fr) ]
-
 due : ∀ {A} → Tape A → Maybe Key
-due (play τ u i t fr) = just (atᴷ (slotOf u i fr))
+due (play τ u i t fr) = just (atᴷ (u ▸ ix i))
 due (ending e)        = just (atᴷ e)
 due over              = nothing
 
@@ -97,19 +85,13 @@ peek over                      = nothing
 rest : ∀ {A t} → Time → Pos → From A t → Tape A
 rest τ e done        = ending e
 rest τ e quiet       = over
-rest τ e (at t _ fr) = play τ (ix (τ + t) ∷ subᴾ e ∷ []) 0 t fr
-
--- What a value's step leaves: the frame's next step, or, its frame
--- closing straight after, the close taken with it and what follows.
-onward : ∀ {A} → Time → Pos → ℕ → (t : Time) → Frame A t → Tape A
-onward τ u i t (close k) = rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force k)
-onward τ u i t k         = play τ u (suc i) t k
+rest τ e (at t _ fr) = play τ (fired (τ + t) e) 0 t fr
 
 -- A timeline subscribed at `p`: frame 0 played in place, or its frames
 -- after it.
 opening : ∀ {A} → Pos → From A 0 → Tape A
-opening p (at zero _ b) = play (tick p) p 0 0 b
-opening p m             = rest (tick p) (p ++ [ last ]) m
+opening p (at zero _ b) = play (tick p) (nested p) 0 0 b
+opening p m             = rest (tick p) (p ⊕ [ last ]) m
 
 -- A program the pure runtime runs: colds are timelines.
 PureObs : List Set → Set → Set₁
@@ -138,9 +120,9 @@ module Driver (R : Set) where
   played (leaf false l cl dv st) = silent 0 (st over)
   played (leaf true l true dv st) = silent 0 (st over)
   played (leaf true (play τ u i t (emit a k)) false dv st) =
-    silent (tick u) (dv (nx a) (onward τ u i t k) true (slotOf u i (emit a k)))
-  played (leaf true (play τ u i t (stall k)) false dv st) = silent (tick u) (st (play τ u (suc i) t (Frame∞.force k)))
-  played (leaf true (play τ u i t (close k)) false dv st) = silent (tick u) (st (rest τ (u ++ [ last ]) (From∞.force k)))
+    silent (tickᴿ u) (dv (nx a) (play τ u (suc i) t k) true (u ▸ ix i))
+  played (leaf true (play τ u i t (stall k)) false dv st) = silent (tickᴿ u) (st (play τ u (suc i) t (Frame∞.force k)))
+  played (leaf true (play τ u i t (close k)) false dv st) = silent (tickᴿ u) (st (rest τ (u ▸ last) (From∞.force k)))
   played (leaf true over false dv st) = silent 0 (st over)
 
   took : Stepped R → Step

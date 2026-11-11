@@ -13,12 +13,12 @@ module adequacy.TickRow where
 open import Data.Bool using (Bool; T; true; false; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_]; _++_; map; _ʳ++_)
-open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
+open import Data.Nat using (suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -26,19 +26,20 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; Timeline; ix; last; root; Frame; emit; stall; close)
+open import denotation.Position using (Pos; ix; last; root; _⊕_; _▸_) renaming (Path to Steps)
+open import denotation.Events using (Timeline; Frame; emit; stall; close)
 open import denotation.EmissionSet using (EmissionSet; Ev; Den; ⟦_⟧; enter; out; skip; end; _≺_; Reach; Dep; InE; at-skip; map-skip;
   map-end; module Scan; module TakeWhile; module Connecting; module Merge; module Bounded;
   module Switch; module Exhaust)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺→≼; ≺-≼-≺)
-open import denotation.Laws.Worlds using (Hots)
-open import operation.PureObservable using (PureObs; module Machine; play; slotOf; onward)
+open import denotation.Laws.Worlds using (Hots; ⊕-assoc; ⊕-identityʳ)
+open import operation.PureObservable using (PureObs; module Machine; play)
 open Machine using (Ctx; St; Scope; CS; ⟨_,_,_,_⟩; plug; load; search; found; leafM; absorbed; rising; nx; closed; scopeOf;
                     top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody;
                     mapS; scanS; cutS; lnS; takeS; flatS; connS; coldS; free; cpAt; cutAt; overAt)
-open import operation.Key using (at; after; <ᴷ-irrefl)
+open import operation.Key using (at; after; <ᴷ-irrefl; at-after)
 open import adequacy.Least using (Lo; k-own; k-kid; k-take)
-open import adequacy.Floor.Keys using (Into; sub-at; lo-weaken; at-after)
+open import adequacy.Floor.Keys using (Into; sub-at; lo-weaken)
 open import adequacy.Apart.Floor using (floor)
 open import adequacy.Rows using (full; tapeE)
 open import adequacy.Path using (Path; _⇜_; _▸τ_)
@@ -62,10 +63,10 @@ open import adequacy.Guard using (LiveN; Clr; clr-≈; clr-tr; reach-zs; m-skip;
 
 -- A row of `t` at `y` or under it.
 Below : ∀ {A} → EmissionSet A → Pos → Set
-Below {A} t y = Σ Pos λ r → Σ (Ev A) λ e → t r e × Σ Pos λ xs → r ≡ y ++ xs
+Below {A} t y = Σ Pos λ r → Σ (Ev A) λ e → t r e × Σ Steps λ xs → r ≡ y ⊕ xs
 
-below-up : ∀ {A} {t : EmissionSet A} {y} zs → Below t (y ++ zs) → Below t y
-below-up {y = y} zs (r , e , tr , xs , eq) = r , e , tr , zs ++ xs , trans eq (++-assoc y zs xs)
+below-up : ∀ {A} {t : EmissionSet A} {y} zs → Below t (y ⊕ zs) → Below t y
+below-up {y = y} zs (r , e , tr , xs , eq) = r , e , tr , zs ++ xs , trans eq (⊕-assoc y zs xs)
 
 -- What lies before `q` and is behind its cursor, a row at `q` reaches.
 reach₀ : ∀ {A} {t : EmissionSet A} {q e} → Behind (bef q) t → Reach t q e
@@ -73,11 +74,11 @@ reach₀ (ks , f) = ks , λ tk lt _ → f tk (λ qk → qk lt)
 
 conn-reach₀ : ∀ {A B} {p} {σ : EmissionSet A} {β : EmissionSet B} {q e} → Behind (bef q) σ → Reach β q e
             → Reach (Connecting.ConnT p σ β) q e
-conn-reach₀ {p = p} {σ} {β} {q} {e} (ks , f) (ls , g) = ls ++ map (_++ [ ix 0 ]) ks , go
+conn-reach₀ {p = p} {σ} {β} {q} {e} (ks , f) (ls , g) = ls ++ map (_⊕ [ ix 0 ]) ks , go
   where
-    sl : ∀ {k e′} → σ k e′ → (k ++ [ ix 0 ]) ≺ q → (k ++ [ ix 0 ]) ∈ (ls ++ map (_++ [ ix 0 ]) ks)
-    sl {k} r lt = ∈-++⁺ʳ ls (∈-map⁺ (_++ [ ix 0 ]) (f r λ qk → qk (≺-trans {k} {k ++ [ ix 0 ]} {q} (≺-ext k []) lt)))
-    go : ∀ {k e′} → Connecting.ConnT p σ β k e′ → k ≺ q → Dep q e k e′ → k ∈ (ls ++ map (_++ [ ix 0 ]) ks)
+    sl : ∀ {k e′} → σ k e′ → (k ⊕ [ ix 0 ]) ≺ q → (k ⊕ [ ix 0 ]) ∈ (ls ++ map (_⊕ [ ix 0 ]) ks)
+    sl {k} r lt = ∈-++⁺ʳ ls (∈-map⁺ (_⊕ [ ix 0 ]) (f r λ qk → qk (≺-trans {k} {k ⊕ [ ix 0 ]} {q} (≺-ext k []) lt)))
+    go : ∀ {k e′} → Connecting.ConnT p σ β k e′ → k ≺ q → Dep q e k e′ → k ∈ (ls ++ map (_⊕ [ ix 0 ]) ks)
     go (Connecting.body r)       lt d = ∈-++⁺ˡ (g r lt d)
     go (Connecting.burst r _)    lt _ = sl r lt
     go (Connecting.echo r _ _ _) lt _ = sl r lt
@@ -124,15 +125,15 @@ hand₀ : ∀ op {Γ A B} {sc : Scope Γ} {f : A → Obs Timeline Γ B} {O : Emi
       → Sound (JRo sc Rg op f O) O → O q₀ (out a₀) → Runs (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q₀
       → E ≈ Lane (polF op (λ a → ⟦ f a ⟧ (full sc)) O) q₀ a₀ → Sound (JRl sc Rg op f O q₀) E → E q end
       → HandAt op (λ a → ⟦ f a ⟧ (full sc)) O q
-      → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O (q ++ [ ix 0 ]) skip × Clr q (q ++ [ ix 0 ]) (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
+      → JoinF op (λ a → ⟦ f a ⟧ (full sc)) O (q ⊕ [ ix 0 ]) skip × Clr q (q ⊕ [ ix 0 ]) (JoinF op (λ a → ⟦ f a ⟧ (full sc)) O)
 hand₀ (mergeᶠ (just m)) ji li so x rn le sl r hq = hand-clr m ji li so x rn le sl r hq
 hand₀ (mergeᶠ nothing)  _ _ _ _ _ _ _ _ ()
 hand₀ switchᶠ           _ _ _ _ _ _ _ _ ()
 hand₀ exhaustᶠ          _ _ _ _ _ _ _ _ ()
 
 -- A failed take's end key past where it fell.
-stop-into : ∀ {Γ A} {i f} (s : St Γ A) q → Into (at (q ++ [ last ])) (takeS i f free s) (takeS i f (cpAt q) s)
-stop-into s q (k-own (here refl)) = inj₂ (<ᴷ-irrefl (at (q ++ [ last ])))
+stop-into : ∀ {Γ A} {i f} (s : St Γ A) q → Into (at (q ⊕ [ last ])) (takeS i f free s) (takeS i f (cpAt q) s)
+stop-into s q (k-own (here refl)) = inj₂ (<ᴷ-irrefl (at (q ⊕ [ last ])))
 stop-into s q (k-own (there ()))
 stop-into s q (k-kid (k-take h)) = inj₁ (k-kid (k-take h))
 
@@ -144,15 +145,15 @@ module _ {R : Set} (o : PureObs [] R) where
   -- A lifted row, or an isle's: under the first child.
   lifted-below : ∀ {Cr q S} → Lo S (at q) → Lifted Cr q ⊎ Isled Cr q S → Below Rt q
   lifted-below {q = q} _ (inj₁ (r , e , tr , z , _)) with zs-under z
-  ... | xs , eq = r , e , tr , ix 0 ∷ xs , trans eq (++-assoc q [ ix 0 ] xs)
+  ... | xs , eq = r , e , tr , ix 0 ∷ xs , trans eq (⊕-assoc q [ ix 0 ] xs)
   lifted-below {q = q} lo (inj₂ il) with isle-row Rt il lo
-  ... | r , e , tr , xs , eq = r , e , tr , ix 0 ∷ xs , trans eq (++-assoc q [ ix 0 ] xs)
+  ... | r , e , tr , xs , eq = r , e , tr , ix 0 ∷ xs , trans eq (⊕-assoc q [ ix 0 ] xs)
 
   -- A SKIP OR END AT THE CURSOR, carried up every live frame: at its
   -- position, or a level down under a joiner's hand-off or a source.
   lift₀ : ∀ {Cr Γ A} {c : Ctx R Γ A} {s : St Γ A} {Rg N E q e} → Fr Rt Cr (bef q) Rg c N E → Lo (plug c s) (at q) → LiveN N
         → E q e → Foot Rg q e → ¬ ¬ Below Rt q
-  lift₀ (f-top m) _ _ r _ κ = κ (_ , _ , voc m r , [] , sym (++-identityʳ _))
+  lift₀ (f-top m) _ _ r _ κ = κ (_ , _ , voc m r , [] , sym (⊕-identityʳ _))
   lift₀ {s = s} (f-map {f = f} fr m _) lo _ r (ft-skip g) = lift₀ {s = mapS f s} fr lo tt (voc m (map-skip r)) (ft-skip g)
   lift₀ {s = s} (f-map {f = f} fr m _) lo _ r ft-end      = lift₀ {s = mapS f s} fr lo tt (voc m (map-end r)) ft-end
   lift₀ {s = s} (f-scan {f = f} {z = z} fr _ m _) lo _ r (ft-skip g) = lift₀ {s = scanS f z s} fr lo tt (voc m (Scan.sstep r)) (ft-skip g)
@@ -232,7 +233,7 @@ module _ {R : Set} (o : PureObs [] R) where
   pass-step wa rewrite wa = _ , refl
 
   incl-step : ∀ {Γ A} {w : A → Bool} {c : Ctx R Γ A} {s a y} → w a ≡ false
-            → ⟨ c , takeS true w (cpAt y) s , rising (nx a) , y ++ [ ix 0 ] ⟩ ⇜ ⟨ inTake true w free c , s , rising (nx a) , y ⟩
+            → ⟨ c , takeS true w (cpAt y) s , rising (nx a) , y ⊕ [ ix 0 ] ⟩ ⇜ ⟨ inTake true w free c , s , rising (nx a) , y ⟩
   incl-step wa rewrite wa = _ , refl
 
   body-step : ∀ {Γ X B} {k : CS Γ X} {o′ : St Γ X} {c : Ctx R Γ B} {s b y} → CS.srcLive k ≡ true
@@ -241,7 +242,7 @@ module _ {R : Set} (o : PureObs [] R) where
 
   emit-step : ∀ {Γ A Γ′ A′} {c : Ctx R Γ A} {s q} {c′ : Ctx R Γ′ A′} {τ u i t a} {f : Frame A′ t} {κ}
             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t (emit a f))) leafM κ) → closed c′ ≡ false
-            → ⟨ c′ , coldS true (onward τ u i t f) , rising (nx a) , slotOf u i (emit a f) ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
+            → ⟨ c′ , coldS true (play τ u (suc i) t f) , rising (nx a) , u ▸ ix i ⟩ ⇜ ⟨ c , s , absorbed , q ⟩
   emit-step fd cl rewrite fd | cl = _ , refl
 
   -- A TAKE'S FAILURE ENDS UNDER IT: past the failing value, the take's
@@ -251,13 +252,13 @@ module _ {R : Set} (o : PureObs [] R) where
   fail-below {w = w} {c} {s} {a} {y} pth wa with inv-at pth
   ... | _ , _ , flying (f-take fr nf m sd) _ (sy , row) =
     let nk  = subst (λ b → T (not b)) (sym wa) tt
-        lo₁ : Lo (plug c (takeS false w (cpAt y) s)) (at (y ++ [ last ]))
-        lo₁ = sub-at c {X = at (y ++ [ last ])} (stop-into {i = false} {f = w} s y) (lo-weaken (at (y ++ [ last ])) (after y) (floor o pth tt) (at-after y [ last ]))
+        lo₁ : Lo (plug c (takeS false w (cpAt y) s)) (at (y ⊕ [ last ]))
+        lo₁ = sub-at c {X = at (y ⊕ [ last ])} (stop-into {i = false} {f = w} s y) (lo-weaken (at (y ⊕ [ last ])) (after y) (floor o pth tt) (at-after y [ last ]))
         sy′ = s-took (a , row , nk , λ (_ , _ , x , nk′ , qp) → nf x nk′ qp)
-                     (λ pq → pq) (λ ()) (o-cp (≺→≼ {y} {y ++ [ last ]} (≺-ext y {last} [])))
+                     (λ pq → pq) (λ ()) (o-cp (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y {last} [])))
                      (took-tail sy row nk nf) (proj₂ (husk-of sy)) (λ t → t)
                      (λ {r′} t (q , _ , x , nk′ , qr) → nf x nk′ (≺-≼-≺ {q} {r′} {y} qr t)) m sd
-        (_ , fr″ , _ , _) = fr-shift Rt fr sy′ (≺→≼ {y} {y ++ [ last ]} (≺-ext y {last} [])) lo₁
+        (_ , fr″ , _ , _) = fr-shift Rt fr sy′ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y {last} [])) lo₁
     in λ κ → lift₀ fr″ lo₁ tt (voc m (TakeWhile.stop row nk λ { (_ , _ , x , k , lt) → nf x k lt })) ft-end (λ b → κ (below-up [ last ] b))
   ... | _ , _ , flying (f-took _ _ _ _ _ _ _ _ _ _) _ ()
   ... | _ , _ , flying (d-take _ _) _ ()
@@ -269,7 +270,7 @@ module _ {R : Set} (o : PureObs [] R) where
   -- failure ends under it.
   climb : ∀ {rs Γ A} {c : Ctx R Γ A} {s a y} → Path (load o) rs ⟨ c , s , rising (nx a) , y ⟩ → closed c ≡ false → ¬ ¬ Below Rt y
   climb {c = top} pth cl with inv-at pth
-  ... | _ , _ , flying (f-top m) _ (_ , row) = λ κ → κ (_ , _ , voc m row , [] , sym (++-identityʳ _))
+  ... | _ , _ , flying (f-top m) _ (_ , row) = λ κ → κ (_ , _ , voc m row , [] , sym (⊕-identityʳ _))
   ... | _ , _ , adrift fr cl′ _ = ⊥-elim (adrift-no cl′ fr)
   ... | _ , _ , settled () _ _
   climb {c = inMap f c} pth cl = climb {c = c} (pth ▸τ (_ , refl)) cl
@@ -322,8 +323,8 @@ module _ {R : Set} (o : PureObs [] R) where
   -- AN OPEN COLD'S TICK IS AN ANCESTOR OF A ROW of the root's entry.
   tick-below : ∀ {rs Γ A} {c : Ctx R Γ A} {s q Γ′ A′} {c′ : Ctx R Γ′ A′} {τ u i t} {fr : Frame A′ t}
              → Path (load o) rs ⟨ c , s , absorbed , q ⟩
-             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (slotOf u i fr)))
-             → closed c′ ≡ false → ¬ ¬ Below Rt (slotOf u i fr)
+             → search top (plug c s) ≡ just (found (Γ′ , A′ , c′ , coldS true (play τ u i t fr)) leafM (at (u ▸ ix i)))
+             → closed c′ ≡ false → ¬ ¬ Below Rt (u ▸ ix i)
   tick-below {c = c} {s} {q} {fr = emit a f} pth fd cl = climb (pth ▸τ emit-step {c = c} {s = s} {q = q} fd cl) cl
   tick-below {fr = stall f}  pth fd cl = tick-skip pth fd cl at-skip
   tick-below {fr = close f}  pth fd cl = tick-skip pth fd cl at-skip

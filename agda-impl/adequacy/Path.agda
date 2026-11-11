@@ -10,7 +10,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Events using (Pos)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (Ev; out; end)
 open import operation.PureObservable using (module Machine; module Driver)
 open Machine using (Conf; nx; cp) renaming (Shown to Shownᴹ)

@@ -18,7 +18,7 @@ open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (Pos; ix; last; inside)
+open import denotation.Position using (Pos; ix; last; inside; _⊕_)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; pin; _≺_; _≼_; Reach; Few; MapT; map-out; map-skip; map-pin; map-end;
   module Scan; module TakeWhile)
 open import denotation.Laws.Modulus using (≺-ext; ≺→≼; ≼-refl; ≼-≺-≺)
@@ -76,13 +76,13 @@ reach-mv {y = y} {r = r} g im (ks , f) = concatMap g ks , λ {k′} x ky d → l
 
 -- A take's rows: at its source's, or one under it.
 tk : Pos → List Pos
-tk k = k ∷ (k ++ [ ix 0 ]) ∷ (k ++ [ last ]) ∷ []
+tk k = k ∷ (k ⊕ [ ix 0 ]) ∷ (k ⊕ [ last ]) ∷ []
 
 reach-take : ∀ {A} {incl} {keep : A → Bool} {E : EmissionSet A} {y r} → Reach E y (pin r) → Reach (TakeWhile.TakeT incl keep E) y (pin r)
 reach-take = reach-mv tk λ where
   (TakeWhile.pass {q} x _ _)   → q , _ , x , ≼-refl {q} , here refl , λ ()
-  (TakeWhile.fail {q} x _ _ _) → q , _ , x , ≺→≼ {q} {q ++ [ ix 0 ]} (≺-ext q []) , there (here refl) , λ ()
-  (TakeWhile.stop {q} x _ _)   → q , _ , x , ≺→≼ {q} {q ++ [ last ]} (≺-ext q []) , there (there (here refl)) , λ ()
+  (TakeWhile.fail {q} x _ _ _) → q , _ , x , ≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q []) , there (here refl) , λ ()
+  (TakeWhile.stop {q} x _ _)   → q , _ , x , ≺→≼ {q} {q ⊕ [ last ]} (≺-ext q []) , there (there (here refl)) , λ ()
   (TakeWhile.step {q} x _)     → q , _ , x , ≼-refl {q} , here refl , λ ()
   (TakeWhile.tend {q} x _)     → q , _ , x , ≼-refl {q} , here refl , λ ()
   (TakeWhile.left {q} x _ _)   → q , _ , x , ≼-refl {q} , here refl , λ { refl → refl }

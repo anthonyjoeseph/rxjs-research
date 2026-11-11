@@ -6,8 +6,7 @@
 module adequacy.Regions where
 
 open import Data.Empty using (⊥-elim)
-open import Data.List using ([_]; _++_)
-open import Data.List.Properties using (∷ʳ-injectiveˡ)
+open import Data.List using ([_])
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Nat.Properties using (<-cmp)
@@ -17,9 +16,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (yes; no)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Events using (Pos; ix; _≟ᵖ_)
+open import denotation.Position using (Pos; ix; _≟ᵖ_; _⊕_)
 open import denotation.EmissionSet using (EmissionSet; out; Den)
-open import denotation.Laws.Worlds using (W⁼; here; inW; nest-in; plain-ix; ⊑-refl; Ok; InvAt; InvD)
+open import denotation.Laws.Worlds using (W⁼; here; inW; nest-in; plain-ix; ⊑-refl; Ok; InvAt; InvD; ⊕-injˡ)
 open import denotation.Laws.JoinInv using (module Kids)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import adequacy.Cursor using (LaneRg; polF)
@@ -32,10 +31,10 @@ w-trans (inW v) w = inW (nest-in v w)
 module _ {A B : Set} {H : Pos → Set} {at : Pos} (ok : Ok H at) (F : A → Den B) (fi : ∀ a → InvD H (F a))
          {O : EmissionSet A} (io : InvAt H at O) where
 
-  plain : ∀ {q q′ a a′ y} → O q (out a) → O q′ (out a′) → W⁼ H (q ++ [ ix 1 ]) y → W⁼ H (q′ ++ [ ix 1 ]) y → q ≡ q′
+  plain : ∀ {q q′ a a′ y} → O q (out a) → O q′ (out a′) → W⁼ H (q ⊕ [ ix 1 ]) y → W⁼ H (q′ ⊕ [ ix 1 ]) y → q ≡ q′
   plain {q} {q′} x x′ w w′ with q ≟ᵖ q′
   ... | yes eq = eq
-  ... | no ne  = ⊥-elim (Kids.kids ok io x x′ plain-ix plain-ix (λ eq → ne (∷ʳ-injectiveˡ q q′ eq)) w w′)
+  ... | no ne  = ⊥-elim (Kids.kids ok io x x′ plain-ix plain-ix (λ eq → ne (⊕-injˡ q q′ eq)) w w′)
 
   module _ (m : ℕ) where
     open BoundedI ok m F fi io

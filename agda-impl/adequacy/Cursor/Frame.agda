@@ -13,7 +13,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.Events using (Pos; Timeline; ix)
+open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; ⟦_⟧; MapT; module Scan; module TakeWhile; module Connecting)
 open import operation.PureObservable using (module Machine; Tape; play; ending) renaming (over to tapeOver)
 
@@ -102,7 +103,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
     -- a takeWhile failed at `r`: what it still owes within what its
     -- source still runs
     f-took  : ∀ {Γ A} {i} {keep : A → Bool} {o} {c : Ctx R Γ A} {C D Rg Rg′ Es E′ r P}
-            → Fr Cr C Rg c owes E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ++ [ ix 0 ])) → OweAt C o r
+            → Fr Cr C Rg c owes E′ → Failure keep Es r → Gone C r → (T i → ¬ Owes C (r ⊕ [ ix 0 ])) → OweAt C o r
             → TailP C (TakeWhile.TakeT i keep Es) P → Dom C D → (∀ {r′} → Thru D r′ → ¬ TakeWhile.Failed i keep Es r′)
             → TakeWhile.TakeT i keep Es ≈ E′ → Sound Rg Es
             → Fr Cr C Rg′ (inTake i keep o c) (dead D P) Es
@@ -161,8 +162,8 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → T (not (CS.srcAtt k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c))
             → Sync (binds (CS.src k) (CS.connAt k) (scopeOf c)) (Parts.Rb pt) C b β → Behind C β
             → Flags C k β → E ≈ Frozen k → ConnE (CS.connAt k) (Frozen k) β E′
-            → Owes C (CS.connAt k ++ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
-            → Fr Cr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) E
+            → Owes C (CS.connAt k ⊕ [ ix 1 ]) → Subd (scopeOf c) C k → NoIsle b
+            → Fr Cr C (Parts.Rs pt) (inSrc k b c) (pnd (CS.connAt k ⊕ [ ix 1 ])) E
     -- a body while its source runs
     f-body  : ∀ {Γ X B} {k : CS Γ X} {o} {c : Ctx R Γ B} {C Rg E E′}
             → Fr Cr C Rg c owes E′ → CS.scope k ≡ scopeOf c → (pt : Parts (scopeOf c) Rg k E) → T (CS.srcLive k)
@@ -194,19 +195,19 @@ module _ {R : Set} (Rt : EmissionSet R) where
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k))
             → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → Sound Ri (Frozen k) → AttOwed k → InCall Ci k
-            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ])
+            → Bursts k E′ → Thru D (CS.connAt k ⊕ [ ix 0 ])
             → NoIsle b → Open k Db → InScope k (scopeOf c) → Fr Cr Ci Ri (inSrc k b c) owes (Frozen k)
     -- an isle whose source has ended
     f-islec : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D D₁ Db Ci Rg′ P N Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
             → P ⊑ (Burst Ci k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (CS.closed k)
             → Spent Ci (Frozen k) → TailP Ci (Frozen k) N → Dom Ci D₁ → Behind Ci (Frozen k) → Subd (scopeOf c) Ci k → AttOwed k → InCall Ci k
-            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → Open k Db → InScope k (scopeOf c)
+            → Bursts k E′ → Thru D (CS.connAt k ⊕ [ ix 0 ]) → Open k Db → InScope k (scopeOf c)
             → Fr Cr C Rg′ (inSrc k b c) (dead D₁ N) (Frozen k)
     -- an isle's source not yet subscribed: its cursor at where it will be
     f-islep : ∀ {Γ X B} {k : CS Γ X} {b : St (X ∷ Γ) B} {c : Ctx R Γ B} {C D Db Ri P Qb β E′}
             → Unread Cr C D E′ β c k P → Husk (binds (CS.src k) (CS.connAt k) (CS.scope k)) Db b β Qb → Up Db β D E′
-            → P ⊑ (Burst (bef (CS.connAt k ++ [ ix 1 ])) k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing
+            → P ⊑ (Burst (bef (CS.connAt k ⊕ [ ix 1 ])) k ∪ᵖ Qb) → T (not (CS.srcAtt k)) → T (not (CS.closed k)) → CS.bodyAt k ≡ just (CS.connAt k) → CS.attSrc k ≡ nothing
             → CS.scope k ≡ scopeOf c → Adm (binds (CS.src k) (CS.connAt k) (scopeOf c)) → Sound Ri (Frozen k)
-            → Bursts k E′ → Thru D (CS.connAt k ++ [ ix 0 ]) → NoIsle b → Open k Db → InScope k (scopeOf c)
-            → Fr Cr (bef (CS.connAt k ++ [ ix 1 ])) Ri (inSrc k b c) (pnd (CS.connAt k ++ [ ix 1 ])) (Frozen k)
+            → Bursts k E′ → Thru D (CS.connAt k ⊕ [ ix 0 ]) → NoIsle b → Open k Db → InScope k (scopeOf c)
+            → Fr Cr (bef (CS.connAt k ⊕ [ ix 1 ])) Ri (inSrc k b c) (pnd (CS.connAt k ⊕ [ ix 1 ])) (Frozen k)

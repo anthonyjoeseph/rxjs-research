@@ -42,34 +42,12 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym) renaming (trans to ≡-trans)
 
-open import denotation.EmissionSet using (Seen)
 open import simultaneous.SObs using (SObs)
-open import simultaneous.Readings using (Rooted)
-open import simultaneous.Relations using (events; elaborated; batched; Met; ranked; Closes; Ends; joined; values;
-  stampedᴰ; stampedᴮ; grouped; Groups; Erases)
-open import simultaneous.Protocol using (row-rooted)
+open import simultaneous.Relations using (events; batched; Met; ranked; Closes; Ends; joined; values; stampedᴰ; stampedᴮ; grouped;
+  Groups)
 open import simultaneous.Batcher using (batcher-ends)
 open import simultaneous.Closing using (batches)
-
-------------------------------------------------------------------------
--- The pieces
-
--- THE ERASURE: the elaboration adds no instant and holds no value, so a
--- prefix of the elaborated run erases to a prefix of the plain one with
--- the same stamped values, and an instant over on one side is over on
--- the other.  Switch, exhaust and the bounded queue are the real cases.
--- The batcher's half is `simultaneous.Closing`.
-postulate
-  erases    : ∀ {A} (o : SObs [] A) → Erases (elaborated o) (events o)
-
--- THE INSTANTS: every position a program reaches lies under the subscribe
--- frame or one timer cascade, which is what makes `instantOf` read an
--- instant, and a stamp count them.
-Positioned : Set₁
-Positioned = ∀ {A} (o : SObs [] A) {k e} → Seen (events o) k e → Rooted k
-
-positioned : Positioned
-positioned o s = row-rooted o (proj₁ (proj₁ s))
+open import simultaneous.Erasure using (erases)
 
 ------------------------------------------------------------------------
 -- The statement

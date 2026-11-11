@@ -22,10 +22,11 @@ open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Events using (Pos; root; ix; last; <ᵖ-part; _≟ᵖ_; emit; stall; close; From∞; Frame; module Frame∞)
+open import denotation.Position using (Pos; root; ix; last; _≟ᵖ_; _⊕_; _▸_)
+open import denotation.Events using (<ᵖ-part; emit; stall; close; From∞; Frame; timelineAt)
 open import denotation.EmissionSet using (enter; ⟦_⟧; _≼_)
 open import denotation.Read using () renaming (cursor to cursorᴿ)
-open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending; slotOf; baseOf; stepOf) renaming (over to overT)
+open import operation.PureObservable using (PureObs; module Machine; module Driver; opening; due; Tape; rest; play; ending) renaming (over to overT)
 open Machine using (Ctx; top; inMap; inScan; inCut; inLn; inTake; inOuter; inLanes; inSrc; inBody; St; pend; coldS; ofS; doneS; mapS; scanS; cutS; lnS; takeS; flatS; connS; joinS;
                     CS; cs; Mode; Conf; ⟨_,_,_,_⟩; plug; load; subscribing; absorbed; rising; nx; cp; closedUp; closed; alive; dirs; unsub; cut; killAll; ended; settle;
                     attAt; attached; free; cpAt; cutAt; overAt; search; found; own; run; unsubIf; off; offL; offIf; ofM; attM; cpM; cutM; bodyM; srcAttM; owedM; joinM; leafM)
@@ -35,7 +36,7 @@ open import adequacy.Weight using (Clock; W; Wᶜ; anc; prefixes; listed; depth;
 open import adequacy.Found using (Marked; ofK; attK; conK; joinK; leafK; stopK; cutK; found-mark; found-least; found-plug)
 open import adequacy.Simulated using (cursor)
 open import adequacy.Path using (Path; Still)
-open import adequacy.Stamped using (frame-ahead; fin-ahead; slot-next; opening-ahead; pend-focus)
+open import adequacy.Stamped using (frame-ahead; slot-next; open-ahead; pend-focus)
 open import adequacy.Floor.Keys using (below)
 open import adequacy.Floor using (fed-ahead)
 open import adequacy.Simulation using (Simulation; module Along; Aimed)
@@ -49,12 +50,12 @@ open import denotation.Laws.Modulus using (≼-false)
 open import adequacy.Guard using (RowUnder; Gd; gd; echo-guard; defer-guard; cap; module Outer)
 
 -- A position's first child keyed before its second.
-part : ∀ q → at (q ++ [ ix 0 ]) <ᴷ at (q ++ [ ix 1 ]) ≡ true
-part q = trans (at-<ᴷ (q ++ [ ix 0 ]) (q ++ [ ix 1 ])) (<ᵖ-part q {ix 0} {ix 1} [] [] refl)
+part : ∀ q → at (q ⊕ [ ix 0 ]) <ᴷ at (q ⊕ [ ix 1 ]) ≡ true
+part q = trans (at-<ᴷ (q ⊕ [ ix 0 ]) (q ⊕ [ ix 1 ])) (<ᵖ-part q {ix 0} {ix 1} [] [] refl)
 
 -- A clock a level down at the second child is not before the first.
-over : ∀ q → at (q ++ [ ix 1 ]) <ᴷ at (q ++ [ ix 0 ]) ≡ true → ⊥
-over q h = clash (<ᴷ-trans (at (q ++ [ ix 1 ])) (at (q ++ [ ix 0 ])) (at (q ++ [ ix 1 ])) h (part q)) (<ᴷ-irrefl (at (q ++ [ ix 1 ])))
+over : ∀ q → at (q ⊕ [ ix 1 ]) <ᴷ at (q ⊕ [ ix 0 ]) ≡ true → ⊥
+over q h = clash (<ᴷ-trans (at (q ⊕ [ ix 1 ])) (at (q ⊕ [ ix 0 ])) (at (q ⊕ [ ix 1 ])) h (part q)) (<ᴷ-irrefl (at (q ⊕ [ ix 1 ])))
 
 -- An ancestor of a listed position, among the ancestors listed.
 anc-∈ : ∀ {y r} ks → r ∈ ks → y ∈ prefixes r → y ∈ anc ks
@@ -115,9 +116,9 @@ module Begun {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (co
 
     -- An of's marks, each strictly past where it was subscribed.
     ofW-ahead : ∀ {X : Set} i (xs : List X) → ofW D i q xs ≤ length xs * (2 + D) + (2 + D)
-    ofW-ahead i []       = wt-ahead D (at (q ++ [ last ])) (below q)
+    ofW-ahead i []       = wt-ahead D (at (q ⊕ [ last ])) (below q)
     ofW-ahead i (_ ∷ xs) =
-      ≤-trans (+-mono-≤ (wt-ahead D (at (q ++ [ ix i ])) (below q)) (ofW-ahead (suc i) xs)) (≤-reflexive (asc (2 + D) (length xs * (2 + D)) (2 + D)))
+      ≤-trans (+-mono-≤ (wt-ahead D (at (q ⊕ [ ix i ])) (below q)) (ofW-ahead (suc i) xs)) (≤-reflexive (asc (2 + D) (length xs * (2 + D)) (2 + D)))
       where asc : ∀ a b c → a + (b + c) ≡ (a + b) + c
             asc = solve-∀
 
@@ -143,14 +144,14 @@ module Begun {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (co
   begun (takeWhile i f s′) pth refl _ = lt0 (lighter-at c (take-arith (2 * (2 + D)) (3 + D) (syn (2 + D) s′)))
   begun (flatMap op f s′)  pth refl _ = lt0 (lighter-at c (flat-arith (3 + D) (syn (2 + D) s′)))
   begun (connect s′ b)     pth refl _ =
-    lt0 (lighter-at c (conn-arith _ (2 + D) (syn (suc D) s′) (syn (suc D) b) (wt-ahead D (at (q ++ [ ix 1 ])) (below q))))
+    lt0 (lighter-at c (conn-arith _ (2 + D) (syn (suc D) s′) (syn (suc D) b) (wt-ahead D (at (q ⊕ [ ix 1 ])) (below q))))
   begun (defer l)          pth refl kept =
     ⊥-elim (over q (kept (under-listed o p ks cov (defer-guard o pth m)) (below q)))
-  begun (cold x)           pth refl _ = lt0 (lighter-at c (cold-lt _ (opening-ahead o pth)))
-  begun empty              pth refl _ = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ++ [ last ])) (below q))))
+  begun (cold x)           pth refl _ = lt0 (lighter-at c (cold-lt _ (open-ahead q (timelineAt x q))))
+  begun empty              pth refl _ = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ⊕ [ last ])) (below q))))
   begun (of xs)            pth refl _ = lt0 (lighter-at c (of-lt xs))
   begun (connected x)      pth eq   _ with closedUp c x
-  begun (connected x)      pth refl _ | true  = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ++ [ last ])) (below q))))
+  begun (connected x)      pth refl _ | true  = lt0 (lighter-at c (s≤s (wt-ahead D (at (q ⊕ [ last ])) (below q))))
   begun (connected x)      pth refl _ | false = lt0 (lighter-at c (s≤s z≤n))
 
 -- A STILL SUBSCRIBE LIGHTENS: a subscribe trades its syntax for what it
@@ -172,7 +173,7 @@ module Shed (ks : List Pos) (P : Pos) (C : Key) where
 
   take-le : ∀ {Γ A} d {i q} w {s s′ : St Γ A} → pot (suc d) s′ ≤ pot (suc d) s → pot d (takeS i q w s′) ≤ pot d (takeS i q w s)
   take-le d free       h = +-monoʳ-≤ (2 * (2 + d)) h
-  take-le d (cpAt r)   h = +-monoʳ-≤ (wt d (at (r ++ [ last ])) + (2 + d)) h
+  take-le d (cpAt r)   h = +-monoʳ-≤ (wt d (at (r ⊕ [ last ])) + (2 + d)) h
   take-le d (cutAt r)  h = +-monoʳ-≤ (2 + d) h
   take-le d (overAt r) h = h
 
@@ -312,7 +313,7 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (con
     open Shed L p (at q)
 
     Guard : Set
-    Guard = RowUnder o (q ++ [ ix 0 ]) p
+    Guard = RowUnder o (q ⊕ [ ix 0 ]) p
 
     Kept : Conf R → Set
     Kept k′ = ∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → Clock k′ <ᴷ at q′ ≡ true
@@ -326,12 +327,12 @@ module Rose {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (con
             sh = solve-∀
 
     -- A lane begun has passed its guard.
-    begun : (∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → at (q ++ [ ix 1 ]) <ᴷ at q′ ≡ true) → Guard → ⊥
+    begun : (∀ {q′} → q′ ∈ L → at q <ᴷ at q′ ≡ true → at (q ⊕ [ ix 1 ]) <ᴷ at q′ ≡ true) → Guard → ⊥
     begun kept g = over q (kept (under-listed o p ks cov g) (below q))
 
     -- A takeWhile's failing value: its end owed past where it fell.
     failed : ∀ {Γ A} {i f} (s : St Γ A) d → pot d (takeS i f (cpAt q) s) ≤ pot d (takeS i f free s)
-    failed s d = +-monoˡ-≤ (pot (suc d) s) (≤-trans (+-monoˡ-≤ (2 + d) (wt-ahead d (at (q ++ [ last ])) (below q))) (≤-reflexive (dbl (2 + d))))
+    failed s d = +-monoˡ-≤ (pot (suc d) s) (≤-trans (+-monoˡ-≤ (2 + d) (wt-ahead d (at (q ⊕ [ last ])) (below q))) (≤-reflexive (dbl (2 + d))))
       where dbl : ∀ a → a + a ≡ 2 * a
             dbl = solve-∀
 
@@ -516,47 +517,37 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv
 
     -- A cold's turn.
     leafs : ∀ {Γ A} (c : Ctx R Γ A) b (l : Tape A) → (leafM , κ) ∈ own {Γ} (coldS b l) → Np
-          → (closed c ≡ false → b ≡ true → ∀ {τ u i t} {fr : Frame A t} → l ≡ play τ u i t fr → κ ≡ at (slotOf u i fr) → listed L κ ≡ true)
-          → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
-          → (∀ {τ u i t a f κ′} → l ≡ play τ u i t (emit a (close f)) → due (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+          → (closed c ≡ false → b ≡ true → ∀ {τ u i t} {fr : Frame A t} → l ≡ play τ u i t fr → κ ≡ at (u ▸ ix i) → listed L κ ≡ true)
+          → (∀ {τ u i t f κ′} → l ≡ play τ u i t (close f) → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
           → ∀ {τ k′} → Driver.took R (run c (coldS b l) leafM q) ≡ Driver.silent τ k′ → Wᶜ L p κ k′ < pot 0 (plug c (coldS b l)) + 0
-    leafs c b     overT              () np row ah ah′ eq
-    leafs c false (ending e₀)        (here k) np row ah ah′ refl = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
-    leafs c false (play τ u i t fr)  (here k) np row ah ah′ refl = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
-    leafs c true  (ending e₀)        (here k) np row ah ah′ refl =
+    leafs c b     overT              () np row ah eq
+    leafs c false (ending e₀)        (here k) np row ah refl = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
+    leafs c false (play τ u i t fr)  (here k) np row ah refl = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
+    leafs c true  (ending e₀)        (here k) np row ah refl =
       hole c (spend₀ (depth c) (cong proj₂ k) (lift {c = c} (if not (closed c) then rising cp else absorbed)) (np (cong proj₂ k)))
-    leafs c true  (play τ u i t fr)  (here k) np row ah ah′ eq with closed c
-    leafs c true  (play τ u i t fr)  (here k) np row ah ah′ refl | true =
+    leafs c true  (play τ u i t fr)  (here k) np row ah eq with closed c
+    leafs c true  (play τ u i t fr)  (here k) np row ah refl | true =
       hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
-    leafs {Γ} c true  (play τ u i t (emit a (close f)))  (here k) np row ah ah′ refl | false =
+    leafs c true  (play τ u i t (emit a f))  (here k) np row ah refl | false =
       hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
-                   (cold-ahead {Γ} (depth c) true (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f)) (ah′ refl))
+                   (wt-ahead (depth c) (at (u ▸ ix (suc i))) (subst (λ z → z <ᴷ at (u ▸ ix (suc i)) ≡ true) (sym (cong proj₂ k))
+                                            (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i))))
                    (≤-reflexive (dirs-depth c)))
-    leafs c true  (play τ u i t (emit a f@(emit _ _)))  (here k) np row ah ah′ refl | false =
+    leafs c true  (play τ u i t (stall f))  (here k) np row ah refl | false =
       hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
-                   (wt-ahead (depth c) (at (slotOf u (suc i) f)) (subst (λ z → z <ᴷ at (slotOf u (suc i) f) ≡ true) (sym (cong proj₂ k))
-                                            (trans (at-<ᴷ (u ++ [ ix i ]) _) (slot-next u i f))))
-                   (≤-reflexive (dirs-depth c)))
-    leafs c true  (play τ u i t (emit a f@(stall _)))  (here k) np row ah ah′ refl | false =
-      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
-                   (wt-ahead (depth c) (at (slotOf u (suc i) f)) (subst (λ z → z <ᴷ at (slotOf u (suc i) f) ≡ true) (sym (cong proj₂ k))
-                                            (trans (at-<ᴷ (u ++ [ ix i ]) _) (slot-next u i f))))
-                   (≤-reflexive (dirs-depth c)))
-    leafs c true  (play τ u i t (stall f))  (here k) np row ah ah′ refl | false =
-      hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
-                   (wt-ahead (depth c) (at (slotOf u (suc i) (Frame∞.force f))) (subst (λ z → z <ᴷ at (slotOf u (suc i) (Frame∞.force f)) ≡ true) (sym (cong proj₂ k))
-                                            (trans (at-<ᴷ (u ++ [ ix i ]) _) (slot-next u i (Frame∞.force f)))))
+                   (wt-ahead (depth c) (at (u ▸ ix (suc i))) (subst (λ z → z <ᴷ at (u ▸ ix (suc i)) ≡ true) (sym (cong proj₂ k))
+                                            (trans (at-<ᴷ (u ▸ ix i) _) (slot-next u i))))
                    z≤n)
-    leafs {Γ} c true  (play τ u i t (close f))  (here k) np row ah ah′ refl | false =
+    leafs {Γ} c true  (play τ u i t (close f))  (here k) np row ah refl | false =
       hole c (tick (depth c) (cong proj₂ k) (np (cong proj₂ k)) (row refl refl refl (cong proj₂ k))
-                   (cold-ahead {Γ} (depth c) true (rest τ (u ++ [ last ]) (From∞.force f)) (ah refl)) z≤n)
+                   (cold-ahead {Γ} (depth c) true (rest τ (u ▸ last) (From∞.force f)) (ah refl)) z≤n)
 
     -- A connect's admin mark.
     conns : ∀ {Γ A X} (c : Ctx R Γ A) (k : CS Γ X) (o′ : St Γ X) b mk → mk ≡ bodyM ⊎ (mk ≡ srcAttM ⊎ mk ≡ owedM) → (mk , κ) ∈ own (connS k o′ b)
           → ∀ {τ k′} → Driver.took R (run c (connS k o′ b) mk q) ≡ Driver.silent τ k′ → Wᶜ L p κ k′ < pot 0 (plug c (connS k o′ b)) + 0
     conns c k@(cs cl sl sa (just p₀) as ow ca ea sr sc) o′ b .bodyM (inj₁ refl) mi refl =
       hole c (+-monoˡ-< (pot (suc (depth c)) b) (+-monoˡ-< (pot (suc (depth c)) o′) (+-monoˡ-< _ (+-monoˡ-< _
-        (≤-trans (m≤n+m (3 + depth c) (wt (depth c) (at (p₀ ++ [ ix 1 ])))) (m≤m+n _ _))))))
+        (≤-trans (m≤n+m (3 + depth c) (wt (depth c) (at (p₀ ⊕ [ ix 1 ])))) (m≤m+n _ _))))))
     conns c k@(cs cl sl sa nothing as ow ca ea sr sc) o′ b .bodyM (inj₁ refl) mi eq with own-body k o′ b mi
     ... | _ , ()
     conns c k@(cs cl sl sa ba (just p₀) ow ca ea sr sc) o′ b .srcAttM (inj₂ (inj₁ refl)) mi refl =
@@ -574,29 +565,28 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv
 
     -- The least mark run, by its kind.
     runs : ∀ {Γ A} (c : Ctx R Γ A) {s : St Γ A} {mk} → Marked s mk → (mk , κ) ∈ own s → Np
-         → (closed c ≡ false → ∀ {τ u i t} {fr : Frame A t} → s ≡ coldS true (play τ u i t fr) → mk ≡ leafM → κ ≡ at (slotOf u i fr) → listed L κ ≡ true)
-         → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
-         → (∀ {b τ u i t a f κ′} → s ≡ coldS b (play τ u i t (emit a (close f))) → mk ≡ leafM → due (rest τ ((u ++ [ last ]) ++ [ last ]) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
+         → (closed c ≡ false → ∀ {τ u i t} {fr : Frame A t} → s ≡ coldS true (play τ u i t fr) → mk ≡ leafM → κ ≡ at (u ▸ ix i) → listed L κ ≡ true)
+         → (∀ {b τ u i t f κ′} → s ≡ coldS b (play τ u i t (close f)) → mk ≡ leafM → due (rest τ (u ▸ last) (From∞.force f)) ≡ just κ′ → κ <ᴷ κ′ ≡ true)
          → ∀ {τ k′} → Driver.took R (run c s mk q) ≡ Driver.silent τ k′ → Wᶜ L p κ k′ < pot 0 (plug c s) + 0
-    runs c (ofK i p₀ []) (here k) np row ah ah′ eq with closed c
-    runs c (ofK i p₀ []) (here k) np row ah ah′ refl | true  = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
-    runs c (ofK i p₀ []) (here k) np row ah ah′ refl | false = hole c (spend₀ (depth c) (cong proj₂ k) (≤-reflexive (dirs-depth c)) (np (cong proj₂ k)))
-    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah ah′ eq with closed c
-    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah ah′ refl | true  = hole c (<-≤-trans (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k))) (m≤m+n _ _))
-    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah ah′ refl | false = hole c (spend (depth c) (cong proj₂ k) (≤-reflexive (dirs-depth c)) (np (cong proj₂ k)))
-    runs c (attK l p₀ s₀) mi np row ah ah′ refl = hole c (admin (depth c) (unsubIf-le (not l) (suc (depth c)) s₀))
-    runs c (conK k o′ b mk w) mi np row ah ah′ eq = conns c k o′ b mk w mi eq
-    runs c (joinK j g x q₀ (nx a) ib) (here k) np row ah ah′ refl =
+    runs c (ofK i p₀ []) (here k) np row ah eq with closed c
+    runs c (ofK i p₀ []) (here k) np row ah refl | true  = hole c (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k)))
+    runs c (ofK i p₀ []) (here k) np row ah refl | false = hole c (spend₀ (depth c) (cong proj₂ k) (≤-reflexive (dirs-depth c)) (np (cong proj₂ k)))
+    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah eq with closed c
+    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah refl | true  = hole c (<-≤-trans (spend₀ (depth c) (cong proj₂ k) z≤n (np (cong proj₂ k))) (m≤m+n _ _))
+    runs c (ofK i p₀ (x ∷ xs)) (here k) np row ah refl | false = hole c (spend (depth c) (cong proj₂ k) (≤-reflexive (dirs-depth c)) (np (cong proj₂ k)))
+    runs c (attK l p₀ s₀) mi np row ah refl = hole c (admin (depth c) (unsubIf-le (not l) (suc (depth c)) s₀))
+    runs c (conK k o′ b mk w) mi np row ah eq = conns c k o′ b mk w mi eq
+    runs c (joinK j g x q₀ (nx a) ib) (here k) np row ah refl =
       hole c (spend (depth c) (cong proj₂ k) (lift {c = c} (if g ∧ not (closed c) then rising (nx a) else absorbed)) (np (cong proj₂ k)))
-    runs c (joinK j g x q₀ cp ib) (here k) np row ah ah′ refl =
+    runs c (joinK j g x q₀ cp ib) (here k) np row ah refl =
       hole c (spend (depth c) (cong proj₂ k) (lift {c = c} (if g ∧ not (closed c) then rising cp else absorbed)) (np (cong proj₂ k)))
-    runs c (leafK b l) mi np row ah ah′ eq = leafs c b l mi np (λ cl bt {τ} {u} {i} {t} {fr} e → row cl {τ} {u} {i} {t} {fr} (trans (cong (λ b′ → coldS b′ l) bt) (cong (coldS true) e)) refl) (λ e → ah (cong (coldS b) e) refl) (λ e → ah′ (cong (coldS b) e) refl) eq
-    runs c (stopK i f r s₀) (here k) np row ah ah′ refl =
+    runs c (leafK b l) mi np row ah eq = leafs c b l mi np (λ cl bt {τ} {u} {i} {t} {fr} e → row cl {τ} {u} {i} {t} {fr} (trans (cong (λ b′ → coldS b′ l) bt) (cong (coldS true) e)) refl) (λ e → ah (cong (coldS b) e) refl) eq
+    runs c (stopK i f r s₀) (here k) np row ah refl =
       hole c (sp (depth c) (cong proj₂ k) (lift {c = c} (if not (closed c) then rising cp else absorbed)) (np (cong proj₂ k)))
       where
         sp : ∀ d {κ₀ n P} → κ ≡ κ₀ → n ≤ d → at p <ᴷ κ ≡ false → n + ((2 + d) + P) < (wt d κ₀ + (2 + d)) + P
         sp d {n = n} {P} e h np′ = ≤-trans (≤-reflexive (cong suc (sym (+-assoc n (2 + d) P)))) (+-monoˡ-< P (spend d e h np′))
-    runs c (cutK i f r s₀) mi np row ah ah′ refl = hole c (admin (depth c) (cut-le (suc (depth c)) s₀))
+    runs c (cutK i f r s₀) mi np row ah refl = hole c (admin (depth c) (cut-le (suc (depth c)) s₀))
 
   -- A STILL MARK RUN LIGHTENS: the least mark found and run, weighed at
   -- its key, the run's clock.
@@ -609,12 +599,11 @@ module Run {R} (o : PureObs [] R) {rs p e} (m : Aimed o (cursorᴿ nothing (conv
     subst (λ t → Wᶜ L p κ k′ < Weigh.pot L p κ 0 t + 0) (found-plug c s fd)
       (At.runs κ c′ (found-mark c s fd) (proj₁ (found-least {t = plug c s} fd))
         (λ { refl → mark-short o pth m fd })
-        (λ { cl {u = u} {i = i} {fr = fr} refl refl refl → true-stable (listed L (at (slotOf u i fr))) λ k →
+        (λ { cl {u = u} {i = i} {fr = fr} refl refl refl → true-stable (listed L (at (u ▸ ix i))) λ k →
                tick-below o pth fd cl λ (_ , _ , tr , xs , eq) →
-                 k (∈-listed L (slotOf u i fr) (under-listed o p ks cov
-                      (cap {u = baseOf u fr} {a = ix (stepOf i fr)} tr (xs , eq) (proj₁ (Outer.met o pth m)) (≮-≼ p (slotOf u i fr) (mark-short o pth m fd))))) })
+                 k (∈-listed L (u ▸ ix i) (under-listed o p ks cov
+                      (cap {y = u ▸ ix i} tr (xs , eq) (proj₁ (Outer.met o pth m)) (≮-≼ p (u ▸ ix i) (mark-short o pth m fd))))) })
         (λ { refl refl dr → frame-ahead o pth fd dr })
-        (λ { refl refl dr → fin-ahead o pth fd dr })
         eq)
 
 -- STILL STEPS LIGHTEN, WEIGHED AT THE CLOCK THEY START FROM.

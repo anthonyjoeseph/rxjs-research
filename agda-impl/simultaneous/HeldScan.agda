@@ -8,12 +8,13 @@
 module simultaneous.HeldScan where
 
 open import Data.List using (List; []; _∷_)
-open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import denotation.Events using (Pos; Timeline; root; fresh; finals; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; module Scan; _≼_; _≺_; Few)
 open import denotation.Read using (Run; []; _∷_; Visible; After)
 open import denotation.Laws.Modulus using (entered-reach; entered-few)
@@ -23,10 +24,10 @@ open import simultaneous.InstEmit using (instEmit; value; mark)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (HeldD)
-open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
+open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same; rest-same)
 open import simultaneous.HeldMap using (module MapRun; mapRows)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) finals using (IE; scanIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; scanIE)
 
 ------------------------------------------------------------------------
 -- Runs
@@ -87,7 +88,7 @@ same-scanIE st (instEmit (mark _) _)  refl = same-mark
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
               → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ fwd (h p ok nt ep)
+held-scan-den f z d cs h p ok ep = held-same row end-row back′ fwd (rest-same every back′) (h p ok ep)
   where
     module Sr = ScanRun (scanIE f) z d p
     module Mr = MapRun proj₂ (Op.scan (scanIE f) z d) p
@@ -96,6 +97,14 @@ held-scan-den f z d cs h p ok nt ep = held-same row end-row back′ fwd (h p ok 
     row m with Mr.unmap m
     ... | out _ , (Scan.sval ac , _) , refl with Sr.accv ac
     ...   | c , x , y , eq = x , y , same-scanIE c x eq
+
+    -- Every row of the scan lies where one of its source's does.
+    every : ∀ {y e′} → Mr.M y e′ → Σ _ (Sr.S y)
+    every m with Mr.unmap m
+    ... | _ , (Scan.sval ac , _) , _ = _ , proj₁ (proj₂ (proj₂ (Sr.accv ac)))
+    ... | _ , (Scan.sstep x , _) , _ = _ , x
+    ... | _ , (Scan.spin x , _) , _  = _ , x
+    ... | _ , (Scan.send x , _) , _  = _ , x
 
     end-row : ∀ {y} → Mr.M y end → Sr.S y end
     end-row m with Mr.unmap m

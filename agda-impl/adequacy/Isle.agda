@@ -10,7 +10,7 @@ module adequacy.Isle where
 
 open import Data.Bool using (T; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; _ʳ++_)
+open import Data.List using (List; []; _∷_; [_]; _ʳ++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -19,7 +19,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; map₁)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import denotation.Events using (Pos; ix)
+open import denotation.Position using (Pos; ix; _⊕_)
 open import operation.Key using (Key; at; after; _<ᴷ_; clash; ≮ᴷ-trans)
 open import operation.PureObservable using (module Machine)
 open Machine using (St; Ctx; CS; Cand; Out; search; Found; found; plug; seek; kids; lanes; own; ownBest; first; retag; raceT; sourceT; cutT; alive;
@@ -77,7 +77,7 @@ AttL k = T (CS.srcAtt k) ⊎ Σ Pos (λ p → CS.bodyAt k ≡ just p) ⊎ Σ Pos
 
 -- A body yet to run is keyed no earlier than `κ`.
 Late : ∀ {Γ X} → CS Γ X → Key → Set
-Late k κ = ∀ {p} → CS.bodyAt k ≡ just p → at (p ++ [ ix 1 ]) <ᴷ κ ≡ false
+Late k κ = ∀ {p} → CS.bodyAt k ≡ just p → at (p ⊕ [ ix 1 ]) <ᴷ κ ≡ false
 
 -- Every attach the body owes keyed no later than any mark of the source,
 -- or than the body's own run.
@@ -388,12 +388,12 @@ mutual
   noatt-noisle : ∀ {Γ A} (s : St Γ A) → StOK s → G s → NoAttB s → NoIsle s
   noatt-noisle (mapS f s)      ok       g na = noatt-noisle s ok g (λ a → na (a-map a))
   noatt-noisle (scanS f z s)   ok       g na = noatt-noisle s ok g (λ a → na (a-scan a))
-  noatt-noisle (cutS l a s)    (_ , ok) g na = noatt-noisle s ok g (λ a′ → na (a-cut a′))
+  noatt-noisle (cutS l a s)    ok g na = noatt-noisle s ok g (λ a′ → na (a-cut a′))
   noatt-noisle (lnS b s)       ok       g na = noatt-noisle s ok g (λ a → na (a-ln a))
-  noatt-noisle (takeS i q w s) (_ , ok) g na = noatt-noisle s ok g (λ a → na (a-take a))
+  noatt-noisle (takeS i q w s) ok g na = noatt-noisle s ok g (λ a → na (a-take a))
   noatt-noisle (flatS op f ω d n q o ls) (oko , okl) (go , gl) na =
     noatt-noisle o oko go (λ a → na (a-outer a)) , noatt-noisleL ls okl gl (λ m a → na (a-lane m a))
-  noatt-noisle (connS k o b) (_ , ho , hb , hbo) (al , _ , go , gb) na =
+  noatt-noisle (connS k o b) (ho , hb , hbo) (al , _ , go , gb) na =
     settles k o hbo al (λ e → na (a-here e)) , noatt-noisle o ho go (λ a → na (a-src a)) , noatt-noisle b hb gb (λ a → na (a-body a))
   noatt-noisle (pend o q)       _ _ _ = tt
   noatt-noisle (coldS b l)      _ _ _ = tt
@@ -468,17 +468,17 @@ mutual
     cl-retag (mapKp f) (seek (inMap f c) s) (cl-map (seek (inMap f c) s) (λ ki → k-kid (k-map ki)) (λ cc → cc) (seek-clear (inMap f c) s g ok))
   kids-clear c (scanS f z s) g ok =
     cl-retag (scanKp f z) (seek (inScan f z c) s) (cl-map (seek (inScan f z c) s) (λ ki → k-kid (k-scan ki)) (λ cc → cc) (seek-clear (inScan f z c) s g ok))
-  kids-clear c (cutS l a s) g (_ , ok) =
+  kids-clear c (cutS l a s) g ok =
     cl-retag (cutKp l) (seek (inCut l a c) s) (cl-map (seek (inCut l a c) s) (λ ki → k-kid (k-cut ki)) (λ cc → cc) (seek-clear (inCut l a c) s g ok))
   kids-clear c (lnS b s) g ok =
     cl-map (seek (inLn b c) s) (λ ki → k-kid (k-ln ki)) (λ cc → cc) (seek-clear (inLn b c) s g ok)
-  kids-clear c (takeS i q w s) g (_ , ok) =
+  kids-clear c (takeS i q w s) g ok =
     cl-retag (takeKp i q w) (seek (inTake i q w c) s) (cl-map (seek (inTake i q w c) s) (λ ki → k-kid (k-take ki)) (λ cc → cc) (seek-clear (inTake i q w c) s g ok))
   kids-clear c (flatS op f ω d n q o ls) (go , gl) (oko , okl) =
     cl-race d n q (seek (inOuter op f ω d n q ls c) o) (lanes c op f ω d n q o [] ls)
       (cl-map (seek (inOuter op f ω d n q ls c) o) (λ ki → k-kid (k-outer ki)) (λ cc → cc) (seek-clear (inOuter op f ω d n q ls c) o go oko))
       (lanes-clear c op f ω d n q o [] ls (λ m → m) gl okl)
-  kids-clear c (connS k o b) (al , up , go , gb) (_ , ho , hb , _) =
+  kids-clear c (connS k o b) (al , up , go , gb) (ho , hb , _) =
     cl-source c k o b (seek (inSrc k b c) o) (seek (inBody k o c) b) (seek-clear (inSrc k b c) o go ho) (seek-clear (inBody k o c) b gb hb)
       (seek-b (inBody k o c) b) W
     where
