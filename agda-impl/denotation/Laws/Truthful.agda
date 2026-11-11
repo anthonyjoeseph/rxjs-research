@@ -37,6 +37,7 @@ open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; 
 open import denotation.Laws.Count using (ag-cnt)
 open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; InvD; Lawful; _∪ʰ_; ⊑-refl)
 open import denotation.Laws.ConnectNe using (Causal)
+open import denotation.Laws.Hush using (Hushes; hush-at)
 open import denotation.Laws using (from; inv-approx; good-cons; causal-at)
 open import denotation.Laws.Truth using (Finite; Rel; Safe; few-ag; safe-ag; spin-truth; truth-finite; truth-lies; placed-refl; Placed)
 open import denotation.Laws.Truth.Ops using (defer-truth; map-truth; scan-truth; take-truth)
@@ -46,12 +47,14 @@ open import denotation.Laws.ShowsEv using (sk-approx)
 -- EACH OPERATOR KEEPS THE TRUTH: every operator over children each
 -- against the next.  A connect's body is read against its next under ONE
 -- handle, and across the two handles by causality (`Causal`), as the
--- order modulus is (`settle`).
+-- order modulus is (`settle`).  Its body keeps the handle's silence
+-- (`Hushes`): one showing a skip as a value is causal and keeps the
+-- invariant, yet spins loud under its source's cut.
 postulate
   connect-truth : ∀ {A B H} {s s′ : Den A} {F F′ : Den A → Den B}
                 → InvD H s → InvD H s′
                 → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) → (∀ {t} → Lawful t → InvD (H ∪ʰ t) (F′ (hot t)))
-                → Causal F → Causal F′
+                → Causal F → Causal F′ → Hushes H F
                 → Rel H s s′ → (∀ {t} → Lawful t → Rel (H ∪ʰ t) (F (hot t)) (F′ (hot t)))
                 → Rel H (Op.connect s F) (Op.connect s′ F′)
 
@@ -80,7 +83,7 @@ truth n       (connect s b)     ρ g =
   connect-truth {s = approx n s ρ} {approx (suc n) s ρ} {λ h → approx n b (h ∷ ρ)} {λ h → approx (suc n) b (h ∷ ρ)}
     (inv-approx n s ρ g) (inv-approx (suc n) s ρ g)
     (λ {t} L → inv-approx n b (hot t ∷ ρ) (good-cons L g)) (λ {t} L → inv-approx (suc n) b (hot t ∷ ρ) (good-cons L g))
-    (causal-at n b ρ) (causal-at (suc n) b ρ)
+    (causal-at n b ρ) (causal-at (suc n) b ρ) (hush-at n b ρ g)
     (truth n s ρ g) (λ {t} L → truth n b (hot t ∷ ρ) (good-cons L g))
 truth n       (connected i)     ρ g p ok = placed-refl
 truth zero    (defer l)         ρ g = spin-truth (inv-approx zero (Later.force l) ρ g)
