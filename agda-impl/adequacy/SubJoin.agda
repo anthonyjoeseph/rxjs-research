@@ -14,7 +14,7 @@ open import Data.Bool using (T; true; false; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
@@ -196,18 +196,6 @@ settle-of {Γ} {sc} {Rg} {C} {A} {i} {q} {xs} {P} {E} m to from ow =
     from′ : ∀ {r e} → Due origin (InE (ofᴱ q i xs)) r e → Due C P r e
     from′ (r , v , _) = from r , v , ow r
 
--- An of's rows: finitely many, each under its subscription.
-of-rows : ∀ {A : Set} → Pos → ℕ → List A → List Pos
-of-rows p i []       = [ p ⊕ [ last ] ]
-of-rows p i (_ ∷ xs) = (p ⊕ [ ix i ]) ∷ of-rows p (suc i) xs
-
-of-in : ∀ {A} p i (xs : List A) {y e} → InE (ofᴱ p i xs) y e → y ∈ of-rows p i xs
-of-in p i []       at-end     = here refl
-of-in p i (_ ∷ xs) at-out     = here refl
-of-in p i (_ ∷ xs) (on-out r) = there (of-in p (suc i) xs r)
-
-of-reach : ∀ {A} p i (xs : List A) {y e} → Reach (InE (ofᴱ p i xs)) y e
-of-reach p i xs = of-rows p i xs , λ r _ _ → of-in p i xs r
 
 of-owes : ∀ C {A} p i (xs : List A) → Owes C p → ∀ {y e} → InE (ofᴱ p i xs) y e → Owes C y
 of-owes C p i []       ow at-end     = owes-≼ C {p} {p ⊕ [ last ]} ow (≺→≼ {p} {p ⊕ [ last ]} (≺-ext p []))
