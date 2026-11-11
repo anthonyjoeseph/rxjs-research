@@ -33,8 +33,8 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; Home; Near; Whole;
-  instant-⊕; EnvRel; Bound; HotsListed; module OneUnder)
+open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; Home; Near; Whole; instant-⊕; EnvRel; Bound; HotsListed; IntoAt)
+open import simultaneous.CarryLeaves using (module OneUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab)
 
@@ -94,8 +94,8 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
   carried = record
     { Img     = Img
     ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
-    ; img     = λ tk _ _ _ _ → img tk
-    ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (l , i , e′ , ul , m)
+    ; img     = λ tk _ _ _ _ → inj₁ (img tk)
+    ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (inj₁ (l , i , e′ , ul , m))
     ; shown   = λ { (spin _ , _) () }
     ; img-row = λ { (_ , _ , spin i , r) n → n (skip , (spin i , r) , tt) }
     ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
@@ -105,7 +105,8 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; whole   = λ wt _ _ → whole wt
     ; bk      = λ l → [ down l ]
     ; in-bk   = λ { ((a , _ , refl , refl) , _) → here (sym (down-⊕ [ a ])) }
-    ; pbk     = λ _ → []
+    ; PB      = λ _ _ → ⊥
+    ; pb-few  = λ _ → [] , λ ()
     ; pinned  = λ { (() , _) _ }
     }
 
@@ -131,7 +132,7 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
 carry-grow sub c = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole
-  ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned }
+  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pinned = pinned }
   where
     open CarryAt c
 
@@ -229,17 +230,36 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   ext (inj₁ (refl , refl)) = E.g , mg , ⊑-refl E.g
   ext (inj₂ i)             = C.ext i
 
+  -- What the body puts into its instant, on its own rows.
+  PB : Pos → Pos → Set
+  PB k l = Σ (Ev (IE A)) (E.B l) × C.PB k l
+
+  pb-few : ∀ {l e} → E.T l e → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
+  pb-few (guard , _)  = [] , λ { ((_ , y) , _) → ⊥-elim (E.¬g y) }
+  pb-few (body y , _) = proj₁ (C.pb-few y) , λ { (_ , m) → proj₂ (C.pb-few y) m }
+
+  into : ∀ {k} → IntoAt C.Img (enter s′ (p′ ⊕ [ ix 1 ])) C.PB HP (p ⊕ [ ix 1 ]) k → IntoAt Img E.T PB HP p k
+  into ((l , (e , ul) , L , m) , h) = (l , (e , E.up ul) , E.lst→ ul L , ((e , ul) , m)) , at h
+    where
+      at : _ → _
+      at (inj₁ e)                                             = inj₁ (trans e (instant-⊕ p [ ix 1 ]))
+      at (inj₂ (inj₁ (k₀ , l₀ , i , kk , e , (e₀ , ul₀) , L))) = inj₂ (inj₁ (k₀ , l₀ , inj₂ i , kk , e , (e₀ , E.up ul₀) , E.lst→ ul₀ L))
+      at (inj₂ (inj₂ h))                                      = inj₂ (inj₂ h)
+
   img : ∀ {k e} → P.T k e → Unpinned e → Live P.T k → Listed P.T k → LP k
-      → Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Listed E.T l × Match Every (One valuesOf) (Reads valuesOf) e e′
-  img (guard , _) _ _ _ _ = E.g , inj₁ (refl , refl) , skip , E.gT , ([] , (λ x lt → ⊥-elim (E.none x lt)) , λ ()) , (λ ()) , λ _ ()
+      → (Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Listed E.T l × Match Every (One valuesOf) (Reads valuesOf) e e′)
+        ⊎ (e ≡ skip × IntoAt Img E.T PB HP p k)
+  img (guard , _) _ _ _ _ = inj₁ (E.g , inj₁ (refl , refl) , skip , E.gT , ([] , (λ x lt → ⊥-elim (E.none x lt)) , λ ()) , (λ ()) , λ _ ())
   img (body x , _) un lv ls lp with C.img x un (P.live← lv) (P.lst← ls) lp
-  ... | l , i , e′ , ul , lu , m = l , inj₂ i , e′ , E.up ul , E.lst→ ul lu , m
+  ... | inj₁ (l , i , e′ , ul , lu , m) = inj₁ (l , inj₂ i , e′ , E.up ul , E.lst→ ul lu , m)
+  ... | inj₂ (es , h)                   = inj₂ (es , into h)
 
   img¬¬ : ∀ {k e} → P.T k e → Unpinned e → Live P.T k → Few P.T k
-        → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′
-  img¬¬ (guard , _) _ _ _ n = n (E.g , inj₁ (refl , refl) , skip , E.gT , (λ ()) , λ _ ())
+        → ¬ ¬ ((Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → E.T l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
+  img¬¬ (guard , _) _ _ _ n = n (inj₁ (E.g , inj₁ (refl , refl) , skip , E.gT , (λ ()) , λ _ ()))
   img¬¬ (body x , _) un lv fw n =
-    C.img¬¬ x un (P.live← lv) (P.few← fw) λ { (l , i , e′ , ul , m) → n (l , inj₂ i , e′ , E.up ul , m) }
+    C.img¬¬ x un (P.live← lv) (P.few← fw) λ { (inj₁ (l , i , e′ , ul , m)) → n (inj₁ (l , inj₂ i , e′ , E.up ul , m))
+                                             ; (inj₂ es) → n (inj₂ es) }
 
   shown : ∀ {l e} → E.T l e → Shown (One valuesOf) e → Live E.T l → Few E.T l
         → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → P.T k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
@@ -294,11 +314,11 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
   pinned : ∀ {k q} → P.T k (pin q) → Live P.T k
-         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × k ∈ C.pbk l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q))
+         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q))
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
   pinned {k} {q} (body x , _) lv with C.pinned x (P.live← lv)
-  ... | (l , q′ , ul , m , b) , r = (l , q′ , E.up ul , m , b′) , homed {k} {q} r
+  ... | (l , q′ , ul , m , b) , r = (l , q′ , E.up ul , ((pin q′ , ul) , m) , b′) , homed {k} {q} r
     where
       b′ : ∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q
       b′ (inj₁ (refl , refl)) _ = ≺-≼-≺ {P.g} {p ⊕ [ ix 1 ]} {q} (ticks p 0) (proj₂ (aP x) refl)
@@ -308,7 +328,7 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   carried = record
     { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
     ; live = live ; few = few ; whole = whole
-    ; bk = bk ; in-bk = in-bk ; pbk = C.pbk ; pinned = pinned }
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pinned = pinned }
 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by
 -- the guard and the body's subscription, held fresh at the body's.

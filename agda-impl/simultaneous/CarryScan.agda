@@ -48,7 +48,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map;
-  module Relabel; module Mono; Home; Near; Whole; sub-listed; few-sub; match-val; carried-val; match-end)
+  module Relabel; module Mono; Home; Near; Whole; IntoAt; sub-listed; few-sub; match-val; carried-val; match-end)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
 
@@ -262,7 +262,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ... | n , refl = _ , i , instEmit (value _) n , ul , refl
 
     img-out : ∀ {x a} → t x (out a) → ¬ ¬ Σ Pos λ l′ → Img x l′ × Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
-    img-out tx n = img¬¬ tx tt (live-out tx) (few-of tt tx) λ { (_ , i , _ , ul , mt) → n (img-val i ul mt) }
+    img-out tx n = img¬¬ tx tt (live-out tx) (few-of tt tx) λ { (inj₁ (_ , i , _ , ul , mt)) → n (img-val i ul mt) ; (inj₂ ()) }
 
     img-at : ∀ {x a l′} → t x (out a) → Img x l′ → ¬ ¬ Σ (IE A) λ y → u l′ (out y) × Reads valuesOf a y
     img-at tx i′ n = img-out tx λ { (l″ , i″ , y , ul , r) → n (y , subst (λ l → u l (out y)) (img-fun i″ i′) ul , r) }
@@ -362,28 +362,45 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     send-at ul (cr , _) with cr tt
     ... | refl = end , (E.send ul , reach-kin downU₀ k-end (rchU ul)) , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
 
+    -- A skip carried into its instant, on the fold's rows.
+    into : ∀ {k} → IntoAt Img u PB HP s k → IntoAt Img S′ PB HP s k
+    into ((l , (_ , ul) , L , m) , h) = (l , (proj₁ (upL L ul) , proj₁ (proj₂ (upL L ul))) , lstU→ L , m) , at h
+      where
+        at : _ → _
+        at (inj₁ e) = inj₁ e
+        at (inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (_ , ul₀) , L₀))) =
+          inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (proj₁ (upL L₀ ul₀) , proj₁ (proj₂ (upL L₀ ul₀))) , lstU→ L₀))
+        at (inj₂ (inj₂ h)) = inj₂ (inj₂ h)
+
     img′ : ∀ {k e} → S k e → Unpinned e → Live S k → Listed S k → LP k
-         → Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) e e′
+         → (Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Listed S′ l × Match Every (One stateValues) (Reads stateValues) e e′)
+           ⊎ (e ≡ skip × IntoAt Img S′ PB HP s k)
     img′ (P.sval ac , _) _ lv L lp with PF.acc-val ac
     ... | a , tk with img tk tt (liveS← lv) (lstS← L) lp
-    ...   | l , i , e₁ , ul , Lu , mt = l , i , sval-at ac (liveS← lv) tk i ul Lu mt
+    ...   | inj₁ (l , i , e₁ , ul , Lu , mt) = inj₁ (l , i , sval-at ac (liveS← lv) tk i ul Lu mt)
+    ...   | inj₂ (() , _)
     img′ (P.sstep x , _) _ lv L lp with img x tt (liveS← lv) (lstS← L) lp
-    ... | l , i , e₁ , ul , Lu , (_ , ns) with upL Lu ul
-    ...   | e₁′ , s₁ , _ = l , i , e₁′ , s₁ , lstU→ Lu , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw)
+    ... | inj₂ (_ , h) = inj₂ (refl , into h)
+    ... | inj₁ (l , i , e₁ , ul , Lu , (_ , ns)) with upL Lu ul
+    ...   | e₁′ , s₁ , _ = inj₁ (l , i , e₁′ , s₁ , lstU→ Lu , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw))
     img′ (P.send x , _) _ lv L lp with img x tt (liveS← lv) (lstS← L) lp
-    ... | l , i , e₁ , ul , Lu , (cr , _) with cr tt
-    ...   | refl = l , i , end , (E.send ul , reach-kin downU₀ k-end (rchU ul)) , lstU→ Lu , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
+    ... | inj₂ (() , _)
+    ... | inj₁ (l , i , e₁ , ul , Lu , (cr , _)) with cr tt
+    ...   | refl = inj₁ (l , i , end , (E.send ul , reach-kin downU₀ k-end (rchU ul)) , lstU→ Lu , (λ _ → refl) , λ ns → ⊥-elim (ns tt))
     img′ (P.spin _ , _) () _ _ _
 
     img¬¬′ : ∀ {k e} → S k e → Unpinned e → Live S k → Few S k
-           → ¬ ¬ Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Match Every (One stateValues) (Reads stateValues) e e′
+           → ¬ ¬ ((Σ Pos λ l → Img k l × Σ (Ev (B × IE B)) λ e′ → S′ l e′ × Match Every (One stateValues) (Reads stateValues) e e′) ⊎ e ≡ skip)
     img¬¬′ (P.sval ac , _) _ lv _ n with PF.acc-val ac
-    ... | a , tk = img¬¬ tk tt (liveS← lv) (few-of tt tk) λ { (l , i , e₁ , ul , mt) →
-      few-¬¬listed (few-ofU (carried-unp mt) ul) λ Lu → let (e′ , s₁ , _ , m) = sval-at ac (liveS← lv) tk i ul Lu mt in n (l , i , e′ , s₁ , m) }
-    img¬¬′ (P.sstep x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (l , i , e₁ , ul , (_ , ns)) →
-      upU ul λ { (e₁′ , s₁ , _) → n (l , i , e₁′ , s₁ , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw)) } }
-    img¬¬′ (P.send x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (l , i , e₁ , ul , m) →
-      let (e′ , s₁ , m′) = send-at ul m in n (l , i , e′ , s₁ , m′) }
+    ... | a , tk = img¬¬ tk tt (liveS← lv) (few-of tt tk) λ { (inj₁ (l , i , e₁ , ul , mt)) →
+      few-¬¬listed (few-ofU (carried-unp mt) ul) λ Lu → let (e′ , s₁ , _ , m) = sval-at ac (liveS← lv) tk i ul Lu mt in n (inj₁ (l , i , e′ , s₁ , m))
+      ; (inj₂ ()) }
+    img¬¬′ (P.sstep x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (inj₁ (l , i , e₁ , ul , (_ , ns))) →
+      upU ul λ { (e₁′ , s₁ , _) → n (inj₁ (l , i , e₁′ , s₁ , (λ ()) , λ _ sw → ns (λ ()) (shownU ul s₁ sw))) }
+      ; (inj₂ _) → n (inj₂ refl) }
+    img¬¬′ (P.send x , _) _ lv _ n = img¬¬ x tt (liveS← lv) (few-of tt x) λ { (inj₁ (l , i , e₁ , ul , m)) →
+      let (e′ , s₁ , m′) = send-at ul m in n (inj₁ (l , i , e′ , s₁ , m′))
+      ; (inj₂ ()) }
     img¬¬′ (P.spin _ , _) () _ _
 
     shown′ : ∀ {l e} → S′ l e → Shown (One stateValues) e → Live S′ l → Few S′ l
@@ -416,7 +433,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
     pinned′ : ∀ {k p} → S k (pin p) → Live S k
-              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × k ∈ pbk l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p))
+              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p))
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) lv with pinned x (liveS← lv)
@@ -433,7 +450,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
     ; whole = λ wt ne lp → let (ls , F) = whole (wholeS← wt) (endedS← ne) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
-    ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′ }
 
 ------------------------------------------------------------------------
 -- The former
