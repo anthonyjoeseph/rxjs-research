@@ -37,7 +37,8 @@ open import denotation.EmissionSet
 open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; ≼-refl; upto)
 open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-sym)
 open import denotation.Laws.Worlds using (⊑-refl)
-open import denotation.Laws.Truthful using (reached; few-ag)
+open import denotation.Laws.Truth using (few-ag)
+open import denotation.Laws.Truthful using (reached)
 open import denotation.Laws.ColdInv using (depth)
 open import denotation.Laws.Cut using (Deep; spinIx; capprox; cut-ne)
 import quickcheck.Tabled as Tb
