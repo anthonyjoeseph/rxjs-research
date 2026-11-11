@@ -49,7 +49,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map;
-  module Relabel; module Mono; Home; Near; Rest; Whole)
+  module Relabel; module Mono; Home; Near; Whole)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
 
@@ -266,10 +266,6 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     lstS← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′ kk) })
                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (down (proj₂ (proj₂ (B m)))))
 
-    restS← : ∀ {k} → Rest S k → Rest t k
-    restS← (ks , F , B) = ks , (λ y kk → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′ kk) })
-                        , λ m → proj₁ (B m) , _ , proj₁ (proj₂ (down (proj₂ (proj₂ (B m)))))
-
     wholeS← : Whole S → Whole t
     wholeS← (ks , F , B) = ks , (λ y → ∈-stable λ ni → up y λ { (_ , y′ , _) → ni (F y′) })
                          , λ m → _ , proj₁ (proj₂ (down (proj₂ (B m))))
@@ -451,13 +447,14 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
-    pinned′ : ∀ {k p} → S k (pin p) → Live S k → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × k ∈ pbk l)
+    pinned′ : ∀ {k p} → S k (pin p) → Live S k
+              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × k ∈ pbk l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p))
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) lv with pinned x (liveS← lv)
-    ... | (l , p′ , ul , m) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m) , inj₁ e
-    ... | (l , p′ , ul , m) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
-    ... | (l , p′ , ul , m) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m) , inj₂ (inj₂ hh)
+    ... | (l , p′ , ul , m , b) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b) , inj₁ e
+    ... | (l , p′ , ul , m , b) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
+    ... | (l , p′ , ul , m , b) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b) , inj₂ (inj₂ hh)
 
   scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
@@ -467,7 +464,6 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (liveU← {m} (λ {c} → lv {c})) (lstU← {m} lm))
     ; live = λ {k} {l} i lv → liveU→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
-    ; spent = λ {k} i lt rt lp → let (ls , F) = spent i (lstS← {k} lt) (restS← {k} rt) lp in ls , λ s₁ lr → F (proj₁ (proj₂ (downU s₁))) lr
     ; whole = λ wt lp → let (ls , F) = whole (wholeS← wt) lp in ls , λ s₁ → F (proj₁ (proj₂ (downU s₁)))
     ; bk = bk ; in-bk = in-bk ; pbk = pbk ; pinned = pinned′ }
 
