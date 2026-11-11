@@ -139,13 +139,13 @@ module Bnds {A B : Set} {H : Pos → Set} (n : ℕ) {f f′ : A → Den B} {s s�
     I₀ = BI.LI sb₀
 
     z₀ : Pos
-    z₀ = proj₁ (Truth.shows tr ct 0)
+    z₀ = proj₁ (Truth.first tr ct)
 
     cz₀ : (c ⊕ [ ix 0 ]) ⊑ z₀
-    cz₀ = proj₁ (proj₂ (proj₂ (Truth.shows tr ct 0)))
+    cz₀ = proj₁ (proj₂ (proj₂ (Truth.first tr ct)))
 
-    lz₀ : enter (f a₀) s₀ z₀ (proj₁ (proj₂ (Truth.shows tr ct 0)))
-    lz₀ = proj₂ (proj₂ (proj₂ (Truth.shows tr ct 0)))
+    lz₀ : enter (f a₀) s₀ z₀ (proj₁ (proj₂ (Truth.first tr ct)))
+    lz₀ = proj₂ (proj₂ (proj₂ (Truth.first tr ct)))
 
     -- The cut's first spin row: silent, so no queued end.
     lr₀ : Lr a₀ s₀ z₀
@@ -210,7 +210,7 @@ module Bnds {A B : Set} {H : Pos → Set} (n : ℕ) {f f′ : A → Den B} {s s�
   at-lane : ∀ {q₀ a₀ s₀ c e q a} {X : EmissionSet B} → o q₀ (out a₀) → J.Sl q₀ a₀ s₀ → (tr : Truth (enter (f a₀) s₀) X)
           → W⁼ H s₀ c → Truth.Cut tr c → o q (out a) → Lane q a c e → ⊥
   at-lane {c = c} _ (i₀ , sb₀) tr c⁼ ct _ (i , _ , sb , ly) with i ≟ i₀
-  ... | yes refl with BI.sub-fun sb sb₀ | Truth.shows tr ct 0
+  ... | yes refl with BI.sub-fun sb sb₀ | Truth.first tr ct
   ...   | refl , refl , refl | _ , _ , cz , lz = flat-under (BI.LI sb₀) (proj₁ ly) lz cz
   at-lane {c = c} _ (i₀ , sb₀) tr c⁼ ct _ (i , _ , sb , ly) | no ne =
     lr-any ly (λ l → Off.off sb₀ tr c⁼ ct sb ne l (⊑-refl c) (≺-ext c {ix 0} []))
@@ -220,7 +220,7 @@ module Bnds {A B : Set} {H : Pos → Set} (n : ℕ) {f f′ : A → Den B} {s s�
   at-hand : ∀ {q₀ a₀ s₀ c q a} {X : EmissionSet B} → o q₀ (out a₀) → J.Sl q₀ a₀ s₀ → (tr : Truth (enter (f a₀) s₀) X)
           → W⁼ H s₀ (c ⊕ [ ix 0 ]) → Truth.Cut tr (c ⊕ [ ix 0 ]) → o q (out a) → Lane q a c end → Queued c → ⊥
   at-hand {c = c} _ (i₀ , sb₀) tr c⁼ ct _ (i , _ , sb , ly) h with i ≟ i₀
-  ... | yes refl with BI.sub-fun sb sb₀ | Truth.shows tr ct 0
+  ... | yes refl with BI.sub-fun sb sb₀ | Truth.first tr ct
   ...   | refl , refl , refl | _ , _ , cz , lz = flat-under (BI.LI sb₀) (proj₁ ly) lz (⊑-trans (⊑-snoc⁺ (c ⊕ [ ix 0 ])) cz)
   at-hand {c = c} _ (i₀ , sb₀) tr c⁼ ct _ (i , _ , sb , ly) h | no ne =
     Off.off sb₀ tr c⁼ ct sb ne (lr-hand ly h refl) (⊑-refl (c ⊕ [ ix 0 ])) (≺-ext (c ⊕ [ ix 0 ]) {ix 0} [])

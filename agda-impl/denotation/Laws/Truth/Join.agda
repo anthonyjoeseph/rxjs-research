@@ -111,7 +111,7 @@ module Joiners {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : De
   -- No lane row at a lane's cut: it would be that lane's, under its spin.
   at-lane : ∀ {q₀ a₀ s₀ c e q a} {X : EmissionSet B} → o q₀ (out a₀) → s₀ ≡ q₀ ⊕ [ ix 1 ] → (tr : Truth (enter (f a₀) s₀) X)
           → W⁼ H s₀ c → Truth.Cut tr c → o q (out a) → LaneOf f q a c e → ⊥
-  at-lane {c = c} x₀ refl tr c⁼ ct x l with Truth.shows tr ct 0
+  at-lane {c = c} x₀ refl tr c⁼ ct x l with Truth.first tr ct
   ... | _ , _ , cz , lz = flat-under (J.JU.LI x₀) (J.same x₀ c⁼ x l (⊑-refl c)) lz cz
 
   at-hand : ∀ {q₀ a₀ s₀ c q a} {X : EmissionSet B} → o q₀ (out a₀) → s₀ ≡ q₀ ⊕ [ ix 1 ] → (tr : Truth (enter (f a₀) s₀) X)

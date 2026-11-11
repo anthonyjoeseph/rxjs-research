@@ -2,11 +2,11 @@
 
 -- A JOINING KEEPS THE TRUTH, over an outer and lanes each read against
 -- the next.  The joining's cuts are its inputs' cuts it shows a reached
--- row past the first spin row of: the outer's, and those of a lane it
--- runs uncut there.  Under such a cut its rows are that input's rows, at
--- the same positions (no other lane, value or outer row lies there), so
--- the spin shows silent; and once a row under it is reached, every spin
--- row is, through the rows it reached and the input's own (`Spreading`).
+-- row under the spin of: the outer's, and those of a lane it runs uncut
+-- there.  Under such a cut its rows are that input's rows, at the same
+-- positions (no other lane, value or outer row lies there), so the spin
+-- shows silent; a spin row the input shows is reached through the rows
+-- before the cut and the input's own (`Spreading`).
 --
 -- Up to a clean bound, every input cut few in the joining is one of its
 -- cuts, so no row at or before the bound lies past an input cut, and
@@ -46,13 +46,13 @@ open import denotation.Read using (loud)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≺-irrefl;
   ≺-ext; ticks; reach-few; entered-reach; trunc-to)
 open import denotation.Laws.Count using (Cov; cov-down; cov-lift; cov-stable; em; pinned-after)
-open import denotation.Laws.Shows using (cover; cov-∈; cov-few; lead-∈; few-down; few-reach)
+open import denotation.Laws.Shows using (cover; cov-∈; cov-few; lead-∈; few-down; few-reach; ∈-stable)
 open import denotation.Laws.Worlds using (W; W⁼; inW; Ok; InvAt; InvD; Shows; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊑-cmp; ⊑-≼;
   conv; leads; plain-ix; world-after; inside-⊑; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ; w-up; nest; nest⁼; flat-under)
   renaming (step to wstep)
 open import denotation.Laws.JoinInv using (ix10)
-open import denotation.Laws.Truth using (Truth; Rel; Placed; placing; Spun; Lies; Lie; Clean; Before; lie-up; before-of; few-ag; truth-lies;
-  where?; below-next; spin-few)
+open import denotation.Laws.Truth using (Truth; Rel; Placed; placing; Spun; Lies; Lie; Pins; Clean; Before; lie-up; lies-≼; before-of; few-ag;
+  truth-lies; pins-via; where?; below-next; spin-few)
 
 -- A pin reached: few before its connect.
 reach-pin : ∀ {X} {t : EmissionSet X} {y r} → T (inside r y) → Reach t y (pin r) → Few t r
@@ -67,6 +67,9 @@ under-c c (last ∷ r , refl)  = inj₂ (inj₂ λ _ → Equivalence.from T-≡ 
 
 lies-⊑ : ∀ {c y} → Lies c y → c ⊑ y
 lies-⊑ {c} (_ , l) = ⊑-trans (⊑-snoc⁺ c) l
+
+lies-spun : ∀ {c y} → Lies c y → Spun c y
+lies-spun (i , l) = suc i , l
 
 lies-≺ : ∀ {c y} → Lies c y → c ≺ y
 lies-≺ {c} {y} (i , l) = ≺-≼-≺ {c} {c ⊕ [ ix (suc i) ]} {y} (≺-ext c []) (⊑-≼ l)
@@ -201,15 +204,20 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
   o-val-spun cc sp x = loud tt (TO.silent cc sp x)
 
   o-at-cut : ∀ {c e} → TO.Cut c → o c e → ⊥
-  o-at-cut cc x with TO.shows cc 0
+  o-at-cut cc x with TO.first cc
   ... | _ , _ , cz , oz = flat-under Io x oz cz
 
   -- No lane reaches under an outer cut's spin.
   w1 : ∀ {c ρ b y m} → TO.Cut c → o ρ (out b) → W H (ρ ⊕ [ ix 1 ]) y → (c ⊕ [ ix m ]) ⊑ y → ⊥
-  w1 {c} {ρ} {m = m} cc x yw le with TO.shows cc m
+  w1 {c} {ρ} {m = m} cc x yw le with TO.first cc
   ... | _ , _ , cz , oz =
-    leads (proj₂ ok) (wstep (Placed.placed (R p ok) cc) plain-ix) (λ v → InvAt.under Io x oz plain-ix v cz) nb (inW yw) le
+    leads (proj₂ ok) (wstep (Placed.placed (R p ok) cc) plain-ix) nw nb (inW yw) le
     where
+      nw : W⁼ H (ρ ⊕ [ ix 1 ]) (c ⊕ [ ix m ]) → ⊥
+      nw v with w-up plain-ix v
+      ... | inj₁ eq = o-at-cut cc (subst (λ w → o w (out _)) (⊕-injˡ ρ c eq) x)
+      ... | inj₂ v′ = InvAt.under Io x oz plain-ix v′ (⊑-trans (⊑-snoc⁺ c) cz)
+
       nb : (c ⊕ [ ix m ]) ⊑ (ρ ⊕ [ ix 1 ]) → ⊥
       nb l with ⊑-snoc ρ l
       ... | inj₁ cq = o-val-spun cc (m , cq) x
@@ -332,9 +340,9 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     InCut : Pos → Set
     InCut c = TO.Cut c ⊎ LCut c
 
-    -- An input's cut the joining shows a row past the first of.
+    -- An input's cut the joining shows a row under the spin of.
     Cut′ : Pos → Set
-    Cut′ c = InCut c × Σ Pos λ y → Σ (Ev B) λ e → Jt y e × Lies c y
+    Cut′ c = InCut c × Σ Pos λ y → Σ (Ev B) λ e → Jt y e × Spun c y
 
     unc : ∀ {q k c} → ¬ Cut f o q k → c ≼ k → ¬ Cut f o q c
     unc nc ck ct = nc (cut-up ct ck)
@@ -374,7 +382,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     in-o {c} cc (_ , cy) (hand {c = ce} x _ l _ _) with ⊑-snoc ce cy
     ... | inj₁ cce = ⊥-elim (lane-w1 cc x l cce)
     ... | inj₂ eq with ⊕-injˡ c ce eq
-    ...   | refl with TO.shows cc 0
+    ...   | refl with TO.first cc
     ...     | _ , _ , cz , oz = ⊥-elim (lane-o x l oz (⊑-trans (⊑-snoc⁺ c) cz))
     in-o cc (_ , cy) (left x _ l _ _)    = ⊥-elim (lane-w1 cc x l cy)
     in-o cc _  (run () _)
@@ -383,21 +391,21 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     in-o cc _  (rhand () _)
 
     not-at-o : ∀ {c e} → TO.Cut c → JoinT c e → ⊥
-    not-at-o cc (val {q} x) with TO.shows cc 0
+    not-at-o cc (val {q} x) with TO.first cc
     ... | _ , _ , cz , oz = flat-under Io x oz (⊑-trans (⊑-snoc⁺ (q ⊕ [ ix 0 ])) cz)
     not-at-o cc (step x)    = o-at-cut cc x
     not-at-o cc (opin x)    = o-at-cut cc x
     not-at-o cc (oend x _)  = o-at-cut cc x
     not-at-o cc (opass x _) = o-at-cut cc x
-    not-at-o {c} cc (lane x _ l _ _) with TO.shows cc 0
+    not-at-o {c} cc (lane x _ l _ _) with TO.first cc
     ... | _ , _ , cz , oz = lane-o x l oz (⊑-trans (⊑-snoc⁺ c) cz)
-    not-at-o {c} cc (lend x _ l _ _ _) with TO.shows cc 0
+    not-at-o {c} cc (lend x _ l _ _ _) with TO.first cc
     ... | _ , _ , cz , oz = lane-o x l oz (⊑-trans (⊑-snoc⁺ c) cz)
-    not-at-o {c} cc (lpass x _ l _ _ _) with TO.shows cc 0
+    not-at-o {c} cc (lpass x _ l _ _ _) with TO.first cc
     ... | _ , _ , cz , oz = lane-o x l oz (⊑-trans (⊑-snoc⁺ c) cz)
-    not-at-o cc (hand {c = ce} x _ l _ _) with TO.shows cc 0
+    not-at-o cc (hand {c = ce} x _ l _ _) with TO.first cc
     ... | _ , _ , cz , oz = lane-o x l oz (⊑-trans (⊑-snoc⁺ ce) (⊑-trans (⊑-snoc⁺ (ce ⊕ [ ix 0 ])) cz))
-    not-at-o {c} cc (left x _ l _ _) with TO.shows cc 0
+    not-at-o {c} cc (left x _ l _ _) with TO.first cc
     ... | _ , _ , cz , oz = lane-o x l oz (⊑-trans (⊑-snoc⁺ c) cz)
     not-at-o cc (run () _)
     not-at-o cc (rend () _ _)
@@ -446,26 +454,22 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     not-at-L x₀ sl₀ cl (rhand () _)
 
     ------------------------------------------------------------------------
-    -- A cut reached shows every spin row
-
-    Spread : Pos → Set
-    Spread c = ∀ i → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix i ]) ⊑ z × Jt z e
+    -- A spin row shown, reached
 
     -- An input `I` whose spin rows the joining shows where they lie, and
     -- whose rows are the joining's under the spin: past a bound under the
-    -- cut few in the joining, every spin row is reached, through the rows
-    -- before the bound and the input's own.
+    -- cut few in the joining, a spin row the input shows is reached,
+    -- through the rows before the bound and the input's own.
     module Spreading {X : Set} (I : EmissionSet X) (Rl : Ev X → Ev B → Set) {c : Pos}
-                     (sh : ∀ i → Σ Pos λ z → Σ (Ev X) λ e₀ → (c ⊕ [ ix i ]) ⊑ z × I z e₀)
                      (img : ∀ {z e₀} → Spun c z → I z e₀ → Σ (Ev B) λ e → Rl e₀ e × JoinT z e)
                      (back : ∀ {k e} → Spun c k → JoinT k e → Σ (Ev X) λ e₀ → Rl e₀ e × I k e₀)
                      (dep : ∀ {z k e₀ e e₀′ e′} → Rl e₀ e → Rl e₀′ e′ → Dep z e k e′ → Dep z e₀ k e₀′)
                      (rch : ∀ {z e₀} → I z e₀ → Reach I z e₀)
                      (not-at : ∀ {e} → JoinT c e → ⊥) where
-      spread : ∀ {b} → c ⊑ b → Few JoinT b → Spread c
-      spread {b} cb (ks , h) i with sh i
-      ... | z , e₀ , cz , iz with img (i , cz) iz | rch iz
-      ...   | e , rl , jz | ks′ , h′ = z , e , cz , jz , (ks ++ ks′ , reach)
+      spread : ∀ {b} → c ⊑ b → Few JoinT b → ∀ {i} → (Σ Pos λ z → Σ (Ev X) λ e₀ → (c ⊕ [ ix i ]) ⊑ z × I z e₀)
+             → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix i ]) ⊑ z × Jt z e
+      spread {b} cb (ks , h) {i} (z , e₀ , cz , iz) with img (i , cz) iz | rch iz
+      ... | e , rl , jz | ks′ , h′ = z , e , cz , jz , (ks ++ ks′ , reach)
         where
           reach : ∀ {k e′} → JoinT k e′ → k ≺ z → Dep z e k e′ → k ∈ ks ++ ks′
           reach {k} jk kz d with ≼-or-≻ b k
@@ -483,25 +487,27 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     ... | held = pin _ , s-pin , opin oz
 
     module SpO {c} (cc : TO.Cut c) =
-      Spreading o Same {c} (TO.shows cc) (img-spin-o cc) (in-o cc)
+      Spreading o Same {c} (img-spin-o cc) (in-o cc)
         (λ {z} {k} {e₀} {e} {e₀′} {e′} → same-dep {z = z} {k = k} {e₀ = e₀} {e₀′ = e₀′} {e = e} {e′ = e′})
         (entered-reach s p) (not-at-o cc)
 
     module SpL {q₀ a₀ s₀ c} (x₀ : o q₀ (out a₀)) (sl₀ : Sl q₀ a₀ s₀) (rn : Runs f o q₀) (nc : ¬ Cut f o q₀ c) (cl : TC x₀ sl₀ c) =
-      Spreading (enter (f a₀) s₀) _≡_ {c} (Truth.shows (TL x₀ sl₀) cl)
+      Spreading (enter (f a₀) s₀) _≡_ {c}
         (λ sp lz → _ , refl , lane x₀ rn (mk sl₀ (lz , after x₀ sl₀ lz)) (unc-in x₀ sl₀ (lc⁼ x₀ sl₀ cl) nc (⊑-trans (⊑-snoc⁺ c) (proj₂ sp)))
                                    (work-silent (Truth.silent (TL x₀ sl₀) cl sp lz)))
         (λ sp jk → _ , refl , in-L x₀ sl₀ cl sp jk)
         (λ { refl refl d → d })
         (entered-reach (f a₀) s₀) (not-at-L x₀ sl₀ cl)
 
-    spread : ∀ {c b} → InCut c → c ⊑ b → Few JoinT b → Spread c
-    spread (inj₁ cc)                                  = SpO.spread cc
-    spread (inj₂ (_ , _ , _ , x₀ , sl₀ , rn , nc , cl)) = SpL.spread x₀ sl₀ rn nc cl
+    -- Few before the cut, its first row shows reached.
+    spread : ∀ {c b} → InCut c → c ⊑ b → Few JoinT b → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix 0 ]) ⊑ z × Jt z e
+    spread (inj₁ cc) cb F = SpO.spread cc cb F (TO.first cc)
+    spread (inj₂ (_ , _ , _ , x₀ , sl₀ , rn , nc , cl)) cb F = SpL.spread x₀ sl₀ rn nc cl cb F (Truth.first (TL x₀ sl₀) cl)
 
     -- A pin past a cut whose connect leads it recurs under every spin row.
-    again′ : ∀ {c w r} → InCut c → Jt w (pin r) → Lies c w → r ⊑ c → ∀ i → Σ Pos λ z → (c ⊕ [ ix i ]) ⊑ z × Jt z (pin r)
-    again′ {c} {w} {r} ic (jw , rw) li rc i = go ic
+    again′ : ∀ {c w r} → InCut c → Jt w (pin r) → Lies c w → r ⊑ c → ∀ i → Pins Jt r (c ⊕ [ ix (suc i) ])
+           → Σ Pos λ z → (c ⊕ [ ix i ]) ⊑ z × Jt z (pin r)
+    again′ {c} {w} {r} ic (jw , rw) li rc i ps = go ic
       where
         F : Few JoinT r
         F = reach-pin (S.ins-J jw) rw
@@ -511,34 +517,42 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
 
         go : InCut c → Σ Pos λ z → (c ⊕ [ ix i ]) ⊑ z × Jt z (pin r)
         go (inj₁ cc) with in-o cc sp jw
-        ... | _ , s-pin , ow with TO.again cc ow li rc i
+        ... | _ , s-pin , ow with TO.again cc ow li rc i (pins-via {Y = o} {Z = Jt} (λ y _ → opin y , S.reach-opin F y) ps)
         ...   | z , cz , oz = z , cz , opin oz , S.reach-opin F oz
-        go (inj₂ (_ , _ , _ , x₀ , sl₀ , rn , nc , cl)) with Truth.again (TL x₀ sl₀) cl (in-L x₀ sl₀ cl sp jw) li rc i
+        go (inj₂ (_ , a₀ , s₀ , x₀ , sl₀ , rn , nc , cl)) with Truth.again (TL x₀ sl₀) cl (in-L x₀ sl₀ cl sp jw) li rc i
+                (pins-via {Y = enter (f a₀) s₀} {Z = Jt}
+                   (λ y _ → left x₀ rn (mk sl₀ (y , after x₀ sl₀ y)) (unc nc (⊑-≼ rc)) (proj₂ (InvAt.pinned (LI x₀ sl₀) y)) , S.reach-lane F x₀ sl₀ y) ps)
         ... | z , cz , lz = z , cz , lane x₀ rn (mk sl₀ (lz , after x₀ sl₀ lz)) (unc-in x₀ sl₀ (lc⁼ x₀ sl₀ cl) nc (⊑-trans (⊑-snoc⁺ c) cz)) tt
                           , S.reach-lane F x₀ sl₀ lz
 
-    shows′ : ∀ {c} → Cut′ c → Spread c
-    shows′ {c} (ic , y , e , (jy , ry) , li) = by e jy ry
+    -- The first spin row: the witness, or reached from few before the
+    -- cut, or a pin of a connect leading it recurring there.
+    first′ : ∀ {c} → Cut′ c → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix 0 ]) ⊑ z × Jt z e
+    first′ (_ , y , e , jy , zero , l) = y , e , l , jy
+    first′ {c} (ic , y , e , (jy , ry) , suc j , l) = by e jy ry
       where
         cy : c ⊑ y
-        cy = lies-⊑ li
+        cy = lies-⊑ (j , l)
 
-        by : ∀ e → JoinT y e → Reach JoinT y e → Spread c
+        by : ∀ e → JoinT y e → Reach JoinT y e → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix 0 ]) ⊑ z × Jt z e
         by (out a) _  ry = spread ic cy (reach-few {e = out a} (λ {_} {_} → tt) ry)
         by skip    _  ry = spread ic cy (reach-few {e = skip} (λ {_} {_} → tt) ry)
         by end     _  ry = spread ic cy (reach-few {e = end} (λ {_} {_} → tt) ry)
-        by (pin r) jy ry with ⊑-cmp c r cy (inside-⊑ r y (S.ins-J jy))
-        ... | inj₁ cr = spread ic cr (reach-pin (S.ins-J jy) ry)
-        ... | inj₂ rc = λ i → let (z , cz , jz) = again′ ic (jy , ry) li rc i in z , pin r , cz , jz
+        by (pin r) jy (ks , h) with ⊑-cmp c r cy (inside-⊑ r y (S.ins-J jy))
+        ... | inj₁ cr = spread ic cr (reach-pin (S.ins-J jy) (ks , h))
+        ... | inj₂ rc = let (z , cz , jz) = again′ ic (jy , (ks , h)) (j , l) rc 0 pins in z , pin r , cz , jz
+          where
+            pins : Pins Jt r (c ⊕ [ ix 1 ])
+            pins = ks , λ {k} jk kv → h (proj₁ jk) (≺-≼-≺ {k} {c ⊕ [ ix 1 ]} {y} kv (lies-≼ (j , l))) (λ _ → inj₂ refl)
 
     silent′ : ∀ {c y e} → Cut′ c → Spun c y → Jt y e → Silent e
     silent′ (inj₁ cc , _) sp (jy , _) = same-silent (proj₁ (proj₂ (in-o cc sp jy)))
     silent′ (inj₂ (_ , _ , _ , x₀ , sl₀ , _ , _ , cl) , _) sp (jy , _) = Truth.silent (TL x₀ sl₀) cl sp (in-L x₀ sl₀ cl sp jy)
 
     -- A lane's cut the joining shows past: few before its subscription.
-    wit-few : ∀ {q₀ a₀ s₀ c} (x₀ : o q₀ (out a₀)) (sl₀ : Sl q₀ a₀ s₀) → TC x₀ sl₀ c → (Σ Pos λ y → Σ (Ev B) λ e → Jt y e × Lies c y)
+    wit-few : ∀ {q₀ a₀ s₀ c} (x₀ : o q₀ (out a₀)) (sl₀ : Sl q₀ a₀ s₀) → TC x₀ sl₀ c → (Σ Pos λ y → Σ (Ev B) λ e → Jt y e × Spun c y)
             → Few JoinT s₀
-    wit-few {q₀} {a₀} {s₀} x₀ sl₀ cl (y , e , (jy , ry) , i , l) = by e (in-L x₀ sl₀ cl (suc i , l) jy) ry
+    wit-few {q₀} {a₀} {s₀} x₀ sl₀ cl (y , e , (jy , ry) , sp) = by e (in-L x₀ sl₀ cl sp jy) ry
       where
         by : ∀ e → enter (f a₀) s₀ y e → Reach JoinT y e → Few JoinT s₀
         s₀y : ∀ {e} → enter (f a₀) s₀ y e → s₀ ≼ y
@@ -596,6 +610,40 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
                → Cov b K k
       cov-left x sl rn l nr kb = cov-img kb (left x rn (mk sl (l , after x sl l)) nr (proj₂ (InvAt.pinned (LI x sl) l))) (⊑-refl _)
 
+    -- Few reached rows before: few rows, where hangs show.
+    raw : ∀ {v} → Few Jt v → Few JoinT v
+    raw {v} (ks , h) = ks , λ {k} jk kv → ∈-stable λ ¬i → ¬F λ Fv → ¬i (h (jk , few-reach (few-down Fv (≺→≼ {k} {v} kv))) kv)
+      where
+        ¬F : ¬ ¬ Few JoinT v
+        ¬F = shows-J (ks , λ jk F kv → h (jk , few-reach F) kv)
+
+    -- A spin row few rows precede the next of: the input's shows there,
+    -- reached through the few.
+    shows′ : ∀ {c} → Cut′ c → ∀ i → Few Jt (c ⊕ [ ix (suc i) ]) → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix i ]) ⊑ z × Jt z e
+    shows′ {c} (ic , _) i FJt = go ic
+      where
+        v : Pos
+        v = c ⊕ [ ix (suc i) ]
+
+        FJ : Few JoinT v
+        FJ = raw FJt
+
+        reached : ∀ {z e} → (c ⊕ [ ix i ]) ⊑ z → JoinT z e → Jt z e
+        reached {z} cz jz = jz , few-reach (few-down FJ (≺→≼ {z} {v} (below-next c cz ≤-refl)))
+
+        fewL : ∀ {q₀ a₀ s₀} (x₀ : o q₀ (out a₀)) (sl₀ : Sl q₀ a₀ s₀) → Runs f o q₀ → ¬ Cut f o q₀ c → TC x₀ sl₀ c → Few (enter (f a₀) s₀) v
+        fewL {a₀ = a₀} {s₀} x₀ sl₀ rn nc cl = cov-few {X = enter (f a₀) s₀} {v = v} {ks = FewAt.K FJ}
+          (λ {k} lk kv → FewAt.cov-l FJ x₀ sl₀ rn lk (λ ct → unc-in x₀ sl₀ (lc⁼ x₀ sl₀ cl) nc (⊑-snoc⁺ c) (cut-up ct (≺→≼ {k} {v} kv))) kv)
+
+        go : InCut c → Σ Pos λ z → Σ (Ev B) λ e → (c ⊕ [ ix i ]) ⊑ z × Jt z e
+        go (inj₁ cc) with TO.shows cc i (FewAt.few-o FJ)
+        ... | z , _ , cz , oz with img-spin-o cc (i , cz) oz
+        ...   | e , _ , jz = z , e , cz , reached cz jz
+        go (inj₂ (_ , _ , _ , x₀ , sl₀ , rn , nc , cl)) with Truth.shows (TL x₀ sl₀) cl i (fewL x₀ sl₀ rn nc cl)
+        ... | z , _ , cz , lz =
+          z , _ , cz , reached cz (lane x₀ rn (mk sl₀ (lz , after x₀ sl₀ lz)) (unc-in x₀ sl₀ (lc⁼ x₀ sl₀ cl) nc (⊑-trans (⊑-snoc⁺ c) cz))
+                                     (work-silent (Truth.silent (TL x₀ sl₀) cl (i , cz) lz)))
+
     -- Few before a lane's subscription: an end of a lane before it is
     -- clean, so the next's.  A cut it lay past would spin endlessly many
     -- joining rows before it.
@@ -605,6 +653,11 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
       where
         open FewAt F using (K; cov-l)
 
+        -- The lane's rows before its end are few.
+        fewL : Few (enter (f a₂) s₂) c₂
+        fewL = cov-few {X = enter (f a₂) s₂} {v = c₂} {ks = K}
+                 (λ {k} lk kc → cov-down (cov-l x₂ sl₂ rn₂ lk (unc nc₂ (≺→≼ {k} {c₂} kc)) (≺-trans {k} {c₂} {s₀} kc c₂s₀)) kc (≺→≼ {c₂} {s₀} c₂s₀))
+
         nl : ∀ {k} → k ≼ c₂ → ¬ Lie (TC x₂ sl₂) k
         nl {k} kc (c* , ct , i , l) with where? c* c₂
         ... | inj₁ c₂c = ≺-irrefl {c₂} (≺-trans {c₂} {c* ⊕ [ ix 0 ]} {c₂} c₂c
@@ -613,7 +666,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
         ... | inj₂ (inj₂ far) = spin-few {s = c*} row F
           where
             row : ∀ j → Σ Pos λ z → Σ (Ev B) λ e → (c* ⊕ [ ix j ]) ⊑ z × JoinT z e × z ≺ s₀
-            row j with Truth.shows (TL x₂ sl₂) ct j
+            row j with Truth.shows (TL x₂ sl₂) ct j (few-down fewL (≺→≼ {c* ⊕ [ ix (suc j) ]} {c₂} (far (suc j))))
             ... | z , e , cz , lz =
               z , e , cz , lane x₂ rn₂ (mk sl₂ (lz , after x₂ sl₂ lz)) (unc nc₂ (≺→≼ {z} {c₂} zc)) (work-silent (Truth.silent (TL x₂ sl₂) ct (j , cz) lz))
               , ≺-trans {z} {c₂} {s₀} zc c₂s₀
@@ -649,12 +702,12 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
       ... | inj₂ (inj₁ (zero , sb)) =
         ≺-irrefl {b} (≺-≼-≺ {b} {y} {b} (≺-≼-≺ {b} {c ⊕ [ ix (suc i) ]} {y} (below-next c sb (s≤s z≤n)) (⊑-≼ l)) yb)
       ... | inj₂ (inj₁ (suc j , sb)) = nl (c , cc , j , sb)
-      ... | inj₂ (inj₂ far) with shows′ cc 1
+      ... | inj₂ (inj₂ far) with shows′ cc 1 (few-down (proj₁ fewJ , λ jk kb → proj₂ fewJ (proj₁ jk) kb) (≺→≼ {c ⊕ [ ix 2 ]} {b} (far 2)))
       ...   | z , _ , cz , jz = proj₂ (proj₂ bf jz (≺-trans {z} {c ⊕ [ ix 2 ]} {b} (below-next c cz ≤-refl) (far 2))) (c , cc , 0 , cz)
 
       -- An input's cut before the bound is the joining's.
       cut-of : ∀ {c} → InCut c → c ≺ b → Cut′ c
-      cut-of {c} ic cb with spread ic (⊑-refl c) (few-down fewJ (≺→≼ {c} {b} cb)) 1
+      cut-of {c} ic cb with spread ic (⊑-refl c) (few-down fewJ (≺→≼ {c} {b} cb))
       ... | z , e , cz , jz = ic , z , e , jz , 0 , cz
 
       clearO : ∀ {y} → y ≼ b → ¬ Lie TO.Cut y
@@ -754,7 +807,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           dep : ∀ {k e₀} → o k e₀ → k ≺ q → Dep q (pin r) k e₀ → Cov q (K ++ cks) k × ¬ Lie TO.Cut k
           dep {k} ok kq d with d ins
           ... | inj₁ kr   = wide (cov-o ok kr) , clearO (≺→≼ {k} {r} kr)
-          ... | inj₂ refl = cov-++ʳ (proj₁ hit) , λ { (c , cc , l) → proj₂ hit (c , (inj₁ cc , k , pin r , jk , l) , l) }
+          ... | inj₂ refl = cov-++ʳ (proj₁ hit) , λ { (c , cc , l) → proj₂ hit (c , (inj₁ cc , k , pin r , jk , lies-spun l) , l) }
             where
               jk : Jt k (pin r)
               jk = opin ok , S.reach-opin fewJ ok
@@ -769,7 +822,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           ... | inj₁ kr   = wide (cov-l x sl rn lk (unc nr (≺→≼ {k} {r} kr)) kr)
                           , clearL x sl rn (≺→≼ {k} {r} kr) (λ {c} ck → unc nr (≼-trans {c} {k} {r} (⊑-≼ ck) (≺→≼ {k} {r} kr)))
           ... | inj₂ refl = cov-++ʳ (proj₁ hit)
-                          , λ { (c , ct , l) → proj₂ hit (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (lies-⊑ l) rk , ct) , k , pin r , jk , l) , l) }
+                          , λ { (c , ct , l) → proj₂ hit (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (lies-⊑ l) rk , ct) , k , pin r , jk , lies-spun l) , l) }
             where
               ink : T (inside r k)
               ink = proj₂ (InvAt.pinned (LI x sl) lk)
@@ -788,7 +841,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           q₂r : q₂ ≼ r
           q₂r = val-pin x sl l
           nq : ¬ Lie (TC x sl) q
-          nq (c , ct , li) = proj₁ cl (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (lies-⊑ li) rq , ct) , q , pin r , jq , li) , li)
+          nq (c , ct , li) = proj₁ cl (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (lies-⊑ li) rq , ct) , q , pin r , jq , lies-spun li) , li)
           l′ : enter (f′ a) s₂ q (pin r)
           l′ = proj₁ (Truth.agree (TL x sl) q (pin r) (cleanL-pin x sl rn nr r⁼ nq)) l
           x′ : o′ q₂ (out a)
@@ -804,7 +857,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
       to jq@(opin x , _) = K′.opin x′ , S′.reach-opin fewJ′ x′
         where
           x′ : o′ q (pin r)
-          x′ = proj₁ (TO.agree q (pin r) (cleanO-pin λ { (c , cc , l) → proj₁ cl (c , (inj₁ cc , q , pin r , jq , l) , l) })) x
+          x′ = proj₁ (TO.agree q (pin r) (cleanO-pin λ { (c , cc , l) → proj₁ cl (c , (inj₁ cc , q , pin r , jq , lies-spun l) , l) })) x
       to jq@(lane x rn l nc _ , _) = let (_ , sl , (lq , aq)) = slot l in toL x sl rn lq aq (unc nc (⊑-≼ rq)) jq
       to jq@(left x rn l nr _ , _) = let (_ , sl , (lq , aq)) = slot l in toL x sl rn lq aq nr jq
       to (run () _ , _)
@@ -832,7 +885,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           ...   | z , z1 , lz = proj₁ cl (c , (inj₂ (q₂ , a , s₂ , x , sl , rn , uncut-under x sl nr r⁼ (⊑-refl c) rc , ct)
                                               , z , pin r , (left x rn (mk sl (lz , after x sl lz)) nr (proj₂ (InvAt.pinned (LI x sl) lz))
                                                             , S.reach-lane fewJ x sl lz)
-                                              , 0 , z1) , li)
+                                              , 1 , z1) , li)
           l : enter (f a) s₂ q (pin r)
           l = proj₂ (Truth.agree (TL x sl) q (pin r) (cleanL-pin x sl rn nr r⁼ nq)) l′
 
@@ -843,7 +896,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
           nq (c , cc , li) with lie-split li rq
           ... | inj₁ lr = clearO (≼-refl {r}) (c , cc , lr)
           ... | inj₂ rc with TO.shadow cc x′ li rc beforeO (clearO (≼-refl {r}))
-          ...   | z , z1 , oz = proj₁ cl (c , (inj₁ cc , z , pin r , (opin oz , S.reach-opin fewJ oz) , 0 , z1) , li)
+          ...   | z , z1 , oz = proj₁ cl (c , (inj₁ cc , z , pin r , (opin oz , S.reach-opin fewJ oz) , 1 , z1) , li)
           x : o q (pin r)
           x = proj₂ (TO.agree q (pin r) (cleanO-pin nq)) x′
       from (K′.lane x′ rn′ l′ nc′ _ , _) = let (_ , sl′ , (lq , aq)) = SL′.slot l′ in fromL x′ sl′ rn′ lq aq (λ ct → nc′ (cut-up′ ct (⊑-≼ rq)))
@@ -915,6 +968,7 @@ module Core {A B : Set} {H : Pos → Set} {f f′ : A → Den B} {s s′ : Den A
     truth = record
       { Cut    = Cut′
       ; silent = silent′
+      ; first  = first′
       ; shows  = shows′
       ; again  = λ c → again′ (proj₁ c)
       ; shadow = shadow′
