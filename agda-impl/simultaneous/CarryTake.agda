@@ -35,7 +35,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; ≼-≺-≺; ≺-≼-≺; ≼-antisym;
   ≺-ext; T-not; reach-few; few-ind; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; W⁼; inW; step; Plain; plain-ix; plain-last; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼;
-  ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc; ⊕-injʳ; inside-⊑)
+  ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc; ⊕-injʳ; inside-⊑; ⊑-inside; Disj)
 open import denotation.Laws.Count using (em)
 open import denotation.Laws.ShowsOps using (bool)
 open import denotation.Laws using (inv-approx)
@@ -46,7 +46,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Carry; carry; Bare; Within; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; listed↓; IntoAt)
+open import simultaneous.Carry using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Carry; carry; Bare; Within; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; listed↓; IntoAt; Grown; joins-grow)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; passes)
@@ -548,6 +548,12 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
       pair (inj₂ c′) n        = Kc c′ , embK c′ , selfK c′ , otherK c′ n
       pair (inj₁ m) (inj₂ c′) = Kc c′ , embK c′ , otherK c′ (inj₁ m) , selfK c′
 
+  -- A cut lies one label under a point of the map, holding no hot row.
+  grown′ : Disj H₁ s → ∀ {x y} → M′ x y → M x y ⊎ Grown M H₁ x y
+  grown′ _  (inj₁ m) = inj₁ m
+  grown′ dj (inj₂ (cut tk _ _ i _ _ refl refl)) with C.ext i
+  ... | y₀ , m₀ , pp = inj₂ (_ , y₀ , _ , m₀ , ⊑-trans pp (⊑-snoc⁺ _) , refl , λ hq kq → dj hq (InvAt.world It tk) (⊑-inside kq))
+
   within′ : ∀ {x y} → M′ x y → M x y ⊎ W⁼ H₁ s x
   within′ (inj₁ m) = inj₁ m
   within′ (inj₂ (cut tk _ _ _ _ lb refl _)) = inj₂ (inW (step (inW (InvAt.world It tk)) (lab-plain lb)))
@@ -825,16 +831,17 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 -- THE ELABORATED TAKEWHILE CARRIES the plain one, its map grown by the
 -- cuts under the first failing value.
 take-carry : ∀ {A} incl (keep : A → Bool) (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ → Emb M
-           → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′) → Bare M (enter d p) → (∀ {x y} → x ≼ y → LP y → LP x)
+           → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′) → Disj H₁ p → Bare M (enter d p) → (∀ {x y} → x ≼ y → LP y → LP x)
            → CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′
            → Σ PMap λ M′ → M ⊆ᴹ M′ × Emb M′ × (∀ {x y} → M′ x y → M x y ⊎ W⁼ H₁ p x) × Bare M′ (enter (Op.takeWhile incl keep d) p)
-             × CarryAt valuesOf M′ HP HE LP (enter (Op.takeWhile incl keep d) p) (enter (Op.takeWhile incl (passes keep) d′) p′) p p′
-take-carry incl keep d d′ p p′ hm It Iu br lp c = K.M′ , inj₁ , K.emb′ , K.within′ , K.bare′ , K.carried′
+             × (∀ {x y} → M′ x y → M x y ⊎ Grown M H₁ x y) × CarryAt valuesOf M′ HP HE LP (enter (Op.takeWhile incl keep d) p) (enter (Op.takeWhile incl (passes keep) d′) p′) p p′
+take-carry incl keep d d′ p p′ hm It Iu dj br lp c = K.M′ , inj₁ , K.emb′ , K.within′ , K.bare′ , K.grown′ dj , K.carried′
   where module K = Core incl keep hm (λ {q} {e} → entered-reach d p {q} {e}) (λ {q} {e} → entered-reach d′ p′ {q} {e}) It Iu br lp c
 
 carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → Bool) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
-carry-takeWhile n ρ i k s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , br , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-      (M′ , ms′ , hm″ , wi′ , br′ , c′) = take-carry i k (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
-        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) br (λ {x} {y} → listed↓ envP {x} {y}) c
-  in M′ , (λ m → ms′ (ms m)) , hm″ , within-∘ {M₀ = M₀} {M = M} {M′ = M′} {p = p} wi (λ {x} {y} → wi′ {x} {y}) , br′ , c′
+carry-takeWhile n ρ i k s (carry h) = carry λ envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr →
+  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr
+      (M′ , ms′ , hm″ , wi′ , br′ , gr , c′) = take-carry i k (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
+        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) (proj₂ okP) br (λ {x} {y} → listed↓ envP {x} {y}) c
+  in M′ , (λ m → ms′ (ms m)) , hm″ , within-∘ {M₀ = M₀} {M = M} {M′ = M′} {p = p} wi (λ {x} {y} → wi′ {x} {y}) , br′
+     , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M} {N = M′} (λ {x} {y} → ms′ {x} {y}) jn′ (λ {x} {y} → gr {x} {y}) , c′

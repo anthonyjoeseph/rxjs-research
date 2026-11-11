@@ -41,8 +41,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; cold; map; flatMap; connect; connected)
-open import denotation.Position using (Pos; Path; Label; Instant; ix; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath;
+open import denotation.Position using (Pos; Path; Label; Instant; ix; sub; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath;
   cmpInstant; isLt; inside)
+open import Data.List.Properties using (∷-injective)
 open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; coldAt; enter; Proper; DenEnv; Few;
@@ -51,7 +52,7 @@ import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-inside;
-  inside-⊑)
+  inside-⊑; ∙-inj)
 open import simultaneous.SObs using (module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
@@ -769,17 +770,81 @@ Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ W⁼ H p x
 Bare : ∀ {A : Set} → PMap → EmissionSet A → Set
 Bare M t = ∀ {k e x y} → t k e → M x y → k ⊑ x → x ≡ k
 
+-- No hot row at or under a position.
+NotHot : (Pos → Set) → Pos → Set
+NotHot H p = ∀ {q} → H q → p ⊑ q → ⊥
+
+-- A row of a bound hot.
+BoundRow : ∀ {M₀ LP X} {d : Den X} {d′ : Den (AIE X)} → Bound M₀ LP d d′ → Pos → Set
+BoundRow {X = X} b q = Σ (Ev X) (Proper (enter (approx (Bound.m b) (Bound.src b) (Bound.envP b)) (Bound.at b ⊕ [ ix 1 ])) q)
+
+hots-at : ∀ {Γ} (envP : DenEnv Γ) {X} (i : X ∈ Γ) {t : EmissionSet X} → lookup envP i ≡ hot t → ∀ {q e} → t q e → Hots envP q
+hots-at (hot _ ∷ _)    (here refl) refl tq = inj₁ (_ , tq)
+hots-at (coldAt _ ∷ _) (here refl) ()   _
+hots-at (hot _ ∷ ρ)    (there i)   e    tq = inj₂ (hots-at ρ i e tq)
+hots-at (coldAt _ ∷ ρ) (there i)   e    tq = hots-at ρ i e tq
+
+bound-hot : ∀ {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} (envP : DenEnv Γ) {envE : DenEnv Δ}
+            (er : EnvRel M₀ ρ envP envE) {X} (i : X ∈ Γ) {q} → BoundRow (er i) q → Hots envP q
+bound-hot envP er i (_ , x) = hots-at envP i (Bound.isP (er i)) x
+
+-- UNDER A HOT ROW, ONLY A READER'S JOIN: a point the map puts strictly
+-- under a row of a bound hot lies under the row joined at a subscription
+-- `e`, its image under the row's carrier joined at `e`'s image.  Two
+-- readers' rows of one hot row keep their subscriptions' order so.
+Joins : ∀ {Γ Δ} {M₀ : PMap} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (envP : DenEnv Γ) (envE : DenEnv Δ)
+      → EnvRel M₀ ρ envP envE → PMap → Set₁
+Joins {Γ} _ _ _ er M = ∀ {X} (i : X ∈ Γ) {x y q a σ} → M x y → BoundRow (er i) q → x ≡ q ⊕ (a ∷ σ)
+  → Σ Pos λ e → a ≡ sub e × Σ Pos λ e′ → M e e′ × Σ Pos λ L → CarryAt.Img (Bound.carried (er i)) q L × (L ⊕ [ sub e′ ]) ⊑ y
+
+-- One label under a point of the map, imaged under its image, the point
+-- holding no hot row at or under it.
+Grown : PMap → (Pos → Set) → PMap
+Grown M H x y = Σ Pos λ r → Σ Pos λ r₀ → Σ Label λ a → M r r₀ × r₀ ⊑ y × x ≡ r ⊕ [ a ] × NotHot H r
+
+private
+  snoc-split : ∀ (ps qs : Path) {a a′ σ} → ps ++ [ a ] ≡ qs ++ a′ ∷ σ → (ps ≡ qs × a ≡ a′) ⊎ Σ Path λ σ′ → ps ≡ qs ++ a′ ∷ σ′
+  snoc-split []       []            refl = inj₁ (refl , refl)
+  snoc-split (_ ∷ ps) []            refl = inj₂ (ps , refl)
+  snoc-split []       (_ ∷ [])      ()
+  snoc-split []       (_ ∷ _ ∷ _)   ()
+  snoc-split (_ ∷ ps) (_ ∷ qs)      e with ∷-injective e
+  ... | refl , e′ with snoc-split ps qs e′
+  ...   | inj₁ (refl , refl) = inj₁ (refl , refl)
+  ...   | inj₂ (σ′ , refl)   = inj₂ (σ′ , refl)
+
+  -- One label under `r`, read under `q`: `r` is `q`, or lies under `q`'s step.
+  pos-split : ∀ r q {a a′ σ} → r ⊕ [ a ] ≡ q ⊕ (a′ ∷ σ) → (r ≡ q × a ≡ a′) ⊎ Σ Path λ σ′ → r ≡ q ⊕ (a′ ∷ σ′)
+  pos-split (i ∙ ps) (j ∙ qs) e with ∙-inj e
+  ... | refl , e′ with snoc-split ps qs e′
+  ...   | inj₁ (refl , refl) = inj₁ (refl , refl)
+  ...   | inj₂ (σ′ , refl)   = inj₂ (σ′ , refl)
+
+-- THE JOINS KEPT by a map growing by points one label under points of
+-- the map.
+joins-grow : ∀ {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
+             {er : EnvRel M₀ ρ envP envE} {M N : PMap}
+           → M ⊆ᴹ N → Joins ρ envP envE er M → (∀ {x y} → N x y → M x y ⊎ Grown M (Hots envP) x y) → Joins ρ envP envE er N
+joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} ms jn gr i n row xe with gr n
+... | inj₁ m with jn i m row xe
+...   | e , ae , e′ , me , L , il , Ly = e , ae , e′ , ms me , L , il , Ly
+joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} ms jn gr i n row xe | inj₂ (r , r₀ , a , m , ry , refl , nh) with pos-split r _ xe
+... | inj₁ (refl , refl) = ⊥-elim (nh (bound-hot {ρ = ρ} envP {envE = envE} er i row) (⊑-refl r))
+... | inj₂ (σ′ , refl) with jn i m row refl
+...   | e , ae , e′ , me , L , il , Ly = e , ae , e′ , ms me , L , il , ⊑-trans Ly ry
+
 -- CARRIED under every environment of carried binders: subscribed at
--- admissible positions the map pairs, its worlds untouched, the subterm
--- extends the map over its worlds and carries.
+-- admissible positions the map pairs, holding no hot row, its worlds
+-- untouched, the subterm extends the map over its worlds, keeping the
+-- joins, and carries.
 -- A record, so that a statement about a former is compared by its
 -- arguments, never by the elaborated tree its meaning unfolds to.
 record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
-                → ∀ M₀ → Emb M₀ → EnvRel M₀ ρ envP envE
-                → ∀ p p′ → (Σ Pos λ p₀ → M₀ p p₀ × p₀ ⊑ p′) → Ok (Hots envP) p → Ok (Hots envE) p′ → Fresh (Hots envP) M₀ p
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p)
+                → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀
+                → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → NotHot (Hots envP) p → Fresh (Hots envP) M₀ p
+                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p) × Joins ρ envP envE er M
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
 
 ------------------------------------------------------------------------
@@ -796,6 +861,6 @@ postulate
   carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
-carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er p p′ m₀ okP okE fr →
-  let (M , ms , hm′ , wi , br , c) = h envP envE gP gE M₀ hm er p p′ m₀ okP okE fr
-  in M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr →
+  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr
+  in M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , jn′ , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
