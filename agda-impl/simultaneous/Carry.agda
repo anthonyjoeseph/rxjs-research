@@ -40,7 +40,7 @@ open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; cold; map; flatMap; connect; connected)
+open import Tree using (Obs; cold; map; flatMap; connect)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; sub; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath;
   cmpInstant; isLt; inside)
 open import Data.List.Properties using (∷-injective)
@@ -797,6 +797,13 @@ Joins : ∀ {Γ Δ} {M₀ : PMap} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 Joins {Γ} _ _ _ er M = ∀ {X} (i : X ∈ Γ) {x y q a σ} → M x y → BoundRow (er i) q → x ≡ q ⊕ (a ∷ σ)
   → Σ Pos λ e → a ≡ sub e × Σ Pos λ e′ → M e e′ × Σ Pos λ L → CarryAt.Img (Bound.carried (er i)) q L × (L ⊕ [ sub e′ ]) ⊑ y
 
+-- NO POSITION HOLDS ROWS OF TWO HOTS: a hot's rows lie in its source's
+-- world, which holds no row of a hot already bound.
+Apart : ∀ {Γ} → DenEnv Γ → Set
+Apart []             = ⊤
+Apart (hot t ∷ ρ)    = (∀ {q e} → t q e → Hots ρ q → ⊥) × Apart ρ
+Apart (coldAt _ ∷ ρ) = Apart ρ
+
 -- One label under a point of the map, imaged under its image, the point
 -- holding no hot row at or under it.
 Grown : PMap → (Pos → Set) → PMap
@@ -842,7 +849,7 @@ joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} ms jn gr i n row xe |
 record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
-                → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀
+                → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀ → Apart envP
                 → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → NotHot (Hots envP) p → Fresh (Hots envP) M₀ p
                 → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p) × Joins ρ envP envE er M
                   × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
@@ -858,9 +865,8 @@ postulate
                   → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → Carry m ρ′ (f a)) → Carry m ρ (flatMap op f s)
   carry-connect   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
                   → Carry m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → Carry m ρ′ b) → Carry m ρ (connect s b)
-  carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
-carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr →
-  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr
+carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr →
+  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr
   in M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , jn′ , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c

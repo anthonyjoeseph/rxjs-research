@@ -42,8 +42,9 @@ connect's echoes (`Bound.lists`), then the embedding past a former's
 children, and a concat's queued lane. Settled when each former's leaf is
 a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-connected`, `carry-cold`,
-`carry-wrap`.
+Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `carry-wrap`,
+`read-post`, `reader-emb`, `reader-within`, `reader-bare`,
+`reader-joins`, `reader-rejoined`.
 
 #### THE PROTOCOL
 

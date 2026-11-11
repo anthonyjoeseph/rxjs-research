@@ -839,8 +839,8 @@ take-carry incl keep d d′ p p′ hm It Iu dj br lp c = K.M′ , inj₁ , K.emb
   where module K = Core incl keep hm (λ {q} {e} → entered-reach d p {q} {e}) (λ {q} {e} → entered-reach d′ p′ {q} {e}) It Iu br lp c
 
 carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → Bool) s → Carry m ρ s → Carry m ρ (takeWhile i p s)
-carry-takeWhile n ρ i k s (carry h) = carry λ envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr →
-  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn p p′ m₀ okP okE nh fr
+carry-takeWhile n ρ i k s (carry h) = carry λ envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr →
+  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr
       (M′ , ms′ , hm″ , wi′ , br′ , gr , c′) = take-carry i k (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
         (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) (proj₂ okP) br (λ {x} {y} → listed↓ envP {x} {y}) c
   in M′ , (λ m → ms′ (ms m)) , hm″ , within-∘ {M₀ = M₀} {M = M} {M′ = M′} {p = p} wi (λ {x} {y} → wi′ {x} {y}) , br′
