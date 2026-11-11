@@ -19,6 +19,7 @@ open import Data.List using (List; []; _∷_; _++_; [_]; length)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; _≤_; _⊔_)
