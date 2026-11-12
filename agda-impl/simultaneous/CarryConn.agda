@@ -32,7 +32,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
 open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few; ≼-split; ≺-trans; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
 open import denotation.Laws.BoundedInv using (first-child)
 open import denotation.Laws.Shows using (few-reach)
-open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊕-injˡ; inside-⊑; full)
+open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊑-trans; ⊕-identityʳ; ⊕-injˡ; inside-⊑; full)
 import denotation.Laws.Connect as LC
 open import denotation.Laws.ConnectNe using (module Rows)
 import denotation.Laws.Truth.Connect.Cuts as Cuts
@@ -41,14 +41,20 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (unp-pin; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; Ahead; few-sub;
+open import simultaneous.CarryBase using (unp-pin; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; From; Ahead; ahead-under; ahead-over; few-sub;
   sub-listed; instant-⊕)
-open import simultaneous.Carry using (annValues)
+open import simultaneous.Carry using (annValues; PastOver; Anchor)
 open import simultaneous.ReadRows using (up; up-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE)
 
 private
+  -- Past an embedded point, nothing over a later point's image precedes
+  -- the earlier point's.
+  follows : ∀ {M x y x′ y′ l} → Emb M → M x y → M x′ y′ → x ≺ x′ → y′ ⊑ l → l ≺ y → ⊥
+  follows {y = y} {l = l} E m m′ xx yl ly =
+    ≺-irrefl {l} (≺-trans {l} {y} {l} ly (proj₁ (ahead-over (Emb.mono E m m′ xx , λ yy → ⊑-≼ {y} {l} (⊑-trans yy yl) ly) yl)))
+
   nin : ∀ {r k} → T (not (inside r k)) → T (inside r k) → ⊥
   nin {r} {k} ni i with inside r k
   ... | Data.Bool.true  = ni
@@ -88,16 +94,16 @@ private
 
   -- The ends a functional set lists before a position.
   ends-of : ∀ {X : Set} {t : EmissionSet X} {q} → Func t → Listed t q
-          → Σ (List Pos) λ es → (∀ {c} → c ∈ es → t c end) × (∀ {c} → t c end → c ≺ q → c ∈ es)
+          → Σ (List Pos) λ es → (∀ {c} → c ∈ es → c ≺ q × t c end) × (∀ {c} → t c end → c ≺ q → c ∈ es)
   ends-of {X} {t} {q} f (ks , F , B) = gather ks d , is-end , has-end
     where
       d : ∀ {k} → k ∈ ks → List Pos
       d {k} m = endOf k (proj₁ (proj₂ (B m)))
 
-      is-end : ∀ {c} → c ∈ gather ks d → t c end
+      is-end : ∀ {c} → c ∈ gather ks d → c ≺ q × t c end
       is-end m with gather-sound ks d m
       ... | k , mk , jd with endOf-sound k (proj₁ (proj₂ (B mk))) jd
-      ...   | refl , eq = subst (t k) eq (proj₂ (proj₂ (B mk)))
+      ...   | refl , eq = proj₁ (B mk) , subst (t k) eq (proj₂ (proj₂ (B mk)))
 
       has-end : ∀ {c} → t c end → c ≺ q → c ∈ gather ks d
       has-end {c} x cq = gather-complete ks d (F x cq) (subst (λ e → c ∈ endOf c e) (f x (proj₂ (proj₂ (B (F x cq))))) (here refl))
@@ -113,7 +119,7 @@ private
       keep? j = all? (λ c → ¬? (T? (c <ᵖ j))) (proj₁ E)
 
       cover : ∀ {j e} → Proper t j e → j ≺ q → j ∈ filter keep? ks
-      cover {j} (x , pr) jq = ∈-filter⁺ keep? (F x jq) (tabulate λ {c} mc cj → ≺-irrefl {j} (≼-≺-≺ {j} {c} {j} (pr (proj₁ (proj₂ E) mc)) cj))
+      cover {j} (x , pr) jq = ∈-filter⁺ keep? (F x jq) (tabulate λ {c} mc cj → ≺-irrefl {j} (≼-≺-≺ {j} {c} {j} (pr (proj₂ (proj₁ (proj₂ E) mc))) cj))
 
       back : ∀ {j} → j ∈ filter keep? ks → j ≺ q × Σ (Ev X) (Proper t j)
       back {j} m with ∈-filter⁻ keep? {xs = ks} m
@@ -125,6 +131,19 @@ private
           ... | inj₁ jc = jc
           ... | inj₂ cj = ⊥-elim (lookup al (proj₂ (proj₂ E) y (≺-trans {c} {j} {q} cj jq)) cj)
 
+  -- A functional set listed before a position: alive there, or ended
+  -- before it.
+  live-or-ended : ∀ {X : Set} {t : EmissionSet X} {q} → Func t → Listed t q → Live t q ⊎ Σ Pos λ c → c ≺ q × t c end
+  live-or-ended {t = t} {q} f L with ends-of f L
+  ... | c ∷ _ , is , _ = inj₂ (c , is (here refl))
+  ... | [] , _ , has = inj₁ go
+    where
+      go : ∀ {c} → t c end → q ≼ c
+      go {c} y with ≼-or-≻ q c
+      ... | inj₁ qc = qc
+      ... | inj₂ cq with has y cq
+      ...   | ()
+
   -- Whether a position before the listing's bound precedes every end.
   before-ends? : ∀ {X : Set} {t : EmissionSet X} {q} → Func t → Listed t q → ∀ {j} → j ≺ q → Dec (∀ {c} → t c end → j ≺ c)
   before-ends? {t = t} {q} f L {j} jq with all? (λ c → T? (j <ᵖ c)) (proj₁ E)
@@ -135,7 +154,7 @@ private
       go {c} y with ≼-or-≻ q c
       ... | inj₁ qc = ≺-≼-≺ {j} {q} {c} jq qc
       ... | inj₂ cq = lookup al (proj₂ (proj₂ (ends-of f L)) y cq)
-  ... | no nal = no λ h → nal (tabulate λ mc → h (proj₁ (proj₂ (ends-of f L)) mc))
+  ... | no nal = no λ h → nal (tabulate λ mc → h (proj₂ (proj₁ (proj₂ (ends-of f L)) mc)))
 
   -- Listed past a row: the row itself is all that lies before its first child.
   listed-step : ∀ {X : Set} {a : EmissionSet X} {l e} → Listed a l → a l e → Listed a (l ⊕ [ ix 0 ])
@@ -264,9 +283,15 @@ module ConnLists {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   ... | inj₁ lt   = lt
   ... | inj₂ refl = ⊥-elim (InvAt.flat Iσ x y)
 
+  -- The source before a body row, listed.
+  src-under : ∀ {k} → ¬ ¬ Σ (Ev B) (C.β k) → Few C.ConnT k → Listed t k → Listed C.σ k
+  src-under {k} nb Fk L = src-listed Fk L λ {j} x jk →
+      (λ {c} ce → decidable-stable (T? (j <ᵖ c)) λ n → nb λ (_ , b) → n (R.alive-β b x jk ce))
+    , decidable-stable (T? ((j ⊕ [ ix 0 ]) <ᵖ k)) λ n → nb λ (_ , b) → n (below-β x b jk)
+
   -- The hot a body row reads, listed before it.
   hot-listed : ∀ {k e} → C.β k e → Few C.ConnT k → Listed t k → Listed (Proper C.σ) k
-  hot-listed b Fk L = listed-proper (InvAt.func Iσ) (src-listed Fk L λ x jk → R.alive-β b x jk , below-β x b jk)
+  hot-listed b Fk L = listed-proper (InvAt.func Iσ) (src-under (λ n → n (_ , b)) Fk L)
 
   -- The source before an echo's row, listed.
   src-before : ∀ {k e} → C.σ k e → C.Alive k → Few C.ConnT (k ⊕ [ ix 0 ]) → Listed t (k ⊕ [ ix 0 ]) → Listed C.σ k
@@ -381,6 +406,10 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
   Iσ : InvAt HP (p ⊕ [ ix 1 ]) CP.σ
   Iσ = LC.Iσ {s = sP} {F = FP} IsP IFP p okP
 
+  -- A body position leads no source position.
+  leads : ∀ {k k′ e₀ e} → CP.β k e₀ → CP.σ k′ e → k ⊑ k′ → ⊥
+  leads b x = LC.body-leads {s = sP} {F = FP} IsP IFP p okP (LC.bw {s = sP} {F = FP} IsP IFP p okP b) (LC.sw {s = sP} {F = FP} IsP IFP p okP x)
+
   -- An unpinned source row lies before the source's end.
   src-live : ∀ {k e} → CP.σ k e → Unpinned e → Live CP.σ k
   src-live {k} x un {c} y with ≼-or-≻ k c
@@ -403,7 +432,10 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
 
   module Body (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (emb′ : Emb (M_b ∪ᴹ Echo))
               (c_b : CarryAt valuesOf M_b (HP ∪ʰ Proper CP.σ) (HE ∪ʰ Proper CE.σ) (λ q → Listed (Proper CP.σ) q × LP q)
-                             CP.β CE.β (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ])) where
+                             CP.β CE.β (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ]))
+              (past-a : PastOver c_a M_b)
+              (nest : ∀ {k l e₀ h L a σ} → CarryAt.PB c_b k l → CP.β k e₀ → Live CP.β k → Σ (Ev A) (Proper CP.σ h) → CarryAt.Img c_a h L → k ≡ h ⊕ (a ∷ σ)
+                    → Anchor M_b k l h a) where
     module B′ = CarryAt c_b
 
     M′ : PMap
@@ -501,6 +533,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
                  → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → ConnImg k l × instantOf l ≡ instantOf m × Near u m l)
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
       conn-whole : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
+      conn-cover : ∀ {v w} → Listed t v → LP v → Live t v → From ConnImg PB′ t u v w → Listed u w
       conn-pinned : ∀ {k q} → t k (pin q) → Live t k → Listed t k → LP k
                   → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × (∀ {k′ l′} → ConnImg k′ l′ → l′ ≺ q′ → k′ ≺ q) × Listed u l)
                     × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
@@ -519,9 +552,12 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- RECOVERY: git show 018ed286 restores `listed-in`, a subterm listed
     --   where few of its rows precede under listed functional hots.
     postulate
-      conn-σ-body : ∀ {k l e} → Few CP.ConnT k → B′.Img k l ⊎ B′.PB k l → CE.β l e → Listed CE.β l → Listed CE.σ l
-      conn-β-echo : ∀ {k l e e′} → CP.σ k e → CP.Alive k → T (not (inside r k)) → Few CP.ConnT (k ⊕ [ ix 0 ])
-                  → A′.Img k l ⊎ A′.PB k l → CE.σ l e′ → Listed CE.σ l → Listed CE.β (l ⊕ [ ix 0 ])
+      conn-σ-late : ∀ {k l e} → ¬ ¬ Σ (Ev B) (CP.β k) → Few CP.ConnT k → Listed t k → LP k → B′.PB k l → CE.β l e → Listed CE.β l
+                  → Listed CE.σ l
+      conn-σ-ended : ∀ {k l c e} → ¬ ¬ Σ (Ev B) (CP.β k) → B′.Img k l → c ≺ k → CP.σ c end → Listed CP.σ k → LP k → CE.β l e
+                   → Listed CE.β l → Listed CE.σ l
+      conn-β-late : ∀ {k l e e′} → CP.σ k e → Unpinned e → CP.Alive k → T (not (inside r k)) → Few CP.ConnT (k ⊕ [ ix 0 ]) → Listed t (k ⊕ [ ix 0 ])
+                  → LP (k ⊕ [ ix 0 ]) → Live t (k ⊕ [ ix 0 ]) → A′.PB k l → CE.σ l e′ → Listed CE.σ l → Listed CE.β (l ⊕ [ ix 0 ])
 
     -- A reached echo's annotation image is echoed, unshown, in the
     -- elaborated connect; one carried only into its instant is carried
@@ -532,6 +568,93 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
                     → Σ (Ev (IE B)) λ e″ → CE.ConnT (l ⊕ [ ix 0 ]) e″ × ¬ Shown (One valuesOf) e″
       conn-src-carrier : ∀ {k l e e′} → CP.σ k e → CP.Alive k → T (not (inside r k)) → Few CP.ConnT (k ⊕ [ ix 0 ])
                        → A′.PB k l → CE.σ l e′ → Σ (Ev (IE B)) (CE.ConnT (l ⊕ [ ix 0 ]))
+
+    -- A body row's image follows every elaborated source row carrying a
+    -- live source row from the body row on: an image by the order
+    -- embedding, a late carrier by the source's carry.
+    body-from : ∀ {k l} → ¬ ¬ Σ (Ev B) (CP.β k) → B′.Img k l → From A′.Img A′.PB CP.σ CE.σ k l
+    body-from {k} {l} nb i {k′} {_} {l′} tk′ lk′ kk′ m ul′ l′l =
+      ≺-irrefl {l} (≺-trans {l} {l′} {l} (proj₁ (ahead-under (ahead m) (proj₂ (proj₂ (B′.ext i))))) l′l)
+      where
+        y = proj₁ (B′.ext i)
+        my = proj₁ (proj₂ (B′.ext i))
+
+        nk : ¬ (k ⊑ k′)
+        nk kk = nb λ (_ , b) → leads b tk′ kk
+
+        lt : k ≺ k′
+        lt with ≼-split {k} {k′} kk′
+        ... | inj₁ lt′ = lt′
+        ... | inj₂ eq  = ⊥-elim (nk (subst (k ⊑_) eq (⊑-refl k)))
+
+        ahead : A′.Img k′ l′ ⊎ A′.PB k′ l′ → Ahead y l′
+        ahead (inj₁ i′) = ahead-over (Emb.mono emb′ (inj₁ my) (inj₁ (ms_b my′)) lt , λ yy → nk (Emb.reflect emb′ (inj₁ my) (inj₁ (ms_b my′)) yy))
+                                     (proj₂ (proj₂ (A′.ext i′)))
+          where my′ = proj₁ (proj₂ (A′.ext i′))
+        ahead (inj₂ pb) = past-a pb tk′ lk′ ul′ my lt nk
+
+    -- The elaborated source listed before a reached body row's carrier:
+    -- the source's carry covers it from the body row on, while the
+    -- source is alive there.
+    conn-σ-body : ∀ {k l e} → ¬ ¬ Σ (Ev B) (CP.β k) → Few CP.ConnT k → Listed t k → LP k → B′.Img k l ⊎ B′.PB k l → CE.β l e → Listed CE.β l
+                → Listed CE.σ l
+    conn-σ-body nb F L lp (inj₂ pb) ul Lβ = conn-σ-late nb F L lp pb ul Lβ
+    conn-σ-body nb F L lp (inj₁ i) ul Lβ with live-or-ended (InvAt.func Iσ) (PL.src-under nb F L)
+    ... | inj₁ lv = A′.cover (PL.src-under nb F L) lp lv (body-from nb i)
+    ... | inj₂ (c , ck , ce) = conn-σ-ended nb i ck ce (PL.src-under nb F L) lp ul Lβ
+
+    -- An echo's carrier follows every elaborated body row carrying a live
+    -- body row from the echo on: an image past the echo by the order
+    -- embedding; a late carrier past the source row by the body's carry,
+    -- under it by its anchor.
+    echo-from : ∀ {k l e} → CP.σ k e → Unpinned e → A′.Img k l → From B′.Img B′.PB CP.β CE.β (k ⊕ [ ix 0 ]) (l ⊕ [ ix 0 ])
+    echo-from {k} {l} x un i {k₂} {_} {l₂} b₂ lk₂ kk₂ m ul₂ l₂l = go m
+      where
+        E : M′ (k ⊕ [ ix 0 ]) (l ⊕ [ ix 0 ])
+        E = inj₂ (k , l , (_ , x) , i , refl , refl)
+
+        ff : ∀ {x′ y′} → M′ x′ y′ → (k ⊕ [ ix 0 ]) ≺ x′ → y′ ⊑ l₂ → ⊥
+        ff m′ lt′ yl = follows emb′ E m′ lt′ yl l₂l
+
+        lt : (k ⊕ [ ix 0 ]) ≺ k₂
+        lt with ≼-split {k ⊕ [ ix 0 ]} {k₂} kk₂
+        ... | inj₁ lt′ = lt′
+        ... | inj₂ eq  = ⊥-elim (SP.img-body x b₂ (subst ((k ⊕ [ ix 0 ]) ⊑_) eq (⊑-refl _)))
+
+        kk : k ≺ k₂
+        kk = ≺-trans {k} {k ⊕ [ ix 0 ]} {k₂} (≺-ext k []) lt
+
+        past : ¬ (k ⊑ k₂) → B′.PB k₂ l₂ → ⊥
+        past nk pb = ≺-irrefl {l₂} (≺-trans {l₂} {l ⊕ [ ix 0 ]} {l₂} l₂l
+                       (proj₁ (ahead-under (ahead-under (B′.pb-past pb b₂ lk₂ ul₂ (ms_b my) kk nk) yl) ([ ix 0 ] , refl))))
+          where my = proj₁ (proj₂ (A′.ext i))
+                yl = proj₂ (proj₂ (A′.ext i))
+
+        under : B′.PB k₂ l₂ → k ⊑ k₂ → ⊥
+        under pb ([] , eq) = ≺-irrefl {k} (subst (k ≺_) (trans eq (⊕-identityʳ k)) kk)
+        under pb (a ∷ σ , eq) with nest pb b₂ lk₂ (_ , x , src-live x un) i eq
+        ... | _ , _ , m′ , yl , inj₂ kx = ff (inj₁ m′) (≺-trans {k ⊕ [ ix 0 ]} {k₂} {_} lt kx) yl
+        ... | x′ , _ , m′ , yl , inj₁ (ax , xk) = ff (inj₁ m′) (≺-≼-≺ {k ⊕ [ ix 0 ]} {k ⊕ [ a ]} {x′} ka (⊑-≼ ax)) yl
+          where
+            ka : (k ⊕ [ ix 0 ]) ≺ (k ⊕ [ a ])
+            ka with ≼-or-≻ (k ⊕ [ ix 0 ]) (k ⊕ [ a ])
+            ... | inj₂ ak = ⊥-elim (first-child k (≺-ext k []) ak)
+            ... | inj₁ le with ≼-split {k ⊕ [ ix 0 ]} {k ⊕ [ a ]} le
+            ...   | inj₁ lt′ = lt′
+            ...   | inj₂ eq′ = ⊥-elim (SP.img-body x b₂ (subst (_⊑ k₂) (sym eq′) (⊑-trans ax xk)))
+
+        go : B′.Img k₂ l₂ ⊎ B′.PB k₂ l₂ → ⊥
+        go (inj₁ i₂) = ff (inj₁ (proj₁ (proj₂ (B′.ext i₂)))) lt (proj₂ (proj₂ (B′.ext i₂)))
+        go (inj₂ pb) = past (under pb) pb
+
+    -- The elaborated body listed before a reached echo's carrier: the
+    -- body's carry covers it from the echo on, the elaborated body alive
+    -- there.
+    conn-β-echo : ∀ {k l e e′} → CP.σ k e → Unpinned e → CP.Alive k → T (not (inside r k)) → Few CP.ConnT (k ⊕ [ ix 0 ]) → Listed t (k ⊕ [ ix 0 ])
+                → LP (k ⊕ [ ix 0 ]) → Live t (k ⊕ [ ix 0 ]) → A′.Img k l ⊎ A′.PB k l → CE.σ l e′ → Listed CE.σ l → Listed CE.β (l ⊕ [ ix 0 ])
+    conn-β-echo x un al ni F L lp lv (inj₂ pb) ul Lσ = conn-β-late x un al ni F L lp lv pb ul Lσ
+    conn-β-echo x un al ni F L lp lv (inj₁ i) ul Lσ =
+      B′.cover (PL.body-listed F L) (listed-proper (InvAt.func Iσ) (listed-step (PL.src-before x al F L) x) , lp) (body-live F lv) (echo-from x un i)
 
     -- An elaborated body row, listed with the source before it, is a row
     -- of the elaborated connect listed there.
@@ -562,18 +685,18 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
       reached : ∀ {k e} → t k e → Unpinned e → Few CP.ConnT k
       reached (_ , R) un = reach-few (full un) R
 
-      body-home : ∀ {k e} → CP.β k e → Few CP.ConnT k → Listed t k
+      body-home : ∀ {k e} → CP.β k e → Few CP.ConnT k → Listed t k → LP k
                 → instantOf k ≡ instantOf (p ⊕ [ ix 0 ])
                   ⊎ (Σ Pos λ k₀ → Σ Pos λ l₀ → B′.Img k₀ l₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k × Σ (Ev (IE B)) (CE.β l₀) × Listed CE.β l₀)
                   ⊎ Σ Pos (λ h → (HP ∪ʰ Proper CP.σ) h × instantOf h ≡ instantOf k)
                 → Homed k
-      body-home {k} b F L (inj₁ e) = inj₁ (trans e (instant-⊕ p [ ix 0 ]))
-      body-home {k} b F L (inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (e₀ , ul) , L₀))) =
+      body-home {k} b F L lp (inj₁ e) = inj₁ (trans e (instant-⊕ p [ ix 0 ]))
+      body-home {k} b F L lp (inj₂ (inj₁ (k₀ , l₀ , i , kk , ek , (e₀ , ul) , L₀))) =
         inj₂ (inj₁ (k₀ , l₀ , inj₁ (i , F₀) , kk , ek , (e₀ , proj₁ R) , proj₂ R))
         where F₀ = few-sub {a = CP.ConnT} {w = k} {v = k₀} F kk
-              R = body-row ul L₀ (conn-σ-body F₀ (inj₁ i) ul L₀)
-      body-home b F L (inj₂ (inj₂ (h , inj₂ hp , eh))) = inj₂ (inj₂ (h , hp , eh))
-      body-home b F L (inj₂ (inj₂ (h , inj₁ (_ , x , _) , eh))) = conn-heard-home x eh (CP.body b , few-reach {e = _} F) L
+              R = body-row ul L₀ (conn-σ-body (λ n → B′.img-row i λ (e , b , _) → n (e , b)) F₀ (sub-listed L kk) (lp↓ (≺→≼ {k₀} {k} kk) lp) (inj₁ i) ul L₀)
+      body-home b F L lp (inj₂ (inj₂ (h , inj₂ hp , eh))) = inj₂ (inj₂ (h , hp , eh))
+      body-home b F L lp (inj₂ (inj₂ (h , inj₁ (_ , x , _) , eh))) = conn-heard-home x eh (CP.body b , few-reach {e = _} F) L
 
       src-home : ∀ {k₀ e₀} → CP.σ k₀ e₀ → CP.Alive k₀ → T (not (inside r k₀)) → Listed t (k₀ ⊕ [ ix 0 ])
                → instantOf k₀ ≡ instantOf r
@@ -590,11 +713,11 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     conn-img tk@(CP.body b , _) un lv L lp with B′.img b un (body-live (reached tk un) lv) (PL.body-listed (reached tk un) L) (PL.hot-listed b (reached tk un) L , lp)
     ... | inj₁ (l , i , e′ , ul , Lβ , m) = inj₁ (l , inj₁ (i , F) , e′ , proj₁ R , proj₂ R , m)
       where F = reached tk un
-            R = body-row ul Lβ (conn-σ-body F (inj₁ i) ul Lβ)
+            R = body-row ul Lβ (conn-σ-body (λ n → n (_ , b)) F L lp (inj₁ i) ul Lβ)
     ... | inj₂ (es , ((l , (e″ , ul) , Lβ , pb) , h)) =
-      inj₂ (es , ((l , (e″ , proj₁ R) , proj₂ R , inj₁ (pb , (_ , b))) , body-home b F L h))
+      inj₂ (es , ((l , (e″ , proj₁ R) , proj₂ R , inj₁ (pb , (_ , b))) , body-home b F L lp h))
       where F = reached tk un
-            R = body-row ul Lβ (conn-σ-body F (inj₂ pb) ul Lβ)
+            R = body-row ul Lβ (conn-σ-body (λ n → n (_ , b)) F L lp (inj₂ pb) ul Lβ)
     conn-img (CP.burst _ _ , _) ()
     conn-img (CP.kept _ _ _ _ , _) ()
     conn-img {k} tk@(CP.echo {k₀} x al un₀ ni , _) un lv L lp
@@ -603,13 +726,13 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     ...   | e″ , c , ns =
       inj₁ (l₀ ⊕ [ ix 0 ] , inj₂ (k₀ , l₀ , (_ , x , un₀) , al , ni , i , reached tk un , refl , refl) , e″ , proj₁ R , proj₂ R
            , (λ ()) , λ _ → ns)
-      where R = echo-row ul₀ L₀ (conn-β-echo x al ni (reached tk un) (inj₁ i) ul₀ L₀) c
+      where R = echo-row ul₀ L₀ (conn-β-echo x un₀ al ni (reached tk un) L lp lv (inj₁ i) ul₀ L₀) c
     conn-img tk@(CP.echo {k₀} x al un₀ ni , _) un lv L lp | inj₂ (_ , ((l , (_ , ul) , Ll , pb) , h)) with conn-src-carrier x al ni (reached tk un) pb ul
     ... | e″ , c = inj₂ (refl , ((l ⊕ [ ix 0 ] , (e″ , proj₁ R) , proj₂ R , inj₂ (k₀ , l , (_ , x) , inj₂ pb , refl , refl)) , src-home x al ni L h))
-      where R = echo-row ul Ll (conn-β-echo x al ni (reached tk un) (inj₂ pb) ul Ll) c
+      where R = echo-row ul Ll (conn-β-echo x un₀ al ni (reached tk un) L lp lv (inj₂ pb) ul Ll) c
 
     carried : CarryAt valuesOf M′ HP HE LP t u p p′
     carried = record
       { Img = ConnImg ; ext = ext′ ; PB = PB′ ; pb-few = conn-pb-few ; pb-img = pb-img′ ; pb-past = conn-pb-past
       ; img = conn-img ; img¬¬ = conn-img¬¬ ; shown = conn-shown ; img-row = img-row′ ; img-fun = img-fun′
-      ; place = conn-place ; live = live′ ; few = few′ ; whole = conn-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = conn-pinned }
+      ; place = conn-place ; live = live′ ; few = few′ ; whole = conn-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = conn-pinned ; cover = conn-cover }

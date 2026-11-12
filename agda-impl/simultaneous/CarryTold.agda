@@ -33,7 +33,7 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads; Carried; Live)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
+open import simultaneous.CarryBase using (From; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
   sub-listed; ahead-over)
 open import simultaneous.ReadRows using (up; up-⊕)
 open import simultaneous.ToldRows using (told; module Told)
@@ -382,6 +382,11 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
             B′ (inj₂ refl) {l″ = l″} (l₁ , i , mv) lr =
               B i (≺-trans {l₁} {q} {p′} (≼-≺-≺ {l₁} {l″} {q} (⊑-≼ {l₁} {l″} (mv-⊑ mv)) lr) (told-pin-past y))
 
+  -- The told run listed before a point its carriers follow.
+  postulate
+    told-cover : ∀ {v w} → Listed t v → LP v → Live t v → From Img′ PB′ t (enter (approx n (told x S) env) q) v w
+               → Listed (enter (approx n (told x S) env) q) w
+
   told-carry : Σ (CarryAt f M HP HE LP t (enter (approx n (told x S) env) q) s q)
                  λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → t k e₀ → Live t k → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
   told-carry = record
@@ -391,7 +396,7 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
     ; img-row = λ { (_ , i , _) → C.img-row i } ; img-fun = img-fun′
     ; place = place′ ; live = live′ ; few = λ { (_ , i , _) → C.few i }
-    ; whole = λ wt ne lp → told-whole (C.whole wt ne lp)
+    ; whole = λ wt ne lp → told-whole (C.whole wt ne lp) ; cover = told-cover
     ; bk = bk′ ; in-bk = in-bk′ ; pinned = pinned′ }
     , λ { (l , pb , e , _ , refl) _ _ → l , pb , (δ e , refl) }
 

@@ -595,7 +595,8 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- annotation's.
         carried : CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                     (enter (approx n (elab ρ (connect s b)) envE) p′) p p′
-        carried = ConnCarry.Body.carried {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b
+        carried = ConnCarry.Body.carried {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
+          (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
 
         postulate
           -- Its late carriers under a bound hot's row are anchored.

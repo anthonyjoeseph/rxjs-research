@@ -42,7 +42,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _∪ᴹ_; Emb; Fresh; CarryAt; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed-≼; sub-listed; Ahead; ahead-over; ahead-under)
+open import simultaneous.CarryBase using (From; PMap; _∪ᴹ_; Emb; Fresh; CarryAt; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed-≼; sub-listed; Ahead; ahead-over; ahead-under)
 open import simultaneous.Carry using (Within; Bare; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; annValues; listed↓; hots-at; bound-hot)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -941,8 +941,12 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- THE READER CARRIES its hot's carry: a joined row on its joined
   -- carrier, a late end on a late end; a row the hot carries into its
   -- instant, into the instant of the hot's row.
+  -- The reader listed before a point its carriers follow.
+  postulate
+    reader-cover : ∀ {v w} → Listed t v → HotsListed envP v → Live t v → From Img PB t u v w → Listed u w
+
   reader-rejoined : CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) t u p p′
   reader-rejoined = record
     { Img = Img ; ext = ext ; PB = PB ; pb-few = pb-few ; img = img ; img¬¬ = img¬¬ ; shown = shown′ ; img-row = img-row
-    ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; bk = bk ; in-bk = in-bk
+    ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = reader-cover ; bk = bk ; in-bk = in-bk
     ; pb-img = pb-img′ ; pb-past = pb-past′ ; pinned = λ { (shown _ () _ , _) } }

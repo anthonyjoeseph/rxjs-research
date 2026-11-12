@@ -245,6 +245,7 @@ private
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
       ; few     = λ _ → fewT
+      ; cover   = λ _ _ _ _ → lstU
       ; whole   = λ _ _ _ → proj₁ allU , (λ ur → proj₂ allU (proj₁ ur)) , λ m → let (e , r) = of-row p′ 0 (L.map V xs) m in e , r , reachU
       ; bk      = λ _ → proj₁ allT
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }

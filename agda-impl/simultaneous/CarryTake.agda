@@ -48,7 +48,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; IntoAt; Ahead; ahead-over)
+open import simultaneous.CarryBase using (From; PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; IntoAt; Ahead; ahead-over)
 open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
 
@@ -955,10 +955,14 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ... | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₂ hh) | nfk =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₂ hh)
 
+  -- The taken run listed before a point its carriers follow.
+  postulate
+    take-cover : ∀ {v w} → Listed P.T′ v → LP v → Live P.T′ v → From Img′ PB′ P.T′ Q.T′ v w → Listed Q.T′ w
+
   carried′ : CarryAt valuesOf M′ HP HE LP P.T′ Q.T′ s s′
   carried′ = record
     { Img = Img′ ; ext = ext′ ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun′
-    ; place = place′ ; live = live′ ; few = few′ ; whole = whole′ ; bk = bk′ ; in-bk = in-bk′ ; PB = PB′ ; pb-few = pb-few′ ; pinned = pinned′
+    ; place = place′ ; live = live′ ; few = few′ ; whole = whole′ ; cover = take-cover ; bk = bk′ ; in-bk = in-bk′ ; PB = PB′ ; pb-few = pb-few′ ; pinned = pinned′
     ; pb-img = pb-img′ ; pb-past = pb-past′ }
 
   -- A row carried into its instant: its source's, or anchored past by the

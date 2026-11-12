@@ -151,6 +151,10 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     liveS← : ∀ {k} → Live S k → Live t k
     liveS← lv tc = lv (P.send tc , reach-kin down₀ k-end (rch tc))
 
+    liveS→ : ∀ {k} → Live t k → Live S k
+    liveS→ lv sc with down sc
+    ... | _ , tc , k-end = lv tc
+
     module UL = Lifts {a = u} {b = S′} {Rel = λ _ e e′ → Kin e e′} (λ k → k) upL upU (λ uc → E.send uc , reach-kin downU₀ k-end (rchU uc)) downU
 
     fewS→ : ∀ {k} → Few t k → Few S k
@@ -367,6 +371,8 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; live = λ {k} {l} i lv → UL.live→ {l} (λ {c} → live i (liveS← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ i → fewS→ (few i)
     ; whole = λ wt ne lp → UL.whole→ (whole (wholeS← wt) (endedS← ne) lp)
+    ; cover = λ {v} {w} L lp lv F → UL.lst→ {w} (cover (lstS← L) lp (liveS← {v} (λ {c} → lv {c}))
+                λ tk lk vk m ul lw → up tk λ { (_ , sk , _) → upU ul λ { (_ , su , _) → F sk (liveS→ lk) vk m su lw } })
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (liveS← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (downU s₁))) }

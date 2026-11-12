@@ -235,6 +235,10 @@ Home {A} t k = ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
 Near : ∀ {Y : Set} → EmissionSet Y → Pos → Pos → Set
 Near {Y} u m l = l ≼ m ⊎ (Σ (Ev Y) (u l) × Listed u l)
 
+-- Every live row of `t` from `v` on carried, by rows of `u`, from `w` on.
+From : ∀ {A Y : Set} → (Pos → Pos → Set) → (Pos → Pos → Set) → EmissionSet A → EmissionSet Y → Pos → Pos → Set
+From Img PB t u v w = ∀ {k e l e′} → t k e → Live t k → v ≼ k → Img k l ⊎ PB k l → u l e′ → w ≼ l
+
 -- Every row, listed exactly.
 Whole : ∀ {A : Set} → EmissionSet A → Set
 Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k} → k ∈ ks → Σ _ (t k))
@@ -339,6 +343,12 @@ IntoAt {Y} Img u PB HP s k =
 -- names a position from listings alone, so such a former decides where
 -- the failure lies.
 --
+-- `u` IS LISTED BEFORE A POINT ITS CARRIERS FOLLOW: before `w`, when `t`
+-- is listed before `v`, alive there, and carried from `w` on from `v` on.
+-- What an elaborated row before `w` not carrying a row before `v` can be
+-- is a mark, finitely many of them; another subterm's carrier is such a
+-- `w`, which no image of this one names.
+--
 -- DEAD ROUTE: each row from finitely many before it, outright.  A scan's
 --   row needs its source's values before it listed, and a subterm's run is
 --   not listed from few rows: a lane reading a hot past an accumulation of
@@ -373,6 +383,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     live    : ∀ {k l} → Img k l → Live t k → Live u l
     few     : ∀ {k l} → Img k l → Few t k
     whole   : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
+    cover   : ∀ {v w} → Listed t v → LP v → Live t v → From Img PB t u v w → Listed u w
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pinned  : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
@@ -405,6 +416,11 @@ private
     live← {k} lb {c} ac with to ac
     ... | _ , bc , r with kn r
     ...   | k-end = lb {c} bc
+
+    live→ : ∀ {k} → Live a k → Live b k
+    live→ {k} la {c} bc with fro bc
+    ... | _ , ac , r with kn r
+    ...   | k-end = la {c} ac
 
     few→ : ∀ {k} → Few a k → Few b k
     few→ (ks , F) = ks , λ bk kk → F (proj₁ (proj₂ (fro bk))) kk
@@ -566,6 +582,8 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
     ; whole = λ wt ne lp → U.whole→ (whole (T.whole← wt) (T.ended← ne) lp)
+    ; cover = λ {v} {w} L lp lv F → U.lst→ {w} (cover (T.lst← {v} L) lp (T.live← {v} (λ {c} → lv {c}))
+                (λ {k} tk lk vk m ul lw → up¬¬′ ul λ { (_ , ul′ , _) → F (proj₁ (proj₂ (up tk))) (T.live→ {k} (λ {c} → lk {c})) vk m ul′ lw }))
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (T.live← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (down′ ul))) }
