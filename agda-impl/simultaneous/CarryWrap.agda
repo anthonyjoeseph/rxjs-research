@@ -35,7 +35,7 @@ open import simultaneous.Attribution using (Shown; Match; Every; One; Reads; Car
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
 open import simultaneous.Relations using (stamp₀; sourced)
-open import simultaneous.Carry using (PMap; Emb; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel)
 open import simultaneous.CarryLeaves using (coreAt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; elaborate; restamp; completing; unfinished)

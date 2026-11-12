@@ -37,14 +37,15 @@ open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Few; InE; _≺_; _≼_; module Op)
   renaming (shown to rj-shown)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≼-split; entered-reach)
-open import denotation.Laws.Worlds using (InvAt; ⊑-trans; ⊑-≼)
+open import denotation.Laws.Worlds using (InvAt; _⊑_; ⊑-trans; ⊑-≼)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (few-¬¬listed)
-open import simultaneous.Carry using (PMap; CarryAt; annValues; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
+open import simultaneous.CarryBase using (PMap; CarryAt; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
+open import simultaneous.Carry using (annValues)
 open import simultaneous.ReadRows using (module Rows; step-just; step-none; of-shown; of-marks; up; up-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)
@@ -245,7 +246,16 @@ private
       ; pinned  = λ kp lv → ⊥-elim (pinU (proj₁ (proj₂ (proj₂ (proj₁ (pinned kp lv))))))
       }
 
+    -- A row read carried into its instant: on, or under, the annotated carrier.
+    pb-up : ∀ {k l′} → PB′ k l′ → Σ Pos λ l → PB k l × l ⊑ l′
+    pb-up (l , pb , p , _) = l , pb , hang-⊑ (pt-hang p)
+
 read-post : ∀ {X : Set} {M : PMap} {HP HE LP H : Pos → Set} {t : EmissionSet X} {T : EmissionSet (AIE X)} {s s′}
           → InvAt H s′ (enter (hot T) s′) → CarryAt annValues M HP HE LP t (enter (hot T) s′) s s′
           → CarryAt valuesOf M HP HE LP t (enter (Reading (hot T)) s′) s s′
 read-post Iu c = Post.carry Iu c
+
+read-post-pb : ∀ {X : Set} {M : PMap} {HP HE LP H : Pos → Set} {t : EmissionSet X} {T : EmissionSet (AIE X)} {s s′}
+             → (Iu : InvAt H s′ (enter (hot T) s′)) (c : CarryAt annValues M HP HE LP t (enter (hot T) s′) s s′)
+             → ∀ {k l′} → CarryAt.PB (read-post Iu c) k l′ → Σ Pos λ l → CarryAt.PB c k l × l ⊑ l′
+read-post-pb Iu c = Post.pb-up Iu c

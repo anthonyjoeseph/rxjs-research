@@ -105,6 +105,7 @@ Each cost real time at least once, and they share a shape: **Agda reports them a
 - "X is not a constructor of T" for something you meant as a variable → grep for `X :` before touching the proof.
 - An implicit used inside an `all`-predicate lambda is a fresh unsolved meta per element → bind it on the clause's left-hand side (`{e = e}`).
 - Under `with`, a function defined by `if` is already unfolded in the goal: `rewrite` by its equation "did not apply", and its implicits won't infer → pass implicits explicitly; `trans` with a lemma instead of `rewrite`.
+- Slow/OOM check: a `with` costs its CONTEXT (module params, concrete terms), not depth → match in small lemmas over variables; heavy params in a `with`-free inner module.
 
 ## Work from the outside in
 
