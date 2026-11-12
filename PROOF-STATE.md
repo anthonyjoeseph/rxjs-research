@@ -32,6 +32,18 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE NEXT ROW
+
+Scouted, unproven: past a value whose instant has finitely many rows
+left, decide whether a proper row of another instant follows. Classically
+trivial; constructively nothing decides it: `listed` decides only the rows
+before a position, the simulation only the visible ones. Settled by a
+computable next row (the machine, through a simulation of every row), or
+by `Over` asking only that the instant's proper rows past the value be
+finitely many, classically the same (Anthony's question).
+
+Members: `exits-bounded`.
+
 #### THE DEAD PIN
 
 Untried: a takeWhile keeps a source pin past its failure, while its
@@ -69,15 +81,24 @@ completion mark. Settled when each former's leaf is a body.
 
 Members: `carry-flatMap`, `carry-cold`, `wrap-take`.
 
-#### THE PROTOCOL
+#### THE BATCH RANK
 
-Untried: every emit is named for its own instant, one begin and one
-value name per instant — the elaboration mints both per async value,
-which is per instant; the subscribe mark sits once before every begin
-with every value past it async; every value precedes the completion.
-Settled when each is a body over the elaboration's layers.
+Untried: a batch leaves within its own instant, at the rank its values
+carry. Needs the layers' positions to keep instants, and the release
+mark to sit in the instant it releases. Settled when `batch-rank` is a
+body over the layers and the release protocol.
 
-Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
+Members: `batch-rank`.
+
+#### THE RELEASE
+
+Untried: the batcher releases exactly at the protocol's marks — past
+the last value with nothing held, a mark past it released it, of one of
+four kinds; a held batch is released by marks before the run leaves its
+instant. Settled when each is a body over `Walk`'s tally and the
+protocol.
+
+Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
 
 #### THE HELD STREAMS
 
@@ -100,16 +121,6 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
 `cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
 
-#### THE NEXT ROW
-
-Untried: past finitely many rows of a value's instant, the program
-reaches another instant or its end, or makes no row — constructively.
-Nothing decides the row after a position; `listed` decides those before
-one. Settled when the next row past a position is decided by operator,
-each timeline forcing to its next frame, `done` or `quiet`.
-
-Members: `exits-bounded`.
-
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
@@ -119,15 +130,15 @@ echoes), the combinator scan's, a cold's.
 
 Members: `cold-rest`, `scan-rest`, `conn-rest`.
 
-#### THE RELEASE
+#### THE PROTOCOL
 
-Untried: the batcher releases exactly at the protocol's marks — past
-the last value with nothing held, a mark past it released it, of one of
-four kinds; a held batch is released by marks before the run leaves its
-instant. Settled when each is a body over `Walk`'s tally and the
-protocol.
+Untried: every emit is named for its own instant, one begin and one
+value name per instant — the elaboration mints both per async value,
+which is per instant; the subscribe mark sits once before every begin
+with every value past it async; every value precedes the completion.
+Settled when each is a body over the elaboration's layers.
 
-Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE PASS
 
@@ -137,12 +148,3 @@ proven; open is the row at the bound itself, which a listing before it
 omits. Settled when it is a body over them.
 
 Members: `pass`.
-
-#### THE BATCH RANK
-
-Untried: a batch leaves within its own instant, at the rank its values
-carry. Needs the layers' positions to keep instants, and the release
-mark to sit in the instant it releases. Settled when `batch-rank` is a
-body over the layers and the release protocol.
-
-Members: `batch-rank`.

@@ -533,10 +533,11 @@ postulate
 
 -- A VALUE WHOSE INSTANT FINISHES IS LEFT: past finitely many rows of its
 -- instant, the program reaches a row of another instant or its end, or
--- makes no row at all.  Which, is decided by the program: every leaf's
--- timeline forces to its next frame or to `done` or `quiet`, so the next
--- row past a position is decided the way `listed` decides the rows
--- before one.
+-- makes no row at all.  Classically immediate; constructively it asks
+-- for the least proper row past a finitely-preceded position, or none.
+-- Every leaf's timeline forces to its next frame or to `done` or
+-- `quiet`, so the machine computes it, but the simulation relates only
+-- visible rows, and `listed` decides only the rows before a position.
 postulate
   exits-bounded : ∀ {A : Set} (o : SObs [] A) {q x} → elaborated o q (out x) → Bounded (elaborated o) q → Exits (elaborated o) q
 
