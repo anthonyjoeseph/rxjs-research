@@ -151,7 +151,10 @@ jobs:
         run: make cursor-check
 
   # The simultaneous spec over the elaboration: no seed may refute it, and
-  # the selftest proves the check can fire.
+  # the selftest proves the check can fire.  Run only when the elaboration
+  # changed (Anthony): a green run leaves a marker keyed on the hash of
+  # everything the binary compiles (scripts/spec-inputs.py), and a run that
+  # finds its marker skips.  Proof modules are outside that closure.
   spec-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -159,20 +162,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Hash the spec-check inputs
+        id: inputs
+        run: echo "hash=$(python3 scripts/spec-inputs.py --hash)" >> "$GITHUB_OUTPUT"
+
+      - name: Already green for these inputs?
+        id: green
+        uses: actions/cache/restore@v4
+        with:
+          path: spec-green
+          key: spec-green-${{ steps.inputs.outputs.hash }}
+          lookup-only: true
+
+      - name: Skipped — the elaboration is unchanged
+        if: steps.green.outputs.cache-hit == 'true'
+        run: 'echo "spec-check: GREEN (already green for inputs ${{ steps.inputs.outputs.hash }})"'
+
       - name: Set up Agda
+        if: steps.green.outputs.cache-hit != 'true'
         uses: ./.github/actions/agda-toolchain
 
       - name: Cache compiled MAlonzo objects
+        if: steps.green.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: agda-impl/_cli/MAlonzo
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
 
       - name: make spec-check-selftest
+        if: steps.green.outputs.cache-hit != 'true'
         run: make spec-check-selftest
 
       - name: make spec-check
+        if: steps.green.outputs.cache-hit != 'true'
         run: make spec-check
+
+      - name: Mark these inputs green
+        if: steps.green.outputs.cache-hit != 'true'
+        run: mkdir -p spec-green && echo "${{ steps.inputs.outputs.hash }}" > spec-green/hash
+
+      - name: Save the green marker
+        if: steps.green.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: spec-green
+          key: spec-green-${{ steps.inputs.outputs.hash }}
 
   # The oracle: every drawn program, on all three Agda engines,
   # gives the trace real rxjs does.
