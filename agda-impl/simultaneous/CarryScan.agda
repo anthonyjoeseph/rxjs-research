@@ -375,11 +375,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
                 λ tk lk vk m ul lw → up tk λ { (_ , sk , _) → upU ul λ { (_ , su , _) → F sk (liveS→ lk) vk m su lw } })
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
     ; pb-img = pb-img
-    ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (liveS← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (downU s₁))) }
+    ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (λ un → liveS← {k} (λ {c} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c})) (proj₁ (proj₂ (downU s₁))) }
 
   -- Its rows carried into their instant are its source's.
-  pb-down : ∀ {k l e₀} → PB k l → S k e₀ → Live S k → PB k l × Σ (Ev A) (t k) × Live t k
-  pb-down {k} pb sk lv = pb , (_ , proj₁ (proj₂ (down sk))) , liveS← {k} (λ {c₁} → lv {c₁})
+  pb-down : ∀ {k l e₀} → PB k l → S k e₀ → (Unpinned e₀ → Live S k) → PB k l × Σ (Ev A) λ e → t k e × (Unpinned e → Live t k)
+  pb-down {k} pb sk lv = pb , _ , proj₁ (proj₂ (down sk)) , λ un → liveS← {k} (λ {c₁} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c₁})
 
 ------------------------------------------------------------------------
 -- The former

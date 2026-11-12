@@ -37,11 +37,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Probed, unproven: the connect's rows carried from its body's carry and
 its annotated source's. Each subterm is listed before the other's image
 by `cover`; open: the same before a LATE carrier, and the source listed
-past its end (pins after it); a source pin past the source's end:
-every carry speaks only for pins its run is alive at. Settled when each
-leaf is a body.
+past its end (pins after it), where `pinned` speaks only for a pin its
+run is alive at. Settled when each leaf is a body.
 
-Members: `conn-src-pin`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest-pin`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 

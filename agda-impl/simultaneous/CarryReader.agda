@@ -43,7 +43,7 @@ open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.CarryBase using (From; PMap; _∪ᴹ_; Emb; Fresh; CarryAt; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed-≼; sub-listed; Ahead; ahead-over; ahead-under)
-open import simultaneous.Carry using (Within; Bare; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; annValues; listed↓; hots-at; bound-hot)
+open import simultaneous.Carry using (Within; Bare; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; annValues; listed↓; hots-at; bound-hot; BoundSrc; Rows; rows-at)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -51,10 +51,7 @@ open import simultaneous.Rejoined using (Flat; split-at; same-hot; nest; joined-
   late-none; rejoin-listed; listed-at; proper-listed; last-sub; djs; djs-in; djs-out; mt-rj;
   shown-unp; out-of; end-of)
 
--- A binder's hot, plain and annotated.
-HotOf : ∀ {M₀ LP X} {d : Den X} {d′ : Den (AIE X)} → Bound M₀ LP d d′ → EmissionSet X
-HotOf b = enter (approx (Bound.m b) (Bound.src b) (Bound.envP b)) (Bound.at b ⊕ [ ix 1 ])
-
+-- A binder's annotated hot.
 HotOf′ : ∀ {M₀ LP X} {d : Den X} {d′ : Den (AIE X)} → Bound M₀ LP d d′ → EmissionSet (AIE X)
 HotOf′ b = enter (approx (Bound.m b) (annotate (elab (Bound.σ b) (Bound.src b))) (Bound.envE b)) (Bound.at′ b ⊕ [ ix 1 ])
 
@@ -129,7 +126,7 @@ rejoin-whole {S = S} {j} fl (ls , G , Bk) ne = L.map (_⊕ [ sub j ]) ks , pick 
 module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
             (hm : Emb M₀) (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ap : Apart envP)
             {X} (i : X ∈ Γ) {p p′} (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′)
-            (nh : NotHot (Hots envP) p) (fr : Fresh (Hots envP) M₀ p) where
+            (nh : NotHot (Rows er) p) (fr : Fresh (Hots envP) M₀ p) where
   module C = CarryAt (Bound.carried (er i))
 
   private
@@ -137,7 +134,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     module VE = InvAt (Bound.invE (er i))
 
   T₀ : EmissionSet X
-  T₀ = HotOf (er i)
+  T₀ = BoundSrc (er i)
 
   T₀′ : EmissionSet (AIE X)
   T₀′ = HotOf′ (er i)
@@ -236,12 +233,12 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     before {q} {l₀} tq ci pl with T? (p <ᵖ q)
     ... | yes pq = pq
     ... | no npq with ≼-split {q} {p} npq
-    ...   | inj₂ refl = ⊥-elim (nh (hotP tq) (⊑-refl q))
+    ...   | inj₂ refl = ⊥-elim (nh (rows-at er i (proj₁ tq)) (⊑-refl q))
     ...   | inj₁ qp = ⊥-elim (≺-irrefl {l₀} (≺-trans {l₀} {p′} {l₀} (pre tq ci qp) pl))
 
     late-at : ∀ {c c′ e} → Proper T₀ c e → C.Img c c′ → c ≼ p → c′ ≼ p′
     late-at {c} {c′} tc ci cp with ≼-split {c} {p} cp
-    ... | inj₂ refl = ⊥-elim (nh (hotP tc) (⊑-refl c))
+    ... | inj₂ refl = ⊥-elim (nh (rows-at er i (proj₁ tc)) (⊑-refl c))
     ... | inj₁ cp′ = ≺→≼ {c′} {p′} (pre tc ci cp′)
 
     -- A plain row whose carrier lives lives.
@@ -292,7 +289,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
                → IntoAt Img u PB (Hots envP) p (q ⊕ [ sub p ])
     heard-into {q} {l₀} {e₁ = e₁} tq pq pb ul L′ L =
       rejoin-into {S = T₀′} {j = p′} {l₀ = l₀} {e₁ = e₁} flatE VE.func endE (λ tc → fewE tc tt) ul
-        (proj₁ (C.pb-past pb (proj₁ tq) (λ {c₈} → proj₂ tq {c₈}) ul m₀ pq (nh (hotP tq))))
+        (proj₁ (C.pb-past pb (proj₁ tq) (λ _ {c₈} → proj₂ tq {c₈}) ul m₀ pq (nh (rows-at er i (proj₁ tq)))))
         (λ tc → end-past tq pq tc) L′ (PB (q ⊕ [ sub p ])) (λ w → q , l₀ , pb , (_ , tq) , (_ , ul) , pq , refl , w)
       , inj₂ (inj₂ (q , hotP tq , sym (instant-⊕ q [ sub p ])))
 
@@ -515,7 +512,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
         pick {k} {e} tk with T? (k <ᵖ p)
         ... | yes kp = ∈-++⁺ˡ (proj₁ (proj₂ L₁) (prop tk) kp)
         ... | no pk with ≼-split {p} {k} pk
-        ...   | inj₂ refl = ⊥-elim (nh (hotP (prop tk)) (⊑-refl p))
+        ...   | inj₂ refl = ⊥-elim (nh (rows-at er i (proj₁ (prop tk))) (⊑-refl p))
         ...   | inj₁ pk′ = ∈-++⁺ʳ (proj₁ L₁) (djs-in ks B (F (rjRow (prop tk) pk′ , few-reach {e = rjEv e} (rejoin-few flatP tk fk))))
           where
             fk : Few T₀ k
@@ -569,7 +566,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     under (shown {q′} tq _ _ , _) br kq = under-row {q′} tq br kq
     under (heard {q′} tq _ , _)   br kq = under-row {q′} tq br kq
     under (ended {q′} tq _ , _)   br kq = under-row {q′} tq br kq
-    under (late _ _ , _)          br kq = nh (bound-hot {ρ = ρ} envP {envE = envE} er i br) (⊑-trans (⊑-snoc⁺ p) kq)
+    under (late _ _ , _)          br kq = nh (rows-at er i (proj₁ (proj₂ br))) (⊑-trans (⊑-snoc⁺ p) kq)
 
     -- A row of the reading leading a joined point is it.
     lead : ∀ {k e} q {a} → t k e → (k ⊑ q → ⊥) → k ⊑ (q ⊕ [ a ]) → (q ⊕ [ a ]) ≡ k
@@ -604,7 +601,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   ...   | y₁ , my₁ , yl with jn i′ my₁ br e
   ...     | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , ⊑-trans le (⊑-trans yl (⊑-snoc⁺ l))
   reader-joins i′ (inj₂ (inj₂ (refl , refl))) br eq with split-at _ p eq
-  ... | inj₁ (refl , _) = ⊥-elim (nh (bound-hot {ρ = ρ} envP {envE = envE} er i′ br) (⊑-refl p))
+  ... | inj₁ (refl , _) = ⊥-elim (nh (rows-at er i′ (proj₁ (proj₂ br))) (⊑-refl p))
   ... | inj₂ (zs , e) with jn i′ m₀ br e
   ...   | e₀ , ae , e₀′ , me , L , ci , le = e₀ , ae , e₀′ , inj₁ me , L , ci , ⊑-trans le (⊑-snoc⁺ p′)
 
@@ -673,7 +670,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     stale-sub {q} {σ = σ} br pq m e = stale m (joinW (proj₂ br) pq) (σ , trans e (sym (⊕-assoc q [ sub p ] σ)))
 
     hotB : ∀ {q} → BoundRow (er i) q → p ⊑ q → ⊥
-    hotB br = nh (bound-hot {ρ = ρ} envP {envE = envE} er i br)
+    hotB br = nh (rows-at er i (proj₁ (proj₂ br)))
 
     -- A point paired with the subscription's image is the subscription.
     same-join : ∀ {e e′} → M₀ e e′ → e′ ≡ p′ → e ≡ p
@@ -894,17 +891,17 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
       where
         old : x ≺ q ⊎ x ≡ q ⊎ q ≺ x → Ahead y (l₀ ⊕ [ sub p′ ])
         old (inj₁ xq) =
-          ahead-over (C.pb-past pb (proj₁ tq) (λ {c} → proj₂ tq {c}) ul m xq (λ xq′ → nxk (⊑-trans xq′ (⊑-snoc⁺ q)))) (⊑-snoc⁺ l₀)
+          ahead-over (C.pb-past pb (proj₁ tq) (λ _ {c} → proj₂ tq {c}) ul m xq (λ xq′ → nxk (⊑-trans xq′ (⊑-snoc⁺ q)))) (⊑-snoc⁺ l₀)
         old (inj₂ (inj₁ e)) = ⊥-elim (nxk (subst (λ z → x ⊑ (z ⊕ [ sub p ])) e (⊑-snoc⁺ x)))
         old (inj₂ (inj₂ qx)) = ⊥-elim (hot-split pb tq m qx (proj₁ (between {q} {x} [ sub p ] qx xk)) (proj₂ (between {q} {x} [ sub p ] qx xk)))
     hot-ahead {q} {l₀} pb tq ul pq (inj₂ (inj₁ (q′ , L , br′ , ci′ , _ , refl , refl))) xk _ =
-      ahead-under (ahead-over (ahead-under (C.pb-past pb (proj₁ tq) (λ {c} → proj₂ tq {c}) ul (proj₁ (proj₂ (C.ext ci′))) qq
+      ahead-under (ahead-over (ahead-under (C.pb-past pb (proj₁ tq) (λ _ {c} → proj₂ tq {c}) ul (proj₁ (proj₂ (C.ext ci′))) qq
         (flat-lead br′ (_ , tq) qq)) (proj₂ (proj₂ (C.ext ci′)))) (⊑-snoc⁺ l₀)) (⊑-snoc⁺ L)
       where
         qq : q′ ≺ q
         qq = joined-back q′ q xk (flat-lead (_ , tq) br′)
     hot-ahead {q} {l₀} pb tq ul pq (inj₂ (inj₂ (refl , refl))) _ _ =
-      ahead-under (ahead-over (C.pb-past pb (proj₁ tq) (λ {c} → proj₂ tq {c}) ul m₀ pq (hotB (_ , tq))) (⊑-snoc⁺ l₀)) (⊑-snoc⁺ p′)
+      ahead-under (ahead-over (C.pb-past pb (proj₁ tq) (λ _ {c} → proj₂ tq {c}) ul m₀ pq (hotB (_ , tq))) (⊑-snoc⁺ l₀)) (⊑-snoc⁺ p′)
 
     -- Trailing the annotated end: past, and apart from, the same points,
     -- the end's join carrying the plain end's.
@@ -934,7 +931,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
       C.pb-img pb (subst (λ z → C.Img z _) (sym (⊕-injˡ q q′ e)) ci)
     pb-img′ (q , _ , _ , _ , _ , _ , refl , _) (inj₂ (e , _)) = last-sub (sym (⊕-injʳ q p e))
 
-    pb-past′ : ∀ {k l e₀ e x y} → PB k l → t k e₀ → Live t k → u l e → M x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    pb-past′ : ∀ {k l e₀ e x y} → PB k l → t k e₀ → (Unpinned e₀ → Live t k) → u l e → M x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     pb-past′ (_ , _ , pb , (_ , tq) , (_ , ul) , pq , refl , inj₁ refl) _ _ _ m xk nxk = hot-ahead pb tq ul pq m xk nxk
     pb-past′ (_ , _ , _ , (_ , tq) , _ , pq , refl , inj₂ (_ , tc′ , _ , refl)) _ _ _ m xk nxk = end-ahead tq pq tc′ m xk nxk
 

@@ -367,7 +367,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     PB      : Pos → Pos → Set
     pb-few  : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
     pb-img  : ∀ {k l l′} → PB k l → Img k l′ → ⊥
-    pb-past : ∀ {k l e₀ e x y} → PB k l → t k e₀ → Live t k → u l e → M x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    pb-past : ∀ {k l e₀ e x y} → PB k l → t k e₀ → (Unpinned e₀ → Live t k) → u l e → M x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     img     : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → LP k
             → (Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Listed u l × Match Every (One f) (Reads f) e e′)
               ⊎ (e ≡ skip × IntoAt Img u PB HP s k)
@@ -586,7 +586,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
                 (λ {k} tk lk vk m ul lw → up¬¬′ ul λ { (_ , ul′ , _) → F (proj₁ (proj₂ (up tk))) (T.live→ {k} (λ {c} → lk {c})) vk m ul′ lw }))
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′
     ; pb-img = pb-img
-    ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (T.live← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (down′ ul))) }
+    ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (λ un → T.live← {k} (λ {c} → lv (unp→ (kin (proj₂ (proj₂ (down tk)))) un) {c})) (proj₁ (proj₂ (down′ ul))) }
 
 ------------------------------------------------------------------------
 -- A map

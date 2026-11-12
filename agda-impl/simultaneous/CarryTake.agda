@@ -37,7 +37,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; ≼-≺-≺; ≺-≼-≺; ≼-antisym;
   ≺-ext; T-not; reach-few; few-ind; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; W⁼; inW; step; Plain; plain-ix; plain-last; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼;
-  ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc; ⊕-injʳ; inside-⊑; ⊑-inside; Disj; conv)
+  ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc; ⊕-injʳ; inside-⊑; ⊑-inside; W; conv)
 open import denotation.Laws.Count using (em)
 open import denotation.Laws.ShowsOps using (bool)
 open import denotation.Laws using (inv-approx)
@@ -654,7 +654,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
       pair (inj₁ m) (inj₂ c′) = Kc c′ , embK c′ , otherK c′ (inj₁ m) , selfK c′
 
   -- A cut lies one label under a point of the map, holding no hot row.
-  grown′ : Disj H₁ s → ∀ {x y} → M′ x y → M x y ⊎ Grown M H₁ x y
+  grown′ : ∀ {R} → (∀ {q w} → R q → W H₁ s w → T (inside w q) → ⊥) → ∀ {x y} → M′ x y → M x y ⊎ Grown M R x y
   grown′ _  (inj₁ m) = inj₁ m
   grown′ dj (inj₂ (cut tk _ _ i _ _ refl refl)) with C.ext i
   ... | y₀ , m₀ , pp = inj₂ (_ , y₀ , _ , m₀ , ⊑-trans pp (⊑-snoc⁺ _) , refl , λ hq kq → dj hq (InvAt.world It tk) (⊑-inside kq))
@@ -911,8 +911,10 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     pb-img′ (inj₂ (_ , _ , _ , _ , _ , _ , _ , _ , (_ , pb))) (inj₁ (i , _)) = C.pb-img pb i
     pb-img′ (inj₂ (_ , _ , _ , _ , _ , _ , _ , (_ , tk) , _)) (inj₂ (cut tk₀ _ _ _ _ _ refl _)) = flatP tk₀ tk
 
-    pb-past′ : ∀ {k l e₀ e x y} → PB′ k l → P.T′ k e₀ → Live P.T′ k → Q.T′ l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
-    pb-past′ (inj₁ ((_ , um) , (_ , tk) , nfk , pb)) _ lv _ (inj₁ m) xk nxk = C.pb-past pb tk (P.live← nfk lv) um m xk nxk
+    pb-past′ : ∀ {k l e₀ e x y} → PB′ k l → P.T′ k e₀ → (Unpinned e₀ → Live P.T′ k) → Q.T′ l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    pb-past′ (inj₁ ((_ , um) , (_ , tk) , nfk , pb)) (r , _) lv _ (inj₁ m) xk nxk with P.view r
+    ... | inj₁ (tk′ , _) = C.pb-past pb tk′ (λ un → P.live← nfk (lv un)) um m xk nxk
+    ... | inj₂ (_ , _ , x₀ , _ , _ , _ , _ , refl , _) = ⊥-elim (flatP x₀ tk)
     pb-past′ {k} (inj₁ (_ , _ , nfk , _)) _ _ _ (inj₂ (cut {k₀ = k₁} {a = a} tk₁ nk₁ _ _ _ _ refl refl)) xk _ =
       ⊥-elim (nfk (k₁ , _ , tk₁ , nk₁ , ≺-trans {k₁} {k₁ ⊕ [ a ]} {k} (≺-ext k₁ []) xk))
     pb-past′ {k} {x = x} {y} (inj₂ (f , k₀ , _ , i₀ , refl , _ , kk , _)) _ _ _ (inj₁ m) xk nxk with C.ext i₀
@@ -967,9 +969,11 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
   -- A row carried into its instant: its source's, or anchored past by the
   -- first failing value it precedes.
-  pb-anchor : ∀ {k l e₀} → PB′ k l → P.T′ k e₀ → Live P.T′ k
-            → (Σ Pos λ l₀ → C.PB k l₀ × l₀ ⊑ l × Σ (Ev A) (t k) × Live t k) ⊎ Σ Pos λ x → Σ Pos λ y → M′ x y × y ⊑ l × k ≺ x
-  pb-anchor {l = l} (inj₁ (_ , (_ , tk) , nfk , pb)) _ lv = inj₁ (l , pb , ⊑-refl l , (_ , tk) , P.live← nfk lv)
+  pb-anchor : ∀ {k l e₀} → PB′ k l → P.T′ k e₀ → (Unpinned e₀ → Live P.T′ k)
+            → (Σ Pos λ l₀ → C.PB k l₀ × l₀ ⊑ l × Σ (Ev A) λ e → t k e × (Unpinned e → Live t k)) ⊎ Σ Pos λ x → Σ Pos λ y → M′ x y × y ⊑ l × k ≺ x
+  pb-anchor {l = l} (inj₁ (_ , (_ , tk) , nfk , pb)) (r , _) lv with P.view r
+  ... | inj₁ (tk′ , _) = inj₁ (l , pb , ⊑-refl l , _ , tk′ , λ un → P.live← nfk (lv un))
+  ... | inj₂ (_ , _ , x₀ , _ , _ , _ , _ , refl , _) = ⊥-elim (flatP x₀ tk)
   pb-anchor (inj₂ (f , k₀ , _ , i₀ , refl , _ , kk , _)) _ _ with C.ext i₀
   ... | y₀ , m₀ , y₀f = inj₂ (k₀ , y₀ , inj₁ m₀ , ⊑-trans y₀f (⊑-snoc⁺ f) , kk)
 
@@ -978,14 +982,14 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
 -- THE ELABORATED TAKEWHILE CARRIES the plain one, its map grown by the
 -- cuts under the first failing value.
-take-carry : ∀ {A} incl (keep : A → Bool) (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ → Emb M
-           → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′) → Disj H₁ p → Bare M (enter d p) → (∀ {x y} → x ≼ y → LP y → LP x)
+take-carry : ∀ {A} incl (keep : A → Bool) (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂ R} p p′ → Emb M
+           → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′) → (∀ {q w} → R q → W H₁ p w → T (inside w q) → ⊥) → Bare M (enter d p) → (∀ {x y} → x ≼ y → LP y → LP x)
            → (c : CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′)
            → Σ PMap λ M′ → M ⊆ᴹ M′ × Emb M′ × (∀ {x y} → M′ x y → M x y ⊎ W⁼ H₁ p x) × Bare M′ (enter (Op.takeWhile incl keep d) p)
-             × (∀ {x y} → M′ x y → M x y ⊎ Grown M H₁ x y)
+             × (∀ {x y} → M′ x y → M x y ⊎ Grown M R x y)
              × Σ (CarryAt valuesOf M′ HP HE LP (enter (Op.takeWhile incl keep d) p) (enter (Op.takeWhile incl (passes keep) d′) p′) p p′) λ c′
-                 → ∀ {k l e₀} → CarryAt.PB c′ k l → enter (Op.takeWhile incl keep d) p k e₀ → Live (enter (Op.takeWhile incl keep d) p) k
-                   → (Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l × Σ (Ev A) (enter d p k) × Live (enter d p) k) ⊎ Σ Pos λ x → Σ Pos λ y → M′ x y × y ⊑ l × k ≺ x
+                 → ∀ {k l e₀} → CarryAt.PB c′ k l → enter (Op.takeWhile incl keep d) p k e₀ → (Unpinned e₀ → Live (enter (Op.takeWhile incl keep d) p) k)
+                   → (Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l × Σ (Ev A) λ e → enter d p k e × (Unpinned e → Live (enter d p) k)) ⊎ Σ Pos λ x → Σ Pos λ y → M′ x y × y ⊑ l × k ≺ x
 take-carry incl keep d d′ p p′ hm It Iu dj br lp c = K.M′ , inj₁ , K.emb′ , K.within′ , K.bare′ , K.grown′ dj , K.carried′ , K.pb-anchor
   where module K = Core incl keep hm (λ {q} {e} → entered-reach d p {q} {e}) (λ {q} {e} → entered-reach d′ p′ {q} {e}) It Iu br lp c
 
@@ -993,7 +997,7 @@ carry-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 carry-takeWhile n ρ i k s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
   let (M , ms , hm′ , wi , br , jn′ , ep , c , nc) = h envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
       (M′ , ms′ , hm″ , wi′ , br′ , gr , c′ , dn) = take-carry i k (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
-        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) (proj₂ okP) br (λ {x} {y} → listed↓ envP {x} {y}) c
+        (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) (λ r w i → nh r (inW w) i) br (λ {x} {y} → listed↓ envP {x} {y}) c
   in M′ , (λ m → ms′ (ms m)) , hm″ , within-∘ {M₀ = M₀} {M = M} {M′ = M′} {p = p} wi (λ {x} {y} → wi′ {x} {y}) , br′
      , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M} {N = M′} (λ {x} {y} → ms′ {x} {y}) jn′ (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er ep (λ {x} {y} → gr {x} {y})

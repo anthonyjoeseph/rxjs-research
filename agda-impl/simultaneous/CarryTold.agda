@@ -393,7 +393,7 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
                → Listed (enter (approx n (told x S) env) q) w
 
   told-carry : Σ (CarryAt f M HP HE LP t (enter (approx n (told x S) env) q) s q)
-                 λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → t k e₀ → Live t k → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
+                 λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → t k e₀ → (Unpinned e₀ → Live t k) → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
   told-carry = record
     { Img = Img′ ; ext = λ { (_ , i , mv) → let (y , m , yl) = C.ext i in y , m , ⊑-trans yl (mv-⊑ mv) }
     ; PB = PB′ ; pb-few = pb-few′ ; pb-img = λ { (_ , pb , _) (_ , i , _) → C.pb-img pb i }
