@@ -592,14 +592,8 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- end, and a pin's reach waits only on its connect's past, so a body
     -- ended between its pin's connect and it is seen by no row of the
     -- connect, and neither carry speaks for the carrier.
-    -- An echo's late carrier past the echo of a source row it lies under:
-    -- the annotation's carry places a late carrier past the images of the
-    -- rows before it and not above it, never under one.
     postulate
       conn-pb-pin : ∀ {k l q e x y} → PB′ k l → t k (pin q) → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
-      conn-pb-nested : ∀ {k₀ l₀ k₁ l₁ e₀ e₁ e′} → CP.σ k₀ e₀ → Unpinned e₀ → CP.Alive k₀ → T (not (inside r k₀)) → Live t (k₀ ⊕ [ ix 0 ])
-                     → A′.PB k₀ l₀ → CE.σ l₀ e′ → CP.σ k₁ e₁ → A′.Img k₁ l₁ → k₁ ≺ k₀ → k₁ ⊑ k₀ → ¬ ((k₁ ⊕ [ ix 0 ]) ⊑ k₀)
-                     → Ahead (l₁ ⊕ [ ix 0 ]) (l₀ ⊕ [ ix 0 ])
 
     private
       ahead-stable : ∀ {y l} → ¬ ¬ Ahead y l → Ahead y l
@@ -664,7 +658,8 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- An echo's late carrier: past the body's points by the annotation's
     -- carry, which a body point before the echo and not above it is
     -- before the echo's source row and not above it; past another echo's
-    -- by the annotation's carry at that echo's source row.
+    -- by the annotation's carry at that echo's source row, which lies
+    -- above no other source row: the source is flat.
     past-echo : ∀ {k₀ l₀ e₀ e′ x y} → CP.σ k₀ e₀ → Unpinned e₀ → CP.Alive k₀ → T (not (inside r k₀)) → Live t (k₀ ⊕ [ ix 0 ])
               → A′.PB k₀ l₀ → CE.σ l₀ e′ → M′ x y → x ≺ (k₀ ⊕ [ ix 0 ]) → ¬ (x ⊑ (k₀ ⊕ [ ix 0 ])) → Ahead y (l₀ ⊕ [ ix 0 ])
     past-echo x₀ un al ni lv pb ul (inj₁ m) xk nx with below-first xk nx
@@ -677,7 +672,8 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     ... | no nk  = ahead-over (ahead-under (ahead-under (A′.pb-past pb x₀ (src-live x₀ un) ul my k₁k₀ nk) yl) ([ ix 0 ] , refl)) ([ ix 0 ] , refl)
       where my = proj₁ (proj₂ (A′.ext i))
             yl = proj₂ (proj₂ (A′.ext i))
-    ... | yes kk = conn-pb-nested x₀ un al ni lv pb ul x₁ i k₁k₀ kk (λ h → nx (⊑-trans h ([ ix 0 ] , refl)))
+    ... | yes ([] , eq) = ⊥-elim (≺-irrefl {k₁} (subst (k₁ ≺_) (trans eq (⊕-identityʳ k₁)) k₁k₀))
+    ... | yes (_ ∷ _ , refl) = ⊥-elim (InvAt.flat Iσ x₁ x₀)
 
     -- An unpinned row of the connect carried into its instant one label
     -- under a source row is that row's echo.
