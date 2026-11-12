@@ -23,7 +23,7 @@ open import Tree using (Obs)
 open import denotation.Position using (_≟ᵖ_; Pos; ix; sub; last; _⊕_; root)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Den; DenEnv; enter; approx; _≺_; module Scan; module Op)
-open import denotation.Laws.Modulus using (entered-reach; reach-few; ≼-split; ≺→≼; ≺-≼-≺; ≼-≺-≺; ≺-trans)
+open import denotation.Laws.Modulus using (entered-reach; reach-few; ≼-split; ≺→≼; ≺-≼-≺)
 open import denotation.Laws.Worlds using (InvAt; Ok; Hots; GoodEnv; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊕-assoc)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -33,7 +33,7 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads; Carried; Live)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (From; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
+open import simultaneous.CarryBase using (From; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
   sub-listed; ahead-over)
 open import simultaneous.ReadRows using (up; up-⊕)
 open import simultaneous.ToldRows using (told; module Told)
@@ -367,20 +367,20 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     ... | inj₁ (l , _ , yl , refl) = proj₁ (C.pb-few yl) , λ { (l₂ , pb , _ , y₂ , eq) → proj₂ (C.pb-few yl) (subst (C.PB _) (sym (told-inj yl y₂ eq)) pb) }
 
     pinned′ : ∀ {k p} → t k (pin p) → Listed t k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → τ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed τ l)
+            → (Σ Pos λ l → Σ Pos λ p′ → τ l (pin p′) × PB′ k l × Targeted M p p′ × Listed τ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ tk L lp with C.pinned tk L lp
+    pinned′ {k} {p} tk L lp with C.pinned tk L lp
     ... | (l , p′ , y , pb , B , Ll) , h = carrier (told-row y (few-of Ll)) , h
       where
         carrier : (Σ (Ev Y) λ e′ → τ (l ⊕ [ ix 0 ]) e′ × Told (pin p′) e′)
-                → Σ Pos λ l′ → Σ Pos λ r → τ l′ (pin r) × PB′ _ l′ × (∀ {k′ l″} → Img′ k′ l″ → l″ ≺ r → k′ ≺ _) × Listed τ l′
+                → Σ Pos λ l′ → Σ Pos λ r → τ l′ (pin r) × PB′ k l′ × Targeted M p r × Listed τ l′
         carrier (pin r , y′ , t-pin rr) = l ⊕ [ ix 0 ] , r , y′ , (l , pb , pin p′ , y , refl) , B′ rr , told-listed y Ll
           where
-            B′ : r ≡ p′ ⊎ r ≡ q → ∀ {k′ l″} → Img′ k′ l″ → l″ ≺ r → k′ ≺ _
-            B′ (inj₁ refl) {l″ = l″} (l₁ , i , mv) lr = B i (≼-≺-≺ {l₁} {l″} {p′} (⊑-≼ {l₁} {l″} (mv-⊑ mv)) lr)
-            B′ (inj₂ refl) {l″ = l″} (l₁ , i , mv) lr =
-              B i (≺-trans {l₁} {q} {p′} (≼-≺-≺ {l₁} {l″} {q} (⊑-≼ {l₁} {l″} (mv-⊑ mv)) lr) (told-pin-past y))
+            -- A pin retold to the told run's own connect, before the source's.
+            B′ : r ≡ p′ ⊎ r ≡ q → Targeted M p r
+            B′ (inj₁ refl) = B
+            B′ (inj₂ refl) = proj₁ B , proj₁ (proj₂ B) , ≺→≼ {q} {proj₁ B} (≺-≼-≺ {q} {p′} {proj₁ B} (told-pin-past y) (proj₂ (proj₂ B)))
 
   -- The told run listed before a point its carriers follow.  The told
   -- run moves each carrier down to its image (`δ`): a point between a

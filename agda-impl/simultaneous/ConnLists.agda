@@ -28,22 +28,16 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
 open import denotation.Laws.Modulus using (≼-or-≻; ≺-ext; ≼-split; ≺-trans; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
 open import denotation.Laws.BoundedInv using (first-child)
 open import denotation.Laws.Shows using (few-reach)
-open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊑-trans; ⊕-injˡ; inside-⊑)
+open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; ⊑-refl; ⊑-≼; ⊕-injˡ; inside-⊑)
 import denotation.Laws.Connect as LC
 open import denotation.Laws.ConnectNe using (module Rows)
 import denotation.Laws.Truth.Connect.Cuts as Cuts
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (Emb; ahead-over; few-sub; sub-listed)
+open import simultaneous.CarryBase using (few-sub; sub-listed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE)
-
--- Past an embedded point, nothing over a later point's image precedes
--- the earlier point's.
-follows : ∀ {M x y x′ y′ l} → Emb M → M x y → M x′ y′ → x ≺ x′ → y′ ⊑ l → l ≺ y → ⊥
-follows {y = y} {l = l} E m m′ xx yl ly =
-  ≺-irrefl {l} (≺-trans {l} {y} {l} ly (proj₁ (ahead-over (Emb.mono E m m′ xx , λ yy → ⊑-≼ {y} {l} (⊑-trans yy yl) ly) yl)))
 
 nin : ∀ {r k} → T (not (inside r k)) → T (inside r k) → ⊥
 nin {r} {k} ni i with inside r k

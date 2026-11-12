@@ -48,7 +48,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
-open import simultaneous.CarryBase using (From; PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; IntoAt; Ahead; ahead-over)
+open import simultaneous.CarryBase using (From; Targeted; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; IntoAt; Ahead; ahead-over)
 open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
 
@@ -964,22 +964,20 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ----------------------------------------------------------------------
     -- Pins: kept with their connect unfailed, past no carried failure
 
-    pin-unfailed : ∀ {p p′} → ¬ P.Failed p → (∀ {k′ l′} → C.Img k′ l′ → l′ ≺ p′ → k′ ≺ p) → ¬ Q.Failed p′
-    pin-unfailed nfp bd (q , instEmit (mark _) _ , _ , () , _)
-    pin-unfailed nfp bd (q , instEmit (value b) n , uq , nb , qp) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    pin-unfailed : ∀ {p p′} → ¬ P.Failed p → Targeted M p p′ → ¬ Q.Failed p′
+    pin-unfailed nfp tg (q , instEmit (mark _) _ , _ , () , _)
+    pin-unfailed nfp tg (q , instEmit (value b) n , uq , nb , qp) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
     ... | k′ , i′ , _ , tk′ , mt with match-val mt
-    ...   | refl = nfp (k′ , b , tk′ , nb , bd i′ qp)
+    ...   | refl = nfp (k′ , b , tk′ , nb , pin-bound hm tg (proj₁ (proj₂ (C.ext i′))) (proj₂ (proj₂ (C.ext i′))) qp)
 
-    bound′ : ∀ {p p′} → ¬ Q.Failed p′ → (∀ {k′ l′} → C.Img k′ l′ → l′ ≺ p′ → k′ ≺ p) → ∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p
-    bound′ nfp′ bd (inj₁ (i , _)) lp = bd i lp
-    bound′ {p′ = p′} nfp′ bd (inj₂ (cut {l₀ = l₀} {a = a} _ nk _ _ ul _ _ refl)) lp =
-      ⊥-elim (nfp′ (l₀ , _ , ul , nk , ≺-trans {l₀} {l₀ ⊕ [ a ]} {p′} (≺-ext l₀ []) lp))
+    aimed : ∀ {p p′} → Targeted M p p′ → Targeted M′ p p′
+    aimed (y , m , py) = y , inj₁ m , py
 
     home-up : ∀ {p k₀} → ¬ P.Failed p → k₀ ≺ p → Home t k₀ → Home P.T′ k₀
     home-up {p} {k₀} nfp kp h n = h λ { (e , tk , un) → n (e , P.up tk (P.unfailed nfp (≺→≼ {k₀} {p} kp)) (P.pass-before tk kp nfp) , un) }
 
     PinOut : Pos → Pos → Set
-    PinOut k p = (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed Q.T′ l)
+    PinOut k p = (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × Targeted M′ p p′ × Listed Q.T′ l)
                  × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home P.T′ k₀ × instantOf k₀ ≡ instantOf k)
                     ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -997,11 +995,11 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ... | yes fk = take-pin-past tk′ fk L lp
     ... | no nfk with C.pinned tk (P.lst← nfk L) lp
     ...   | (l , p′ , ul , mb , bd , ls) , inj₁ e =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₁ e
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , aimed bd , Q.lst-any ls) , inj₁ e
     ...   | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , aimed bd , Q.lst-any ls) , inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
     ...   | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₂ hh) =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₂ hh)
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , aimed bd , Q.lst-any ls) , inj₂ (inj₂ hh)
 
   -- The taken run listed before a point its carriers follow.
   postulate

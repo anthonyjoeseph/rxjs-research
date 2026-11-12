@@ -38,12 +38,12 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (unp-pin; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; From; Ahead; ahead-under; ahead-over; few-sub;
-  sub-listed; instant-⊕; apart)
+open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; From;
+  Ahead; ahead-under; ahead-over; few-sub; sub-listed; instant-⊕; apart)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.Carry using (annValues; PastOver; Anchor; anchor-grow)
 open import simultaneous.ReadRows using (up; up-⊕)
-open import simultaneous.ConnLists using (module ConnLists; follows; listed-proper; listed-step; live-or-ended; nin; trunc-few)
+open import simultaneous.ConnLists using (module ConnLists; listed-proper; listed-step; live-or-ended; nin; trunc-few)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.SObs using (lone; module Elaborate)
 
@@ -414,7 +414,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
       conn-whole : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
       conn-cover : ∀ {v w} → Listed t v → LP v → Live t v → From ConnImg PB′ t u v w → Listed u w
       conn-pinned : ∀ {k q} → t k (pin q) → Listed t k → LP k
-                  → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × (∀ {k′ l′} → ConnImg k′ l′ → l′ ≺ q′ → k′ ≺ q) × Listed u l)
+                  → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × Targeted M′ q q′ × Listed u l)
                     × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
                        ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 

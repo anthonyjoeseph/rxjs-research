@@ -42,7 +42,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (From; PMap; _∪ᴹ_; Emb; Fresh; CarryAt; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed-≼; sub-listed; Ahead; ahead-over; ahead-under)
+open import simultaneous.CarryBase using (From; Targeted; PMap; _∪ᴹ_; Emb; Fresh; CarryAt; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed-≼; sub-listed; Ahead; ahead-over; ahead-under)
 open import simultaneous.Carry using (Within; Bare; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; annValues; listed↓; hots-at; bound-hot; BoundSrc; Rows; rows-at)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -361,8 +361,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
     img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → HotsListed envP k → Out k e
     heard-img : ∀ {q r} → Proper T₀ q (pin r) → p ≺ q → Listed t (q ⊕ [ sub p ]) → HotsListed envP (q ⊕ [ sub p ])
-              → (Σ Pos λ l → Σ Pos λ r′ → T₀′ l (pin r′) × C.PB q l × (∀ {k′ l′} → C.Img k′ l′ → l′ ≺ r′ → k′ ≺ r)
-                  × Listed T₀′ l)
+              → (Σ Pos λ l → Σ Pos λ r′ → T₀′ l (pin r′) × C.PB q l × Targeted M₀ r r′ × Listed T₀′ l)
               → Out (q ⊕ [ sub p ]) skip
     heard-img {q} {r} tq pq L lp (l , r′ , ul , pb , _ , ls) =
       inj₂ (refl , heard-into {q} {l} {pin r} {pin r′} tq pq pb ul ls L)

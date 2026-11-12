@@ -45,7 +45,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
 open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
@@ -354,7 +354,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
     pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed S′ l)
+              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp

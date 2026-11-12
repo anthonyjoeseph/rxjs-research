@@ -36,7 +36,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Few; _≺_; _≼_; module Op)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-≼-≺; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-≼-≺; ≺-ext; ≼-or-≻; ≼-split)
 open import denotation.Laws.Worlds using (W⁼; here; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
@@ -112,6 +112,25 @@ ahead-under {y} {l = l} (yl , n) (σ , refl) =
 ahead-over : ∀ {y l l′} → Ahead y l → l ⊑ l′ → Ahead y l′
 ahead-over {y} {l} {l′} (yl , n) ll =
   ≺-≼-≺ {y} {l} {l′} yl (⊑-≼ ll) , λ yl′ → [ n , (λ ly → ⊑-≼ {l} {y} ly yl) ]′ (⊑-cmp y l yl′ ll)
+
+-- Past an embedded point, nothing over a later point's image precedes
+-- the earlier point's.
+follows : ∀ {M x y x′ y′ l} → Emb M → M x y → M x′ y′ → x ≺ x′ → y′ ⊑ l → l ≺ y → ⊥
+follows {y = y} {l = l} E m m′ xx yl ly =
+  ≺-irrefl {l} (≺-trans {l} {y} {l} ly (proj₁ (ahead-over (Emb.mono E m m′ xx , λ yy → ⊑-≼ {y} {l} (⊑-trans yy yl) ly) yl)))
+
+-- A pin's target, at or before its connect's image.
+Targeted : PMap → Pos → Pos → Set
+Targeted M q r = Σ Pos λ y → M q y × r ≼ y
+
+-- What precedes a pin's target carries what precedes its connect.
+pin-bound : ∀ {M q r k y l} → Emb M → Targeted M q r → M k y → y ⊑ l → l ≺ r → k ≺ q
+pin-bound {q = q} {r} {k} {l = l} E (y₀ , mq , ry) mk yl lr with ≼-or-≻ q k
+... | inj₂ kq = kq
+... | inj₁ qk with ≼-split {q} {k} qk
+...   | inj₁ q<k  = ⊥-elim (follows E mq mk q<k yl (≺-≼-≺ {l} {r} {y₀} lr ry))
+...   | inj₂ refl with Emb.fun E mq mk
+...     | refl = ⊥-elim (⊑-≼ yl (≺-≼-≺ {l} {r} {y₀} lr ry))
 
 _∪ᴹ_ : PMap → PMap → PMap
 (M ∪ᴹ N) x y = M x y ⊎ N x y
@@ -387,7 +406,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pinned  : ∀ {k p} → t k (pin p) → Listed t k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u l)
+            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × Targeted M p p′ × Listed u l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -559,7 +578,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
     pinned′ : ∀ {k p} → t′ k (pin p) → Listed t′ k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u′ l)
+              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′ × Listed u′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} tk L lp with down tk

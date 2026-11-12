@@ -35,7 +35,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
 open import simultaneous.Carry using (Clear; clear-not; Rows; rows-map; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
@@ -165,9 +165,10 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
 carry-grow sub c past = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = cover
-  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned }
+  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned′ }
   where
     open CarryAt c
+    pinned′ = λ {k} {q} tk L lp → let ((l , q′ , ul , pb , (y , m , qy) , ls) , h) = pinned {k} {q} tk L lp in (l , q′ , ul , pb , (y , sub m , qy) , ls) , h
 
 -- AN ENVIRONMENT STAYS ONE along a map grown past its binders' late
 -- carriers.
@@ -409,15 +410,11 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
   pinned : ∀ {k q} → P.T k (pin q) → Listed P.T k → LP k
-         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q) × Listed E.T l)
+         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × Listed E.T l)
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
   pinned {k} {q} (body x , _) L lp with C.pinned x (P.lst← L) lp
-  ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b′ , E.lst→ ul ls) , homed {k} {q} r
-    where
-      b′ : ∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q
-      b′ (inj₁ (refl , refl)) _ = ≺-≼-≺ {P.g} {p ⊕ [ ix 1 ]} {q} (ticks p 0) (proj₂ (aP x) refl)
-      b′ (inj₂ i)             lq = b i lq
+  ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lst→ ul ls) , homed {k} {q} r
 
   cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
   cover L lp lv F = E.lstw (C.cover (P.lst← L) lp (P.live← lv) λ tk lk vk m ul → F (P.up tk) (P.live→ lk) vk (fwd m tk ul) (E.up ul))
