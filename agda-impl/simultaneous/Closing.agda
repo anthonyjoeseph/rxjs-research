@@ -10,7 +10,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++; ∈-++⁻; ∈-map⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++; ∈-++⁻; ∈-map⁻; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
 open import Data.Maybe using (just; nothing)
@@ -29,12 +29,12 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
 open import Tree using (scan)
-open import denotation.Position using (Pos; root; frame; _∙_; _≟ᵖ_; _<ᵖ_)
+open import denotation.Position using (Pos; root; frame; _∙_; _≟ᵖ_; _<ᵖ_; _≟ⁱ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Seen; Few; _≺_; _≼_; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Laws.Modulus using (≺-trans; ≺-absurd; ≼-refl; ≼-split; ≼-trans; ≺→≼)
+open import denotation.Laws.Modulus using (≺-trans; ≺-absurd; ≼-refl; ≼-split; ≼-trans; ≺→≼; ≼-≺-≺; ≺-ext)
 open import denotation.Simultaneity using (between)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
@@ -45,6 +45,8 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Held using (shut; held)
 open import simultaneous.Routed using (Held; cnt)
 open import simultaneous.Reach using (module Reached)
+open import simultaneous.Listing using (listed)
+open import simultaneous.NextRow using (next)
 open import simultaneous.Project using (run-prefix)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
@@ -419,6 +421,14 @@ max-≽ b (k ∷ ks) with T? (b <ᵖ k)
 ... | yes bk = ≼-trans {b} {k} {maxᵖ k ks} (≺→≼ {b} {k} bk) (max-≽ k ks)
 ... | no _   = max-≽ b ks
 
+max-in : ∀ b ks → maxᵖ b ks ∈ b ∷ ks
+max-in b []       = here refl
+max-in b (k ∷ ks) with T? (b <ᵖ k)
+... | yes _ = there (max-in k ks)
+... | no _ with max-in b ks
+...   | here e  = here e
+...   | there m = there (there m)
+
 max-∈ : ∀ b ks {k} → k ∈ ks → k ≼ maxᵖ b ks
 max-∈ b (k ∷ ks) (here refl) with T? (b <ᵖ k)
 ... | yes _ = max-≽ k ks
@@ -533,13 +543,112 @@ postulate
 
 -- A VALUE WHOSE INSTANT FINISHES IS LEFT: past finitely many rows of its
 -- instant, the program reaches a row of another instant or its end, or
--- makes no row at all.  Classically immediate; constructively it asks
--- for the least proper row past a finitely-preceded position, or none.
--- Every leaf's timeline forces to its next frame or to `done` or
--- `quiet`, so the machine computes it, but the simulation relates only
--- visible rows, and `listed` decides only the rows before a position.
-postulate
-  exits-bounded : ∀ {A : Set} (o : SObs [] A) {q x} → elaborated o q (out x) → Bounded (elaborated o) q → Exits (elaborated o) q
+-- makes no row at all.  Past the instant's last listed row the next row
+-- is decided (`simultaneous.NextRow.next`).  A row there lies in another
+-- instant, and is before every end unless an end before it is listed;
+-- with none, the rows past the value are the instant's, and either one
+-- listed is the end or none is, so all lie before any end.
+exits-bounded : ∀ {A : Set} (o : SObs [] A) {q x} → elaborated o q (out x) → Bounded (elaborated o) q → Exits (elaborated o) q
+exits-bounded {A} o {q} {x} xq (ks , h) = from-next (next (elaborate (plain o)) few-c)
+  where
+    X = elaborated o
+    open Reached (⟦ elaborate (plain o) ⟧ []ᴬ) root (inv-⟦⟧ (elaborate (plain o)) []ᴬ (λ ()) root (tt , λ ())) using (seen)
+
+    sq : Seen X q (out x)
+    sq = seen xq tt
+
+    same? = λ k → instantOf k ≟ⁱ instantOf q
+
+    js : List Pos
+    js = L.filter same? ks
+
+    -- The instant's last listed row past `q`, or `q`.
+    c : Pos
+    c = maxᵖ q js
+
+    inst-c : instantOf c ≡ instantOf q
+    inst-c with max-in q js
+    ... | here e  = cong instantOf e
+    ... | there m = proj₂ (∈-filter⁻ same? {xs = ks} m)
+
+    in-c : ∀ {y e} → X y e → q ≺ y → instantOf y ≡ instantOf q → y ≼ c
+    in-c xy qy iy = max-∈ q js (∈-filter⁺ same? (h xy qy iy) iy)
+
+    inst-past : ∀ {y} → q ≺ y → y ≼ c → instantOf y ≡ instantOf q
+    inst-past {y} qy yc with ≼-split {y} {c} yc
+    ... | inj₁ yc′  = between {q} {y} {c} (from≺ q y qy) (from≺ y c yc′) (sym inst-c)
+    ... | inj₂ refl = inst-c
+
+    few-c : Few X c
+    few-c = proj₁ (proj₂ sq) ++ q ∷ ks , at
+      where
+        at : ∀ {y e} → X y e → y ≺ c → y ∈ proj₁ (proj₂ sq) ++ q ∷ ks
+        at {y} xy yc with T? (y <ᵖ q)
+        ... | yes yq = ∈-++⁺ˡ (proj₂ (proj₂ sq) xy yq)
+        ... | no qy with ≼-split {q} {y} qy
+        ...   | inj₁ qy′  = ∈-++⁺ʳ (proj₁ (proj₂ sq)) (there (h xy qy′ (inst-past qy′ (≺→≼ {y} {c} yc))))
+        ...   | inj₂ refl = ∈-++⁺ʳ (proj₁ (proj₂ sq)) (here refl)
+
+    -- Every end lies past the value.
+    live-q : ∀ {k} → X k end → q ≺ k
+    live-q {k} xk with ≼-split {q} {k} (proj₂ (proj₁ sq) xk)
+    ... | inj₁ qk = qk
+    ... | inj₂ refl with at-func (elaborate (plain o)) xq xk
+    ...   | ()
+
+    no-end : ∀ {k e} → X k e → (e ≡ end → ⊥) → X k end → ⊥
+    no-end xk ne xe = ne (at-func (elaborate (plain o)) xk xe)
+
+    -- An end among rows listed, or none.
+    hunt : (ls : List Pos) → (∀ {k} → k ∈ ls → Σ (Ev (IE A)) (X k)) → (Σ Pos λ k → X k end) ⊎ (∀ {k} → k ∈ ls → X k end → ⊥)
+    hunt []       _ = inj₂ λ ()
+    hunt (k ∷ ls) b with hunt ls (λ m → b (there m))
+    ... | inj₁ f    = inj₁ f
+    ... | inj₂ none with b (here refl)
+    ...   | end   , xk = inj₁ (k , xk)
+    ...   | out _ , xk = inj₂ λ { (here refl) → no-end xk (λ ()) ; (there m) → none m }
+    ...   | skip  , xk = inj₂ λ { (here refl) → no-end xk (λ ()) ; (there m) → none m }
+    ...   | pin _ , xk = inj₂ λ { (here refl) → no-end xk (λ ()) ; (there m) → none m }
+
+    -- With no row past `c`, every row lies at or before it.
+    module None (none : ∀ {r e} → X r e → c ≺ r → ⊥) where
+      upto-c : ∀ {y e} → X y e → y ≼ c
+      upto-c xy cy = none xy cy
+
+      b : Pos
+      b = c ⊕ [ ix 0 ]
+
+      to-b : ∀ {y e} → X y e → y ≺ b
+      to-b {y} xy = ≼-≺-≺ {y} {c} {b} (upto-c xy) (≺-ext c [])
+
+      few-b : Few X b
+      few-b = c ∷ proj₁ few-c , at
+        where
+          at : ∀ {y e} → X y e → y ≺ b → y ∈ c ∷ proj₁ few-c
+          at {y} xy _ with ≼-split {y} {c} (upto-c xy)
+          ... | inj₁ yc   = there (proj₂ few-c xy yc)
+          ... | inj₂ refl = here refl
+
+      past : ∀ {y e} → X y e → q ≺ y → y ∈ ks
+      past xy qy = h xy qy (inst-past qy (upto-c xy))
+
+      exits : Exits X q
+      exits with listed (elaborate (plain o)) few-b
+      ... | ls , has , back with hunt ls (λ m → proj₂ (back m))
+      ...   | inj₁ (k , xk) = inj₁ (k , end , seen xk tt , live-q xk , inj₂ refl)
+      ...   | inj₂ absent   = inj₂ (ks , λ xy qy → past xy qy , xy , λ xk → ⊥-elim (absent (has xk (to-b xk)) xk))
+
+    from-next : (Σ Pos λ r → Σ (Ev (IE A)) λ e → X r e × c ≺ r × Few X r × (∀ {y e′} → X y e′ → c ≺ y → y ≺ r → ⊥))
+                ⊎ (∀ {r e} → X r e → c ≺ r → ⊥)
+              → Exits X q
+    from-next (inj₁ (r , e , xr , cr , fr , _)) with listed (elaborate (plain o)) fr
+    ... | ls , has , back with hunt ls (λ m → proj₂ (back m))
+    ...   | inj₁ (k , xk) = inj₁ (k , end , seen xk tt , live-q xk , inj₂ refl)
+    ...   | inj₂ absent   = inj₁ (r , e , ((xr , λ xk kr → absent (has xk kr) xk) , fr) , qr , inj₁ λ ir → in-c xr qr ir cr)
+      where
+        qr : q ≺ r
+        qr = ≼-≺-≺ {q} {c} {r} (max-≽ q js) cr
+    from-next (inj₂ none) = None.exits none
 
 -- PAST A RELEASE, THE INSTANT IS OVER: no value of it, and the run
 -- leaves it.

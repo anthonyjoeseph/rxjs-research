@@ -32,18 +32,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE NEXT ROW
-
-Scouted, unproven: past a value whose instant has finitely many rows
-left, decide whether a proper row of another instant follows. Classically
-trivial; constructively nothing decides it: `listed` decides only the rows
-before a position, the simulation only the visible ones. Settled by a
-computable next row (the machine, through a simulation of every row), or
-by `Over` asking only that the instant's proper rows past the value be
-finitely many, classically the same (Anthony's question).
-
-Members: `exits-bounded`.
-
 #### THE DEAD PIN
 
 Untried: a takeWhile keeps a source pin past its failure, while its
