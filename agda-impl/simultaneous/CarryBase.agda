@@ -458,6 +458,9 @@ module Lifts {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {Rel : Pos → 
   near→ (inj₁ lm)             = inj₁ lm
   near→ (inj₂ ((_ , al) , L)) = inj₂ ((_ , proj₁ (proj₂ (toL L al))) , lst→ L)
 
+unp-pin : ∀ {X : Set} {r} → Unpinned {X} (pin r) → ⊥
+unp-pin ()
+
 unp← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Unpinned e′ → Unpinned e
 unp← k-out  _ = tt
 unp← k-skip _ = tt

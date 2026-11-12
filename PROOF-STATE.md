@@ -35,14 +35,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE CONNECT'S CARRY
 
 Probed, unproven: the connect's rows carried from its body's carry and
-its annotated source's. Open: whether an elaborated body row the body
-carrier lands on has few rows before it (reach); whether an echo's
-image lies outside the annotation's subscription with its elaborated
-body alive; and whether the elaborated connect is listed up to a
-carrier — no field of `CarryAt` says any. Settled when each leaf is a
-body, over whatever fields the record must gain.
+its annotated source's. Open: how many elaborated rows of one subterm
+precede the carrier of the other's row — the source's before a body
+row's, the body's before an echo's (annotation marks included); whether
+an echo's image lies outside the annotation's subscription with its
+elaborated body alive. No field of `CarryAt` says either. Settled when
+each leaf is a body, over whatever fields the record must gain.
 
-Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-body-reach`, `conn-body-listed`, `conn-echo-row`, `conn-echo-listed`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-body`, `conn-β-echo`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE ERASURE
 
