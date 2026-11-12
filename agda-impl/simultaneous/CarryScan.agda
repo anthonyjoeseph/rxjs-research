@@ -33,7 +33,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Few; _≺_; _≼_; Unpinned;
   module Scan; module Op; approx)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; reach-few; entered-reach)
-open import denotation.Laws.Worlds using (InvAt; full)
+open import denotation.Laws.Worlds using (InvAt; full; GoodEnv; Ok; Hots)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Shows using (∈-stable)
@@ -47,7 +47,7 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
 open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl;
   module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val;
-  carried-val; match-end)
+  carried-val; match-end; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
 
@@ -373,6 +373,10 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; pb-img = pb-img
     ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (liveS← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (downU s₁))) }
 
+  -- Its rows carried into their instant are its source's.
+  pb-down : ∀ {k l e₀} → PB k l → S k e₀ → Live S k → PB k l × Σ (Ev A) (t k) × Live t k
+  pb-down {k} pb sk lv = pb , (_ , proj₁ (proj₂ (down sk))) , liveS← {k} (λ {c₁} → lv {c₁})
+
 ------------------------------------------------------------------------
 -- The former
 
@@ -414,7 +418,17 @@ scan-carry f z d d′ p p′ hm It Iu c =
     module W = MapRun proj₂ (Op.scan (scanIE f) (z , marked begin) d′) p′
 
 carry-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
-carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr →
-  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr
-  in M , ms , hm′ , wi , (λ tk → br (proj₂ (scan-row (proj₁ tk)))) , jn′ , scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′
-       (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c
+carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
+  scanned envP envE gP gE M₀ er p p′ okP okE (h envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr)
+  where
+    scanned : ∀ envP envE → GoodEnv envP → GoodEnv envE → ∀ M₀ (er : EnvRel M₀ ρ envP envE) p p′ → Ok (Hots envP) p → Ok (Hots envE) p′
+            → CarriesAt n ρ s envP envE M₀ er p p′ → CarriesAt n ρ (scan f z s) envP envE M₀ er p p′
+    scanned envP envE gP gE M₀ er p p′ okP okE (M , ms , hm′ , wi , br , jn′ , ep , c , nc) =
+      M , ms , hm′ , wi , (λ tk → br (proj₂ (scan-row (proj₁ tk)))) , jn′ , ep , c′
+      , nest-via {er = er} {c = c} {c′ = c′} (λ m → m)
+          (λ {k} {l} {e₀} → Core.pb-down f z hm′ (λ {q} {e} → entered-reach (approx n s envP) p {q} {e})
+             (λ {q} {e} → entered-reach (approx n (elab ρ s) envE) p′ {q} {e}) (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c {k} {l} {e₀})
+          nc
+      where
+        c′ : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (scan f z s) envP) p) (enter (approx n (elab ρ (scan f z s)) envE) p′) p p′
+        c′ = scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′ (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c

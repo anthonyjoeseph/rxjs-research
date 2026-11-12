@@ -300,9 +300,9 @@ unpinned-liveₙ n o tk up {c} tc ck with InvAt.quiet (inv-approx n (plain o) []
 --   a reader reaches are placed, each in the instant of a carrier.
 erasingₙ : ∀ n {A} (o : SObs [] A)
          → Attribution Every (One valuesOf) (Reads valuesOf) (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root) root root
-erasingₙ n o with Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ()) (λ ()) tt
+erasingₙ n o with Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ()) (λ ()) (λ ()) tt
                     root coreAt (refl , refl) ok₀ (tt , λ ()) (λ ()) fresh-At₀
-... | M , ms , hm , _ , _ , _ , c with carry-wrap n o hm (ms (refl , refl)) c
+... | M , ms , hm , _ , _ , _ , _ , c , _ with carry-wrap n o hm (ms (refl , refl)) c
 ...   | M′ , hm′ , δ , at′ , c′ =
   attributed hm′ (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
     (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o)

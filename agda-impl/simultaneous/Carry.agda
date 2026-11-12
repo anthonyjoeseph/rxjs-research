@@ -41,7 +41,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 open import denotation.Laws.Shows using (∈-stable)
 
-open import Tree using (Obs; cold; map; flatMap; connect)
+open import Tree using (Obs; cold; map; flatMap)
 open import denotation.Position using (Pos; Path; Label; Instant; ix; sub; last; _∙_; _⊕_; root; lt; eq; gt; cmpLabel; cmpPath;
   cmpInstant; isLt; inside)
 open import Data.List.Properties using (∷-injective)
@@ -903,19 +903,111 @@ joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} ms jn gr i n row xe |
 ... | inj₂ (σ′ , refl) with jn i m row refl
 ...   | e , ae , e′ , me , L , il , Ly = e , ae , e′ , ms me , L , il , ⊑-trans Ly ry
 
+-- A CARRY'S LATE CARRIERS STAY PAST a map: past, and apart from, the
+-- image of every point before the row they carry and not above it.
+PastOver : ∀ {A Y} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+         → CarryAt f M HP HE LP t u s s′ → PMap → Set
+PastOver {t = t} {u = u} c N = ∀ {k l e₀ e x y} → CarryAt.PB c k l → t k e₀ → Live t k → u l e → N x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+
+-- Every binder's, along a map grown past the binders.
+EnvPast : ∀ {Γ} {M₀ : PMap} {LP : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+        → (∀ {X} (i : X ∈ Γ) → Bound M₀ LP (dP i) (dE i)) → PMap → Set₁
+EnvPast {Γ} er N = ∀ {X} (i : X ∈ Γ) → PastOver (Bound.carried (er i)) N
+
+-- Every binder's own map.
+env-past : ∀ {Γ} {M : PMap} {LP : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+         → (er : ∀ {X} (i : X ∈ Γ) → Bound M LP (dP i) (dE i)) → EnvPast er M
+env-past er i = CarryAt.pb-past (Bound.carried (er i))
+
+-- A MAP GROWN ONE LABEL UNDER POINTS HOLDING NO HOT ROW stays past every
+-- binder's late carriers: a hot row past such a point is apart from it.
+grown-past : ∀ {Γ Δ} {M₀ M M′ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
+           → (er : EnvRel M₀ ρ envP envE) → EnvPast er M → (∀ {x y} → M′ x y → M x y ⊎ Grown M (Hots envP) x y) → EnvPast er M′
+grown-past {ρ = ρ₀} {envP = envP₀} {envE = envE₀} er ep gr i =
+  past-grow (Bound.carried (er i)) (λ {k} {e₀} tk lv → bound-hot {ρ = ρ₀} envP₀ {envE = envE₀} er i (e₀ , tk , λ {c} → lv {c})) (ep i) gr
+  where
+    past-grow : ∀ {A Y} {f : Y → List A} {M₁ : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+                (c : CarryAt f M₁ HP HE LP t u s s′) {N N′ : PMap} {H : Pos → Set}
+              → (∀ {k e₀} → t k e₀ → Live t k → H k) → PastOver c N → (∀ {x y} → N′ x y → N x y ⊎ Grown N H x y) → PastOver c N′
+    past-grow c hk ep′ gr′ pb tk lv ul m′ xk nxk with gr′ m′
+    ... | inj₁ m = ep′ pb tk lv ul m xk nxk
+    ... | inj₂ (r , r₀ , a , mr , ry , refl , nh) =
+      ahead-under (ep′ pb tk lv ul mr (≺-trans {r} {r ⊕ [ a ]} {_} (≺-ext r []) xk) (λ rk → nh (hk tk lv) rk)) ry
+
+-- A point of the map at or over a late carrier, itself on the carried
+-- row's step under a hot row and over the row, or past the row.
+Anchor : PMap → Pos → Pos → Pos → Label → Set
+Anchor N k l h a = Σ Pos λ x → Σ Pos λ y → N x y × y ⊑ l × ((((h ⊕ [ a ]) ⊑ x) × x ⊑ k) ⊎ k ≺ x)
+
+-- A LATE CARRIER UNDER A CARRIED HOT ROW IS ANCHORED: a row carried into
+-- its instant, lying strictly under a bound hot's row which that hot
+-- carries in order, has its carrier under a point of the map on its own
+-- step, or past it.
+PBNest : ∀ {Γ} {M₀ : PMap} {LP₀ : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+       → (∀ {X} (i : X ∈ Γ) → Bound M₀ LP₀ (dP i) (dE i)) → PMap → ∀ {A Y} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+       → CarryAt f M HP HE LP t u s s′ → Set₁
+PBNest {Γ} er N {t = t} c = ∀ {X} (i : X ∈ Γ) {k l e₀ h L a σ} → CarryAt.PB c k l → t k e₀ → Live t k → BoundRow (er i) h
+                          → CarryAt.Img (Bound.carried (er i)) h L → k ≡ h ⊕ (a ∷ σ) → Anchor N k l h a
+
+-- Every binder's late carriers, so anchored.
+Nests : ∀ {Γ} {M₀ : PMap} {LP₀ : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+      → (∀ {X} (i : X ∈ Γ) → Bound M₀ LP₀ (dP i) (dE i)) → PMap → Set₁
+Nests {Γ} er N = ∀ {X} (j : X ∈ Γ) → PBNest er N (Bound.carried (er j))
+
+-- Anchors are kept along a larger map, and over a carrier moved under.
+anchor-grow : ∀ {N N′ k l h a} → N ⊆ᴹ N′ → Anchor N k l h a → Anchor N′ k l h a
+anchor-grow ss (x , y , n , yl , w) = x , y , ss n , yl , w
+
+anchor-up : ∀ {N k l l′ h a} → Anchor N k l h a → l ⊑ l′ → Anchor N k l′ h a
+anchor-up (x , y , n , yl , w) ll = x , y , n , ⊑-trans yl ll , w
+
+-- A CARRY'S ANCHORS FROM ANOTHER'S: each row it carries into its instant
+-- the other's, on a carrier under its own, or anchored anew past itself.
+nest-or : ∀ {Γ} {M₀ : PMap} {LP₀ : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+          {er : ∀ {X} (i : X ∈ Γ) → Bound M₀ LP₀ (dP i) (dE i)} {N N′ : PMap}
+          {A Y A′ Y′} {f : Y → List A} {f′ : Y′ → List A′} {M M′ : PMap} {HP HE LP HP′ HE′ LP′ : Pos → Set}
+          {t : EmissionSet A} {u : EmissionSet Y} {t′ : EmissionSet A′} {u′ : EmissionSet Y′} {s₀ s₀′ s₁ s₁′ : Pos}
+          {c : CarryAt f M HP HE LP t u s₀ s₀′} {c′ : CarryAt f′ M′ HP′ HE′ LP′ t′ u′ s₁ s₁′}
+        → N ⊆ᴹ N′
+        → (∀ {k l e₀} → CarryAt.PB c′ k l → t′ k e₀ → Live t′ k
+           → (Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l × Σ (Ev A) (t k) × Live t k) ⊎ Σ Pos λ x → Σ Pos λ y → N′ x y × y ⊑ l × k ≺ x)
+        → PBNest er N c → PBNest er N′ c′
+nest-or ss dn ns i pb tk lv br ci e with dn pb tk lv
+... | inj₁ (_ , pb₀ , ll , (_ , tk₀) , lv₀) = anchor-up (anchor-grow ss (ns i pb₀ tk₀ lv₀ br ci e)) ll
+... | inj₂ (x , y , n , yl , kx)            = x , y , n , yl , inj₂ kx
+
+-- The same, each row on the other's carrier.
+nest-via : ∀ {Γ} {M₀ : PMap} {LP₀ : Pos → Set} {dP : ∀ {X} → X ∈ Γ → Den X} {dE : ∀ {X} → X ∈ Γ → Den (AIE X)}
+           {er : ∀ {X} (i : X ∈ Γ) → Bound M₀ LP₀ (dP i) (dE i)} {N N′ : PMap}
+           {A Y A′ Y′} {f : Y → List A} {f′ : Y′ → List A′} {M M′ : PMap} {HP HE LP HP′ HE′ LP′ : Pos → Set}
+           {t : EmissionSet A} {u : EmissionSet Y} {t′ : EmissionSet A′} {u′ : EmissionSet Y′} {s₀ s₀′ s₁ s₁′ : Pos}
+           {c : CarryAt f M HP HE LP t u s₀ s₀′} {c′ : CarryAt f′ M′ HP′ HE′ LP′ t′ u′ s₁ s₁′}
+         → N ⊆ᴹ N′ → (∀ {k l e₀} → CarryAt.PB c′ k l → t′ k e₀ → Live t′ k → CarryAt.PB c k l × Σ (Ev A) (t k) × Live t k)
+         → PBNest er N c → PBNest er N′ c′
+nest-via {er = er} {c = c} {c′ = c′} ss dn =
+  nest-or {er = er} {c = c} {c′ = c′} ss λ pb tk lv → let (pb₀ , r , lv₀) = dn pb tk lv in inj₁ (_ , pb₀ , ⊑-refl _ , r , lv₀)
+
+-- What a carry gives at a pair of subscriptions: the map extended over
+-- the subterm's worlds, keeping the joins, every binder's late carriers
+-- past it, and the carry, its own late carriers anchored.
+CarriesAt : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) (envP : DenEnv Γ) (envE : DenEnv Δ)
+            (M₀ : PMap) → EnvRel M₀ ρ envP envE → Pos → Pos → Set₁
+CarriesAt n ρ o envP envE M₀ er p p′ =
+  Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p) × Joins ρ envP envE er M × EnvPast er M
+  × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′)
+      (λ c → PBNest er M c)
+
 -- CARRIED under every environment of carried binders: subscribed at
 -- admissible positions the map pairs, holding no hot row, its worlds
--- untouched, the subterm extends the map over its worlds, keeping the
--- joins, and carries.
+-- untouched.
 -- A record, so that a statement about a former is compared by its
 -- arguments, never by the elaborated tree its meaning unfolds to.
 record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
-                → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀ → Apart envP
+                → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀ → Nests er M₀ → Apart envP
                 → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → NotHot (Hots envP) p → Fresh (Hots envP) M₀ p
-                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p) × Joins ρ envP envE er M
-                  × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′
+                → CarriesAt n ρ o envP envE M₀ er p p′
 
 ------------------------------------------------------------------------
 -- The formers
@@ -926,10 +1018,20 @@ postulate
   carry-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → Carry m ρ (cold c)
   carry-flatMap   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
                   → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → Carry m ρ′ (f a)) → Carry m ρ (flatMap op f s)
-  carry-connect   : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
-                  → Carry m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → Carry m ρ′ b) → Carry m ρ (connect s b)
 
 carry-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → Carry m ρ s → Carry m ρ (map f s)
-carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr →
-  let (M , ms , hm′ , wi , br , jn′ , c) = h envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr
-  in M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , jn′ , map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
+  mapped envP envE M₀ er p p′ (h envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr)
+  where
+    mapped : ∀ envP envE M₀ (er : EnvRel M₀ ρ envP envE) p p′ → CarriesAt n ρ s envP envE M₀ er p p′ → CarriesAt n ρ (map f s) envP envE M₀ er p p′
+    mapped envP envE M₀ er p p′ (M , ms , hm′ , wi , br , jn′ , ep , c , nc) =
+      M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , jn′ , ep , c′
+      , nest-via {er = er} {c = c} {c′ = c′} (λ m → m) down nc
+      where
+        c′ : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (map f s) envP) p) (enter (approx n (elab ρ (map f s)) envE) p′) p p′
+        c′ = map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
+
+        down : ∀ {k l e₀} → CarryAt.PB c′ k l → enter (approx n (map f s) envP) p k e₀ → Live (enter (approx n (map f s) envP) p) k
+             → CarryAt.PB c k l × Σ (Ev _) (enter (approx n s envP) p k) × Live (enter (approx n s envP) p) k
+        down pb tk lv with MapRun.unmap f (approx n s envP) p tk
+        ... | e , tk₀ , _ = pb , (e , tk₀) , λ sc → lv (MapRun.lift f (approx n s envP) p sc)

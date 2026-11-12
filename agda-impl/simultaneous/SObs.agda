@@ -174,9 +174,10 @@ private
   isLane lanePart  = true
   isLane burstPart = false
 
-  ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ
-  ext ρ (here p)  = here p
-  ext ρ (there i) = there (ρ i)
+-- A renaming under one more binder.
+ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ
+ext ρ (here p)  = here p
+ext ρ (there i) = there (ρ i)
 
 -- A leaf emitting its value as it is subscribed, then silent forever.
 lone : ∀ {A} → A → Timeline A

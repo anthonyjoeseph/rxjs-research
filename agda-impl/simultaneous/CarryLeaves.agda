@@ -23,7 +23,7 @@ open import Function using (mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Tree using (empty; of; map)
-open import denotation.Position using (_≟ᵖ_; Pos; Path; Label; ix; last; _∙_; _⊕_; root; cmpPath; cmpPos; isLt)
+open import denotation.Position using (_≟ᵖ_; Pos; Path; Label; ix; sub; last; _∙_; _⊕_; root; cmpPath; cmpPos; isLt)
 open import denotation.Simultaneity using (reflˡ; reflⁱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; Truncate; Reach; InE; at-end;
   at-out; on-out)
@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
-open import simultaneous.Carry using (Bare; Carry; CarryAt; Emb; Fresh; PMap; Within; _∪ᴹ_; _⊆ᴹ_; carry; emb-under; instant-⊕; NotHot; Grown; joins-grow)
+open import simultaneous.Carry using (Bare; Carry; CarryAt; Emb; Fresh; PMap; Within; _∪ᴹ_; _⊆ᴹ_; carry; emb-under; instant-⊕; NotHot; Grown; joins-grow; grown-past; env-past)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 
@@ -131,6 +131,10 @@ last-max q plain-last     h = subst (λ c → T (isLt c)) (cmp-under q [ last ] 
 
 ix-last : ∀ q → (q ⊕ [ ix 0 ]) ≺ (q ⊕ [ last ])
 ix-last q = subst (λ c → T (isLt c)) (sym (cmp-under q [ ix 0 ] [ last ])) tt
+
+-- A tick one label under `q` comes before every reading so labelled.
+ix-sub : ∀ q e → (q ⊕ [ ix 0 ]) ≺ (q ⊕ [ sub e ])
+ix-sub q e = subst (λ c → T (isLt c)) (sym (cmp-under q [ ix 0 ] [ sub e ])) tt
 
 private
   unp-pin : ∀ {X : Set} {r} → Unpinned {X} (pin r) → ⊥
@@ -264,15 +268,17 @@ private
 
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
-carry-of n ρ xs = carry λ envP envE _ _ M₀ e₀ er jn _ p p′ m₀ _ _ nh fr →
+carry-of n ρ xs = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
   let (M , ms , hm , wi , br , gr , c) = of-carried xs e₀ fr m₀ (⊑-refl p′) nh
-  in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y}) , c
+  in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
+     , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , λ _ ()
 
 -- THE EMPTY PROGRAM ends at once, on both sides: the empty listing.
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
-carry-empty n ρ = carry λ envP envE _ _ M₀ e₀ er jn _ p p′ m₀ _ _ nh fr →
+carry-empty n ρ = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
   let (M , ms , hm , wi , br , gr , c) = of-carried [] e₀ fr m₀ (⊑-refl p′) nh
-  in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y}) , c
+  in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
+     , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , λ _ ()
 
 ------------------------------------------------------------------------
 -- The whole run

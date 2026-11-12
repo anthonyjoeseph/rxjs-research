@@ -36,10 +36,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Probed, unproven: each former's elaborated run carries its plain one
 (`Carry`) along an order embedding; each wrapper stage moves only the
-end — the close past the completion mark, the take under it. Settled
-when each former's leaf is a body.
+end — the close past the completion mark, the take under it. Riskiest:
+the connect's, which `CarryAt` as stated cannot give — a burst past an
+endless synchronous burst has no carrier, an image under the source's
+subscription is not known under the annotation's, and an echo's
+elaborated body is not known alive. Settled when each former's leaf is a
+body, over whatever fields the record must gain.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-close`, `wrap-take`.
+Members: `annotate-carry`, `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-close`, `wrap-take`.
 
 #### THE PROTOCOL
 

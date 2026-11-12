@@ -21,7 +21,7 @@ open import Data.List using (List; []; _∷_; _++_; [_]; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
-open import Data.List.Relation.Unary.All using (lookup; _∷_)
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -30,27 +30,24 @@ open import Function using (Equivalence; _⇔_)
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import Tree using (connected)
 open import denotation.Position using (Pos; Path; ix; sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part; <ᵖ-between)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Proper; DenEnv; Few;
-  Truncate; Rejoin; shown; heard; ended; late; _≺_; _≼_; approx)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Proper; DenEnv; Few; Truncate;
+  Rejoin; shown; heard; ended; late; _≺_; _≼_; approx)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; ≼-≺-≺; ≺-trans; ≺-≼-≺; ≺-ext; ≺→≼; ≼-refl; ≼-trans; ≼-split; entered-few)
 open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-cmp; ext≢; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ;
   W⁼; here; inW; join; step; plain-last; conv)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; EnvRel; Bound; HotsListed;
-  NotHot; BoundRow; Joins; Apart; annValues; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed↓; listed-≼; sub-listed; hots-at; bound-hot;
-  Ahead; ahead-over; ahead-under)
+open import simultaneous.Carry using (PMap; _∪ᴹ_; Emb; Fresh; Within; Bare; CarryAt; EnvRel; Bound; HotsListed; NotHot; BoundRow;
+  Joins; Apart; annValues; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed↓;
+  listed-≼; sub-listed; hots-at; bound-hot; Ahead; ahead-over; ahead-under)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
-open import simultaneous.CarryRead using (Reading; read-post)
 open import simultaneous.Rejoined using (Flat; split-at; same-hot; nest; joined-back; few-reach; rjEv; rjUnp; rjRow; rejoin-few;
   late-none; rejoin-listed; listed-at; proper-listed; last-sub; djs; djs-in; djs-out; mt-rj;
   shown-unp; out-of; end-of)
@@ -70,8 +67,9 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
             (hm : Emb M₀) (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ap : Apart envP)
             {X} (i : X ∈ Γ) {p p′} (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′)
             (nh : NotHot (Hots envP) p) (fr : Fresh (Hots envP) M₀ p) where
+  module C = CarryAt (Bound.carried (er i))
+
   private
-    module C = CarryAt (Bound.carried (er i))
     module VP = InvAt (Bound.invP (er i))
     module VE = InvAt (Bound.invE (er i))
 
@@ -116,20 +114,24 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     flatE : Flat T₀′
     flatE = VE.flat
 
-    endP : ∀ {c c′} → T₀ c end → T₀ c′ end → c ≼ c′
-    endP tc tc′ c′c with VP.quiet tc′ tc c′c
-    ... | _ , () , _
+  endP : ∀ {c c′} → T₀ c end → T₀ c′ end → c ≼ c′
+  endP tc tc′ c′c with VP.quiet tc′ tc c′c
+  ... | _ , () , _
 
-    endE : ∀ {c c′} → T₀′ c end → T₀′ c′ end → c ≼ c′
-    endE tc tc′ c′c with VE.quiet tc′ tc c′c
-    ... | _ , () , _
+  endE : ∀ {c c′} → T₀′ c end → T₀′ c′ end → c ≼ c′
+  endE tc tc′ c′c with VE.quiet tc′ tc c′c
+  ... | _ , () , _
+
+  private
 
     fewP : ∀ {q e} → T₀ q e → Unpinned e → Few T₀ q
     fewP tq un = entered-few (approx (Bound.m (er i)) (Bound.src (er i)) (Bound.envP (er i))) (Bound.at (er i) ⊕ [ ix 1 ]) (full un) tq
 
-    fewE : ∀ {l e} → T₀′ l e → Unpinned e → Few T₀′ l
-    fewE tl un = entered-few (approx (Bound.m (er i)) (annotate (elab (Bound.σ (er i)) (Bound.src (er i)))) (Bound.envE (er i)))
-                             (Bound.at′ (er i) ⊕ [ ix 1 ]) (full un) tl
+  fewE : ∀ {l e} → T₀′ l e → Unpinned e → Few T₀′ l
+  fewE tl un = entered-few (approx (Bound.m (er i)) (annotate (elab (Bound.σ (er i)) (Bound.src (er i)))) (Bound.envE (er i)))
+                           (Bound.at′ (er i) ⊕ [ ix 1 ]) (full un) tl
+
+  private
 
     hotP : ∀ {q e} → Proper T₀ q e → Hots envP q
     hotP tq = bound-hot {ρ = ρ} envP {envE = envE} er i (_ , tq)
@@ -589,12 +591,14 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     →T : ∀ {b} → b ≡ true → T b
     →T = Equivalence.from T-≡
 
-    cmp3 : ∀ x y → x ≺ y ⊎ x ≡ y ⊎ y ≺ x
-    cmp3 x y with ≼-or-≻ x y
-    ... | inj₂ yx = inj₂ (inj₂ yx)
-    ... | inj₁ xy with ≼-split {x} {y} xy
-    ...   | inj₁ lt = inj₁ lt
-    ...   | inj₂ eq = inj₂ (inj₁ eq)
+  cmp3 : ∀ x y → x ≺ y ⊎ x ≡ y ⊎ y ≺ x
+  cmp3 x y with ≼-or-≻ x y
+  ... | inj₂ yx = inj₂ (inj₂ yx)
+  ... | inj₁ xy with ≼-split {x} {y} xy
+  ...   | inj₁ lt = inj₁ lt
+  ...   | inj₂ eq = inj₂ (inj₁ eq)
+
+  private
 
     -- Siblings keep their labels' order, whatever lies under them.
     sibs : ∀ q {e e′} ys zs → e ≺ e′ → (q ⊕ (sub e ∷ ys)) ≺ (q ⊕ (sub e′ ∷ zs))
@@ -613,18 +617,23 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     snoc-up : ∀ x {a} → (x ⊕ [ a ]) ⊑ x → ⊥
     snoc-up x {a} (zs , e) = ext≢ x zs (sym (trans e (⊕-assoc x [ a ] zs)))
 
-    sib-eq : ∀ x {a b} → (x ⊕ [ a ]) ⊑ (x ⊕ [ b ]) → a ≡ b
-    sib-eq x le with ⊑-snoc x le
-    ... | inj₁ up = ⊥-elim (snoc-up x up)
-    ... | inj₂ e  = ⊕-injʳ x x e
+  sib-eq : ∀ x {a b} → (x ⊕ [ a ]) ⊑ (x ⊕ [ b ]) → a ≡ b
+  sib-eq x le with ⊑-snoc x le
+  ... | inj₁ up = ⊥-elim (snoc-up x up)
+  ... | inj₂ e  = ⊕-injʳ x x e
+
+  private
 
     sib-sub : ∀ x {e e′} → (x ⊕ [ sub e ]) ⊑ (x ⊕ [ sub e′ ]) → e ≡ e′
     sib-sub x le with sib-eq x le
     ... | refl = refl
 
     -- Before an apart position: so is everything under it.
-    past : ∀ {a b c} → a ≺ b → ¬ (a ⊑ b) → a ⊑ c → c ≺ b
-    past {a} {b} ab nab (σ , refl) = subst ((a ⊕ σ) ≺_) (⊕-identityʳ b) (apart {a} {b} ab nab σ [])
+
+  past : ∀ {a b c} → a ≺ b → ¬ (a ⊑ b) → a ⊑ c → c ≺ b
+  past {a} {b} ab nab (σ , refl) = subst ((a ⊕ σ) ≺_) (⊕-identityʳ b) (apart {a} {b} ab nab σ [])
+
+  private
 
     -- The map so far holds no point at or under a point of the world past
     -- the subscription.
@@ -671,8 +680,10 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     j-hit br pq m me ex ep with same-join me ep
     ... | refl = stale-sub br pq m ex
 
-    flat-lead : ∀ {q₁ q₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → q₁ ≺ q₂ → ¬ (q₁ ⊑ q₂)
-    flat-lead br₁ br₂ = nest {S = T₀} flatP (proj₁ (proj₂ br₁)) (proj₁ (proj₂ br₂))
+  flat-lead : ∀ {q₁ q₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → q₁ ≺ q₂ → ¬ (q₁ ⊑ q₂)
+  flat-lead br₁ br₂ = nest {S = T₀} flatP (proj₁ (proj₂ br₁)) (proj₁ (proj₂ br₂))
+
+  private
 
     -- Carriers of rows in order are apart.
     img-apart : ∀ {q₁ q₂ l₁ l₂} → BoundRow (er i) q₁ → BoundRow (er i) q₂ → C.Img q₁ l₁ → C.Img q₂ l₂ → q₁ ≺ q₂ → ¬ (l₁ ⊑ l₂)
@@ -910,26 +921,3 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     { Img = Img ; ext = ext ; PB = PB ; pb-few = pb-few ; img = img ; img¬¬ = img¬¬ ; shown = shown′ ; img-row = img-row
     ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; bk = bk ; in-bk = in-bk
     ; pb-img = pb-img′ ; pb-past = pb-past′ ; pinned = λ { (shown _ () _ , _) } }
-
-
-
-------------------------------------------------------------------------
--- The former
-
-private
-  read-at : ∀ {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
-            (hm : Emb M₀) (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ap : Apart envP)
-            {X} (i : X ∈ Γ) {p p′} (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′)
-            (nh : NotHot (Hots envP) p) (fr : Fresh (Hots envP) M₀ p) {dP : Den X} {dE : Den (AIE X)}
-          → dP ≡ hot (Proper (HotOf (er i))) → dE ≡ hot (Proper (HotOf′ (er i))) → InvAt (Hots envE) p′ (enter dE p′)
-          → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter dP p) × Joins ρ envP envE er M
-            × CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′
-  read-at {M₀ = M₀} {ρ} {envP} {envE} hm er jn ap i m₀ okP okE nh fr refl refl Iu =
-    R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined
-    where module R = Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
-
--- A READER of a bound hot carries it.
-carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
-carry-connected n ρ i = carry λ envP envE gP gE M₀ hm er jn ap p p′ m₀ okP okE nh fr →
-  read-at {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr {dP = lookup envP i} {dE = lookup envE (ρ (∈-map⁺ AIE i))}
-    (Bound.isP (er i)) (Bound.isE (er i)) (proj₁ (gE (ρ (∈-map⁺ AIE i))) p′ okE)
