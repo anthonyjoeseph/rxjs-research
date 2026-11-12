@@ -154,7 +154,7 @@ jobs:
   # the selftest proves the check can fire.
   spec-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 105
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
