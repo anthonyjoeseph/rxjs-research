@@ -194,6 +194,14 @@ listC-exact N (suc n) (defer l) {ρL} ρ p e with bind⁻ {m = listC N n (Later.
 ------------------------------------------------------------------------
 -- The cut program's listing is never cut short
 
+-- Listed in full.
+Uncut : ∀ {A} → Tb.Listed A → Set
+Uncut l = short l ≡ false
+
+UncutEnv : ∀ {Γ} → All Tb.Listed Γ → Set
+UncutEnv []      = ⊤
+UncutEnv (l ∷ ρ) = Uncut l × UncutEnv ρ
+
 private
   -- `m` is `just` something with `P`.
   Gets : ∀ {X : Set} → (X → Set) → Maybe X → Set
@@ -206,13 +214,6 @@ private
   mapM-gets : ∀ {X Y : Set} {P : Y → Set} {f : X → Maybe Y} (xs : List X) → (∀ x → Gets P (f x)) → Gets (All P) (mapM f xs)
   mapM-gets []       h = [] , refl , []
   mapM-gets (x ∷ xs) h = bind-gets (h x) λ y py → bind-gets (mapM-gets xs h) λ ys pys → y ∷ ys , refl , py ∷ pys
-
-  Uncut : ∀ {A} → Tb.Listed A → Set
-  Uncut l = short l ≡ false
-
-  UncutEnv : ∀ {Γ} → All Tb.Listed Γ → Set
-  UncutEnv []      = ⊤
-  UncutEnv (l ∷ ρ) = Uncut l × UncutEnv ρ
 
   uncut-lookup : ∀ {Γ A} {ρ : All Tb.Listed Γ} → UncutEnv ρ → (i : A ∈ Γ) → Uncut (lookup ρ i)
   uncut-lookup {ρ = l ∷ ρ} (u , _)  (here refl) = u
@@ -283,6 +284,21 @@ listC-ok N (suc n) (defer l)         u p = bind-gets (listC-ok N n (Later.force 
 ------------------------------------------------------------------------
 -- A reading's rows, listed
 
+-- An exact table lists its rows before any position.
+listed-exact : ∀ {A} {L : Tb.Listed A} {t : EmissionSet A} → Exact L t → ∀ q → Listed t q
+listed-exact {L = L} {t} ex q = ks , cover , back
+  where
+    ks : List Pos
+    ks = filter (λ k → T? (k <ᵖ q)) (mapL proj₁ (rows L))
+
+    cover : ∀ {k e} → t k e → k ≺ q → k ∈ ks
+    cover x kq = ∈-filter⁺ (λ k → T? (k <ᵖ q)) (∈-map⁺ proj₁ (complete ex x)) kq
+
+    back : ∀ {k} → k ∈ ks → k ≺ q × Σ _ (t k)
+    back mk with ∈-filter⁻ (λ k → T? (k <ᵖ q)) {xs = mapL proj₁ (rows L)} mk
+    ... | mk′ , kq with ∈-map⁻ proj₁ mk′
+    ...   | (k , e) , mr , refl = kq , e , sound ex mr
+
 -- Listed rows carry across an agreement up to the cut.
 listed-ag : ∀ {A} {t t′ : EmissionSet A} {q} → AgreeTo q t t′ → Listed t′ q → Listed t q
 listed-ag {q = q} ag (ks , cover , back) =
@@ -295,7 +311,7 @@ listed-ag {q = q} ag (ks , cover , back) =
 -- Sealed: consumers read its type, never its body.
 opaque
   listedₙ : ∀ {A} n (o : Obs Timeline [] A) → Listing (enter (approx n o []) root)
-  listedₙ {A} n o {q} (ks , few) = ks′ , cover , back
+  listedₙ {A} n o {q} (ks , few) = listed-ag agq (listed-exact ex q)
     where
       m : ℕ
       m = length ks
@@ -322,17 +338,6 @@ opaque
 
       ex : Exact L c
       ex = listC-exact N n o [] root (proj₁ (proj₂ lc)) (proj₂ (proj₂ lc))
-
-      ks′ : List Pos
-      ks′ = filter (λ k → T? (k <ᵖ q)) (mapL proj₁ (rows L))
-
-      cover : ∀ {k e} → t k e → k ≺ q → k ∈ ks′
-      cover {k} x kq = ∈-filter⁺ (λ k → T? (k <ᵖ q)) (∈-map⁺ proj₁ (complete ex (proj₁ (upto agq {k} (≺→≼ {k} {q} kq)) x))) kq
-
-      back : ∀ {k} → k ∈ ks′ → k ≺ q × Σ _ (t k)
-      back mk with ∈-filter⁻ (λ k → T? (k <ᵖ q)) {xs = mapL proj₁ (rows L)} mk
-      ... | mk′ , kq with ∈-map⁻ proj₁ mk′
-      ...   | (k , e) , mr , refl = kq , e , proj₂ (upto agq {k} (≺→≼ {k} {q} kq)) (sound ex mr)
 
   listed : ∀ {A} (o : Obs Timeline [] A) → Listing (enter (⟦ o ⟧ []) root)
   listed o {q} F with reached o [] (λ ()) root (tt , λ ()) F
