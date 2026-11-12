@@ -522,6 +522,10 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     live′ (inj₁ (i , F)) lv = live-u (B′.live i (body-live F lv))
     live′ (inj₂ ei)      lv = conn-echo-live ei lv
 
+    -- `conn-pb-past`: a body row's late carrier is past the map by the body's carry,
+    -- given the body alive there; a pin's reach waits only on its
+    -- connect's past, so a body ended between its pin's connect and it is
+    -- seen by no row of the connect.
     postulate
       conn-pb-few : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB′ k l → k ∈ ks
       conn-pb-past : ∀ {k l e₀ e x y} → PB′ k l → t k e₀ → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l

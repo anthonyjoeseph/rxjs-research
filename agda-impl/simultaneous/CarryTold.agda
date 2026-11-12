@@ -382,7 +382,12 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
             B′ (inj₂ refl) {l″ = l″} (l₁ , i , mv) lr =
               B i (≺-trans {l₁} {q} {p′} (≼-≺-≺ {l₁} {l″} {q} (⊑-≼ {l₁} {l″} (mv-⊑ mv)) lr) (told-pin-past y))
 
-  -- The told run listed before a point its carriers follow.
+  -- The told run listed before a point its carriers follow.  The told
+  -- run moves each carrier down to its image (`δ`): a point between a
+  -- carrier and its image pulls back to the carrier, which is the one
+  -- source row over the point; deciding it along the point's prefixes,
+  -- and imaging each carrier at all (`told-row`), needs few source rows
+  -- before the carrier, which no row `From` ranges over carries.
   postulate
     told-cover : ∀ {v w} → Listed t v → LP v → Live t v → From Img′ PB′ t (enter (approx n (told x S) env) q) v w
                → Listed (enter (approx n (told x S) env) q) w
