@@ -32,19 +32,35 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE CONNECT'S CARRY
+
+Probed, unproven: the connect's rows carried from its body's carry and
+its annotated source's. Each subterm is listed before the other's image
+by `cover`; open: the same before a LATE carrier, and the source listed
+past its end (pins after it); where a pinned row's late carrier lies
+(a body pin past the body's end), and an echo's under an imaged source
+row; whether an echo's image lies outside the annotation's subscription
+with its elaborated body alive. Settled when each leaf is a body.
+
+Members: `conn-echo-live`, `conn-pb-pin`, `conn-pb-nested`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+
+#### THE COVER
+
+Untried: a carry lists its elaborated run before a point its carriers
+follow, from its plain run listed and alive before the matching point.
+Spins, defers and scans carry it through; open per producer: the told
+run, the take, a read, a reader, the connect. Settled when each is a
+body.
+
+Members: `told-cover`, `take-cover`, `read-cover`, `reader-cover`, `conn-cover`.
+
 #### THE ERASURE
 
-Probed, unproven: each former's elaborated run carries its plain one
-(`Carry`) along an order embedding; a run told its end (`told`, the
-annotation's and the close's one connect) moves only its end, past the
-told row; the take moves it under the completion mark. Riskiest: the
-connect's, which `CarryAt` as stated cannot give — a burst past an
-endless synchronous burst has no carrier, an image under the source's
-subscription is not known under the annotation's, and an echo's
-elaborated body is not known alive. Settled when each former's leaf is a
-body, over whatever fields the record must gain.
+Probed, unproven: each other former's elaborated run carries its plain
+one (`Carry`) along an order embedding; the take moves the end under the
+completion mark. Settled when each former's leaf is a body.
 
-Members: `told-carry`, `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
+Members: `carry-flatMap`, `carry-cold`, `wrap-take`.
 
 #### THE PROTOCOL
 

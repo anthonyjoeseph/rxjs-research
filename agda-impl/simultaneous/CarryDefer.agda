@@ -20,7 +20,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; ¬?; yes; no)
 
 open import Tree using (Later; defer)
-open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_)
+open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_; _<ᵖ_)
+open import Data.Bool.Properties using (T?)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
@@ -33,7 +34,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Home; Near; Whole; instant-⊕; IntoAt; Ahead)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
 open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
@@ -88,6 +89,22 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
   up-in : ∀ {ks j} → p ⊕ [ ix j ] ∈ ks → p′ ⊕ [ ix j ] ∈ L.map up ks
   up-in {j = j} m = subst (_∈ L.map up _) (up-⊕ [ ix j ]) (∈-map⁺ up m)
 
+  -- Before a point its carriers follow, the elaborated skips are those
+  -- of the plain ones before the point they follow.
+  cover : ∀ {v w} → Listed t v → From Img (λ _ _ → ⊥) t u v w → Listed u w
+  cover {v} {w} (ks , Fk , Bk) Fr = filter (λ l → T? (l <ᵖ w)) (L.map up ks) , cov , back
+    where
+      cov : ∀ {l e} → u l e → l ≺ w → l ∈ filter (λ l → T? (l <ᵖ w)) (L.map up ks)
+      cov (spin j , r) lw with T? ((p ⊕ [ ix j ]) <ᵖ v)
+      ... | yes jv = ∈-filter⁺ (λ l → T? (l <ᵖ w)) (up-in (Fk (spin j , P.reach j) jv)) lw
+      ... | no nj  = ⊥-elim (Fr (spin j , P.reach j) (λ { (() , _) }) nj (inj₁ (proj₁ (proj₂ (img (spin j , P.reach j))))) (spin j , r) lw)
+
+      back : ∀ {l} → l ∈ filter (λ l → T? (l <ᵖ w)) (L.map up ks) → l ≺ w × Σ (Ev (IE A)) (u l)
+      back m with ∈-filter⁻ (λ l → T? (l <ᵖ w)) {xs = L.map up ks} m
+      ... | m′ , lw with ∈-map⁻ up m′
+      ...   | k , mk , refl with Bk mk
+      ...     | _ , _ , (spin j , _) = lw , skip , subst (λ y → u y skip) (sym (up-⊕ [ ix j ])) (spin j , P′.reach j)
+
   whole : Whole t → Whole u
   whole (ks , F , Bk) = L.map up ks , (λ { (spin j , _) → up-in (F (spin j , P.reach j)) }) , back
     where
@@ -109,6 +126,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; live    = λ _ _ → λ { (() , _) }
     ; few     = λ { (_ , _ , spin i , _) → P.rows i , λ x kq → P.before i (proj₁ x) kq }
     ; whole   = λ wt _ _ → whole wt
+    ; cover   = λ L _ _ F → cover L F
     ; bk      = λ l → [ down l ]
     ; in-bk   = λ { ((a , _ , refl , refl) , _) → here (sym (down-⊕ [ a ])) }
     ; PB      = λ _ _ → ⊥
@@ -145,7 +163,7 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
            → CarryAt f M′ HP HE LP t u s s′
 carry-grow sub c past = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
-  ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole
+  ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = cover
   ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned }
   where
     open CarryAt c
@@ -260,6 +278,14 @@ module Side {X : Set} (d : Den X) (q : Pos)
   lst→ : ∀ {k e} → B k e → Listed B k → Listed T k
   lst→ x (ks , F , Bk) = g ∷ ks , (λ { (guard , _) _ → here refl ; (body x′ , _) kq → there (F x′ kq) })
                        , λ { (here refl) → gb x , skip , gT ; (there m) → let (kq , e , x′) = Bk m in kq , e , up x′ }
+
+  -- Listed before any point: the guard, when before it, and the body.
+  lstw : ∀ {w} → Listed B w → Listed T w
+  lstw {w} (ks , F , Bk) with T? (g <ᵖ w)
+  ... | yes gw = g ∷ ks , (λ { (guard , _) _ → here refl ; (body x , _) kq → there (F x kq) })
+               , λ { (here refl) → gw , skip , gT ; (there m) → let (kq , e , x) = Bk m in kq , e , up x }
+  ... | no ngw = ks , (λ { (guard , _) kq → ⊥-elim (ngw kq) ; (body x , _) kq → F x kq })
+               , λ m → let (kq , e , x) = Bk m in kq , e , up x
 
   near→ : ∀ {m l} → Near B m l → Near T m l
   near→ (inj₁ lm)           = inj₁ lm
@@ -389,10 +415,17 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
       b′ (inj₁ (refl , refl)) _ = ≺-≼-≺ {P.g} {p ⊕ [ ix 1 ]} {q} (ticks p 0) (proj₂ (aP x) refl)
       b′ (inj₂ i)             lq = b i lq
 
+  cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
+  cover L lp lv F = E.lstw (C.cover (P.lst← L) lp (P.live← lv) λ tk lk vk m ul → F (P.up tk) (P.live→ lk) vk (fwd m tk ul) (E.up ul))
+    where
+      fwd : ∀ {k l e e′} → C.Img k l ⊎ C.PB k l → P.B k e → E.B l e′ → Img k l ⊎ PB k l
+      fwd (inj₁ i)  _  _  = inj₁ (inj₂ i)
+      fwd (inj₂ pb) tk ul = inj₂ ((_ , ul) , (_ , tk) , pb)
+
   carried : CarryAt valuesOf M HP HE LP P.T E.T p p′
   carried = record
     { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
-    ; live = live ; few = few ; whole = whole
+    ; live = live ; few = few ; whole = whole ; cover = cover
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = pb-past ; pinned = pinned }
 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by

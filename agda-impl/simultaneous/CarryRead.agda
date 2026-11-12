@@ -44,7 +44,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (few-¬¬listed)
-open import simultaneous.CarryBase using (PMap; CarryAt; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
+open import simultaneous.CarryBase using (From; PMap; CarryAt; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
 open import simultaneous.Carry using (annValues)
 open import simultaneous.ReadRows using (module Rows; step-just; step-none; of-shown; of-marks; up; up-⊕)
 
@@ -224,6 +224,10 @@ private
         at (h-lane b) = ∈-++⁺ʳ (bk _) (∈-++⁺ʳ (bk _)
           (subst (λ z → k ∈ bk z) (sym (trans (cong up (up-⊕ (l ⊕ [ ix 1 ]) b)) (up-⊕ l (ix 1)))) (in-bk i)))
 
+    -- The sending listed before a point its carriers follow.
+    postulate
+      read-cover : ∀ {v w} → Listed t v → LP v → Live t v → From Img′ PB′ t R v w → Listed R w
+
     carry : CarryAt valuesOf M HP HE LP t R s s′
     carry = record
       { Img     = Img′
@@ -241,6 +245,7 @@ private
       ; live    = live′
       ; few     = λ { (_ , i , _) → few i }
       ; whole   = whole′
+      ; cover   = read-cover
       ; bk      = bk′
       ; in-bk   = in-bk′
       ; pinned  = λ kp lv L lp → ⊥-elim (pinU (proj₁ (proj₂ (proj₂ (proj₁ (pinned kp lv L lp))))))

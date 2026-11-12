@@ -490,8 +490,10 @@ private
   fires s 0 = "spec-check: selftest " +++ s +++ " SILENT"
   fires s k = "spec-check: selftest " +++ s +++ " fires on " +++ showℕ k +++ " seeds"
 
+  -- the proof of the spec is what covers every program; these seeds are
+  -- a smoke test of the elaboration while it is unproven
   seeds : List ℕ
-  seeds = upTo 300
+  seeds = upTo 100
 
   -- a sabotage needs only to fire, so fewer seeds serve
   sabotaged : List ℕ

@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
-open import simultaneous.CarryBase using (CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
+open import simultaneous.CarryBase using (unp-pin; CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
 open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; Grown; joins-grow; grown-past; env-past)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
@@ -138,9 +138,6 @@ ix-sub : ∀ q e → (q ⊕ [ ix 0 ]) ≺ (q ⊕ [ sub e ])
 ix-sub q e = subst (λ c → T (isLt c)) (sym (cmp-under q [ ix 0 ] [ sub e ])) tt
 
 private
-  unp-pin : ∀ {X : Set} {r} → Unpinned {X} (pin r) → ⊥
-  unp-pin ()
-
   -- What an elaborated `of` emits for a value.
   V : ∀ {A : Set} → A → IE A
   V x = instEmit (value x) root
@@ -248,6 +245,7 @@ private
       ; place   = λ um _ _ → inj₁ (place um)
       ; live    = λ i _ → live i
       ; few     = λ _ → fewT
+      ; cover   = λ _ _ _ _ → lstU
       ; whole   = λ _ _ _ → proj₁ allU , (λ ur → proj₂ allU (proj₁ ur)) , λ m → let (e , r) = of-row p′ 0 (L.map V xs) m in e , r , reachU
       ; bk      = λ _ → proj₁ allT
       ; in-bk   = λ { (_ , _ , tk) → proj₂ allT (proj₁ tk) }

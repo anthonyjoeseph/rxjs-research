@@ -37,10 +37,12 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; emb-under; instant-⊕)
-open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot)
+open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot; listed↓)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
-open import simultaneous.CarryTold using (module Folded; module Mapped; told; told-carry; justValues)
+open import simultaneous.CarryTold using (module Folded; module Mapped; told-carry; justValues)
+open import simultaneous.ToldRows using (told)
+open import simultaneous.CarryConn using (module ConnCarry)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; annStep)
 
@@ -591,20 +593,19 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- THE CONNECT CARRIES: the body's rows on the body's, each source
         -- row's echo on its annotation's, each burst and kept pin on the
         -- annotation's.
-        --
-        -- DEAD ROUTE: from `c_a` and `c_b` as `CarryAt` states them.  A burst
-        --   is a pin made from any source row in the subscribe instant, past
-        --   an endless synchronous burst too, where `c_a` has no image and no
-        --   late carrier: `pinned` names one only for a pin.  An image under
-        --   the source's subscription is not shown under the annotation's:
-        --   no field puts a pair under `s` under `s′`.  An echo's elaborated
-        --   row needs the elaborated body alive past the annotation's row,
-        --   whose end `c_b.shown` carries back only from few rows, which no
-        --   field gives at a point that is not an image of the body's.
+        carried : CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
+                    (enter (approx n (elab ρ (connect s b)) envE) p′) p p′
+        carried = ConnCarry.Body.carried {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
+          (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
+
         postulate
-          conn-carry : Σ (CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
-                                 (enter (approx n (elab ρ (connect s b)) envE) p′) p p′)
-                         (λ c → PBNest er M′ c)
+          -- Its late carriers under a bound hot's row are anchored.
+          conn-nest : PBNest er M′ carried
+
+        conn-carry : Σ (CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
+                               (enter (approx n (elab ρ (connect s b)) envE) p′) p p′)
+                       (λ c → PBNest er M′ c)
+        conn-carry = carried , conn-nest
 
         result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
         result = M′ , (λ m → inj₁ (ms_b (ms_s (inj₁ m)))) , emb′ , within′ , bare′ , joins″
