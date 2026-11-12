@@ -51,9 +51,7 @@ silent or the queued value, in the subscribe instant or under a run row;
 liveness, listings and few rows transfer both ways along the offset.
 Settled when each is a body over the connect's and the concat's rows.
 
-Members: `told-row`, `told-listed`, `told-inj`, `told-source?`, `told-shown`,
-`told-from`, `told-live←`, `told-listed←`, `told-few←`, `told-live`,
-`told-live-at`, `told-whole`.
+Members: `told-listed`, `told-listed←`, `told-whole`.
 
 #### THE PROTOCOL
 

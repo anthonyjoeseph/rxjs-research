@@ -482,19 +482,12 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
       ... | inj₁ lt   = there (F y′ lt)
       ... | inj₂ refl = here refl
 
-  few-fixed : ∀ {u} {t : EmissionSet Y} → u ∈ fixedL → (∀ {v e′} → t v e′ → Raw v e′) → Few t u
-  few-fixed {u} m rw = few-at rw [] λ {k} {_} {v} y kv vu → ⊥-elim (≺-absurd {r} {k} (r≺ y) (≺-trans {k} {u} {r} (≼-≺-≺ {k} {v} {u} (⊑-≼ {k} {v} kv) vu) (fixed-≺ m)))
-
   ------------------------------------------------------------------------
   -- The told rows made
 
   T-or : ∀ b → T b ⊎ T (not b)
   T-or true  = inj₁ tt
   T-or false = inj₂ tt
-
-  bare-work : ∀ {e : Ev Y} → Bare e → Work e
-  bare-work {out _} _ = tt
-  bare-work {skip}  _ = tt
 
   c₁-≻ : ∀ k → k ≺ c₁ k
   c₁-≻ k = subst (k ≺_) (sym (proj₂ (under-c₁ k))) (≺-ext k (ix 1 ∷ last ∷ []))
@@ -513,10 +506,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
       ... | inj₂ lt with InvAt.quiet invσ yc y lt
       ...   | _ , refl , _ = ⊥-elim u
 
-  alive-unp : ∀ {k e} → σ k e → Unpinned e → Cn.Alive k
-  alive-unp {k} y u bc with ends-raw (raw-j (proj₁ bc))
-  ... | k′ , y′ , refl = ≼-≺-≺ {k} {k′} {c₁ k′} (proj₂ (proper-unp y u) y′) (c₁-≻ k′)
-
   alive-pin : ∀ {k p′} → σ k (pin p′) → Cn.Alive p′
   alive-pin {k} {p′} y bc with ends-raw (raw-j (proj₁ bc))
   ... | k′ , y′ , refl with ≼-or-≻ k k′
@@ -530,13 +519,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
 
   j-lane0 : ∀ {k e e′} → σ k e → Few σ k → Rejoin w (Proper σ) (k ⊕ [ sub w ]) e′ → Work e′ → Bd.JoinT (k ⊕ [ sub w ]) e′
   j-lane0 y fk rj wk = Bd.lane o0 (0 , true , nth0) (0 , w , sub0 , lane0-row y fk rj) (λ ()) wk
-
-  j-hand : ∀ {k} → σ k end → Bd.JoinT ((k ⊕ [ sub w ]) ⊕ [ ix 0 ]) skip
-  j-hand y = Bd.hand o0 (0 , true , nth0) (0 , w , sub0 , end0-row y) (λ ()) (hand0 y)
-
-  j-x : ∀ {k} → σ k end → Bd.JoinT (((k ⊕ [ sub w ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out x)
-  j-x {k} y = Bd.lane o1 (1 , false , nth1) (1 , s , (nth1 , start1 y) , ((at-out , of1-reach s {s ⊕ [ ix 0 ]} {out x}) , ≺-ext s [])) (λ ()) tt
-    where s = (k ⊕ [ sub w ]) ⊕ [ ix 1 ]
 
   j-end : ∀ {k} → σ k end → Bd.JoinT (c₁ k) end
   j-end y = Bd.lend o1 (1 , false , nth1) (1 , _ , (nth1 , start1 y) , end1-row) (λ ()) (no-hand1 y) (done1 y)
