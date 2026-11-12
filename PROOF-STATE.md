@@ -35,15 +35,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ERASURE
 
 Probed, unproven: each former's elaborated run carries its plain one
-(`Carry`) along an order embedding; each wrapper stage moves only the
-end — the close past the completion mark, the take under it. Riskiest:
-the connect's, which `CarryAt` as stated cannot give — a burst past an
+(`Carry`) along an order embedding; a run told its end (`told`, the
+annotation's and the close's one connect) moves only its end, past the
+told row; the take moves it under the completion mark. Riskiest: the
+connect's, which `CarryAt` as stated cannot give — a burst past an
 endless synchronous burst has no carrier, an image under the source's
 subscription is not known under the annotation's, and an echo's
 elaborated body is not known alive. Settled when each former's leaf is a
 body, over whatever fields the record must gain.
 
-Members: `annotate-carry`, `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-close`, `wrap-take`.
+Members: `told-carry`, `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
 
 #### THE PROTOCOL
 
