@@ -14,6 +14,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (_⇔_; mk⇔; Equivalence)
@@ -21,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 open import Data.Bool.Properties using (T?)
 
-open import Tree using (Obs; connect)
+open import Tree using (Obs; connect; map)
 open import denotation.Position using (Pos; Label; Path; ix; sub; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
@@ -39,13 +40,19 @@ open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _�
 open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
+open import simultaneous.CarryTold using (module Folded; module Mapped; told; told-carry; justValues)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; annStep)
 
 ------------------------------------------------------------------------
 -- The two subscriptions
 
 private
+  -- A route fold keeps the emit, so what it shows.
+  ann-law : ∀ {X} b (y : Maybe (IE X)) → annValues (proj₂ (annStep b y)) ≡ justValues y
+  ann-law (_ , _) (just _) = refl
+  ann-law (_ , _) nothing  = refl
+
   ix01 : ∀ q → q ⊕ [ ix 0 ] ≡ q ⊕ [ ix 1 ] → ⊥
   ix01 q e = ≺-irrefl {q ⊕ [ ix 0 ]} (subst ((q ⊕ [ ix 0 ]) ≺_) (sym e) (ticks q 0))
 
@@ -310,12 +317,20 @@ module Conn {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   nests-bind er c ns ht hh th (there j)   (there i)   = ns j i
 
   -- THE ANNOTATED SOURCE CARRIES THE SOURCE where the elaborated source
-  -- does, each late carrier under one of the elaborated source's.
-  postulate
-    annotate-carry : ∀ {M} → Emb M
-                   → (c : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) σP uS (p ⊕ [ ix 1 ]) s₀′)
-                   → Σ (CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ]))
-                       λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → σP k e₀ → Live σP k → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
+  -- does, each late carrier under one of the elaborated source's: read
+  -- as maybe-emits, told its end by `nothing`, and folded into routes,
+  -- each row showing what it showed.
+  annotate-carry : ∀ {M} → (c : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) σP uS (p ⊕ [ ix 1 ]) s₀′)
+                 → Σ (CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ]))
+                     λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → σP k e₀ → Live σP k → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
+  annotate-carry c = Folded.carried annStep ((root , 0) , ((root , 0) , nothing)) proj₂ ann-law (approx n told′ envE) (p′ ⊕ [ ix 1 ])
+                       (inv-approx n told′ envE gE (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (proj₁ tc) , proj₂ tc
+    where
+      told′ : Obs Timeline Δ (Maybe (IE A))
+      told′ = told nothing (map just (elab ρ s))
+
+      tc = told-carry n (map just (elab ρ s)) nothing refl envE gE (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)
+             (Mapped.carried {f₁ = valuesOf} {f₂ = justValues} just (λ _ → refl) (approx n (elab ρ s) envE) s₀′ c)
 
 ------------------------------------------------------------------------
 -- The assembly
@@ -352,7 +367,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     ns₂ : Nests er₂ M_s
     ns₂ = nests-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er₁ ep_s ns₁
 
-    annotated = annotate-carry hm_s c_s
+    annotated = annotate-carry c_s
 
     c_a : CarryAt annValues M_s (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])
     c_a = proj₁ annotated

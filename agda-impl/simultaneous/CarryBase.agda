@@ -325,6 +325,12 @@ IntoAt {Y} Img u PB HP s k =
 -- and not above it: a pin is carried late, never early.  A reader's
 -- subscription is such a point for the hot rows past it.
 --
+-- A PIN TOO IS CARRIED FROM ITS LISTING.  Past an endless synchronous
+-- burst a pin stays (its connect lies before the burst), but a connect
+-- reading the run cuts its own burst pins there, so the pin has no
+-- carrier past the images of the burst's rows.  A reader reaches no such
+-- pin.
+--
 -- A ROW OF `u` IS PLACED FROM ITS LISTING, by a carrier near it: at or
 -- before it, or listed up to.  `u` HAS FEW ROWS IN ALL when `t` and the
 -- environment do and `t` has no end: a row past a carrier is not listed
@@ -369,9 +375,8 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     whole   : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
-    pinned  : ∀ {k p} → t k (pin p) → Live t k
-            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p)
-                × (Listed t k → LP k → Listed u l))
+    pinned  : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
+            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -534,15 +539,14 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ {m} (inj₂ (inj₁ (k , l , i , e , n))) = inj₂ (inj₁ (k , l , i , e , U.near→ {m} {l} n))
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
-    pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k
-              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p)
-                  × (Listed t′ k → LP k → Listed u′ l))
+    pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → Listed t′ k → LP k
+              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} tk lv with down tk
+    pinned′ {k} {p} tk lv L lp with down tk
     ... | _ , tk₀ , r with kin r
-    ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c}))
-    ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , λ L lp → U.lst→ {l} (ls (T.lst← {k} L) lp)) , homed′ {k} {p} h
+    ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} L) lp
+    ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , U.lst→ {l} ls) , homed′ {k} {p} h
       where
         homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                    ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
@@ -747,8 +751,8 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
       ... | inj₁ (l , i , e′ , ul , L , m) = inj₁ (l , i , e′ , ul , few-of L , m)
       ... | inj₂ (es , h)                  = inj₂ (es , into-at h)
 
-      pinned′ : ∀ {k p} → t k (pin p) → Live t k → Into Img u PB s k
-      pinned′ {k} {p} tk lk with pinned tk lk
+      pinned′ : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB s k
+      pinned′ {k} {p} tk lk fk with pinned tk lk (lst fk) tt
       ... | (l , p′ , ul , m , _) , inj₁ e = (l , (pin p′ , ul) , m) , inj₁ e
       ... | (l , p′ , ul , m , _) , inj₂ (inj₂ (_ , () , _))
       ... | (l , p′ , ul , m , _) , inj₂ (inj₁ (k₀ , kp , h , ek)) with pin-few tk

@@ -943,18 +943,17 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     home-up : ∀ {p k₀} → ¬ P.Failed p → k₀ ≺ p → Home t k₀ → Home P.T′ k₀
     home-up {p} {k₀} nfp kp h n = h λ { (e , tk , un) → n (e , P.up tk (P.unfailed nfp (≺→≼ {k₀} {p} kp)) (P.pass-before tk kp nfp) , un) }
 
-    pinned′ : ∀ {k p} → P.T′ k (pin p) → Live P.T′ k
-            → (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p)
-                × (Listed P.T′ k → LP k → Listed Q.T′ l))
+    pinned′ : ∀ {k p} → P.T′ k (pin p) → Live P.T′ k → Listed P.T′ k → LP k
+            → (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed Q.T′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home P.T′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ (P.left tk nfp _ , _) lv with C.pinned tk (P.live← (P.live-unfailed lv tk) lv) | P.live-unfailed lv tk
+    pinned′ (P.left tk nfp _ , _) lv L lp with C.pinned tk (P.live← (P.live-unfailed lv tk) lv) (P.lst← (P.live-unfailed lv tk) L) lp | P.live-unfailed lv tk
     ... | (l , p′ , ul , mb , bd , ls) , inj₁ e | nfk =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , λ L lp → Q.lst-any (ls (P.lst← nfk L) lp)) , inj₁ e
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₁ e
     ... | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) | nfk =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , λ L lp → Q.lst-any (ls (P.lst← nfk L) lp)) , inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
     ... | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₂ hh) | nfk =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , λ L lp → Q.lst-any (ls (P.lst← nfk L) lp)) , inj₂ (inj₂ hh)
+      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₂ hh)
 
   carried′ : CarryAt valuesOf M′ HP HE LP P.T′ Q.T′ s s′
   carried′ = record

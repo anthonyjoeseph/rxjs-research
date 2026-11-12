@@ -50,6 +50,8 @@ open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import simultaneous.Relations using (Rank; Before; Over; Left; elaborated; events)
 open import simultaneous.Ranks using (enter-few; visible-unpinned)
+open import denotation.Laws.Shows using (k-shows)
+open import denotation.Laws.ShowsEv using (sk-approx)
 open import simultaneous.Listing using (Listing; listedₙ)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
@@ -318,6 +320,7 @@ private
       (λ {k} {e} → Reached.seen (approx n (elaborate (plain o)) []) root (inv-approx n (elaborate (plain o)) [] (λ ()) root ok₀) {k} {e})
       (λ {k} {e} → enter-few (approx n (plain o) []) root {k} {e}) (λ {k} {e} → unpinned-liveₙ n o {k} {e})
       (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q})
+      (k-shows λ m → sk-approx m n (plain o) [] (λ ()) root ok₀)
       (erasingₙ n o)
 
 ------------------------------------------------------------------------

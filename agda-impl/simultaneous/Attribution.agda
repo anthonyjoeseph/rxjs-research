@@ -50,6 +50,10 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; irrⁱ; triⁱ; frame-least; ≺-instant; instant-≺)
 open import simultaneous.Relations using (Rank; Before; Left; Exits; Over; Spent)
 open import simultaneous.Listing using (Listing)
+open import denotation.Laws.Worlds using (Shows)
+open import denotation.Position using (_≟ᵖ_)
+open import Data.List.Relation.Unary.Any using (any?)
+open import Relation.Nullary.Decidable using (decidable-stable)
 
 open Values using (Nth; Next; first; next)
 open Equivalence using (to; from)
@@ -168,7 +172,7 @@ record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → 
     spent    : ∀ {k l} → Img k l → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
     bk       : Pos → List Pos
     in-bk    : ∀ {k l} → Img k l → k ∈ bk l
-    pinned   : ∀ {k p} → t k (pin p) → Live t k → Into Img u PB s k
+    pinned   : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB s k
 
 -- A plain run shows every value; an elaborated one, those `f` reads one
 -- value off, and carries the value it reads.
@@ -250,7 +254,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
                   (funcT : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) (funcU : ∀ {y e e′} → u y e → u y e′ → e ≡ e′)
                   (seenT : ∀ {k e} → t k e → Visible e → Seen t k e) (seenU : ∀ {l e} → u l e → Visible e → Seen u l e)
                   (fewT : ∀ {k e} → t k e → Unpinned e → Few t k) (liveT′ : ∀ {k e} → t k e → Unpinned e → Live t k)
-                  (listT : Listing t) (listU : Listing u)
+                  (listT : Listing t) (listU : Listing u) (showsT : Shows t)
                   (R : Attribution Every (One f) (Reads f) t u root root) where
   open Attribution R
 
@@ -275,19 +279,19 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     module NU = Nths (V f u)
 
     -- A row is carried in order, or into its instant.
-    carried? : ∀ {k e} → t k e → Live t k → (Unpinned e → Few t k)
+    carried? : ∀ {k e} → t k e → Live t k → Few t k
              → (Σ Pos λ l → Img k l × Σ (Ev X) λ e′ → u l e′ × Few u l × Match Every (One f) (Reads f) e e′)
                ⊎ ((e ≡ end → ⊥) × Into Img u PB root k)
-    carried? {e = out _} tk lk fk with img tk tt lk (fk tt)
+    carried? {e = out _} tk lk fk with img tk tt lk fk
     ... | inj₁ c        = inj₁ c
     ... | inj₂ (() , _)
-    carried? {e = end}   tk lk fk with img tk tt lk (fk tt)
+    carried? {e = end}   tk lk fk with img tk tt lk fk
     ... | inj₁ c        = inj₁ c
     ... | inj₂ (() , _)
-    carried? {e = skip}  tk lk fk with img tk tt lk (fk tt)
+    carried? {e = skip}  tk lk fk with img tk tt lk fk
     ... | inj₁ c        = inj₁ c
     ... | inj₂ (_ , h)  = inj₂ ((λ ()) , h)
-    carried? {e = pin _} tk lk fk = inj₂ ((λ ()) , pinned tk lk)
+    carried? {e = pin _} tk lk fk = inj₂ ((λ ()) , pinned tk lk fk)
 
     -- Carrying keeps the order, and reflects it.
     reflect : ∀ {k k′ l l′} → Img k l → Img k′ l′ → l ≺ l′ → k ≺ k′
@@ -448,7 +452,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
 
     bwd : ∀ {k l I} → Img k l → Live t k → Few t k → Before t k I → Σ Instant λ J → Before u l J × Lands J I
     bwd al lk fk (ne , inj₁ refl) = frame , ((λ eq → ne (sym (to (home al) (sym eq)))) , inj₁ refl) , inj₁ (refl , refl)
-    bwd {k} al lk fk (ne , inj₂ (m₁ , e₁ , tm₁ , m₁k , refl)) with carried? tm₁ (live-≺ {w = t} m₁k lk) (λ _ → few-≺ {w = t} fk m₁k)
+    bwd {k} al lk fk (ne , inj₂ (m₁ , e₁ , tm₁ , m₁k , refl)) with carried? tm₁ (live-≺ {w = t} m₁k lk) (few-≺ {w = t} fk m₁k)
     ... | inj₁ (m , am , e′ , um , _ , _) =
       instantOf m , ((λ eq → ne (to (inst am al) eq)) , inj₂ (m , e′ , um , img-mono am al m₁k , refl)) ,
       inj₂ (m , m₁ , am , refl , refl)
@@ -572,19 +576,37 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
         pbs : List Pos
         pbs = every (λ z → z) (mapWith (proj₁ W) pb)
 
-        put : ∀ {r e} → t r e → k ≺ r → (Unpinned e → Few t r) → r ∈ every bk ks ++ pbs
-        put tr kr fr with carried? tr (λ tc → ⊥-elim (unended tc)) fr
+        put-few : ∀ {r e} → t r e → k ≺ r → Few t r → r ∈ every bk ks ++ pbs
+        put-few tr kr fr with carried? tr (λ tc → ⊥-elim (unended tc)) fr
         ... | inj₁ (r′ , ar , _ , ur , _ , _) = ∈-++⁺ˡ (∈-every bk ks (proj₁ (sp ur (img-mono al ar kr))) (in-bk ar))
         ... | inj₂ (_ , (m , (e′ , um) , rm) , _) =
           let mw = proj₁ (proj₂ W) um (within um) in
           ∈-++⁺ʳ (every bk ks) (∈-every (λ z → z) (mapWith (proj₁ W) pb) (∈-mapWith⁺ (proj₁ W) pb mw)
                                   (proj₂ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) mw)))) rm))
 
+        -- Every row past `k`: those with few rows before them are listed,
+        -- so a hang shows, and each has few before it.
+        put : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks ++ pbs
+        put {r} tr kr = decidable-stable (any? (r ≟ᵖ_) (every bk ks ++ pbs)) λ n → showsT cover λ fr → n (put-few tr kr fr)
+          where
+            fk : Few t k
+            fk = fewT tk tt
+
+            cover : Σ (List Pos) λ js → ∀ {k′ e′} → t k′ e′ → Few t k′ → k′ ≺ r → k′ ∈ js
+            cover = proj₁ fk ++ k ∷ every bk ks ++ pbs , pick
+              where
+                pick : ∀ {k′ e′} → t k′ e′ → Few t k′ → k′ ≺ r → k′ ∈ proj₁ fk ++ k ∷ every bk ks ++ pbs
+                pick {k′} tk′ fk′ _ with T? (k′ <ᵖ k)
+                ... | yes kk = ∈-++⁺ˡ (proj₂ fk tk′ kk)
+                ... | no nkk with ≼-split {k} {k′} nkk
+                ...   | inj₁ kk′  = ∈-++⁺ʳ (proj₁ fk) (there (put-few tk′ kk′ fk′))
+                ...   | inj₂ refl = ∈-++⁺ʳ (proj₁ fk) (here refl)
+
         row : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks ++ pbs × (t r e × (∀ {c} → t c end → r ≼ c))
-        row tr kr = put tr kr (fewT tr) , tr , (λ tc → ⊥-elim (unended tc))
+        row tr kr = put tr kr , tr , (λ tc → ⊥-elim (unended tc))
 
     exits-tu : ∀ {k l x b} → Img k l → u l (out x) → t k (out b) → Exits t k → Exits u l
-    exits-tu {k} al ul tk (inj₁ (m₁ , e₁ , ((tm₁ , pt) , ft) , km₁ , cond)) with carried? tm₁ pt (λ _ → ft)
+    exits-tu {k} al ul tk (inj₁ (m₁ , e₁ , ((tm₁ , pt) , ft) , km₁ , cond)) with carried? tm₁ pt ft
     ... | inj₁ (m , am , e′ , um , fm , (c , _)) = inj₁ (m , e′ , ((um , live am pt) , fm) , img-mono al am km₁ , cond-tu al am c cond)
     ... | inj₂ (ne , _ , inj₁ ef) = ⊥-elim (frame-least (subst (instantOf k ≺ⁱ_) ef (later {k} {m₁} km₁ ne cond)))
     ... | inj₂ (ne , _ , inj₂ (k₀ , m , a₀ , (e′ , um) , fm , ek)) with img-row a₀
