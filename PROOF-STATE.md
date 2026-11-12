@@ -43,16 +43,6 @@ body, over whatever fields the record must gain.
 
 Members: `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
 
-#### THE TOLD ROWS
-
-Untried: each row of a run told its end, with few rows before it, shows
-again once, at a fixed offset under itself; every other told row is
-silent or the queued value, in the subscribe instant or under a run row;
-liveness, listings and few rows transfer both ways along the offset.
-Settled when each is a body over the connect's and the concat's rows.
-
-Members: `told-listed`, `told-listed←`, `told-whole`.
-
 #### THE PROTOCOL
 
 Untried: every emit is named for its own instant, one begin and one

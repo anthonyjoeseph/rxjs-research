@@ -9,13 +9,15 @@
 -- lies in the subscribe instant or under a row of `σ`.
 module simultaneous.ToldRows where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; T; not)
-open import Data.List using (List; []; _∷_; [_]; _++_; concat)
+open import Data.Bool using (Bool; true; false; if_then_else_; T; not; _∨_)
+open import Data.List using (List; []; _∷_; [_]; _++_; concat; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-concat⁺′)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-concat⁺′; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (Any; here; there)
+import Data.List.Relation.Unary.Any.Properties as AnyP
+open import Relation.Nullary.Decidable.Core using (T?)
 open import Data.Nat using (s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -25,15 +27,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connect; connected; of)
-open import denotation.Position using (_≟ᵖ_; Pos; Path; Label; ix; sub; last; _⊕_; root; inside)
+open import denotation.Position using (_≟ᵖ_; _<ᵖ_; Pos; Path; Label; ix; sub; last; _⊕_; root; inside)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Few; Reach; Truncate; Proper; Bare; Unpinned; Work; After; Ended;
   InE; at-out; at-end; on-out; Rejoin; shown; heard; ended; late; Den; hot; DenEnv; enter; approx; _≺_; _≼_; module Op; module Values;
   module Bounded; module Connecting)
-open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; _⊑_; InvAt; Real; inside-⊑; real-init; world-after; world-after⁼; ok-step; ⊑-refl;
+open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; Shows; _⊑_; InvAt; Real; inside-⊑; real-init; world-after; world-after⁼; ok-step; ⊑-refl;
   ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
 open import denotation.Laws.Modulus using (≺-≼-≺; ≼-≺-≺; ≺-ext; ≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-split; ≼-or-≻; entered-few)
 open import denotation.Laws.Cut using (ix-asc)
+open import denotation.Laws.Shows using (k-shows; ∈-stable; few-down)
+open import denotation.Laws.ShowsEv using (sk-approx)
 open import denotation.Laws.Truth using (past)
 open import denotation.Laws.BoundedInv using (end-uniq)
 open import denotation.Laws using (inv-approx)
@@ -92,14 +96,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
     t-skip : Told skip skip
     t-end  : Told end end
     t-pin  : ∀ {r r′} → r′ ≡ r ⊎ r′ ≡ q → Told (pin r) (pin r′)
-
-  postulate
-    -- A row with few before it shows again.  A pin past an endless
-    -- synchronous burst of `σ` does not: the told connect cuts its burst
-    -- pins there.
-    told-listed : ∀ {l e} → σ l e → Listed σ l → Listed τ (l ⊕ δ e)
-    told-listed←    : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Listed τ m → Listed σ l
-    told-whole      : Whole σ → Whole τ
 
   -- `σ`'s invariant, at the told run's second child.
   invσ : InvAt (Hots env) (q ⊕ [ ix 1 ]) σ
@@ -482,6 +478,9 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
       ... | inj₁ lt   = there (F y′ lt)
       ... | inj₂ refl = here refl
 
+  few-fixed : ∀ {u} {t : EmissionSet Y} → u ∈ fixedL → (∀ {v e′} → t v e′ → Raw v e′) → Few t u
+  few-fixed {u} m rw = few-at rw [] λ {k} {_} {v} y kv vu → ⊥-elim (≺-absurd {r} {k} (r≺ y) (≺-trans {k} {u} {r} (≼-≺-≺ {k} {v} {u} (⊑-≼ {k} {v} kv) vu) (fixed-≺ m)))
+
   ------------------------------------------------------------------------
   -- The told rows made
 
@@ -506,6 +505,10 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
       ... | inj₂ lt with InvAt.quiet invσ yc y lt
       ...   | _ , refl , _ = ⊥-elim u
 
+  alive-unp : ∀ {k e} → σ k e → Unpinned e → Cn.Alive k
+  alive-unp {k} y u bc with ends-raw (raw-j (proj₁ bc))
+  ... | k′ , y′ , refl = ≼-≺-≺ {k} {k′} {c₁ k′} (proj₂ (proper-unp y u) y′) (c₁-≻ k′)
+
   alive-pin : ∀ {k p′} → σ k (pin p′) → Cn.Alive p′
   alive-pin {k} {p′} y bc with ends-raw (raw-j (proj₁ bc))
   ... | k′ , y′ , refl with ≼-or-≻ k k′
@@ -519,6 +522,13 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
 
   j-lane0 : ∀ {k e e′} → σ k e → Few σ k → Rejoin w (Proper σ) (k ⊕ [ sub w ]) e′ → Work e′ → Bd.JoinT (k ⊕ [ sub w ]) e′
   j-lane0 y fk rj wk = Bd.lane o0 (0 , true , nth0) (0 , w , sub0 , lane0-row y fk rj) (λ ()) wk
+
+  j-hand : ∀ {k} → σ k end → Bd.JoinT ((k ⊕ [ sub w ]) ⊕ [ ix 0 ]) skip
+  j-hand y = Bd.hand o0 (0 , true , nth0) (0 , w , sub0 , end0-row y) (λ ()) (hand0 y)
+
+  j-x : ∀ {k} → σ k end → Bd.JoinT (((k ⊕ [ sub w ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out x)
+  j-x {k} y = Bd.lane o1 (1 , false , nth1) (1 , s , (nth1 , start1 y) , ((at-out , of1-reach s {s ⊕ [ ix 0 ]} {out x}) , ≺-ext s [])) (λ ()) tt
+    where s = (k ⊕ [ sub w ]) ⊕ [ ix 1 ]
 
   j-end : ∀ {k} → σ k end → Bd.JoinT (c₁ k) end
   j-end y = Bd.lend o1 (1 , false , nth1) (1 , _ , (nth1 , start1 y) , end1-row) (λ ()) (no-hand1 y) (done1 y)
@@ -690,3 +700,285 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
   ... | inj₁ le = le
   ... | inj₂ lt = ⊥-elim (lv tc (img-≺ yc y lt (δ end) zs))
     where tc = proj₁ (proj₂ (told-row yc (few-unp yc tt)))
+
+  ------------------------------------------------------------------------
+  -- The told rows, listed
+
+  few-of : ∀ {l} → Listed σ l → Few σ l
+  few-of (ks , F , _) = ks , F
+
+  -- A hang of `σ` shows: few rows before wherever its few rows are listed.
+  shσ : Shows σ
+  shσ = k-shows (λ m → sk-approx m n S env genv r (ok-step q ok))
+
+  hang-few : ∀ {v} (L : List Pos) → (∀ {j e} → σ j e → Few σ j → j ≺ v → j ∈ L) → Few σ v
+  hang-few {v} L mem = L , λ {j} xj jv → ∈-stable λ ¬m → shσ (L , mem) λ Fv → ¬m (mem xj (few-down Fv (≺→≼ {j} {v} jv)) jv)
+
+  -- The row at a row's first child: its burst copy, its echo, or its pin.
+  img0 : ∀ {k e} → σ k e → Few σ k → Σ (Ev Y) λ e′ → τ (k ⊕ [ ix 0 ]) e′
+  img0 {k} {pin p′} y F = proj₁ (told-row y F) , proj₁ (proj₂ (told-row y F))
+  img0 {k} {out a}  y F = img0u y tt F
+    where
+      img0u : ∀ {e} → σ k e → Unpinned e → Few σ k → Σ (Ev Y) λ e′ → τ (k ⊕ [ ix 0 ]) e′
+      img0u y u F with T-or (inside r k)
+      ... | inj₁ i  = pin q , Cn.burst y i , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {pin q} (few-under y F (⊑-snoc⁺ k) rawC)
+      ... | inj₂ ni = skip , Cn.echo y (alive-unp y u) u ni , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {skip} (few-under y F (⊑-snoc⁺ k) rawC)
+  img0 {k} {skip}   y F with T-or (inside r k)
+  ... | inj₁ i  = pin q , Cn.burst y i , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {pin q} (few-under y F (⊑-snoc⁺ k) rawC)
+  ... | inj₂ ni = skip , Cn.echo y (alive-unp y tt) tt ni , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {skip} (few-under y F (⊑-snoc⁺ k) rawC)
+  img0 {k} {end}    y F with T-or (inside r k)
+  ... | inj₁ i  = pin q , Cn.burst y i , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {pin q} (few-under y F (⊑-snoc⁺ k) rawC)
+  ... | inj₂ ni = skip , Cn.echo y (alive-unp y tt) tt ni , few-reach {S = Cn.ConnT} {k ⊕ [ ix 0 ]} {skip} (few-under y F (⊑-snoc⁺ k) rawC)
+
+  τ-fixed : ∀ {u e′} → u ∈ fixedL → Bd.JoinT u e′ → τ u e′
+  τ-fixed m j = Cn.body (j , few-reach (few-fixed m raw-j)) , few-reach (few-fixed m rawC)
+
+  -- A row of `σ` with few before it.
+  Entry : Set
+  Entry = Σ Pos λ k → Σ (Ev Y) λ e → σ k e × Few σ k
+
+  Row : Set
+  Row = Σ Pos λ v → Σ (Ev Y) (τ v)
+
+  At : List Entry → Pos → Set
+  At es k = Any (λ en → proj₁ en ≡ k) es
+
+  Has : List Row → Pos → Set
+  Has rs v = Any (λ rw → v ≡ proj₁ rw) rs
+
+  at-in : ∀ {fs k} → At fs k → Σ Entry λ en → en ∈ fs × proj₁ en ≡ k
+  at-in (here eq) = _ , here refl , eq
+  at-in (there a) with at-in a
+  ... | en , m , eq = en , there m , eq
+
+  or-l : ∀ {a} b → T a → T (a ∨ b)
+  or-l {true} _ _ = tt
+
+  or-r : ∀ a {b} → T b → T (a ∨ b)
+  or-r true  _ = tt
+  or-r false t = t
+
+  or-split : ∀ a {b} → T (a ∨ b) → T a ⊎ T b
+  or-split true  t = inj₁ tt
+  or-split false t = inj₂ t
+
+  not-T : ∀ {b} → T (not b) → T b → ⊥
+  not-T {true}  () _
+  not-T {false} _  ()
+
+  -- Whether an entry ends before `k`.
+  endB : List Entry → Pos → Bool
+  endB []                     k = false
+  endB ((c , end , _) ∷ es)   k = (c <ᵖ k) ∨ endB es k
+  endB ((_ , out _ , _) ∷ es) k = endB es k
+  endB ((_ , skip , _) ∷ es)  k = endB es k
+  endB ((_ , pin _ , _) ∷ es) k = endB es k
+
+  endB-sound : ∀ es {k} → T (endB es k) → Σ Pos λ c → σ c end × c ≺ k
+  endB-sound []                           ()
+  endB-sound ((c , end , y , _) ∷ es) {k} h with or-split (c <ᵖ k) h
+  ... | inj₁ ck = c , y , ck
+  ... | inj₂ h′ = endB-sound es h′
+  endB-sound ((_ , out _ , _) ∷ es) h = endB-sound es h
+  endB-sound ((_ , skip , _) ∷ es)  h = endB-sound es h
+  endB-sound ((_ , pin _ , _) ∷ es) h = endB-sound es h
+
+  endB-any : ∀ {es c k} → At es c → σ c end → c ≺ k → T (endB es k)
+  endB-any {(_ , end , _) ∷ es} {k = k} (here refl) _ ck = or-l (endB es k) ck
+  endB-any {(_ , out _ , y , _) ∷ es} (here refl) yc _ with InvAt.func invσ y yc
+  ... | ()
+  endB-any {(_ , skip , y , _) ∷ es} (here refl) yc _ with InvAt.func invσ y yc
+  ... | ()
+  endB-any {(_ , pin _ , y , _) ∷ es} (here refl) yc _ with InvAt.func invσ y yc
+  ... | ()
+  endB-any {(c′ , end , _) ∷ es} {k = k} (there a) yc ck = or-r (c′ <ᵖ k) (endB-any a yc ck)
+  endB-any {(_ , out _ , _) ∷ es} (there a) yc ck = endB-any a yc ck
+  endB-any {(_ , skip , _) ∷ es}  (there a) yc ck = endB-any a yc ck
+  endB-any {(_ , pin _ , _) ∷ es} (there a) yc ck = endB-any a yc ck
+
+  -- A pin's copy in the first lane: there unless the run ended before it.
+  pinRows : ∀ {k p′} → σ k (pin p′) → Few σ k → (b : Bool) → (T (not b) → Proper σ k (pin p′)) → List Row
+  pinRows     y F true  _  = []
+  pinRows {k} y F false pr = (k ⊕ [ sub w ] , skip , τ-under y F (⊑-snoc⁺ k) (j-lane0 y F (heard (pr tt) (w≺ y)) tt)) ∷ []
+
+  pin-in : ∀ {k p′} (y : σ k (pin p′)) F (b : Bool) pr → (T b → ⊥) → Has (pinRows y F b pr) (k ⊕ [ sub w ])
+  pin-in y F true  pr nb = ⊥-elim (nb tt)
+  pin-in y F false pr nb = here refl
+
+  fixedRows : List Row
+  fixedRows = ((Q0 ⊕ [ ix 0 ]) ⊕ [ ix 0 ] , skip , τ-fixed (here refl) (Bd.val o0))
+            ∷ ((Q0 ⊕ [ ix 1 ]) ⊕ [ ix 0 ] , skip , τ-fixed (there (here refl)) (Bd.val o1))
+            ∷ (Q0 ⊕ [ last ] , skip , τ-fixed (there (there (here refl))) (Bd.opass oe no-oend))
+            ∷ []
+
+  -- THE TOLD ROWS OF A LIST OF ENTRIES closed under the ends before them:
+  -- each entry's every image, and the subscribe instant's.
+  module Image (es : List Entry) where
+    Clo : Pos → Set
+    Clo k = ∀ {c} → σ c end → c ≺ k → At es c
+
+    proper-pin : ∀ {k p′} → σ k (pin p′) → Clo k → T (not (endB es k)) → Proper σ k (pin p′)
+    proper-pin {k} y cl ne = y , le
+      where
+        le : ∀ {c} → σ c end → k ≼ c
+        le {c} yc with ≼-or-≻ k c
+        ... | inj₁ l  = l
+        ... | inj₂ ck = ⊥-elim (not-T ne (endB-any (cl yc ck) yc ck))
+
+    rowsOf : (en : Entry) → Clo (proj₁ en) → List Row
+    rowsOf (k , out a , y , F) _  = (k ⊕ [ ix 0 ] , img0 y F) ∷ (k ⊕ [ sub w ] , proj₁ (told-row y F) , proj₁ (proj₂ (told-row y F))) ∷ []
+    rowsOf (k , skip , y , F)  _  = (k ⊕ [ ix 0 ] , img0 y F) ∷ (k ⊕ [ sub w ] , proj₁ (told-row y F) , proj₁ (proj₂ (told-row y F))) ∷ []
+    rowsOf (k , end , y , F)   _  =
+        (k ⊕ [ ix 0 ] , img0 y F)
+      ∷ ((k ⊕ [ sub w ]) ⊕ [ ix 0 ] , skip , τ-under y F (imgs-⊑ k (there (there (here refl)))) (j-hand y))
+      ∷ (((k ⊕ [ sub w ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ] , out x , τ-under y F (imgs-⊑ k (there (there (there (here refl))))) (j-x y))
+      ∷ (c₁ k , end , τ-under y F (under-c₁ k) (j-end y))
+      ∷ []
+    rowsOf (k , pin p′ , y , F) cl = (k ⊕ [ ix 0 ] , img0 y F) ∷ pinRows y F (endB es k) (proper-pin y cl)
+
+    walk : (fs : List Entry) → (∀ {en} → en ∈ fs → Clo (proj₁ en)) → List Row
+    walk []        _  = []
+    walk (en ∷ fs) cl = rowsOf en (cl (here refl)) ++ walk fs (λ m → cl (there m))
+
+    has-walk : ∀ {v en fs} (cl : ∀ {en} → en ∈ fs → Clo (proj₁ en)) → en ∈ fs → (∀ (c : Clo (proj₁ en)) → Has (rowsOf en c) v) → Has (walk fs cl) v
+    has-walk {fs = en ∷ _}  cl (here refl) h = AnyP.++⁺ˡ {xs = rowsOf en (cl (here refl))} (h (cl (here refl)))
+    has-walk {fs = en ∷ fs} cl (there m)   h = AnyP.++⁺ʳ (rowsOf en (cl (here refl))) (has-walk (λ m′ → cl (there m′)) m h)
+
+    head-in : ∀ {k} e (y : σ k e)  F (c : Clo k) → Has (rowsOf (k , e , y , F) c) (k ⊕ [ ix 0 ])
+    head-in (out _) _ _ _ = here refl
+    head-in skip    _ _ _ = here refl
+    head-in end     _ _ _ = here refl
+    head-in (pin _) _ _ _ = here refl
+
+    shown-in : ∀ {k e} → σ k e → Bare e → ∀ {e₁} (y₁ : σ k e₁)  F (c : Clo k) → Has (rowsOf (k , e₁ , y₁ , F) c) (k ⊕ [ sub w ])
+    shown-in {e = out _} y _ y₁ F c with InvAt.func invσ y₁ y
+    ... | refl = there (here refl)
+    shown-in {e = skip}  y _ y₁ F c with InvAt.func invσ y₁ y
+    ... | refl = there (here refl)
+    shown-in {e = end}   y ()
+    shown-in {e = pin _} y ()
+
+    heard-in : ∀ {k p′} → Proper σ k (pin p′) → ∀ {e₁} (y₁ : σ k e₁)  F (c : Clo k) → Has (rowsOf (k , e₁ , y₁ , F) c) (k ⊕ [ sub w ])
+    heard-in {k} pr y₁ F c with InvAt.func invσ y₁ (proj₁ pr)
+    ... | refl = there (pin-in y₁ F (endB es k) (proper-pin y₁ c) λ h → let (_ , yc , ck) = endB-sound es h in proj₂ pr yc ck)
+
+    end-in : ∀ {k} → σ k end → ∀ {v} → (∀ (y′ : σ k end) F (c : Clo k) → Has (rowsOf (k , end , y′ , F) c) v) → ∀ {e₁} (y₁ : σ k e₁)  F (c : Clo k) → Has (rowsOf (k , e₁ , y₁ , F) c) v
+    end-in y h y₁ F c with InvAt.func invσ y₁ y
+    ... | refl = h y₁ F c
+
+    module Cover (clo : ∀ {en} → en ∈ es → Clo (proj₁ en)) where
+      all : List Row
+      all = fixedRows ++ walk es clo
+
+      via : ∀ {k e v} → σ k e → At es k → (∀ {e₁} (y₁ : σ k e₁)  F (c : Clo k) → Has (rowsOf (k , e₁ , y₁ , F) c) v) → Has all v
+      via y a h with at-in a
+      ... | (_ , e₁ , y₁ , F) , m , refl = AnyP.++⁺ʳ fixedRows (has-walk clo m (h y₁ F))
+
+      -- Every told row, where its owner is an entry.
+      cover : ∀ {v e′} → τ v e′ → (∀ {k e} → σ k e → k ⊑ v → At es k) → Has all v
+      cover t own = go own (raw t)
+        where
+          go : ∀ {v e′} → (∀ {k e} → σ k e → k ⊑ v → At es k) → Raw v e′ → Has all v
+          go own r-v0              = AnyP.++⁺ˡ {xs = fixedRows} (here refl)
+          go own r-v1              = AnyP.++⁺ˡ {xs = fixedRows} (there (here refl))
+          go own r-pass            = AnyP.++⁺ˡ {xs = fixedRows} (there (there (here refl)))
+          go own (r-burst {k} y _)     = via y (own y (⊑-snoc⁺ k)) (λ {e₁} → head-in e₁)
+          go own (r-echo {k} y _ _ _)  = via y (own y (⊑-snoc⁺ k)) (λ {e₁} → head-in e₁)
+          go own (r-kept {k} y _ _ _)  = via y (own y (⊑-snoc⁺ k)) (λ {e₁} → head-in e₁)
+          go own (r-shown {k} p b) = via (proj₁ p) (own (proj₁ p) (⊑-snoc⁺ k)) (λ {e₁} → shown-in (proj₁ p) b {e₁})
+          go own (r-heard {k} p)   = via (proj₁ p) (own (proj₁ p) (⊑-snoc⁺ k)) (λ {e₁} → heard-in p {e₁})
+          go own (r-hand {k} y)    = via y (own y (imgs-⊑ k (there (there (here refl))))) (λ {e₁} → end-in y (λ _ _ _ → there (here refl)) {e₁})
+          go own (r-x {k} y)       = via y (own y (imgs-⊑ k (there (there (there (here refl)))))) (λ {e₁} → end-in y (λ _ _ _ → there (there (here refl))) {e₁})
+          go own (r-end {k} y)     = via y (own y (under-c₁ k)) (λ {e₁} → end-in y (λ _ _ _ → there (there (there (here refl)))) {e₁})
+
+      back : ∀ {v} → v ∈ L.map proj₁ all → Σ (Ev Y) (τ v)
+      back m with ∈-map⁻ proj₁ {xs = all} m
+      ... | (_ , e′ , t) , _ , refl = e′ , t
+
+  -- Entries for the listed positions.
+  ents : (fs : List Pos) → (∀ {k} → k ∈ fs → Σ (Ev Y) (σ k) × Few σ k) → List Entry
+  ents []       _ = []
+  ents (k ∷ fs) b = (k , proj₁ (proj₁ (b (here refl))) , proj₂ (proj₁ (b (here refl))) , proj₂ (b (here refl))) ∷ ents fs (λ m → b (there m))
+
+  ents-at : ∀ {fs k} {b : ∀ {k} → k ∈ fs → Σ (Ev Y) (σ k) × Few σ k} → k ∈ fs → At (ents fs b) k
+  ents-at (here refl) = here refl
+  ents-at (there m)   = there (ents-at m)
+
+  ents-in : ∀ {fs en} {b : ∀ {k} → k ∈ fs → Σ (Ev Y) (σ k) × Few σ k} → en ∈ ents fs b → proj₁ en ∈ fs
+  ents-in {_ ∷ _} (here refl) = here refl
+  ents-in {_ ∷ _} (there m)   = there (ents-in m)
+
+  -- EVERY ROW OF THE RUN LISTED, EVERY TOLD ROW LISTED.
+  told-whole : Whole σ → Whole τ
+  told-whole (ks , cov , bk) = L.map proj₁ C.all , (λ t → AnyP.map⁺ (C.cover t λ y _ → ents-at (cov y))) , C.back
+    where
+      Fw : ∀ {k} → Few σ k
+      Fw = ks , λ y _ → cov y
+      es : List Entry
+      es = ents ks (λ m → bk m , Fw)
+      module C = Image.Cover es (λ _ yc _ → ents-at (cov yc))
+
+  -- A row with few before it shows again, and every told row before its
+  -- image is the image of a row before it or of the subscribe instant.
+  told-listed : ∀ {l e} → σ l e → Listed σ l → Listed τ (l ⊕ δ e)
+  told-listed {l} {e} y Ll@(ks , cov , bk) = filter (λ v → T? (v <ᵖ u)) (L.map proj₁ C.all) , cover′ , back′
+    where
+      u : Pos
+      u = l ⊕ δ e
+      Fl : Few σ l
+      Fl = few-of Ll
+      es : List Entry
+      es = (l , e , y , Fl) ∷ ents ks (λ m → proj₂ (bk m) , few-down Fl (≺→≼ {_} {l} (proj₁ (bk m))))
+      bound : ∀ {en} → en ∈ es → proj₁ en ≼ l
+      bound (here refl) = ≼-refl {l}
+      bound (there m)   = ≺→≼ {_} {l} (proj₁ (bk (ents-in m)))
+      clo : ∀ {en} → en ∈ es → Image.Clo es (proj₁ en)
+      clo {en} m {c} yc ck = there (ents-at (cov yc (≺-≼-≺ {c} {proj₁ en} {l} ck (bound m))))
+      module C = Image.Cover es clo
+      own : ∀ {v} → v ≺ u → ∀ {k e₁} → σ k e₁ → k ⊑ v → At es k
+      own {v} vu {k} y₁ kv with ≼-split {k} {l} (img-≼ y₁ y kv (δ e , refl) vu)
+      ... | inj₁ kl   = there (ents-at (cov y₁ kl))
+      ... | inj₂ refl = here refl
+      cover′ : ∀ {v e′} → τ v e′ → v ≺ u → v ∈ filter (λ v → T? (v <ᵖ u)) (L.map proj₁ C.all)
+      cover′ t vu = ∈-filter⁺ (λ v → T? (v <ᵖ u)) (AnyP.map⁺ (C.cover t (own vu))) vu
+      back′ : ∀ {v} → v ∈ filter (λ v → T? (v <ᵖ u)) (L.map proj₁ C.all) → v ≺ u × Σ _ (τ v)
+      back′ m with ∈-filter⁻ (λ v → T? (v <ᵖ u)) {xs = L.map proj₁ C.all} m
+      ... | m′ , vu = vu , C.back m′
+
+  -- Where a told row lies under a row of the run: the run's rows before it.
+  src1 : ∀ {v} → Source v → List Pos
+  src1 (inj₁ (l , _)) = l ∷ []
+  src1 (inj₂ _)       = []
+
+  srcs : (ms : List Pos) → (∀ {v} → v ∈ ms → Σ _ (τ v)) → List Pos
+  srcs []       _ = []
+  srcs (v ∷ ms) b = src1 (told-source? (proj₂ (b (here refl)))) ++ srcs ms (λ m → b (there m))
+
+  srcs-sound : ∀ ms {b : ∀ {v} → v ∈ ms → Σ _ (τ v)} {k} → k ∈ srcs ms b → Σ _ (σ k)
+  srcs-sound (v ∷ ms) {b} m with told-source? (proj₂ (b (here refl))) | ∈-++⁻ {v = _} (src1 (told-source? (proj₂ (b (here refl))))) m
+  ... | inj₁ (_ , e , y , _) | inj₁ (here refl) = e , y
+  ... | inj₂ _               | inj₁ ()
+  ... | _                    | inj₂ m′ = srcs-sound ms m′
+
+  srcs-complete : ∀ ms {b : ∀ {v} → v ∈ ms → Σ _ (τ v)} {k e} → σ k e → (k ⊕ δ e) ∈ ms → k ∈ srcs ms b
+  srcs-complete (v ∷ ms) {b} {k} y (here refl) = AnyP.++⁺ˡ {xs = src1 (told-source? (proj₂ (b (here refl))))} (one (told-source? (proj₂ (b (here refl)))))
+    where
+      one : (s : Source (k ⊕ δ _)) → k ∈ src1 s
+      one (inj₁ (l′ , e′ , y′ , eq)) = here (told-inj y y′ eq)
+      one (inj₂ none)                = ⊥-elim (none y refl)
+  srcs-complete (v ∷ ms) {b} y (there m) = AnyP.++⁺ʳ (src1 (told-source? (proj₂ (b (here refl))))) (srcs-complete ms y m)
+
+  told-listed← : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Listed τ m → Listed σ l
+  told-listed← {m} {l = l} _ yl (zs , refl) (ms , cov , bk) = filter (λ k → T? (k <ᵖ l)) Ss , cover′ , back′
+    where
+      Ss : List Pos
+      Ss = srcs ms (λ mm → proj₂ (bk mm))
+      img-in : ∀ {k e₁} → σ k e₁ → Few σ k → k ≺ l → k ∈ Ss
+      img-in {k} {e₁} y F kl = srcs-complete ms y (cov (proj₁ (proj₂ (told-row y F))) (img-≺ y yl kl (δ e₁) zs))
+      Fl : Few σ l
+      Fl = hang-few Ss img-in
+      cover′ : ∀ {k e₁} → σ k e₁ → k ≺ l → k ∈ filter (λ k → T? (k <ᵖ l)) Ss
+      cover′ {k} y kl = ∈-filter⁺ (λ k → T? (k <ᵖ l)) (img-in y (few-down Fl (≺→≼ {k} {l} kl)) kl) kl
+      back′ : ∀ {k} → k ∈ filter (λ k → T? (k <ᵖ l)) Ss → k ≺ l × Σ _ (σ k)
+      back′ m with ∈-filter⁻ (λ k → T? (k <ᵖ l)) {xs = Ss} m
+      ... | m′ , kl = kl , srcs-sound ms m′

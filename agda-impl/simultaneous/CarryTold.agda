@@ -195,9 +195,6 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     open Told n S x env genv q ok
     module C = CarryAt c
 
-    few-of : ∀ {l} → Listed σ l → Few σ l
-    few-of (ks , F , _) = ks , F
-
     inst-⊑ : ∀ {l m} → l ⊑ m → instantOf m ≡ instantOf l
     inst-⊑ {l} (zs , refl) = instant-⊕ l zs
 
