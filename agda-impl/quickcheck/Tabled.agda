@@ -276,19 +276,30 @@ open ScanL public using (scanRows)
 
 -- `EmissionSet.TakeWhile.TakeT`.
 module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (o : Listed A) where
-  failed : Pos → Bool
-  failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
+  -- The failing values' positions, found once rather than per row: a
+  -- takeWhile over a whole run is otherwise quadratic in it.
+  failAt : Pos × A → List Pos
+  failAt (q , a) = when (not (keep a)) q
+
+  failures : List Pos
+  failures = concatMap failAt (values (rows o))
+
+  failed : List Pos → Pos → Bool
+  failed fs k = anyᵇ (_<ᵖ k) fs
 
   kept : Row A → List (Row A)
   kept (q , out a) = if keep a then [ q , out a ] else when incl (q ⊕ [ ix 0 ] , out a) ++ [ q ⊕ [ last ] , end ]
   kept r           = [ r ]
 
-  takeRow : Row A → List (Row A)
-  takeRow (q , pin r) = when (not (failed r) ∧ inside r q) (q , pin r)
-  takeRow (q , e)     = if failed q then [] else kept (q , e)
+  takeRow : List Pos → Row A → List (Row A)
+  takeRow fs (q , pin r) = when (not (failed fs r) ∧ inside r q) (q , pin r)
+  takeRow fs (q , e)     = if failed fs q then [] else kept (q , e)
+
+  takeWith : List Pos → Listed A
+  takeWith fs = concatMap (takeRow fs) (rows o) ⊣ short o
 
   takeRows : Listed A
-  takeRows = concatMap takeRow (rows o) ⊣ short o
+  takeRows = takeWith failures
 open TakeL public using (takeRows)
 
 -- `EmissionSet.Switch.JoinT`, each value's lane listed at its subscription.

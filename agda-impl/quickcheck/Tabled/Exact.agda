@@ -274,21 +274,22 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
 
 module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) (o : Listed A) (ex : Exact o t) where
   open Tb.TakeWhile incl keep t
-  open TakeL incl keep o using (failed; takeRow)
+  open TakeL incl keep o using (failures; failed; takeRow)
 
   private
     false-of : ∀ {b} → T (not b) → b ≡ false
     false-of {false} _ = refl
 
-    failed→ : ∀ k → failed k ≡ true → Failed k
-    failed→ k e with any⁻ {xs = values (rows o)} e
-    ... | ((q , a) , m , h) = let (nk , qk) = ∧-true h in
-      q , a , sound ex (values⁻ m) , Equivalence.from T-≡ nk , Equivalence.from T-≡ qk
+    failed→ : ∀ k → failed failures k ≡ true → Failed k
+    failed→ k e with any⁻ {xs = failures} e
+    ... | (q , m , qk) with cm⁻ {xs = values (rows o)} m
+    ... | ((_ , a) , vm , h) with when⁻ {b = not (keep a)} h
+    ... | (nk , refl) = q , a , sound ex (values⁻ vm) , Equivalence.from T-≡ nk , Equivalence.from T-≡ qk
 
-    →failed : ∀ k → Failed k → failed k ≡ true
-    →failed k (q , a , x , nk , qk) = any⁺ (values⁺ (complete ex x)) (∧-intro (fromT nk) (fromT qk))
+    →failed : ∀ k → Failed k → failed failures k ≡ true
+    →failed k (q , a , x , nk , qk) = any⁺ (cm⁺ (values⁺ (complete ex x)) (when⁺ (fromT nk))) (fromT qk)
 
-    unfailed : ∀ k → failed k ≡ false → ¬ Failed k
+    unfailed : ∀ k → failed failures k ≡ false → ¬ Failed k
     unfailed k nf F = offT nf (Equivalence.from T-≡ (→failed k F))
 
     kept-row : ∀ {k e₀ q e} → t k e₀ → ¬ Failed k → Tb.Unpinned e₀ → (q , e) ∈ TakeL.kept incl keep o (k , e₀) → TakeT q e
@@ -306,17 +307,17 @@ module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) (o 
     kept-row {e₀ = end} x nF _ h with single⁻ h
     ... | refl = tend x nF
 
-    unpinned-t : ∀ {k e₀ q e} → t k e₀ → Tb.Unpinned e₀ → (q , e) ∈ (if failed k then [] else TakeL.kept incl keep o (k , e₀)) → TakeT q e
-    unpinned-t {k} x un h with if⁻ {b = failed k} h
+    unpinned-t : ∀ {k e₀ q e} → t k e₀ → Tb.Unpinned e₀ → (q , e) ∈ (if failed failures k then [] else TakeL.kept incl keep o (k , e₀)) → TakeT q e
+    unpinned-t {k} x un h with if⁻ {b = failed failures k} h
     ... | inj₁ (_ , ())
     ... | inj₂ (nf , h′) = kept-row x (unfailed k nf) un h′
 
-    row-t : ∀ {k e₀ q e} → t k e₀ → (q , e) ∈ takeRow (k , e₀) → TakeT q e
+    row-t : ∀ {k e₀ q e} → t k e₀ → (q , e) ∈ takeRow failures (k , e₀) → TakeT q e
     row-t {e₀ = out _} x h = unpinned-t x tt h
     row-t {e₀ = skip}  x h = unpinned-t x tt h
     row-t {e₀ = end}   x h = unpinned-t x tt h
     row-t {k} {e₀ = Tb.pin r} x h with when⁻ h
-    ... | (c , refl) with ∧-true {not (failed r)} c
+    ... | (c , refl) with ∧-true {not (failed failures r)} c
     ... | (nf , ins) = left x (λ F → not-T nf (Equivalence.from T-≡ (→failed r F))) (Equivalence.from T-≡ ins)
 
   sound-t : ∀ {q e} → (q , e) ∈ rows (takeRows incl keep o) → TakeT q e
