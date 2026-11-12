@@ -365,16 +365,16 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → HotsListed envP k → Out k e
     heard-img : ∀ {q r} → Proper T₀ q (pin r) → p ≺ q → Listed t (q ⊕ [ sub p ]) → HotsListed envP (q ⊕ [ sub p ])
               → (Σ Pos λ l → Σ Pos λ r′ → T₀′ l (pin r′) × C.PB q l × (∀ {k′ l′} → C.Img k′ l′ → l′ ≺ r′ → k′ ≺ r)
-                  × (Listed T₀ q → HotsListed (Bound.envP (er i)) q → Listed T₀′ l))
+                  × Listed T₀′ l)
               → Out (q ⊕ [ sub p ]) skip
     heard-img {q} {r} tq pq L lp (l , r′ , ul , pb , _ , ls) =
-      inj₂ (refl , heard-into {q} {l} {pin r} {pin r′} tq pq pb ul
-                     (ls (lstP {q} {pin r} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp)) L)
+      inj₂ (refl , heard-into {q} {l} {pin r} {pin r′} tq pq pb ul ls L)
 
     img (shown {q} {e} tq _ pq , _) un _ L lp =
       img-shown {q} {e} tq pq un L (C.img {q} {e} (proj₁ tq) un (λ {c₉} → proj₂ tq {c₉})
         (lstP {q} {e} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp))
-    img (heard {q} {r} tq pq , _) _ _ L lp = heard-img {q} {r} tq pq L lp (proj₁ (C.pinned {q} {r} (proj₁ tq) (λ {c₉} → proj₂ tq {c₉})))
+    img (heard {q} {r} tq pq , _) _ _ L lp = heard-img {q} {r} tq pq L lp
+      (proj₁ (C.pinned {q} {r} (proj₁ tq) (λ {c₉} → proj₂ tq {c₉}) (lstP {q} {pin r} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp)))
     img (ended {c} tc pc , _) _ _ _ lp =
       img-ended {c} tc pc (C.img {c} {end} (proj₁ tc) tt (λ {c₉} → proj₂ tc {c₉})
         (lstP {c} {end} {c ⊕ [ sub p ]} tc (sub≼ c) lp) (lsts {c} {c ⊕ [ sub p ]} (sub≼ c) lp))
