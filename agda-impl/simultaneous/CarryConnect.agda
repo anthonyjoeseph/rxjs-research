@@ -40,7 +40,8 @@ open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _�
 open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
-open import simultaneous.CarryTold using (module Folded; module Mapped; told; told-carry; justValues)
+open import simultaneous.CarryTold using (module Folded; module Mapped; told-carry; justValues)
+open import simultaneous.ToldRows using (told)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; annStep)
 

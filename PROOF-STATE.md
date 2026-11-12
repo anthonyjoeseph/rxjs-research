@@ -35,16 +35,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ERASURE
 
 Probed, unproven: each former's elaborated run carries its plain one
-(`Carry`) along an order embedding; a run told its end (`told`, the
-annotation's and the close's one connect) moves only its end, past the
-told row; the take moves it under the completion mark. Riskiest: the
-connect's, which `CarryAt` as stated cannot give — a burst past an
-endless synchronous burst has no carrier, an image under the source's
+(`Carry`) along an order embedding; the take moves the end under the
+completion mark. Riskiest: the connect's — an image under the source's
 subscription is not known under the annotation's, and an echo's
 elaborated body is not known alive. Settled when each former's leaf is a
 body, over whatever fields the record must gain.
 
-Members: `told-carry`, `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
+Members: `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
+
+#### THE TOLD ROWS
+
+Untried: each row of a run told its end, with few rows before it, shows
+again once, at a fixed offset under itself; every other told row is
+silent or the queued value, in the subscribe instant or under a run row;
+liveness, listings and few rows transfer both ways along the offset.
+Settled when each is a body over the connect's and the concat's rows.
+
+Members: `told-row`, `told-listed`, `told-inj`, `told-source?`, `told-shown`,
+`told-from`, `told-live←`, `told-listed←`, `told-few←`, `told-live`,
+`told-live-at`, `told-whole`.
 
 #### THE PROTOCOL
 
