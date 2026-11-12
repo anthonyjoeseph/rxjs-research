@@ -40,7 +40,7 @@ module quickcheck.Spec-Check where
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo; length; deduplicate; filter) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; upTo; length; filter; foldr) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -53,27 +53,27 @@ open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
 open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
-open import Relation.Nullary using (does; ¬?)
+open import Relation.Nullary using (does)
 import Data.Nat
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
 open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh)
-open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_; frame)
+open import denotation.Position using (_≟ⁱ_; Instant; Pos; root; _≟ᵖ_; _<ᵖ_; frame)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟ᵖ_ using (batchSimultaneousᴰ)
 open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupStamps)
 open import simultaneous.Relations using (values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ)
+open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ; anyᵇ)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; batchSimultaneous)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -105,24 +105,43 @@ both l with whole l
 ------------------------------------------------------------------------
 -- Stamps
 
+-- Every instant a listing meets, with the earliest position of its rows
+-- there: grouped once per listing rather than once per value ranked, and
+-- a row before `q` exactly when the earliest is.
+Groups : Set
+Groups = List (Instant × Pos)
+
+byInstant : ∀ {A} → Rows A → Groups
+byInstant = foldr (λ r → file (instantOf (proj₁ r)) (proj₁ r)) []
+  where
+    file : Instant → Pos → Groups → Groups
+    file i q []             = (i , q) ∷ []
+    file i q ((j , m) ∷ gs) = if does (i ≟ⁱ j) then (j , (if q <ᵖ m then q else m)) ∷ gs else (j , m) ∷ file i q gs
+
 -- `Relations.Rank`: the subscribe frame and the instants of the rows
 -- before `q`, its own excluded, counted once each.
-rankIn : ∀ {A} → Rows A → Pos → ℕ
-rankIn all q = length (deduplicate _≟ⁱ_ (filter (λ i → ¬? (i ≟ⁱ instantOf q)) (frame ∷ mapL (λ r → instantOf (proj₁ r)) (filter (λ r → T? (proj₁ r <ᵖ q)) all))))
+rankIn : Groups → Pos → ℕ
+rankIn gs q = (if does (frame ≟ⁱ instantOf q) then 0 else 1) + length (filter (λ g → T? (counted g)) gs)
+  where
+    counted : Instant × Pos → Bool
+    counted (i , m) = not (does (i ≟ⁱ frame)) ∧ not (does (i ≟ⁱ instantOf q)) ∧ (m <ᵖ q)
 
 -- `Relations.stampedᴰ`: the plain run's values, each with its stamp.
 stampsᴰ : Both ℕ → List (ℕ × ℕ)
-stampsᴰ (met , all) = mapL (λ { (q , a) → rankIn all q , a }) (outs met)
+stampsᴰ (met , all) = stampsWith (byInstant all)
+  where
+    stampsWith : Groups → List (ℕ × ℕ)
+    stampsWith gs = mapL (λ { (q , a) → rankIn gs q , a }) (outs met)
 
 -- `Relations.stampedᴮ`: an elaborated run's values, marks dropped, or a
 -- batched run's batches, each with the stamp of the row carrying it.
 stampsᴮ : ∀ {A : Set} → Both (IE A) → List (ℕ × A)
-stampsᴮ {A} (met , all) = go (outs met)
+stampsᴮ {A} (met , all) = go (byInstant all) (outs met)
   where
-    go : List (Pos × IE A) → List (ℕ × A)
-    go []                                = []
-    go ((q , instEmit (value a) _) ∷ xs) = (rankIn all q , a) ∷ go xs
-    go (_ ∷ xs)                          = go xs
+    go : Groups → List (Pos × IE A) → List (ℕ × A)
+    go gs []                                = []
+    go gs ((q , instEmit (value a) _) ∷ xs) = (rankIn gs q , a) ∷ go gs xs
+    go gs (_ ∷ xs)                          = go gs xs
 
 ------------------------------------------------------------------------
 -- The three statements, decided over whole runs
@@ -141,11 +160,6 @@ private
   iff : Bool → Bool → Bool
   iff a b = (a ∧ b) ∨ (not a ∧ not b)
 
-  -- every pair, the earlier first
-  allPairsᵇ : ∀ {X : Set} → (X → X → Bool) → List X → Bool
-  allPairsᵇ r []       = true
-  allPairsᵇ r (x ∷ xs) = allᵇ (r x) xs ∧ allPairsᵇ r xs
-
   -- the batches met, each with the name it carries
   batchesOut : ∀ {A} → Rows (IE (List A)) → List (Pos × List A)
   batchesOut rs = stamped (values rs)
@@ -155,17 +169,27 @@ private
   groupedᴺ : ∀ {A} → Rows (IE A) → List (Pos × List A)
   groupedᴺ rs = batchSimultaneousᴰ (stamped (values rs))
 
-  -- an emit at its position, read as its position and its name
-  named : ∀ {A} → Pos × IE A → Pos × Pos
-  named (p , x) = p , InstEmit.instant x
+  -- an emit read as its name and the instant of its position
+  named : ∀ {A} → Pos × IE A → Pos × Instant
+  named (p , x) = InstEmit.instant x , instantOf p
 
   -- names equal exactly when instants are
-  sameInstant : Pos × Pos → Pos × Pos → Bool
-  sameInstant (p , i) (q , j) = iff (does (i ≟ᵖ j)) (does (instantOf p ≟ⁱ instantOf q))
+  sameInstant : Pos × Instant → Pos × Instant → Bool
+  sameInstant (i , s) (j , t) = iff (does (i ≟ᵖ j)) (does (s ≟ⁱ t))
+
+  same : Pos × Instant → Pos × Instant → Bool
+  same (i , s) (j , t) = does (i ≟ᵖ j) ∧ does (s ≟ⁱ t)
+
+  -- every pair agrees: each emit read against the distinct readings
+  -- before it, which decide every pair it is in, so a run costs its
+  -- length times its instants rather than its length squared
+  agreeing : List (Pos × Instant) → List (Pos × Instant) → Bool
+  agreeing seen []       = true
+  agreeing seen (x ∷ xs) = allᵇ (sameInstant x) seen ∧ agreeing (if anyᵇ (same x) seen then seen else x ∷ seen) xs
 
 -- every pair of emits met agrees
 agreeᵇ : ∀ {A} → Rows (IE A) → Bool
-agreeᵇ rs = allPairsᵇ sameInstant (mapL named (outs rs))
+agreeᵇ rs = agreeing [] (mapL named (outs rs))
 
 -- `Relations.Ends`
 endsᵇ : ∀ {A} → Rows A → Bool
@@ -218,12 +242,26 @@ data Verdict : Set where
   -- left-to-right, coherent, batchable, erasing, grouping
   checked : Bool → Bool → Bool → Bool → Bool → Verdict
 
-judge : ℕ → Three → Verdict
-judge n (three o x b) with both (listT n o [] root) | both (listT n x [] root) | both (listT n b [] root)
+-- A seed's three listings, each found once.
+record Listings : Set where
+  constructor listings
+  field
+    lo : Maybe (Listed ℕ)
+    lx : Maybe (Listed (IE ℕ))
+    lb : Maybe (Listed (IE (List ℕ)))
+
+listed : ℕ → Three → Listings
+listed n (three o x b) = listings (listT n o [] root) (listT n x [] root) (listT n b [] root)
+
+judgeL : Listings → Verdict
+judgeL (listings lo lx lb) with both lo | both lx | both lb
 ... | just ro | just rx | just rb =
   checked (joinsᵇ (proj₁ rb) (proj₁ ro)) (agreeᵇ (proj₁ rx) ∧ agreeᵇ (proj₁ rb)) (batchesᵇ (proj₁ rb) (proj₁ rx))
           (erasesᵇ rx ro) (groupsᵇ rb ro)
 ... | _       | _       | _       = skipped
+
+judge : ℕ → Three → Verdict
+judge n t = judgeL (listed n t)
 
 private
   -- The batcher on top of the elaboration, as `simultaneous.Relations.batchedObs`
@@ -443,12 +481,38 @@ private
   -- each seed judged once, its failures printed as met
   report : List ℕ → Tally → IO Unit
   report []          t = putStrLn ("spec-check: done " +++ showTally t)
-  report (seed ∷ ss) t with judge (budget seed) (real seed)
-  ... | v = progress seed >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+  -- each listing and each check forced on its own line, so the log's
+  -- timestamps show which of them a seed's cost went to
+  report (seed ∷ ss) t = progress seed >>= λ _ → staged (listed (budget seed) (real seed))
     where
       failed : List String → IO Unit
       failed []       = return _
       failed (f ∷ fs) = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
+
+      stage : String → String → IO Unit
+      stage s r = putStrLn ("spec-check:   " +++ s +++ " " +++ r)
+
+      size : ∀ {A} → Maybe (Listed A) → String
+      size (just l) = showℕ (length (rows l)) +++ " rows"
+      size nothing  = "cut"
+
+      bit : Bool → String
+      bit true  = "ok"
+      bit false = "no"
+
+      checks : Verdict → IO Unit
+      checks skipped             = stage "skipped" ""
+      checks (checked x y z u w) =
+        stage "left-to-right" (bit x) >>= λ _ → stage "coherent" (bit y) >>= λ _ → stage "batchable" (bit z) >>= λ _ →
+        stage "erasing" (bit u) >>= λ _ → stage "grouping" (bit w)
+
+      judged : Verdict → IO Unit
+      judged v = checks v >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+
+      staged : Listings → IO Unit
+      staged ls =
+        stage "plain" (size (Listings.lo ls)) >>= λ _ → stage "elaborated" (size (Listings.lx ls)) >>= λ _ →
+        stage "batched" (size (Listings.lb ls)) >>= λ _ → judged (judgeL ls)
 
   selftest : IO Unit
   selftest =

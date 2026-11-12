@@ -20,12 +20,12 @@ open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Modulus using (entered-reach)
 open import adequacy.SubOne using (map-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (HeldD)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same; rest-same)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; mapIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; mapIE)
 
 ------------------------------------------------------------------------
 -- Rows

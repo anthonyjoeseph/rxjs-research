@@ -39,7 +39,7 @@ open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; �
 open import denotation.Laws.Worlds using (Hots; Ok; InvAt; full; _⊑_; ⊑-refl; ⊑-≼; ⊑-cmp; ext≢; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ;
   W⁼; here; inW; join; step; plain-last; conv)
 open import denotation.Laws.Count using (⊑?)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
@@ -48,7 +48,7 @@ open import simultaneous.Carry using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; With
   NotHot; BoundRow; Joins; Apart; annValues; Whole; Near; IntoAt; module Mono; apart; instant-⊕; listed↓; listed-≼; sub-listed; hots-at; bound-hot;
   Ahead; ahead-over; ahead-under)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
 open import simultaneous.CarryRead using (Reading; read-post)
 open import simultaneous.Rejoined using (Flat; split-at; same-hot; nest; joined-back; few-reach; rjEv; rjUnp; rjRow; rejoin-few;

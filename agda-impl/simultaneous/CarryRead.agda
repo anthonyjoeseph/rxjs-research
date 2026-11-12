@@ -38,7 +38,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
   renaming (shown to rj-shown)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≼-split; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; ⊑-trans; ⊑-≼)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
@@ -47,7 +47,7 @@ open import simultaneous.Folds using (few-¬¬listed)
 open import simultaneous.Carry using (PMap; CarryAt; annValues; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
 open import simultaneous.ReadRows using (module Rows; step-just; step-none; of-shown; of-marks; up; up-⊕)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; joinStep)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)
 
 -- The elaborated reader's run over a handle: the fold of `joinStep`,
 -- each fold's emits sent.

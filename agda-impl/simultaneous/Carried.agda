@@ -13,7 +13,7 @@ open import Data.Nat using (zero; suc)
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Carry using (Carry; carry-cold; carry-map; carry-flatMap; carry-connect)
 open import simultaneous.CarryReader using (carry-connected)
 open import simultaneous.CarryLeaves using (carry-empty; carry-of)
@@ -21,7 +21,7 @@ open import simultaneous.CarryDefer using (carry-⊥; carry-next)
 open import simultaneous.CarryScan using (carry-scan)
 open import simultaneous.CarryTake using (carry-takeWhile)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (AIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE)
 
 carry-approx : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → Carry n ρ o
 carry-approx n       ρ (cold c)          = carry-cold n ρ c

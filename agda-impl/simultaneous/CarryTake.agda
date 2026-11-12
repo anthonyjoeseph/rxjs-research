@@ -42,7 +42,7 @@ open import denotation.Laws.Count using (em)
 open import denotation.Laws.ShowsOps using (bool)
 open import denotation.Laws using (inv-approx)
 open import adequacy.SubOne using (take-reach; below-or-under; at-or-before)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
@@ -52,7 +52,7 @@ open import simultaneous.Carry using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Ca
   Ahead; ahead-over)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; passes)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; passes)
 
 ------------------------------------------------------------------------
 -- The cuts under a failing value

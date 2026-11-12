@@ -7,7 +7,7 @@
 -- whatever is still held.
 module simultaneous.Batcher where
 
-open import Data.Bool using (false)
+open import Data.Bool using (false; true; T; not)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; _∷ʳ_; concat; concatMap)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
@@ -20,23 +20,23 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; sym; trans; subst; module ≡-Reasoning)
 
-open import Tree using (scan; map; of)
+open import Tree using (scan; map; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; skip; end; pin) renaming (out to emit)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
-open import simultaneous.SObs using (SObs; plain; Batching; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; Batching; lone; module Elaborate)
 open import simultaneous.Readings using (stamped; closed)
 open import simultaneous.Protocol using (nameStep; Fresh)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchFrom; batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-++)
 open import simultaneous.Relations using (stamp₀; sourced; Met; values; joined; vals; Ends; EndsWith; elaborated; batched)
-open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; concat-last)
+open import simultaneous.Layers using (scans; scan-out; scan-in; each-out; each-in; map-back; take-last; beside-lone)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
-  pending; asEmits; mark-step; restamp; marked; concatˢ; elab; E)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; Step; bstep; bstart; bstep-held; completed-held; unbatched;
+  pending; asEmits; mark-step; restamp; marked; elab; E; unfinished; completing)
 
 ------------------------------------------------------------------------
 -- The fold, as lists
@@ -126,17 +126,35 @@ scans-snoc : ∀ {X Y : Set} (f : Y → X → Y) z (xs : List X) x → scans f z
 scans-snoc f z []       x = refl
 scans-snoc f z (y ∷ xs) x = cong (f z y ∷_) (scans-snoc f (f z y) xs x)
 
+-- A failing emit is the completion mark.
+finished : ∀ {A : Set} (x : IE A) → T (not (unfinished x)) → Σ Pos λ m → x ≡ instEmit (mark completed) m
+finished (instEmit (mark completed) m)         _ = m , refl
+finished (instEmit (value _) _)                ()
+finished (instEmit (mark Marks.begin) _)       ()
+finished (instEmit (mark Marks.over) _)        ()
+finished (instEmit (mark Marks.stop) _)        ()
+finished (instEmit (mark Marks.outerOpen) _)   ()
+finished (instEmit (mark Marks.outerClose) _)  ()
+finished (instEmit (mark Marks.laneStart) _)   ()
+finished (instEmit (mark Marks.carry) _)       ()
+finished (instEmit (mark Marks.laneDone) _)    ()
+finished (instEmit (mark Marks.burstEnd) _)    ()
+finished (instEmit (mark Marks.outerDone) _)   ()
+finished (instEmit (mark Marks.subscribed) _)  ()
+
 -- THE LAST EMIT IS THE COMPLETION: the elaboration is a map over a scan
--- over a concat of the run with a lone completion mark, so a completed
--- run's last value is that mark, restamped.
+-- over a takeWhile, to the completion mark inclusive, of the run merged
+-- with a lane that never ends, so a completed run's last value is that
+-- mark, restamped.
 completed-last : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Ends rx
                → Σ (List (IE A)) λ vs → Σ Pos λ n → values rx ≡ vs ++ [ instEmit (mark completed) n ]
-completed-last o {rx} mx ex with map-back proj₂ (scan restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ [])))) mx
-... | sc , msc , eqm , enm with scan-out restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ []))) msc
-...   | kx , mk , eqs , ens with concat-last (sourced o) (marked completed) mk (ens (enm ex))
-...     | vs , eqk =
+completed-last o {rx} mx ex with map-back proj₂ (scan restamp stamp₀ (takeWhile true unfinished (sourced o))) mx
+... | sc , msc , eqm , enm with scan-out restamp stamp₀ (takeWhile true unfinished (sourced o)) msc
+...   | kx , mk , eqs , ens with take-last unfinished (sourced o) (λ {c} → beside-lone (completing (elab (λ i → i) (plain o))) (marked Marks.subscribed) {c}) mk (ens (enm ex))
+...     | vs , x , eqk , nk with finished x nk
+...       | m , refl =
   L.map proj₂ (scans restamp stamp₀ vs) , proj₁ (L.foldl restamp stamp₀ vs) ,
-  trans eqm (trans (cong (L.map proj₂) (trans eqs (trans (cong (scans restamp stamp₀) eqk) (scans-snoc restamp stamp₀ vs (marked completed)))))
+  trans eqm (trans (cong (L.map proj₂) (trans eqs (trans (cong (scans restamp stamp₀) eqk) (scans-snoc restamp stamp₀ vs x))))
                    (map-++ proj₂ (scans restamp stamp₀ vs) _))
 
 ------------------------------------------------------------------------
@@ -324,7 +342,7 @@ stamps-restamp a e (k ∷ ks) =
 
 -- An elaborated run's values are named by its begins.
 stamps-of : ∀ {A : Set} (o : SObs [] A) {rx} → Met (elaborated o) rx → Stamps root (values rx)
-stamps-of o {rx} mx with map-back proj₂ (scan restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ [])))) mx
-... | sc , msc , eqm , _ with scan-out restamp stamp₀ (concatˢ (sourced o) (of (marked completed ∷ []))) msc
+stamps-of o {rx} mx with map-back proj₂ (scan restamp stamp₀ (takeWhile true unfinished (sourced o))) mx
+... | sc , msc , eqm , _ with scan-out restamp stamp₀ (takeWhile true unfinished (sourced o)) msc
 ...   | kx , _ , eqs , _ =
   subst (Stamps root) (sym (trans eqm (cong (L.map proj₂) eqs))) (stamps-restamp root (marked Marks.begin) (values kx))

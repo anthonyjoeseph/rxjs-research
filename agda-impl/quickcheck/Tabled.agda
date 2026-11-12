@@ -92,6 +92,10 @@ endBefore rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k <ᵖ c) }) rs
 ends : ∀ {A} → List (Row A) → List Pos
 ends = concatMap λ { (k , e) → when (isEnd e) k }
 
+-- `endBy` against the end positions, found once rather than per call.
+endAmong : List Pos → Pos → Bool
+endAmong es c = anyᵇ (_≼ᵇ c) es
+
 -- `EmissionSet.Proper`: at or before every end.
 properᵇ : ∀ {A} → List (Row A) → Pos → Bool
 properᵇ rs q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q ≼ᵇ c) }) rs
@@ -222,16 +226,22 @@ lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ⊕ [ ix 1 ])) λ l 
 
 -- `EmissionSet.Merge.JoinT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
-  done : Pos → Bool
-  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
+  -- The outer's ends, found once and passed on: read per lane end, a
+  -- merge with a lane per value of a whole run is otherwise quadratic.
+  module Ended (oe : List Pos) where
+    done : Pos → Bool
+    done c = endAmong oe c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
 
-  laneRow : Row B → Row B
-  laneRow (c , end) = c , (if done c then end else skip)
-  laneRow r         = r
+    laneRow : Row B → Row B
+    laneRow (c , end) = c , (if done c then end else skip)
+    laneRow r         = r
+
+    merged : Listed B
+    merged = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , _ , l) → mapL laneRow (rows l) }) ls)
+           ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 
   mergeRows : Listed B
-  mergeRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , _ , l) → mapL laneRow (rows l) }) ls)
-            ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
+  mergeRows = Ended.merged (ends (rows o))
 open MergeL public using (mergeRows)
 
 -- `EmissionSet.Scan.ScanT`: level by level, as `Values.Nth` counts, each
@@ -276,19 +286,30 @@ open ScanL public using (scanRows)
 
 -- `EmissionSet.TakeWhile.TakeT`.
 module TakeL {A : Set} (incl : Bool) (keep : A → Bool) (o : Listed A) where
-  failed : Pos → Bool
-  failed k = anyᵇ (λ { (q , a) → not (keep a) ∧ (q <ᵖ k) }) (values (rows o))
+  -- The failing values' positions, found once rather than per row: a
+  -- takeWhile over a whole run is otherwise quadratic in it.
+  failAt : Pos × A → List Pos
+  failAt (q , a) = when (not (keep a)) q
+
+  failures : List Pos
+  failures = concatMap failAt (values (rows o))
+
+  failed : List Pos → Pos → Bool
+  failed fs k = anyᵇ (_<ᵖ k) fs
 
   kept : Row A → List (Row A)
   kept (q , out a) = if keep a then [ q , out a ] else when incl (q ⊕ [ ix 0 ] , out a) ++ [ q ⊕ [ last ] , end ]
   kept r           = [ r ]
 
-  takeRow : Row A → List (Row A)
-  takeRow (q , pin r) = when (not (failed r) ∧ inside r q) (q , pin r)
-  takeRow (q , e)     = if failed q then [] else kept (q , e)
+  takeRow : List Pos → Row A → List (Row A)
+  takeRow fs (q , pin r) = when (not (failed fs r) ∧ inside r q) (q , pin r)
+  takeRow fs (q , e)     = if failed fs q then [] else kept (q , e)
+
+  takeWith : List Pos → Listed A
+  takeWith fs = concatMap (takeRow fs) (rows o) ⊣ short o
 
   takeRows : Listed A
-  takeRows = concatMap takeRow (rows o) ⊣ short o
+  takeRows = takeWith failures
 open TakeL public using (takeRows)
 
 -- `EmissionSet.Switch.JoinT`, each value's lane listed at its subscription.
@@ -446,20 +467,25 @@ module ConnL {A B : Set} (p : Pos) (σ : Listed A) (β : Listed B) where
   r : Pos
   r = p ⊕ [ ix 1 ]
 
-  alive : Pos → Bool
-  alive q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q <ᵖ c) }) (rows β)
+  -- Before every end of the body, its ends found once rather than per
+  -- source row: a connect reading a whole run is otherwise quadratic in it.
+  alive : List Pos → Pos → Bool
+  alive es q = allᵇ (q <ᵖ_) es
 
   -- Unsubscribed, a source row shows only while the body runs, a pin
   -- only whose connect it subscribed while the body ran.
-  unsub : Row A → List (Row B)
-  unsub (k , pin p′) = when (alive p′ ∧ inside p′ k) (k ⊕ [ ix 0 ] , pin p′)
-  unsub (k , _)      = when (alive k) (k ⊕ [ ix 0 ] , skip)
+  unsub : List Pos → Row A → List (Row B)
+  unsub es (k , pin p′) = when (alive es p′ ∧ inside p′ k) (k ⊕ [ ix 0 ] , pin p′)
+  unsub es (k , _)      = when (alive es k) (k ⊕ [ ix 0 ] , skip)
 
-  shown : Row A → List (Row B)
-  shown (k , e) = if inside r k then [ k ⊕ [ ix 0 ] , pin p ] else unsub (k , e)
+  shown : List Pos → Row A → List (Row B)
+  shown es (k , e) = if inside r k then [ k ⊕ [ ix 0 ] , pin p ] else unsub es (k , e)
+
+  connWith : List Pos → Listed B
+  connWith es = (rows β ++ concatMap (shown es) (rows σ)) ⊣ (short σ ∨ short β)
 
   connRows : Listed B
-  connRows = (rows β ++ concatMap shown (rows σ)) ⊣ (short σ ∨ short β)
+  connRows = connWith (ends (rows β))
 open ConnL public using (connRows)
 
 ------------------------------------------------------------------------

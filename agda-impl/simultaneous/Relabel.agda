@@ -27,14 +27,14 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
 open import denotation.Read using (Visible; After; cursor)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; Idle; Rest; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; Routing; Early; Valued; opos)
 open import simultaneous.Readings using (rootOf)
 open import denotation.Laws.Worlds using (_⊑_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count)
 
 ------------------------------------------------------------------------
 -- Same marks

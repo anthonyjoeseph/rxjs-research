@@ -36,13 +36,13 @@ open import denotation.EmissionSet
   ended; late; Den; enter; After; LaneOf; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; properᵇ; ends; allᵇ; _≼ᵇ_; values; fuel; horizon; walk;
+  using (Row; Listed; _⊣_; rows; short; concatMap; when; endAmong; proper; properᵇ; ends; allᵇ; _≼ᵇ_; values; fuel; horizon; walk;
   mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes; afterL;
   module MergeL; module TakeL; module ConnL; listT)
 open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; fromT; fromNot; offT; not-T; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
-  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to; afterL-exact)
+  values⁻; values⁺; endBy→; →endBy; endAmong-ends; proper→; →proper; lanes-from; lanes-to; afterL-exact; ends⁺; ends⁻)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
 open import quickcheck.Tabled.Exact.Switch using (switch-exact)
 open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
@@ -169,7 +169,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
   (ls-to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   where
   open Tb.Merge fD t
-  open MergeL o ls using (done; laneRow)
+  open MergeL.Ended o ls (ends (rows o)) using (done; laneRow)
 
   private
     exo : Exact o t
@@ -185,12 +185,12 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     out-of m = sound exo (values⁻ (proj₁ (ls-from m)))
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x _ qc _ →
+    done→ c e = endBy→ exo {c} (trans (sym (endAmong-ends (rows o) c)) (proj₁ (∧-true {endAmong (ends (rows o)) c} e))) , λ x _ qc _ →
       let (l , m) = ls-to (values⁺ (complete exo x))
-      in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
+      in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endAmong (ends (rows o)) c} e)) m))
 
     →done : ∀ c → Done c → done c ≡ true
-    →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
+    →done c ((c₀ , x , le) , lanes) = ∧-intro (trans (endAmong-ends (rows o) c) (→endBy exo {c₀} {c} x le)) (all⁺ {xs = ls} λ { {q , a , l} m →
       or-of (q <ᵖ c) λ qc → let (c′ , y , le′) = lanes (out-of m) tt (Equivalence.from T-≡ qc) (λ ()) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → JoinT c (if done c then end else skip)
@@ -274,21 +274,22 @@ merge-exact fD {t} o ls eo from to u = record { sound = sound-m ; complete = com
 
 module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) (o : Listed A) (ex : Exact o t) where
   open Tb.TakeWhile incl keep t
-  open TakeL incl keep o using (failed; takeRow)
+  open TakeL incl keep o using (failures; failed; takeRow)
 
   private
     false-of : ∀ {b} → T (not b) → b ≡ false
     false-of {false} _ = refl
 
-    failed→ : ∀ k → failed k ≡ true → Failed k
-    failed→ k e with any⁻ {xs = values (rows o)} e
-    ... | ((q , a) , m , h) = let (nk , qk) = ∧-true h in
-      q , a , sound ex (values⁻ m) , Equivalence.from T-≡ nk , Equivalence.from T-≡ qk
+    failed→ : ∀ k → failed failures k ≡ true → Failed k
+    failed→ k e with any⁻ {xs = failures} e
+    ... | (q , m , qk) with cm⁻ {xs = values (rows o)} m
+    ... | ((_ , a) , vm , h) with when⁻ {b = not (keep a)} h
+    ... | (nk , refl) = q , a , sound ex (values⁻ vm) , Equivalence.from T-≡ nk , Equivalence.from T-≡ qk
 
-    →failed : ∀ k → Failed k → failed k ≡ true
-    →failed k (q , a , x , nk , qk) = any⁺ (values⁺ (complete ex x)) (∧-intro (fromT nk) (fromT qk))
+    →failed : ∀ k → Failed k → failed failures k ≡ true
+    →failed k (q , a , x , nk , qk) = any⁺ (cm⁺ (values⁺ (complete ex x)) (when⁺ (fromT nk))) (fromT qk)
 
-    unfailed : ∀ k → failed k ≡ false → ¬ Failed k
+    unfailed : ∀ k → failed failures k ≡ false → ¬ Failed k
     unfailed k nf F = offT nf (Equivalence.from T-≡ (→failed k F))
 
     kept-row : ∀ {k e₀ q e} → t k e₀ → ¬ Failed k → Tb.Unpinned e₀ → (q , e) ∈ TakeL.kept incl keep o (k , e₀) → TakeT q e
@@ -306,17 +307,17 @@ module TakeX {A : Set} (incl : Bool) (keep : A → Bool) (t : EmissionSet A) (o 
     kept-row {e₀ = end} x nF _ h with single⁻ h
     ... | refl = tend x nF
 
-    unpinned-t : ∀ {k e₀ q e} → t k e₀ → Tb.Unpinned e₀ → (q , e) ∈ (if failed k then [] else TakeL.kept incl keep o (k , e₀)) → TakeT q e
-    unpinned-t {k} x un h with if⁻ {b = failed k} h
+    unpinned-t : ∀ {k e₀ q e} → t k e₀ → Tb.Unpinned e₀ → (q , e) ∈ (if failed failures k then [] else TakeL.kept incl keep o (k , e₀)) → TakeT q e
+    unpinned-t {k} x un h with if⁻ {b = failed failures k} h
     ... | inj₁ (_ , ())
     ... | inj₂ (nf , h′) = kept-row x (unfailed k nf) un h′
 
-    row-t : ∀ {k e₀ q e} → t k e₀ → (q , e) ∈ takeRow (k , e₀) → TakeT q e
+    row-t : ∀ {k e₀ q e} → t k e₀ → (q , e) ∈ takeRow failures (k , e₀) → TakeT q e
     row-t {e₀ = out _} x h = unpinned-t x tt h
     row-t {e₀ = skip}  x h = unpinned-t x tt h
     row-t {e₀ = end}   x h = unpinned-t x tt h
     row-t {k} {e₀ = Tb.pin r} x h with when⁻ h
-    ... | (c , refl) with ∧-true {not (failed r)} c
+    ... | (c , refl) with ∧-true {not (failed failures r)} c
     ... | (nf , ins) = left x (λ F → not-T nf (Equivalence.from T-≡ (→failed r F))) (Equivalence.from T-≡ ins)
 
   sound-t : ∀ {q e} → (q , e) ∈ rows (takeRows incl keep o) → TakeT q e
@@ -346,15 +347,26 @@ module ConnX {A B : Set} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Lis
   (eσ : Exact σl (Tb.Connect.σ sD F p)) (eβ : Exact βl (Tb.Connect.β sD F p))
   where
   open Tb.Connect sD F p using (r; Alive; ConnT; body; burst; echo; kept)
-  open ConnL p σl βl using (alive; unsub; shown)
+  open ConnL p σl βl using () renaming (alive to aliveAt; unsub to unsubAt; shown to shownAt)
 
   private
+    es : List Pos
+    es = ends (rows βl)
+
+    alive : Pos → Bool
+    alive = aliveAt es
+
+    unsub : Row A → List (Row B)
+    unsub = unsubAt es
+
+    shown : Row A → List (Row B)
+    shown = shownAt es
+
     alive→ : ∀ q → alive q ≡ true → Alive q
-    alive→ q e x = Equivalence.from T-≡ (all⁻ e (complete eβ x))
+    alive→ q e x = Equivalence.from T-≡ (all⁻ {p = q <ᵖ_} e (ends⁺ (complete eβ x)))
 
     →alive : ∀ q → Alive q → alive q ≡ true
-    →alive q h = all⁺ {xs = rows βl} λ
-      { {c , end} m → fromT (h (sound eβ m)) ; {c , out _} m → refl ; {c , skip} m → refl ; {c , Tb.pin _} m → refl }
+    →alive q h = all⁺ {p = q <ᵖ_} {xs = es} λ m → fromT (h (sound eβ (ends⁻ {rs = rows βl} m)))
 
     not-of : ∀ {b} → b ≡ false → T (not b)
     not-of refl = tt

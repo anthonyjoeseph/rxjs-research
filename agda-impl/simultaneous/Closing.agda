@@ -38,7 +38,7 @@ open import denotation.Laws.Modulus using (≺-trans; ≺-absurd; ≼-refl; ≼-
 open import denotation.Simultaneity using (between)
 open import simultaneous.InstEmit using (instEmit; value; mark; completed; valuesOf)
 import simultaneous.InstEmit as Marks
-open import simultaneous.SObs using (SObs; plain; Batching; batching; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; Batching; batching; lone; module Elaborate)
 open import simultaneous.Readings using (stamped; closed; instantOf; rootOf)
 open import simultaneous.Protocol using (nameStep; lastBegin; subStep; seenSub; Fresh; fresh-all; lb-snoc; ss-snoc; lb-view; seen-sub; named; sub-async; done-last; module Leaves; module Split)
 open import simultaneous.Shut using (r₀)
@@ -55,7 +55,7 @@ open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run
 open import simultaneous.Batcher using (released; released-held; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; Step; bstep; bstart; pending; pendingOf; asEmits; mark-step; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; Step; bstep; bstart; pending; pendingOf; asEmits; mark-step; Routes; count)
 
 ------------------------------------------------------------------------
 -- The protocol, read off the elaborated run
@@ -518,15 +518,15 @@ postulate
              → pending (proj₁ (after bstart (values (unrank rx)))) ≡ [] → lastValue valuesOf rx ≡ just q
              → Release o (unrank rx) q
 
--- The completion mark comes before the end: the run's last `of` is
--- the completion's, which completes as it emits.
+-- The completion mark comes before the end: the run's takeWhile ends
+-- one label under the mark, the first emit it fails.
 postulate
   done-end : ∀ {A : Set} (o : SObs [] A) {k m} → elaborated o k (out (instEmit (mark completed) m))
            → Σ Pos λ c → elaborated o c end × k ≺ c
 
 -- Past the subscribe mark, finitely many rows of the subscribe frame:
 -- the mark is the frame's last emit, and what the frame does past it is
--- the completion of the mark's own `of`.
+-- its lane's close and the merge's outer end.
 postulate
   sub-rest : ∀ {A : Set} (o : SObs [] A) {k m} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
            → Σ (List Pos) λ ks → ∀ {y e} → elaborated o y e → k ≺ y → instantOf y ≡ frame → y ∈ ks

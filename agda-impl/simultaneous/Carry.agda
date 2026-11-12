@@ -54,7 +54,7 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-≼-≺; ≺-ext)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-inside;
   inside-⊑; ∙-inj; InvAt)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
@@ -62,7 +62,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Attribution; Int
 open import denotation.Position using (_≟ᵖ_)
 open import simultaneous.Listing using (Listed; Listing)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 open Equivalence using (to; from)
 
 ------------------------------------------------------------------------
