@@ -48,8 +48,9 @@ jobs:
   gate:
     runs-on: ubuntu-latest
     # A cold interface cache rechecks the stdlib and the whole adequacy
-    # tower, and runs to 30; a job killed there saves no cache.
-    timeout-minutes: 45
+    # tower, and runs past 45; a job killed there saves no cache, so every
+    # rerun is cold again.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
