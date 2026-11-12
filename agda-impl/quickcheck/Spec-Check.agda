@@ -40,7 +40,7 @@ module quickcheck.Spec-Check where
 open import Agda.Builtin.IO using (IO)
 open import Agda.Builtin.Unit using () renaming (⊤ to Unit)
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; not; if_then_else_)
-open import Data.List using (List; []; _∷_; upTo; length; deduplicate; filter) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; upTo; length; filter; foldr) renaming (map to mapL)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
@@ -53,12 +53,12 @@ open import Data.String using (String) renaming (_++_ to _+++_)
 open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
 open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
-open import Relation.Nullary using (does; ¬?)
+open import Relation.Nullary using (does)
 import Data.Nat
 
 open import Tree using (Obs; cold; empty; map; flatMap; of; mergeᶠ; connect; connected; takeWhile; merge)
 open import denotation.Events using (Timeline; fixed; From∞; done; at; emit; close; fresh)
-open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_; frame)
+open import denotation.Position using (_≟ⁱ_; Instant; Pos; root; _≟ᵖ_; _<ᵖ_; frame)
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin)
@@ -69,7 +69,7 @@ open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupSta
 open import simultaneous.Relations using (values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ)
+open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ; anyᵇ)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
@@ -105,24 +105,42 @@ both l with whole l
 ------------------------------------------------------------------------
 -- Stamps
 
+-- Every instant a listing meets, with the positions of its rows there:
+-- grouped once per listing rather than once per value ranked.
+Groups : Set
+Groups = List (Instant × List Pos)
+
+byInstant : ∀ {A} → Rows A → Groups
+byInstant = foldr (λ r → file (instantOf (proj₁ r)) (proj₁ r)) []
+  where
+    file : Instant → Pos → Groups → Groups
+    file i q []              = (i , q ∷ []) ∷ []
+    file i q ((j , qs) ∷ gs) = if does (i ≟ⁱ j) then (j , q ∷ qs) ∷ gs else (j , qs) ∷ file i q gs
+
 -- `Relations.Rank`: the subscribe frame and the instants of the rows
 -- before `q`, its own excluded, counted once each.
-rankIn : ∀ {A} → Rows A → Pos → ℕ
-rankIn all q = length (deduplicate _≟ⁱ_ (filter (λ i → ¬? (i ≟ⁱ instantOf q)) (frame ∷ mapL (λ r → instantOf (proj₁ r)) (filter (λ r → T? (proj₁ r <ᵖ q)) all))))
+rankIn : Groups → Pos → ℕ
+rankIn gs q = (if does (frame ≟ⁱ instantOf q) then 0 else 1) + length (filter (λ g → T? (counted g)) gs)
+  where
+    counted : Instant × List Pos → Bool
+    counted (i , qs) = not (does (i ≟ⁱ frame)) ∧ not (does (i ≟ⁱ instantOf q)) ∧ anyᵇ (_<ᵖ q) qs
 
 -- `Relations.stampedᴰ`: the plain run's values, each with its stamp.
 stampsᴰ : Both ℕ → List (ℕ × ℕ)
-stampsᴰ (met , all) = mapL (λ { (q , a) → rankIn all q , a }) (outs met)
+stampsᴰ (met , all) = stampsWith (byInstant all)
+  where
+    stampsWith : Groups → List (ℕ × ℕ)
+    stampsWith gs = mapL (λ { (q , a) → rankIn gs q , a }) (outs met)
 
 -- `Relations.stampedᴮ`: an elaborated run's values, marks dropped, or a
 -- batched run's batches, each with the stamp of the row carrying it.
 stampsᴮ : ∀ {A : Set} → Both (IE A) → List (ℕ × A)
-stampsᴮ {A} (met , all) = go (outs met)
+stampsᴮ {A} (met , all) = go (byInstant all) (outs met)
   where
-    go : List (Pos × IE A) → List (ℕ × A)
-    go []                                = []
-    go ((q , instEmit (value a) _) ∷ xs) = (rankIn all q , a) ∷ go xs
-    go (_ ∷ xs)                          = go xs
+    go : Groups → List (Pos × IE A) → List (ℕ × A)
+    go gs []                                = []
+    go gs ((q , instEmit (value a) _) ∷ xs) = (rankIn gs q , a) ∷ go gs xs
+    go gs (_ ∷ xs)                          = go gs xs
 
 ------------------------------------------------------------------------
 -- The three statements, decided over whole runs

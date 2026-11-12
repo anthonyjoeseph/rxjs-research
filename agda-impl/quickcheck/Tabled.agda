@@ -446,20 +446,25 @@ module ConnL {A B : Set} (p : Pos) (σ : Listed A) (β : Listed B) where
   r : Pos
   r = p ⊕ [ ix 1 ]
 
-  alive : Pos → Bool
-  alive q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q <ᵖ c) }) (rows β)
+  -- Before every end of the body, its ends found once rather than per
+  -- source row: a connect reading a whole run is otherwise quadratic in it.
+  alive : List Pos → Pos → Bool
+  alive es q = allᵇ (q <ᵖ_) es
 
   -- Unsubscribed, a source row shows only while the body runs, a pin
   -- only whose connect it subscribed while the body ran.
-  unsub : Row A → List (Row B)
-  unsub (k , pin p′) = when (alive p′ ∧ inside p′ k) (k ⊕ [ ix 0 ] , pin p′)
-  unsub (k , _)      = when (alive k) (k ⊕ [ ix 0 ] , skip)
+  unsub : List Pos → Row A → List (Row B)
+  unsub es (k , pin p′) = when (alive es p′ ∧ inside p′ k) (k ⊕ [ ix 0 ] , pin p′)
+  unsub es (k , _)      = when (alive es k) (k ⊕ [ ix 0 ] , skip)
 
-  shown : Row A → List (Row B)
-  shown (k , e) = if inside r k then [ k ⊕ [ ix 0 ] , pin p ] else unsub (k , e)
+  shown : List Pos → Row A → List (Row B)
+  shown es (k , e) = if inside r k then [ k ⊕ [ ix 0 ] , pin p ] else unsub es (k , e)
+
+  connWith : List Pos → Listed B
+  connWith es = (rows β ++ concatMap (shown es) (rows σ)) ⊣ (short σ ∨ short β)
 
   connRows : Listed B
-  connRows = (rows β ++ concatMap shown (rows σ)) ⊣ (short σ ∨ short β)
+  connRows = connWith (ends (rows β))
 open ConnL public using (connRows)
 
 ------------------------------------------------------------------------

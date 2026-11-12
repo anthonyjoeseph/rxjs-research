@@ -42,7 +42,7 @@ open import quickcheck.Tabled
 open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; fromT; fromNot; offT; not-T; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
-  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to; afterL-exact)
+  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to; afterL-exact; ends⁺; ends⁻)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
 open import quickcheck.Tabled.Exact.Switch using (switch-exact)
 open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
@@ -346,15 +346,26 @@ module ConnX {A B : Set} (sD : Den A) (F : Den A → Den B) (p : Pos) (σl : Lis
   (eσ : Exact σl (Tb.Connect.σ sD F p)) (eβ : Exact βl (Tb.Connect.β sD F p))
   where
   open Tb.Connect sD F p using (r; Alive; ConnT; body; burst; echo; kept)
-  open ConnL p σl βl using (alive; unsub; shown)
+  open ConnL p σl βl using () renaming (alive to aliveAt; unsub to unsubAt; shown to shownAt)
 
   private
+    es : List Pos
+    es = ends (rows βl)
+
+    alive : Pos → Bool
+    alive = aliveAt es
+
+    unsub : Row A → List (Row B)
+    unsub = unsubAt es
+
+    shown : Row A → List (Row B)
+    shown = shownAt es
+
     alive→ : ∀ q → alive q ≡ true → Alive q
-    alive→ q e x = Equivalence.from T-≡ (all⁻ e (complete eβ x))
+    alive→ q e x = Equivalence.from T-≡ (all⁻ {p = q <ᵖ_} e (ends⁺ (complete eβ x)))
 
     →alive : ∀ q → Alive q → alive q ≡ true
-    →alive q h = all⁺ {xs = rows βl} λ
-      { {c , end} m → fromT (h (sound eβ m)) ; {c , out _} m → refl ; {c , skip} m → refl ; {c , Tb.pin _} m → refl }
+    →alive q h = all⁺ {p = q <ᵖ_} {xs = es} λ m → fromT (h (sound eβ (ends⁻ {rs = rows βl} m)))
 
     not-of : ∀ {b} → b ≡ false → T (not b)
     not-of refl = tt
