@@ -39,10 +39,9 @@ its annotated source's. Each subterm is listed before the other's image
 by `cover`; open: the same before a LATE carrier, and the source listed
 past its end (pins after it); where a pinned row's late carrier lies
 (a body pin past the body's end), and an echo's under an imaged source
-row; whether an echo's image lies outside the annotation's subscription
-with its elaborated body alive. Settled when each leaf is a body.
+row. Settled when each leaf is a body.
 
-Members: `conn-echo-live`, `conn-pb-pin`, `conn-pb-nested`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-pb-pin`, `conn-pb-nested`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 

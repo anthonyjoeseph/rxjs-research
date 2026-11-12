@@ -29,7 +29,7 @@ open import denotation.Position using (Pos; ix; _⊕_; inside; _≟ᵖ_; root; _
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; _≼_;
   module Connect)
-open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few; ≼-split; ≺-trans; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few; few-ind; ≼-split; ≺-trans; ≺-irrefl; ≼-≺-≺; ≺-≼-≺)
 open import denotation.Laws.BoundedInv using (first-child)
 open import denotation.Laws.Shows using (few-reach)
 open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; _⊑_; ⊑-refl; ⊑-≼; ⊑-trans; ⊕-identityʳ; ⊕-injˡ; inside-⊑; full)
@@ -515,14 +515,56 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     live-u : ∀ {l} → Live CE.β l → Live u l
     live-u lv (CE.body b , _) = lv b
 
-    postulate
-      -- An echo is carried live: the elaborated body is alive past the
-      -- annotation's image where the plain body is past the row.
-      conn-echo-live : ∀ {k l} → EchoImg k l → Live t k → Live u l
+    private
+      -- A carrier of the end shows the end.
+      ended : ∀ {e₀ : Ev B} → Match Every (One valuesOf) (Reads valuesOf) e₀ (end {IE B}) → e₀ ≡ end
+      ended {out _} (c , _) with c tt
+      ... | _ , () , _
+      ended {end}   _       = refl
+      ended {skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
+      ended {pin _} (_ , n) = ⊥-elim (n (λ ()) tt)
+
+      βfew : ∀ {w} → Few CE.ConnT w → Few CE.β w
+      βfew (ks , h) = ks , λ b kw → h (CE.body b) kw
+
+    -- An echo is carried live: the first end of the elaborated body
+    -- before the echo's carrier would carry a plain body end, which the
+    -- order embedding puts before the echo, where the connect is alive.
+    echo-live : ∀ {k l} → EchoImg k l → Live t k → Live u l
+    echo-live {k} {l} (k₀ , l₀ , (_ , x , _) , _ , _ , i , F , refl , refl) lv {c} uc cl =
+      few-ind P step (reach-few {q = c} {e = end} (λ {k₁} {e₁} → full {X = IE B} {q = c} {e = end} tt {k₁} {e₁}) (proj₂ uc)) (proj₁ uc) cl
+      where
+        E : M′ (k₀ ⊕ [ ix 0 ]) (l₀ ⊕ [ ix 0 ])
+        E = inj₂ (k₀ , l₀ , (_ , x) , i , refl , refl)
+
+        P : Pos → Set
+        P w = CE.ConnT w end → w ≺ l → ⊥
+
+        past : ∀ {w k′} → w ≺ l → B′.Img k′ w → CP.β k′ end → ⊥
+        past {w} {k′} wl i′ b′ with ≼-or-≻ k k′
+        ... | inj₂ k′k = lv (CP.body b′ , few-reach {e = end} (few-sub {a = CP.ConnT} {w = k} {v = k′} F k′k)) k′k
+        ... | inj₁ le with ≼-split {k} {k′} le
+        ...   | inj₂ refl = SP.img-body x b′ (⊑-refl _)
+        ...   | inj₁ lt   = ≺-irrefl {l} (≺-trans {l} {w} {l} (proj₁ (ahead-over ah (proj₂ (proj₂ (B′.ext i′))))) wl)
+          where
+            my′ = proj₁ (proj₂ (B′.ext i′))
+            ah : Ahead l (proj₁ (B′.ext i′))
+            ah = Emb.mono emb′ E (inj₁ my′) lt , λ ly → SP.img-body x b′ (Emb.reflect emb′ E (inj₁ my′) ly)
+
+        fin : ∀ {w k′ e₀} → w ≺ l → B′.Img k′ w → CP.β k′ e₀ → Match Every (One valuesOf) (Reads valuesOf) e₀ (end {IE B}) → ⊥
+        fin wl i′ b′ m with ended m
+        ... | refl = past wl i′ b′
+
+        step : ∀ {w} → Few CE.ConnT w → (∀ {v e} → CE.ConnT v e → v ≺ w → P v) → P w
+        step {w} Fw ih (CE.body b) wl =
+          let (_ , i′ , _ , b′ , m) = B′.shown b tt lβ (βfew Fw) in fin wl i′ b′ m
+          where
+            lβ : Live CE.β w
+            lβ {c₂} b₂ c₂w = ih (CE.body b₂) c₂w (CE.body b₂) (≺-trans {c₂} {w} {l} c₂w wl)
 
     live′ : ∀ {k l} → ConnImg k l → Live t k → Live u l
     live′ (inj₁ (i , F)) lv = live-u (B′.live i (body-live F lv))
-    live′ (inj₂ ei)      lv = conn-echo-live ei lv
+    live′ (inj₂ ei)      lv = echo-live ei lv
 
     -- An echo's late carriers: the annotation's carried at the source
     -- row, or imaged there in the burst.
