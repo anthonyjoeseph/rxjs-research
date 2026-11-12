@@ -21,13 +21,13 @@ open import denotation.Laws.Modulus using (entered-reach; entered-few)
 open import denotation.Laws.Fold using (fold)
 open import adequacy.SubOne using (scan-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (HeldD)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same; rest-same)
 open import simultaneous.HeldMap using (module MapRun; mapRows)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; scanIE)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; scanIE)
 
 ------------------------------------------------------------------------
 -- Runs

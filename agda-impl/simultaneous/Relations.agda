@@ -42,14 +42,14 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Proper; Seen; _≺_; enter; ⟦_⟧)
 open import denotation.Read using (Meets; After)
 open import simultaneous.InstEmit using (valuesOf; begin; subscribed)
-open import Tree using (merge; of)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import Tree using (merge; cold)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟_ using (batchSimultaneousᴰ)
 open import simultaneous.Readings using (instantOf; stamped; closed)
 open import simultaneous.Instants using (_≺ⁱ_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (E; IE; elaborate; batchSimultaneous; elab; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; elaborate; batchSimultaneous; elab; marked; completing)
 
 -- The program the author's stands for: elaborated, batched on top.
 batchedObs : ∀ {A} → SObs [] A → E [] (IE (List A))
@@ -63,13 +63,13 @@ events o = enter (⟦ plain o ⟧ []) root
 elaborated : ∀ {A} → SObs [] A → EmissionSet (IE A)
 elaborated o = enter (⟦ elaborate (plain o) ⟧ []) root
 
--- The elaboration's parts: the restamp's start, and the run with the end
--- of its subscribe burst.
+-- The elaboration's parts: the restamp's start, and the run told
+-- completing beside the lane marking the end of its subscribe burst.
 stamp₀ : ∀ {A : Set} → Pos × IE A
 stamp₀ = root , marked begin
 
 sourced : ∀ {A : Set} → SObs [] A → E [] (IE A)
-sourced o = merge (elab (λ i → i) (plain o)) (of (marked subscribed ∷ []))
+sourced o = merge (completing (elab (λ i → i) (plain o))) (cold (lone (marked subscribed)))
 
 batched : ∀ {A} → SObs [] A → EmissionSet (IE (List A))
 batched o = enter (⟦ batchedObs o ⟧ []) root

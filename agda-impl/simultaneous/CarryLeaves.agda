@@ -32,7 +32,7 @@ open import denotation.Events using (Timeline; fresh)
 open import simultaneous.HeldMap using (mapEv)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (here; inW; step; Plain; plain-ix; plain-last; _⊑_; ⊕-identityʳ; ⊑-refl; ⊑-≼; ⊑-trans; ⊑-snoc⁺)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
@@ -40,7 +40,7 @@ open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
 open import simultaneous.Carry using (Bare; Carry; CarryAt; Emb; Fresh; PMap; Within; _∪ᴹ_; _⊆ᴹ_; carry; emb-under; instant-⊕; NotHot; Grown; joins-grow)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; mapIE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 
 -- Positions one label under a common prefix.
 private
@@ -277,10 +277,11 @@ carry-empty n ρ = carry λ envP envE _ _ M₀ e₀ er jn _ p p′ m₀ _ _ nh f
 ------------------------------------------------------------------------
 -- The whole run
 
--- Where `elaborate` subscribes the elaborated program: past its restamp,
--- the first lane of its concat and the first of its merge.
+-- Where `elaborate` subscribes the elaborated program: past its restamp
+-- and its takeWhile, the first lane of its merge, and that lane's
+-- connect's source.
 coreAt : Pos
-coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
 
 -- The plain run's subscription paired with the core's: one pair, in
 -- neither world.

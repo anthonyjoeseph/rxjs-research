@@ -45,7 +45,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Readings using (instantOf; stamped; closed)
 open import simultaneous.Relations using (Met; values; ranked; Rank; Before; stampedᴮ; events; elaborated; batched; batchedObs)
 open import simultaneous.Instants using (_≺ⁱ_; Sorted; irrⁱ; transⁱ; triⁱ; frame-least; insertⁱ; sorted-insert; ∈-insert⁻; ∈-insert⁺; sorted-⊆; sorted-⊂; ≺-instant; instant-≺)
@@ -53,7 +53,7 @@ open import simultaneous.Protocol using (named)
 open import simultaneous.Listing using (Listed; Listing; listed)
 import simultaneous.Spec as Spec
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elaborate)
 open Equivalence using (to; from)
 
 ------------------------------------------------------------------------

@@ -80,7 +80,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_; z≤n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
@@ -88,6 +88,7 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
 open import denotation.Events using (Timeline; From; fixed)
+import denotation.Events as Evs
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
 
 -- An author's cold: a timeline fixed relative to its subscription.
@@ -177,7 +178,14 @@ private
   ext ρ (here p)  = here p
   ext ρ (there i) = there (ρ i)
 
-module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (name : N) (mint : C N) where
+-- A leaf emitting its value as it is subscribed, then silent forever.
+lone : ∀ {A} → A → Timeline A
+lone a = fixed (Evs.at 0 z≤n (Evs.emit a (Evs.close silence)))
+  where
+    silence : ∀ {A t} → Evs.From∞ A t
+    silence .Evs.From∞.force = Evs.quiet
+
+module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (name : N) (mint : C N) (once : ∀ {A} → A → C A) where
 
   -- What the engine runs: the author's leaves.
   E : List Set → Set → Set₁
@@ -555,13 +563,29 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   restamp (n , _) (instEmit (mark begin) m) = m , instEmit (mark begin) m
   restamp (n , _) (instEmit ev _)           = n , instEmit ev n
 
-  -- The run, then the end of its subscribe burst, then its completion,
-  -- each told by a mark: a batcher reads the elaborated program as the
-  -- source of its own scan, subscribed where the program alone would be,
-  -- so the names it mints are the program's own.
+  -- Any emit but the completion mark.
+  unfinished : ∀ {A} → IE A → Bool
+  unfinished (instEmit (mark completed) _) = false
+  unfinished _                             = true
+
+  -- The run, its completion told by a mark as it completes: read through
+  -- its own subject by a concat queueing the mark, so the mark leaves
+  -- from the run's completion, even where its subscription never returns.
+  completing : ∀ {Δ A} → E Δ (IE A) → E Δ (IE A)
+  completing s = connect s (concatˢ (connected (here refl)) (of (marked completed ∷ [])))
+
+  -- The closed run, then the end of its subscribe burst, told by a mark
+  -- from a lane that never ends, so the program ends at the completion
+  -- mark and there only: the subscribe mark follows it only if the run
+  -- is still going as its subscription returns.
+  wrapped : ∀ {Δ A} → E Δ (IE A) → E Δ (IE A)
+  wrapped s = takeWhile true unfinished (merge (completing s) (cold (once (marked subscribed))))
+
+  -- A batcher reads the elaborated program as the source of its own scan,
+  -- subscribed where the program alone would be, so the names it mints
+  -- are the program's own.
   elaborate : ∀ {Γ A} → Obs C Γ A → E (L.map AIE Γ) (IE A)
-  elaborate o = map proj₂ (scan restamp (name , marked begin)
-    (concatˢ (merge (elab (λ i → i) o) (of (marked subscribed ∷ []))) (of (marked completed ∷ []))))
+  elaborate o = map proj₂ (scan restamp (name , marked begin) (wrapped (elab (λ i → i) o)))
 
   ------------------------------------------------------------------------
   -- The batcher

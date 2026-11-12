@@ -46,7 +46,7 @@ open import denotation.Laws using (inv-approx; inv-⟦⟧) renaming (from to wit
 open import denotation.Laws.Truth using (Opens; Finite; few-ag)
 open import denotation.Laws.Truthful using (reached; never-lies; finite-true)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import simultaneous.Relations using (Rank; Before; Over; Left; elaborated; events)
 open import simultaneous.Ranks using (enter-few; visible-unpinned)
@@ -58,7 +58,7 @@ open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreA
 open import simultaneous.CarryWrap using (carry-wrap)
 open import simultaneous.Carried using (carry-approx)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 open Values using (Nth)
 open Equivalence using (to; from)
 

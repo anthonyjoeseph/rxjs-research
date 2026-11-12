@@ -42,7 +42,7 @@ open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws.Modulus using (≼-split; ≼-antisym; ≼-refl; ≺→≼; ≼-trans; ≼-≺-≺; ≺-trans; few-ind)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Readings using (stamped)
 open import simultaneous.Relations using (Met; ranked; Rank; values; outs; vals; stampedᴮ; stampedᴰ; carried; Over; Closes; Ends; Erases;
   elaborated; events)
@@ -53,7 +53,7 @@ open import simultaneous.Project using (run-prefix)
 open import simultaneous.Attribution using (Live; Single; V; vrow)
 open import simultaneous.Approximants using (VX; VE; single-values; erase-x; erase-e; erase-rank; erase-over; erase-end)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 open Values using (Nth; Next; first; next)
 open Equivalence using (to; from)
 

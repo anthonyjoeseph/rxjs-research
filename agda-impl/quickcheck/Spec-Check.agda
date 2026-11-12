@@ -62,7 +62,7 @@ open import denotation.Position using (_≟ⁱ_; Pos; root; _≟ᵖ_; _<ᵖ_; fr
 open import denotation.EmissionSet using (Ev; end)
 open import simultaneous.Readings using (instantOf; stamped)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 import simultaneous.Spec as Grouping
 open Grouping _≟ᵖ_ using (batchSimultaneousᴰ)
 open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupStamps)
@@ -73,7 +73,7 @@ open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; a
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; batchSimultaneous)
 
 ------------------------------------------------------------------------
 -- Listings

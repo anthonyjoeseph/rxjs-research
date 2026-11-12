@@ -20,11 +20,11 @@ open import denotation.Position using (root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; out)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count)
 
 -- No route yet.
 r₀ : Routes

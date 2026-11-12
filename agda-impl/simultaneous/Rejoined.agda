@@ -25,12 +25,12 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
   Truncate; Rejoin; shown; heard; ended; late; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-≼-≺; ≺→≼; ≼-split)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-snoc; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ; here)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Carry using (HotsListed; Apart; annValues; apart; hots-at)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate; joinStep)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; joinStep)
 
 -- No row of `S` lies strictly under another.
 Flat : ∀ {A} → EmissionSet A → Set

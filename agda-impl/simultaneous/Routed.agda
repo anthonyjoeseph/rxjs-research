@@ -47,14 +47,14 @@ open import denotation.Read using (Visible; After; cursor)
 open import Data.Maybe using (nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
 open import denotation.Laws.Worlds using (Ok; _⊑_)
 open import Data.Empty using (⊥)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count)
 
 ------------------------------------------------------------------------
 -- What a stream holds

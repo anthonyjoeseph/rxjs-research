@@ -3,8 +3,8 @@
 -- THE RUN'S PROTOCOL, READ OFF ITS POSITIONS: what the batcher needs of
 -- the elaborated run, one emit at a time, from where the emits sit.
 -- An instant is an interval of positions (`between`), each emit is named
--- for its instant, the subscribe mark sits once, at the end of the
--- subscribe frame, an instant's values come before its overs and every
+-- for its instant, the subscribe mark sits at most once, at the end of
+-- the subscribe frame, an instant's values come before its overs and every
 -- value before the completion.  The run meets the visible rows in
 -- position order, so each of these is a fact of the run.
 module simultaneous.Protocol where
@@ -32,7 +32,7 @@ open import denotation.Read using (Run; _∷_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-≼-≺)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 import simultaneous.InstEmit as Marks
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Routed using (Held; Valued; opos)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
@@ -41,7 +41,7 @@ open import denotation.Simultaneity using (between)
 open import simultaneous.Relations using (Met; values; elaborated)
 open import simultaneous.Layers using (at-func; run-tail; run-after; run-row; run-has; from≺)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 
 ------------------------------------------------------------------------
 -- The run as the batcher reads it
@@ -219,8 +219,8 @@ module Split {A : Set} where
 -- The positions of an elaborated program's emits
 
 -- THE INSTANT STRUCTURE: every emit is named for its instant, and the
--- begins of one instant name it alike; the subscribe mark sits once, before every
--- begin, every value past it async, and every value precedes the
+-- begins of one instant name it alike; the subscribe mark sits at most
+-- once, before every begin, every value past it async, and every value precedes the
 -- completion.
 postulate
   named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k

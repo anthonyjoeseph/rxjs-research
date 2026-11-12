@@ -32,9 +32,9 @@ open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
-open import simultaneous.SObs using (Flat; flat; outerB; laneB; closeB; isZero; module Elaborate)
+open import simultaneous.SObs using (Flat; flat; outerB; laneB; closeB; isZero; lone; module Elaborate)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; Out; Input; react; onMark; begun; entered; anew; bump;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Out; Input; react; onMark; begun; entered; anew; bump;
   share; stopped; overed; cut; unpark; arrive; ended; burstOver; left; stops; anyHolds; setAt)
 
 ------------------------------------------------------------------------

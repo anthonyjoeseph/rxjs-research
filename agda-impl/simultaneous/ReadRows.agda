@@ -41,7 +41,7 @@ open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; �
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊑-≼; full)
 open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-rows; of-in; of-row; of-reach; of-idx; of-end-row; ine-pin)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark; begin; over; stop; outerOpen; outerClose;
   laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed)
 open import simultaneous.Attribution using (Live; Shown; Carried; Match; Every; One; Reads)
@@ -50,7 +50,7 @@ open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFo
 open import simultaneous.Carry using (Kin; k-out; k-skip; k-pin; k-end; apart; sub-listed; annValues)
 open import simultaneous.Rejoined using (Flat; nest; few-reach)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; joinStep; joins)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep; joins)
 
 ------------------------------------------------------------------------
 -- A fold's emits: marks, then the emit folded in

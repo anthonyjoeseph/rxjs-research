@@ -22,7 +22,7 @@ open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhil
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
-open import simultaneous.SObs using (SObs; plain; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
@@ -40,7 +40,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -67,7 +67,7 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
-open import denotation.Laws.Worlds using (InvAt; ok-step; _⊑_; ⊑-trans)
+open import denotation.Laws.Worlds using (ok-step; _⊑_; ⊑-trans)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -561,9 +561,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
-  IM : InvAt (Hots env′) P M
-  IM = inv-ev m src env′ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) P ok₃
-
   comb-runs : ∀ {rx} → Met M rx → RunHeld cs′ (outRows op init rx)
   comb-runs {rx} mt = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
     where
@@ -628,9 +625,6 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
                (ci : CombIn op (enter (ev m s ρ) P) cs) where
   M = enter (ev m s ρ) P
   S = enter (ev m (each proj₂ (scan (react op) init s)) ρ) P
-
-  IM : InvAt (Hots ρ) P M
-  IM = inv-ev m s ρ g P ok
 
   open Reached (ev m (each proj₂ (scan (react op) init s)) ρ) P (inv-ev m (each proj₂ (scan (react op) init s)) ρ g P ok) using (reach)
 

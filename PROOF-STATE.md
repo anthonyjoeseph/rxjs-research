@@ -34,14 +34,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Suspected false: `wrap-merge` under a synchronous hang past the core's
-end — plain ends, the merge's end lies past infinitely many rows (rxjs
-agrees), so the spec's completion clause fails too; awaits Anthony's
-ruling. Otherwise probed, unproven: each former's elaborated run
-carries its plain one (`Carry`) along an order embedding. Settled when
-each former's leaf is a body.
+Probed, unproven: each former's elaborated run carries its plain one
+(`Carry`) along an order embedding; each wrapper stage moves only the
+end — the close past the completion mark, the take under it. Settled
+when each former's leaf is a body.
 
-Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-merge`, `wrap-concat`.
+Members: `carry-connect`, `carry-flatMap`, `carry-cold`, `wrap-close`, `wrap-take`.
 
 #### THE PROTOCOL
 

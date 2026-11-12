@@ -39,8 +39,8 @@ open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
 
-open import simultaneous.SObs using (module Elaborate)
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE)
+open import simultaneous.SObs using (lone; module Elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
 ------------------------------------------------------------------------
 -- Positions

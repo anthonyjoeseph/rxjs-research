@@ -28,7 +28,7 @@ open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; �
 open import denotation.Laws.Cut using (ix-asc; ix-back)
 open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib; W⁼; leads; ⊑-snoc; ⊑-≼)
 open import denotation.Laws using (aft; inv-approx)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
@@ -37,7 +37,7 @@ open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; 
   Ahead; ahead-under; bound-hot)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
 ------------------------------------------------------------------------
 -- The bottom approximant

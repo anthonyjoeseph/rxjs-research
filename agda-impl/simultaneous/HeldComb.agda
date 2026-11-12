@@ -29,7 +29,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
-open import simultaneous.SObs using (Flat; flat; module Elaborate)
+open import simultaneous.SObs using (Flat; flat; lone; module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++)
 open import Data.List.Properties using (foldl-++; ++-assoc)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ)
@@ -40,7 +40,7 @@ open import simultaneous.Routed using (Carried; c-end)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle; Rest)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; Routes; count; Out; Input; react; each)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Out; Input; react; each)
 
 ------------------------------------------------------------------------
 -- What the scan lays out

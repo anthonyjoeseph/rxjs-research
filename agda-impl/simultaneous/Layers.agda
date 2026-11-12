@@ -15,9 +15,10 @@ open import Data.List.Relation.Unary.Any using (here; there) renaming (map to an
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; s≤s)
+open import Data.Nat using (ℕ; suc)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; T; not; true; false; if_then_else_)
+open import Relation.Nullary using (¬_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Unit using (tt)
@@ -26,13 +27,14 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂; trans; sym; subst)
 
-open import Tree using (Obs; scan; map; of)
+open import Tree using (Obs; scan; map; of; takeWhile; merge; cold)
 open import denotation.Position using (Pos; Path; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-apart; <ᵖ-between; <ᵖ-part; ix-<)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE; at-out; on-out; Seen; Reach; Dep; Ended; LaneOf; module Merge; module Bounded; module Values; MapT; map-out; map-end; map-skip; map-pin)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; _≺_; _≼_; enter; ⟦_⟧; module Scan; Den; module Op; InE;
+  at-out; on-out; on-skip; Seen; Reach; Dep; Ended; LaneOf; module Merge; module TakeWhile;
+  MapT; map-out; map-end; map-skip; map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws using (inv-⟦⟧)
-open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.Worlds using (InvAt; PinBy; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-end; of-end-row; of-idx; of-rows; of-in; of-reach)
 open import denotation.Laws.Modulus using (≼-split; ≼-antisym; entered-reach; entered-few; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-≼-≺; ≼-trans; ≼-or-≻; ≺-ext)
@@ -40,10 +42,10 @@ open import denotation.Laws.Fold using (fold)
 open import adequacy.SubOne using (scan-reach; map-reach; lift-in)
 open import adequacy.Complete using (reach)
 open import adequacy.Simulated using () renaming (cursor to simulated)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++; Ends)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (each; concatˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (each)
 
 -- A closed program's emission set, subscribed at the root.
 at : ∀ {A} → Obs Timeline [] A → EmissionSet A
@@ -652,145 +654,100 @@ map-back : ∀ {A B} (g : A → B) (s : Obs Timeline [] A) {rx} → Met (at (map
 map-back g s = MapLayer.out-go g s
 
 ------------------------------------------------------------------------
--- A concat
+-- A takeWhile
 
--- A CONCAT'S LAST VALUE IS ITS SECOND PART'S: a concat of a program
--- with a lone value that completes has met that value last.  It ends
--- only once its second lane has, whose value it has met; the first lane
--- ended before the second started, and shows nothing past its end.
-module ConcatLayer {X : Set} (s : Obs Timeline [] X) (c : X) where
+-- A TAKEWHILE'S LAST VALUE FAILS: an inclusive takeWhile of a source that
+-- never ends ends only at a failing value, so a run of it that ends has
+-- met that value last.  Its end is the first failure's, whose kept copy
+-- it has met, and past that failure nothing passes.
+module TakeLayer {X : Set} (keep : X → Bool) (s : Obs Timeline [] X) (endless : ∀ {c} → at s c end → ⊥) where
+  open TakeWhile true keep (at s) using (TakeT; Failed; pass; fail; stop; tend)
+
+  K = at (takeWhile true keep s)
+
+  -- Past a failing value's kept copy, no value is met.
+  past-fail : ∀ {q a k x} → at s q (out a) → T (not (keep a)) → ¬ Failed q → K k (out x) → (q ⊕ [ ix 0 ]) ≺ k → ⊥
+  past-fail {q} {a} xq na nf (pass {k} _ _ nk , _) lt = nk (q , a , xq , na , ≺-trans {q} {q ⊕ [ ix 0 ]} {k} (≺-ext q {ix 0} []) lt)
+  past-fail {q} {a} xq na nf (fail {q′} xq′ na′ nf′ _ , _) lt with ≼-or-≻ q′ q
+  ... | inj₂ qq′ = nf′ (q , a , xq , na , qq′)
+  ... | inj₁ q′q with ≼-split {q′} {q} q′q
+  ...   | inj₁ lt′  = nf (q′ , _ , xq′ , na′ , lt′)
+  ...   | inj₂ refl = ≺-irrefl {q ⊕ [ ix 0 ]} lt
+
+  -- A list of rows with no value has no values.
+  quiet-values : ∀ (zs : List (Pos × Ev X)) → (∀ {k x} → (k , out x) ∈ zs → ⊥) → values zs ≡ []
+  quiet-values []                 _ = refl
+  quiet-values ((k , out x) ∷ zs) h = ⊥-elim (h (here refl))
+  quiet-values ((k , skip) ∷ zs)  h = quiet-values zs (λ m → h (there m))
+  quiet-values ((k , end) ∷ zs)   h = quiet-values zs (λ m → h (there m))
+  quiet-values ((k , pin _) ∷ zs) h = quiet-values zs (λ m → h (there m))
+
+  take-last′ : ∀ {sc} → Met K sc → Ends sc → Σ (List X) λ vs → Σ X λ x → values sc ≡ vs ++ [ x ] × T (not (keep x))
+  take-last′ {sc} m en with snoc-view sc
+  ... | inj₁ refl with en
+  ...   | ()
+  take-last′ {sc} m en | inj₂ (ys , (qe , e) , refl) with ends-last ys m en
+  ... | refl with run-row m (∈-++⁺ʳ ys (here refl))
+  ...   | (tend xe _ , _) , _ = ⊥-elim (endless xe)
+  ...   | (stop {q} {a} xq na nf , (ks , rq)) , _ with ∈-∃++ inRun
+    where
+      kf = q ⊕ [ ix 0 ]
+      kfq : kf ≺ (q ⊕ [ last ])
+      kfq = to≺ kf (q ⊕ [ last ]) (<ᵖ-part q {ix 0} {last} [] [] refl)
+      rowF : K kf (out a)
+      rowF = fail xq na nf tt , ks , λ {k′} y lt _ → rq y (≺-trans {k′} {kf} {q ⊕ [ last ]} lt kfq) tt
+      inRun : (kf , out a) ∈ (ys ++ [ (q ⊕ [ last ] , end) ])
+      inRun = run-has (at-func (takeWhile true keep s)) m rowF tt tt (≺→≼ {kf} {q ⊕ [ last ]} kfq) (∈-++⁺ʳ ys (here refl))
+  ...     | as , zs , eq = values as , a ,
+    trans (cong values eq) (trans (values-++ as ((q ⊕ [ ix 0 ] , out a) ∷ zs)) (cong (λ w → values as ++ a ∷ w) (quiet-values zs past))) , na
+    where
+      kf = q ⊕ [ ix 0 ]
+      tl : Run K (just kf) zs
+      tl = subst (λ w → Run K w zs) (cursor-snoc nothing as)
+             (run-tail (as ++ [ (kf , out a) ]) (subst (Run K nothing) (trans eq (sym (++-assoc as [ (kf , out a) ] zs))) m))
+      past : ∀ {k x} → (k , out x) ∈ zs → ⊥
+      past mem = past-fail xq na nf (proj₁ (run-row tl mem)) (run-after tl mem)
+
+take-last : ∀ {X} (keep : X → Bool) (s : Obs Timeline [] X) → (∀ {c} → at s c end → ⊥) → ∀ {sc} → Met (at (takeWhile true keep s)) sc → Ends sc
+          → Σ (List X) λ vs → Σ X λ x → values sc ≡ vs ++ [ x ] × T (not (keep x))
+take-last keep s endless = TakeLayer.take-last′ keep s endless
+
+------------------------------------------------------------------------
+-- Beside a lone
+
+-- A PROGRAM MERGED WITH A LONE NEVER ENDS: a merge ends only once every
+-- lane has, and a lone, after its value, is silent forever.
+module LoneLayer {X : Set} (s : Obs Timeline [] X) (a : X) where
   bs : List Bool
   bs = true ∷ false ∷ []
 
   F : Bool → Den X
-  F b = ⟦ if b then s else of [ c ] ⟧ []
+  F b = ⟦ if b then s else cold (lone a) ⟧ []
 
   O = enter (Op.of bs) root
 
-  module B = Bounded 1 F O
-  module V = Values O
-  open Nths O using (nth-val; nth-fun; nth-inj)
+  open Merge F O using (Done; oend; lend; lane; run; rend)
 
-  C = at (concatˢ s (of [ c ]))
+  lone-endless : ∀ {p c} → enter (F false) p c end → ⊥
+  lone-endless (on-out (on-skip ()) , _)
 
-  q₀ q₁ : Pos
-  q₀ = root ⊕ [ ix 0 ]
+  q₁ : Pos
   q₁ = root ⊕ [ ix 1 ]
-
-  o-val : ∀ {q a} → O q (out a) → (q ≡ q₀ × a ≡ true) ⊎ (q ≡ q₁ × a ≡ false)
-  o-val (at-out , _)                 = inj₁ (refl , refl)
-  o-val (on-out at-out , _)          = inj₂ (refl , refl)
-  o-val (on-out (on-out ()) , _)
-
-  x₀ : O q₀ (out true)
-  x₀ = at-out , of-reach root 0 bs {q₀} {out true}
 
   x₁ : O q₁ (out false)
   x₁ = on-out at-out , of-reach root 0 bs {q₁} {out false}
 
-  nth₀ : V.Nth 0 q₀ true
-  nth₀ = V.first x₀ λ y → mn y
-    where
-      mn : ∀ {k b} → O k (out b) → q₀ ≼ k
-      mn y with o-val y
-      ... | inj₁ (refl , _) = ≼-refl {q₀}
-      ... | inj₂ (refl , _) = ≺→≼ {q₀} {q₁} tt
+  undone : ∀ {c} → Done c → ⊥
+  undone {c} ((c₀ , xo , c₀c) , lanes) with of-end root 0 bs (proj₁ xo)
+  ... | refl with lanes x₁ tt (≺-≼-≺ {q₁} {root ⊕ [ last ]} {c} tt c₀c) (λ ())
+  ...   | _ , (yL , _) , _ = lone-endless yL
 
-  nth₁ : V.Nth 1 q₁ false
-  nth₁ = V.next nth₀ x₁ tt nx
-    where
-      nx : ∀ {k b} → O k (out b) → q₀ ≺ k → q₁ ≼ k
-      nx y lt with o-val y
-      ... | inj₁ (refl , _) = ⊥-elim (≺-irrefl {q₀} lt)
-      ... | inj₂ (refl , _) = ≼-refl {q₁}
+  endless′ : ∀ {c} → at (merge s (cold (lone a))) c end → ⊥
+  endless′ (oend _ d , _)         = undone d
+  endless′ (lend _ _ _ _ _ d , _) = undone d
+  endless′ (lane _ _ _ _ () , _)
+  endless′ (run () _ , _)
+  endless′ (rend () _ _ , _)
 
-  IM = inv-⟦⟧ s [] (λ ()) (q₀ ⊕ [ ix 1 ]) (tt , λ ())
-
-  -- The first lane, wherever it runs, shows nothing past an end of it.
-  first-quiet : ∀ {i s′ cE k x} → B.Sub i q₀ s′ true → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end → enter (F true) s′ k (out x) → cE ≺ k → ⊥
-  first-quiet (nth , st) yE y lt with nth-inj nth nth₀
-  first-quiet (nth , B.room _) yE y lt | refl = pinby-vis tt (InvAt.quiet IM yE y lt)
-  first-quiet (nth , B.freed () _) yE y lt | refl
-  first-quiet (nth , B.queued () _ _ _ _) yE y lt | refl
-
-  -- An end of the first lane, the lane at its value's second child.
-  first-end : ∀ {cE} → B.Ends 0 [] cE → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end
-  first-end (q , a , s′ , nth , st , (yE , _)) with nth-fun nth nth₀
-  ... | refl with o-val (nth-val nth)
-  ...   | inj₂ (() , _)
-  first-end (q , a , s′ , nth , B.room _ , (yE , _)) | refl | inj₁ (_ , refl) = yE
-  first-end (q , a , s′ , nth , B.freed () _ , (yE , _)) | refl | inj₁ (_ , refl)
-  first-end (q , a , s′ , nth , B.queued () _ _ _ _ , (yE , _)) | refl | inj₁ (_ , refl)
-
-  -- The second lane starts past an end of the first.
-  second-start : ∀ {i s₁} → B.Sub i q₁ s₁ false → Σ Pos λ cE → enter (F true) (q₀ ⊕ [ ix 1 ]) cE end × cE ≺ s₁
-  second-start (nth , st) with nth-inj nth nth₁
-  second-start (nth , B.room (s≤s ())) | refl
-  second-start (nth , B.freed _ (inj₁ (cE , e , lt))) | refl =
-    cE , first-end e , ≺-trans {cE} {q₁} {q₁ ⊕ [ ix 1 ]} lt (≺-ext q₁ {ix 1} [])
-  second-start (nth , B.queued {c′} _ _ (inj₁ (cE , e , refl)) _ _) | refl = cE , first-end e , ≺-ext cE []
-
-  -- Past the second lane's value, every value met is it.
-  past-second : ∀ {i s₁ k x} → B.Sub i q₁ s₁ false → C k (out x) → (s₁ ⊕ [ ix 0 ]) ≺ k → x ≡ c
-  past-second {s₁ = s₁} {k} sub (B.lane ox _ (_ , s′ , sub′ , (y , _)) _ _ , _) lt with o-val ox
-  ... | inj₂ (refl , refl) with proj₁ y
-  ...   | at-out        = refl
-  ...   | on-out ()
-  past-second {s₁ = s₁} {k} sub (B.lane ox _ (_ , s′ , sub′ , (y , _)) _ _ , _) lt | inj₁ (refl , refl) with second-start sub
-  ... | cE , yE , ce = ⊥-elim (first-quiet sub′ yE y (≺-trans {cE} {s₁} {k} ce (≺-trans {s₁} {s₁ ⊕ [ ix 0 ]} {k} (≺-ext s₁ []) lt)))
-  past-second _ (B.run () _ , _) _
-
-  done-of : ∀ {k} → C k end → B.Done k
-  done-of (B.oend _ d , _)           = d
-  done-of (B.lend _ _ _ _ _ d , _)   = d
-  done-of (B.lane _ _ _ _ () , _)
-  done-of (B.run () _ , _)
-  done-of (B.rend () _ _ , _)
-
-  -- The values after a value `c`, each `c`.
-  ends-c : ∀ (zs : List (Pos × Ev X)) → (∀ {k x} → (k , out x) ∈ zs → x ≡ c) → Σ (List X) λ vs → c ∷ values zs ≡ vs ++ [ c ]
-  ends-c [] _ = [] , refl
-  ends-c ((k , out x) ∷ zs) h with h (here refl) | ends-c zs (λ m → h (there m))
-  ... | refl | vs , eq = c ∷ vs , cong (c ∷_) eq
-  ends-c ((k , skip) ∷ zs) h  = ends-c zs (λ m → h (there m))
-  ends-c ((k , end) ∷ zs) h   = ends-c zs (λ m → h (there m))
-  ends-c ((k , pin _) ∷ zs) h = ends-c zs (λ m → h (there m))
-
-  concat-last′ : ∀ {sc} → Met C sc → Ends sc → Σ (List X) λ vs → values sc ≡ vs ++ [ c ]
-  concat-last′ {sc} m en with snoc-view sc
-  ... | inj₁ refl with en
-  ...   | ()
-  concat-last′ {sc} m en | inj₂ (ys , (qe , e) , refl) with ends-last ys m en
-  ... | refl with run-row m (∈-++⁺ʳ ys (here refl))
-  ...   | yq@(jq , (ks , rq)) , _ with done-of yq
-  ...     | dn@((c₀ , xo , c₀q) , lanes) with lanes x₁ (1 , false , nth₁) q₁q (λ ())
-    where
-      q₁q : q₁ ≺ qe
-      q₁q with of-end root 0 bs (proj₁ xo)
-      ... | refl = ≺-≼-≺ {q₁} {root ⊕ [ last ]} {qe} tt c₀q
-  ...       | cL , (i , s₁ , sub , ((yL , _) , _)) , cLq with of-end s₁ 0 [ c ] yL
-  ...         | refl with ∈-∃++ inRun
-    where
-      kc = s₁ ⊕ [ ix 0 ]
-      kcq : kc ≺ qe
-      kcq = ≺-≼-≺ {kc} {s₁ ⊕ [ last ]} {qe} (to≺ kc (s₁ ⊕ [ last ]) (<ᵖ-part s₁ {ix 0} {last} [] [] refl)) cLq
-      rowC : C kc (out c)
-      rowC = B.lane x₁ (1 , false , nth₁) (i , s₁ , sub , ((at-out , of-reach s₁ 0 [ c ] {kc} {out c}) , ≺-ext s₁ [])) (λ ()) tt ,
-             ks , λ {k′} y lt _ → rq y (≺-trans {k′} {kc} {qe} lt kcq) tt
-      inRun : (kc , out c) ∈ (ys ++ [ (qe , end) ])
-      inRun = run-has (at-func (concatˢ s (of [ c ]))) m rowC tt tt (≺→≼ {kc} {qe} kcq) (∈-++⁺ʳ ys (here refl))
-  ...           | as , zs , eq with ends-c zs past
-    where
-      kc = s₁ ⊕ [ ix 0 ]
-      tl : Run C (just kc) zs
-      tl = subst (λ w → Run C w zs) (cursor-snoc nothing as)
-             (run-tail (as ++ [ (kc , out c) ]) (subst (Run C nothing) (trans eq (sym (++-assoc as [ (kc , out c) ] zs))) m))
-      past : ∀ {k x} → (k , out x) ∈ zs → x ≡ c
-      past mem = past-second sub (proj₁ (run-row tl mem)) (run-after tl mem)
-  ...             | vs , eqv = values as ++ vs ,
-    trans (cong values eq) (trans (values-++ as ((s₁ ⊕ [ ix 0 ] , out c) ∷ zs))
-      (trans (cong (values as ++_) eqv) (sym (++-assoc (values as) vs [ c ]))))
-
-concat-last : ∀ {X} (s : Obs Timeline [] X) (c : X) {sc} → Met (at (concatˢ s (of [ c ]))) sc → Ends sc
-            → Σ (List X) λ vs → values sc ≡ vs ++ [ c ]
-concat-last s c = ConcatLayer.concat-last′ s c
+beside-lone : ∀ {X} (s : Obs Timeline [] X) (a : X) {c} → at (merge s (cold (lone a))) c end → ⊥
+beside-lone s a = LoneLayer.endless′ s a

@@ -38,7 +38,7 @@ open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws using (inv-approx)
-open import simultaneous.SObs using (module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark; begin)
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
@@ -49,7 +49,7 @@ open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-o
   module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val;
   carried-val; match-end)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) using (IE; AIE; elab; scanIE; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
 
 -- The label of an elaborated scan: the values of the emit it passes.
 stateValues : ∀ {B : Set} → B × IE B → List B
