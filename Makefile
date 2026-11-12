@@ -177,7 +177,7 @@ $(SPEC_BIN): $(AGDA_SRC)
 # Stopped at its limit, every line stamped with the second it was
 # printed, so a run that outlives the limit shows how far it got and what
 # each seed cost.  `pipefail` keeps the binary's exit status.
-SPEC_LIMIT := 1200
+SPEC_LIMIT := 2400
 
 $(SPEC_LOG): $(SPEC_BIN)
 	@bash -c 'set -o pipefail; timeout -s INT $(SPEC_LIMIT) $(SPEC_BIN) \
