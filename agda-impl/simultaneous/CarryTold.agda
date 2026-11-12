@@ -196,14 +196,8 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     open Told n S x env genv q ok
     module C = CarryAt c
 
-    funcσ : ∀ {l e e′} → σ l e → σ l e′ → e ≡ e′
-    funcσ = InvAt.func (inv-approx n S env genv (q ⊕ [ ix 1 ]) (ok-step q ok))
-
     few-of : ∀ {l} → Listed σ l → Few σ l
     few-of (ks , F , _) = ks , F
-
-    few-row : ∀ {l e} → σ l e → Unpinned e → Few σ l
-    few-row {l} {e} y un = entered-few (approx n S env) (q ⊕ [ ix 1 ]) (λ {k} {e′} → full {q = l} {e = e} un {k} {e′}) y
 
     inst-⊑ : ∀ {l m} → l ⊑ m → instantOf m ≡ instantOf l
     inst-⊑ {l} (zs , refl) = instant-⊕ l zs
@@ -217,7 +211,7 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     mv-⊑ {l} (inj₂ (_ , refl)) = ⊑-refl l
 
     mv-fun : ∀ {l a b} → Mv l a → Mv l b → a ≡ b
-    mv-fun (inj₁ (_ , y , refl)) (inj₁ (_ , y′ , refl)) rewrite funcσ y y′ = refl
+    mv-fun (inj₁ (_ , y , refl)) (inj₁ (_ , y′ , refl)) rewrite InvAt.func invσ y y′ = refl
     mv-fun (inj₁ (_ , y , _))    (inj₂ (n , _))         = ⊥-elim (n y)
     mv-fun (inj₂ (n , _))        (inj₁ (_ , y , _))     = ⊥-elim (n y)
     mv-fun (inj₂ (_ , refl))     (inj₂ (_ , refl))      = refl
@@ -315,17 +309,23 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
         go : ((Σ Pos λ l → C.Img _ l × Σ (Ev Y) λ e′ → σ l e′ × Match Every (One f) (Reads f) e e′) ⊎ e ≡ skip) → ⊥
         go (inj₂ es) = n (inj₂ es)
         go (inj₁ (l , i , pin _ , y , mt)) = n (inj₂ (pin-skip mt un))
-        go (inj₁ (l , i , out a , y , mt)) with imaged i y (few-row y tt)
+        go (inj₁ (l , i , out a , y , mt)) with imaged i y (few-unp y tt)
         ... | e″ , i′ , y′ , tr = n (inj₁ (_ , i′ , e″ , y′ , match-told mt tr))
-        go (inj₁ (l , i , skip , y , mt)) with imaged i y (few-row y tt)
+        go (inj₁ (l , i , skip , y , mt)) with imaged i y (few-unp y tt)
         ... | e″ , i′ , y′ , tr = n (inj₁ (_ , i′ , e″ , y′ , match-told mt tr))
-        go (inj₁ (l , i , end , y , mt)) with imaged i y (few-row y tt)
+        go (inj₁ (l , i , end , y , mt)) with imaged i y (few-unp y tt)
         ... | e″ , i′ , y′ , tr = n (inj₁ (_ , i′ , e″ , y′ , match-told mt tr))
+
+    shown-unp : ∀ {e e′} → Told e e′ → Shown (One f) e′ → Unpinned e
+    shown-unp t-out _ = tt
+    shown-unp t-end _ = tt
+    shown-unp t-skip ()
+    shown-unp (t-pin _) ()
 
     shown′ : ∀ {l e} → τ l e → Shown (One f) e → Live τ l → Few τ l
            → Σ Pos λ k → Img′ k l × Σ (Ev X) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
     shown′ y sh lv fw with told-shown fx y sh
-    ... | l , e , yl , refl , tr with C.shown yl (shown-back tr sh) (told-live← y yl (δ e , refl) (λ {c′} → lv {c′})) (told-few← y yl (δ e , refl) fw)
+    ... | l , e , yl , refl , tr with C.shown yl (shown-back tr sh) (told-live← y yl (δ e , refl) (λ {c′} → lv {c′})) (few-unp yl (shown-unp tr sh))
     ...   | k , i , e₀ , tk , mt = k , (l , i , inj₁ (e , yl , refl)) , e₀ , tk , match-told mt tr
 
     Placed : Pos → Set

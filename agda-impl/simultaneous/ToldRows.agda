@@ -98,9 +98,7 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
     -- synchronous burst of `σ` does not: the told connect cuts its burst
     -- pins there.
     told-listed : ∀ {l e} → σ l e → Listed σ l → Listed τ (l ⊕ δ e)
-    told-live←      : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Live τ m → Live σ l
     told-listed←    : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Listed τ m → Listed σ l
-    told-few←       : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Few τ m → Few σ l
     told-whole      : Whole σ → Whole τ
 
   -- `σ`'s invariant, at the told run's second child.
@@ -476,8 +474,8 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
       go (o-fix m) _ = ∈-++⁺ˡ m
       go (o-row {k} y m) lt = ∈-++⁺ʳ fixedL (∈-concat⁺′ m (∈-map⁺ imgs (h y (imgs-⊑ k m) lt)))
 
-  few-row : ∀ {k e u} {t : EmissionSet Y} → σ k e → Few σ k → k ⊑ u → (∀ {v e′} → t v e′ → Raw v e′) → Few t u
-  few-row {k} y (ks , F) ku rw = few-at rw (k ∷ ks) λ y′ kv vu → pick y′ (img-≼ y′ y kv ku vu)
+  few-under : ∀ {k e u} {t : EmissionSet Y} → σ k e → Few σ k → k ⊑ u → (∀ {v e′} → t v e′ → Raw v e′) → Few t u
+  few-under {k} y (ks , F) ku rw = few-at rw (k ∷ ks) λ y′ kv vu → pick y′ (img-≼ y′ y kv ku vu)
     where
       pick : ∀ {k′ e′} → σ k′ e′ → k′ ≼ k → k′ ∈ k ∷ ks
       pick {k′} y′ le with ≼-split {k′} {k} le
@@ -545,7 +543,7 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
 
   -- A body row under a row of `σ` with few before it.
   τ-under : ∀ {k e u e′} → σ k e → Few σ k → k ⊑ u → Bd.JoinT u e′ → τ u e′
-  τ-under y fk ku j = Cn.body (j , few-reach (few-row y fk ku raw-j)) , few-reach (few-row y fk ku rawC)
+  τ-under y fk ku j = Cn.body (j , few-reach (few-under y fk ku raw-j)) , few-reach (few-under y fk ku rawC)
 
   ------------------------------------------------------------------------
   -- The leaves
@@ -555,8 +553,8 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
   told-row {l} {skip}  y fk = skip , τ-under y fk (⊑-snoc⁺ l) (j-lane0 y fk (shown (proper-unp y tt) tt (w≺ y)) tt) , t-skip
   told-row {l} {end}   y fk = end , subst (λ z → τ z end) (proj₂ (under-c₁ l)) (τ-under y fk (under-c₁ l) (j-end y)) , t-end
   told-row {l} {pin p′} y fk with T-or (inside r l)
-  ... | inj₁ i  = pin q , (Cn.burst y i , few-reach (few-row y fk (⊑-snoc⁺ l) rawC)) , t-pin (inj₂ refl)
-  ... | inj₂ ni = pin p′ , (Cn.kept y (alive-pin y) ni (proj₂ (InvAt.pinned invσ y)) , few-reach (few-row y fk (⊑-snoc⁺ l) rawC)) , t-pin (inj₁ refl)
+  ... | inj₁ i  = pin q , (Cn.burst y i , few-reach (few-under y fk (⊑-snoc⁺ l) rawC)) , t-pin (inj₂ refl)
+  ... | inj₂ ni = pin p′ , (Cn.kept y (alive-pin y) ni (proj₂ (InvAt.pinned invσ y)) , few-reach (few-under y fk (⊑-snoc⁺ l) rawC)) , t-pin (inj₁ refl)
 
   -- An image split at its last label.
   lab : Ev Y → Label
@@ -704,3 +702,9 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
   told-live-at : ∀ {l} → Live σ l → Live τ l
   told-live-at {l} lv tc with ends-raw (raw tc)
   ... | k , y′ , refl = ≼-trans {l} {k} {c₁ k} (lv y′) (⊑-≼ {k} {c₁ k} (under-c₁ k))
+
+  told-live← : ∀ {m e′ l e} → τ m e′ → σ l e → l ⊑ m → Live τ m → Live σ l
+  told-live← {l = l} _ y (zs , refl) lv {c} yc with ≼-or-≻ l c
+  ... | inj₁ le = le
+  ... | inj₂ lt = ⊥-elim (lv tc (img-≺ yc y lt (δ end) zs))
+    where tc = proj₁ (proj₂ (told-row yc (few-unp yc tt)))
