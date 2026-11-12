@@ -41,7 +41,7 @@ past its end (pins after it); whether an echo's image lies outside the
 annotation's subscription with its elaborated body alive. Settled when
 each leaf is a body.
 
-Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-echo-live`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 

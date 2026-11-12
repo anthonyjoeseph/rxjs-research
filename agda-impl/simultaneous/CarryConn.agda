@@ -398,6 +398,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
   module CE = Connect sE FE p′
   module A′ = CarryAt c_a
   module SP = Cuts.Side {s = sP} {F = FP} IsP IFP p okP
+  module SE = Cuts.Side {s = sE} {F = FE} IsE IFE p′ okE
 
   module RP = Rows {s = sP} {F = FP} IsP IFP p okP
   module PL = ConnLists {s = sP} {F = FP} IsP IFP p okP
@@ -457,10 +458,10 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- image: one label down on the annotation's carrier.
     SrcPB : Pos → Pos → Set
     SrcPB k l = Σ Pos λ k₀ → Σ Pos λ l₀ → Σ (Ev A) (CP.σ k₀) × ((A′.Img k₀ l₀ × T (inside r k₀)) ⊎ A′.PB k₀ l₀)
-              × k ≡ k₀ ⊕ [ ix 0 ] × l ≡ l₀ ⊕ [ ix 0 ]
+              × k ≡ k₀ ⊕ [ ix 0 ] × l ≡ l₀ ⊕ [ ix 0 ] × Σ (Ev (AIE A)) (CE.σ l₀)
 
     PB′ : Pos → Pos → Set
-    PB′ k l = (B′.PB k l × Σ (Ev B) (CP.β k)) ⊎ SrcPB k l
+    PB′ k l = (B′.PB k l × Σ (Ev B) (CP.β k) × Σ (Ev (IE B)) (CE.β l)) ⊎ SrcPB k l
 
     ext′ : ∀ {k l} → ConnImg k l → Σ Pos λ y → M′ k y × y ⊑ l
     ext′ (inj₁ (i , _)) with B′.ext i
@@ -487,7 +488,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
 
     pb-img′ : ∀ {k l l′} → PB′ k l → ConnImg k l′ → ⊥
     pb-img′ (inj₁ (pb , _)) (inj₁ (i , _)) = B′.pb-img pb i
-    pb-img′ (inj₁ (_ , _ , b)) (inj₂ (_ , _ , (_ , x , _) , _ , _ , _ , _ , refl , _)) = SP.img-body x b (⊑-refl _)
+    pb-img′ (inj₁ (_ , (_ , b) , _)) (inj₂ (_ , _ , (_ , x , _) , _ , _ , _ , _ , refl , _)) = SP.img-body x b (⊑-refl _)
     pb-img′ (inj₂ (_ , _ , (_ , x) , _ , refl , _)) (inj₁ (i , _)) = B′.img-row i λ { (_ , y , _) → SP.img-body x y (⊑-refl _) }
     pb-img′ (inj₂ (k₀ , _ , _ , w , e , _)) (inj₂ (k₁ , _ , _ , _ , ni , i′ , _ , e′ , _)) with ⊕-injˡ k₀ k₁ (trans (sym e) e′)
     pb-img′ (inj₂ (_ , _ , _ , inj₁ (_ , ins) , _ , _)) (inj₂ (k₀ , _ , _ , _ , ni , _ , _ , _ , _)) | refl = nin {r} {k₀} ni ins
@@ -526,8 +527,29 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- given the body alive there; a pin's reach waits only on its
     -- connect's past, so a body ended between its pin's connect and it is
     -- seen by no row of the connect.
+    -- An echo's late carriers: the annotation's carried at the source
+    -- row, or imaged there in the burst.
+    from-src : ∀ {j e₁} → CE.σ j e₁ → Σ (List Pos) λ ks → ∀ {k} → PB′ k (j ⊕ [ ix 0 ]) → k ∈ ks
+    from-src {j} y = L.map (_⊕ [ ix 0 ]) (A′.bk j ++ proj₁ (A′.pb-few y)) , mem
+      where
+        mem : ∀ {k} → PB′ k (j ⊕ [ ix 0 ]) → k ∈ L.map (_⊕ [ ix 0 ]) (A′.bk j ++ proj₁ (A′.pb-few y))
+        mem (inj₁ (_ , _ , (_ , bl))) = ⊥-elim (SE.img-body y bl (⊑-refl _))
+        mem (inj₂ (k₀ , l₀ , _ , w , refl , eq , _)) with ⊕-injˡ j l₀ eq
+        ... | refl with w
+        ...   | inj₁ (i , _) = ∈-map⁺ (_⊕ [ ix 0 ]) (∈-++⁺ˡ (A′.in-bk i))
+        ...   | inj₂ pb      = ∈-map⁺ (_⊕ [ ix 0 ]) (∈-++⁺ʳ (A′.bk j) (proj₂ (A′.pb-few y) pb))
+
+    -- The late carriers a row of the elaborated connect carries: a body
+    -- row's, the body's; an echo's, the annotation's, one label up.
+    pb-few′ : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB′ k l → k ∈ ks
+    pb-few′ {l} (CE.body b , _) with B′.pb-few b
+    ... | ks , h = ks , λ { (inj₁ (pb , _)) → h pb
+                          ; (inj₂ (_ , l₀ , _ , _ , _ , eq , (_ , y))) → ⊥-elim (SE.img-body y b ([] , trans eq (sym (⊕-identityʳ (l₀ ⊕ [ ix 0 ]))))) }
+    pb-few′ (CE.burst y _ , _)    = from-src y
+    pb-few′ (CE.echo y _ _ _ , _) = from-src y
+    pb-few′ (CE.kept y _ _ _ , _) = from-src y
+
     postulate
-      conn-pb-few : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB′ k l → k ∈ ks
       conn-pb-past : ∀ {k l e₀ e x y} → PB′ k l → t k e₀ → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
       conn-img¬¬ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
                  → ¬ ¬ ((Σ Pos λ l → ConnImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
@@ -719,7 +741,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
       where F = reached tk un
             R = body-row ul Lβ (conn-σ-body (λ n → n (_ , b)) F L lp (inj₁ i) ul Lβ)
     ... | inj₂ (es , ((l , (e″ , ul) , Lβ , pb) , h)) =
-      inj₂ (es , ((l , (e″ , proj₁ R) , proj₂ R , inj₁ (pb , (_ , b))) , body-home b F L lp h))
+      inj₂ (es , ((l , (e″ , proj₁ R) , proj₂ R , inj₁ (pb , (_ , b) , (e″ , ul))) , body-home b F L lp h))
       where F = reached tk un
             R = body-row ul Lβ (conn-σ-body (λ n → n (_ , b)) F L lp (inj₂ pb) ul Lβ)
     conn-img (CP.burst _ _ , _) ()
@@ -732,11 +754,11 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
            , (λ ()) , λ _ → ns)
       where R = echo-row ul₀ L₀ (conn-β-echo x un₀ al ni (reached tk un) L lp lv (inj₁ i) ul₀ L₀) c
     conn-img tk@(CP.echo {k₀} x al un₀ ni , _) un lv L lp | inj₂ (_ , ((l , (_ , ul) , Ll , pb) , h)) with conn-src-carrier x al ni (reached tk un) pb ul
-    ... | e″ , c = inj₂ (refl , ((l ⊕ [ ix 0 ] , (e″ , proj₁ R) , proj₂ R , inj₂ (k₀ , l , (_ , x) , inj₂ pb , refl , refl)) , src-home x al ni L h))
+    ... | e″ , c = inj₂ (refl , ((l ⊕ [ ix 0 ] , (e″ , proj₁ R) , proj₂ R , inj₂ (k₀ , l , (_ , x) , inj₂ pb , refl , refl , (_ , ul))) , src-home x al ni L h))
       where R = echo-row ul Ll (conn-β-echo x un₀ al ni (reached tk un) L lp lv (inj₂ pb) ul Ll) c
 
     carried : CarryAt valuesOf M′ HP HE LP t u p p′
     carried = record
-      { Img = ConnImg ; ext = ext′ ; PB = PB′ ; pb-few = conn-pb-few ; pb-img = pb-img′ ; pb-past = conn-pb-past
+      { Img = ConnImg ; ext = ext′ ; PB = PB′ ; pb-few = pb-few′ ; pb-img = pb-img′ ; pb-past = conn-pb-past
       ; img = conn-img ; img¬¬ = conn-img¬¬ ; shown = conn-shown ; img-row = img-row′ ; img-fun = img-fun′
       ; place = conn-place ; live = live′ ; few = few′ ; whole = conn-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = conn-pinned ; cover = conn-cover }
