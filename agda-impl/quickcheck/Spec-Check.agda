@@ -69,11 +69,11 @@ open Grouping Data.Nat._≟_ using () renaming (batchSimultaneousᴰ to groupSta
 open import simultaneous.Relations using (values; joined; outs)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
-open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ; anyᵇ)
+open import quickcheck.Tabled using (Listed; rows; short; listT; sort; proper; allᵇ; anyᵇ; bind; lanes; afterL; mapRows; scanRows; mergeRows) renaming (values to valuesᵀ)
 open import quickcheck.Trace using (depth)
 open import quickcheck.Ty using (natᵗ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; batchSimultaneous)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate; batchSimultaneous; bstep; bstart)
 
 ------------------------------------------------------------------------
 -- Listings
@@ -229,13 +229,25 @@ groupsᵇ b e = eqGroups (stampsᴮ b) (groupStamps (stampsᴰ e))
 ------------------------------------------------------------------------
 -- One seed
 
--- A seed's three programs: plain, elaborated, batched.
+-- `listT` of `each f` over a run already listed, as its `flatMap`
+-- clause reads it at the root.
+eachL : ∀ {X Y : Set} → ℕ → (X → List Y) → Listed X → Maybe (Listed Y)
+eachL n f o = bind (lanes (afterL (λ a → listT n (of (f a)) [])) (valuesᵀ (rows o))) λ ls → just (mergeRows o ls)
+
+-- `listT` of the batcher over an elaborated run already listed: the
+-- elaboration, which costs most, is listed once for both readings.
+batchL : ℕ → Listed (IE ℕ) → Maybe (Listed (IE (List ℕ)))
+batchL n l = eachL n proj₂ (scanRows bstep bstart l)
+
+-- A seed's programs: plain, and the elaboration, listed once, with the
+-- elaborated and batched listings each read from that one.
 record Three : Set₁ where
   constructor three
   field
     plain      : Obs Timeline [] ℕ
-    elaborated : Obs Timeline [] (IE ℕ)
-    batched    : Obs Timeline [] (IE (List ℕ))
+    core       : Obs Timeline [] (IE ℕ)
+    elaborated : ℕ → Listed (IE ℕ) → Maybe (Listed (IE ℕ))
+    batched    : ℕ → Listed (IE ℕ) → Maybe (Listed (IE (List ℕ)))
 
 data Verdict : Set where
   skipped : Verdict
@@ -250,8 +262,12 @@ record Listings : Set where
     lx : Maybe (Listed (IE ℕ))
     lb : Maybe (Listed (IE (List ℕ)))
 
+-- The core's listing passed in, so it is found once.
+listedOver : ℕ → Three → Maybe (Listed (IE ℕ)) → Listings
+listedOver n (three o _ x b) lc = listings (listT n o [] root) (bind lc (x n)) (bind lc (b n))
+
 listed : ℕ → Three → Listings
-listed n (three o x b) = listings (listT n o [] root) (listT n x [] root) (listT n b [] root)
+listed n t = listedOver n t (listT n (Three.core t) [] root)
 
 judgeL : Listings → Verdict
 judgeL (listings lo lx lb) with both lo | both lx | both lb
@@ -276,8 +292,11 @@ private
   budget : ℕ → ℕ
   budget seed = depth 3 (program seed)
 
+  asIs : ℕ → Listed (IE ℕ) → Maybe (Listed (IE ℕ))
+  asIs _ = just
+
   real : ℕ → Three
-  real seed = let o = plainOf seed in three o (elaborate o) (batchedOf o)
+  real seed = let o = plainOf seed in three o (elaborate o) asIs batchL
 
   restamp : ∀ {A} → IE A → IE A
   restamp x = record x { instant = root }
@@ -294,11 +313,11 @@ private
 
   -- The sabotages, each aimed at one statement.
   emptied unstamped doubled shiftedˣ shiftedᵇ : ℕ → Three
-  emptied seed   = let o = plainOf seed in three o (elaborate o) empty
-  unstamped seed = let o = plainOf seed in three o (map restamp (elaborate o)) (batchedOf o)
-  doubled seed   = let o = plainOf seed in three o (elaborate o) (flatMap (mergeᶠ nothing) (λ e → of (twice e)) (batchedOf o))
-  shiftedˣ seed  = let o = plainOf seed in three o (merge (elaborate o) spare) (batchedOf o)
-  shiftedᵇ seed  = let o = plainOf seed in three o (elaborate o) (merge (batchedOf o) spare)
+  emptied seed   = let o = plainOf seed in three o (elaborate o) asIs (λ n _ → listT n empty [] root)
+  unstamped seed = let o = plainOf seed in three o (elaborate o) (λ _ l → just (mapRows restamp l)) batchL
+  doubled seed   = let o = plainOf seed in three o (elaborate o) asIs (λ n l → bind (batchL n l) (eachL n twice))
+  shiftedˣ seed  = let o = plainOf seed in three o (elaborate o) (λ n _ → listT n (merge (elaborate o) spare) [] root) batchL
+  shiftedᵇ seed  = let o = plainOf seed in three o (elaborate o) asIs (λ n _ → listT n (merge (batchedOf o) spare) [] root)
 
 ------------------------------------------------------------------------
 -- The pinned programs
