@@ -36,13 +36,13 @@ open import denotation.EmissionSet
   ended; late; Den; enter; After; LaneOf; MapT; map-out; map-skip; map-end; DeferT; guard; DenEnv; approx)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; _⊣_; rows; short; concatMap; when; endBy; proper; properᵇ; ends; allᵇ; _≼ᵇ_; values; fuel; horizon; walk;
+  using (Row; Listed; _⊣_; rows; short; concatMap; when; endAmong; proper; properᵇ; ends; allᵇ; _≼ᵇ_; values; fuel; horizon; walk;
   mapRow; mapRows; rejoinRow; rejoin; hotOf; outerRow; mergeRows; connRows; takeRows; lanes; afterL;
   module MergeL; module TakeL; module ConnL; listT)
 open import quickcheck.Tabled.Exact.Base
   using (Exact; Exactly; sound; complete; fromT; fromNot; offT; not-T; T-not; ∨-false; ∧-true; ∧-intro; off; or-of; or-right;
   any⁻; any⁺; any-off; all⁻; all⁺; single⁻; when⁻; when⁺; if⁻; if-t; if-f; cm⁻; cm⁺; bind⁻;
-  values⁻; values⁺; endBy→; →endBy; proper→; →proper; lanes-from; lanes-to; afterL-exact; ends⁺; ends⁻)
+  values⁻; values⁺; endBy→; →endBy; endAmong-ends; proper→; →proper; lanes-from; lanes-to; afterL-exact; ends⁺; ends⁻)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
 open import quickcheck.Tabled.Exact.Switch using (switch-exact)
 open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
@@ -169,7 +169,7 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
   (ls-to : ∀ {q a} → (q , a) ∈ values (rows o) → Σ (Listed B) λ l → (q , a , l) ∈ ls)
   where
   open Tb.Merge fD t
-  open MergeL o ls using (done; laneRow)
+  open MergeL.Ended o ls (ends (rows o)) using (done; laneRow)
 
   private
     exo : Exact o t
@@ -185,12 +185,12 @@ module MergeX {A B : Set} (fD : A → Den B) (t : EmissionSet A) (o : Listed A) 
     out-of m = sound exo (values⁻ (proj₁ (ls-from m)))
 
     done→ : ∀ c → done c ≡ true → Done c
-    done→ c e = endBy→ exo {c} (proj₁ (∧-true {endBy (rows o) c} e)) , λ x _ qc _ →
+    done→ c e = endBy→ exo {c} (trans (sym (endAmong-ends (rows o) c)) (proj₁ (∧-true {endAmong (ends (rows o)) c} e))) , λ x _ qc _ →
       let (l , m) = ls-to (values⁺ (complete exo x))
-      in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endBy (rows o) c} e)) m))
+      in endBy→ (exl m) {c} (or-right (fromT qc) (all⁻ {xs = ls} (proj₂ (∧-true {endAmong (ends (rows o)) c} e)) m))
 
     →done : ∀ c → Done c → done c ≡ true
-    →done c ((c₀ , x , le) , lanes) = ∧-intro (→endBy exo {c₀} {c} x le) (all⁺ {xs = ls} λ { {q , a , l} m →
+    →done c ((c₀ , x , le) , lanes) = ∧-intro (trans (endAmong-ends (rows o) c) (→endBy exo {c₀} {c} x le)) (all⁺ {xs = ls} λ { {q , a , l} m →
       or-of (q <ᵖ c) λ qc → let (c′ , y , le′) = lanes (out-of m) tt (Equivalence.from T-≡ qc) (λ ()) in →endBy (exl m) {c′} {c} y le′ })
 
     end-row : ∀ {c} → t c end → JoinT c (if done c then end else skip)

@@ -105,25 +105,26 @@ both l with whole l
 ------------------------------------------------------------------------
 -- Stamps
 
--- Every instant a listing meets, with the positions of its rows there:
--- grouped once per listing rather than once per value ranked.
+-- Every instant a listing meets, with the earliest position of its rows
+-- there: grouped once per listing rather than once per value ranked, and
+-- a row before `q` exactly when the earliest is.
 Groups : Set
-Groups = List (Instant × List Pos)
+Groups = List (Instant × Pos)
 
 byInstant : ∀ {A} → Rows A → Groups
 byInstant = foldr (λ r → file (instantOf (proj₁ r)) (proj₁ r)) []
   where
     file : Instant → Pos → Groups → Groups
-    file i q []              = (i , q ∷ []) ∷ []
-    file i q ((j , qs) ∷ gs) = if does (i ≟ⁱ j) then (j , q ∷ qs) ∷ gs else (j , qs) ∷ file i q gs
+    file i q []             = (i , q) ∷ []
+    file i q ((j , m) ∷ gs) = if does (i ≟ⁱ j) then (j , (if q <ᵖ m then q else m)) ∷ gs else (j , m) ∷ file i q gs
 
 -- `Relations.Rank`: the subscribe frame and the instants of the rows
 -- before `q`, its own excluded, counted once each.
 rankIn : Groups → Pos → ℕ
 rankIn gs q = (if does (frame ≟ⁱ instantOf q) then 0 else 1) + length (filter (λ g → T? (counted g)) gs)
   where
-    counted : Instant × List Pos → Bool
-    counted (i , qs) = not (does (i ≟ⁱ frame)) ∧ not (does (i ≟ⁱ instantOf q)) ∧ anyᵇ (_<ᵖ q) qs
+    counted : Instant × Pos → Bool
+    counted (i , m) = not (does (i ≟ⁱ frame)) ∧ not (does (i ≟ⁱ instantOf q)) ∧ (m <ᵖ q)
 
 -- `Relations.stampedᴰ`: the plain run's values, each with its stamp.
 stampsᴰ : Both ℕ → List (ℕ × ℕ)
@@ -159,11 +160,6 @@ private
   iff : Bool → Bool → Bool
   iff a b = (a ∧ b) ∨ (not a ∧ not b)
 
-  -- every pair, the earlier first
-  allPairsᵇ : ∀ {X : Set} → (X → X → Bool) → List X → Bool
-  allPairsᵇ r []       = true
-  allPairsᵇ r (x ∷ xs) = allᵇ (r x) xs ∧ allPairsᵇ r xs
-
   -- the batches met, each with the name it carries
   batchesOut : ∀ {A} → Rows (IE (List A)) → List (Pos × List A)
   batchesOut rs = stamped (values rs)
@@ -173,17 +169,27 @@ private
   groupedᴺ : ∀ {A} → Rows (IE A) → List (Pos × List A)
   groupedᴺ rs = batchSimultaneousᴰ (stamped (values rs))
 
-  -- an emit at its position, read as its position and its name
-  named : ∀ {A} → Pos × IE A → Pos × Pos
-  named (p , x) = p , InstEmit.instant x
+  -- an emit read as its name and the instant of its position
+  named : ∀ {A} → Pos × IE A → Pos × Instant
+  named (p , x) = InstEmit.instant x , instantOf p
 
   -- names equal exactly when instants are
-  sameInstant : Pos × Pos → Pos × Pos → Bool
-  sameInstant (p , i) (q , j) = iff (does (i ≟ᵖ j)) (does (instantOf p ≟ⁱ instantOf q))
+  sameInstant : Pos × Instant → Pos × Instant → Bool
+  sameInstant (i , s) (j , t) = iff (does (i ≟ᵖ j)) (does (s ≟ⁱ t))
+
+  same : Pos × Instant → Pos × Instant → Bool
+  same (i , s) (j , t) = does (i ≟ᵖ j) ∧ does (s ≟ⁱ t)
+
+  -- every pair agrees: each emit read against the distinct readings
+  -- before it, which decide every pair it is in, so a run costs its
+  -- length times its instants rather than its length squared
+  agreeing : List (Pos × Instant) → List (Pos × Instant) → Bool
+  agreeing seen []       = true
+  agreeing seen (x ∷ xs) = allᵇ (sameInstant x) seen ∧ agreeing (if anyᵇ (same x) seen then seen else x ∷ seen) xs
 
 -- every pair of emits met agrees
 agreeᵇ : ∀ {A} → Rows (IE A) → Bool
-agreeᵇ rs = allPairsᵇ sameInstant (mapL named (outs rs))
+agreeᵇ rs = agreeing [] (mapL named (outs rs))
 
 -- `Relations.Ends`
 endsᵇ : ∀ {A} → Rows A → Bool

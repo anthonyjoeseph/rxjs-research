@@ -19,7 +19,7 @@ open import Data.Nat.Properties using (m≤n⇒m≤1+n; ≤-trans)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_; does; yes; no)
 
 open import denotation.Events using (<ᵖ-trans; <ᵖ-irrefl)
@@ -28,7 +28,7 @@ open import denotation.EmissionSet using (out; skip; end; EmissionSet; _≺_; _�
 open import denotation.Laws.Nth using (module Nths)
 import denotation.EmissionSet as Tb
 open import quickcheck.Tabled
-  using (Row; Listed; rows; short; bind; concatMap; mapM; concatMapM; when; anyᵇ; allᵇ; endBy; endBefore; ends;
+  using (Row; Listed; rows; short; bind; concatMap; mapM; concatMapM; when; anyᵇ; allᵇ; _≼ᵇ_; endBy; endAmong; endBefore; ends;
   properᵇ; values; lanes; pastRows; afterL; module Order)
 
 ------------------------------------------------------------------------
@@ -225,6 +225,13 @@ ends⁻ {rs = rs} m | ((k , Tb.pin _) , rm , ())
 
 ends⁺ : ∀ {A} {rs : List (Row A)} {c} → (c , end) ∈ rs → c ∈ ends rs
 ends⁺ m = cm⁺ m (here refl)
+
+endAmong-ends : ∀ {A} (rs : List (Row A)) c → endAmong (ends rs) c ≡ endBy rs c
+endAmong-ends []                   c = refl
+endAmong-ends ((k , end) ∷ rs)     c = cong ((k ≼ᵇ c) ∨_) (endAmong-ends rs c)
+endAmong-ends ((k , out _) ∷ rs)   c = endAmong-ends rs c
+endAmong-ends ((k , skip) ∷ rs)    c = endAmong-ends rs c
+endAmong-ends ((k , Tb.pin _) ∷ rs) c = endAmong-ends rs c
 
 endBy→ : ∀ {X : Set} {u : EmissionSet X} {l : Listed X} → Exact l u → ∀ {c} → endBy (rows l) c ≡ true → Σ Pos λ k → u k end × k ≼ c
 endBy→ {l = l} ex e with any⁻ {xs = rows l} e

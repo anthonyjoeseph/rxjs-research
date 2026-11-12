@@ -92,6 +92,10 @@ endBefore rs c = anyᵇ (λ { (k , e) → isEnd e ∧ (k <ᵖ c) }) rs
 ends : ∀ {A} → List (Row A) → List Pos
 ends = concatMap λ { (k , e) → when (isEnd e) k }
 
+-- `endBy` against the end positions, found once rather than per call.
+endAmong : List Pos → Pos → Bool
+endAmong es c = anyᵇ (_≼ᵇ c) es
+
 -- `EmissionSet.Proper`: at or before every end.
 properᵇ : ∀ {A} → List (Row A) → Pos → Bool
 properᵇ rs q = allᵇ (λ { (c , e) → not (isEnd e) ∨ (q ≼ᵇ c) }) rs
@@ -222,16 +226,22 @@ lanes ln = mapM λ qa → bind (ln (proj₂ qa) (proj₁ qa ⊕ [ ix 1 ])) λ l 
 
 -- `EmissionSet.Merge.JoinT`, each value's lane listed at its subscription.
 module MergeL {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) where
-  done : Pos → Bool
-  done c = endBy (rows o) c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
+  -- The outer's ends, found once and passed on: read per lane end, a
+  -- merge with a lane per value of a whole run is otherwise quadratic.
+  module Ended (oe : List Pos) where
+    done : Pos → Bool
+    done c = endAmong oe c ∧ allᵇ (λ { (q , _ , l) → not (q <ᵖ c) ∨ endBy (rows l) c }) ls
 
-  laneRow : Row B → Row B
-  laneRow (c , end) = c , (if done c then end else skip)
-  laneRow r         = r
+    laneRow : Row B → Row B
+    laneRow (c , end) = c , (if done c then end else skip)
+    laneRow r         = r
+
+    merged : Listed B
+    merged = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , _ , l) → mapL laneRow (rows l) }) ls)
+           ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
 
   mergeRows : Listed B
-  mergeRows = (concatMap (outerRow done) (rows o) ++ concatMap (λ { (_ , _ , l) → mapL laneRow (rows l) }) ls)
-            ⊣ (short o ∨ anyᵇ (λ { (_ , _ , l) → short l }) ls)
+  mergeRows = Ended.merged (ends (rows o))
 open MergeL public using (mergeRows)
 
 -- `EmissionSet.Scan.ScanT`: level by level, as `Values.Nth` counts, each
