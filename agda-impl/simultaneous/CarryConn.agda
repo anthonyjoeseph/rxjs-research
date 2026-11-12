@@ -42,7 +42,8 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.CarryBase using (unp-pin; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; From; Ahead; ahead-under; ahead-over; few-sub;
-  sub-listed; instant-⊕)
+  sub-listed; instant-⊕; apart)
+open import denotation.Laws.Count using (⊑?)
 open import simultaneous.Carry using (annValues; PastOver; Anchor)
 open import simultaneous.ReadRows using (up; up-⊕)
 
@@ -523,10 +524,6 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     live′ (inj₁ (i , F)) lv = live-u (B′.live i (body-live F lv))
     live′ (inj₂ ei)      lv = conn-echo-live ei lv
 
-    -- `conn-pb-past`: a body row's late carrier is past the map by the body's carry,
-    -- given the body alive there; a pin's reach waits only on its
-    -- connect's past, so a body ended between its pin's connect and it is
-    -- seen by no row of the connect.
     -- An echo's late carriers: the annotation's carried at the source
     -- row, or imaged there in the burst.
     from-src : ∀ {j e₁} → CE.σ j e₁ → Σ (List Pos) λ ks → ∀ {k} → PB′ k (j ⊕ [ ix 0 ]) → k ∈ ks
@@ -549,8 +546,116 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     pb-few′ (CE.echo y _ _ _ , _) = from-src y
     pb-few′ (CE.kept y _ _ _ , _) = from-src y
 
+    -- A pinned row's late carrier: a body pin may lie past the body's
+    -- end, and a pin's reach waits only on its connect's past, so a body
+    -- ended between its pin's connect and it is seen by no row of the
+    -- connect, and neither carry speaks for the carrier.
+    -- An echo's late carrier past the echo of a source row it lies under:
+    -- the annotation's carry places a late carrier past the images of the
+    -- rows before it and not above it, never under one.
     postulate
-      conn-pb-past : ∀ {k l e₀ e x y} → PB′ k l → t k e₀ → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+      conn-pb-pin : ∀ {k l q e x y} → PB′ k l → t k (pin q) → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+      conn-pb-nested : ∀ {k₀ l₀ k₁ l₁ e₀ e₁ e′} → CP.σ k₀ e₀ → Unpinned e₀ → CP.Alive k₀ → T (not (inside r k₀)) → Live t (k₀ ⊕ [ ix 0 ])
+                     → A′.PB k₀ l₀ → CE.σ l₀ e′ → CP.σ k₁ e₁ → A′.Img k₁ l₁ → k₁ ≺ k₀ → k₁ ⊑ k₀ → ¬ ((k₁ ⊕ [ ix 0 ]) ⊑ k₀)
+                     → Ahead (l₁ ⊕ [ ix 0 ]) (l₀ ⊕ [ ix 0 ])
+
+    private
+      ahead-stable : ∀ {y l} → ¬ ¬ Ahead y l → Ahead y l
+      ahead-stable {y} {l} n = decidable-stable (T? (y <ᵖ l)) (λ m → n (λ a → m (proj₁ a))) , λ yl → n (λ a → proj₂ a yl)
+
+      pin-or : (e : Ev B) → Unpinned e ⊎ Σ Pos λ q → e ≡ pin q
+      pin-or (out _) = inj₁ tt
+      pin-or skip    = inj₁ tt
+      pin-or end     = inj₁ tt
+      pin-or (pin q) = inj₂ (q , refl)
+
+      -- Before a first child and not above it: before its parent, and
+      -- not above that.
+      below-first : ∀ {x y} → x ≺ (y ⊕ [ ix 0 ]) → ¬ (x ⊑ (y ⊕ [ ix 0 ])) → x ≺ y × ¬ (x ⊑ y)
+      below-first {x} {y} xy nx = lt , λ xy′ → nx (⊑-trans xy′ ([ ix 0 ] , refl))
+        where
+          lt : x ≺ y
+          lt with ≼-or-≻ x y
+          ... | inj₂ yx = ⊥-elim (first-child y yx xy)
+          ... | inj₁ le with ≼-split {x} {y} le
+          ...   | inj₁ l′   = l′
+          ...   | inj₂ refl = ⊥-elim (nx ([ ix 0 ] , refl))
+
+    -- A body row's late carrier, the body alive there: past the body's
+    -- points by the body's carry; past an echo apart from the row by the
+    -- body's carry at the echo's source row, and past one above the row
+    -- by the anchor the body nests on that source row.
+    past-body : ∀ {k l e_b e x y} → B′.PB k l → CP.β k e_b → CE.β l e → Live CP.β k → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    past-body pb b ul lβ (inj₁ m) xk nx = B′.pb-past pb b lβ ul m xk nx
+    past-body {k} {l} pb b ul lβ (inj₂ (k₀ , l₀ , (_ , x₀) , i , refl , refl)) xk nx =
+      ahead-stable λ n → A′.img-row i λ (_ , x₁ , un₁) → n (go x₁ un₁)
+      where
+        my = proj₁ (proj₂ (A′.ext i))
+        yl = proj₂ (proj₂ (A′.ext i))
+
+        E : M′ (k₀ ⊕ [ ix 0 ]) (l₀ ⊕ [ ix 0 ])
+        E = inj₂ (k₀ , l₀ , (_ , x₀) , i , refl , refl)
+
+        kk : k₀ ≺ k
+        kk = ≺-trans {k₀} {k₀ ⊕ [ ix 0 ]} {k} (≺-ext k₀ []) xk
+
+        go : ∀ {e₁} → CP.σ k₀ e₁ → Unpinned e₁ → Ahead (l₀ ⊕ [ ix 0 ]) l
+        go x₁ un₁ with ⊑? k₀ k
+        ... | no nk = ahead-under (ahead-under (B′.pb-past pb b lβ ul (ms_b my) kk nk) yl) ([ ix 0 ] , refl)
+        ... | yes ([] , eq) = ⊥-elim (≺-irrefl {k₀} (subst (k₀ ≺_) (trans eq (⊕-identityʳ k₀)) kk))
+        ... | yes (a ∷ σ , eq) with nest pb b lβ (_ , x₁ , src-live x₁ un₁) i eq
+        ...   | x′ , _ , m′ , yl′ , inj₂ kx′ =
+          ahead-over (Emb.mono emb′ E (inj₁ m′) (≺-trans {k₀ ⊕ [ ix 0 ]} {k} {x′} xk kx′) , λ yy → nxx (Emb.reflect emb′ E (inj₁ m′) yy)) yl′
+          where
+            nxx : ¬ ((k₀ ⊕ [ ix 0 ]) ⊑ x′)
+            nxx (σ′ , refl) = ≺-irrefl {k} (≺-trans {k} {_} {k} kx′ (subst (((k₀ ⊕ [ ix 0 ]) ⊕ σ′) ≺_) (⊕-identityʳ k) (apart xk nx σ′ [])))
+        ...   | x′ , _ , m′ , yl′ , inj₁ (ax , xk′) =
+          ahead-over (Emb.mono emb′ E (inj₁ m′) (≺-≼-≺ {k₀ ⊕ [ ix 0 ]} {k₀ ⊕ [ a ]} {x′} ka (⊑-≼ ax)) , λ yy → nx (⊑-trans (Emb.reflect emb′ E (inj₁ m′) yy) xk′)) yl′
+          where
+            ka : (k₀ ⊕ [ ix 0 ]) ≺ (k₀ ⊕ [ a ])
+            ka with ≼-or-≻ (k₀ ⊕ [ ix 0 ]) (k₀ ⊕ [ a ])
+            ... | inj₂ ak = ⊥-elim (first-child k₀ (≺-ext k₀ []) ak)
+            ... | inj₁ le with ≼-split {k₀ ⊕ [ ix 0 ]} {k₀ ⊕ [ a ]} le
+            ...   | inj₁ lt′ = lt′
+            ...   | inj₂ eq′ = ⊥-elim (nx (subst (_⊑ k) (sym eq′) (⊑-trans ax xk′)))
+
+    -- An echo's late carrier: past the body's points by the annotation's
+    -- carry, which a body point before the echo and not above it is
+    -- before the echo's source row and not above it; past another echo's
+    -- by the annotation's carry at that echo's source row.
+    past-echo : ∀ {k₀ l₀ e₀ e′ x y} → CP.σ k₀ e₀ → Unpinned e₀ → CP.Alive k₀ → T (not (inside r k₀)) → Live t (k₀ ⊕ [ ix 0 ])
+              → A′.PB k₀ l₀ → CE.σ l₀ e′ → M′ x y → x ≺ (k₀ ⊕ [ ix 0 ]) → ¬ (x ⊑ (k₀ ⊕ [ ix 0 ])) → Ahead y (l₀ ⊕ [ ix 0 ])
+    past-echo x₀ un al ni lv pb ul (inj₁ m) xk nx with below-first xk nx
+    ... | lt , nk = ahead-over (past-a pb x₀ (src-live x₀ un) ul m lt nk) ([ ix 0 ] , refl)
+    past-echo {k₀} x₀ un al ni lv pb ul (inj₂ (k₁ , l₁ , (_ , x₁) , i , refl , refl)) xk nx with ≼-or-≻ k₀ k₁
+    ... | inj₁ le with ≼-split {k₀} {k₁} le
+    ...   | inj₁ lt   = ⊥-elim (first-child k₀ (≺-trans {k₀} {k₁} {_} lt (≺-ext k₁ [])) xk)
+    ...   | inj₂ refl = ⊥-elim (nx (⊑-refl _))
+    past-echo {k₀} x₀ un al ni lv pb ul (inj₂ (k₁ , l₁ , (_ , x₁) , i , refl , refl)) xk nx | inj₂ k₁k₀ with ⊑? k₁ k₀
+    ... | no nk  = ahead-over (ahead-under (ahead-under (A′.pb-past pb x₀ (src-live x₀ un) ul my k₁k₀ nk) yl) ([ ix 0 ] , refl)) ([ ix 0 ] , refl)
+      where my = proj₁ (proj₂ (A′.ext i))
+            yl = proj₂ (proj₂ (A′.ext i))
+    ... | yes kk = conn-pb-nested x₀ un al ni lv pb ul x₁ i k₁k₀ kk (λ h → nx (⊑-trans h ([ ix 0 ] , refl)))
+
+    -- An unpinned row of the connect carried into its instant one label
+    -- under a source row is that row's echo.
+    past-src : ∀ {k l e₀ x y} → CP.ConnT k e₀ → Unpinned e₀ → Live t k → SrcPB k l → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    past-src (CP.body b) _ _ (_ , l₀ , (_ , x₀) , _ , eq , _) = ⊥-elim (SP.img-body x₀ b ([] , trans eq (sym (⊕-identityʳ _))))
+    past-src (CP.burst _ _) un = ⊥-elim (unp-pin {B} {p} un)
+    past-src (CP.kept {p′ = q} _ _ _ _) un = ⊥-elim (unp-pin {B} {q} un)
+    past-src (CP.echo {k₁} x₁ al un₁ ni) _ lv (k₀ , _ , _ , w , eq , refl , (_ , ul)) with ⊕-injˡ k₁ k₀ eq
+    ... | refl with w
+    ...   | inj₁ (_ , ins) = ⊥-elim (nin {r} {k₁} ni ins)
+    ...   | inj₂ pb        = past-echo x₁ un₁ al ni lv pb ul
+
+    conn-pb-past : ∀ {k l e₀ e x y} → PB′ k l → t k e₀ → Live t k → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
+    conn-pb-past {e₀ = e₀} pb tk lv ul m xk nx with pin-or e₀
+    ... | inj₂ (_ , refl) = conn-pb-pin pb tk lv ul m xk nx
+    conn-pb-past (inj₁ (pb , (_ , b) , (_ , ul))) tk lv _ m xk nx | inj₁ un =
+      past-body pb b ul (body-live (reach-few (full un) (proj₂ tk)) lv) m xk nx
+    conn-pb-past (inj₂ sp) (c , _) lv _ m xk nx | inj₁ un = past-src c un lv sp m xk nx
+
+    postulate
       conn-img¬¬ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
                  → ¬ ¬ ((Σ Pos λ l → ConnImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
       conn-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
