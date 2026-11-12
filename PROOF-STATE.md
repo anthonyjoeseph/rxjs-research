@@ -32,16 +32,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE CONNECT'S CARRY
+
+Probed, unproven: the connect's rows carried from its body's carry and
+its annotated source's. Open: whether an image inside the source's
+subscription lies inside the annotation's, whether an echo's elaborated
+body is alive, and whether the elaborated connect is listed up to an
+echo — no field of `CarryAt` says any. Settled when each leaf is a body,
+over whatever fields the record must gain.
+
+Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`.
+
 #### THE ERASURE
 
-Probed, unproven: each former's elaborated run carries its plain one
-(`Carry`) along an order embedding; the take moves the end under the
-completion mark. Riskiest: the connect's — an image under the source's
-subscription is not known under the annotation's, and an echo's
-elaborated body is not known alive. Settled when each former's leaf is a
-body, over whatever fields the record must gain.
+Probed, unproven: each other former's elaborated run carries its plain
+one (`Carry`) along an order embedding; the take moves the end under the
+completion mark. Settled when each former's leaf is a body.
 
-Members: `conn-carry`, `carry-flatMap`, `carry-cold`, `wrap-take`.
+Members: `carry-flatMap`, `carry-cold`, `wrap-take`.
 
 #### THE PROTOCOL
 
