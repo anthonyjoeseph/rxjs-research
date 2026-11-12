@@ -236,12 +236,26 @@ data Verdict : Set where
   -- left-to-right, coherent, batchable, erasing, grouping
   checked : Bool → Bool → Bool → Bool → Bool → Verdict
 
-judge : ℕ → Three → Verdict
-judge n (three o x b) with both (listT n o [] root) | both (listT n x [] root) | both (listT n b [] root)
+-- A seed's three listings, each found once.
+record Listings : Set where
+  constructor listings
+  field
+    lo : Maybe (Listed ℕ)
+    lx : Maybe (Listed (IE ℕ))
+    lb : Maybe (Listed (IE (List ℕ)))
+
+listed : ℕ → Three → Listings
+listed n (three o x b) = listings (listT n o [] root) (listT n x [] root) (listT n b [] root)
+
+judgeL : Listings → Verdict
+judgeL (listings lo lx lb) with both lo | both lx | both lb
 ... | just ro | just rx | just rb =
   checked (joinsᵇ (proj₁ rb) (proj₁ ro)) (agreeᵇ (proj₁ rx) ∧ agreeᵇ (proj₁ rb)) (batchesᵇ (proj₁ rb) (proj₁ rx))
           (erasesᵇ rx ro) (groupsᵇ rb ro)
 ... | _       | _       | _       = skipped
+
+judge : ℕ → Three → Verdict
+judge n t = judgeL (listed n t)
 
 private
   -- The batcher on top of the elaboration, as `simultaneous.Relations.batchedObs`
@@ -461,12 +475,38 @@ private
   -- each seed judged once, its failures printed as met
   report : List ℕ → Tally → IO Unit
   report []          t = putStrLn ("spec-check: done " +++ showTally t)
-  report (seed ∷ ss) t with judge (budget seed) (real seed)
-  ... | v = progress seed >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+  -- each listing and each check forced on its own line, so the log's
+  -- timestamps show which of them a seed's cost went to
+  report (seed ∷ ss) t = progress seed >>= λ _ → staged (listed (budget seed) (real seed))
     where
       failed : List String → IO Unit
       failed []       = return _
       failed (f ∷ fs) = putStrLn ("spec-check: FAIL seed " +++ showℕ seed +++ words (f ∷ fs) +++ " " +++ showCode natᵗ (program seed))
+
+      stage : String → String → IO Unit
+      stage s r = putStrLn ("spec-check:   " +++ s +++ " " +++ r)
+
+      size : ∀ {A} → Maybe (Listed A) → String
+      size (just l) = showℕ (length (rows l)) +++ " rows"
+      size nothing  = "cut"
+
+      bit : Bool → String
+      bit true  = "ok"
+      bit false = "no"
+
+      checks : Verdict → IO Unit
+      checks skipped             = stage "skipped" ""
+      checks (checked x y z u w) =
+        stage "left-to-right" (bit x) >>= λ _ → stage "coherent" (bit y) >>= λ _ → stage "batchable" (bit z) >>= λ _ →
+        stage "erasing" (bit u) >>= λ _ → stage "grouping" (bit w)
+
+      judged : Verdict → IO Unit
+      judged v = checks v >>= λ _ → failed (fails v) >>= λ _ → report ss (add v t)
+
+      staged : Listings → IO Unit
+      staged ls =
+        stage "plain" (size (Listings.lo ls)) >>= λ _ → stage "elaborated" (size (Listings.lx ls)) >>= λ _ →
+        stage "batched" (size (Listings.lb ls)) >>= λ _ → judged (judgeL ls)
 
   selftest : IO Unit
   selftest =
