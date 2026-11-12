@@ -9,31 +9,36 @@
 module simultaneous.CarryConn where
 
 open import Data.Bool using (T; not)
+open import Data.Bool.Properties using (T?)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_]; _++_; filter)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-filter⁺; ∈-filter⁻)
+open import Data.List.Relation.Unary.All using (All; all?; tabulate; lookup)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; ¬?)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
-open import denotation.Position using (Pos; ix; _⊕_; inside; _≟ᵖ_; root)
+open import denotation.Position using (Pos; ix; _⊕_; inside; _≟ᵖ_; root; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Truncate; Proper; Den; hot; _≺_; _≼_; module Connect)
-open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Truncate; Proper; Den; hot; _≺_; _≼_; module Connect)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few; ≼-split; ≺-trans; ≺-irrefl; ≼-≺-≺)
 open import denotation.Laws.Shows using (few-reach)
 open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; _∪ʰ_; _⊑_; ⊑-refl; ⊕-injˡ; full)
 import denotation.Laws.Connect as LC
+open import denotation.Laws.ConnectNe using (module Rows)
 import denotation.Laws.Truth.Connect.Cuts as Cuts
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; Ahead; few-sub; listed-≼; instant-⊕)
+open import simultaneous.CarryBase using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; Ahead; few-sub; sub-listed; listed-≼; instant-⊕)
+open import simultaneous.ListedIn using (Func)
 open import simultaneous.Carry using (annValues)
 open import simultaneous.ReadRows using (up; up-⊕)
 
@@ -51,6 +56,66 @@ private
   pin-un : ∀ {X : Set} {q} → Unpinned {X} (pin q) → ⊥
   pin-un ()
 
+  -- The positions a listing's rows name, a list for each.
+  gather : (ks : List Pos) → (∀ {k} → k ∈ ks → List Pos) → List Pos
+  gather []       d = []
+  gather (k ∷ ks) d = d (here refl) ++ gather ks (λ m → d (there m))
+
+  gather-sound : ∀ ks (d : ∀ {k} → k ∈ ks → List Pos) {j} → j ∈ gather ks d → Σ Pos λ k → Σ (k ∈ ks) λ m → j ∈ d m
+  gather-sound (k ∷ ks) d m with ∈-++⁻ (d (here refl)) m
+  ... | inj₁ m′ = k , here refl , m′
+  ... | inj₂ m′ with gather-sound ks (λ m → d (there m)) m′
+  ...   | k′ , mk , jd = k′ , there mk , jd
+
+  gather-complete : ∀ ks (d : ∀ {k} → k ∈ ks → List Pos) {k j} (m : k ∈ ks) → j ∈ d m → j ∈ gather ks d
+  gather-complete (k ∷ ks) d (here refl) jd = ∈-++⁺ˡ jd
+  gather-complete (k ∷ ks) d (there m)   jd = ∈-++⁺ʳ (d (here refl)) (gather-complete ks (λ m → d (there m)) m jd)
+
+  -- The end a listed row is.
+  endOf : ∀ {X : Set} → Pos → Ev X → List Pos
+  endOf c end     = [ c ]
+  endOf c (out _) = []
+  endOf c skip    = []
+  endOf c (pin _) = []
+
+  endOf-sound : ∀ {X : Set} c (e : Ev X) {j} → j ∈ endOf c e → j ≡ c × e ≡ end
+  endOf-sound c end (here refl) = refl , refl
+
+  -- A functional set listed: its proper rows listed, a row proper where
+  -- no end listed precedes it.
+  listed-proper : ∀ {X : Set} {t : EmissionSet X} {q} → Func t → Listed t q → Listed (Proper t) q
+  listed-proper {X} {t} {q} f (ks , F , B) = filter keep? ks , cover , back
+    where
+      d : ∀ {k} → k ∈ ks → List Pos
+      d {k} m = endOf k (proj₁ (proj₂ (B m)))
+
+      ends : List Pos
+      ends = gather ks d
+
+      is-end : ∀ {c} → c ∈ ends → t c end
+      is-end m with gather-sound ks d m
+      ... | k , mk , jd with endOf-sound k (proj₁ (proj₂ (B mk))) jd
+      ...   | refl , eq = subst (t k) eq (proj₂ (proj₂ (B mk)))
+
+      has-end : ∀ {c} → t c end → c ≺ q → c ∈ ends
+      has-end {c} x cq = gather-complete ks d (F x cq) (subst (λ e → c ∈ endOf c e) (f x (proj₂ (proj₂ (B (F x cq))))) (here refl))
+
+      keep? : ∀ j → _
+      keep? j = all? (λ c → ¬? (T? (c <ᵖ j))) ends
+
+      cover : ∀ {j e} → Proper t j e → j ≺ q → j ∈ filter keep? ks
+      cover {j} (x , pr) jq = ∈-filter⁺ keep? (F x jq) (tabulate λ {c} mc cj → ≺-irrefl {j} (≼-≺-≺ {j} {c} {j} (pr (is-end mc)) cj))
+
+      back : ∀ {j} → j ∈ filter keep? ks → j ≺ q × Σ (Ev X) (Proper t j)
+      back {j} m with ∈-filter⁻ keep? {xs = ks} m
+      ... | mj , al with B mj
+      ...   | jq , e , x = jq , e , x , pr
+        where
+          pr : ∀ {c} → t c end → j ≼ c
+          pr {c} y with ≼-or-≻ j c
+          ... | inj₁ jc = jc
+          ... | inj₂ cj = ⊥-elim (lookup al (has-end y (≺-trans {c} {j} {q} cj jq)) cj)
+
 module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A → Den B} {sE : Den (AIE A)} {FE : Den (AIE A) → Den (IE B)}
                  (IsP : InvD HP sP) (IFP : ∀ {t} → Lawful t → InvD (HP ∪ʰ t) (FP (hot t)))
                  (IsE : InvD HE sE) (IFE : ∀ {t} → Lawful t → InvD (HE ∪ʰ t) (FE (hot t)))
@@ -60,6 +125,8 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
   module CE = Connect sE FE p′
   module A′ = CarryAt c_a
   module SP = Cuts.Side {s = sP} {F = FP} IsP IFP p okP
+
+  module RP = Rows {s = sP} {F = FP} IsP IFP p okP
 
   Iσ : InvAt HP (p ⊕ [ ix 1 ]) CP.σ
   Iσ = LC.Iσ {s = sP} {F = FP} IsP IFP p okP
@@ -189,12 +256,95 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
                     × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
                        ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
-    -- The rows the connect lists before a row of its own: its body's,
-    -- the hot its body reads, and its source's before an echo.
-    postulate
-      conn-lst-body : ∀ {k e} → CP.β k e → Listed t k → Listed CP.β k
-      conn-lst-hot : ∀ {k e} → CP.β k e → Live CP.β k → Listed t k → Listed (Proper CP.σ) k
-      conn-lst-src : ∀ {k e} → CP.σ k e → CP.Alive k → T (not (inside r k)) → Listed t (k ⊕ [ ix 0 ]) → Listed CP.σ k
+    -- The rows the connect lists before a row it reaches: its body's,
+    -- and its source's wherever each shows below the row.
+    private
+      bodyOf : ∀ {k e} → CP.ConnT k e → List Pos
+      bodyOf {k} (CP.body _)   = [ k ]
+      bodyOf (CP.burst _ _)    = []
+      bodyOf (CP.echo _ _ _ _) = []
+      bodyOf (CP.kept _ _ _ _) = []
+
+      bodyOf-sound : ∀ {k e} (w : CP.ConnT k e) {j} → j ∈ bodyOf w → j ≡ k × Σ (Ev B) (CP.β k)
+      bodyOf-sound (CP.body b) (here refl) = refl , _ , b
+
+      bodyOf-complete : ∀ {k e e′} → CP.β k e → (w : CP.ConnT k e′) → k ∈ bodyOf w
+      bodyOf-complete b (CP.body _)       = here refl
+      bodyOf-complete b (CP.burst x _)    = ⊥-elim (SP.img-body x b (⊑-refl _))
+      bodyOf-complete b (CP.echo x _ _ _) = ⊥-elim (SP.img-body x b (⊑-refl _))
+      bodyOf-complete b (CP.kept x _ _ _) = ⊥-elim (SP.img-body x b (⊑-refl _))
+
+      srcOf : ∀ {k e} → CP.ConnT k e → List Pos
+      srcOf (CP.body _)           = []
+      srcOf (CP.burst {j} _ _)    = [ j ]
+      srcOf (CP.echo {j} _ _ _ _) = [ j ]
+      srcOf (CP.kept {j} _ _ _ _) = [ j ]
+
+      srcOf-sound : ∀ {k e} (w : CP.ConnT k e) {j} → j ∈ srcOf w → Σ (Ev A) (CP.σ j) × k ≡ j ⊕ [ ix 0 ]
+      srcOf-sound (CP.burst x _)    (here refl) = (_ , x) , refl
+      srcOf-sound (CP.echo x _ _ _) (here refl) = (_ , x) , refl
+      srcOf-sound (CP.kept x _ _ _) (here refl) = (_ , x) , refl
+
+      srcOf-complete : ∀ {j e₀ k e} → CP.σ j e₀ → (w : CP.ConnT k e) → k ≡ j ⊕ [ ix 0 ] → j ∈ srcOf w
+      srcOf-complete x (CP.body b) refl                      = ⊥-elim (SP.img-body x b (⊑-refl _))
+      srcOf-complete {j} x (CP.burst {j′} _ _) eq    = here (⊕-injˡ j j′ (sym eq))
+      srcOf-complete {j} x (CP.echo {j′} _ _ _ _) eq = here (⊕-injˡ j j′ (sym eq))
+      srcOf-complete {j} x (CP.kept {j′} _ _ _ _) eq = here (⊕-injˡ j j′ (sym eq))
+
+    body-listed : ∀ {k} → Few CP.ConnT k → Listed t k → Listed CP.β k
+    body-listed {k} Fk (ks , Fl , Bk) = gather ks d , cover , back
+      where
+        d : ∀ {j} → j ∈ ks → List Pos
+        d m = bodyOf (proj₁ (proj₂ (proj₂ (Bk m))))
+
+        cover : ∀ {j e} → CP.β j e → j ≺ k → j ∈ gather ks d
+        cover {j} b jk = gather-complete ks d m (bodyOf-complete b (proj₁ (proj₂ (proj₂ (Bk m)))))
+          where m = Fl (CP.body b , few-reach {e = _} (few-sub {a = CP.ConnT} {w = k} {v = j} Fk jk)) jk
+
+        back : ∀ {j} → j ∈ gather ks d → j ≺ k × Σ (Ev B) (CP.β j)
+        back mj with gather-sound ks d mj
+        ... | _ , mk , jd with bodyOf-sound (proj₁ (proj₂ (proj₂ (Bk mk)))) jd
+        ...   | refl , w = proj₁ (Bk mk) , w
+
+    -- The source rows before a position, each alive and shown below it.
+    src-listed : ∀ {q} → Few CP.ConnT q → Listed t q → (∀ {j e} → CP.σ j e → j ≺ q → CP.Alive j × (j ⊕ [ ix 0 ]) ≺ q) → Listed CP.σ q
+    src-listed {q} Fq (ks , Fl , Bk) sh = gather ks d , cover , back
+      where
+        d : ∀ {j} → j ∈ ks → List Pos
+        d m = srcOf (proj₁ (proj₂ (proj₂ (Bk m))))
+
+        cover : ∀ {j e} → CP.σ j e → j ≺ q → j ∈ gather ks d
+        cover {j} x jq with sh x jq
+        ... | al , jq′ with RP.img x (inj₁ al)
+        ...   | _ , c = gather-complete ks d m (srcOf-complete x (proj₁ (proj₂ (proj₂ (Bk m)))) refl)
+          where m = Fl (c , few-reach {e = _} (few-sub {a = CP.ConnT} {w = q} {v = j ⊕ [ ix 0 ]} Fq jq′)) jq′
+
+        back : ∀ {j} → j ∈ gather ks d → j ≺ q × Σ (Ev A) (CP.σ j)
+        back {j} mj with gather-sound ks d mj
+        ... | k , mk , jd with srcOf-sound (proj₁ (proj₂ (proj₂ (Bk mk)))) jd
+        ...   | w , refl = ≺-trans {j} {j ⊕ [ ix 0 ]} {q} (≺-ext j []) (proj₁ (Bk mk)) , w
+
+    -- A source row before a body row, or another source row, shows below it.
+    below-β : ∀ {j k e₀ e} → CP.σ j e₀ → CP.β k e → j ≺ k → (j ⊕ [ ix 0 ]) ≺ k
+    below-β {j} {k} x b jk with ≼-split {j ⊕ [ ix 0 ]} {k} (Cuts.step≼ {j} {k} jk)
+    ... | inj₁ lt   = lt
+    ... | inj₂ refl = ⊥-elim (SP.img-body x b (⊑-refl _))
+
+    below-σ : ∀ {j k e₀ e} → CP.σ j e₀ → CP.σ k e → j ≺ k → (j ⊕ [ ix 0 ]) ≺ k
+    below-σ {j} {k} x y jk with ≼-split {j ⊕ [ ix 0 ]} {k} (Cuts.step≼ {j} {k} jk)
+    ... | inj₁ lt   = lt
+    ... | inj₂ refl = ⊥-elim (InvAt.flat Iσ x y)
+
+    -- The hot a body row reads, listed before it.
+    hot-listed : ∀ {k e} → CP.β k e → Few CP.ConnT k → Listed t k → Listed (Proper CP.σ) k
+    hot-listed b Fk L = listed-proper (InvAt.func Iσ) (src-listed Fk L λ x jk → RP.alive-β b x jk , below-β x b jk)
+
+    -- The source before an echo's row, listed.
+    src-before : ∀ {k e} → CP.σ k e → CP.Alive k → Few CP.ConnT (k ⊕ [ ix 0 ]) → Listed t (k ⊕ [ ix 0 ]) → Listed CP.σ k
+    src-before {k} x al F L =
+      src-listed (few-sub {a = CP.ConnT} {w = k ⊕ [ ix 0 ]} {v = k} F kk) (sub-listed L kk)
+                 λ {j} y jk → (λ {c} ce → ≺-trans {j} {k} {c} jk (al ce)) , below-σ y x jk
+      where kk = ≺-ext k []
 
     -- The elaborated connect reaches what its body carries a reached
     -- body row on, and lists it where the plain connect is listed.
@@ -264,8 +414,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     conn-img : ∀ {k e} → t k e → Unpinned e → Live t k → Listed t k → LP k
              → (Σ Pos λ l → Img′ k l × Σ (Ev (IE B)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′)
                ⊎ (e ≡ skip × IntoAt Img′ u PB′ HP p k)
-    conn-img tk@(CP.body b , _) un lv L lp with B′.img b un bl (conn-lst-body b L) (conn-lst-hot b bl L , lp)
-      where bl = body-live (reached tk un) lv
+    conn-img tk@(CP.body b , _) un lv L lp with B′.img b un (body-live (reached tk un) lv) (body-listed (reached tk un) L) (hot-listed b (reached tk un) L , lp)
     ... | inj₁ (l , i , e′ , ul , Lβ , m) =
       inj₁ (l , inj₁ (i , F) , e′ , (CE.body ul , conn-body-reach F (inj₁ i) ul) , conn-body-listed F L (inj₁ i) ul Lβ , m)
       where F = reached tk un
@@ -275,7 +424,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     conn-img (CP.burst _ _ , _) ()
     conn-img (CP.kept _ _ _ _ , _) ()
     conn-img {k} tk@(CP.echo {k₀} x al un₀ ni , _) un lv L lp
-      with A′.img x un₀ (src-live x un₀) (conn-lst-src x al ni L) (lp↓ (≺→≼ {k₀} {k} (≺-ext k₀ [])) lp)
+      with A′.img x un₀ (src-live x un₀) (src-before x al (reached tk un) L) (lp↓ (≺→≼ {k₀} {k} (≺-ext k₀ [])) lp)
     ... | inj₁ (l₀ , i , e′ , ul₀ , L₀ , m) with conn-echo-row x un₀ al ni (reached tk un) i ul₀ m
     ...   | e″ , ur , ns =
       inj₁ (l₀ ⊕ [ ix 0 ] , inj₂ (k₀ , l₀ , (_ , x , un₀) , al , ni , i , reached tk un , refl , refl) , e″ , ur

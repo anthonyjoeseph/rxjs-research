@@ -42,7 +42,7 @@ body alive; and whether the elaborated connect is listed up to a
 carrier — no field of `CarryAt` says any. Settled when each leaf is a
 body, over whatever fields the record must gain.
 
-Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-lst-body`, `conn-lst-hot`, `conn-lst-src`, `conn-body-reach`, `conn-body-listed`, `conn-echo-row`, `conn-echo-listed`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-echo-live`, `conn-pb-few`, `conn-pb-past`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-body-reach`, `conn-body-listed`, `conn-echo-row`, `conn-echo-listed`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE ERASURE
 
