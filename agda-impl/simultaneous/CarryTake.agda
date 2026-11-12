@@ -429,6 +429,39 @@ module Side {X : Set} {H : Pos → Set} {s : Pos} (incl : Bool) (kp : X → Bool
   no-fail : (∀ {c} → T′ c end → ⊥) → ∀ {q a} → t q (out a) → T (not (kp a)) → ⊥
   no-fail ne x nk = first¬¬ x nk λ { (_ , ((_ , x′ , nk′) , nf′) , _) → ne (lift (stop x′ nk′ nf′)) }
 
+  -- The stop at a position: the cut ending the takeWhile at its first
+  -- failure.
+  StopAt : Pos → Set
+  StopAt c = Σ Pos λ q → Σ X λ a → t q (out a) × T (not (kp a)) × ¬ Failed q × c ≡ q ⊕ [ last ]
+
+  private
+    stop? : ∀ {c e} → TakeT c e → Dec (StopAt c)
+    stop? (stop x nk nf)       = yes (_ , _ , x , nk , nf , refl)
+    stop? (pass x _ _)         = no λ { (_ , _ , x′ , _ , _ , refl) → flatT x′ x }
+    stop? (step x _)           = no λ { (_ , _ , x′ , _ , _ , refl) → flatT x′ x }
+    stop? (tend x _)           = no λ { (_ , _ , x′ , _ , _ , refl) → flatT x′ x }
+    stop? (left x _ _)         = no λ { (_ , _ , x′ , _ , _ , refl) → flatT x′ x }
+    stop? (fail {q} x _ _ _)   = no λ { (q′ , _ , _ , _ , _ , e) → ix≢last (⊕-injʳ q q′ e) }
+      where
+        ix≢last : ix 0 ≡ last → ⊥
+        ix≢last ()
+
+    stops : (cs : List Pos) → (∀ {c} → c ∈ cs → Σ (Ev X) (T′ c)) → Dec (Σ Pos λ c → c ∈ cs × StopAt c)
+    stops []       _ = no λ { (_ , () , _) }
+    stops (c ∷ cs) R with stop? (proj₁ (proj₂ (R (here refl))))
+    ... | yes s = yes (c , here refl , s)
+    ... | no ns with stops cs (λ m → R (there m))
+    ...   | yes (c′ , m , s) = yes (c′ , there m , s)
+    ...   | no ns′ = no λ { (_ , here refl , s) → ns s ; (c′ , there m , s) → ns′ (c′ , m , s) }
+
+  -- Whether a source row lies past a failure, from the takeWhile listed
+  -- there: past one, the first failure's stop is listed before it.
+  failed-at? : ∀ {k e} → Listed T′ k → t k e → Dec (Failed k)
+  failed-at? {k} (ks , F , B) x with stops ks (λ m → proj₂ (B m))
+  ... | yes (c , m , (q , a , xq , nk , _ , refl)) = yes (q , a , xq , nk , ≺-trans {q} {q ⊕ [ last ]} {k} (≺-ext q []) (proj₁ (B m)))
+  ... | no ns = no λ { (q , a , xq , nkq , qk) → first¬¬ xq nkq λ { (q′ , ((_ , x′ , nk′) , nf′) , q′q) →
+                  ns (q′ ⊕ [ last ] , F (lift (stop x′ nk′ nf′)) (cut-before x′ x (≼-≺-≺ {q′} {q} {k} q′q qk) last) , (q′ , _ , x′ , nk′ , nf′ , refl)) } }
+
   never-failed : (∀ {c} → T′ c end → ⊥) → ∀ {k} → ¬ Failed k
   never-failed ne (_ , _ , x , nk , _) = no-fail ne x nk
 
@@ -945,16 +978,29 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     home-up : ∀ {p k₀} → ¬ P.Failed p → k₀ ≺ p → Home t k₀ → Home P.T′ k₀
     home-up {p} {k₀} nfp kp h n = h λ { (e , tk , un) → n (e , P.up tk (P.unfailed nfp (≺→≼ {k₀} {p} kp)) (P.pass-before tk kp nfp) , un) }
 
-    pinned′ : ∀ {k p} → P.T′ k (pin p) → Live P.T′ k → Listed P.T′ k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed Q.T′ l)
-              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home P.T′ k₀ × instantOf k₀ ≡ instantOf k)
-                 ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ (P.left tk nfp _ , _) lv L lp with C.pinned tk (P.live← (P.live-unfailed lv tk) lv) (P.lst← (P.live-unfailed lv tk) L) lp | P.live-unfailed lv tk
-    ... | (l , p′ , ul , mb , bd , ls) , inj₁ e | nfk =
+    PinOut : Pos → Pos → Set
+    PinOut k p = (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × (∀ {k′ l′} → Img′ k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed Q.T′ l)
+                 × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home P.T′ k₀ × instantOf k₀ ≡ instantOf k)
+                    ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+
+    -- A PIN KEPT PAST THE FAILURE IS CARRIED, onto the elaborated
+    -- source's pin kept past the elaborated failure, listed there.
+    -- DEAD ROUTE: the source's `pinned` on the source pin.  It asks the
+    --   source listed up to the pin, and past the failure the source's
+    --   rows are hidden: the takeWhile lists only the pins it keeps,
+    --   while the source may make infinitely many rows between.
+    postulate
+      take-pin-past : ∀ {k p} → P.T′ k (pin p) → P.Failed k → Listed P.T′ k → LP k → PinOut k p
+
+    pinned′ : ∀ {k p} → P.T′ k (pin p) → Listed P.T′ k → LP k → PinOut k p
+    pinned′ tk′@(P.left tk nfp _ , _) L lp with P.failed-at? L tk
+    ... | yes fk = take-pin-past tk′ fk L lp
+    ... | no nfk with C.pinned tk (P.lst← nfk L) lp
+    ...   | (l , p′ , ul , mb , bd , ls) , inj₁ e =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₁ e
-    ... | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) | nfk =
+    ...   | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
-    ... | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₂ hh) | nfk =
+    ...   | (l , p′ , ul , mb , bd , ls) , inj₂ (inj₂ hh) =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , nfk , mb) , bound′ (pin-unfailed nfp bd) bd , Q.lst-any ls) , inj₂ (inj₂ hh)
 
   -- The taken run listed before a point its carriers follow.

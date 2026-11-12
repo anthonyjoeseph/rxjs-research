@@ -32,13 +32,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE DEAD PIN
+
+Untried: a takeWhile keeps a source pin past its failure, while its
+source's rows there are hidden, so the source is never listed up to the
+pin. Needs the source's early-connect pins listed over a region (an
+early cover). Settled when the leaf is a body.
+
+Members: `take-pin-past`.
+
 #### THE CONNECT'S CARRY
 
 Probed, unproven: the connect's rows carried from its body's carry and
 its annotated source's. Each subterm is listed before the other's image
-by `cover`; open: the same before a LATE carrier, and the source listed
-past its end (pins after it), where `pinned` speaks only for a pin its
-run is alive at. Settled when each leaf is a body.
+by `cover`; open: the same before a LATE carrier, and a pin, alive or
+dead, carried from whichever subterm made it. Settled when each leaf is
+a body.
 
 Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 

@@ -134,7 +134,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; pb-few  = λ _ → [] , λ ()
     ; pb-img  = λ ()
     ; pb-past = λ ()
-    ; pinned  = λ { (() , _) _ _ _ }
+    ; pinned  = λ { (() , _) _ _ }
     }
 
 -- THE BOTTOM APPROXIMANT shows only skips: the spin, on both sides.
@@ -408,11 +408,11 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₁ (k₀ , kq , h , e))) = inj₂ (inj₁ (k₀ , kq , (λ n → h λ { (e′ , x , un) → n (e′ , P.up x , un) }) , e))
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
-  pinned : ∀ {k q} → P.T k (pin q) → Live P.T k → Listed P.T k → LP k
+  pinned : ∀ {k q} → P.T k (pin q) → Listed P.T k → LP k
          → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q) × Listed E.T l)
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-  pinned {k} {q} (body x , _) lv L lp with C.pinned x (P.live← lv) (P.lst← L) lp
+  pinned {k} {q} (body x , _) L lp with C.pinned x (P.lst← L) lp
   ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b′ , E.lst→ ul ls) , homed {k} {q} r
     where
       b′ : ∀ {k′ l′} → Img k′ l′ → l′ ≺ q′ → k′ ≺ q

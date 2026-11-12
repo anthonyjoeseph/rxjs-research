@@ -386,7 +386,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     cover   : ∀ {v w} → Listed t v → LP v → Live t v → From Img PB t u v w → Listed u w
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
-    pinned  : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
+    pinned  : ∀ {k p} → t k (pin p) → Listed t k → LP k
             → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
@@ -558,13 +558,13 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ {m} (inj₂ (inj₁ (k , l , i , e , n))) = inj₂ (inj₁ (k , l , i , e , U.near→ {m} {l} n))
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
-    pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → Listed t′ k → LP k
+    pinned′ : ∀ {k p} → t′ k (pin p) → Listed t′ k → LP k
               → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed u′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} tk lv L lp with down tk
+    pinned′ {k} {p} tk L lp with down tk
     ... | _ , tk₀ , r with kin r
-    ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} L) lp
+    ...   | k-pin with pinned tk₀ (T.lst← {k} L) lp
     ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , U.lst→ {l} ls) , homed′ {k} {p} h
       where
         homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
@@ -773,7 +773,7 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
       ... | inj₂ (es , h)                  = inj₂ (es , into-at h)
 
       pinned′ : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB s k
-      pinned′ {k} {p} tk lk fk with pinned tk lk (lst fk) tt
+      pinned′ {k} {p} tk lk fk with pinned tk (lst fk) tt
       ... | (l , p′ , ul , m , _) , inj₁ e = (l , (pin p′ , ul) , m) , inj₁ e
       ... | (l , p′ , ul , m , _) , inj₂ (inj₂ (_ , () , _))
       ... | (l , p′ , ul , m , _) , inj₂ (inj₁ (k₀ , kp , h , ek)) with pin-few tk

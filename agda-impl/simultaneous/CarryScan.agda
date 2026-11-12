@@ -353,11 +353,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
-    pinned′ : ∀ {k p} → S k (pin p) → Live S k → Listed S k → LP k
+    pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
               → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed S′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} (P.spin x , _) lv L lp with pinned x (liveS← lv) (lstS← L) lp
+    pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp
     ... | (l , p′ , ul , m , b , ls) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₁ e
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₂ hh)

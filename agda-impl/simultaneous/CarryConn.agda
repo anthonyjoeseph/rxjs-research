@@ -413,7 +413,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
       conn-whole : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
       conn-cover : ∀ {v w} → Listed t v → LP v → Live t v → From ConnImg PB′ t u v w → Listed u w
-      conn-pinned : ∀ {k q} → t k (pin q) → Live t k → Listed t k → LP k
+      conn-pinned : ∀ {k q} → t k (pin q) → Listed t k → LP k
                   → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × (∀ {k′ l′} → ConnImg k′ l′ → l′ ≺ q′ → k′ ≺ q) × Listed u l)
                     × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
                        ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
