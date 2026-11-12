@@ -25,7 +25,7 @@ open import Data.Bool.Properties using (T?)
 open import Tree using (Obs; connect; map)
 open import denotation.Position using (Pos; Label; Path; ix; sub; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
+open import denotation.EmissionSet using (Ev; pin; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺-ext; ticks; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊑-≼; ⊑-cmp; ⊑-inside; inside-⊑; ⊕-assoc; ⊕-identityʳ;
   ⊕-injˡ; ⊕-injʳ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW;
@@ -595,12 +595,27 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- annotation's.
         carried : CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                     (enter (approx n (elab ρ (connect s b)) envE) p′) p p′
-        carried = ConnCarry.Body.carried {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
-          (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
+        module CB = ConnCarry.Body {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE
+                      (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
+                      (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
+
+        carried = CB.carried
 
         postulate
-          -- Its late carriers under a bound hot's row are anchored.
-          conn-nest : PBNest er M′ carried
+          -- A source pin's late carrier under a bound hot's row, the
+          -- connect alive at its echo, is anchored.
+          conn-nest-pin : ∀ {X} (i : X ∈ Γ) {k₀ l₀ q e₁ h L a σ} → CarryAt.PB c_a k₀ l₀ → σP k₀ (pin q)
+                        → enter (approx n (connect s b) envP) p (k₀ ⊕ [ ix 0 ]) e₁ → Live (enter (approx n (connect s b) envP) p) (k₀ ⊕ [ ix 0 ])
+                        → BoundRow (er i) h → CarryAt.Img (Bound.carried (er i)) h L → k₀ ≡ h ⊕ (a ∷ σ) → Anchor M_s k₀ l₀ h a
+
+        -- Its late carriers under a bound hot's row are anchored: the
+        -- body's by the body's anchors, the source's by the annotation's.
+        conn-nest : PBNest er M′ carried
+        conn-nest i = CB.nest′ (λ {h} → bound-hot {ρ = λ {X} → ρ {X}} envP {envE = envE} er i {h})
+                        (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (there i) {k} {l} {e₀} {h} {L} {a} {σ})
+                        (λ {k} {l} {e₀} {h} {L} {a} {σ} → nest-a i {k} {l} {e₀} {h} {L} {a} {σ})
+                        (λ {k₀} {l₀} {q} {e₁} {h} {L} {a} {σ} → conn-nest-pin i {k₀} {l₀} {q} {e₁} {h} {L} {a} {σ})
+                        (λ {k} {e} {x} {y} → br_s {k} {e} {x} {y})
 
         conn-carry : Σ (CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                                (enter (approx n (elab ρ (connect s b)) envE) p′) p p′)
