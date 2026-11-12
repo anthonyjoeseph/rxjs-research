@@ -45,9 +45,8 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.Carry using (PMap; Emb; CarryAt; Carry; carry; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl;
-  module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val;
-  carried-val; match-end; nest-via; CarriesAt; EnvRel; HotsListed)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
 

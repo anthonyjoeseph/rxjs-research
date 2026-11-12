@@ -44,7 +44,8 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (few-¬¬listed)
-open import simultaneous.Carry using (PMap; CarryAt; annValues; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
+open import simultaneous.CarryBase using (PMap; CarryAt; Whole; whole-listed; sub-listed; instant-⊕; IntoAt; Near; ahead-over)
+open import simultaneous.Carry using (annValues)
 open import simultaneous.ReadRows using (module Rows; step-just; step-none; of-shown; of-marks; up; up-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)

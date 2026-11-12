@@ -48,8 +48,8 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Carry; carry; Bare; Within; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; listed↓; IntoAt; Grown; joins-grow;
-  Ahead; ahead-over; grown-past; nest-or)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; _∪ᴹ_; Emb; CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; apart; instant-⊕; sub-listed; few-sub; match-val; carried-val; IntoAt; Ahead; ahead-over)
+open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
 open import simultaneous.CarryLeaves using (module OneAt; last-max; ix-last)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; passes)

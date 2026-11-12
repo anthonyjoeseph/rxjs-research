@@ -33,9 +33,8 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; Home; Near; Whole; instant-⊕;
-  EnvRel; Bound; HotsListed; IntoAt; NotHot; Grown; Joins; joins-grow; Apart; Ahead; EnvPast;
-  PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Home; Near; Whole; instant-⊕; IntoAt; Ahead)
+open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)

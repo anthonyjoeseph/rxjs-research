@@ -35,10 +35,8 @@ open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live)
-open import simultaneous.Carry using (PMap; CarriesAt; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry;
-  carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast;
-  PBNest; Nests; Anchor; anchor-up; grown-past; env-past; emb-under; instant-⊕; annValues;
-  bound-hot)
+open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; emb-under; instant-⊕)
+open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
 
@@ -403,8 +401,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     -- Past the body.  Only what the body's map needs is a parameter here:
     -- each `with` below rechecks the parameters, and the body's carry
     -- holds the environment grown twice.
-    module AfterBody (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (hm_b : Emb M_b) (wi_b : Within (Hots envP′) M_s M_b (p ⊕ [ ix 0 ]))
-                     (jh : JoinsHere M_b) where
+    module AfterBody (M_b : PMap) (jh : JoinsHere M_b) (ms_b : M_s ⊆ᴹ M_b) (hm_b : Emb M_b) (wi_b : Within (Hots envP′) M_s M_b (p ⊕ [ ix 0 ])) where
       within : Within (Hots envP) M₀ M_b p
       within m with wi_b m
       ... | inj₂ w = inj₂ (inW (narrow⁼ σ-in w))
@@ -601,7 +598,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
     after : CarriesAt n ρ′ b envP′ envE′ M_s er′ (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ]) → CarriesAt n ρ (connect s b) envP envE M₀ er p p′
     after (M_b , ms_b , hm_b , wi_b , br_b , jn_b , ep_b , c_b , nc_b) =
-      AfterBody.Body.result M_b ms_b hm_b wi_b (λ {x} {y} {q} {a} {σ} → jn_b (here refl) {x} {y} {q} {a} {σ}) br_b jn_b ep_b c_b nc_b
+      AfterBody.Body.result M_b (λ {x} {y} {q} {a} {σ} → jn_b (here refl) {x} {y} {q} {a} {σ}) ms_b hm_b wi_b br_b jn_b ep_b c_b nc_b
 
     result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
     result = after (Carry.carries (hb ρ′) envP′ envE′ gP′ gE′ M_s hm_s er′ joins′ nests′ ap′ (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ])

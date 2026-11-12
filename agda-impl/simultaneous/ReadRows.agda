@@ -47,7 +47,8 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark; begin;
 open import simultaneous.Attribution using (Live; Shown; Carried; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.Carry using (Kin; k-out; k-skip; k-pin; k-end; apart; sub-listed; annValues)
+open import simultaneous.CarryBase using (Kin; k-out; k-skip; k-pin; k-end; apart; sub-listed)
+open import simultaneous.Carry using (annValues)
 open import simultaneous.Rejoined using (Flat; nest; few-reach)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep; joins)

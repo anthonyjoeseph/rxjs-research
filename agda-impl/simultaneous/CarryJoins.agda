@@ -27,9 +27,8 @@ open import denotation.Laws.Worlds using (Hots; Ok; InvAt; _⊑_; ⊑-refl; ⊑-
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.Carry using (PMap; _⊆ᴹ_; Emb; Fresh; Within; Bare; CarryAt; Carry; carry; EnvRel; Bound; HotsListed;
-  NotHot; BoundRow; Joins; Apart; apart; bound-hot; ahead-over; ahead-under; EnvPast; PBNest;
-  Nests; env-past; nest-or)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; apart; ahead-over; ahead-under)
+open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; bound-hot; EnvPast; PBNest; Nests; env-past; nest-or)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 

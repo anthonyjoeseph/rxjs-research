@@ -38,7 +38,8 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
-open import simultaneous.Carry using (Bare; Carry; CarryAt; Emb; Fresh; PMap; Within; _∪ᴹ_; _⊆ᴹ_; carry; emb-under; instant-⊕; NotHot; Grown; joins-grow; grown-past; env-past)
+open import simultaneous.CarryBase using (CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
+open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; Grown; joins-grow; grown-past; env-past)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 

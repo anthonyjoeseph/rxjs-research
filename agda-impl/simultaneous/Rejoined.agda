@@ -28,7 +28,8 @@ open import denotation.Laws.Worlds using (_⊑_; ⊑-snoc; ⊕-assoc; ⊕-identi
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (HotsListed; Apart; annValues; apart; hots-at)
+open import simultaneous.CarryBase using (apart)
+open import simultaneous.Carry using (HotsListed; Apart; annValues; hots-at)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; joinStep)
 

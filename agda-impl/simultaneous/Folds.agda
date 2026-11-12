@@ -21,7 +21,7 @@ open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Reach; Dep; Few; _≺_; _≼_; module Scan)
 open import denotation.Laws.Modulus using (≺→≼; ≼-refl; ≼-trans; ≼-or-≻; reach-via; few-ind)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.Carry using (Kin; k-out; k-skip; k-pin; k-end; sub-listed)
+open import simultaneous.CarryBase using (Kin; k-out; k-skip; k-pin; k-end; sub-listed)
 
 -- What a row of `b` waits on, a row of `a` it came from waits on.
 dep : ∀ {X Y : Set} {q k} {e₀ e : Ev X} {e₀′ e′ : Ev Y} → Kin e₀ e₀′ → Kin e e′ → Dep q e₀′ k e′ → Dep q e₀ k e
