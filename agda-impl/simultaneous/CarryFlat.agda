@@ -25,9 +25,11 @@ open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf; Few; _≺_;
   module Joining; module Op; module Bounded; module Switch; module Exhaust; module Connect)
-open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_; Lawful)
 open import denotation.Laws.Modulus using (≺-trans)
 open import denotation.Laws using (inv-approx; good-cons)
+open import denotation.Laws.Connect using () renaming (lawful to conn-lawful; ok₀ to conn-ok₀)
+open import denotation.Laws.BoundedInv using (end-uniq; module BoundedI)
 open import denotation.Laws.Truth.Joining using (Slots)
 open import denotation.Laws.Truth.Join using (module JoinerSide)
 open import denotation.Laws.Truth.Bounded using (module BoundedSide)
@@ -79,6 +81,24 @@ module Parts {A B : Set} (g : A → Den B) (o : EmissionSet A) where
   slots (mergeᶠ (just m)) ok Ig Io = BoundedSide.slots ok m g Ig Io
   slots switchᶠ           ok Ig Io = JoinerSide.slots ok g Ig Io
   slots exhaustᶠ          ok Ig Io = JoinerSide.slots ok g Ig Io
+
+  -- One value, one seat.
+  seat-one : ∀ op {H p} (ok : Ok H p) (Ig : ∀ a → InvD H (g a)) (Io : InvAt H p o) {q a s s′}
+           → Slots.Sl (slots op ok Ig Io) q a s → Slots.Sl (slots op ok Ig Io) q a s′ → s ≡ s′
+  seat-one (mergeᶠ nothing)  _  _  _  refl refl = refl
+  seat-one (mergeᶠ (just m)) ok Ig Io (_ , sb) (_ , sb′) = BoundedI.sub-same ok m g Ig Io sb sb′
+  seat-one switchᶠ           _  _  _  refl refl = refl
+  seat-one exhaustᶠ          _  _  _  refl refl = refl
+
+-- A LANE'S ROWS PRECEDE ITS END: its one seat's run keeps nothing but pins
+-- past its end.
+slot-live : ∀ {A B H} {g : A → Den B} {u : EmissionSet A} {Ln : Pos → A → EmissionSet B} (SL : Slots H g u Ln) (Ig : ∀ a → InvD H (g a))
+          → (∀ {q a s s′} → Slots.Sl SL q a s → Slots.Sl SL q a s′ → s ≡ s′)
+          → ∀ {q a k e} → u q (out a) → Ln q a k e → Unpinned e → Live (Ln q a) k
+slot-live SL Ig one {a = a} x y un y′ ck with Slots.slot SL y | Slots.slot SL y′
+... | s , sl , en , _ | s′ , sl′ , en′ , _ with one sl sl′
+... | refl with InvAt.quiet (Ig a s (Slots.okS SL x sl)) en′ en ck
+... | _ , refl , _ = un
 
 -- THE PLAIN FLATMAP IS ITS JOINER over the parts.
 joins-flat : ∀ {A B} op (g : A → Den B) (sD : Den A) p
@@ -350,6 +370,38 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       module P* = Parts lE o*
 
+      -- THE ELABORATED OUTER KEEPS THE INVARIANT, read down the two
+      -- connects: each source's proper rows a lawful hot, each body
+      -- subscribed admissibly.
+      gE₁ : GoodEnv env₁
+      gE₁ = good-cons (conn-lawful {s = approx n (elab ρ s) envE} {F = λ h → approx n (Body lanesE tk) (h ∷ envE)} (inv-approx n (elab ρ s) envE gE)
+                         (λ {t} L → inv-approx n (Body lanesE tk) (hot t ∷ envE) (good-cons L gE)) p′ okE) gE
+
+      ok₁ : Ok (Hots env₁) (p′ ⊕ [ ix 0 ])
+      ok₁ = conn-ok₀ {s = approx n (elab ρ s) envE} {F = λ h → approx n (Body lanesE tk) (h ∷ envE)} (inv-approx n (elab ρ s) envE gE)
+                     (λ {t} L → inv-approx n (Body lanesE tk) (hot t ∷ envE) (good-cons L gE)) p′ okE
+
+      IC₁ : ∀ {t : EmissionSet (IE B)} → Lawful t → InvD (Hots env₁ ∪ʰ t) (approx n (connect X (combined op tk)) (hot t ∷ env₁))
+      IC₁ {t} L = inv-approx n (connect X (combined op tk)) (hot t ∷ env₁) (good-cons L gE₁)
+
+      gE₂ : GoodEnv env₂
+      gE₂ = good-cons (conn-lawful {s = approx n closer env₁} {F = λ h → approx n (connect X (combined op tk)) (h ∷ env₁)} (inv-approx n closer env₁ gE₁) IC₁ (p′ ⊕ [ ix 0 ]) ok₁) gE₁
+
+      ok₂ : Ok (Hots env₂) (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ])
+      ok₂ = conn-ok₀ {s = approx n closer env₁} {F = λ h → approx n (connect X (combined op tk)) (h ∷ env₁)} (inv-approx n closer env₁ gE₁) IC₁ (p′ ⊕ [ ix 0 ]) ok₁
+
+      ok* : Ok (Hots env₂) q₁
+      ok* = ok-step (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ]) ok₂
+
+      Io* : InvAt (Hots env₂) q₁ o*
+      Io* = inv-approx n (each valuesOf (connected (there (here refl)))) env₂ gE₂ q₁ ok*
+
+      Ig* : ∀ a → InvD (Hots env₂) (lE a)
+      Ig* a = inv-approx n (laneˢ (lanesE a)) env₂ gE₂
+
+      SL* : Slots (Hots env₂) lE o* (P*.Ln op)
+      SL* = P*.slots op ok* Ig* Io*
+
       V : Pos → A → Pos → Set
       V q a q* = o q (out a) × P.Runs op q × o* q* (out a) × P*.Runs op q*
                  × Σ Pos λ l → FW.S′.Img q l × q* ≡ ((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
@@ -383,20 +435,15 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         paired⁻ : ∀ {q* a l e} → o* q* (out a) → P*.Runs op q* → P*.Ln op q* a l e
                 → Live (Truncate JS.JoinT) l → Few (Truncate JS.JoinT) l → Σ Pos λ q → V q a q*
         ends⁻ : ∀ {c*} → o* c* end → Few (Truncate JS.JoinT) c* → Σ Pos λ c → Ends c c*
-        -- A lane's rows precede its end, elaborated too.
-        lane-live* : ∀ {q a l e} → o* q (out a) → P*.Runs op q → P*.Ln op q a l e → Unpinned e → Live (P*.Ln op q a) l
-        -- A lane's rows precede its end.
-        lane-live : ∀ {q a k e} → o q (out a) → P.Runs op q → P.Ln op q a k e → Unpinned e → Live (P.Ln op q a) k
         -- Under its listed environment, a lane is listed wherever few rows precede.
         lane-listing : ∀ {q a k} → o q (out a) → P.Runs op q → Few (P.Ln op q a) k → HotsListed envP k → Listed (P.Ln op q a) k
         -- Neither a hand-off nor the outer's end lies on a lane's row.
         hand-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {c c* l}
                    → LI v c c* → P.Ln op q a c end → P.Hand op c → LI v′ (c ⊕ [ ix 0 ]) l ⊎ LB v′ (c ⊕ [ ix 0 ]) l ⊎ Ends (c ⊕ [ ix 0 ]) l → ⊥
         end-apart : ∀ {q a q*} (v : V q a q*) {c l l′} → Ends c l → LI v c l′ ⊎ LB v c l′ → ⊥
-        -- The elaborated outer ends, once, where the plain one does, its
-        -- end deciding as the plain one's.
+        -- The elaborated outer ends where the plain one does, its end
+        -- deciding as the plain one's.
         outer-ends : ∀ {c} → o c end → Listed o c → HotsListed envP c → Σ Pos λ c* → o* c* end
-        outer-end-one : ∀ {c c′} → o* c end → o* c′ end → c ≡ c′
         end-done : ∀ {c c*} → Ends c c*
                  → Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
                    ⇔ Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
@@ -449,10 +496,11 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       module JD = Joined {HP = Hots envP} {HE = H₂} {LP = HotsListed envP} p q₁ o (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
                     o* (P*.Ln op) (P*.Runs op) (P*.Cut op) (P*.Hand op) V (λ (x , r , x* , r* , _) → x , r , x* , r*)
                     N (λ v → proj₁ (lane-framed v)) (λ {q} {a} {q*} v m → inj₂ (q , a , q* , v , m)) (λ v → proj₂ (lane-framed v))
-                    Ends lane-after (λ {q} {k} {k′} → cut↑ g o op {q} {k} {k′}) lane-live lane-listing (λ {x} {y} → listed↓ envP {x} {y})
-                    lane-live* (λ {q} {l} {l′} → cut↑ lE o* op {q} {l} {l′})
+                    Ends lane-after (λ {q} {k} {k′} → cut↑ g o op {q} {k} {k′}) (λ x _ y un → slot-live SLp Ig (P.seat-one op okP Ig Io) x y un)
+                    lane-listing (λ {x} {y} → listed↓ envP {x} {y})
+                    (λ x _ y un → slot-live SL* Ig* (P*.seat-one op ok* Ig* Io*) x y un) (λ {q} {l} {l′} → cut↑ lE o* op {q} {l} {l′})
                     lanes-apart lanes-pb-apart hand-apart end-apart pair-all paired⁻ pair-cut pair-done pair-hand hand-ext
-                    (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) ends⁻ (λ ε → ε) (λ ε ε′ → outer-end-one (proj₂ ε) (proj₂ ε′))
+                    (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) ends⁻ (λ ε → ε) (λ ε ε′ → end-uniq Io* (proj₂ ε) (proj₂ ε′))
                     end-done end-ext
 
       postulate
