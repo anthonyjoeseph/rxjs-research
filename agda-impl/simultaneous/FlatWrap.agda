@@ -25,8 +25,8 @@ open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Properties using (∷-injectiveˡ)
 
-open import denotation.Position using (Pos; Label; ix; sub; _⊕_; inside; _≟ᵖ_; root)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; _≼_; Ended;
+open import denotation.Position using (Pos; ix; sub; _⊕_; inside; _≟ᵖ_; root)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; Ended;
   module Joining; module Connect)
 open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-ext; ≺-absurd; ≺-≼-≺; ticks)
 open import denotation.Laws.Shows using (few-reach)

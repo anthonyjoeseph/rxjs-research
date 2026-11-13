@@ -12,20 +12,18 @@ open import Data.List using (_∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
-open import denotation.Position using (Pos; Label; ix; _⊕_; root; _≟ᵖ_)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect)
+open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
-  module Joining; module Op; module Connect; module Bounded; module Switch; module Exhaust)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-snoc⁺; ⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_;
-  inW; step; plain-ix)
+open import denotation.EmissionSet using (out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
+  module Joining; module Op; module Bounded; module Switch; module Exhaust)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Truth.Joining using (Slots)
 open import denotation.Laws.Truth.Join using (module JoinerSide)
@@ -239,18 +237,15 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     postulate
       flat-lanes : AtBody.LanesFact (proj₁ split)
 
-  -- The lanes carried past every carry of the outer.
-  LanesAt : E (IE A L.∷ Δ) (IE B) → Set₁
-  LanesAt bE = ∀ (M_s : PMap) (ms_s : M₀ ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) M₀ M_s p) (br_s : Bare M_s o)
-                 (jn_s : Joins ρ envP envE er M_s) (ep_s : EnvPast er M_s)
-                 (c_s : CarryAt valuesOf M_s (Hots envP) (Hots envE) (HotsListed envP) o (enter (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ])) p (p′ ⊕ [ ix 1 ]))
-                 (nc_s : PBNest er M_s c_s) → AfterSource.AtBody.LanesFact M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s bE
-
   -- MOVED ALONG THE EQUATION, the body held abstract: the result's type
   -- names no body, so nothing is unified against the elaborated program
   -- before the body is known.
   module Moved (bE : E (IE A L.∷ Δ) (IE B)) (eq : elab ρ (flatMap op f s) ≡ connect (elab ρ s) bE)
-               (lanes : LanesAt bE) where
+               -- the lanes carried past every carry of the outer
+               (lanes : ∀ (M_s : PMap) (ms_s : M₀ ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) M₀ M_s p) (br_s : Bare M_s o)
+                          (jn_s : Joins ρ envP envE er M_s) (ep_s : EnvPast er M_s)
+                          (c_s : CarryAt valuesOf M_s (Hots envP) (Hots envE) (HotsListed envP) o (enter (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ])) p (p′ ⊕ [ ix 1 ]))
+                          (nc_s : PBNest er M_s c_s) → AfterSource.AtBody.LanesFact M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s bE) where
     after : CarriesAt n ρ s envP envE M₀ er p (p′ ⊕ [ ix 1 ]) → CarriesX (connect (elab ρ s) bE)
     after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) =
       AfterSource.AtBody.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s bE (lanes M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s)
