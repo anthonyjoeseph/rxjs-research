@@ -410,18 +410,79 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
+-- The pins of the connect at `r` before `v`, listed exactly.
+PinList : ∀ {X : Set} → EmissionSet X → Pos → Pos → Set
+PinList a r v = Σ (List Pos) λ ks → (∀ {k} → a k (pin r) → k ≺ v → k ∈ ks) × (∀ {k} → k ∈ ks → k ≺ v × a k (pin r))
+
+pins-map : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {r v}
+         → (∀ {k} → a k (pin r) → b k (pin r)) → (∀ {k} → b k (pin r) → a k (pin r)) → PinList a r v → PinList b r v
+pins-map to fro (ks , F , B) = ks , (λ bk kv → F (fro bk) kv) , λ m → proj₁ (B m) , to (proj₂ (B m))
+
+private
+  pin-ev? : ∀ {X : Set} r (e : Ev X) → Dec (e ≡ pin r)
+  pin-ev? r (out _) = no λ ()
+  pin-ev? r skip    = no λ ()
+  pin-ev? r end     = no λ ()
+  pin-ev? r (pin r′) with r′ ≟ᵖ r
+  ... | yes refl = yes refl
+  ... | no n     = no λ { refl → n refl }
+
+  pick : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) → (∀ {k} → k ∈ ks → Σ (Ev X) (b k)) → List Pos
+  pick r []       B = []
+  pick r (k ∷ ks) B with pin-ev? r (proj₁ (B (here refl)))
+  ... | yes _ = k ∷ pick r ks (λ m → B (there m))
+  ... | no _  = pick r ks (λ m → B (there m))
+
+  pick-sound : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k))
+             → ∀ {k} → k ∈ pick r ks B → Σ (k ∈ ks) λ m → proj₁ (B m) ≡ pin r
+  pick-sound r (k ∷ ks) B m with pin-ev? r (proj₁ (B (here refl)))
+  pick-sound r (k ∷ ks) B (here refl) | yes e = here refl , e
+  pick-sound r (k ∷ ks) B (there m)   | yes _ = let (m′ , e) = pick-sound r ks (λ x → B (there x)) m in there m′ , e
+  pick-sound r (k ∷ ks) B m           | no _  = let (m′ , e) = pick-sound r ks (λ x → B (there x)) m in there m′ , e
+
+  pick-complete : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k))
+                → ∀ {k} (m : k ∈ ks) → proj₁ (B m) ≡ pin r → k ∈ pick r ks B
+  pick-complete r (k ∷ ks) B (here refl) e with pin-ev? r (proj₁ (B (here refl)))
+  ... | yes _ = here refl
+  ... | no n  = ⊥-elim (n e)
+  pick-complete r (k ∷ ks) B (there m) e with pin-ev? r (proj₁ (B (here refl)))
+  ... | yes _ = there (pick-complete r ks (λ x → B (there x)) m e)
+  ... | no _  = pick-complete r ks (λ x → B (there x)) m e
+
+-- A connect's pins read off a listing of a run holding them.
+pins-from : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {r v} → Listed b v
+          → (∀ {k e} → b k e → b k (pin r) → e ≡ pin r)
+          → (∀ {k} → a k (pin r) → k ≺ v → b k (pin r)) → (∀ {k} → b k (pin r) → a k (pin r)) → PinList a r v
+pins-from {Z = Z} {b = b} {r} {v} (ks , F , B) uniq up down = pick r ks B′ , cov , snd
+  where
+    B′ : ∀ {k} → k ∈ ks → Σ (Ev Z) (b k)
+    B′ m = proj₂ (B m)
+    cov : ∀ {k} → _ → k ≺ v → k ∈ pick r ks B′
+    cov ak kv = pick-complete r ks B′ (F (up ak kv) kv) (uniq (proj₂ (B′ (F (up ak kv) kv))) (up ak kv))
+    snd : ∀ {k} → k ∈ pick r ks B′ → k ≺ v × _
+    snd m with pick-sound r ks B′ m
+    ... | m′ , e = proj₁ (B m′) , down (subst (b _) e (proj₂ (B′ m′)))
+
 -- A PIN CARRIED FROM ITS OWN PAST: the rows before its connect listed,
--- never the rows between, which a cut past the connect hides.  A full
--- subterm's carry has it; a told run does not, since it pins every row
--- of its burst to its own connect, so its carrier waits on rows the
--- pin does not, an inner connect's body among them.
+-- never the rows between, which a cut past the connect hides, and the
+-- connect's pins before it, the rest of what it waits on; its carrier
+-- comes with the elaborated connect's pins before it, which a pin of the
+-- same connect carried late passes.  A full subterm's carry has it; a
+-- told run does not, since it pins every row of its burst to its own
+-- connect, so its carrier waits on rows the pin does not, an inner
+-- connect's body among them.
 record Narrow {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
               (c : CarryAt f M HP HE LP t u s s′) : Set₁ where
   field
-    pinned↓ : ∀ {k p} → t k (pin p) → Listed t p → LP p
-            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × CarryAt.PB c k l × Targeted M p p′)
+    pinned↓ : ∀ {k p} → t k (pin p) → Listed t p → PinList t p k → LP p
+            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × CarryAt.PB c k l × Targeted M p p′ × PinList u p′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+
+-- A run with no pin carries none.
+unpinned-narrow : ∀ {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+                → (∀ {k r} → t k (pin r) → ⊥) → (c : CarryAt f M HP HE LP t u s s′) → Narrow c
+unpinned-narrow np c = record { pinned↓ = λ tk _ _ _ → ⊥-elim (np tk) }
 
 ------------------------------------------------------------------------
 -- Relabelled rows
@@ -590,6 +651,21 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ {m} (inj₂ (inj₁ (k , l , i , e , n))) = inj₂ (inj₁ (k , l , i , e , U.near→ {m} {l} n))
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
+    pin↓ : ∀ {k r} → t′ k (pin r) → t k (pin r)
+    pin↓ tk with down tk
+    ... | _ , tk₀ , r with kin r
+    ...   | k-pin = tk₀
+
+    pin↑ : ∀ {k r} → t k (pin r) → t′ k (pin r)
+    pin↑ tk with up tk
+    ... | _ , tk′ , r with kin r
+    ...   | k-pin = tk′
+
+    pinU↓ : ∀ {l r} → u′ l (pin r) → u l (pin r)
+    pinU↓ ul with down′ ul
+    ... | _ , ul₀ , r with kin′ r
+    ...   | k-pin = ul₀
+
     homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
            → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
@@ -623,14 +699,12 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
   narrowed : Narrow c → Narrow carried
   narrowed nc = record { pinned↓ = pinned↓′ }
     where
-      pinned↓′ : ∀ {k p} → t′ k (pin p) → Listed t′ p → LP p
-               → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′)
+      pinned↓′ : ∀ {k p} → t′ k (pin p) → Listed t′ p → PinList t′ p k → LP p
+               → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′ × PinList u′ p′ l)
                  × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                     ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-      pinned↓′ {k} {p} tk L lp with down tk
-      ... | _ , tk₀ , r with kin r
-      ...   | k-pin with Narrow.pinned↓ nc tk₀ (T.lst← {p} L) lp
-      ...     | (l , p′ , ul , m , b) , h = (l , p′ , up-pin′ ul , m , b) , homed′ {k} {p} h
+      pinned↓′ {k} {p} tk L P lp with Narrow.pinned↓ nc (pin↓ tk) (T.lst← {p} L) (pins-map {a = t′} {b = t} (λ {k′} → pin↓ {k′}) (λ {k′} → pin↑ {k′}) P) lp
+      ... | (l , p′ , ul , m , b , Pu) , h = (l , p′ , up-pin′ ul , m , b , pins-map {a = u} {b = u′} (λ {l′} → up-pin′ {l′}) (λ {l′} → pinU↓ {l′}) Pu) , homed′ {k} {p} h
 
 ------------------------------------------------------------------------
 -- A map
@@ -659,17 +733,26 @@ private
 
 -- A MAP CARRIES what its source did: it relabels each row on both sides
 -- by the function, a value's carrier carrying its image.
+module MapCarry {A B} (g : A → B) (d : Den A) (d′ : Den (IE A)) {M HP HE LP} p p′
+                (c : CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′) where
+  private
+    module P = MapRun g d p
+    module E = MapRun (mapIE g) d′ p′
+    module R = Relabel (λ _ e e′ → e′ ≡ mapEv g e) (λ _ e e′ → e′ ≡ mapEv (mapIE g) e)
+      (λ { {e = e} refl → kin-map e }) (λ { {e = e} refl → kin-map e })
+      (λ tk → _ , P.lift tk , refl) P.unmap (λ _ ul → _ , E.lift ul , refl) (λ ul n → n (_ , E.lift ul , refl)) E.lift E.lift E.unmap c
+      (λ { {e = e} refl sw → sh-map {g = g} e sw }) (λ { {e₀ = e₀} {e₁ = e₁} _ refl refl m → match-map {g = g} e₀ e₁ m })
+
+  carried : CarryAt valuesOf M HP HE LP (enter (Op.map g d) p) (enter (Op.map (mapIE g) d′) p′) p p′
+  carried = R.carried
+
+  narrowed : Narrow c → Narrow carried
+  narrowed = R.narrowed
+
 map-carry : ∀ {A B} (g : A → B) (d : Den A) (d′ : Den (IE A)) {M HP HE LP} p p′
           → CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′
           → CarryAt valuesOf M HP HE LP (enter (Op.map g d) p) (enter (Op.map (mapIE g) d′) p′) p p′
-map-carry g d d′ p p′ c =
-  Relabel.carried (λ _ e e′ → e′ ≡ mapEv g e) (λ _ e e′ → e′ ≡ mapEv (mapIE g) e)
-    (λ { {e = e} refl → kin-map e }) (λ { {e = e} refl → kin-map e })
-    (λ tk → _ , P.lift tk , refl) P.unmap (λ _ ul → _ , E.lift ul , refl) (λ ul n → n (_ , E.lift ul , refl)) E.lift E.lift E.unmap c
-    (λ { {e = e} refl sw → sh-map {g = g} e sw }) (λ { {e₀ = e₀} {e₁ = e₁} _ refl refl m → match-map {g = g} e₀ e₁ m })
-  where
-    module P = MapRun g d p
-    module E = MapRun (mapIE g) d′ p′
+map-carry g d d′ p p′ c = MapCarry.carried g d d′ p p′ c
 
 ------------------------------------------------------------------------
 -- Carriers in order

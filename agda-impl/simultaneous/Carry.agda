@@ -46,7 +46,7 @@ open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; 
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (Ahead; CarryAt; Emb; Fresh; PMap; _⊆ᴹ_; ahead-under; listed-≼; map-carry)
+open import simultaneous.CarryBase using (Ahead; CarryAt; Narrow; module MapCarry; Emb; Fresh; PMap; _⊆ᴹ_; ahead-under; listed-≼; map-carry)
 open import simultaneous.SObs using (lone; module Elaborate)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; elab; annotate)
@@ -300,7 +300,7 @@ CarriesAt : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (
 CarriesAt n ρ o envP envE M₀ er p p′ =
   Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter (approx n o envP) p) × Joins ρ envP envE er M × EnvPast er M
   × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′)
-      (λ c → PBNest er M c)
+      (λ c → PBNest er M c × Narrow c)
 
 -- CARRIED under every environment of carried binders: subscribed at
 -- admissible positions the map pairs, holding no hot row, its worlds
@@ -329,9 +329,9 @@ carry-map n ρ f s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p p�
   mapped envP envE M₀ er p p′ (h envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr)
   where
     mapped : ∀ envP envE M₀ (er : EnvRel M₀ ρ envP envE) p p′ → CarriesAt n ρ s envP envE M₀ er p p′ → CarriesAt n ρ (map f s) envP envE M₀ er p p′
-    mapped envP envE M₀ er p p′ (M , ms , hm′ , wi , br , jn′ , ep , c , nc) =
+    mapped envP envE M₀ er p p′ (M , ms , hm′ , wi , br , jn′ , ep , c , nc , nr) =
       M , ms , hm′ , wi , (λ tk → br (proj₁ (proj₂ (MapRun.unmap f (approx n s envP) p tk)))) , jn′ , ep , c′
-      , nest-via {er = er} {c = c} {c′ = c′} (λ m → m) down nc
+      , nest-via {er = er} {c = c} {c′ = c′} (λ m → m) down nc , MapCarry.narrowed f (approx n s envP) (approx n (elab ρ s) envE) p p′ c nr
       where
         c′ : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (map f s) envP) p) (enter (approx n (elab ρ (map f s)) envE) p′) p p′
         c′ = map-carry f (approx n s envP) (approx n (elab ρ s) envE) p p′ c
