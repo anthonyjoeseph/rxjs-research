@@ -11,6 +11,7 @@ open import Data.Unit using (⊤)
 open import Data.List using (List)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Relation.Nullary using (¬_)
+open import Function using (_⇔_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -55,7 +56,20 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               (V : Pos → A → Pos → Set)
               (v-at : ∀ {q a q*} → V q a q* → o q (out a) × Runs q × o* q* (out a) × Runs* q*)
               (N : PMap) (LM : ∀ {q a q*} → V q a q* → PMap) (lm-sub : ∀ {q a q*} (v : V q a q*) → LM v ⊆ᴹ N)
-              (lc : ∀ {q a q*} (v : V q a q*) → Σ Pos λ s → Σ Pos λ s* → CarryAt valuesOf (LM v) HP HE LP (Ln q a) (Ln* q* a) s s*) where
+              (lc : ∀ {q a q*} (v : V q a q*) → Σ Pos λ s → Σ Pos λ s* → CarryAt valuesOf (LM v) HP HE LP (Ln q a) (Ln* q* a) s s*)
+              -- Two lanes' rows lie apart: one row is one lane's, imaged once.
+              (img-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {k l l′}
+                         → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → CarryAt.Img (proj₂ (proj₂ (lc v′))) k l′ → l ≡ l′)
+              (pb-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {k l l′}
+                        → CarryAt.PB (proj₂ (proj₂ (lc v))) k l → CarryAt.Img (proj₂ (proj₂ (lc v′))) k l′ → ⊥)
+              -- THE PAIRED JOINERS AGREE: every running value is paired, a
+              -- lane is cut where its partner is, and its end is joined, and
+              -- handed off, where its partner's is.
+              (paired : ∀ {q a} → o q (out a) → Runs q → Σ Pos (V q a))
+              (cut-agree : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut q k ⇔ Cut* q* l)
+              (done-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end
+                          → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
+              (hand-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand c ⇔ Hand* c*) where
   open Lanes Ln o Runs Cut Hand public
   module J* = Joining Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*
 
@@ -87,7 +101,6 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   -- a lane's end joined as its partner's is.
   postulate
     join-pb-few  : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → LanePB k l → k ∈ ks
-    join-pb-img  : ∀ {k l l′} → LanePB k l → LaneImg k l′ → ⊥
     join-pb-past : ∀ {k l e₀ e x y} → LanePB k l → tB k e₀ → (Unpinned e₀ → Live tB k) → u l e → N x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     join-img     : ∀ {k e} → tB k e → Unpinned e → Live tB k → Listed tB k → LP′ k
                  → (Σ Pos λ l → LaneImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′)
@@ -97,7 +110,6 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
     join-shown   : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
                  → Σ Pos λ k → LaneImg k l × Σ (Ev B) λ e₀ → tB k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
     join-img-row : ∀ {k l} → LaneImg k l → ¬ ¬ Σ (Ev B) λ e → tB k e × Unpinned e
-    join-img-fun : ∀ {k l l′} → LaneImg k l → LaneImg k l′ → l ≡ l′
     join-place   : ∀ {m e} → u m e → Live u m → Listed u m
                  → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → LaneImg k l × instantOf l ≡ instantOf m × Near u m l)
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
@@ -110,9 +122,15 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
                    × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ r × Home tB k₀ × instantOf k₀ ≡ instantOf k)
                       ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
+  img-fun : ∀ {k l l′} → LaneImg k l → LaneImg k l′ → l ≡ l′
+  img-fun (_ , _ , _ , v , i , _) (_ , _ , _ , v′ , i′ , _) = img-apart v v′ i i′
+
+  pb-img : ∀ {k l l′} → LanePB k l → LaneImg k l′ → ⊥
+  pb-img (_ , _ , _ , v , pb , _) (_ , _ , _ , v′ , i , _) = pb-apart v v′ pb i
+
   carried : CarryAt valuesOf N HP HE LP′ tB u p p′
   carried = record
-    { Img = LaneImg ; ext = ext ; PB = LanePB ; pb-few = join-pb-few ; pb-img = join-pb-img ; pb-past = join-pb-past
-    ; img = join-img ; img¬¬ = join-img¬¬ ; shown = join-shown ; img-row = join-img-row ; img-fun = join-img-fun
+    { Img = LaneImg ; ext = ext ; PB = LanePB ; pb-few = join-pb-few ; pb-img = pb-img ; pb-past = join-pb-past
+    ; img = join-img ; img¬¬ = join-img¬¬ ; shown = join-shown ; img-row = join-img-row ; img-fun = img-fun
     ; place = join-place ; live = join-live ; few = few ; whole = join-whole ; cover = join-cover ; bk = proj₁ join-bk
     ; in-bk = proj₂ join-bk ; pinned = join-pinned }

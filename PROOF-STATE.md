@@ -32,16 +32,26 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE JOINER'S DECISIONS
+
+Untried: the elaborated joiner decides as the plain one. Each running
+value is paired with the value its carrier reads; a lane is cut where its
+partner is; its end is joined and handed off where its partner's is.
+Open per op: switch's cut and exhaust's run read the outer against lane
+ends across the two maps; bounded's hand-off reads the queue. Settled
+when each holds for all four ops, or a refutation names the op.
+
+Members: `pair-all`, `pair-cut`, `pair-done`, `pair-hand`.
+
 #### THE JOINED LANES
 
-Untried: a joiner over lanes carried into another's, its running values
-paired value for value, carries its lane rows (`Joined`). Open: whether
-the paired joiners agree on which values run, where a lane is cut and
-which ends hand off — a lane's end must be joined end for end — and
-whether the lanes' maps keep the outer's facts. Settled when each field
-is a body or a refutation names the op that disagrees.
+Untried: a joiner over lanes carried into another's, its decisions
+agreeing, carries its lane rows (`Joined`). Open: whether the lanes'
+maps embed jointly with the outer's (`joined-maps`), rows of two lanes
+lying apart on both sides, and the fields read lane by lane. Settled
+when each is a body.
 
-Members: `join-pb-few`, `join-pb-img`, `join-pb-past`, `join-img`, `join-img¬¬`, `join-shown`, `join-img-row`, `join-img-fun`, `join-place`, `join-live`, `join-whole`, `join-cover`, `join-bk`, `join-pinned`, `joined-maps`, `joined-nest`.
+Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`.
 
 #### THE ERASURE
 

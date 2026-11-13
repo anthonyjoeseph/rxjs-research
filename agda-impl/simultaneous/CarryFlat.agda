@@ -17,12 +17,13 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
+open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
   module Joining; module Op; module Bounded; module Switch; module Exhaust; module Connect)
 open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW)
 open import denotation.Laws using (inv-approx; good-cons)
@@ -326,12 +327,31 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         lane-framed : ∀ {q a q*} → V q a q* → Σ PMap λ M_l → Σ Pos λ s → Σ Pos λ s*
                     → CarryAt valuesOf M_l (Hots envP) H₂ (HotsListed envP) (P.Ln op q a) (P*.Ln op q* a) s s*
 
+      LI : ∀ {q a q*} → V q a q* → Pos → Pos → Set
+      LI v = CarryAt.Img (proj₂ (proj₂ (proj₂ (lane-framed v))))
+
+      postulate
+        -- Two lanes' rows lie apart, each imaged once.
+        lanes-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {k l l′} → LI v k l → LI v′ k l′ → l ≡ l′
+        lanes-pb-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {k l l′}
+                       → CarryAt.PB (proj₂ (proj₂ (proj₂ (lane-framed v)))) k l → LI v′ k l′ → ⊥
+        -- THE ELABORATED JOINER DECIDES AS THE PLAIN ONE: each running
+        -- value paired, a lane cut where its partner is, its end joined
+        -- and handed off where its partner's is.
+        pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Σ Pos (V q a)
+        pair-cut : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k ⇔ P*.Cut op q* l
+        pair-done : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
+                  → Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
+                    ⇔ Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+        pair-hand : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P.Hand op c ⇔ P*.Hand op c*
+
       N : PMap
       N = M_s ∪ᴹ λ x y → Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → proj₁ (lane-framed v) x y
 
       module JD = Joined {HP = Hots envP} {HE = H₂} {LP = HotsListed envP} p q₁ o (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
                     o* (P*.Ln op) (P*.Runs op) (P*.Cut op) (P*.Hand op) V (λ (x , r , x* , r* , _) → x , r , x* , r*)
                     N (λ v → proj₁ (lane-framed v)) (λ {q} {a} {q*} v m → inj₂ (q , a , q* , v , m)) (λ v → proj₂ (lane-framed v))
+                    lanes-apart lanes-pb-apart pair-all pair-cut pair-done pair-hand
 
       postulate
         -- The lanes' map keeps what the outer's does.
