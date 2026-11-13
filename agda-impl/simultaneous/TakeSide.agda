@@ -7,20 +7,18 @@ module simultaneous.TakeSide where
 
 open import Data.Bool using (Bool; T; not; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_]; filter)
+open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
-open import Data.List.Membership.Propositional using (_∈_; lose)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻; ∈-cartesianProduct⁺)
-open import Data.List.Relation.Unary.Any using (here; there; any?; satisfied)
-open import Data.Bool.Properties using (T?)
-open import Data.Nat using (zero; suc)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import denotation.Position using (Pos; Label; ix; sub; last; _⊕_; root; _≟ᵖ_; _<ᵖ_; inside)
+open import denotation.Position using (Pos; Label; ix; sub; last; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; _≺_; _≼_;
   module TakeWhile)
@@ -61,14 +59,6 @@ cutEv x last    = end
 cut-unp : ∀ {X : Set} {incl a} {x : X} → Lab incl a → Unpinned (cutEv x a)
 cut-unp (inj₁ (refl , _)) = tt
 cut-unp (inj₂ refl)       = tt
-
-lab? : ∀ incl b → Dec (Lab incl b)
-lab? incl last         = yes (inj₂ refl)
-lab? incl (sub _)      = no λ { (inj₁ (() , _)) ; (inj₂ ()) }
-lab? incl (ix (suc _)) = no λ { (inj₁ (() , _)) ; (inj₂ ()) }
-lab? incl (ix zero) with T? incl
-... | yes i = yes (inj₁ (refl , i))
-... | no ni = no λ { (inj₁ (_ , i)) → ni i ; (inj₂ ()) }
 
 -- A value's cut and its carrier's, shown alike.
 cut-match : ∀ {A : Set} {incl a} {b : A} {n : Pos} → Lab incl a
@@ -269,116 +259,6 @@ module Side {X : Set} {H : Pos → Set} {s : Pos} (incl : Bool) (kp : X → Bool
   lst← : ∀ {w} → ¬ Failed w → Listed T′ w → Listed t w
   lst← {w} nf (ks , F , B) = ks , (λ {k} x kw → F (up x (unfailed nf (≺→≼ {k} {w} kw)) (pass-before x kw nf)) kw)
                            , λ {k} m → let (kw , e , y) = B m in kw , e , proj₁ (down y (unfailed nf (≺→≼ {k} {w} kw)))
-
-  -- Past a failure too: a listing decides each failure before it, so
-  -- each listed source row decides whether it is kept, and the first
-  -- failure's cuts are found under the rows listed.
-  private
-    fails-at? : ∀ {w} → Listed t w → ∀ c → c ≺ w → Dec (Fails c)
-    fails-at? (ks , F , B) c cw with any? (c ≟ᵖ_) ks
-    ... | no ¬m = no λ { (_ , x , _) → ¬m (F x cw) }
-    ... | yes m with fails? (proj₂ (proj₂ (B m)))
-    ...   | inj₁ f  = yes f
-    ...   | inj₂ nf = no nf
-
-    fail-before? : ∀ {w} → Listed t w → ∀ k → k ≼ w → ∀ c → Dec (c ≺ k × Fails c)
-    fail-before? {w} Lw k kw c with T? (c <ᵖ k)
-    ... | no nck = no λ { (ck , _) → nck ck }
-    ... | yes ck with fails-at? Lw c (≺-≼-≺ {c} {k} {w} ck kw)
-    ...   | yes f = yes (ck , f)
-    ...   | no nf = no λ { (_ , f) → nf f }
-
-    failed? : ∀ {w} → Listed t w → ∀ k → k ≼ w → Dec (Failed k)
-    failed? {w} Lw@(ks , F , _) k kw with any? (fail-before? Lw k kw) ks
-    ... | yes a = let (c , ck , a′ , x , nk) = satisfied a in yes (c , a′ , x , nk , ck)
-    ... | no na = no λ { (q , a , x , nk , qk) → na (lose (F x (≺-≼-≺ {q} {k} {w} qk kw)) (qk , a , x , nk)) }
-
-    -- Past a failure, only a pin whose connect is unfailed is kept.
-    past-fail : ∀ {c e e′} → t c e → Failed c → TakeT c e′ → Σ Pos λ r → t c (pin r) × ¬ Failed r
-    past-fail x fd (pass _ _ nf)    = ⊥-elim (nf fd)
-    past-fail x fd (step _ nf)      = ⊥-elim (nf fd)
-    past-fail x fd (tend _ nf)      = ⊥-elim (nf fd)
-    past-fail x fd (left x′ nfr _)  = _ , x′ , nfr
-    past-fail x fd (fail x′ _ _ _)  = ⊥-elim (flatT x′ x)
-    past-fail x fd (stop x′ _ _)    = ⊥-elim (flatT x′ x)
-
-    kept-pin : ∀ {c r e′} → t c (pin r) → Failed c → Failed r → TakeT c e′ → ⊥
-    kept-pin x fd fr y with past-fail x fd y
-    ... | _ , x′ , nfr with InvAt.func I x x′
-    ...   | refl = nfr fr
-
-    no-pin : ∀ {c e e′} → t c e → Unpinned e → Failed c → TakeT c e′ → ⊥
-    no-pin x un fd y with past-fail x fd y
-    ... | _ , x′ , _ with InvAt.func I x x′
-    no-pin x () fd y | _ , x′ , _ | refl
-
-    kept? : ∀ {w c} e → Listed t w → t c e → c ≺ w → Failed c → Dec (Σ _ (T′ c))
-    kept? {w} {c} (pin r) Lw x cw fd with failed? Lw r (≼-trans {r} {c} {w} (⊑-≼ (inside-⊑ r c (ins x))) (≺→≼ {c} {w} cw))
-    ... | no nfr = yes (pin r , lift (left x nfr (ins x)))
-    ... | yes fr = no λ { (_ , y , _) → kept-pin x fd fr y }
-    kept? (out _) Lw x cw fd = no λ { (_ , y , _) → no-pin x tt fd y }
-    kept? skip    Lw x cw fd = no λ { (_ , y , _) → no-pin x tt fd y }
-    kept? end     Lw x cw fd = no λ { (_ , y , _) → no-pin x tt fd y }
-
-    row-src? : ∀ {w c e} → Listed t w → t c e → c ≺ w → Dec (Σ _ (T′ c))
-    row-src? {w} {c} Lw x cw with failed? Lw c (≺→≼ {c} {w} cw)
-    ... | yes fd = kept? _ Lw x cw fd
-    ... | no nf with fails? x
-    ...   | inj₂ nfs = yes (_ , up x nf (pass-of nfs x))
-    ...   | inj₁ f   = no λ { (_ , y) → pass-fails (proj₁ (down y nf)) (proj₂ (down y nf)) f }
-
-    cutAt : Pos × Label → Pos
-    cutAt (q , b) = q ⊕ [ b ]
-
-    labs : List Label
-    labs = ix 0 ∷ last ∷ []
-
-  lst-any : ∀ {w} → Listed t w → Listed T′ w
-  lst-any {w} Lw@(ks , F , B) = filter src? ks ++ L.map cutAt (filter cut? (L.cartesianProduct ks labs)) , F′ , B′
-    where
-      src? : ∀ c → Dec (c ≺ w × Σ _ (T′ c) × Σ _ (t c))
-      src? c with T? (c <ᵖ w)
-      ... | no ncw = no λ { (cw , _) → ncw cw }
-      ... | yes cw with any? (c ≟ᵖ_) ks
-      ...   | no ¬m = no λ { (_ , _ , (_ , x)) → ¬m (F x cw) }
-      ...   | yes m with row-src? Lw (proj₂ (proj₂ (B m))) cw
-      ...     | yes r  = yes (cw , r , proj₂ (B m))
-      ...     | no ¬r = no λ { (_ , r , _) → ¬r r }
-
-      cut? : ∀ qb → Dec (First (proj₁ qb) × Lab incl (proj₂ qb) × cutAt qb ≺ w)
-      cut? (q , b) with T? ((q ⊕ [ b ]) <ᵖ w)
-      ... | no nw = no λ { (_ , _ , qw) → nw qw }
-      ... | yes qbw with lab? incl b
-      ...   | no nl = no λ { (_ , l , _) → nl l }
-      ...   | yes l with fails-at? Lw q (≺-trans {q} {q ⊕ [ b ]} {w} (≺-ext q []) qbw)
-                       | failed? Lw q (≺→≼ {q} {w} (≺-trans {q} {q ⊕ [ b ]} {w} (≺-ext q []) qbw))
-      ...     | no nf′ | _     = no λ { ((f , _) , _) → nf′ f }
-      ...     | yes _  | yes fd = no λ { ((_ , nf) , _) → nf fd }
-      ...     | yes f  | no nf  = yes ((f , nf) , l , qbw)
-
-      src-in : ∀ {r e e′} → T′ r e → t r e′ → r ≺ w → r ∈ filter src? ks ++ L.map cutAt (filter cut? (L.cartesianProduct ks labs))
-      src-in y x rw = ∈-++⁺ˡ (∈-filter⁺ src? (F x rw) (rw , (_ , y) , (_ , x)))
-
-      cut-in : ∀ {q a b} → t q (out a) → T (not (kp a)) → ¬ Failed q → Lab incl b → b ∈ labs → (q ⊕ [ b ]) ≺ w
-             → (q ⊕ [ b ]) ∈ filter src? ks ++ L.map cutAt (filter cut? (L.cartesianProduct ks labs))
-      cut-in {q} {b = b} x nk nf l bl qw =
-        ∈-++⁺ʳ (filter src? ks) (∈-map⁺ cutAt (∈-filter⁺ cut? (∈-cartesianProduct⁺ (F x (≺-trans {q} {q ⊕ [ b ]} {w} (≺-ext q []) qw)) bl)
-          (((_ , x , nk) , nf) , l , qw)))
-
-      F′ : ∀ {r e} → T′ r e → r ≺ w → r ∈ filter src? ks ++ L.map cutAt (filter cut? (L.cartesianProduct ks labs))
-      F′ y@(pass x _ _ , _)     rw = src-in y x rw
-      F′ y@(step x _ , _)       rw = src-in y x rw
-      F′ y@(tend x _ , _)       rw = src-in y x rw
-      F′ y@(left x _ _ , _)     rw = src-in y x rw
-      F′ (fail x nk nf inc , _) rw = cut-in x nk nf (inj₁ (refl , inc)) (here refl) rw
-      F′ (stop x nk nf , _)     rw = cut-in x nk nf (inj₂ refl) (there (here refl)) rw
-
-      B′ : ∀ {r} → r ∈ filter src? ks ++ L.map cutAt (filter cut? (L.cartesianProduct ks labs)) → r ≺ w × Σ _ (T′ r)
-      B′ m with ∈-++⁻ (filter src? ks) m
-      ... | inj₁ ms = let (rw , r , _) = proj₂ (∈-filter⁻ src? {xs = ks} ms) in rw , r
-      ... | inj₂ mc with ∈-map⁻ cutAt mc
-      ...   | (q , b) , mq , refl with proj₂ (∈-filter⁻ cut? {xs = L.cartesianProduct ks labs} mq)
-      ...     | ((a , x , nk) , nf) , l , qbw = qbw , cutEv a b , cut-row x nk nf l
 
   few→ : ∀ {k} → Few t k → Few T′ k
   few→ {k} (ks , F) = ks ++ L.map (λ q → q ⊕ [ ix 0 ]) ks ++ L.map (λ q → q ⊕ [ last ]) ks , pick

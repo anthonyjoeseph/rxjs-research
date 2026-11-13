@@ -45,7 +45,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Narrow; PinList; pins-map; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.CarryBase using (InOrder; from-map; PMap; Emb; CarryAt; Narrow; PinList; pins-map; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
 open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
@@ -373,11 +373,15 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     pinU↓ (E.spin x , _) = x
 
     pinned′ : ∀ {k p} → S k (pin p) → Live S k → Listed S k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
+              → InOrder Img PB S S′ k
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) lv L lp with pinned x (liveS← {k} (λ {c} → lv {c})) (lstS← L) lp
-    ... | (l , p′ , ul , m , b , ls) , h = (l , p′ , spinU ul , m , b , UL.lst→ {l} ls) , homed {k} {p} h
+    ... | (l , (_ , ul) , m , ls , F) , h =
+      (l , (proj₁ (upL ls ul) , proj₁ (proj₂ (upL ls ul))) , m , UL.lst→ {l} ls
+        , from-map {Img = Img} {PB} {Img} {PB} {t = t} {S} {u} {S′} (λ {k′} y lk → _ , proj₁ (proj₂ (down y)) , liveS← {k′} (λ {c} → lk {c}))
+            (λ m′ → m′) (λ y → _ , proj₁ (proj₂ (downU y))) {k} {l} (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂}))
+      , homed {k} {p} h
 
 
   scanned : CarryAt stateValues M HP HE LP S S′ s s′

@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; Narrow; PinList; IntoAt; Near; Home; Whole; From;
+open import simultaneous.CarryBase using (InOrder; unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; Narrow; PinList; IntoAt; Near; Home; Whole; From;
   Ahead; ahead-under; ahead-over; few-sub; sub-listed; instant-⊕; apart)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.Carry using (annValues; PastOver; Anchor; anchor-grow)
@@ -414,18 +414,26 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
       conn-whole : Whole t → (∀ {c} → t c end → ⊥) → (∀ {q} → LP q) → Whole u
       conn-cover : ∀ {v w} → Listed t v → LP v → Live t v → From ConnImg PB′ t u v w → Listed u w
 
-    -- A live pin's carrier, the elaborated connect listed before it.
-    -- DEAD ROUTE: the carrier's rows from the plain ones up to the pin.
-    --   The connect pins each row of its source's burst, and a source pin
-    --   carried late into its instant has elaborated values before its
-    --   carrier whose plain rows come after it, so their elaborated pins
-    --   precede the carrier while their plain pins follow the pin; the
-    --   hypotheses stop at the pin.
+    -- A live pin's carrier in order: a body pin's on the body's carrier,
+    -- a source pin's on the source's moved under the burst or its echo;
+    -- each followed by the other subterm's carriers of every later row.
+    -- DEAD ROUTE: the pin's own carrier, listed.  A source pin carried
+    --   late has the elaborated source value before it, and a body that
+    --   answers that value with an endless synchronous burst puts endlessly
+    --   many rows before that carrier, while the plain pin stays listed.
     postulate
-      conn-pinned : ∀ {k q} → t k (pin q) → Live t k → Listed t k → LP k
-                  → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × Targeted M′ q q′ × Listed u l)
-                    × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
-                       ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+      conn-first : ∀ {k q} → t k (pin q) → Live t k → Listed t k → LP k
+                 → (Σ Pos λ l → Σ (Ev (IE B)) (u l) × PB′ k l × From ConnImg PB′ t u k l)
+                   × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
+                      ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+
+    -- Listed before it as the connect is before the pin.
+    conn-pinned : ∀ {k q} → t k (pin q) → Live t k → Listed t k → LP k
+                → InOrder ConnImg PB′ t u k
+                  × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
+                     ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+    conn-pinned {k} tk lv L lp with conn-first tk lv L lp
+    ... | (l , ul , pb , F) , h = (l , ul , pb , conn-cover L lp lv (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂}) , (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂})) , h
 
     -- ACROSS THE CONNECT'S TWO SUBTERMS: the elaborated source listed
     -- before the elaborated body row a reached body row is carried on,

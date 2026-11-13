@@ -14,7 +14,7 @@
 -- ends it, so its rows are its source's.
 module simultaneous.CarryTake where
 
-open import Data.Bool using (Bool; T; not)
+open import Data.Bool using (Bool; T; not; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
@@ -27,11 +27,11 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (takeWhile)
-open import denotation.Position using (Pos; ix; last; _⊕_; root; _≟ᵖ_; inside)
-open import denotation.Events using (Timeline; fresh)
+open import denotation.Position using (Pos; Label; ix; last; _⊕_; root; _≟ᵖ_; inside)
+open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Reach; Few; _≺_; _≼_; module Op;
   approx)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-≺-≺; ≺-absurd; ≺→≼; ≼-refl; ≼-or-≻; ≼-split; ≺-ext; entered-reach)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-≺-≺; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; ≺-ext; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; W⁼; inW; step; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc;
   ⊕-injʳ; ⊑-inside; W; conv)
 open import denotation.Laws using (inv-approx)
@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
-open import simultaneous.CarryBase using (From; Targeted; Narrow; PinList; unp-pin; ahead-under; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb;
+open import simultaneous.CarryBase using (From; InOrder; Targeted; Narrow; PinList; unp-pin; ahead-under; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb;
   CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; instant-⊕; sub-listed; few-sub;
   match-val; carried-val; IntoAt; Ahead; ahead-over)
 open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
@@ -159,7 +159,11 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
   PB′ : Pos → Pos → Set
   PB′ k m = (Σ (Ev (IE A)) (u m) × Σ (Ev A) (t k) × Kept k × C.PB k m)
-          ⊎ Σ Pos λ f → Σ Pos λ k₀ → Q.First f × C.Img k₀ f × m ≡ f ⊕ [ last ] × P.First k₀ × k ≺ k₀ × Σ (Ev A) (t k) × Σ Pos (C.PB k)
+          ⊎ Σ Pos λ f → Σ Pos λ k₀ → Q.First f × C.Img k₀ f × Σ Label (λ a → Lab incl a × m ≡ f ⊕ [ a ]) × P.First k₀ × k ≺ k₀ × Σ (Ev A) (t k) × Σ Pos (C.PB k)
+
+  -- The taken run listed before a point its carriers follow.
+  postulate
+    take-cover : ∀ {v w} → Listed P.T′ v → LP v → Live P.T′ v → From Img′ PB′ P.T′ Q.T′ v w → Listed Q.T′ w
 
   private
     live-of : ∀ {k e₀} → Kept k → t k e₀ → (Unpinned e₀ → Live P.T′ k) → Unpinned e₀ → Live t k
@@ -283,7 +287,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     cut-into {k} {f} tk nfk pb ff@((instEmit (value b) n , uf , ny) , nff) L with C.shown uf (b , refl) (Q.live-out uf) (Q.few-out uf)
     ... | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
     ...   | refl = f ⊕ [ last ] , (end , Q.cut-row uf ny nff (inj₂ refl)) , Q.lst-cut ff L (inj₂ refl)
-                 , inj₂ (f , k₀ , ff , i₀ , refl , ((b , tk₀ , ny) , e2 i₀ nff) , before , (skip , tk) , (_ , pb))
+                 , inj₂ (f , k₀ , ff , i₀ , (last , inj₂ refl , refl) , ((b , tk₀ , ny) , e2 i₀ nff) , before , (skip , tk) , (_ , pb))
       where
         before : k ≺ k₀
         before with ≼-or-≻ k k₀
@@ -324,7 +328,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     pb-few′ : ∀ {m e} → Q.T′ m e → Σ (List Pos) λ ks → ∀ {k} → PB′ k m → k ∈ ks
     pb-few′ (r , _) with Q.view r
     ... | inj₁ (um , _) = proj₁ (C.pb-few um) , λ { (inj₁ (_ , _ , _ , pb)) → proj₂ (C.pb-few um) pb
-                                                   ; (inj₂ (_ , _ , ((_ , uf , _) , _) , _ , eq , _)) → ⊥-elim (InvAt.flat Iu uf (subst (λ z → u z _) eq um)) }
+                                                   ; (inj₂ (_ , _ , ((_ , uf , _) , _) , _ , (_ , _ , eq) , _)) → ⊥-elim (InvAt.flat Iu uf (subst (λ z → u z _) eq um)) }
     ... | inj₂ (q , instEmit (mark _) _ , _ , () , _)
     ... | inj₂ (q , instEmit (value b) n , uq , ny , nfq , a , lb , refl , refl) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
     ...   | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
@@ -474,7 +478,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
       where
         k₁k : k₁ ≺ k
         k₁k = ≺-trans {k₁} {k₁ ⊕ [ a ]} {k} (≺-ext k₁ []) xk
-    pb-past′ {k} {x = x} {y} (inj₂ (f , k₀ , _ , i₀ , refl , _ , kk , _)) _ _ _ (inj₁ m) xk nxk with C.ext i₀
+    pb-past′ {k} {x = x} {y} (inj₂ (f , k₀ , _ , i₀ , (_ , _ , refl) , _ , kk , _)) _ _ _ (inj₁ m) xk nxk with C.ext i₀
     ... | y₀ , m₀ , y₀f =
       ahead-over (Emb.mono hm m m₀ xk₀ , λ yy → nxk₀ (Emb.reflect hm m m₀ yy)) (⊑-trans y₀f (⊑-snoc⁺ f))
       where
@@ -482,7 +486,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
         xk₀ = ≺-trans {x} {k} {k₀} xk kk
         nxk₀ : ¬ (x ⊑ k₀)
         nxk₀ xk′ = nxk (conv (⊑-refl x) (≺→≼ {x} {k} xk) kk xk′)
-    pb-past′ {k} (inj₂ (_ , k₀ , _ , _ , refl , (_ , nf₀) , kk , _)) _ _ _ (inj₂ (cut {k₀ = k₁} {a = a} tk₁ nk₁ _ _ _ _ refl refl)) xk _ =
+    pb-past′ {k} (inj₂ (_ , k₀ , _ , _ , (_ , _ , refl) , (_ , nf₀) , kk , _)) _ _ _ (inj₂ (cut {k₀ = k₁} {a = a} tk₁ nk₁ _ _ _ _ refl refl)) xk _ =
       ⊥-elim (nf₀ (k₁ , _ , tk₁ , nk₁ , ≺-trans {k₁} {k} {k₀} (≺-trans {k₁} {k₁ ⊕ [ a ]} {k} (≺-ext k₁ []) xk) kk))
 
     ----------------------------------------------------------------------
@@ -501,7 +505,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     home-up {p} {k₀} nfp kp h n = h λ { (e , tk , un) → n (e , P.up tk (P.unfailed nfp (≺→≼ {k₀} {p} kp)) (P.pass-before tk kp nfp) , un) }
 
     PinOut : Pos → Pos → Set
-    PinOut k p = (Σ Pos λ l → Σ Pos λ p′ → Q.T′ l (pin p′) × PB′ k l × Targeted M′ p p′ × Listed Q.T′ l)
+    PinOut k p = InOrder Img′ PB′ P.T′ Q.T′ k
                  × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home P.T′ k₀ × instantOf k₀ ≡ instantOf k)
                     ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -512,15 +516,96 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     homed nfp (inj₂ (inj₁ (k₀ , kp , h , ek))) = inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
     homed nfp (inj₂ (inj₂ hh))                = inj₂ (inj₂ hh)
 
+    -- The least cut label: the failing value shown under it, or the end.
+    lo : Bool → Label
+    lo true  = ix 0
+    lo false = last
+
+    lo-lab : ∀ b → Lab b (lo b)
+    lo-lab true  = inj₁ (refl , tt)
+    lo-lab false = inj₂ refl
+
+    lo-min : ∀ {b a} f → Lab b a → (f ⊕ [ lo b ]) ≼ (f ⊕ [ a ])
+    lo-min {true}  f (inj₁ (refl , _)) = ≼-refl {f ⊕ [ ix 0 ]}
+    lo-min {true}  f (inj₂ refl)       = ≺→≼ {f ⊕ [ ix 0 ]} {f ⊕ [ last ]} (subst T (sym (<ᵖ-part f [] [] refl)) tt)
+    lo-min {false} f (inj₁ (_ , ()))
+    lo-min {false} f (inj₂ refl)       = ≼-refl {f ⊕ [ last ]}
+
+    -- Past the first failing carrier, a row of the taken run lies at or
+    -- after the least cut under it.
+    past-first : ∀ {f l₁ e} → Q.First f → f ≼ l₁ → Q.T′ l₁ e → (f ⊕ [ lo incl ]) ≼ l₁
+    past-first {f} {l₁} ff fl z with ≼-split {f} {l₁} fl
+    ... | inj₂ refl = ⊥-elim (Q.none-at ff (proj₁ z))
+    ... | inj₁ fl′ with Q.view (proj₁ z)
+    ...   | inj₁ (ul₁ , _) = ≺→≼ {f ⊕ [ lo incl ]} {l₁} (Q.cut-before (proj₁ (proj₂ (proj₁ ff))) ul₁ fl′ (lo incl))
+    ...   | inj₂ (q , _ , uq , nk , nfq , b , lb , refl , _) with Q.first ((_ , uq , nk) , nfq) ff
+    ...     | refl = lo-min f lb
+
+    -- The plain row a first failing carrier carries, past an unfailed pin.
+    first-src : ∀ {k r f} → t k (pin r) → ¬ P.Failed k → Q.First f → Σ Pos λ k₀ → C.Img k₀ f × P.First k₀ × k ≺ k₀
+    first-src _ _ ((instEmit (mark _) _ , _ , ()) , _)
+    first-src {k} tk nfk ((instEmit (value b) n , uf , ny) , nff) with C.shown uf (b , refl) (Q.live-out uf) (Q.few-out uf)
+    ... | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
+    ...   | refl = k₀ , i₀ , ((b , tk₀ , ny) , e2 i₀ nff) , before
+      where
+        before : k ≺ k₀
+        before with ≼-or-≻ k k₀
+        ... | inj₂ k₀k = ⊥-elim (nfk (k₀ , b , tk₀ , ny , k₀k))
+        ... | inj₁ kk₀ with ≼-split {k} {k₀} kk₀
+        ...   | inj₁ lt   = lt
+        ...   | inj₂ refl with InvAt.func It tk tk₀
+        ...     | ()
+
+    -- Carried from a source row on, read across the take: a cut's
+    -- carrier lies under its failing value's, and a row carried onto the
+    -- end cut precedes that value.
+    from-take : ∀ {k e l} → t k e → From C.Img C.PB t u k l → From Img′ PB′ P.T′ Q.T′ k l
+    from-take tk F y lv kk₁ (inj₁ (inj₁ (i , nf , _))) z =
+      F (proj₁ (P.down y nf)) (P.live← nf lv) kk₁ (inj₁ i) (proj₁ (Q.down z (e1 i nf)))
+    from-take {k} {l = l} tk F y lv kk₁ (inj₁ (inj₂ (cut {k₀ = k₀} {l₀ = l₀} {a = a} tk₀ _ _ i₀ ul₀ _ refl refl))) _ =
+      ≼-trans {l} {l₀} {l₀ ⊕ [ a ]} (F tk₀ (P.live-out tk₀) kk₀ (inj₁ i₀) ul₀) (≺→≼ {l₀} {l₀ ⊕ [ a ]} (≺-ext l₀ []))
+      where
+        kk₀ : k ≼ k₀
+        kk₀ with ≼-or-≻ k k₀
+        ... | inj₁ le  = le
+        ... | inj₂ k₀k = ⊥-elim (≺-irrefl {k} (≼-≺-≺ {k} {k₀ ⊕ [ a ]} {k} kk₁ (P.cut-before tk₀ tk k₀k a)))
+    from-take tk F y lv kk₁ (inj₂ (inj₁ ((_ , um) , (_ , tk₁) , _ , pb))) _ =
+      F tk₁ (P.live← (P.live-unfailed lv tk₁) lv) kk₁ (inj₂ pb) um
+    from-take {k} {_} {l} tk F {k₁} y lv kk₁ (inj₂ (inj₂ (f , k₀ , ((_ , uf , _) , _) , i₀ , (a , _ , refl) , ((_ , tk₀ , _) , _) , k₁k₀ , _))) _ =
+      ≼-trans {l} {f} {f ⊕ [ a ]} (F tk₀ (P.live-out tk₀) (≼-trans {k} {k₁} {k₀} kk₁ (≺→≼ {k₁} {k₀} k₁k₀)) (inj₁ i₀) uf) (≺→≼ {f} {f ⊕ [ a ]} (≺-ext f []))
+
+    -- A pin before the failure, carried in order: on the source's
+    -- in-order carrier, or, where that carrier is the first failing value,
+    -- on the least cut the take puts under it.  No failure precedes that
+    -- carrier: the failing value's own carrier would precede it.
+    take-first : ∀ {k r} → t k (pin r) → ¬ P.Failed k → InOrder C.Img C.PB t u k
+               → Σ Pos λ l → Σ (Ev (IE A)) (Q.T′ l) × PB′ k l × From Img′ PB′ P.T′ Q.T′ k l
+    take-first {k} tk nfk (l , (e , ul) , pb , Ls , F) with Q.search Ls
+    ... | inj₂ (f , ff , fl) with first-src tk nfk ff
+    ...   | k₀ , i₀ , ((_ , tk₀ , _) , _) , kk₀ =
+      ⊥-elim (≺-irrefl {l} (≼-≺-≺ {l} {f} {l} (F tk₀ (P.live-out tk₀) (≺→≼ {k} {k₀} kk₀) (inj₁ i₀) (proj₁ (proj₂ (proj₁ ff)))) fl))
+    take-first {k} tk nfk (l , (e , ul) , pb , Ls , F) | inj₁ nfl with Q.fails? ul
+    ... | inj₂ nfsl = l , (_ , Q.up ul nfl (Q.pass-of nfsl ul)) , inj₁ ((_ , ul) , (_ , tk) , inj₁ nfk , pb)
+                    , from-take tk (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂})
+    ... | inj₁ fs@(_ , uf , nk) with first-src tk nfk (fs , nfl)
+    ...   | k₀ , i₀ , pf , kk₀ =
+      l ⊕ [ lo incl ] , (_ , Q.cut-row uf nk nfl (lo-lab incl))
+      , inj₂ (l , k₀ , (fs , nfl) , i₀ , (lo incl , lo-lab incl , refl) , pf , kk₀ , (_ , tk) , (l , pb))
+      , λ {k₁} {e₁} {l₁} {e₂} y lv kk₁ m z → past-first (fs , nfl) (from-take tk (λ {k₂} {e₃} {l₂} {e₄} → F {k₂} {e₃} {l₂} {e₄}) {k₁} {e₁} {l₁} {e₂} y lv kk₁ m z) z
+
+    -- Listed as the taken run is before it.
+    take-in-order : ∀ {k r} → t k (pin r) → ¬ P.Failed k → Live P.T′ k → Listed P.T′ k → LP k → InOrder Img′ PB′ P.T′ Q.T′ k
+    take-in-order tk nfk lv L lp with take-first tk nfk (proj₁ (C.pinned tk (P.live← nfk lv) (P.lst← nfk L) lp))
+    ... | l , ul , pb , F = l , ul , pb , take-cover L lp lv (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂}) , (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂})
+
     -- A LIVE PIN IS NEVER PAST THE FAILURE: the taken run ends at the
     -- failing value's end cut, before every row it keeps past it.
     pinned′ : ∀ {k p} → P.T′ k (pin p) → Live P.T′ k → Listed P.T′ k → LP k → PinOut k p
     pinned′ {k} {p} (P.left tk nfp _ , _) lv L lp with P.failed-at? L tk
     ... | yes fk with P.first-at L tk fk
     ...   | f , ((_ , tf , nkf) , nff) , fc = ⊥-elim (≺-irrefl {k} (≼-≺-≺ {k} {f ⊕ [ last ]} {k} (lv (P.cut-row tf nkf nff (inj₂ refl))) fc))
-    pinned′ {k} {p} (P.left tk nfp _ , _) lv L lp | no nfk with C.pinned tk (P.live← nfk lv) (P.lst← nfk L) lp
-    ... | (l , p′ , ul , mb , bd , ls) , h =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , inj₁ nfk , mb) , aimed bd , Q.lst-any ls) , homed {k} {p} nfp h
+    pinned′ {k} {p} (P.left tk nfp _ , _) lv L lp | no nfk =
+      take-in-order tk nfk lv L lp , homed {k} {p} nfp (proj₂ (C.pinned tk (P.live← nfk lv) (P.lst← nfk L) lp))
 
     -- A PIN KEPT IS CARRIED FROM ITS OWN PAST, as its source's: its
     -- connect is subscribed before the failure, so the rows before it
@@ -533,10 +618,6 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ... | (l , p′ , ul , mb , bd , Pu) , h =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , inj₂ (_ , tk) , mb) , aimed bd
          , Q.pins→ (pin-unfailed nfp bd) Pu) , homed {k} {p} nfp h
-
-  -- The taken run listed before a point its carriers follow.
-  postulate
-    take-cover : ∀ {v w} → Listed P.T′ v → LP v → Live P.T′ v → From Img′ PB′ P.T′ Q.T′ v w → Listed Q.T′ w
 
   carried′ : CarryAt valuesOf M′ HP HE LP P.T′ Q.T′ s s′
   carried′ = record
@@ -554,7 +635,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
   pb-anchor {l = l} (inj₁ (_ , (_ , tk) , nfk , pb)) (r , _) lv with P.view r
   ... | inj₁ (tk′ , _) = inj₁ (l , pb , ⊑-refl l , _ , tk′ , live-of nfk tk′ lv)
   ... | inj₂ (_ , _ , x₀ , _ , _ , _ , _ , refl , _) = ⊥-elim (flatP x₀ tk)
-  pb-anchor (inj₂ (f , k₀ , _ , i₀ , refl , _ , kk , _)) _ _ with C.ext i₀
+  pb-anchor (inj₂ (f , k₀ , _ , i₀ , (_ , _ , refl) , _ , kk , _)) _ _ with C.ext i₀
   ... | y₀ , m₀ , y₀f = inj₂ (k₀ , y₀ , inj₁ m₀ , ⊑-trans y₀f (⊑-snoc⁺ f) , kk)
 
 ------------------------------------------------------------------------

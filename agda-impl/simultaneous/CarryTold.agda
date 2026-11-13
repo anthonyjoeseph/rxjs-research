@@ -33,8 +33,8 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads; Carried; Live)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (From; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
-  sub-listed; ahead-over)
+open import simultaneous.CarryBase using (From; InOrder; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt;
+  Near; Home; instant-⊕; sub-listed; ahead-over)
 open import simultaneous.ReadRows using (up; up-⊕)
 open import simultaneous.ToldRows using (told; module Told)
 
@@ -366,21 +366,21 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     ... | inj₂ none = [] , λ { (_ , _ , _ , y₂ , eq) → ⊥-elim (none y₂ eq) }
     ... | inj₁ (l , _ , yl , refl) = proj₁ (C.pb-few yl) , λ { (l₂ , pb , _ , y₂ , eq) → proj₂ (C.pb-few yl) (subst (C.PB _) (sym (told-inj yl y₂ eq)) pb) }
 
+    -- A told carrier is carried from as its source was: the told run
+    -- moves every carrier down to its row's image (`δ`), and a carrier
+    -- the source's carriers follow from a row on, moved, is followed by
+    -- theirs moved.  Open is the order of two moved carriers, one under
+    -- the other's row.
+    postulate
+      told-follows : ∀ {k l e} → σ l e → From C.Img C.PB t σ k l → From Img′ PB′ t τ k (l ⊕ δ e)
+
     pinned′ : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → τ l (pin p′) × PB′ k l × Targeted M p p′ × Listed τ l)
+            → InOrder Img′ PB′ t τ k
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} tk lv L lp with C.pinned tk lv L lp
-    ... | (l , p′ , y , pb , B , Ll) , h = carrier (told-row y (few-of Ll)) , h
-      where
-        carrier : (Σ (Ev Y) λ e′ → τ (l ⊕ [ ix 0 ]) e′ × Told (pin p′) e′)
-                → Σ Pos λ l′ → Σ Pos λ r → τ l′ (pin r) × PB′ k l′ × Targeted M p r × Listed τ l′
-        carrier (pin r , y′ , t-pin rr) = l ⊕ [ ix 0 ] , r , y′ , (l , pb , pin p′ , y , refl) , B′ rr , told-listed y Ll
-          where
-            -- A pin retold to the told run's own connect, before the source's.
-            B′ : r ≡ p′ ⊎ r ≡ q → Targeted M p r
-            B′ (inj₁ refl) = B
-            B′ (inj₂ refl) = proj₁ B , proj₁ (proj₂ B) , ≺→≼ {q} {proj₁ B} (≺-≼-≺ {q} {p′} {proj₁ B} (told-pin-past y) (proj₂ (proj₂ B)))
+    ... | (l , (e , y) , pb , Ll , F) , h with told-row y (few-of Ll)
+    ...   | e′ , y′ , _ = (l ⊕ δ e , (e′ , y′) , (l , pb , e , y , refl) , told-listed y Ll , told-follows {k} {l} {e} y (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂})) , h
 
   -- The told run listed before a point its carriers follow.  The told
   -- run moves each carrier down to its image (`δ`): a point between a
