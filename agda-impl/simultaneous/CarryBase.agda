@@ -410,6 +410,19 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
+-- A PIN CARRIED FROM ITS OWN PAST: the rows before its connect listed,
+-- never the rows between, which a cut past the connect hides.  A full
+-- subterm's carry has it; a told run does not, since it pins every row
+-- of its burst to its own connect, so its carrier waits on rows the
+-- pin does not, an inner connect's body among them.
+record Narrow {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
+              (c : CarryAt f M HP HE LP t u s s′) : Set₁ where
+  field
+    pinned↓ : ∀ {k p} → t k (pin p) → Listed t p → LP p
+            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × CarryAt.PB c k l × Targeted M p p′)
+              × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
+                 ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+
 ------------------------------------------------------------------------
 -- Relabelled rows
 
@@ -577,6 +590,14 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     placed′ {m} (inj₂ (inj₁ (k , l , i , e , n))) = inj₂ (inj₁ (k , l , i , e , U.near→ {m} {l} n))
     placed′ (inj₂ (inj₂ h))                   = inj₂ (inj₂ h)
 
+    homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
+               ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+           → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
+               ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+    homed′ (inj₁ e)                         = inj₁ e
+    homed′ (inj₂ (inj₁ (k₀ , kp , hm , ek))) = inj₂ (inj₁ (k₀ , kp , (λ n → hm λ r → n (up-row r)) , ek))
+    homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
+
     pinned′ : ∀ {k p} → t′ k (pin p) → Listed t′ k → LP k
               → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′ × Listed u′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
@@ -585,14 +606,6 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ... | _ , tk₀ , r with kin r
     ...   | k-pin with pinned tk₀ (T.lst← {k} L) lp
     ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , U.lst→ {l} ls) , homed′ {k} {p} h
-      where
-        homed′ : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
-                   ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
-               → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
-                   ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
-        homed′ (inj₁ e)                         = inj₁ e
-        homed′ (inj₂ (inj₁ (k₀ , kp , hm , ek))) = inj₂ (inj₁ (k₀ , kp , (λ n → hm λ r → n (up-row r)) , ek))
-        homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
 
   carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
@@ -606,6 +619,18 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (λ un → T.live← {k} (λ {c} → lv (unp→ (kin (proj₂ (proj₂ (down tk)))) un) {c})) (proj₁ (proj₂ (down′ ul))) }
+
+  narrowed : Narrow c → Narrow carried
+  narrowed nc = record { pinned↓ = pinned↓′ }
+    where
+      pinned↓′ : ∀ {k p} → t′ k (pin p) → Listed t′ p → LP p
+               → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′)
+                 × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
+                    ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+      pinned↓′ {k} {p} tk L lp with down tk
+      ... | _ , tk₀ , r with kin r
+      ...   | k-pin with Narrow.pinned↓ nc tk₀ (T.lst← {p} L) lp
+      ...     | (l , p′ , ul , m , b) , h = (l , p′ , up-pin′ ul , m , b) , homed′ {k} {p} h
 
 ------------------------------------------------------------------------
 -- A map
