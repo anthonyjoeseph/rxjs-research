@@ -318,7 +318,7 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
     emb′ = emb-pairs pair
 
   module Body (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (emb′ : Emb (M_b ∪ᴹ Echo))
-              (c_b : CarryAt valuesOf M_b HP (HE ∪ʰ Proper CE.σ) (λ q → Listed o q × LP q) tB CE.β p (p′ ⊕ [ ix 0 ]))
+              (c_b : CarryAt valuesOf M_b (HP ∪ʰ o) (HE ∪ʰ Proper CE.σ) (λ q → Listed o q × LP q) tB CE.β p (p′ ⊕ [ ix 0 ]))
               (past-s : PastOver c_s M_b)
               (nest-v : ∀ {k l e₀ h L a σ} → CarryAt.PB c_b k l → tB k e₀ → (Unpinned e₀ → Live tB k) → Σ A (λ b → o h (out b)) → S′.Img h L
                       → k ≡ h ⊕ (a ∷ σ) → Anchor M_b k l h a) where

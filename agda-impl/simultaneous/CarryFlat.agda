@@ -207,10 +207,10 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       -- The lanes' carry.
       LaneCarry : PMap → Set₁
-      LaneCarry M_b = CarryAt valuesOf M_b (Hots envP) (Hots envE ∪ʰ Proper FW.CE.σ) (λ q → Listed o q × HotsListed envP q) FW.tB FW.CE.β p (p′ ⊕ [ ix 0 ])
+      LaneCarry M_b = CarryAt valuesOf M_b (Hots envP ∪ʰ o) (Hots envE ∪ʰ Proper FW.CE.σ) (λ q → Listed o q × HotsListed envP q) FW.tB FW.CE.β p (p′ ⊕ [ ix 0 ])
 
       -- A lane's late carrier strictly under a value's row, anchored.
-      NestAt : ∀ {M_b : PMap} {H : Pos → Set} {u : EmissionSet (IE B)} {s′ : Pos} → CarryAt valuesOf M_b (Hots envP) H (λ q → Listed o q × HotsListed envP q) FW.tB u p s′ → Set
+      NestAt : ∀ {M_b : PMap} {H : Pos → Set} {u : EmissionSet (IE B)} {s′ : Pos} → CarryAt valuesOf M_b (Hots envP ∪ʰ o) H (λ q → Listed o q × HotsListed envP q) FW.tB u p s′ → Set
       NestAt {M_b} c = ∀ {k l : Pos} {e₀ : Ev B} {h L : Pos} {a : Label} {σ : L.List Label} → CarryAt.PB c k l → FW.tB k e₀ → (Unpinned e₀ → Live FW.tB k) → Σ A (λ b → o h (out b)) → FW.S′.Img h L
                      → k ≡ h ⊕ (a ∷ σ) → Anchor M_b k l h a
 
@@ -228,7 +228,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       -- The lanes carried into `u`, subscribed at `s′`, under the hots `H`,
       -- their late carriers anchored.
       Staged : PMap → (Pos → Set) → EmissionSet (IE B) → Pos → Set₁
-      Staged M_b H u s′ = Σ (CarryAt valuesOf M_b (Hots envP) H (λ q → Listed o q × HotsListed envP q) FW.tB u p s′) λ c → PBNest er₂ M_b c × NestAt {M_b} {H} {u} {s′} c
+      Staged M_b H u s′ = Σ (CarryAt valuesOf M_b (Hots envP ∪ʰ o) H (λ q → Listed o q × HotsListed envP q) FW.tB u p s′) λ c → PBNest er₂ M_b c × NestAt {M_b} {H} {u} {s′} c
 
       -- THE LANES ARE CARRIED by the connect's body: every lane row past the
       -- outer's map, nothing paired under a value but under its second

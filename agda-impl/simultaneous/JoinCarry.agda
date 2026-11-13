@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import denotation.Position using (Pos; _≟ᵖ_; root)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Truncate; Few; Ended; _≺_; module Joining)
-open import denotation.Laws.Worlds using (_⊑_)
+open import denotation.Laws.Worlds using (_⊑_; _∪ʰ_)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
@@ -104,7 +104,7 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
     join-pb-past : ∀ {k l e₀ e x y} → LanePB k l → tB k e₀ → (Unpinned e₀ → Live tB k) → u l e → N x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     join-img     : ∀ {k e} → tB k e → Unpinned e → Live tB k → Listed tB k → LP′ k
                  → (Σ Pos λ l → LaneImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Listed u l × Match Every (One valuesOf) (Reads valuesOf) e e′)
-                   ⊎ (e ≡ skip × IntoAt LaneImg u LanePB HP p k)
+                   ⊎ (e ≡ skip × IntoAt LaneImg u LanePB (HP ∪ʰ o) p k)
     join-img¬¬   : ∀ {k e} → tB k e → Unpinned e → Live tB k → Few tB k
                  → ¬ ¬ ((Σ Pos λ l → LaneImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
     join-shown   : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
@@ -120,7 +120,7 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
     join-pinned  : ∀ {k r} → tB k (pin r) → Live tB k → Listed tB k → LP′ k
                  → InOrder LaneImg LanePB tB u k
                    × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ r × Home tB k₀ × instantOf k₀ ≡ instantOf k)
-                      ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+                      ⊎ Σ Pos λ h → (HP ∪ʰ o) h × instantOf h ≡ instantOf k)
 
   img-fun : ∀ {k l l′} → LaneImg k l → LaneImg k l′ → l ≡ l′
   img-fun (_ , _ , _ , v , i , _) (_ , _ , _ , v′ , i′ , _) = img-apart v v′ i i′
@@ -128,7 +128,10 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   pb-img : ∀ {k l l′} → LanePB k l → LaneImg k l′ → ⊥
   pb-img (_ , _ , _ , v , pb , _) (_ , _ , _ , v′ , i , _) = pb-apart v v′ pb i
 
-  carried : CarryAt valuesOf N HP HE LP′ tB u p p′
+  -- A lane's row carried into its instant may lie in its value's: the
+  -- outer's rows stand with the environment's hots, its echo carrying
+  -- them once the joiner sits under its outer's connect.
+  carried : CarryAt valuesOf N (HP ∪ʰ o) HE LP′ tB u p p′
   carried = record
     { Img = LaneImg ; ext = ext ; PB = LanePB ; pb-few = join-pb-few ; pb-img = pb-img ; pb-past = join-pb-past
     ; img = join-img ; img¬¬ = join-img¬¬ ; shown = join-shown ; img-row = join-img-row ; img-fun = img-fun
