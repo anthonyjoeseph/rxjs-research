@@ -42,7 +42,7 @@ and exhaust's run read the outer against lane ends across the two maps;
 bounded's run and hand-off read the queue; every op's done reads all
 lanes' ends. Settled when each holds, or a refutation names the op.
 
-Members: `switch-cut`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `pair-done`, `end-done`, `outer-ends`, `paired⁻`, `ends⁻`.
+Members: `switch-cut`, `switch-cut¬¬`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `paired⁻`, `ends⁻`.
 
 #### THE JOINED LANES
 
@@ -54,7 +54,9 @@ hand-off and the outer's end lying apart, a lane listed under its
 environment's listing, and the fields read lane by lane. Settled when
 each is a body.
 
-Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`, `lane-listing`, `hand-apart`, `end-apart`, `hand-ext`, `end-ext`.
+Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`, `lane-listing`, `hand-apart`, `end-apart`, `hand-ext`, `end-ext`,
+`join-pb-few`, `join-pb-past`, `join-img¬¬`, `join-place`, `join-live`, `join-whole`, `join-cover`, `join-bk`, `join-pinned`,
+`img-reach`, `back-reach`, `end-reach⁻`, `join-from`, `into-lift`.
 
 #### THE ERASURE
 

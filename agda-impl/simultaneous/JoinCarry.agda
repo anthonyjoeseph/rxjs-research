@@ -79,13 +79,6 @@ match-unpin⁻ {e₀ = out _} _ _ = tt
 match-unpin⁻ {e₀ = skip}  _ _ = tt
 match-unpin⁻ {e₀ = end}   _ _ = tt
 
-match-end⁻ : ∀ {X Y : Set} {Sh : Y → Set} {Vl : X → Y → Set} {e₀ : Ev X} → Match Every Sh Vl e₀ end → e₀ ≡ end
-match-end⁻ {e₀ = end}   _ = refl
-match-end⁻ {e₀ = out _} m with proj₁ m tt
-... | _ , () , _
-match-end⁻ {e₀ = skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
-match-end⁻ {e₀ = pin _} (_ , n) = ⊥-elim (n (λ ()) tt)
-
 end-match : ∀ {Y A : Set} {f : Y → List A} → Match {A} {Y} Every (One f) (Reads f) end end
 end-match = (λ _ → refl) , λ n _ → n tt
 
@@ -145,21 +138,31 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               -- THE PAIRED JOINERS AGREE: every running value is paired, a
               -- lane is cut where its partner is, and its end is joined, and
               -- handed off, where its partner's is; so is the outer's end.
+              -- Read forward, a decision needs the plain run listed; read
+              -- back, a plain decision is held classically, since it reads
+              -- every plain value's partner.
               (paired : ∀ {q a} → o q (out a) → Runs q → Listed o q → LP q → Σ Pos (V q a))
               (paired⁻ : ∀ {q* a l e} → o* q* (out a) → Runs* q* → Ln* q* a l e
                        → Live (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) l
                        → Few (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) l → Σ Pos λ q → V q a q*)
-              (cut-agree : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut q k ⇔ Cut* q* l)
-              (done-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end
-                          → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
-              (hand-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand c ⇔ Hand* c*)
+              (cut-from : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut* q* l → Cut q k)
+              (cut-to¬¬ : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut q k → ¬ ¬ Cut* q* l)
+              (done-to : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Listed o c × LP c
+                       → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c → Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
+              (done-from¬¬ : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end
+                           → Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c* → ¬ ¬ Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c)
+              (hand-from : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand* c* → Hand c)
+              (hand-to : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Listed o c × LP c → Hand c → Hand* c*)
+              (hand-to¬¬ : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand c → ¬ ¬ Hand* c*)
               (hand-ext : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand c
                         → Σ Pos λ y → N (c ⊕ [ ix 0 ]) y × y ⊑ (c* ⊕ [ ix 0 ]))
               (ends : ∀ {c} → o c end → Listed o c → LP c → Σ Pos (E c))
               (ends⁻ : ∀ {c*} → o* c* end → Few (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) c* → Σ Pos λ c → E c c*)
               (e-at : ∀ {c c*} → E c c* → o c end × o* c* end)
               (e-fun : ∀ {c c* c*′} → E c c* → E c c*′ → c* ≡ c*′)
-              (end-done : ∀ {c c*} → E c c* → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
+              (end-to : ∀ {c c*} → E c c* → Listed o c × LP c
+                      → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c → Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
+              (end-from¬¬ : ∀ {c c*} → E c c* → Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c* → ¬ ¬ Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c)
               (e-ext : ∀ {c c*} → E c c* → Σ Pos λ y → N c y × y ⊑ c*) where
   open Lanes Ln o Runs Cut Hand public
   module J* = Joining Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*
@@ -170,14 +173,16 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   -- Each value's lane carry.
   module L {q a q*} (v : V q a q*) = CarryAt (proj₂ (proj₂ (lc v)))
 
-  -- A JOINED ROW AND ITS CARRIER: a lane row (or end) on its lane's
-  -- carrier; a hand-off one child under its lane end's; the outer's end
-  -- on its partner.
+  -- A JOINED ROW AND ITS CARRIER: a lane row on its lane's carrier; a
+  -- hand-off one child under its lane end's; a lane's end read back on
+  -- its lane's carrier, and the outer's on its partner, each joined end
+  -- held classically.
   data LaneImg (k l : Pos) : Set where
     row : ∀ {q a q* e₀} (v : V q a q*) → L.Img v k l → tB k e₀ → Unpinned e₀ → ¬ Cut q k → LaneImg k l
     hnd : ∀ {q a q* c c*} (v : V q a q*) → L.Img v c c* → Ln q a c end → ¬ Cut q c → Hand c
         → k ≡ c ⊕ [ ix 0 ] → l ≡ c* ⊕ [ ix 0 ] → tB k skip → LaneImg k l
-    fin : E k l → J.Done k → tB k end → LaneImg k l
+    lnd : ∀ {q a q*} (v : V q a q*) → L.Img v k l → Few J.JoinT k → ¬ ¬ tB k end → LaneImg k l
+    fin : E k l → Few J.JoinT k → ¬ ¬ tB k end → LaneImg k l
 
   -- A lane row carried into its instant, by its lane.
   LanePB : Pos → Pos → Set
@@ -186,18 +191,20 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   LP′ : Pos → Set
   LP′ q = Listed o q × LP q
 
-  img-tB : ∀ {k l} → LaneImg k l → Σ (Ev B) λ e → tB k e × Unpinned e
-  img-tB (row _ _ x un _)       = _ , x , un
-  img-tB (hnd _ _ _ _ _ _ _ x)  = _ , x , tt
-  img-tB (fin _ _ x)            = _ , x , tt
-
   img-few : ∀ {k l} → LaneImg k l → Few J.JoinT k
-  img-few i = let (e , ((_ , rc) , _) , un) = img-tB i in unpin-few {e = e} un rc
+  img-few (row {e₀ = e₀} _ _ ((_ , rc) , _) un _) = unpin-few {e = e₀} un rc
+  img-few (hnd _ _ _ _ _ _ _ ((_ , rc) , _))     = unpin-few {e = skip} tt rc
+  img-few (lnd _ _ F _)                          = F
+  img-few (fin _ F _)                            = F
+
+  lane-ext : ∀ {q a q* k l} (v : V q a q*) → L.Img v k l → Σ Pos λ y → N k y × y ⊑ l
+  lane-ext v i with L.ext v i
+  ... | y , m , yl = y , lm-sub v m , yl
 
   ext : ∀ {k l} → LaneImg k l → Σ Pos λ y → N k y × y ⊑ l
-  ext (row v i _ _ _) with L.ext v i
-  ... | y , m , yl = y , lm-sub v m , yl
+  ext (row v i _ _ _) = lane-ext v i
   ext (hnd v i y _ h refl refl _) = hand-ext v i y h
+  ext (lnd v i _ _) = lane-ext v i
   ext (fin ε _ _) = e-ext ε
 
   few : ∀ {k l} → LaneImg k l → Few tB k
@@ -234,24 +241,40 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
                  → IntoAt (L.Img v) (Ln* q* a) (L.PB v) HP (proj₁ (lc v)) k → IntoAt LaneImg u LanePB (HP ∪ʰ o) p k
 
   img-row : ∀ {k l} → LaneImg k l → ¬ ¬ Σ (Ev B) λ e → tB k e × Unpinned e
-  img-row i n = n (img-tB i)
+  img-row (row _ _ x un _) n = n (_ , x , un)
+  img-row (hnd _ _ _ _ _ _ _ x) n = n (_ , x , tt)
+  img-row (lnd _ _ _ nn) n = nn λ x → n (end , x , tt)
+  img-row (fin _ _ nn) n = nn λ x → n (end , x , tt)
+
+  -- A lane's carrier, whether its row is read forward or its end back.
+  LaneOn : Pos → Pos → Set
+  LaneOn k l = Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → L.Img v k l
+
+  on-lane : ∀ {k l} → LaneImg k l → LaneOn k l ⊎ ((Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → Σ Pos λ c → Σ Pos λ c*
+                                                   → L.Img v c c* × Ln q a c end × Hand c × k ≡ c ⊕ [ ix 0 ] × l ≡ c* ⊕ [ ix 0 ]) ⊎ E k l)
+  on-lane (row v i _ _ _) = inj₁ (_ , _ , _ , v , i)
+  on-lane (lnd v i _ _) = inj₁ (_ , _ , _ , v , i)
+  on-lane (hnd v i y _ h kc lc′ _) = inj₂ (inj₁ (_ , _ , _ , v , _ , _ , i , y , h , kc , lc′))
+  on-lane (fin ε _ _) = inj₂ (inj₂ ε)
 
   img-fun : ∀ {k l l′} → LaneImg k l → LaneImg k l′ → l ≡ l′
-  img-fun (row v i _ _ _) (row v′ i′ _ _ _) = img-apart v v′ i i′
-  img-fun (row v i _ _ _) (hnd v′ i′ y′ _ h′ refl _ _) = ⊥-elim (hand-apart v′ v i′ y′ h′ (inj₁ i))
-  img-fun (row v i _ _ _) (fin ε _ _) = ⊥-elim (end-apart v ε (inj₁ i))
-  img-fun (hnd v i y _ h refl _ _) (row v′ i′ _ _ _) = ⊥-elim (hand-apart v v′ i y h (inj₁ i′))
-  img-fun (hnd {c = c} v i _ _ _ refl refl _) (hnd {c = c′} v′ i′ _ _ _ cc refl _) with ⊕-injˡ c c′ cc
-  ... | refl = cong (_⊕ [ ix 0 ]) (img-apart v v′ i i′)
-  img-fun (hnd v i y _ h refl _ _) (fin ε _ _) = ⊥-elim (hand-apart v v i y h (inj₂ (inj₂ ε)))
-  img-fun (fin ε _ _) (row v′ i′ _ _ _) = ⊥-elim (end-apart v′ ε (inj₁ i′))
-  img-fun (fin ε _ _) (hnd v′ i′ y′ _ h′ refl _ _) = ⊥-elim (hand-apart v′ v′ i′ y′ h′ (inj₂ (inj₂ ε)))
-  img-fun (fin ε _ _) (fin ε′ _ _) = e-fun ε ε′
+  img-fun i i′ with on-lane i | on-lane i′
+  ... | inj₁ (_ , _ , _ , v , j) | inj₁ (_ , _ , _ , v′ , j′) = img-apart v v′ j j′
+  ... | inj₁ (_ , _ , _ , v , j) | inj₂ (inj₁ (_ , _ , _ , v′ , _ , _ , j′ , y′ , h′ , refl , _)) = ⊥-elim (hand-apart v′ v j′ y′ h′ (inj₁ j))
+  ... | inj₁ (_ , _ , _ , v , j) | inj₂ (inj₂ ε) = ⊥-elim (end-apart v ε (inj₁ j))
+  ... | inj₂ (inj₁ (_ , _ , _ , v , _ , _ , j , y , h , refl , _)) | inj₁ (_ , _ , _ , v′ , j′) = ⊥-elim (hand-apart v v′ j y h (inj₁ j′))
+  ... | inj₂ (inj₁ (_ , _ , _ , v , c , _ , j , _ , _ , refl , refl)) | inj₂ (inj₁ (_ , _ , _ , v′ , c′ , _ , j′ , _ , _ , cc , refl)) with ⊕-injˡ c c′ cc
+  ...   | refl = cong (_⊕ [ ix 0 ]) (img-apart v v′ j j′)
+  img-fun i i′ | inj₂ (inj₁ (_ , _ , _ , v , _ , _ , j , y , h , refl , _)) | inj₂ (inj₂ ε) = ⊥-elim (hand-apart v v j y h (inj₂ (inj₂ ε)))
+  img-fun i i′ | inj₂ (inj₂ ε) | inj₁ (_ , _ , _ , v′ , j′) = ⊥-elim (end-apart v′ ε (inj₁ j′))
+  img-fun i i′ | inj₂ (inj₂ ε) | inj₂ (inj₁ (_ , _ , _ , v′ , _ , _ , j′ , y′ , h′ , refl , _)) = ⊥-elim (hand-apart v′ v′ j′ y′ h′ (inj₂ (inj₂ ε)))
+  img-fun i i′ | inj₂ (inj₂ ε) | inj₂ (inj₂ ε′) = e-fun ε ε′
 
   pb-img : ∀ {k l l′} → LanePB k l → LaneImg k l′ → ⊥
-  pb-img (_ , _ , _ , v , pb , _) (row v′ i _ _ _) = pb-apart v v′ pb i
-  pb-img (_ , _ , _ , v , pb , _) (hnd v′ i′ y′ _ h′ refl _ _) = hand-apart v′ v i′ y′ h′ (inj₂ (inj₁ pb))
-  pb-img (_ , _ , _ , v , pb , _) (fin ε _ _) = end-apart v ε (inj₂ pb)
+  pb-img (_ , _ , _ , v , pb , _) i with on-lane i
+  ... | inj₁ (_ , _ , _ , v′ , j) = pb-apart v v′ pb j
+  ... | inj₂ (inj₁ (_ , _ , _ , v′ , _ , _ , j′ , y′ , h′ , refl , _)) = hand-apart v′ v j′ y′ h′ (inj₂ (inj₁ pb))
+  ... | inj₂ (inj₂ ε) = end-apart v ε (inj₂ pb)
 
   -- A LANE ROW READ BY ITS LANE: its value paired through the outer's
   -- listing, its own rows listed as the joiner's are, the lane's carry
@@ -298,23 +321,22 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   join-img {e = e} b@((J.lane x r y nc w , rc) , _) un lv ls lp with lane-read x r y un nc (unpin-few {e = e} un rc) ls lp
   ... | q* , v , inj₁ (l , i , e′ , y* , _ , m) =
     let (_ , _ , x* , r*) = v-at v
-    in joined lv ls lp (row v i b un nc) (J*.lane x* r* y* (λ c* → nc (Equivalence.from (cut-agree v i) c*)) (match-work w m)) m
+    in joined lv ls lp (row v i b un nc) (J*.lane x* r* y* (λ c* → nc (cut-from v i c*)) (match-work w m)) m
   ... | q* , v , inj₂ (refl , into) = inj₂ (refl , into-lift v x r b nc ls lp into)
   join-img b@((J.lend x r y nc nh d , rc) , _) un lv ls lp with lane-read x r y tt nc (unpin-few {e = end} un rc) ls lp
   ... | q* , v , inj₁ (l , i , e′ , y* , _ , m) with proj₁ m tt
   ...   | refl =
     let (_ , _ , x* , r*) = v-at v
     in joined lv ls lp (row v i b tt nc)
-         (J*.lend x* r* y* (λ c* → nc (Equivalence.from (cut-agree v i) c*)) (λ h* → nh (Equivalence.from (hand-agree v i y) h*))
-                  (Equivalence.to (done-agree v i y) d)) (end-match {f = valuesOf})
+         (J*.lend x* r* y* (λ c* → nc (cut-from v i c*)) (λ h* → nh (hand-from v i y h*)) (done-to v i y lp d)) (end-match {f = valuesOf})
   join-img ((J.lend x r y nc nh d , rc) , _) un lv ls lp | q* , v , inj₂ (() , _)
   join-img b@((J.lpass x r y nc nh nd , rc) , _) un lv ls lp with lane-read x r y tt nc (unpin-few {e = skip} un rc) ls lp
   ... | q* , v , inj₁ (l , i , e′ , y* , _ , m) with proj₁ m tt
   ...   | refl =
     let (_ , _ , x* , r*) = v-at v
     in joined lv ls lp (row v i b tt nc)
-         (J*.lpass x* r* y* (λ c* → nc (Equivalence.from (cut-agree v i) c*)) (λ h* → nh (Equivalence.from (hand-agree v i y) h*))
-                   (λ d* → nd (Equivalence.from (done-agree v i y) d*))) (skip-match {IE B} {B} {valuesOf})
+         (J*.lpass x* r* y* (λ c* → nc (cut-from v i c*)) (λ h* → nh (hand-from v i y h*)) (λ d* → done-from¬¬ v i y d* nd))
+         (skip-match {IE B} {B} {valuesOf})
   join-img ((J.lpass x r y nc nh nd , rc) , _) un lv ls lp | q* , v , inj₂ (() , _)
   join-img b@((J.hand {c = c} x r y nc h , rc) , _) un lv ls (lo , lp)
     with lane-read x r y tt nc (few-≺ (unpin-few {e = skip} un rc) (≺-ext c [])) (listed-≼ ls (c≼ c)) (listed-≼ lo (c≼ c) , lp↓ (c≼ c) lp)
@@ -322,10 +344,10 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   ...   | refl =
     let (_ , _ , x* , r*) = v-at v
     in joined lv ls (lo , lp) (hnd v i y nc h refl refl b)
-         (J*.hand x* r* y* (λ c* → nc (Equivalence.from (cut-agree v i) c*)) (Equivalence.to (hand-agree v i y) h)) (skip-match {IE B} {B} {valuesOf})
+         (J*.hand x* r* y* (λ c* → nc (cut-from v i c*)) (hand-to v i y (listed-≼ lo (c≼ c) , lp↓ (c≼ c) lp) h)) (skip-match {IE B} {B} {valuesOf})
   join-img ((J.hand x r y nc h , rc) , _) un lv ls (lo , lp) | q* , v , inj₂ (() , _)
   join-img b@((J.oend xc d , rc) , _) un lv ls (lo , lp) with ends xc lo lp
-  ... | c* , ε = joined lv ls (lo , lp) (fin ε d b) (J*.oend (proj₂ (e-at ε)) (Equivalence.to (end-done ε) d)) (end-match {f = valuesOf})
+  ... | c* , ε = joined lv ls (lo , lp) (fin ε (unpin-few {e = end} tt rc) (λ n → n b)) (J*.oend (proj₂ (e-at ε)) (end-to ε (lo , lp) d)) (end-match {f = valuesOf})
 
   -- A SHOWN ROW READ BACK: its lane's value paired back, the lane's own
   -- carry finding the plain row; the outer's end paired back.
@@ -341,15 +363,7 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   ShownAt : Pos → Ev (IE B) → Set
   ShownAt l e = Σ Pos λ k → LaneImg k l × Σ (Ev B) λ e₀ → tB k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
 
-  shown-end : ∀ {q a q* k l e₀} (v : V q a q*) → L.Img v k l → Ln q a k e₀ → e₀ ≡ end → Few J*.JoinT l → ¬ Cut* q* l → ¬ Hand* l → J*.Done l
-            → ShownAt l end
-  shown-end v i y₀ refl F* nc* nh* d* =
-    let (x , r , _ , _) = v-at v
-        nc = λ c → nc* (Equivalence.to (cut-agree v i) c)
-        b = (J.lend x r y₀ nc (λ h → nh* (Equivalence.to (hand-agree v i y₀) h)) (Equivalence.from (done-agree v i y₀) d*) , few-reach {e = end} (back-reach v i F*)) , tt
-    in _ , row v i b tt nc , end , b , end-match {IE B} {B} {valuesOf}
-
-  join-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l → ShownAt l e
+  join-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Work e → Live u l → Few u l → ShownAt l e
   join-shown (J*.val _ , _) ()
   join-shown (J*.step _ , _) ()
   join-shown (J*.opin _ , _) ()
@@ -361,25 +375,40 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   join-shown (J*.rend () _ _ , _) _
   join-shown (J*.rpass () _ _ , _) _
   join-shown (J*.rhand () _ , _) _
-  join-shown {e = e} (J*.lane x* r* y* nc* w , rc) sh lv F =
+  join-shown (J*.lend _ _ _ _ _ _ , _) _ ()
+  join-shown (J*.oend _ _ , _) _ ()
+  join-shown {e = e} (J*.lane x* r* y* nc* w , rc) sh _ lv F =
     let un = shown-unpin sh
         F* = unpin-few {e = e} un rc
         (q , v) = paired⁻ x* r* y* lv F
         (x , r , _ , _) = v-at v
-        (k , i , e₀ , y₀ , m) = L.shown v y* sh (lane-live* x* r* y* un) (lane-few* x* r* y* un nc* F* F)
-        nc = λ c → nc* (Equivalence.to (cut-agree v i) c)
+        (k , i , e₀ , y₀ , m) = L.shown v y* sh w (lane-live* x* r* y* un) (lane-few* x* r* y* un nc* F* F)
+        nc = λ c → cut-to¬¬ v i c nc*
         b = (J.lane x r y₀ nc (match-work⁻ w m) , few-reach {e = e₀} (back-reach v i F*)) , tt
     in k , row v i b (match-unpin⁻ sh m) nc , e₀ , b , m
-  join-shown (J*.lend x* r* y* nc* nh* d* , rc) _ lv F =
+
+  -- AN END READ BACK, its plain end held classically: a lane's through
+  -- its lane's carry, its decisions read back; the outer's paired back.
+  join-shown-end : ∀ {l} → u l end → Live u l → Few u l → Σ Pos λ k → LaneImg k l × ¬ ¬ tB k end
+  join-shown-end (J*.lane _ _ _ _ () , _) _ _
+  join-shown-end (J*.run () _ , _) _ _
+  join-shown-end (J*.rend () _ _ , _) _ _
+  join-shown-end (J*.lend x* r* y* nc* nh* d* , rc) lv F =
     let F* = unpin-few {e = end} tt rc
         (q , v) = paired⁻ x* r* y* lv F
-        (k , i , e₀ , y₀ , m) = L.shown v y* tt (lane-live* x* r* y* tt) (lane-few* x* r* y* tt nc* F* F)
-    in shown-end v i y₀ (match-end⁻ {Sh = One valuesOf} {Vl = Reads valuesOf} m) F* nc* nh* d*
-  join-shown (J*.oend x* d* , rc) _ lv F =
+        (x , r , _ , _) = v-at v
+        (k , i , nn) = L.shown-end v y* (lane-live* x* r* y* tt) (lane-few* x* r* y* tt nc* F* F)
+        Fk = back-reach v i F*
+        held : ¬ ¬ tB k end
+        held n = nn λ y₀ → done-from¬¬ v i y₀ d* λ d →
+                   n ((J.lend x r y₀ (λ c → cut-to¬¬ v i c nc*) (λ h → hand-to¬¬ v i y₀ h nh*) d , few-reach {e = end} Fk) , tt)
+    in k , lnd v i Fk held , held
+  join-shown-end (J*.oend x* d* , rc) lv F =
     let (c , ε) = ends⁻ x* F
-        d = Equivalence.from (end-done ε) d*
-        b = (J.oend (proj₁ (e-at ε)) d , few-reach {e = end} (end-reach⁻ ε (unpin-few {e = end} tt rc))) , tt
-    in c , fin ε d b , end , b , end-match {IE B} {B} {valuesOf}
+        Fc = end-reach⁻ ε (unpin-few {e = end} tt rc)
+        held : ¬ ¬ tB c end
+        held n = end-from¬¬ ε d* λ d → n ((J.oend (proj₁ (e-at ε)) d , few-reach {e = end} Fc) , tt)
+    in c , fin ε Fc held , held
 
   -- A lane row carried into its instant may lie in its value's: the
   -- outer's rows stand with the environment's hots, its echo carrying
@@ -387,6 +416,6 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
   carried : CarryAt valuesOf N (HP ∪ʰ o) HE LP′ tB u p p′
   carried = record
     { Img = LaneImg ; ext = ext ; PB = LanePB ; pb-few = join-pb-few ; pb-img = pb-img ; pb-past = join-pb-past
-    ; img = join-img ; img¬¬ = join-img¬¬ ; shown = join-shown ; img-row = img-row ; img-fun = img-fun
+    ; img = join-img ; img¬¬ = join-img¬¬ ; shown = join-shown ; shown-end = join-shown-end ; img-row = img-row ; img-fun = img-fun
     ; place = join-place ; live = join-live ; few = few ; whole = join-whole ; cover = join-cover ; bk = proj₁ join-bk
     ; in-bk = proj₂ join-bk ; pinned = join-pinned }

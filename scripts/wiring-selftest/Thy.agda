@@ -139,3 +139,23 @@ open import Param import-arg using (apply)
 
 via-import-arg : Nat → Nat
 via-import-arg w = apply (both-mods w)
+
+-- A HEADER LONGER THAN A WINDOW.  The `where` of a module whose telescope
+-- runs many lines must still be found, or its whole body, postulates
+-- included, is invisible to the ledger.
+module Long (a₀ : Nat)
+            (a₁ : Nat)
+            (a₂ : Nat)
+            (a₃ : Nat)
+            (a₄ : Nat)
+            (a₅ : Nat)
+            (a₆ : Nat)
+            (a₇ : Nat)
+            (a₈ : Nat)
+            (a₉ : Nat)
+            (a₁₀ : Nat)
+            (a₁₁ : Nat)
+            (a₁₂ : Nat)
+            (a₁₃ : Nat) where
+  postulate
+    long-gap : Nat → Nat

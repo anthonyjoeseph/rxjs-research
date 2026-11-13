@@ -17,8 +17,8 @@ open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Function using (_⇔_; mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
@@ -112,19 +112,19 @@ joins-flat exhaustᶠ          g sD p = refl
 
 -- ONLY A SWITCH CUTS, only a bounded merge hands off, and only a bounded
 -- merge or an exhaust runs some values and not others.
-cut-by : ∀ {A B A′ B′} (g : A → Den B) (o : EmissionSet A) (g′ : A′ → Den B′) (o′ : EmissionSet A′) op {q k q′ k′}
-       → (op ≡ switchᶠ → Parts.Cut g o op q k ⇔ Parts.Cut g′ o′ op q′ k′) → Parts.Cut g o op q k ⇔ Parts.Cut g′ o′ op q′ k′
-cut-by g o g′ o′ (mergeᶠ nothing)  h = mk⇔ (λ ()) (λ ())
-cut-by g o g′ o′ (mergeᶠ (just m)) h = mk⇔ (λ ()) (λ ())
-cut-by g o g′ o′ switchᶠ           h = h refl
-cut-by g o g′ o′ exhaustᶠ          h = mk⇔ (λ ()) (λ ())
+only-switch : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k} {X : Set}
+            → (op ≡ switchᶠ → Parts.Cut g o op q k → X) → Parts.Cut g o op q k → X
+only-switch g o (mergeᶠ nothing)  h ()
+only-switch g o (mergeᶠ (just m)) h ()
+only-switch g o switchᶠ           h c = h refl c
+only-switch g o exhaustᶠ          h ()
 
-hand-by : ∀ {A B A′ B′} (g : A → Den B) (o : EmissionSet A) (g′ : A′ → Den B′) (o′ : EmissionSet A′) op {c c′}
-        → (∀ m → op ≡ mergeᶠ (just m) → Parts.Hand g o op c ⇔ Parts.Hand g′ o′ op c′) → Parts.Hand g o op c ⇔ Parts.Hand g′ o′ op c′
-hand-by g o g′ o′ (mergeᶠ nothing)  h = mk⇔ (λ ()) (λ ())
-hand-by g o g′ o′ (mergeᶠ (just m)) h = h m refl
-hand-by g o g′ o′ switchᶠ           h = mk⇔ (λ ()) (λ ())
-hand-by g o g′ o′ exhaustᶠ          h = mk⇔ (λ ()) (λ ())
+only-bounded : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {c} {X : Set}
+             → (∀ m → op ≡ mergeᶠ (just m) → Parts.Hand g o op c → X) → Parts.Hand g o op c → X
+only-bounded g o (mergeᶠ nothing)  h ()
+only-bounded g o (mergeᶠ (just m)) h x = h m refl x
+only-bounded g o switchᶠ           h ()
+only-bounded g o exhaustᶠ          h ()
 
 runs-by : ∀ {A B A′ B′} (g : A → Den B) (o : EmissionSet A) (g′ : A′ → Den B′) (o′ : EmissionSet A′) op {q q′}
         → (∀ m → op ≡ mergeᶠ (just m) → Parts.Runs g o op q → Parts.Runs g′ o′ op q′) → (op ≡ exhaustᶠ → Parts.Runs g o op q → Parts.Runs g′ o′ op q′)
@@ -444,9 +444,13 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- The elaborated outer ends where the plain one does, its end
         -- deciding as the plain one's.
         outer-ends : ∀ {c} → o c end → Listed o c → HotsListed envP c → Σ Pos λ c* → o* c* end
-        end-done : ∀ {c c*} → Ends c c*
+        end-done : ∀ {c c*} → Ends c c* → Listed o c × HotsListed envP c
                  → Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
-                   ⇔ Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+                 → Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+        -- and back, held classically: every plain lane before it, ended.
+        end-done¬¬ : ∀ {c c*} → Ends c c*
+                   → Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+                   → ¬ ¬ Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
 
       postulate
         -- Two lanes' rows lie apart, each imaged once.
@@ -464,25 +468,46 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
-        -- A switch's lane is cut where its partner is.
-        switch-cut : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k ⇔ P*.Cut op q* l
-        pair-done : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
+        -- A switch's lane is cut where its partner is: read back, and
+        -- forward under the classical reading of every later value.
+        switch-cut : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
+        switch-cut¬¬ : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
+        -- A lane's end is joined where its partner's is: forward from the
+        -- plain run listed, back held classically.
+        pair-done : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → Listed o c × HotsListed envP c
                   → Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
-                    ⇔ Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
-        -- A bounded lane's end hands off where its partner's does.
+                  → Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+        pair-done¬¬ : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
+                    → Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
+                    → ¬ ¬ Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
+        -- A bounded lane's end hands off where its partner's does: read
+        -- back; forward from the plain run listed, or classically.
         bounded-hand : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
-                     → P.Hand op c ⇔ P*.Hand op c*
+                     → P*.Hand op c* → P.Hand op c
+        bounded-hand-to : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
+                        → Listed o c × HotsListed envP c → P.Hand op c → P*.Hand op c*
+        bounded-hand¬¬ : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
+                       → P.Hand op c → ¬ ¬ P*.Hand op c*
 
       pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Listed o q → HotsListed envP q → Σ Pos (V q a)
       pair-all x r ls lp =
         let (l , i , x*) = read-value x ls lp
         in _ , x , r , x* , runs-by g o lE o* op (λ m e → bounded-runs m e x i) (λ e → exhaust-runs e x i) r , l , i , refl
 
-      pair-cut : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k ⇔ P*.Cut op q* l
-      pair-cut v i = cut-by g o lE o* op λ e → switch-cut e v i
+      cut-from : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
+      cut-from v i = only-switch lE o* op λ e → switch-cut e v i
 
-      pair-hand : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P.Hand op c ⇔ P*.Hand op c*
-      pair-hand v i y = hand-by g o lE o* op λ m e → bounded-hand m e v i y
+      cut-to¬¬ : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
+      cut-to¬¬ v i = only-switch g o op λ e → switch-cut¬¬ e v i
+
+      hand-from : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P*.Hand op c* → P.Hand op c
+      hand-from v i y = only-bounded lE o* op λ m e → bounded-hand m e v i y
+
+      hand-to : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → Listed o c × HotsListed envP c → P.Hand op c → P*.Hand op c*
+      hand-to v i y lp = only-bounded g o op λ m e → bounded-hand-to m e v i y lp
+
+      hand-to¬¬ : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P.Hand op c → ¬ ¬ P*.Hand op c*
+      hand-to¬¬ v i y = only-bounded g o op λ m e → bounded-hand¬¬ m e v i y
 
       N : PMap
       N = M_s ∪ᴹ λ x y → Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → proj₁ (lane-framed v) x y
@@ -499,9 +524,10 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                     Ends lane-after (λ {q} {k} {k′} → cut↑ g o op {q} {k} {k′}) (λ x _ y un → slot-live SLp Ig (P.seat-one op okP Ig Io) x y un)
                     lane-listing (λ {x} {y} → listed↓ envP {x} {y})
                     (λ x _ y un → slot-live SL* Ig* (P*.seat-one op ok* Ig* Io*) x y un) (λ {q} {l} {l′} → cut↑ lE o* op {q} {l} {l′})
-                    lanes-apart lanes-pb-apart hand-apart end-apart pair-all paired⁻ pair-cut pair-done pair-hand hand-ext
+                    lanes-apart lanes-pb-apart hand-apart end-apart pair-all paired⁻ cut-from cut-to¬¬ pair-done pair-done¬¬
+                    hand-from hand-to hand-to¬¬ hand-ext
                     (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) ends⁻ (λ ε → ε) (λ ε ε′ → end-uniq Io* (proj₂ ε) (proj₂ ε′))
-                    end-done end-ext
+                    end-done end-done¬¬ end-ext
 
       postulate
         -- The lanes' map keeps what the outer's does.

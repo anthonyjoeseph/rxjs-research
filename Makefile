@@ -226,10 +226,11 @@ wiring-selftest:
 	  led=$$(scripts/check-wiring.py --postulates --src scripts/wiring-selftest 2>&1); \
 	  echo "$$led" | grep -q "^sealed-gap " || { echo "SELFTEST FAIL: sealed-gap missing from the ledger — a nested block opener is being sliced off the RAW line, so members of a postulate block inside a seal are invisible"; fail=1; }; \
 	  echo "$$led" | grep -qE "^(te|ct|al|te) " && { echo "SELFTEST FAIL: a keyword tail registered as a postulate — the nested opener is sliced off the RAW line"; fail=1; }; \
+	  echo "$$led" | grep -q "^long-gap " || { echo "SELFTEST FAIL: long-gap missing from the ledger — a module header past a fixed window hides its body"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-bound " && { echo "SELFTEST FAIL: ffi-bound on the ledger — a CLI postulate with a COMPILE GHC body is not remaining work"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-unbound " || { echo "SELFTEST FAIL: ffi-unbound missing from the ledger — the FFI exemption swallowed a CLI postulate with no binding"; fail=1; }; \
 	  echo "$$led" | grep -q "^ffi-outside " || { echo "SELFTEST FAIL: ffi-outside missing from the ledger — a binding outside CLI/ must earn nothing"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
+	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal, or under a long module header, reaches the ledger; a pragma nested in a pragma closes on its own close; a CLI postulate with a COMPILE GHC body leaves it, an unbound one or one outside CLI/ stays)"; \
 	  else echo "$$out"; exit 1; fi
 
 # SOUNDNESS GUARD.  The build is not `--safe` — it cannot be while
