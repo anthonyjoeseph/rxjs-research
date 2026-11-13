@@ -409,7 +409,6 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
             → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × Targeted M p p′ × Listed u p′)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    heard   : ∀ {k p l p′} → t k (pin p) → Listed t k → LP k → PB k l → u l (pin p′) → Listed u l
 
 ------------------------------------------------------------------------
 -- Relabelled rows
@@ -595,11 +594,6 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
         homed′ (inj₂ (inj₁ (k₀ , kp , hm , ek))) = inj₂ (inj₁ (k₀ , kp , (λ n → hm λ r → n (up-row r)) , ek))
         homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
 
-    heard′ : ∀ {k p l p′} → t′ k (pin p) → Listed t′ k → LP k → PB k l → u′ l (pin p′) → Listed u′ l
-    heard′ {k} {l = l} tk L lp pb ul with down tk | down′ ul
-    ... | _ , tk₀ , r | _ , ul₀ , r′ with kin r | kin′ r′
-    ...   | k-pin | k-pin = U.lst→ {l} (heard tk₀ (T.lst← {k} L) lp pb ul₀)
-
   carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
     { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun
@@ -610,7 +604,6 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; cover = λ {v} {w} L lp lv F → U.lst→ {w} (cover (T.lst← {v} L) lp (T.live← {v} (λ {c} → lv {c}))
                 (λ {k} tk lk vk m ul lw → up¬¬′ ul λ { (_ , ul′ , _) → F (proj₁ (proj₂ (up tk))) (T.live→ {k} (λ {c} → lk {c})) vk m ul′ lw }))
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ ul → pb-few (proj₁ (proj₂ (down′ ul))) ; pinned = pinned′
-    ; heard = heard′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (λ un → T.live← {k} (λ {c} → lv (unp→ (kin (proj₂ (proj₂ (down tk)))) un) {c})) (proj₁ (proj₂ (down′ ul))) }
 

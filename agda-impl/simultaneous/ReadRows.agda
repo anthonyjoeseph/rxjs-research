@@ -311,13 +311,6 @@ module Rows {X : Set} {u : EmissionSet (AIE X)}
   view (J.rpass () _ _)
   view (J.rhand () _)
 
-  -- The reading has no pins: its outer has none, nor has a lane.
-  pin-free : ∀ {k r} → J.JoinT k (pin r) → ⊥
-  pin-free (J.opin (S.spin x , _))          = pinU x
-  pin-free (J.lane _ _ ((r , _) , _) _ _) = ine-pin r
-  pin-free (J.left _ _ ((r , _) , _) _ _) = ine-pin r
-  pin-free (J.run () _)
-
   vpos : ∀ {k e} → View k e → Pos
   vpos (v-val {q} _ _)    = q
   vpos (v-step {q} _)     = q
