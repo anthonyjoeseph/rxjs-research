@@ -42,9 +42,10 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Product using (_×_; Σ; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; subst; sym) renaming (trans to ≡-trans)
 
+open import denotation.EmissionSet using (EmissionSet)
 open import simultaneous.SObs using (SObs)
 open import simultaneous.Relations using (events; batched; Met; ranked; Closes; Ends; joined; values; stampedᴰ; stampedᴮ; grouped;
-  Groups)
+  Groups; Batches; Erases; EndsWith)
 open import simultaneous.Batcher using (batcher-ends)
 open import simultaneous.Closing using (batches)
 open import simultaneous.Erasure using (erases)
@@ -58,29 +59,33 @@ Spec = ∀ {A} (o : SObs [] A) → Groups (batched o) (events o)
 -- A batched prefix is within the grouping of an elaborated prefix, which
 -- erases, stamp for stamp, to a plain one; and back.  At the end, the
 -- values: the batcher ends with the elaborated run, which ends with the
--- plain one.
-spec : Spec
-spec o = sound , complete , ends-out , ends-in
+-- plain one.  Composed over the three runs as variables, so no proof's
+-- body is ever unfolded to check the composition.
+grouping : ∀ {A} {b x} {e : EmissionSet A} → Batches b x → Erases x e → EndsWith b x → Groups b e
+grouping {b = b} {x} {e} bat era bend = sound , complete , ends-out , ends-in
   where
-    sound : ∀ {rs} → Met (ranked (batched o)) rs →
-            Σ _ λ rs′ → Σ Bool λ ov → Met (ranked (events o)) rs′ × Closes [_] (events o) rs′ ov ×
+    sound : ∀ {rs} → Met (ranked b) rs →
+            Σ _ λ rs′ → Σ Bool λ ov → Met (ranked e) rs′ × Closes [_] e rs′ ov ×
             Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴰ rs′))
-    sound {rs} m with proj₁ (batches o) m
-    ... | rx , ov , mx , cl , p with proj₁ (erases o) {ov = ov} mx cl
+    sound {rs} m with proj₁ bat m
+    ... | rx , ov , mx , cl , p with proj₁ era {ov = ov} mx cl
     ...   | rs′ , me , cl′ , eq = rs′ , ov , me , cl′ , subst (λ ys → Prefix _≡_ (stampedᴮ rs) (grouped ov ys)) eq p
 
-    complete : ∀ {rs′ ov} → Met (ranked (events o)) rs′ → Closes [_] (events o) rs′ ov →
-               Σ _ λ rs → Met (ranked (batched o)) rs × Prefix _≡_ (grouped ov (stampedᴰ rs′)) (stampedᴮ rs)
-    complete {rs′} {ov} m cl with proj₁ (proj₂ (erases o)) {ov = ov} m cl
-    ... | rx , mx , clx , eq with proj₂ (batches o) {ov = ov} mx clx
+    complete : ∀ {rs′ ov} → Met (ranked e) rs′ → Closes [_] e rs′ ov →
+               Σ _ λ rs → Met (ranked b) rs × Prefix _≡_ (grouped ov (stampedᴰ rs′)) (stampedᴮ rs)
+    complete {rs′} {ov} m cl with proj₁ (proj₂ era) {ov = ov} m cl
+    ... | rx , mx , clx , eq with proj₂ bat {ov = ov} mx clx
     ...   | rs , mb , p = rs , mb , subst (λ ys → Prefix _≡_ (grouped ov ys) (stampedᴮ rs)) (sym eq) p
 
-    ends-out : ∀ {rs} → Met (batched o) rs → Ends rs → Σ _ λ rs′ → Met (events o) rs′ × Ends rs′ × joined rs ≡ values rs′
-    ends-out m en with proj₁ (batcher-ends o) m en
-    ... | rx , mx , ex , eq with proj₁ (proj₂ (proj₂ (erases o))) mx ex
+    ends-out : ∀ {rs} → Met b rs → Ends rs → Σ _ λ rs′ → Met e rs′ × Ends rs′ × joined rs ≡ values rs′
+    ends-out m en with proj₁ bend m en
+    ... | rx , mx , ex , eq with proj₁ (proj₂ (proj₂ era)) mx ex
     ...   | rs′ , me , es , eq′ = rs′ , me , es , ≡-trans eq eq′
 
-    ends-in : ∀ {rs′} → Met (events o) rs′ → Ends rs′ → Σ _ λ rs → Met (batched o) rs × Ends rs × values rs′ ≡ joined rs
-    ends-in m en with proj₂ (proj₂ (proj₂ (erases o))) m en
-    ... | rx , mx , ex , eq with proj₂ (batcher-ends o) mx ex
+    ends-in : ∀ {rs′} → Met e rs′ → Ends rs′ → Σ _ λ rs → Met b rs × Ends rs × values rs′ ≡ joined rs
+    ends-in m en with proj₂ (proj₂ (proj₂ era)) m en
+    ... | rx , mx , ex , eq with proj₂ bend mx ex
     ...   | rs , mb , eb , eq′ = rs , mb , eb , ≡-trans eq eq′
+
+spec : Spec
+spec o = grouping (batches o) (erases o) (batcher-ends o)
