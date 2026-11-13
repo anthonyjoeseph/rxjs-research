@@ -32,16 +32,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE JOINED LANES
+
+Untried: a joiner over lanes carried into another's, its running values
+paired value for value, carries its lane rows (`Joined`). Open: whether
+the paired joiners agree on which values run, where a lane is cut and
+which ends hand off — a lane's end must be joined end for end — and
+whether the lanes' maps keep the outer's facts. Settled when each field
+is a body or a refutation names the op that disagrees.
+
+Members: `join-pb-few`, `join-pb-img`, `join-pb-past`, `join-img`, `join-img¬¬`, `join-shown`, `join-img-row`, `join-img-fun`, `join-place`, `join-live`, `join-whole`, `join-cover`, `join-bk`, `join-pinned`, `joined-maps`, `joined-nest`.
+
 #### THE ERASURE
 
 Probed, unproven: a flatMap's lanes and a cold's elaborated runs carry
 their plain ones (`Carry`) along an order embedding. A lane ends under
 its plain end's image, so a queued lane and the end keep the plain order
-past dead pins; open: the joiner over carried lanes and the lane's frame
-(`lanes-joined`), the routing scan's reading, the two connects' bodies.
-Settled when every member is a body.
+past dead pins; open: a lane through its frame (`lane-framed`), the
+routing scan's reading, the two connects' bodies. Settled when every
+member is a body.
 
-Members: `lanes-joined`, `lanes-routed`, `lanes-inner`, `lanes-closer`, `carry-cold`.
+Members: `lane-framed`, `lanes-routed`, `lanes-inner`, `lanes-closer`, `carry-cold`.
 
 #### THE LATE WINDOW
 

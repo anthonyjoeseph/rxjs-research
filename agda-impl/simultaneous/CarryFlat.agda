@@ -14,13 +14,13 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Nat using (ℕ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
-open import denotation.Position using (Pos; Label; ix; _⊕_; root; _≟ᵖ_)
+open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
   module Joining; module Op; module Bounded; module Switch; module Exhaust; module Connect)
@@ -38,6 +38,7 @@ open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; Env
   PastOver; PBNest; Nests; Anchor; bound-hot; grown-past; Clear; Rows; foot)
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
+open import simultaneous.JoinCarry using (module Joined)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers; Routes)
 
@@ -299,8 +300,52 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       H₂ = (Hots envE ∪ʰ Proper FW.CE.σ) ∪ʰ Proper C₁.σ
       H₃ = H₂ ∪ʰ Proper C₂.σ
 
+      -- THE JOINER OVER THE CARRIED LANES: its outer the elaborated
+      -- outer's values read back, each plain running value paired with
+      -- the value its carrier reads, its lane carried into the partner's.
+      q₁ : Pos
+      q₁ = p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+
+      oE : Den A
+      oE = approx n (each valuesOf (connected (there (here refl)))) env₂
+
+      lE : A → Den (IE B)
+      lE a = approx n (laneˢ (lanesE a)) env₂
+
+      o* : EmissionSet A
+      o* = enter oE q₁
+
+      module P* = Parts lE o*
+
+      V : Pos → A → Pos → Set
+      V q a q* = o q (out a) × P.Runs op q × o* q* (out a) × P*.Runs op q*
+                 × Σ Pos λ l → FW.S′.Img q l × q* ≡ ((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
+
       postulate
-        lanes-joined : Σ PMap λ M_b → Maps M_b × Staged M_b H₂ C₂.σ (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ])
+        -- Each paired value's lane, carried through the lane's frame.
+        lane-framed : ∀ {q a q*} → V q a q* → Σ PMap λ M_l → Σ Pos λ s → Σ Pos λ s*
+                    → CarryAt valuesOf M_l (Hots envP) H₂ (HotsListed envP) (P.Ln op q a) (P*.Ln op q* a) s s*
+
+      N : PMap
+      N = M_s ∪ᴹ λ x y → Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → proj₁ (lane-framed v) x y
+
+      module JD = Joined {HP = Hots envP} {HE = H₂} {LP = HotsListed envP} p q₁ o (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
+                    o* (P*.Ln op) (P*.Runs op) (P*.Cut op) (P*.Hand op) V (λ (x , r , x* , r* , _) → x , r , x* , r*)
+                    N (λ v → proj₁ (lane-framed v)) (λ {q} {a} {q*} v m → inj₂ (q , a , q* , v , m)) (λ v → proj₂ (lane-framed v))
+
+      postulate
+        -- The lanes' map keeps what the outer's does.
+        joined-maps : Maps N
+        -- The joined lanes' late carriers nest and are anchored.
+        joined-nest : PBNest er₂ N JD.carried × NestAt {N} {H₂} {JD.u} {q₁} JD.carried
+
+      shift : ∀ {U} → JD.u ≡ U → Staged N H₂ JD.u q₁ → Staged N H₂ U q₁
+      shift refl c = c
+
+      lanes-joined : Σ PMap λ M_b → Maps M_b × Staged M_b H₂ C₂.σ q₁
+      lanes-joined = N , joined-maps , shift (joins-flat op lE oE q₁) (JD.carried , joined-nest)
+
+      postulate
         lanes-routed : ∀ {M_b} → Maps M_b → Staged M_b H₂ C₂.σ (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ])
                      → Staged M_b H₃ C₂.β (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ])
         lanes-inner : ∀ {M_b} → Maps M_b → Staged M_b H₃ C₂.β (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ])
