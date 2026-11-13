@@ -1,9 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
--- THE WRAPPER CARRIES THE CORE.  `elaborate` subscribes the elaborated
--- core as the source of a connect telling its completion, that connect
--- as the first lane of a merge with the subscribe mark, takes the merge
--- to the completion mark, and restamps and projects the whole.  Each
+-- THE WRAPPER CARRIES THE CORE.  `elaborate` takes the core, told and
+-- merged beside the subscribe mark, to the completion mark
+-- (`simultaneous.WrapTake`), and restamps and projects the whole.  Each
 -- stage carries the plain run on its own: a mark shows nothing, so only
 -- the end moves, and the stage's carry has an embedding of its own.
 module simultaneous.CarryWrap where
@@ -13,7 +12,7 @@ open import Data.List using ([]; _∷_)
 open import Data.Bool using (true)
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
@@ -30,7 +29,8 @@ import simultaneous.InstEmit as Marks
 open import simultaneous.Relations using (stamp₀; sourced)
 open import simultaneous.CarryBase using (PMap; Emb; CarryAt)
 open import simultaneous.CarryLeaves using (coreAt)
-open import simultaneous.CarryTold using (module Folded; told-carry)
+open import simultaneous.CarryTold using (module Folded)
+open import simultaneous.WrapTake using (module Wrap)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; elaborate; restamp; completing; unfinished; marked)
 
@@ -40,11 +40,6 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 Wrapped : ∀ {A} → ℕ → SObs [] A → EmissionSet (IE A) → Pos → Set₁
 Wrapped n o u s′ = Σ PMap λ M → Emb M × Σ Path λ δ → M root (s′ ⊕ δ)
                  × CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root) u root s′
-
--- Where the merge subscribes its first lane, the connect telling the
--- core's completion: the second child of the merge's first outer value.
-cAt : Pos
-cAt = root ⊕ (ix 0 ∷ ix 1 ∷ [])
 
 ------------------------------------------------------------------------
 -- The restamp
@@ -68,20 +63,10 @@ restamp-vals (_ , _) (instEmit (mark completed) _)     = refl
 ------------------------------------------------------------------------
 -- The stages
 
--- THE CLOSE CARRIES THE CORE: the core told its end by the completion
--- mark, which shows nothing.
-wrap-close : ∀ n {A} (o : SObs [] A) → Wrapped n o (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) coreAt
-           → Wrapped n o (enter (approx n (completing (elab (λ i → i) (plain o))) []) cAt) cAt
-wrap-close n o (M , hm , δ , at , c) =
-  M , hm , ix 1 ∷ δ , at , proj₁ (told-carry n (elab (λ i → i) (plain o)) (marked completed) refl [] (λ ()) cAt (tt , λ ()) c)
-
--- THE TAKE CARRIES THE CLOSE: beside the subscribe mark's lane, which
--- never ends, the merge ends nowhere, and the takeWhile cuts it at the
--- completion mark, so the end moves under the mark; every row before it
--- stays where the close's was.
-postulate
-  wrap-take  : ∀ n {A} (o : SObs [] A) → Wrapped n o (enter (approx n (completing (elab (λ i → i) (plain o))) []) cAt) cAt
-             → Wrapped n o (enter (approx n (takeWhile true unfinished (sourced o)) []) root) root
+-- THE TAKE CARRIES THE CORE, through the told run and the merge.
+wrap-take : ∀ n {A} (o : SObs [] A) → Wrapped n o (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) coreAt
+          → Wrapped n o (enter (approx n (takeWhile true unfinished (sourced o)) []) root) root
+wrap-take n o (M , hm , δ , at , c) = M , hm , ix 0 ∷ ix 1 ∷ ix 1 ∷ δ , at , Wrap.carried n o hm c
 
 -- The restamp and projection, over the takeWhile.
 wrap-restamp : ∀ n {A} (o : SObs [] A) → Wrapped n o (enter (approx n (takeWhile true unfinished (sourced o)) []) root) root
@@ -99,4 +84,4 @@ carry-wrap : ∀ n {A} (o : SObs [] A) {M} → Emb M → M root coreAt
                (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) root coreAt
            → Wrapped n o (enter (approx n (elaborate (plain o)) []) root) root
 carry-wrap n o {M} hm m c =
-  wrap-restamp n o (wrap-take n o (wrap-close n o (M , hm , [] , subst (M root) (sym (⊕-identityʳ coreAt)) m , c)))
+  wrap-restamp n o (wrap-take n o (M , hm , [] , subst (M root) (sym (⊕-identityʳ coreAt)) m , c))
