@@ -23,7 +23,7 @@ open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; c
 open import denotation.Position using (Pos; Label; ix; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
-  module Joining; module Connect; module Bounded; module Switch; module Exhaust)
+  module Joining; module Op; module Connect; module Bounded; module Switch; module Exhaust)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-snoc⁺; ⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_;
   inW; step; plain-ix)
 open import denotation.Laws using (inv-approx; good-cons)
@@ -78,6 +78,38 @@ module Parts {A B : Set} (g : A → Den B) (o : EmissionSet A) where
   slots switchᶠ           ok Ig Io = JoinerSide.slots ok g Ig Io
   slots exhaustᶠ          ok Ig Io = JoinerSide.slots ok g Ig Io
 
+-- THE PLAIN FLATMAP IS ITS JOINER over the parts.
+joins-flat : ∀ {A B} op (g : A → Den B) (sD : Den A) p
+           → Truncate (Joining.JoinT (Parts.Ln g (enter sD p) op) (enter sD p) (λ _ _ → ⊥) (Ended (enter sD p))
+                (Parts.Runs g (enter sD p) op) (Parts.Cut g (enter sD p) op) (Parts.Hand g (enter sD p) op))
+             ≡ enter (Op.flatMap op g sD) p
+joins-flat (mergeᶠ nothing)  g sD p = refl
+joins-flat (mergeᶠ (just m)) g sD p = refl
+joins-flat switchᶠ           g sD p = refl
+joins-flat exhaustᶠ          g sD p = refl
+
+-- CARRIED from the plain rows `T` into the elaborated program `X`: what
+-- `CarriesAt` asks, the plain run given only by its rows.  A record,
+-- compared by its arguments: a type that unfolds at a named elaborated
+-- flatMap unfolds the whole program, even against its own spelling.
+record CarriesOf (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (envP : DenEnv Γ) (envE : DenEnv Δ) (M₀ : PMap)
+                 (er : EnvRel M₀ ρ envP envE) (p p′ : Pos) (T : EmissionSet A) (X : E Δ (IE A)) : Set₁ where
+  constructor held
+  field
+    unheld : Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M T × Joins ρ envP envE er M × EnvPast er M
+             × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) T (enter (approx n X envE) p′) p p′) (λ c → PBNest er M c × Narrow c)
+
+-- Carried at every subscription, held to rows: checked over a program
+-- held abstract, so no program is unfolded.
+carry-of : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A)
+         → (∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
+            → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀ → Nests er M₀ → Apart envP
+            → ∀ p p′ → M₀ p (p′ ⊕ foot o) → Ok (Hots envP) p → Ok (Hots envE) p′ → Clear (Rows er) (Hots envP) p → Fresh (Hots envP) M₀ p
+            → CarriesOf n ρ envP envE M₀ er p p′ (enter (approx n o envP) p) (elab ρ o))
+         → Carry n ρ o
+carry-of n ρ o h = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
+  CarriesOf.unheld (h envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr)
+
 ------------------------------------------------------------------------
 -- The assembly
 
@@ -107,11 +139,11 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
   -- Carried into the run of an elaborated program `X`.
   CarriesX : E Δ (IE B) → Set₁
-  CarriesX X = Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M t × Joins ρ envP envE er M × EnvPast er M
-             × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) t (enter (approx n X envE) p′) p p′) (λ c → PBNest er M c × Narrow c)
+  CarriesX X = CarriesOf n ρ envP envE M₀ er p p′ t X
 
-  Carries : Set₁
-  Carries = CarriesX (elab ρ (flatMap op f s))
+  -- Moved along the plain run's equation, over a program held abstract.
+  along : ∀ {X} {T : EmissionSet B} → t ≡ T → CarriesX X → CarriesOf n ρ envP envE M₀ er p p′ T X
+  along refl c = c
 
   -- THE ELABORATED FLATMAP IS A CONNECT over the elaborated outer, its
   -- body read off `elab` itself.  The assembly runs over a body held
@@ -188,10 +220,17 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                    (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_s i {k} {l} {e₀} {h} {L} {a} {σ})
                    (λ {k} {e} {x} {y} → br_s {k} {e} {x} {y})
 
+        past′ : EnvPast er FB.M′
+        past′ = grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er past-b (λ {x} {y} → grown′ {x} {y})
+
+        -- Typed apart: inferred inside the tuple, the carry's type is
+        -- compared against `CarriesX` far more slowly.
+        carry′ : Σ (CarryAt valuesOf FB.M′ (Hots envP) (Hots envE) (HotsListed envP) t (enter (approx n (connect (elab ρ s) bE) envE) p′) p p′)
+                   (λ c → PBNest er FB.M′ c × Narrow c)
+        carry′ = FB.carried , nest , FB.narrowed
+
         result : CarriesX (connect (elab ρ s) bE)
-        result = FB.M′ , (λ m → inj₁ (ms_b (ms_s m))) , emb′ , within′ , bare′ , joins″
-               , grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er past-b (λ {x} {y} → grown′ {x} {y})
-               , FB.carried , nest , FB.narrowed
+        result = held (FB.M′ , (λ m → inj₁ (ms_b (ms_s m))) , emb′ , within′ , bare′ , joins″ , past′ , carry′)
 
       result : LanesFact → CarriesX (connect (elab ρ s) bE)
       result (M_b , ms_b , hm_b , wi_b , br_b , lh , jn_b , ep_b , past-s , c_b , nc_b , nest-v) =
@@ -200,24 +239,35 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     postulate
       flat-lanes : AtBody.LanesFact (proj₁ split)
 
-    result : CarriesX (connect (elab ρ s) (proj₁ split))
-    result = AtBody.result (proj₁ split) flat-lanes
+  -- The lanes carried past every carry of the outer.
+  LanesAt : E (IE A L.∷ Δ) (IE B) → Set₁
+  LanesAt bE = ∀ (M_s : PMap) (ms_s : M₀ ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) M₀ M_s p) (br_s : Bare M_s o)
+                 (jn_s : Joins ρ envP envE er M_s) (ep_s : EnvPast er M_s)
+                 (c_s : CarryAt valuesOf M_s (Hots envP) (Hots envE) (HotsListed envP) o (enter (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ])) p (p′ ⊕ [ ix 1 ]))
+                 (nc_s : PBNest er M_s c_s) → AfterSource.AtBody.LanesFact M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s bE
 
-  after : CarriesAt n ρ s envP envE M₀ er p (p′ ⊕ [ ix 1 ]) → CarriesX (connect (elab ρ s) (proj₁ split))
-  after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) = AfterSource.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s
+  -- MOVED ALONG THE EQUATION, the body held abstract: the result's type
+  -- names no body, so nothing is unified against the elaborated program
+  -- before the body is known.
+  module Moved (bE : E (IE A L.∷ Δ) (IE B)) (eq : elab ρ (flatMap op f s) ≡ connect (elab ρ s) bE)
+               (lanes : LanesAt bE) where
+    after : CarriesAt n ρ s envP envE M₀ er p (p′ ⊕ [ ix 1 ]) → CarriesX (connect (elab ρ s) bE)
+    after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) =
+      AfterSource.AtBody.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s bE (lanes M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s)
 
-  result : Carries
-  result = subst CarriesX (sym (proj₂ split)) (after (Carry.carries hs envP envE gP gE M₀ hm er jn ns ap p (p′ ⊕ [ ix 1 ]) (subst (M₀ p) (sym (⊕-assoc p′ [ ix 1 ] (foot s))) m₀)
-                    okP (ok-step p′ okE) nh fr))
+    moved : (Y : E Δ (IE B)) → Y ≡ connect (elab ρ s) bE → CarriesX (connect (elab ρ s) bE) → CarriesX Y
+    moved _ refl c = c
+
+    result : CarriesX (elab ρ (flatMap op f s))
+    result = moved (elab ρ (flatMap op f s)) eq (after (Carry.carries hs envP envE gP gE M₀ hm er jn ns ap p (p′ ⊕ [ ix 1 ]) (subst (M₀ p) (sym (⊕-assoc p′ [ ix 1 ] (foot s))) m₀)
+                      okP (ok-step p′ okE) nh fr))
+
+  result : CarriesOf n ρ envP envE M₀ er p p′ (enter (approx n (flatMap op f s) envP) p) (elab ρ (flatMap op f s))
+  result = along (joins-flat op g (approx n s envP) p)
+             (Moved.result (proj₁ split) (proj₂ split) (λ M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s → AfterSource.flat-lanes M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s))
 
 -- A `flatMap` carries when its outer and its lanes do.
 carry-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
               → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → Carry m ρ′ (f a)) → Carry m ρ (flatMap op f s)
-carry-flatMap n ρ (mergeᶠ nothing) f s hs hf = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  Assembly.result n ρ (mergeᶠ nothing) f s hs hf envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
-carry-flatMap n ρ (mergeᶠ (just k)) f s hs hf = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  Assembly.result n ρ (mergeᶠ (just k)) f s hs hf envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
-carry-flatMap n ρ switchᶠ f s hs hf = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  Assembly.result n ρ switchᶠ f s hs hf envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
-carry-flatMap n ρ exhaustᶠ f s hs hf = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  Assembly.result n ρ exhaustᶠ f s hs hf envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
+carry-flatMap n ρ op f s hs hf = carry-of n ρ (flatMap op f s) λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
+  Assembly.result n ρ op f s hs hf envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
