@@ -37,10 +37,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Probed, unproven: a flatMap's lanes and a cold's elaborated runs carry
 their plain ones (`Carry`) along an order embedding. A lane ends under
 its plain end's image, so a queued lane and the end keep the plain order
-past dead pins; open: the joiner over carried lanes, the lane's frame,
-the routing scan's reading. Settled when both leaves are bodies.
+past dead pins; open: the joiner over carried lanes and the lane's frame
+(`lanes-joined`), the routing scan's reading, the two connects' bodies.
+Settled when every member is a body.
 
-Members: `flat-lanes`, `carry-cold`.
+Members: `lanes-joined`, `lanes-routed`, `lanes-inner`, `lanes-closer`, `carry-cold`.
 
 #### THE LATE WINDOW
 
