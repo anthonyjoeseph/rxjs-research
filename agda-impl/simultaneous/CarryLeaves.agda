@@ -39,7 +39,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
 open import simultaneous.CarryBase using (unp-pin; CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
-open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; Grown; joins-grow; grown-past; env-past)
+open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; clear-not; Grown; joins-grow; grown-past; env-past)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 
@@ -101,7 +101,7 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
   within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
 
   -- Its points lie one label under the subscription, holding no hot row.
-  grown : NotHot HP p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ HP x y
+  grown : ∀ {R} → NotHot R p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y
   grown _  (inj₁ m)                  = inj₁ m
   grown nh (inj₂ (a , _ , refl , refl)) = inj₂ (p , p₀ , a , m₀ , ⊑-trans pp (⊑-snoc⁺ p′) , refl , nh)
 
@@ -253,12 +253,12 @@ private
       ; pb-few  = λ _ → [] , λ ()
       ; pb-img  = λ ()
       ; pb-past = λ ()
-      ; pinned  = λ {_} {r} tk _ _ _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
+      ; pinned  = λ {_} {r} tk _ _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
-  of-carried : ∀ {A HP HE LP M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′ → NotHot HP p
+  of-carried : ∀ {A HP HE LP R M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′ → NotHot R p
              → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within HP M₀ M p × Bare M (Truncate (InE (Evs.ofᴱ p 0 xs)))
-               × (∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ HP x y) × CarryAt valuesOf M HP HE LP (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
+               × (∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y) × CarryAt valuesOf M HP HE LP (Truncate (InE (Evs.ofᴱ p 0 xs))) (Truncate (InE (Evs.ofᴱ p′ 0 (L.map V xs)))) p p′
   of-carried {A} {HP} {HE} {LP} {p = p} xs E₀ fr m₀ pp nh = O.M , inj₁ , O.emb , O.within , O.bare {t = Truncate (InE (Evs.ofᴱ p 0 xs))} (λ {k} {e} tk → of-shape {k} {e} (proj₁ tk)) , O.grown nh , X.carried
     where module X = OfRows {A} {HP} {HE} {LP} xs E₀ fr m₀ pp
           module O = OneUnder E₀ fr m₀ pp
@@ -268,14 +268,14 @@ private
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
 carry-of n ρ xs = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
-  let (M , ms , hm , wi , br , gr , c) = of-carried xs e₀ fr m₀ (⊑-refl p′) nh
+  let (M , ms , hm , wi , br , gr , c) = of-carried xs e₀ fr m₀ (⊑-refl p′) (clear-not nh)
   in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , λ _ ()
 
 -- THE EMPTY PROGRAM ends at once, on both sides: the empty listing.
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
 carry-empty n ρ = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
-  let (M , ms , hm , wi , br , gr , c) = of-carried [] e₀ fr m₀ (⊑-refl p′) nh
+  let (M , ms , hm , wi , br , gr , c) = of-carried [] e₀ fr m₀ (⊑-refl p′) (clear-not nh)
   in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , λ _ ()
 

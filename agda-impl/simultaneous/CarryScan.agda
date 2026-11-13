@@ -45,7 +45,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
 open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
@@ -353,11 +353,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
-    pinned′ : ∀ {k p} → S k (pin p) → Live S k → Listed S k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × (∀ {k′ l′} → Img k′ l′ → l′ ≺ p′ → k′ ≺ p) × Listed S′ l)
+    pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
+              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} (P.spin x , _) lv L lp with pinned x (liveS← lv) (lstS← L) lp
+    pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp
     ... | (l , p′ , ul , m , b , ls) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₁ e
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₂ hh)
@@ -375,11 +375,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
                 λ tk lk vk m ul lw → up tk λ { (_ , sk , _) → upU ul λ { (_ , su , _) → F sk (liveS→ lk) vk m su lw } })
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
     ; pb-img = pb-img
-    ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (liveS← {k} (λ {c} → lv {c})) (proj₁ (proj₂ (downU s₁))) }
+    ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (λ un → liveS← {k} (λ {c} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c})) (proj₁ (proj₂ (downU s₁))) }
 
   -- Its rows carried into their instant are its source's.
-  pb-down : ∀ {k l e₀} → PB k l → S k e₀ → Live S k → PB k l × Σ (Ev A) (t k) × Live t k
-  pb-down {k} pb sk lv = pb , (_ , proj₁ (proj₂ (down sk))) , liveS← {k} (λ {c₁} → lv {c₁})
+  pb-down : ∀ {k l e₀} → PB k l → S k e₀ → (Unpinned e₀ → Live S k) → PB k l × Σ (Ev A) λ e → t k e × (Unpinned e → Live t k)
+  pb-down {k} pb sk lv = pb , _ , proj₁ (proj₂ (down sk)) , λ un → liveS← {k} (λ {c₁} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c₁})
 
 ------------------------------------------------------------------------
 -- The former

@@ -25,11 +25,11 @@ open import Data.Bool.Properties using (T?)
 open import Tree using (Obs; connect; map)
 open import denotation.Position using (Pos; Label; Path; ix; sub; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
+open import denotation.EmissionSet using (Ev; Unpinned; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺-ext; ticks; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊑-≼; ⊑-cmp; ⊑-inside; inside-⊑; ⊕-assoc; ⊕-identityʳ;
   ⊕-injˡ; ⊕-injʳ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW;
-  step; plain-ix; nest-in; not-up; sib; shrink⁼; narrow⁼)
+  step; plain-ix; nest-in; not-up; sib; shrink; shrink⁼; narrow⁼)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Connect using (σ-wp; lawful; ok₀; body-leads; source-leads; sw; bw)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
@@ -37,7 +37,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; emb-under; instant-⊕)
-open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot; listed↓)
+open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot; listed↓; Clear; clear-not; Rows; rows-at; rows-map)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
 open import simultaneous.CarryTold using (module Folded; module Mapped; told-carry; justValues)
@@ -186,7 +186,7 @@ module ConnUnder {H : Pos → Set} {M₀ : PMap} {p p′ : Pos} (E₀ : Emb M₀
   within (inj₂ (inj₁ (refl , _))) = inj₂ (inW (step here plain-ix))
   within (inj₂ (inj₂ (refl , _))) = inj₂ (inW (step here plain-ix))
 
-  grown : NotHot H p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ H x y
+  grown : ∀ {R} → NotHot R p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y
   grown _  (inj₁ m)                    = inj₁ m
   grown nh (inj₂ (inj₁ (refl , refl))) = inj₂ (p , p′ , ix 0 , m₀ , ⊑-snoc⁺ p′ , refl , nh)
   grown nh (inj₂ (inj₂ (refl , refl))) = inj₂ (p , p′ , ix 1 , m₀ , ⊑-trans (⊑-snoc⁺ p′) (⊑-snoc⁺ (p′ ⊕ [ ix 1 ])) , refl , nh)
@@ -307,7 +307,7 @@ module Conn {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   Under : ∀ {M} → CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ]) → PMap
         → ∀ {A′ Y} {f : Y → List A′} {M₁ : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A′} {u : EmissionSet Y} {s₁ s₁′ : Pos}
         → CarryAt f M₁ HP HE LP t u s₁ s₁′ → Set
-  Under c N {t = t} c′ = ∀ {k l e₀ h L a σ} → CarryAt.PB c′ k l → t k e₀ → Live t k → BoundRow (bound c) h → CarryAt.Img c h L
+  Under c N {t = t} c′ = ∀ {k l e₀ h L a σ} → CarryAt.PB c′ k l → t k e₀ → (Unpinned e₀ → Live t k) → BoundRow (bound c) h → CarryAt.Img c h L
                        → k ≡ h ⊕ (a ∷ σ) → Anchor N k l h a
 
   nests-bind : ∀ {M N} (er : EnvRel M ρ envP envE) (c : CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ]))
@@ -324,7 +324,7 @@ module Conn {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- each row showing what it showed.
   annotate-carry : ∀ {M} → (c : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) σP uS (p ⊕ [ ix 1 ]) s₀′)
                  → Σ (CarryAt annValues M (Hots envP) (Hots envE) (HotsListed envP) σP σE (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ]))
-                     λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → σP k e₀ → Live σP k → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
+                     λ c′ → ∀ {k l e₀} → CarryAt.PB c′ k l → σP k e₀ → (Unpinned e₀ → Live σP k) → Σ Pos λ l₀ → CarryAt.PB c k l₀ × l₀ ⊑ l
   annotate-carry c = Folded.carried annStep ((root , 0) , ((root , 0) , nothing)) proj₂ ann-law (approx n told′ envE) (p′ ⊕ [ ix 1 ])
                        (inv-approx n told′ envE gE (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (proj₁ tc) , proj₂ tc
     where
@@ -341,13 +341,13 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                 (hs : Carry n ρ s) (hb : ∀ {Δ′} (ρ″ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → Carry n ρ″ b)
                 (envP : DenEnv Γ) (envE : DenEnv Δ) (gP : GoodEnv envP) (gE : GoodEnv envE) (M₀ : PMap) (hm : Emb M₀)
                 (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ns : Nests er M₀) (ap : Apart envP)
-                (p p′ : Pos) (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′) (nh : NotHot (Hots envP) p)
+                (p p′ : Pos) (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′) (nh : Clear (Rows er) (Hots envP) p)
                 (fr : Fresh (Hots envP) M₀ p) where
   open Conn n ρ s b envP envE gP gE p p′ okP okE
   module U = ConnUnder {H = Hots envP} hm fr m₀
 
   past₁ : EnvPast er U.M
-  past₁ = grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → U.grown nh {x} {y})
+  past₁ = grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → U.grown (clear-not nh) {x} {y})
 
   er₁ : EnvRel U.M ρ envP envE
   er₁ = env-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} inj₁ er past₁
@@ -357,7 +357,8 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
   jn₁ : Joins ρ envP envE er₁ U.M
   jn₁ = joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er₁} {M = M₀} {N = U.M} inj₁
-          (joins-up {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} inj₁ er past₁ jn) (λ {x} {y} → U.grown nh {x} {y})
+          (joins-up {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} inj₁ er past₁ jn)
+          (λ {x} {y} → U.grown (λ hq → clear-not nh (rows-map er er₁ (λ _ x → x) hq)) {x} {y})
 
   -- Past the source.
   module AfterSource (M_s : PMap) (ms_s : U.M ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) U.M M_s (p ⊕ [ ix 1 ])) (br_s : Bare M_s σP)
@@ -392,15 +393,17 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     nests′ = nests-bind er₂ c_a ns₂ (nest-up {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} {c = c_a} ms_s er₁ ep_s nest-a)
                (λ { pb tk lv (_ , x) ci refl → ⊥-elim (InvAt.flat Iσ (proj₁ x) tk) })
                (λ { j {h = h} {a = a} {σ = σ} pb tk lv (_ , x) ci refl →
-                 ⊥-elim (proj₂ okP (bound-hot {ρ = λ {X} → ρ {X}} envP {envE = envE} er₂ j (_ , tk , λ {c} → lv {c})) (σ-in x)
-                   (⊑-inside {h} {h ⊕ (a ∷ σ)} (a ∷ σ , refl))) })
+                 ⊥-elim (nh (rows-at er j tk) (inW (σ-in x)) (⊑-inside {h} {h ⊕ (a ∷ σ)} (a ∷ σ , refl))) })
 
     ap′ : Apart envP′
     ap′ = (λ {q} x hq → proj₂ okP hq (σ-in x) (⊑-inside {q} {q} (⊑-refl q))) , ap
 
-    nh-b : NotHot (Hots envP′) (p ⊕ [ ix 0 ])
-    nh-b (inj₂ hq)     kq = nh hq (⊑-trans (⊑-snoc⁺ p) kq)
-    nh-b (inj₁ (_ , x)) kq = body-leads {s = sP} {F = FP} IsP IFP p okP here (sw {s = sP} {F = FP} IsP IFP p okP (proj₁ x)) kq
+    -- No row of a binder lies inside a world point of the body: the
+    -- source's lie after the body's, the others' inside none of the
+    -- connect's.
+    nh-b : Clear (Rows er′) (Hots envP′) (p ⊕ [ ix 0 ])
+    nh-b (inj₂ hq)     w i = nh (rows-map er (λ {X} i → er′ (there i)) (λ _ x → x) hq) (inW (narrow⁼ σ-in w)) i
+    nh-b (inj₁ (_ , x)) w i = body-leads {s = sP} {F = FP} IsP IFP p okP w (sw {s = sP} {F = FP} IsP IFP p okP x) (inside-⊑ _ _ i)
 
     fresh-b : Fresh (Hots envP′) M_s (p ⊕ [ ix 0 ])
     fresh-b m (w , ww , wx) with wi_s m
@@ -536,11 +539,11 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
           pair (inj₁ m) (inj₂ e)  = swap (echo-m e m)
 
       -- An echo lies one label under its row's carrier, holding no hot row.
-      grown′ : ∀ {x y} → M′ x y → M_b x y ⊎ Grown M_b (Hots envP) x y
+      grown′ : ∀ {x y} → M′ x y → M_b x y ⊎ Grown M_b (Rows er) x y
       grown′ (inj₁ m) = inj₁ m
       grown′ (inj₂ (k₀ , l₀ , (_ , tk₀) , i₀ , refl , refl)) with at-a i₀
       ... | y₀ , m₀ , p₀ =
-        inj₂ (k₀ , y₀ , ix 0 , m₀ , ⊑-trans p₀ (⊑-snoc⁺ l₀) , refl , λ hq kq → proj₂ (ok-step p okP) hq (InvAt.world Iσ tk₀) (⊑-inside kq))
+        inj₂ (k₀ , y₀ , ix 0 , m₀ , ⊑-trans p₀ (⊑-snoc⁺ l₀) , refl , λ hq kq → nh hq (inW (shrink (InvAt.world Iσ tk₀))) (⊑-inside kq))
 
       within′ : Within (Hots envP) M₀ M′ p
       within′ (inj₁ m) = within m
@@ -595,12 +598,19 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- annotation's.
         carried : CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                     (enter (approx n (elab ρ (connect s b)) envE) p′) p p′
-        carried = ConnCarry.Body.carried {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
-          (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
+        module CB = ConnCarry.Body {sP = sP} {FP = FP} {sE = sE} {FE = FE} IsP (λ {t} → IFP {t}) IsE (λ {t} → IFE {t}) p p′ okP okE
+                      (λ {x} {y} → listed↓ envP {x} {y}) M_s c_a M_b ms_b emb′ c_b (ep_b (here refl))
+                      (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (here refl) {k} {l} {e₀} {h} {L} {a} {σ})
 
-        postulate
-          -- Its late carriers under a bound hot's row are anchored.
-          conn-nest : PBNest er M′ carried
+        carried = CB.carried
+
+        -- Its late carriers under a bound hot's row are anchored: the
+        -- body's by the body's anchors, the source's by the annotation's.
+        conn-nest : PBNest er M′ carried
+        conn-nest i = CB.nest′ (λ {h} → bound-hot {ρ = λ {X} → ρ {X}} envP {envE = envE} er i {h})
+                        (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b (there i) {k} {l} {e₀} {h} {L} {a} {σ})
+                        (λ {k} {l} {e₀} {h} {L} {a} {σ} → nest-a i {k} {l} {e₀} {h} {L} {a} {σ})
+                        (λ {k} {e} {x} {y} → br_s {k} {e} {x} {y})
 
         conn-carry : Σ (CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                                (enter (approx n (elab ρ (connect s b)) envE) p′) p p′)
@@ -625,7 +635,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
   result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
   result = after (Carry.carries hs envP envE gP gE U.M U.emb er₁ jn₁ ns₁ ap (p ⊕ [ ix 1 ]) s₀′ (inj₂ (inj₂ (refl , refl)))
-                    (ok-step p okP) (ok-step (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (λ hq kq → nh hq (⊑-trans (⊑-snoc⁺ p) kq)) (U.fresh-s okP))
+                    (ok-step p okP) (ok-step (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (λ hq w i → nh (rows-map er er₁ (λ _ x → x) hq) (inW (shrink⁼ w)) i) (U.fresh-s okP))
 
 -- A `connect` carries when its source and its body do.
 carry-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)

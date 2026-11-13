@@ -28,14 +28,15 @@ open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; apart; ahead-over; ahead-under)
-open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart; bound-hot; EnvPast; PBNest; Nests; env-past; nest-or)
+open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart;
+  EnvPast; PBNest; Nests; env-past; nest-or; BoundSrc; Rows; rows-at; clear-not)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
 open import simultaneous.CarryRead using (Reading; read-post; read-post-pb)
 open import simultaneous.Rejoined using (split-at; same-hot; end-of)
 
-open import simultaneous.CarryReader using (HotOf; HotOf′; module Read)
+open import simultaneous.CarryReader using (HotOf′; module Read)
 
 ------------------------------------------------------------------------
 -- One reader's joins
@@ -43,7 +44,7 @@ open import simultaneous.CarryReader using (HotOf; HotOf′; module Read)
 module ReadPast {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
                 (hm : Emb M₀) (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ap : Apart envP)
                 {X} (i : X ∈ Γ) {p p′} (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′)
-                (nh : NotHot (Hots envP) p) (fr : Fresh (Hots envP) M₀ p) where
+                (nh : NotHot (Rows er) p) (fr : Fresh (Hots envP) M₀ p) where
   open Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
 
   -- EVERY BINDER'S LATE CARRIERS STAY PAST THE JOINS: a join before a
@@ -57,7 +58,7 @@ module ReadPast {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   reader-past ns j pb tk lv ul (inj₁ m) xk nxk = ep₀ j pb tk lv ul m xk nxk
   reader-past ns j {k} pb tk lv ul (inj₂ (inj₂ (refl , refl))) xk nxk =
     ahead-under (ep₀ j pb tk lv ul m₀ (≺-trans {p} {p ⊕ [ last ]} {k} (≺-ext p []) xk)
-                   (λ pk → nh (bound-hot {ρ = ρ} envP {envE = envE} er j (_ , tk , λ {c} → lv {c})) pk)) (⊑-snoc⁺ p′)
+                   (nh (rows-at er j tk))) (⊑-snoc⁺ p′)
   reader-past ns j {k} pb tk lv ul (inj₂ (inj₁ (q , L , br , ci , pq , refl , refl))) xk nxk with C.ext ci
   ... | yq , myq , yqL with cmp3 q k
   ...   | inj₂ (inj₁ refl) = ⊥-elim (≺-absurd {q ⊕ [ sub p ]} {q} xk (≺-ext q []))
@@ -100,7 +101,7 @@ module ReadPast {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   reader-nest ns i₂ {h = h} {L = L₂} (q , l₀ , pbq , (_ , tq) , _ , pq , refl , inj₁ refl) _ _ brh cih e with split-at h q e
   ... | inj₁ (refl , _) = ⊥-elim (same-hot envP ap i i₂ (Bound.isP (er i)) (Bound.isP (er i₂)) tq (proj₂ brh)
                                    (λ j → CarryAt.Img (Bound.carried (er j)) q L₂ → ⊥) (C.pb-img pbq) cih)
-  ... | inj₂ (_ , qe) with ns i i₂ pbq (proj₁ tq) (proj₂ tq) brh cih qe
+  ... | inj₂ (_ , qe) with ns i i₂ pbq (proj₁ tq) (λ _ {c} → proj₂ tq {c}) brh cih qe
   ...   | x₀ , y₀ , m , y₀l , inj₁ (hx , x₀q) = x₀ , y₀ , inj₁ m , ⊑-trans y₀l (⊑-snoc⁺ l₀) , inj₁ (hx , ⊑-trans x₀q (⊑-snoc⁺ q))
   ...   | x₀ , y₀ , m , y₀l , inj₂ qx₀ = x₀ , y₀ , inj₁ m , ⊑-trans y₀l (⊑-snoc⁺ l₀) , inj₂ (pb-past-row pbq tq m qx₀)
   reader-nest ns i₂ (q , l₀ , pbq , (_ , tq) , _ , pq , refl , inj₂ (c′ , tc′ , _ , refl)) _ _ _ _ _
@@ -123,8 +124,8 @@ private
   read-at : ∀ {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {envP : DenEnv Γ} {envE : DenEnv Δ}
             (hm : Emb M₀) (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ap : Apart envP)
             {X} (i : X ∈ Γ) {p p′} (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′)
-            (nh : NotHot (Hots envP) p) (fr : Fresh (Hots envP) M₀ p) {dP : Den X} {dE : Den (AIE X)}
-          → dP ≡ hot (Proper (HotOf (er i))) → dE ≡ hot (Proper (HotOf′ (er i))) → InvAt (Hots envE) p′ (enter dE p′)
+            (nh : NotHot (Rows er) p) (fr : Fresh (Hots envP) M₀ p) {dP : Den X} {dE : Den (AIE X)}
+          → dP ≡ hot (Proper (BoundSrc (er i))) → dE ≡ hot (Proper (HotOf′ (er i))) → InvAt (Hots envE) p′ (enter dE p′)
           → Nests er M₀
           → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter dP p) × Joins ρ envP envE er M × EnvPast er M
             × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′) (λ c → PBNest er M c)
@@ -132,7 +133,7 @@ private
     R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , R′.reader-past ns
     , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined
     , nest-or {er = er} {c = R.reader-rejoined} {c′ = read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined} (λ m → m)
-        (λ pb tk lv → let (l , pb₀ , ll) = read-post-pb {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined pb in inj₁ (l , pb₀ , ll , (_ , tk) , lv))
+        (λ pb tk lv → let (l , pb₀ , ll) = read-post-pb {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined pb in inj₁ (l , pb₀ , ll , _ , tk , lv))
         (R′.reader-nest ns)
     where
       module R  = Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
@@ -141,5 +142,5 @@ private
 -- A READER of a bound hot carries it.
 carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 carry-connected n ρ i = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  read-at {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr {dP = lookup envP i} {dE = lookup envE (ρ (∈-map⁺ AIE i))}
+  read-at {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE (clear-not nh) fr {dP = lookup envP i} {dE = lookup envE (ρ (∈-map⁺ AIE i))}
     (Bound.isP (er i)) (Bound.isE (er i)) (proj₁ (gE (ρ (∈-map⁺ AIE i))) p′ okE) ns

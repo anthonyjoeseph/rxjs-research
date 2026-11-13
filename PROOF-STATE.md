@@ -32,17 +32,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE DEAD PIN
+
+Untried: a takeWhile keeps a source pin past its failure, while its
+source's rows there are hidden, so the source is never listed up to the
+pin. Needs the source's early-connect pins listed over a region (an
+early cover). Settled when the leaf is a body.
+
+Members: `take-pin-past`.
+
 #### THE CONNECT'S CARRY
 
 Probed, unproven: the connect's rows carried from its body's carry and
 its annotated source's. Each subterm is listed before the other's image
-by `cover`; open: the same before a LATE carrier, and the source listed
-past its end (pins after it); where a pinned row's late carrier lies
-(a body pin past the body's end), and an echo's under an imaged source
-row; whether an echo's image lies outside the annotation's subscription
-with its elaborated body alive. Settled when each leaf is a body.
+by `cover`; open: the same before a LATE carrier, and a pin, alive or
+dead, carried from whichever subterm made it. Settled when each leaf is
+a body.
 
-Members: `conn-echo-live`, `conn-pb-pin`, `conn-pb-nested`, `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-nest`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 
@@ -62,15 +69,24 @@ completion mark. Settled when each former's leaf is a body.
 
 Members: `carry-flatMap`, `carry-cold`, `wrap-take`.
 
-#### THE PROTOCOL
+#### THE BATCH RANK
 
-Untried: every emit is named for its own instant, one begin and one
-value name per instant — the elaboration mints both per async value,
-which is per instant; the subscribe mark sits once before every begin
-with every value past it async; every value precedes the completion.
-Settled when each is a body over the elaboration's layers.
+Untried: a batch leaves within its own instant, at the rank its values
+carry. Needs the layers' positions to keep instants, and the release
+mark to sit in the instant it releases. Settled when `batch-rank` is a
+body over the layers and the release protocol.
 
-Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
+Members: `batch-rank`.
+
+#### THE RELEASE
+
+Untried: the batcher releases exactly at the protocol's marks — past
+the last value with nothing held, a mark past it released it, of one of
+four kinds; a held batch is released by marks before the run leaves its
+instant. Settled when each is a body over `Walk`'s tally and the
+protocol.
+
+Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
 
 #### THE HELD STREAMS
 
@@ -93,16 +109,6 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
 `cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
 
-#### THE NEXT ROW
-
-Untried: past finitely many rows of a value's instant, the program
-reaches another instant or its end, or makes no row — constructively.
-Nothing decides the row after a position; `listed` decides those before
-one. Settled when the next row past a position is decided by operator,
-each timeline forcing to its next frame, `done` or `quiet`.
-
-Members: `exits-bounded`.
-
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
@@ -112,15 +118,15 @@ echoes), the combinator scan's, a cold's.
 
 Members: `cold-rest`, `scan-rest`, `conn-rest`.
 
-#### THE RELEASE
+#### THE PROTOCOL
 
-Untried: the batcher releases exactly at the protocol's marks — past
-the last value with nothing held, a mark past it released it, of one of
-four kinds; a held batch is released by marks before the run leaves its
-instant. Settled when each is a body over `Walk`'s tally and the
-protocol.
+Untried: every emit is named for its own instant, one begin and one
+value name per instant — the elaboration mints both per async value,
+which is per instant; the subscribe mark sits once before every begin
+with every value past it async; every value precedes the completion.
+Settled when each is a body over the elaboration's layers.
 
-Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
 
 #### THE PASS
 
@@ -130,12 +136,3 @@ proven; open is the row at the bound itself, which a listing before it
 omits. Settled when it is a body over them.
 
 Members: `pass`.
-
-#### THE BATCH RANK
-
-Untried: a batch leaves within its own instant, at the rank its values
-carry. Needs the layers' positions to keep instants, and the release
-mark to sit in the instant it releases. Settled when `batch-rank` is a
-body over the layers and the release protocol.
-
-Members: `batch-rank`.
