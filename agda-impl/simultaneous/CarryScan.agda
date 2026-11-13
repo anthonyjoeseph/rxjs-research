@@ -362,6 +362,9 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {p′} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
     ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {p′} ls) , inj₂ (inj₂ hh)
 
+    heard′ : ∀ {k p l p′} → S k (pin p) → Listed S k → LP k → PB k l → S′ l (pin p′) → Listed S′ l
+    heard′ {l = l} (P.spin x , _) L lp pb (E.spin ul , _) = UL.lst→ {l} (heard x (lstS← L) lp pb ul)
+
   scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
     { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
@@ -373,7 +376,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; whole = λ wt ne lp → UL.whole→ (whole (wholeS← wt) (endedS← ne) lp)
     ; cover = λ {v} {w} L lp lv F → UL.lst→ {w} (cover (lstS← L) lp (liveS← {v} (λ {c} → lv {c}))
                 λ tk lk vk m ul lw → up tk λ { (_ , sk , _) → upU ul λ { (_ , su , _) → F sk (liveS→ lk) vk m su lw } })
-    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′ ; heard = heard′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (λ un → liveS← {k} (λ {c} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c})) (proj₁ (proj₂ (downU s₁))) }
 

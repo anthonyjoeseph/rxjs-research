@@ -249,6 +249,7 @@ private
       ; bk      = bk′
       ; in-bk   = in-bk′
       ; pinned  = λ kp L lp → ⊥-elim (pinU (proj₁ (proj₂ (proj₂ (proj₁ (pinned kp L lp))))))
+      ; heard   = λ _ _ _ _ y → ⊥-elim (pin-free (proj₁ y))
       }
 
     -- A row read carried into its instant: on, or under, the annotated carrier.

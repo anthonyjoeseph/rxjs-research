@@ -135,6 +135,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; pb-img  = λ ()
     ; pb-past = λ ()
     ; pinned  = λ { (() , _) _ _ }
+    ; heard   = λ { (() , _) _ _ _ _ }
     }
 
 -- THE BOTTOM APPROXIMANT shows only skips: the spin, on both sides.
@@ -165,7 +166,7 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
 carry-grow sub c past = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = cover
-  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned′ }
+  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned′ ; heard = heard }
   where
     open CarryAt c
     pinned′ = λ {k} {q} tk L lp → let ((l , q′ , ul , pb , (y , m , qy) , ls) , h) = pinned {k} {q} tk L lp in (l , q′ , ul , pb , (y , sub m , qy) , ls) , h
@@ -416,6 +417,9 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   pinned {k} {q} (body x , _) L lp with C.pinned x (P.lst← L) lp
   ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lstw ls) , homed {k} {q} r
 
+  heard : ∀ {k q l q′} → P.T k (pin q) → Listed P.T k → LP k → PB k l → E.T l (pin q′) → Listed E.T l
+  heard (body x , _) L lp (_ , _ , pb) (body y , _) = E.lstw (C.heard x (P.lst← L) lp pb y)
+
   cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
   cover L lp lv F = E.lstw (C.cover (P.lst← L) lp (P.live← lv) λ tk lk vk m ul → F (P.up tk) (P.live→ lk) vk (fwd m tk ul) (E.up ul))
     where
@@ -427,7 +431,7 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   carried = record
     { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
     ; live = live ; few = few ; whole = whole ; cover = cover
-    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = pb-past ; pinned = pinned }
+    ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = pb-past ; pinned = pinned ; heard = heard }
 
 -- EACH FURTHER APPROXIMANT is the body under the guard: the map grown by
 -- the guard and the body's subscription, held fresh at the body's.
