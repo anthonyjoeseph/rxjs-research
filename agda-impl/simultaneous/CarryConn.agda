@@ -628,6 +628,14 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     -- The pins of the connects enclosing a row, listed between carriers:
     -- a pin of a body connect by the body's carry, of the connect itself
     -- by the source's and the told rows', all past the row's image.
+    -- DEAD ROUTE: the connect's own pins from the plain ones up to the
+    --   pin.  The connect pins each row of its source's burst, and a
+    --   source pin carried late into its instant has elaborated values
+    --   before its carrier whose plain rows come after it, so their
+    --   elaborated pins precede the carrier while their plain pins follow
+    --   the pin.  Listing them needs the source listed past the pin, to
+    --   where every plain row is carried at or after the carrier; the
+    --   hypotheses stop at the pin.
     postulate
       conn-encl↓ : ∀ {x x′ k l r r′} → ConnImg x x′ → Listed t x → LP k → t k (pin r) → T (inside r x) → x ≺ k
                  → u l (pin r′) → PB′ k l → Encl t x k → Encl u x′ l
