@@ -15,7 +15,7 @@ open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
@@ -40,7 +40,7 @@ open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; Env
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; closer; laneˢ; each; combined; trackers)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers)
 
 ------------------------------------------------------------------------
 -- The joiners
@@ -105,106 +105,110 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   t : EmissionSet B
   t = Truncate J.JoinT
 
-  u : EmissionSet (IE B)
-  u = enter (approx n (elab ρ (flatMap op f s)) envE) p′
+  -- Carried into the run of an elaborated program `X`.
+  CarriesX : E Δ (IE B) → Set₁
+  CarriesX X = Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M t × Joins ρ envP envE er M × EnvPast er M
+             × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) t (enter (approx n X envE) p′) p p′) (λ c → PBNest er M c × Narrow c)
 
   Carries : Set₁
-  Carries = Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M t × Joins ρ envP envE er M × EnvPast er M
-          × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) t u p p′) (λ c → PBNest er M c × Narrow c)
+  Carries = CarriesX (elab ρ (flatMap op f s))
+
+  -- THE ELABORATED FLATMAP IS A CONNECT over the elaborated outer, its
+  -- body read off `elab` itself.  The assembly runs over a body held
+  -- abstract and is moved along this equation: compared against `elab`'s
+  -- unfolding, any other spelling of the body unfolds the whole program.
+  split : Σ (E (IE A L.∷ Δ) (IE B)) λ b → elab ρ (flatMap op f s) ≡ connect (elab ρ s) b
+  split = _ , refl
 
   -- Past the outer.
   module AfterSource (M_s : PMap) (ms_s : M₀ ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) M₀ M_s p) (br_s : Bare M_s o)
                      (jn_s : Joins ρ envP envE er M_s) (ep_s : EnvPast er M_s)
                      (c_s : CarryAt valuesOf M_s (Hots envP) (Hots envE) (HotsListed envP) o (enter (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ])) p (p′ ⊕ [ ix 1 ]))
                      (nc_s : PBNest er M_s c_s) where
-    -- The elaborated connect's source and body written as `elab` unfolds
-    -- them, so that its run is compared without unfolding the body.
-    module FW = FlatCarry {HP = Hots envP} {HE = Hots envE} {LP = HotsListed envP} p p′ okP okE Io g Ig (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
-                  (P.slots op okP Ig Io) {sE = approx n (elab ρ s) envE}
-                  {FE = λ h → approx n (connect closer (connect (flatMap op (λ a → laneˢ (elab (λ i → there (there (ρ i))) (f a)))
-                                                                   (each valuesOf (connected (there (here refl)))))
-                                                          (combined op (trackers Γ 0 (λ i → there (there (there (ρ i))))))))
-                                         (h ∷ envE)}
-                  (inv-approx n (elab ρ s) envE gE)
-                  (λ {t} L → inv-approx n (connect closer (connect (flatMap op (λ a → laneˢ (elab (λ i → there (there (ρ i))) (f a)))
-                                                                   (each valuesOf (connected (there (here refl)))))
-                                                          (combined op (trackers Γ 0 (λ i → there (there (there (ρ i))))))))
-                                         (hot t ∷ envE) (good-cons L gE))
-                  M_s c_s
-
     er₂ : EnvRel M_s ρ envP envE
     er₂ = env-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er ep_s
 
-    -- The lanes' carry.
-    LaneCarry : PMap → Set₁
-    LaneCarry M_b = CarryAt valuesOf M_b (Hots envP) (Hots envE ∪ʰ Proper FW.CE.σ) (λ q → Listed o q × HotsListed envP q) FW.tB FW.CE.β p (p′ ⊕ [ ix 0 ])
+    module AtBody (bE : E (IE A L.∷ Δ) (IE B)) where
+      module FW = FlatCarry {HP = Hots envP} {HE = Hots envE} {LP = HotsListed envP} p p′ okP okE Io g Ig (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
+                    (P.slots op okP Ig Io) {sE = approx n (elab ρ s) envE} {FE = λ h → approx n bE (h ∷ envE)}
+                    (inv-approx n (elab ρ s) envE gE) (λ {t} L → inv-approx n bE (hot t ∷ envE) (good-cons L gE)) M_s c_s
 
-    -- A lane's late carrier strictly under a value's row, anchored.
-    NestV : (M_b : PMap) → LaneCarry M_b → Set
-    NestV M_b c_b = ∀ {k l e₀ h L a σ} → CarryAt.PB c_b k l → FW.tB k e₀ → (Unpinned e₀ → Live FW.tB k) → Σ A (λ b → o h (out b)) → FW.S′.Img h L
-                  → k ≡ h ⊕ (a ∷ σ) → Anchor M_b k l h a
+      -- The lanes' carry.
+      LaneCarry : PMap → Set₁
+      LaneCarry M_b = CarryAt valuesOf M_b (Hots envP) (Hots envE ∪ʰ Proper FW.CE.σ) (λ q → Listed o q × HotsListed envP q) FW.tB FW.CE.β p (p′ ⊕ [ ix 0 ])
 
-    -- THE LANES ARE CARRIED by the connect's body: every lane row past the
-    -- outer's map, nothing paired under a value but under its second
-    -- child, each binder's late carriers past it, and the outer's.
+      -- A lane's late carrier strictly under a value's row, anchored.
+      NestV : (M_b : PMap) → LaneCarry M_b → Set
+      NestV M_b c_b = ∀ {k l e₀ h L a σ} → CarryAt.PB c_b k l → FW.tB k e₀ → (Unpinned e₀ → Live FW.tB k) → Σ A (λ b → o h (out b)) → FW.S′.Img h L
+                    → k ≡ h ⊕ (a ∷ σ) → Anchor M_b k l h a
+
+      -- THE LANES ARE CARRIED by the connect's body: every lane row past the
+      -- outer's map, nothing paired under a value but under its second
+      -- child, each binder's late carriers past it, and the outer's.
+      LanesFact : Set₁
+      LanesFact = Σ PMap λ M_b → M_s ⊆ᴹ M_b × Emb M_b × Within (Hots envP) M_s M_b p × Bare M_b FW.t × FW.LaneHere M_b
+                  × Joins ρ envP envE er₂ M_b × EnvPast er₂ M_b × PastOver c_s M_b
+                  × Σ (LaneCarry M_b) λ c_b → PBNest er₂ M_b c_b × NestV M_b c_b
+
+      module Lanes (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (hm_b : Emb M_b) (wi_b : Within (Hots envP) M_s M_b p) (br_b : Bare M_b FW.t)
+                   (lh : FW.LaneHere M_b) (jn_b : Joins ρ envP envE er₂ M_b) (ep_b : EnvPast er₂ M_b) (past-s : PastOver c_s M_b)
+                   (c_b : LaneCarry M_b) (nc_b : PBNest er₂ M_b c_b) (nest-v : NestV M_b c_b) where
+        emb′ : Emb (M_b ∪ᴹ FW.Echo)
+        emb′ = FW.Paired.emb′ M_b ms_b hm_b lh
+
+        module FB = FW.Body M_b ms_b emb′ c_b past-s (λ {k} {l} {e₀} {h} {L} {a} {σ} → nest-v {k} {l} {e₀} {h} {L} {a} {σ})
+
+        within′ : Within (Hots envP) M₀ FB.M′ p
+        within′ (inj₁ m) = [ (λ ms → wi_s ms) , inj₂ ]′ (wi_b m)
+        within′ (inj₂ e) = inj₂ (FW.echo-world e)
+
+        bare′ : Bare FB.M′ t
+        bare′ tk (inj₁ m) kx = br_b tk m kx
+        bare′ tk (inj₂ e) kx = FW.echo-bare tk e kx
+
+        -- An echo lies one label under its value's carrier, holding no hot
+        -- row.
+        grown′ : ∀ {x y} → FB.M′ x y → M_b x y ⊎ Grown M_b (Rows er) x y
+        grown′ (inj₁ m) = inj₁ m
+        grown′ (inj₂ e) =
+          let (k₀ , y₀ , m₀ , yl , xe , w) = FW.echo-at e in inj₂ (k₀ , y₀ , ix 0 , ms_b m₀ , yl , xe , λ hq kq → nh hq (inW w) (⊑-inside kq))
+
+        past-b : EnvPast er M_b
+        past-b = past-shrink {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er ep_s ep_b
+
+        joins″ : Joins ρ envP envE er FB.M′
+        joins″ = joins-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} {er = er} {M = M_b} {N = FB.M′} inj₁
+                   (joins-shrink {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er ep_s jn_b) (λ {x} {y} → grown′ {x} {y})
+
+        -- Its late carriers under a bound hot's row are anchored: the lanes'
+        -- by the lanes' anchors, the outer's by the outer's.
+        nest : PBNest er FB.M′ FB.carried
+        nest i = FB.nest′ (λ {h} → bound-hot {ρ = λ {X} → ρ {X}} envP {envE = envE} er i {h})
+                   (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b i {k} {l} {e₀} {h} {L} {a} {σ})
+                   (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_s i {k} {l} {e₀} {h} {L} {a} {σ})
+                   (λ {k} {e} {x} {y} → br_s {k} {e} {x} {y})
+
+        result : CarriesX (connect (elab ρ s) bE)
+        result = FB.M′ , (λ m → inj₁ (ms_b (ms_s m))) , emb′ , within′ , bare′ , joins″
+               , grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er past-b (λ {x} {y} → grown′ {x} {y})
+               , FB.carried , nest , FB.narrowed
+
+      result : LanesFact → CarriesX (connect (elab ρ s) bE)
+      result (M_b , ms_b , hm_b , wi_b , br_b , lh , jn_b , ep_b , past-s , c_b , nc_b , nest-v) =
+        Lanes.result M_b ms_b hm_b wi_b br_b lh jn_b ep_b past-s c_b nc_b nest-v
+
     postulate
-      flat-lanes : Σ PMap λ M_b → M_s ⊆ᴹ M_b × Emb M_b × Within (Hots envP) M_s M_b p × Bare M_b FW.t × FW.LaneHere M_b
-                 × Joins ρ envP envE er₂ M_b × EnvPast er₂ M_b × PastOver c_s M_b
-                 × Σ (LaneCarry M_b) λ c_b → PBNest er₂ M_b c_b × NestV M_b c_b
+      flat-lanes : AtBody.LanesFact (proj₁ split)
 
-    module Lanes (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (hm_b : Emb M_b) (wi_b : Within (Hots envP) M_s M_b p) (br_b : Bare M_b FW.t)
-                 (lh : FW.LaneHere M_b) (jn_b : Joins ρ envP envE er₂ M_b) (ep_b : EnvPast er₂ M_b) (past-s : PastOver c_s M_b)
-                 (c_b : LaneCarry M_b) (nc_b : PBNest er₂ M_b c_b) (nest-v : NestV M_b c_b) where
-      emb′ : Emb (M_b ∪ᴹ FW.Echo)
-      emb′ = FW.Paired.emb′ M_b ms_b hm_b lh
+    result : CarriesX (connect (elab ρ s) (proj₁ split))
+    result = AtBody.result (proj₁ split) flat-lanes
 
-      module FB = FW.Body M_b ms_b emb′ c_b past-s (λ {k} {l} {e₀} {h} {L} {a} {σ} → nest-v {k} {l} {e₀} {h} {L} {a} {σ})
-
-      within′ : Within (Hots envP) M₀ FB.M′ p
-      within′ (inj₁ m) = [ (λ ms → wi_s ms) , inj₂ ]′ (wi_b m)
-      within′ (inj₂ e) = inj₂ (FW.echo-world e)
-
-      bare′ : Bare FB.M′ t
-      bare′ tk (inj₁ m) kx = br_b tk m kx
-      bare′ tk (inj₂ e) kx = FW.echo-bare tk e kx
-
-      -- An echo lies one label under its value's carrier, holding no hot
-      -- row.
-      grown′ : ∀ {x y} → FB.M′ x y → M_b x y ⊎ Grown M_b (Rows er) x y
-      grown′ (inj₁ m) = inj₁ m
-      grown′ (inj₂ e) =
-        let (k₀ , y₀ , m₀ , yl , xe , w) = FW.echo-at e in inj₂ (k₀ , y₀ , ix 0 , ms_b m₀ , yl , xe , λ hq kq → nh hq (inW w) (⊑-inside kq))
-
-      past-b : EnvPast er M_b
-      past-b = past-shrink {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er ep_s ep_b
-
-      joins″ : Joins ρ envP envE er FB.M′
-      joins″ = joins-grow {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} {er = er} {M = M_b} {N = FB.M′} inj₁
-                 (joins-shrink {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} ms_s er ep_s jn_b) (λ {x} {y} → grown′ {x} {y})
-
-      -- Its late carriers under a bound hot's row are anchored: the lanes'
-      -- by the lanes' anchors, the outer's by the outer's.
-      nest : PBNest er FB.M′ FB.carried
-      nest i = FB.nest′ (λ {h} → bound-hot {ρ = λ {X} → ρ {X}} envP {envE = envE} er i {h})
-                 (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_b i {k} {l} {e₀} {h} {L} {a} {σ})
-                 (λ {k} {l} {e₀} {h} {L} {a} {σ} → nc_s i {k} {l} {e₀} {h} {L} {a} {σ})
-                 (λ {k} {e} {x} {y} → br_s {k} {e} {x} {y})
-
-      result : Carries
-      result = FB.M′ , (λ m → inj₁ (ms_b (ms_s m))) , emb′ , within′ , bare′ , joins″
-             , grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er past-b (λ {x} {y} → grown′ {x} {y})
-             , FB.carried , nest , FB.narrowed
-
-    result : Carries
-    result = let (M_b , ms_b , hm_b , wi_b , br_b , lh , jn_b , ep_b , past-s , c_b , nc_b , nest-v) = flat-lanes
-             in Lanes.result M_b ms_b hm_b wi_b br_b lh jn_b ep_b past-s c_b nc_b nest-v
-
-  after : CarriesAt n ρ s envP envE M₀ er p (p′ ⊕ [ ix 1 ]) → Carries
+  after : CarriesAt n ρ s envP envE M₀ er p (p′ ⊕ [ ix 1 ]) → CarriesX (connect (elab ρ s) (proj₁ split))
   after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) = AfterSource.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s
 
   result : Carries
-  result = after (Carry.carries hs envP envE gP gE M₀ hm er jn ns ap p (p′ ⊕ [ ix 1 ]) (subst (M₀ p) (sym (⊕-assoc p′ [ ix 1 ] (foot s))) m₀)
-                    okP (ok-step p′ okE) nh fr)
+  result = subst CarriesX (sym (proj₂ split)) (after (Carry.carries hs envP envE gP gE M₀ hm er jn ns ap p (p′ ⊕ [ ix 1 ]) (subst (M₀ p) (sym (⊕-assoc p′ [ ix 1 ] (foot s))) m₀)
+                    okP (ok-step p′ okE) nh fr))
 
 -- A `flatMap` carries when its outer and its lanes do.
 carry-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
