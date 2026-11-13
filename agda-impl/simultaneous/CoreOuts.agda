@@ -260,7 +260,7 @@ module _ (n : ℕ) where
   counted-G g = each-G (g-scan {R = λ acc → All U (proj₂ acc)} g [] (λ {acc} {e} _ u → laneStep-U acc e u)) (λ r → r)
 
   laneˢ-G : ∀ {Θ B} {env : DenEnv Θ} {x : E Θ (IE B)} → Good n env x U → Good n env (laneˢ x) U
-  laneˢ-G gx = g-flat′ λ {k} → g-conn (g-flat′ gx) (λ h hh → counted-G (g-flat′ (λ {i} → piece-G k i hh)))
+  laneˢ-G gx = g-take (g-flat′ λ {k} → g-conn (g-flat′ gx) (λ h hh → counted-G (g-flat′ (λ {i} → piece-G k i hh))))
 
   closer-G : ∀ {Δ A B} {env : DenEnv Δ} {h : Den (IE A)} → Good n (h ∷ env) (closer {Δ} {A} {B}) U
   closer-G = concat-G (each-G g-top (λ {x} _ → closing-U x)) (g-of (tt ∷ []))

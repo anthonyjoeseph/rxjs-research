@@ -351,11 +351,20 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   counted : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
   counted s = each proj₂ (scan laneStep ((name , 0) , []) s)
 
-  -- The lane, gated to its own part, under its subject.
+  undone : ∀ {B} → IE B → Bool
+  undone (instEmit (mark laneDone) _) = false
+  undone _                            = true
+
+  -- The lane, gated to its own part, under its subject, ending at its own
+  -- `laneDone`, never at its burst's end: a connect's source runs on
+  -- synchronously past its body's end until its subscribe returns, and
+  -- rxjs subscribes the next queued lane inside that run, so a lane ended
+  -- in its burst never waits on it.  Its burst's end, past a lane already
+  -- done, would change nothing (`burstOver`).
   laneˢ : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
-  laneˢ x = flatMap (mergeᶠ nothing)
+  laneˢ x = takeWhile true undone (flatMap (mergeᶠ nothing)
     (λ k → connect (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (counted (framed k)))
-    (of (lanePart ∷ burstPart ∷ []))
+    (of (lanePart ∷ burstPart ∷ [])))
   {-# INLINE laneˢ #-}
 
   Out : Set → Set
