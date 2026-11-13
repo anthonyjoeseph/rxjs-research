@@ -36,11 +36,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: a live pin has an in-order carrier, at or before the carrier
 of every later live row, so it is listed as the plain row is (`cover`).
-The take moves one under its failure; open: the connect's source pin,
-whose own carrier is late, and the told run, which moves carriers by
-`δ`. Settled when each is a body.
+The take moves one under its failure, the told run by `δ`; open: the
+connect's source pin, whose own carrier is late, and, in the told run,
+a skip's carrier with no row, which the source's order does not reach.
+Settled when each is a body.
 
-Members: `conn-first`, `told-follows`.
+Members: `conn-first`, `told-skip`.
 
 #### THE CONNECT'S CARRY
 
