@@ -34,14 +34,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE LATE WINDOW
 
-Dead route probed: before a live pin's late carrier lie the connect's
-pins of values the plain run puts after the pin, so the carrier's
-listing is not read off the plain run up to the pin. Settled when it is
-read off a later plain point a reader reaches, or refuted by a late
-carrier past endlessly many rows, with a reader's heard pin then put on
-an in-order carrier.
+Untried: a live pin has an in-order carrier, at or before the carrier
+of every later live row, so it is listed as the plain row is (`cover`).
+The take moves one under its failure, the told run by `δ`; open: the
+connect's source pin, whose own carrier is late, and, in the told run,
+a skip's carrier with no row, which the source's order does not reach.
+Settled when each is a body.
 
-Members: `conn-pinned`.
+Members: `conn-first`, `told-skip`.
 
 #### THE CONNECT'S CARRY
 

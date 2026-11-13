@@ -25,7 +25,7 @@ open import Data.Bool.Properties using (T?)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
 open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib; W⁼;
   leads; ⊑-snoc; ⊑-≼; shrink⁼)
@@ -35,7 +35,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; PinList; pins-map; unpinned-narrow; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
+open import simultaneous.CarryBase using (InOrder; PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; PinList; pins-map; unpinned-narrow; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
 open import simultaneous.Carry using (Clear; clear-not; Rows; rows-map; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
@@ -165,10 +165,9 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
 carry-grow sub c past = record
   { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = cover
-  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned′ }
+  ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned }
   where
     open CarryAt c
-    pinned′ = λ {k} {q} tk lv L lp → let ((l , q′ , ul , pb , (y , m , qy) , ls) , h) = pinned {k} {q} tk (λ {c} → lv {c}) L lp in (l , q′ , ul , pb , (y , sub m , qy) , ls) , h
 
 -- AN ENVIRONMENT STAYS ONE along a map grown past its binders' late
 -- carriers.
@@ -305,7 +304,7 @@ module Side {X : Set} (d : Den X) (q : Pos)
 -- THE GUARD CARRIES THE GUARD and the body carries the body: a carry of
 -- the body under each guard is one of the whole.
 module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′ : Den (IE A)) (p p′ : Pos)
-  (mg : M (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ]))
+  (mg : M (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ])) (hm : Emb M)
   (aP : ∀ {y e} → enter s (p ⊕ [ ix 1 ]) y e → (p ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p ⊕ [ ix 1 ]) ≼ r))
   (aE : ∀ {y e} → enter s′ (p′ ⊕ [ ix 1 ]) y e → (p′ ⊕ [ ix 1 ]) ≼ y × (∀ {r} → e ≡ pin r → (p′ ⊕ [ ix 1 ]) ≼ r))
   (c : CarryAt valuesOf M HP HE LP (enter s (p ⊕ [ ix 1 ])) (enter s′ (p′ ⊕ [ ix 1 ])) (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])) where
@@ -418,12 +417,27 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₁ (k₀ , kq , h , e))) = inj₂ (inj₁ (k₀ , kq , (λ n → h λ { (e′ , x , un) → n (e′ , P.up x , un) }) , e))
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
+  -- No body row's image lies on the guard.
+  guard-img : ∀ {k e} → P.B k e → C.Img k E.g → ⊥
+  guard-img {k} x i with C.ext i
+  ... | y , my , yg = ≺-irrefl {k} (≼-≺-≺ {k} {P.g} {k} (⊑-≼ (Emb.reflect hm my mg yg)) (P.gb x))
+
+  -- What the body's carriers follow from a body row on, the defer's do.
+  from↑ : ∀ {k l} → From C.Img C.PB (enter s (p ⊕ [ ix 1 ])) (enter s′ (p′ ⊕ [ ix 1 ])) k l → P.g ≺ k → From Img PB P.T E.T k l
+  from↑ {k} F gk (guard , _) _ kk _ _ = ⊥-elim (≺-irrefl {P.g} (≺-≼-≺ {P.g} {k} {P.g} gk kk))
+  from↑ F gk (body x , _) _ _ (inj₁ (inj₁ (refl , _))) _ = ⊥-elim (P.¬g x)
+  from↑ F gk (body x , _) _ _ (inj₁ (inj₂ i)) (guard , _) = ⊥-elim (guard-img x i)
+  from↑ F gk {k₁} {_} {l₁} (body x , _) lk kk (inj₁ (inj₂ i)) (body y , _) = F {k₁} {_} {l₁} x (P.live← (λ {c} → lk {c})) kk (inj₁ i) y
+  from↑ F gk {k₁} {_} {l₁} (body x , _) lk kk (inj₂ ((_ , y) , _ , m)) _ = F {k₁} {_} {l₁} x (P.live← (λ {c} → lk {c})) kk (inj₂ m) y
+
   pinned : ∀ {k q} → P.T k (pin q) → Live P.T k → Listed P.T k → LP k
-         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × Listed E.T l)
+         → InOrder Img PB P.T E.T k
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
   pinned {k} {q} (body x , _) lv L lp with C.pinned x (P.live← lv) (P.lst← L) lp
-  ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lst→ ul ls) , homed {k} {q} r
+  ... | (l , (e₁ , ul) , m , ls , F) , r =
+    (l , (e₁ , E.up ul) , ((e₁ , ul) , (_ , x) , m) , E.lst→ ul ls , from↑ {k} {l} (λ {k₁} {e₂} {l₁} {e₃} → F {k₁} {e₂} {l₁} {e₃}) (P.gb x))
+    , homed {k} {q} r
 
   cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
   cover L lp lv F = E.lstw (C.cover (P.lst← L) lp (P.live← lv) λ tk lk vk m ul → F (P.up tk) (P.live→ lk) vk (fwd m tk ul) (E.up ul))
@@ -500,7 +514,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
             , NC.narrowed nrw
           where
            module NC = NextCarry (approx n (Later.force l) envP) (approx n (elab ρ (Later.force l)) envE) p p′
-               (ms (inj₂ (ix 0 , plain-ix , refl , refl)))
+               (ms (inj₂ (ix 0 , plain-ix , refl , refl))) hm′
                (aft (approx n (Later.force l) envP) (inv-approx n (Later.force l) envP gP) p okP)
                (aft (approx n (elab ρ (Later.force l)) envE) (inv-approx n (elab ρ (Later.force l)) envE gE) p′ okE) c
 

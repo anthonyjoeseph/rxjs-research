@@ -32,8 +32,8 @@ open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Few; Reach; Truncate; Proper; Bare; Unpinned; Work; After; Ended;
   InE; at-out; at-end; on-out; Rejoin; shown; heard; ended; late; Den; hot; DenEnv; enter; approx; _≺_; _≼_; module Op; module Values;
   module Bounded; module Connecting)
-open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; Shows; _⊑_; InvAt; Real; inside-⊑; real-init; world-after; world-after⁼; ok-step; ⊑-refl;
-  ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
+open import denotation.Laws.Worlds using (Ok; Hots; GoodEnv; Shows; _⊑_; InvAt; inside-⊑; world-after; ok-step; ⊑-refl; ⊑-snoc;
+  ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
 open import denotation.Laws.Modulus using (≺-≼-≺; ≼-≺-≺; ≺-ext; ≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-split; ≼-or-≻; entered-few)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Shows using (k-shows; ∈-stable; few-down)
@@ -100,14 +100,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
   -- `σ`'s invariant, at the told run's second child.
   invσ : InvAt (Hots env) (q ⊕ [ ix 1 ]) σ
   invσ = inv-approx n S env genv (q ⊕ [ ix 1 ]) (ok-step q ok)
-
-  -- A pin of `σ` is of a subscription in its world, so past `q`.
-  told-pin-past : ∀ {l r} → σ l (pin r) → q ≺ r
-  told-pin-past {l} {r} y =
-    ≺-≼-≺ {q} {q ⊕ [ ix 1 ]} {r} (≺-ext q [])
-      (world-after⁼ (proj₁ (InvAt.pinned invσ y)) (real-init r (proj₁ rl) (subst Real (proj₂ rl) (InvAt.real invσ y))))
-    where
-      rl = inside-⊑ r l (proj₂ (InvAt.pinned invσ y))
 
   ------------------------------------------------------------------------
   -- The told run, unfolded

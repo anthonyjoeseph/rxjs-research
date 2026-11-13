@@ -131,11 +131,11 @@ private
             × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′) (λ c → PBNest er M c × Narrow c)
   read-at {M₀ = M₀} {ρ} {envP} {envE} hm er jn ap i m₀ okP okE nh fr refl refl Iu ns =
     R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , R′.reader-past ns
-    , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined
-    , nest-or {er = er} {c = R.reader-rejoined} {c′ = read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined} (λ m → m)
-        (λ pb tk lv → let (l , pb₀ , ll) = read-post-pb {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined pb in inj₁ (l , pb₀ , ll , _ , tk , lv))
+    , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined (λ { (shown _ () _ , _) })
+    , nest-or {er = er} {c = R.reader-rejoined} {c′ = read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined (λ { (shown _ () _ , _) })} (λ m → m)
+        (λ pb tk lv → let (l , pb₀ , ll) = read-post-pb {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined (λ { (shown _ () _ , _) }) pb in inj₁ (l , pb₀ , ll , _ , tk , lv))
         (R′.reader-nest ns)
-    , unpinned-narrow (λ { (shown _ () _ , _) }) (read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined)
+    , unpinned-narrow (λ { (shown _ () _ , _) }) (read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined (λ { (shown _ () _ , _) }))
     where
       module R  = Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
       module R′ = ReadPast {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr

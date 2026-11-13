@@ -22,9 +22,9 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (Obs)
 open import denotation.Position using (_≟ᵖ_; Pos; ix; sub; last; _⊕_; root)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Den; DenEnv; enter; approx; _≺_; module Scan; module Op)
-open import denotation.Laws.Modulus using (entered-reach; reach-few; ≼-split; ≺→≼; ≺-≼-≺)
-open import denotation.Laws.Worlds using (InvAt; Ok; Hots; GoodEnv; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊕-assoc)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Den; DenEnv; enter; approx; _≺_; _≼_; module Scan; module Op)
+open import denotation.Laws.Modulus using (entered-reach; reach-few; ≼-split; ≺→≼; ≺-≼-≺; ≼-refl; ≺-irrefl)
+open import denotation.Laws.Worlds using (InvAt; Ok; Hots; GoodEnv; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
@@ -33,8 +33,8 @@ open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import simultaneous.Attribution using (Shown; Match; Every; One; Reads; Carried; Live)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (From; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt; Near; Home; instant-⊕;
-  sub-listed; ahead-over)
+open import simultaneous.CarryBase using (apart; From; InOrder; CarryAt; Kin; k-out; k-skip; k-pin; k-end; kin-refl; module Relabel; IntoAt;
+  Near; Home; instant-⊕; sub-listed; ahead-over)
 open import simultaneous.ReadRows using (up; up-⊕)
 open import simultaneous.ToldRows using (told; module Told)
 
@@ -366,21 +366,46 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     ... | inj₂ none = [] , λ { (_ , _ , _ , y₂ , eq) → ⊥-elim (none y₂ eq) }
     ... | inj₁ (l , _ , yl , refl) = proj₁ (C.pb-few yl) , λ { (l₂ , pb , _ , y₂ , eq) → proj₂ (C.pb-few yl) (subst (C.PB _) (sym (told-inj yl y₂ eq)) pb) }
 
+    -- Two carriers in order stay in order moved: the run is flat, so a
+    -- carrier before another is not above it.
+    moved≼ : ∀ {l l₁ e e₁} → σ l e → σ l₁ e₁ → l ≼ l₁ → (l ⊕ δ e) ≼ (l₁ ⊕ δ e₁)
+    moved≼ {l} {l₁} {e} {e₁} y y₁ ll with ≼-split {l} {l₁} ll
+    ... | inj₂ refl with InvAt.func invσ y y₁
+    ...   | refl = ≼-refl {l ⊕ δ e}
+    moved≼ {l} {l₁} {e} {e₁} y y₁ ll | inj₁ lt =
+      ≺→≼ {l ⊕ δ e} {l₁ ⊕ δ e₁} (apart {l} {l₁} lt (λ { ([] , refl) → ≺-irrefl {l} (subst (l ≺_) (⊕-identityʳ l) lt) ; (_ ∷ _ , refl) → flatσ y y₁ }) (δ e) (δ e₁))
+
+    -- A carrier with no row of its own stays put, and the source's
+    -- carriers say nothing of it, needing a row there.  Open is its order
+    -- after a moved carrier the source's follow, at a told row under
+    -- another row.
+    postulate
+      told-skip : ∀ {k l e k₁ l₁ e₂} → σ l e → From C.Img C.PB t σ k l → t k₁ skip → Live t k₁ → k ≼ k₁
+                → C.Img k₁ l₁ → (∀ {e′} → σ l₁ e′ → ⊥) → τ l₁ e₂ → (l ⊕ δ e) ≼ l₁
+
+    -- Only a skip has a carrier with no row: every other row carried has
+    -- one with a row (`img¬¬`), and the carrier is unique.
+    told-bare : ∀ {k l e k₁ e₁ l₁ e₂} → σ l e → From C.Img C.PB t σ k l → t k₁ e₁ → Live t k₁ → k ≼ k₁
+              → C.Img k₁ l₁ → (∀ {e′} → σ l₁ e′ → ⊥) → τ l₁ e₂ → (l ⊕ δ e) ≼ l₁
+    told-bare {k₁ = k₁} y F _ lv kk i n z lt = C.img-row i λ { (_ , tk₀ , un) →
+      C.img¬¬ tk₀ un (λ {c} → lv {c}) (C.few i) λ
+        { (inj₁ (_ , i′ , _ , y′ , _)) → n (subst (λ m → σ m _) (C.img-fun i′ i) y′)
+        ; (inj₂ refl) → told-skip y F tk₀ (λ {c} → lv {c}) kk i n z lt } }
+
+    -- A told carrier is carried from as its source was: the told run
+    -- moves every carrier with a row down to its image (`δ`).
+    told-follows : ∀ {k l e} → σ l e → From C.Img C.PB t σ k l → From Img′ PB′ t τ k (l ⊕ δ e)
+    told-follows y F tk lv kk (inj₁ (_ , i , inj₁ (_ , y₁ , refl))) _ = moved≼ y y₁ (F tk lv kk (inj₁ i) y₁)
+    told-follows y F tk lv kk (inj₁ (_ , i , inj₂ (n , refl)))      z = told-bare y F tk lv kk i n z
+    told-follows y F tk lv kk (inj₂ (_ , pb , _ , y₁ , refl))        _ = moved≼ y y₁ (F tk lv kk (inj₂ pb) y₁)
+
     pinned′ : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → τ l (pin p′) × PB′ k l × Targeted M p p′ × Listed τ l)
+            → InOrder Img′ PB′ t τ k
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} tk lv L lp with C.pinned tk lv L lp
-    ... | (l , p′ , y , pb , B , Ll) , h = carrier (told-row y (few-of Ll)) , h
-      where
-        carrier : (Σ (Ev Y) λ e′ → τ (l ⊕ [ ix 0 ]) e′ × Told (pin p′) e′)
-                → Σ Pos λ l′ → Σ Pos λ r → τ l′ (pin r) × PB′ k l′ × Targeted M p r × Listed τ l′
-        carrier (pin r , y′ , t-pin rr) = l ⊕ [ ix 0 ] , r , y′ , (l , pb , pin p′ , y , refl) , B′ rr , told-listed y Ll
-          where
-            -- A pin retold to the told run's own connect, before the source's.
-            B′ : r ≡ p′ ⊎ r ≡ q → Targeted M p r
-            B′ (inj₁ refl) = B
-            B′ (inj₂ refl) = proj₁ B , proj₁ (proj₂ B) , ≺→≼ {q} {proj₁ B} (≺-≼-≺ {q} {p′} {proj₁ B} (told-pin-past y) (proj₂ (proj₂ B)))
+    ... | (l , (e , y) , pb , Ll , F) , h with told-row y (few-of Ll)
+    ...   | e′ , y′ , _ = (l ⊕ δ e , (e′ , y′) , (l , pb , e , y , refl) , told-listed y Ll , told-follows {k} {l} {e} y (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂})) , h
 
   -- The told run listed before a point its carriers follow.  The told
   -- run moves each carrier down to its image (`δ`): a point between a

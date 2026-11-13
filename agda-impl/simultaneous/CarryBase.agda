@@ -258,6 +258,22 @@ Near {Y} u m l = l ≼ m ⊎ (Σ (Ev Y) (u l) × Listed u l)
 From : ∀ {A Y : Set} → (Pos → Pos → Set) → (Pos → Pos → Set) → EmissionSet A → EmissionSet Y → Pos → Pos → Set
 From Img PB t u v w = ∀ {k e l e′} → t k e → Live t k → v ≼ k → Img k l ⊎ PB k l → u l e′ → w ≼ l
 
+-- A carrier of the row at `k`, listed, at or before the carrier of every
+-- live row from `k` on: what it waits on is carried from what that row
+-- waits on.
+InOrder : ∀ {A Y : Set} → (Pos → Pos → Set) → (Pos → Pos → Set) → EmissionSet A → EmissionSet Y → Pos → Set
+InOrder {Y = Y} Img PB t u k = Σ Pos λ l → Σ (Ev Y) (u l) × PB k l × Listed u l × From Img PB t u k l
+
+-- Carried from a point on, read down each side.
+from-map : ∀ {A A′ Y Y′ : Set} {Img PB Img′ PB′ : Pos → Pos → Set} {t : EmissionSet A} {t′ : EmissionSet A′}
+             {u : EmissionSet Y} {u′ : EmissionSet Y′}
+         → (∀ {k e} → t′ k e → Live t′ k → Σ (Ev A) λ e₀ → t k e₀ × Live t k)
+         → (∀ {k l} → Img′ k l ⊎ PB′ k l → Img k l ⊎ PB k l)
+         → (∀ {l e} → u′ l e → Σ (Ev Y) (u l))
+         → ∀ {v w} → From Img PB t u v w → From Img′ PB′ t′ u′ v w
+from-map dn rl dU F {k} {_} {l} tk lk vk m ul with dn tk lk
+... | e₀ , tk₀ , lk₀ = F {k} {e₀} {l} tk₀ lk₀ vk (rl m) (proj₂ (dU ul))
+
 -- Every row, listed exactly.
 Whole : ∀ {A : Set} → EmissionSet A → Set
 Whole t = Σ (List Pos) λ ks → (∀ {k e} → t k e → k ∈ ks) × (∀ {k} → k ∈ ks → Σ _ (t k))
@@ -408,7 +424,7 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
     bk      : Pos → List Pos
     in-bk   : ∀ {k l} → Img k l → k ∈ bk l
     pinned  : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
-            → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × PB k l × Targeted M p p′ × Listed u l)
+            → InOrder Img PB t u k
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
@@ -681,13 +697,17 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     homed′ (inj₂ (inj₂ h))                  = inj₂ (inj₂ h)
 
     pinned′ : ∀ {k p} → t′ k (pin p) → Live t′ k → Listed t′ k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′ × Listed u′ l)
+              → InOrder Img PB t′ u′ k
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} tk lv L lp with down tk
     ... | _ , tk₀ , r with kin r
     ...   | k-pin with pinned tk₀ (T.live← {k} (λ {c} → lv {c})) (T.lst← {k} L) lp
-    ...     | (l , p′ , ul , m , b , ls) , h = (l , p′ , up-pin′ ul , m , b , U.lst→ {l} ls) , homed′ {k} {p} h
+    ...     | (l , (_ , ul) , m , ls , F) , h =
+      (l , (proj₁ (upL′ ls ul) , proj₁ (proj₂ (upL′ ls ul))) , m , U.lst→ {l} ls
+        , from-map {Img = Img} {PB} {Img} {PB} {t = t} {t′} {u} {u′} (λ {k′} tk′ lk → _ , proj₁ (proj₂ (down tk′)) , T.live← {k′} (λ {c} → lk {c}))
+            (λ m′ → m′) (λ ul′ → _ , proj₁ (proj₂ (down′ ul′))) {k} {l} (λ {k₁} {e₁} {l₁} {e₂} → F {k₁} {e₁} {l₁} {e₂}))
+      , homed′ {k} {p} h
 
   carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
@@ -907,15 +927,15 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
 
       pinned′ : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB s k
       pinned′ {k} {p} tk lk fk with pinned tk lk (lst fk) tt
-      ... | (l , p′ , ul , m , _) , inj₁ e = (l , (pin p′ , ul) , m) , inj₁ e
-      ... | (l , p′ , ul , m , _) , inj₂ (inj₂ (_ , () , _))
-      ... | (l , p′ , ul , m , _) , inj₂ (inj₁ (k₀ , kp , h , ek)) with pin-few tk
+      ... | (l , ul , m , _) , inj₁ e = (l , ul , m) , inj₁ e
+      ... | (l , ul , m , _) , inj₂ (inj₂ (_ , () , _))
+      ... | (l , ul , m , _) , inj₂ (inj₁ (k₀ , kp , h , ek)) with pin-few tk
       ...   | ks , F with row-at {k₀} (ks , λ {x} tx xk → F tx (≺-trans {x} {k₀} {p} xk kp)) h
       ...     | e₀ , tk₀ , un with img tk₀ un (liveT′ tk₀ un) (lst (ks , λ {x} tx xk → F tx (≺-trans {x} {k₀} {p} xk kp))) tt
-      ...       | inj₁ (l₀ , i , e′ , ul₀ , L , _) = (l , (pin p′ , ul) , m) , inj₂ (k₀ , l₀ , i , (e′ , ul₀) , few-of L , ek)
+      ...       | inj₁ (l₀ , i , e′ , ul₀ , L , _) = (l , ul , m) , inj₂ (k₀ , l₀ , i , (e′ , ul₀) , few-of L , ek)
       ...       | inj₂ (_ , _ , h₀) with home-at h₀
-      ...         | inj₁ e₀s = (l , (pin p′ , ul) , m) , inj₁ (trans (sym ek) e₀s)
-      ...         | inj₂ (k₁ , l₁ , i₁ , r₁ , f₁ , e₁) = (l , (pin p′ , ul) , m) , inj₂ (k₁ , l₁ , i₁ , r₁ , f₁ , trans e₁ ek)
+      ...         | inj₁ e₀s = (l , ul , m) , inj₁ (trans (sym ek) e₀s)
+      ...         | inj₂ (k₁ , l₁ , i₁ , r₁ , f₁ , e₁) = (l , ul , m) , inj₂ (k₁ , l₁ , i₁ , r₁ , f₁ , trans e₁ ek)
 
       placed : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
                ⊎ Σ Pos (λ h → ⊥ × instantOf h ≡ instantOf m)

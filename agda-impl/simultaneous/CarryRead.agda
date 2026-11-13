@@ -8,8 +8,8 @@
 -- `Pt`), and everything the reading's carry lists, few or live, the
 -- joined rows hung under it do too.
 --
--- The reading is a hot rejoined: no pins, so a plain pin has no
--- carrier to keep, and the carry's pins hold vacuously.
+-- The reading is a hot rejoined over a run with no pins, so the carry's
+-- pins hold vacuously.
 --
 -- DEAD ROUTE: over any reading, not only a hot rejoined.  A joined pin
 --   row waits on every joined row before its connect, so it is a row
@@ -228,8 +228,8 @@ private
     postulate
       read-cover : ∀ {v w} → Listed t v → LP v → Live t v → From Img′ PB′ t R v w → Listed R w
 
-    carry : CarryAt valuesOf M HP HE LP t R s s′
-    carry = record
+    carry : (∀ {k r} → t k (pin r) → ⊥) → CarryAt valuesOf M HP HE LP t R s s′
+    carry nopin = record
       { Img     = Img′
       ; ext     = λ { (l , i , p) → let (y , my , yl) = ext i in y , my , ⊑-trans yl (hang-⊑ (pt-hang p)) }
       ; PB      = PB′
@@ -248,7 +248,7 @@ private
       ; cover   = read-cover
       ; bk      = bk′
       ; in-bk   = in-bk′
-      ; pinned  = λ kp lv L lp → ⊥-elim (pinU (proj₁ (proj₂ (proj₂ (proj₁ (pinned kp lv L lp))))))
+      ; pinned  = λ kp _ _ _ → ⊥-elim (nopin kp)
       }
 
     -- A row read carried into its instant: on, or under, the annotated carrier.
@@ -257,10 +257,10 @@ private
 
 read-post : ∀ {X : Set} {M : PMap} {HP HE LP H : Pos → Set} {t : EmissionSet X} {T : EmissionSet (AIE X)} {s s′}
           → InvAt H s′ (enter (hot T) s′) → CarryAt annValues M HP HE LP t (enter (hot T) s′) s s′
-          → CarryAt valuesOf M HP HE LP t (enter (Reading (hot T)) s′) s s′
-read-post Iu c = Post.carry Iu c
+          → (∀ {k r} → t k (pin r) → ⊥) → CarryAt valuesOf M HP HE LP t (enter (Reading (hot T)) s′) s s′
+read-post Iu c nopin = Post.carry Iu c nopin
 
 read-post-pb : ∀ {X : Set} {M : PMap} {HP HE LP H : Pos → Set} {t : EmissionSet X} {T : EmissionSet (AIE X)} {s s′}
-             → (Iu : InvAt H s′ (enter (hot T) s′)) (c : CarryAt annValues M HP HE LP t (enter (hot T) s′) s s′)
-             → ∀ {k l′} → CarryAt.PB (read-post Iu c) k l′ → Σ Pos λ l → CarryAt.PB c k l × l ⊑ l′
-read-post-pb Iu c = Post.pb-up Iu c
+             → (Iu : InvAt H s′ (enter (hot T) s′)) (c : CarryAt annValues M HP HE LP t (enter (hot T) s′) s s′) (nopin : ∀ {k r} → t k (pin r) → ⊥)
+             → ∀ {k l′} → CarryAt.PB (read-post Iu c nopin) k l′ → Σ Pos λ l → CarryAt.PB c k l × l ⊑ l′
+read-post-pb Iu c _ = Post.pb-up Iu c
