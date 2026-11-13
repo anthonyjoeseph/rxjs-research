@@ -26,8 +26,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
   module TakeWhile)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-≺-≺; ≺-≼-≺; ≼-antisym; ≺-ext;
   T-not; reach-few; few-ind)
-open import denotation.Laws.Worlds using (InvAt; step; Plain; plain-ix; plain-last; full; _⊑_; ⊑-≼; ⊕-identityʳ; ⊕-injʳ; inside-⊑; ⊑-inside; ⊑-refl;
-  ⊑-trans; ⊑-snoc⁺; conv)
+open import denotation.Laws.Worlds using (InvAt; step; Plain; plain-ix; plain-last; full; _⊑_; ⊑-≼; ⊕-identityʳ; ⊕-injʳ; inside-⊑)
 open import denotation.Laws.Count using (em)
 open import denotation.Laws.ShowsOps using (bool)
 open import adequacy.SubOne using (take-reach; below-or-under; at-or-before)
@@ -37,7 +36,7 @@ open import simultaneous.Attribution using (Live; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; irrⁱ; transⁱ; instant-≺)
-open import simultaneous.CarryBase using (PinList; pins-map; pins-from; unp-pin; Whole; apart; Encl; encl-tr)
+open import simultaneous.CarryBase using (PinList; pins-map; pins-from; unp-pin; Whole; apart)
 open import simultaneous.CarryLeaves using (last-max; ix-last)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; passes)
@@ -477,45 +476,6 @@ module Side {X : Set} {H : Pos → Set} {s : Pos} (incl : Bool) (kp : X → Bool
   ... | yes (_ , m , (f , a′ , xf , nkf , nff , refl)) = f , ((a′ , xf , nkf) , nff) , proj₁ (B m)
   ... | no ns = ⊥-elim (first¬¬ xq nkq λ { (q′ , ((_ , x′ , nk′) , nf′) , q′q) →
                   ns (q′ ⊕ [ last ] , F (lift (stop x′ nk′ nf′)) (cut-before x′ x (≼-≺-≺ {q′} {q} {k} q′q qk) last) , (q′ , _ , x′ , nk′ , nf′ , refl)) })
-
-  -- A pin past a failure, its connect unfailed, is a pin of a connect
-  -- the failure lies in.
-  encloses : ∀ {f k r} → Fails f → t k (pin r) → ¬ Failed r → f ≺ k → T (inside r f)
-  encloses {f} {k} {r} (a , xf , nk) x nfr fk =
-    ⊑-inside (conv {r} {r} {f} {k} (⊑-refl r) (λ fr → nfr (f , a , xf , nk , fr)) fk (inside-⊑ r k (ins x)))
-
-  -- Past the end cut of the first failure, a row is a pin kept.
-  past-first : ∀ {f r e} → First f → (f ⊕ [ last ]) ≺ r → T′ r e → Σ Pos λ r′ → e ≡ pin r′ × t r (pin r′) × ¬ Failed r′
-  past-first {f} {r} ((a , xf , nk) , _) fr (pass _ _ nf , _) = ⊥-elim (nf (f , a , xf , nk , ≺-trans {f} {f ⊕ [ last ]} {r} (≺-ext f []) fr))
-  past-first {f} {r} ((a , xf , nk) , _) fr (step _ nf , _)   = ⊥-elim (nf (f , a , xf , nk , ≺-trans {f} {f ⊕ [ last ]} {r} (≺-ext f []) fr))
-  past-first {f} {r} ((a , xf , nk) , _) fr (tend _ nf , _)   = ⊥-elim (nf (f , a , xf , nk , ≺-trans {f} {f ⊕ [ last ]} {r} (≺-ext f []) fr))
-  past-first _ _ (left x nfr _ , _) = _ , refl , x , nfr
-  past-first {f} ff fr (fail x nk nf _ , _) with first ff ((_ , x , nk) , nf)
-  ... | refl = ⊥-elim (last-max f plain-ix fr)
-  past-first {f} ff fr (stop x nk nf , _) with first ff ((_ , x , nk) , nf)
-  ... | refl = ⊥-elim (≺-irrefl {f ⊕ [ last ]} fr)
-
-  -- The enclosing pins of an unfailed row, across the takeWhile.
-  encl← : ∀ {x v} → ¬ Failed x → Encl T′ x v → Encl t x v
-  encl← {x} nf = encl-tr {a = T′} {b = t} (λ { (left y _ _ , _) iz xk _ → y , iz , xk })
-                   (λ {k} {r} y iz xk _ → lift (left y (unfailed nf (⊑-≼ (inside-⊑ r x iz))) (ins y)) , iz , xk)
-
-  encl→ : ∀ {x v} → ¬ Failed x → Encl t x v → Encl T′ x v
-  encl→ {x} nf = encl-tr {a = t} {b = T′} (λ {k} {r} y iz xk _ → lift (left y (unfailed nf (⊑-≼ (inside-⊑ r x iz))) (ins y)) , iz , xk)
-                   (λ { (left y _ _ , _) iz xk _ → y , iz , xk })
-
-  -- Those of the first failure, and of a cut under it.
-  encl-cut← : ∀ {f a v} → First f → Encl T′ (f ⊕ [ a ]) v → Encl t f v
-  encl-cut← {f} {a} ff@(fs@(_ , xf , _) , nff) = encl-tr {a = T′} {b = t}
-    (λ { (left y nfr _ , _) _ xk _ → let fk = ≺-trans {f} {f ⊕ [ a ]} {_} (≺-ext f []) xk in y , encloses fs y nfr fk , fk })
-    (λ {k} {r} y iz fk _ → lift (left y (unfailed nff (⊑-≼ (inside-⊑ r f iz))) (ins y))
-                         , ⊑-inside (⊑-trans (inside-⊑ r f iz) (⊑-snoc⁺ f)) , cut-before xf y fk a)
-
-  encl-cut→ : ∀ {f a v} → First f → Encl t f v → Encl T′ (f ⊕ [ a ]) v
-  encl-cut→ {f} {a} ff@(fs@(_ , xf , _) , nff) = encl-tr {a = t} {b = T′}
-    (λ {k} {r} y iz fk _ → lift (left y (unfailed nff (⊑-≼ (inside-⊑ r f iz))) (ins y))
-                         , ⊑-inside (⊑-trans (inside-⊑ r f iz) (⊑-snoc⁺ f)) , cut-before xf y fk a)
-    (λ { (left y nfr _ , _) _ xk _ → let fk = ≺-trans {f} {f ⊕ [ a ]} {_} (≺-ext f []) xk in y , encloses fs y nfr fk , fk })
 
   never-failed : (∀ {c} → T′ c end → ⊥) → ∀ {k} → ¬ Failed k
   never-failed ne (_ , _ , x , nk , _) = no-fail ne x nk

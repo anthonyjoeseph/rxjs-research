@@ -366,11 +366,11 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     ... | inj₂ none = [] , λ { (_ , _ , _ , y₂ , eq) → ⊥-elim (none y₂ eq) }
     ... | inj₁ (l , _ , yl , refl) = proj₁ (C.pb-few yl) , λ { (l₂ , pb , _ , y₂ , eq) → proj₂ (C.pb-few yl) (subst (C.PB _) (sym (told-inj yl y₂ eq)) pb) }
 
-    pinned′ : ∀ {k p} → t k (pin p) → Listed t k → LP k
+    pinned′ : ∀ {k p} → t k (pin p) → Live t k → Listed t k → LP k
             → (Σ Pos λ l → Σ Pos λ p′ → τ l (pin p′) × PB′ k l × Targeted M p p′ × Listed τ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} tk L lp with C.pinned tk L lp
+    pinned′ {k} {p} tk lv L lp with C.pinned tk lv L lp
     ... | (l , p′ , y , pb , B , Ll) , h = carrier (told-row y (few-of Ll)) , h
       where
         carrier : (Σ (Ev Y) λ e′ → τ (l ⊕ [ ix 0 ]) e′ × Told (pin p′) e′)

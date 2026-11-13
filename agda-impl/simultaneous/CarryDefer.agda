@@ -20,23 +20,22 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; ¬?; yes; no)
 
 open import Tree using (Later; defer)
-open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_; _<ᵖ_; inside)
-open import Data.Bool using () renaming (T to Tᵇ)
+open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_; _<ᵖ_)
 open import Data.Bool.Properties using (T?)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach; ≺-ext; ≼-trans)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
 open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib; W⁼;
-  leads; ⊑-snoc; ⊑-≼; shrink⁼; inside-⊑)
+  leads; ⊑-snoc; ⊑-≼; shrink⁼)
 open import denotation.Laws using (aft; inv-approx)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; PinList; pins-map; Encl; encl-map; unpinned-narrow; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; PinList; pins-map; unpinned-narrow; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
 open import simultaneous.Carry using (Clear; clear-not; Rows; rows-map; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
 open import simultaneous.CarryLeaves using (module OneUnder)
 
@@ -135,7 +134,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; pb-few  = λ _ → [] , λ ()
     ; pb-img  = λ ()
     ; pb-past = λ ()
-    ; pinned  = λ { (() , _) _ _ }
+    ; pinned  = λ { (() , _) _ _ _ }
     }
 
 -- THE BOTTOM APPROXIMANT shows only skips: the spin, on both sides.
@@ -169,7 +168,7 @@ carry-grow sub c past = record
   ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned′ }
   where
     open CarryAt c
-    pinned′ = λ {k} {q} tk L lp → let ((l , q′ , ul , pb , (y , m , qy) , ls) , h) = pinned {k} {q} tk L lp in (l , q′ , ul , pb , (y , sub m , qy) , ls) , h
+    pinned′ = λ {k} {q} tk lv L lp → let ((l , q′ , ul , pb , (y , m , qy) , ls) , h) = pinned {k} {q} tk (λ {c} → lv {c}) L lp in (l , q′ , ul , pb , (y , sub m , qy) , ls) , h
 
 -- AN ENVIRONMENT STAYS ONE along a map grown past its binders' late
 -- carriers.
@@ -419,11 +418,11 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₁ (k₀ , kq , h , e))) = inj₂ (inj₁ (k₀ , kq , (λ n → h λ { (e′ , x , un) → n (e′ , P.up x , un) }) , e))
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
-  pinned : ∀ {k q} → P.T k (pin q) → Listed P.T k → LP k
+  pinned : ∀ {k q} → P.T k (pin q) → Live P.T k → Listed P.T k → LP k
          → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × Listed E.T l)
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-  pinned {k} {q} (body x , _) L lp with C.pinned x (P.lst← L) lp
+  pinned {k} {q} (body x , _) lv L lp with C.pinned x (P.live← lv) (P.lst← L) lp
   ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lst→ ul ls) , homed {k} {q} r
 
   cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
@@ -440,17 +439,8 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = pb-past ; pinned = pinned }
 
   narrowed : Narrow c → Narrow carried
-  narrowed nc = record { pinned↓ = pinned↓′ ; encl↓ = encl↓′ }
+  narrowed nc = record { pinned↓ = pinned↓′ }
     where
-      encl↓′ : ∀ {x x′ k l r r′} → Img x x′ → Listed P.T x → LP k → P.T k (pin r) → Tᵇ (inside r x) → x ≺ k
-             → E.T l (pin r′) → PB k l → Encl P.T x k → Encl E.T x′ l
-      encl↓′ {r = r} (inj₁ (refl , refl)) _ _ (body y , _) ins _ _ _ _ =
-        ⊥-elim (≼-trans {p ⊕ [ ix 1 ]} {r} {P.g} (proj₂ (aP y) refl) (⊑-≼ (inside-⊑ r P.g ins)) (ticks p 0))
-      encl↓′ (inj₂ i) L lp sk ins xk ul (_ , _ , m) E =
-        encl-map {a = E.B} {b = E.T} (λ {l′} {r₀} → E.up {l′} {pin r₀}) (λ {l′} {r₀} → E.pin↓ {l′} {r₀})
-          (Narrow.encl↓ nc i (P.lst← L) lp (P.pin↓ sk) ins xk (E.pin↓ ul) m
-            (encl-map {a = P.T} {b = P.B} (λ {k′} {r₀} → P.pin↓ {k′} {r₀}) (λ {k′} {r₀} → P.up {k′} {pin r₀}) E))
-
       pinned↓′ : ∀ {k q} → P.T k (pin q) → Listed P.T q → PinList P.T q k → LP q
                → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × PinList E.T q′ l)
                  × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
