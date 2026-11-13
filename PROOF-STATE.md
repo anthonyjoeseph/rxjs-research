@@ -32,6 +32,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE ERASURE
+
+Probed, unproven: a flatMap's and a cold's elaborated runs carry their
+plain ones (`Carry`) along an order embedding, as every other former's
+and the wrapper's do. Settled when both leaves are bodies.
+
+Members: `carry-flatMap`, `carry-cold`.
+
 #### THE LATE WINDOW
 
 Untried: a live pin has an in-order carrier, at or before the carrier
@@ -62,14 +70,6 @@ run, the take, a read, a reader, the connect. Settled when each is a
 body.
 
 Members: `told-cover`, `take-cover`, `read-cover`, `reader-cover`, `conn-cover`.
-
-#### THE ERASURE
-
-Probed, unproven: each other former's elaborated run carries its plain
-one (`Carry`) along an order embedding; the take moves the end under the
-completion mark. Settled when each former's leaf is a body.
-
-Members: `carry-flatMap`, `carry-cold`, `wrap-take`.
 
 #### THE BATCH RANK
 
