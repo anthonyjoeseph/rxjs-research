@@ -14,13 +14,13 @@ open import Data.List.Relation.Unary.All using ([])
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (takeWhile)
 open import denotation.Position using (_≟ᵖ_; Pos; Path; ix; _⊕_; root)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; enter; approx)
-open import denotation.Laws.Worlds using (Ok; Hots; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Ok; Hots)
 open import denotation.Laws using (inv-approx)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; valuesOf; value; mark; begin; over; stop; outerOpen; outerClose; laneStart;
@@ -79,9 +79,8 @@ wrap-restamp n o (M , hm , δ , at , c) =
     ok₀ = tt , λ ()
 
 -- THE WRAPPER CARRIES THE CORE, at each approximant, stage by stage.
-carry-wrap : ∀ n {A} (o : SObs [] A) {M} → Emb M → M root coreAt
+carry-wrap : ∀ n {A} (o : SObs [] A) {M δ} → Emb M → M root (coreAt ⊕ δ)
            → CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) (enter (approx n (plain o) []) root)
                (enter (approx n (elab (λ i → i) (plain o)) []) coreAt) root coreAt
            → Wrapped n o (enter (approx n (elaborate (plain o)) []) root) root
-carry-wrap n o {M} hm m c =
-  wrap-restamp n o (wrap-take n o (M , hm , [] , subst (M root) (sym (⊕-identityʳ coreAt)) m , c))
+carry-wrap n o {M} {δ} hm m c = wrap-restamp n o (wrap-take n o (M , hm , δ , m , c))

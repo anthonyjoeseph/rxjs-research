@@ -56,7 +56,7 @@ open import simultaneous.Listing using (Listing; listedₙ)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
 open import simultaneous.CarryBase using (attributed)
-open import simultaneous.Carry using (Carry)
+open import simultaneous.Carry using (Carry; foot)
 open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreAt)
 open import simultaneous.CarryWrap using (carry-wrap)
 open import simultaneous.Carried using (carry-approx)
@@ -304,8 +304,8 @@ unpinned-liveₙ n o tk up {c} tc ck with InvAt.quiet (inv-approx n (plain o) []
 erasingₙ : ∀ n {A} (o : SObs [] A)
          → Attribution Every (One valuesOf) (Reads valuesOf) (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root) root root
 erasingₙ n o =
-  let (M , ms , hm , _ , _ , _ , _ , c , _) = Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) At₀ emb-At₀ (λ ()) (λ ()) (λ ()) tt
-                                                 root coreAt (refl , refl) ok₀ (tt , λ ()) (λ ()) fresh-At₀
+  let (M , ms , hm , _ , _ , _ , _ , c , _) = Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) (At₀ (foot (plain o))) (emb-At₀ _) (λ ()) (λ ()) (λ ()) tt
+                                                 root coreAt (refl , refl) ok₀ (tt , λ ()) (λ ()) (fresh-At₀ _)
       (M′ , hm′ , δ , at′ , c′) = carry-wrap n o hm (ms (refl , refl)) c
   in attributed hm′ (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
     (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o)

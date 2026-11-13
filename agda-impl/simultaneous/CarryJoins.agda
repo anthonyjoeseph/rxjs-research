@@ -28,7 +28,7 @@ open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; unpinned-narrow; apart; ahead-over; ahead-under)
-open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart;
+open import simultaneous.Carry using (at-foot; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart;
   EnvPast; PBNest; Nests; env-past; nest-or; BoundSrc; Rows; rows-at; clear-not)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -143,5 +143,5 @@ private
 -- A READER of a bound hot carries it.
 carry-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → Carry m ρ (connected i)
 carry-connected n ρ i = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
-  read-at {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE (clear-not nh) fr {dP = lookup envP i} {dE = lookup envE (ρ (∈-map⁺ AIE i))}
+  read-at {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i (at-foot {M₀} m₀) okP okE (clear-not nh) fr {dP = lookup envP i} {dE = lookup envE (ρ (∈-map⁺ AIE i))}
     (Bound.isP (er i)) (Bound.isE (er i)) (proj₁ (gE (ρ (∈-map⁺ AIE i))) p′ okE) ns

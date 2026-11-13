@@ -39,7 +39,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
 open import simultaneous.CarryBase using (unp-pin; unpinned-narrow; CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
-open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; clear-not; Grown; joins-grow; grown-past; env-past)
+open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; clear-not; Grown; joins-grow; grown-past; env-past; ⊑-foot)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
 
@@ -268,7 +268,7 @@ private
 -- AN `of` lists its values one label under each subscription.
 carry-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : List A) → Carry m ρ (of xs)
 carry-of n {A = A} ρ xs = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
-  let (M , ms , hm , wi , br , gr , c) = of-carried xs e₀ fr m₀ (⊑-refl p′) (clear-not nh)
+  let (M , ms , hm , wi , br , gr , c) = of-carried xs e₀ fr m₀ (⊑-foot p′) (clear-not nh)
   in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , (λ _ ())
      , unpinned-narrow (λ {_} {r} tk → unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk))) c
@@ -276,7 +276,7 @@ carry-of n {A = A} ρ xs = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m�
 -- THE EMPTY PROGRAM ends at once, on both sides: the empty listing.
 carry-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Carry m ρ (empty {A = A})
 carry-empty n {A = A} ρ = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
-  let (M , ms , hm , wi , br , gr , c) = of-carried [] e₀ fr m₀ (⊑-refl p′) (clear-not nh)
+  let (M , ms , hm , wi , br , gr , c) = of-carried [] e₀ fr m₀ (⊑-foot p′) (clear-not nh)
   in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , (λ _ ())
      , unpinned-narrow (λ {_} {r} tk → unp-pin {A} {r} (of-unp p 0 [] (proj₁ tk))) c
@@ -290,18 +290,18 @@ carry-empty n {A = A} ρ = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m�
 coreAt : Pos
 coreAt = root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
 
--- The plain run's subscription paired with the core's: one pair, in
--- neither world.
-At₀ : PMap
-At₀ x y = x ≡ root × y ≡ coreAt
+-- The plain run's subscription paired with a point under the core's:
+-- one pair, in neither world.
+At₀ : Path → PMap
+At₀ δ x y = x ≡ root × y ≡ coreAt ⊕ δ
 
-emb-At₀ : Emb At₀
-emb-At₀ = record
+emb-At₀ : ∀ δ → Emb (At₀ δ)
+emb-At₀ _ = record
   { fun     = λ { (refl , refl) (refl , refl) → refl }
   ; mono    = λ { (refl , refl) (refl , refl) rr → ⊥-elim (≺-irrefl {root} rr) }
   ; reflect = λ { (refl , refl) (refl , refl) _ → [] , refl }
   ; inst    = λ { (refl , refl) (refl , refl) → mk⇔ (λ _ → refl) (λ _ → refl) }
   }
 
-fresh-At₀ : Fresh (λ _ → ⊥) At₀ root
-fresh-At₀ (refl , refl) _ = refl
+fresh-At₀ : ∀ δ → Fresh (λ _ → ⊥) (At₀ δ) root
+fresh-At₀ _ (refl , refl) _ = refl

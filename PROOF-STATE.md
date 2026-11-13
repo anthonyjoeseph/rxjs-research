@@ -35,8 +35,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE ERASURE
 
 Probed, unproven: a flatMap's and a cold's elaborated runs carry their
-plain ones (`Carry`) along an order embedding, as every other former's
-and the wrapper's do. Settled when both leaves are bodies.
+plain ones (`Carry`) along an order embedding. A lane ends under its
+plain end's image, so a queued lane and the end keep the plain order
+past dead pins; open: the joiner over carried lanes, the lane's frame,
+the routing scan's reading. Settled when both leaves are bodies.
 
 Members: `carry-flatMap`, `carry-cold`.
 

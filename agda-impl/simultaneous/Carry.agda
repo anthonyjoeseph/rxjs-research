@@ -31,10 +31,10 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool using (T)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; cold; map; flatMap)
+open import Tree using (Obs; cold; map; scan; takeWhile; flatMap)
 open import denotation.Position using (Pos; Path; Label; ix; sub; _∙_; _⊕_; root; _≟ᵖ_; inside)
 open import Data.List.Properties using (∷-injective)
 open import denotation.Events using (Timeline; fresh)
@@ -42,7 +42,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; Emission
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (module MapRun; mapEv)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊑-refl; ⊑-trans; ⊑-inside; ∙-inj; InvAt)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; W⁼; here; _⊑_; ⊑-refl; ⊑-trans; ⊑-inside; ∙-inj; InvAt; ⊕-identityʳ)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.Listing using (Listed)
@@ -302,16 +302,35 @@ CarriesAt n ρ o envP envE M₀ er p p′ =
   × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n o envP) p) (enter (approx n (elab ρ o) envE) p′) p p′)
       (λ c → PBNest er M c × Narrow c)
 
+-- THE FOOT of a program: where its elaborated run subscribes the last
+-- former the plain run subscribes at the same position.  A flatMap reads
+-- its outer past its own connect's `ix 1`; a map, scan or takeWhile
+-- reads its source where it is itself read.  A reader at the foot is
+-- paired with where it reads, so its joins lie under its image.
+foot : ∀ {Γ A} → Obs Timeline Γ A → Path
+foot (map _ s)         = foot s
+foot (scan _ _ s)      = foot s
+foot (takeWhile _ _ s) = foot s
+foot (flatMap _ _ s)   = ix 1 ∷ foot s
+foot _                 = []
+
+-- A foot of nothing is the subscription itself.
+at-foot : ∀ {M : PMap} {p p′ : Pos} → M p (p′ ⊕ []) → M p p′
+at-foot {M} {p} {p′} = subst (M p) (⊕-identityʳ p′)
+
+⊑-foot : ∀ p′ → (p′ ⊕ []) ⊑ p′
+⊑-foot p′ = [] , sym (trans (⊕-identityʳ (p′ ⊕ [])) (⊕-identityʳ p′))
+
 -- CARRIED under every environment of carried binders: subscribed at
--- admissible positions the map pairs, holding no hot row, its worlds
--- untouched.
+-- admissible positions, the plain one paired with the elaborated foot,
+-- holding no hot row, its worlds untouched.
 -- A record, so that a statement about a former is compared by its
 -- arguments, never by the elaborated tree its meaning unfolds to.
 record Carry (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor carry
   field carries : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE
                 → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE) → Joins ρ envP envE er M₀ → Nests er M₀ → Apart envP
-                → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Clear (Rows er) (Hots envP) p → Fresh (Hots envP) M₀ p
+                → ∀ p p′ → M₀ p (p′ ⊕ foot o) → Ok (Hots envP) p → Ok (Hots envE) p′ → Clear (Rows er) (Hots envP) p → Fresh (Hots envP) M₀ p
                 → CarriesAt n ρ o envP envE M₀ er p p′
 
 ------------------------------------------------------------------------
