@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; Narrow; PinList; IntoAt; Near; Home; Whole; From;
+open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; Narrow; PinList; Encl; IntoAt; Near; Home; Whole; From;
   Ahead; ahead-under; ahead-over; few-sub; sub-listed; instant-⊕; apart)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.Carry using (annValues; PastOver; Anchor; anchor-grow)
@@ -625,5 +625,12 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
                      × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
                         ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
 
+    -- The pins of the connects enclosing a row, listed between carriers:
+    -- a pin of a body connect by the body's carry, of the connect itself
+    -- by the source's and the told rows', all past the row's image.
+    postulate
+      conn-encl↓ : ∀ {x x′ k l r r′} → ConnImg x x′ → Listed t x → LP k → t k (pin r) → T (inside r x) → x ≺ k
+                 → u l (pin r′) → PB′ k l → Encl t x k → Encl u x′ l
+
     narrowed : Narrow carried
-    narrowed = record { pinned↓ = conn-pinned↓ }
+    narrowed = record { pinned↓ = conn-pinned↓ ; encl↓ = conn-encl↓ }

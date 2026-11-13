@@ -32,25 +32,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE DEAD PIN
-
-Untried: a pin a takeWhile keeps past its failure, its carrier listed.
-The carrier's own connect's pins come with it; open: the kept pins of
-connects in that connect's body, each the image of a plain kept pin,
-though the map need not keep the plain nesting. Settled when the leaf
-is a body.
-
-Members: `take-pin-listed`.
-
 #### THE CONNECT'S CARRY
 
 Probed, unproven: the connect's rows carried from its body's carry and
 its annotated source's. Each subterm is listed before the other's image
 by `cover`; open: the same before a LATE carrier, and a pin, alive or
 dead, carried from whichever subterm made it, from its connect's own
-past as well as from the whole run's. Settled when each leaf is a body.
+past as well as from the whole run's, and the pins of the connects
+enclosing a row listed between carriers (what a takeWhile keeps past
+its failure). Settled when each leaf is a body.
 
-Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-pinned↓`, `conn-encl↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 
