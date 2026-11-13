@@ -65,7 +65,7 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               -- THE PAIRED JOINERS AGREE: every running value is paired, a
               -- lane is cut where its partner is, and its end is joined, and
               -- handed off, where its partner's is.
-              (paired : ∀ {q a} → o q (out a) → Runs q → Σ Pos (V q a))
+              (paired : ∀ {q a} → o q (out a) → Runs q → Listed o q → LP q → Σ Pos (V q a))
               (cut-agree : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut q k ⇔ Cut* q* l)
               (done-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end
                           → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
