@@ -481,10 +481,18 @@ Encl : ∀ {X : Set} → EmissionSet X → Pos → Pos → Set
 Encl a x v = Σ (List Pos) λ ks → (∀ {k r} → a k (pin r) → T (inside r x) → x ≺ k → k ≺ v → k ∈ ks)
                                × (∀ {k} → k ∈ ks → x ≺ k × k ≺ v × Σ Pos λ r → a k (pin r) × T (inside r x))
 
+-- Carried to another run and point, each pin by the other's.
+encl-tr : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {x y v}
+        → (∀ {k r} → a k (pin r) → T (inside r x) → x ≺ k → k ≺ v → b k (pin r) × T (inside r y) × y ≺ k)
+        → (∀ {k r} → b k (pin r) → T (inside r y) → y ≺ k → k ≺ v → a k (pin r) × T (inside r x) × x ≺ k)
+        → Encl a x v → Encl b y v
+encl-tr to fro (ks , F , B) =
+  ks , (λ bk iy yk kv → let (ak , iz , xk) = fro bk iy yk kv in F ak iz xk kv)
+     , λ m → let (xk , kv , r , ak , iz) = B m ; (bk , iy , yk) = to ak iz xk kv in yk , kv , r , bk , iy
+
 encl-map : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {x v}
          → (∀ {k r} → a k (pin r) → b k (pin r)) → (∀ {k r} → b k (pin r) → a k (pin r)) → Encl a x v → Encl b x v
-encl-map to fro (ks , F , B) =
-  ks , (λ bk ix xk kv → F (fro bk) ix xk kv) , λ m → let (xk , kv , r , ak , ix) = B m in xk , kv , r , to ak , ix
+encl-map {a = a} {b} to fro = encl-tr {a = a} {b = b} (λ ak iz xk _ → to ak , iz , xk) (λ bk iz xk _ → fro bk , iz , xk)
 
 -- Read off a listing of a run holding them.
 encl-from : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {x v} → Listed b v
