@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; IntoAt; Near; Home; Whole; From;
+open import simultaneous.CarryBase using (unp-pin; follows; Targeted; PMap; _∪ᴹ_; _⊆ᴹ_; Emb; CarryAt; Narrow; PinList; IntoAt; Near; Home; Whole; From;
   Ahead; ahead-under; ahead-over; few-sub; sub-listed; instant-⊕; apart)
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.Carry using (annValues; PastOver; Anchor; anchor-grow)
@@ -615,3 +615,15 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
       { Img = ConnImg ; ext = ext′ ; PB = PB′ ; pb-few = pb-few′ ; pb-img = pb-img′ ; pb-past = conn-pb-past
       ; img = conn-img ; img¬¬ = conn-img¬¬ ; shown = conn-shown ; img-row = img-row′ ; img-fun = img-fun′
       ; place = conn-place ; live = live′ ; few = few′ ; whole = conn-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = conn-pinned ; cover = conn-cover }
+
+    -- A pin carried from its own connect's past: a body pin by the body's
+    -- carry, a burst or kept pin by the annotated source's, its carrier
+    -- with the elaborated pins of its connect before it.
+    postulate
+      conn-pinned↓ : ∀ {k q} → t k (pin q) → Listed t q → PinList t q k → LP q
+                   → (Σ Pos λ l → Σ Pos λ q′ → u l (pin q′) × PB′ k l × Targeted M′ q q′ × PinList u q′ l)
+                     × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home t k₀ × instantOf k₀ ≡ instantOf k)
+                        ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+
+    narrowed : Narrow carried
+    narrowed = record { pinned↓ = conn-pinned↓ }

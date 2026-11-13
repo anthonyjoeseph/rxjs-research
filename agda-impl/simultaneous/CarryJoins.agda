@@ -27,7 +27,7 @@ open import denotation.Laws.Worlds using (Hots; Ok; InvAt; _⊑_; ⊑-refl; ⊑-
 open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; apart; ahead-over; ahead-under)
+open import simultaneous.CarryBase using (PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; unpinned-narrow; apart; ahead-over; ahead-under)
 open import simultaneous.Carry using (Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; BoundRow; Joins; Apart;
   EnvPast; PBNest; Nests; env-past; nest-or; BoundSrc; Rows; rows-at; clear-not)
 
@@ -128,13 +128,14 @@ private
           → dP ≡ hot (Proper (BoundSrc (er i))) → dE ≡ hot (Proper (HotOf′ (er i))) → InvAt (Hots envE) p′ (enter dE p′)
           → Nests er M₀
           → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (enter dP p) × Joins ρ envP envE er M × EnvPast er M
-            × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′) (λ c → PBNest er M c)
+            × Σ (CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter dP p) (enter (Reading dE) p′) p p′) (λ c → PBNest er M c × Narrow c)
   read-at {M₀ = M₀} {ρ} {envP} {envE} hm er jn ap i m₀ okP okE nh fr refl refl Iu ns =
     R.M , inj₁ , R.reader-emb , R.reader-within , R.reader-bare , R.reader-joins , R′.reader-past ns
     , read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined
     , nest-or {er = er} {c = R.reader-rejoined} {c′ = read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined} (λ m → m)
         (λ pb tk lv → let (l , pb₀ , ll) = read-post-pb {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined pb in inj₁ (l , pb₀ , ll , _ , tk , lv))
         (R′.reader-nest ns)
+    , unpinned-narrow (λ { (shown _ () _ , _) }) (read-post {T = Proper (HotOf′ (er i))} Iu R.reader-rejoined)
     where
       module R  = Read {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
       module R′ = ReadPast {M₀ = M₀} {ρ = ρ} {envP = envP} {envE = envE} hm er jn ap i m₀ okP okE nh fr
