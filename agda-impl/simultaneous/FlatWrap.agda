@@ -13,7 +13,7 @@ open import Data.Bool using (T; not)
 open import Data.Bool.Properties using (T?)
 open import Function using (mk⇔)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -26,8 +26,8 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Properties using (∷-injectiveˡ)
 
 open import denotation.Position using (Pos; ix; sub; _⊕_; inside; _≟ᵖ_; root)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; Ended;
-  module Joining; module Connect)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_;
+  module Connect)
 open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-ext; ≺-absurd; ≺-≼-≺; ticks)
 open import denotation.Laws.Shows using (few-reach)
 open import denotation.Laws.Worlds using (InvD; InvAt; Lawful; Ok; W; W⁼; _∪ʰ_; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊕-identityʳ; ⊕-injˡ; ⊕-assoc;
@@ -50,6 +50,7 @@ open import simultaneous.ReadRows using (up; up-⊕)
 open import simultaneous.ConnLists using (trunc-few; nin)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.SObs using (lone; module Elaborate)
+open import simultaneous.JoinCarry using (module Lanes)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
@@ -59,14 +60,12 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
                  {sE : Den (IE A)} {FE : Den (IE A) → Den (IE B)}
                  (IsE : InvD HE sE) (IFE : ∀ {t} → Lawful t → InvD (HE ∪ʰ t) (FE (hot t)))
                  (M_s : PMap) (c_s : CarryAt valuesOf M_s HP HE LP o (Connect.σ sE FE p′) p (p′ ⊕ [ ix 1 ])) where
-  module J  = Joining Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand
+  open Lanes Ln o Runs Cut Hand public
   module CE = Connect sE FE p′
   module S′ = CarryAt c_s
   module SE = Cuts.Side {s = sE} {F = FE} IsE IFE p′ okE
   module JK = JI.Join okP g Ig Io
 
-  t : EmissionSet B
-  t = Truncate J.JoinT
 
   u : EmissionSet (IE B)
   u = Truncate (Connect.ConnT sE FE p′)
@@ -92,17 +91,6 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
   shown-unp (s-val _)    _ = tt
   shown-unp (s-skip _)   _ = tt
   shown-unp (s-pass _ _) _ = tt
-
-  -- A JOINED ROW OF THE LANES, not the outer's.
-  Bod : ∀ {k e} → J.JoinT k e → Set
-  Bod (J.val _)     = ⊥
-  Bod (J.step _)    = ⊥
-  Bod (J.opin _)    = ⊥
-  Bod (J.opass _ _) = ⊥
-  Bod _             = ⊤
-
-  tB : EmissionSet B
-  tB k e = Σ (t k e) λ x → Bod (proj₁ x)
 
   -- Every row of the flatMap is a lane's or shows an outer row.
   classify : ∀ {k e} (x : t k e) → tB k e ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → o k₀ e₀ × Shows k₀ e₀ k e
@@ -330,7 +318,7 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
     emb′ = emb-pairs pair
 
   module Body (M_b : PMap) (ms_b : M_s ⊆ᴹ M_b) (emb′ : Emb (M_b ∪ᴹ Echo))
-              (c_b : CarryAt valuesOf M_b HP (HE ∪ʰ Proper CE.σ) (λ q → Listed o q × LP q) tB CE.β p (p′ ⊕ [ ix 0 ]))
+              (c_b : CarryAt valuesOf M_b (HP ∪ʰ o) (HE ∪ʰ Proper CE.σ) (λ q → Listed o q × LP q) tB CE.β p (p′ ⊕ [ ix 0 ]))
               (past-s : PastOver c_s M_b)
               (nest-v : ∀ {k l e₀ h L a σ} → CarryAt.PB c_b k l → tB k e₀ → (Unpinned e₀ → Live tB k) → Σ A (λ b → o h (out b)) → S′.Img h L
                       → k ≡ h ⊕ (a ∷ σ) → Anchor M_b k l h a) where

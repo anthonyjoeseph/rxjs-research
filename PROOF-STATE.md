@@ -32,15 +32,38 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE JOINER'S DECISIONS
+
+Untried: the elaborated joiner decides as the plain one. Each running
+value is paired with the value its carrier reads; a lane is cut where its
+partner is; its end is joined and handed off where its partner's is.
+Open: switch's cut and exhaust's run read the outer against lane ends
+across the two maps; bounded's run and hand-off read the queue; every
+op's done reads all lanes' ends. Settled when each holds, or a
+refutation names the op.
+
+Members: `switch-cut`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `pair-done`.
+
+#### THE JOINED LANES
+
+Untried: a joiner over lanes carried into another's, its decisions
+agreeing, carries its lane rows (`Joined`). Open: whether the lanes'
+maps embed jointly with the outer's (`joined-maps`), rows of two lanes
+lying apart on both sides, and the fields read lane by lane. Settled
+when each is a body.
+
+Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`.
+
 #### THE ERASURE
 
 Probed, unproven: a flatMap's lanes and a cold's elaborated runs carry
 their plain ones (`Carry`) along an order embedding. A lane ends under
 its plain end's image, so a queued lane and the end keep the plain order
-past dead pins; open: the joiner over carried lanes, the lane's frame,
-the routing scan's reading. Settled when both leaves are bodies.
+past dead pins; open: a lane through its frame (`lane-framed`), the
+routing scan's reading, the two connects' bodies. Settled when every
+member is a body.
 
-Members: `flat-lanes`, `carry-cold`.
+Members: `lane-framed`, `lanes-routed`, `lanes-inner`, `lanes-closer`, `carry-cold`.
 
 #### THE LATE WINDOW
 
