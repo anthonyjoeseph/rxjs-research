@@ -36,7 +36,7 @@ open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live)
-open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; emb-under; instant-⊕)
+open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; emb-under; instant-⊕)
 open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot; listed↓; Clear; clear-not; Rows; rows-at; rows-map)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
@@ -614,8 +614,8 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
         conn-carry : Σ (CarryAt valuesOf M′ (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (connect s b) envP) p)
                                (enter (approx n (elab ρ (connect s b)) envE) p′) p p′)
-                       (λ c → PBNest er M′ c)
-        conn-carry = carried , conn-nest
+                       (λ c → PBNest er M′ c × Narrow c)
+        conn-carry = carried , conn-nest , CB.narrowed
 
         result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
         result = M′ , (λ m → inj₁ (ms_b (ms_s (inj₁ m)))) , emb′ , within′ , bare′ , joins″
@@ -623,7 +623,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                , conn-carry
 
     after : CarriesAt n ρ′ b envP′ envE′ M_s er′ (p ⊕ [ ix 0 ]) (p′ ⊕ [ ix 0 ]) → CarriesAt n ρ (connect s b) envP envE M₀ er p p′
-    after (M_b , ms_b , hm_b , wi_b , br_b , jn_b , ep_b , c_b , nc_b) =
+    after (M_b , ms_b , hm_b , wi_b , br_b , jn_b , ep_b , c_b , nc_b , _) =
       AfterBody.Body.result M_b (λ {x} {y} {q} {a} {σ} → jn_b (here refl) {x} {y} {q} {a} {σ}) ms_b hm_b wi_b br_b jn_b ep_b c_b nc_b
 
     result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
@@ -631,7 +631,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                       (ms_s (inj₂ (inj₁ (refl , refl)))) okP′ okE′ nh-b fresh-b)
 
   after : CarriesAt n ρ s envP envE U.M er₁ (p ⊕ [ ix 1 ]) s₀′ → CarriesAt n ρ (connect s b) envP envE M₀ er p p′
-  after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s) = AfterSource.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s
+  after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) = AfterSource.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s
 
   result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
   result = after (Carry.carries hs envP envE gP gE U.M U.emb er₁ jn₁ ns₁ ap (p ⊕ [ ix 1 ]) s₀′ (inj₂ (inj₂ (refl , refl)))

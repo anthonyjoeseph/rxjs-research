@@ -45,7 +45,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Narrow; PinList; pins-map; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
 open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
@@ -353,14 +353,32 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
+    homed : ∀ {k p} → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k) ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+          → instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k) ⊎ Σ Pos (λ h → HP h × instantOf h ≡ instantOf k)
+    homed (inj₁ e)                        = inj₁ e
+    homed (inj₂ (inj₁ (k₀ , kp , h , ek))) = inj₂ (inj₁ (k₀ , kp , home′ h , ek))
+    homed (inj₂ (inj₂ hh))                = inj₂ (inj₂ hh)
+
+    -- A pin of the scan is its source's, on both sides.
+    spinS : ∀ {k r} → t k (pin r) → S k (pin r)
+    spinS x = P.spin x , reach-kin down₀ k-pin (rch x)
+
+    pinS↓ : ∀ {k r} → S k (pin r) → t k (pin r)
+    pinS↓ (P.spin x , _) = x
+
+    spinU : ∀ {l r} → u l (pin r) → S′ l (pin r)
+    spinU x = E.spin x , reach-kin downU₀ k-pin (rchU x)
+
+    pinU↓ : ∀ {l r} → S′ l (pin r) → u l (pin r)
+    pinU↓ (E.spin x , _) = x
+
     pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
               → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp
-    ... | (l , p′ , ul , m , b , ls) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₁ e
-    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
-    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₂ hh)
+    ... | (l , p′ , ul , m , b , ls) , h = (l , p′ , spinU ul , m , b , UL.lst→ {l} ls) , homed {k} {p} h
+
 
   scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
@@ -376,6 +394,20 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = λ s₁ → pb-few (proj₁ (proj₂ (downU s₁))) ; pinned = pinned′
     ; pb-img = pb-img
     ; pb-past = λ {k} pb sk lv s₁ → pb-past pb (proj₁ (proj₂ (down sk))) (λ un → liveS← {k} (λ {c} → lv (unp→ (proj₂ (proj₂ (down sk))) un) {c})) (proj₁ (proj₂ (downU s₁))) }
+
+  -- A PIN IS CARRIED FROM ITS OWN PAST as its source's: a scan keeps
+  -- every pin.
+  narrowed : Narrow c → Narrow scanned
+  narrowed nc = record { pinned↓ = pinned↓′ }
+    where
+      pinned↓′ : ∀ {k p} → S k (pin p) → Listed S p → PinList S p k → LP p
+               → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × PinList S′ p′ l)
+                 × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
+                    ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+      pinned↓′ {k} {p} (P.spin x , _) L Pk lp
+        with Narrow.pinned↓ nc x (lstS← L) (pins-map {a = S} {b = t} (λ {k′} → pinS↓ {k′}) (λ {k′} → spinS {k′}) Pk) lp
+      ... | (l , p′ , ul , m , b , Pu) , h =
+        (l , p′ , spinU ul , m , b , pins-map {a = u} {b = S′} (λ {l′} → spinU {l′}) (λ {l′} → pinU↓ {l′}) Pu) , homed {k} {p} h
 
   -- Its rows carried into their instant are its source's.
   pb-down : ∀ {k l e₀} → PB k l → S k e₀ → (Unpinned e₀ → Live S k) → PB k l × Σ (Ev A) λ e → t k e × (Unpinned e → Live t k)
@@ -406,20 +438,37 @@ private
   match-proj {e₀ = skip}  e₁ (_ , ns)  = (λ ()) , λ n sw → ns n (sh-proj e₁ sw)
   match-proj {e₀ = pin _} e₁ (_ , ns)  = (λ ()) , λ n sw → ns n (sh-proj e₁ sw)
 
+module ScanCarry {A B} (f : B → A → B) z (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ (hm : Emb M)
+                 (It : InvAt H₁ p (enter d p)) (Iu : InvAt H₂ p′ (enter d′ p′))
+                 (c : CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′) where
+  private
+    module W = MapRun proj₂ (Op.scan (scanIE f) (z , marked begin) d′) p′
+    module K = Core f z hm (λ {q} {e} → entered-reach d p {q} {e}) (λ {q} {e} → entered-reach d′ p′ {q} {e}) It Iu c
+    module R = Relabel (λ _ e e′ → e′ ≡ e) (λ _ e e′ → e′ ≡ mapEv proj₂ e)
+      (λ { {e = e} refl → kin-refl e }) (λ { {e = e} refl → kin-map e })
+      (λ tk → _ , tk , refl) (λ tk → _ , tk , refl) (λ _ ul → _ , W.lift ul , refl) (λ ul n → n (_ , W.lift ul , refl)) W.lift W.lift W.unmap
+      K.scanned
+      (λ { {e = e} refl sw → sh-proj e sw }) (λ { {e₁ = e₁} _ refl refl m → match-proj e₁ m })
+
+  carried : CarryAt valuesOf M HP HE LP (enter (Op.scan f z d) p) (enter (Op.map proj₂ (Op.scan (scanIE f) (z , marked begin) d′)) p′) p p′
+  carried = R.carried
+
+  narrowed : Narrow c → Narrow carried
+  narrowed nc = R.narrowed (K.narrowed nc)
+
 -- THE ELABORATED SCAN CARRIES the plain one: its state's emit, projected,
 -- carries the plain fold.
 scan-carry : ∀ {A B} (f : B → A → B) z (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ → Emb M
            → InvAt H₁ p (enter d p) → InvAt H₂ p′ (enter d′ p′)
            → CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′
            → CarryAt valuesOf M HP HE LP (enter (Op.scan f z d) p) (enter (Op.map proj₂ (Op.scan (scanIE f) (z , marked begin) d′)) p′) p p′
-scan-carry f z d d′ p p′ hm It Iu c =
-  Relabel.carried (λ _ e e′ → e′ ≡ e) (λ _ e e′ → e′ ≡ mapEv proj₂ e)
-    (λ { {e = e} refl → kin-refl e }) (λ { {e = e} refl → kin-map e })
-    (λ tk → _ , tk , refl) (λ tk → _ , tk , refl) (λ _ ul → _ , W.lift ul , refl) (λ ul n → n (_ , W.lift ul , refl)) W.lift W.lift W.unmap
-    (Core.scanned f z hm (λ {q} {e} → entered-reach d p {q} {e}) (λ {q} {e} → entered-reach d′ p′ {q} {e}) It Iu c)
-    (λ { {e = e} refl sw → sh-proj e sw }) (λ { {e₁ = e₁} _ refl refl m → match-proj e₁ m })
-  where
-    module W = MapRun proj₂ (Op.scan (scanIE f) (z , marked begin) d′) p′
+scan-carry f z d d′ p p′ hm It Iu c = ScanCarry.carried f z d d′ p p′ hm It Iu c
+
+scan-narrow : ∀ {A B} (f : B → A → B) z (d : Den A) (d′ : Den (IE A)) {M HP HE LP H₁ H₂} p p′ (hm : Emb M)
+            → (It : InvAt H₁ p (enter d p)) (Iu : InvAt H₂ p′ (enter d′ p′))
+            → (c : CarryAt valuesOf M HP HE LP (enter d p) (enter d′ p′) p p′)
+            → Narrow c → Narrow (scan-carry f z d d′ p p′ hm It Iu c)
+scan-narrow f z d d′ p p′ hm It Iu c = ScanCarry.narrowed f z d d′ p p′ hm It Iu c
 
 carry-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → Carry m ρ s → Carry m ρ (scan f z s)
 carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr →
@@ -427,12 +476,13 @@ carry-scan n ρ f z s (carry h) = carry λ envP envE gP gE M₀ hm er jn ns ap p
   where
     scanned : ∀ envP envE → GoodEnv envP → GoodEnv envE → ∀ M₀ (er : EnvRel M₀ ρ envP envE) p p′ → Ok (Hots envP) p → Ok (Hots envE) p′
             → CarriesAt n ρ s envP envE M₀ er p p′ → CarriesAt n ρ (scan f z s) envP envE M₀ er p p′
-    scanned envP envE gP gE M₀ er p p′ okP okE (M , ms , hm′ , wi , br , jn′ , ep , c , nc) =
+    scanned envP envE gP gE M₀ er p p′ okP okE (M , ms , hm′ , wi , br , jn′ , ep , c , nc , nr) =
       M , ms , hm′ , wi , (λ tk → br (proj₂ (scan-row (proj₁ tk)))) , jn′ , ep , c′
       , nest-via {er = er} {c = c} {c′ = c′} (λ m → m)
           (λ {k} {l} {e₀} → Core.pb-down f z hm′ (λ {q} {e} → entered-reach (approx n s envP) p {q} {e})
              (λ {q} {e} → entered-reach (approx n (elab ρ s) envE) p′ {q} {e}) (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c {k} {l} {e₀})
           nc
+      , scan-narrow f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′ (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c nr
       where
         c′ : CarryAt valuesOf M (Hots envP) (Hots envE) (HotsListed envP) (enter (approx n (scan f z s) envP) p) (enter (approx n (elab ρ (scan f z s)) envE) p′) p p′
         c′ = scan-carry f z (approx n s envP) (approx n (elab ρ s) envE) p p′ hm′ (inv-approx n s envP gP p okP) (inv-approx n (elab ρ s) envE gE p′ okE) c
