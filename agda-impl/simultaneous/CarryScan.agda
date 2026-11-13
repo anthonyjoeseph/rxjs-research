@@ -22,14 +22,13 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Data.Bool using (T)
 open import Data.Bool.Properties using (T?)
 open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 
 open import Tree using (scan)
-open import denotation.Position using (Pos; _<ᵖ_; root; _≟ᵖ_; inside)
+open import denotation.Position using (Pos; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Few; _≺_; _≼_; Unpinned;
   module Scan; module Op; approx)
@@ -46,7 +45,7 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Folds using (reach-kin; few-¬¬listed; module ListedFold)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Narrow; PinList; pins-map; Encl; encl-map; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; Narrow; PinList; pins-map; Targeted; Kin; k-out; k-skip; k-pin; k-end; unp→; kin-map; kin-refl; module Relabel; module Lifts; module Mono; Home; Near; Whole; IntoAt; few-sub; match-val; carried-val; match-end)
 open import simultaneous.Carry using (Carry; carry; nest-via; CarriesAt; EnvRel; HotsListed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; scanIE; marked)
@@ -373,11 +372,11 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     pinU↓ : ∀ {l r} → S′ l (pin r) → u l (pin r)
     pinU↓ (E.spin x , _) = x
 
-    pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
+    pinned′ : ∀ {k p} → S k (pin p) → Live S k → Listed S k → LP k
               → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
-    pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp
+    pinned′ {k} {p} (P.spin x , _) lv L lp with pinned x (liveS← {k} (λ {c} → lv {c})) (lstS← L) lp
     ... | (l , p′ , ul , m , b , ls) , h = (l , p′ , spinU ul , m , b , UL.lst→ {l} ls) , homed {k} {p} h
 
 
@@ -399,15 +398,8 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
   -- A PIN IS CARRIED FROM ITS OWN PAST as its source's: a scan keeps
   -- every pin.
   narrowed : Narrow c → Narrow scanned
-  narrowed nc = record { pinned↓ = pinned↓′ ; encl↓ = encl↓′ }
+  narrowed nc = record { pinned↓ = pinned↓′ }
     where
-      encl↓′ : ∀ {x x′ k l p p′} → Img x x′ → Listed S x → LP k → S k (pin p) → T (inside p x) → x ≺ k
-             → S′ l (pin p′) → PB k l → Encl S x k → Encl S′ x′ l
-      encl↓′ i L lp sk ix xk sl pb E =
-        encl-map {a = u} {b = S′} (λ {l′} {r} → spinU {l′} {r}) (λ {l′} {r} → pinU↓ {l′} {r})
-          (Narrow.encl↓ nc i (lstS← L) lp (pinS↓ sk) ix xk (pinU↓ sl) pb
-            (encl-map {a = S} {b = t} (λ {k′} {r} → pinS↓ {k′} {r}) (λ {k′} {r} → spinS {k′} {r}) E))
-
       pinned↓′ : ∀ {k p} → S k (pin p) → Listed S p → PinList S p k → LP p
                → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × PinList S′ p′ l)
                  × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)

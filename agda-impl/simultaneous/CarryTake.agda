@@ -19,8 +19,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -32,9 +31,9 @@ open import denotation.Position using (Pos; ix; last; _⊕_; root; _≟ᵖ_; ins
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Reach; Few; _≺_; _≼_; module Op;
   approx)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-or-≻; ≼-split; ≺-ext; entered-reach)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-≺-≺; ≺-absurd; ≺→≼; ≼-refl; ≼-or-≻; ≼-split; ≺-ext; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; W⁼; inW; step; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc;
-  ⊕-injʳ; inside-⊑; ⊑-inside; W; conv)
+  ⊕-injʳ; ⊑-inside; W; conv)
 open import denotation.Laws using (inv-approx)
 open import adequacy.SubOne using (at-or-before)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -44,7 +43,7 @@ open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.CarryBase using (From; Targeted; Narrow; PinList; unp-pin; ahead-under; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb;
   CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; instant-⊕; sub-listed; few-sub;
-  match-val; carried-val; IntoAt; Ahead; ahead-over; Encl; encl-from)
+  match-val; carried-val; IntoAt; Ahead; ahead-over)
 open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
 open import simultaneous.CarryLeaves using (module OneAt)
 open import simultaneous.TakeSide using (Keeps; Lab; module Side; between; cut-match; cut-unp; cutEv; lab-plain)
@@ -513,79 +512,13 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     homed nfp (inj₂ (inj₁ (k₀ , kp , h , ek))) = inj₂ (inj₁ (k₀ , kp , home-up nfp kp h , ek))
     homed nfp (inj₂ (inj₂ hh))                = inj₂ (inj₂ hh)
 
-    -- The source's pin and its connect's past, from the taken run's.
-    lst-at : ∀ {k p} → ¬ P.Failed p → p ≼ k → Listed P.T′ k → Listed t p
-    lst-at {k} {p} nfp pk L with ≼-split {p} {k} pk
-    ... | inj₁ lt = P.lst← nfp (sub-listed L lt)
-    ... | inj₂ e  = P.lst← nfp (subst (Listed P.T′) (sym e) L)
-
-    under : ∀ {k p} → t k (pin p) → p ≼ k
-    under {k} {p} tk = ⊑-≼ (inside-⊑ p k (P.ins tk))
-
-    -- A PIN KEPT PAST THE FAILURE waits on what the elaborated run keeps
-    -- before its carrier: the rows before the elaborated failure's end
-    -- cut, that cut, and past it the pins of the connects the failure
-    -- lies in, which the source's carry lists between carriers.
-    listed-past : ∀ {f k p l p′} → P.First f → f ≺ k → t k (pin p) → ¬ P.Failed p → Listed P.T′ k → LP k
-                → u l (pin p′) → C.PB k l → Listed Q.T′ l
-    listed-past {f} {k} {p} {l} ((b , tf , nkf) , nff) fk tk nfp L lp ul mb
-      with C.img tf tt (P.live-out tf) (P.lst← nff (sub-listed L fk)) (lp↓ (≺→≼ {f} {k} fk) lp)
-    ... | inj₂ (() , _)
-    ... | inj₁ (f′ , i , _ , uf′ , Lu , mt) with carried-val mt
-    ...   | _ , refl = ksc ++ cq ∷ kse , F , B
-      where
-        ff′ : Q.First f′
-        ff′ = firstQ tf nkf nff i uf′
-
-        cq : Pos
-        cq = f′ ⊕ [ last ]
-
-        Lc : Listed Q.T′ cq
-        Lc = Q.lst-cut ff′ Lu (inj₂ refl)
-
-        ksc : List Pos
-        ksc = proj₁ Lc
-
-        insp : T (inside p f)
-        insp = ⊑-inside (conv {p} {p} {f} {k} (⊑-refl p) (λ fp → nfp (f , b , tf , nkf , fp)) fk (inside-⊑ p k (P.ins tk)))
-
-        Ef : Encl t f k
-        Ef = encl-from {a = t} {b = P.T′} L (λ {k′} → P.pin-func {k′})
-               (λ {k′} {r} y iz _ _ → P.lift (P.left y (P.unfailed nff (⊑-≼ (inside-⊑ r f iz))) (P.ins y))) (λ {k′} → P.src-pin {k′})
-
-        Ec : Encl Q.T′ cq l
-        Ec = Q.encl-cut→ ff′ (Narrow.encl↓ nar i (P.lst← nff (sub-listed L fk)) lp tk insp fk ul mb Ef)
-
-        kse : List Pos
-        kse = proj₁ Ec
-
-        cl : cq ≺ l
-        cl with C.ext i
-        ... | y , m , yf′ = proj₁ (ahead-under (ahead-under (C.pb-past mb tk (λ ()) ul m fk (P.not-under tf tk fk)) yf′) (⊑-snoc⁺ f′))
-
-        F : ∀ {r e} → Q.T′ r e → r ≺ l → r ∈ ksc ++ cq ∷ kse
-        F {r} y rl with ≼-or-≻ r cq
-        ... | inj₁ rc with ≼-split {r} {cq} rc
-        ...   | inj₁ lt   = ∈-++⁺ˡ (proj₁ (proj₂ Lc) y lt)
-        ...   | inj₂ refl = ∈-++⁺ʳ ksc (here refl)
-        F {r} y rl | inj₂ cr with Q.past-first ff′ cr y
-        ... | r′ , refl , ur , nfr′ =
-          ∈-++⁺ʳ ksc (there (proj₁ (proj₂ Ec) y
-            (⊑-inside (⊑-trans (inside-⊑ r′ f′ (Q.encloses (proj₁ ff′) ur nfr′ (≺-trans {f′} {cq} {r} (≺-ext f′ []) cr))) (⊑-snoc⁺ f′))) cr rl))
-
-        B : ∀ {r} → r ∈ ksc ++ cq ∷ kse → r ≺ l × Σ (Ev (IE A)) (Q.T′ r)
-        B {r} m with ∈-++⁻ ksc m
-        ... | inj₁ m′ = let (rc , y) = proj₂ (proj₂ Lc) m′ in ≺-trans {r} {cq} {l} rc cl , y
-        ... | inj₂ (here refl) = cl , end , Q.cut-row uf′ nkf (proj₂ ff′) (inj₂ refl)
-        ... | inj₂ (there m′) = let (_ , rl , _ , y , _) = proj₂ (proj₂ Ec) m′ in rl , _ , y
-
-    pinned′ : ∀ {k p} → P.T′ k (pin p) → Listed P.T′ k → LP k → PinOut k p
-    pinned′ {k} {p} (P.left tk nfp _ , _) L lp with P.failed-at? L tk
-    ... | yes fk with P.first-at L tk fk | Narrow.pinned↓ nar tk (lst-at nfp (under tk) L) (P.pins-of nfp L) (lp↓ (under tk) lp)
-    ...   | f , ff , fc | (l , p′ , ul , mb , bd , _) , h =
-      (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , inj₂ (_ , tk) , mb) , aimed bd
-         , listed-past ff (≺-trans {f} {f ⊕ [ last ]} {k} (≺-ext f []) fc) tk nfp L lp ul mb) , homed {k} {p} nfp h
-    pinned′ {k} {p} (P.left tk nfp _ , _) L lp | no nfk with C.pinned tk (P.lst← nfk L) lp
+    -- A LIVE PIN IS NEVER PAST THE FAILURE: the taken run ends at the
+    -- failing value's end cut, before every row it keeps past it.
+    pinned′ : ∀ {k p} → P.T′ k (pin p) → Live P.T′ k → Listed P.T′ k → LP k → PinOut k p
+    pinned′ {k} {p} (P.left tk nfp _ , _) lv L lp with P.failed-at? L tk
+    ... | yes fk with P.first-at L tk fk
+    ...   | f , ((_ , tf , nkf) , nff) , fc = ⊥-elim (≺-irrefl {k} (≼-≺-≺ {k} {f ⊕ [ last ]} {k} (lv (P.cut-row tf nkf nff (inj₂ refl))) fc))
+    pinned′ {k} {p} (P.left tk nfp _ , _) lv L lp | no nfk with C.pinned tk (P.live← nfk lv) (P.lst← nfk L) lp
     ... | (l , p′ , ul , mb , bd , ls) , h =
       (l , p′ , Q.lift (Q.left ul (pin-unfailed nfp bd) (Q.ins ul)) , inj₁ ((pin p′ , ul) , (_ , tk) , inj₁ nfk , mb) , aimed bd , Q.lst-any ls) , homed {k} {p} nfp h
 
@@ -611,25 +544,8 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ; place = place′ ; live = live′ ; few = few′ ; whole = whole′ ; cover = take-cover ; bk = bk′ ; in-bk = in-bk′ ; PB = PB′ ; pb-few = pb-few′ ; pinned = pinned′
     ; pb-img = pb-img′ ; pb-past = pb-past′ }
 
-  -- THE PINS OF CONNECTS ENCLOSING A ROW, across the takeWhile: before
-  -- the failure its source's, and under a cut those of the failing value
-  -- it is cut under.
-  private
-    encl↓′ : ∀ {x x′ k l r r′} → Img′ x x′ → Listed P.T′ x → LP k → P.T′ k (pin r) → T (inside r x) → x ≺ k
-           → Q.T′ l (pin r′) → PB′ k l → Encl P.T′ x k → Encl Q.T′ x′ l
-    encl↓′ _ _ _ _ _ _ ul (inj₂ (_ , _ , ((_ , uf , _) , _) , _ , refl , _)) _ = ⊥-elim (InvAt.flat Iu uf (Q.src-pin ul))
-    encl↓′ (inj₁ (i , nfx , _)) L lp (P.left tk _ _ , _) iz xk ul (inj₁ (_ , _ , _ , pb)) E =
-      Q.encl→ (e1 i nfx) (Narrow.encl↓ nar i (P.lst← nfx L) lp tk iz xk (Q.src-pin ul) pb (P.encl← nfx E))
-    encl↓′ {k = k} (inj₂ (cut {k₀} {a = a} tk₀ nk nf₀ i₀ ul₀ _ refl refl)) L lp (P.left tk nfr _ , _) _ xk ul (inj₁ (_ , _ , _ , pb)) E =
-      Q.encl-cut→ (firstQ tk₀ nk nf₀ i₀ ul₀)
-        (Narrow.encl↓ nar i₀ (P.lst← nf₀ (sub-listed L (≺-ext k₀ []))) lp tk (P.encloses (_ , tk₀ , nk) tk nfr k₀k) k₀k (Q.src-pin ul) pb
-          (P.encl-cut← ((_ , tk₀ , nk) , nf₀) E))
-      where
-        k₀k : k₀ ≺ k
-        k₀k = ≺-trans {k₀} {k₀ ⊕ [ a ]} {k} (≺-ext k₀ []) xk
-
   narrowed′ : Narrow carried′
-  narrowed′ = record { pinned↓ = pinned↓′ ; encl↓ = encl↓′ }
+  narrowed′ = record { pinned↓ = pinned↓′ }
 
   -- A row carried into its instant: its source's, or anchored past by the
   -- first failing value it precedes.

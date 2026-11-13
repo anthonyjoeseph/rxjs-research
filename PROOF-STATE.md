@@ -34,23 +34,24 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE LATE WINDOW
 
-Dead route probed: an enclosing connect's pins before a late carrier
-include re-pinned values the plain run puts after the pin, so the
-plain window cannot end at the pin. Settled when the window is
-restated to end where every plain row is carried at or after the
-carrier, and the take's listing comes through that window.
+Dead route probed: before a live pin's late carrier lie the connect's
+pins of values the plain run puts after the pin, so the carrier's
+listing is not read off the plain run up to the pin. Settled when it is
+read off a later plain point a reader reaches, or refuted by a late
+carrier past endlessly many rows, with a reader's heard pin then put on
+an in-order carrier.
 
-Members: `conn-encl↓`.
+Members: `conn-pinned`.
 
 #### THE CONNECT'S CARRY
 
 Probed, unproven: the connect's rows carried from its body's carry and
 its annotated source's. Each subterm is listed before the other's image
 by `cover`; open: the same before a LATE carrier, and a pin, alive or
-dead, carried from whichever subterm made it, from its connect's own
-past as well as from the whole run's. Settled when each leaf is a body.
+dead, carried from its connect's own past by whichever subterm made it.
+Settled when each leaf is a body.
 
-Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE COVER
 

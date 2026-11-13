@@ -370,7 +370,7 @@ module Read {Γ Δ} {M₀ : PMap} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
       img-shown {q} {e} tq pq un L (C.img {q} {e} (proj₁ tq) un (λ {c₉} → proj₂ tq {c₉})
         (lstP {q} {e} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp))
     img (heard {q} {r} tq pq , _) _ _ L lp = heard-img {q} {r} tq pq L lp
-      (proj₁ (C.pinned {q} {r} (proj₁ tq) (lstP {q} {pin r} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp)))
+      (proj₁ (C.pinned {q} {r} (proj₁ tq) (λ {c₉} → proj₂ tq {c₉}) (lstP {q} {pin r} {q ⊕ [ sub p ]} tq (sub≼ q) lp) (lsts {q} {q ⊕ [ sub p ]} (sub≼ q) lp)))
     img (ended {c} tc pc , _) _ _ _ lp =
       img-ended {c} tc pc (C.img {c} {end} (proj₁ tc) tt (λ {c₉} → proj₂ tc {c₉})
         (lstP {c} {end} {c ⊕ [ sub p ]} tc (sub≼ c) lp) (lsts {c} {c ⊕ [ sub p ]} (sub≼ c) lp))

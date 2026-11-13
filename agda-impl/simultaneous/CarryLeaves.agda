@@ -253,7 +253,7 @@ private
       ; pb-few  = λ _ → [] , λ ()
       ; pb-img  = λ ()
       ; pb-past = λ ()
-      ; pinned  = λ {_} {r} tk _ _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
+      ; pinned  = λ {_} {r} tk _ _ _ → ⊥-elim (unp-pin {A} {r} (of-unp p 0 xs (proj₁ tk)))
       }
 
   of-carried : ∀ {A HP HE LP R M₀ p p₀ p′} (xs : List A) → Emb M₀ → Fresh HP M₀ p → M₀ p p₀ → p₀ ⊑ p′ → NotHot R p
