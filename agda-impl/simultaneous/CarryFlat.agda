@@ -14,11 +14,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Nat using (ℕ)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
 open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
@@ -38,7 +39,7 @@ open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; Env
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers; Routes)
 
 ------------------------------------------------------------------------
 -- The joiners
@@ -143,12 +144,27 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   along : ∀ {X} {T : EmissionSet B} → t ≡ T → CarriesX X → CarriesOf n ρ envP envE M₀ er p p′ T X
   along refl c = c
 
+  -- The elaborated lanes' renaming: past the outer's and the closer's
+  -- binders.
+  ρ″ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ (IE B L.∷ IE A L.∷ Δ)
+  ρ″ i = there (there (ρ i))
+
+  -- THE ELABORATED FLATMAP'S BODY, over its lanes and the connects it
+  -- watches: the closer's connect over the joiner's, read by the routing
+  -- scan.
+  Body : (A → E (IE B L.∷ IE A L.∷ Δ) (IE B)) → E (IE B L.∷ IE B L.∷ IE A L.∷ Δ) (ℕ × Routes) → E (IE A L.∷ Δ) (IE B)
+  Body lanesE tk = connect closer (connect (flatMap op (λ a → laneˢ (lanesE a)) (each valuesOf (connected (there (here refl))))) (combined op tk))
+
   -- THE ELABORATED FLATMAP IS A CONNECT over the elaborated outer, its
-  -- body read off `elab` itself.  The assembly runs over a body held
-  -- abstract and is moved along this equation: compared against `elab`'s
-  -- unfolding, any other spelling of the body unfolds the whole program.
-  split : Σ (E (IE A L.∷ Δ) (IE B)) λ b → elab ρ (flatMap op f s) ≡ connect (elab ρ s) b
-  split = _ , refl
+  -- body read off `elab` itself.  The assembly runs over the lanes and
+  -- trackers held abstract and is moved along this equation: compared
+  -- against `elab`'s unfolding, any other spelling unfolds the whole
+  -- program.
+  split : Σ (A → E (IE B L.∷ IE A L.∷ Δ) (IE B)) λ lanesE → (∀ a → lanesE a ≡ elab ρ″ (f a))
+          × Σ (E (IE B L.∷ IE B L.∷ IE A L.∷ Δ) (ℕ × Routes)) λ tk → tk ≡ trackers Γ 0 (λ i → there (there (there (ρ i))))
+          × elab ρ (flatMap op f s) ≡ connect (elab ρ s) (connect closer (connect (flatMap op (λ a → laneˢ (lanesE a))
+              (each valuesOf (connected (there (here refl))))) (combined op tk)))
+  split = _ , (λ a → refl) , _ , refl , refl
 
   -- Past the outer.
   module AfterSource (M_s : PMap) (ms_s : M₀ ⊆ᴹ M_s) (hm_s : Emb M_s) (wi_s : Within (Hots envP) M₀ M_s p) (br_s : Bare M_s o)
@@ -235,7 +251,8 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         Lanes.result M_b ms_b hm_b wi_b br_b lh jn_b ep_b past-s c_b nc_b nest-v
 
     postulate
-      flat-lanes : AtBody.LanesFact (proj₁ split)
+      flat-lanes : ∀ lanesE tk → (∀ a → lanesE a ≡ elab ρ″ (f a)) → tk ≡ trackers Γ 0 (λ i → there (there (there (ρ i))))
+                 → AtBody.LanesFact (Body lanesE tk)
 
   -- MOVED ALONG THE EQUATION, the body held abstract: the result's type
   -- names no body, so nothing is unified against the elaborated program
@@ -258,8 +275,9 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                       okP (ok-step p′ okE) nh fr))
 
   result : CarriesOf n ρ envP envE M₀ er p p′ (enter (approx n (flatMap op f s) envP) p) (elab ρ (flatMap op f s))
-  result = along (joins-flat op g (approx n s envP) p)
-             (Moved.result (proj₁ split) (proj₂ split) (λ M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s → AfterSource.flat-lanes M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s))
+  result with split
+  ... | lanesE , eL , tk , eT , eq = along (joins-flat op g (approx n s envP) p)
+          (Moved.result (Body lanesE tk) eq (λ M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s → AfterSource.flat-lanes M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s lanesE tk eL eT))
 
 -- A `flatMap` carries when its outer and its lanes do.
 carry-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → Carry m ρ s
