@@ -427,41 +427,86 @@ private
   ... | yes refl = yes refl
   ... | no n     = no λ { refl → n refl }
 
-  pick : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) → (∀ {k} → k ∈ ks → Σ (Ev X) (b k)) → List Pos
-  pick r []       B = []
-  pick r (k ∷ ks) B with pin-ev? r (proj₁ (B (here refl)))
-  ... | yes _ = k ∷ pick r ks (λ m → B (there m))
-  ... | no _  = pick r ks (λ m → B (there m))
+  -- The listed positions whose row the test passes.
+  pick : ∀ {X : Set} {b : EmissionSet X} (P : Pos → Ev X → Set) → (∀ k e → Dec (P k e)) → (ks : List Pos)
+       → (∀ {k} → k ∈ ks → Σ (Ev X) (b k)) → List Pos
+  pick P P? []       B = []
+  pick P P? (k ∷ ks) B with P? k (proj₁ (B (here refl)))
+  ... | yes _ = k ∷ pick P P? ks (λ m → B (there m))
+  ... | no _  = pick P P? ks (λ m → B (there m))
 
-  pick-sound : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k))
-             → ∀ {k} → k ∈ pick r ks B → Σ (k ∈ ks) λ m → proj₁ (B m) ≡ pin r
-  pick-sound r (k ∷ ks) B m with pin-ev? r (proj₁ (B (here refl)))
-  pick-sound r (k ∷ ks) B (here refl) | yes e = here refl , e
-  pick-sound r (k ∷ ks) B (there m)   | yes _ = let (m′ , e) = pick-sound r ks (λ x → B (there x)) m in there m′ , e
-  pick-sound r (k ∷ ks) B m           | no _  = let (m′ , e) = pick-sound r ks (λ x → B (there x)) m in there m′ , e
+  pick-sound : ∀ {X : Set} {b : EmissionSet X} (P : Pos → Ev X → Set) (P? : ∀ k e → Dec (P k e)) (ks : List Pos)
+               (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k)) → ∀ {k} → k ∈ pick P P? ks B → Σ (k ∈ ks) λ m → P k (proj₁ (B m))
+  pick-sound P P? (k ∷ ks) B m with P? k (proj₁ (B (here refl)))
+  pick-sound P P? (k ∷ ks) B (here refl) | yes e = here refl , e
+  pick-sound P P? (k ∷ ks) B (there m)   | yes _ = let (m′ , e) = pick-sound P P? ks (λ x → B (there x)) m in there m′ , e
+  pick-sound P P? (k ∷ ks) B m           | no _  = let (m′ , e) = pick-sound P P? ks (λ x → B (there x)) m in there m′ , e
 
-  pick-complete : ∀ {X : Set} {b : EmissionSet X} (r : Pos) (ks : List Pos) (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k))
-                → ∀ {k} (m : k ∈ ks) → proj₁ (B m) ≡ pin r → k ∈ pick r ks B
-  pick-complete r (k ∷ ks) B (here refl) e with pin-ev? r (proj₁ (B (here refl)))
+  pick-complete : ∀ {X : Set} {b : EmissionSet X} (P : Pos → Ev X → Set) (P? : ∀ k e → Dec (P k e)) (ks : List Pos)
+                  (B : ∀ {k} → k ∈ ks → Σ (Ev X) (b k)) → ∀ {k} (m : k ∈ ks) → P k (proj₁ (B m)) → k ∈ pick P P? ks B
+  pick-complete P P? (k ∷ ks) B (here refl) e with P? k (proj₁ (B (here refl)))
   ... | yes _ = here refl
   ... | no n  = ⊥-elim (n e)
-  pick-complete r (k ∷ ks) B (there m) e with pin-ev? r (proj₁ (B (here refl)))
-  ... | yes _ = there (pick-complete r ks (λ x → B (there x)) m e)
-  ... | no _  = pick-complete r ks (λ x → B (there x)) m e
+  pick-complete P P? (k ∷ ks) B (there m) e with P? k (proj₁ (B (here refl)))
+  ... | yes _ = there (pick-complete P P? ks (λ x → B (there x)) m e)
+  ... | no _  = pick-complete P P? ks (λ x → B (there x)) m e
+
+  encl-ev? : ∀ {X : Set} x (e : Ev X) → Dec (Σ Pos λ r → e ≡ pin r × T (inside r x))
+  encl-ev? x (out _) = no λ { (_ , () , _) }
+  encl-ev? x skip    = no λ { (_ , () , _) }
+  encl-ev? x end     = no λ { (_ , () , _) }
+  encl-ev? x (pin r) with T? (inside r x)
+  ... | yes i = yes (r , refl , i)
+  ... | no n  = no λ { (_ , refl , i) → n i }
 
 -- A connect's pins read off a listing of a run holding them.
 pins-from : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {r v} → Listed b v
           → (∀ {k e} → b k e → b k (pin r) → e ≡ pin r)
           → (∀ {k} → a k (pin r) → k ≺ v → b k (pin r)) → (∀ {k} → b k (pin r) → a k (pin r)) → PinList a r v
-pins-from {Z = Z} {b = b} {r} {v} (ks , F , B) uniq up down = pick r ks B′ , cov , snd
+pins-from {Z = Z} {b = b} {r} {v} (ks , F , B) uniq up down = pick P (λ _ e → pin-ev? r e) ks B′ , cov , snd
   where
+    P : Pos → Ev Z → Set
+    P _ e = e ≡ pin r
     B′ : ∀ {k} → k ∈ ks → Σ (Ev Z) (b k)
     B′ m = proj₂ (B m)
-    cov : ∀ {k} → _ → k ≺ v → k ∈ pick r ks B′
-    cov ak kv = pick-complete r ks B′ (F (up ak kv) kv) (uniq (proj₂ (B′ (F (up ak kv) kv))) (up ak kv))
-    snd : ∀ {k} → k ∈ pick r ks B′ → k ≺ v × _
-    snd m with pick-sound r ks B′ m
+    cov : ∀ {k} → _ → k ≺ v → k ∈ pick P (λ _ e → pin-ev? r e) ks B′
+    cov ak kv = pick-complete P (λ _ e → pin-ev? r e) ks B′ (F (up ak kv) kv) (uniq (proj₂ (B′ (F (up ak kv) kv))) (up ak kv))
+    snd : ∀ {k} → k ∈ pick P (λ _ e → pin-ev? r e) ks B′ → k ≺ v × _
+    snd m with pick-sound P (λ _ e → pin-ev? r e) ks B′ m
     ... | m′ , e = proj₁ (B m′) , down (subst (b _) e (proj₂ (B′ m′)))
+
+-- The pins past `x` and before `v` of the connects `x` lies in, listed
+-- exactly: past a failure at `x`, what a takeWhile keeps.
+Encl : ∀ {X : Set} → EmissionSet X → Pos → Pos → Set
+Encl a x v = Σ (List Pos) λ ks → (∀ {k r} → a k (pin r) → T (inside r x) → x ≺ k → k ≺ v → k ∈ ks)
+                               × (∀ {k} → k ∈ ks → x ≺ k × k ≺ v × Σ Pos λ r → a k (pin r) × T (inside r x))
+
+encl-map : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {x v}
+         → (∀ {k r} → a k (pin r) → b k (pin r)) → (∀ {k r} → b k (pin r) → a k (pin r)) → Encl a x v → Encl b x v
+encl-map to fro (ks , F , B) =
+  ks , (λ bk ix xk kv → F (fro bk) ix xk kv) , λ m → let (xk , kv , r , ak , ix) = B m in xk , kv , r , to ak , ix
+
+-- Read off a listing of a run holding them.
+encl-from : ∀ {X Z : Set} {a : EmissionSet X} {b : EmissionSet Z} {x v} → Listed b v
+          → (∀ {k e r} → b k e → b k (pin r) → e ≡ pin r)
+          → (∀ {k r} → a k (pin r) → T (inside r x) → x ≺ k → k ≺ v → b k (pin r)) → (∀ {k r} → b k (pin r) → a k (pin r))
+          → Encl a x v
+encl-from {Z = Z} {a = a} {b} {x} {v} (ks , F , B) uniq up down = pick P P? ks B′ , cov , snd
+  where
+    P : Pos → Ev Z → Set
+    P k e = x ≺ k × Σ Pos λ r → e ≡ pin r × T (inside r x)
+    P? : ∀ k e → Dec (P k e)
+    P? k e with T? (x <ᵖ k) | encl-ev? x e
+    ... | yes xk | yes q = yes (xk , q)
+    ... | no n   | _     = no λ q → n (proj₁ q)
+    ... | yes _  | no n  = no λ q → n (proj₂ q)
+    B′ : ∀ {k} → k ∈ ks → Σ (Ev Z) (b k)
+    B′ m = proj₂ (B m)
+    cov : ∀ {k r} → a k (pin r) → T (inside r x) → x ≺ k → k ≺ v → k ∈ pick P P? ks B′
+    cov {k} {r} ak ix xk kv = pick-complete P P? ks B′ (F (up ak ix xk kv) kv) (xk , r , uniq (proj₂ (B′ (F (up ak ix xk kv) kv))) (up ak ix xk kv) , ix)
+    snd : ∀ {k} → k ∈ pick P P? ks B′ → x ≺ k × k ≺ v × Σ Pos λ r → a k (pin r) × T (inside r x)
+    snd m with pick-sound P P? ks B′ m
+    ... | m′ , (xk , r , e , ix) = xk , proj₁ (B m′) , r , down (subst (b _) e (proj₂ (B′ m′))) , ix
 
 -- A PIN CARRIED FROM ITS OWN PAST: the rows before its connect listed,
 -- never the rows between, which a cut past the connect hides, and the
@@ -478,11 +523,13 @@ record Narrow {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set}
             → (Σ Pos λ l → Σ Pos λ p′ → u l (pin p′) × CarryAt.PB c k l × Targeted M p p′ × PinList u p′ l)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
+    encl↓   : ∀ {x x′ k l p p′} → CarryAt.Img c x x′ → Listed t x → LP k → t k (pin p) → T (inside p x) → x ≺ k
+            → u l (pin p′) → CarryAt.PB c k l → Encl t x k → Encl u x′ l
 
 -- A run with no pin carries none.
 unpinned-narrow : ∀ {A Y : Set} {f : Y → List A} {M : PMap} {HP HE LP : Pos → Set} {t : EmissionSet A} {u : EmissionSet Y} {s s′ : Pos}
                 → (∀ {k r} → t k (pin r) → ⊥) → (c : CarryAt f M HP HE LP t u s s′) → Narrow c
-unpinned-narrow np c = record { pinned↓ = λ tk _ _ _ → ⊥-elim (np tk) }
+unpinned-narrow np c = record { pinned↓ = λ tk _ _ _ → ⊥-elim (np tk) ; encl↓ = λ _ _ _ tk _ _ _ _ _ → ⊥-elim (np tk) }
 
 ------------------------------------------------------------------------
 -- Relabelled rows
@@ -697,8 +744,15 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
     ; pb-past = λ {k} pb tk lv ul → pb-past pb (proj₁ (proj₂ (down tk))) (λ un → T.live← {k} (λ {c} → lv (unp→ (kin (proj₂ (proj₂ (down tk)))) un) {c})) (proj₁ (proj₂ (down′ ul))) }
 
   narrowed : Narrow c → Narrow carried
-  narrowed nc = record { pinned↓ = pinned↓′ }
+  narrowed nc = record { pinned↓ = pinned↓′ ; encl↓ = encl↓′ }
     where
+      encl↓′ : ∀ {x x′ k l p p′} → Img x x′ → Listed t′ x → LP k → t′ k (pin p) → T (inside p x) → x ≺ k
+             → u′ l (pin p′) → PB k l → Encl t′ x k → Encl u′ x′ l
+      encl↓′ {x} i L lp tk ix xk ul pb E =
+        encl-map {a = u} {b = u′} (λ {l′} {r} → up-pin′ {l′} {r}) (λ {l′} {r} → pinU↓ {l′} {r})
+          (Narrow.encl↓ nc i (T.lst← {x} L) lp (pin↓ tk) ix xk (pinU↓ ul) pb
+            (encl-map {a = t′} {b = t} (λ {k′} {r} → pin↓ {k′} {r}) (λ {k′} {r} → pin↑ {k′} {r}) E))
+
       pinned↓′ : ∀ {k p} → t′ k (pin p) → Listed t′ p → PinList t′ p k → LP p
                → (Σ Pos λ l → Σ Pos λ p′ → u′ l (pin p′) × PB k l × Targeted M p p′ × PinList u′ p′ l)
                  × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home t′ k₀ × instantOf k₀ ≡ instantOf k)
