@@ -23,9 +23,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf;
+open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf; Few; _≺_;
   module Joining; module Op; module Bounded; module Switch; module Exhaust; module Connect)
-open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_)
+open import denotation.Laws.Modulus using (≺-trans)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Truth.Joining using (Slots)
 open import denotation.Laws.Truth.Join using (module JoinerSide)
@@ -36,7 +37,7 @@ open import simultaneous.Attribution using (Live)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.CarryBase using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow)
 open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; EnvRel; HotsListed; Grown; Joins; joins-grow; Apart; EnvPast;
-  PastOver; PBNest; Nests; Anchor; bound-hot; grown-past; Clear; Rows; foot)
+  PastOver; PBNest; Nests; Anchor; bound-hot; grown-past; Clear; Rows; foot; listed↓)
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
 open import simultaneous.JoinCarry using (module Joined)
@@ -112,6 +113,13 @@ runs-by g o g′ o′ (mergeᶠ nothing)  b x r = tt
 runs-by g o g′ o′ (mergeᶠ (just m)) b x r = b m refl r
 runs-by g o g′ o′ switchᶠ           b x r = tt
 runs-by g o g′ o′ exhaustᶠ          b x r = x refl r
+
+-- A lane cut stays cut.
+cut↑ : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k k′} → Parts.Cut g o op q k′ → k′ ≺ k → Parts.Cut g o op q k
+cut↑ g o (mergeᶠ nothing)  () _
+cut↑ g o (mergeᶠ (just m)) () _
+cut↑ g o switchᶠ {k = k} {k′} (q′ , a′ , x , qq , qk) kk = q′ , a′ , x , qq , ≺-trans {q′} {k′} {k} qk kk
+cut↑ g o exhaustᶠ          () _
 
 -- CARRIED from the plain rows `T` into the elaborated program `X`: what
 -- `CarriesAt` asks, the plain run given only by its rows.  A record,
@@ -351,8 +359,38 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         lane-framed : ∀ {q a q*} → V q a q* → Σ PMap λ M_l → Σ Pos λ s → Σ Pos λ s*
                     → CarryAt valuesOf M_l (Hots envP) H₂ (HotsListed envP) (P.Ln op q a) (P*.Ln op q* a) s s*
 
-      LI : ∀ {q a q*} → V q a q* → Pos → Pos → Set
+      LI LB : ∀ {q a q*} → V q a q* → Pos → Pos → Set
       LI v = CarryAt.Img (proj₂ (proj₂ (proj₂ (lane-framed v))))
+      LB v = CarryAt.PB (proj₂ (proj₂ (proj₂ (lane-framed v))))
+
+      SLp : Slots (Hots envP) g o (P.Ln op)
+      SLp = P.slots op okP Ig Io
+
+      -- A lane runs past its value.
+      lane-after : ∀ {q a k e} → P.Ln op q a k e → q ≺ k
+      lane-after {q} {k = k} y with Slots.slot SLp y
+      ... | s , sl , _ , sk = ≺-trans {q} {s} {k} (Slots.past SLp sl) sk
+
+      -- The outer's end and the elaborated outer's.
+      Ends : Pos → Pos → Set
+      Ends c c* = o c end × o* c* end
+
+      postulate
+        -- A lane's rows precede its end.
+        lane-live : ∀ {q a k e} → o q (out a) → P.Runs op q → P.Ln op q a k e → Unpinned e → Live (P.Ln op q a) k
+        -- Under its listed environment, a lane is listed wherever few rows precede.
+        lane-listing : ∀ {q a k} → o q (out a) → P.Runs op q → Few (P.Ln op q a) k → HotsListed envP k → Listed (P.Ln op q a) k
+        -- Neither a hand-off nor the outer's end lies on a lane's row.
+        hand-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {c c* l}
+                   → LI v c c* → P.Ln op q a c end → P.Hand op c → LI v′ (c ⊕ [ ix 0 ]) l ⊎ LB v′ (c ⊕ [ ix 0 ]) l ⊎ Ends (c ⊕ [ ix 0 ]) l → ⊥
+        end-apart : ∀ {q a q*} (v : V q a q*) {c l l′} → Ends c l → LI v c l′ ⊎ LB v c l′ → ⊥
+        -- The elaborated outer ends, once, where the plain one does, its
+        -- end deciding as the plain one's.
+        outer-ends : ∀ {c} → o c end → Listed o c → HotsListed envP c → Σ Pos λ c* → o* c* end
+        outer-end-one : ∀ {c c′} → o* c end → o* c′ end → c ≡ c′
+        end-done : ∀ {c c*} → Ends c c*
+                 → Joining.Done (P.Ln op) o (λ _ _ → ⊥) (Ended o) (P.Runs op) (P.Cut op) (P.Hand op) c
+                   ⇔ Joining.Done (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op) c*
 
       postulate
         -- Two lanes' rows lie apart, each imaged once.
@@ -393,10 +431,19 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       N : PMap
       N = M_s ∪ᴹ λ x y → Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → proj₁ (lane-framed v) x y
 
+      postulate
+        -- A hand-off's carrier, and the outer end's, along the joined map.
+        hand-ext : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P.Hand op c
+                 → Σ Pos λ y → N (c ⊕ [ ix 0 ]) y × y ⊑ (c* ⊕ [ ix 0 ])
+        end-ext : ∀ {c c*} → Ends c c* → Σ Pos λ y → N c y × y ⊑ c*
+
       module JD = Joined {HP = Hots envP} {HE = H₂} {LP = HotsListed envP} p q₁ o (P.Ln op) (P.Runs op) (P.Cut op) (P.Hand op)
                     o* (P*.Ln op) (P*.Runs op) (P*.Cut op) (P*.Hand op) V (λ (x , r , x* , r* , _) → x , r , x* , r*)
                     N (λ v → proj₁ (lane-framed v)) (λ {q} {a} {q*} v m → inj₂ (q , a , q* , v , m)) (λ v → proj₂ (lane-framed v))
-                    lanes-apart lanes-pb-apart pair-all pair-cut pair-done pair-hand
+                    Ends lane-after (λ {q} {k} {k′} → cut↑ g o op {q} {k} {k′}) lane-live lane-listing (λ {x} {y} → listed↓ envP {x} {y})
+                    lanes-apart lanes-pb-apart hand-apart end-apart pair-all pair-cut pair-done pair-hand hand-ext
+                    (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) proj₂ (λ ε ε′ → outer-end-one (proj₂ ε) (proj₂ ε′))
+                    end-done end-ext
 
       postulate
         -- The lanes' map keeps what the outer's does.

@@ -36,23 +36,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: the elaborated joiner decides as the plain one. Each running
 value is paired with the value its carrier reads; a lane is cut where its
-partner is; its end is joined and handed off where its partner's is.
-Open: switch's cut and exhaust's run read the outer against lane ends
-across the two maps; bounded's run and hand-off read the queue; every
-op's done reads all lanes' ends. Settled when each holds, or a
-refutation names the op.
+partner is; its end is joined and handed off where its partner's is, and
+the outer's end, paired once, where its partner's is. Open: switch's cut
+and exhaust's run read the outer against lane ends across the two maps;
+bounded's run and hand-off read the queue; every op's done reads all
+lanes' ends. Settled when each holds, or a refutation names the op.
 
-Members: `switch-cut`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `pair-done`.
+Members: `switch-cut`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `pair-done`, `end-done`, `outer-ends`, `outer-end-one`.
 
 #### THE JOINED LANES
 
 Untried: a joiner over lanes carried into another's, its decisions
-agreeing, carries its lane rows (`Joined`). Open: whether the lanes'
-maps embed jointly with the outer's (`joined-maps`), rows of two lanes
-lying apart on both sides, and the fields read lane by lane. Settled
-when each is a body.
+agreeing, carries its lane rows (`Joined`); a row is imaged through its
+lane's carry from the lane's own listing. Open: whether the lanes' maps
+embed jointly with the outer's (`joined-maps`), rows of two lanes, a
+hand-off and the outer's end lying apart, a lane listed under its
+environment's listing, and the fields read lane by lane. Settled when
+each is a body.
 
-Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`.
+Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`, `lane-live`, `lane-listing`, `hand-apart`, `end-apart`, `hand-ext`, `end-ext`.
 
 #### THE ERASURE
 
