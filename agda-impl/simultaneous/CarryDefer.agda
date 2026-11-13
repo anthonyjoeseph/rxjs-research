@@ -409,12 +409,12 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
   homed (inj₂ (inj₁ (k₀ , kq , h , e))) = inj₂ (inj₁ (k₀ , kq , (λ n → h λ { (e′ , x , un) → n (e′ , P.up x , un) }) , e))
   homed (inj₂ (inj₂ h))                = inj₂ (inj₂ h)
 
-  pinned : ∀ {k q} → P.T k (pin q) → Listed P.T q → LP q
-         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × Listed E.T q′)
+  pinned : ∀ {k q} → P.T k (pin q) → Listed P.T k → LP k
+         → (Σ Pos λ l → Σ Pos λ q′ → E.T l (pin q′) × PB k l × Targeted M q q′ × Listed E.T l)
            × (instantOf k ≡ instantOf p ⊎ (Σ Pos λ k₀ → k₀ ≺ q × Home P.T k₀ × instantOf k₀ ≡ instantOf k)
               ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
   pinned {k} {q} (body x , _) L lp with C.pinned x (P.lst← L) lp
-  ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lstw ls) , homed {k} {q} r
+  ... | (l , q′ , ul , m , b , ls) , r = (l , q′ , E.up ul , ((pin q′ , ul) , (_ , x) , m) , b , E.lst→ ul ls) , homed {k} {q} r
 
   cover : ∀ {v w} → Listed P.T v → LP v → Live P.T v → From Img PB P.T E.T v w → Listed E.T w
   cover L lp lv F = E.lstw (C.cover (P.lst← L) lp (P.live← lv) λ tk lk vk m ul → F (P.up tk) (P.live→ lk) vk (fwd m tk ul) (E.up ul))
