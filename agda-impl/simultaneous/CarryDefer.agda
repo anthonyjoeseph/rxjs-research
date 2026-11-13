@@ -27,8 +27,8 @@ open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; Emission
   DenEnv; approx; DeferT; guard; body)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
-open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; not-up; sib; W⁼;
-  leads; ⊑-snoc; ⊑-≼; shrink⁼)
+open import denotation.Laws.Worlds using (plain-ix; _⊑_; ⊑-refl; Hots; GoodEnv; Ok; ok-step; here; inW; step; nest-in; sib; W⁼; leads;
+  ⊑-snoc; ⊑-≼; shrink⁼)
 open import denotation.Laws using (aft; inv-approx)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
@@ -36,8 +36,9 @@ open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Read
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.CarryBase using (InOrder; PMap; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; PinList; pins-map; unpinned-narrow; Targeted; Home; Near; Whole; From; instant-⊕; IntoAt; Ahead)
-open import simultaneous.Carry using (Clear; clear-not; Rows; rows-map; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt)
+open import simultaneous.Carry using (Clear; clear-not; Rows; rows-map; Within; Bare; Carry; carry; EnvRel; Bound; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; anchor-grow; nest-via; grown-past; env-past; CarriesAt; foot; at-foot; ⊑-foot)
 open import simultaneous.CarryLeaves using (module OneUnder)
+open import simultaneous.CarryPair using (module PairUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -140,7 +141,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
 -- THE BOTTOM APPROXIMANT shows only skips: the spin, on both sides.
 carry-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → Carry zero ρ (defer l)
 carry-⊥ {A = A} ρ l = carry λ envP envE _ _ M₀ e₀ er jn _ _ p p′ m₀ _ _ nh fr →
-  let (M , ms , hm , wi , br , gr , c) = spun e₀ fr m₀ (⊑-refl p′) (clear-not nh)
+  let (M , ms , hm , wi , br , gr , c) = spun e₀ fr m₀ (⊑-foot p′) (clear-not nh)
   in M , ms , hm , wi , br , joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er} {M = M₀} {N = M} (λ {x} {y} → ms {x} {y}) jn (λ {x} {y} → gr {x} {y})
      , grown-past {ρ = ρ} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → gr {x} {y}) , c , (λ _ ()) , unpinned-narrow (λ { (() , _) }) c
   where
@@ -470,7 +471,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
   nexted envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr
   where
     nexted : ∀ (envP : DenEnv Γ) (envE : DenEnv Δ) → GoodEnv envP → GoodEnv envE → ∀ M₀ → Emb M₀ → (er : EnvRel M₀ ρ envP envE)
-           → Joins ρ envP envE er M₀ → Nests er M₀ → Apart envP → ∀ p p′ → M₀ p p′ → Ok (Hots envP) p → Ok (Hots envE) p′ → Clear (Rows er) (Hots envP) p
+           → Joins ρ envP envE er M₀ → Nests er M₀ → Apart envP → ∀ p p′ → M₀ p (p′ ⊕ []) → Ok (Hots envP) p → Ok (Hots envE) p′ → Clear (Rows er) (Hots envP) p
            → Fresh (Hots envP) M₀ p
            → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (Truncate (DeferT (approx n (Later.force l) envP) p))
              × Joins ρ envP envE er M × EnvPast er M
@@ -478,9 +479,9 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
                    (Truncate (DeferT (approx n (elab ρ (Later.force l)) envE) p′)) p p′) (λ c → PBNest er M c × Narrow c)
     nexted envP envE gP gE M₀ hm er jn ns ap p p′ m₀ okP okE nh fr =
       finish (h envP envE gP gE O.M O.emb er₁ jn₁ ns₁ ap (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])
-             (inj₂ (ix 1 , plain-ix , refl , refl)) (ok-step p okP) (ok-step p′ okE) (λ hq w i → nh (rows-map er er₁ (λ _ x → x) hq) (inW (shrink⁼ w)) i) fresh₁)
+             (inj₂ (inj₂ (refl , refl))) (ok-step p okP) (ok-step p′ okE) (λ hq w i → nh (rows-map er er₁ (λ _ x → x) hq) (inW (shrink⁼ w)) i) (O.fresh₁ (proj₁ okP)))
       where
-        module O = OneUnder hm fr m₀ (⊑-refl p′)
+        module O = PairUnder hm fr m₀ (⊑-foot p′) [] (foot (Later.force l))
 
         past₁ : EnvPast er O.M
         past₁ = grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → O.grown (clear-not nh) {x} {y})
@@ -493,13 +494,6 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
 
         jn₁ : Joins ρ envP envE er₁ O.M
         jn₁ = joins-grow {ρ = ρ} {envP = envP} {envE = envE} {er = er₁} {M = M₀} {N = O.M} inj₁ (λ i → jn i) (λ {x} {y} → O.grown (λ hq → clear-not nh (rows-map er er₁ (λ _ x → x) hq)) {x} {y})
-
-        fresh₁ : Fresh (Hots envP) O.M (p ⊕ [ ix 1 ])
-        fresh₁ (inj₁ m) (w , ww , wx) with fr m (w , inW (nest-in (step here plain-ix) ww) , wx)
-        ... | refl = ⊥-elim (not-up (proj₁ okP) ww wx)
-        fresh₁ (inj₂ (a , pl , refl , _)) (w , ww , wx) with (p ⊕ [ a ]) ≟ᵖ (p ⊕ [ ix 1 ])
-        ... | yes e = e
-        ... | no ne = ⊥-elim (sib (proj₁ okP) pl (⊑-refl p) ne ww wx)
 
         finish : CarriesAt n ρ (Later.force l) envP envE O.M er₁ (p ⊕ [ ix 1 ]) (p′ ⊕ [ ix 1 ])
                → Σ PMap λ M → M₀ ⊆ᴹ M × Emb M × Within (Hots envP) M₀ M p × Bare M (Truncate (DeferT (approx n (Later.force l) envP) p))
@@ -514,7 +508,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
             , NC.narrowed nrw
           where
            module NC = NextCarry (approx n (Later.force l) envP) (approx n (elab ρ (Later.force l)) envE) p p′
-               (ms (inj₂ (ix 0 , plain-ix , refl , refl))) hm′
+               (at-foot {M} (ms (inj₂ (inj₁ (refl , refl))))) hm′
                (aft (approx n (Later.force l) envP) (inv-approx n (Later.force l) envP gP) p okP)
                (aft (approx n (elab ρ (Later.force l)) envE) (inv-approx n (elab ρ (Later.force l)) envE gE) p′ okE) c
 
@@ -527,7 +521,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
            -- Nothing the body's map adds lies under the guard.
            g-bare : ∀ {x y} → M x y → g ⊑ x → x ≡ g
            g-bare m gx with wi m
-           ... | inj₁ m₁ = O.bare {X = A} {t = λ k _ → k ≡ g} (λ { refl → ix 0 , plain-ix , refl }) {e = skip} refl m₁ gx
+           ... | inj₁ m₁ = O.bare₀ m₁ gx
            ... | inj₂ w  = ⊥-elim (leads (proj₂ okP) (step here plain-ix) nb nr w gx)
              where
                nb : W⁼ (Hots envP) (p ⊕ [ ix 1 ]) g → ⊥

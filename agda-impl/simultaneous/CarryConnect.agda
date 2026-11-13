@@ -26,23 +26,26 @@ open import Tree using (Obs; connect; map)
 open import denotation.Position using (Pos; Label; Path; ix; sub; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺-ext; ticks; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-ext; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊑-≼; ⊑-cmp; ⊑-inside; inside-⊑; ⊕-assoc; ⊕-identityʳ;
-  ⊕-injˡ; ⊕-injʳ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW;
-  step; plain-ix; nest-in; not-up; sib; shrink; shrink⁼; narrow⁼)
+  ⊕-injʳ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW; step;
+  plain-ix; not-up; shrink; shrink⁼; narrow⁼)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Connect using (σ-wp; lawful; ok₀; body-leads; source-leads; sw; bw)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Live)
-open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; emb-under; instant-⊕)
-open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; NotHot; Grown; Joins; joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past; annValues; bound-hot; listed↓; Clear; clear-not; Rows; rows-at; rows-map)
+open import simultaneous.CarryBase using (PMap; _∪ᴹ_; emb-pairs; emb-at; _⊆ᴹ_; Emb; Fresh; CarryAt; Narrow; instant-⊕)
+open import simultaneous.Carry using (CarriesAt; Within; Bare; Carry; carry; EnvRel; Bound; BoundRow; HotsListed; Grown; Joins;
+  joins-grow; Apart; EnvPast; PBNest; Nests; Anchor; anchor-up; grown-past; env-past;
+  annValues; bound-hot; listed↓; Clear; clear-not; Rows; rows-at; rows-map; foot; ⊑-foot)
 open import simultaneous.CarryDefer using (env-grow; nests-grow; past-shrink; nest-up; joins-up; joins-shrink)
 open import simultaneous.CarryLeaves using (module OneAt; ix-sub)
 open import simultaneous.CarryTold using (module Folded; module Mapped; told-carry; justValues)
 open import simultaneous.ToldRows using (told)
 open import simultaneous.CarryConn using (module ConnCarry)
+open import simultaneous.CarryPair using (module PairUnder)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; annStep)
 
@@ -54,30 +57,6 @@ private
   ann-law : ∀ {X} b (y : Maybe (IE X)) → annValues (proj₂ (annStep b y)) ≡ justValues y
   ann-law (_ , _) (just _) = refl
   ann-law (_ , _) nothing  = refl
-
-  ix01 : ∀ q → q ⊕ [ ix 0 ] ≡ q ⊕ [ ix 1 ] → ⊥
-  ix01 q e = ≺-irrefl {q ⊕ [ ix 0 ]} (subst ((q ⊕ [ ix 0 ]) ≺_) (sym e) (ticks q 0))
-
-  below-two : ∀ q → (q ⊕ [ ix 0 ]) ≺ ((q ⊕ [ ix 1 ]) ⊕ [ ix 1 ])
-  below-two q = ≺-trans {q ⊕ [ ix 0 ]} {q ⊕ [ ix 1 ]} {(q ⊕ [ ix 1 ]) ⊕ [ ix 1 ]} (ticks q 0) (≺-ext (q ⊕ [ ix 1 ]) [])
-
-  over-two : ∀ q → q ≺ ((q ⊕ [ ix 1 ]) ⊕ [ ix 1 ])
-  over-two q = ≺-trans {q} {q ⊕ [ ix 1 ]} {(q ⊕ [ ix 1 ]) ⊕ [ ix 1 ]} (≺-ext q []) (≺-ext (q ⊕ [ ix 1 ]) [])
-
-  not-under-two : ∀ q → (q ⊕ [ ix 0 ]) ⊑ ((q ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) → ⊥
-  not-under-two q h with ⊑-snoc (q ⊕ [ ix 1 ]) h
-  ... | inj₂ e = ext≢ q [] (sym (⊕-injˡ q (q ⊕ [ ix 1 ]) e))
-  ... | inj₁ h′ with ⊑-snoc q h′
-  ...   | inj₁ h″ = ⊑-≼ h″ (≺-ext q [])
-  ...   | inj₂ e  = ix01 q e
-
-  two-not-under : ∀ q → ((q ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊑ (q ⊕ [ ix 0 ]) → ⊥
-  two-not-under q h with ⊑-snoc q h
-  ... | inj₁ h′ = ⊑-≼ h′ (over-two q)
-  ... | inj₂ e  = ext≢ q [] (⊕-injˡ (q ⊕ [ ix 1 ]) q e)
-
-  inst-two : ∀ q → instantOf ((q ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ≡ instantOf q
-  inst-two q = trans (instant-⊕ (q ⊕ [ ix 1 ]) [ ix 1 ]) (instant-⊕ q [ ix 1 ])
 
   -- Two labels one under a position, both leading a third, are one.
   one-label : ∀ k {a b x} → (k ⊕ [ a ]) ⊑ x → (k ⊕ [ b ]) ⊑ x → a ≡ b
@@ -134,69 +113,6 @@ private
                   ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) → i
                   ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) →
                       mk⇔ (λ q → sym (Equivalence.to i (sym q))) (λ q → sym (Equivalence.from i (sym q))) } }
-
--- THE CONNECT'S TWO SUBSCRIPTIONS, paired: the body's at `ix 0` on each
--- side; the source's at `ix 1`, put past the elaborated annotate's own
--- `ix 1`.
-module ConnAt (p p′ : Pos) where
-  N : PMap
-  N x y = (x ≡ p ⊕ [ ix 0 ] × y ≡ p′ ⊕ [ ix 0 ]) ⊎ (x ≡ p ⊕ [ ix 1 ] × y ≡ (p′ ⊕ [ ix 1 ]) ⊕ [ ix 1 ])
-
-  iP : ∀ {x y} → N x y → instantOf x ≡ instantOf p
-  iP (inj₁ (refl , _)) = instant-⊕ p [ ix 0 ]
-  iP (inj₂ (refl , _)) = instant-⊕ p [ ix 1 ]
-
-  iE : ∀ {x y} → N x y → instantOf y ≡ instantOf p′
-  iE (inj₁ (_ , refl)) = instant-⊕ p′ [ ix 0 ]
-  iE (inj₂ (_ , refl)) = inst-two p′
-
-  embN : Emb N
-  embN = record
-    { fun     = λ { (inj₁ (refl , refl)) (inj₁ (_ , refl)) → refl
-                  ; (inj₂ (refl , refl)) (inj₂ (_ , refl)) → refl
-                  ; (inj₁ (refl , _))    (inj₂ (e , _))    → ⊥-elim (ix01 p e)
-                  ; (inj₂ (refl , _))    (inj₁ (e , _))    → ⊥-elim (ix01 p (sym e)) }
-    ; mono    = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) h → ⊥-elim (≺-irrefl {p ⊕ [ ix 0 ]} h)
-                  ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) h → ⊥-elim (≺-irrefl {p ⊕ [ ix 1 ]} h)
-                  ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) _ → below-two p′
-                  ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → ⊥-elim (≺-absurd {p ⊕ [ ix 0 ]} {p ⊕ [ ix 1 ]} (ticks p 0) h) }
-    ; reflect = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) _ → ⊑-refl _
-                  ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) _ → ⊑-refl _
-                  ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) h → ⊥-elim (not-under-two p′ h)
-                  ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → ⊥-elim (two-not-under p′ h) }
-    ; inst    = λ n n′ → mk⇔ (λ _ → trans (iP n) (sym (iP n′))) (λ _ → trans (iE n) (sym (iE n′)))
-    }
-
--- A map held fresh grown by the two subscriptions.
-module ConnUnder {H : Pos → Set} {M₀ : PMap} {p p′ : Pos} (E₀ : Emb M₀) (fr : Fresh H M₀ p) (m₀ : M₀ p p′) where
-  open ConnAt p p′ public
-
-  M : PMap
-  M = M₀ ∪ᴹ N
-
-  emb : Emb M
-  emb = emb-under {N = N} E₀ fr m₀ (⊑-refl p′) embN sh
-    where
-      sh : ∀ {x y} → N x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ p ⊕ (a ∷ σ) × y ≡ p′ ⊕ (b ∷ σ′)
-      sh (inj₁ (refl , refl)) = ix 0 , [] , ix 0 , [] , refl , refl
-      sh (inj₂ (refl , refl)) = ix 1 , [] , ix 1 , [ ix 1 ] , refl , ⊕-assoc p′ [ ix 1 ] [ ix 1 ]
-
-  within : Within H M₀ M p
-  within (inj₁ m)                 = inj₁ m
-  within (inj₂ (inj₁ (refl , _))) = inj₂ (inW (step here plain-ix))
-  within (inj₂ (inj₂ (refl , _))) = inj₂ (inW (step here plain-ix))
-
-  grown : ∀ {R} → NotHot R p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y
-  grown _  (inj₁ m)                    = inj₁ m
-  grown nh (inj₂ (inj₁ (refl , refl))) = inj₂ (p , p′ , ix 0 , m₀ , ⊑-snoc⁺ p′ , refl , nh)
-  grown nh (inj₂ (inj₂ (refl , refl))) = inj₂ (p , p′ , ix 1 , m₀ , ⊑-trans (⊑-snoc⁺ p′) (⊑-snoc⁺ (p′ ⊕ [ ix 1 ])) , refl , nh)
-
-  -- The source's subscription is held fresh.
-  fresh-s : Ok H p → Fresh H M (p ⊕ [ ix 1 ])
-  fresh-s ok (inj₁ m) (w , ww , wx) with fr m (w , inW (nest-in (step here plain-ix) ww) , wx)
-  ... | refl = ⊥-elim (not-up (proj₁ ok) ww wx)
-  fresh-s ok (inj₂ (inj₁ (refl , _))) (w , ww , wx) = ⊥-elim (sib (proj₁ ok) plain-ix (⊑-refl p) (ix01 p) ww wx)
-  fresh-s ok (inj₂ (inj₂ (refl , _))) _ = refl
 
 ------------------------------------------------------------------------
 -- The connect's parts
@@ -341,10 +257,10 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                 (hs : Carry n ρ s) (hb : ∀ {Δ′} (ρ″ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → Carry n ρ″ b)
                 (envP : DenEnv Γ) (envE : DenEnv Δ) (gP : GoodEnv envP) (gE : GoodEnv envE) (M₀ : PMap) (hm : Emb M₀)
                 (er : EnvRel M₀ ρ envP envE) (jn : Joins ρ envP envE er M₀) (ns : Nests er M₀) (ap : Apart envP)
-                (p p′ : Pos) (m₀ : M₀ p p′) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′) (nh : Clear (Rows er) (Hots envP) p)
+                (p p′ : Pos) (m₀ : M₀ p (p′ ⊕ [])) (okP : Ok (Hots envP) p) (okE : Ok (Hots envE) p′) (nh : Clear (Rows er) (Hots envP) p)
                 (fr : Fresh (Hots envP) M₀ p) where
   open Conn n ρ s b envP envE gP gE p p′ okP okE
-  module U = ConnUnder {H = Hots envP} hm fr m₀
+  module U = PairUnder {H = Hots envP} hm fr m₀ (⊑-foot p′) (foot b) (ix 1 ∷ foot s)
 
   past₁ : EnvPast er U.M
   past₁ = grown-past {ρ = λ {X} → ρ {X}} {envP = envP} {envE = envE} er (env-past er) (λ {x} {y} → U.grown (clear-not nh) {x} {y})
@@ -634,8 +550,9 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   after (M_s , ms_s , hm_s , wi_s , br_s , jn_s , ep_s , c_s , nc_s , _) = AfterSource.result M_s ms_s hm_s wi_s br_s jn_s ep_s c_s nc_s
 
   result : CarriesAt n ρ (connect s b) envP envE M₀ er p p′
-  result = after (Carry.carries hs envP envE gP gE U.M U.emb er₁ jn₁ ns₁ ap (p ⊕ [ ix 1 ]) s₀′ (inj₂ (inj₂ (refl , refl)))
-                    (ok-step p okP) (ok-step (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (λ hq w i → nh (rows-map er er₁ (λ _ x → x) hq) (inW (shrink⁼ w)) i) (U.fresh-s okP))
+  result = after (Carry.carries hs envP envE gP gE U.M U.emb er₁ jn₁ ns₁ ap (p ⊕ [ ix 1 ]) s₀′
+                    (subst (U.M (p ⊕ [ ix 1 ])) (sym (⊕-assoc (p′ ⊕ [ ix 1 ]) [ ix 1 ] (foot s))) (inj₂ (inj₂ (refl , refl))))
+                    (ok-step p okP) (ok-step (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)) (λ hq w i → nh (rows-map er er₁ (λ _ x → x) hq) (inW (shrink⁼ w)) i) (U.fresh₁ (proj₁ okP)))
 
 -- A `connect` carries when its source and its body do.
 carry-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
