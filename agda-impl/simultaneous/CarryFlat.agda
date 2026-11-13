@@ -375,7 +375,16 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       Ends : Pos → Pos → Set
       Ends c c* = o c end × o* c* end
 
+      module JS = Joining (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op)
+
       postulate
+        -- Every elaborated running value with a shown lane row reads a
+        -- plain one; the elaborated outer's end, the plain one's.
+        paired⁻ : ∀ {q* a l e} → o* q* (out a) → P*.Runs op q* → P*.Ln op q* a l e
+                → Live (Truncate JS.JoinT) l → Few (Truncate JS.JoinT) l → Σ Pos λ q → V q a q*
+        ends⁻ : ∀ {c*} → o* c* end → Few (Truncate JS.JoinT) c* → Σ Pos λ c → Ends c c*
+        -- A lane's rows precede its end, elaborated too.
+        lane-live* : ∀ {q a l e} → o* q (out a) → P*.Runs op q → P*.Ln op q a l e → Unpinned e → Live (P*.Ln op q a) l
         -- A lane's rows precede its end.
         lane-live : ∀ {q a k e} → o q (out a) → P.Runs op q → P.Ln op q a k e → Unpinned e → Live (P.Ln op q a) k
         -- Under its listed environment, a lane is listed wherever few rows precede.
@@ -441,8 +450,9 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                     o* (P*.Ln op) (P*.Runs op) (P*.Cut op) (P*.Hand op) V (λ (x , r , x* , r* , _) → x , r , x* , r*)
                     N (λ v → proj₁ (lane-framed v)) (λ {q} {a} {q*} v m → inj₂ (q , a , q* , v , m)) (λ v → proj₂ (lane-framed v))
                     Ends lane-after (λ {q} {k} {k′} → cut↑ g o op {q} {k} {k′}) lane-live lane-listing (λ {x} {y} → listed↓ envP {x} {y})
-                    lanes-apart lanes-pb-apart hand-apart end-apart pair-all pair-cut pair-done pair-hand hand-ext
-                    (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) proj₂ (λ ε ε′ → outer-end-one (proj₂ ε) (proj₂ ε′))
+                    lane-live* (λ {q} {l} {l′} → cut↑ lE o* op {q} {l} {l′})
+                    lanes-apart lanes-pb-apart hand-apart end-apart pair-all paired⁻ pair-cut pair-done pair-hand hand-ext
+                    (λ x ls lp → let (c* , y*) = outer-ends x ls lp in c* , x , y*) ends⁻ (λ ε → ε) (λ ε ε′ → outer-end-one (proj₂ ε) (proj₂ ε′))
                     end-done end-ext
 
       postulate

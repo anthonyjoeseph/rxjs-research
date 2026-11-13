@@ -16,7 +16,7 @@ open import Relation.Nullary using (¬_)
 open import Function using (_⇔_; Equivalence)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst)
 
 open import denotation.Position using (Pos; _≟ᵖ_; root; _⊕_; ix)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Truncate; Few; Reach; Ended; _≺_; _≼_; module Joining)
@@ -59,6 +59,32 @@ match-work {e = out _} _ m with proj₁ m tt
 match-work {e = skip}  _ (_ , n) = unshown-work (n (λ ()))
 match-work {e = end}   () _
 match-work {e = pin _} _ (_ , n) = unshown-work (n (λ ()))
+
+-- A shown carrier's row is work, never a pin; one carried to an end, an end.
+shown-unpin : ∀ {Y : Set} {Sh : Y → Set} {e : Ev Y} → Shown Sh e → Unpinned e
+shown-unpin {e = out _} _ = tt
+shown-unpin {e = skip}  ()
+shown-unpin {e = end}   _ = tt
+shown-unpin {e = pin _} ()
+
+match-work⁻ : ∀ {X Y : Set} {Sh : Y → Set} {Vl : X → Y → Set} {e₀ : Ev X} {e : Ev Y} → Work e → Match Every Sh Vl e₀ e → Work e₀
+match-work⁻ {e₀ = end}   w m = subst Work (proj₁ m tt) w
+match-work⁻ {e₀ = out _} _ _ = tt
+match-work⁻ {e₀ = skip}  _ _ = tt
+match-work⁻ {e₀ = pin _} _ _ = tt
+
+match-unpin⁻ : ∀ {X Y : Set} {Sh : Y → Set} {Vl : X → Y → Set} {e₀ : Ev X} {e : Ev Y} → Shown Sh e → Match Every Sh Vl e₀ e → Unpinned e₀
+match-unpin⁻ {e₀ = pin _} sh (_ , n) = n (λ ()) sh
+match-unpin⁻ {e₀ = out _} _ _ = tt
+match-unpin⁻ {e₀ = skip}  _ _ = tt
+match-unpin⁻ {e₀ = end}   _ _ = tt
+
+match-end⁻ : ∀ {X Y : Set} {Sh : Y → Set} {Vl : X → Y → Set} {e₀ : Ev X} → Match Every Sh Vl e₀ end → e₀ ≡ end
+match-end⁻ {e₀ = end}   _ = refl
+match-end⁻ {e₀ = out _} m with proj₁ m tt
+... | _ , () , _
+match-end⁻ {e₀ = skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
+match-end⁻ {e₀ = pin _} (_ , n) = ⊥-elim (n (λ ()) tt)
 
 end-match : ∀ {Y A : Set} {f : Y → List A} → Match {A} {Y} Every (One f) (Reads f) end end
 end-match = (λ _ → refl) , λ n _ → n tt
@@ -104,6 +130,8 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               (lane-live : ∀ {q a k e} → o q (out a) → Runs q → Ln q a k e → Unpinned e → Live (Ln q a) k)
               (lane-listing : ∀ {q a k} → o q (out a) → Runs q → Few (Ln q a) k → LP k → Listed (Ln q a) k)
               (lp↓ : ∀ {x y} → x ≼ y → LP y → LP x)
+              (lane-live* : ∀ {q a l e} → o* q (out a) → Runs* q → Ln* q a l e → Unpinned e → Live (Ln* q a) l)
+              (cut↑* : ∀ {q l l′} → Cut* q l′ → l′ ≺ l → Cut* q l)
               -- Two lanes' rows lie apart: one row is one lane's, imaged
               -- once; nor is a hand-off or the outer's end a lane's row.
               (img-apart : ∀ {q a q* q′ a′ q*′} (v : V q a q*) (v′ : V q′ a′ q*′) {k l l′}
@@ -118,6 +146,9 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               -- lane is cut where its partner is, and its end is joined, and
               -- handed off, where its partner's is; so is the outer's end.
               (paired : ∀ {q a} → o q (out a) → Runs q → Listed o q → LP q → Σ Pos (V q a))
+              (paired⁻ : ∀ {q* a l e} → o* q* (out a) → Runs* q* → Ln* q* a l e
+                       → Live (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) l
+                       → Few (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) l → Σ Pos λ q → V q a q*)
               (cut-agree : ∀ {q a q*} (v : V q a q*) {k l} → CarryAt.Img (proj₂ (proj₂ (lc v))) k l → Cut q k ⇔ Cut* q* l)
               (done-agree : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end
                           → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
@@ -125,7 +156,8 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
               (hand-ext : ∀ {q a q*} (v : V q a q*) {c c*} → CarryAt.Img (proj₂ (proj₂ (lc v))) c c* → Ln q a c end → Hand c
                         → Σ Pos λ y → N (c ⊕ [ ix 0 ]) y × y ⊑ (c* ⊕ [ ix 0 ]))
               (ends : ∀ {c} → o c end → Listed o c → LP c → Σ Pos (E c))
-              (e-at : ∀ {c c*} → E c c* → o* c* end)
+              (ends⁻ : ∀ {c*} → o* c* end → Few (Truncate (Joining.JoinT Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand*)) c* → Σ Pos λ c → E c c*)
+              (e-at : ∀ {c c*} → E c c* → o c end × o* c* end)
               (e-fun : ∀ {c c* c*′} → E c c* → E c c*′ → c* ≡ c*′)
               (end-done : ∀ {c c*} → E c c* → Joining.Done Ln o (λ _ _ → ⊥) (Ended o) Runs Cut Hand c ⇔ Joining.Done Ln* o* (λ _ _ → ⊥) (Ended o*) Runs* Cut* Hand* c*)
               (e-ext : ∀ {c c*} → E c c* → Σ Pos λ y → N c y × y ⊑ c*) where
@@ -178,8 +210,6 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
     join-pb-past : ∀ {k l e₀ e x y} → LanePB k l → tB k e₀ → (Unpinned e₀ → Live tB k) → u l e → N x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l
     join-img¬¬   : ∀ {k e} → tB k e → Unpinned e → Live tB k → Few tB k
                  → ¬ ¬ ((Σ Pos λ l → LaneImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
-    join-shown   : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
-                 → Σ Pos λ k → LaneImg k l × Σ (Ev B) λ e₀ → tB k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
     join-place   : ∀ {m e} → u m e → Live u m → Listed u m
                  → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → LaneImg k l × instantOf l ≡ instantOf m × Near u m l)
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
@@ -194,6 +224,9 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
     -- A joined row's carrier has few joined rows before it, and comes no
     -- later than the carrier of any later row.
     img-reach    : ∀ {k l} → LaneImg k l → Few J*.JoinT l
+    -- and back: a carried row has few plain rows before it.
+    back-reach   : ∀ {q a q* k l} (v : V q a q*) → L.Img v k l → Few J*.JoinT l → Few J.JoinT k
+    end-reach⁻   : ∀ {c c*} → E c c* → Few J*.JoinT c* → Few J.JoinT c
     join-from    : ∀ {k l} → LaneImg k l → From LaneImg LanePB tB u k l
     -- A lane row carried into its lane's instant is carried into the
     -- joiner's.
@@ -292,7 +325,61 @@ module Joined {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos)
          (J*.hand x* r* y* (λ c* → nc (Equivalence.from (cut-agree v i) c*)) (Equivalence.to (hand-agree v i y) h)) (skip-match {IE B} {B} {valuesOf})
   join-img ((J.hand x r y nc h , rc) , _) un lv ls (lo , lp) | q* , v , inj₂ (() , _)
   join-img b@((J.oend xc d , rc) , _) un lv ls (lo , lp) with ends xc lo lp
-  ... | c* , ε = joined lv ls (lo , lp) (fin ε d b) (J*.oend (e-at ε) (Equivalence.to (end-done ε) d)) (end-match {f = valuesOf})
+  ... | c* , ε = joined lv ls (lo , lp) (fin ε d b) (J*.oend (proj₂ (e-at ε)) (Equivalence.to (end-done ε) d)) (end-match {f = valuesOf})
+
+  -- A SHOWN ROW READ BACK: its lane's value paired back, the lane's own
+  -- carry finding the plain row; the outer's end paired back.
+  lane-few* : ∀ {q* a l e} → o* q* (out a) → Runs* q* → Ln* q* a l e → Unpinned e → ¬ Cut* q* l → Few J*.JoinT l → Few u l → Few (Ln* q* a) l
+  lane-few* {q*} {a} {l} x r y un nc F (ks , h) = ks , at
+    where
+      at : ∀ {l′ e′} → Ln* q* a l′ e′ → l′ ≺ l → l′ ∈ ks
+      at {e′ = end}   y′ ll = ⊥-elim (lane-live* x r y un y′ ll)
+      at {l′} {out b} y′ ll = h {l′} {out b} (J*.lane x r y′ (λ c → nc (cut↑* c ll)) tt , few-reach {e = out b} (few-≺ F ll)) ll
+      at {l′} {skip}  y′ ll = h {l′} {skip} (J*.lane x r y′ (λ c → nc (cut↑* c ll)) tt , few-reach {e = skip} (few-≺ F ll)) ll
+      at {l′} {pin w} y′ ll = h {l′} {pin w} (J*.lane x r y′ (λ c → nc (cut↑* c ll)) tt , few-reach {e = pin w} (few-≺ F ll)) ll
+
+  ShownAt : Pos → Ev (IE B) → Set
+  ShownAt l e = Σ Pos λ k → LaneImg k l × Σ (Ev B) λ e₀ → tB k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
+
+  shown-end : ∀ {q a q* k l e₀} (v : V q a q*) → L.Img v k l → Ln q a k e₀ → e₀ ≡ end → Few J*.JoinT l → ¬ Cut* q* l → ¬ Hand* l → J*.Done l
+            → ShownAt l end
+  shown-end v i y₀ refl F* nc* nh* d* =
+    let (x , r , _ , _) = v-at v
+        nc = λ c → nc* (Equivalence.to (cut-agree v i) c)
+        b = (J.lend x r y₀ nc (λ h → nh* (Equivalence.to (hand-agree v i y₀) h)) (Equivalence.from (done-agree v i y₀) d*) , few-reach {e = end} (back-reach v i F*)) , tt
+    in _ , row v i b tt nc , end , b , end-match {IE B} {B} {valuesOf}
+
+  join-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l → ShownAt l e
+  join-shown (J*.val _ , _) ()
+  join-shown (J*.step _ , _) ()
+  join-shown (J*.opin _ , _) ()
+  join-shown (J*.opass _ _ , _) ()
+  join-shown (J*.lpass _ _ _ _ _ _ , _) ()
+  join-shown (J*.hand _ _ _ _ _ , _) ()
+  join-shown (J*.left _ _ _ _ _ , _) ()
+  join-shown (J*.run () _ , _) _
+  join-shown (J*.rend () _ _ , _) _
+  join-shown (J*.rpass () _ _ , _) _
+  join-shown (J*.rhand () _ , _) _
+  join-shown {e = e} (J*.lane x* r* y* nc* w , rc) sh lv F =
+    let un = shown-unpin sh
+        F* = unpin-few {e = e} un rc
+        (q , v) = paired⁻ x* r* y* lv F
+        (x , r , _ , _) = v-at v
+        (k , i , e₀ , y₀ , m) = L.shown v y* sh (lane-live* x* r* y* un) (lane-few* x* r* y* un nc* F* F)
+        nc = λ c → nc* (Equivalence.to (cut-agree v i) c)
+        b = (J.lane x r y₀ nc (match-work⁻ w m) , few-reach {e = e₀} (back-reach v i F*)) , tt
+    in k , row v i b (match-unpin⁻ sh m) nc , e₀ , b , m
+  join-shown (J*.lend x* r* y* nc* nh* d* , rc) _ lv F =
+    let F* = unpin-few {e = end} tt rc
+        (q , v) = paired⁻ x* r* y* lv F
+        (k , i , e₀ , y₀ , m) = L.shown v y* tt (lane-live* x* r* y* tt) (lane-few* x* r* y* tt nc* F* F)
+    in shown-end v i y₀ (match-end⁻ {Sh = One valuesOf} {Vl = Reads valuesOf} m) F* nc* nh* d*
+  join-shown (J*.oend x* d* , rc) _ lv F =
+    let (c , ε) = ends⁻ x* F
+        d = Equivalence.from (end-done ε) d*
+        b = (J.oend (proj₁ (e-at ε)) d , few-reach {e = end} (end-reach⁻ ε (unpin-few {e = end} tt rc))) , tt
+    in c , fin ε d b , end , b , end-match {IE B} {B} {valuesOf}
 
   -- A lane row carried into its instant may lie in its value's: the
   -- outer's rows stand with the environment's hots, its echo carrying
