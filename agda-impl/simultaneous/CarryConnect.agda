@@ -58,61 +58,61 @@ private
   ann-law (_ , _) (just _) = refl
   ann-law (_ , _) nothing  = refl
 
-  -- Two labels one under a position, both leading a third, are one.
-  one-label : ∀ k {a b x} → (k ⊕ [ a ]) ⊑ x → (k ⊕ [ b ]) ⊑ x → a ≡ b
-  one-label k {a} {b} ax bx with ⊑-cmp (k ⊕ [ a ]) (k ⊕ [ b ]) ax bx
-  ... | inj₁ ab with ⊑-snoc k ab
-  ...   | inj₁ ak = ⊥-elim (⊑-≼ ak (≺-ext k []))
-  ...   | inj₂ e  = ⊕-injʳ k k e
-  one-label k {a} {b} ax bx | inj₂ ba with ⊑-snoc k ba
-  ...   | inj₁ bk = ⊥-elim (⊑-≼ bk (≺-ext k []))
-  ...   | inj₂ e  = sym (⊕-injʳ k k e)
+-- Two labels one under a position, both leading a third, are one.
+one-label : ∀ k {a b x} → (k ⊕ [ a ]) ⊑ x → (k ⊕ [ b ]) ⊑ x → a ≡ b
+one-label k {a} {b} ax bx with ⊑-cmp (k ⊕ [ a ]) (k ⊕ [ b ]) ax bx
+... | inj₁ ab with ⊑-snoc k ab
+...   | inj₁ ak = ⊥-elim (⊑-≼ ak (≺-ext k []))
+...   | inj₂ e  = ⊕-injʳ k k e
+one-label k {a} {b} ax bx | inj₂ ba with ⊑-snoc k ba
+...   | inj₁ bk = ⊥-elim (⊑-≼ bk (≺-ext k []))
+...   | inj₂ e  = sym (⊕-injʳ k k e)
 
-  -- A tick one label under a position leads nothing its readings do.
-  tick-read : ∀ k {e x} → (k ⊕ [ sub e ]) ⊑ x → (k ⊕ [ ix 0 ]) ⊑ x → ⊥
-  tick-read k sx tx with one-label k sx tx
-  ... | ()
+-- A tick one label under a position leads nothing its readings do.
+tick-read : ∀ k {e x} → (k ⊕ [ sub e ]) ⊑ x → (k ⊕ [ ix 0 ]) ⊑ x → ⊥
+tick-read k sx tx with one-label k sx tx
+... | ()
 
-  one-sh : ∀ {k l x y} → OneAt.N k l x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ k ⊕ (a ∷ σ) × y ≡ l ⊕ (b ∷ σ′)
-  one-sh (a , _ , refl , refl) = a , [] , a , [] , refl , refl
+one-sh : ∀ {k l x y} → OneAt.N k l x y → Σ Label λ a → Σ Path λ σ → Σ Label λ b → Σ Path λ σ′ → x ≡ k ⊕ (a ∷ σ) × y ≡ l ⊕ (b ∷ σ′)
+one-sh (a , _ , refl , refl) = a , [] , a , [] , refl , refl
 
-  -- Two pairs.
-  Two : Pos → Pos → Pos → Pos → PMap
-  Two a b a′ b′ x y = (x ≡ a × y ≡ b) ⊎ (x ≡ a′ × y ≡ b′)
+-- Two pairs.
+Two : Pos → Pos → Pos → Pos → PMap
+Two a b a′ b′ x y = (x ≡ a × y ≡ b) ⊎ (x ≡ a′ × y ≡ b′)
 
-  -- Two pairs of an embedding embed.
-  emb-two : ∀ {M a b a′ b′} → Emb M → M a b → M a′ b′ → Emb (Two a b a′ b′)
-  emb-two {M} {a} {b} {a′} {b′} E m m′ = record
-    { fun     = λ t t′ → Emb.fun E (back t) (back t′)
-    ; mono    = λ t t′ → Emb.mono E (back t) (back t′)
-    ; reflect = λ t t′ → Emb.reflect E (back t) (back t′)
-    ; inst    = λ t t′ → Emb.inst E (back t) (back t′) }
-    where
-      back : ∀ {x y} → Two a b a′ b′ x y → M x y
-      back (inj₁ (refl , refl)) = m
-      back (inj₂ (refl , refl)) = m′
+-- Two pairs of an embedding embed.
+emb-two : ∀ {M a b a′ b′} → Emb M → M a b → M a′ b′ → Emb (Two a b a′ b′)
+emb-two {M} {a} {b} {a′} {b′} E m m′ = record
+  { fun     = λ t t′ → Emb.fun E (back t) (back t′)
+  ; mono    = λ t t′ → Emb.mono E (back t) (back t′)
+  ; reflect = λ t t′ → Emb.reflect E (back t) (back t′)
+  ; inst    = λ t t′ → Emb.inst E (back t) (back t′) }
+  where
+    back : ∀ {x y} → Two a b a′ b′ x y → M x y
+    back (inj₁ (refl , refl)) = m
+    back (inj₂ (refl , refl)) = m′
 
-  -- Two distinct pairs embed when each relation between them carries.
-  emb-two′ : ∀ {x y x′ y′} → (x ≡ x′ → ⊥) → (x ≺ x′ → y ≺ y′) → (x′ ≺ x → y′ ≺ y) → (y ⊑ y′ → x ⊑ x′) → (y′ ⊑ y → x′ ⊑ x)
-           → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′) → Emb (Two x y x′ y′)
-  emb-two′ {x} {y} {x′} {y′} ne m₁ m₂ r₁ r₂ i = record
-    { fun     = λ { (inj₁ (refl , refl)) (inj₁ (_ , refl)) → refl
-                  ; (inj₂ (refl , refl)) (inj₂ (_ , refl)) → refl
-                  ; (inj₁ (refl , refl)) (inj₂ (e , _))    → ⊥-elim (ne e)
-                  ; (inj₂ (refl , refl)) (inj₁ (e , _))    → ⊥-elim (ne (sym e)) }
-    ; mono    = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) h → ⊥-elim (≺-irrefl {x} h)
-                  ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) h → ⊥-elim (≺-irrefl {x′} h)
-                  ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) h → m₁ h
-                  ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → m₂ h }
-    ; reflect = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) _ → ⊑-refl x
-                  ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) _ → ⊑-refl x′
-                  ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) h → r₁ h
-                  ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → r₂ h }
-    ; inst    = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) → mk⇔ (λ _ → refl) (λ _ → refl)
-                  ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) → mk⇔ (λ _ → refl) (λ _ → refl)
-                  ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) → i
-                  ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) →
-                      mk⇔ (λ q → sym (Equivalence.to i (sym q))) (λ q → sym (Equivalence.from i (sym q))) } }
+-- Two distinct pairs embed when each relation between them carries.
+emb-two′ : ∀ {x y x′ y′} → (x ≡ x′ → ⊥) → (x ≺ x′ → y ≺ y′) → (x′ ≺ x → y′ ≺ y) → (y ⊑ y′ → x ⊑ x′) → (y′ ⊑ y → x′ ⊑ x)
+         → (instantOf y ≡ instantOf y′ ⇔ instantOf x ≡ instantOf x′) → Emb (Two x y x′ y′)
+emb-two′ {x} {y} {x′} {y′} ne m₁ m₂ r₁ r₂ i = record
+  { fun     = λ { (inj₁ (refl , refl)) (inj₁ (_ , refl)) → refl
+                ; (inj₂ (refl , refl)) (inj₂ (_ , refl)) → refl
+                ; (inj₁ (refl , refl)) (inj₂ (e , _))    → ⊥-elim (ne e)
+                ; (inj₂ (refl , refl)) (inj₁ (e , _))    → ⊥-elim (ne (sym e)) }
+  ; mono    = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) h → ⊥-elim (≺-irrefl {x} h)
+                ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) h → ⊥-elim (≺-irrefl {x′} h)
+                ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) h → m₁ h
+                ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → m₂ h }
+  ; reflect = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) _ → ⊑-refl x
+                ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) _ → ⊑-refl x′
+                ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) h → r₁ h
+                ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) h → r₂ h }
+  ; inst    = λ { (inj₁ (refl , refl)) (inj₁ (refl , refl)) → mk⇔ (λ _ → refl) (λ _ → refl)
+                ; (inj₂ (refl , refl)) (inj₂ (refl , refl)) → mk⇔ (λ _ → refl) (λ _ → refl)
+                ; (inj₁ (refl , refl)) (inj₂ (refl , refl)) → i
+                ; (inj₂ (refl , refl)) (inj₁ (refl , refl)) →
+                    mk⇔ (λ q → sym (Equivalence.to i (sym q))) (λ q → sym (Equivalence.from i (sym q))) } }
 
 ------------------------------------------------------------------------
 -- The connect's parts

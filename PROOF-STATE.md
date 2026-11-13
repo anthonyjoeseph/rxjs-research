@@ -34,13 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ERASURE
 
-Probed, unproven: a flatMap's and a cold's elaborated runs carry their
-plain ones (`Carry`) along an order embedding. A lane ends under its
-plain end's image, so a queued lane and the end keep the plain order
+Probed, unproven: a flatMap's lanes and a cold's elaborated runs carry
+their plain ones (`Carry`) along an order embedding. A lane ends under
+its plain end's image, so a queued lane and the end keep the plain order
 past dead pins; open: the joiner over carried lanes, the lane's frame,
 the routing scan's reading. Settled when both leaves are bodies.
 
-Members: `carry-flatMap`, `carry-cold`.
+Members: `flat-lanes`, `carry-cold`.
 
 #### THE LATE WINDOW
 
@@ -51,7 +51,7 @@ connect's source pin, whose own carrier is late, and, in the told run,
 a skip's carrier with no row, which the source's order does not reach.
 Settled when each is a body.
 
-Members: `conn-first`, `told-skip`.
+Members: `conn-first`, `flat-first`, `told-skip`.
 
 #### THE CONNECT'S CARRY
 
@@ -63,6 +63,15 @@ Settled when each leaf is a body.
 
 Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
+#### THE FLATMAP'S CARRY
+
+Untried: the flatMap's rows carried from its lanes' carry and its
+outer's echoes, as the connect's are from its body's and source's; a
+lane row never shows where an outer row does. Open: each field past
+that, an outer row's late carrier included. Settled when each is a body.
+
+Members: `flat-src-live`, `flat-pb-past`, `flat-img`, `flat-img¬¬`, `flat-shown`, `flat-place`, `flat-whole`, `flat-pinned↓`.
+
 #### THE COVER
 
 Untried: a carry lists its elaborated run before a point its carriers
@@ -71,7 +80,7 @@ Spins, defers and scans carry it through; open per producer: the told
 run, the take, a read, a reader, the connect. Settled when each is a
 body.
 
-Members: `told-cover`, `take-cover`, `read-cover`, `reader-cover`, `conn-cover`.
+Members: `told-cover`, `take-cover`, `read-cover`, `reader-cover`, `conn-cover`, `flat-cover`.
 
 #### THE BATCH RANK
 
