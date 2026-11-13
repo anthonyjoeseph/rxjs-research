@@ -353,14 +353,14 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
     home′ : ∀ {k} → Home t k → Home S k
     home′ h n = h λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
 
-    pinned′ : ∀ {k p} → S k (pin p) → Listed S k → LP k
-              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ l)
+    pinned′ : ∀ {k p} → S k (pin p) → Listed S p → LP p
+              → (Σ Pos λ l → Σ Pos λ p′ → S′ l (pin p′) × PB k l × Targeted M p p′ × Listed S′ p′)
               × (instantOf k ≡ instantOf s ⊎ (Σ Pos λ k₀ → k₀ ≺ p × Home S k₀ × instantOf k₀ ≡ instantOf k)
                  ⊎ Σ Pos λ h → HP h × instantOf h ≡ instantOf k)
     pinned′ {k} {p} (P.spin x , _) L lp with pinned x (lstS← L) lp
-    ... | (l , p′ , ul , m , b , ls) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₁ e
-    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
-    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {l} ls) , inj₂ (inj₂ hh)
+    ... | (l , p′ , ul , m , b , ls) , inj₁ e                          = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {p′} ls) , inj₁ e
+    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₁ (k₀ , kp , h , ek)) = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {p′} ls) , inj₂ (inj₁ (k₀ , kp , home′ h , ek))
+    ... | (l , p′ , ul , m , b , ls) , inj₂ (inj₂ hh)                 = (l , p′ , (E.spin ul , reach-kin downU₀ k-pin (rchU ul)) , m , b , UL.lst→ {p′} ls) , inj₂ (inj₂ hh)
 
   scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
