@@ -28,7 +28,7 @@ open import denotation.Position using (Pos; Label; Path; root; _≟ᵖ_; _⊕_; 
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Unpinned; Few; EmissionSet; Den; hot; coldAt; Proper; Truncate; Rejoin;
   shown; heard; ended; late; _≺_; _≼_; enter; module Scan; module Op; DenEnv)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-ext; ≼-≺-≺; ≺-≼-≺; ≺→≼; entered-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-ext; ≼-≺-≺; ≺-≼-≺; ≺→≼; entered-few)
 open import denotation.Laws.Worlds using (Hots; Lawful; _⊑_; ⊑-≼; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊕-injˡ; ⊕-injʳ; ⊕-cancelˡ; ⊕-assoc;
   ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
@@ -39,7 +39,7 @@ open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Carried; c-out; c-
   Joins; Upto; Under; Mapped; Run; _⊆ᴹ_; allᴱ; Shows; Shown; AShows; AShown; HotSim; EnvSim;
   EnvListed; ListedB; EnvNeeds; EnvJoins; Apart; SimIH; sih)
 open import simultaneous.SimPos using (UpTo)
-open import simultaneous.ReadMap using (module Map; module Cars; upto-dn; under?; under-down)
+open import simultaneous.ReadMap using (module Map; upto-dn; under?; under-down)
 open import simultaneous.ReadRows using (module Rows)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)
@@ -143,16 +143,32 @@ module Read {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G
   ext (ilate sq qp refl refl)               = p′ ⊕ [ last ] , inj₂ (mlate sq qp refl refl) , ⊑-refl _
 
   ----------------------------------------------------------------------
-  -- CUT AT A BOUND OF A LATER MAP: the hot cut at the same bound.  A
-  -- reader's row up to the bound joins a hot row up to it, whose carrier
-  -- lies under the bound's image; a row under the image is over a hot row
-  -- under it.
+  -- CUT AT A BOUND OF A LATER MAP: the hot cut at the same bound, and a
+  -- reader's row up to it carried with the hot cut at its hot row, under
+  -- whose anchor the row's carrier lies.  A row under the bound's image
+  -- is over a hot row under it.
 
-  module Cut (A′ : PMap) (inc : M ⊆ᴹ A′) (emA : Emb A′) (jA : Joins A′ A′ S Car) (c : Maybe Pos) (mp : Mapped A′ c)
-             (hs : Sim AShows AShown A′ Car c S G) where
+  module Cut (A′ : PMap) (inc : M ⊆ᴹ A′) (emA : Emb A′) (c : Maybe Pos) (mp : Mapped A′ c)
+             (hs : Sim AShows AShown A′ Car c S G)
+             (at-row : ∀ {q e} → S q e → Carried e → Upto c q → Mapped A′ (just q) × Sim AShows AShown A′ Car (just q) S G) where
 
-    open Sim hs using () renaming (fwd to fwd₀; val← to val₀; end← to end₀; upto to upto₀)
-    open Cars A′ S Car car-fun (λ car → let (y , a , yl) = car-ext car in y , inc (inj₁ a) , yl) jA lawS emA using (car-ug)
+    open Sim hs using () renaming (val← to val₀; end← to end₀; upto to upto₀)
+
+    -- The hot cut at a row: its carrier under the row's anchor.
+    module At {q e} (s : S q e) (ce : Carried e) (uq : Upto c q) where
+      mq : Mapped A′ (just q)
+      mq = proj₁ (at-row s ce uq)
+
+      hq : Sim AShows AShown A′ Car (just q) S G
+      hq = proj₂ (at-row s ce uq)
+      open Sim hq public using () renaming (fwd to fwdq)
+      open Rows.Listed G p′ lawG fewG (Under A′ (just q)) (under? {A′} (λ {x} {y} {y′} → Emb.fun emA {x} {y} {y′}) (just q) mq) (λ {l} {l′} → under-down {A′} (just q) {l} {l′})
+                       (proj₁ (Sim.upto hq)) (λ g u → proj₁ (proj₂ (Sim.upto hq)) g u) (proj₂ (proj₂ (Sim.upto hq)))
+        public using (acc; u-val; u-end; u-late)
+
+      ug : ∀ {L} → Car q L → Under A′ (just q) L
+      ug car with car-ext car
+      ... | y , a , yL = proj₁ mq , proj₂ mq , inj₂ (subst (_⊑ _) (Emb.fun emA (inc (inj₁ a)) (proj₂ mq)) yL)
 
     open Rows.Listed G p′ lawG fewG (Under A′ c) (under? (Emb.fun emA) c mp) (λ {l} {l′} → under-down {A′} c {l} {l′})
                      (proj₁ upto₀) (λ g u → proj₁ (proj₂ upto₀) g u) (proj₂ (proj₂ upto₀))
@@ -176,19 +192,22 @@ module Read {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G
     -- Forward: each plain value and end up to the bound, carried.
 
     fwd : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev (IE X)) λ e′ → U l e′ × Mt Shows e e′
-    fwd (shown {q} s _ pk , _) c-out u with fwd₀ s c-out (row-up u)
+    fwd (shown {q} s _ pk , _) c-out u with At.fwdq s c-out (row-up u) s c-out (inj₂ (⊑-refl _))
     ... | L′ , car , out (r , nothing) , g , m-out ()
     ... | L′ , car , out (r , just b) , g , m-out sh =
-      _ , ival s pk car g (proj₂ (acc g lv)) refl refl , out b , u-val g lv , m-out sh
-      where lv = car-ug c mp s car (row-up u) , past-sup pk car
+      _ , ival s pk car g (proj₂ (Q.acc g lv)) refl refl , out b , Q.u-val g lv , m-out sh
+      where module Q = At s c-out (row-up u)
+            lv = Q.ug car , past-sup pk car
     fwd (shown _ () _ , _) c-end _
     fwd (heard _ _ , _) () _
-    fwd (ended {q} s pk , _) c-end u with fwd₀ s c-end (row-up u)
-    ... | L′ , car , _ , g , m-end = at L′ , iend s pk car g refl refl , end , u-end g lv , m-end
-      where lv = car-ug c mp s car (row-up u) , past-sup pk car
-    fwd (late {q} sq qp , _) c-end u with fwd₀ sq c-end (late-up qp u)
+    fwd (ended {q} s pk , _) c-end u with At.fwdq s c-end (row-up u) s c-end (inj₂ (⊑-refl _))
+    ... | L′ , car , _ , g , m-end = at L′ , iend s pk car g refl refl , end , Q.u-end g lv , m-end
+      where module Q = At s c-end (row-up u)
+            lv = Q.ug car , past-sup pk car
+    fwd (late {q} sq qp , _) c-end u with At.fwdq sq c-end (late-up qp u) sq c-end (inj₂ (⊑-refl _))
     ... | E , car , _ , gE , m-end =
-      p′ ⊕ [ last ] , ilate sq qp refl refl , end , u-late gE (≺→≼ {E} {p′} (late-car sq qp car)) (car-ug c mp sq car (late-up qp u)) , m-end
+      p′ ⊕ [ last ] , ilate sq qp refl refl , end , Q.u-late gE (≺→≼ {E} {p′} (late-car sq qp car)) (Q.ug car) , m-end
+      where module Q = At sq c-end (late-up qp u)
 
     --------------------------------------------------------------------
     -- Back: each value shown and each end under the bound's image
@@ -266,25 +285,32 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   ... | inj₂ (b , τ , pe , refl) with HotSim.joins (es i′) pp q′ pe
   ...   | e₁ , refl , e₁′ , a₁ , L₁ , car₁ , h = e₁ , refl , e₁′ , inj₁ a₁ , L₁ , car₁ , ⊑-trans h (⊑-snoc⁺ p′)
 
-  -- Listed up to a later position: up to a hot row before it.
-  listed-row : ∀ {k e₀ x} → rows k e₀ → k ≺ x → ListedB rows (just x) → ListedB rows (just k)
-  listed-row {k} {x = x} s kx (ks , cov , back) = ks , (λ y u → cov y (up y u)) , back
+  -- Listed up to a bound: listed up to a hot row up to it.
+  listed-up : ∀ c {k e₀} → rows k e₀ → Upto c k → ListedB rows c → ListedB rows (just k)
+  listed-up c {k} s uk (ks , cov , back) = ks , (λ y u → cov y (up y u)) , back
     where
-      up : ∀ {j e} → rows j e → UpTo k j → UpTo x j
-      up {j} _ (inj₁ jk)           = inj₁ (≺-trans {j} {k} {x} jk kx)
-      up     _ (inj₂ ([] , refl))  = inj₁ (subst (_≺ x) (sym (⊕-identityʳ k)) kx)
+      up : ∀ {j e} → rows j e → UpTo k j → Upto c j
+      up {j} _ (inj₁ jk)             = upto-dn c jk uk
+      up     _ (inj₂ ([] , refl))    = subst (Upto c) (sym (⊕-identityʳ k)) uk
       up     y (inj₂ (_ ∷ _ , refl)) = ⊥-elim (Lawful.flat law s y)
+
+  -- The hot cut at a row up to a bound, mapped at its anchor.
+  at-row : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ c → EnvListed ρ env env′ es A′ c
+         → ∀ {q e} → rows q e → Carried e → Upto c q → Mapped A′ (just q) × Sim AShows AShown A′ Car (just q) rows rows′
+  at-row A′ inc emA c L {q} s ce uq = mq , Run.sim run A′ inc′ emA (just q) mq nq lq
+    where
+      inc′ : Amb ⊆ᴹ A′
+      inc′ a = inc (inj₁ a)
+      nq = HotSim.need-row (es i) s uq (en i A′ c L)
+      lq = listed-up c s uq (allᴱ L i)
+      mq : Mapped A′ (just q)
+      mq with Run.anchor run A′ inc′ emA s ce nq lq
+      ... | y , a = y , inc′ a
 
   joined : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {q e} → rows q e → Carried e → (pk : p ≺ q)
          → EnvListed ρ env env′ es A′ (just (q ⊕ [ sub p ])) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
-  joined A′ inc emA {q} s ce pk L = go (Run.anchor run A′ (λ a → inc (inj₁ a)) emA s ce nq lq)
-    where
-      nq = HotSim.need-row (es i) s (inj₁ (≺-ext q {sub p} [])) (en i A′ (just (q ⊕ [ sub p ])) L)
-      lq = listed-row s (≺-ext q {sub p} []) (proj₁ (allᴱ L i))
-
-      go : Σ Pos (Amb q) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
-      go (y , a) with Sim.fwd (Run.sim run A′ (λ a′ → inc (inj₁ a′)) emA (just q) (y , inc (inj₁ a)) nq lq) s ce (inj₂ (⊑-refl _))
-      ... | L′ , car , _ , g , _ = L′ ⊕ [ sub p′ ] , inj₂ (mrow s ce pk car g refl refl)
+  joined A′ inc emA {q} s ce pk L with Sim.fwd (proj₂ (at-row A′ inc emA (just (q ⊕ [ sub p ])) L s ce (inj₁ (≺-ext q {sub p} [])))) s ce (inj₂ (⊑-refl _))
+  ... | L′ , car , _ , g , _ = L′ ⊕ [ sub p′ ] , inj₂ (mrow s ce pk car g refl refl)
 
   -- A joined row's anchor: its hot row's carrier joined, the hot cut at
   -- its row.
@@ -300,8 +326,8 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   core : Goal (hot rows) (hot rows′)
   core = Mr , local , emb , none-under , reader-joins
        , record { Img = RD.Img ; img-fun = RD.img-fun ; ext = RD.ext
-                ; sim = λ A′ inc emA c mp L _ → RD.Cut.sim A′ inc emA (proj₂ (allᴱ L i)) c mp
-                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i A′ c L) (proj₁ (allᴱ L i)))
+                ; sim = λ A′ inc emA c mp L _ → RD.Cut.sim A′ inc emA c mp
+                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i A′ c L) (allᴱ L i)) (at-row A′ inc emA c L)
                 ; anchor = anchor }
 
   leaf : Goal (lookup env i) (lookup env′ (ρ (∈-map⁺ AIE i)))

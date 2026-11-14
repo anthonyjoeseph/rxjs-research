@@ -102,7 +102,6 @@ emb₀ = record
   { fun     = λ { (_ , refl) (_ , refl) → refl }
   ; mono    = λ { (refl , _) (refl , _) lt → ⊥-elim (≺-irrefl {root} lt) }
   ; reflect = λ { (refl , _) (refl , _) _ → ⊑-refl _ }
-  ; pres    = λ { (_ , refl) (_ , refl) _ → ⊑-refl _ }
   }
 
 fresh₀ : ∀ {H H′ : Pos → Set} → Fresh H H′ Pair₀ root root

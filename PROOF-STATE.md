@@ -36,9 +36,10 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: a connect's carriers fixed source first, then body; the body
 cut at its end or the connect's bound, the source at the same bound,
-listed through its subscribe burst, echoes and kept pins. Risk: every
-map a former adds keeps leading (`Emb.pres`) and the source's joins at
-each later bound. Settled when `sim-connect` is a body.
+listed through its burst, echoes and kept pins where hangs show. Risk:
+the annotated source as a run of the source; the source's and body's
+maps one embedding, fresh at each pair. Settled when `sim-connect` is a
+body.
 
 Members: `sim-connect`.
 

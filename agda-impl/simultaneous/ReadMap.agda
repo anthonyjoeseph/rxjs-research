@@ -81,7 +81,7 @@ under-down (just _) {l} {l′} ll (y , a , u) = y , a , upto-down {y} {l} {l′}
 module Cars {X : Set} (B : PMap) (S : EmissionSet X) (Car : Pos → Pos → Set) (car-fun : ∀ {k l l′} → Car k l → Car k l′ → l ≡ l′)
             (car-ext : ∀ {k l} → Car k l → Σ Pos λ y → B k y × y ⊑ l) (joins : Joins B B S Car) (lawS : Lawful S) (em : Emb B) where
 
-  open Emb em using () renaming (fun to a-fun; mono to a-mono; reflect to a-refl; pres to a-pres)
+  open Emb em using () renaming (fun to a-fun; mono to a-mono; reflect to a-refl)
 
   -- A row before a point: its carrier before the point's image.
   car-before : ∀ {q e L x y} → S q e → Car q L → B x y → q ≺ x → L ≺ y
@@ -93,13 +93,6 @@ module Cars {X : Set} (B : PMap) (S : EmissionSet X) (Car : Pos → Pos → Set)
   ...     | (l ∷ σ) , e with joins a′ s e
   ...       | _ , refl , e′ , _ , L′ , car′ , h with car-fun car car′
   ...         | refl = ≺-≼-≺ {yq ⊕ zs} {(yq ⊕ zs) ⊕ [ sub e′ ]} {y} (≺-ext (yq ⊕ zs) {sub e′} []) (⊑-≼ {(yq ⊕ zs) ⊕ [ sub e′ ]} {y} h)
-
-  -- A carrier of a row up to a bound: under the bound's image.
-  car-ug : ∀ c → Mapped B c → ∀ {q e L} → S q e → Car q L → Upto c q → Under B c L
-  car-ug nothing  _         _ _ _ = tt
-  car-ug (just _) (y₀ , a₀) s car (inj₁ lt) = y₀ , a₀ , inj₁ (car-before s car a₀ lt)
-  car-ug (just _) (y₀ , a₀) s car (inj₂ cq) with car-ext car
-  ... | yq , a , yL = y₀ , a₀ , inj₂ (⊑-trans (a-pres a₀ a cq) yL)
 
   -- Carriers keep the order of their rows.
   car-mono : ∀ {q q′ L L′ e e′} → S q e → S q′ e′ → Car q L → Car q′ L′ → q ≺ q′ → L ≺ L′
@@ -127,7 +120,7 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
 
   open Rows G p′ lawG fewG using (at-unique; at-apart)
 
-  open Emb em using () renaming (fun to a-fun; mono to a-mono; reflect to a-refl; pres to a-pres)
+  open Emb em using () renaming (fun to a-fun; mono to a-mono; reflect to a-refl)
   open Cars Amb S Car car-fun car-ext joins lawS em using (car-before; car-mono; car-inj)
 
   fresh₁ : ∀ {x y} → Amb x y → Below H p x → x ≡ p
@@ -311,38 +304,9 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
   ma-refl (mrow _ _ pk car g refl refl) a′ h = ⊥-elim (amb-car a′ g (past-sup pk car) h)
   ma-refl (mlate _ _ refl refl)         a′ h = ⊥-elim (amb-late a′ h)
 
-  -- Leading kept.
-  am-pres : ∀ {x x′ y y′} → Amb x y → Mr x′ y′ → x ⊑ x′ → y ⊑ y′
-  am-pres a (mrow {k} {L = L} s _ pk car g refl refl) h with ⊑-snoc k h
-  ... | inj₂ e = ⊥-elim (amb-join a s pk e)
-  ... | inj₁ xk with car-ext car
-  ...   | yk , ak , ykL = ⊑-trans (a-pres a ak xk) (⊑-trans ykL (⊑-snoc⁺ L))
-  am-pres a (mlate _ _ refl refl) h with ⊑-snoc p h
-  ... | inj₂ e  = ⊥-elim (amb-lt a e)
-  ... | inj₁ xp = ⊑-trans (a-pres a pp xp) (⊑-snoc⁺ p′)
-
-  ma-pres : ∀ {x x′ y y′} → Mr x y → Amb x′ y′ → x ⊑ x′ → y ⊑ y′
-  ma-pres (mrow {k} s _ pk _ _ refl refl) a′ h with fresh₁ a′ (below-up (below-join (hS s) pk) h)
-  ... | refl = ⊥-elim (⊑-≺ h (≺-trans {p} {k} {k ⊕ [ sub p ]} pk (≺-ext k {sub p} [])))
-  ma-pres (mlate _ _ refl refl) a′ h with fresh₁ a′ (below-up below-last h)
-  ... | refl = ⊥-elim (⊑-≺ h (≺-ext p {last} []))
-
-  mr-pres : ∀ {x x′ y y′} → Mr x y → Mr x′ y′ → x ⊑ x′ → y ⊑ y′
-  mr-pres (mrow {k} s _ _ car _ refl refl) (mrow {k′} {e₂} s′ _ _ car′ _ refl refl) h with ⊑-snoc k′ h
-  ... | inj₁ (zs , e) = ⊥-elim (Lawful.flat lawS s (subst (λ z → S z e₂) (trans e (⊕-assoc k [ sub p ] zs)) s′))
-  ... | inj₂ e with ⊕-injˡ k k′ e
-  ...   | refl with car-fun car car′
-  ...     | refl = ⊑-refl _
-  mr-pres (mrow {k} s _ pk _ _ refl refl) (mlate _ _ refl refl) h with ⊑-snoc p h
-  ... | inj₁ kp = ⊥-elim (⊑-≺ kp (≺-trans {p} {k} {k ⊕ [ sub p ]} pk (≺-ext k {sub p} [])))
-  ... | inj₂ e with ⊕-injʳ k p e
-  ...   | ()
-  mr-pres (mlate sc cp refl refl) (mrow s _ pk _ _ refl refl) _ = ⊥-elim (no-late sc cp s pk)
-  mr-pres (mlate _ _ refl refl) (mlate _ _ refl refl) _ = ⊑-refl _
-
   -- THE AMBIENT MAP WITH THE READER'S: an order embedding.
   emb : Emb (Amb ∪ᴹ Mr)
-  emb = record { fun = fu ; mono = mo ; reflect = re ; pres = pr }
+  emb = record { fun = fu ; mono = mo ; reflect = re }
     where
       fu : ∀ {x y y′} → (Amb ∪ᴹ Mr) x y → (Amb ∪ᴹ Mr) x y′ → y ≡ y′
       fu (inj₁ a) (inj₁ a′) = a-fun a a′
@@ -361,12 +325,6 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
       re (inj₁ a) (inj₂ m)  = am-refl a m
       re (inj₂ m) (inj₁ a)  = ma-refl m a
       re (inj₂ m) (inj₂ m′) = mr-refl m m′
-
-      pr : ∀ {x x′ y y′} → (Amb ∪ᴹ Mr) x y → (Amb ∪ᴹ Mr) x′ y′ → x ⊑ x′ → y ⊑ y′
-      pr (inj₁ a) (inj₁ a′) = a-pres a a′
-      pr (inj₁ a) (inj₂ m)  = am-pres a m
-      pr (inj₂ m) (inj₁ a)  = ma-pres m a
-      pr (inj₂ m) (inj₂ m′) = mr-pres m m′
 
   -- Within the pair's worlds.
   local : Local H H′ p p′ Mr
