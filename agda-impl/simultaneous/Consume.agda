@@ -8,6 +8,7 @@
 module simultaneous.Consume where
 
 open import Data.Bool using (Bool; true)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -18,19 +19,21 @@ open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; s≤s; _<ᵇ_)
 open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m; ≤-trans; <⇒<ᵇ)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _∙_; last; frame; cascade; tick)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; _≺_; enter; approx)
+open import denotation.Laws.Modulus using (≺-irrefl)
+open import denotation.Laws.Worlds using (⊑-refl)
 open import simultaneous.Listing using (Listing)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
-open import simultaneous.Sim using (PMap; Emb; Sim; ListedB; Shows; Shown; SimIH)
+open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Fresh; Sim; Run; ListedB; Shows; Shown; SimIH; sih)
 open import simultaneous.SimMap using (sim-map)
 open import simultaneous.SimReader using (sim-connected)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; elab; elaborate)
 
 ------------------------------------------------------------------------
 -- A finite run, listed
@@ -90,13 +93,35 @@ sim-approx n       ρ (connected i)     = sim-connected n ρ i
 sim-approx zero    ρ (defer l)         = sim-⊥ ρ l
 sim-approx (suc n) ρ (defer l)         = sim-next n ρ l (sim-approx n ρ (Later.force l))
 
--- THE CLOSED PROGRAM: its elaboration, restamped beside the subscribe
--- and completion marks, simulates it from the root, wherever its rows
--- are listed.
+-- The closed program's subscription pair, alone.
+Pair₀ : PMap
+Pair₀ x y = x ≡ root × y ≡ root
+
+emb₀ : Emb Pair₀
+emb₀ = record
+  { fun     = λ { (_ , refl) (_ , refl) → refl }
+  ; mono    = λ { (refl , _) (refl , _) lt → ⊥-elim (≺-irrefl {root} lt) }
+  ; reflect = λ { (refl , _) (refl , _) _ → ⊑-refl _ }
+  ; pres    = λ { (_ , refl) (_ , refl) _ → ⊑-refl _ }
+  }
+
+fresh₀ : ∀ {H H′ : Pos → Set} → Fresh H H′ Pair₀ root root
+fresh₀ (refl , refl) = (λ _ → refl) , (λ _ → refl)
+
+-- THE CLOSED PROGRAM'S ELABORATION, restamped beside the subscribe and
+-- completion marks, still simulates it, unbounded.
 postulate
-  sim-top : ∀ n {A} (o : Obs Timeline [] A) → SimIH n (λ i → i) o → ListedB (enter (approx n o []) root) nothing → Σ PMap λ M → Emb M
-          × Sim Shows Shown M nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
+  restamp-sim : ∀ n {A} (o : Obs Timeline [] A) {M Img}
+              → Sim Shows Shown M Img nothing (enter (approx n o []) root) (enter (approx n (elab (λ i → i) o) []) root)
+              → Σ (Pos → Pos → Set) λ Img′ → Sim Shows Shown M Img′ nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
+
+-- THE CLOSED PROGRAM: its elaboration simulates it from the root,
+-- wherever its rows are listed.
+sim-top : ∀ n {A} (o : Obs Timeline [] A) → SimIH n (λ i → i) o → ListedB (enter (approx n o []) root) nothing → Σ PMap λ M → Emb M
+        × Σ (Pos → Pos → Set) λ Img → Sim Shows Shown M Img nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
+sim-top n o (sih ih) lst with ih [] [] Pair₀ (λ {_} ()) (λ {_} ()) tt (λ {_} ()) (λ {_} ()) emb₀ root root (refl , refl) fresh₀ (tt , λ ()) (tt , λ ()) (λ ())
+... | M , _ , em , _ , _ , R = Pair₀ ∪ᴹ M , em , restamp-sim n o (Run.sim R (Pair₀ ∪ᴹ M) (λ a → a) em nothing tt tt lst)
 
 sim-root : ∀ n {A} (o : SObs [] A) → ListedB (enter (approx n (plain o) []) root) nothing → Σ PMap λ M → Emb M
-         × Sim Shows Shown M nothing (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root)
+         × Σ (Pos → Pos → Set) λ Img → Sim Shows Shown M Img nothing (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root)
 sim-root n o = sim-top n (plain o) (sim-approx n (λ i → i) (plain o))

@@ -8,20 +8,20 @@ module simultaneous.SimPos where
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.List using ([]; _∷_; _++_; [_])
+open import Data.Product using (_,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 open import Relation.Nullary using (¬_; yes; no)
 
-open import denotation.Position using (Pos; Path; Label; _∙_; _⊕_; sub; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt)
+open import denotation.Position using (Pos; _∙_; _⊕_; sub; lt; eq; gt; cmpLabel; cmpPath; cmpInstant; isLt)
 open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (<ᵖ-part)
-open import denotation.EmissionSet using (EmissionSet; _≺_; _≼_)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-absurd; ≺-ext; ≼-or-≻; ≼-split; ≺→≼; ≺-≼-≺; ≼-≺-≺)
-open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ⊕-injˡ; ⊕-injʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-snoc)
+open import denotation.EmissionSet using (EmissionSet; _≺_)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-absurd; ≺-ext; ≼-or-≻; ≼-split)
+open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-≼)
 open import denotation.Laws.Count using (⊑?)
 
 private
@@ -48,9 +48,6 @@ apart {i ∙ p} {j ∙ q} () np σ σ′ | gt
 apart₁ : ∀ {y y′} → y ≺ y′ → ¬ (y ⊑ y′) → ∀ σ → (y ⊕ σ) ≺ y′
 apart₁ {y} {y′} h np σ = subst ((y ⊕ σ) ≺_) (⊕-identityʳ y′) (apart h np σ [])
 
-apart₂ : ∀ {y y′} → y ≺ y′ → ¬ (y ⊑ y′) → ∀ σ → y ≺ (y′ ⊕ σ)
-apart₂ {y} {y′} h np σ = subst (_≺ (y′ ⊕ σ)) (⊕-identityʳ y) (apart h np [] σ)
-
 -- Two rows of a lawful hot in order lie apart.
 flat-apart : ∀ {A} {t : EmissionSet A} → Lawful t → ∀ {l l′ e e′} → t l e → t l′ e′ → l ≺ l′ → ¬ (l ⊑ l′)
 flat-apart L {l} g g′ h ([] , refl)    = ≺-irrefl {l} (subst (l ≺_) (⊕-identityʳ l) h)
@@ -60,12 +57,6 @@ flat-apart L     g g′ h (_ ∷ _ , refl) = Lawful.flat L g g′
 ⊑-split : ∀ {x y} → x ⊑ y → x ≡ y ⊎ x ≺ y
 ⊑-split {x} ([] , refl)     = inj₁ (sym (⊕-identityʳ x))
 ⊑-split {x} (l ∷ zs , refl) = inj₂ (≺-ext x zs)
-
-⊑-antisym : ∀ {x y} → x ⊑ y → y ⊑ x → x ≡ y
-⊑-antisym {x} {y} xy yx with ⊑-split xy | ⊑-split yx
-... | inj₁ e  | _      = e
-... | inj₂ _  | inj₁ e = sym e
-... | inj₂ a  | inj₂ b = ⊥-elim (≺-absurd {x} {y} a b)
 
 -- HOW TWO POSITIONS LIE: one leads the other, or they lie apart.
 data Lie (x y : Pos) : Set where

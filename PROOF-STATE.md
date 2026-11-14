@@ -34,13 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE SIMULATION: THE ENVIRONMENT
 
-Untried: a reader of a simulated hot is simulated, its value at the
-reader row's image while its joins and marks interleave with other
-readers' rows under the hot row's anchor; a connect's source is listed
-through the echoes, bursts and kept pins up to its body's end. Settled
-when each is a body. Riskiest: it tests the inductive hypothesis itself.
+Untried: a connect's carriers fixed source first, then body; the body
+cut at its end or the connect's bound, the source at the same bound,
+listed through its subscribe burst, echoes and kept pins. Risk: every
+map a former adds keeps leading (`Emb.pres`) and the source's joins at
+each later bound. Settled when `sim-connect` is a body.
 
-Members: `sim-connected`, `sim-connect`.
+Members: `sim-connect`.
 
 #### THE SIMULATION: FLATMAP
 
@@ -59,7 +59,7 @@ Untried: a take's failure, a scan's state and a map's values transfer
 both ways along the map; the closed run beside its marks, restamped,
 simulates the program from the root. Settled when each is a body.
 
-Members: `sim-takeWhile`, `sim-scan`, `sim-top`.
+Members: `sim-takeWhile`, `sim-scan`, `restamp-sim`.
 
 #### THE SIMULATION: SOURCES
 

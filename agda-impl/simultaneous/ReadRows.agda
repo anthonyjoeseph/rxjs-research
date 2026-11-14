@@ -8,7 +8,7 @@
 -- reach.
 module simultaneous.ReadRows where
 
-open import Data.Bool using (Bool; true; T)
+open import Data.Bool using (Bool; true)
 open import Data.Bool.Properties using (T?)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; length; filter)
@@ -20,16 +20,16 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat using (pred)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂; cong)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; subst₂)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable using (_×-dec_)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; _<ᵖ_; sub; ix; last)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; Unpinned; EmissionSet; Den; Few; Reach; Truncate;
-  Rejoin; shown; heard; ended; late; InE; LaneOf; _≺_; _≼_; module Scan; module Merge; module Op)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-≼-≺; ≼-antisym; ≼-split; ≺-ext; ≼-or-≻)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; Few; Reach; Truncate; Rejoin; shown;
+  heard; ended; late; InE; LaneOf; _≺_; _≼_; module Scan; module Merge; module Op)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-≼-≺; ≼-split; ≺-ext; ≼-or-≻)
 open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-injˡ; ⊕-injʳ; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊑-cmp; ⊑-snoc; ⊑-snoc⁺; ⊑-refl; ⊑-trans)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-idx; of-row; of-rows; of-in; of-reach; of-end-row; ine-pin)
 open import adequacy.SubOne using (scan-reach)

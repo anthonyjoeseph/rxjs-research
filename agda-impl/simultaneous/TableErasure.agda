@@ -316,7 +316,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.
   whole-ahead : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ (List Pos) λ ls → ∀ {l e} → u l e → l ∈ ls
   whole-ahead ks every with sim-root n o (listed-all (listedₙ n P) ks every)
-  ... | _ , _ , S = sim-whole S
+  ... | _ , _ , _ , S = sim-whole S
 
   erasingᵀ : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
   erasingᵀ = Erase.erasing t u CP.c CQ.c CP.L CQ.L CP.ex CQ.ex
