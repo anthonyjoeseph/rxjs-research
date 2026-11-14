@@ -43,7 +43,7 @@ next outer value, an exhaust's busy lane, a concat's hand-off), so no
 count over one program settles it. Settled when each member is a body
 over the per-operator correspondence `tables` asserts.
 
-Members: `stable`, `img-row`, `img-few`, `put-row`, `causal←`.
+Members: `stableA`, `img-row`, `img-few`, `put-row`, `causal←`.
 
 #### THE TABLES
 
