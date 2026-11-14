@@ -37,7 +37,7 @@ open import adequacy.SubJoin using (Bind; rejoin-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Carried; c-out; c-end; Mt; m-out; m-end; Local; Fresh; NoneUnder;
   Joins; Upto; Under; Mapped; Run; _⊆ᴹ_; allᴱ; Shows; Shown; AShows; AShown; HotSim; EnvSim;
-  EnvListed; ListedB; EnvNeeds; EnvJoins; Apart; SimIH; sih)
+  EnvListed; ListedB; ListedL; Live; EndsAfter; EnvNeeds; EnvJoins; Apart; SimIH; sih)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.ReadMap using (module Map; upto-dn; under?; under-down)
 open import simultaneous.ReadRows using (module Rows)
@@ -268,7 +268,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   Goal : Den A → Den (AIE A) → Set₁
   Goal d d′ = Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter d p)
       × EnvJoins ρ env env′ es M
-      × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es) (enter d p)
+      × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es (enter d p)) (enter d p)
           (enter (Op.flatMap (mergeᶠ nothing) (λ s → Op.of (proj₂ s)) (Op.scan joinStep z₀ d′)) p′)
 
   -- THE READER KEEPS EVERY BOUND HOT'S JOINS: a point it puts under a
@@ -285,6 +285,24 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   ... | inj₂ (b , τ , pe , refl) with HotSim.joins (es i′) pp q′ pe
   ...   | e₁ , refl , e₁′ , a₁ , L₁ , car₁ , h = e₁ , refl , e₁′ , inj₁ a₁ , L₁ , car₁ , ⊑-trans h (⊑-snoc⁺ p′)
 
+  Tr : EmissionSet A
+  Tr = enter (hot rows) p
+
+  -- Each reader end past a hot end.
+  ends : EndsAfter rows Tr
+  ends (shown _ () _ , _)
+  ends (ended {c} sc _ , _)  = c , sc , ≺-ext c {sub p} []
+  ends (late {c} sc cp , _)  = c , sc , ≼-≺-≺ {c} {p} {p ⊕ [ last ]} cp (≺-ext p {last} [])
+
+  -- Every hot row live in the reader.
+  live : ∀ {j e} → rows j e → Live Tr j
+  live {j} y {k} tk with ends tk
+  ... | c , sc , ck = ≼-≺-≺ {j} {c} {k} (Lawful.proper law sc y) ck
+
+  -- Listed while live in the reader: listed.
+  unlive : ∀ c → ListedL rows Tr c → ListedB rows c
+  unlive c (ks , cov , back) = ks , (λ y u → cov y u (live y)) , back
+
   -- Listed up to a bound: listed up to a hot row up to it.
   listed-up : ∀ c {k e₀} → rows k e₀ → Upto c k → ListedB rows c → ListedB rows (just k)
   listed-up c {k} s uk (ks , cov , back) = ks , (λ y u → cov y (up y u)) , back
@@ -295,26 +313,26 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
       up     y (inj₂ (_ ∷ _ , refl)) = ⊥-elim (Lawful.flat law s y)
 
   -- The hot cut at a row up to a bound, mapped at its anchor.
-  at-row : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ c → EnvListed ρ env env′ es A′ c
+  at-row : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ c → EnvListed ρ env env′ es Tr A′ c
          → ∀ {q e} → rows q e → Carried e → Upto c q → Mapped A′ (just q) × Sim AShows AShown A′ Car (just q) rows rows′
   at-row A′ inc emA c L {q} s ce uq = mq , Run.sim run A′ inc′ emA (just q) mq nq lq
     where
       inc′ : Amb ⊆ᴹ A′
       inc′ a = inc (inj₁ a)
-      nq = HotSim.need-row (es i) s uq (en i A′ c L)
-      lq = listed-up c s uq (allᴱ L i)
+      nq = HotSim.need-row (es i) s uq (en i Tr ends A′ c L)
+      lq = listed-up c s uq (unlive c (allᴱ L i))
       mq : Mapped A′ (just q)
       mq with Run.anchor run A′ inc′ emA s ce nq lq
       ... | y , a = y , inc′ a
 
   joined : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {q e} → rows q e → Carried e → (pk : p ≺ q)
-         → EnvListed ρ env env′ es A′ (just (q ⊕ [ sub p ])) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
+         → EnvListed ρ env env′ es Tr A′ (just (q ⊕ [ sub p ])) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
   joined A′ inc emA {q} s ce pk L with Sim.fwd (proj₂ (at-row A′ inc emA (just (q ⊕ [ sub p ])) L s ce (inj₁ (≺-ext q {sub p} [])))) s ce (inj₂ (⊑-refl _))
   ... | L′ , car , _ , g , _ = L′ ⊕ [ sub p′ ] , inj₂ (mrow s ce pk car g refl refl)
 
   -- A joined row's anchor: its hot row's carrier joined, the hot cut at
   -- its row.
-  anchor : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {x e} → RD.T x e → Carried e → EnvListed ρ env env′ es A′ (just x)
+  anchor : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {x e} → RD.T x e → Carried e → EnvListed ρ env env′ es Tr A′ (just x)
          → ListedB RD.T (just x) → Σ Pos ((Amb ∪ᴹ Mr) x)
   anchor A′ inc emA (shown {q} s _ pk , _) ce L _ = joined A′ inc emA s ce pk L
   anchor A′ inc emA (ended {q} s pk , _)   ce L _ = joined A′ inc emA s c-end pk L
@@ -327,7 +345,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   core = Mr , local , emb , none-under , reader-joins
        , record { Img = RD.Img ; img-fun = RD.img-fun ; ext = RD.ext
                 ; sim = λ A′ inc emA c mp L _ → RD.Cut.sim A′ inc emA c mp
-                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i A′ c L) (allᴱ L i)) (at-row A′ inc emA c L)
+                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i Tr ends A′ c L) (unlive c (allᴱ L i))) (at-row A′ inc emA c L)
                 ; anchor = anchor }
 
   leaf : Goal (lookup env i) (lookup env′ (ρ (∈-map⁺ AIE i)))

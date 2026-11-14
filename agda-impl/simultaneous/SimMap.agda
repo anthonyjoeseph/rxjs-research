@@ -19,7 +19,7 @@ open import denotation.Laws.Modulus using (entered-reach)
 open import adequacy.SubOne using (map-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Sim using (PMap; Sim; Run; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; ListedB; NoneUnder; Shows; Shown; SimIH; sih)
+open import simultaneous.Sim using (PMap; Sim; Run; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; ListedB; Live; env-live; NoneUnder; Shows; Shown; SimIH; sih)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; mapIE)
 
@@ -69,6 +69,10 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
 
   listed : ∀ {c} → ListedB T c → ListedB t₀ c
   listed (ks , cov , back) = ks , (λ x u → cov (proj₂ (up x)) u) , λ m → down (proj₂ (back m))
+
+  -- Live in the source: live in the map, which ends where it does.
+  live : ∀ {j} → Live t₀ j → Live T j
+  live {j} l (map-end x , _) = l x
 
   -- A carried row: its source's, carried.
   carried : ∀ {k e} → T k e → Carried e → Σ (Ev A) λ e₀ → t₀ k e₀ × Carried e₀
@@ -127,5 +131,5 @@ sim-map n ρ f s (sih ih) = sih λ env env′ Amb ge ge′ ap es ns em p p′ pp
       open Run R
   in M , lc , eb , none {M} (λ {k} {e} {x} {y} → nu {k} {e} {x} {y}) , ej
      , record { Img = Img ; img-fun = img-fun ; ext = ext
-              ; sim = λ A′ inc ea c mp L lst → mapped (sim A′ inc ea c mp L (listed lst))
-              ; anchor = λ A′ inc ea x ce L lst → let (_ , x₀ , ce₀) = carried x ce in anchor A′ inc ea x₀ ce₀ L (listed lst) }
+              ; sim = λ A′ inc ea c mp L lst → mapped (sim A′ inc ea c mp (env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = t₀} (λ {j} → live {j}) {A′} {c} L) (listed lst))
+              ; anchor = λ A′ inc ea x ce L lst → let (_ , x₀ , ce₀) = carried x ce in anchor A′ inc ea x₀ ce₀ (env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = t₀} (λ {j} → live {j}) {A′} L) (listed lst) }

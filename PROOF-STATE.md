@@ -32,16 +32,35 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SIMULATION: THE ENVIRONMENT
+#### CONNECT: THE ANNOTATED SOURCE
 
-Untried: a connect's carriers fixed source first, then body; the body
-cut at its end or the connect's bound, the source at the same bound,
-listed through its burst, echoes and kept pins where hangs show. Risk:
-the annotated source as a run of the source; the source's and body's
-maps one embedding, fresh at each pair. Settled when `sim-connect` is a
-body.
+Untried: the annotated source is a run of the plain source — the
+source's simulation at its pair, then the told rows (each source row at
+one image, a fold projected, a map). Settled when each is a body over
+the source's simulation and the told-row inventory.
 
-Members: `sim-connect`.
+Members: `annotate-run`, `need-row`, `joins-σ`.
+
+#### CONNECT: THE ROWS PAST THE BODY
+
+Untried: a burst, echo or kept row under a bound's image is carried by
+the source's simulation cut at the bound or the body's end; the body's
+and the source's listings sit inside the connect's. Settled when each is
+a body over the source's simulation and the connect laws.
+
+Members: `u-under`, `src-listed`, `listed-σ`, `listed-β`, `t-mem`,
+`under-upto`, `env-up`, `lst-up`.
+
+#### CONNECT: THE MAPS
+
+Untried: the source's map, the three pairs and the body's map are one
+embedding, fresh at each pair; each lies in its own pair's worlds, none
+under the other's rows. Settled when each is a body over the
+simulations' locality and freshness.
+
+Members: `joins-sub`, `emb-s`, `fresh-s`, `ok-s′`, `nh-s`, `joins-b`,
+`emb-b`, `fresh-b`, `apart-b`, `nh-b`, `below-b`, `below-b′`, `below-s`,
+`below-s′`, `body-s`, `src-b`, `pairs-none`.
 
 #### THE SIMULATION: FLATMAP
 
