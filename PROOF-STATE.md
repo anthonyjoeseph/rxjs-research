@@ -59,7 +59,7 @@ Untried: a take's failure, a scan's state and a map's values transfer
 both ways along the map; the closed run beside its marks, restamped,
 simulates the program from the root. Settled when each is a body.
 
-Members: `sim-takeWhile`, `sim-scan`, `sim-map`, `sim-top`.
+Members: `sim-takeWhile`, `sim-scan`, `sim-top`.
 
 #### THE SIMULATION: SOURCES
 

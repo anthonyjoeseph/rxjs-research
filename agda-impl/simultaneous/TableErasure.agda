@@ -52,7 +52,8 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
 open import simultaneous.Listing using (listC-ok; listC-exact; listedₙ)
 open import simultaneous.Attribution using (Live; Attribution; Every; One; Reads; Match; Shown; Into)
-open import simultaneous.Consume using (sim-root; sim-whole; listed-all)
+open import simultaneous.Consume using (sim-root; listed-all)
+open import simultaneous.Sim using (sim-whole)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 
