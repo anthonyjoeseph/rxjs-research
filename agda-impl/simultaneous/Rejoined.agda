@@ -47,11 +47,11 @@ split-at q {a} {σ} z eq with ⊑-snoc {q ⊕ [ a ]} z (σ , trans eq (sym (⊕-
 -- A position holding rows of two hots of an apart environment: one
 -- handle.
 same-hot : ∀ {Γ} (env : DenEnv Γ) → Apart env → ∀ {X Y} (i : X ∈ Γ) (j : Y ∈ Γ) {t : EmissionSet X} {t′ : EmissionSet Y}
-         → lookup env i ≡ hot t → lookup env j ≡ hot t′ → ∀ {q e e′} → t q e → t′ q e′
+         → lookup env i ≡ hot t → lookup env j ≡ hot t′ → ∀ {q} → ¬ ¬ Σ (Ev X) (t q) → ¬ ¬ Σ (Ev Y) (t′ q)
          → (P : ∀ {Z} → Z ∈ Γ → Set) → P i → P j
 same-hot (hot _ ∷ _)    _        (here refl) (here refl) _    _    _  _   _ x = x
-same-hot (hot _ ∷ ρ)    (a , _)  (here refl) (there j)   refl e′   tq tq′ _ _ = ⊥-elim (a tq (hots-at ρ j e′ tq′))
-same-hot (hot _ ∷ ρ)    (a , _)  (there i)   (here refl) e    refl tq tq′ _ _ = ⊥-elim (a tq′ (hots-at ρ i e tq))
+same-hot (hot _ ∷ ρ)    (a , _)  (here refl) (there j)   refl e′   tq tq′ _ _ = ⊥-elim (tq λ r → tq′ λ r′ → a (proj₂ r) (hots-at ρ j e′ (proj₂ r′)))
+same-hot (hot _ ∷ ρ)    (a , _)  (there i)   (here refl) e    refl tq tq′ _ _ = ⊥-elim (tq λ r → tq′ λ r′ → a (proj₂ r′) (hots-at ρ i e (proj₂ r)))
 same-hot (hot _ ∷ ρ)    (_ , ap) (there i)   (there j)   e    e′   tq tq′ P x = same-hot ρ ap i j e e′ tq tq′ (λ k → P (there k)) x
 same-hot (coldAt _ ∷ _) _        (here refl) _           ()   _    _  _   _ _
 same-hot (coldAt _ ∷ _) _        (there _)   (here refl) _    ()   _  _   _ _
@@ -93,14 +93,21 @@ rjRow {e = end}   r h = ended r h
 rjRow {e = pin _} r h = heard r h
 
 -- Before a joined row, the joined rows before its row, and the late end.
-rejoin-few : ∀ {A} {S : EmissionSet A} {j q e} → Flat S → S q e → Few S q → Few (Rejoin j (Proper S)) (q ⊕ [ sub j ])
-rejoin-few {S = S} {j} {q} fl sq (ks , F) = L.map (_⊕ [ sub j ]) ks ++ [ j ⊕ [ last ] ] , pick
+-- The row's own presence is read only to set it apart, so held classically.
+rejoin-few¬¬ : ∀ {A} {S : EmissionSet A} {j q} → Flat S → ¬ ¬ Σ (Ev A) (S q) → Few S q → Few (Rejoin j (Proper S)) (q ⊕ [ sub j ])
+rejoin-few¬¬ {S = S} {j} {q} fl sq (ks , F) = L.map (_⊕ [ sub j ]) ks ++ [ j ⊕ [ last ] ] , pick
   where
+    apt : ∀ {q′ e′} → S q′ e′ → q ≺ q′ → ¬ (q ⊑ q′)
+    apt r qq le = sq λ s → nest {S = S} fl (proj₂ s) r qq le
+
     pick : ∀ {k e′} → Rejoin j (Proper S) k e′ → k ≺ (q ⊕ [ sub j ]) → k ∈ L.map (_⊕ [ sub j ]) ks ++ [ j ⊕ [ last ] ]
-    pick (shown {q′} r _ _) h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (nest {S = S} fl sq (proj₁ r)))))
-    pick (heard {q′} r _)   h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (nest {S = S} fl sq (proj₁ r)))))
-    pick (ended {q′} r _)   h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (nest {S = S} fl sq (proj₁ r)))))
+    pick (shown {q′} r _ _) h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (apt (proj₁ r)))))
+    pick (heard {q′} r _)   h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (apt (proj₁ r)))))
+    pick (ended {q′} r _)   h = ∈-++⁺ˡ (∈-map⁺ (_⊕ [ sub j ]) (F (proj₁ r) (joined-back q′ q h (apt (proj₁ r)))))
     pick (late _ _)         _ = ∈-++⁺ʳ (L.map (_⊕ [ sub j ]) ks) (here refl)
+
+rejoin-few : ∀ {A} {S : EmissionSet A} {j q e} → Flat S → S q e → Few S q → Few (Rejoin j (Proper S)) (q ⊕ [ sub j ])
+rejoin-few {S = S} {j} fl sq = rejoin-few¬¬ {S = S} {j} fl (λ n → n (_ , sq))
 
 -- Past an end at or before the subscription, nothing before the late end.
 late-none : ∀ {A} {S : EmissionSet A} {j c r e} → Proper S c end → c ≼ j → Rejoin j (Proper S) r e → r ≺ (j ⊕ [ last ]) → ⊥
@@ -212,10 +219,3 @@ out-of {e₀ = skip}  (_ , n) sh = ⊥-elim (n (λ ()) sh)
 out-of {e₀ = pin _} (_ , n) sh = ⊥-elim (n (λ ()) sh)
 out-of {e₀ = end}   (c , _) _ with c tt
 ... | ()
-
-end-of : ∀ {X} {e₀ : Ev X} → Match Every (One annValues) (Reads annValues) e₀ (end {A = AIE X}) → e₀ ≡ end
-end-of {e₀ = out _} (c , _) with c tt
-... | _ , () , _
-end-of {e₀ = end}   _ = refl
-end-of {e₀ = skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
-end-of {e₀ = pin _} (_ , n) = ⊥-elim (n (λ ()) tt)

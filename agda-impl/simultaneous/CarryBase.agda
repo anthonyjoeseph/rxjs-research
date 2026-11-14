@@ -33,7 +33,7 @@ open import denotation.Position using (Pos; Path; Label; Instant; last; _∙_; _
   isLt; inside)
 open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Few; _≺_; _≼_; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Den; enter; Few; _≺_; _≼_; module Op)
 import denotation.Events as Evs
 open import simultaneous.HeldMap using (mapEv; module MapRun)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≼-≺-≺; ≺-≼-≺; ≺-ext; ≼-or-≻; ≼-split)
@@ -317,12 +317,18 @@ carried-val (cr , _) with cr tt
 ... | instEmit (mark _) _  , refl , ()
 
 -- The plain row carried by an end is an end.
-match-end : ∀ {A : Set} {e₀ : Ev A} → Match Every (One {X = IE A} valuesOf) (Reads valuesOf) e₀ end → e₀ ≡ end
+match-end : ∀ {A X : Set} {f : X → List A} {e₀ : Ev A} → Match Every (One f) (Reads f) e₀ end → e₀ ≡ end
 match-end {e₀ = out _} (cr , _) with cr tt
 ... | _ , () , _
 match-end {e₀ = end}   _        = refl
 match-end {e₀ = skip}  (_ , ns) = ⊥-elim (ns (λ ()) tt)
 match-end {e₀ = pin _} (_ , ns) = ⊥-elim (ns (λ ()) tt)
+
+-- An end read back with its row in hand.
+end-held : ∀ {A Y : Set} {f : Y → List A} {Img : Pos → Pos → Set} {t : EmissionSet A} {l}
+         → (Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ end)
+         → Σ Pos λ k → Img k l × ¬ ¬ t k end
+end-held {t = t} (k , i , e₀ , tk , m) = k , i , λ n → n (subst (t k) (match-end m) tk)
 
 -- CARRIED INTO ITS INSTANT, along `Img`: put by `PB` on a row of `u`
 -- with finitely many before it, and in the subscription's instant, a
@@ -410,8 +416,11 @@ record CarryAt {A Y : Set} (f : Y → List A) (M : PMap) (HP HE LP : Pos → Set
               ⊎ (e ≡ skip × IntoAt Img u PB HP s k)
     img¬¬   : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
             → ¬ ¬ ((Σ Pos λ l → Img k l × Σ (Ev Y) λ e′ → u l e′ × Match Every (One f) (Reads f) e e′) ⊎ e ≡ skip)
-    shown   : ∀ {l e} → u l e → Shown (One f) e → Live u l → Few u l
+    shown   : ∀ {l e} → u l e → Shown (One f) e → Work e → Live u l → Few u l
             → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
+    -- An end read back to its carrier, held classically: the plain end
+    -- may need every part's end decided.
+    shown-end : ∀ {l} → u l end → Live u l → Few u l → Σ Pos λ k → Img k l × ¬ ¬ t k end
     img-row : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A) λ e → t k e × Unpinned e
     img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
     place   : ∀ {m e} → u m e → Live u m → Listed u m
@@ -515,6 +524,18 @@ data Kin {A B : Set} : Ev A → Ev B → Set where
   k-skip : Kin skip skip
   k-pin  : ∀ {r} → Kin (pin r) (pin r)
   k-end  : Kin end end
+
+work← : ∀ {X Z} {e : Ev X} {e′ : Ev Z} → Kin e e′ → Work e′ → Work e
+work← k-out  _ = tt
+work← k-skip _ = tt
+work← k-pin  _ = tt
+work← k-end  ()
+
+kin-end← : ∀ {X Z} {e : Ev X} → Kin e (end {Z}) → e ≡ end
+kin-end← k-end = refl
+
+kin-end→ : ∀ {X Z} {e′ : Ev Z} → Kin (end {X}) e′ → e′ ≡ end
+kin-end→ k-end = refl
 
 kin-refl : ∀ {X : Set} (e : Ev X) → Kin e e
 kin-refl (out _) = k-out
@@ -652,12 +673,18 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
       λ { (inj₁ (l , i , e₁ , ul , m)) → up¬¬′ ul λ { (e₁′ , ul′ , r′) → n (inj₁ (l , i , e₁′ , ul′ , mt i r r′ m)) }
         ; (inj₂ es) → n (inj₂ (skip-up r es)) }
 
-    shown′ : ∀ {l e₁′} → u′ l e₁′ → Shown (One f′) e₁′ → Live u′ l → Few u′ l
+    shown′ : ∀ {l e₁′} → u′ l e₁′ → Shown (One f′) e₁′ → Work e₁′ → Live u′ l → Few u′ l
            → Σ Pos λ k → Img k l × Σ (Ev A′) λ e₀′ → t′ k e₀′ × Match Every (One f′) (Reads f′) e₀′ e₁′
-    shown′ {l} ul sw lv fw with down′ ul
-    ... | e₁ , ul₀ , r′ with shown ul₀ (sh r′ sw) (U.live← {l} (λ {c} → lv {c})) (U.few← {l} fw)
+    shown′ {l} ul sw wk lv fw with down′ ul
+    ... | e₁ , ul₀ , r′ with shown ul₀ (sh r′ sw) (work← (kin′ r′) wk) (U.live← {l} (λ {c} → lv {c})) (U.few← {l} fw)
     ...   | k , i , e₀ , tk , m with up tk
     ...     | e₀′ , tk′ , r = k , i , e₀′ , tk′ , mt i r r′ m
+
+    shown-end′ : ∀ {l} → u′ l end → Live u′ l → Few u′ l → Σ Pos λ k → Img k l × ¬ ¬ t′ k end
+    shown-end′ {l} ul lv fw with down′ ul
+    ... | e₁ , ul₀ , r′ with kin-end← (kin′ r′)
+    ...   | refl with shown-end ul₀ (U.live← {l} (λ {c} → lv {c})) (U.few← {l} fw)
+    ...     | k , i , nn = k , i , λ n → nn λ tk → n (subst (t′ k) (kin-end→ (kin (proj₂ (proj₂ (up tk))))) (proj₁ (proj₂ (up tk))))
 
     up-row : ∀ {k} → Σ (Ev A) (λ e → t k e × Unpinned e) → Σ (Ev A′) λ e → t′ k e × Unpinned e
     up-row (e , tk , un) = proj₁ (up tk) , proj₁ (proj₂ (up tk)) , unp→ (kin (proj₂ (proj₂ (up tk)))) un
@@ -711,7 +738,7 @@ module Relabel {A A′ Y Y′ : Set} {f : Y → List A} {f′ : Y′ → List A�
 
   carried : CarryAt f′ M HP HE LP t′ u′ s s′
   carried = record
-    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun
+    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; shown-end = shown-end′ ; img-row = img-row′ ; img-fun = img-fun
     ; place = λ {m} um lv lm → placed′ {m} (place (proj₁ (proj₂ (down′ um))) (U.live← {m} (λ {c} → lv {c})) (U.lst← {m} lm))
     ; live = λ {k} {l} i lv → U.live→ {l} (λ {c} → live i (T.live← {k} (λ {c′} → lv {c′})) {c})
     ; few = λ {k} i → T.few→ {k} (few i)
@@ -893,9 +920,28 @@ module _ {A : Set} {M : PMap} (hm : Emb M) {t : EmissionSet A} {u : EmissionSet 
     (λ ls → to (Emb.inst hm my at) (trans (sym e) (trans ls (sym (instant-⊕ s′ δ)))))
     (λ ks → trans e (trans (from (Emb.inst hm my at) ks) (instant-⊕ s′ δ)))
 
+  -- A shown end's plain row, held classically, found among those listed.
+  shown-at : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
+           → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
+  shown-at {e = out _} ul sh lv fw = shown ul sh tt lv fw
+  shown-at {e = skip}  _ ()
+  shown-at {e = pin _} _ ()
+  shown-at {e = end}   ul _ lv fw with shown-end ul lv fw
+  ... | k , i , nn with row-at (few i) (λ n → nn λ tk → n (end , tk , tt))
+  ...   | e₀ , tk , _ = k , i , end , subst (t k) (end-is nn tk) tk , (λ _ → refl) , λ n → ⊥-elim (n tt)
+    where
+      neq : ∀ {k e₀} → t k e₀ → ¬ (e₀ ≡ end) → ¬ t k end
+      neq tk ne tk′ = ne (func tk tk′)
+
+      end-is : ∀ {k e₀} → ¬ ¬ t k end → t k e₀ → e₀ ≡ end
+      end-is {e₀ = end}   _  _  = refl
+      end-is {e₀ = out _} nn tk = ⊥-elim (nn (neq tk λ ()))
+      end-is {e₀ = skip}  nn tk = ⊥-elim (nn (neq tk λ ()))
+      end-is {e₀ = pin _} nn tk = ⊥-elim (nn (neq tk λ ()))
+
   attributed : Attribution Every (One valuesOf) (Reads valuesOf) t u s s′
   attributed = record
-    { Img = Img ; img = img′ ; shown = shown ; img-row = λ i → row-at (few i) (img-row i) ; img-fun = img-fun
+    { Img = Img ; img = img′ ; shown = shown-at ; img-row = λ i → row-at (few i) (img-row i) ; img-fun = img-fun
     ; img-mono = Mono.img-mono hm flat c ; inst = inst′ ; home = home′
     ; place = λ {m} um lm fm → placed {m} (place um lm (lstU fm))
     ; live = live

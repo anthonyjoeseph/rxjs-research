@@ -34,7 +34,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (mergeᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; root)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; hot; enter; Few; InE; _≺_; _≼_; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Den; hot; enter; Few; InE; _≺_; _≼_; module Op)
   renaming (shown to rj-shown)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≼-split; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; _⊑_; ⊑-trans; ⊑-≼)
@@ -128,30 +128,38 @@ private
     ... | b , (rt , just w) , y , refl with step-just b rt w
     ...   | ms , mk , eq with of-shown (q ⊕ [ ix 1 ]) 0 ms w mk (subst (λ z → InE (ofᴱ (q ⊕ [ ix 1 ]) 0 z) _ _) eq r) sh
     ...     | l′eq , refl =
-      let (k , i , e₀ , tk , m) = shown y sh (liveU y (lane-hang r) lv) (fewU′ y (lane-hang r) fw)
+      let (k , i , e₀ , tk , m) = shown y sh tt (liveU y (lane-hang r) lv) (fewU′ y (lane-hang r) fw)
       in k , (q , i , inj₂ ((rt , just w) , y , _ , ac , ms , eq , l′eq)) , e₀ , tk , tr-just m
 
-    shown′ : ∀ {l′ e″} → J.JoinT l′ e″ → Shown (One valuesOf) e″ → Live R l′ → Few R l′
+    shown′ : ∀ {l′ e″} → J.JoinT l′ e″ → Shown (One valuesOf) e″ → Work e″ → Live R l′ → Few R l′
            → Σ Pos λ k → Img′ k l′ × Σ (Ev X) λ e₀ → t k e₀ × MatchV e₀ e″
-    shown′ (J.val _) () _ _
-    shown′ (J.step _) () _ _
-    shown′ (J.opass _ _) () _ _
-    shown′ (J.lpass _ _ _ _ _ _) () _ _
-    shown′ (J.opin _) () _ _
-    shown′ (J.oend (S.send x , _) _) _ lv fw =
-      let (k , i , e₀ , tk , m) = shown x tt (liveU x h-at lv) (fewU′ x h-at fw)
-      in k , (_ , i , inj₁ (refl , λ y → oe (func y x))) , e₀ , tk , tr-end m
-    shown′ (J.lend (S.sval ac , _) _ ((r , _) , _) _ _ d) _ _ _ = ⊥-elim (not-done (acc-u ac) (lane-hang r) d)
-    shown′ (J.lane {e = out _} (S.sval ac , _) _ ((r , _) , _) _ _) sh lv fw = shown-lane ac r sh lv fw
-    shown′ (J.lane {e = end} _ _ _ _ ()) _ _ _
-    shown′ (J.lane {e = skip} _ _ _ _ _) () _ _
-    shown′ (J.lane {e = pin _} _ _ _ _ _) () _ _
-    shown′ (J.hand _ _ _ _ ()) _ _ _
-    shown′ (J.left _ _ _ _ _) () _ _
-    shown′ (J.run () _) _ _ _
-    shown′ (J.rend () _ _) _ _ _
-    shown′ (J.rpass () _ _) _ _ _
-    shown′ (J.rhand () _) _ _ _
+    shown′ (J.val _) ()
+    shown′ (J.step _) ()
+    shown′ (J.opass _ _) ()
+    shown′ (J.lpass _ _ _ _ _ _) ()
+    shown′ (J.opin _) ()
+    shown′ (J.oend _ _) _ ()
+    shown′ (J.lend _ _ _ _ _ _) _ ()
+    shown′ (J.lane {e = out _} (S.sval ac , _) _ ((r , _) , _) _ _) sh _ lv fw = shown-lane ac r sh lv fw
+    shown′ (J.lane {e = end} _ _ _ _ ()) _
+    shown′ (J.lane {e = skip} _ _ _ _ _) ()
+    shown′ (J.lane {e = pin _} _ _ _ _ _) ()
+    shown′ (J.hand _ _ _ _ ()) _
+    shown′ (J.left _ _ _ _ _) ()
+    shown′ (J.run () _) _
+    shown′ (J.rend () _ _) _
+    shown′ (J.rpass () _ _) _
+    shown′ (J.rhand () _) _
+
+    -- The read's end on its source's end, held as the source's carry holds it.
+    shown-end′ : ∀ {l′} → J.JoinT l′ end → Live R l′ → Few R l′ → Σ Pos λ k → Img′ k l′ × ¬ ¬ t k end
+    shown-end′ (J.oend (S.send x , _) _) lv fw =
+      let (k , i , nn) = shown-end x (liveU x h-at lv) (fewU′ x h-at fw)
+      in k , (_ , i , inj₁ (refl , λ y → oe (func y x))) , nn
+    shown-end′ (J.lend (S.sval ac , _) _ ((r , _) , _) _ _ d) _ _ = ⊥-elim (not-done (acc-u ac) (lane-hang r) d)
+    shown-end′ (J.lane _ _ _ _ ()) _ _
+    shown-end′ (J.run () _) _ _
+    shown-end′ (J.rend () _ _) _ _
 
     img-fun′ : ∀ {k l₁ l₂} → Img′ k l₁ → Img′ k l₂ → l₁ ≡ l₂
     img-fun′ (_ , i₁ , p₁) (_ , i₂ , p₂) with img-fun i₁ i₂
@@ -238,7 +246,8 @@ private
       ; pb-past = λ { (_ , pb , p , (_ , x)) tk lv _ m xk nxk → ahead-over (pb-past pb tk lv x m xk nxk) (hang-⊑ (pt-hang p)) }
       ; img     = img′
       ; img¬¬   = img¬¬′
-      ; shown   = λ y sh lv fw → shown′ (proj₁ y) sh lv fw
+      ; shown   = λ y sh w lv fw → shown′ (proj₁ y) sh w lv fw
+      ; shown-end = λ y lv fw → shown-end′ (proj₁ y) lv fw
       ; img-row = λ { (_ , i , _) → img-row i }
       ; img-fun = img-fun′
       ; place   = place′

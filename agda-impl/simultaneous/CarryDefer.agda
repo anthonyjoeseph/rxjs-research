@@ -23,7 +23,7 @@ open import Tree using (Later; defer)
 open import denotation.Position using (Pos; ix; _⊕_; root; _≟ᵖ_; _<ᵖ_)
 open import Data.Bool.Properties using (T?)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
+open import denotation.EmissionSet using (Ev; skip; end; pin; Unpinned; Work; EmissionSet; Truncate; Reach; Few; Spin; spin; _≺_; _≼_; Den; enter;
   DenEnv; approx; DeferT; guard; body)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ticks; entered-reach; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
@@ -122,6 +122,7 @@ module SpinCarry {A : Set} {HP HE LP : Pos → Set} {M₀ : PMap} {p p₀ p′ :
     ; img     = λ tk _ _ _ _ → inj₁ (img tk)
     ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (inj₁ (l , i , e′ , ul , m))
     ; shown   = λ { (spin _ , _) () }
+    ; shown-end = λ { (() , _) }
     ; img-row = λ { (_ , _ , spin i , r) n → n (skip , (spin i , r) , tt) }
     ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
     ; place   = λ { (spin i , _) _ _ → inj₁ (instant-⊕ p′ [ ix i ]) }
@@ -164,7 +165,7 @@ carry-grow : ∀ {A Y} {f : Y → List A} {M M′ : PMap} {HP HE LP : Pos → Se
            → (∀ {k l e₀ e x y} → CarryAt.PB c k l → t k e₀ → (Unpinned e₀ → Live t k) → u l e → M′ x y → x ≺ k → ¬ (x ⊑ k) → Ahead y l)
            → CarryAt f M′ HP HE LP t u s s′
 carry-grow sub c past = record
-  { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row
+  { Img = Img ; ext = λ i → let (y , m , yl) = ext i in y , sub m , yl ; img = img ; img¬¬ = img¬¬ ; shown = shown ; shown-end = shown-end ; img-row = img-row
   ; img-fun = img-fun ; place = place ; live = live ; few = few ; whole = whole ; cover = cover
   ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = past ; pinned = pinned }
   where
@@ -365,11 +366,15 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
     C.img¬¬ x un (P.live← lv) (P.few← fw) λ { (inj₁ (l , i , e′ , ul , m)) → n (inj₁ (l , inj₂ i , e′ , E.up ul , m))
                                              ; (inj₂ es) → n (inj₂ es) }
 
-  shown : ∀ {l e} → E.T l e → Shown (One valuesOf) e → Live E.T l → Few E.T l
+  shown : ∀ {l e} → E.T l e → Shown (One valuesOf) e → Work e → Live E.T l → Few E.T l
         → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → P.T k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
   shown (guard , _) ()
-  shown (body y , _) sh lv fw with C.shown y sh (E.live← lv) (E.few← fw)
+  shown (body y , _) sh w lv fw with C.shown y sh w (E.live← lv) (E.few← fw)
   ... | k , i , e₀ , tk , m = k , inj₂ i , e₀ , P.up tk , m
+
+  shown-end : ∀ {l} → E.T l end → Live E.T l → Few E.T l → Σ Pos λ k → Img k l × ¬ ¬ P.T k end
+  shown-end (body y , _) lv fw with C.shown-end y (E.live← lv) (E.few← fw)
+  ... | k , i , nn = k , inj₂ i , λ n → nn λ tk → n (P.up tk)
 
   img-row : ∀ {k l} → Img k l → ¬ ¬ Σ (Ev A) λ e → P.T k e × Unpinned e
   img-row (inj₁ (refl , refl)) n = n (skip , P.gT , tt)
@@ -449,7 +454,7 @@ module NextCarry {A : Set} {HP HE LP : Pos → Set} {M : PMap} (s : Den A) (s′
 
   carried : CarryAt valuesOf M HP HE LP P.T E.T p p′
   carried = record
-    { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; img-row = img-row ; img-fun = img-fun ; place = place
+    { Img = Img ; ext = ext ; img = img ; img¬¬ = img¬¬ ; shown = shown ; shown-end = shown-end ; img-row = img-row ; img-fun = img-fun ; place = place
     ; live = live ; few = few ; whole = whole ; cover = cover
     ; bk = bk ; in-bk = in-bk ; PB = PB ; pb-few = pb-few ; pb-img = pb-img ; pb-past = pb-past ; pinned = pinned }
 
@@ -522,7 +527,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
            g-bare : ∀ {x y} → M x y → g ⊑ x → x ≡ g
            g-bare m gx with wi m
            ... | inj₁ m₁ = O.bare₀ m₁ gx
-           ... | inj₂ w  = ⊥-elim (leads (proj₂ okP) (step here plain-ix) nb nr w gx)
+           ... | inj₂ w  = ⊥-elim (w λ w′ → leads (proj₂ okP) (step here plain-ix) nb nr w′ gx)
              where
                nb : W⁼ (Hots envP) (p ⊕ [ ix 1 ]) g → ⊥
                nb ww = sib (proj₁ okP) plain-ix (⊑-refl p) g≢ ww (⊑-refl g)
@@ -539,4 +544,4 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
            wi′ : Within (Hots envP) M₀ M p
            wi′ m with wi m
            ... | inj₁ m₁ = O.within m₁
-           ... | inj₂ w  = inj₂ (inW (nest-in (step here plain-ix) w))
+           ... | inj₂ w  = inj₂ (λ n → w λ w′ → n (inW (nest-in (step here plain-ix) w′)))

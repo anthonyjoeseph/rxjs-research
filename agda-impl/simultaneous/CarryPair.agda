@@ -116,8 +116,8 @@ module PairUnder {H : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos} (E₀ : Emb
 
   within : Within H M₀ M p
   within (inj₁ m)                 = inj₁ m
-  within (inj₂ (inj₁ (refl , _))) = inj₂ (inW (step here plain-ix))
-  within (inj₂ (inj₂ (refl , _))) = inj₂ (inW (step here plain-ix))
+  within (inj₂ (inj₁ (refl , _))) = inj₂ (λ n → n (inW (step here plain-ix)))
+  within (inj₂ (inj₂ (refl , _))) = inj₂ (λ n → n (inW (step here plain-ix)))
 
   private
     under : ∀ {a} σ → p₀ ⊑ ((p′ ⊕ [ a ]) ⊕ σ)

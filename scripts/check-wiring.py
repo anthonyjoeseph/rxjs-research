@@ -427,6 +427,23 @@ def extract_definitions(src_dir, files):
             order.append(name)
             note_mixfix(name)
 
+    # A `module` HEADER'S `where`, searched across the header's own
+    # continuation lines however many there are: a telescope of fifty
+    # parameters is still one header.  A fixed window hid such a module's
+    # whole body, postulates included, from the ledger.  None when the
+    # header ends (a line back at its indent) without one.
+    def header_where(raw_lines, visible, i, end):
+        indent = leading_spaces(raw_lines[i])
+        k = i
+        while k < end:
+            if (k > i and visible[k].strip() != ""
+                    and leading_spaces(raw_lines[k]) <= indent):
+                return None
+            if visible[k].split("--", 1)[0].split()[-1:] == ["where"]:
+                return k
+            k += 1
+        return None
+
     def scan_block(raw_lines, visible, start, end, indent_level, relpath):
         """Scan lines [start, end) that belong to one indentation scope
         (indent_level — 0 for a file's true top level, or a block's base
@@ -479,10 +496,8 @@ def extract_definitions(src_dir, files):
                 continue
 
             if tok0 == "module":
-                k, limit = i, min(end, i + 12)
-                while k < limit and visible[k].split("--", 1)[0].split()[-1:] != ["where"]:
-                    k += 1
-                if k >= limit:
+                k = header_where(raw_lines, visible, i, end)
+                if k is None:
                     i += 1          # not a `… where` header after all
                     continue
                 j = k + 1
@@ -667,10 +682,8 @@ def extract_definitions(src_dir, files):
             # it: every member invisible, its uses attributed to whichever
             # definition preceded it.  Recurse at the body's own indent.
             if tok0 == "module":
-                k, limit = i, min(end, i + 12)
-                while k < limit and visible[k].split("--", 1)[0].split()[-1:] != ["where"]:
-                    k += 1
-                if k < limit:
+                k = header_where(raw_lines, visible, i, end)
+                if k is not None:
                     j = k + 1
                     inner_base = None
                     while j < end:

@@ -116,9 +116,5 @@ zero. Detach with the Bash tool's `run_in_background`.
 ## No keep-alives
 
 The session runs on a persistent laptop, so the container does not suspend between
-tool calls — background workers and detached builds advance on their own, and worker
-completion notifications wake the design session. Keep only a SPARSE fallback
-check-in (~60 min) to catch workers wedged by harness restarts: a restart kills a
-worker's in-flight turn, diagnosed via transcript mtime + `ps` and revived via
-SendMessage with re-verify instructions. **"queued" = alive, "resumed from
-transcript" = was dead.**
+tool calls — detached builds advance on their own and their completion notifications
+wake the session. No keep-alive check-ins.

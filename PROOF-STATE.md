@@ -42,7 +42,7 @@ and exhaust's run read the outer against lane ends across the two maps;
 bounded's run and hand-off read the queue; every op's done reads all
 lanes' ends. Settled when each holds, or a refutation names the op.
 
-Members: `switch-cut`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `pair-done`, `end-done`, `outer-ends`, `paired⁻`, `ends⁻`.
+Members: `switch-cut`, `switch-cut¬¬`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `paired⁻`, `ends⁻`.
 
 #### THE JOINED LANES
 
@@ -54,7 +54,9 @@ hand-off and the outer's end lying apart, a lane listed under its
 environment's listing, and the fields read lane by lane. Settled when
 each is a body.
 
-Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`, `lane-listing`, `hand-apart`, `end-apart`, `hand-ext`, `end-ext`.
+Members: `joined-maps`, `joined-nest`, `lanes-apart`, `lanes-pb-apart`, `read-value`, `lane-listing`, `hand-apart`, `end-apart`, `hand-ext`, `end-ext`,
+`join-pb-few`, `join-pb-past`, `join-img¬¬`, `join-place`, `join-live`, `join-whole`, `join-cover`, `join-bk`, `join-pinned`,
+`img-reach`, `back-reach`, `end-reach⁻`, `join-from`, `into-lift`.
 
 #### THE ERASURE
 
@@ -86,7 +88,7 @@ by `cover`; open: the same before a LATE carrier, and a pin, alive or
 dead, carried from its connect's own past by whichever subterm made it.
 Settled when each leaf is a body.
 
-Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-shown-end`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE FLATMAP'S CARRY
 
@@ -95,7 +97,7 @@ outer's echoes, as the connect's are from its body's and source's; a
 lane row never shows where an outer row does. Open: each field past
 that, an outer row's late carrier included. Settled when each is a body.
 
-Members: `flat-src-live`, `flat-pb-past`, `flat-img`, `flat-img¬¬`, `flat-shown`, `flat-place`, `flat-whole`, `flat-pinned↓`.
+Members: `flat-src-live`, `flat-pb-past`, `flat-img`, `flat-img¬¬`, `flat-shown`, `flat-shown-end`, `flat-place`, `flat-whole`, `flat-pinned↓`.
 
 #### THE COVER
 

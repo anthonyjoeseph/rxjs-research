@@ -95,7 +95,7 @@ EnvRel {Γ} M₀ ρ envP envE = ∀ {X} (i : X ∈ Γ) → Bound M₀ (HotsListe
 
 -- What the map adds lies in the world with the subscription.
 Within : (Pos → Set) → PMap → PMap → Pos → Set
-Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ W⁼ H p x
+Within H M₀ M p = ∀ {x y} → M x y → M₀ x y ⊎ ¬ ¬ W⁼ H p x
 
 -- The map pairs nothing strictly under a row: what a former putting a
 -- row under another's position grows the map by.

@@ -22,7 +22,7 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (Obs)
 open import denotation.Position using (_≟ᵖ_; Pos; ix; sub; last; _⊕_; root)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Reach; Den; DenEnv; enter; approx; _≺_; _≼_; module Scan; module Op)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Few; Reach; Den; DenEnv; enter; approx; _≺_; _≼_; module Scan; module Op)
 open import denotation.Laws.Modulus using (entered-reach; reach-few; ≼-split; ≺→≼; ≺-≼-≺; ≼-refl; ≺-irrefl)
 open import denotation.Laws.Worlds using (InvAt; Ok; Hots; GoodEnv; full; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
@@ -318,11 +318,22 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     shown-unp t-skip ()
     shown-unp (t-pin _) ()
 
-    shown′ : ∀ {l e} → τ l e → Shown (One f) e → Live τ l → Few τ l
+    work-back : ∀ {e e′} → Told e e′ → Work e′ → Work e
+    work-back t-out     _ = tt
+    work-back t-skip    _ = tt
+    work-back t-end     ()
+    work-back (t-pin _) _ = tt
+
+    shown′ : ∀ {l e} → τ l e → Shown (One f) e → Work e → Live τ l → Few τ l
            → Σ Pos λ k → Img′ k l × Σ (Ev X) λ e₀ → t k e₀ × Match Every (One f) (Reads f) e₀ e
-    shown′ y sh lv fw with told-shown fx y sh
-    ... | l , e , yl , refl , tr with C.shown yl (shown-back tr sh) (told-live← y yl (δ e , refl) (λ {c′} → lv {c′})) (few-unp yl (shown-unp tr sh))
+    shown′ y sh w lv fw with told-shown fx y sh
+    ... | l , e , yl , refl , tr with C.shown yl (shown-back tr sh) (work-back tr w) (told-live← y yl (δ e , refl) (λ {c′} → lv {c′})) (few-unp yl (shown-unp tr sh))
     ...   | k , i , e₀ , tk , mt = k , (l , i , inj₁ (e , yl , refl)) , e₀ , tk , match-told mt tr
+
+    shown-end′ : ∀ {l} → τ l end → Live τ l → Few τ l → Σ Pos λ k → Img′ k l × ¬ ¬ t k end
+    shown-end′ y lv fw with told-shown {f = f} fx y tt
+    ... | l , e , yl , refl , t-end with C.shown-end yl (told-live← y yl (δ e , refl) (λ {c′} → lv {c′})) (few-unp yl tt)
+    ...   | k , i , nn = k , (l , i , inj₁ (e , yl , refl)) , nn
 
     Placed : Pos → Set
     Placed m = instantOf m ≡ instantOf q ⊎ (Σ Pos λ k → Σ Pos λ l → Img′ k l × instantOf l ≡ instantOf m × Near τ m l)
@@ -423,7 +434,7 @@ module _ {Γ X Y} {f : Y → List X} {M HP HE LP} {t : EmissionSet X} {s} n (S :
     { Img = Img′ ; ext = λ { (_ , i , mv) → let (y , m , yl) = C.ext i in y , m , ⊑-trans yl (mv-⊑ mv) }
     ; PB = PB′ ; pb-few = pb-few′ ; pb-img = λ { (_ , pb , _) (_ , i , _) → C.pb-img pb i }
     ; pb-past = λ { (l , pb , e , y , refl) tk lv _ m xk nx → ahead-over (C.pb-past pb tk lv y m xk nx) (δ e , refl) }
-    ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
+    ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; shown-end = shown-end′
     ; img-row = λ { (_ , i , _) → C.img-row i } ; img-fun = img-fun′
     ; place = place′ ; live = live′ ; few = λ { (_ , i , _) → C.few i }
     ; whole = λ wt ne lp → told-whole (C.whole wt ne lp) ; cover = told-cover

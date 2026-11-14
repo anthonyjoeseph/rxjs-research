@@ -24,7 +24,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Properties using (∷-injectiveˡ)
 
 open import denotation.Position using (Pos; ix; _⊕_; inside; _≟ᵖ_; root; _<ᵖ_)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; _≼_;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_; _≼_;
   module Connect)
 open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≺-ext; reach-few; few-ind; ≼-split; ≺-trans; ≺-irrefl; ≺-≼-≺)
 open import denotation.Laws.BoundedInv using (first-child)
@@ -178,14 +178,6 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     live-u lv (CE.body b , _) = lv b
 
     private
-      -- A carrier of the end shows the end.
-      ended : ∀ {e₀ : Ev B} → Match Every (One valuesOf) (Reads valuesOf) e₀ (end {IE B}) → e₀ ≡ end
-      ended {out _} (c , _) with c tt
-      ... | _ , () , _
-      ended {end}   _       = refl
-      ended {skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
-      ended {pin _} (_ , n) = ⊥-elim (n (λ ()) tt)
-
       βfew : ∀ {w} → Few CE.ConnT w → Few CE.β w
       βfew (ks , h) = ks , λ b kw → h (CE.body b) kw
 
@@ -213,13 +205,9 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
             ah : Ahead l (proj₁ (B′.ext i′))
             ah = Emb.mono emb′ E (inj₁ my′) lt , λ ly → SP.img-body x b′ (Emb.reflect emb′ E (inj₁ my′) ly)
 
-        fin : ∀ {w k′ e₀} → w ≺ l → B′.Img k′ w → CP.β k′ e₀ → Match Every (One valuesOf) (Reads valuesOf) e₀ (end {IE B}) → ⊥
-        fin wl i′ b′ m with ended m
-        ... | refl = past wl i′ b′
-
         step : ∀ {w} → Few CE.ConnT w → (∀ {v e} → CE.ConnT v e → v ≺ w → P v) → P w
         step {w} Fw ih (CE.body b) wl =
-          let (_ , i′ , _ , b′ , m) = B′.shown b tt lβ (βfew Fw) in fin wl i′ b′ m
+          let (_ , i′ , nb′) = B′.shown-end b lβ (βfew Fw) in nb′ (past wl i′)
           where
             lβ : Live CE.β w
             lβ {c₂} b₂ c₂w = ih (CE.body b₂) c₂w (CE.body b₂) (≺-trans {c₂} {w} {l} c₂w wl)
@@ -406,8 +394,9 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     postulate
       conn-img¬¬ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
                  → ¬ ¬ ((Σ Pos λ l → ConnImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
-      conn-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
+      conn-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Work e → Live u l → Few u l
                  → Σ Pos λ k → ConnImg k l × Σ (Ev B) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
+      conn-shown-end : ∀ {l} → u l end → Live u l → Few u l → Σ Pos λ k → ConnImg k l × ¬ ¬ t k end
       conn-place : ∀ {m e} → u m e → Live u m → Listed u m
                  → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → ConnImg k l × instantOf l ≡ instantOf m × Near u m l)
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
@@ -630,7 +619,7 @@ module ConnCarry {A B : Set} {HP HE LP : Pos → Set} {sP : Den A} {FP : Den A �
     carried : CarryAt valuesOf M′ HP HE LP t u p p′
     carried = record
       { Img = ConnImg ; ext = ext′ ; PB = PB′ ; pb-few = pb-few′ ; pb-img = pb-img′ ; pb-past = conn-pb-past
-      ; img = conn-img ; img¬¬ = conn-img¬¬ ; shown = conn-shown ; img-row = img-row′ ; img-fun = img-fun′
+      ; img = conn-img ; img¬¬ = conn-img¬¬ ; shown = conn-shown ; shown-end = conn-shown-end ; img-row = img-row′ ; img-fun = img-fun′
       ; place = conn-place ; live = live′ ; few = few′ ; whole = conn-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = conn-pinned ; cover = conn-cover }
 
     -- A pin carried from its own connect's past: a body pin by the body's

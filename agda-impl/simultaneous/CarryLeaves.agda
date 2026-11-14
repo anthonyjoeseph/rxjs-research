@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import denotation.Laws.Worlds.Leaves using (of-rows; of-in; of-row)
-open import simultaneous.CarryBase using (unp-pin; unpinned-narrow; CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕)
+open import simultaneous.CarryBase using (unp-pin; unpinned-narrow; CarryAt; Emb; Fresh; PMap; _∪ᴹ_; _⊆ᴹ_; emb-under; instant-⊕; end-held)
 open import simultaneous.Carry using (Bare; Carry; Within; carry; NotHot; clear-not; Grown; joins-grow; grown-past; env-past; ⊑-foot)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; mapIE; elaborate)
@@ -98,7 +98,7 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
 
   within : Within HP M₀ M p
   within (inj₁ m)                  = inj₁ m
-  within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
+  within (inj₂ (_ , pl , refl , _)) = inj₂ (λ n → n (inW (step here pl)))
 
   -- Its points lie one label under the subscription, holding no hot row.
   grown : ∀ {R} → NotHot R p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y
@@ -239,7 +239,8 @@ private
       ; ext     = λ { (n , _) → _ , inj₂ n , ⊑-refl _ }
       ; img     = λ tk _ _ _ _ → inj₁ (img tk)
       ; img¬¬   = λ tk _ _ _ n → let (l , i , e′ , ul , _ , m) = img tk in n (inj₁ (l , i , e′ , ul , m))
-      ; shown   = shown
+      ; shown   = λ ul sh _ lv fw → shown ul sh lv fw
+      ; shown-end = λ ul lv fw → end-held {f = valuesOf} {Img = Img} (shown ul tt lv fw)
       ; img-row = λ { (_ , e , tk) n → n (e , tk , of-unp p 0 xs (proj₁ tk)) }
       ; img-fun = λ { (n , _) (n′ , _) → Emb.fun embN n n′ }
       ; place   = λ um _ _ → inj₁ (place um)
