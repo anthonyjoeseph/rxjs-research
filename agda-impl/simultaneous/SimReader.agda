@@ -38,8 +38,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Carried; c-out; c-end; Mt; m-out; m-end; Local; Fresh; NoneUnder;
   Joins; Upto; Under; Mapped; Run; _⊆ᴹ_; allᴱ; Shows; Shown; AShows; AShown; HotSim; EnvSim;
   EnvListed; ListedB; ListedL; Live; EndsAfter; EnvNeeds; EnvJoins; Apart; SimIH; sih)
-open import simultaneous.SimPos using (UpTo)
-open import simultaneous.ReadMap using (module Map; upto-dn; under?; under-down)
+open import simultaneous.ReadMap using (module Map; upto-dn; under?; under-down; listed-up)
 open import simultaneous.ReadRows using (module Rows)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)
@@ -304,14 +303,6 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   unlive c (ks , cov , back) = ks , (λ y u → cov y u (live y)) , back
 
   -- Listed up to a bound: listed up to a hot row up to it.
-  listed-up : ∀ c {k e₀} → rows k e₀ → Upto c k → ListedB rows c → ListedB rows (just k)
-  listed-up c {k} s uk (ks , cov , back) = ks , (λ y u → cov y (up y u)) , back
-    where
-      up : ∀ {j e} → rows j e → UpTo k j → Upto c j
-      up {j} _ (inj₁ jk)             = upto-dn c jk uk
-      up     _ (inj₂ ([] , refl))    = subst (Upto c) (sym (⊕-identityʳ k)) uk
-      up     y (inj₂ (_ ∷ _ , refl)) = ⊥-elim (Lawful.flat law s y)
-
   -- The hot cut at a row up to a bound, mapped at its anchor.
   at-row : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ c → EnvListed ρ env env′ es Tr A′ c
          → ∀ {q e} → rows q e → Carried e → Upto c q → Mapped A′ (just q) × Sim AShows AShown A′ Car (just q) rows rows′
@@ -320,7 +311,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
       inc′ : Amb ⊆ᴹ A′
       inc′ a = inc (inj₁ a)
       nq = HotSim.need-row (es i) s uq (en i Tr ends A′ c L)
-      lq = listed-up c s uq (unlive c (allᴱ L i))
+      lq = listed-up (λ {y} {e} {l} {ys} {e′} → Lawful.flat law {y} {e} {l} {ys} {e′}) c s uq (unlive c (allᴱ L i))
       mq : Mapped A′ (just q)
       mq with Run.anchor run A′ inc′ emA s ce nq lq
       ... | y , a = y , inc′ a
