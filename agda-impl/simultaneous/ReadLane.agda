@@ -10,10 +10,10 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; length; replicate)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_; pred)
 open import Data.Nat.Properties using (+-suc; +-identityʳ)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (does)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; ix)
@@ -88,3 +88,22 @@ of-last w j (m ∷ ms) e = on-out (subst (λ n → InE (ofᴱ w (suc j) (ms ++ e
 of-skip : ∀ {A} w j (xs : List A) {y} → InE (ofᴱ w j xs) y skip → ⊥
 of-skip w j []       ()
 of-skip w j (x ∷ xs) (on-out r) = of-skip w (suc j) xs r
+
+------------------------------------------------------------------------
+-- The lane's last index
+
+len-snoc : ∀ {A : Set} (ms : List A) e → length (ms ++ e ∷ []) ≡ suc (length ms)
+len-snoc []       e = refl
+len-snoc (m ∷ ms) e = cong suc (len-snoc ms e)
+
+pred-snoc : ∀ {A : Set} (ms : List A) e → pred (length (ms ++ e ∷ [])) ≡ length ms
+pred-snoc ms e = cong pred (len-snoc ms e)
+
+-- Marks then an emit: the emit at the last index.
+of-at-last : ∀ {X} w (xs ms : List (IE X)) e → xs ≡ ms ++ e ∷ [] → InE (ofᴱ w 0 xs) (w ⊕ (ix (pred (length xs)) ∷ [])) (out e)
+of-at-last w xs ms e refl = subst (λ n → InE (ofᴱ w 0 (ms ++ e ∷ [])) (w ⊕ (ix n ∷ [])) (out e)) (sym (pred-snoc ms e)) (of-last w 0 ms e)
+
+of-at-last⁻ : ∀ {X} w (xs ms : List (IE X)) e {y b} → Marks ms → xs ≡ ms ++ e ∷ [] → InE (ofᴱ w 0 xs) y (out b) → Shown b
+            → b ≡ e × y ≡ w ⊕ (ix (pred (length xs)) ∷ [])
+of-at-last⁻ w xs ms e mk refl r sh with of-last⁻ w 0 ms e mk r sh
+... | eb , ey = eb , trans ey (cong (λ n → w ⊕ (ix n ∷ [])) (sym (pred-snoc ms e)))

@@ -17,6 +17,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
+open import Data.Nat using (pred)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
@@ -29,16 +30,17 @@ open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; Unpinned; EmissionSet; Den; Few; Reach; Truncate;
   Rejoin; shown; heard; ended; late; InE; LaneOf; _≺_; _≼_; module Scan; module Merge; module Op)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-≼-≺; ≼-antisym; ≼-split; ≺-ext; ≼-or-≻)
-open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-injˡ; ⊕-injʳ; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊑-cmp; ⊑-snoc; ⊑-refl; ⊑-trans)
+open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-injˡ; ⊕-injʳ; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊑-cmp; ⊑-snoc; ⊑-snoc⁺; ⊑-refl; ⊑-trans)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-idx; of-row; of-rows; of-in; of-reach; of-end-row; ine-pin)
 open import adequacy.SubOne using (scan-reach)
 open import simultaneous.SimPos using (apart; flat-apart)
-open import simultaneous.ReadLane using (Marks; step-just; step-nothing; of-marks; of-last⁻; of-last; of-skip)
+open import simultaneous.ReadLane using (step-just; step-nothing; of-marks; of-skip; of-at-last; of-at-last⁻)
 open import adequacy.SubJoin using (Bind; lower; row-reach; rejoin-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
+open import simultaneous.Sim using (Shown)
 open import simultaneous.ReadFold using (foldᵈ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; joinStep)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; joinStep)
 
 module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
             (fewG : ∀ {q e} → G q e → Unpinned e → Few G q) where
@@ -304,6 +306,29 @@ module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
       ... | ov-val _ g′ pl′ refl _ _ = ⊥-elim (late-none g cp g′ pl′)
 
   ----------------------------------------------------------------------
+  -- A reader's value and end, read back
+
+  -- A value shown: the last of a lane, of a joined value showing it.
+  u-val⁻ : ∀ {m b} → J m (out b) → Shown b → Σ Pos λ l → Σ Routes λ r → G l (out (r , just b)) × p′ ≺ l
+         × Σ (Bool × List (IE X)) λ s → Scan.Acc joinStep z₀ R (at l) s × m ≡ at l ⊕ [ ix 1 ] ⊕ [ ix (pred (length (proj₂ s))) ]
+  u-val⁻ {m} {b} (Merge.lane {a = s} x _ ln _ _) sh with ov x
+  ... | ov-val {l} {x = r , nothing} β g pl refl a refl = ⊥-elim (of-marks (at l ⊕ [ ix 1 ]) 0 _ (step-nothing β r) (proj₁ (proj₁ ln)) sh)
+  ... | ov-val {l} {x = r , just b′} β g pl refl a refl with step-just β r b′
+  ...   | ms , mk , eq with of-at-last⁻ (at l ⊕ [ ix 1 ]) _ ms b′ mk eq (proj₁ (proj₁ ln)) sh
+  ...     | refl , ey = l , r , g , pl , _ , a , ey
+  u-val⁻ (Merge.run () _) _
+
+  -- An end: a joined end, or the late end.
+  u-end⁻ : ∀ {m} → J m end → (Σ Pos λ l → G l end × p′ ≺ l × m ≡ at l) ⊎ (Σ Pos λ c → G c end × c ≼ p′ × m ≡ p′ ⊕ [ last ])
+  u-end⁻ (Merge.oend x _) with ov x
+  ... | ov-end g pl refl  = inj₁ (_ , g , pl , refl)
+  ... | ov-late g cp refl = inj₂ (_ , g , cp , refl)
+  u-end⁻ (Merge.lend {a = s} x _ ln _ _ dn) with ov x
+  ... | ov-val {l} _ g pl refl _ _ with lane-at {at l} {s} ln
+  ...   | σ , e = ⊥-elim (not-done g pl σ (subst (Merge.Done F O) e dn))
+  u-end⁻ (Merge.rend () _ _)
+
+  ----------------------------------------------------------------------
   -- THE ROWS LISTED: where the rows of `G` in a decided, downward-closed
   -- `UG` are listed with their rows, the reader's rows over them are
   -- listed too, each with its row and its reach.
@@ -524,3 +549,30 @@ module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
     backU : ∀ {m} → m ∈ ksU → Σ (Ev (IE X)) (U m)
     backU i with backJ i
     ... | gd , e , x = e , x , reachJ x gd
+
+    ----------------------------------------------------------------------
+    -- A reader's value and end, constructed
+
+    u-val′ : ∀ {l r b s} → G l (out (r , just b)) → Live l → Scan.Acc joinStep z₀ R (at l) s
+           → U (at l ⊕ [ ix 1 ] ⊕ [ ix (pred (length (proj₂ s))) ]) (out b)
+    u-val′ {l} {r} {b} g (u , pl) a with acc-step a
+    ... | β , x′ , rx , refl with r-func rx (r-out g pl)
+    ...   | refl with step-just β r b
+    ...     | ms , _ , eq = jr , reachJ jr (g-row g pl (⊑-trans (⊑-snoc⁺ (at l)) (⊑-snoc⁺ (at l ⊕ [ ix 1 ]))) u)
+      where
+        w = at l ⊕ [ ix 1 ]
+        xs = proj₂ (joinStep β (r , just b))
+        jr = JM.lane (o-val g pl a) tt ((of-at-last w xs ms b eq , of-reach w 0 xs {_} {out b}) , ≺-ext w {ix (pred (length xs))} []) (λ ()) tt
+
+    -- A joined value showing an emit: the emit, last on its lane.
+    u-val : ∀ {l r b} (g : G l (out (r , just b))) (lv : Live l)
+          → U (at l ⊕ [ ix 1 ] ⊕ [ ix (pred (length (proj₂ (proj₁ (acc g lv))))) ]) (out b)
+    u-val g lv = u-val′ g lv (proj₂ (acc g lv))
+
+    u-end : ∀ {l} → G l end → Live l → U (at l) end
+    u-end g (u , pl) = jr , reachJ jr (g-row g pl (⊑-refl _) u)
+      where jr = JM.oend (o-end g pl) (done-at g pl)
+
+    u-late : ∀ {c} → G c end → c ≼ p′ → UG c → U (p′ ⊕ [ last ]) end
+    u-late g cp u = jr , reachJ jr (g-late g cp refl u)
+      where jr = JM.oend (o-late g cp) (done-late g cp)
