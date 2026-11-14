@@ -25,6 +25,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (¬_; yes; no; ¬?)
+open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Relation.Unary.Any using (any?)
 
 open import Tree using (Obs; cold)
@@ -39,6 +40,7 @@ open import denotation.Laws.Worlds using (InvAt; Ok; Hots; W; W⁼; here; inW; s
   ⊑-snoc; ⊕-injʳ; ⊕-identityʳ; ⊕-assoc; world-after; conv)
 open import denotation.Laws.Worlds.Leaves using (of-end; of-reach)
 open import denotation.Laws.BoundedInv using (end-uniq)
+open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws.ColdInv using (cold-reach)
 open import denotation.Laws using (inv-approx)
 open import adequacy.SubOne using (Lifted; reach-lift)
@@ -48,7 +50,7 @@ open import simultaneous.Readings using (instantOf; parent; parent-snoc)
 open import simultaneous.Relations using (sourced)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
-open import simultaneous.CarryBase using (PMap; Emb; CarryAt; instant-⊕; sub-listed; listed-≼; apart; match-end; module Mono; IntoAt; From;
+open import simultaneous.CarryBase using (PMap; Emb; CarryAt; instant-⊕; sub-listed; listed-≼; apart; module Mono; IntoAt; From;
   InOrder; Near; Home; Whole; Ahead; ahead-over)
 open import simultaneous.CarryLeaves using (coreAt; ix-last)
 open import simultaneous.CarryTold using (told-carry)
@@ -363,10 +365,9 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   stop yK = MS.cut-row (mx yK) tt (never-before yK) (inj₂ refl)
 
   -- The plain end the told end carries.
-  L2 : ∀ {K} → σ K end → Σ Pos λ c₀ → t c₀ end × CC.Img c₀ K
-  L2 {K} yK with CC.shown yK tt (λ yc → subst (K ≼_) (end-uniq T.invσ yK yc) (≼-refl {K})) (T.few-unp yK tt)
-  ... | c₀ , i , e₀ , tk , mt with match-end mt
-  ...   | refl = c₀ , tk , i
+  L2 : ∀ {K} → σ K end → Σ Pos λ c₀ → ¬ ¬ t c₀ end × CC.Img c₀ K
+  L2 {K} yK with CC.shown-end yK (λ yc → subst (K ≼_) (end-uniq T.invσ yK yc) (≼-refl {K})) (T.few-unp yK tt)
+  ... | c₀ , i , ntc = c₀ , ntc , i
 
   module Mn = Mono hm (λ {y} {e} {l} {ys} {e′} → InvAt.flat It {y} {e} {l} {ys} {e′}) cc
 
@@ -384,17 +385,20 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   Wv l l″ = Sv l l″ ⊎ (σ l end × l″ ≡ Xs l)
 
   -- A live carrier that stays lies before every failure.
-  stay-≺ : ∀ {k l l′ K} → CC.Img k l → Sv l l′ → Live t k → σ K end → l′ ≺ qc K
-  stay-≺ {k} {l} {K = K} i sv lv yK with L2 yK
-  ... | c₀ , tc₀ , i₀ with ≼-split {k} {c₀} (lv tc₀)
-  ...   | inj₂ refl with CC.img-fun i i₀
-  ...     | refl with sv
-  ...       | w-row y wk with InvAt.func T.invσ y yK
-  ...         | refl = ⊥-elim wk
-  stay-≺ {k} {l} {K = K} i sv lv yK | c₀ , tc₀ , i₀ | inj₂ refl | refl | w-bare nr _ = ⊥-elim (nr yK)
-  stay-≺ {k} {l} {K = K} i sv lv yK | c₀ , tc₀ , i₀ | inj₁ kc with sv
+  stay-at : ∀ {k l l′ K c₀} → CC.Img k l → Sv l l′ → Live t k → σ K end → t c₀ end → CC.Img c₀ K → l′ ≺ qc K
+  stay-at {k} {l} {K = K} {c₀} i sv lv yK tc₀ i₀ with ≼-split {k} {c₀} (lv tc₀)
+  ... | inj₂ refl with CC.img-fun i i₀
+  ...   | refl with sv
+  ...     | w-row y wk with InvAt.func T.invσ y yK
+  ...       | refl = ⊥-elim wk
+  stay-at {k} {l} {K = K} i sv lv yK tc₀ i₀ | inj₂ refl | refl | w-bare nr _ = ⊥-elim (nr yK)
+  stay-at {k} {l} {K = K} i sv lv yK tc₀ i₀ | inj₁ kc with sv
   ... | w-row {e} y _ = subst ((l ⊕ δ e) ≺_) (qc-path K) (T.img-≺ y yK (Mn.img-mono i i₀ kc) (δ e) (sub w ∷ ix 1 ∷ ix 0 ∷ []))
   ... | w-bare _ _    = ≺-trans {l} {K} {qc K} (Mn.img-mono i i₀ kc) (K≺qc K)
+
+  stay-≺ : ∀ {k l l′ K} → CC.Img k l → Sv l l′ → Live t k → σ K end → l′ ≺ qc K
+  stay-≺ {l′ = l′} {K} i sv lv yK with L2 yK
+  ... | c₀ , ntc₀ , i₀ = decidable-stable (T? (l′ <ᵖ qc K)) λ n → ntc₀ λ tc₀ → n (stay-at i sv lv yK tc₀ i₀)
 
   stay-unf : ∀ {k l l′} → CC.Img k l → Sv l l′ → Live t k → ¬ MS.Failed l′
   stay-unf {l′ = l′} i sv lv fl with failed-at fl
@@ -531,7 +535,7 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
 
   -- What a row carried before failing is cut at.
   Cut : Pos → Pos → Set
-  Cut k l = Σ Pos λ K → Σ Pos λ c₀ → σ K end × l ≡ Xs K × t c₀ end × CC.Img c₀ K × k ≺ c₀ × Σ _ (t k) × Σ Pos (CC.PB k)
+  Cut k l = Σ Pos λ K → Σ Pos λ c₀ → σ K end × l ≡ Xs K × ¬ ¬ t c₀ end × CC.Img c₀ K × k ≺ c₀ × Σ _ (t k) × Σ Pos (CC.PB k)
 
   PB″ : Pos → Pos → Set
   PB″ k l = (Cc.PB k l × Σ _ (C l)) ⊎ Cut k l
@@ -594,10 +598,13 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   live-end {c₀} tc tc′ = subst (c₀ ≼_) (end-uniq It tc tc′) (≼-refl {c₀})
 
   -- A live row with a told pin before the end lies before the end.
-  before-end : ∀ {k c₀ l K} → Live t k → t c₀ end → CC.Img c₀ K → CC.PB k l → k ≺ c₀
-  before-end {k} {c₀} lv tc₀ i₀ pb with ≼-split {k} {c₀} (lv tc₀)
-  ... | inj₁ lt   = lt
-  ... | inj₂ refl = ⊥-elim (CC.pb-img pb i₀)
+  before-end : ∀ {k c₀ l K} → Live t k → ¬ ¬ t c₀ end → CC.Img c₀ K → CC.PB k l → k ≺ c₀
+  before-end {k} {c₀} lv ntc₀ i₀ pb = decidable-stable (T? (k <ᵖ c₀)) λ n → ntc₀ λ tc₀ → n (go tc₀)
+    where
+      go : t c₀ end → k ≺ c₀
+      go tc₀ with ≼-split {k} {c₀} (lv tc₀)
+      ... | inj₁ lt   = lt
+      ... | inj₂ refl = ⊥-elim (CC.pb-img pb i₀)
 
   ----------------------------------------------------------------------
   -- The fields
@@ -638,20 +645,26 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   live″ (l , i , inj₂ (yl , refl)) lv uc | u-end {K} yK with end-uniq invσ yl yK
   ... | refl = ≼-refl {Xs K}
 
-  shown″ : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
+  shown″ : ∀ {l e} → u l e → Shown (One valuesOf) e → Work e → Live u l → Few u l
          → Σ Pos λ k → Img″ k l × Σ (Ev A) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
-  shown″ uy sh lv fw with uview uy
-  ... | u-c y wk nf _ with Cc.shown y sh (live-C nf) (few-C nf fw)
+  shown″ uy sh wk′ lv fw with uview uy
+  ... | u-c y wk nf _ with Cc.shown y sh wk′ (live-C nf) (few-C nf fw)
   ...   | k , ci , e₀ , tk , mt = k , c-img ci y wk , e₀ , tk , mt
-  shown″ uy () lv fw | u-pin _
-  shown″ uy () lv fw | u-fix fx-v0 _
-  shown″ uy () lv fw | u-fix fx-v1 _
-  shown″ uy (_ , ()) lv fw | u-fix fx-sub _
-  shown″ uy () lv fw | u-fix fx-sk _
-  shown″ uy () lv fw | u-fix fx-pass _
-  shown″ uy (_ , ()) lv fw | u-x _
-  shown″ uy sh lv fw | u-end {K} yK with L2 yK
-  ... | c₀ , tc₀ , i₀ = c₀ , (K , i₀ , inj₂ (yK , refl)) , end , tc₀ , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
+  shown″ uy () wk′ lv fw | u-pin _
+  shown″ uy () wk′ lv fw | u-fix fx-v0 _
+  shown″ uy () wk′ lv fw | u-fix fx-v1 _
+  shown″ uy (_ , ()) wk′ lv fw | u-fix fx-sub _
+  shown″ uy () wk′ lv fw | u-fix fx-sk _
+  shown″ uy () wk′ lv fw | u-fix fx-pass _
+  shown″ uy (_ , ()) wk′ lv fw | u-x _
+  shown″ uy sh () lv fw | u-end _
+
+  shown-end″ : ∀ {l} → u l end → Live u l → Few u l → Σ Pos λ k → Img″ k l × ¬ ¬ t k end
+  shown-end″ uy lv fw with uview uy
+  ... | u-c _ () _ _
+  ... | u-fix () _
+  ... | u-end {K} yK with L2 yK
+  ...   | c₀ , ntc₀ , i₀ = c₀ , (K , i₀ , inj₂ (yK , refl)) , ntc₀
 
   Into″ : Pos → Set
   Into″ = IntoAt Img″ u PB″ (λ _ → ⊥) root
@@ -762,7 +775,7 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   ... | ks , F , B = ks ++ fixL , F′ , B′
     where
       noend : ∀ {K} → σ K end → ⊥
-      noend yK = ne (proj₁ (proj₂ (L2 yK)))
+      noend yK = proj₁ (proj₂ (L2 yK)) ne
 
       nofail : ∀ {l} → ¬ MS.Failed l
       nofail fl = noend (proj₁ (proj₂ (failed-at fl)))
@@ -814,7 +827,7 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
       ... | inj₂ (f , ((_ , x , nk) , _) , fw) with fails-at x nk
       ...   | K , yK , refl with L2 yK
       ...     | c₀ , tc₀ , i₀ =
-        listed-≼ (lst-Xs yK LC (≺→≼ {qc K} {w} fw)) (F″ tc₀ (live-end tc₀) (lv tc₀) (inj₁ (K , i₀ , inj₂ (yK , refl))) (stop yK))
+        listed-≼ (lst-Xs yK LC (≺→≼ {qc K} {w} fw)) λ lt → tc₀ λ tc → F″ tc (live-end tc) (lv tc) (inj₁ (K , i₀ , inj₂ (yK , refl))) (stop yK) lt
 
   ----------------------------------------------------------------------
   -- Pins and their carriers
@@ -841,7 +854,7 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
       ix≢last ()
   ... | u-end yK with L2 yK
   ...   | c₀ , tc₀ , i₀ = proj₁ (CC.few i₀) , λ { (inj₁ (_ , _ , y)) → ⊥-elim (no-C-Xs yK y)
-                                                ; {k} (inj₂ (_ , _ , _ , _ , tc₀′ , _ , kc , (_ , tk) , _)) → proj₂ (CC.few i₀) tk (subst (k ≺_) (end-uniq It tc₀′ tc₀) kc) }
+                                                ; {k} (inj₂ (_ , _ , _ , _ , tc₀′ , _ , kc , (_ , tk) , _)) → ∈-stable λ n → tc₀′ λ tc′ → tc₀ λ tc → n (proj₂ (CC.few i₀) tk (subst (k ≺_) (end-uniq It tc′ tc) kc)) }
 
   pb-img″ : ∀ {k l l′} → PB″ k l → Img″ k l′ → ⊥
   pb-img″ (inj₁ ((_ , pb , _) , _)) (_ , i , _)                  = CC.pb-img pb i
@@ -897,7 +910,7 @@ module Wrap n {A} (o : SObs [] A) {M : PMap} (hm : Emb M)
   carried : CarryAt valuesOf M (λ _ → ⊥) (λ _ → ⊥) (λ _ → ⊤) t u root root
   carried = record
     { Img = Img″ ; ext = ext″ ; PB = PB″ ; pb-few = pb-few″ ; pb-img = pb-img″ ; pb-past = pb-past″
-    ; img = img″ ; img¬¬ = img¬¬″ ; shown = shown″
+    ; img = img″ ; img¬¬ = img¬¬″ ; shown = shown″ ; shown-end = shown-end″
     ; img-row = λ { (_ , i , _) → CC.img-row i } ; img-fun = img-fun″
     ; place = place″ ; live = live″ ; few = λ { (_ , i , _) → CC.few i }
     ; whole = whole″ ; cover = cover″ ; bk = bk″ ; in-bk = in-bk″ ; pinned = pinned″ }

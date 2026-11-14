@@ -282,7 +282,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
         within′ : Within (Hots envP) M₀ FB.M′ p
         within′ (inj₁ m) = [ (λ ms → wi_s ms) , inj₂ ]′ (wi_b m)
-        within′ (inj₂ e) = inj₂ (FW.echo-world e)
+        within′ (inj₂ e) = inj₂ (λ n → n (FW.echo-world e))
 
         bare′ : Bare FB.M′ t
         bare′ tk (inj₁ m) kx = br_b tk m kx

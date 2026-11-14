@@ -26,7 +26,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Properties using (∷-injectiveˡ)
 
 open import denotation.Position using (Pos; ix; sub; _⊕_; inside; _≟ᵖ_; root)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Few; Truncate; Proper; Den; hot; _≺_;
   module Connect)
 open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-ext; ≺-absurd; ≺-≼-≺; ticks)
 open import denotation.Laws.Shows using (few-reach)
@@ -507,8 +507,9 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
                  ⊎ (e ≡ skip × IntoAt FlatImg u PB′ HP p k)
       flat-img¬¬ : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
                  → ¬ ¬ ((Σ Pos λ l → FlatImg k l × Σ (Ev (IE B)) λ e′ → u l e′ × Match Every (One valuesOf) (Reads valuesOf) e e′) ⊎ e ≡ skip)
-      flat-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Live u l → Few u l
+      flat-shown : ∀ {l e} → u l e → Shown (One valuesOf) e → Work e → Live u l → Few u l
                  → Σ Pos λ k → FlatImg k l × Σ (Ev B) λ e₀ → t k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
+      flat-shown-end : ∀ {l} → u l end → Live u l → Few u l → Σ Pos λ k → FlatImg k l × ¬ ¬ t k end
       flat-place : ∀ {m e} → u m e → Live u m → Listed u m
                  → instantOf m ≡ instantOf p′ ⊎ (Σ Pos λ k → Σ Pos λ l → FlatImg k l × instantOf l ≡ instantOf m × Near u m l)
                    ⊎ Σ Pos λ h → HE h × instantOf h ≡ instantOf m
@@ -534,7 +535,7 @@ module FlatCarry {A B : Set} {HP HE LP : Pos → Set} (p p′ : Pos) (okP : Ok H
     carried : CarryAt valuesOf M′ HP HE LP t u p p′
     carried = record
       { Img = FlatImg ; ext = ext′ ; PB = PB′ ; pb-few = pb-few′ ; pb-img = pb-img′ ; pb-past = flat-pb-past
-      ; img = flat-img ; img¬¬ = flat-img¬¬ ; shown = flat-shown ; img-row = img-row′ ; img-fun = img-fun′
+      ; img = flat-img ; img¬¬ = flat-img¬¬ ; shown = flat-shown ; shown-end = flat-shown-end ; img-row = img-row′ ; img-fun = img-fun′
       ; place = flat-place ; live = live′ ; few = few′ ; whole = flat-whole ; bk = bk′ ; in-bk = in-bk′ ; pinned = flat-pinned ; cover = flat-cover }
 
     narrowed : Narrow carried

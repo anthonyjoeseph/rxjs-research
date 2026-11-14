@@ -219,10 +219,3 @@ out-of {e₀ = skip}  (_ , n) sh = ⊥-elim (n (λ ()) sh)
 out-of {e₀ = pin _} (_ , n) sh = ⊥-elim (n (λ ()) sh)
 out-of {e₀ = end}   (c , _) _ with c tt
 ... | ()
-
-end-of : ∀ {X} {e₀ : Ev X} → Match Every (One annValues) (Reads annValues) e₀ (end {A = AIE X}) → e₀ ≡ end
-end-of {e₀ = out _} (c , _) with c tt
-... | _ , () , _
-end-of {e₀ = end}   _ = refl
-end-of {e₀ = skip}  (_ , n) = ⊥-elim (n (λ ()) tt)
-end-of {e₀ = pin _} (_ , n) = ⊥-elim (n (λ ()) tt)

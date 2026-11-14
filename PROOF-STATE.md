@@ -97,7 +97,7 @@ outer's echoes, as the connect's are from its body's and source's; a
 lane row never shows where an outer row does. Open: each field past
 that, an outer row's late carrier included. Settled when each is a body.
 
-Members: `flat-src-live`, `flat-pb-past`, `flat-img`, `flat-img¬¬`, `flat-shown`, `flat-place`, `flat-whole`, `flat-pinned↓`.
+Members: `flat-src-live`, `flat-pb-past`, `flat-img`, `flat-img¬¬`, `flat-shown`, `flat-shown-end`, `flat-place`, `flat-whole`, `flat-pinned↓`.
 
 #### THE COVER
 

@@ -21,7 +21,7 @@ open import Data.Bool.Properties using (T?)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Tree using (connected)
-open import denotation.Position using (Pos; sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
+open import denotation.Position using (sub; last; _⊕_; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (end; Den; hot; enter; Proper; DenEnv; shown; _≺_)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺-ext; ≺→≼; ≼-split)
