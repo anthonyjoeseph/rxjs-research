@@ -96,14 +96,12 @@ PMap = Pos → Pos → Set
 _∪ᴹ_ : PMap → PMap → PMap
 (M ∪ᴹ M′) x y = M x y ⊎ M′ x y
 
--- AN ORDER EMBEDDING: one image each, the order kept, leading kept and
--- reflected.
+-- AN ORDER EMBEDDING: one image each, the order kept, leading reflected.
 record Emb (M : PMap) : Set where
   field
     fun     : ∀ {x y y′} → M x y → M x y′ → y ≡ y′
     mono    : ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
     reflect : ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
-    pres    : ∀ {x x′ y y′} → M x y → M x′ y′ → x ⊑ x′ → y ⊑ y′
 
 -- `x` lies at or under a position of the world with `p`.
 Below : (Pos → Set) → Pos → Pos → Set
@@ -258,10 +256,9 @@ allᴱ : ∀ {Γ} {f : ∀ {X} → X ∈ Γ → Set} → Allᴱ Γ f → ∀ {X}
 allᴱ (l , _)  (here refl) = l
 allᴱ (_ , ls) (there i)   = allᴱ ls i
 
--- Every bound hot's rows up to the bound listed, and the later map
--- keeping its joins.
+-- Every bound hot's rows up to the bound listed.
 EnvListed : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → PMap → Maybe Pos → Set
-EnvListed {Γ} _ _ _ es A′ c = Allᴱ Γ (λ i → ListedB (HotSim.rows (es i)) c × Joins A′ A′ (HotSim.rows (es i)) (HotSim.car (es i)))
+EnvListed {Γ} _ _ _ es _ c = Allᴱ Γ (λ i → ListedB (HotSim.rows (es i)) c)
 
 -- What each bound hot reads is listed wherever the hots are.
 EnvNeeds : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → Set₁
