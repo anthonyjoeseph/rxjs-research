@@ -527,7 +527,7 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
            g-bare : ∀ {x y} → M x y → g ⊑ x → x ≡ g
            g-bare m gx with wi m
            ... | inj₁ m₁ = O.bare₀ m₁ gx
-           ... | inj₂ w  = ⊥-elim (leads (proj₂ okP) (step here plain-ix) nb nr w gx)
+           ... | inj₂ w  = ⊥-elim (w λ w′ → leads (proj₂ okP) (step here plain-ix) nb nr w′ gx)
              where
                nb : W⁼ (Hots envP) (p ⊕ [ ix 1 ]) g → ⊥
                nb ww = sib (proj₁ okP) plain-ix (⊑-refl p) g≢ ww (⊑-refl g)
@@ -544,4 +544,4 @@ carry-next n {Γ} {Δ} {A} ρ l (carry h) = carry λ envP envE gP gE M₀ hm er 
            wi′ : Within (Hots envP) M₀ M p
            wi′ m with wi m
            ... | inj₁ m₁ = O.within m₁
-           ... | inj₂ w  = inj₂ (inW (nest-in (step here plain-ix) w))
+           ... | inj₂ w  = inj₂ (λ n → w λ w′ → n (inW (nest-in (step here plain-ix) w′)))

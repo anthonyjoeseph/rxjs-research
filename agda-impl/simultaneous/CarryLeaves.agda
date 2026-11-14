@@ -98,7 +98,7 @@ module OneUnder {HP : Pos → Set} {M₀ : PMap} {p p₀ p′ : Pos}
 
   within : Within HP M₀ M p
   within (inj₁ m)                  = inj₁ m
-  within (inj₂ (_ , pl , refl , _)) = inj₂ (inW (step here pl))
+  within (inj₂ (_ , pl , refl , _)) = inj₂ (λ n → n (inW (step here pl)))
 
   -- Its points lie one label under the subscription, holding no hot row.
   grown : ∀ {R} → NotHot R p → ∀ {x y} → M x y → M₀ x y ⊎ Grown M₀ R x y

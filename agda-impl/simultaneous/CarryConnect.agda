@@ -19,18 +19,19 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (Dec; ¬_; yes; no)
 open import Data.Bool.Properties using (T?)
 
 open import Tree using (Obs; connect; map)
-open import denotation.Position using (Pos; Label; Path; ix; sub; _⊕_; root; _≟ᵖ_; inside)
+open import denotation.Position using (Pos; Label; Path; ix; sub; last; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; EmissionSet; Proper; Den; hot; enter; DenEnv; approx; _≺_; module Connect)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-ext; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊑-≼; ⊑-cmp; ⊑-inside; inside-⊑; ⊕-assoc; ⊕-identityʳ;
-  ⊕-injʳ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW; step;
-  plain-ix; not-up; shrink; shrink⁼; narrow⁼)
+  ⊕-injʳ; ⊕-cancelˡ; ext≢; Hots; GoodEnv; Ok; ok-step; InvAt; Lawful; InvD; _∪ʰ_; W; here; inW; step;
+  plain-ix; not-up; shrink; shrink⁼; narrow⁼; W⁼)
 open import denotation.Laws using (inv-approx; good-cons)
+open import denotation.Laws.Count using (⊑?)
 open import denotation.Laws.Connect using (σ-wp; lawful; ok₀; body-leads; source-leads; sw; bw)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.InstEmit using (valuesOf)
@@ -67,6 +68,40 @@ one-label k {a} {b} ax bx with ⊑-cmp (k ⊕ [ a ]) (k ⊕ [ b ]) ax bx
 one-label k {a} {b} ax bx | inj₂ ba with ⊑-snoc k ba
 ...   | inj₁ bk = ⊥-elim (⊑-≼ bk (≺-ext k []))
 ...   | inj₂ e  = sym (⊕-injʳ k k e)
+
+-- Under a position, the label it steps by is read back.
+step-of : ∀ k {a x} zs → x ≡ k ⊕ zs → (k ⊕ [ a ]) ⊑ x → Σ Path λ τ → _≡_ {A = Path} zs (a ∷ τ)
+step-of k {a} zs ex (τ , ey) = τ , ⊕-cancelˡ k zs (a ∷ τ) (trans (sym ex) (trans ey (⊕-assoc k [ a ] τ)))
+
+private
+  nil-step : ∀ {a : Label} {τ : Path} → _≡_ {A = Path} [] (a ∷ τ) → ⊥
+  nil-step ()
+
+  ix-step : ∀ {i e} {τ τ′ : Path} → _≡_ {A = Path} (ix i ∷ τ) (sub e ∷ τ′) → ⊥
+  ix-step ()
+
+  last-step : ∀ {e} {τ τ′ : Path} → _≡_ {A = Path} (last ∷ τ) (sub e ∷ τ′) → ⊥
+  last-step ()
+
+-- Whether a point lies under a join of a position.
+sub-under? : ∀ k x → Dec (Σ Pos λ e → (k ⊕ [ sub e ]) ⊑ x)
+sub-under? k x with ⊑? k x
+... | no n = no λ { (_ , le) → n (⊑-trans (⊑-snoc⁺ k) le) }
+... | yes (zs , ex) = from zs ex
+  where
+    from : ∀ (zs : Path) → x ≡ k ⊕ zs → Dec (Σ Pos λ e → (k ⊕ [ sub e ]) ⊑ x)
+    from (sub e ∷ τ) ex′ = yes (e , τ , trans ex′ (sym (⊕-assoc k [ sub e ] τ)))
+    from []          ex′ = no λ { (_ , le) → nil-step (proj₂ (step-of k [] ex′ le)) }
+    from (ix i ∷ τ)  ex′ = no λ { (_ , le) → ix-step (proj₂ (step-of k (ix i ∷ τ) ex′ le)) }
+    from (last ∷ τ)  ex′ = no λ { (_ , le) → last-step (proj₂ (step-of k (last ∷ τ) ex′ le)) }
+
+-- Two points each under a join of their positions: decided, so held classically.
+joins-under : ∀ k l x y → ¬ ¬ (Σ Pos λ e → Σ Pos λ e′ → (k ⊕ [ sub e ]) ⊑ x × (l ⊕ [ sub e′ ]) ⊑ y)
+            → Σ Pos λ e → Σ Pos λ e′ → (k ⊕ [ sub e ]) ⊑ x × (l ⊕ [ sub e′ ]) ⊑ y
+joins-under k l x y nn with sub-under? k x | sub-under? l y
+... | yes (e , a) | yes (e′ , b) = e , e′ , a , b
+... | no n        | _            = ⊥-elim (nn λ { (e , _ , a , _) → n (e , a) })
+... | yes _       | no n         = ⊥-elim (nn λ { (_ , e′ , _ , b) → n (e′ , b) })
 
 -- A tick one label under a position leads nothing its readings do.
 tick-read : ∀ k {e x} → (k ⊕ [ sub e ]) ⊑ x → (k ⊕ [ ix 0 ]) ⊑ x → ⊥
@@ -323,7 +358,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
     fresh-b : Fresh (Hots envP′) M_s (p ⊕ [ ix 0 ])
     fresh-b m (w , ww , wx) with wi_s m
-    ... | inj₂ sx = ⊥-elim (body-leads {s = sP} {F = FP} IsP IFP p okP ww sx wx)
+    ... | inj₂ sx = ⊥-elim (sx λ s → body-leads {s = sP} {F = FP} IsP IFP p okP ww s wx)
     ... | inj₁ (inj₂ (inj₁ (refl , _))) = refl
     ... | inj₁ (inj₂ (inj₂ (refl , _))) = ⊥-elim (body-leads {s = sP} {F = FP} IsP IFP p okP ww here wx)
     ... | inj₁ (inj₁ m₁) with fr m₁ (w , inW (narrow⁼ σ-in ww) , wx)
@@ -340,9 +375,9 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
     module AfterBody (M_b : PMap) (jh : JoinsHere M_b) (ms_b : M_s ⊆ᴹ M_b) (hm_b : Emb M_b) (wi_b : Within (Hots envP′) M_s M_b (p ⊕ [ ix 0 ])) where
       within : Within (Hots envP) M₀ M_b p
       within m with wi_b m
-      ... | inj₂ w = inj₂ (inW (narrow⁼ σ-in w))
+      ... | inj₂ w = inj₂ (λ n → w λ w′ → n (inW (narrow⁼ σ-in w′)))
       ... | inj₁ ms with wi_s ms
-      ...   | inj₂ w = inj₂ (inW (shrink⁼ w))
+      ...   | inj₂ w = inj₂ (λ n → w λ w′ → n (inW (shrink⁼ w′)))
       ...   | inj₁ u = U.within u
 
       -- Nothing is paired strictly under a source row's echo: the source's
@@ -352,10 +387,13 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       σ-bare {k} x m kx with wi_b m
       ... | inj₁ ms with br_s x ms (⊑-trans (⊑-snoc⁺ k) kx)
       ...   | refl = ⊥-elim (⊑-≼ kx (≺-ext k []))
-      σ-bare {k} x m kx | inj₂ w with source-leads {s = sP} {F = FP} IsP IFP p okP (sw {s = sP} {F = FP} IsP IFP p okP x) w (⊑-trans (⊑-snoc⁺ k) kx)
-      ... | h , e , (_ , x′) , kh , hx with σ-flat x (proj₁ x′) kh
-      ...   | refl with one-label k kx hx
-      ...     | ()
+      σ-bare {k} x m kx | inj₂ w = ⊥-elim (w λ w′ → σ-off x w′ kx)
+        where
+          σ-off : ∀ {k e x} → σP k e → W⁼ (Hots envP′) (p ⊕ [ ix 0 ]) x → (k ⊕ [ ix 0 ]) ⊑ x → ⊥
+          σ-off {k} x w kx with source-leads {s = sP} {F = FP} IsP IFP p okP (sw {s = sP} {F = FP} IsP IFP p okP x) w (⊑-trans (⊑-snoc⁺ k) kx)
+          ... | h , e , (_ , x′) , kh , hx with σ-flat x (proj₁ x′) kh
+          ...   | refl with one-label k kx hx
+          ...     | ()
 
       -- EACH SOURCE ROW'S ECHO, paired one label under the row with its
       -- annotation's: the map the connect's rows are carried along.
@@ -373,14 +411,19 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       -- it, imaged under a reading of its annotation.
       read-under : ∀ {k₀ e₀ l₀ x y} → σP k₀ e₀ → CarryAt.Img c_a k₀ l₀ → M_b x y → k₀ ⊑ x → (x ≡ k₀ → ⊥)
                  → Σ Pos λ e → Σ Pos λ e′ → (k₀ ⊕ [ sub e ]) ⊑ x × (l₀ ⊕ [ sub e′ ]) ⊑ y
-      read-under {k₀} tk i m ([] , refl) ne = ⊥-elim (ne (⊕-identityʳ k₀))
-      read-under {k₀} tk i m (a ∷ σ₁ , refl) ne with wi_b m
-      ... | inj₁ ms = ⊥-elim (ne (br_s tk ms (a ∷ σ₁ , refl)))
-      ... | inj₂ w with source-leads {s = sP} {F = FP} IsP IFP p okP (sw {s = sP} {F = FP} IsP IFP p okP tk) w (a ∷ σ₁ , refl)
-      ...   | h , e , (_ , x′) , kh , _ with σ-flat tk (proj₁ x′) kh
-      ...     | refl with jh m (_ , x′) refl
-      ...       | e₁ , refl , e′ , _ , L , iL , Ly with CarryAt.img-fun c_a iL i
-      ...         | refl = e₁ , e′ , (σ₁ , sym (⊕-assoc _ [ sub e₁ ] σ₁)) , Ly
+      read-under {k₀} {l₀ = l₀} {x} {y} tk i m kx ne with wi_b m
+      ... | inj₁ ms = ⊥-elim (ne (br_s tk ms kx))
+      ... | inj₂ w = joins-under k₀ l₀ x y (λ n → w λ w′ → n (read-world tk i m kx ne w′))
+        where
+          read-world : ∀ {k₀ e₀ l₀ x y} → σP k₀ e₀ → CarryAt.Img c_a k₀ l₀ → M_b x y → k₀ ⊑ x → (x ≡ k₀ → ⊥)
+                     → W⁼ (Hots envP′) (p ⊕ [ ix 0 ]) x
+                     → Σ Pos λ e → Σ Pos λ e′ → (k₀ ⊕ [ sub e ]) ⊑ x × (l₀ ⊕ [ sub e′ ]) ⊑ y
+          read-world {k₀} tk i m ([] , refl) ne _ = ⊥-elim (ne (⊕-identityʳ k₀))
+          read-world {k₀} tk i m (a ∷ σ₁ , refl) ne w with source-leads {s = sP} {F = FP} IsP IFP p okP (sw {s = sP} {F = FP} IsP IFP p okP tk) w (a ∷ σ₁ , refl)
+          ... | h , e , (_ , x′) , kh , _ with σ-flat tk (proj₁ x′) kh
+          ...   | refl with jh m (_ , x′) refl
+          ...     | e₁ , refl , e′ , _ , L , iL , Ly with CarryAt.img-fun c_a iL i
+          ...       | refl = e₁ , e′ , (σ₁ , sym (⊕-assoc _ [ sub e₁ ] σ₁)) , Ly
 
       -- Two echoes lie one label under their rows' carriers.
       echo-echo : ∀ {x y x′ y′} → Echo x y → Echo x′ y′ → Σ PMap λ K → Emb K × K x y × K x′ y′
@@ -463,7 +506,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       within′ : Within (Hots envP) M₀ M′ p
       within′ (inj₁ m) = within m
-      within′ (inj₂ (_ , _ , (_ , tk₀) , _ , refl , refl)) = inj₂ (inW (shrink⁼ (inW (step (inW (InvAt.world Iσ tk₀)) plain-ix))))
+      within′ (inj₂ (_ , _ , (_ , tk₀) , _ , refl , refl)) = inj₂ (λ n → n (inW (shrink⁼ (inW (step (inW (InvAt.world Iσ tk₀)) plain-ix)))))
 
       -- Nothing is paired strictly under an echo: the echoes are one label
       -- under source rows, which lie flat.

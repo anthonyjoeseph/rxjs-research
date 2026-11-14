@@ -81,7 +81,7 @@ private
   within-∘ : ∀ {H : Pos → Set} {M₀ M M′ : PMap} {p} → Within H M₀ M p → (∀ {x y} → M′ x y → M x y ⊎ W⁼ H p x) → Within H M₀ M′ p
   within-∘ wi wi′ m′ with wi′ m′
   ... | inj₁ m = wi m
-  ... | inj₂ w = inj₂ w
+  ... | inj₂ w = inj₂ (λ n → n w)
 
 module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H₁ H₂ : Pos → Set}
   {t : EmissionSet A} {u : EmissionSet (IE A)} {s s′ : Pos} (hm : Emb M)

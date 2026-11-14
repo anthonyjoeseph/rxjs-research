@@ -88,7 +88,7 @@ by `cover`; open: the same before a LATE carrier, and a pin, alive or
 dead, carried from its connect's own past by whichever subterm made it.
 Settled when each leaf is a body.
 
-Members: `conn-img¬¬`, `conn-shown`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
+Members: `conn-img¬¬`, `conn-shown`, `conn-shown-end`, `conn-place`, `conn-whole`, `conn-pinned↓`, `conn-σ-late`, `conn-σ-ended`, `conn-β-late`, `conn-echo-row`, `conn-src-carrier`, `conn-heard-home`, `conn-src-home`.
 
 #### THE FLATMAP'S CARRY
 
