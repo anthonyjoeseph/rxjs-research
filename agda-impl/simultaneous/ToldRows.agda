@@ -100,6 +100,10 @@ T-or : ∀ b → T b ⊎ T (not b)
 T-or true  = inj₁ tt
 T-or false = inj₂ tt
 
+not-T : ∀ {b} → T (not b) → T b → ⊥
+not-T {true}  () _
+not-T {false} _  ()
+
 module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : GoodEnv env) (q : Pos) (ok : Ok (Hots env) q) where
 
   σ : EmissionSet Y
@@ -706,10 +710,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
   or-split : ∀ a {b} → T (a ∨ b) → T a ⊎ T b
   or-split true  t = inj₁ tt
   or-split false t = inj₂ t
-
-  not-T : ∀ {b} → T (not b) → T b → ⊥
-  not-T {true}  () _
-  not-T {false} _  ()
 
   -- Whether an entry ends before `k`.
   endB : List Entry → Pos → Bool
