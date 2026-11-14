@@ -52,6 +52,14 @@
 -- `Under`).  Cut at a subscription, a run keeps its whole subscribe
 -- burst on both sides, and the plain listing then lists all of it.
 --
+-- A PIN PAST A BOUND, OF A SUBSCRIPTION BEFORE IT (`Run.late`): a pin
+-- waits only on its subscription's past, so it may follow rows no
+-- reader past the bound sees — a connect's source past its body's end
+-- shows its pins of a subscription the body outlived, and only those.
+-- Infinitely many hidden rows may lie before such a pin, so no bound
+-- reaching it has its run listed; the run lists those pins up to an
+-- outer bound from the plain ones, and its rows up to the inner.
+--
 -- THE SUBSCRIPTION IS NO HOT ROW.  A reader whose hot ended before it
 -- ends at once, under its subscription with a plain label; were the
 -- subscription a hot row, that end would lie under it as no join.
@@ -79,7 +87,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; sub)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; coldAt; Proper; DenEnv; _≺_; enter; approx)
+open import denotation.EmissionSet using (Ev; out; end; pin; EmissionSet; Den; hot; coldAt; Proper; DenEnv; _≺_; enter; approx)
 open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok; Lawful)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SimPos using (UpTo)
@@ -138,6 +146,25 @@ Upto : Maybe Pos → Pos → Set
 Upto nothing  _ = ⊤
 Upto (just c) k = UpTo c k
 
+-- A pin of a subscription strictly before a plain bound.
+Late : ∀ {A} → Maybe Pos → Ev A → Set
+Late nothing  _ = ⊥
+Late (just b) e = Σ Pos λ x → e ≡ pin x × x ≺ b
+
+-- A pin of a subscription strictly before a bound's image.
+LateU : ∀ {B} → PMap → Maybe Pos → Ev B → Set
+LateU M nothing  _  = ⊥
+LateU M (just b) e′ = Σ Pos λ y → M b y × Σ Pos λ x′ → e′ ≡ pin x′ × x′ ≺ y
+
+-- What is late is a pin.
+lateU-pin : ∀ {B M b} {e′ : Ev B} → LateU M b e′ → Σ Pos λ x′ → e′ ≡ pin x′
+lateU-pin {b = nothing} ()
+lateU-pin {b = just _} (_ , _ , x′ , eq , _) = x′ , eq
+
+-- THE PINS OF SUBSCRIPTIONS BEFORE `b`, UP TO `c`, listed.
+LateL : ∀ {A} → EmissionSet A → Maybe Pos → Maybe Pos → Set
+LateL {A} T b c = Σ (List Pos) λ ks → (∀ {k e} → T k e → Late b e → Upto c k → k ∈ ks) × (∀ {k} → k ∈ ks → Σ (Ev A) (T k))
+
 -- Up to the bound's image: before its anchor, or under it.
 Under : PMap → Maybe Pos → Pos → Set
 Under M nothing  _ = ⊤
@@ -166,6 +193,12 @@ record Sim {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (Img : 
 _⊆ᴹ_ : PMap → PMap → Set
 M ⊆ᴹ M′ = ∀ {x y} → M x y → M′ x y
 
+-- THE ELABORATED PINS UP TO `c` OF SUBSCRIPTIONS BEFORE `b`, listed
+-- wherever the plain rows up to `b` and the plain such pins are.
+Lates : ∀ {A B : Set} → PMap → (PMap → Maybe Pos → Set) → EmissionSet A → EmissionSet B → Set₁
+Lates {B = B} M L T U = ∀ A′ → M ⊆ᴹ A′ → Emb A′ → ∀ b c → Mapped A′ b → L A′ b → ListedB T b → LateL T b c
+  → Σ (List Pos) λ ls → (∀ {l e′} → U l e′ → LateU A′ b e′ → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev B) (U l))
+
 -- A RUN: one carrier each, anchored in `M`, and then the simulation up
 -- to every bound a later order embedding holding `M` maps, wherever the
 -- plain rows up to it are listed and what the run reads (`L`) is.
@@ -176,6 +209,7 @@ record Run {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (L : PM
     img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
     ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
     sim     : ∀ A′ → M ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → L A′ c → ListedB T c → Sim V Sh A′ Img c T U
+    late    : Lates M L T U
     anchor  : ∀ A′ → M ⊆ᴹ A′ → Emb A′ → ∀ {k e} → T k e → Carried e → L A′ (just k) → ListedB T (just k) → Σ Pos (M k)
 
 -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.

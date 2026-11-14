@@ -42,7 +42,7 @@ open import denotation.Laws.Truth.Connect.Cuts using (step≼; module Side)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; InvD; InvAt; _∪ʰ_; ok-step; here; _⊑_; ⊑-refl; ⊑-cmp; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊑-inside; inside-⊑; ⊕-injˡ)
 import denotation.Laws.Connect as LC
 open import simultaneous.SObs using (lone; module Elaborate; ext)
-open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Mt; Carried; c-end; Upto;
+open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; Carried; c-end; Upto;
   Under; Mapped; ListedB; ListedL; Live; Allᴱ; EndsAfter; env-live; Joins; Shows; Shown; AShows;
   AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih)
 open import simultaneous.ReadMap using (under?; under-down; upto-dn; listed-up)
@@ -75,6 +75,7 @@ run-up inc R = record
   ; img-fun = img-fun
   ; ext     = λ i → proj₁ (ext′ i) , inc (proj₁ (proj₂ (ext′ i))) , proj₂ (proj₂ (ext′ i))
   ; sim     = λ A′ inc′ → sim A′ (λ a → inc′ (inc a))
+  ; late    = λ A′ inc′ → late A′ (λ a → inc′ (inc a))
   ; anchor  = λ A′ inc′ em x ce L lst → proj₁ (anchor A′ (λ a → inc′ (inc a)) em x ce L lst)
                                       , inc (proj₂ (anchor A′ (λ a → inc′ (inc a)) em x ce L lst))
   }
@@ -658,7 +659,18 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
           ... | k , m , kj = pr (proj₂ (Kσ.kept-row cands (KS.kept-row ks bk) m)) kj
 
   postulate
+    -- THE CONNECT'S LATE PINS, listed: the body's by its run's, the
+    -- burst's and the kept's by the source's late pins and its rows.
+    conn-late : Lates (Amb ∪ᴹ M) (EnvListed ρ env env′ es T) T U
+
+  postulate
     -- THE ELABORATED CONNECT'S SOURCE ROWS UNDER A BOUND'S IMAGE, listed.
+    --
+    -- DEAD ROUTE: the source's simulation at a bound the connect's listing
+    --   covers.  A kept pin past the body's end waits only on its
+    --   subscription's past, so it may follow infinitely many source rows
+    --   the connect hides, and no bound reaching it has the source listed;
+    --   such pins come from the source's `Run.late` instead.
     src-listed : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
                → Σ (L.List Pos) λ ls → (∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev (IE B)) (U l))
 
@@ -761,6 +773,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     ; img-fun = Run.img-fun Rb
     ; ext     = λ i → proj₁ (Run.ext Rb i) , b⊆M (proj₁ (proj₂ (Run.ext Rb i))) , proj₂ (proj₂ (Run.ext Rb i))
     ; sim     = λ A′ inc emA c mp L lst → CSim.sim A′ inc emA c mp L lst
+    ; late    = conn-late
     ; anchor  = anchor
     }
 

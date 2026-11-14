@@ -35,14 +35,23 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### CONNECT: THE ELABORATED SOURCE ROWS
 
 Untried: the elaborated connect's burst, echo and kept rows under a
-bound's image are listed. Risk: pins and skips are not carried, so they
-trace to plain rows only through the annotated source's listing, whose
-bound must be fed every proper source row up to it — which the
-connect's listing hides past the body's end. Settled when `src-listed`
-is a body over the annotated source's simulation at a bound the
-connect's listing covers.
+bound's image are listed. Risk: past the body's end the source may hide
+infinitely many rows before a kept pin, so the source's rows are listed
+only up to the body's end and its pins past it only as late pins.
+Settled when `src-listed` is a body over the annotated source's
+simulation up to the body's end, its late pins, and its owners.
 
 Members: `src-listed`.
+
+#### THE LATE PINS
+
+Untried: a run lists its elaborated pins of subscriptions before a bound
+wherever the plain such pins and rows are. Risk: the reader's and the
+annotation's pins trace to plain rows only through joins and owners,
+and the connect's through the source's late pins, recursively. Settled
+when each is a body over its run's own carriers.
+
+Members: `ann-late`, `conn-late`, `reader-late`.
 
 #### CONNECT: THE MAPS
 

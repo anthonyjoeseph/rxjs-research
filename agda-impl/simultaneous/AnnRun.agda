@@ -41,7 +41,7 @@ open import denotation.Laws.Count using (⊑?)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.SimPos using (UpTo; upto-down; ⊑-split)
-open import simultaneous.Sim using (PMap; Emb; _⊆ᴹ_; Sim; Run; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; Mapped; ListedB;
+open import simultaneous.Sim using (PMap; Emb; _⊆ᴹ_; Sim; Run; Lates; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; Mapped; ListedB;
                                     Shows; Shown; AShows; AShown; annValues)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.ReadMap using (upto-dn; under?; under-down; upto-row)
@@ -280,13 +280,14 @@ module Annotated {X : Set} (σₑ : EmissionSet (IE X)) (σ′ : EmissionSet (AI
       upto : Σ (List Pos) λ ls → (∀ {m e′} → Proper σ′ m e′ → Under A′ c m → m ∈ ls) × (∀ {m} → m ∈ ls → Σ (Ev (AIE X)) (Proper σ′ m))
       upto = proj₁ lst′ , (λ x u → proj₁ (proj₂ lst′) x (λ _ km → under-⊑ c′ km (row x u))) , proj₂ (proj₂ lst′)
 
-  -- THE RUN.
-  run : Run AShows AShown M L (Proper σ) (Proper σ′)
-  run = record
+  -- THE RUN, given its late pins.
+  run : Lates M L (Proper σ) (Proper σ′) → Run AShows AShown M L (Proper σ) (Proper σ′)
+  run lt = record
     { Img     = Img′
     ; img-fun = img-fun′
     ; ext     = ext′
     ; sim     = sim′
+    ; late    = lt
     ; anchor  = λ A′ inc em {k} x ce Lk lk → R.anchor A′ inc em (proj₁ x) ce Lk (lb-own x (inj₂ (⊑-refl k)) lk)
     }
 
@@ -300,7 +301,12 @@ module AnnRun {Γ X} n (S : Obs Timeline Γ (IE X)) (env : DenEnv Γ) (genv : Go
 
   open Ann n S env genv q ok using (σₑ; σ′; Iₑ; Iσ′; w; val→; end→; val←; end←; module Over)
 
+  postulate
+    -- THE ANNOTATED SOURCE'S LATE PINS, listed: each told pin is a source
+    -- row's, so the source's late pins and its rows list them.
+    ann-late : Lates M L (Proper σ) (Proper σ′)
+
   -- THE ANNOTATED SOURCE RUNS WHAT ITS SOURCE RUNS.
   run : Run AShows AShown M L (Proper σ) (Proper σ′)
   run = Annotated.run σₑ σ′ (InvAt.func Iₑ) Iσ′ w val→ end→ val← end←
-          (λ P P? down ks cov bk → Over.listing P P? down ks cov bk) Iσ R (λ {A′} {c} {k} {e} → need-row {A′} {c} {k} {e})
+          (λ P P? down ks cov bk → Over.listing P P? down ks cov bk) Iσ R (λ {A′} {c} {k} {e} → need-row {A′} {c} {k} {e}) ann-late
