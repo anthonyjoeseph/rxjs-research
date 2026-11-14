@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (takeWhile)
 open import denotation.Position using (Pos; Label; ix; last; _⊕_; root; _≟ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Den; enter; Reach; Few; _≺_; _≼_; module Op;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Work; EmissionSet; Den; enter; Reach; Few; _≺_; _≼_; module Op;
   approx)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-≺-≺; ≺-absurd; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; ≺-ext; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; W⁼; inW; step; _⊑_; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-snoc; ⊑-snoc⁺; ⊕-identityʳ; ⊕-assoc;
@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.Attribution using (Live; Shown; Match; Every; One; Reads)
 open import simultaneous.Listing using (Listed)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
-open import simultaneous.CarryBase using (From; InOrder; Targeted; Narrow; PinList; unp-pin; ahead-under; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb;
+open import simultaneous.CarryBase using (end-held; From; InOrder; Targeted; Narrow; PinList; unp-pin; ahead-under; pin-bound; PMap; _⊆ᴹ_; _∪ᴹ_; Emb;
   CarryAt; Near; Whole; Home; module Mono; emb-at; emb-pairs; instant-⊕; sub-listed; few-sub;
   match-val; carried-val; IntoAt; Ahead; ahead-over)
 open import simultaneous.Carry using (Carry; carry; Bare; Within; listed↓; Grown; joins-grow; grown-past; nest-or)
@@ -103,7 +103,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     -- A carrier with no failure before it carries a row with none.
     e1 : ∀ {k l} → C.Img k l → ¬ P.Failed k → ¬ Q.Failed l
     e1 i nf (q , instEmit (mark _) _ , _ , () , _)
-    e1 {k} {l} i nf (q , instEmit (value b) n , uq , nb , ql) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    e1 {k} {l} i nf (q , instEmit (value b) n , uq , nb , ql) with C.shown uq (b , refl) tt (Q.live-out uq) (Q.few-out uq)
     ... | k′ , i′ , e₀ , tk′ , mt with match-val mt
     ...   | refl with ≼-or-≻ k k′
     ...     | inj₂ k′k = nf (k′ , b , tk′ , nb , k′k)
@@ -130,7 +130,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     -- A carrier of a row that does not fail does not fail.
     unfails→ : ∀ {k l} → C.Img k l → ¬ P.Fails k → ¬ Q.Fails l
     unfails→ i nfs (instEmit (mark _) _ , _ , ())
-    unfails→ {k} {l} i nfs (instEmit (value b) n , ul , nb) with C.shown ul (b , refl) (Q.live-out ul) (Q.few-out ul)
+    unfails→ {k} {l} i nfs (instEmit (value b) n , ul , nb) with C.shown ul (b , refl) tt (Q.live-out ul) (Q.few-out ul)
     ... | k′ , i′ , e₀ , tk′ , mt with match-val mt
     ...   | refl with ≼-or-≻ k k′
     ...     | inj₂ k′k = ≺-irrefl {l} (img-mono i′ i k′k)
@@ -177,7 +177,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     cut-shown : ∀ {q y a} → u q (out y) → T (not (passes keep y)) → ¬ Q.Failed q → Lab incl a
               → Σ Pos λ k → Img′ k (q ⊕ [ a ]) × Σ (Ev A) λ e₀ → P.T′ k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ (cutEv y a)
     cut-shown {y = instEmit (mark _) _} _ () _ _
-    cut-shown {q} {instEmit (value b) n} {a} uq nb nfq lb with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    cut-shown {q} {instEmit (value b) n} {a} uq nb nfq lb with C.shown uq (b , refl) tt (Q.live-out uq) (Q.few-out uq)
     ... | k₀ , i , e₀ , tk , mt with match-val mt
     ...   | refl = k₀ ⊕ [ a ] , inj₂ (cut tk nb (e2 i nfq) i uq lb refl refl) , cutEv b a , P.cut-row tk nb (e2 i nfq) lb , cut-match lb
 
@@ -284,7 +284,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     cut-into : ∀ {k f l₁} → t k skip → ¬ P.Failed k → C.PB k l₁ → Q.First f → Listed u f
              → Σ Pos λ m → Σ (Ev (IE A)) (Q.T′ m) × Listed Q.T′ m × PB′ k m
     cut-into tk nfk _ ((instEmit (mark _) _ , _ , ()) , _) L
-    cut-into {k} {f} tk nfk pb ff@((instEmit (value b) n , uf , ny) , nff) L with C.shown uf (b , refl) (Q.live-out uf) (Q.few-out uf)
+    cut-into {k} {f} tk nfk pb ff@((instEmit (value b) n , uf , ny) , nff) L with C.shown uf (b , refl) tt (Q.live-out uf) (Q.few-out uf)
     ... | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
     ...   | refl = f ⊕ [ last ] , (end , Q.cut-row uf ny nff (inj₂ refl)) , Q.lst-cut ff L (inj₂ refl)
                  , inj₂ (f , k₀ , ff , i₀ , (last , inj₂ refl , refl) , ((b , tk₀ , ny) , e2 i₀ nff) , before , (skip , tk) , (_ , pb))
@@ -330,7 +330,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     ... | inj₁ (um , _) = proj₁ (C.pb-few um) , λ { (inj₁ (_ , _ , _ , pb)) → proj₂ (C.pb-few um) pb
                                                    ; (inj₂ (_ , _ , ((_ , uf , _) , _) , _ , (_ , _ , eq) , _)) → ⊥-elim (InvAt.flat Iu uf (subst (λ z → u z _) eq um)) }
     ... | inj₂ (q , instEmit (mark _) _ , _ , () , _)
-    ... | inj₂ (q , instEmit (value b) n , uq , ny , nfq , a , lb , refl , refl) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    ... | inj₂ (q , instEmit (value b) n , uq , ny , nfq , a , lb , refl , refl) with C.shown uq (b , refl) tt (Q.live-out uq) (Q.few-out uq)
     ...   | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
     ...     | refl = proj₁ (C.few i₀) , mem
       where
@@ -375,17 +375,28 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
       C.img¬¬ tq tt (P.live-out tq) (P.few← nf (few-sub fw (≺-ext q []))) λ { (inj₁ (_ , i , _ , ul , mt)) → cut¬¬ tq nk nf lb i ul mt (λ x → n (inj₁ x))
                                                                             ; (inj₂ ()) }
 
-    src-shown : ∀ {l e} → u l e → Keeps (passes keep) e → ¬ Q.Failed l → Shown (One valuesOf) e → Live Q.T′ l → Few Q.T′ l
+    src-shown : ∀ {l e} → u l e → Keeps (passes keep) e → ¬ Q.Failed l → Shown (One valuesOf) e → Work e → Live Q.T′ l → Few Q.T′ l
               → Σ Pos λ k → Img′ k l × Σ (Ev A) λ e₀ → P.T′ k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
-    src-shown ul pe nf sw lv fw with C.shown ul sw (Q.live← nf lv) (Q.few← nf fw)
+    src-shown ul pe nf sw w lv fw with C.shown ul sw w (Q.live← nf lv) (Q.few← nf fw)
     ... | k , i , e₀ , tk , mt =
       k , inj₁ (i , e2 i nf , P.pass-fails tk (keeps← {kp = keep} mt pe)) , e₀ , P.up tk (e2 i nf) (keeps← {kp = keep} mt pe) , mt
 
-    shown′ : ∀ {l e} → Q.T′ l e → Shown (One valuesOf) e → Live Q.T′ l → Few Q.T′ l
+    shown′ : ∀ {l e} → Q.T′ l e → Shown (One valuesOf) e → Work e → Live Q.T′ l → Few Q.T′ l
            → Σ Pos λ k → Img′ k l × Σ (Ev A) λ e₀ → P.T′ k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e
-    shown′ (r , _) sw lv fw with Q.view r
-    ... | inj₁ (ul , pe) = src-shown ul pe (Q.live-unfailed lv ul) sw lv fw
+    shown′ (r , _) sw w lv fw with Q.view r
+    ... | inj₁ (ul , pe) = src-shown ul pe (Q.live-unfailed lv ul) sw w lv fw
     ... | inj₂ (_ , _ , uq , ny , nfq , _ , lb , refl , refl) = cut-shown uq ny nfq lb
+
+    -- A source's end read back as the source's carry holds it; a cut's
+    -- end on its failing value, at once.
+    shown-end′ : ∀ {l} → Q.T′ l end → Live Q.T′ l → Few Q.T′ l → Σ Pos λ k → Img′ k l × ¬ ¬ P.T′ k end
+    shown-end′ (r , _) lv fw with Q.view r
+    ... | inj₂ (_ , _ , uq , ny , nfq , _ , lb , refl , ee) =
+      end-held {f = valuesOf} {Img = Img′} (subst (λ e → Σ Pos λ k → Img′ k _ × Σ (Ev A) λ e₀ → P.T′ k e₀ × Match Every (One valuesOf) (Reads valuesOf) e₀ e)
+                                                  (sym ee) (cut-shown uq ny nfq lb))
+    ... | inj₁ (ul , pe) with Q.live-unfailed lv ul
+    ...   | nf with C.shown-end ul (Q.live← nf lv) (Q.few← nf fw)
+    ...     | k , i , nn = k , inj₁ (i , e2 i nf , λ fk → nn λ tk → P.pass-fails tk tt fk) , λ n → nn λ tk → n (P.up tk (e2 i nf) tt)
 
     ----------------------------------------------------------------------
     -- Placing a row from its source's placing
@@ -439,7 +450,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
     u-fail : (∀ {c} → P.T′ c end → ⊥) → ∀ {q y} → u q (out y) → T (not (passes keep y)) → ⊥
     u-fail ne {y = instEmit (mark _) _} _ ()
-    u-fail ne {y = instEmit (value b) n} uq nb with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    u-fail ne {y = instEmit (value b) n} uq nb with C.shown uq (b , refl) tt (Q.live-out uq) (Q.few-out uq)
     ... | _ , _ , _ , tk , mt with match-val mt
     ...   | refl = P.no-fail ne tk nb
 
@@ -494,7 +505,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
     pin-unfailed : ∀ {p p′} → ¬ P.Failed p → Targeted M p p′ → ¬ Q.Failed p′
     pin-unfailed nfp tg (q , instEmit (mark _) _ , _ , () , _)
-    pin-unfailed nfp tg (q , instEmit (value b) n , uq , nb , qp) with C.shown uq (b , refl) (Q.live-out uq) (Q.few-out uq)
+    pin-unfailed nfp tg (q , instEmit (value b) n , uq , nb , qp) with C.shown uq (b , refl) tt (Q.live-out uq) (Q.few-out uq)
     ... | k′ , i′ , _ , tk′ , mt with match-val mt
     ...   | refl = nfp (k′ , b , tk′ , nb , pin-bound hm tg (proj₁ (proj₂ (C.ext i′))) (proj₂ (proj₂ (C.ext i′))) qp)
 
@@ -544,7 +555,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
     -- The plain row a first failing carrier carries, past an unfailed pin.
     first-src : ∀ {k r f} → t k (pin r) → ¬ P.Failed k → Q.First f → Σ Pos λ k₀ → C.Img k₀ f × P.First k₀ × k ≺ k₀
     first-src _ _ ((instEmit (mark _) _ , _ , ()) , _)
-    first-src {k} tk nfk ((instEmit (value b) n , uf , ny) , nff) with C.shown uf (b , refl) (Q.live-out uf) (Q.few-out uf)
+    first-src {k} tk nfk ((instEmit (value b) n , uf , ny) , nff) with C.shown uf (b , refl) tt (Q.live-out uf) (Q.few-out uf)
     ... | k₀ , i₀ , e₀ , tk₀ , mt with match-val mt
     ...   | refl = k₀ , i₀ , ((b , tk₀ , ny) , e2 i₀ nff) , before
       where
@@ -621,7 +632,7 @@ module Core {A : Set} (incl : Bool) (keep : A → Bool) {M : PMap} {HP HE LP H�
 
   carried′ : CarryAt valuesOf M′ HP HE LP P.T′ Q.T′ s s′
   carried′ = record
-    { Img = Img′ ; ext = ext′ ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; img-row = img-row′ ; img-fun = img-fun′
+    { Img = Img′ ; ext = ext′ ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; shown-end = shown-end′ ; img-row = img-row′ ; img-fun = img-fun′
     ; place = place′ ; live = live′ ; few = few′ ; whole = whole′ ; cover = take-cover ; bk = bk′ ; in-bk = in-bk′ ; PB = PB′ ; pb-few = pb-few′ ; pinned = pinned′
     ; pb-img = pb-img′ ; pb-past = pb-past′ }
 

@@ -30,7 +30,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Tree using (scan)
 open import denotation.Position using (Pos; _<ᵖ_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; enter; Truncate; Reach; Few; _≺_; _≼_; Unpinned;
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Work; Den; enter; Truncate; Reach; Few; _≺_; _≼_; Unpinned;
   module Scan; module Op; approx)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans; ≼-or-≻; ≼-split; reach-few; entered-reach)
 open import denotation.Laws.Worlds using (InvAt; full; GoodEnv; Ok; Hots)
@@ -213,7 +213,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
            ⊎ Σ Pos λ k → Σ Pos λ lk → Img k lk × lk ≼ m × P.Acc k b × (∀ {x a l′} → t x (out a) → k ≺ x → Img x l′ → m ≺ l′)
 
   back : ∀ {m st} → E.Acc m st → Live u m → Few u m → Back m (proj₁ st)
-  back {m} (E.acc₀ {a = instEmit (value a) n} y mn) lv fw with shown y (a , refl) lv fw
+  back {m} (E.acc₀ {a = instEmit (value a) n} y mn) lv fw with shown y (a , refl) tt lv fw
   ... | k , i , e₀ , tk , mt with match-val mt
   ...   | refl = inj₂ (k , m , i , ≼-refl {m} , P.acc₀ tk (λ tx xk → img-out tx λ { (l′ , i′ , _ , ul′ , _) → mn ul′ (img-mono i′ i xk) })
                       , λ _ kx i′ → img-mono i i′ kx)
@@ -222,7 +222,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
   ... | inj₁ (eq , none) = inj₁ (eq , λ tx i′ → at-mark y tx i′ λ ul′ → nx ul′ (none tx i′))
   ... | inj₂ (k , lk , i , lkm , ac , lat) =
     inj₂ (k , lk , i , ≼-trans {lk} {m₀} {m} lkm (≺→≼ {m₀} {m} mm) , ac , λ tx kx i′ → at-mark y tx i′ λ ul′ → nx ul′ (lat tx kx i′))
-  back {m} (E.acc {q = m₀} {b = st₀} {a′ = instEmit (value a) n} a₀ y mm nx) lv fw with shown y (a , refl) lv fw
+  back {m} (E.acc {q = m₀} {b = st₀} {a′ = instEmit (value a) n} a₀ y mm nx) lv fw with shown y (a , refl) tt lv fw
   ... | k , i , e₀ , tk , mt with match-val mt
   ...   | refl = inj₂ (k , m , i , ≼-refl {m} , pacc (back a₀ (live-before {m₀} {m} lv mm) (few-sub fw mm)) , λ _ kx i′ → img-mono i i′ kx)
     where
@@ -325,22 +325,24 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
       ; (inj₂ ()) }
     img¬¬′ (P.spin _ , _) () _ _
 
-    shown′ : ∀ {l e} → S′ l e → Shown (One stateValues) e → Live S′ l → Few S′ l
+    shown′ : ∀ {l e} → S′ l e → Shown (One stateValues) e → Work e → Live S′ l → Few S′ l
            → Σ Pos λ k → Img k l × Σ (Ev B) λ e₀ → S k e₀ × Match Every (One stateValues) (Reads stateValues) e₀ e
-    shown′ (E.sval ac , _) sw lv fw with EF.acc-val ac
+    shown′ (E.sval ac , _) sw _ lv fw with EF.acc-val ac
     ... | instEmit (value a) n , uy with out-at ac uy
-    ...   | st₀ , refl with shown uy (a , refl) (UL.live← lv) (UL.few← fw)
+    ...   | st₀ , refl with shown uy (a , refl) tt (UL.live← lv) (UL.few← fw)
     ...     | k , i , e₀ , tk , mt with match-val mt
     ...       | refl = k , i , out _ , (P.sval (back-at (back ac (UL.live← lv) (UL.few← fw)) tk i) , reach-kin down₀ (k-out {a = a} {b = f (proj₁ st₀) a}) (rch tk))
                        , (λ _ → _ , refl , refl) , λ ns → ⊥-elim (ns tt)
-    shown′ (E.sval ac , _) sw lv fw | instEmit (mark _) n , uy with out-at ac uy
+    shown′ (E.sval ac , _) sw _ lv fw | instEmit (mark _) n , uy with out-at ac uy
     ...   | st₀ , refl with sw
     ...     | _ , ()
-    shown′ (E.send ue , _) _ lv fw with shown ue tt (UL.live← lv) (UL.few← fw)
-    ... | k , i , e₀ , tk , mt with match-end mt
-    ...   | refl = k , i , end , (P.send tk , reach-kin down₀ k-end (rch tk)) , (λ _ → refl) , λ ns → ⊥-elim (ns tt)
-    shown′ (E.sstep _ , _) () _ _
-    shown′ (E.spin _ , _)  () _ _
+    shown′ (E.send _ , _) _ ()
+    shown′ (E.sstep _ , _) ()
+    shown′ (E.spin _ , _)  ()
+
+    shown-end′ : ∀ {l} → S′ l end → Live S′ l → Few S′ l → Σ Pos λ k → Img k l × ¬ ¬ S k end
+    shown-end′ (E.send ue , _) lv fw with shown-end ue (UL.live← lv) (UL.few← fw)
+    ... | k , i , nn = k , i , λ n → nn λ tk → n (P.send tk , reach-kin down₀ k-end (rch tk))
 
     placed′ : ∀ {m} → instantOf m ≡ instantOf s′ ⊎ (Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m × Near u m l)
                 ⊎ Σ Pos (λ h → HE h × instantOf h ≡ instantOf m)
@@ -386,7 +388,7 @@ module Core {A B : Set} (f : B → A → B) (z : B) {M : PMap} {HP HE LP H₁ H�
 
   scanned : CarryAt stateValues M HP HE LP S S′ s s′
   scanned = record
-    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′
+    { Img = Img ; ext = ext ; img = img′ ; img¬¬ = img¬¬′ ; shown = shown′ ; shown-end = shown-end′
     ; img-row = λ i n → img-row i λ { (_ , tk , un) → up tk λ { (e′ , sk , kn) → n (e′ , sk , unp→ kn un) } }
     ; img-fun = img-fun
     ; place = λ {m} s₁ lv lm → placed′ {m} (place (proj₁ (proj₂ (downU s₁))) (UL.live← {m} (λ {c} → lv {c})) (UL.lst← {m} lm))
