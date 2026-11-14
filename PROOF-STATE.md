@@ -32,16 +32,40 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SIMULATION
+#### THE SIMULATION: FLATMAP
 
-Untried: the elaborated run simulates the plain run, exactly and both
-ways, along one order embedding of anchors, every elaborated row owned
-by the subscription, a plain row or an environment row, finitely many
-each. Riskiest: flatMap's bookkeeping (the scan's marks, the trackers'
-reads of the environment), the joiners' decisions read across the map,
-and pins. Settled when `sim-root` is a body over per-former simulations.
+Untried: the elaborated flatMap simulates the plain one, its lanes'
+local maps joined into one embedding, every row owned and listed. Risk:
+the scan's marks, the trackers' rows owned by environment rows across
+every lane alive at them, and joined maps staying an embedding. Settled
+when `sim-flatMap` is a body over the lanes' and the outer's simulations.
 
-Members: `sim-root`.
+Members: `sim-flatMap`.
+
+#### THE SIMULATION: THE ENVIRONMENT
+
+Untried: a reader of a simulated hot is simulated, its marks owned under
+the environment row's anchor while the value lies at the reader row's;
+a connect's body owns its environment rows through the echoes, bursts
+and kept pins while it lives. Settled when each is a body.
+
+Members: `sim-connected`, `sim-connect`.
+
+#### THE SIMULATION: DECISIONS
+
+Untried: a take's failure, a scan's state and a map's values transfer
+both ways along the map; the closed run beside its marks, restamped,
+simulates the program from the root. Settled when each is a body.
+
+Members: `sim-takeWhile`, `sim-scan`, `sim-map`, `sim-top`.
+
+#### THE SIMULATION: SOURCES
+
+Untried: a cold's, an of's and an empty's elaborated rows carry their
+plain rows; a defer's guard and bottom carry theirs. Settled when each
+is a body.
+
+Members: `sim-cold`, `sim-of`, `sim-empty`, `sim-⊥`, `sim-next`.
 
 #### THE CONSUMPTION
 
@@ -54,10 +78,9 @@ Members: `img-row`, `img-few`, `put-row`, `causal←`.
 
 #### THE TABLES
 
-Probed: the plain and elaborated tables of one cut correspond along one
-position map and one late placement. Switch's list-level simulation
-closed with no postulate; exhaust's fuel, pins and the wrappers are
-untried. Settled when `tables` is a body over per-operator simulations.
+Untried: the plain and elaborated tables of one cut correspond along one
+position map and one late placement. Settled when `tables` is a body
+over per-operator simulations.
 
 Members: `tables`.
 
