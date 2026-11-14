@@ -2,7 +2,7 @@
 
 CLAUDE.md is the **file of record for directives**: rulings, standing rules, laws.
 It is read in full at the start of every session, so every byte in it is paid for
-by every worker. These files hold the part that is **not a directive** — how a
+by every session. These files hold the part that is **not a directive** — how a
 tool works, what its flags mean, which trap cost a day. A session reads one of
 these when it is about to USE the thing.
 
@@ -43,6 +43,5 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, rulings, traps |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
-| [delegation.md](delegation.md) | worker model pinning and directives |
 | [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |

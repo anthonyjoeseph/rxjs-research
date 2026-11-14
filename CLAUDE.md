@@ -19,7 +19,7 @@ As we try to prove adequacy, it's important that we be able to change the implem
 ## This file
 
 - **File of record for every directive.** Ruling, standing rule, correction, "from now on" — here, in the section it belongs to, same commit. Not recorded until it is in this file; don't answer "noted" and carry it in context only.
-- **Never the auto-memory directory** (`~/.claude/projects/…/memory/`) or any other out-of-repo note. Outside the repo = no gate, no grep, invisible to every worker.
+- **Never the auto-memory directory** (`~/.claude/projects/…/memory/`) or any other out-of-repo note. Outside the repo = no gate, no grep, invisible to every session.
 - **Ask before changing this file (Anthony).** Draft the wording, show it, land it on his yes. An agent's own inference installed as law propagates further than any code change.
 - **Rules here; mechanics in `docs/`** (one file per tool, indexed by `docs/README.md`). Split by KIND, not length. This file carries only what must be obeyed *prophylactically* — before you'd have reason to open a doc.
 - **Fragments over paragraphs; omit rather than explain the omission (Anthony).** Every word here is paid on every turn.
@@ -64,18 +64,11 @@ Every PROOF-STATE.md tier discharged: no postulates, everything typechecks.
 
 **No classical axioms (Anthony)** — the development must compile under `--safe` when done. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
-## Delegation — the design session directs, Sonnet workers grind
+## Delegation — do the work yourself (Anthony)
 
-- **Workers run Sonnet 4.6, and `model: "sonnet"` does NOT get you there** — that alias resolves to Sonnet 5 here. Both levers apply only at session start, so a running session cannot change or verify its workers' model; say so plainly. → [docs/delegation.md](docs/delegation.md)
-- **Workers never babysit long builds;** the full gate is CI's.
-- **A worker must kill any detached build before reporting**, and say nothing is running. Agda doesn't lock interfaces — two processes on one `.agdai` is a corrupt cache or a spurious failure.
-- **Delegation has a FIXED context cost — amortise it or do it yourself (Anthony).** Delegate on BREADTH (several independent items, concurrently), REPETITION (one context, many similar obligations), or NARROWNESS (a small nameable slice). **Keep DEPTH:** one hard thing in a file already loaded is cheaper to do than to delegate.
-- **The tell, and it is reliable: if writing the directive required you to do the analysis, you have already done the expensive part.**
-- Parallel workers authorized; Agda builds one at a time.
-- **Directives carry the law** — every worker prompt restates the rules it needs.
-- Workers don't commit. Land green work via a PR, never a direct push to main. **You have autonomy to open up to two PRs, and use their CI as an asynchronous gate. No more than two PRs open at a time; don't merge to main until CI is green (Anthony).**
-- **Stage explicitly while a worker holds a file — never `git add -A` (Anthony).**
-- **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
+- **Don't spawn agents or workers.** One starts cold and pays to read in the context this session already holds; that cost exceeds the work it saves. Grind it here.
+- Only when Anthony asks for one.
+- **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, start the next.
 
 ## Agda builds
 
@@ -158,7 +151,9 @@ Per tier: a one-line description (≤150 chars), then a **ledger** of GROUPS. No
 - **Stack, don't wait (Anthony).** While a PR's gate runs, open the next against its branch; retarget it to `main` when the first merges. **At most two open PRs.** A fix to the first lands on the first, then merges forward — never on the second alone.
 - **Every reconciliation ends with a ledger pass (Anthony):** re-rank PROOF-STATE.md's groups, rewrite each touched group's issue to what is still open, delete settled groups.
 - **Laws are deferred in writing, never suspended** — whatever writing leaves, reconciliation pays.
-- Workers in both phases. Agda builds one at a time.
+- Agda builds one at a time.
+- Land green work via a PR, never a direct push to main. **You have autonomy to open up to two PRs, and use their CI as an asynchronous gate. No more than two PRs open at a time; don't merge to main until CI is green (Anthony).**
+- **Stage explicitly — never `git add -A` (Anthony).**
 
 ### Dead routes
 
