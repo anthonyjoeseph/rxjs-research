@@ -32,17 +32,17 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### CONNECT: THE ROWS PAST THE BODY
+#### CONNECT: THE ELABORATED SOURCE ROWS
 
-Untried: a burst, echo or kept row under a bound's image is carried by
-the source's simulation cut at the bound or the body's end; the body's
-and the source's listings sit inside the connect's. Risk: a body row up
-to a listed bound reaches the connect only if the source rows before it
-are few, which no law states directly. Settled when each is a body over
-the source's simulation and the connect laws.
+Untried: the elaborated connect's burst, echo and kept rows under a
+bound's image are listed. Risk: pins and skips are not carried, so they
+trace to plain rows only through the annotated source's listing, whose
+bound must be fed every proper source row up to it — which the
+connect's listing hides past the body's end. Settled when `src-listed`
+is a body over the annotated source's simulation at a bound the
+connect's listing covers.
 
-Members: `u-under`, `src-listed`, `listed-σ`, `listed-β`, `t-mem`,
-`under-upto`.
+Members: `src-listed`.
 
 #### CONNECT: THE MAPS
 

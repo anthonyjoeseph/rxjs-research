@@ -95,6 +95,11 @@ sib-≺ x {a} {b} h = apart h np
     ... | inj₁ le = ⊑-≼ {x ⊕ [ a ]} {x} le (≺-ext x [])
     ... | inj₂ eq = ≺-irrefl {x ⊕ [ a ]} (subst ((x ⊕ [ a ]) ≺_) (sym eq) h)
 
+-- A boolean or its negation holds.
+T-or : ∀ b → T b ⊎ T (not b)
+T-or true  = inj₁ tt
+T-or false = inj₂ tt
+
 module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : GoodEnv env) (q : Pos) (ok : Ok (Hots env) q) where
 
   σ : EmissionSet Y
@@ -500,10 +505,6 @@ module Told {Γ Y} n (S : Obs Timeline Γ Y) (x : Y) (env : DenEnv Γ) (genv : G
 
   ------------------------------------------------------------------------
   -- The told rows made
-
-  T-or : ∀ b → T b ⊎ T (not b)
-  T-or true  = inj₁ tt
-  T-or false = inj₂ tt
 
   c₁-≻ : ∀ k → k ≺ c₁ k
   c₁-≻ k = subst (k ≺_) (sym (proj₂ (under-c₁ k))) (≺-ext k (ix 1 ∷ last ∷ []))
