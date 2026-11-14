@@ -68,6 +68,13 @@
 -- nested connects put the outer's readers in the order rxjs would meet
 -- them, and a choice among programs is a choice among `connected`
 -- handles, never among children.
+--
+-- NO CHILD IS A CONNECT'S SOURCE ITSELF (`shareˢ`): rxjs runs a source's
+-- subscribe burst to its end whatever unsubscribed below, so a child the
+-- plain run cuts mid-burst would run on elaborated, and a loop there
+-- would hang the run past every later instant.  The child is a lane of
+-- a flatMap over a one-row trigger, fired past the connect's own
+-- subscribe, so a cut reaches it as it reaches the plain child.
 open import Relation.Binary.Definitions using (DecidableEquality)
 
 module simultaneous.SObs where
@@ -82,6 +89,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_; z≤n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
@@ -206,6 +214,13 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   each : ∀ {Γ X Y} → (X → List Y) → E Γ X → E Γ Y
   each f s = flatMap (mergeᶠ nothing) (λ x → of (f x)) s
+
+  -- A child shared by a body, subscribed as the lane of a trigger fired
+  -- past the body's subscribe: within the connect's burst, never as its
+  -- source, so a cut below stops it.
+  shareˢ : ∀ {Γ X Y} → E (⊤ ∷ Γ) X → E (X ∷ ⊤ ∷ Γ) Y → E Γ Y
+  shareˢ s b = connect (of (tt ∷ [])) (connect (flatMap (mergeᶠ nothing) (λ _ → s) (connected (here refl))) b)
+  {-# INLINE shareˢ #-}
 
   ------------------------------------------------------------------------
   -- Routes
@@ -361,9 +376,9 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- rxjs subscribes the next queued lane inside that run, so a lane ended
   -- in its burst never waits on it.  Its burst's end, past a lane already
   -- done, would change nothing (`burstOver`).
-  laneˢ : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
+  laneˢ : ∀ {Θ B} → E (⊤ ∷ Θ) (IE B) → E Θ (IE B)
   laneˢ x = takeWhile true undone (flatMap (mergeᶠ nothing)
-    (λ k → connect (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (counted (framed k)))
+    (λ k → shareˢ (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (counted (framed k)))
     (of (lanePart ∷ burstPart ∷ [])))
   {-# INLINE laneˢ #-}
 
@@ -525,9 +540,10 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
   -- then by `closer`: the order the nested connects subscribe them in.
-  flatMapˢ : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → (A → E (IE B ∷ IE A ∷ Δ) (IE B)) → E Δ (IE A) → E Δ (IE B)
+  flatMapˢ : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes) → (A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
+           → E (⊤ ∷ Δ) (IE A) → E Δ (IE B)
   flatMapˢ op tk g s =
-    connect s (connect closer
+    shareˢ s (connect closer
       (connect (flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))) (combined op tk)))
   {-# INLINE flatMapˢ #-}
 
@@ -560,7 +576,8 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     elab ρ (scan f z s)      = scanˢ f z (elab ρ s)
     elab ρ (takeWhile i p s) = takeWhileˢ i p (elab ρ s)
     elab {Γ} ρ (flatMap op f s) =
-      flatMapˢ op (trackers Γ 0 (λ i → there (there (there (ρ i))))) (λ a → elab (λ i → there (there (ρ i))) (f a)) (elab ρ s)
+      flatMapˢ op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))
+        (λ a → elab (λ i → there (there (there (there (ρ i))))) (f a)) (elab (λ i → there (ρ i)) s)
     elab ρ (connect s b)     = connect (annotate (elab ρ s)) (elab (ext ρ) b)
     elab ρ (connected i)     = reader (connected (ρ (∈-map⁺ AIE i)))
     elab ρ (defer l)         = defer (elabˡ ρ l)

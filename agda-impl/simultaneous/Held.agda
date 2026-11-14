@@ -18,7 +18,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
@@ -39,6 +39,7 @@ open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds)
@@ -256,10 +257,10 @@ held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
          ; (there i)   → widen (eh i) })
       (p ⊕ [ ix 0 ]) ok₀ ep₀
 
--- A FLATMAP'S SCAN HOLDS, read past the three connects that share its
--- outer: the outer at `p ⊕ [ ix 1 ]`, the closer, then the real
--- flatMap, each made hot.  What it reads: the connects in scope, the
--- outer, the lanes and the closer.
+-- A FLATMAP'S SCAN HOLDS, read past the connects that share its outer:
+-- the trigger at `p ⊕ [ ix 1 ]`, the outer as its lane, the closer,
+-- then the real flatMap, each made hot.  What it reads: the connects in
+-- scope, the outer, the lanes and the closer.
 -- A source read while its items go on passes no `nothing`, under the
 -- meaning and every approximant.
 ev-none : ∀ m {Γ X} (s : Obs Timeline Γ (Maybe X)) (env : DenEnv Γ) P {q}
@@ -272,36 +273,47 @@ ev-none (just n) s env P (TakeWhile.fail _ _ _ () , _)
 module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (s : Obs Timeline Γ A) (env : DenEnv Δ) (p : Pos) where
 
-  g : A → Obs Timeline (IE B ∷ IE A ∷ Δ) (IE B)
-  g a = elab (λ i → there (there (ρ i))) (f a)
+  g : A → Obs Timeline (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
+  g a = elab (λ i → there (there (there (there (ρ i))))) (f a)
 
-  tk : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)
-  tk = trackers Γ 0 (λ i → there (there (there (ρ i))))
+  tk : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)
+  tk = trackers Γ 0 (λ i → there (there (there (there (ρ i)))))
 
-  real : Obs Timeline (IE B ∷ IE A ∷ Δ) (IE B)
+  real : Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   real = flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))
 
-  p₀ p₀₀ : Pos
-  p₀  = p ⊕ [ ix 0 ]
+  -- The outer, a lane of the trigger.
+  trig : Obs Timeline (⊤ ∷ Δ) (IE A)
+  trig = flatMap (mergeᶠ nothing) (λ _ → elab (λ i → there (ρ i)) s) (connected (here refl))
+
+  c p₀ p₀₀ : Pos
+  c   = p ⊕ [ ix 0 ]
+  p₀  = c ⊕ [ ix 0 ]
   p₀₀ = p₀ ⊕ [ ix 0 ]
 
+  σ₀ : EmissionSet ⊤
+  σ₀ = Proper (enter (ev m (of (tt ∷ [])) env) (p ⊕ [ ix 1 ]))
+
+  env₀ : DenEnv (⊤ ∷ Δ)
+  env₀ = hot σ₀ ∷ env
+
   σ₁ : EmissionSet (IE A)
-  σ₁ = Proper (enter (ev m (elab ρ s) env) (p ⊕ [ ix 1 ]))
+  σ₁ = Proper (enter (ev m trig env₀) (c ⊕ [ ix 1 ]))
 
   σ₂ : EmissionSet (IE B)
-  σ₂ = Proper (enter (ev m closer (hot σ₁ ∷ env)) (p₀ ⊕ [ ix 1 ]))
+  σ₂ = Proper (enter (ev m closer (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]))
 
   σ₃ : EmissionSet (IE B)
-  σ₃ = Proper (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env)) (p₀₀ ⊕ [ ix 1 ]))
+  σ₃ = Proper (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]))
 
-  env′ : DenEnv (IE B ∷ IE B ∷ IE A ∷ Δ)
-  env′ = hot σ₃ ∷ hot σ₂ ∷ hot σ₁ ∷ env
+  env′ : DenEnv (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ)
+  env′ = hot σ₃ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀
 
   P : Pos
   P = p₀₀ ⊕ [ ix 0 ]
 
   -- What the scan reads: the connects in scope, then its own branches.
-  src : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ Δ) (Maybe (Input B))
+  src : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (Maybe (Input B))
   src = takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))
 
   scanned : EmissionSet (IE B)
@@ -346,12 +358,15 @@ closing-value ()
 -- subscribed it, or the end, under the scan's own subscription.
 module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
-               (hs : HeldD (Hots env) (ev m (elab ρ s) env) cs) (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
+               (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
                (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
+               (H₁ : Held (enter (ev m (FlatHots.trig m ρ op f s env p) (FlatHots.env₀ m ρ op f s env p)) (FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]))
+                          ((FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]) ∷ p ∷ cs))
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
-               (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀ m ρ op f s env p))
-               (ok₂ : Ok (Hots (hot (FlatHots.σ₂ m ρ op f s env p) ∷ hot (FlatHots.σ₁ m ρ op f s env p) ∷ env)) (FlatHots.p₀₀ m ρ op f s env p))
+               (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p)) (FlatHots.p₀ m ρ op f s env p))
+               (ok₂ : Ok (Hots (hot (FlatHots.σ₂ m ρ op f s env p) ∷ hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p))
+                         (FlatHots.p₀₀ m ρ op f s env p))
                (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
@@ -406,7 +421,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     close-ends  : ∀ {q} → σ₂ q end → Early q
 
   cs′ : List Pos
-  cs′ = P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs
+  cs′ = P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs
 
   -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met:
   -- the routes open at a row are of its instant; a value read, a live
@@ -529,9 +544,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
   ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
-  H₁ : Held (enter (ev m (elab ρ s) env) (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
-  H₁ = hs (p ⊕ [ ix 1 ]) (ok-step p ok) (early-inst [ ix 1 ] ep)
-
   named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
   named x with m-rows x tt
   ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
@@ -576,7 +588,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
       fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
 
-  comb : CombIn op M (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
+  comb : CombIn op M cs′
   comb = record { named = named ; early = early ; ends = ends ; late = late ; runs = comb-runs }
 
 ------------------------------------------------------------------------
@@ -683,27 +695,45 @@ comb-held m op s ρ P cs g ok ci id re = held-runs named routing early ends late
   where open Scanned m op s ρ P cs g ok ci
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
-            (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ s) env) cs
+            (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs
           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
           → ∀ p → Ok (Hots env) p → Early p
           → let open FlatHots m ρ op f s env p in
-            Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₁ ∷ env)) p₀ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env)) p₀₀ → Ok (Hots env′) P → Early P
-          → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ p ∷ cs)
-held-comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
-  comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ gd))) ok₃
-    (CombSrc.comb m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
-    (CombSrc.scan-idle m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
-    (CombSrc.scan-rest m ρ op f s env cs gd eh hs hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
-  where open FlatHots m ρ op f s env p using (src; env′; P)
+            Held (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) ((c ⊕ [ ix 1 ]) ∷ p ∷ cs)
+          → Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₁ ∷ env₀)) p₀ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) p₀₀
+          → Ok (Hots env′) P → Early P
+          → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs)
+held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
+  comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))) ok₃
+    (CombSrc.comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombSrc.scan-idle m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombSrc.scan-rest m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+  where
+    open FlatHots m ρ op f s env p using (src; env′; P)
+    L₀ = src-lawful {s = ev m (of (tt ∷ [])) env} {F = λ h → ev m (of (tt ∷ [])) (h ∷ env)} (inv-ev m (of (tt ∷ [])) env gd) (λ L → inv-ev m (of (tt ∷ [])) (hot _ ∷ env) (good-cons L gd)) p ok
 
-held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → IH m ρ s
+-- A TRIGGERED LANE HOLDS as its child does: the child is subscribed once,
+-- at the trigger's one row, inside the share's own burst, which the
+-- share's subscription exempts.
+postulate
+  held-trigger : ∀ m {Δ A} (x : Obs Timeline (⊤ ∷ Δ) (IE A)) (env : DenEnv Δ) cs p → GoodEnv env → Ok (Hots env) p → Early p
+               → let σ₀ = Proper (enter (ev m (of (tt ∷ [])) env) (p ⊕ [ ix 1 ])) in
+                 HeldD (Hots (hot σ₀ ∷ env)) (ev m x (hot σ₀ ∷ env)) cs
+               → Held (enter (ev m (flatMap (mergeᶠ nothing) (λ _ → x) (connected (here refl))) (hot σ₀ ∷ env)) ((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))
+                      (((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ∷ p ∷ cs)
+
+held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
+             → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
-held-flatMap m ρ op f s (ih hs) hf = ih λ env cs g eh p ok ep →
-  conn-ev m (elab ρ s) _ env cs g p ok ep λ L₁ ok₁ ep₁ →
-    conn-ev m closer _ _ (p ∷ cs) (good-cons L₁ g) (p ⊕ [ ix 0 ]) ok₁ ep₁ λ L₂ ok₂ ep₂ →
-      conn-ev m (FlatHots.real m ρ op f s env p) _ _ ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ g))
-        ((p ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ok₂ ep₂ λ L₃ ok₃ ep₃ →
-        held-comb m ρ op f s env cs g eh (hs env cs g eh) hf p ok ep L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
+  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀) in
+  conn-ev m (of (tt ∷ [])) _ env cs g p ok ep λ L₀ ok₀ ep₀ →
+    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ λ L₁ ok₁ ep₁ →
+      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ λ L₂ ok₂ ep₂ →
+        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ λ L₃ ok₃ ep₃ →
+          held-comb m ρ op f s env cs g eh hf p ok ep
+            (held-trigger m (elab (λ i → there (ρ i)) s) env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
+            L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
@@ -721,7 +751,7 @@ held-approx n       ρ (of xs)           = held-of (just n) ρ xs
 held-approx n       ρ (map f s)         = held-map (just n) ρ f s (held-approx n ρ s)
 held-approx n       ρ (scan f z s)      = held-scan (just n) ρ f z s (held-approx n ρ s)
 held-approx n       ρ (takeWhile i p s) = held-takeWhile (just n) ρ i p s (held-approx n ρ s)
-held-approx n       ρ (flatMap op f s)  = held-flatMap (just n) ρ op f s (held-approx n ρ s) λ a ρ′ → held-approx n ρ′ (f a)
+held-approx n       ρ (flatMap op f s)  = held-flatMap (just n) ρ op f s (λ ρ′ → held-approx n ρ′ s) λ a ρ′ → held-approx n ρ′ (f a)
 held-approx n       ρ (connect s b)     = held-connect (just n) ρ s b (held-approx n ρ s) λ ρ′ → held-approx n ρ′ b
 held-approx n       ρ (connected i)     = held-connected (just n) ρ i
 held-approx zero    ρ (defer l)         = held-⊥ ρ l
@@ -734,7 +764,7 @@ held-⟦⟧ ρ (of xs)           = held-of nothing ρ xs
 held-⟦⟧ ρ (map f s)         = held-map nothing ρ f s (held-⟦⟧ ρ s)
 held-⟦⟧ ρ (scan f z s)      = held-scan nothing ρ f z s (held-⟦⟧ ρ s)
 held-⟦⟧ ρ (takeWhile i p s) = held-takeWhile nothing ρ i p s (held-⟦⟧ ρ s)
-held-⟦⟧ ρ (flatMap op f s)  = held-flatMap nothing ρ op f s (held-⟦⟧ ρ s) λ a ρ′ → held-⟦⟧ ρ′ (f a)
+held-⟦⟧ ρ (flatMap op f s)  = held-flatMap nothing ρ op f s (λ ρ′ → held-⟦⟧ ρ′ s) λ a ρ′ → held-⟦⟧ ρ′ (f a)
 held-⟦⟧ ρ (connect s b)     = held-connect nothing ρ s b (held-⟦⟧ ρ s) λ ρ′ → held-⟦⟧ ρ′ b
 held-⟦⟧ ρ (connected i)     = held-connected nothing ρ i
 held-⟦⟧ ρ (defer l)         = held-lim ρ l λ n → held-approx n ρ (defer l)

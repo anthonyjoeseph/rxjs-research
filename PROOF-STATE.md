@@ -92,7 +92,8 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `lane-ends`, `close-ends`, `lane-named`, `lane-early`, `lane-late`,
 `close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
-`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
+`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`,
+`held-trigger`.
 
 #### THE FINITE REST
 
