@@ -36,11 +36,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: the elaborated program reads exactly the cold values its plain
 program reads, plus its own shallow leaves (a minted name, the subscribed
-mark). Forward for a whole endless plain run, back from any table image,
-and placing each image and late row. Settled when `whole-ahead` is a body
-over a per-operator consumption count beside `cut-ne`'s.
+mark): deep cuts with one plain table have one elaborated table; back
+from any table image; placing each image and late row. Every read is
+decided by values and cross-stream order (a take's failure, a switch's
+next outer value, an exhaust's busy lane, a concat's hand-off), so no
+count over one program settles it. Settled when each member is a body
+over the per-operator correspondence `tables` asserts.
 
-Members: `whole-ahead`, `img-row`, `img-few`, `put-row`, `causal←`.
+Members: `stable`, `img-row`, `img-few`, `put-row`, `causal←`.
 
 #### THE TABLES
 
@@ -89,7 +92,8 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `lane-ends`, `close-ends`, `lane-named`, `lane-early`, `lane-late`,
 `close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
 `held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
-`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`.
+`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`,
+`held-trigger`.
 
 #### THE FINITE REST
 
