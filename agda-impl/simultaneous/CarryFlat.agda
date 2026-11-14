@@ -23,10 +23,11 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx; Ended; LaneOf; Few; _≺_;
-  module Joining; module Op; module Bounded; module Switch; module Exhaust; module Connect)
-open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_; Lawful)
-open import denotation.Laws.Modulus using (≺-trans)
+open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx;
+  Ended; LaneOf; Few; _≺_; module Joining; module Op; module Bounded; module Switch;
+  module Exhaust; module Connect)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; plain-ix; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_; Lawful)
+open import denotation.Laws.Modulus using (≺-trans; entered-reach)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to conn-lawful; ok₀ to conn-ok₀)
 open import denotation.Laws.BoundedInv using (end-uniq; module BoundedI)
@@ -43,6 +44,7 @@ open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; Env
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
 open import simultaneous.JoinCarry using (module Joined)
+open import simultaneous.OuterOrder using (module Read)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers; Routes)
 
@@ -118,6 +120,12 @@ only-switch g o (mergeᶠ nothing)  h ()
 only-switch g o (mergeᶠ (just m)) h ()
 only-switch g o switchᶠ           h c = h refl c
 only-switch g o exhaustᶠ          h ()
+
+as-switch : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k} → op ≡ switchᶠ → Parts.Cut g o op q k → Switch.Cut g o q k
+as-switch g o .switchᶠ refl c = c
+
+to-switch : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k} → op ≡ switchᶠ → Switch.Cut g o q k → Parts.Cut g o op q k
+to-switch g o .switchᶠ refl c = c
 
 only-bounded : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {c} {X : Set}
              → (∀ m → op ≡ mergeᶠ (just m) → Parts.Hand g o op c → X) → Parts.Hand g o op c → X
@@ -468,9 +476,8 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
-        -- A switch's lane is cut where its partner is: read back, and
-        -- forward under the classical reading of every later value.
-        switch-cut : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
+        -- A switch's lane is cut where its partner is, forward under the
+        -- classical reading of every later value.
         switch-cut¬¬ : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
         -- A lane's end is joined where its partner's is: forward from the
         -- plain run listed, back held classically.
@@ -494,9 +501,6 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         let (l , i , x*) = read-value x ls lp
         in _ , x , r , x* , runs-by g o lE o* op (λ m e → bounded-runs m e x i) (λ e → exhaust-runs e x i) r , l , i , refl
 
-      cut-from : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
-      cut-from v i = only-switch lE o* op λ e → switch-cut e v i
-
       cut-to¬¬ : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
       cut-to¬¬ v i = only-switch g o op λ e → switch-cut¬¬ e v i
 
@@ -511,6 +515,36 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       N : PMap
       N = M_s ∪ᴹ λ x y → Σ Pos λ q → Σ A λ a → Σ Pos λ q* → Σ (V q a q*) λ v → proj₁ (lane-framed v) x y
+
+      postulate
+        -- The lanes' map keeps what the outer's does.
+        joined-maps : Maps N
+
+      Iσ : InvAt (Hots envE) (p′ ⊕ [ ix 1 ]) FW.CE.σ
+      Iσ = inv-approx n (elab ρ s) envE gE (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)
+
+      module OR = Read q₁ Io Iσ (λ {l} {e} y → entered-reach (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ]) {l} {e} y) M_s hm_s c_s
+
+      -- No lane row lies over a value.
+      off-value : ∀ {q a q*} (v : V q a q*) {k l q′ a′} → LI v k l → o q′ (out a′) → k ⊑ q′ → ⊥
+      off-value v i x′ kq = CarryAt.img-row (proj₂ (proj₂ (proj₂ (lane-framed v)))) i λ y →
+        let (_ , _ , xρ , w) = FW.lane-w (proj₁ v) (proj₁ (proj₂ y)) in InvAt.under Io xρ x′ plain-ix (inW w) kq
+
+      -- A VALUE READ BEFORE A LANE ROW'S CARRIER came before the row, on
+      -- the joined map.
+      outer-past-lane : ∀ {q a q*} (v : V q a q*) {k l q′ a′ l′} → LI v k l → o q′ (out a′) → FW.S′.Img q′ l′ → OR.Q l′ ≺ l → q′ ≺ k
+      outer-past-lane {q} {a} {q*} v i x′ i′ lt =
+        let (y , my , yl) = CarryAt.ext (proj₂ (proj₂ (proj₂ (lane-framed v)))) i
+        in OR.past-row (proj₁ (proj₂ joined-maps)) inj₁ (inj₂ (q , a , q* , v , my)) yl (off-value v i x′) i′ lt
+
+      switch-back : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → Switch.Cut lE o* q* l → Switch.Cut g o q k
+      switch-back v@(_ , _ , x* , _ , _ , i₀ , refl) i c* = OR.switch-read i₀ x* c* (λ x′ i′ lt → outer-past-lane v i x′ i′ lt)
+
+      switch-cut : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
+      switch-cut e v i c* = to-switch g o op e (switch-back v i (as-switch lE o* op e c*))
+
+      cut-from : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
+      cut-from v i = only-switch lE o* op λ e → switch-cut e v i
 
       postulate
         -- A hand-off's carrier, and the outer end's, along the joined map.
@@ -530,8 +564,6 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                     end-done end-done¬¬ end-ext
 
       postulate
-        -- The lanes' map keeps what the outer's does.
-        joined-maps : Maps N
         -- The joined lanes' late carriers nest and are anchored.
         joined-nest : PBNest er₂ N JD.carried × NestAt {N} {H₂} {JD.u} {q₁} JD.carried
 
