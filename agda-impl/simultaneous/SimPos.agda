@@ -21,7 +21,7 @@ open import denotation.Simultaneity using (eqˡ; eqⁱ)
 open import denotation.Events using (<ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-absurd; ≺-ext; ≼-or-≻; ≼-split; ≺→≼; ≺-≼-≺; ≼-≺-≺)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ⊕-injˡ; ⊕-injʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-snoc)
+open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ⊕-injˡ; ⊕-injʳ; ⊑-refl; ⊑-trans; ⊑-≼; ⊑-cmp; ⊑-snoc)
 open import denotation.Laws.Count using (⊑?)
 
 private
@@ -50,6 +50,11 @@ apart₁ {y} {y′} h np σ = subst ((y ⊕ σ) ≺_) (⊕-identityʳ y′) (apa
 
 apart₂ : ∀ {y y′} → y ≺ y′ → ¬ (y ⊑ y′) → ∀ σ → y ≺ (y′ ⊕ σ)
 apart₂ {y} {y′} h np σ = subst (_≺ (y′ ⊕ σ)) (⊕-identityʳ y) (apart h np [] σ)
+
+-- Two rows of a lawful hot in order lie apart.
+flat-apart : ∀ {A} {t : EmissionSet A} → Lawful t → ∀ {l l′ e e′} → t l e → t l′ e′ → l ≺ l′ → ¬ (l ⊑ l′)
+flat-apart L {l} g g′ h ([] , refl)    = ≺-irrefl {l} (subst (l ≺_) (⊕-identityʳ l) h)
+flat-apart L     g g′ h (_ ∷ _ , refl) = Lawful.flat L g g′
 
 -- Leading: at, or before.
 ⊑-split : ∀ {x y} → x ⊑ y → x ≡ y ⊎ x ≺ y

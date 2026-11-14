@@ -32,7 +32,7 @@ open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; �
 open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-injˡ; ⊕-injʳ; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊑-cmp; ⊑-snoc; ⊑-refl; ⊑-trans)
 open import denotation.Laws.Worlds.Leaves using (module AccF; of-idx; of-row; of-rows; of-in; of-reach; of-end-row; ine-pin)
 open import adequacy.SubOne using (scan-reach)
-open import simultaneous.SimPos using (apart)
+open import simultaneous.SimPos using (apart; flat-apart)
 open import simultaneous.ReadLane using (Marks; step-just; step-nothing; of-marks; of-last⁻; of-last; of-skip)
 open import adequacy.SubJoin using (Bind; lower; row-reach; rejoin-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -139,14 +139,10 @@ module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
   ----------------------------------------------------------------------
   -- Joined rows apart
 
-  flat-apart : ∀ {l l′ e e′} → G l e → G l′ e′ → l ≺ l′ → ¬ (l ⊑ l′)
-  flat-apart {l} g g′ lt ([] , refl)    = ≺-irrefl {l} (subst (l ≺_) (⊕-identityʳ l) lt)
-  flat-apart     g g′ lt (_ ∷ _ , refl) = Lawful.flat lawG g g′
-
   -- Joined rows of rows in order lie in order, everything below them too.
   at-apart : ∀ {l l′ e e′} → G l e → G l′ e′ → l ≺ l′ → ∀ σ σ′ → (at l ⊕ σ) ≺ (at l′ ⊕ σ′)
   at-apart {l} {l′} g g′ lt σ σ′ =
-    subst₂ _≺_ (sym (⊕-assoc l [ sub p′ ] σ)) (sym (⊕-assoc l′ [ sub p′ ] σ′)) (apart lt (flat-apart g g′ lt) (sub p′ ∷ σ) (sub p′ ∷ σ′))
+    subst₂ _≺_ (sym (⊕-assoc l [ sub p′ ] σ)) (sym (⊕-assoc l′ [ sub p′ ] σ′)) (apart lt (flat-apart lawG g g′ lt) (sub p′ ∷ σ) (sub p′ ∷ σ′))
 
   -- No hot row lies under another's join.
   under-at : ∀ {l l′ e e′} → G l e → G l′ e′ → at l ⊑ l′ → ⊥
