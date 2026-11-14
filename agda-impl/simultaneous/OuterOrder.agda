@@ -28,11 +28,11 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import denotation.Position using (Pos; ix; sub; last; _⊕_; _<ᵖ_)
 open import denotation.Events using (ofᴱ)
 open import denotation.EmissionSet using (out; end; skip; pin; EmissionSet; Truncate; Proper; Reach; Few; hot; enter; _≺_; InE; at-out;
-  at-end; on-out; Rejoin; LaneOf; module Merge; module Op)
+  at-end; on-out; Rejoin; LaneOf; module Merge; module Op; module Values)
 open import denotation.Laws.Worlds using (InvAt; Ok; W; W⁼; inW; step; plain-ix; ok-in; real-snoc; leads; same-lead; _⊑_; ⊑-refl;
   ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ) renaming (here to here⁼)
 open import denotation.Laws.Worlds.Leaves using (of-reach; ine-pin)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-split; ≼-or-≻; ≺-ext; reach-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-split; ≼-or-≻; ≼-antisym; ≺-ext; reach-few)
 open import denotation.Laws.Count using (⊑?; Cov)
 open import denotation.Laws.Shows using (cov-few; few-reach; lead-∈)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; valuesOf)
@@ -272,3 +272,34 @@ module Read {N A : Set} {HP HE LP : Pos → Set} (q₁ : Pos) {p s′ : Pos} {o 
   ... | l₁ , _ , y₁ , _ , e₁ = read-fwd x′ λ (l′ , i′ , _ , y′ , vx) →
         n (Q l′ , a′ , star-row y′ vx , Q-mono (subst (λ z → σ z _) (Q-inj (sym e₁)) (proj₁ y₁)) (proj₁ y′) (MS.img-mono i₀ i′ qq)
           , fwd x′ qq i′ qk)
+
+  -- ONE VALUE PER CARRIER: the carry's image is injective.
+  img-inj : ∀ {q q′ l} → S.Img q l → S.Img q′ l → q ≡ q′
+  img-inj {q} {q′} {l} i i′ = ≼-antisym {q} {q′} (λ lt → ≺-irrefl {l} (MS.img-mono i′ i lt)) (λ lt → ≺-irrefl {l} (MS.img-mono i i′ lt))
+
+  -- AN ELABORATED VALUE READS BACK a plain one, at its carrier.
+  value-back : ∀ {q* a} → O* q* (out a) → Σ Pos λ q → Σ Pos λ l → o q (out a) × S.Img q l × q* ≡ Q l
+  value-back x* with star-read x*
+  ... | l , _ , y , vx , e with read-back y vx
+  ...   | q , i , x = q , l , x , i , e
+
+  module VO = Values o
+  module V* = Values O*
+
+  -- THE I-TH ELABORATED VALUE READS BACK THE I-TH PLAIN ONE: each value
+  -- before or between is read forward classically, under the negation
+  -- the order is.
+  nth-back : ∀ {i q* a} → V*.Nth i q* a → Σ Pos λ l → q* ≡ Q l × Σ (InstEmit N A) (λ x → σ l (out x)) × Σ Pos λ q → S.Img q l × VO.Nth i q a
+  nth-back (V*.first x* min*) with star-read x*
+  ... | l , _ , y , vx , refl with read-back y vx
+  ...   | q , i , x = l , refl , (_ , proj₁ y) , q , i , VO.first x λ xk kq → read-fwd xk λ (lk , ik , _ , yk , vk) →
+          min* (star-row yk vk) (Q-mono (proj₁ yk) (proj₁ y) (MS.img-mono ik i kq))
+  nth-back (V*.next n* x*′ lt nx*) with nth-back n* | star-read x*′
+  ... | l , refl , (_ , y) , q , i , n | l′ , _ , y′ , vx′ , refl with read-back y′ vx′
+  ...   | q′ , i′ , x′ = l′ , refl , (_ , proj₁ y′) , q′ , i′ ,
+          VO.next n x′ (value-order i i′ y (proj₁ y′) lt) λ xk qk kq′ → read-fwd xk λ (lk , ik , _ , yk , vk) →
+            nx* (star-row yk vk) (Q-mono y (proj₁ yk) (MS.img-mono i ik qk)) (Q-mono (proj₁ yk) (proj₁ y′) (MS.img-mono ik i′ kq′))
+
+  nth-at : ∀ {j q l q* b} → S.Img q l → q* ≡ Q l → V*.Nth j q* b → VO.Nth j q b
+  nth-at {j} {q} {l} {b = b} i refl n* with nth-back n*
+  ... | l′ , eq , _ , q′ , i′ , n = subst (λ z → VO.Nth j z b) (img-inj (subst (S.Img q′) (sym (Q-inj eq)) i′) i) n
