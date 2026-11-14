@@ -38,11 +38,12 @@ Untried: the elaborated joiner decides as the plain one. Each running
 value is paired with the value its carrier reads, and back; its end is
 joined and handed off where its partner's is, and the outer's end where
 its partner's is. Open: exhaust's run reads the outer against lane ends
-across the two maps; bounded's run and hand-off read the queue; every
+across the two maps; bounded's run read forward needs the environment
+listed, which its statement lacks; its hand-off reads the queue; every
 op's done reads all lanes' ends. Settled when each holds, or a
 refutation names the op.
 
-Members: `exhaust-runs`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `paired⁻`, `ends⁻`.
+Members: `exhaust-runs`, `exhaust-runs⁻`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `ends⁻`.
 
 #### THE JOINED LANES
 

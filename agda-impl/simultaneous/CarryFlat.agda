@@ -130,6 +130,12 @@ as-switch g o .switchᶠ refl c = c
 to-switch : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k} → op ≡ switchᶠ → Switch.Cut g o q k → Parts.Cut g o op q k
 to-switch g o .switchᶠ refl c = c
 
+as-indexed : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {m q} → op ≡ mergeᶠ (just m) → Parts.Runs g o op q → Bounded.Indexed m g o q
+as-indexed g o .(mergeᶠ (just _)) refl r = r
+
+to-indexed : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {m q} → op ≡ mergeᶠ (just m) → Bounded.Indexed m g o q → Parts.Runs g o op q
+to-indexed g o .(mergeᶠ (just _)) refl r = r
+
 as-lane : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q a k e} → op ≡ switchᶠ → Parts.Ln g o op q a k e → LaneOf g q a k e
 as-lane g o .switchᶠ refl l = l
 
@@ -444,10 +450,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       module JS = Joining (P*.Ln op) o* (λ _ _ → ⊥) (Ended o*) (P*.Runs op) (P*.Cut op) (P*.Hand op)
 
       postulate
-        -- Every elaborated running value with a shown lane row reads a
-        -- plain one; the elaborated outer's end, the plain one's.
-        paired⁻ : ∀ {q* a l e} → o* q* (out a) → P*.Runs op q* → P*.Ln op q* a l e
-                → Live (Truncate JS.JoinT) l → Few (Truncate JS.JoinT) l → Σ Pos λ q → V q a q*
+        -- The elaborated outer's end, the plain one's.
         ends⁻ : ∀ {c*} → o* c* end → Few (Truncate JS.JoinT) c* → Σ Pos λ c → Ends c c*
         -- Under its listed environment, a lane is listed wherever few rows precede.
         lane-listing : ∀ {q a k} → o q (out a) → P.Runs op q → Few (P.Ln op q a) k → HotsListed envP k → Listed (P.Ln op q a) k
@@ -475,6 +478,13 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- value paired, a lane cut where its partner is, its end joined
         -- and handed off where its partner's is.
         -- A bounded or exhaust value runs where its partner does.
+        -- DEAD ROUTE: forward along the queue with no environment listing.
+        --   The elaborated index chain needs every earlier value's partner,
+        --   read only through the outer's carry: `img` asks the outer and its
+        --   environment listed at that value, `img¬¬` gives it classically.
+        --   Listing the outer from few rows alone is the outright route
+        --   `CarryAt` records dead: an environment hot can hide an
+        --   accumulation from the outer.
         bounded-runs : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
@@ -522,6 +532,23 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       module OR = Read q₁ Io Iσ (λ {l} {e} y → entered-reach (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ]) {l} {e} y)
                     (λ {l} {e} x → entered-reach (approx n s envP) p {l} {e} x) (λ {l} {e} y → q₁σ {l} {e} y) M_s hm_s c_s
+
+      -- A bounded value runs where its partner does, read back: its
+      -- index is its partner's.
+      bounded-back : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q l q*} → FW.S′.Img q l → q* ≡ OR.Q l → P*.Runs op q* → P.Runs op q
+      bounded-back m e i eq r* = let (j , b , n*) = as-indexed lE o* op e r* in to-indexed g o op e (j , b , OR.nth-at i eq n*)
+
+      postulate
+        -- An exhaust's elaborated value running, read back: its partner runs.
+        exhaust-runs⁻ : op ≡ exhaustᶠ → ∀ {q a l q* l′ e} → o q (out a) → FW.S′.Img q l → q* ≡ OR.Q l → o* q* (out a) → P*.Ln op q* a l′ e
+                      → Live (Truncate JS.JoinT) l′ → Few (Truncate JS.JoinT) l′ → P*.Runs op q* → P.Runs op q
+
+      -- EVERY ELABORATED RUNNING VALUE READS A PLAIN ONE, running.
+      paired⁻ : ∀ {q* a l e} → o* q* (out a) → P*.Runs op q* → P*.Ln op q* a l e
+              → Live (Truncate JS.JoinT) l → Few (Truncate JS.JoinT) l → Σ Pos λ q → V q a q*
+      paired⁻ x* r* y lv fw =
+        let (q , l₀ , xq , i₀ , eq) = OR.value-back x*
+        in q , xq , runs-by lE o* g o op (λ m e r → bounded-back m e i₀ eq r) (λ e r → exhaust-runs⁻ e xq i₀ eq x* y lv fw r) r* , x* , r* , l₀ , i₀ , eq
 
       pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Listed o q → HotsListed envP q → Σ Pos (V q a)
       pair-all x r ls lp =
