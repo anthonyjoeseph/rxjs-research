@@ -95,8 +95,8 @@ sim-approx (suc n) ρ (defer l)         = sim-next n ρ l (sim-approx n ρ (Late
 -- are listed.
 postulate
   sim-top : ∀ n {A} (o : Obs Timeline [] A) → SimIH n (λ i → i) o → ListedB (enter (approx n o []) root) nothing → Σ PMap λ M → Emb M
-          × Sim Shows Shown M root nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
+          × Sim Shows Shown M nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
 
 sim-root : ∀ n {A} (o : SObs [] A) → ListedB (enter (approx n (plain o) []) root) nothing → Σ PMap λ M → Emb M
-         × Sim Shows Shown M root nothing (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root)
+         × Sim Shows Shown M nothing (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root)
 sim-root n o = sim-top n (plain o) (sim-approx n (λ i → i) (plain o))

@@ -1,10 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE SIMULATION: the elaborated program reads what its plain program
--- reads, up to a bound.  Each plain row up to it has an elaborated row
--- of its kind (`Sim.fwd`); each value, end and pin the elaborated run
--- shows before the bound's image is a plain row's (`Sim.val←`,
--- `Sim.end←`, `Sim.pin←`); and the elaborated rows before the bound's
+-- reads, up to a bound.  Each plain value and end up to it has a CARRIER,
+-- an elaborated row of its kind (`Sim.fwd`); each value shown and each
+-- end of the elaborated run before the bound's image carries one
+-- (`Sim.val←`, `Sim.end←`); and the elaborated rows before the bound's
 -- image are listed (`Sim.upto`).  Unbounded, a finite plain run has a
 -- finite elaborated run (`sim-whole`).
 --
@@ -13,11 +13,21 @@
 -- switch's next outer value, an exhaust's busy lane, a concat's
 -- hand-off), and a reading keeps a row only with finitely many before
 -- it, so neither side's rows are bounded by the other's unless each
--- decision transfers both ways.
+-- decision transfers both ways.  Nothing decides from a skip or a pin,
+-- so neither is carried: a skip has no canonical carrier, the marks
+-- beside a value being skips of the elaborated run too.
 --
 -- ORDER ACROSS STREAMS IS ONE EMBEDDING (`Emb`): a plain row maps to the
--- ANCHOR its elaborated row lies under, and the anchors keep the plain
--- order, an anchor under another only for a row under another.
+-- ANCHOR its carrier lies under, and the anchors keep the plain order,
+-- an anchor under another only for a row under another.  A carrier is
+-- ONE row (`Sim.img-fun`): a reader joins a hot row under its carrier,
+-- and two readers' joins of one row must lie under one position.
+--
+-- UNDER A HOT ROW, ONLY A READER'S JOIN (`Joins`): the ambient map puts
+-- a point strictly under a row of a bound hot only as a reader's join at
+-- a subscription it maps, under the row's carrier joined at the
+-- subscription's image.  So a new reader's joins fall between the
+-- earlier ones in their subscriptions' order.
 --
 -- THE PLAIN ROWS UP TO THE BOUND ARE LISTED, EACH WITH ITS ROW
 -- (`ListedB`).  Where an elaborated row lies is data: a reader's joins
@@ -35,20 +45,20 @@ open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
-open import Data.List.Relation.Unary.All using (lookup)
+open import Data.List.Relation.Unary.All using (lookup) renaming ([] to []ᴬ; _∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; _∙_; ix; sub; cascade)
+open import denotation.Position using (Pos; Label; Path; root; _≟ᵖ_; _⊕_; sub)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; hot; Proper; DenEnv; _≺_; _≼_; enter; approx)
-open import denotation.Laws.Worlds using (_⊑_; Hots; GoodEnv; Ok)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; coldAt; Proper; DenEnv; _≺_; _≼_; enter; approx)
+open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 
@@ -70,33 +80,35 @@ record Emb (M : PMap) : Set where
     mono    : ∀ {x x′ y y′} → M x y → M x′ y′ → x ≺ x′ → y ≺ y′
     reflect : ∀ {x x′ y y′} → M x y → M x′ y′ → y ⊑ y′ → x ⊑ x′
 
--- BELOW A SUBSCRIPTION: under it, joined to a hot by a reader below it,
--- or in an instant a timer created below it fires.
-data Desc (p : Pos) : Pos → Set where
-  d-in   : ∀ {x} → p ⊑ x → Desc p x
-  d-sub  : ∀ {x e zs} → Desc p e → Desc p (x ⊕ (sub e ∷ zs))
-  d-fire : ∀ {τ c l zs} → Desc p c → Desc p (cascade τ c l ∙ zs)
+-- `x` lies at or under a position of the world with `p`.
+Below : (Pos → Set) → Pos → Pos → Set
+Below H p x = Σ Pos λ w → W⁼ H p w × w ⊑ x
 
--- A map below a subscription pair.
-Local : Pos → Pos → PMap → Set
-Local p p′ M = ∀ {x y} → M x y → Desc p x × Desc p′ y
+-- A map within a subscription pair's worlds.
+Local : (Pos → Set) → (Pos → Set) → Pos → Pos → PMap → Set
+Local H H′ p p′ M = ∀ {x y} → M x y → Below H p x × Below H′ p′ y
 
--- Below the pair, an ambient map holds the pair alone.
-Fresh : PMap → Pos → Pos → Set
-Fresh Amb p p′ = ∀ {x y} → Amb x y → (Desc p x → x ≡ p) × (Desc p′ y → y ≡ p′)
+-- Within the pair's worlds, an ambient map holds the pair alone.
+Fresh : (Pos → Set) → (Pos → Set) → PMap → Pos → Pos → Set
+Fresh H H′ Amb p p′ = ∀ {x y} → Amb x y → (Below H p x → x ≡ p) × (Below H′ p′ y → y ≡ p′)
+
+-- The map pairs nothing strictly under a row.
+NoneUnder : ∀ {A} → PMap → EmissionSet A → Set
+NoneUnder M t = ∀ {k e x y} → t k e → M x y → k ⊑ x → x ≡ k
 
 ------------------------------------------------------------------------
 -- The simulation
 
+-- What a simulation carries: a value or an end.
+data Carried {A : Set} : Ev A → Set where
+  c-out : ∀ {a} → Carried (out a)
+  c-end : Carried end
+
 -- A plain event and an elaborated one of its kind: a value and a value
--- showing it, a skip and a skip or a value showing nothing, an end and an
--- end, a pin and a pin of its connect's image.
-data Mt {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) : Ev A → Ev B → Set where
-  m-out  : ∀ {a b} → V a b → Mt V Sh M (out a) (out b)
-  m-skip : Mt V Sh M skip skip
-  m-mark : ∀ {b} → ¬ Sh b → Mt V Sh M skip (out b)
-  m-end  : Mt V Sh M end end
-  m-pin  : ∀ {r r′} → M r r′ → Mt V Sh M (pin r) (pin r′)
+-- showing it, an end and an end.
+data Mt {A B : Set} (V : A → B → Set) : Ev A → Ev B → Set where
+  m-out : ∀ {a b} → V a b → Mt V (out a) (out b)
+  m-end : Mt V end end
 
 -- Up to a plain bound: before it, or at it.
 Upto : Maybe Pos → Pos → Set
@@ -123,20 +135,22 @@ Within (just c) (just c₀) = c ≼ c₀
 ListedB : ∀ {A} → EmissionSet A → Maybe Pos → Set
 ListedB {A} T c = Σ (List Pos) λ ks → (∀ {k e} → T k e → Upto c k → k ∈ ks) × (∀ {k} → k ∈ ks → Σ (Ev A) (T k))
 
--- The elaborated rows `U`, subscribed at `p′`, simulate the plain rows
--- `T`, subscribed at `p`, along `M`, up to the bound `c`.
-record Sim {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (p : Pos) (c : Maybe Pos)
-           (T : EmissionSet A) (U : EmissionSet B) : Set where
+-- The elaborated rows `U` simulate the plain rows `T` along `M`, up to
+-- the bound `c`, each carried value and end by its carrier (`Img`).
+record Sim {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (c : Maybe Pos)
+           (T : EmissionSet A) (U : EmissionSet B) : Set₁ where
   field
-    bnd   : Mapped M c
-    fwd   : ∀ {k e} → T k e → Upto c k → Σ Pos λ y → M k y × Σ Pos λ l → y ⊑ l × Σ (Ev B) λ e′ → U l e′ × Mt V Sh M e e′
-    val←  : ∀ {l b} → U l (out b) → Sh b → Under M c l → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × Σ A λ a → T k (out a) × V a b
-    end←  : ∀ {l} → U l end → Under M c l → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × T k end
-    pin←  : ∀ {l r r′} → U l (pin r′) → M r r′ → Under M c l → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × T k (pin r)
-    upto  : Σ (List Pos) λ ls → ∀ {l e′} → U l e′ → Under M c l → l ∈ ls
+    Img     : Pos → Pos → Set
+    img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
+    ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
+    bnd     : Mapped M c
+    fwd     : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev B) λ e′ → U l e′ × Mt V e e′
+    val←    : ∀ {l b} → U l (out b) → Sh b → Under M c l → Σ Pos λ k → Img k l × Σ A λ a → T k (out a) × V a b
+    end←    : ∀ {l} → U l end → Under M c l → Σ Pos λ k → Img k l × T k end
+    upto    : Σ (List Pos) λ ls → ∀ {l e′} → U l e′ → Under M c l → l ∈ ls
 
 -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.
-sim-whole : ∀ {A B} {V : A → B → Set} {Sh M p T U} → Sim V Sh M p nothing T U → Σ (List Pos) λ ls → ∀ {l e} → U l e → l ∈ ls
+sim-whole : ∀ {A B} {V : A → B → Set} {Sh M T U} → Sim V Sh M nothing T U → Σ (List Pos) λ ls → ∀ {l e} → U l e → l ∈ ls
 sim-whole S = proj₁ (Sim.upto S) , λ y → proj₂ (Sim.upto S) y tt
 
 ------------------------------------------------------------------------
@@ -149,19 +163,64 @@ Shows a b = valuesOf b ≡ a ∷ []
 Shown : ∀ {A} → IE A → Set
 Shown b = ¬ (valuesOf b ≡ [])
 
--- AN ENVIRONMENT OF SIMULATED HOTS: each plain binder the proper rows of
--- a source a connect subscribed, its elaborated binder the proper rows
--- of that source's elaboration, annotated, subscribed at the image, which
--- subscribes the elaboration below it; the source's rows simulated up to
--- a bound past the reader's.
-HotSim : ∀ {X} → PMap → Maybe Pos → Den X → Den (AIE X) → Set₁
-HotSim {X} Amb c d d′ =
-  Σ (Den X) λ s → Σ Pos λ q → Σ ℕ λ m → Σ (List Set) λ Δ₀ → Σ (Obs Timeline Δ₀ (IE X)) λ x → Σ (DenEnv Δ₀) λ env₀ → Σ Pos λ q′
-  → Σ (Maybe Pos) λ c₀ → d ≡ hot (Proper (enter s q)) × d′ ≡ hot (Proper (enter (approx m (annotate x) env₀) q′))
-  × Within c c₀ × Sim Shows Shown Amb q c₀ (enter s q) (enter (approx m x env₀) (q′ ⊕ [ ix 1 ]))
+-- What an annotated row shows: the values of the emit it carries.
+annValues : ∀ {X} → AIE X → List X
+annValues (_ , just x)  = valuesOf x
+annValues (_ , nothing) = []
+
+AShows : ∀ {A} → A → AIE A → Set
+AShows a b = annValues b ≡ a ∷ []
+
+AShown : ∀ {A} → AIE A → Set
+AShown b = ¬ (annValues b ≡ [])
+
+-- Every point `P` puts strictly under a row of the hot `t` is a reader's
+-- join, at a subscription `S` maps, under the row's carrier joined at
+-- the subscription's image.
+Joins : ∀ {X} → PMap → PMap → EmissionSet X → (Pos → Pos → Set) → Set
+Joins S P t Img = ∀ {x y q a σ e₀} → P x y → t q e₀ → x ≡ q ⊕ (a ∷ σ)
+  → Σ Pos λ e → a ≡ sub e × Σ Pos λ e′ → S e e′ × Σ Pos λ L → Img q L × (L ⊕ [ sub e′ ]) ⊑ y
+
+-- A SIMULATED HOT: the plain binder the proper rows of a source a
+-- connect subscribed, its elaborated binder the proper rows of that
+-- source's elaboration annotated, the annotated rows simulating the
+-- source's up to a bound past the reader's, and every point the ambient
+-- map puts under a source row a join.
+record HotSim (Amb : PMap) (c : Maybe Pos) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
+  field
+    {Δ₀}   : List Set
+    src    : Den X
+    at     : Pos
+    m      : ℕ
+    core   : Obs Timeline Δ₀ (IE X)
+    env₀   : DenEnv Δ₀
+    at′    : Pos
+    c₀     : Maybe Pos
+    isP    : d ≡ hot (Proper (enter src at))
+    isE    : d′ ≡ hot (Proper (enter (approx m (annotate core) env₀) at′))
+    within : Within c c₀
+    sim    : Sim AShows AShown Amb c₀ (enter src at) (enter (approx m (annotate core) env₀) at′)
+    joins  : Joins Amb Amb (Proper (enter src at)) (Sim.Img sim)
+
+  rows : EmissionSet X
+  rows = Proper (enter src at)
+
+  car : Pos → Pos → Set
+  car = Sim.Img sim
 
 EnvSim : ∀ {Γ Δ} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → PMap → Maybe Pos → DenEnv Γ → DenEnv Δ → Set₁
 EnvSim {Γ} ρ Amb c env env′ = ∀ {X} (i : X ∈ Γ) → HotSim Amb c (lookup env i) (lookup env′ (ρ (∈-map⁺ AIE i)))
+
+-- What a map adds keeps every bound hot's joins.
+EnvJoins : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb c} env env′ → EnvSim ρ Amb c env env′ → PMap → Set₁
+EnvJoins {Γ} _ {Amb = Amb} _ _ es M = ∀ {X} (i : X ∈ Γ) → Joins (Amb ∪ᴹ M) M (HotSim.rows (es i)) (HotSim.car (es i))
+
+-- NO POSITION HOLDS ROWS OF TWO HOTS: a hot's rows lie in its source's
+-- world, which holds no row of a hot already bound.
+Apart : ∀ {Γ} → DenEnv Γ → Set
+Apart []ᴬ              = ⊤
+Apart (hot t ∷ᴬ ρ)    = (∀ {q e} → t q e → Hots ρ q → ⊥) × Apart ρ
+Apart (coldAt _ ∷ᴬ ρ) = Apart ρ
 
 -- The bound is the ambient's, or a row of the run.
 BoundOk : ∀ {A} → PMap → EmissionSet A → Maybe Pos → Set
@@ -169,16 +228,17 @@ BoundOk     Amb T nothing  = ⊤
 BoundOk {A} Amb T (just c) = Σ Pos (Amb c) ⊎ Σ (Ev A) (T c)
 
 -- SIMULATED under every environment of simulated hots, at every
--- subscription pair the ambient map holds alone below it, up to every
--- bound its rows are listed to.  A record, so that a statement about a
--- former is compared by its arguments, never by the elaborated tree its
--- meaning unfolds to.
+-- subscription pair the ambient map holds alone in its worlds, up to
+-- every bound its rows are listed to; what the map adds lies in the
+-- pair's worlds, pairs nothing under a row, and keeps the joins.  A
+-- record, so that a statement about a former is compared by its
+-- arguments, never by the elaborated tree its meaning unfolds to.
 record SimIH (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor sih
   field
-    sims : ∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) (c : Maybe Pos) → GoodEnv env → GoodEnv env′ → EnvSim ρ Amb c env env′ → Emb Amb
-         → ∀ p p′ → Amb p p′ → Fresh Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′
+    sims : ∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) (c : Maybe Pos) → GoodEnv env → GoodEnv env′ → Apart env
+         → (es : EnvSim ρ Amb c env env′) → Emb Amb
+         → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′
          → ListedB (enter (approx n o env) p) c → BoundOk Amb (enter (approx n o env) p) c
-         → Σ PMap λ M → Local p p′ M × Emb (Amb ∪ᴹ M)
-           × Sim Shows Shown (Amb ∪ᴹ M) p c (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)
-
+         → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
+           × EnvJoins ρ env env′ es M × Sim Shows Shown (Amb ∪ᴹ M) c (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)

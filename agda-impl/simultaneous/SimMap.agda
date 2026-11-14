@@ -2,8 +2,7 @@
 
 -- A MAP SIMULATES ITS MAP: both keep their source's positions and kinds,
 -- so the source's simulation carries row for row, along the same map,
--- up to the same bound.  A mark mapped is a mark, a value shown mapped is
--- its value mapped.
+-- up to the same bound.  A value shown mapped shows its value mapped.
 module simultaneous.SimMap where
 
 import Data.List as L
@@ -24,7 +23,7 @@ open import denotation.Laws.Worlds using (_⊑_)
 open import adequacy.SubOne using (map-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Sim using (PMap; Sim; Mt; m-out; m-skip; m-mark; m-end; m-pin; Upto; Under; ListedB; BoundOk; Shows; Shown; SimIH; sih)
+open import simultaneous.Sim using (PMap; Sim; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; ListedB; BoundOk; NoneUnder; Shows; Shown; SimIH; sih)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; mapIE)
 
@@ -41,10 +40,6 @@ shows-map f {b = b} sh = trans (values-map f b) (cong (L.map f) sh)
 shown← : ∀ {A B} (f : A → B) {b : IE A} → Shown (mapIE f b) → Shown b
 shown← f {instEmit (value _) _} _  ()
 shown← f {instEmit (mark _) _}  sh _ = sh refl
-
-unshown→ : ∀ {A B} (f : A → B) {b : IE A} → ¬ Shown b → ¬ Shown (mapIE f b)
-unshown→ f {instEmit (value _) _} ¬sh _ = ¬sh λ ()
-unshown→ f {instEmit (mark _) _}  _  sh = sh refl
 
 ------------------------------------------------------------------------
 -- The simulation, carried
@@ -84,50 +79,47 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
   bound {c = just _}  (inj₁ a)       = inj₁ a
   bound {c = just _}  (inj₂ (_ , x)) = inj₂ (down x)
 
-  module _ {M : PMap} {c : Maybe Pos} (S : Sim Shows Shown M p c t₀ u₀) where
+  -- Nothing under a mapped row but under its source's.
+  none : ∀ {M} → NoneUnder M t₀ → NoneUnder M T
+  none nu x m kx = nu (proj₂ (down x)) m kx
+
+  module _ {M : PMap} {c : Maybe Pos} (S : Sim Shows Shown M c t₀ u₀) where
     open Sim S
 
-    mapped : Sim Shows Shown M p c T U
+    mapped : Sim Shows Shown M c T U
     mapped = record
-      { bnd = bnd
-      ; fwd = fw
-      ; val← = λ { (map-out x , _) sh un → bv x sh un }
-      ; end← = λ { (map-end x , _) un → be x un }
-      ; pin← = λ { (map-pin x , _) m un → bp x m un }
-      ; upto = proj₁ upto , λ { (map-out x , _) un → proj₂ upto x un ; (map-skip x , _) un → proj₂ upto x un
-                                ; (map-pin x , _) un → proj₂ upto x un ; (map-end x , _) un → proj₂ upto x un } }
+      { Img     = Img
+      ; img-fun = img-fun
+      ; ext     = ext
+      ; bnd     = bnd
+      ; fwd     = fw
+      ; val←    = λ { (map-out x , _) sh un → bv x sh un }
+      ; end←    = λ { (map-end x , _) un → be x un }
+      ; upto    = proj₁ upto , λ { (map-out x , _) un → proj₂ upto x un ; (map-skip x , _) un → proj₂ upto x un
+                                   ; (map-pin x , _) un → proj₂ upto x un ; (map-end x , _) un → proj₂ upto x un } }
       where
       ent : ∀ {l e} → MapT (mapIE f) u₀ l e → U l e
       ent m = m , map-reach (entered-reach d′ p′) m
 
-      fw : ∀ {k e} → T k e → Upto c k → Σ Pos λ y → M k y × Σ Pos λ l → y ⊑ l × Σ (Ev (IE B)) λ e′ → U l e′ × Mt Shows Shown M e e′
-      fw (map-out x , _) u with fwd x u
-      ... | y , m , l , yl , _ , ux , m-out sh   = y , m , l , yl , _ , ent (map-out ux) , m-out (shows-map f sh)
-      fw (map-skip x , _) u with fwd x u
-      ... | y , m , l , yl , _ , ux , m-skip     = y , m , l , yl , _ , ent (map-skip ux) , m-skip
-      ... | y , m , l , yl , _ , ux , m-mark ¬sh = y , m , l , yl , _ , ent (map-out ux) , m-mark (unshown→ f ¬sh)
-      fw (map-pin x , _) u with fwd x u
-      ... | y , m , l , yl , _ , ux , m-pin mr   = y , m , l , yl , _ , ent (map-pin ux) , m-pin mr
-      fw (map-end x , _) u with fwd x u
-      ... | y , m , l , yl , _ , ux , m-end      = y , m , l , yl , _ , ent (map-end ux) , m-end
+      fw : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev (IE B)) λ e′ → U l e′ × Mt Shows e e′
+      fw (map-out x , _) _ u with fwd x c-out u
+      ... | l , i , _ , ux , m-out sh = l , i , _ , ent (map-out ux) , m-out (shows-map f sh)
+      fw (map-end x , _) _ u with fwd x c-end u
+      ... | l , i , _ , ux , m-end    = l , i , _ , ent (map-end ux) , m-end
 
       bv : ∀ {l b} → u₀ l (out b) → Shown (mapIE f b) → Under M c l
-         → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × Σ B λ a → T k (out a) × Shows a (mapIE f b)
+         → Σ Pos λ k → Img k l × Σ B λ a → T k (out a) × Shows a (mapIE f b)
       bv x sh un with val← x (shown← f sh) un
-      ... | k , y , m , yl , a , tx , v = k , y , m , yl , f a , proj₂ (up tx) , shows-map f v
+      ... | k , i , a , tx , v = k , i , f a , proj₂ (up tx) , shows-map f v
 
-      be : ∀ {l} → u₀ l end → Under M c l → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × T k end
+      be : ∀ {l} → u₀ l end → Under M c l → Σ Pos λ k → Img k l × T k end
       be x un with end← x un
-      ... | k , y , m , yl , tx = k , y , m , yl , proj₂ (up tx)
-
-      bp : ∀ {l r r′} → u₀ l (pin r′) → M r r′ → Under M c l → Σ Pos λ k → Σ Pos λ y → M k y × y ⊑ l × T k (pin r)
-      bp x mr un with pin← x mr un
-      ... | k , y , m , yl , tx = k , y , m , yl , proj₂ (up tx)
+      ... | k , i , tx = k , i , proj₂ (up tx)
 
 -- THE FORMER: the source's simulation, mapped.
 sim-map : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) (s : Obs Timeline Γ A)
         → SimIH n ρ s → SimIH n ρ (map f s)
-sim-map n ρ f s (sih ih) = sih λ env env′ Amb c ge ge′ es em p p′ ap fr ok ok′ L B →
+sim-map n ρ f s (sih ih) = sih λ env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ L B →
   let open Mapped f (approx n s env) (approx n (elab ρ s) env′) p p′
-      (M , lc , eb , S) = ih env env′ Amb c ge ge′ es em p p′ ap fr ok ok′ (listed L) (bound B)
-  in M , lc , eb , mapped S
+      (M , lc , eb , nu , ej , S) = ih env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ (listed L) (bound B)
+  in M , lc , eb , none {M} (λ {k} {e} {x} {y} → nu {k} {e} {x} {y}) , ej , mapped S
