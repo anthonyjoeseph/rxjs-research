@@ -256,13 +256,37 @@ allᴱ : ∀ {Γ} {f : ∀ {X} → X ∈ Γ → Set} → Allᴱ Γ f → ∀ {X}
 allᴱ (l , _)  (here refl) = l
 allᴱ (_ , ls) (there i)   = allᴱ ls i
 
--- Every bound hot's rows up to the bound listed.
-EnvListed : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → PMap → Maybe Pos → Set
-EnvListed {Γ} _ _ _ es _ c = Allᴱ Γ (λ i → ListedB (HotSim.rows (es i)) c)
+-- Before every end of the run.
+Live : ∀ {B} → EmissionSet B → Pos → Set
+Live T j = ∀ {k} → T k end → j ≺ k
 
--- What each bound hot reads is listed wherever the hots are.
+-- THE ROWS UP TO A BOUND STILL LIVE IN THE RUN `T`, listed.
+ListedL : ∀ {A B} → EmissionSet A → EmissionSet B → Maybe Pos → Set
+ListedL {A} t T c = Σ (List Pos) λ ks → (∀ {k e} → t k e → Upto c k → Live T k → k ∈ ks) × (∀ {k} → k ∈ ks → Σ (Ev A) (t k))
+
+-- Every end of `T` past an end of `t`.
+EndsAfter : ∀ {A B} → EmissionSet A → EmissionSet B → Set
+EndsAfter t T = ∀ {k} → T k end → Σ Pos λ k′ → t k′ end × k′ ≺ k
+
+-- Every bound hot's rows up to the bound, live in the run, listed.
+EnvListed : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → ∀ {B} → EmissionSet B → PMap → Maybe Pos → Set
+EnvListed {Γ} _ _ _ es T _ c = Allᴱ Γ (λ i → ListedL (HotSim.rows (es i)) T c)
+
+-- Listed while live in a run: listed while live in one living no longer.
+env-live : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {Amb env env′} (es : EnvSim ρ Amb env env′) {B B′}
+           {T : EmissionSet B} {T′ : EmissionSet B′} → (∀ {j} → Live T′ j → Live T j)
+         → ∀ {A′ c} → EnvListed ρ env env′ es T A′ c → EnvListed ρ env env′ es T′ A′ c
+env-live {Γ} es {T = T} {T′ = T′} h = go Γ (λ i → HotSim.rows (es i))
+  where
+    go : ∀ Γ′ (r : ∀ {X} → X ∈ Γ′ → EmissionSet X) {c} → Allᴱ Γ′ (λ i → ListedL (r i) T c) → Allᴱ Γ′ (λ i → ListedL (r i) T′ c)
+    go []       _ _                             = tt
+    go (_ ∷ Γ′) r ((ks , cov , back) , ls) = (ks , (λ {k} y u l → cov y u (h {k} l)) , back) , go Γ′ (λ i → r (there i)) ls
+
+-- What each bound hot reads is listed wherever the hots are, for a run
+-- ending only past the hot's ends.
 EnvNeeds : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → Set₁
-EnvNeeds {Γ} ρ env env′ es = ∀ {X} (i : X ∈ Γ) A′ c → EnvListed ρ env env′ es A′ c → HotSim.need (es i) A′ c
+EnvNeeds {Γ} ρ env env′ es = ∀ {X} (i : X ∈ Γ) {B} (T : EmissionSet B) → EndsAfter (HotSim.rows (es i)) T
+  → ∀ A′ c → EnvListed ρ env env′ es T A′ c → HotSim.need (es i) A′ c
 
 -- What a map adds keeps every bound hot's joins.
 EnvJoins : ∀ {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {Amb} env env′ → EnvSim ρ Amb env env′ → PMap → Set₁
@@ -289,4 +313,4 @@ record SimIH (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
          → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
          → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
            × EnvJoins ρ env env′ es M
-           × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es) (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)
+           × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es (enter (approx n o env) p)) (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)
