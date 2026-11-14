@@ -35,10 +35,11 @@ open import Relation.Nullary.Decidable.Core using (T?)
 open import Tree using (Obs)
 open import denotation.Position using (Pos; root; instant; _≟ᵖ_; _≟ⁱ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; end; pin; Unpinned; EmissionSet; Few; Seen; Proper; _≺_; _≼_; module Values; enter; approx; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Few; Seen; Proper; _≺_; _≼_; module Values; enter;
+  approx; ⟦_⟧)
 open import denotation.Read using (Visible)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ≼-refl; ≺→≼; ≼-trans; ≼-split; ≼-or-≻; ≺-≼-≺; ≼-≺-≺; entered-reach)
-open import denotation.Laws.Worlds using (Ok; Hots; InvAt; ⊑-refl; ⊑-≼; inside-⊑)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ≼-refl; ≺→≼; ≼-trans; ≼-split; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
+open import denotation.Laws.Worlds using (Ok; Hots; InvAt; ⊑-refl)
 open import denotation.Laws.ConnectNe using (proper-ag)
 open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Nth using (module Nths)
@@ -55,11 +56,7 @@ open import denotation.Laws.ShowsEv using (sk-approx)
 open import simultaneous.Listing using (Listing; listedₙ)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Attribution using (Live; Single; V; vrow; Attribution; Every; One; Reads; module Attributed)
-open import simultaneous.CarryBase using (attributed)
-open import simultaneous.Carry using (Carry; foot)
-open import simultaneous.CarryLeaves using (At₀; emb-At₀; fresh-At₀; coreAt)
-open import simultaneous.CarryWrap using (carry-wrap)
-open import simultaneous.Carried using (carry-approx)
+open import simultaneous.TableErasure using (module At)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 open Values using (Nth)
@@ -259,11 +256,6 @@ single-values : ∀ {A} → Single {IE A} valuesOf
 single-values (instEmit (value a) _) = inj₂ (a , refl)
 single-values (instEmit (mark _) _)  = inj₁ refl
 
--- A pin waits on every row before its connect.
-pin-fewₙ : ∀ n {A} (o : SObs [] A) {k p} → enter (approx n (plain o) []) root k (pin p) → Few (enter (approx n (plain o) []) root) p
-pin-fewₙ n o {k} {p} tk with entered-reach (approx n (plain o) []) root tk | proj₂ (InvAt.pinned (inv-approx n (plain o) [] (λ ()) root ok₀) tk)
-... | ks , F | i = ks , λ {x} tx xp → F tx (≺-≼-≺ {x} {p} {k} xp (⊑-≼ (inside-⊑ p k i))) (λ _ → inj₁ xp)
-
 -- A plain row that is not a pin is at or before every end.
 unpinned-liveₙ : ∀ n {A} (o : SObs [] A) {k e} → enter (approx n (plain o) []) root k e → Unpinned e → Live (enter (approx n (plain o) []) root) k
 unpinned-liveₙ n o tk up {c} tc ck with InvAt.quiet (inv-approx n (plain o) [] (λ ()) root ok₀) tc tk ck
@@ -303,13 +295,7 @@ unpinned-liveₙ n o tk up {c} tc ck with InvAt.quiet (inv-approx n (plain o) []
 --   a reader reaches are placed, each in the instant of a carrier.
 erasingₙ : ∀ n {A} (o : SObs [] A)
          → Attribution Every (One valuesOf) (Reads valuesOf) (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root) root root
-erasingₙ n o =
-  let (M , ms , hm , _ , _ , _ , _ , c , _) = Carry.carries (carry-approx n (λ i → i) (plain o)) [] [] (λ ()) (λ ()) (At₀ (foot (plain o))) (emb-At₀ _) (λ ()) (λ ()) (λ ()) tt
-                                                 root coreAt (refl , refl) ok₀ (tt , λ ()) (λ ()) (fresh-At₀ _)
-      (M′ , hm′ , δ , at′ , c′) = carry-wrap n o hm (ms (refl , refl)) c
-  in attributed hm′ (InvAt.flat (inv-approx n (plain o) [] (λ ()) root ok₀)) (InvAt.func (inv-approx n (plain o) [] (λ ()) root ok₀))
-    (λ {q} → listedₙ n (plain o) {q}) (λ {q} → listedₙ n (elaborate (plain o)) {q}) (pin-fewₙ n o)
-    (λ {k} {e} → unpinned-liveₙ n o {k} {e}) δ at′ c′
+erasingₙ n o = At.erasingᵀ n o
 
 private
   module Erₙ (n : ℕ) {A : Set} (o : SObs [] A) =
