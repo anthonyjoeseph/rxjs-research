@@ -32,25 +32,57 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE SIMULATION: THE ENVIRONMENT
+
+Untried: a connect's carriers fixed source first, then body; the body
+cut at its end or the connect's bound, the source at the same bound,
+listed through its subscribe burst, echoes and kept pins. Risk: every
+map a former adds keeps leading (`Emb.pres`) and the source's joins at
+each later bound. Settled when `sim-connect` is a body.
+
+Members: `sim-connect`.
+
+#### THE SIMULATION: FLATMAP
+
+Untried: the elaborated flatMap simulates the plain one up to a bound,
+its lanes' local maps joined into one embedding. Risk: the scan's marks,
+the trackers' rows read from every binder while the run lives, each
+lane listed from its outer row's listing, and joined maps staying an
+embedding. Settled when `sim-flatMap` is a body over the lanes' and the
+outer's simulations.
+
+Members: `sim-flatMap`.
+
+#### THE SIMULATION: DECISIONS
+
+Untried: a take's failure, a scan's state and a map's values transfer
+both ways along the map; the closed run beside its marks, restamped,
+simulates the program from the root. Settled when each is a body.
+
+Members: `sim-takeWhile`, `sim-scan`, `restamp-sim`.
+
+#### THE SIMULATION: SOURCES
+
+Untried: a cold's, an of's and an empty's elaborated rows carry their
+plain rows; a defer's guard and bottom carry theirs. Settled when each
+is a body.
+
+Members: `sim-cold`, `sim-of`, `sim-empty`, `sim-⊥`, `sim-next`.
+
 #### THE CONSUMPTION
 
-Untried: the elaborated program reads exactly the cold values its plain
-program reads, plus its own shallow leaves (a minted name, the subscribed
-mark): deep cuts with one plain table have one elaborated table; back
-from any table image; placing each image and late row. Every read is
-decided by values and cross-stream order (a take's failure, a switch's
-next outer value, an exhaust's busy lane, a concat's hand-off), so no
-count over one program settles it. Settled when each member is a body
-over the per-operator correspondence `tables` asserts.
+Untried: a table image of a plain row agreed with is the approximant's,
+with few rows before it; a late placement too; and agreement crosses
+back from the elaborated side. Settled when each member is a body over
+`sim-root`'s simulation and the tables.
 
-Members: `stable`, `img-row`, `img-few`, `put-row`, `causal←`.
+Members: `img-row`, `img-few`, `put-row`, `causal←`.
 
 #### THE TABLES
 
-Probed: the plain and elaborated tables of one cut correspond along one
-position map and one late placement. Switch's list-level simulation
-closed with no postulate; exhaust's fuel, pins and the wrappers are
-untried. Settled when `tables` is a body over per-operator simulations.
+Untried: the plain and elaborated tables of one cut correspond along one
+position map and one late placement. Settled when `tables` is a body
+over per-operator simulations.
 
 Members: `tables`.
 
