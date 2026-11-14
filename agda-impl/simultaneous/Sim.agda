@@ -36,13 +36,17 @@
 -- before it, marks included, which no plain row names.  So the rows
 -- before a row are found only from the rows before it AND what they
 -- hold, and a position list does not suffice.
---
+
 -- THE CARRIERS ARE FIXED BEFORE THE BOUND (`Run`): a run's anchors and
 -- carriers come first, then its simulation up to every bound any later
 -- map holding them maps.  A connect's body may be cut at its own row,
 -- whose image only the body's carriers give, while its readers need the
 -- source simulated up to that same bound; fixed first, the source's
 -- carriers are cut there after the body's are known.
+--
+-- A RUN CUT AT ITS OWN ROW (`Run.anchor`): listed up to a row, a run
+-- anchors it, so a former deciding at a child's row cuts the child
+-- there, its image the anchor.
 --
 -- A BOUND CUTS BOTH SIDES ALIKE: before it or under it (`Upto`,
 -- `Under`).  Cut at a subscription, a run keeps its whole subscribe
@@ -174,6 +178,7 @@ record Run {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (L : PM
     img-fun : ∀ {k l l′} → Img k l → Img k l′ → l ≡ l′
     ext     : ∀ {k l} → Img k l → Σ Pos λ y → M k y × y ⊑ l
     sim     : ∀ A′ → M ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → L A′ c → ListedB T c → Sim V Sh A′ Img c T U
+    anchor  : ∀ A′ → M ⊆ᴹ A′ → Emb A′ → ∀ {k e} → T k e → Carried e → L A′ (just k) → ListedB T (just k) → Σ Pos (M k)
 
 -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.
 sim-whole : ∀ {A B} {V : A → B → Set} {Sh M Img T U} → Sim V Sh M Img nothing T U → Σ (List Pos) λ ls → ∀ {l e} → U l e → l ∈ ls
@@ -211,7 +216,8 @@ Joins S P t Img = ∀ {x y q a σ e₀} → P x y → t q e₀ → x ≡ q ⊕ (
 -- connect subscribed, its elaborated binder the proper rows of that
 -- source's elaboration annotated, both lawful, the proper annotated rows
 -- a run of the proper source rows wherever what the source reads is
--- listed (`need`), and every point the ambient map puts under a source
+-- listed (`need`), listed up to a source row wherever up to a bound past
+-- it (`need-row`), and every point the ambient map puts under a source
 -- row a join.
 record HotSim (Amb : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
@@ -223,6 +229,7 @@ record HotSim (Amb : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ w
     env₀   : DenEnv Δ₀
     at′    : Pos
     need   : PMap → Maybe Pos → Set
+    need-row : ∀ {A′ c k e} → Proper (enter src at) k e → Upto c k → need A′ c → need A′ (just k)
     isP    : d ≡ hot (Proper (enter src at))
     isE    : d′ ≡ hot (Proper (enter (approx m (annotate core) env₀) at′))
     law    : Lawful (Proper (enter src at))

@@ -70,6 +70,11 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
   listed : ∀ {c} → ListedB T c → ListedB t₀ c
   listed (ks , cov , back) = ks , (λ x u → cov (proj₂ (up x)) u) , λ m → down (proj₂ (back m))
 
+  -- A carried row: its source's, carried.
+  carried : ∀ {k e} → T k e → Carried e → Σ (Ev A) λ e₀ → t₀ k e₀ × Carried e₀
+  carried (map-out x , _) c-out = _ , x , c-out
+  carried (map-end x , _) c-end = _ , x , c-end
+
   -- Nothing under a mapped row but under its source's.
   none : ∀ {M} → NoneUnder M t₀ → NoneUnder M T
   none nu x m kx = nu (proj₂ (down x)) m kx
@@ -122,4 +127,5 @@ sim-map n ρ f s (sih ih) = sih λ env env′ Amb ge ge′ ap es ns em p p′ pp
       open Run R
   in M , lc , eb , none {M} (λ {k} {e} {x} {y} → nu {k} {e} {x} {y}) , ej
      , record { Img = Img ; img-fun = img-fun ; ext = ext
-              ; sim = λ A′ inc ea c mp L lst → mapped (sim A′ inc ea c mp L (listed lst)) }
+              ; sim = λ A′ inc ea c mp L lst → mapped (sim A′ inc ea c mp L (listed lst))
+              ; anchor = λ A′ inc ea x ce L lst → let (_ , x₀ , ce₀) = carried x ce in anchor A′ inc ea x₀ ce₀ L (listed lst) }

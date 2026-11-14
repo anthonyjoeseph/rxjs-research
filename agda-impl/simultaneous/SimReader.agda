@@ -28,7 +28,7 @@ open import denotation.Position using (Pos; Label; Path; root; _≟ᵖ_; _⊕_; 
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Unpinned; Few; EmissionSet; Den; hot; coldAt; Proper; Truncate; Rejoin;
   shown; heard; ended; late; _≺_; _≼_; enter; module Scan; module Op; DenEnv)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-ext; ≼-≺-≺; ≺-≼-≺; ≺→≼; entered-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-trans; ≺-ext; ≼-≺-≺; ≺-≼-≺; ≺→≼; entered-few)
 open import denotation.Laws.Worlds using (Hots; Lawful; _⊑_; ⊑-≼; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊕-injˡ; ⊕-injʳ; ⊕-cancelˡ; ⊕-assoc;
   ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
@@ -37,7 +37,8 @@ open import adequacy.SubJoin using (Bind; rejoin-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Carried; c-out; c-end; Mt; m-out; m-end; Local; Fresh; NoneUnder;
   Joins; Upto; Under; Mapped; Run; _⊆ᴹ_; allᴱ; Shows; Shown; AShows; AShown; HotSim; EnvSim;
-  EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih)
+  EnvListed; ListedB; EnvNeeds; EnvJoins; Apart; SimIH; sih)
+open import simultaneous.SimPos using (UpTo)
 open import simultaneous.ReadMap using (module Map; module Cars; upto-dn; under?; under-down)
 open import simultaneous.ReadRows using (module Rows)
 
@@ -265,13 +266,43 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   ... | inj₂ (b , τ , pe , refl) with HotSim.joins (es i′) pp q′ pe
   ...   | e₁ , refl , e₁′ , a₁ , L₁ , car₁ , h = e₁ , refl , e₁′ , inj₁ a₁ , L₁ , car₁ , ⊑-trans h (⊑-snoc⁺ p′)
 
+  -- Listed up to a later position: up to a hot row before it.
+  listed-row : ∀ {k e₀ x} → rows k e₀ → k ≺ x → ListedB rows (just x) → ListedB rows (just k)
+  listed-row {k} {x = x} s kx (ks , cov , back) = ks , (λ y u → cov y (up y u)) , back
+    where
+      up : ∀ {j e} → rows j e → UpTo k j → UpTo x j
+      up {j} _ (inj₁ jk)           = inj₁ (≺-trans {j} {k} {x} jk kx)
+      up     _ (inj₂ ([] , refl))  = inj₁ (subst (_≺ x) (sym (⊕-identityʳ k)) kx)
+      up     y (inj₂ (_ ∷ _ , refl)) = ⊥-elim (Lawful.flat law s y)
+
+  joined : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {q e} → rows q e → Carried e → (pk : p ≺ q)
+         → EnvListed ρ env env′ es A′ (just (q ⊕ [ sub p ])) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
+  joined A′ inc emA {q} s ce pk L = go (Run.anchor run A′ (λ a → inc (inj₁ a)) emA s ce nq lq)
+    where
+      nq = HotSim.need-row (es i) s (inj₁ (≺-ext q {sub p} [])) (en i A′ (just (q ⊕ [ sub p ])) L)
+      lq = listed-row s (≺-ext q {sub p} []) (proj₁ (allᴱ L i))
+
+      go : Σ Pos (Amb q) → Σ Pos ((Amb ∪ᴹ Mr) (q ⊕ [ sub p ]))
+      go (y , a) with Sim.fwd (Run.sim run A′ (λ a′ → inc (inj₁ a′)) emA (just q) (y , inc (inj₁ a)) nq lq) s ce (inj₂ (⊑-refl _))
+      ... | L′ , car , _ , g , _ = L′ ⊕ [ sub p′ ] , inj₂ (mrow s ce pk car g refl refl)
+
+  -- A joined row's anchor: its hot row's carrier joined, the hot cut at
+  -- its row.
+  anchor : ∀ A′ → (Amb ∪ᴹ Mr) ⊆ᴹ A′ → Emb A′ → ∀ {x e} → RD.T x e → Carried e → EnvListed ρ env env′ es A′ (just x)
+         → ListedB RD.T (just x) → Σ Pos ((Amb ∪ᴹ Mr) x)
+  anchor A′ inc emA (shown {q} s _ pk , _) ce L _ = joined A′ inc emA s ce pk L
+  anchor A′ inc emA (ended {q} s pk , _)   ce L _ = joined A′ inc emA s c-end pk L
+  anchor A′ inc emA (late sq qp , _)       ce L _ = p′ ⊕ [ last ] , inj₂ (mlate sq qp refl refl)
+  anchor A′ inc emA (heard _ _ , _)        ()
+
   -- The reader's carriers come first; cut at a later map's bound, the hot
   -- is cut at the same bound.
   core : Goal (hot rows) (hot rows′)
   core = Mr , local , emb , none-under , reader-joins
        , record { Img = RD.Img ; img-fun = RD.img-fun ; ext = RD.ext
                 ; sim = λ A′ inc emA c mp L _ → RD.Cut.sim A′ inc emA (proj₂ (allᴱ L i)) c mp
-                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i A′ c L) (proj₁ (allᴱ L i))) }
+                          (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i A′ c L) (proj₁ (allᴱ L i)))
+                ; anchor = anchor }
 
   leaf : Goal (lookup env i) (lookup env′ (ρ (∈-map⁺ AIE i)))
   leaf = subst₂ Goal (sym isP) (sym isE) core
