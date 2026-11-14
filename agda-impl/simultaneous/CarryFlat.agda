@@ -19,15 +19,18 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (¬_)
+open import Relation.Nullary.Decidable using (decidable-stable)
+open import Data.Bool.Properties using (T?)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected)
-open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_)
+open import denotation.Position using (Pos; Label; ix; sub; _⊕_; root; _≟ᵖ_; _<ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Unpinned; EmissionSet; Truncate; Proper; Den; hot; enter; DenEnv; approx;
   Ended; LaneOf; Few; _≺_; module Joining; module Op; module Bounded; module Switch;
   module Exhaust; module Connect)
-open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; plain-ix; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_; Lawful)
+open import denotation.Laws.Worlds using (⊑-inside; ⊕-assoc; plain-ix; world-after; ⊑-trans; ⊑-snoc⁺; Hots; GoodEnv; Ok; ok-step; InvAt; InvD; _∪ʰ_; inW; _⊑_; Lawful)
 open import denotation.Laws.Modulus using (≺-trans; entered-reach)
+open import denotation.Laws.Count using (under-guard)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to conn-lawful; ok₀ to conn-ok₀)
 open import denotation.Laws.BoundedInv using (end-uniq; module BoundedI)
@@ -44,7 +47,7 @@ open import simultaneous.Carry using (Carry; carry; CarriesAt; Within; Bare; Env
 open import simultaneous.CarryDefer using (env-grow; past-shrink; joins-shrink)
 open import simultaneous.FlatWrap using (module FlatCarry)
 open import simultaneous.JoinCarry using (module Joined)
-open import simultaneous.OuterOrder using (module Read)
+open import simultaneous.OuterOrder using (module Read; val-ok; value-off-lane)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; closer; laneˢ; each; combined; trackers; Routes)
 
@@ -126,6 +129,9 @@ as-switch g o .switchᶠ refl c = c
 
 to-switch : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q k} → op ≡ switchᶠ → Switch.Cut g o q k → Parts.Cut g o op q k
 to-switch g o .switchᶠ refl c = c
+
+as-lane : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {q a k e} → op ≡ switchᶠ → Parts.Ln g o op q a k e → LaneOf g q a k e
+as-lane g o .switchᶠ refl l = l
 
 only-bounded : ∀ {A B} (g : A → Den B) (o : EmissionSet A) op {c} {X : Set}
              → (∀ m → op ≡ mergeᶠ (just m) → Parts.Hand g o op c → X) → Parts.Hand g o op c → X
@@ -468,17 +474,11 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- THE ELABORATED JOINER DECIDES AS THE PLAIN ONE: each running
         -- value paired, a lane cut where its partner is, its end joined
         -- and handed off where its partner's is.
-        -- A listed value's carrier, read back as the elaborated outer's.
-        read-value : ∀ {q a} → o q (out a) → Listed o q → HotsListed envP q
-                   → Σ Pos λ l → FW.S′.Img q l × o* (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out a)
         -- A bounded or exhaust value runs where its partner does.
         bounded-runs : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
-        -- A switch's lane is cut where its partner is, forward under the
-        -- classical reading of every later value.
-        switch-cut¬¬ : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
         -- A lane's end is joined where its partner's is: forward from the
         -- plain run listed, back held classically.
         pair-done : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → Listed o c × HotsListed envP c
@@ -495,14 +495,6 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
                         → Listed o c × HotsListed envP c → P.Hand op c → P*.Hand op c*
         bounded-hand¬¬ : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end
                        → P.Hand op c → ¬ ¬ P*.Hand op c*
-
-      pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Listed o q → HotsListed envP q → Σ Pos (V q a)
-      pair-all x r ls lp =
-        let (l , i , x*) = read-value x ls lp
-        in _ , x , r , x* , runs-by g o lE o* op (λ m e → bounded-runs m e x i) (λ e → exhaust-runs e x i) r , l , i , refl
-
-      cut-to¬¬ : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
-      cut-to¬¬ v i = only-switch g o op λ e → switch-cut¬¬ e v i
 
       hand-from : ∀ {q a q*} (v : V q a q*) {c c*} → LI v c c* → P.Ln op q a c end → P*.Hand op c* → P.Hand op c
       hand-from v i y = only-bounded lE o* op λ m e → bounded-hand m e v i y
@@ -523,7 +515,18 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       Iσ : InvAt (Hots envE) (p′ ⊕ [ ix 1 ]) FW.CE.σ
       Iσ = inv-approx n (elab ρ s) envE gE (p′ ⊕ [ ix 1 ]) (ok-step p′ okE)
 
-      module OR = Read q₁ Io Iσ (λ {l} {e} y → entered-reach (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ]) {l} {e} y) M_s hm_s c_s
+      -- The source's rows lie past the elaborated outer's subscription.
+      q₁σ : ∀ {l e} → FW.CE.σ l e → q₁ ≺ l
+      q₁σ {l} y = ≺-trans {q₁} {p′ ⊕ [ ix 1 ]} {l} (under-guard p′ (⊑-trans (⊑-snoc⁺ (p′ ⊕ [ ix 0 ])) (⊑-snoc⁺ (p′ ⊕ [ ix 0 ] ⊕ [ ix 0 ]))))
+                    (world-after (InvAt.world Iσ y) (InvAt.real Iσ y))
+
+      module OR = Read q₁ Io Iσ (λ {l} {e} y → entered-reach (approx n (elab ρ s) envE) (p′ ⊕ [ ix 1 ]) {l} {e} y)
+                    (λ {l} {e} x → entered-reach (approx n s envP) p {l} {e} x) (λ {l} {e} y → q₁σ {l} {e} y) M_s hm_s c_s
+
+      pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Listed o q → HotsListed envP q → Σ Pos (V q a)
+      pair-all x r ls lp =
+        let (l , i , x*) = OR.read-val x ls lp
+        in _ , x , r , x* , runs-by g o lE o* op (λ m e → bounded-runs m e x i) (λ e → exhaust-runs e x i) r , l , i , refl
 
       -- No lane row lies over a value.
       off-value : ∀ {q a q*} (v : V q a q*) {k l q′ a′} → LI v k l → o q′ (out a′) → k ⊑ q′ → ⊥
@@ -545,6 +548,24 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
 
       cut-from : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P*.Cut op q* l → P.Cut op q k
       cut-from v i = only-switch lE o* op λ e → switch-cut e v i
+
+      -- A LATER VALUE BEFORE A SWITCH LANE'S ROW was read before the row's
+      -- image: it lies over no row of the lane's world.
+      lane-past : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l q′ a′ l′} → LI v k l → o q′ (out a′) → q ≺ q′ → FW.S′.Img q′ l′ → q′ ≺ k
+                → OR.Q l′ ≺ l
+      lane-past e {q} {a} {q*} v {k} {l} {l′ = l′} i x′ qq i′ qk = decidable-stable (T? (OR.Q l′ <ᵖ l)) λ nlt →
+        CarryAt.img-row (proj₂ (proj₂ (proj₂ (lane-framed v)))) i λ (_ , ln , _) →
+          let (y , my , yl) = CarryAt.ext (proj₂ (proj₂ (proj₂ (lane-framed v)))) i
+          in nlt (OR.row-past (proj₁ (proj₂ joined-maps)) inj₁ (inj₂ (q , a , q* , v , my)) yl
+                   (value-off-lane okP Io (proj₁ v) x′ qq (InvAt.world (Ig a (q ⊕ [ ix 1 ]) (val-ok okP Io (proj₁ v))) (proj₁ (as-lane g o op e ln))))
+                   i′ qk)
+
+      switch-cut¬¬ : op ≡ switchᶠ → ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
+      switch-cut¬¬ e v@(_ , _ , x* , _ , _ , i₀ , refl) i c n =
+        OR.switch-fwd i₀ x* (as-switch g o op e c) (λ x′ qq i′ qk → lane-past e v i x′ qq i′ qk) (λ c* → n (to-switch lE o* op e c*))
+
+      cut-to¬¬ : ∀ {q a q*} (v : V q a q*) {k l} → LI v k l → P.Cut op q k → ¬ ¬ P*.Cut op q* l
+      cut-to¬¬ v i = only-switch g o op λ e → switch-cut¬¬ e v i
 
       postulate
         -- A hand-off's carrier, and the outer end's, along the joined map.
