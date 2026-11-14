@@ -34,15 +34,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### CONNECT: THE ROWS PAST THE BODY
 
-Untried: a burst, echo or kept row under a bound's image is carried by
-the source's simulation cut at the bound or the body's end; the body's
-and the source's listings sit inside the connect's. Risk: a body row up
-to a listed bound reaches the connect only if the source rows before it
-are few, which no law states directly. Settled when each is a body over
-the source's simulation and the connect laws.
+Untried: a live or burst source row up to a bound shows a connect row
+at its first child, so the connect's listing lists the source's; the
+elaborated source's rows under a bound's image are listed. Risk: pins
+and skips are not carried, so the elaborated burst, echo and kept rows
+trace to plain rows only through the annotated source's listing, whose
+bound must be fed a full source listing the connect hides past the
+body's end. Settled when each is a body over the source's simulation
+and the connect laws.
 
-Members: `u-under`, `src-listed`, `listed-σ`, `listed-β`, `t-mem`,
-`under-upto`.
+Members: `src-listed`, `listed-σ`.
 
 #### CONNECT: THE MAPS
 
