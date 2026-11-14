@@ -32,24 +32,26 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE SIMULATION: FLATMAP
-
-Untried: the elaborated flatMap simulates the plain one, its lanes'
-local maps joined into one embedding, every row owned and listed. Risk:
-the scan's marks, the trackers' rows owned by environment rows across
-every lane alive at them, and joined maps staying an embedding. Settled
-when `sim-flatMap` is a body over the lanes' and the outer's simulations.
-
-Members: `sim-flatMap`.
-
 #### THE SIMULATION: THE ENVIRONMENT
 
-Untried: a reader of a simulated hot is simulated, its marks owned under
-the environment row's anchor while the value lies at the reader row's;
-a connect's body owns its environment rows through the echoes, bursts
-and kept pins while it lives. Settled when each is a body.
+Untried: a reader of a simulated hot is simulated, its value at the
+reader row's image while its joins and marks interleave with other
+readers' rows under the hot row's anchor; a connect's source is listed
+through the echoes, bursts and kept pins up to its body's end. Settled
+when each is a body. Riskiest: it tests the inductive hypothesis itself.
 
 Members: `sim-connected`, `sim-connect`.
+
+#### THE SIMULATION: FLATMAP
+
+Untried: the elaborated flatMap simulates the plain one up to a bound,
+its lanes' local maps joined into one embedding. Risk: the scan's marks,
+the trackers' rows read from every binder while the run lives, each
+lane listed from its outer row's listing, and joined maps staying an
+embedding. Settled when `sim-flatMap` is a body over the lanes' and the
+outer's simulations.
+
+Members: `sim-flatMap`.
 
 #### THE SIMULATION: DECISIONS
 
