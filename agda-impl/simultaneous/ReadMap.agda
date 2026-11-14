@@ -27,8 +27,8 @@ open import denotation.Laws.Worlds using (Lawful; _⊑_; plain-last; ⊕-assoc; 
 open import denotation.Laws.Count using (⊑?)
 open import adequacy.SubJoin using (lower)
 open import simultaneous.SimPos using (apart; apart₁; flat-apart; ⊑-split; upto-down; lie; above; below; left; right; join-lt; join-back;
-  join-fwd; ⊕-cons)
-open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Carried; Local; Fresh; Below; NoneUnder; Joins; Upto; Under; Mapped)
+  join-fwd; ⊕-cons; UpTo)
+open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Carried; Local; Fresh; Below; NoneUnder; Joins; Upto; Under; Mapped; ListedB)
 open import simultaneous.ReadRows using (module Rows)
 open import simultaneous.SObs using (lone; module Elaborate)
 
@@ -72,6 +72,18 @@ under? fu (just c₀) (y₀ , a₀) l with T? (l <ᵖ y₀) | ⊑? y₀ l
 under-down : ∀ {Amb : PMap} c₀ {l l′} → l′ ≺ l → Under Amb c₀ l → Under Amb c₀ l′
 under-down nothing  _  _ = tt
 under-down (just _) {l} {l′} ll (y , a , u) = y , a , upto-down {y} {l} {l′} ll u
+
+-- Up to a bound, a row's own subtree, no row lying under another.
+upto-row : ∀ {X} {t : EmissionSet X} → (∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥)
+         → ∀ c {k e j e′} → t k e → Upto c k → t j e′ → UpTo k j → Upto c j
+upto-row fl c {k} _ uk _ (inj₁ jk)             = upto-dn c jk uk
+upto-row fl c {k} _ uk _ (inj₂ ([] , refl))    = subst (Upto c) (sym (⊕-identityʳ k)) uk
+upto-row fl c     x uk y (inj₂ (_ ∷ _ , refl)) = ⊥-elim (fl x y)
+
+-- Listed up to a bound: listed up to a row up to it.
+listed-up : ∀ {X} {t : EmissionSet X} → (∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥)
+          → ∀ c {k e} → t k e → Upto c k → ListedB t c → ListedB t (just k)
+listed-up fl c x uk (ks , cov , back) = ks , (λ y u → cov y (upto-row (λ {y} {e} {l} {ys} {e′} → fl {y} {e} {l} {ys} {e′}) c x uk y u)) , back
 
 ------------------------------------------------------------------------
 -- Carriers within a map

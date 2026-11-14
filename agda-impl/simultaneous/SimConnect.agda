@@ -17,7 +17,7 @@ open import Data.List using ([]; _∷_; [_]; _++_; filter)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Maybe using (Maybe; just)
@@ -33,13 +33,16 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; DenEnv; Proper; enter; approx; module Connect)
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; InvD; _∪ʰ_; ok-step; here; _⊑_; ⊑-snoc⁺; ⊑-trans; ⊑-≼)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; InvD; InvAt; _∪ʰ_; ok-step; here; _⊑_; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊑-inside)
 import denotation.Laws.Connect as LC
 open import simultaneous.SObs using (lone; module Elaborate; ext)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Mt; Carried; c-end; Upto;
-  Under; Mapped; ListedB; ListedL; Live; EndsAfter; env-live; Joins; Shows; Shown; AShows;
+  Under; Mapped; ListedB; ListedL; Live; Allᴱ; EndsAfter; env-live; Joins; Shows; Shown; AShows;
   AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih)
-open import simultaneous.ReadMap using (under?)
+open import simultaneous.ReadMap using (under?; upto-dn; listed-up)
+open import simultaneous.SimReader using (hots-at)
+open import simultaneous.SimPos using (UpTo)
+open import simultaneous.AnnRun using (module AnnRun)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -91,6 +94,22 @@ hot-up inc h j = record
   { Δ₀ = Δ₀ ; src = src ; at = at ; m = m ; core = core ; env₀ = env₀ ; at′ = at′ ; need = need ; need-row = need-row
   ; isP = isP ; isE = isE ; law = law ; law′ = law′ ; run = run-up inc run ; joins = j }
   where open HotSim h
+
+-- WHAT A RUN READS, listed up to a bound, is listed up to a row up to it
+-- where no hot row lies at or under the row.
+env-row : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {Amb env env′} (es : EnvSim ρ Amb env env′) {B} {T : EmissionSet B} {c k}
+        → Upto c k → (∀ {X} (i : X ∈ Γ) {h e} → HotSim.rows (es i) h e → k ⊑ h → ⊥)
+        → ∀ {A′} → EnvListed ρ env env′ es T A′ c → EnvListed ρ env env′ es T A′ (just k)
+env-row {Γ} es {T = T} {c} {k} uk nh = go Γ (λ i → HotSim.rows (es i)) (λ i → nh i)
+  where
+    go : ∀ Γ′ (r : ∀ {X} → X ∈ Γ′ → EmissionSet X) → (∀ {X} (i : X ∈ Γ′) {h e} → r i h e → k ⊑ h → ⊥)
+       → Allᴱ Γ′ (λ i → ListedL (r i) T c) → Allᴱ Γ′ (λ i → ListedL (r i) T (just k))
+    go []       _ _  _                      = tt
+    go (_ ∷ Γ′) r nr ((ks , cov , bk) , ls) = (ks , (λ y u l → cov y (fix y u) l) , bk) , go Γ′ (λ i → r (there i)) (λ i → nr (there i)) ls
+      where
+        fix : ∀ {h e} → r (here refl) h e → UpTo k h → Upto c h
+        fix _ (inj₁ lt) = upto-dn c lt uk
+        fix y (inj₂ kh) = ⊥-elim (nr (here refl) y kh)
 
 ------------------------------------------------------------------------
 -- The connect at a pair
@@ -176,7 +195,6 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     joins-sub : ∀ {X} (i : X ∈ Γ) {x y} → p ⊑ x → p′ ⊑ y → Joins Amb (Pair x y) (HotSim.rows (es i)) (HotSim.car (es i))
     emb-s   : Emb Amb-s
     fresh-s : Fresh (Hots env) (Hots env′) Amb-s r r″
-    ok-s′   : Ok (Hots env′) r″
     nh-s    : ¬ Hots env r
 
   joins-s : ∀ {X} (i : X ∈ Γ) → Joins Amb-s Amb-s (HotSim.rows (es i)) (HotSim.car (es i))
@@ -192,7 +210,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   at-s : Amb-s r r″
   at-s = inj₂ (refl , refl)
 
-  srcIH = SimIH.sims ihs env env′ Amb-s ge ge′ ap es-s en-s (emb-s) r r″ at-s (fresh-s) (ok-step p ok) (ok-s′) nh-s
+  srcIH = SimIH.sims ihs env env′ Amb-s ge ge′ ap es-s en-s (emb-s) r r″ at-s (fresh-s) (ok-step p ok) (ok-step r′ (ok-step p′ ok′)) nh-s
 
   Ms : PMap
   Ms = proj₁ srcIH
@@ -215,12 +233,22 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   s⊆b : (Amb-s ∪ᴹ Ms) ⊆ᴹ Amb-b
   s⊆b a = inj₁ (inj₁ a)
 
+  -- No hot row lies at or under a source row: the row is in the source's
+  -- world, which holds none.
+  under-σ : ∀ {X} (i : X ∈ Γ) {h e k e′} → HotSim.rows (es i) h e → σ k e′ → k ⊑ h → ⊥
+  under-σ i y x kh = proj₂ (ok-step p ok) (hots-at env i (HotSim.isP (es i)) y) (InvAt.world (Is r (ok-step p ok)) x) (⊑-inside kh)
+
+  -- What the source reads, listed up to a bound: listed up to a source
+  -- row up to it.
+  need-row : ∀ {A′ c k e} → Proper σ k e → Upto c k → EnvListed ρ env env′ es-s σ A′ c → EnvListed ρ env env′ es-s σ A′ (just k)
+  need-row {A′} x uk = env-row {Γ} {Δ} {λ {X} → ρ {X}} {Amb-s} {env} {env′} es-s {T = σ} uk (λ i y kh → under-σ i y (proj₁ x) kh) {A′}
+
+  -- THE ANNOTATED SOURCE IS A RUN OF THE SOURCE.
+  annotate-run : Run AShows AShown (Amb-s ∪ᴹ Ms) (EnvListed ρ env env′ es-s σ) (Proper σ) (Proper σ′)
+  annotate-run = AnnRun.run n (elab ρ s) env′ ge′ r′ (ok-step p′ ok′) (Is r (ok-step p ok)) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ srcIH)))))
+                   (λ {A′} {c} {k} {e} → need-row {A′} {c} {k} {e})
+
   postulate
-    -- THE ANNOTATED SOURCE IS A RUN OF THE SOURCE.
-    annotate-run : Run AShows AShown (Amb-s ∪ᴹ Ms) (EnvListed ρ env env′ es-s σ) (Proper σ) (Proper σ′)
-    -- What the source reads, listed up to a bound: listed up to a source
-    -- row up to it.
-    need-row : ∀ {A′ c k e} → Proper σ k e → Upto c k → EnvListed ρ env env′ es-s σ A′ c → EnvListed ρ env env′ es-s σ A′ (just k)
     -- No point of the body's ambient map lies strictly under a source row.
     joins-σ : Joins Amb-b Amb-b (Proper σ) (Run.Img annotate-run)
 
@@ -384,6 +412,17 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   live-β : ∀ {j} → Live β j → Live T j
   live-β l x = l (t-end x)
 
+  IT : InvAt (Hots env) p T
+  IT = inv-approx n (connect s b) env ge p ok
+
+  -- What the connect reads, listed up to a bound: listed up to a row up
+  -- to it, no hot row lying in its world.
+  env-up : ∀ {A′ c k e} → T k e → Upto c k → EnvListed ρ env env′ es T A′ c → EnvListed ρ env env′ es T A′ (just k)
+  env-up {A′} x uk = env-row {Γ} {Δ} {λ {X} → ρ {X}} {Amb} {env} {env′} es {T = T} uk (λ i y kh → proj₂ ok (hots-at env i (HotSim.isP (es i)) y) (InvAt.world IT x) (⊑-inside kh)) {A′}
+
+  lst-up : ∀ {c k e} → T k e → Upto c k → ListedB T c → ListedB T (just k)
+  lst-up {c} = listed-up (λ {y} {e} {l} {ys} {e′} → InvAt.flat IT {y} {e} {l} {ys} {e′}) c
+
   postulate
     -- THE LISTINGS THROUGH THE CONNECT: its rows up to a bound listed, the
     -- body's are, and the source's still live in the body.
@@ -393,16 +432,15 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     t-mem : ∀ {c k e} → ListedB T c → β k e → Upto c k → T k e
     -- A carrier under a bound's image is up to the bound.
     under-upto : ∀ {A′} → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ {c} → Mapped A′ c → ∀ {k l} → Run.Img Rb k l → Under A′ c l → Upto c k
-    -- What the connect reads, listed up to a bound: listed up to a row up
-    -- to it.
-    env-up : ∀ {A′ c k e} → T k e → Upto c k → EnvListed ρ env env′ es T A′ c → EnvListed ρ env env′ es T A′ (just k)
-    lst-up : ∀ {c k e} → T k e → Upto c k → ListedB T c → ListedB T (just k)
     -- THE ELABORATED CONNECT'S ROWS UNDER A BOUND'S IMAGE: a body row is
     -- the connect's, and the source's are listed.
     u-under : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
             → ∀ {l e} → β′ l e → Under A′ c l → U l e
     src-listed : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
                → Σ (L.List Pos) λ ls → (∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev (IE B)) (U l))
+    -- RECOVERY: git show a0945587^:agda-impl/simultaneous/ToldRows.agda
+    --   restores told-listed←, for listed-σ: the source listed under a told
+    --   row's listing.
 
   -- What the body reads, from what the connect reads.
   Lb : ∀ {A′ c} → EnvListed ρ env env′ es T A′ c → ListedB T c → EnvListed (ext ρ) env-b env′-b es-b β A′ c
