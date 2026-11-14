@@ -74,10 +74,11 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
   listed : ∀ {c} → ListedB T c → ListedB t₀ c
   listed (ks , cov , back) = ks , (λ x u → cov (proj₂ (up x)) u) , λ m → down (proj₂ (back m))
 
-  bound : ∀ {Amb c} → BoundOk Amb T c → BoundOk Amb t₀ c
-  bound {c = nothing} _              = tt
-  bound {c = just _}  (inj₁ a)       = inj₁ a
-  bound {c = just _}  (inj₂ (_ , x)) = inj₂ (down x)
+  bound : ∀ {H′ Amb c} → BoundOk H′ Amb T c → BoundOk H′ Amb t₀ c
+  bound {c = nothing} _                                 = tt
+  bound {c = just _}  (inj₁ a)                          = inj₁ a
+  bound {c = just _}  (inj₂ (_ , c-out , map-out x , _)) = inj₂ (_ , c-out , x)
+  bound {c = just _}  (inj₂ (_ , c-end , map-end x , _)) = inj₂ (_ , c-end , x)
 
   -- Nothing under a mapped row but under its source's.
   none : ∀ {M} → NoneUnder M t₀ → NoneUnder M T
@@ -95,11 +96,21 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
       ; fwd     = fw
       ; val←    = λ { (map-out x , _) sh un → bv x sh un }
       ; end←    = λ { (map-end x , _) un → be x un }
-      ; upto    = proj₁ upto , λ { (map-out x , _) un → proj₂ upto x un ; (map-skip x , _) un → proj₂ upto x un
-                                   ; (map-pin x , _) un → proj₂ upto x un ; (map-end x , _) un → proj₂ upto x un } }
+      ; upto    = proj₁ upto , (λ { (map-out x , _) un → cov x un ; (map-skip x , _) un → cov x un
+                                    ; (map-pin x , _) un → cov x un ; (map-end x , _) un → cov x un })
+                  , λ m → ent′ (proj₂ (back m)) }
       where
+      cov = proj₁ (proj₂ upto)
+      back = proj₂ (proj₂ upto)
+
       ent : ∀ {l e} → MapT (mapIE f) u₀ l e → U l e
       ent m = m , map-reach (entered-reach d′ p′) m
+
+      ent′ : ∀ {l e} → u₀ l e → Σ (Ev (IE B)) (U l)
+      ent′ {e = out _} x = _ , ent (map-out x)
+      ent′ {e = skip}  x = _ , ent (map-skip x)
+      ent′ {e = pin _} x = _ , ent (map-pin x)
+      ent′ {e = end}   x = _ , ent (map-end x)
 
       fw : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev (IE B)) λ e′ → U l e′ × Mt Shows e e′
       fw (map-out x , _) _ u with fwd x c-out u
@@ -119,7 +130,7 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
 -- THE FORMER: the source's simulation, mapped.
 sim-map : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) (s : Obs Timeline Γ A)
         → SimIH n ρ s → SimIH n ρ (map f s)
-sim-map n ρ f s (sih ih) = sih λ env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ L B →
+sim-map n ρ f s (sih ih) = sih λ env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ nh L B →
   let open Mapped f (approx n s env) (approx n (elab ρ s) env′) p p′
-      (M , lc , eb , nu , ej , S) = ih env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ (listed L) (bound B)
+      (M , lc , eb , nu , ej , S) = ih env env′ Amb c ge ge′ ap es em p p′ pp fr ok ok′ nh (listed L) (bound B)
   in M , lc , eb , none {M} (λ {k} {e} {x} {y} → nu {k} {e} {x} {y}) , ej , mapped S

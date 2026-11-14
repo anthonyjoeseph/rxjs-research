@@ -28,6 +28,7 @@ open import simultaneous.Listing using (Listing)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Sim using (PMap; Emb; Sim; ListedB; Shows; Shown; SimIH)
 open import simultaneous.SimMap using (sim-map)
+open import simultaneous.SimReader using (sim-connected)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; elaborate)
 
@@ -71,7 +72,6 @@ postulate
                 → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
   sim-connect   : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
                 → SimIH n ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → SimIH n ρ′ b) → SimIH n ρ (connect s b)
-  sim-connected : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → SimIH n ρ (connected i)
   -- THE BOTTOM APPROXIMANT, and each further one under a `defer`'s guard.
   sim-⊥         : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → SimIH zero ρ (defer l)
   sim-next      : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)

@@ -29,11 +29,17 @@
 -- subscription's image.  So a new reader's joins fall between the
 -- earlier ones in their subscriptions' order.
 --
--- THE PLAIN ROWS UP TO THE BOUND ARE LISTED, EACH WITH ITS ROW
--- (`ListedB`).  Where an elaborated row lies is data: a reader's joins
--- and a scan's marks count routes, a lane is its outer value's.  So the
--- elaborated rows before a plain row are found only from the plain rows
--- before it AND what they hold, and a position list does not suffice.
+-- THE ROWS UP TO THE BOUND ARE LISTED, EACH WITH ITS ROW: the plain
+-- (`ListedB`) and the elaborated (`Sim.upto`).  Where an elaborated row
+-- lies is data: a reader's joins and a scan's marks count routes, a lane
+-- is its outer value's, and a reader's scan folds the annotated rows
+-- before it, marks included, which no plain row names.  So the rows
+-- before a row are found only from the rows before it AND what they
+-- hold, and a position list does not suffice.
+--
+-- THE SUBSCRIPTION IS NO HOT ROW.  A reader whose hot ended before it
+-- ends at once, under its subscription with a plain label; were the
+-- subscription a hot row, that end would lie under it as no join.
 -- A bound is what a decision cuts a child at: a take at its failure, a
 -- switch's lane at the next outer value, a connect's source at its
 -- body's end.
@@ -58,7 +64,7 @@ open import Tree using (Obs)
 open import denotation.Position using (Pos; Label; Path; root; _≟ᵖ_; _⊕_; sub)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; coldAt; Proper; DenEnv; _≺_; _≼_; enter; approx)
-open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok)
+open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok; Lawful)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 
@@ -147,11 +153,11 @@ record Sim {A B : Set} (V : A → B → Set) (Sh : B → Set) (M : PMap) (c : Ma
     fwd     : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev B) λ e′ → U l e′ × Mt V e e′
     val←    : ∀ {l b} → U l (out b) → Sh b → Under M c l → Σ Pos λ k → Img k l × Σ A λ a → T k (out a) × V a b
     end←    : ∀ {l} → U l end → Under M c l → Σ Pos λ k → Img k l × T k end
-    upto    : Σ (List Pos) λ ls → ∀ {l e′} → U l e′ → Under M c l → l ∈ ls
+    upto    : Σ (List Pos) λ ls → (∀ {l e′} → U l e′ → Under M c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev B) (U l))
 
 -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.
 sim-whole : ∀ {A B} {V : A → B → Set} {Sh M T U} → Sim V Sh M nothing T U → Σ (List Pos) λ ls → ∀ {l e} → U l e → l ∈ ls
-sim-whole S = proj₁ (Sim.upto S) , λ y → proj₂ (Sim.upto S) y tt
+sim-whole S = proj₁ (Sim.upto S) , λ y → proj₁ (proj₂ (Sim.upto S)) y tt
 
 ------------------------------------------------------------------------
 -- The elaboration simulates its program
@@ -183,9 +189,9 @@ Joins S P t Img = ∀ {x y q a σ e₀} → P x y → t q e₀ → x ≡ q ⊕ (
 
 -- A SIMULATED HOT: the plain binder the proper rows of a source a
 -- connect subscribed, its elaborated binder the proper rows of that
--- source's elaboration annotated, the annotated rows simulating the
--- source's up to a bound past the reader's, and every point the ambient
--- map puts under a source row a join.
+-- source's elaboration annotated, both lawful, the proper annotated rows
+-- simulating the proper source rows up to a bound past the reader's, and
+-- every point the ambient map puts under a source row a join.
 record HotSim (Amb : PMap) (c : Maybe Pos) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
     {Δ₀}   : List Set
@@ -198,12 +204,17 @@ record HotSim (Amb : PMap) (c : Maybe Pos) {X : Set} (d : Den X) (d′ : Den (AI
     c₀     : Maybe Pos
     isP    : d ≡ hot (Proper (enter src at))
     isE    : d′ ≡ hot (Proper (enter (approx m (annotate core) env₀) at′))
+    law    : Lawful (Proper (enter src at))
+    law′   : Lawful (Proper (enter (approx m (annotate core) env₀) at′))
     within : Within c c₀
-    sim    : Sim AShows AShown Amb c₀ (enter src at) (enter (approx m (annotate core) env₀) at′)
+    sim    : Sim AShows AShown Amb c₀ (Proper (enter src at)) (Proper (enter (approx m (annotate core) env₀) at′))
     joins  : Joins Amb Amb (Proper (enter src at)) (Sim.Img sim)
 
   rows : EmissionSet X
   rows = Proper (enter src at)
+
+  rows′ : EmissionSet (AIE X)
+  rows′ = Proper (enter (approx m (annotate core) env₀) at′)
 
   car : Pos → Pos → Set
   car = Sim.Img sim
@@ -222,10 +233,13 @@ Apart []ᴬ              = ⊤
 Apart (hot t ∷ᴬ ρ)    = (∀ {q e} → t q e → Hots ρ q → ⊥) × Apart ρ
 Apart (coldAt _ ∷ᴬ ρ) = Apart ρ
 
--- The bound is the ambient's, or a row of the run.
-BoundOk : ∀ {A} → PMap → EmissionSet A → Maybe Pos → Set
-BoundOk     Amb T nothing  = ⊤
-BoundOk {A} Amb T (just c) = Σ Pos (Amb c) ⊎ Σ (Ev A) (T c)
+-- THE BOUND IS A VALUE OR END of the run, or an ambient point whose
+-- image leads no elaborated hot row: everything under the image is up to
+-- the bound, so an image over a hot's rows would bound none of a
+-- reader's rows by the plain bound.
+BoundOk : ∀ {A} → (Pos → Set) → PMap → EmissionSet A → Maybe Pos → Set
+BoundOk     H′ Amb T nothing  = ⊤
+BoundOk {A} H′ Amb T (just c) = (Σ Pos λ y → Amb c y × (∀ {h} → H′ h → y ⊑ h → ⊥)) ⊎ Σ (Ev A) λ e → Carried e × T c e
 
 -- SIMULATED under every environment of simulated hots, at every
 -- subscription pair the ambient map holds alone in its worlds, up to
@@ -238,7 +252,7 @@ record SimIH (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
   field
     sims : ∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) (c : Maybe Pos) → GoodEnv env → GoodEnv env′ → Apart env
          → (es : EnvSim ρ Amb c env env′) → Emb Amb
-         → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′
-         → ListedB (enter (approx n o env) p) c → BoundOk Amb (enter (approx n o env) p) c
+         → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
+         → ListedB (enter (approx n o env) p) c → BoundOk (Hots env′) Amb (enter (approx n o env) p) c
          → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
            × EnvJoins ρ env env′ es M × Sim Shows Shown (Amb ∪ᴹ M) c (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)
