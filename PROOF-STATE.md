@@ -37,12 +37,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Untried: the elaborated joiner decides as the plain one. Each running
 value is paired with the value its carrier reads, and back; a lane is cut where its
 partner is; its end is joined and handed off where its partner's is, and
-the outer's end where its partner's is. Open: switch's cut
+the outer's end where its partner's is. Open: switch's forward cut
 and exhaust's run read the outer against lane ends across the two maps;
 bounded's run and hand-off read the queue; every op's done reads all
 lanes' ends. Settled when each holds, or a refutation names the op.
 
-Members: `switch-cut`, `switch-cut¬¬`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `paired⁻`, `ends⁻`.
+Members: `switch-cut¬¬`, `exhaust-runs`, `bounded-runs`, `bounded-hand`, `bounded-hand-to`, `bounded-hand¬¬`, `pair-done`, `pair-done¬¬`, `end-done`, `end-done¬¬`, `outer-ends`, `paired⁻`, `ends⁻`.
 
 #### THE JOINED LANES
 
