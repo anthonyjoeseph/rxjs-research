@@ -32,18 +32,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE SIMULATION
+
+Untried: the elaborated run simulates the plain run, exactly and both
+ways, along one order embedding of anchors, every elaborated row owned
+by the subscription, a plain row or an environment row, finitely many
+each. Riskiest: flatMap's bookkeeping (the scan's marks, the trackers'
+reads of the environment), the joiners' decisions read across the map,
+and pins. Settled when `sim-root` is a body over per-former simulations.
+
+Members: `sim-root`.
+
 #### THE CONSUMPTION
 
-Untried: the elaborated program reads exactly the cold values its plain
-program reads, plus its own shallow leaves (a minted name, the subscribed
-mark): deep cuts with one plain table have one elaborated table; back
-from any table image; placing each image and late row. Every read is
-decided by values and cross-stream order (a take's failure, a switch's
-next outer value, an exhaust's busy lane, a concat's hand-off), so no
-count over one program settles it. Settled when each member is a body
-over the per-operator correspondence `tables` asserts.
+Untried: a table image of a plain row agreed with is the approximant's,
+with few rows before it; a late placement too; and agreement crosses
+back from the elaborated side. Settled when each member is a body over
+`sim-root`'s simulation and the tables.
 
-Members: `stableA`, `img-row`, `img-few`, `put-row`, `causal←`.
+Members: `img-row`, `img-few`, `put-row`, `causal←`.
 
 #### THE TABLES
 
