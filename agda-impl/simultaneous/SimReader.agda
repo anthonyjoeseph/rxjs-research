@@ -9,7 +9,8 @@
 -- subscription's image (`Map.Mr`).
 module simultaneous.SimReader where
 
-open import Data.List using (List; []; [_]; length)
+open import Data.Empty using (⊥-elim)
+open import Data.List using (List; []; _∷_; [_]; _++_; length)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
@@ -18,17 +19,18 @@ open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷�
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (pred)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (connected; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; sub; ix; last)
+open import denotation.Position using (Pos; Label; Path; root; _≟ᵖ_; _⊕_; sub; ix; last)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; Unpinned; Few; EmissionSet; Den; hot; coldAt; Proper; Truncate; Rejoin;
   shown; heard; ended; late; _≺_; _≼_; enter; module Scan; module Op; DenEnv)
-open import denotation.Laws.Modulus using (≺-ext; ≼-refl; ≼-≺-≺; ≺→≼; entered-few)
-open import denotation.Laws.Worlds using (Hots; Lawful; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊕-injˡ; ⊕-injʳ)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-ext; ≼-refl; ≼-≺-≺; ≺→≼; entered-few)
+open import denotation.Laws.Worlds using (Hots; Lawful; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc; ⊑-snoc⁺; ⊕-injˡ; ⊕-injʳ; ⊕-cancelˡ; ⊕-assoc;
+  ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import adequacy.SubOne using (dep-un)
 open import adequacy.SubJoin using (Bind; rejoin-reach)
@@ -51,6 +53,29 @@ hots-at (hot _ ∷ᴬ _)    (here refl) refl x = inj₁ (_ , x)
 hots-at (coldAt _ ∷ᴬ _) (here refl) ()   _
 hots-at (hot _ ∷ᴬ env)    (there i) eq   x = inj₂ (hots-at env i eq x)
 hots-at (coldAt _ ∷ᴬ env) (there i) eq   x = hots-at env i eq x
+
+-- NO POSITION HOLDS ROWS OF TWO HOTS: two bound hots with a row at one
+-- position are one.
+same-hot : ∀ {Γ} (env : DenEnv Γ) → Apart env → ∀ {X X′} (i : X ∈ Γ) (i′ : X′ ∈ Γ) {t : EmissionSet X} {t′ : EmissionSet X′}
+         → lookup env i ≡ hot t → lookup env i′ ≡ hot t′ → ∀ {q e e′} → t q e → t′ q e′ → _≡_ {A = Σ Set (_∈ Γ)} (X , i) (X′ , i′)
+same-hot (hot _ ∷ᴬ _)      _        (here refl) (here refl) _    _    _ _  = refl
+same-hot (coldAt _ ∷ᴬ _)   _        (here refl) _           ()   _    _ _
+same-hot (coldAt _ ∷ᴬ _)   _        _           (here refl) _    ()   _ _
+same-hot (hot _ ∷ᴬ env)    (ap , _) (here refl) (there i′)  refl eq′  x x′ = ⊥-elim (ap x (hots-at env i′ eq′ x′))
+same-hot (hot _ ∷ᴬ env)    (ap , _) (there i)   (here refl) eq   refl x x′ = ⊥-elim (ap x′ (hots-at env i eq x))
+same-hot (hot _ ∷ᴬ env)    (_ , ap) (there i)   (there i′)  eq   eq′  x x′ with same-hot env ap i i′ eq eq′ x x′
+... | refl = refl
+same-hot (coldAt _ ∷ᴬ env) ap       (there i)   (there i′)  eq   eq′  x x′ with same-hot env ap i i′ eq eq′ x x′
+... | refl = refl
+
+-- A position under a row joined: the join itself, or under the row.
+join-split : ∀ {k q a₀ a σ} → k ⊕ [ a₀ ] ≡ q ⊕ (a ∷ σ) → (k ≡ q × a ≡ a₀) ⊎ Σ Label λ b → Σ Path λ τ → k ≡ q ⊕ (b ∷ τ) × a ≡ b
+join-split {k} {q} {a₀} {a} {σ} e with ⊑-snoc k {a₀} (a ∷ σ , e)
+... | inj₂ e′ = ⊥-elim (≺-irrefl {q} (subst (q ≺_) (sym (trans e′ e)) (≺-ext q {a} σ)))
+... | inj₁ ([] , refl) with ⊕-cancelˡ q [ a₀ ] (a ∷ σ) (trans (sym (⊕-assoc q [] [ a₀ ])) e)
+...   | refl = inj₁ (⊕-identityʳ q , refl)
+join-split {k} {q} {a₀} {a} {σ} e | inj₁ ((b ∷ τ) , refl) with ⊕-cancelˡ q ((b ∷ τ) ++ [ a₀ ]) (a ∷ σ) (trans (sym (⊕-assoc q (b ∷ τ) [ a₀ ])) e)
+... | refl = inj₂ (b , τ , refl , refl)
 
 ------------------------------------------------------------------------
 -- A reading, plain and elaborated
@@ -207,7 +232,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   hS = hots-at env i isP
   hG = hots-at env′ (ρ (∈-map⁺ AIE i)) isE
 
-  open Map Amb (Hots env) (Hots env′) rows rows′ sim joins law law′ fewG hS hG em p p′ pp fr nh using (Mr; local; emb; none-under)
+  open Map Amb (Hots env) (Hots env′) rows rows′ sim joins law law′ fewG hS hG em p p′ pp fr nh using (Mr; mrow; mlate; local; emb; none-under)
   module RD = Read Amb (Hots env) (Hots env′) rows rows′ sim joins law law′ fewS fewG hS hG em p p′ pp fr nh c within
 
   z₀ = Rows.z₀ rows′ p′ law′ fewG
@@ -218,8 +243,19 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
       × EnvJoins ρ env env′ es M
       × Sim Shows Shown (Amb ∪ᴹ M) c (enter d p) (enter (Op.flatMap (mergeᶠ nothing) (λ s → Op.of (proj₂ s)) (Op.scan joinStep z₀ d′)) p′)
 
-  postulate
-    reader-joins : EnvJoins ρ env env′ es Mr
+  -- THE READER KEEPS EVERY BOUND HOT'S JOINS: a point it puts under a
+  -- row is that row's join, or lies under an ambient point under it.
+  reader-joins : EnvJoins ρ env env′ es Mr
+  reader-joins i′ (mrow s _ _ car _ refl refl) q′ e with join-split e
+  ... | inj₁ (refl , refl) with same-hot env ap i i′ isP (HotSim.isP (es i′)) s q′
+  ...   | refl = p , refl , p′ , inj₁ pp , _ , car , ⊑-refl _
+  reader-joins i′ (mrow {L = L} s _ _ car _ refl refl) q′ e | inj₂ (b , τ , refl , refl) with Sim.ext sim car
+  ... | yk , ak , ykL with HotSim.joins (es i′) ak q′ refl
+  ...   | e₁ , refl , e₁′ , a₁ , L₁ , car₁ , h = e₁ , refl , e₁′ , inj₁ a₁ , L₁ , car₁ , ⊑-trans h (⊑-trans ykL (⊑-snoc⁺ L))
+  reader-joins i′ (mlate _ _ refl refl) q′ e with join-split e
+  ... | inj₁ (refl , refl) = ⊥-elim (nh (hots-at env i′ (HotSim.isP (es i′)) q′))
+  ... | inj₂ (b , τ , pe , refl) with HotSim.joins (es i′) pp q′ pe
+  ...   | e₁ , refl , e₁′ , a₁ , L₁ , car₁ , h = e₁ , refl , e₁′ , inj₁ a₁ , L₁ , car₁ , ⊑-trans h (⊑-snoc⁺ p′)
 
   core : Goal (hot rows) (hot rows′)
   core _ B = Mr , local , emb , none-under , reader-joins , RD.sim B
