@@ -8,17 +8,20 @@
 -- tables at one cut correspond along a map of positions (`Tables`).
 -- What crosses from a table back to the approximant is placement, not
 -- agreement: a cut agreeing with the plain run up to a row need not
--- agree with the elaborated run up to its image, since a cold value the
--- plain run leaves silent still marks the elaborated one; so each table
--- row placed for an agreed plain row is itself the approximant's
--- (`img-row`, `put-row`), and agreement crosses back only from the
--- elaborated side, which hears every value the plain side does.
+-- agree with the elaborated run up to its image, since the elaboration
+-- reads cold leaves of its own (a minted name, the subscribed mark) that
+-- a shallow cut truncates; so each table row placed for an agreed plain
+-- row is itself the approximant's (`img-row`, `put-row`), agreement
+-- crosses back only from the elaborated side (`causal←`), and forward
+-- only for a whole plain run, cut deeper than those leaves
+-- (`whole-ahead`).
 module simultaneous.TableErasure where
 
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; length) renaming (map to mapL)
+open import Data.List using (List; []; _∷_; _++_; length) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (just)
@@ -115,7 +118,7 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   (img-few : ∀ {N k e e′} → AgreeTo k t (c N) → Rows (L N) k e → Unpinned e → Rows (L* N) (φ k) e′ → Few u (φ k))
   (causal← : ∀ {N k e} → Rows (L N) k e → Unpinned e → AgreeTo (φ k) u (d N) → AgreeTo k t (c N))
   (put-row : ∀ {N k l e′} → AgreeTo k t (c N) → Rows (L* N) l e′ → Put k l → u l e′)
-  (rest : ∀ {k} → Few t k → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → φ k ≺ r → r ∈ ls)
+  (whole-ahead : ∀ {N} (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → suc (suc (suc (length ks))) ≤ N → (∀ {c} → t c end → ⊥) → ∀ q → AgreeTo q u (d N))
   where
   module RP = Rowed t c L ex
   module RQ = Rowed u d L* ex*
@@ -218,6 +221,29 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   pinned : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB root k
   pinned {k} x _ fw = let ag = cutP fw {bP fw} ≤-refl′ in into ag (Tables.pin→ (T (bP fw)) (RP.to-row ag (≼-refl {k}) x))
 
+  -- Past a row, a plain run with finitely many rows and no end is all
+  -- listed, so one cut agrees with it everywhere, and with the elaborated
+  -- run too: every elaborated row is its table's.
+  rest : ∀ {k} → Few t k → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → φ k ≺ r → r ∈ ls
+  rest {k} (ks₁ , f₁) (ks₂ , f₂) ne =
+    mapL proj₁ (rows (L* N)) , λ {r} {e} y _ → ∈-map⁺ proj₁ (complete (ex* N) (proj₁ (upto (ag r) (≼-refl {r})) y))
+    where
+    ks : List Pos
+    ks = k ∷ ks₁ ++ ks₂
+
+    N : ℕ
+    N = suc (suc (suc (length ks)))
+
+    every : ∀ {k′ e} → t k′ e → k′ ∈ ks
+    every {k′} x with ≼-or-≻ k′ k
+    ... | inj₂ kk = there (∈-++⁺ʳ ks₁ (proj₁ (f₂ x kk)))
+    ... | inj₁ kk with ≼-split {k′} {k} kk
+    ...   | inj₁ lt = there (∈-++⁺ˡ (f₁ x lt))
+    ...   | inj₂ refl = here refl
+
+    ag : ∀ q → AgreeTo q u (d N)
+    ag = whole-ahead ks every ≤-refl′ ne
+
   erasing : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
   erasing = record
     { Img = Img ; PB = PB ; pb-few = λ {l} _ → pb-few l
@@ -288,13 +314,15 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
     causal← : ∀ {N k e} → Rows (CP.L N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c N) → AgreeTo k t (CP.c N)
     -- A late placement found in a table is a row of the approximant.
     put-row : ∀ {N k l e′} → AgreeTo k t (CP.c N) → Rows (CQ.L N) l e′ → proj₁ (proj₂ tables) k l → u l e′
-    -- Past a row, a plain run with finitely many rows and no end leaves
-    -- finitely many elaborated rows past the row's image.
-    rest : ∀ {k} → Few t k → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → φ k ≺ r → r ∈ ls
+    -- A plain run with finitely many rows and no end consumes no cold
+    -- value past its row count, so a cut deeper than that, and than the
+    -- elaboration's own leaves (a minted name, the subscribed mark: three
+    -- rows each), agrees with the elaborated run everywhere.
+    whole-ahead : ∀ {N} (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → suc (suc (suc (length ks))) ≤ N → (∀ {c} → t c end → ⊥) → ∀ q → AgreeTo q u (CQ.c N)
 
   erasingᵀ : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
   erasingᵀ = Erase.erasing t u CP.c CQ.c CP.L CQ.L CP.ex CQ.ex
     (λ {q} → CP.bound {q}) (λ {q} fw {N} → CP.cut-at {q} fw {N}) (λ {q} → CQ.bound {q}) (λ {q} fw {N} → CQ.cut-at {q} fw {N})
     φ (proj₁ (proj₂ tables)) (proj₁ (proj₂ (proj₂ tables)))
     (proj₁ (proj₂ (proj₂ (proj₂ tables)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ tables))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ tables)))))
-    (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′}) (λ {k} → rest {k})
+    (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′}) (λ {N} → whole-ahead {N})
