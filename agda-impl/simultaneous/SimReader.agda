@@ -86,7 +86,7 @@ module Read {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G
             (fewS : ∀ {q e} → S q e → Unpinned e → Few S q) (fewG : ∀ {q e} → G q e → Unpinned e → Few G q)
             (hS : ∀ {q e} → S q e → H q) (hG : ∀ {q e} → G q e → H′ q)
             (em : Emb Amb) (p p′ : Pos) (pp : Amb p p′) (fr : Fresh H H′ Amb p p′) (nh : ¬ H p)
-            (c : Maybe Pos) (within : Within c c₀) (B : BoundOk H′ Amb (Truncate (Rejoin p S)) c) where
+            (c : Maybe Pos) (within : Within c c₀) (B : BoundOk H′ Amb p (Truncate (Rejoin p S)) c) where
 
   open Map Amb H H′ S G hs joins lawS lawG fewG hS hG em p p′ pp fr nh
   open Rows G p′ lawG fewG
@@ -155,7 +155,7 @@ module Read {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G
   ext (ilate sq qp refl refl)               = p′ ⊕ [ last ] , inj₂ (mlate sq qp refl refl) , ⊑-refl _
 
   -- The bound's image: ambient, or a plain value's or end's.
-  bound : ∀ c′ → Within c′ c₀ → BoundOk H′ Amb T c′ → Mapped M c′
+  bound : ∀ c′ → Within c′ c₀ → BoundOk H′ Amb p T c′ → Mapped M c′
   bound nothing   _  _                  = _
   bound (just _) _ (inj₁ (y , a , _)) = y , inj₁ a
   bound (just _) cc (inj₂ (_ , c-out , (shown {q} s _ pk , _))) with fwd₀ s c-out (up₀ _ c₀ cc (≼-refl {q ⊕ [ sub p ]}) (≺-ext q {sub p} []))
@@ -238,7 +238,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   z₀ = Rows.z₀ rows′ p′ law′ fewG
 
   Goal : Den A → Den (AIE A) → Set₁
-  Goal d d′ = ListedB (enter d p) c → BoundOk (Hots env′) Amb (enter d p) c
+  Goal d d′ = ListedB (enter d p) c → BoundOk (Hots env′) Amb p (enter d p) c
     → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter d p)
       × EnvJoins ρ env env′ es M
       × Sim Shows Shown (Amb ∪ᴹ M) c (enter d p) (enter (Op.flatMap (mergeᶠ nothing) (λ s → Op.of (proj₂ s)) (Op.scan joinStep z₀ d′)) p′)

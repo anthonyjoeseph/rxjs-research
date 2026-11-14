@@ -74,7 +74,7 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
   listed : ∀ {c} → ListedB T c → ListedB t₀ c
   listed (ks , cov , back) = ks , (λ x u → cov (proj₂ (up x)) u) , λ m → down (proj₂ (back m))
 
-  bound : ∀ {H′ Amb c} → BoundOk H′ Amb T c → BoundOk H′ Amb t₀ c
+  bound : ∀ {H′ Amb c} → BoundOk H′ Amb p T c → BoundOk H′ Amb p t₀ c
   bound {c = nothing} _                                 = tt
   bound {c = just _}  (inj₁ a)                          = inj₁ a
   bound {c = just _}  (inj₂ (_ , c-out , map-out x , _)) = inj₂ (_ , c-out , x)

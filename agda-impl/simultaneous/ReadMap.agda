@@ -402,13 +402,13 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
   LateCar : Maybe Pos → Set
   LateCar c = ∀ {q} → S q end → q ≼ p → Upto c (p ⊕ [ last ]) → Σ Pos λ E → Car q E × G E end
 
-  under-row : ∀ c c₀′ → Within c c₀′ → Mapped Amb c₀′ → BoundOk H′ Amb (Truncate (Rejoin p S)) c → LateCar c
+  under-row : ∀ c c₀′ → Within c c₀′ → Mapped Amb c₀′ → BoundOk H′ Amb p (Truncate (Rejoin p S)) c → LateCar c
             → ∀ {l₀ e₀ m} → G l₀ e₀ → p′ ≺ l₀ → (l₀ ⊕ [ sub p′ ]) ⊑ m → Under (Amb ∪ᴹ Mr) c m → Under Amb c₀′ l₀
   under-row nothing   nothing    _  _ _ _ _ _ _ _ = tt
   under-row nothing   (just _)   () _ _ _ _ _ _ _
   under-row (just _)  nothing    _  _ _ _ _ _ _ _ = tt
   under-row (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₂ (_ , _ , r , _)) lc g pl am (y , inj₁ a , u) = ⊥-elim (amb-t a r)
-  under-row (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₁ (y′ , a′ , nl)) lc {l₀} g pl am (y , inj₁ a , u) with a-fun a a′
+  under-row (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₁ (y′ , a′ , nl , _)) lc {l₀} g pl am (y , inj₁ a , u) with a-fun a a′
   ... | refl = y₀ , a₀ , inj₁ (amb-bound {z = l₀} a a₀ cc (row-bound g am nl u))
   under-row (just c₁) (just c₀₁) cc (y₀ , a₀) B lc {l₀} g pl (σ , refl) (y , inj₂ (mrow {q} {L = L} s _ pk car gL refl refl) , u) =
     y₀ , a₀ , pick u
@@ -430,13 +430,13 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
   under-row (just c₁) (just c₀₁) cc (y₀ , a₀) B lc {l₀} g pl am (y , inj₂ (mlate sc cp refl refl) , u) with lc sc cp (≼-refl {p ⊕ [ last ]})
   ... | E , carE , gE = ⊥-elim (≺-irrefl {p′} (≺-≼-≺ {p′} {l₀} {p′} pl (≼-trans {l₀} {E} {p′} (Lawful.proper lawG gE g) (≺→≼ {E} {p′} (late-car sc cp carE)))))
 
-  under-late : ∀ c c₀′ → Within c c₀′ → Mapped Amb c₀′ → BoundOk H′ Amb (Truncate (Rejoin p S)) c → LateCar c
+  under-late : ∀ c c₀′ → Within c c₀′ → Mapped Amb c₀′ → BoundOk H′ Amb p (Truncate (Rejoin p S)) c → LateCar c
              → ∀ {c₂} → G c₂ end → c₂ ≼ p′ → Under (Amb ∪ᴹ Mr) c (p′ ⊕ [ last ]) → Under Amb c₀′ c₂
   under-late nothing   nothing    _  _ _ _ _ _ _ = tt
   under-late nothing   (just _)   () _ _ _ _ _ _
   under-late (just _)  nothing    _  _ _ _ _ _ _ = tt
   under-late (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₂ (_ , _ , r , _)) lc g cp (y , inj₁ a , u) = ⊥-elim (amb-t a r)
-  under-late (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₁ (y′ , a′ , nl)) lc {c₂} g cp (y , inj₁ a , u) with a-fun a a′
+  under-late (just c₁) (just c₀₁) cc (y₀ , a₀) (inj₁ (y′ , a′ , nl , _)) lc {c₂} g cp (y , inj₁ a , u) with a-fun a a′
   ... | refl = y₀ , a₀ , inj₁ (amb-bound {z = c₂} a a₀ cc (late-bound g cp nl u))
   under-late (just c₁) (just c₀₁) cc (y₀ , a₀) B lc {c₂} g cp (y , inj₂ (mrow {L = L} s _ pk car gL refl refl) , u) =
     ⊥-elim (≺-irrefl {p′} (≺-≼-≺ {p′} {L} {p′} (past-sup pk car) (≼-trans {L} {c₂} {p′} (Lawful.proper lawG g gL) cp)))

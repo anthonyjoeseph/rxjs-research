@@ -234,12 +234,13 @@ Apart (hot t ∷ᴬ ρ)    = (∀ {q e} → t q e → Hots ρ q → ⊥) × Apar
 Apart (coldAt _ ∷ᴬ ρ) = Apart ρ
 
 -- THE BOUND IS A VALUE OR END of the run, or an ambient point whose
--- image leads no elaborated hot row: everything under the image is up to
--- the bound, so an image over a hot's rows would bound none of a
--- reader's rows by the plain bound.
-BoundOk : ∀ {A} → (Pos → Set) → PMap → EmissionSet A → Maybe Pos → Set
-BoundOk     H′ Amb T nothing  = ⊤
-BoundOk {A} H′ Amb T (just c) = (Σ Pos λ y → Amb c y × (∀ {h} → H′ h → y ⊑ h → ⊥)) ⊎ Σ (Ev A) λ e → Carried e × T c e
+-- image leads no elaborated hot row and which leads no subscription at
+-- `p`: everything under the image is up to the bound, so an image over a
+-- hot's rows, or over the run's own, would bound none of them by the
+-- plain bound.
+BoundOk : ∀ {A} → (Pos → Set) → PMap → Pos → EmissionSet A → Maybe Pos → Set
+BoundOk     H′ Amb p T nothing  = ⊤
+BoundOk {A} H′ Amb p T (just c) = (Σ Pos λ y → Amb c y × (∀ {h} → H′ h → y ⊑ h → ⊥) × ¬ (c ⊑ p)) ⊎ Σ (Ev A) λ e → Carried e × T c e
 
 -- SIMULATED under every environment of simulated hots, at every
 -- subscription pair the ambient map holds alone in its worlds, up to
@@ -253,6 +254,6 @@ record SimIH (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
     sims : ∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) (c : Maybe Pos) → GoodEnv env → GoodEnv env′ → Apart env
          → (es : EnvSim ρ Amb c env env′) → Emb Amb
          → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
-         → ListedB (enter (approx n o env) p) c → BoundOk (Hots env′) Amb (enter (approx n o env) p) c
+         → ListedB (enter (approx n o env) p) c → BoundOk (Hots env′) Amb p (enter (approx n o env) p) c
          → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
            × EnvJoins ρ env env′ es M × Sim Shows Shown (Amb ∪ᴹ M) c (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)
