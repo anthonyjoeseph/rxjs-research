@@ -13,11 +13,12 @@ open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Bool.Properties using (T?)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
-open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Nullary using (¬_; Dec; yes; no)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; sub; last)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; _<ᵖ_; sub; last)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (end; Unpinned; Few; EmissionSet; Truncate; Rejoin; shown; heard; ended; late; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-antisym; ≺-≼-≺; ≼-≺-≺; ≼-split; ≼-or-≻; ≺-ext)
@@ -52,6 +53,27 @@ below-up (w , ww , wx) xy = w , ww , ⊑-trans wx xy
 
 below-at : ∀ {K : Pos → Set} {r x} → r ⊑ x → Below K r x
 below-at h = _ , w-here , h
+
+------------------------------------------------------------------------
+-- Bounds
+
+-- A row before one up to a bound within another: up to the other.
+up₀ : ∀ c c₀ {k q} → Within c c₀ → Upto c k → q ≺ k → Upto c₀ q
+up₀ _        nothing    _  _  _  = tt
+up₀ nothing  (just _)   () _  _
+up₀ (just c) (just c₀) {k} {q} cc kc qk = ≺→≼ {q} {c₀} (≺-≼-≺ {q} {k} {c₀} qk (≼-trans {k} {c} {c₀} kc cc))
+
+-- Under a mapped bound's image: decided, and closed downward.
+under? : ∀ {Amb : PMap} → (∀ {x y y′} → Amb x y → Amb x y′ → y ≡ y′) → ∀ c₀ → Mapped Amb c₀ → ∀ l → Dec (Under Amb c₀ l)
+under? fu nothing   _         l = yes tt
+under? fu (just c₀) (y₀ , a₀) l with T? (l <ᵖ y₀) | ⊑? y₀ l
+... | yes ly | _      = yes (y₀ , a₀ , inj₁ ly)
+... | no _   | yes yl = yes (y₀ , a₀ , inj₂ yl)
+... | no nly | no nyl = no λ (y , a , u) → [ nly , nyl ]′ (subst (λ z → l ≺ z ⊎ z ⊑ l) (fu a a₀) u)
+
+under-down : ∀ {Amb : PMap} c₀ {l l′} → l′ ≺ l → Under Amb c₀ l → Under Amb c₀ l′
+under-down nothing  _  _ = tt
+under-down (just _) {l} {l′} ll (y , a , u) = y , a , upto-down {y} {l} {l′} ll u
 
 ------------------------------------------------------------------------
 -- The map
@@ -138,6 +160,11 @@ module Map {X : Set} (Amb : PMap) (H H′ : Pos → Set) (S : EmissionSet X) (G 
   late-car {c} sc cp car with ≼-split {c} {p} cp
   ... | inj₁ lt   = car-before sc car pp lt
   ... | inj₂ refl = ⊥-elim (nh (hS sc))
+
+  -- A carrier of a row up to the bound: under the bound's image.
+  car-ug : ∀ c₀′ → Mapped Amb c₀′ → ∀ {q e L} → S q e → Car q L → Upto c₀′ q → Under Amb c₀′ L
+  car-ug nothing    _         _ _ _ = tt
+  car-ug (just c₀₁) (y₀ , a₀) s car qc = y₀ , a₀ , car-under s car a₀ qc
 
   -- Carriers keep the order of their rows.
   car-mono : ∀ {q q′ L L′ e e′} → S q e → S q′ e′ → Car q L → Car q′ L′ → q ≺ q′ → L ≺ L′
