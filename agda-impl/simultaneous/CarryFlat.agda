@@ -477,17 +477,15 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- THE ELABORATED JOINER DECIDES AS THE PLAIN ONE: each running
         -- value paired, a lane cut where its partner is, its end joined
         -- and handed off where its partner's is.
-        -- A bounded or exhaust value runs where its partner does.
-        -- DEAD ROUTE: forward along the queue with no environment listing.
-        --   The elaborated index chain needs every earlier value's partner,
-        --   read only through the outer's carry: `img` asks the outer and its
-        --   environment listed at that value, `img¬¬` gives it classically.
-        --   Listing the outer from few rows alone is the outright route
-        --   `CarryAt` records dead: an environment hot can hide an
-        --   accumulation from the outer.
-        bounded-runs : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
+        -- A bounded or exhaust value runs where its partner does, under
+        -- its environment's listing: every earlier value's partner, and
+        -- every earlier lane's end, is read through a carry, which images
+        -- a row only from its listing, the environment's included; listed
+        -- from few rows alone, an environment hot could hide an
+        -- accumulation from the outer (`CarryAt`).
+        bounded-runs : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q → HotsListed envP q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
-        exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
+        exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q → HotsListed envP q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         -- A lane's end is joined where its partner's is: forward from the
         -- plain run listed, back held classically.
@@ -553,7 +551,7 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
       pair-all : ∀ {q a} → o q (out a) → P.Runs op q → Listed o q → HotsListed envP q → Σ Pos (V q a)
       pair-all x r ls lp =
         let (l , i , x*) = OR.read-val x ls lp
-        in _ , x , r , x* , runs-by g o lE o* op (λ m e → bounded-runs m e x i) (λ e → exhaust-runs e x i) r , l , i , refl
+        in _ , x , r , x* , runs-by g o lE o* op (λ m e r′ → bounded-runs m e x i r′ lp) (λ e r′ → exhaust-runs e x i r′ lp) r , l , i , refl
 
       -- No lane row lies over a value.
       off-value : ∀ {q a q*} (v : V q a q*) {k l q′ a′} → LI v k l → o q′ (out a′) → k ⊑ q′ → ⊥
