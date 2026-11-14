@@ -18,7 +18,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂; cong)
 open import Relation.Nullary using (¬_; Dec; yes; no)
@@ -28,9 +28,9 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; _<ᵖ_; sub; 
 open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; Unpinned; EmissionSet; Den; Few; Reach; Truncate;
   Rejoin; shown; heard; ended; late; InE; LaneOf; _≺_; _≼_; module Scan; module Merge; module Op)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-≼-≺; ≼-antisym; ≼-split; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺-trans; ≺→≼; ≼-refl; ≼-trans; ≼-≺-≺; ≺-≼-≺; ≼-antisym; ≼-split; ≺-ext; ≼-or-≻)
 open import denotation.Laws.Worlds using (Lawful; _⊑_; ⊕-injˡ; ⊕-injʳ; ⊑-≼; ⊕-assoc; ⊕-identityʳ; ⊑-cmp; ⊑-snoc; ⊑-refl; ⊑-trans)
-open import denotation.Laws.Worlds.Leaves using (module AccF; of-idx; of-row; of-in; of-reach; of-end-row; ine-pin)
+open import denotation.Laws.Worlds.Leaves using (module AccF; of-idx; of-row; of-rows; of-in; of-reach; of-end-row; ine-pin)
 open import adequacy.SubOne using (scan-reach)
 open import simultaneous.SimPos using (apart)
 open import simultaneous.ReadLane using (Marks; step-just; step-nothing; of-marks; of-last⁻; of-last; of-skip)
@@ -60,6 +60,8 @@ module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
 
   U : EmissionSet (IE X)
   U = Truncate J
+
+  module JM = Merge F O
 
   BG : Bind G
   BG = record { law = lawG ; few = fewG }
@@ -304,3 +306,225 @@ module Rows {X : Set} (G : EmissionSet (AIE X)) (p′ : Pos) (lawG : Lawful G)
       none : ∀ {q s} → O q (out s) → Σ Pos λ c₀ → LaneOf F q s c₀ end × c₀ ≼ (p′ ⊕ [ last ])
       none x with ov x
       ... | ov-val _ g′ pl′ refl _ _ = ⊥-elim (late-none g cp g′ pl′)
+
+  ----------------------------------------------------------------------
+  -- THE ROWS LISTED: where the rows of `G` in a decided, downward-closed
+  -- `UG` are listed with their rows, the reader's rows over them are
+  -- listed too, each with its row and its reach.
+
+  module Listed (UG : Pos → Set) (ug? : ∀ l → Dec (UG l)) (down : ∀ {l l′} → l′ ≺ l → UG l → UG l′)
+                (ls : List Pos) (cov : ∀ {l e} → G l e → UG l → l ∈ ls) (back : ∀ {l} → l ∈ ls → Σ (Ev (AIE X)) (G l)) where
+
+    down≼ : ∀ {l l′} → l′ ≼ l → UG l → UG l′
+    down≼ {l} {l′} h u with ≼-split {l′} {l} h
+    ... | inj₁ lt   = down lt u
+    ... | inj₂ refl = u
+
+    few-ug : ∀ {l} → UG l → Few G l
+    few-ug u = ls , λ g lt → cov g (down lt u)
+
+    Live : Pos → Set
+    Live l = UG l × p′ ≺ l
+
+    live? : ∀ l → Dec (Live l)
+    live? l = ug? l ×-dec T? (p′ <ᵖ l)
+
+    -- The joined rows a fold reads.
+    ksR : List Pos
+    ksR = L.map at (filter live? ls)
+
+    rowsR : ∀ {k} → k ∈ ksR → Σ (Ev (AIE X)) (R k)
+    rowsR i with ∈-map⁻ at i
+    ... | l , il , refl with ∈-filter⁻ live? {xs = ls} il
+    ...   | ils , (u , pl) = r-row (proj₂ (back ils)) pl (few-ug u)
+
+    covR : ∀ {l e₀} → G l e₀ → Live l → ∀ {k e} → R k e → k ≺ at l → k ∈ ksR
+    covR g (u , pl) y lt with rv (proj₁ y)
+    ... | rv-row g′ pl′ refl _ = let u′ = down (at-lower g g′ lt) u in ∈-map⁺ at (∈-filter⁺ live? (cov g′ u′) (u′ , pl′))
+    ... | rv-late gc cp refl _ = ⊥-elim (late-none gc cp g pl)
+
+    -- A joined value's fold, constructed.
+    acc : ∀ {l x} → G l (out x) → Live l → Σ (Bool × List (IE X)) (Scan.Acc joinStep z₀ R (at l))
+    acc g lv = foldᵈ joinStep z₀ R r-func ksR rowsR (covR g lv) (r-out g (proj₂ lv))
+
+    -- The reader's rows over one listed row.
+    gen : ∀ l → Σ (Ev (AIE X)) (G l) → Live l → List Pos
+    gen l (out x , g) lv = (at l ⊕ [ ix 0 ]) ∷ of-rows (at l ⊕ [ ix 1 ]) 0 (proj₂ (proj₁ (acc g lv)))
+    gen l (skip , _)  _  = [ at l ]
+    gen l (pin _ , _) _  = [ at l ]
+    gen l (end , _)   _  = [ at l ]
+
+    Back : List Pos → Set
+    Back ks = ∀ {l} → l ∈ ks → Σ (Ev (AIE X)) (G l)
+
+    genAll : (ks : List Pos) → Back ks → List Pos
+    genAll []       b = []
+    genAll (l ∷ ks) b with live? l
+    ... | yes lv = gen l (b (here refl)) lv ++ genAll ks (λ i → b (there i))
+    ... | no _   = genAll ks (λ i → b (there i))
+
+    -- The late end, where a listed end lies at or before the subscription.
+    late? : ∀ l → Σ (Ev (AIE X)) (G l) → List Pos
+    late? l (out _ , _) = []
+    late? l (skip , _)  = []
+    late? l (pin _ , _) = []
+    late? l (end , _) with ug? l | T? (p′ <ᵖ l)
+    ... | yes _ | no _  = [ p′ ⊕ [ last ] ]
+    ... | yes _ | yes _ = []
+    ... | no _  | _     = []
+
+    lateAll : (ks : List Pos) → Back ks → List Pos
+    lateAll []       b = []
+    lateAll (l ∷ ks) b = late? l (b (here refl)) ++ lateAll ks (λ i → b (there i))
+
+    ksU : List Pos
+    ksU = genAll ls back ++ lateAll ls back
+
+    ----------------------------------------------------------------------
+    -- Listed
+
+    genAll-in : ∀ ks (b : Back ks) {l m} → l ∈ ks → Live l → (∀ r lv → m ∈ gen l r lv) → m ∈ genAll ks b
+    genAll-in (k ∷ ks) b (here refl) lv h with live? k
+    ... | yes lv′ = ∈-++⁺ˡ (h (b (here refl)) lv′)
+    ... | no nl   = ⊥-elim (nl lv)
+    genAll-in (k ∷ ks) b (there i) lv h with live? k
+    ... | yes lv′ = ∈-++⁺ʳ (gen k (b (here refl)) lv′) (genAll-in ks (λ j → b (there j)) i lv h)
+    ... | no _    = genAll-in ks (λ j → b (there j)) i lv h
+
+    late-np : ∀ {c} → c ≼ p′ → ¬ (p′ ≺ c)
+    late-np {c} cp h = ≺-irrefl {c} (≼-≺-≺ {c} {p′} {c} cp h)
+
+    late-has : ∀ {c} (r : Σ (Ev (AIE X)) (G c)) → G c end → UG c → ¬ (p′ ≺ c) → (p′ ⊕ [ last ]) ∈ late? c r
+    late-has {c} (e , g′) g u np with Lawful.func lawG g g′
+    ... | refl with ug? c | T? (p′ <ᵖ c)
+    ...   | yes _ | no _  = here refl
+    ...   | yes _ | yes h = ⊥-elim (np h)
+    ...   | no nu | _     = ⊥-elim (nu u)
+
+    lateAll-in : ∀ ks (b : Back ks) {c} → c ∈ ks → G c end → UG c → ¬ (p′ ≺ c) → (p′ ⊕ [ last ]) ∈ lateAll ks b
+    lateAll-in (k ∷ ks) b (here refl) g u np = ∈-++⁺ˡ (late-has (b (here refl)) g u np)
+    lateAll-in (k ∷ ks) b (there i)   g u np = ∈-++⁺ʳ (late? k (b (here refl))) (lateAll-in ks (λ j → b (there j)) i g u np)
+
+    -- Where a reader's row lies, within the bound.
+    data Good (m : Pos) : Set where
+      g-row  : ∀ {l e₀} → G l e₀ → p′ ≺ l → at l ⊑ m → UG l → Good m
+      g-late : ∀ {c} → G c end → c ≼ p′ → m ≡ p′ ⊕ [ last ] → UG c → Good m
+
+    good-before : ∀ {m y e} → J y e → y ≺ m → Good m → Good y
+    good-before y lt (g-row g pl a u) with origin y
+    ... | or-row g′ pl′ a′  = g-row g′ pl′ a′ (down≼ (origin-order g g′ a a′ lt) u)
+    ... | or-late gc cp _   = ⊥-elim (late-none gc cp g pl)
+    good-before y lt (g-late gc′ cp′ _ u) with origin y
+    ... | or-row g′ pl′ _   = ⊥-elim (late-none gc′ cp′ g′ pl′)
+    ... | or-late gc cp eq  = g-late gc cp eq (down≼ (Lawful.proper lawG gc′ gc) u)
+
+    ug-row : ∀ {l e₀ m} → G l e₀ → p′ ≺ l → at l ⊑ m → Good m → UG l
+    ug-row g pl a (g-row g′ _ a′ u) with at-unique g g′ a a′
+    ... | refl = u
+    ug-row g pl a (g-late _ _ refl _) = ⊥-elim (at-late pl a)
+
+    in-gen : ∀ {l e₀ m} → G l e₀ → Live l → (∀ r lv → m ∈ gen l r lv) → m ∈ ksU
+    in-gen g lv h = ∈-++⁺ˡ (genAll-in ls back (cov g (proj₁ lv)) lv h)
+
+    val-in : ∀ {l x} → G l (out x) → ∀ r lv → (at l ⊕ [ ix 0 ]) ∈ gen l r lv
+    val-in g (e , g′) lv with Lawful.func lawG g g′
+    ... | refl = here refl
+
+    lane-in : ∀ {l x s k} → G l (out x) → Scan.Acc joinStep z₀ R (at l) s → k ∈ of-rows (at l ⊕ [ ix 1 ]) 0 (proj₂ s)
+            → ∀ r lv → k ∈ gen l r lv
+    lane-in {l} {k = k} g a i (e , g′) lv with Lawful.func lawG g g′
+    ... | refl = there (subst (λ s′ → k ∈ of-rows (at l ⊕ [ ix 1 ]) 0 (proj₂ s′)) (acc-func refl a (proj₂ (acc g′ lv))) i)
+
+    at-in : ∀ {l e₀} → G l e₀ → (∀ {x} → e₀ ≡ out x → ⊥) → ∀ r lv → at l ∈ gen l r lv
+    at-in g nx (out x , g′) lv = ⊥-elim (nx (Lawful.func lawG g g′))
+    at-in g nx (skip , _)   lv = here refl
+    at-in g nx (pin _ , _)  lv = here refl
+    at-in g nx (end , _)    lv = here refl
+
+    late-cov : ∀ {c} → G c end → c ≼ p′ → Good (p′ ⊕ [ last ]) → (p′ ⊕ [ last ]) ∈ ksU
+    late-cov gc cp (g-row g pl a _)   = ⊥-elim (at-late pl a)
+    late-cov gc cp (g-late gc′ _ _ u) =
+      let u′ = down≼ (Lawful.proper lawG gc′ gc) u in ∈-++⁺ʳ (genAll ls back) (lateAll-in ls back (cov gc u′) gc u′ (late-np cp))
+
+    end-cov : ∀ {m} → O m end → Good m → m ∈ ksU
+    end-cov x gd with ov x
+    ... | ov-end g pl refl   = in-gen g (ug-row g pl (⊑-refl _) gd , pl) (at-in g (λ ()))
+    ... | ov-late gc cp refl = late-cov gc cp gd
+
+    lane-cov : ∀ {q s k e} → O q (out s) → LaneOf F q s k e → Good k → k ∈ ksU
+    lane-cov {s = s} x ln gd with ov x
+    ... | ov-val {l} _ g pl refl a _ =
+      in-gen g (ug-row g pl (⊑-trans ([ ix 1 ] , refl) (lane-at {at l} {s} ln)) gd , pl)
+        (lane-in g a (of-in (at l ⊕ [ ix 1 ]) 0 (proj₂ s) (proj₁ (proj₁ ln))))
+
+    -- EVERY READER ROW WITHIN THE BOUND IS LISTED.
+    covJ : ∀ {m e} → J m e → Good m → m ∈ ksU
+    covJ (Merge.val x) gd with ov x
+    ... | ov-val _ g pl refl _ _ = in-gen g (ug-row g pl ([ ix 0 ] , refl) gd , pl) (val-in g)
+    covJ (Merge.step x) gd with ov x
+    ... | ov-skip g pl refl nx = in-gen g (ug-row g pl (⊑-refl _) gd , pl) (at-in g nx)
+    covJ (Merge.opin x) gd with ov x
+    ... | ()
+    covJ (Merge.oend x _)  gd = end-cov x gd
+    covJ (Merge.opass x _) gd = end-cov x gd
+    covJ (Merge.lane x _ ln _ _)    gd = lane-cov x ln gd
+    covJ (Merge.lend x _ ln _ _ _)  gd = lane-cov x ln gd
+    covJ (Merge.lpass x _ ln _ _ _) gd = lane-cov x ln gd
+    covJ (Merge.hand _ _ _ _ ())    gd
+    covJ (Merge.left _ _ ln _ _)    gd = ⊥-elim (ine-pin (proj₁ (proj₁ ln)))
+    covJ (Merge.run () _)    gd
+    covJ (Merge.rend () _ _)  gd
+    covJ (Merge.rpass () _ _) gd
+    covJ (Merge.rhand () _)   gd
+
+    reachJ : ∀ {m e} → J m e → Good m → Reach J m e
+    reachJ _ gd = ksU , λ y lt _ → covJ y (good-before y lt gd)
+
+    ----------------------------------------------------------------------
+    -- Each listed, with its row
+
+    gen-back : ∀ l (r : Σ (Ev (AIE X)) (G l)) lv {m} → m ∈ gen l r lv → Good m × Σ (Ev (IE X)) (J m)
+    gen-back l (out x , g) (u , pl) (here refl) =
+      g-row g pl ([ ix 0 ] , refl) u , skip , JM.val (o-val g pl (proj₂ (acc g (u , pl))))
+    gen-back l (out x , g) (u , pl) {m} (there i) = lane-back (of-row (at l ⊕ [ ix 1 ]) 0 (proj₂ s) i)
+      where
+        s = proj₁ (acc g (u , pl))
+        ov′ = o-val g pl (proj₂ (acc g (u , pl)))
+        lane-back : Σ (Ev (IE X)) (InE (ofᴱ (at l ⊕ [ ix 1 ]) 0 (proj₂ s)) m) → Good m × Σ (Ev (IE X)) (J m)
+        lane-back (out v , r) = g-row g pl (⊑-trans ([ ix 1 ] , refl) (proj₁ (of-after r))) u , out v ,
+          JM.lane ov′ tt ((r , of-reach (at l ⊕ [ ix 1 ]) 0 (proj₂ s) {m} {out v}) , proj₂ (of-after r)) (λ ()) tt
+        lane-back (end , r) = g-row g pl (⊑-trans ([ ix 1 ] , refl) (proj₁ (of-after r))) u , skip ,
+          JM.lpass ov′ tt ((r , of-reach (at l ⊕ [ ix 1 ]) 0 (proj₂ s) {m} {end}) , proj₂ (of-after r)) (λ ()) (λ ())
+            (λ d → not-done g pl (proj₁ (proj₁ (of-after r))) (subst (Merge.Done F O) (proj₂ (proj₁ (of-after r))) d))
+        lane-back (skip , r)  = ⊥-elim (of-skip (at l ⊕ [ ix 1 ]) 0 (proj₂ s) r)
+        lane-back (pin _ , r) = ⊥-elim (ine-pin r)
+    gen-back l (skip , g)  (u , pl) (here refl) =
+      g-row g pl (⊑-refl _) u , skip , JM.step (o-skip g pl (few-ug u) (λ ()) (λ ()))
+    gen-back l (pin _ , g) (u , pl) (here refl) =
+      g-row g pl (⊑-refl _) u , skip , JM.step (o-skip g pl (few-ug u) (λ ()) (λ ()))
+    gen-back l (end , g)   (u , pl) (here refl) =
+      g-row g pl (⊑-refl _) u , end , JM.oend (o-end g pl) (done-at g pl)
+
+    genAll-back : ∀ ks (b : Back ks) {m} → m ∈ genAll ks b → Good m × Σ (Ev (IE X)) (J m)
+    genAll-back (k ∷ ks) b i with live? k
+    ... | yes lv = [ gen-back k (b (here refl)) lv , genAll-back ks (λ j → b (there j)) ]′ (∈-++⁻ (gen k (b (here refl)) lv) i)
+    ... | no _   = genAll-back ks (λ j → b (there j)) i
+
+    late-back : ∀ l (r : Σ (Ev (AIE X)) (G l)) {m} → m ∈ late? l r → Good m × Σ (Ev (IE X)) (J m)
+    late-back l (end , g) i with ug? l | T? (p′ <ᵖ l)
+    late-back l (end , g) (here refl) | yes u | no np = g-late g cp refl u , end , JM.oend (o-late g cp) (done-late g cp)
+      where cp = [ (λ h → h) , (λ h → ⊥-elim (np h)) ]′ (≼-or-≻ l p′)
+    late-back l (end , g) () | yes _ | yes _
+    late-back l (end , g) () | no _  | _
+
+    lateAll-back : ∀ ks (b : Back ks) {m} → m ∈ lateAll ks b → Good m × Σ (Ev (IE X)) (J m)
+    lateAll-back (k ∷ ks) b i =
+      [ late-back k (b (here refl)) , lateAll-back ks (λ j → b (there j)) ]′ (∈-++⁻ (late? k (b (here refl))) i)
+
+    backJ : ∀ {m} → m ∈ ksU → Good m × Σ (Ev (IE X)) (J m)
+    backJ i = [ genAll-back ls back , lateAll-back ls back ]′ (∈-++⁻ (genAll ls back) i)
+
+    -- EVERY LISTED POSITION HOLDS A READER ROW.
+    backU : ∀ {m} → m ∈ ksU → Σ (Ev (IE X)) (U m)
+    backU i with backJ i
+    ... | gd , e , x = e , x , reachJ x gd
