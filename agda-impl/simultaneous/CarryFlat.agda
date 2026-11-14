@@ -478,6 +478,13 @@ module Assembly {Γ Δ A B} (n : ℕ) (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
         -- value paired, a lane cut where its partner is, its end joined
         -- and handed off where its partner's is.
         -- A bounded or exhaust value runs where its partner does.
+        -- DEAD ROUTE: forward along the queue with no environment listing.
+        --   The elaborated index chain needs every earlier value's partner,
+        --   read only through the outer's carry: `img` asks the outer and its
+        --   environment listed at that value, `img¬¬` gives it classically.
+        --   Listing the outer from few rows alone is the outright route
+        --   `CarryAt` records dead: an environment hot can hide an
+        --   accumulation from the outer.
         bounded-runs : ∀ m → op ≡ mergeᶠ (just m) → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
                      → P*.Runs op (((l ⊕ [ sub q₁ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
         exhaust-runs : op ≡ exhaustᶠ → ∀ {q a l} → o q (out a) → FW.S′.Img q l → P.Runs op q
