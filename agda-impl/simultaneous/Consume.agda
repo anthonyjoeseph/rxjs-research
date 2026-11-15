@@ -29,10 +29,11 @@ open import denotation.Laws.Modulus using (≺-irrefl)
 open import denotation.Laws.Worlds using (⊑-refl)
 open import simultaneous.Listing using (Listing)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
-open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Fresh; Sim; Run; ListedB; Shows; Shown; SimIH; sih)
+open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Fresh; Sim; Run; ListedB; Shows; Shown; SimIH; sih; foot)
 open import simultaneous.SimMap using (sim-map)
 open import simultaneous.SimReader using (sim-connected)
 open import simultaneous.SimConnect using (sim-connect)
+open import simultaneous.SimFlat using (sim-flatMap)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; elab; elaborate)
 
@@ -71,9 +72,6 @@ postulate
                 → SimIH n ρ s → SimIH n ρ (scan f z s)
   sim-takeWhile : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (keep : A → Bool) (s : Obs Timeline Γ A)
                 → SimIH n ρ s → SimIH n ρ (takeWhile i keep s)
-  sim-flatMap   : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
-                → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
-                → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
   -- THE BOTTOM APPROXIMANT, and each further one under a `defer`'s guard.
   sim-⊥         : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → SimIH zero ρ (defer l)
   sim-next      : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
@@ -92,18 +90,18 @@ sim-approx n       ρ (connected i)     = sim-connected n ρ i
 sim-approx zero    ρ (defer l)         = sim-⊥ ρ l
 sim-approx (suc n) ρ (defer l)         = sim-next n ρ l (sim-approx n ρ (Later.force l))
 
--- The closed program's subscription pair, alone.
-Pair₀ : PMap
-Pair₀ x y = x ≡ root × y ≡ root
+-- The closed program's subscription paired with its foot, alone.
+Pair₀ : Pos → PMap
+Pair₀ y₀ x y = x ≡ root × y ≡ y₀
 
-emb₀ : Emb Pair₀
+emb₀ : ∀ {y₀} → Emb (Pair₀ y₀)
 emb₀ = record
   { fun     = λ { (_ , refl) (_ , refl) → refl }
   ; mono    = λ { (refl , _) (refl , _) lt → ⊥-elim (≺-irrefl {root} lt) }
   ; reflect = λ { (refl , _) (refl , _) _ → ⊑-refl _ }
   }
 
-fresh₀ : ∀ {H H′ : Pos → Set} → Fresh H H′ Pair₀ root root
+fresh₀ : ∀ {H H′ : Pos → Set} {y₀} → Fresh H H′ (Pair₀ y₀) root y₀
 fresh₀ (refl , refl) = (λ _ → refl) , (λ _ → refl)
 
 -- THE CLOSED PROGRAM'S ELABORATION, restamped beside the subscribe and
@@ -117,8 +115,8 @@ postulate
 -- wherever its rows are listed.
 sim-top : ∀ n {A} (o : Obs Timeline [] A) → SimIH n (λ i → i) o → ListedB (enter (approx n o []) root) nothing → Σ PMap λ M → Emb M
         × Σ (Pos → Pos → Set) λ Img → Sim Shows Shown M Img nothing (enter (approx n o []) root) (enter (approx n (elaborate o) []) root)
-sim-top n o (sih ih) lst with ih [] [] Pair₀ (λ {_} ()) (λ {_} ()) tt (λ {_} ()) (λ {_} ()) emb₀ root root (refl , refl) fresh₀ (tt , λ ()) (tt , λ ()) (λ ())
-... | M , _ , em , _ , _ , R = Pair₀ ∪ᴹ M , em , restamp-sim n o (Run.sim R (Pair₀ ∪ᴹ M) (λ a → a) em nothing tt tt lst)
+sim-top n o (sih ih) lst with ih [] [] (Pair₀ (foot o root)) (λ {_} ()) (λ {_} ()) tt (λ {_} ()) (λ {_} ()) emb₀ root root (refl , refl) fresh₀ (tt , λ ()) (tt , λ ()) (λ ())
+... | M , _ , em , _ , _ , R = Pair₀ (foot o root) ∪ᴹ M , em , restamp-sim n o (Run.sim R (Pair₀ (foot o root) ∪ᴹ M) (λ a → a) em nothing tt tt lst)
 
 sim-root : ∀ n {A} (o : SObs [] A) → ListedB (enter (approx n (plain o) []) root) nothing → Σ PMap λ M → Emb M
          × Σ (Pos → Pos → Set) λ Img → Sim Shows Shown M Img nothing (enter (approx n (plain o) []) root) (enter (approx n (elaborate (plain o)) []) root)

@@ -45,7 +45,7 @@ import denotation.Laws.Connect as LC
 open import simultaneous.SObs using (lone; module Elaborate; ext)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; Carried; c-end; Upto;
   Under; Mapped; ListedB; ListedL; Live; Allᴱ; EndsAfter; env-live; Joins; Shows; Shown; AShows;
-  AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih)
+  AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih; foot; foot-⊑)
 open import simultaneous.ReadMap using (under?; under-down; upto-dn; listed-up)
 open import simultaneous.SimReader using (hots-at)
 open import simultaneous.SimPos using (UpTo)
@@ -243,6 +243,21 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   p′⊑r″ : p′ ⊑ r″
   p′⊑r″ = ⊑-trans (⊑-snoc⁺ p′) (⊑-snoc⁺ r′)
 
+  -- The annotated source's source's foot: the source's plain
+  -- subscription's image.
+  r⁰ : Pos
+  r⁰ = foot s r″
+
+  p′⊑r⁰ : p′ ⊑ r⁰
+  p′⊑r⁰ = ⊑-trans p′⊑r″ (foot-⊑ s r″)
+
+  -- The body's foot.
+  p₀⁰ : Pos
+  p₀⁰ = foot b p₀′
+
+  p′⊑p₀⁰ : p′ ⊑ p₀⁰
+  p′⊑p₀⁰ = ⊑-trans (⊑-snoc⁺ p′) (foot-⊑ b p₀′)
+
   p⊑rl : p ⊑ rl
   p⊑rl = ⊑-trans p⊑r (⊑-snoc⁺ r)
 
@@ -259,19 +274,19 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The source at its pair
 
   Amb-s : PMap
-  Amb-s = Amb ∪ᴹ Pair r r″
+  Amb-s = Amb ∪ᴹ Pair r r⁰
 
   postulate
     -- A point under the subscription is a join wherever a hot row lies
     -- strictly above it.
     joins-sub : ∀ {X} (i : X ∈ Γ) {x y} → p ⊑ x → p′ ⊑ y → Joins Amb (Pair x y) (HotSim.rows (es i)) (HotSim.car (es i))
     emb-s   : Emb Amb-s
-    fresh-s : Fresh (Hots env) (Hots env′) Amb-s r r″
+    fresh-s : Fresh (Hots env) (Hots env′) Amb-s r r⁰
     nh-s    : ¬ Hots env r
 
   joins-s : ∀ {X} (i : X ∈ Γ) → Joins Amb-s Amb-s (HotSim.rows (es i)) (HotSim.car (es i))
   joins-s i {e₀ = e₀} (inj₁ a)  q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (HotSim.joins (es i)) {e₀ = e₀} a q e
-  joins-s i {e₀ = e₀} (inj₂ pr) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r″) {e₀ = e₀} pr q e
+  joins-s i {e₀ = e₀} (inj₂ pr) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r⁰) {e₀ = e₀} pr q e
 
   es-s : EnvSim ρ Amb-s env env′
   es-s i = hot-up inj₁ (es i) (joins-s i)
@@ -279,7 +294,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   en-s : EnvNeeds ρ env env′ es-s
   en-s i = en i
 
-  at-s : Amb-s r r″
+  at-s : Amb-s r r⁰
   at-s = inj₂ (refl , refl)
 
   srcIH = SimIH.sims ihs env env′ Amb-s ge ge′ ap es-s en-s (emb-s) r r″ at-s (fresh-s) (ok-step p ok) (ok-step r′ (ok-step p′ ok′)) nh-s
@@ -300,7 +315,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The hot the body reads
 
   Amb-b : PMap
-  Amb-b = (((Amb-s ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀′)
+  Amb-b = (((Amb-s ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀⁰)
 
   s⊆b : (Amb-s ∪ᴹ Ms) ⊆ᴹ Amb-b
   s⊆b a = inj₁ (inj₁ a)
@@ -346,7 +361,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   postulate
     joins-b : ∀ {X} (i : X ∈ Γ) → Joins Amb-b Amb-b (HotSim.rows (es i)) (HotSim.car (es i))
     emb-b   : Emb Amb-b
-    fresh-b : Fresh (Hots env-b) (Hots env′-b) Amb-b p₀ p₀′
+    fresh-b : Fresh (Hots env-b) (Hots env′-b) Amb-b p₀ p₀⁰
     apart-b : ∀ {q e} → Proper σ q e → Hots env q → ⊥
     nh-b    : ¬ Hots env-b p₀
 
@@ -358,7 +373,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   en-b (here refl) T′ ea A′ c (_ , Le) = env-live {ρ = ρ} {Amb = Amb-s} {env = env} {env′ = env′} es-s {T = T′} {T′ = σ} (λ {j} → live-after {t = σ} {T′ = T′} ea {j}) {A′} {c} Le
   en-b (there i)   T′ ea A′ c (_ , Le) = en i T′ ea A′ c Le
 
-  at-b : Amb-b p₀ p₀′
+  at-b : Amb-b p₀ p₀⁰
   at-b = inj₂ (refl , refl)
 
   bodyIH = SimIH.sims (ihb {AIE A ∷ Δ} (λ {X} → ext ρ {X})) env-b env′-b Amb-b (good-cons lawσ ge) (good-cons lawσ′ ge′) (apart-b , ap) es-b en-b (emb-b)
@@ -386,7 +401,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The connect's map
 
   M : PMap
-  M = (((Pair r r″ ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀′) ∪ᴹ Mb
+  M = (((Pair r r⁰ ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀⁰) ∪ᴹ Mb
 
   b⊆M : (Amb-b ∪ᴹ Mb) ⊆ᴹ (Amb ∪ᴹ M)
   b⊆M (inj₂ a)                               = inj₂ (inj₂ a)
@@ -418,17 +433,17 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
   local : Local (Hots env) (Hots env′) p p′ M
   local (inj₂ a)                                       = below-b (proj₁ (lc-b a)) , below-b′ (proj₂ (lc-b a))
-  local (inj₁ (inj₂ (refl , refl)))                    = below-at (⊑-snoc⁺ p) , below-at (⊑-snoc⁺ p′)
+  local (inj₁ (inj₂ (refl , refl)))                    = below-at (⊑-snoc⁺ p) , below-at p′⊑p₀⁰
   local (inj₁ (inj₁ (inj₂ (refl , refl))))             = below-at p⊑rl , below-at p′⊑rl″
   local (inj₁ (inj₁ (inj₁ (inj₂ a))))                  = below-s (proj₁ (lc-s a)) , below-s′ (proj₂ (lc-s a))
-  local (inj₁ (inj₁ (inj₁ (inj₁ (refl , refl)))))      = below-at p⊑r , below-at p′⊑r″
+  local (inj₁ (inj₁ (inj₁ (inj₁ (refl , refl)))))      = below-at p⊑r , below-at p′⊑r⁰
 
   env-joins : EnvJoins ρ env env′ es M
   env-joins i {e₀ = e₀} (inj₂ a)                      q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} b⊆M (ej-b (there i)) {e₀ = e₀} a q e
-  env-joins i {e₀ = e₀} (inj₁ (inj₂ a))               q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i (⊑-snoc⁺ p) (⊑-snoc⁺ p′)) {e₀ = e₀} a q e
+  env-joins i {e₀ = e₀} (inj₁ (inj₂ a))               q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i (⊑-snoc⁺ p) p′⊑p₀⁰) {e₀ = e₀} a q e
   env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₂ a)))        q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑rl p′⊑rl″) {e₀ = e₀} a q e
   env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₂ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} s⊆M (ej-s i) {e₀ = e₀} a q e
-  env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₁ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r″) {e₀ = e₀} a q e
+  env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₁ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r⁰) {e₀ = e₀} a q e
 
   postulate
     -- No source-map point lies under a body row, and no body-map point

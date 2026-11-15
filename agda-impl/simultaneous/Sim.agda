@@ -84,11 +84,11 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; sub)
+open import Tree using (Obs; map; scan; takeWhile; flatMap)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; sub; ix)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; pin; EmissionSet; Den; hot; coldAt; Proper; DenEnv; _≺_; enter; approx)
-open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok; Lawful)
+open import denotation.Laws.Worlds using (_⊑_; W⁼; Hots; GoodEnv; Ok; Lawful; ⊑-refl; ⊑-trans; ⊑-snoc⁺)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -333,6 +333,40 @@ Apart []ᴬ              = ⊤
 Apart (hot t ∷ᴬ ρ)    = (∀ {q e} → t q e → Hots ρ q → ⊥) × Apart ρ
 Apart (coldAt _ ∷ᴬ ρ) = Apart ρ
 
+-- WHERE A FLATMAP'S ELABORATED OUTER IS SUBSCRIBED, under its own
+-- subscription: the lane its shared trigger's one row runs, read
+-- through the trigger's hot.
+outerAt : Pos → Pos
+outerAt p′ = (((p′ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) ⊕ [ sub ((p′ ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ]) ⊕ [ ix 1 ]
+
+-- THE FOOT: where the elaborated program subscribes what its plain
+-- program subscribes at its own subscription.  A flatMap's outer is
+-- entered where the flatMap is, plainly, and under the elaborated
+-- flatMap at `outerAt`; one plain point has one image, so the pair is
+-- the foot's.
+foot : ∀ {Γ A} → Obs Timeline Γ A → Pos → Pos
+foot (map _ s)         p′ = foot s p′
+foot (scan _ _ s)      p′ = foot s p′
+foot (takeWhile _ _ s) p′ = foot s p′
+foot (flatMap _ _ s)   p′ = foot s (outerAt p′)
+foot _                 p′ = p′
+
+outer-⊑ : ∀ p′ → p′ ⊑ outerAt p′
+outer-⊑ p′ = ⊑-trans (⊑-trans (⊑-trans (⊑-snoc⁺ p′) (⊑-snoc⁺ (p′ ⊕ [ ix 1 ]))) (⊑-snoc⁺ ((p′ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]))) (⊑-snoc⁺ _)
+
+-- The foot lies under the subscription.
+foot-⊑ : ∀ {Γ A} (o : Obs Timeline Γ A) p′ → p′ ⊑ foot o p′
+foot-⊑ (map _ s)         p′ = foot-⊑ s p′
+foot-⊑ (scan _ _ s)      p′ = foot-⊑ s p′
+foot-⊑ (takeWhile _ _ s) p′ = foot-⊑ s p′
+foot-⊑ (flatMap _ _ s)   p′ = ⊑-trans (outer-⊑ p′) (foot-⊑ s (outerAt p′))
+foot-⊑ (Obs.cold _)      p′ = ⊑-refl p′
+foot-⊑ Obs.empty         p′ = ⊑-refl p′
+foot-⊑ (Obs.of _)        p′ = ⊑-refl p′
+foot-⊑ (Obs.connect _ _) p′ = ⊑-refl p′
+foot-⊑ (Obs.connected _) p′ = ⊑-refl p′
+foot-⊑ (Obs.defer _)     p′ = ⊑-refl p′
+
 -- SIMULATED under every environment of simulated hots, at every
 -- subscription pair the ambient map holds alone in its worlds: what the
 -- map adds lies in the pair's worlds, pairs nothing under a row, and
@@ -344,7 +378,7 @@ record SimIH (n : ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
   field
     sims : ∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) → GoodEnv env → GoodEnv env′ → Apart env
          → (es : EnvSim ρ Amb env env′) → EnvNeeds ρ env env′ es → Emb Amb
-         → ∀ p p′ → Amb p p′ → Fresh (Hots env) (Hots env′) Amb p p′ → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
+         → ∀ p p′ → Amb p (foot o p′) → Fresh (Hots env) (Hots env′) Amb p (foot o p′) → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
          → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
            × EnvJoins ρ env env′ es M
            × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es (enter (approx n o env) p)) (enter (approx n o env) p) (enter (approx n (elab ρ o) env′) p′)

@@ -52,7 +52,7 @@ annotation's pins trace to plain rows only through joins and owners,
 and the connect's through the source's late pins, recursively. Settled
 when each is a body over its run's own carriers.
 
-Members: `ann-late`, `conn-late`, `reader-late`.
+Members: `ann-late`, `conn-late`, `reader-late`, `late-f`.
 
 #### CONNECT: THE MAPS
 
@@ -65,16 +65,53 @@ Members: `joins-σ`, `joins-sub`, `emb-s`, `fresh-s`, `nh-s`, `joins-b`,
 `emb-b`, `fresh-b`, `apart-b`, `nh-b`, `below-b`, `below-b′`, `below-s`,
 `below-s′`, `body-s`, `src-b`, `pairs-none`.
 
-#### THE SIMULATION: FLATMAP
+#### FLATMAP: THE DECISIONS
 
-Untried: the elaborated flatMap simulates the plain one up to a bound,
-its lanes' local maps joined into one embedding. Risk: the scan's marks,
-the trackers' rows read from every binder while the run lives, each
-lane listed from its outer row's listing, and joined maps staying an
-embedding. Settled when `sim-flatMap` is a body over the lanes' and the
-outer's simulations.
+Untried: a lane the plain joiner runs and leaves uncut, the elaborated
+real flatMap runs, over the outer's re-read values, and leaves uncut,
+framed and relayed by the scan; and back. Risk: an exhaust decides by
+earlier lanes' ends, which the elaboration frames and ends at its own
+`laneDone`; a switch cuts at the next value, which the elaboration
+reads through two connects. Settled when each is a body over the
+outer's and the lanes' simulations and the frame.
 
-Members: `sim-flatMap`.
+Members: `lane-row→`, `lane-uncut`, `unrelay`.
+
+#### FLATMAP: THE LANE BOUND
+
+Untried: a running lane is simulated up to the flatMap's bound, or its
+own cut. Risk: a switched-out lane may run on unlisted past its cut.
+Settled when `lane-bound` is a body over the cut and the listing.
+
+Members: `lane-bound`.
+
+#### FLATMAP: THE BOUNDED MERGE
+
+Untried: a bounded merge's lanes start at its schedule's starts, read
+off the same ends on both sides. Settled when `sim-bounded` is a body
+over the unbounded joiners' lanes.
+
+Members: `sim-bounded`.
+
+#### FLATMAP: THE MAPS
+
+Untried: the outer's and every lane's subscription pair lie alone in
+their worlds, admissible, the lanes' hots lawful; the joined map is an
+embedding, local, under no plain row, keeping the joins, one carrier a
+row. Settled when each is a body over the pieces' locality.
+
+Members: `ok-o`, `fresh-o`, `emb-l`, `fresh-l`, `joins-l`, `good-l`,
+`ok-l`, `ok-l′`, `nh-l`, `flat-img`, `local-f`, `emb-f`, `none-f`,
+`flat-joins`.
+
+#### FLATMAP: ENDS, REACH AND LISTING
+
+Untried: the ends correspond; a relayed lane value is reached; the
+outer's rows, and the elaborated rows, up to a bound are listed; a
+lane value is anchored. Settled when each is a body.
+
+Members: `flat-end→`, `flat-end←`, `lane-reach`, `outer-listed`, `u-upto`,
+`anchor-v`.
 
 #### THE SIMULATION: DECISIONS
 
