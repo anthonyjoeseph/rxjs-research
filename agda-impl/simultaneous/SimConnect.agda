@@ -15,7 +15,8 @@ module simultaneous.SimConnect where
 import Data.List as L
 open import Data.List using ([]; _∷_; [_]; _++_; filter)
 open import Data.List.Membership.Propositional using (_∈_; find)
-open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺)
+import Data.List.Relation.Unary.All as AllP
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (⊤; tt)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
@@ -42,14 +43,15 @@ open import denotation.Laws.Truth.Connect.Cuts using (step≼; module Side)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; InvD; InvAt; _∪ʰ_; ok-step; here; _⊑_; ⊑-refl; ⊑-cmp; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊑-inside; inside-⊑; ⊕-injˡ)
 import denotation.Laws.Connect as LC
 open import simultaneous.SObs using (lone; module Elaborate; ext)
-open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Mt; Carried; c-end; Upto;
+open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Below; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; Carried; c-end; Upto;
   Under; Mapped; ListedB; ListedL; Live; Allᴱ; EndsAfter; env-live; Joins; Shows; Shown; AShows;
-  AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih)
+  AShown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Apart; SimIH; sih; foot; foot-⊑)
 open import simultaneous.ReadMap using (under?; under-down; upto-dn; listed-up)
 open import simultaneous.SimReader using (hots-at)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.AnnRun using (Upto?; module AnnRun)
 open import simultaneous.ToldRows using (T-or)
+open import simultaneous.ConnPick using (module Pick; alive-of)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -75,6 +77,7 @@ run-up inc R = record
   ; img-fun = img-fun
   ; ext     = λ i → proj₁ (ext′ i) , inc (proj₁ (proj₂ (ext′ i))) , proj₂ (proj₂ (ext′ i))
   ; sim     = λ A′ inc′ → sim A′ (λ a → inc′ (inc a))
+  ; late    = λ A′ inc′ → late A′ (λ a → inc′ (inc a))
   ; anchor  = λ A′ inc′ em x ce L lst → proj₁ (anchor A′ (λ a → inc′ (inc a)) em x ce L lst)
                                       , inc (proj₂ (anchor A′ (λ a → inc′ (inc a)) em x ce L lst))
   }
@@ -240,6 +243,21 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   p′⊑r″ : p′ ⊑ r″
   p′⊑r″ = ⊑-trans (⊑-snoc⁺ p′) (⊑-snoc⁺ r′)
 
+  -- The annotated source's source's foot: the source's plain
+  -- subscription's image.
+  r⁰ : Pos
+  r⁰ = foot s r″
+
+  p′⊑r⁰ : p′ ⊑ r⁰
+  p′⊑r⁰ = ⊑-trans p′⊑r″ (foot-⊑ s r″)
+
+  -- The body's foot.
+  p₀⁰ : Pos
+  p₀⁰ = foot b p₀′
+
+  p′⊑p₀⁰ : p′ ⊑ p₀⁰
+  p′⊑p₀⁰ = ⊑-trans (⊑-snoc⁺ p′) (foot-⊑ b p₀′)
+
   p⊑rl : p ⊑ rl
   p⊑rl = ⊑-trans p⊑r (⊑-snoc⁺ r)
 
@@ -256,19 +274,19 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The source at its pair
 
   Amb-s : PMap
-  Amb-s = Amb ∪ᴹ Pair r r″
+  Amb-s = Amb ∪ᴹ Pair r r⁰
 
   postulate
     -- A point under the subscription is a join wherever a hot row lies
     -- strictly above it.
     joins-sub : ∀ {X} (i : X ∈ Γ) {x y} → p ⊑ x → p′ ⊑ y → Joins Amb (Pair x y) (HotSim.rows (es i)) (HotSim.car (es i))
     emb-s   : Emb Amb-s
-    fresh-s : Fresh (Hots env) (Hots env′) Amb-s r r″
+    fresh-s : Fresh (Hots env) (Hots env′) Amb-s r r⁰
     nh-s    : ¬ Hots env r
 
   joins-s : ∀ {X} (i : X ∈ Γ) → Joins Amb-s Amb-s (HotSim.rows (es i)) (HotSim.car (es i))
   joins-s i {e₀ = e₀} (inj₁ a)  q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (HotSim.joins (es i)) {e₀ = e₀} a q e
-  joins-s i {e₀ = e₀} (inj₂ pr) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r″) {e₀ = e₀} pr q e
+  joins-s i {e₀ = e₀} (inj₂ pr) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r⁰) {e₀ = e₀} pr q e
 
   es-s : EnvSim ρ Amb-s env env′
   es-s i = hot-up inj₁ (es i) (joins-s i)
@@ -276,7 +294,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   en-s : EnvNeeds ρ env env′ es-s
   en-s i = en i
 
-  at-s : Amb-s r r″
+  at-s : Amb-s r r⁰
   at-s = inj₂ (refl , refl)
 
   srcIH = SimIH.sims ihs env env′ Amb-s ge ge′ ap es-s en-s (emb-s) r r″ at-s (fresh-s) (ok-step p ok) (ok-step r′ (ok-step p′ ok′)) nh-s
@@ -297,7 +315,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The hot the body reads
 
   Amb-b : PMap
-  Amb-b = (((Amb-s ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀′)
+  Amb-b = (((Amb-s ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀⁰)
 
   s⊆b : (Amb-s ∪ᴹ Ms) ⊆ᴹ Amb-b
   s⊆b a = inj₁ (inj₁ a)
@@ -343,7 +361,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   postulate
     joins-b : ∀ {X} (i : X ∈ Γ) → Joins Amb-b Amb-b (HotSim.rows (es i)) (HotSim.car (es i))
     emb-b   : Emb Amb-b
-    fresh-b : Fresh (Hots env-b) (Hots env′-b) Amb-b p₀ p₀′
+    fresh-b : Fresh (Hots env-b) (Hots env′-b) Amb-b p₀ p₀⁰
     apart-b : ∀ {q e} → Proper σ q e → Hots env q → ⊥
     nh-b    : ¬ Hots env-b p₀
 
@@ -355,7 +373,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   en-b (here refl) T′ ea A′ c (_ , Le) = env-live {ρ = ρ} {Amb = Amb-s} {env = env} {env′ = env′} es-s {T = T′} {T′ = σ} (λ {j} → live-after {t = σ} {T′ = T′} ea {j}) {A′} {c} Le
   en-b (there i)   T′ ea A′ c (_ , Le) = en i T′ ea A′ c Le
 
-  at-b : Amb-b p₀ p₀′
+  at-b : Amb-b p₀ p₀⁰
   at-b = inj₂ (refl , refl)
 
   bodyIH = SimIH.sims (ihb {AIE A ∷ Δ} (λ {X} → ext ρ {X})) env-b env′-b Amb-b (good-cons lawσ ge) (good-cons lawσ′ ge′) (apart-b , ap) es-b en-b (emb-b)
@@ -383,7 +401,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   -- The connect's map
 
   M : PMap
-  M = (((Pair r r″ ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀′) ∪ᴹ Mb
+  M = (((Pair r r⁰ ∪ᴹ Ms) ∪ᴹ Pair rl rl″) ∪ᴹ Pair p₀ p₀⁰) ∪ᴹ Mb
 
   b⊆M : (Amb-b ∪ᴹ Mb) ⊆ᴹ (Amb ∪ᴹ M)
   b⊆M (inj₂ a)                               = inj₂ (inj₂ a)
@@ -415,17 +433,17 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
   local : Local (Hots env) (Hots env′) p p′ M
   local (inj₂ a)                                       = below-b (proj₁ (lc-b a)) , below-b′ (proj₂ (lc-b a))
-  local (inj₁ (inj₂ (refl , refl)))                    = below-at (⊑-snoc⁺ p) , below-at (⊑-snoc⁺ p′)
+  local (inj₁ (inj₂ (refl , refl)))                    = below-at (⊑-snoc⁺ p) , below-at p′⊑p₀⁰
   local (inj₁ (inj₁ (inj₂ (refl , refl))))             = below-at p⊑rl , below-at p′⊑rl″
   local (inj₁ (inj₁ (inj₁ (inj₂ a))))                  = below-s (proj₁ (lc-s a)) , below-s′ (proj₂ (lc-s a))
-  local (inj₁ (inj₁ (inj₁ (inj₁ (refl , refl)))))      = below-at p⊑r , below-at p′⊑r″
+  local (inj₁ (inj₁ (inj₁ (inj₁ (refl , refl)))))      = below-at p⊑r , below-at p′⊑r⁰
 
   env-joins : EnvJoins ρ env env′ es M
   env-joins i {e₀ = e₀} (inj₂ a)                      q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} b⊆M (ej-b (there i)) {e₀ = e₀} a q e
-  env-joins i {e₀ = e₀} (inj₁ (inj₂ a))               q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i (⊑-snoc⁺ p) (⊑-snoc⁺ p′)) {e₀ = e₀} a q e
+  env-joins i {e₀ = e₀} (inj₁ (inj₂ a))               q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i (⊑-snoc⁺ p) p′⊑p₀⁰) {e₀ = e₀} a q e
   env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₂ a)))        q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑rl p′⊑rl″) {e₀ = e₀} a q e
   env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₂ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} s⊆M (ej-s i) {e₀ = e₀} a q e
-  env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₁ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r″) {e₀ = e₀} a q e
+  env-joins i {e₀ = e₀} (inj₁ (inj₁ (inj₁ (inj₁ a)))) q e = joins-S {t = HotSim.rows (es i)} {Img = HotSim.car (es i)} inj₁ (joins-sub i p⊑r p′⊑r⁰) {e₀ = e₀} a q e
 
   postulate
     -- No source-map point lies under a body row, and no body-map point
@@ -658,39 +676,129 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
           ... | k , m , kj = pr (proj₂ (Kσ.kept-row cands (KS.kept-row ks bk) m)) kj
 
   postulate
-    -- THE ELABORATED CONNECT'S SOURCE ROWS UNDER A BOUND'S IMAGE, listed.
-    src-listed : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
-               → Σ (L.List Pos) λ ls → (∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev (IE B)) (U l))
+    -- THE CONNECT'S LATE PINS, listed: the body's by its run's, the
+    -- burst's and the kept's by the source's late pins and its rows.
+    conn-late : Lates (Amb ∪ᴹ M) (EnvListed ρ env env′ es T) T U
+
+  postulate
+    -- THE SOURCE ROWS BEHIND THE ELABORATED CONNECT'S SOURCE ROWS UNDER A
+    -- BOUND'S IMAGE, listed.
+    --
+    -- DEAD ROUTE: the source's simulation at a bound the connect's listing
+    --   covers.  A kept pin past the body's end waits only on its
+    --   subscription's past, so it may follow infinitely many source rows
+    --   the connect hides, and no bound reaching it has the source listed;
+    --   such pins come from the source's `Run.late` instead.
+    src-rows : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
+             → Σ (L.List Pos) λ ks → (∀ {k e e′} → σ′ k e → U (k ⊕ [ ix 0 ]) e′ → Under A′ c (k ⊕ [ ix 0 ]) → k ∈ ks)
+                                   × (∀ {k} → k ∈ ks → Σ (Ev (AIE A)) (σ′ k))
 
   -- What the body reads, from what the connect reads.
   Lb : ∀ {A′ c} → EnvListed ρ env env′ es T A′ c → ListedB T c → EnvListed (ext ρ) env-b env′-b es-b β A′ c
   Lb {A′} {c} L lst = listed-σ lst , env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = β} (λ {j} → live-β {j}) {A′} {c} L
 
-  -- AN ELABORATED BODY ROW UNDER A BOUND'S IMAGE IS THE CONNECT'S: every
-  -- elaborated connect row before it is under the image too, so listed —
-  -- the body's by the body's simulation, the source's by `src-listed` —
-  -- and the elaborated connect shows its hangs.
+  Iσ′ : InvAt (Hots env′) r′ σ′
+  Iσ′ = Is′ r′ (ok-step p′ ok′)
+
+  Iβ′ : InvAt (Hots env′ ∪ʰ Proper σ′) p₀′ (enter (F′ (hot (Proper σ′))) p₀′)
+  Iβ′ = IF′ lawσ′ p₀′ (LC.ok₀ {s = ds′} {F = F′} Is′ IF′ p′ ok′)
+
+  -- THE ELABORATED CONNECT UNDER A BOUND'S IMAGE.
+  module Elab (A′ : PMap) (inc : (Amb ∪ᴹ M) ⊆ᴹ A′) (emA : Emb A′) (c : Maybe Pos) (mp : Mapped A′ c)
+              (Lr : EnvListed ρ env env′ es T A′ c) (lst : ListedB T c) where
+
+    hb : Sim Shows Shown A′ (Run.Img Rb) c β β′
+    hb = Run.sim Rb A′ (λ a → inc (b⊆M a)) emA c mp (Lb {A′} {c} Lr lst) (listed-β lst)
+
+    SR = src-rows A′ inc emA c mp Lr lst
+
+    under-dec = under? {A′} (λ {x} {y} {y′} → Emb.fun emA {x} {y} {y′}) c mp
+
+    -- Every elaborated row under the image: the body's, or a listed
+    -- source row's first child.
+    cover : L.List Pos
+    cover = proj₁ (Sim.upto hb) L.++ L.map (_⊕ [ ix 0 ]) (proj₁ SR)
+
+    in-src : ∀ {k e e′} → σ′ k e → U (k ⊕ [ ix 0 ]) e′ → Under A′ c (k ⊕ [ ix 0 ]) → (k ⊕ [ ix 0 ]) ∈ cover
+    in-src x u un = ∈-++⁺ʳ (proj₁ (Sim.upto hb)) (∈-map⁺ (_⊕ [ ix 0 ]) (proj₁ (proj₂ SR) x u un))
+
+    in-cover : ∀ {j e′} → U j e′ → Under A′ c j → j ∈ cover
+    in-cover (body y′ , _) uj          = ∈-++⁺ˡ (proj₁ (proj₂ (Sim.upto hb)) y′ uj)
+    in-cover u@(burst x _ , _) uj      = in-src x u uj
+    in-cover u@(echo x _ _ _ , _) uj   = in-src x u uj
+    in-cover u@(kept x _ _ _ , _) uj   = in-src x u uj
+
+    -- AN ELABORATED CONNECT ROW UNDER THE IMAGE IS SHOWN: every row
+    -- before it is under the image too, so covered, and the elaborated
+    -- connect shows its hangs.
+    reach : ∀ {l e} → ConnT′ l e → Under A′ c l → U l e
+    reach {l} y un = y , few-reach {t = ConnT′} {l} Fl
+      where
+        led : ∀ {j e′} → ConnT′ j e′ → Few ConnT′ j → j ≺ l → j ∈ cover
+        led {j} x f lt = in-cover (x , few-reach {t = ConnT′} {j} f) (under-down c lt un)
+        nF : ¬ ¬ Few ConnT′ l
+        nF = k-shows (λ m → SC.sk-connT ds′ F′ Is′ p′ ok′ (sk-approx m n (annotate (elab ρ s)) env′ ge′ r′ (ok-step p′ ok′))
+                       (sk-approx m n (elab (ext ρ) b) (hot (Proper σ′) ∷ᴬ env′) (good-cons lawσ′ ge′) p₀′ (LC.ok₀ {s = ds′} {F = F′} Is′ IF′ p′ ok′)))
+                     (cover , led)
+        Fl : Few ConnT′ l
+        Fl = cover , λ {j} x lt → ∈-stable λ ¬m → nF λ F′l → ¬m (led x (few-down F′l (≺→≼ {j} {l} lt)) lt)
+
+    -- The body's ends under the image.
+    pickE : ∀ {q e′} → β′ q e′ → Maybe (Σ Pos λ j → Σ (Ev (IE B)) λ _ → β′ j end)
+    pickE {q} {end} y = just (q , end , y)
+    pickE {e′ = out _} _ = nothing
+    pickE {e′ = skip}  _ = nothing
+    pickE {e′ = pin _} _ = nothing
+    module KE = Keep {t = β′} {u = λ j _ → β′ j end} pickE
+
+    endsβ : L.List Pos
+    endsβ = KE.keep (proj₁ (Sim.upto hb)) (proj₂ (proj₂ (Sim.upto hb)))
+
+    end-in : ∀ {j} → β′ j end → Under A′ c j → j ∈ endsβ
+    end-in y un = KE.kept (proj₁ (Sim.upto hb)) (proj₂ (proj₂ (Sim.upto hb))) (proj₁ (proj₂ (Sim.upto hb)) y un) (λ x → only x (InvAt.func Iβ′ y x))
+      where
+        only : ∀ {k e} (x : β′ k e) → end ≡ e → Σ (Σ (Ev (IE B)) λ _ → β′ k end) λ w → pickE x ≡ just (k , w)
+        only x refl = (_ , x) , refl
+
+    -- Before every listed end, at or before a point under the image: the
+    -- body lives; and conversely.
+    alive : ∀ {j l} → j ≼ l → Under A′ c l → AllP.All (j ≺_) endsβ → CE.Alive j
+    alive = alive-of {β = β′} {P = Under A′ c} (λ {j} {l} lt u → under-down c lt u) end-in
+
+    alive← : ∀ {j} → CE.Alive j → AllP.All (j ≺_) endsβ
+    alive← lv = AllP.tabulate λ m → lv (proj₂ (KE.kept-row (proj₁ (Sim.upto hb)) (proj₂ (proj₂ (Sim.upto hb))) m))
+
+    alive? : ∀ j → Dec (AllP.All (j ≺_) endsβ)
+    alive? j = AllP.all? (λ e → T? (j <ᵖ e)) endsβ
+
+    -- A source row's first child, wherever the elaborated connect shows
+    -- it under the image.
+    open Pick σ′ U r′ (Under A′ c) under-dec (λ j → AllP.All (j ≺_) endsβ) alive?
+           (λ y i un → _ , reach (CE.burst y i) un)
+           (λ {k} y lv up ni un → _ , reach (CE.echo y (alive (⊑-≼ (⊑-snoc⁺ k)) un lv) up ni) un)
+           (λ {k} {x} y lv ni ins un → _ , reach (CE.kept y (alive (⊑-≼ (⊑-trans (inside-⊑ x k ins) (⊑-snoc⁺ k))) un lv) ni ins) un)
+      using (pick; Picked; picked-burst; picked-echo; picked-kept)
+
+    module KS = Keep {t = σ′} {u = U} pick
+
+    -- THE ELABORATED CONNECT'S SOURCE ROWS UNDER THE IMAGE, listed.
+    src-listed : Σ (L.List Pos) λ ls → (∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev (IE B)) (U l))
+    src-listed = KS.keep (proj₁ SR) (proj₂ (proj₂ SR)) , cov , KS.kept-row (proj₁ SR) (proj₂ (proj₂ SR))
+      where
+        at : ∀ {k e} (x : σ′ k e) {e′} → U (k ⊕ [ ix 0 ]) e′ → Under A′ c (k ⊕ [ ix 0 ])
+           → (∀ {e″} (x′ : σ′ k e″) → e ≡ e″ → Picked x′) → (k ⊕ [ ix 0 ]) ∈ KS.keep (proj₁ SR) (proj₂ (proj₂ SR))
+        at x u un ok = KS.kept (proj₁ SR) (proj₂ (proj₂ SR)) (proj₁ (proj₂ SR) x u un) (λ x′ → ok x′ (InvAt.func Iσ′ x x′))
+
+        cov : ∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ KS.keep (proj₁ SR) (proj₂ (proj₂ SR))
+        cov (body _ , _) () _
+        cov u@(burst x i , _) _ un         = at x u un λ { x′ refl → picked-burst x′ un i }
+        cov u@(echo {k} x lv up ni , _) _ un      = at x u un λ { x′ refl → picked-echo x′ un (alive← {k} lv) up ni }
+        cov u@(kept {p′ = x} x₀ lv ni ins , _) _ un = at x₀ u un λ { x′ refl → picked-kept x′ un (alive← {x} lv) ni ins }
+
+  -- AN ELABORATED BODY ROW UNDER A BOUND'S IMAGE IS THE CONNECT'S.
   u-under : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c
           → ∀ {l e} → β′ l e → Under A′ c l → U l e
-  u-under A′ inc emA c mp Lr lst {l} y un = CE.body y , few-reach {t = ConnT′} {l} Fl
-    where
-      hb = Run.sim Rb A′ (λ a → inc (b⊆M a)) emA c mp (Lb {A′} {c} Lr lst) (listed-β lst)
-      srcL = src-listed A′ inc emA c mp Lr lst
-      ls : L.List Pos
-      ls = proj₁ (Sim.upto hb) L.++ proj₁ srcL
-      in-ls : ∀ {j e′} → U j e′ → Under A′ c j → j ∈ ls
-      in-ls (body y′ , _) uj          = ∈-++⁺ˡ (proj₁ (proj₂ (Sim.upto hb)) y′ uj)
-      in-ls u@(burst _ _ , _) uj      = ∈-++⁺ʳ _ (proj₁ (proj₂ srcL) u _ uj)
-      in-ls u@(echo _ _ _ _ , _) uj   = ∈-++⁺ʳ _ (proj₁ (proj₂ srcL) u _ uj)
-      in-ls u@(kept _ _ _ _ , _) uj   = ∈-++⁺ʳ _ (proj₁ (proj₂ srcL) u _ uj)
-      led : ∀ {j e′} → ConnT′ j e′ → Few ConnT′ j → j ≺ l → j ∈ ls
-      led {j} x f lt = in-ls (x , few-reach {t = ConnT′} {j} f) (under-down c lt un)
-      nF : ¬ ¬ Few ConnT′ l
-      nF = k-shows (λ m → SC.sk-connT ds′ F′ Is′ p′ ok′ (sk-approx m n (annotate (elab ρ s)) env′ ge′ r′ (ok-step p′ ok′))
-                     (sk-approx m n (elab (ext ρ) b) (hot (Proper σ′) ∷ᴬ env′) (good-cons lawσ′ ge′) p₀′ (LC.ok₀ {s = ds′} {F = F′} Is′ IF′ p′ ok′)))
-                   (ls , led)
-      Fl : Few ConnT′ l
-      Fl = ls , λ {j} x lt → ∈-stable λ ¬m → nF λ F′l → ¬m (led x (few-down F′l (≺→≼ {j} {l} lt)) lt)
+  u-under A′ inc emA c mp Lr lst y un = Elab.reach A′ inc emA c mp Lr lst (CE.body y) un
 
   module CSim (A′ : PMap) (inc : (Amb ∪ᴹ M) ⊆ᴹ A′) (emA : Emb A′) (c : Maybe Pos) (mp : Mapped A′ c)
               (Lr : EnvListed ρ env env′ es T A′ c) (lst : ListedB T c) where
@@ -729,7 +837,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
     under-dec = under? {A′} (λ {x} {y} {y′} → Emb.fun emA {x} {y} {y′}) c mp
 
-    srcL = src-listed A′ inc emA c mp Lr lst
+    srcL = Elab.src-listed A′ inc emA c mp Lr lst
 
     upto : Σ (L.List Pos) λ ls → (∀ {l e′} → U l e′ → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev (IE B)) (U l))
     upto = filter under-dec (proj₁ uptob) L.++ proj₁ srcL , cov , back
@@ -761,6 +869,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     ; img-fun = Run.img-fun Rb
     ; ext     = λ i → proj₁ (Run.ext Rb i) , b⊆M (proj₁ (proj₂ (Run.ext Rb i))) , proj₂ (proj₂ (Run.ext Rb i))
     ; sim     = λ A′ inc emA c mp L lst → CSim.sim A′ inc emA c mp L lst
+    ; late    = conn-late
     ; anchor  = anchor
     }
 

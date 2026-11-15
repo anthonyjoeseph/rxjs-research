@@ -7,7 +7,7 @@ module simultaneous.SimMap where
 
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Maybe using (Maybe)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
@@ -19,7 +19,7 @@ open import denotation.Laws.Modulus using (entered-reach)
 open import adequacy.SubOne using (map-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark; valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Sim using (PMap; Sim; Run; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; ListedB; Live; env-live; NoneUnder; Shows; Shown; SimIH; sih)
+open import simultaneous.Sim using (PMap; Sim; Run; Late; LateL; LateU; lateU-pin; Mt; m-out; m-end; Carried; c-out; c-end; Upto; Under; ListedB; Live; env-live; NoneUnder; Shows; Shown; SimIH; sih)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; mapIE)
 
@@ -70,6 +70,39 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
   listed : ∀ {c} → ListedB T c → ListedB t₀ c
   listed (ks , cov , back) = ks , (λ x u → cov (proj₂ (up x)) u) , λ m → down (proj₂ (back m))
 
+  -- A source row, mapped, entered.
+  ent : ∀ {l e} → MapT (mapIE f) u₀ l e → U l e
+  ent m = m , map-reach (entered-reach d′ p′) m
+
+  ent′ : ∀ {l e} → u₀ l e → Σ (Ev (IE B)) (U l)
+  ent′ {e = out _} x = _ , ent (map-out x)
+  ent′ {e = skip}  x = _ , ent (map-skip x)
+  ent′ {e = pin _} x = _ , ent (map-pin x)
+  ent′ {e = end}   x = _ , ent (map-end x)
+
+  -- A late source pin, mapped: late.
+  late-up : ∀ {b k e} (x : t₀ k e) → Late b e → Late b (proj₁ (up x))
+  late-up {nothing} x ()
+  late-up {just _} {e = pin _} x (y , refl , lt) = y , refl , lt
+  late-up {just _} {e = out _} x (_ , () , _)
+  late-up {just _} {e = skip}  x (_ , () , _)
+  late-up {just _} {e = end}   x (_ , () , _)
+
+  late-listed : ∀ {b c} → LateL T b c → LateL t₀ b c
+  late-listed (ks , cov , back) = ks , (λ x l u → cov (proj₂ (up x)) (late-up x l) u) , λ m → down (proj₂ (back m))
+
+  -- A late mapped pin: its source's.
+  late-row : ∀ {M b c ls} → (∀ {l e′} → u₀ l e′ → LateU M b e′ → Under M c l → l ∈ ls)
+           → ∀ {l e′} → U l e′ → LateU M b e′ → Under M c l → l ∈ ls
+  late-row {b = nothing} cov (map-pin x , _) () un
+  late-row {b = just _}  cov (map-pin x , _) (y , my , x′ , refl , lt) un = cov x (y , my , x′ , refl , lt) un
+  late-row cov (map-out x , _) lu un with lateU-pin lu
+  ... | _ , ()
+  late-row cov (map-skip x , _) lu un with lateU-pin lu
+  ... | _ , ()
+  late-row cov (map-end x , _) lu un with lateU-pin lu
+  ... | _ , ()
+
   -- Live in the source: live in the map, which ends where it does.
   live : ∀ {j} → Live t₀ j → Live T j
   live {j} l (map-end x , _) = l x
@@ -98,15 +131,6 @@ module Mapped {A B : Set} (f : A → B) (d : Den A) (d′ : Den (IE A)) (p p′ 
       cov = proj₁ (proj₂ upto)
       back = proj₂ (proj₂ upto)
 
-      ent : ∀ {l e} → MapT (mapIE f) u₀ l e → U l e
-      ent m = m , map-reach (entered-reach d′ p′) m
-
-      ent′ : ∀ {l e} → u₀ l e → Σ (Ev (IE B)) (U l)
-      ent′ {e = out _} x = _ , ent (map-out x)
-      ent′ {e = skip}  x = _ , ent (map-skip x)
-      ent′ {e = pin _} x = _ , ent (map-pin x)
-      ent′ {e = end}   x = _ , ent (map-end x)
-
       fw : ∀ {k e} → T k e → Carried e → Upto c k → Σ Pos λ l → Img k l × Σ (Ev (IE B)) λ e′ → U l e′ × Mt Shows e e′
       fw (map-out x , _) _ u with fwd x c-out u
       ... | l , i , _ , ux , m-out sh = l , i , _ , ent (map-out ux) , m-out (shows-map f sh)
@@ -132,4 +156,7 @@ sim-map n ρ f s (sih ih) = sih λ env env′ Amb ge ge′ ap es ns em p p′ pp
   in M , lc , eb , none {M} (λ {k} {e} {x} {y} → nu {k} {e} {x} {y}) , ej
      , record { Img = Img ; img-fun = img-fun ; ext = ext
               ; sim = λ A′ inc ea c mp L lst → mapped (sim A′ inc ea c mp (env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = t₀} (λ {j} → live {j}) {A′} {c} L) (listed lst))
+              ; late = λ A′ inc ea b c mp L lst ll →
+                  let (ls , cov , back) = late A′ inc ea b c mp (env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = t₀} (λ {j} → live {j}) {A′} {b} L) (listed lst) (late-listed ll)
+                  in ls , late-row cov , λ m → ent′ (proj₂ (back m))
               ; anchor = λ A′ inc ea x ce L lst → let (_ , x₀ , ce₀) = carried x ce in anchor A′ inc ea x₀ ce₀ (env-live {ρ = ρ} {Amb = Amb} {env = env} {env′ = env′} es {T = T} {T′ = t₀} (λ {j} → live {j}) {A′} L) (listed lst) }

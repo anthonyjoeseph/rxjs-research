@@ -35,7 +35,7 @@ open import denotation.Laws.Worlds.Leaves using (module AccF)
 open import adequacy.SubOne using (dep-un)
 open import adequacy.SubJoin using (Bind; rejoin-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Carried; c-out; c-end; Mt; m-out; m-end; Local; Fresh; NoneUnder;
+open import simultaneous.Sim using (PMap; _∪ᴹ_; Emb; Sim; Lates; Carried; c-out; c-end; Mt; m-out; m-end; Local; Fresh; NoneUnder;
   Joins; Upto; Under; Mapped; Run; _⊆ᴹ_; allᴱ; Shows; Shown; AShows; AShown; HotSim; EnvSim;
   EnvListed; ListedB; ListedL; Live; EndsAfter; EnvNeeds; EnvJoins; Apart; SimIH; sih)
 open import simultaneous.ReadMap using (module Map; upto-dn; under?; under-down; listed-up)
@@ -287,6 +287,12 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
   Tr : EmissionSet A
   Tr = enter (hot rows) p
 
+  postulate
+    -- THE READER'S LATE PINS, listed: a reader pins only its own
+    -- subscription, so they are its hot rows' late pins, joined.
+    reader-late : Lates (Amb ∪ᴹ Mr) (EnvListed ρ env env′ es Tr) Tr
+                    (enter (Op.flatMap (mergeᶠ nothing) (λ s → Op.of (proj₂ s)) (Op.scan joinStep z₀ (hot rows′))) p′)
+
   -- Each reader end past a hot end.
   ends : EndsAfter rows Tr
   ends (shown _ () _ , _)
@@ -337,6 +343,7 @@ module Leaf {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A 
        , record { Img = RD.Img ; img-fun = RD.img-fun ; ext = RD.ext
                 ; sim = λ A′ inc emA c mp L _ → RD.Cut.sim A′ inc emA c mp
                           (Run.sim run A′ (λ a → inc (inj₁ a)) emA c mp (en i Tr ends A′ c L) (unlive c (allᴱ L i))) (at-row A′ inc emA c L)
+                ; late = reader-late
                 ; anchor = anchor }
 
   leaf : Goal (lookup env i) (lookup env′ (ρ (∈-map⁺ AIE i)))
