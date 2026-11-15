@@ -34,14 +34,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### CONNECT: THE ELABORATED SOURCE ROWS
 
-Untried: the elaborated connect's burst, echo and kept rows under a
-bound's image are listed. Risk: past the body's end the source may hide
-infinitely many rows before a kept pin, so the source's rows are listed
-only up to the body's end and its pins past it only as late pins.
-Settled when `src-listed` is a body over the annotated source's
-simulation up to the body's end, its late pins, and its owners.
+Untried: the source positions behind the elaborated connect's source
+rows under a bound's image are listed. Risk: past the body's end the
+source may hide infinitely many rows before a kept pin, and may pin
+past its own end, so its raw rows are listed only up to the body's end
+and its pins past it only as late pins, lifted through the annotation's
+owners. Settled when `src-rows` is a body over the source's raw
+simulation up to the body's end, its late pins, and the owners.
 
-Members: `src-listed`.
+Members: `src-rows`.
 
 #### THE LATE PINS
 

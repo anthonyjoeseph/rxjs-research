@@ -51,7 +51,7 @@ open import simultaneous.SimReader using (hots-at)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.AnnRun using (Upto?; module AnnRun)
 open import simultaneous.ToldRows using (T-or)
-open import simultaneous.ConnPick using (module Pick)
+open import simultaneous.ConnPick using (module Pick; alive-of)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -748,11 +748,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     -- Before every listed end, at or before a point under the image: the
     -- body lives; and conversely.
     alive : ∀ {j l} → j ≼ l → Under A′ c l → AllP.All (j ≺_) endsβ → CE.Alive j
-    alive {j} {l} jl un al {e} y with ≼-or-≻ e l
-    ... | inj₂ le = ≼-≺-≺ {j} {l} {e} jl le
-    ... | inj₁ el with ≼-split {e} {l} el
-    ...   | inj₁ e<l  = AllP.lookup al (end-in y (under-down c e<l un))
-    ...   | inj₂ refl = AllP.lookup al (end-in y un)
+    alive = alive-of {β = β′} {P = Under A′ c} (λ {j} {l} lt u → under-down c lt u) end-in
 
     alive← : ∀ {j} → CE.Alive j → AllP.All (j ≺_) endsβ
     alive← lv = AllP.tabulate λ m → lv (proj₂ (KE.kept-row (proj₁ (Sim.upto hb)) (proj₂ (proj₂ (Sim.upto hb))) m))
@@ -781,8 +777,8 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
         cov : ∀ {l e} (u : U l e) → FromSrc u → Under A′ c l → l ∈ KS.keep (proj₁ SR) (proj₂ (proj₂ SR))
         cov (body _ , _) () _
         cov u@(burst x i , _) _ un         = at x u un λ { x′ refl → picked-burst x′ un i }
-        cov u@(echo x lv up ni , _) _ un   = at x u un λ { x′ refl → picked-echo x′ un (alive← lv) up ni }
-        cov u@(kept x lv ni ins , _) _ un  = at x u un λ { x′ refl → picked-kept x′ un (alive← lv) ni ins }
+        cov u@(echo {k} x lv up ni , _) _ un      = at x u un λ { x′ refl → picked-echo x′ un (alive← {k} lv) up ni }
+        cov u@(kept {p′ = x} x₀ lv ni ins , _) _ un = at x₀ u un λ { x′ refl → picked-kept x′ un (alive← {x} lv) ni ins }
 
   -- AN ELABORATED BODY ROW UNDER A BOUND'S IMAGE IS THE CONNECT'S.
   u-under : ∀ A′ → (Amb ∪ᴹ M) ⊆ᴹ A′ → Emb A′ → ∀ c → Mapped A′ c → EnvListed ρ env env′ es T A′ c → ListedB T c

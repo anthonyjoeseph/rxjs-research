@@ -7,7 +7,9 @@ module simultaneous.ConnPick where
 
 open import Data.Bool using (T; not)
 open import Data.Empty using (⊥-elim)
-open import Data.List using ([_])
+open import Data.List using (List; [_])
+open import Data.List.Membership.Propositional using (_∈_)
+import Data.List.Relation.Unary.All as AllP
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _,_)
 open import Data.Sum using (inj₁; inj₂)
@@ -16,8 +18,20 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (Dec; yes; no)
 
 open import denotation.Position using (Pos; _⊕_; inside; ix)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_)
+open import denotation.Laws.Modulus using (≼-≺-≺; ≼-or-≻; ≼-split)
 open import simultaneous.ToldRows using (T-or; not-T)
+
+-- Before every listed end, at or before a point within a down-closed
+-- bound that lists every end in it: before every end.
+alive-of : ∀ {Y} {β : EmissionSet Y} {P : Pos → Set} {ends : List Pos}
+         → (∀ {j l} → j ≺ l → P l → P j) → (∀ {j} → β j end → P j → j ∈ ends)
+         → ∀ {j l} → j ≼ l → P l → AllP.All (j ≺_) ends → ∀ {e} → β e end → j ≺ e
+alive-of down end-in {j} {l} jl pl al {e} y with ≼-or-≻ e l
+... | inj₂ le = ≼-≺-≺ {j} {l} {e} jl le
+... | inj₁ el with ≼-split {e} {l} el
+...   | inj₁ e<l  = AllP.lookup al (end-in y (down e<l pl))
+...   | inj₂ refl = AllP.lookup al (end-in y pl)
 
 module Pick {X Y : Set} (σ : EmissionSet X) (U : EmissionSet Y) (r : Pos)
             (P : Pos → Set) (P? : ∀ l → Dec (P l)) (Live : Pos → Set) (Live? : ∀ j → Dec (Live j))
