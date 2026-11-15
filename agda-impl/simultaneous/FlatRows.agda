@@ -29,17 +29,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sub
 open import Relation.Nullary using (¬_; does)
 
 import Tree
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected; of; takeWhile)
+open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected; of; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; ix; sub; last)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; DenEnv; Proper; Truncate; _≺_; _≼_; enter; approx; After;
-  LaneOf; InE; at-out; at-end; on-out; shown; MapT; map-out; module Op; module Joiner; module Switch; module Exhaust; module Merge;
-  module Bounded; module Connect; module Scan; module TakeWhile; module Values)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼)
+open import denotation.EmissionSet using (out; end; EmissionSet; Den; hot; DenEnv; Proper; Truncate; _≺_; _≼_; enter; approx; After;
+  LaneOf; InE; at-out; on-out; shown; map-out; module Op; module Joiner; module Switch;
+  module Exhaust; module Bounded; module Connect; module Scan; module TakeWhile; module Values)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-refl; ≺→≼)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (of-end; of-reach)
-open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed; valuesOf)
 open import simultaneous.SObs using (lone; isZero; flat; Part; lanePart; burstPart; isLane; Branch; outerB; laneB; closeB; Flat; module Elaborate)
 open import simultaneous.Sim using (Shown; outerAt)
@@ -118,10 +118,6 @@ mk-rep : ∀ {B} k m n → Marks {B} (replicate k (instEmit (mark m) n))
 mk-rep zero    m n ()
 mk-rep (suc k) m n (here refl) = refl
 mk-rep (suc k) m n (there i)   = mk-rep k m n i
-
--- A shown emit is no mark.
-shown-mk : ∀ {B} {y : IE B} {xs} → y ∈ xs → Marks xs → Shown y → ⊥
-shown-mk i mx sh = sh (mx i)
 
 -- An emit list the flatMap's scan sends: marks, none ending a lane.
 Sends : ∀ {B} → List (IE B) → Set
@@ -693,6 +689,19 @@ module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) whe
   lane-back w {K} {b} r sh = unpair₂ (lane-gen n (λ k → shareˢ (Xs k) (counted (framedˢ k))) ρ (LR b) lfr w (lsb sh)
                                        (subst (λ o → enter (approx n o ρ) w K (out b)) lane-obs r) sh)
 
+  postulate
+    -- A lane's own row past its subscription and before its end, where
+    -- none of its rows ends a lane: the lane's value, framed.
+    --
+    -- DEAD ROUTE: forward through each layer's reach alone.  The lane
+    --   count is a scan, and its row needs its fold (`Acc`), built from
+    --   every earlier value in order; a reach lists positions, not
+    --   events, and which are rows is not decidable without excluded middle.
+    lane-fwd : ∀ w {K₀ b} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+             → (∀ {c} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
+             → (∀ {k y} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
+             → enter (approx n (laneˢ x) ρ) w (framed w K₀) (out b)
+
 ------------------------------------------------------------------------
 -- The elaborated flatMap's rows
 
@@ -826,9 +835,6 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
   init : Out B
   init = flat root 0 0 false false false false 0 0 0 0 0 [] , []
 
-  Dsc : Den (Out B)
-  Dsc = Op.scan (react op) init Dtk
-
   -- A value the scan shows is a branch's value it read.
   opaque
     unfolding CB
@@ -883,6 +889,17 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
     lane-back : ∀ a w {K b} → enter (g₂ a) w K (out b) → Shown b
               → Σ Pos λ K₀ → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
     lane-back a w r sh = Framing.lane-back n (g′ a) envY w r sh
+
+    -- A lane's own row, framed: the real flatMap's lane's.
+    lane-fwd : ∀ a w {K₀ b} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+             → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
+             → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
+             → enter (g₂ a) w (framed w K₀) (out b)
+    lane-fwd a w r lt pr ud = Framing.lane-fwd n (g′ a) envY w r lt pr ud
+
+  postulate
+    -- A value the real flatMap shows, before its end: the scan relays it.
+    relay-fwd : ∀ {K b} → Proper σRF K (out b) → Shown b → U (relay K) (out b)
 
   ----------------------------------------------------------------------
   -- Read back

@@ -18,17 +18,17 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
-open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Nullary using (yes; no)
 
 open import denotation.Position using (Pos; _⊕_; ix; sub; last)
 open import denotation.Events using (<ᵖ-part)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; Proper; Few; Truncate; Rejoin; shown; heard; ended; late;
-  _≺_; _≼_; enter; LaneOf; InE; at-out; module Op; module Joiner)
+open import denotation.EmissionSet using (out; end; EmissionSet; Den; hot; Proper; Few; Truncate; Rejoin; shown; heard; ended; late;
+  _≺_; _≼_; enter; LaneOf; at-out; module Op; module Joiner)
 open import Tree using (mergeᶠ)
 open import Data.Maybe using (nothing)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-or-≻; ≼-split; entered-few)

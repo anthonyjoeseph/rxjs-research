@@ -5,13 +5,13 @@
 module simultaneous.ExMove where
 
 open import Data.Empty using (⊥-elim)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import denotation.Position using (Pos)
-open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; _≺_; _≼_; LaneOf; module Exhaust; module Values)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split)
+open import denotation.EmissionSet using (out; end; EmissionSet; Den; _≺_; _≼_; LaneOf; module Exhaust; module Values)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split)
 
 -- The last lane run's position is a value.
 cur-o : ∀ {A B : Set} {f : A → Den B} {o : EmissionSet A} {q₁ q} → Exhaust.Cur f o q₁ q → Σ A λ a → o q₁ (out a)

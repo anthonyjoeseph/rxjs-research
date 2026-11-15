@@ -16,9 +16,9 @@ open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
 
@@ -101,21 +101,6 @@ module Outs {A : Set} (t : EmissionSet A) where
   outs : (ks : List Pos) → (∀ {k} → k ∈ ks → Σ (Ev A) (t k)) → List Row
   outs []       _  = []
   outs (k ∷ ks) ev = add k (ev (here refl)) (outs ks (λ m → ev (there m)))
-
-  add-here : ∀ q (w : Σ (Ev A) (t q)) rs {a} → proj₁ w ≡ out a → Σ Row λ r → r ∈ add q w rs × proj₁ r ≡ q
-  add-here q (out a , x) rs refl = (q , a , x) , here refl , refl
-
-  add-there : ∀ q (w : Σ (Ev A) (t q)) {rs r} → r ∈ rs → r ∈ add q w rs
-  add-there q (out _ , _) m = there m
-  add-there q (end , _)   m = m
-  add-there q (skip , _)  m = m
-  add-there q (pin _ , _) m = m
-
-  -- Every listed value is kept, rows being functional.
-  outs-∈ : (∀ {q e e′} → t q e → t q e′ → e ≡ e′) → ∀ ks (ev : ∀ {k} → k ∈ ks → Σ (Ev A) (t k)) {q a} → t q (out a) → q ∈ ks → Σ Row λ r → r ∈ outs ks ev × proj₁ r ≡ q
-  outs-∈ fu (k ∷ ks) ev x (here refl) = add-here k (ev (here refl)) _ (fu (proj₂ (ev (here refl))) x)
-  outs-∈ fu (k ∷ ks) ev x (there m) =
-    let (r , i , e) = outs-∈ fu ks (λ m′ → ev (there m′)) x m in r , add-there k (ev (here refl)) i , e
 
 ------------------------------------------------------------------------
 -- The earliest listed

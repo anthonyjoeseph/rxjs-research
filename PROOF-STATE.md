@@ -65,18 +65,28 @@ Members: `joins-σ`, `joins-sub`, `emb-s`, `fresh-s`, `nh-s`, `joins-b`,
 `emb-b`, `fresh-b`, `apart-b`, `nh-b`, `below-b`, `below-b′`, `below-s`,
 `below-s′`, `body-s`, `src-b`, `pairs-none`.
 
+#### FLATMAP: THE RELAY'S LISTING
+
+Probed: `lane-row→` is a body; a lane value's real-flatMap row is built
+and relayed, but each truncated layer needs every row before it, and
+each scan (the lane count, the flatMap's scan) its fold, which needs
+those rows' events: the real flatMap's other lanes, the frame, the
+trackers. Risk: a reach gives positions, not events; the events are
+listed only up to the bound (`upto`, `EnvListed`), and `lane-row→` is
+unbounded. Settled by a ruling on bounding `lane-row→`, then bodies over
+the lanes' listings.
+
+Members: `few₂`, `relay-fwd`, `lane-fwd`.
+
 #### FLATMAP: THE DECISIONS
 
 Probed: read back, every elaborated lane value is a plain running lane's,
-uncut. Open forward: a plain running uncut lane value is relayed, the
-outer's values re-read, and an elaborated exhaust's running lane is the
-plain one's. Risk: every elaboration layer is truncated, and the real
-flatMap's other lanes, the trackers and the scan's branches all lie
-before a relayed row, so each layer's reach needs a cover of those rows.
-Settled when each is a body over the outer's and the lanes' simulations
-and the frame.
+uncut. Open: an exhaust's run and a switch's cut, read forward, and a
+lane's end, read both ways. Risk: each moves along other values'
+carriers, and those are simulated only up to the bound. Settled when
+each is a body over `run←` and the outer's simulation.
 
-Members: `lane-row→`, `o₂-row`, `ex-run←`.
+Members: `ex-run→`, `cut-sw→`, `lane-end←`, `lane-end→`.
 
 #### FLATMAP: THE LANE BOUND
 
