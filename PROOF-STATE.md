@@ -67,23 +67,25 @@ Members: `joins-σ`, `joins-sub`, `emb-s`, `fresh-s`, `nh-s`, `joins-b`,
 
 #### FLATMAP: THE DECISIONS
 
-Untried: a lane the plain joiner runs and leaves uncut, the elaborated
-real flatMap runs, over the outer's re-read values, and leaves uncut,
-framed and relayed by the scan; and back. Risk: an exhaust decides by
-earlier lanes' ends, which the elaboration frames and ends at its own
-`laneDone`; a switch cuts at the next value, which the elaboration
-reads through two connects. Settled when each is a body over the
-outer's and the lanes' simulations and the frame.
+Probed: read back, every elaborated lane value is a plain running lane's,
+uncut. Open forward: a plain running uncut lane value is relayed, the
+outer's values re-read, and an elaborated exhaust's running lane is the
+plain one's. Risk: every elaboration layer is truncated, and the real
+flatMap's other lanes, the trackers and the scan's branches all lie
+before a relayed row, so each layer's reach needs a cover of those rows.
+Settled when each is a body over the outer's and the lanes' simulations
+and the frame.
 
-Members: `lane-row→`, `lane-uncut`, `unrelay`.
+Members: `lane-row→`, `o₂-row`, `ex-run←`.
 
 #### FLATMAP: THE LANE BOUND
 
-Untried: a running lane is simulated up to the flatMap's bound, or its
-own cut. Risk: a switched-out lane may run on unlisted past its cut.
-Settled when `lane-bound` is a body over the cut and the listing.
+Untried: a running lane's rows and hots are listed up to the flatMap's
+bound, or a switch's next value. Risk: a switched-out lane may run on
+unlisted past its cut. Settled when each is a body over the cut and the
+flatMap's listing.
 
-Members: `lane-bound`.
+Members: `lane-env`, `lane-listed`.
 
 #### FLATMAP: THE BOUNDED MERGE
 
