@@ -72,6 +72,12 @@ upto-or y l with T? (l <ᵖ y) | ⊑? y l
 ...   | inj₁ ly with ≼-antisym {l} {y} ly nly
 ...     | refl = ⊥-elim (nyl (⊑-refl l))
 
+-- At or before a position: before it, or it.
+≼-elim : ∀ {k m} (P : Pos → Set) → k ≼ m → (k ≺ m → P k) → P m → P k
+≼-elim {k} {m} P km f pm with ≼-split {k} {m} km
+... | inj₁ lt   = f lt
+... | inj₂ refl = pm
+
 -- At or before a position: up to it.
 upto-≼ : ∀ {k m} → k ≼ m → UpTo m k
 upto-≼ {k} {m} km with ≼-split {k} {m} km

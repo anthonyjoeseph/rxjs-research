@@ -123,80 +123,104 @@ mk-rep (suc k) m n (there i)   = mk-rep k m n i
 shown-mk : ∀ {B} {y : IE B} {xs} → y ∈ xs → Marks xs → Shown y → ⊥
 shown-mk i mx sh = sh (mx i)
 
-cut-mk : ∀ {B} k n s → Marks {B} (proj₂ (cut k n s))
+-- An emit list the flatMap's scan sends: marks, none ending a lane.
+Sends : ∀ {B} → List (IE B) → Set
+Sends xs = ∀ {y} → y ∈ xs → valuesOf y ≡ [] × T (undone y)
+
+sd-[] : ∀ {B} → Sends {B} []
+sd-[] ()
+
+sd-one : ∀ {B} m n → {T (undone {B} (instEmit (mark m) n))} → Sends {B} (instEmit (mark m) n ∷ [])
+sd-one m n {u} (here refl) = refl , u
+sd-one m n (there ())
+
+sd-rep : ∀ {B} k m n → {T (undone {B} (instEmit (mark m) n))} → Sends {B} (replicate k (instEmit (mark m) n))
+sd-rep zero    m n ()
+sd-rep (suc k) m n {u} (here refl) = refl , u
+sd-rep (suc k) m n {u} (there i)   = sd-rep k m n {u} i
+
+cut-mk : ∀ {B} k n s → Sends {B} (proj₂ (cut k n s))
 cut-mk k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
-... | true  | _     = mk-[]
-... | false | true  = mk-[]
-... | false | false = mk-rep k stop n
+... | true  | _     = sd-[]
+... | false | true  = sd-[]
+... | false | false = sd-rep k stop n
 
-unpark-mk : ∀ {B} n s → Marks {B} (proj₂ (unpark n s))
+unpark-mk : ∀ {B} n s → Sends {B} (proj₂ (unpark n s))
 unpark-mk n s with anyHolds (Flat.at s) (Flat.live s)
-... | true  = mk-[]
-... | false = mk-rep (Flat.parked s) stop n
+... | true  = sd-[]
+... | false = sd-rep (Flat.parked s) stop n
 
-arrive-mk : ∀ {B} op n s → Marks {B} (proj₂ (arrive op n s))
+arrive-mk : ∀ {B} op n s → Sends {B} (proj₂ (arrive op n s))
 arrive-mk (mergeᶠ (just k)) n s with Flat.active s <ᵇ k
-... | true  = mk-[]
-... | false = mk-[]
-arrive-mk (mergeᶠ nothing) n s = mk-[]
+... | true  = sd-[]
+... | false = sd-[]
+arrive-mk (mergeᶠ nothing) n s = sd-[]
 arrive-mk switchᶠ          n s = cut-mk (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
-arrive-mk exhaustᶠ         n s = mk-[]
+arrive-mk exhaustᶠ         n s = sd-[]
 
-ended-mk : ∀ {B} k n s → Marks {B} (proj₂ (ended k n s))
+ended-mk : ∀ {B} k n s → Sends {B} (proj₂ (ended k n s))
 ended-mk k n s with isZero (Flat.queue s)
-... | false = mk-[]
+... | false = sd-[]
 ... | true with Flat.finished s ∧ isZero (Flat.active s)
-...   | true  = mk-[]
+...   | true  = sd-[]
 ...   | false = cut-mk (k + Flat.held s) n (record s { held = 0 })
 
-burstOver-mk : ∀ {B} b n s → Marks {B} (proj₂ (burstOver b n s))
-burstOver-mk true  n s = mk-[]
+burstOver-mk : ∀ {B} b n s → Sends {B} (proj₂ (burstOver b n s))
+burstOver-mk true  n s = sd-[]
 burstOver-mk false n s = cut-mk (Flat.held s) n (record s { held = 0 })
 
-left-mk : ∀ {B} n s → Marks {B} (proj₂ (left n s))
+left-mk : ∀ {B} n s → Sends {B} (proj₂ (left n s))
 left-mk n s with isZero (Flat.active s) ∧ isZero (Flat.queue s)
-... | true  = mk-[]
+... | true  = sd-[]
 ... | false = cut-mk (Flat.outer s) n (record s { outer = 0 })
 
-begun-mk : ∀ {B} b n s → Marks {B} (proj₂ (begun b n s))
+begun-mk : ∀ {B} b n s → Sends {B} (proj₂ (begun b n s))
 begun-mk b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
-... | true  = mk-[]
-... | false = mk-one begin n
+... | true  = sd-[]
+... | false = sd-one begin n
 
-stopped-mk : ∀ {B} b n s k → Marks {B} (proj₂ (stopped b n s k))
-stopped-mk b n s zero    = mk-[]
-stopped-mk b n s (suc _) = mk-one stop n
+stopped-mk : ∀ {B} b n s k → Sends {B} (proj₂ (stopped b n s k))
+stopped-mk b n s zero    = sd-[]
+stopped-mk b n s (suc _) = sd-one stop n
 
-overed-mk : ∀ {B} n s → Marks {B} (proj₂ (overed n s))
+overed-mk : ∀ {B} n s → Sends {B} (proj₂ (overed n s))
 overed-mk n s with Flat.spent s
-... | true  = mk-[]
-... | false = mk-one over n
+... | true  = sd-[]
+... | false = sd-one over n
 
-onMark-mk : ∀ {B} op b s m n → Marks {B} (proj₂ (onMark op b s m n))
+onMark-mk : ∀ {B} op b s m n → Sends {B} (proj₂ (onMark op b s m n))
 onMark-mk op b s begin      n = begun-mk b n s
 onMark-mk op b s stop       n = stopped-mk b n s (if Flat.spent s then 0 else share b s)
 onMark-mk op b s over       n = overed-mk n s
-onMark-mk op b s carry      n = mk-[]
+onMark-mk op b s carry      n = sd-[]
 onMark-mk op b s outerOpen  n = arrive-mk op n s
-onMark-mk op b s outerClose n = mk-[]
-onMark-mk op b s laneStart  n = mk-[]
+onMark-mk op b s outerClose n = sd-[]
+onMark-mk op b s laneStart  n = sd-[]
 onMark-mk op b s laneDone   n =
   ended-mk (Flat.acc s ⊓ Flat.lanes s) n
     (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
               ; popping = not (isZero (Flat.queue s)) ; dead = true })
 onMark-mk op b s burstEnd   n = burstOver-mk (isZero (Flat.held s) ∨ Flat.dead s) n s
 onMark-mk op b s outerDone  n = left-mk n (record s { finished = true })
-onMark-mk op b s subscribed n = mk-one subscribed n
-onMark-mk op b s completed  n = mk-one completed n
+onMark-mk op b s subscribed n = sd-one subscribed n
+onMark-mk op b s completed  n = sd-one completed n
 
 -- THE SCAN SHOWS A VALUE ONLY OF A VALUE INPUT, and alone.
 react-val : ∀ {B} op (st : Out B) inp {y} → y ∈ proj₂ (react op st inp) → Shown y
           → Σ Branch λ br → Σ B λ v → Σ Pos λ nm → y ≡ instEmit (value v) nm × inp ≡ just (inj₁ (br , instEmit (value v) nm))
 react-val op (s , _) (just (inj₁ (br , instEmit (value v) nm))) (here refl) _ = br , v , nm , refl , refl
 react-val op (s , _) (just (inj₁ (br , instEmit (value v) nm))) (there ()) _
-react-val op (s , _) (just (inj₁ (br , instEmit (mark m) nm))) i sh = ⊥-elim (sh (onMark-mk op br s m nm i))
-react-val op (s , _) (just (inj₂ (ix′ , r))) i sh = ⊥-elim (sh (unpark-mk root (record s { live = setAt ix′ r (Flat.live s) }) i))
+react-val op (s , _) (just (inj₁ (br , instEmit (mark m) nm))) i sh = ⊥-elim (sh (proj₁ (onMark-mk op br s m nm i)))
+react-val op (s , _) (just (inj₂ (ix′ , r))) i sh = ⊥-elim (sh (proj₁ (unpark-mk root (record s { live = setAt ix′ r (Flat.live s) }) i)))
 react-val op (s , _) nothing () _
+
+-- THE SCAN ENDS NO LANE: it sends a value, or routes.
+react-sends : ∀ {B} op (st : Out B) inp {y} → y ∈ proj₂ (react op st inp) → T (undone y)
+react-sends op (s , _) (just (inj₁ (br , instEmit (value v) nm))) (here refl) = tt
+react-sends op (s , _) (just (inj₁ (br , instEmit (value v) nm))) (there ())
+react-sends op (s , _) (just (inj₁ (br , instEmit (mark m) nm))) i = proj₂ (onMark-mk op br s m nm i)
+react-sends op (s , _) (just (inj₂ (ix′ , r))) i = proj₂ (unpark-mk root (record s { live = setAt ix′ r (Flat.live s) }) i)
+react-sends op (s , _) nothing ()
 
 -- A LANE'S COUNT SHOWS A VALUE ONLY OF A VALUE, and alone.
 laneStep-mk : ∀ {B} (st : Routes × List (IE B)) m n → Marks (proj₂ (laneStep st (instEmit (mark m) n)))

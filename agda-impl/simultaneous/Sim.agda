@@ -69,6 +69,7 @@
 
 module simultaneous.Sim where
 
+open import Data.Bool using (T)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -93,7 +94,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.SObs using (lone; module Elaborate)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; undone)
 
 ------------------------------------------------------------------------
 -- Maps of positions
@@ -250,7 +251,8 @@ Joins S P t Img = ∀ {x y q a σ e₀} → P x y → t q e₀ → x ≡ q ⊕ (
 -- a run of the proper source rows wherever what the source reads is
 -- listed (`need`), listed up to a source row wherever up to a bound past
 -- it (`need-row`), and every point the ambient map puts under a source
--- row a join.
+-- row a join.  The annotated rows end no lane (`undone′`): a lane
+-- reading one would end at its `laneDone`.
 record HotSim (Amb : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ where
   field
     {Δ₀}   : List Set
@@ -268,6 +270,7 @@ record HotSim (Amb : PMap) {X : Set} (d : Den X) (d′ : Den (AIE X)) : Set₁ w
     law′   : Lawful (Proper (enter (approx m (annotate core) env₀) at′))
     run    : Run AShows AShown Amb need (Proper (enter src at)) (Proper (enter (approx m (annotate core) env₀) at′))
     joins  : Joins Amb Amb (Proper (enter src at)) (Run.Img run)
+    undone′ : ∀ {k r e} → Proper (enter (approx m (annotate core) env₀) at′) k (out (r , just e)) → T (undone e)
 
   rows : EmissionSet X
   rows = Proper (enter src at)

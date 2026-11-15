@@ -52,6 +52,7 @@ open import simultaneous.SimPos using (UpTo)
 open import simultaneous.AnnRun using (Upto?; module AnnRun)
 open import simultaneous.ToldRows using (T-or)
 open import simultaneous.ConnPick using (module Pick; alive-of)
+open import simultaneous.ElabUndone using (ann-u; elab-undone; env-u)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -102,7 +103,7 @@ hot-up : ∀ {Amb Amb′ X} {d : Den X} {d′} → Amb ⊆ᴹ Amb′ → (h : Ho
        → Joins Amb′ Amb′ (HotSim.rows h) (HotSim.car h) → HotSim Amb′ d d′
 hot-up inc h j = record
   { Δ₀ = Δ₀ ; src = src ; at = at ; m = m ; core = core ; env₀ = env₀ ; at′ = at′ ; need = need ; need-row = need-row
-  ; isP = isP ; isE = isE ; law = law ; law′ = law′ ; run = run-up inc run ; joins = j }
+  ; isP = isP ; isE = isE ; law = law ; law′ = law′ ; run = run-up inc run ; joins = j ; undone′ = undone′ }
   where open HotSim h
 
 -- WHAT A RUN READS, listed up to a bound, is listed up to a row up to it
@@ -347,6 +348,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     ; isP = refl ; isE = refl ; law = lawσ ; law′ = lawσ′
     ; run = run-up s⊆b annotate-run
     ; joins = joins-σ
+    ; undone′ = λ x → ann-u n (elab ρ s) env′ (elab-undone n ρ s env′ (env-u es)) r′ (proj₁ x)
     }
 
   ----------------------------------------------------------------------

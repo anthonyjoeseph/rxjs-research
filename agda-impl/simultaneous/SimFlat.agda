@@ -42,7 +42,7 @@ open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; D
 open import denotation.Laws using (inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; ok-step; Lawful; InvAt; world-after; inW; plain-ix; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-≼)
 import denotation.Laws.Connect as LC
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ticks; entered-few; ≼-or-≻; ≼-split; ≼-trans; ≺→≼; ≼-refl; ≺-absurd; ≺-irrefl)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ticks; entered-few; ≼-trans; ≺→≼; ≼-refl)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; m-out; m-end; Carried; c-out; c-end;
@@ -53,7 +53,7 @@ open import simultaneous.AnnRun using (under-⊑; Upto?)
 open import simultaneous.ToldRows using (sib-≺)
 open import simultaneous.ExMove using (run←)
 open import simultaneous.FlatFwd using (trig-fwd; vals-fwd; proper-out; sib-⊑; ⊑³)
-open import simultaneous.FlatOrder using (emb-≺; row-apart; row-kid; apart-⊑; upto-or; upto-≼; module Outs; module Earliest)
+open import simultaneous.FlatOrder using (emb-≺; row-apart; row-kid; apart-⊑; upto-or; upto-≼; ≼-elim; module Outs; module Earliest)
 open import simultaneous.SimConnect using (Pair; hot-up; img-upto)
 
 open import simultaneous.FlatRows using (Jn; merge∞; sw; ex; RunsOf; CutOf; inst; laneAt; frameAt; framed; module Rows)
@@ -472,11 +472,8 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
 
       -- A carrier read at or before the given one's: under the image.
       un-rd : ∀ {k x} → U₀ k (out x) → rd k ≼ rd k₀ → Under A′ c k
-      un-rd {k} u le with ≼-or-≻ k k₀
-      ... | inj₂ k₀k = ⊥-elim (le (apart-⊑ (rd-⊑ k₀) (rd-⊑ k) k₀k (row-apart I₀ u₀ u k₀k)))
-      ... | inj₁ kk with ≼-split {k} {k₀} kk
-      ...   | inj₁ lt   = under-down c lt un₀
-      ...   | inj₂ refl = un₀
+      un-rd {k} u le = ≼-elim (Under A′ c) {k} {k₀} (λ k₀k → le (apart-⊑ (rd-⊑ k₀) (rd-⊑ k) k₀k (row-apart I₀ u₀ u k₀k)))
+                         (λ lt → under-down c lt un₀) un₀
 
       In : Pos → Set
       In y = y ≼ rd k₀
@@ -494,9 +491,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
       in-p r le q₀q = le (rd-mono ((_ , oq₀) , uq₀ , _ , i₀ , refl) r q₀q)
 
       up-p : ∀ {q} → InP q → Upto c q
-      up-p {q} le with ≼-split {q} {q₀} le
-      ... | inj₁ lt   = upto-dn c lt uq₀
-      ... | inj₂ refl = uq₀
+      up-p {q} le = ≼-elim (Upto c) {q} {q₀} le (λ lt → upto-dn c lt uq₀) uq₀
 
       back : ∀ {y a₂} → o₂ y (out a₂) → In y → Σ Pos λ q → Rd q y
       back oy le =
