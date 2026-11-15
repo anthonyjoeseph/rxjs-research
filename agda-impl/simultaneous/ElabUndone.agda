@@ -22,7 +22,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; Later; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; Later; merge; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _⊕_; ix)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; Den; hot; Proper; DenEnv; enter; approx; DeferT; module Op; module TakeWhile)
@@ -33,8 +33,8 @@ open import simultaneous.Sim using (EnvSim; HotSim)
 open import simultaneous.FlatRows using (conn-out; merge-out; hot-out; map-out′; scan-out; of-mem; each-one; react-sends; module Cat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; elabˡ; annotate; undone; joins;
-  joinStep; annStep; render; mapIE; scanIE; combined; react; concatˢ; marked;
-  flatMapˢ; closer; laneˢ; each; trackers; Out; Input; going; fed)
+  joinStep; annStep; render; phase; passes; mapIE; scanIE; combined; react; concatˢ; marked;
+  closer; laneˢ; each; trackers; Out; Input; going; fed)
 
 ------------------------------------------------------------------------
 -- What ends no lane
@@ -173,33 +173,23 @@ comb-u n op tk env =
     z₁ = (flat root 0 0 false false false false 0 0 0 0 0 [] , [])
     d₁ = takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))
 
--- The flatMap's lanes, and the trigger's body.
-fmᵉ : ∀ {Δ A B} op (g : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)) → E (IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
-fmᵉ op g = flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))
+-- Four connects show their innermost body's rows.
+conn⁴ : ∀ n {Δ X₁ X₂ X₃ X₄ B} (o : E Δ (IE B)) (s₁ : E Δ X₁) (s₂ : E (X₁ ∷ Δ) X₂) (s₃ : E (X₂ ∷ X₁ ∷ Δ) X₃) (s₄ : E (X₃ ∷ X₂ ∷ X₁ ∷ Δ) X₄)
+      (k : E (X₄ ∷ X₃ ∷ X₂ ∷ X₁ ∷ Δ) (IE B)) (env : DenEnv Δ) → o ≡ connect s₁ (connect s₂ (connect s₃ (connect s₄ k)))
+      → (∀ e → Undone (approx n k e)) → Undone (approx n o env)
+conn⁴ n o s₁ s₂ s₃ s₄ k env refl h =
+  connE n s₁ (connect s₂ (connect s₃ (connect s₄ k))) env λ q →
+    let e₁ = hot (Proper (enter (approx n s₁ env) q)) ∷ᴬ env in
+    connE n s₂ (connect s₃ (connect s₄ k)) e₁ λ q₂ →
+    let e₂ = hot (Proper (enter (approx n s₂ e₁) q₂)) ∷ᴬ e₁ in
+    connE n s₃ (connect s₄ k) e₂ λ q₃ →
+    let e₃ = hot (Proper (enter (approx n s₃ e₂) q₃)) ∷ᴬ e₂ in
+    connE n s₄ k e₃ λ q₄ → h (hot (Proper (enter (approx n s₄ e₃) q₄)) ∷ᴬ e₃)
 
-s₂ᵉ : ∀ {Δ A} (s : E (⊤ ∷ Δ) (IE A)) → E (⊤ ∷ Δ) (IE A)
-s₂ᵉ s = flatMap (mergeᶠ nothing) (λ _ → s) (connected (here refl))
-
-flat-eq : ∀ {Δ A B} op (tk : E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)) (g : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
-          (s : E (⊤ ∷ Δ) (IE A)) → connect (of (tt ∷ [])) (connect (s₂ᵉ s) (connect closer (connect (fmᵉ op g) (combined op tk)))) ≡ flatMapˢ op tk g s
-flat-eq op tk g s = refl
-
-undone-≡ : ∀ n {Δ B} {o o′ : E Δ (IE B)} (env : DenEnv Δ) → o ≡ o′ → Undone (approx n o env) → Undone (approx n o′ env)
-undone-≡ n env refl u = u
-
--- The flatMap's four connects show the scan's rows.
-flat-u : ∀ n {Δ A B} op (tk : E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)) (g : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
-       (s : E (⊤ ∷ Δ) (IE A)) (env : DenEnv Δ) → Undone (approx n (flatMapˢ op tk g s) env)
-flat-u n {Δ} {A} {B} op tk g s env =
-  undone-≡ n {o = connect (of (tt ∷ [])) (connect (s₂ᵉ s) (connect closer (connect (fmᵉ op g) (combined op tk))))} {o′ = flatMapˢ op tk g s}
-    env (flat-eq op tk g s)
-    (connE n (of (tt ∷ [])) (connect (s₂ᵉ s) (connect closer (connect (fmᵉ op g) (combined op tk)))) env λ q →
-      let e₁ = hot (Proper (enter (approx n (of (tt ∷ [])) env) q)) ∷ᴬ env in
-      connE n (s₂ᵉ s) (connect closer (connect (fmᵉ op g) (combined op tk))) e₁ λ q₂ →
-      let e₂ = hot (Proper (enter (approx n (s₂ᵉ s) e₁) q₂)) ∷ᴬ e₁ in
-      connE n closer (connect (fmᵉ op g) (combined op tk)) e₂ λ q₃ →
-      let e₃ = hot (Proper (enter (approx n closer e₂) q₃)) ∷ᴬ e₂ in
-      connE n (fmᵉ op g) (combined op tk) e₃ λ q₄ → comb-u n op tk (hot (Proper (enter (approx n (fmᵉ op g) e₃) q₄)) ∷ᴬ e₃))
+-- A connect, named by an equation.
+conn≡ : ∀ n {Δ A B} (o : E Δ (IE B)) (s : E Δ A) (b : E (A ∷ Δ) (IE B)) (env : DenEnv Δ) → o ≡ connect s b
+      → (∀ q → Undone (approx n b (hot (Proper (enter (approx n s env) q)) ∷ᴬ env))) → Undone (approx n o env)
+conn≡ n o s b env refl h = connE n s b env h
 
 -- An annotated source shows the source's emits.
 z₀ : ∀ {A} → Routes × AIE A
@@ -225,30 +215,29 @@ ann-u n s env us p {y = y} rw | x , sx , eq | st , a , ca , eq′ | refl | inj�
 
 elab-undone : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) (env : DenEnv Δ) → EnvU ρ env
             → Undone (approx n (elab ρ o) env)
-elab-undone n ρ (cold c) env eu p r with merge-out (λ x → approx n (render x) env) _ p r
+elab-undone n ρ (cold c) env eu p r
+  with merge-out (λ x → approx n (render x) env)
+         (approx n (scan phase (false , tick) (merge (concatˢ (map val (cold c)) (of (cdone ∷ []))) (of (tick ∷ [])))) env) p r
 ... | _ , x , _ , l , _ = render-u n x env _ l
 elab-undone n ρ empty env eu p (() , _)
 elab-undone n ρ (of xs) env eu p (r , _) with ∈-map⁻ _ (of-mem p 0 _ r)
 ... | _ , _ , refl = tt
-elab-undone n ρ (map f s) env eu p r with map-out′ _ _ p r
+elab-undone n ρ (map f s) env eu p r with map-out′ (mapIE f) (approx n (elab ρ s) env) p r
 ... | x , sx , refl = mapIE-u f x (elab-undone n ρ s env eu p sx)
 elab-undone n ρ (scan f z s) env eu p r with map-out′ proj₂ (Op.scan (scanIE f) (z , marked begin) (approx n (elab ρ s) env)) p r
 ... | _ , sx , refl with scan-out (scanIE f) (z , marked begin) (approx n (elab ρ s) env) p sx
 ...   | st , x , dx , refl = scanIE-u f st x (elab-undone n ρ s env eu p dx)
-elab-undone n ρ (takeWhile i keep s) env eu p r = let (_ , sx) = take-row i _ _ p r in elab-undone n ρ s env eu p sx
+elab-undone n ρ (takeWhile i keep s) env eu p r = let (_ , sx) = take-row i (passes keep) (approx n (elab ρ s) env) p r in elab-undone n ρ s env eu p sx
 elab-undone n {Γ} ρ (flatMap op f s) env eu =
-  subst (λ o → Undone (approx n o env))
-    {x = flatMapˢ op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))
-           (λ a → elab (λ i → there (there (there (there (ρ i))))) (f a)) (elab (λ i → there (ρ i)) s)}
-    {y = elab ρ (flatMap op f s)} refl
-    (flat-u n op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))
-      (λ a → elab (λ i → there (there (there (there (ρ i))))) (f a)) (elab (λ i → there (ρ i)) s) env)
+  conn⁴ n (elab ρ (flatMap op f s)) (of (tt ∷ [])) (flatMap (mergeᶠ nothing) (λ _ → elab (λ i → there (ρ i)) s) (connected (here refl)))
+    closer (flatMap op (λ a → laneˢ (elab (λ i → there (there (there (there (ρ i))))) (f a))) (each valuesOf (connected (there (here refl)))))
+    (combined op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))) env refl
+    λ e → comb-u n op (trackers Γ 0 (λ i → there (there (there (there (ρ i)))))) e
 elab-undone n ρ (connect s b) env eu =
-  subst (λ o → Undone (approx n o env)) {x = connect (annotate (elab ρ s)) (elab (ext ρ) b)} {y = elab ρ (connect s b)} refl
-    (connE n (annotate (elab ρ s)) (elab (ext ρ) b) env λ q →
-      elab-undone n (ext ρ) b (hot (Proper (enter (approx n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
-        let (_ , (x , _) , _) = hot-out {t = Proper (enter (approx n (annotate (elab ρ s)) env) q)} r
-        in ann-u n (elab ρ s) env (elab-undone n ρ s env eu) q x) eu))
+  conn≡ n (elab ρ (connect s b)) (annotate (elab ρ s)) (elab (ext ρ) b) env refl λ q →
+    elab-undone n (ext ρ) b (hot (Proper (enter (approx n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
+      let (_ , (x , _) , _) = hot-out {t = Proper (enter (approx n (annotate (elab ρ s)) env) q)} r
+      in ann-u n (elab ρ s) env (elab-undone n ρ s env eu) q x) eu)
 elab-undone n ρ (connected i) env eu p r with each-one proj₂ (Op.scan joinStep (true , []) (lookup env (ρ (∈-map⁺ AIE i)))) p r
 ... | _ , x , dx , yi , _ with scan-out joinStep (true , []) (lookup env (ρ (∈-map⁺ AIE i))) p dx
 ...   | st , a , da , eq with join-u st a (subst (λ z → _ ∈ proj₂ z) eq yi)

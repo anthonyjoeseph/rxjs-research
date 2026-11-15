@@ -348,7 +348,7 @@ module Conn (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     ; isP = refl ; isE = refl ; law = lawσ ; law′ = lawσ′
     ; run = run-up s⊆b annotate-run
     ; joins = joins-σ
-    ; undone′ = λ x → ann-u n (elab ρ s) env′ (elab-undone n ρ s env′ (env-u es)) r′ (proj₁ x)
+    ; undone′ = λ x → ann-u n (elab ρ s) env′ (elab-undone n ρ s env′ (env-u {Γ} {Δ} {Amb} {λ {X} → ρ {X}} {env} {env′} es)) r′ (proj₁ x)
     }
 
   ----------------------------------------------------------------------
