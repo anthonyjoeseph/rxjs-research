@@ -38,7 +38,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit using (tt)
 open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Tree using (Obs)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
@@ -103,8 +103,10 @@ M = Match Every (One valuesOf) (Reads valuesOf)
 -- row on its image, a skip possibly put late instead, as a pin is (`put`,
 -- homed in the subscription's instant or a carried row's before it);
 -- each shown elaborated row back on a plain one; each elaborated row in
--- the subscription's instant or a carried row's at or before it; the
--- images keeping the order and the instants of the rows they image.
+-- the subscription's instant or a carried row's, the image at or before
+-- it unless the row leads its instant (an async step's `begin` comes
+-- before the step's value); the images keeping the order and the
+-- instants of the rows they image.
 record Corr {A : Set} (φ : Pos → Pos) (Put : Pos → Pos → Set) (L : EmissionSet A) (L* : EmissionSet (IE A)) : Set where
   Imaged : Pos → Ev A → Set
   Imaged k e = Σ (Ev (IE A)) λ e′ → L* (φ k) e′ × M e e′
@@ -115,13 +117,17 @@ record Corr {A : Set} (φ : Pos → Pos) (Put : Pos → Pos → Set) (L : Emissi
   PutAt : Pos → Set
   PutAt k = (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → L* l e′ × Put k l) × Homed k
 
+  -- No unpinned row of its instant lies before `k`.
+  Leads : Pos → Set
+  Leads k = ∀ {k′ e′} → L k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
+
   field
     row→   : ∀ {k e} → L k e → Unpinned e → Imaged k e ⊎ (e ≡ skip × PutAt k)
     pin→   : ∀ {k p} → L k (pin p) → PutAt k
     shown← : ∀ {l e′} → L* l e′ → Shown (One valuesOf) e′
            → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ k × L k e × Unpinned e × M e e′
     place  : ∀ {m e′} → L* m e′
-           → instantOf m ≡ instantOf root ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × Imaged k e × φ k ≼ m × instantOf (φ k) ≡ instantOf m
+           → instantOf m ≡ instantOf root ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × Imaged k e × (φ k ≼ m ⊎ Leads k) × instantOf (φ k) ≡ instantOf m
     mono   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ k ≺ φ k′
     inst   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′
            → (instantOf (φ k) ≡ instantOf (φ k′) ⇔ instantOf k ≡ instantOf k′)
@@ -141,7 +147,7 @@ corr-≃ {A} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
   { row→ = λ x un → [ (λ im → inj₁ (imaged im)) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
   ; pin→ = λ x → putAt (C.pin→ (from x))
   ; shown← = λ y sh → let (k , e , eq , x , un , m) = C.shown← (from* y) sh in k , e , eq , to x , un , m
-  ; place = λ y → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , le , eq) }) ] (C.place (from* y))
+  ; place = λ {m} y → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y))
   ; mono = λ x x′ → C.mono (from x) (from x′)
   ; inst = λ x x′ → C.inst (from x) (from x′)
   ; home = λ x → C.home (from x)
@@ -161,6 +167,10 @@ corr-≃ {A} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
     homed : ∀ {k} → C.Homed k → Homed k
     homed (inj₁ eq) = inj₁ eq
     homed (inj₂ (k₀ , e₀ , x , un , im , lt , eq)) = inj₂ (k₀ , e₀ , to x , un , imaged im , lt , eq)
+
+    leadsOr : ∀ {k m} → φ k ≼ m ⊎ C.Leads k → φ k ≼ m ⊎ (∀ {k′ e′} → K k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+    leadsOr (inj₁ le) = inj₁ le
+    leadsOr (inj₂ ld) = inj₂ (λ x → ld (from x))
 
     putAt : ∀ {k} → C.PutAt k → (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → K* l e′ × Put k l) × Homed k
     putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
@@ -201,6 +211,8 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   (img-few : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ k) e′ → Few u (φ k))
   (causal← : ∀ {N k e} → Rows (L N) k e → Unpinned e → Settled u d N (φ k) → Settled t c N k)
   (put-row : ∀ {N k l e′} → Settled t c N k → Rows (L* N) l e′ → Put k l → u l e′)
+  (lead : ∀ {N k e m} → Rows (L N) k e → Unpinned e → Corr.Leads (T N) k → instantOf m ≡ instantOf (φ k)
+        → Settled u d N m → Settled u d N (φ k))
   (whole-ahead : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ (List Pos) λ ls → ∀ {l e} → u l e → l ∈ ls)
   where
   module RP = Rowed t c L ex
@@ -285,9 +297,13 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   place {m} y _ fw with cutQS fw {bQ fw} ≤-refl′
   ... | ag* with Corr.place (T (bQ fw)) (RQ.to-row (RQ.now ag*) (≼-refl {m}) y)
   ...   | inj₁ e = inj₁ e
-  ...   | inj₂ (k , e , r , un , im , km , ie) =
-    let ag = causal← r un (RQ.sdown ag* km)
+  ...   | inj₂ (k , e , r , un , im , at , ie) =
+    let ag = causal← r un (upto-img at)
     in inj₂ (k , φ k , img-of ag (RP.of-row (RP.now ag) (≼-refl {k}) r) un im , ie)
+    where
+      upto-img : φ k ≼ m ⊎ Corr.Leads (T (bQ fw)) k → Settled u d (bQ fw) (φ k)
+      upto-img (inj₁ km) = RQ.sdown ag* km
+      upto-img (inj₂ ld) = lead r un ld (sym ie) ag*
 
   -- An image lies at or before every elaborated end: an end before it is
   -- a plain end's image, which the plain row precedes.
@@ -423,6 +439,9 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
     -- And up to a late placement found where the plain cut agrees.
     stable-put : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k t (CP.c₃ N) → Rows (CQ.L₃ N) l e′ → Put k l
                → AgreeTo l (CQ.c₃ N′) (CQ.c₃ N)
+    -- And from a row of the instant a table row leads to that row's image.
+    stable-lead : ∀ {N N′ k e m} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (proj₁ (proj₂ (proj₂ tables)) N) k
+                → instantOf m ≡ instantOf (φ k) → AgreeTo m (CQ.c₃ N′) (CQ.c₃ N) → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
     -- And everywhere: two plain cuts agreeing at every row put the two
     -- elaborated cuts' rows in one another.
     elab-all : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (CP.c₃ N′) (CP.c₃ N)) → ∀ {y e} → CQ.c₃ N′ y e → CQ.c₃ N y e
@@ -457,6 +476,14 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
       fq = reached-few n Q l (mapL proj₁ (rows (CQ.L₃ N))) λ {y} {e} x yl fy →
         let x′ = proj₁ (upto (CQ.cut-at₃ fy {CQ.bound fy ⊔ N} (m≤m⊔n (CQ.bound fy) N)) {y} {e} (≼-refl {y})) x
         in ∈-map⁺ proj₁ (complete (CQ.ex₃ N) (proj₁ (upto (st (m≤n⊔m (CQ.bound fy) N)) {y} {e} (≺→≼ {y} {l} yl)) x′))
+
+  -- Settled up to a row of the instant a table row leads, settled up to
+  -- its image.
+  lead : ∀ {N k e m} → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (proj₁ (proj₂ (proj₂ tables)) N) k
+       → instantOf m ≡ instantOf (φ k) → Settled u CQ.c₃ N m → Settled u CQ.c₃ N (φ k)
+  lead {N} {k} r un ld ie ag* {N′} le =
+    AgreeTo-trans (agree-at {N} {φ k} (λ le′ → stable-lead le′ r un ld ie (AgreeTo-trans (AgreeTo-sym (ag* le′)) (ag* ≤-refl′))))
+      (AgreeTo-sym (stable-lead le r un ld ie (AgreeTo-trans (AgreeTo-sym (ag* le)) (ag* ≤-refl′))))
 
   -- An agreed table row's image: the elaborated run agrees with the cut
   -- up to it.
@@ -512,4 +539,5 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
     (λ {q} → CP.bound {q}) (λ {q} fw {N} → CP.cut-at₃ {q} fw {N}) (λ {q} → CQ.bound {q}) (λ {q} fw {N} → CQ.cut-at₃ {q} fw {N})
     φ (proj₁ (proj₂ tables)) (proj₁ (proj₂ (proj₂ tables)))
     (proj₁ (proj₂ (proj₂ (proj₂ tables)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ tables))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ tables)))))
-    (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′}) whole-ahead
+    (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′})
+    (λ {N} {k} {e} {m} → lead {N} {k} {e} {m}) whole-ahead

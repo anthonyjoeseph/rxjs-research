@@ -43,7 +43,8 @@ map, late placement, cut correspondence and lifting facts (up to an
 image, back, at a late placement, everywhere), over related
 environments. Out of scope: the flatMap and connect content itself.
 
-Members: `corr`, `elab-causal`, `elab-all`, `stable←`, `stable-put`.
+Members: `corr`, `elab-causal`, `elab-all`, `stable←`, `stable-put`,
+`stable-lead`.
 
 ## Tier 3 — the simultaneous spec
 
