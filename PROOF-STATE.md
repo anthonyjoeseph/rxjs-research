@@ -32,130 +32,38 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### CONNECT: THE ELABORATED SOURCE ROWS
+#### THE TABLES
 
-Untried: the source positions behind the elaborated connect's source
-rows under a bound's image are listed. Risk: past the body's end the
-source may hide infinitely many rows before a kept pin, and may pin
-past its own end, so its raw rows are listed only up to the body's end
-and its pins past it only as late pins, lifted through the annotation's
-owners. Settled when `src-rows` is a body over the source's raw
-simulation up to the body's end, its late pins, and the owners.
+Undesigned: the plain and elaborated tables of one cut correspond along
+one position map and one late placement. The connect and flatMap maps
+and decisions all live here now. Settled when `tables` is a body over a
+per-former induction whose hypothesis relates environments (hots, joins).
 
-Members: `src-rows`.
+Members: `tables`.
 
-#### THE LATE PINS
+#### THE CUTS' STABILITY
 
-Untried: a run lists its elaborated pins of subscriptions before a bound
-wherever the plain such pins and rows are. Risk: the reader's and the
-annotation's pins trace to plain rows only through joins and owners,
-and the connect's through the source's late pins, recursively. Settled
-when each is a body over its run's own carriers.
+Untried: deeper cuts agree with shallower ones up to an image, both
+ways, and some cut is final past every plain row. Per-former and
+finite. Settled when each is a body over the tables' per-former steps.
 
-Members: `ann-late`, `conn-late`, `reader-late`, `late-f`.
+Members: `stable`, `stable←`, `stable-all`.
 
-#### CONNECT: THE MAPS
+#### THE WELL-ORDER
 
-Untried: the source's map, the three pairs and the body's map are one
-embedding, fresh at each pair; each lies in its own pair's worlds, none
-under the other's rows, none under a source row. Settled when each is
-a body over the simulations' locality and freshness.
+Untried: an approximant's rows are well-founded under `≺`, so induction
+reaches a row no cut lists. Decision-free; rekeyed sub labels and
+cascades need care. Settled when `rows-ind` is a body over `approx`.
 
-Members: `joins-σ`, `joins-sub`, `emb-s`, `fresh-s`, `nh-s`, `joins-b`,
-`emb-b`, `fresh-b`, `apart-b`, `nh-b`, `below-b`, `below-b′`, `below-s`,
-`below-s′`, `body-s`, `src-b`, `pairs-none`.
-
-#### FLATMAP: THE RELAY'S LISTING
-
-Probed: `lane-row→` is a body, bounded; the lane's rows before its
-carrier are listed by its simulation up to the row (`lane-at`). Open:
-the relay's input listed the same way — the outer's, every lane's and the
-trackers' rows before it — and each scan's forward step a body over
-`foldᵈ`. Risk: the trackers read hots, listed only by their own runs.
-Settled when `relay-at` is a body over the sims up to the row.
-
-Members: `relay-at`, `few₂`, `relay-fwd`, `lane-fwd`.
-
-#### FLATMAP: THE DECISIONS
-
-Probed: read back, every elaborated lane value is a plain running lane's,
-uncut; read forward, each decision is taken up to the bound. Open: an
-exhaust's run and a switch's cut, read forward, and a lane's end, read
-both ways. Risk: each moves along other values' carriers, simulated only
-up to the bound. Settled when each is a body over `run←` and the outer's
-simulation up to the row.
-
-Members: `ex-run→`, `cut-sw→`, `lane-end←`, `lane-end→`.
-
-#### FLATMAP: THE LANE BOUND
-
-Untried: a running lane's rows and hots are listed up to the flatMap's
-bound, or a switch's next value. Risk: a switched-out lane may run on
-unlisted past its cut. Settled when each is a body over the cut and the
-flatMap's listing.
-
-Members: `lane-env`, `lane-listed`.
-
-#### FLATMAP: THE BOUNDED MERGE
-
-Untried: a bounded merge's lanes start at its schedule's starts, read
-off the same ends on both sides. Settled when `sim-bounded` is a body
-over the unbounded joiners' lanes.
-
-Members: `sim-bounded`.
-
-#### FLATMAP: THE MAPS
-
-Untried: the outer's and every lane's subscription pair lie alone in
-their worlds, admissible, the lanes' hots lawful; the joined map is an
-embedding, local, under no plain row, keeping the joins, one carrier a
-row. Settled when each is a body over the pieces' locality.
-
-Members: `ok-o`, `fresh-o`, `emb-l`, `fresh-l`, `joins-l`, `good-l`,
-`ok-l`, `ok-l′`, `nh-l`, `flat-img`, `local-f`, `emb-f`, `none-f`,
-`flat-joins`.
-
-#### FLATMAP: ENDS, REACH AND LISTING
-
-Untried: the ends correspond; a relayed lane value is reached; the
-outer's rows, and the elaborated rows, up to a bound are listed; a
-lane value is anchored. Settled when each is a body.
-
-Members: `flat-end→`, `flat-end←`, `lane-reach`, `outer-listed`, `u-upto`,
-`anchor-v`.
-
-#### THE SIMULATION: DECISIONS
-
-Untried: a take's failure, a scan's state and a map's values transfer
-both ways along the map; the closed run beside its marks, restamped,
-simulates the program from the root. Settled when each is a body.
-
-Members: `sim-takeWhile`, `sim-scan`, `restamp-sim`.
-
-#### THE SIMULATION: SOURCES
-
-Untried: a cold's, an of's and an empty's elaborated rows carry their
-plain rows; a defer's guard and bottom carry theirs. Settled when each
-is a body.
-
-Members: `sim-cold`, `sim-of`, `sim-empty`, `sim-⊥`, `sim-next`.
+Members: `rows-ind`.
 
 #### THE CONSUMPTION
 
-Untried: a table image of a plain row agreed with is the approximant's,
-with few rows before it; a late placement too; and agreement crosses
-back from the elaborated side. Settled when each member is a body over
-`sim-root`'s simulation and the tables.
+Untried: an elaborated cut's row paired with a plain row agreed with is
+a row of the run. Settled when `put-row` is a body over `cut-ne` and
+the tables.
 
-Members: `img-row`, `img-few`, `put-row`, `causal←`.
-
-#### THE TABLES
-
-Untried: the plain and elaborated tables of one cut correspond along one
-position map and one late placement. Settled when `tables` is a body
-over per-operator simulations.
-
-Members: `tables`.
+Members: `put-row`.
 
 #### THE BATCH RANK
 
