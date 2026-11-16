@@ -35,16 +35,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE TABLES
 
 The rewrite, finished before any other proof work: each one-to-one
-former carries its child's record through its operator's table, and
-each leaf, the spin and the batcher's own plumbing has a record of its
-own. Each record also owes coherence, one event per position, flat
-rows, pins inside their connects, and cuts truncated before they differ
-(`cons`); every leaf, `flat-rel` and `conn-rel` too. Untried: whether
-`cons` holds of spun cuts; `take-tab` puts a skip whose put the
-elaborated failure drops under that failure; the leaves' maps rename
-the creator inside an async instant; `scan-tab` matches values only
-where both accumulators read the same values in order. Settled when
-each is a body.
+former carries its child's record through its operator's table; each
+leaf, the spin and the batcher's plumbing has its own. Every record,
+`flat-rel`'s and `conn-rel`'s too, owes coherence, run-shaped tables
+and cuts truncated before they differ (`cons`). Untried: whether `cons`
+holds of spun cuts; `take-tab` puts a skip whose put the elaborated
+failure drops under that failure; the leaves' maps rename the creator
+in an async instant; `scan-tab` matches values only where both
+accumulators read the same values in order. Settled when each is a
+body.
 
 Members: `scan-tab`, `take-tab`, `defer-tab`, `spin-tab`, `empty-rel`,
 `of-rel`, `cold-rel`, `top-rel`.
