@@ -915,18 +915,20 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
     ls≡ : ∀ a → laneˢ (g′ a) ≡ LS a
     ls≡ a = refl
 
-  -- A lane's value: its own lane's row, framed.
-  lane-back : ∀ a w {K b} → enter (g₂ a) w K (out b) → Shown b
-            → Σ Pos λ K₀ → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
-  lane-back a w r sh = Framing.lane-back n (g′ a) envY (LS a) (ls≡ a) w r sh
+  -- Sealed, so a consumer meets each witness by name.
+  opaque
+    -- A lane's value: its own lane's row, framed.
+    lane-back : ∀ a w {K b} → enter (g₂ a) w K (out b) → Shown b
+              → Σ Pos λ K₀ → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
+    lane-back a w r sh = Framing.lane-back n (g′ a) envY (LS a) (ls≡ a) w r sh
 
-  -- A lane's own row, framed: the real flatMap's lane's.
-  lane-fwd : ∀ a w {K₀ b} → Listed (enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
-           → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
-           → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
-           → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
-           → enter (g₂ a) w (framed w K₀) (out b)
-  lane-fwd a w ls r lt pr ud = Framing.lane-fwd n (g′ a) envY (LS a) (ls≡ a) w ls r lt pr ud
+    -- A lane's own row, framed: the real flatMap's lane's.
+    lane-fwd : ∀ a w {K₀ b} → Listed (enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
+             → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+             → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
+             → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
+             → enter (g₂ a) w (framed w K₀) (out b)
+    lane-fwd a w ls r lt pr ud = Framing.lane-fwd n (g′ a) envY (LS a) (ls≡ a) w ls r lt pr ud
 
   postulate
     -- A value the real flatMap shows, before its end, the scan's input
