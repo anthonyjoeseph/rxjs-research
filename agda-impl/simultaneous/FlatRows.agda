@@ -608,7 +608,9 @@ unpair₂ (K₀ , (a , b) , d) = K₀ , a , b , d
 ------------------------------------------------------------------------
 -- A lane, framed
 
-module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) where
+-- The lane given with its equation, so a consumer compares it by name,
+-- never by the denotation its tree unfolds to.
+module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) (L : E Θ (IE B)) (L≡ : laneˢ x ≡ L) where
 
   -- A lane part's share: its trigger, its gated lane, the gate's env.
   σttW : Pos → EmissionSet ⊤
@@ -676,19 +678,27 @@ module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) whe
   lfr : Pos → Pos → Pos
   lfr w₀ K₀ = ((K₀ ⊕ [ sub ((((w₀ ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
 
-  lsb : ∀ {K b} → Shown b → ∀ part w₀ → enter (approx n (shareˢ (Xs part) (counted (framedˢ part))) ρ) w₀ K (out b)
-      → Σ Pos λ K₀ → LR b w₀ K₀ × T (isLane part) × K ≡ lfr w₀ K₀
-  lsb sh part w₀ srow = pair₂ (share-back part w₀ srow sh)
+  -- A part's share, sealed: compared by name, its denotation never
+  -- unfolded.
+  opaque
+    SH : Part → E Θ (IE B)
+    SH k = shareˢ (Xs k) (counted (framedˢ k))
 
-  -- A lane, its parts' shares named.
-  lane-obs : laneˢ x ≡ takeWhile true undone (flatMap (mergeᶠ nothing) (λ k → shareˢ (Xs k) (counted (framedˢ k))) (of (lanePart ∷ burstPart ∷ [])))
-  lane-obs = refl
+  opaque
+    unfolding SH
+    lsb : ∀ {K b} → Shown b → ∀ part w₀ → enter (approx n (SH part) ρ) w₀ K (out b)
+        → Σ Pos λ K₀ → LR b w₀ K₀ × T (isLane part) × K ≡ lfr w₀ K₀
+    lsb sh part w₀ srow = pair₂ (share-back part w₀ srow sh)
+
+    -- A lane, its parts' shares named.
+    lane-obs : laneˢ x ≡ takeWhile true undone (flatMap (mergeᶠ nothing) SH (of (lanePart ∷ burstPart ∷ [])))
+    lane-obs = refl
 
   -- A lane's value: its own lane's row, framed.
-  lane-back : ∀ w {K b} → enter (approx n (laneˢ x) ρ) w K (out b) → Shown b
+  lane-back : ∀ w {K b} → enter (approx n L ρ) w K (out b) → Shown b
             → Σ Pos λ K₀ → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
-  lane-back w {K} {b} r sh = unpair₂ (lane-gen n (λ k → shareˢ (Xs k) (counted (framedˢ k))) ρ (LR b) lfr w (lsb sh)
-                                       (subst (λ o → enter (approx n o ρ) w K (out b)) lane-obs r) sh)
+  lane-back w {K} {b} r sh = unpair₂ (lane-gen n SH ρ (LR b) lfr w (lsb sh)
+                                       (subst (λ o → enter (approx n o ρ) w K (out b)) (trans (sym L≡) lane-obs) r) sh)
 
   postulate
     -- A lane's own row past its subscription and before its end, where
@@ -705,7 +715,7 @@ module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) whe
              → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
              → (∀ {c} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
              → (∀ {k y} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
-             → enter (approx n (laneˢ x) ρ) w (framed w K₀) (out b)
+             → enter (approx n L ρ) w (framed w K₀) (out b)
 
 ------------------------------------------------------------------------
 -- The elaborated flatMap's rows: the program and its rows given, each
@@ -899,20 +909,24 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
   envW : Pos → DenEnv (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ)
   envW w₀ = hot (Proper (enter (Op.of (tt ∷ [])) (w₀ ⊕ [ ix 1 ]))) ∷ᴬ envY
 
-  -- A lane's value: its own lane's row, framed.
+  -- Each lane, its sealed name's equation.
   opaque
     unfolding LS
-    lane-back : ∀ a w {K b} → enter (g₂ a) w K (out b) → Shown b
-              → Σ Pos λ K₀ → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
-    lane-back a w r sh = Framing.lane-back n (g′ a) envY w r sh
+    ls≡ : ∀ a → laneˢ (g′ a) ≡ LS a
+    ls≡ a = refl
 
-    -- A lane's own row, framed: the real flatMap's lane's.
-    lane-fwd : ∀ a w {K₀ b} → Listed (enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
-             → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
-             → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
-             → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
-             → enter (g₂ a) w (framed w K₀) (out b)
-    lane-fwd a w ls r lt pr ud = Framing.lane-fwd n (g′ a) envY w ls r lt pr ud
+  -- A lane's value: its own lane's row, framed.
+  lane-back : ∀ a w {K b} → enter (g₂ a) w K (out b) → Shown b
+            → Σ Pos λ K₀ → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) × laneAt w ≺ K₀ × K ≡ framed w K₀
+  lane-back a w r sh = Framing.lane-back n (g′ a) envY (LS a) (ls≡ a) w r sh
+
+  -- A lane's own row, framed: the real flatMap's lane's.
+  lane-fwd : ∀ a w {K₀ b} → Listed (enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
+           → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+           → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
+           → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
+           → enter (g₂ a) w (framed w K₀) (out b)
+  lane-fwd a w ls r lt pr ud = Framing.lane-fwd n (g′ a) envY (LS a) (ls≡ a) w ls r lt pr ud
 
   postulate
     -- A value the real flatMap shows, before its end, the scan's input
