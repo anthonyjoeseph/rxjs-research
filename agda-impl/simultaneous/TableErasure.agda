@@ -13,9 +13,15 @@
 -- a shallow cut truncates; so each table row placed for an agreed plain
 -- row is itself the approximant's (`img-row`, `put-row`), agreement
 -- crosses back only from the elaborated side (`causal←`); and a finite
--- plain run has a finite elaborated run (`whole-ahead`), the elaborated
--- program reading what its plain program reads
--- (`simultaneous.Consume.sim-root`).
+-- plain run has a finite elaborated run (`whole-ahead`).
+--
+-- WHAT CROSSES BACK IS READ OFF CUTS ALONE.  Every cut is at least three
+-- rows deep, past the elaboration's own leaves.  An elaborated row a cut
+-- reaches is a row of every cut deep enough (`denotation.Laws.Cut.cut-ne`);
+-- two cuts agreeing up to an image (`stable`, `stable←`) put every reached
+-- row before it in the shallower cut's finite table; and an approximant's
+-- rows are well-ordered (`rows-ind`), so a row before it that no cut
+-- reaches has a reached row before it, which the table already lists.
 module simultaneous.TableErasure where
 
 open import Data.Empty using (⊥-elim)
@@ -26,8 +32,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using ([])
 import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (just)
-open import Data.Nat using (ℕ; suc; _≤_; _⊔_)
-open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m) renaming (≤-refl to ≤-refl′)
+open import Data.Nat using (ℕ; suc; _≤_; _⊔_; _+_)
+open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m; m≤n+m; ≤-trans) renaming (≤-refl to ≤-refl′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -38,7 +44,8 @@ open import Tree using (Obs)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; enter; approx)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺→≼; ≼-trans; ≼-split; ≼-or-≻; ≺-irrefl; ≺-absurd)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺→≼; ≼-trans; ≼-split; ≼-or-≻; ≺-irrefl; ≺-absurd; ≺-trans;
+  AgreeTo-trans; AgreeTo-sym)
 open import denotation.Laws.Count using (AgC-sym; ag-cnt)
 open import denotation.Laws.Cut using (capprox; cut-ne)
 open import denotation.Laws.Worlds using (⊑-refl)
@@ -50,16 +57,46 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
-open import simultaneous.Listing using (listC-ok; listC-exact; listedₙ)
+open import simultaneous.Listing using (listC-ok; listC-exact)
 open import simultaneous.Attribution using (Live; Attribution; Every; One; Reads; Match; Shown; Into)
-open import simultaneous.Consume using (sim-root; listed-all)
-open import simultaneous.Sim using (sim-whole)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 
 -- Rows of a cut program's table.
 Rows : ∀ {X : Set} → Tb.Listed X → Pos → Ev X → Set
 Rows L k e = (k , e) ∈ rows L
+
+postulate
+  -- AN APPROXIMANT'S ROWS ARE WELL-ORDERED: an induction over each row
+  -- given every row before it.
+  rows-ind : ∀ {X} n (R : Obs Timeline [] X) (P : Pos → Set)
+           → (∀ {y e} → enter (approx n R []) root y e → (∀ {z e′} → enter (approx n R []) root z e′ → z ≺ y → P z) → P y)
+           → ∀ {y e} → enter (approx n R []) root y e → P y
+
+-- Where every reached row before a position is listed, every row is.
+reached-few : ∀ {X} n (R : Obs Timeline [] X) q (ls : List Pos)
+            → (∀ {y e} → enter (approx n R []) root y e → y ≺ q → Few (enter (approx n R []) root) y → y ∈ ls)
+            → Few (enter (approx n R []) root) q
+reached-few n R q ls h = ls , λ x yq → rows-ind n R (λ y → y ≺ q → y ∈ ls) step x yq
+  where
+    step : ∀ {y e} → enter (approx n R []) root y e → (∀ {z e′} → enter (approx n R []) root z e′ → z ≺ y → z ≺ q → z ∈ ls) → y ≺ q → y ∈ ls
+    step {y} x ih yq = h x yq (ls , λ {z} z′ zy → ih z′ zy (≺-trans {z} {y} {q} zy yq))
+
+-- Where every reached row is listed, every row is.
+every-listed : ∀ {X} n (R : Obs Timeline [] X) (ls : List Pos)
+             → (∀ {y e} → enter (approx n R []) root y e → Few (enter (approx n R []) root) y → y ∈ ls)
+             → ∀ {y e} → enter (approx n R []) root y e → y ∈ ls
+every-listed n R ls h = rows-ind n R (λ y → y ∈ ls) λ x ih → h x (ls , λ z zy → ih z zy)
+
+-- Three bounds under their join.
+⊔₁ : ∀ a b c → a ≤ a ⊔ (b ⊔ c)
+⊔₁ a b c = m≤m⊔n a (b ⊔ c)
+
+⊔₂ : ∀ a b c → b ≤ a ⊔ (b ⊔ c)
+⊔₂ a b c = ≤-trans (m≤m⊔n b c) (m≤n⊔m a (b ⊔ c))
+
+⊔₃ : ∀ a b c → c ≤ a ⊔ (b ⊔ c)
+⊔₃ a b c = ≤-trans (m≤n⊔m b c) (m≤n⊔m a (b ⊔ c))
 
 M : ∀ {A : Set} → Ev A → Ev (IE A) → Set
 M = Match Every (One valuesOf) (Reads valuesOf)
@@ -290,37 +327,97 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
       ag-cnt (AgC-sym (cut-ne {m = length ks} {N} le n R [] (λ ()) root (tt , λ ()))) q
         (inj₁ (ks , ≤-refl′ , λ x lt → inj₂ (Any.map (λ { refl → ⊑-refl _ }) (few x lt))))
 
+    -- The cuts at least three rows deep: past the elaboration's own leaves.
+    c₃ : ℕ → EmissionSet X
+    c₃ N = c (3 + N)
+
+    L₃ : ℕ → Tb.Listed X
+    L₃ N = L (3 + N)
+
+    ex₃ : ∀ N → Exact (L₃ N) (c₃ N)
+    ex₃ N = ex (3 + N)
+
+    cut-at₃ : ∀ {q} (fw : Few a q) {N} → bound fw ≤ N → AgreeTo q a (c₃ N)
+    cut-at₃ fw {N} le = cut-at fw (≤-trans le (m≤n+m N 3))
+
+    module R₃ = Rowed a c₃ L₃ ex₃
+
   module CP = Cut P
   module CQ = Cut Q
 
   postulate
     -- THE TABLES CORRESPOND at every cut, along one map of positions and
     -- one late placement, each position imaged by finitely many.
-    tables : Σ (Pos → Pos) λ φ → Σ (Pos → Pos → Set) λ Put → (∀ N → Tables φ Put (CP.L N) (CQ.L N))
+    tables : Σ (Pos → Pos) λ φ → Σ (Pos → Pos → Set) λ Put → (∀ N → Tables φ Put (CP.L₃ N) (CQ.L₃ N))
            × Σ (Pos → List Pos) λ bk → (∀ k → k ∈ bk (φ k)) × (∀ l → Σ (List Pos) λ ks → ∀ {k} → Put k l → k ∈ ks)
 
   φ : Pos → Pos
   φ = proj₁ tables
 
   postulate
-    -- A table's image of a plain row at a cut agreeing up to the row is
-    -- the approximant's, with finitely many rows before it; where the
-    -- elaborated cut agrees up to a table row's image, the plain cut
-    -- agrees up to the row.
-    img-row : ∀ {N k e e′} → AgreeTo k t (CP.c N) → Rows (CP.L N) k e → Unpinned e → Rows (CQ.L N) (φ k) e′ → u (φ k) e′
-    img-few : ∀ {N k e e′} → AgreeTo k t (CP.c N) → Rows (CP.L N) k e → Unpinned e → Rows (CQ.L N) (φ k) e′ → Few u (φ k)
-    causal← : ∀ {N k e} → Rows (CP.L N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c N) → AgreeTo k t (CP.c N)
+    -- TWO ELABORATED CUTS AGREE UP TO AN IMAGE where the shallower plain
+    -- cut agrees with the plain run up to its row; and back, two plain cuts
+    -- up to a row where the elaborated cuts agree up to its image.
+    stable  : ∀ {N N′ k e} → N ≤ N′ → AgreeTo k t (CP.c₃ N) → Rows (CP.L₃ N) k e → Unpinned e
+            → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
+    stable← : ∀ {N N′ k e} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
+            → AgreeTo k (CP.c₃ N′) (CP.c₃ N)
+    -- A FINITE PLAIN RUN: past some depth, every deeper elaborated cut's
+    -- rows are that cut's.
+    stable-all : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ ℕ λ N → ∀ {N′} → N ≤ N′ → ∀ {y e} → CQ.c₃ N′ y e → CQ.c₃ N y e
     -- A late placement found in a table is a row of the approximant.
-    put-row : ∀ {N k l e′} → AgreeTo k t (CP.c N) → Rows (CQ.L N) l e′ → proj₁ (proj₂ tables) k l → u l e′
+    put-row : ∀ {N k l e′} → AgreeTo k t (CP.c₃ N) → Rows (CQ.L₃ N) l e′ → proj₁ (proj₂ tables) k l → u l e′
 
-  -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN.
+  -- An agreed table row's image: the elaborated run agrees with the cut
+  -- up to it, every reached row before it the cut's.
+  img-agree : ∀ {N k e} → AgreeTo k t (CP.c₃ N) → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c₃ N)
+  img-agree {N} {k} ag r un =
+    AgreeTo-trans (CQ.cut-at₃ fq (m≤m⊔n (CQ.bound fq) N)) (stable (m≤n⊔m (CQ.bound fq) N) ag r un)
+    where
+      fq : Few u (φ k)
+      fq = reached-few n Q (φ k) (mapL proj₁ (rows (CQ.L₃ N))) λ {y} {e} x yq fy →
+        let st = stable {N} {CQ.bound fy ⊔ N} (m≤n⊔m (CQ.bound fy) N) ag r un
+            x′ = proj₁ (upto (CQ.cut-at₃ fy {CQ.bound fy ⊔ N} (m≤m⊔n (CQ.bound fy) N)) {y} {e} (≼-refl {y})) x
+        in ∈-map⁺ proj₁ (complete (CQ.ex₃ N) (proj₁ (upto st {y} {e} (≺→≼ {y} {φ k} yq)) x′))
+
+  -- A table's image of a plain row at a cut agreeing up to the row is the
+  -- approximant's, with finitely many rows before it.
+  img-row : ∀ {N k e e′} → AgreeTo k t (CP.c₃ N) → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ k) e′ → u (φ k) e′
+  img-row {N} {k} ag r un m = CQ.R₃.of-row (img-agree ag r un) (≼-refl {φ k}) m
+
+  img-few : ∀ {N k e e′} → AgreeTo k t (CP.c₃ N) → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ k) e′ → Few u (φ k)
+  img-few ag r un _ = CQ.R₃.few-at (img-agree ag r un)
+
+  -- Where the elaborated cut agrees up to a table row's image, the plain
+  -- cut agrees up to the row.
+  causal← : ∀ {N k e} → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c₃ N) → AgreeTo k t (CP.c₃ N)
+  causal← {N} {k} r un ag* =
+    AgreeTo-trans (CP.cut-at₃ fk (⊔₁ (CP.bound fk) N (CQ.bound fu))) (back (⊔₂ (CP.bound fk) N (CQ.bound fu)) (⊔₃ (CP.bound fk) N (CQ.bound fu)))
+    where
+      fu : Few u (φ k)
+      fu = CQ.R₃.few-at ag*
+
+      back : ∀ {N′} → N ≤ N′ → CQ.bound fu ≤ N′ → AgreeTo k (CP.c₃ N′) (CP.c₃ N)
+      back le le′ = stable← le r un (AgreeTo-trans (AgreeTo-sym (CQ.cut-at₃ fu le′)) ag*)
+
+      fk : Few t k
+      fk = reached-few n P k (mapL proj₁ (rows (CP.L₃ N))) λ {y} {e} x yk fy →
+        let x′ = proj₁ (upto (CP.cut-at₃ fy (⊔₁ (CP.bound fy) N (CQ.bound fu))) {y} {e} (≼-refl {y})) x
+            b = back (⊔₂ (CP.bound fy) N (CQ.bound fu)) (⊔₃ (CP.bound fy) N (CQ.bound fu))
+        in ∈-map⁺ proj₁ (complete (CP.ex₃ N) (proj₁ (upto b {y} {e} (≺→≼ {y} {k} yk)) x′))
+
+  -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN: one cut's table lists it.
   whole-ahead : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ (List Pos) λ ls → ∀ {l e} → u l e → l ∈ ls
-  whole-ahead ks every with sim-root n o (listed-all (listedₙ n P) ks every)
-  ... | _ , _ , _ , S = sim-whole S
+  whole-ahead ks every =
+    let (N , st) = stable-all ks every
+        ls = mapL proj₁ (rows (CQ.L₃ N))
+    in ls , every-listed n Q ls λ {y} {e} x fy →
+         ∈-map⁺ proj₁ (complete (CQ.ex₃ N) (st (m≤n⊔m (CQ.bound fy) N)
+           (proj₁ (upto (CQ.cut-at₃ fy (m≤m⊔n (CQ.bound fy) N)) {y} {e} (≼-refl {y})) x)))
 
   erasingᵀ : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
-  erasingᵀ = Erase.erasing t u CP.c CQ.c CP.L CQ.L CP.ex CQ.ex
-    (λ {q} → CP.bound {q}) (λ {q} fw {N} → CP.cut-at {q} fw {N}) (λ {q} → CQ.bound {q}) (λ {q} fw {N} → CQ.cut-at {q} fw {N})
+  erasingᵀ = Erase.erasing t u CP.c₃ CQ.c₃ CP.L₃ CQ.L₃ CP.ex₃ CQ.ex₃
+    (λ {q} → CP.bound {q}) (λ {q} fw {N} → CP.cut-at₃ {q} fw {N}) (λ {q} → CQ.bound {q}) (λ {q} fw {N} → CQ.cut-at₃ {q} fw {N})
     φ (proj₁ (proj₂ tables)) (proj₁ (proj₂ (proj₂ tables)))
     (proj₁ (proj₂ (proj₂ (proj₂ tables)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ tables))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ tables)))))
     (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′}) whole-ahead
