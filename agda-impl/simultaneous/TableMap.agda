@@ -252,7 +252,7 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = R.φ ; Put = R.Put ; corr = corr′
-    ; φ-agree = λ {N} x ag → R.φ-agree (proj₁ (proj₂ (tr-map→ f (P N) x))) (ag← ag)
+    ; φ-agree = λ {N} x un ag → let (_ , x₀ , u₀) = back-row N x un in R.φ-agree x₀ u₀ (ag← ag)
     ; bk = R.bk
     ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.in-bk x₀ u₀
     ; pb-few = R.pb-few

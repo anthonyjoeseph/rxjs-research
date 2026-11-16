@@ -136,7 +136,7 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   (bP : ∀ {q} → Few t q → ℕ) (cutP : ∀ {q} (fw : Few t q) {N} → bP fw ≤ N → AgreeTo q t (c N))
   (bQ : ∀ {q} → Few u q → ℕ) (cutQ : ∀ {q} (fw : Few u q) {N} → bQ fw ≤ N → AgreeTo q u (d N))
   (φ : ℕ → Pos → Pos) (Put : ℕ → Pos → Pos → Set) (T : ∀ N → Tables (φ N) (Put N) (L N) (L* N))
-  (φ-agree : ∀ {N N′ k e} → Rows (L N) k e → AgreeTo k (c N) (c N′) → φ N k ≡ φ N′ k)
+  (φ-agree : ∀ {N N′ k e} → Rows (L N) k e → Unpinned e → AgreeTo k (c N) (c N′) → φ N k ≡ φ N′ k)
   (bk : Pos → List Pos) (in-bk : ∀ {N k e} → Rows (L N) k e → Unpinned e → k ∈ bk (φ N k))
   (pb-few : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks)
   (img-row : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ N k) e′ → u (φ N k) e′)
@@ -157,8 +157,8 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   cutQS fw le le′ = cutQ fw (≤-trans le le′)
 
   -- Two cuts agreeing with the run up to a row map it alike.
-  same : ∀ {N N′ k e} → t k e → AgreeTo k t (c N) → AgreeTo k t (c N′) → φ N k ≡ φ N′ k
-  same {k = k} x a b = φ-agree (RP.to-row a (≼-refl {k}) x) (AgreeTo-trans (AgreeTo-sym a) b)
+  same : ∀ {N N′ k e} → t k e → Unpinned e → AgreeTo k t (c N) → AgreeTo k t (c N′) → φ N k ≡ φ N′ k
+  same {k = k} x un a b = φ-agree (RP.to-row a (≼-refl {k}) x) un (AgreeTo-trans (AgreeTo-sym a) b)
 
   -- A plain row on its image, along the map of a cut agreeing up to it.
   Img : Pos → Pos → Set
@@ -219,12 +219,12 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   img-mono : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
   img-mono {k} {k′} (_ , a₁ , refl , e , x , un , fw , _) (_ , a₂ , refl , e′ , x′ , un′ , fw′ , _) lt =
     let (N , ag , ag′) = both fw fw′
-    in subst₂ _≺_ (same x ag a₁) (same x′ ag′ a₂) (Corr.mono (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′ lt)
+    in subst₂ _≺_ (same x un ag a₁) (same x′ un′ ag′ a₂) (Corr.mono (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′ lt)
 
   inst : ∀ {k k′ l l′} → Img k l → Img k′ l′ → (instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′)
   inst {k} {k′} (_ , a₁ , refl , e , x , un , fw , _) (_ , a₂ , refl , e′ , x′ , un′ , fw′ , _) =
     let (N , ag , ag′) = both fw fw′
-    in subst₂ (λ l l′ → instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′) (same x ag a₁) (same x′ ag′ a₂)
+    in subst₂ (λ l l′ → instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′) (same x un ag a₁) (same x′ un′ ag′ a₂)
          (Corr.inst (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′)
 
   home : ∀ {k l} → Img k l → (instantOf l ≡ instantOf root ⇔ instantOf k ≡ instantOf root)
@@ -252,8 +252,8 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   ...     | k′ , e₀ , refl , m , un′ , mt with ends un′ mt
   ...       | refl with ≼-split {k} {k′} (lv (RP.of-row (RP.now (causal← m un′ (RQ.to-row (RQ.now ag*) (≺→≼ {c*} {φ N₁ k} lt) uc) (RQ.sdown ag* (≺→≼ {φ (bP fw ⊔ bQ fw*) k′} {φ N₁ k} lt)))) (≼-refl {k′}) m))
   ...         | inj₁ kk = ⊥-elim (≺-absurd {φ N₁ k} {φ (bP fw ⊔ bQ fw*) k′}
-                  (subst (_≺ φ (bP fw ⊔ bQ fw*) k′) (same x ag a₁) (Corr.mono (T (bP fw ⊔ bQ fw*)) (RP.to-row ag (≼-refl {k}) x) m un un′ kk)) lt)
-  ...         | inj₂ refl = ⊥-elim (≺-irrefl {φ N₁ k} (subst (_≺ φ N₁ k) (same x ag a₁) lt))
+                  (subst (_≺ φ (bP fw ⊔ bQ fw*) k′) (same x un ag a₁) (Corr.mono (T (bP fw ⊔ bQ fw*)) (RP.to-row ag (≼-refl {k}) x) m un un′ kk)) lt)
+  ...         | inj₂ refl = ⊥-elim (≺-irrefl {φ N₁ k} (subst (_≺ φ N₁ k) (same x un ag a₁) lt))
 
   pinned : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB root k
   pinned {k} x lv fw with cutS fw {bP fw} ≤-refl′
@@ -283,7 +283,7 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
     { Img = Img ; PB = PB ; pb-few = λ {l} _ → proj₁ (pb-few l) , λ { (_ , p) → proj₂ (pb-few l) p }
     ; img = img ; shown = shown
     ; img-row = λ { (_ , _ , _ , e , x , un , _) → e , x , un }
-    ; img-fun = λ { (_ , a₁ , refl , _ , x , _) (_ , a₂ , refl , _) → same x a₁ a₂ }
+    ; img-fun = λ { (_ , a₁ , refl , _ , x , un , _) (_ , a₂ , refl , _) → same x un a₁ a₂ }
     ; img-mono = img-mono ; inst = inst ; home = home ; place = place ; live = live
     ; spent = λ { {l = l} (_ , _ , _ , _ , _ , _ , fw , _) sp _ → rest {l = l} fw sp }
     ; bk = bk ; in-bk = λ { {k} (_ , ag , refl , _ , x , un , _) → in-bk (RP.to-row ag (≼-refl {k}) x) un }
@@ -384,8 +384,8 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   T : ∀ N → Tables (φ N) (Put N) (CP.L₃ N) (CQ.L₃ N)
   T N = corr-≃ (CP.tr→ {N}) (CP.→tr {N}) (CQ.tr→ {N}) (CQ.→tr {N}) (R.corr N)
 
-  φ-agree : ∀ {N N′ k e} → Rows (CP.L₃ N) k e → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → φ N k ≡ φ N′ k
-  φ-agree {N} r ag = R.φ-agree (CP.→tr {N} r) (CP.ag→ ag)
+  φ-agree : ∀ {N N′ k e} → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → φ N k ≡ φ N′ k
+  φ-agree {N} r un ag = R.φ-agree (CP.→tr {N} r) un (CP.ag→ ag)
 
   bk : Pos → List Pos
   bk = R.bk

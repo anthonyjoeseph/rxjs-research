@@ -260,7 +260,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     φ           : ℕ → Pos → Pos
     Put         : ℕ → Pos → Pos → Set
     corr        : ∀ N → Corr s s* (φ N) (Put N) (TR (P N)) (TR (Q N))
-    φ-agree     : ∀ {N N′ k e} → TR (P N) k e → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
+    φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
     bk          : Pos → List Pos
     in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk (φ N k)
     pb-few      : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks
