@@ -37,12 +37,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 The rewrite, finished before any other proof work: each one-to-one
 former carries its child's record through its operator's table, and
 each leaf, the spin and the batcher's own plumbing has a record of its
-own. Untried: the leaves' maps rename the creator inside an async
-instant; `scan-tab` matches values only where both accumulators read
-the same values in order. Settled when each is a body.
+own. Each record also owes coherence (cuts agreeing in shape agree
+outright), which a value-collapsing operator needs. Untried: the
+leaves' maps rename the creator inside an async instant; `scan-tab`
+matches values only where both accumulators read the same values in
+order, and its coherence needs the accumulator fixed by shape. Settled
+when each is a body.
 
-Members: `map-tab`, `scan-tab`, `take-tab`, `defer-tab`, `spin-tab`,
-`empty-rel`, `of-rel`, `cold-rel`, `top-rel`.
+Members: `scan-tab`, `take-tab`, `defer-tab`, `spin-tab`, `empty-rel`,
+`of-rel`, `cold-rel`, `top-rel`.
 
 #### THE FLATMAP AND CONNECT CASES
 

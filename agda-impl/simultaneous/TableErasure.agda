@@ -62,7 +62,8 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact)
 open import simultaneous.Attribution using (Live; Attribution; Every; One; Reads; Shown; Into)
-open import simultaneous.TableRel using (Rows; TR; M; Corr; Rel; module Rel; rel; top-rel)
+open import simultaneous.TableCorr using (Rows; TR; M; Corr; Rel; module Rel; ag-≃)
+open import simultaneous.TableRel using (rel; top-rel)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
 
@@ -135,12 +136,6 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
 
     putAt : ∀ {k} → C.PutAt k → (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → K* l e′ × Put k l) × Homed k
     putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
-
--- Agreement between runs carries to runs holding the same rows.
-ag-≃ : ∀ {X : Set} {a a′ b b′ : EmissionSet X} {q}
-     → (∀ {k e} → a k e → a′ k e) → (∀ {k e} → a′ k e → a k e) → (∀ {k e} → b k e → b′ k e) → (∀ {k e} → b′ k e → b k e)
-     → AgreeTo q a b → AgreeTo q a′ b′
-ag-≃ f f′ g g′ ⟨ a ⟩ = ⟨ (λ {y} {e} yq → (λ x → g (proj₁ (a {y} {e} yq) (f′ x))) , (λ x → f (proj₂ (a {y} {e} yq) (g′ x)))) ⟩
 
 -- Every cut from depth `N` on agrees with the run up to `q`.
 Settled : ∀ {X : Set} → EmissionSet X → (ℕ → EmissionSet X) → ℕ → Pos → Set

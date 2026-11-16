@@ -25,96 +25,22 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; [])
 open import Data.Maybe using (Maybe; just)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _+_)
-open import Data.Product using (Σ; _×_; _,_; proj₂)
-open import Data.Sum using (_⊎_)
-open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Product using (_,_; proj₂)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; skip; pin; Unpinned; EmissionSet; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo)
+open import denotation.EmissionSet using (skip)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; short; bind; _⊣_; mapRows; scanRows; takeRows)
-open import simultaneous.InstEmit using (valuesOf; begin)
+open import simultaneous.InstEmit using (begin)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (listC; UncutEnv; spinRows)
-open import simultaneous.Attribution using (Every; One; Reads; Match; Shown)
+open import simultaneous.TableCorr using (Rel)
+open import simultaneous.TableMap using (map-tab)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate; mapIE; scanIE; passes; marked)
-
--- Rows of a cut program's table.
-Rows : ∀ {X : Set} → Tb.Listed X → Pos → Ev X → Set
-Rows L k e = (k , e) ∈ rows L
-
--- Rows of a table, if there is one.
-TR : ∀ {X : Set} → Maybe (Tb.Listed X) → EmissionSet X
-TR {X} m k e = Σ (Tb.Listed X) λ L → m ≡ just L × Rows L k e
-
-M : ∀ {A : Set} → Ev A → Ev (IE A) → Set
-M = Match Every (One valuesOf) (Reads valuesOf)
-
--- TWO RUNS CORRESPOND along `φ`, subscribed at `s` and `s*`: each
--- unpinned plain row on its image, a skip possibly put late instead, as
--- a pin is (`put`, homed in the subscription's instant or a carried
--- row's before it); each shown elaborated row back on a plain one; each
--- elaborated row in the subscription's instant or a carried row's, the
--- image at or before it unless the row leads its instant (an async
--- step's `begin` comes before the step's value); the images keeping the
--- order and the instants of the rows they image.
-record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set) (L : EmissionSet A) (L* : EmissionSet (IE A)) : Set where
-  Imaged : Pos → Ev A → Set
-  Imaged k e = Σ (Ev (IE A)) λ e′ → L* (φ k) e′ × M e e′
-
-  Homed : Pos → Set
-  Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → L k₀ e₀ × Unpinned e₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
-
-  PutAt : Pos → Set
-  PutAt k = (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → L* l e′ × Put k l) × Homed k
-
-  -- No unpinned row of its instant lies before `k`.
-  Leads : Pos → Set
-  Leads k = ∀ {k′ e′} → L k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
-
-  field
-    row→   : ∀ {k e} → L k e → Unpinned e → Imaged k e ⊎ (e ≡ skip × PutAt k)
-    pin→   : ∀ {k p} → L k (pin p) → PutAt k
-    shown← : ∀ {l e′} → L* l e′ → Shown (One valuesOf) e′
-           → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ k × L k e × Unpinned e × M e e′
-    place  : ∀ {m e′} → L* m e′
-           → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × Imaged k e × (φ k ≼ m ⊎ Leads k) × instantOf (φ k) ≡ instantOf m
-    mono   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ k ≺ φ k′
-    inst   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′
-           → (instantOf (φ k) ≡ instantOf (φ k′) ⇔ instantOf k ≡ instantOf k′)
-    home   : ∀ {k e} → L k e → Unpinned e → (instantOf (φ k) ≡ instantOf s* ⇔ instantOf k ≡ instantOf s)
-
--- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
--- placement, read off the two families of tables: two cuts agreeing up to
--- a row map it alike; each position is imaged by finitely many, whatever
--- the cut; and agreement crosses between cuts along the map, up to an
--- image and back, up to a late placement, from a row of the instant a
--- row leads to its image, and everywhere.
-record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
-  field
-    φ           : ℕ → Pos → Pos
-    Put         : ℕ → Pos → Pos → Set
-    corr        : ∀ N → Corr s s* (φ N) (Put N) (TR (P N)) (TR (Q N))
-    φ-agree     : ∀ {N N′ k} → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
-    bk          : Pos → List Pos
-    in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk (φ N k)
-    pb-few      : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks
-    elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
-                → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
-    stable←     : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
-                → AgreeTo k (TR (P N′)) (TR (P N))
-    stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put N k l
-                → AgreeTo l (TR (Q N′)) (TR (Q N))
-    stable-lead : ∀ {N N′ k e m} → N ≤ N′ → TR (P N) k e → Unpinned e → Corr.Leads (corr N) k
-                → instantOf m ≡ instantOf (φ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
-    elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
 
 ------------------------------------------------------------------------
 -- The subterm's two families of tables
@@ -154,8 +80,6 @@ postulate
   spin-tab  : ∀ {A} p p* → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p*
 
   -- THE ONE-TO-ONE FORMERS carry a record through their operator.
-  map-tab   : ∀ {A B} (f : A → B) {P Q s s*} → Rel P Q s s*
-            → Rel (λ N → bind (P N) λ l → just (mapRows f l)) (λ N → bind (Q N) λ l → just (mapRows (mapIE f) l)) s s*
   scan-tab  : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
             → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
                   (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (mapRows proj₂ l)) s s*
