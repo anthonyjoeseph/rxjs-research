@@ -348,6 +348,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   postulate
     -- THE TABLES CORRESPOND at every cut, along one map of positions and
     -- one late placement, each position imaged by finitely many.
+    -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over capprox for the per-former tables.
     tables : Σ (Pos → Pos) λ φ → Σ (Pos → Pos → Set) λ Put → (∀ N → Tables φ Put (CP.L₃ N) (CQ.L₃ N))
            × Σ (Pos → List Pos) λ bk → (∀ k → k ∈ bk (φ k)) × (∀ l → Σ (List Pos) λ ks → ∀ {k} → Put k l → k ∈ ks)
 
