@@ -19,9 +19,9 @@
 -- rows deep, past the elaboration's own leaves.  An elaborated row a cut
 -- reaches is a row of every cut deep enough (`denotation.Laws.Cut.cut-ne`);
 -- two cuts agreeing up to an image (`stable`, `stable←`) put every reached
--- row before it in the shallower cut's finite table; and an approximant's
--- rows are well-ordered (`rows-ind`), so a row before it that no cut
--- reaches has a reached row before it, which the table already lists.
+-- row before it in the shallower cut's finite table; and an approximant
+-- shows its hangs (`shows-approx`), so where the table lists every
+-- reached row before a position, it lists every row.
 module simultaneous.TableErasure where
 
 open import Data.Empty using (⊥-elim)
@@ -48,7 +48,9 @@ open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺
   AgreeTo-trans; AgreeTo-sym)
 open import denotation.Laws.Count using (AgC-sym; ag-cnt)
 open import denotation.Laws.Cut using (capprox; cut-ne)
-open import denotation.Laws.Worlds using (⊑-refl)
+open import denotation.Laws.Worlds using (⊑-refl; Shows)
+open import denotation.Laws.Shows using (k-shows; ∈-stable; few-down)
+open import denotation.Laws.ShowsEv using (sk-approx)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows)
 open import quickcheck.Tabled.Exact.Base using (Exact; sound; complete)
@@ -66,27 +68,23 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 Rows : ∀ {X : Set} → Tb.Listed X → Pos → Ev X → Set
 Rows L k e = (k , e) ∈ rows L
 
-postulate
-  -- AN APPROXIMANT'S ROWS ARE WELL-ORDERED: an induction over each row
-  -- given every row before it.
-  rows-ind : ∀ {X} n (R : Obs Timeline [] X) (P : Pos → Set)
-           → (∀ {y e} → enter (approx n R []) root y e → (∀ {z e′} → enter (approx n R []) root z e′ → z ≺ y → P z) → P y)
-           → ∀ {y e} → enter (approx n R []) root y e → P y
+-- An approximant shows its hangs (`denotation.Laws.ShowsEv.sk-approx`).
+shows-approx : ∀ {X} n (R : Obs Timeline [] X) → Shows (enter (approx n R []) root)
+shows-approx n R = k-shows (λ m → sk-approx m n R [] (λ ()) root (tt , λ ()))
 
--- Where every reached row before a position is listed, every row is.
+-- Where every reached row before a position is listed, every row is: it
+-- has few rows before it, not not, and membership is decidable.
 reached-few : ∀ {X} n (R : Obs Timeline [] X) q (ls : List Pos)
             → (∀ {y e} → enter (approx n R []) root y e → y ≺ q → Few (enter (approx n R []) root) y → y ∈ ls)
             → Few (enter (approx n R []) root) q
-reached-few n R q ls h = ls , λ x yq → rows-ind n R (λ y → y ≺ q → y ∈ ls) step x yq
-  where
-    step : ∀ {y e} → enter (approx n R []) root y e → (∀ {z e′} → enter (approx n R []) root z e′ → z ≺ y → z ≺ q → z ∈ ls) → y ≺ q → y ∈ ls
-    step {y} x ih yq = h x yq (ls , λ {z} z′ zy → ih z′ zy (≺-trans {z} {y} {q} zy yq))
+reached-few n R q ls h = ls , λ {y} x yq → ∈-stable λ ¬in →
+  shows-approx n R {q} (ls , λ x′ fy yv → h x′ yv fy) λ fq → ¬in (h x yq (few-down fq (≺→≼ {y} {q} yq)))
 
 -- Where every reached row is listed, every row is.
 every-listed : ∀ {X} n (R : Obs Timeline [] X) (ls : List Pos)
              → (∀ {y e} → enter (approx n R []) root y e → Few (enter (approx n R []) root) y → y ∈ ls)
              → ∀ {y e} → enter (approx n R []) root y e → y ∈ ls
-every-listed n R ls h = rows-ind n R (λ y → y ∈ ls) λ x ih → h x (ls , λ z zy → ih z zy)
+every-listed n R ls h {y} x = ∈-stable λ ¬in → shows-approx n R {y} (ls , λ x′ fy _ → h x′ fy) λ fy → ¬in (h x fy)
 
 -- Three bounds under their join.
 ⊔₁ : ∀ a b c → a ≤ a ⊔ (b ⊔ c)
