@@ -829,7 +829,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   result₀ : Goal T U
   result₀ = M , local-f , emb-f , none-f , flat-joins , run
 
-  result : Goal (enter (Op.flatMap op g ds) p) U
+  result : Goal (enter (approx n (flatMap op f s) env) p) U
   result = subst (λ T′ → Goal T′ U) (sym (inst j g ds p)) result₀
 
 ------------------------------------------------------------------------
@@ -847,8 +847,8 @@ sim-flatMap : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ �
             → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
 sim-flatMap n ρ (mergeᶠ (just k)) f s ihs ihf = sim-bounded n ρ k f s ihs ihf
 sim-flatMap n ρ (mergeᶠ nothing) f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ merge∞ f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
+  Flat.result n ρ {op = mergeᶠ nothing} merge∞ f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
 sim-flatMap n ρ switchᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ sw f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
+  Flat.result n ρ {op = switchᶠ} sw f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
 sim-flatMap n ρ exhaustᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ ex f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
+  Flat.result n ρ {op = exhaustᶠ} ex f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
