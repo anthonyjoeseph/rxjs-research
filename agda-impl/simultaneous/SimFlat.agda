@@ -36,8 +36,8 @@ open import Relation.Nullary.Decidable using (_×-dec_)
 open import Relation.Nullary.Decidable.Core using (T?)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; connected; of)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; _⊕_; ix; sub)
-open import denotation.Events using (Timeline; fresh)
+open import denotation.Position using (Pos; _<ᵖ_; _⊕_; ix; sub)
+open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; DenEnv; Proper; Truncate; Reach; Few; _≺_; _≼_; enter; approx; module Op;
   module Joiner; module Switch; module Exhaust; LaneOf)
 open import denotation.Laws using (inv-approx; good-cons)
@@ -841,13 +841,26 @@ postulate
               → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
               → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap (mergeᶠ (just k)) f s)
 
--- One clause over every unbounded joiner, its operator left abstract: a
--- concrete operator would let the comparison unfold the elaborated tree.
+-- A simulation whose producer takes the elaborated program and its
+-- denotation as variables: the field is met where the program is
+-- abstract, so neither side unfolds the elaborated tree.
+sih-at : ∀ {n Γ Δ A} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {o : Obs Timeline Γ A}
+       → (∀ (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) → GoodEnv env → GoodEnv env′ → Apart env
+          → (es : EnvSim ρ Amb env env′) → EnvNeeds ρ env env′ es → Emb Amb
+          → ∀ p p′ → Amb p (foot o p′) → Fresh (Hots env) (Hots env′) Amb p (foot o p′) → Ok (Hots env) p → Ok (Hots env′) p′ → ¬ Hots env p
+          → ∀ u → elab ρ o ≡ u → ∀ U → enter (approx n u env′) p′ ≡ U
+          → Σ PMap λ M → Local (Hots env) (Hots env′) p p′ M × Emb (Amb ∪ᴹ M) × NoneUnder M (enter (approx n o env) p)
+            × EnvJoins ρ env env′ es M
+            × Run Shows Shown (Amb ∪ᴹ M) (EnvListed ρ env env′ es (enter (approx n o env) p)) (enter (approx n o env) p) U)
+       → SimIH n ρ o
+sih-at h = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh → h env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl _ refl
+
+-- Every unbounded joiner, its operator abstract.
 sim-joined : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {op} (j : Jn op) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
            → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
            → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
-sim-joined n ρ j f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ j f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl _ refl
+sim-joined n ρ j f s ihs ihf = sih-at λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh u u≡ U U≡ →
+  Flat.result n ρ j f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh u u≡ U U≡
 
 sim-flatMap : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
