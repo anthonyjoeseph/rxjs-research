@@ -18,6 +18,7 @@ module simultaneous.TakeKit where
 open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Unit using (tt)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Properties using (∷-injectiveʳ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -27,9 +28,9 @@ open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
 open import denotation.Position using (Pos; Path; Label; ix; last; inside; _⊕_)
-open import denotation.Events using (<ᵖ-apart)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ag-down; few-ind; ≺-trans; ≺-irrefl; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
+open import denotation.Events using (<ᵖ-apart; <ᵖ-part)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ag-down; few-ind; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≼-antisym; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊑-≼; ⊑-snoc; inside-⊑; ⊕-injˡ; ⊕-injʳ; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ext≢)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.TableCorr using (Cons; ag-ind)
@@ -59,6 +60,33 @@ apart {t = t} R {y} {c} {e′ = e′} ws x x′ lt = Equivalence.from T-≡ (<�
     ne []       eq = ≺-irrefl {y} (subst (y ≺_) (trans eq (⊕-identityʳ y)) lt)
     ne (l ∷ ys) eq = Run.flat R x (subst (λ z → t z e′) eq x′)
 
+-- The two labels a failing value's rows sit under it at.
+Lab : Label → Set
+Lab l = l ≡ ix 0 ⊎ l ≡ last
+
+ix<last : ∀ x → (x ⊕ [ ix 0 ]) ≺ (x ⊕ [ last ])
+ix<last x = Equivalence.from T-≡ (<ᵖ-part x [] [] refl)
+
+-- Two such rows keep their order under any position.
+snoc-≺ : ∀ {x y l l′} → Lab l → Lab l′ → (x ⊕ [ l ]) ≺ (x ⊕ [ l′ ]) → (y ⊕ [ l ]) ≺ (y ⊕ [ l′ ])
+snoc-≺ {x} (inj₁ refl) (inj₁ refl) lt = ⊥-elim (≺-irrefl {x ⊕ [ ix 0 ]} lt)
+snoc-≺ {y = y} (inj₁ refl) (inj₂ refl) _ = ix<last y
+snoc-≺ {x} (inj₂ refl) (inj₁ refl) lt = ⊥-elim (≺-absurd {x ⊕ [ last ]} {x ⊕ [ ix 0 ]} lt (ix<last x))
+snoc-≺ {x} (inj₂ refl) (inj₂ refl) lt = ⊥-elim (≺-irrefl {x ⊕ [ last ]} lt)
+
+≼-last : ∀ {x l} → Lab l → (x ⊕ [ l ]) ≼ (x ⊕ [ last ])
+≼-last {x} (inj₁ refl) = ≺→≼ {x ⊕ [ ix 0 ]} {x ⊕ [ last ]} (ix<last x)
+≼-last {x} (inj₂ refl) = ≼-refl {x ⊕ [ last ]}
+
+-- Where a take puts what was put on its failing value.
+lab : Bool → Label
+lab true  = ix 0
+lab false = last
+
+lab-cases : ∀ b → (lab b ≡ ix 0 × T b) ⊎ (lab b ≡ last × ¬ T b)
+lab-cases true  = inj₁ (refl , tt)
+lab-cases false = inj₂ (refl , λ ())
+
 -- A position at or under another.
 sub-or : ∀ {y o} (zs : Path) → o ≡ y ⊕ zs → o ≡ y ⊎ Σ Label λ l → Σ Path λ ys → o ≡ y ⊕ (l ∷ ys)
 sub-or {y} []       eq = inj₁ (trans eq (⊕-identityʳ y))
@@ -71,13 +99,39 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
   ... | true  = inj₁ _
   ... | false = inj₂ _
 
+  -- What a failing value `a` puts under it: itself at its first, if
+  -- included, and the end at its last.
+  data Made (a : A) : Label → Ev A → Set where
+    at0 : T incl → Made a (ix 0) (out a)
+    atl : Made a last end
+
+  made-lab : ∀ {a l e} → Made a l e → Lab l
+  made-lab (at0 _) = inj₁ refl
+  made-lab atl     = inj₂ refl
+
+  made-un : ∀ {a l e} → Made a l e → Unpinned e
+  made-un (at0 _) = tt
+  made-un atl     = tt
+
+  lab-made : ∀ a → Σ (Ev A) (Made a (lab incl))
+  lab-made a with lab-cases incl
+  ... | inj₁ (eq , i) = out a , subst (λ l → Made a l (out a)) (sym eq) (at0 i)
+  ... | inj₂ (eq , _) = end , subst (λ l → Made a l end) (sym eq) atl
+
+  -- What is put on a failing value lies at or before what it makes.
+  lab-≼ : ∀ {x a l e} → Made a l e → (x ⊕ [ lab incl ]) ≼ (x ⊕ [ l ])
+  lab-≼ {x} m with lab-cases incl | m
+  ... | inj₁ (eq , _) | at0 _ = subst (λ l → (x ⊕ [ l ]) ≼ (x ⊕ [ ix 0 ])) (sym eq) (≼-refl {x ⊕ [ ix 0 ]})
+  ... | inj₁ (eq , _) | atl   = subst (λ l → (x ⊕ [ l ]) ≼ (x ⊕ [ last ])) (sym eq) (≺→≼ {x ⊕ [ ix 0 ]} {x ⊕ [ last ]} (ix<last x))
+  ... | inj₂ (_ , ni) | at0 i = ⊥-elim (ni i)
+  ... | inj₂ (eq , _) | atl   = subst (λ l → (x ⊕ [ l ]) ≼ (x ⊕ [ last ])) (sym eq) (≼-refl {x ⊕ [ last ]})
+
   -- Where a take's row comes from, the first failure's two at the side.
   New : Pos → Ev A → Pos → A → Set
-  New w e o a = (w ≡ o ⊕ [ ix 0 ] × e ≡ out a × T incl) ⊎ (w ≡ o ⊕ [ last ] × e ≡ end)
+  New w e o a = Σ Label λ l → w ≡ o ⊕ [ l ] × Made a l e
 
   at-new : ∀ {w e o a} → New w e o a → Σ Label λ l → w ≡ o ⊕ [ l ]
-  at-new (inj₁ (eq , _)) = ix 0 , eq
-  at-new (inj₂ (eq , _)) = last , eq
+  at-new (l , eq , _) = l , eq
 
   ----------------------------------------------------------------------
   -- One take
@@ -95,8 +149,8 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
 
     from : ∀ {w e} → TakeT w e → From w e
     from (pass x k _)     = self x (λ { refl → k })
-    from (fail x nk nF i) = new x nk nF (inj₁ (refl , refl , i))
-    from (stop x nk nF)   = new x nk nF (inj₂ (refl , refl))
+    from (fail x nk nF i) = new x nk nF (ix 0 , refl , at0 i)
+    from (stop x nk nF)   = new x nk nF (last , refl , atl)
     from (step x _)       = self x (λ ())
     from (tend x _)       = self x (λ ())
     from (left x _ _)     = self x (λ ())
@@ -118,12 +172,45 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     ... | new {o} {a} x nk _ loc with at-new loc
     ...   | _ , eq = ⊥-elim (nF (o , a , x , nk , subst (o ≺_) (sym eq) (≺-ext o [])))
 
+    -- Below a position no failure precedes, no failing value.
+    nofail< : ∀ {y z} → ¬ Failed z → y ≺ z → NoFail y
+    nofail< {y} nF lt {a} x with dec-keep a
+    ... | inj₁ k  = k
+    ... | inj₂ nk = ⊥-elim (nF (y , a , x , nk , lt))
+
+    -- Two failing values no failure precedes are one.
+    first-uniq : ∀ {y y′ a a′} → t y (out a) → T (not (keep a)) → ¬ Failed y
+               → t y′ (out a′) → T (not (keep a′)) → ¬ Failed y′ → y ≡ y′
+    first-uniq {y} {y′} {a} {a′} x nk nF x′ nk′ nF′ with ≼-or-≻ y y′
+    ... | inj₂ lt = ⊥-elim (nF (y′ , a′ , x′ , nk′ , lt))
+    ... | inj₁ le with ≼-split {y} {y′} le
+    ...   | inj₁ lt = ⊥-elim (nF′ (y , a , x , nk , lt))
+    ...   | inj₂ eq = eq
+
+    -- A failing value's rows.
+    made-row : ∀ {o a l e} → t o (out a) → T (not (keep a)) → ¬ Failed o → Made a l e → TakeT (o ⊕ [ l ]) e
+    made-row x nk nF (at0 i) = fail x nk nF i
+    made-row x nk nF atl     = stop x nk nF
+
     -- Kept: a source row no failure precedes, no failing value.
     keep-row : ∀ {y e} → t y e → ¬ Failed y → NoFail y → TakeT y e
     keep-row {e = out a} x nF nf = pass x (nf x) nF
     keep-row {e = skip}  x nF _  = step x nF
     keep-row {e = end}   x nF _  = tend x nF
     keep-row {y} {e = pin r} x nF _ = left x (λ F → nF (failed-≼ {r} {y} (⊑-≼ (inside-⊑ r y (pin-in x))) F)) (pin-in x)
+
+    -- An unpinned row of a take: kept, or made by the first failure.
+    data Kind (w : Pos) (e : Ev A) : Set where
+      kept : t w e → ¬ Failed w → NoFail w → Kind w e
+      made : ∀ {o a} → t o (out a) → T (not (keep a)) → ¬ Failed o → New w e o a → Kind w e
+
+    kind : ∀ {w e} → TakeT w e → Unpinned e → Kind w e
+    kind tk@(pass x _ nF)   _ = kept x nF (nofail tk nF)
+    kind (fail x nk nF i)   _ = made x nk nF (ix 0 , refl , at0 i)
+    kind (stop x nk nF)     _ = made x nk nF (last , refl , atl)
+    kind tk@(step x nF)     _ = kept x nF (nofail tk nF)
+    kind tk@(tend x nF)     _ = kept x nF (nofail tk nF)
+    kind (left _ _ _)       ()
 
     -- THE FIRST FAILING VALUE, where failing is decidable and rows few.
     First : Set
@@ -161,12 +248,13 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
       self-new {e = e} {e₀} {a = a} x x₀ loc with at-new {e = e₀} {a = a} loc
       ... | _ , eq = flat x₀ (subst (λ z → t z e) eq x)
 
+      made-eq : ∀ {o a a′ l e e′} → t o (out a) → t o (out a′) → Made a l e → Made a′ l e′ → e ≡ e′
+      made-eq x x′ (at0 _) (at0 _) = func x x′
+      made-eq x x′ atl     atl     = refl
+
       new-new : ∀ {y e e′ o o′ a a′} → t o (out a) → t o′ (out a′) → New y e o a → New y e′ o′ a′ → e ≡ e′
-      new-new {o = o} {o′} x x′ (inj₁ (eq , refl , _)) (inj₁ (eq′ , refl , _)) with ⊕-injˡ o o′ (trans (sym eq) eq′)
-      ... | refl = func x x′
-      new-new {o = o} {o′} x x′ (inj₁ (eq , _)) (inj₂ (eq′ , _)) = ⊥-elim (ix≢last (⊕-injʳ o o′ (trans (sym eq) eq′)))
-      new-new {o = o} {o′} x x′ (inj₂ (eq , _)) (inj₁ (eq′ , _)) = ⊥-elim (ix≢last (sym (⊕-injʳ o o′ (trans (sym eq) eq′))))
-      new-new x x′ (inj₂ (_ , refl)) (inj₂ (_ , refl)) = refl
+      new-new {o = o} {o′} x x′ (l , eq , m) (l′ , eq′ , m′) with ⊕-injˡ o o′ (trans (sym eq) eq′) | ⊕-injʳ o o′ (trans (sym eq) eq′)
+      ... | refl | refl = made-eq x x′ m m′
 
     func-T : ∀ {y e e′} → TakeT y e → TakeT y e′ → e ≡ e′
     func-T tk tk′ with from tk | from tk′
@@ -243,8 +331,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
         ... | _ , eq = zl (≺-trans {y ⊕ [ last ]} {o} {z} (apart R [ last ] x x₀ yo) (subst (o ≺_) (sym eq) (≺-ext o [])))
 
         rebuild : ∀ {e′} → New z e′ o a₀ → W′.TakeT z e′
-        rebuild (inj₁ (eq , refl , i)) = subst (λ w → W′.TakeT w _) (sym eq) (W′.fail (proj₁ (upto ag oy) x₀) nk₀ (unfail ag oy nF₀) i)
-        rebuild (inj₂ (eq , refl))     = subst (λ w → W′.TakeT w end) (sym eq) (W′.stop (proj₁ (upto ag oy) x₀) nk₀ (unfail ag oy nF₀))
+        rebuild (_ , eq , m) = subst (λ w → W′.TakeT w _) (sym eq) (O′.made-row (proj₁ (upto ag oy) x₀) nk₀ (unfail ag oy nF₀) m)
 
     -- AT A ROW, agreement below it and of the takes there carries back.
     point1 : ∀ {y e} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → (∀ {e} → W.TakeT y e → W′.TakeT y e)
@@ -281,11 +368,6 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
       sym< : ∀ {y} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t′ t
       sym< below {y₀} lt = AgreeTo-sym (below {y₀} lt)
 
-      nf< : ∀ {y z} → ¬ W.Failed z → y ≺ z → O.NoFail y
-      nf< {y} nF lt {a} x with dec-keep a
-      ... | inj₁ k  = k
-      ... | inj₂ nk = ⊥-elim (nF (y , a , x , nk , lt))
-
     -- AGREEMENT CARRIES BACK, up to a row of the first take's, no failure before it.
     lift : ∀ {k w e} → AgreeTo k W.TakeT W′.TakeT → W.TakeT w e → k ≼ w → ¬ W.Failed k → O.NoFail k → AgreeTo k t t′
     lift {k} {w} agT tw kw nF nf = ag-ind fin step
@@ -301,7 +383,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
 
             nfy : O.NoFail y
             nfy {a} x with ≼-split {y} {k} yk
-            ... | inj₁ lt   = nf< nF lt x
+            ... | inj₁ lt   = O.nofail< nF lt x
             ... | inj₂ refl = nf x
 
             nf′y : O′.NoFail y
@@ -311,6 +393,27 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (clash (nfy (cba (sym< below) x′ xo yo)) nk)
             ...   | inj₂ F = ⊥-elim (nFy F)
 
+    -- With no failing value in the first source, takes agreeing
+    -- everywhere have sources agreeing everywhere.
+    lift-all : (∀ q → AgreeTo q W.TakeT W′.TakeT) → (∀ {y} → O.NoFail y) → ∀ k → AgreeTo k t t′
+    lift-all agT nf k = ag-ind fin step
+      where
+        nF : ∀ {y} → ¬ W.Failed y
+        nF (_ , _ , x , nk , _) = clash (nf x) nk
+
+        step : ∀ {y} → y ≼ k → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {e} → (t y e → t′ y e) × (t′ y e → t y e)
+        step {y} _ below = point1 below (proj₁ (upto (agT y) (≼-refl {y}))) nF nf , D′.point1 (sym< below) (proj₂ (upto (agT y) (≼-refl {y}))) nF′ nf′
+          where
+            nF′ : ¬ W′.Failed y
+            nF′ F = nF (refail< below F)
+
+            nf′ : O′.NoFail y
+            nf′ {a} x′ with dec-keep a
+            ... | inj₁ kp = kp
+            ... | inj₂ nk with O.from (proj₂ (upto (agT (y ⊕ [ last ])) (≼-refl {y ⊕ [ last ]})) (W′.stop x′ nk nF′))
+            ...   | O.self x₀ _ = ⊥-elim (clash (nf (cba (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
+            ...   | O.new x₀ nk₀ _ _ = ⊥-elim (clash (nf x₀) nk₀)
+
     -- Up to a failing value, for one of its rows.
     lift-fail : ∀ {w e y a} → AgreeTo w W.TakeT W′.TakeT → W.TakeT w e → y ≼ w
               → t y (out a) → T (not (keep a)) → ¬ W.Failed y → AgreeTo y t t′
@@ -319,7 +422,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
         below : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
         below {y₀} lt =
           let y₀w = ≺→≼ {y₀} {w} (≺-≼-≺ {y₀} {y} {w} lt yw)
-          in lift (ag-down {q = w} {y₀} y₀w agT) tw y₀w (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (nf< nF lt)
+          in lift (ag-down {q = w} {y₀} y₀w agT) tw y₀w (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
 
         x′ : t′ y (out a)
         x′ = row-past below cab nF x (proj₁ (upto agT (≼-refl {w})) tw) yw
@@ -334,11 +437,11 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     cons-T {y} below (W.pass x kp nF) tk′ yy′ = W′.pass (row-past cb cab nF x tk′ yy′) kp (λ F → nF (refail< cb F))
       where
         cb : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
-        cb {y₀} lt = lift (below {y₀} lt) (W.pass x kp nF) (≺→≼ {y₀} {y} lt) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (nf< nF lt)
+        cb {y₀} lt = lift (below {y₀} lt) (W.pass x kp nF) (≺→≼ {y₀} {y} lt) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
     cons-T {y′ = y′} below (W.fail {o} x nk nF i) tk′ yy′ =
       W′.fail (row-past cb cab nF x tk′ (≼-trans {o} {o ⊕ [ ix 0 ]} {y′} (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) yy′)) nk (λ F → nF (refail< cb F)) i
       where
         cb : ∀ {y₀} → y₀ ≺ o → AgreeTo y₀ t t′
         cb {y₀} lt =
           let lt′ = ≺-trans {y₀} {o} {o ⊕ [ ix 0 ]} lt (≺-ext o [])
-          in lift (below {y₀} lt′) (W.fail x nk nF i) (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {o} lt) F)) (nf< nF lt)
+          in lift (below {y₀} lt′) (W.fail x nk nF i) (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {o} lt) F)) (O.nofail< nF lt)

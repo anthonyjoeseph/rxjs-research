@@ -12,9 +12,9 @@ open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -123,6 +123,28 @@ TR {X} m k e = Σ (Tb.Listed X) λ L → m ≡ just L × Rows L k e
 M : ∀ {A : Set} → Ev A → Ev (IE A) → Set
 M = Match Every (One valuesOf) (Reads valuesOf)
 
+-- A matched end is an end.
+ends : ∀ {A : Set} {e : Ev A} → Unpinned e → M e end → e ≡ end
+ends {e = out a} _ (c , _) with c tt
+... | _ , () , _
+ends {e = skip} _ (_ , d) = ⊥-elim (d (λ ()) tt)
+ends {e = end} _ _ = refl
+
+-- A shown elaborated value is matched by the value it reads.
+m-back : ∀ {A : Set} {e : Ev A} {x : IE A} → Unpinned e → M e (out x) → Shown (One valuesOf) (out x)
+       → Σ A λ a → e ≡ out a × valuesOf x ≡ a ∷ []
+m-back {e = out a} _ (c , _) _ with c tt
+... | _ , refl , rd = a , refl , rd
+m-back {e = skip} _ (_ , d) sh = ⊥-elim (d (λ ()) sh)
+m-back {e = end} _ (c , _) _ with c tt
+... | ()
+
+m-val : ∀ {A : Set} {a : A} {x : IE A} → valuesOf x ≡ a ∷ [] → M (out a) (out x)
+m-val rd = (λ _ → _ , refl , rd) , (λ n → ⊥-elim (n tt))
+
+m-ee : ∀ {A : Set} → M {A} end end
+m-ee = (λ _ → refl) , (λ n → ⊥-elim (n tt))
+
 -- TWO RUNS CORRESPOND along `φ`, subscribed at `s` and `s*`: each
 -- unpinned plain row on its image, a skip possibly put late instead, as
 -- a live pin is (`put`, homed in the subscription's instant or a carried
@@ -180,6 +202,48 @@ in-keys (L , refl , r) = ∈-map⁺ proj₁ r
 -- Two tables have few rows together.
 tr-few : ∀ {X : Set} (m m′ : Maybe (Tb.Listed X)) q → Few (λ y e → TR m y e ⊎ TR m′ y e) q
 tr-few m m′ q = keys m ++ keys m′ , λ { (inj₁ x) _ → ∈-++⁺ˡ (in-keys x) ; (inj₂ x) _ → ∈-++⁺ʳ (keys m) (in-keys x) }
+
+-- A correspondence carries to runs holding the same rows.
+corr-≃ : ∀ {A s s* φ Put} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)}
+       → (∀ {k e} → L k e → K k e) → (∀ {k e} → K k e → L k e)
+       → (∀ {k e} → L* k e → K* k e) → (∀ {k e} → K* k e → L* k e)
+       → Corr s s* φ Put L L* → Corr s s* φ Put K K*
+corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
+  { row→ = λ x un → [ (λ im → inj₁ (imaged im)) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
+  ; pin→ = λ x lv → pinAt (C.pin→ (from x) (λ xc → lv (to xc)))
+  ; put-before = λ x pl x′ un′ lt → C.put-before (from x) pl (from x′) un′ lt
+  ; shown← = λ y sh → let (k , e , eq , x , un , m) = C.shown← (from* y) sh in k , e , eq , to x , un , m
+  ; place = λ {m} y lv → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y) (λ yc → lv (to* yc)))
+  ; mono = λ x x′ → C.mono (from x) (from x′)
+  ; inst = λ x x′ → C.inst (from x) (from x′)
+  ; home = λ x → C.home (from x)
+  }
+  where
+    module C = Corr C
+
+    Imaged : Pos → Ev A → Set
+    Imaged k e = Σ (Ev (IE A)) λ e′ → K* (φ k) e′ × M e e′
+
+    imaged : ∀ {k e} → C.Imaged k e → Imaged k e
+    imaged (e′ , y , m) = e′ , to* y , m
+
+    Homed : Pos → Set
+    Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → K k₀ e₀ × Unpinned e₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+
+    homed : ∀ {k} → C.Homed k → Homed k
+    homed (inj₁ eq) = inj₁ eq
+    homed (inj₂ (k₀ , e₀ , x , un , im , lt , eq)) = inj₂ (k₀ , e₀ , to x , un , imaged im , lt , eq)
+
+    leadsOr : ∀ {k m} → φ k ≼ m ⊎ C.Leads k → φ k ≼ m ⊎ (∀ {k′ e′} → K k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+    leadsOr (inj₁ le) = inj₁ le
+    leadsOr (inj₂ ld) = inj₂ (λ x → ld (from x))
+
+    putAt : ∀ {k} → C.PutAt k → (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → K* l e′ × Put k l) × Homed k
+    putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
+
+    pinAt : ∀ {k p} → C.PinAt k p
+          → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ e₀} → K k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
+    pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x un lt → past (from x) un lt) , homed h
 
 -- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
 -- placement, read off the two families of tables: two cuts agreeing up to

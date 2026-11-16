@@ -62,7 +62,7 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Relations using (Spent)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact)
 open import simultaneous.Attribution using (Live; Attribution; Every; One; Reads; Shown; Into)
-open import simultaneous.TableCorr using (Rows; TR; M; Corr; Rel; module Rel; ag-≃)
+open import simultaneous.TableCorr using (Rows; TR; M; Corr; Rel; module Rel; ag-≃; corr-≃; ends)
 open import simultaneous.TableRel using (rel; top-rel)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
@@ -98,49 +98,6 @@ every-listed n R ls h {y} x = ∈-stable λ ¬in → shows-approx n R {y} (ls , 
 -- The two tables of one cut correspond.
 Tables : ∀ {A : Set} → (Pos → Pos) → (Pos → Pos → Set) → Tb.Listed A → Tb.Listed (IE A) → Set
 Tables φ Put L L* = Corr root root φ Put (Rows L) (Rows L*)
-
--- A correspondence carries to runs holding the same rows: two cuts to
--- their tables.
-corr-≃ : ∀ {A s s* φ Put} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)}
-       → (∀ {k e} → L k e → K k e) → (∀ {k e} → K k e → L k e)
-       → (∀ {k e} → L* k e → K* k e) → (∀ {k e} → K* k e → L* k e)
-       → Corr s s* φ Put L L* → Corr s s* φ Put K K*
-corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
-  { row→ = λ x un → [ (λ im → inj₁ (imaged im)) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
-  ; pin→ = λ x lv → pinAt (C.pin→ (from x) (λ xc → lv (to xc)))
-  ; put-before = λ x pl x′ un′ lt → C.put-before (from x) pl (from x′) un′ lt
-  ; shown← = λ y sh → let (k , e , eq , x , un , m) = C.shown← (from* y) sh in k , e , eq , to x , un , m
-  ; place = λ {m} y lv → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y) (λ yc → lv (to* yc)))
-  ; mono = λ x x′ → C.mono (from x) (from x′)
-  ; inst = λ x x′ → C.inst (from x) (from x′)
-  ; home = λ x → C.home (from x)
-  }
-  where
-    module C = Corr C
-
-    Imaged : Pos → Ev A → Set
-    Imaged k e = Σ (Ev (IE A)) λ e′ → K* (φ k) e′ × M e e′
-
-    imaged : ∀ {k e} → C.Imaged k e → Imaged k e
-    imaged (e′ , y , m) = e′ , to* y , m
-
-    Homed : Pos → Set
-    Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → K k₀ e₀ × Unpinned e₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
-
-    homed : ∀ {k} → C.Homed k → Homed k
-    homed (inj₁ eq) = inj₁ eq
-    homed (inj₂ (k₀ , e₀ , x , un , im , lt , eq)) = inj₂ (k₀ , e₀ , to x , un , imaged im , lt , eq)
-
-    leadsOr : ∀ {k m} → φ k ≼ m ⊎ C.Leads k → φ k ≼ m ⊎ (∀ {k′ e′} → K k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
-    leadsOr (inj₁ le) = inj₁ le
-    leadsOr (inj₂ ld) = inj₂ (λ x → ld (from x))
-
-    putAt : ∀ {k} → C.PutAt k → (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → K* l e′ × Put k l) × Homed k
-    putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
-
-    pinAt : ∀ {k p} → C.PinAt k p
-          → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ e₀} → K k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
-    pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x un lt → past (from x) un lt) , homed h
 
 -- Every cut from depth `N` on agrees with the run up to `q`.
 Settled : ∀ {X : Set} → EmissionSet X → (ℕ → EmissionSet X) → ℕ → Pos → Set
@@ -287,12 +244,6 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
 
   -- An image lies at or before every elaborated end: an end before it is
   -- a plain end's image, which the plain row precedes.
-  ends : ∀ {e : Ev A} → Unpinned e → M e end → e ≡ end
-  ends {out a} _ (c , _) with c tt
-  ... | _ , () , _
-  ends {skip} _ (_ , d) = ⊥-elim (d (λ ()) tt)
-  ends {end} _ _ = refl
-
   live : ∀ {k l} → Img k l → Live t k → Live u l
   live {k} (N₁ , a₁ , refl , e , x , un , fw , fw* , e′ , y , _) lv {c*} uc with ≼-or-≻ (φ N₁ k) c*
   ... | inj₁ le = le
