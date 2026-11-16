@@ -38,7 +38,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit using (tt)
 open import Function using (_⇔_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; subst₂)
 
 open import Tree using (Obs)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
@@ -205,14 +205,16 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   (ex : ∀ N → Exact (L N) (c N)) (ex* : ∀ N → Exact (L* N) (d N))
   (bP : ∀ {q} → Few t q → ℕ) (cutP : ∀ {q} (fw : Few t q) {N} → bP fw ≤ N → AgreeTo q t (c N))
   (bQ : ∀ {q} → Few u q → ℕ) (cutQ : ∀ {q} (fw : Few u q) {N} → bQ fw ≤ N → AgreeTo q u (d N))
-  (φ : Pos → Pos) (Put : Pos → Pos → Set) (T : ∀ N → Tables φ Put (L N) (L* N))
-  (bk : Pos → List Pos) (in-bk : ∀ k → k ∈ bk (φ k)) (pb-few : ∀ l → Σ (List Pos) λ ks → ∀ {k} → Put k l → k ∈ ks)
-  (img-row : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ k) e′ → u (φ k) e′)
-  (img-few : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ k) e′ → Few u (φ k))
-  (causal← : ∀ {N k e} → Rows (L N) k e → Unpinned e → Settled u d N (φ k) → Settled t c N k)
-  (put-row : ∀ {N k l e′} → Settled t c N k → Rows (L* N) l e′ → Put k l → u l e′)
-  (lead : ∀ {N k e m} → Rows (L N) k e → Unpinned e → Corr.Leads (T N) k → instantOf m ≡ instantOf (φ k)
-        → Settled u d N m → Settled u d N (φ k))
+  (φ : ℕ → Pos → Pos) (Put : ℕ → Pos → Pos → Set) (T : ∀ N → Tables (φ N) (Put N) (L N) (L* N))
+  (φ-agree : ∀ {N N′ k} → AgreeTo k (c N) (c N′) → φ N k ≡ φ N′ k)
+  (bk : Pos → List Pos) (in-bk : ∀ {N k e} → Rows (L N) k e → Unpinned e → k ∈ bk (φ N k))
+  (pb-few : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks)
+  (img-row : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ N k) e′ → u (φ N k) e′)
+  (img-few : ∀ {N k e e′} → Settled t c N k → Rows (L N) k e → Unpinned e → Rows (L* N) (φ N k) e′ → Few u (φ N k))
+  (causal← : ∀ {N k e} → Rows (L N) k e → Unpinned e → Settled u d N (φ N k) → Settled t c N k)
+  (put-row : ∀ {N k l e′} → Settled t c N k → Rows (L* N) l e′ → Put N k l → u l e′)
+  (lead : ∀ {N k e m} → Rows (L N) k e → Unpinned e → Corr.Leads (T N) k → instantOf m ≡ instantOf (φ N k)
+        → Settled u d N m → Settled u d N (φ N k))
   (whole-ahead : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ (List Pos) λ ls → ∀ {l e} → u l e → l ∈ ls)
   where
   module RP = Rowed t c L ex
@@ -224,27 +226,32 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   cutQS : ∀ {q} (fw : Few u q) {N} → bQ fw ≤ N → Settled u d N q
   cutQS fw le le′ = cutQ fw (≤-trans le le′)
 
-  -- A plain row on its image.
+  -- Two cuts agreeing with the run up to a row map it alike.
+  same : ∀ {N N′ k} → AgreeTo k t (c N) → AgreeTo k t (c N′) → φ N k ≡ φ N′ k
+  same a b = φ-agree (AgreeTo-trans (AgreeTo-sym a) b)
+
+  -- A plain row on its image, along the map of a cut agreeing up to it.
   Img : Pos → Pos → Set
-  Img k l = l ≡ φ k × Σ (Ev A) λ e → t k e × Unpinned e × Few t k × Few u l × Σ (Ev (IE A)) λ e′ → u l e′ × M e e′
+  Img k l = Σ ℕ λ N → AgreeTo k t (c N) × l ≡ φ N k
+          × Σ (Ev A) λ e → t k e × Unpinned e × Few t k × Few u l × Σ (Ev (IE A)) λ e′ → u l e′ × M e e′
 
   PB : Pos → Pos → Set
-  PB = Put
+  PB k l = Σ ℕ λ N → Put N k l
 
   img-at : ∀ {k l} → Img k l → Σ (Ev (IE A)) (u l)
-  img-at (_ , _ , _ , _ , _ , _ , e′ , y , _) = e′ , y
+  img-at (_ , _ , _ , _ , _ , _ , _ , _ , e′ , y , _) = e′ , y
 
   -- An image read off the tables of a cut agreeing up to the row.
   imaged : ∀ {N k e} → Settled t c N k → t k e → Unpinned e → Corr.Imaged (T N) k e
-         → Σ (Ev (IE A)) λ e′ → u (φ k) e′ × Few u (φ k) × M e e′
+         → Σ (Ev (IE A)) λ e′ → u (φ N k) e′ × Few u (φ N k) × M e e′
   imaged {N} {k} ag x un (e′ , m , mt) =
     let r = RP.to-row (RP.now ag) (≼-refl {k}) x in
     e′ , img-row ag r un m , img-few ag r un m , mt
 
   -- The image of a row read off a cut agreeing up to it.
-  img-of : ∀ {N k e} → Settled t c N k → t k e → Unpinned e → Corr.Imaged (T N) k e → Img k (φ k)
+  img-of : ∀ {N k e} → Settled t c N k → t k e → Unpinned e → Corr.Imaged (T N) k e → Img k (φ N k)
   img-of {N} {k} ag x un im with imaged ag x un im
-  ... | e′ , y , fw* , mt = refl , _ , x , un , RP.few-at (RP.now ag) , fw* , e′ , y , mt
+  ... | e′ , y , fw* , mt = N , RP.now ag , refl , _ , x , un , RP.few-at (RP.now ag) , fw* , e′ , y , mt
 
   homed : ∀ {N k} → Settled t c N k → Corr.Homed (T N) k
         → instantOf k ≡ instantOf root ⊎ Σ Pos λ k₀ → Σ Pos λ l₀ → Img k₀ l₀ × Σ (Ev (IE A)) (u l₀) × Few u l₀ × instantOf k₀ ≡ instantOf k
@@ -253,10 +260,10 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
     let ag₀ = RP.sdown ag (≺→≼ {k₀} {k} lt)
         x₀ = RP.of-row (RP.now ag₀) (≼-refl {k₀}) m
         i = img-of ag₀ x₀ un im
-    in inj₂ (k₀ , φ k₀ , i , img-at i , proj₁ (proj₂ (proj₂ (imaged ag₀ x₀ un im))) , ie)
+    in inj₂ (k₀ , φ N k₀ , i , img-at i , proj₁ (proj₂ (proj₂ (imaged ag₀ x₀ un im))) , ie)
 
   into : ∀ {N k} → Settled t c N k → Corr.PutAt (T N) k → Into Img u PB root k
-  into ag ((l , e′ , m , pk) , h) = (l , (e′ , put-row ag m pk) , pk) , homed ag h
+  into {N} ag ((l , e′ , m , pk) , h) = (l , (e′ , put-row ag m pk) , N , pk) , homed ag h
 
   img : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
       → (Σ Pos λ l → Img k l × Σ (Ev (IE A)) λ e′ → u l e′ × Few u l × M e e′) ⊎ (e ≡ skip × Into Img u PB root k)
@@ -264,34 +271,34 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   ... | ag with Corr.row→ (T (bP fw)) (RP.to-row (RP.now ag) (≼-refl {k}) x) un
   ...   | inj₂ (eq , pa) = inj₂ (eq , into ag pa)
   ...   | inj₁ im with imaged ag x un im
-  ...     | e′ , y , fw* , mt = inj₁ (φ k , (refl , _ , x , un , fw , fw* , e′ , y , mt) , e′ , y , fw* , mt)
+  ...     | e′ , y , fw* , mt = inj₁ (φ (bP fw) k , (bP fw , RP.now ag , refl , _ , x , un , fw , fw* , e′ , y , mt) , e′ , y , fw* , mt)
 
   shown : ∀ {l e′} → u l e′ → Shown (One valuesOf) e′ → Live u l → Few u l
         → Σ Pos λ k → Img k l × Σ (Ev A) λ e → t k e × M e e′
   shown {l} {e′} y sh _ fw with cutQS fw {bQ fw} ≤-refl′
   ... | ag* with Corr.shown← (T (bQ fw)) (RQ.to-row (RQ.now ag*) (≼-refl {l}) y) sh
-  ...   | k , e , refl , m , un , mt =
-    let ag = RP.now (causal← m un ag*)
+  ...   | k , e , eq , m , un , mt =
+    let ag = RP.now (causal← m un (subst (Settled u d (bQ fw)) eq ag*))
         x = RP.of-row ag (≼-refl {k}) m
-    in k , (refl , e , x , un , RP.few-at ag , fw , e′ , y , mt) , e , x , mt
+    in k , (bQ fw , ag , eq , e , x , un , RP.few-at ag , fw , e′ , y , mt) , e , x , mt
 
   -- Two rows, read off one cut agreeing up to the later.
   both : ∀ {k k′} → Few t k → Few t k′ → Σ ℕ λ N → AgreeTo k t (c N) × AgreeTo k′ t (c N)
   both fw fw′ = bP fw ⊔ bP fw′ , cutP fw (m≤m⊔n (bP fw) (bP fw′)) , cutP fw′ (m≤n⊔m (bP fw) (bP fw′))
 
   img-mono : ∀ {k k′ l l′} → Img k l → Img k′ l′ → k ≺ k′ → l ≺ l′
-  img-mono {k} {k′} (refl , e , x , un , fw , _) (refl , e′ , x′ , un′ , fw′ , _) lt =
+  img-mono {k} {k′} (_ , a₁ , refl , e , x , un , fw , _) (_ , a₂ , refl , e′ , x′ , un′ , fw′ , _) lt =
     let (N , ag , ag′) = both fw fw′
-    in Corr.mono (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′ lt
+    in subst₂ _≺_ (same ag a₁) (same ag′ a₂) (Corr.mono (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′ lt)
 
   inst : ∀ {k k′ l l′} → Img k l → Img k′ l′ → (instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′)
-  inst {k} {k′} (refl , e , x , un , fw , _) (refl , e′ , x′ , un′ , fw′ , _) =
+  inst {k} {k′} (_ , a₁ , refl , e , x , un , fw , _) (_ , a₂ , refl , e′ , x′ , un′ , fw′ , _) =
     let (N , ag , ag′) = both fw fw′
-    in Corr.inst (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′
+    in subst₂ (λ l l′ → instantOf l ≡ instantOf l′ ⇔ instantOf k ≡ instantOf k′) (same ag a₁) (same ag′ a₂)
+         (Corr.inst (T N) (RP.to-row ag (≼-refl {k}) x) (RP.to-row ag′ (≼-refl {k′}) x′) un un′)
 
   home : ∀ {k l} → Img k l → (instantOf l ≡ instantOf root ⇔ instantOf k ≡ instantOf root)
-  home {k} (refl , e , x , un , fw , _) =
-    Corr.home (T (bP fw)) (RP.to-row (cutP fw ≤-refl′) (≼-refl {k}) x) un
+  home {k} (N , ag , refl , e , x , un , _) = Corr.home (T N) (RP.to-row ag (≼-refl {k}) x) un
 
   place : ∀ {m e} → u m e → Live u m → Few u m → instantOf m ≡ instantOf root ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
   place {m} y _ fw with cutQS fw {bQ fw} ≤-refl′
@@ -299,9 +306,9 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   ...   | inj₁ e = inj₁ e
   ...   | inj₂ (k , e , r , un , im , at , ie) =
     let ag = causal← r un (upto-img at)
-    in inj₂ (k , φ k , img-of ag (RP.of-row (RP.now ag) (≼-refl {k}) r) un im , ie)
+    in inj₂ (k , φ (bQ fw) k , img-of ag (RP.of-row (RP.now ag) (≼-refl {k}) r) un im , ie)
     where
-      upto-img : φ k ≼ m ⊎ Corr.Leads (T (bQ fw)) k → Settled u d (bQ fw) (φ k)
+      upto-img : φ (bQ fw) k ≼ m ⊎ Corr.Leads (T (bQ fw)) k → Settled u d (bQ fw) (φ (bQ fw) k)
       upto-img (inj₁ km) = RQ.sdown ag* km
       upto-img (inj₂ ld) = lead r un ld (sym ie) ag*
 
@@ -314,21 +321,22 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   ends {end} _ _ = refl
 
   live : ∀ {k l} → Img k l → Live t k → Live u l
-  live {k} (refl , e , x , un , fw , fw* , e′ , y , _) lv {c*} uc with ≼-or-≻ (φ k) c*
+  live {k} (N₁ , a₁ , refl , e , x , un , fw , fw* , e′ , y , _) lv {c*} uc with ≼-or-≻ (φ N₁ k) c*
   ... | inj₁ le = le
   ... | inj₂ lt with cutP fw (m≤m⊔n (bP fw) (bQ fw*)) | cutQS fw* (m≤n⊔m (bP fw) (bQ fw*))
-  ...   | ag | ag* with Corr.shown← (T (bP fw ⊔ bQ fw*)) (RQ.to-row (RQ.now ag*) (≺→≼ {c*} {φ k} lt) uc) tt
+  ...   | ag | ag* with Corr.shown← (T (bP fw ⊔ bQ fw*)) (RQ.to-row (RQ.now ag*) (≺→≼ {c*} {φ N₁ k} lt) uc) tt
   ...     | k′ , e₀ , refl , m , un′ , mt with ends un′ mt
-  ...       | refl with ≼-split {k} {k′} (lv (RP.of-row (RP.now (causal← m un′ (RQ.sdown ag* (≺→≼ {φ k′} {φ k} lt)))) (≼-refl {k′}) m))
-  ...         | inj₁ kk = ⊥-elim (≺-absurd {φ k} {φ k′} (Corr.mono (T (bP fw ⊔ bQ fw*)) (RP.to-row ag (≼-refl {k}) x) m un un′ kk) lt)
-  ...         | inj₂ refl = ⊥-elim (≺-irrefl {φ k} lt)
+  ...       | refl with ≼-split {k} {k′} (lv (RP.of-row (RP.now (causal← m un′ (RQ.sdown ag* (≺→≼ {φ (bP fw ⊔ bQ fw*) k′} {φ N₁ k} lt)))) (≼-refl {k′}) m))
+  ...         | inj₁ kk = ⊥-elim (≺-absurd {φ N₁ k} {φ (bP fw ⊔ bQ fw*) k′}
+                  (subst (_≺ φ (bP fw ⊔ bQ fw*) k′) (same ag a₁) (Corr.mono (T (bP fw ⊔ bQ fw*)) (RP.to-row ag (≼-refl {k}) x) m un un′ kk)) lt)
+  ...         | inj₂ refl = ⊥-elim (≺-irrefl {φ N₁ k} (subst (_≺ φ N₁ k) (same ag a₁) lt))
 
   pinned : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB root k
   pinned {k} x _ fw = let ag = cutS fw {bP fw} ≤-refl′ in into ag (Corr.pin→ (T (bP fw)) (RP.to-row (RP.now ag) (≼-refl {k}) x))
 
   -- Past a row, a plain run with finitely many rows is all listed, and
   -- so is the elaborated run.
-  rest : ∀ {k} → Few t k → Spent t (just k) → Σ (List Pos) λ ls → ∀ {r e} → u r e → φ k ≺ r → r ∈ ls
+  rest : ∀ {k l} → Few t k → Spent t (just k) → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
   rest {k} (ks₁ , f₁) (ks₂ , f₂) = proj₁ w , λ y _ → proj₂ w y
     where
     ks : List Pos
@@ -346,13 +354,13 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
 
   erasing : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
   erasing = record
-    { Img = Img ; PB = PB ; pb-few = λ {l} _ → pb-few l
+    { Img = Img ; PB = PB ; pb-few = λ {l} _ → proj₁ (pb-few l) , λ { (_ , p) → proj₂ (pb-few l) p }
     ; img = img ; shown = shown
-    ; img-row = λ { (_ , e , x , un , _) → e , x , un }
-    ; img-fun = λ { (refl , _) (refl , _) → refl }
+    ; img-row = λ { (_ , _ , _ , e , x , un , _) → e , x , un }
+    ; img-fun = λ { (_ , a₁ , refl , _) (_ , a₂ , refl , _) → same a₁ a₂ }
     ; img-mono = img-mono ; inst = inst ; home = home ; place = place ; live = live
-    ; spent = λ { (refl , _ , _ , _ , fw , _) sp _ → rest fw sp }
-    ; bk = bk ; in-bk = λ { {k} (refl , _) → in-bk k }
+    ; spent = λ { {l = l} (_ , _ , _ , _ , _ , _ , fw , _) sp _ → rest {l = l} fw sp }
+    ; bk = bk ; in-bk = λ { {k} (_ , ag , refl , _ , x , un , _) → in-bk (RP.to-row ag (≼-refl {k}) x) un }
     ; pinned = pinned }
 
 module At (n : ℕ) {A : Set} (o : SObs [] A) where
@@ -411,37 +419,38 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   module CQ = Cut Q
 
   postulate
-    -- THE CUTS CORRESPOND at every depth, along one map of positions and
-    -- one late placement, each position imaged by finitely many.
+    -- THE CUTS CORRESPOND at every depth, each along its own map of
+    -- positions and late placement; two cuts agreeing up to a row map it
+    -- alike; each position is imaged by finitely many, whatever the cut.
     -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over capprox for the per-former correspondence.
-    corr : Σ (Pos → Pos) λ φ → Σ (Pos → Pos → Set) λ Put → (∀ N → Corr φ Put (CP.c₃ N) (CQ.c₃ N))
-         × Σ (Pos → List Pos) λ bk → (∀ k → k ∈ bk (φ k)) × (∀ l → Σ (List Pos) λ ks → ∀ {k} → Put k l → k ∈ ks)
+    corr : Σ (ℕ → Pos → Pos) λ φ → Σ (ℕ → Pos → Pos → Set) λ Put → (∀ N → Corr (φ N) (Put N) (CP.c₃ N) (CQ.c₃ N))
+         × (∀ {N N′ k} → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → φ N k ≡ φ N′ k)
+         × Σ (Pos → List Pos) λ bk → (∀ {N k e} → CP.c₃ N k e → Unpinned e → k ∈ bk (φ N k))
+         × (∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks)
+
+  φ : ℕ → Pos → Pos
+  φ = proj₁ corr
+
+  Put : ℕ → Pos → Pos → Set
+  Put = proj₁ (proj₂ corr)
 
   -- The tables of each cut correspond as the cuts do.
-  tables : Σ (Pos → Pos) λ φ → Σ (Pos → Pos → Set) λ Put → (∀ N → Tables φ Put (CP.L₃ N) (CQ.L₃ N))
-         × Σ (Pos → List Pos) λ bk → (∀ k → k ∈ bk (φ k)) × (∀ l → Σ (List Pos) λ ks → ∀ {k} → Put k l → k ∈ ks)
-  tables = let (φ′ , Put′ , C , rest) = corr in
-    φ′ , Put′ , (λ N → corr-≃ (complete (CP.ex₃ N)) (sound (CP.ex₃ N)) (complete (CQ.ex₃ N)) (sound (CQ.ex₃ N)) (C N)) , rest
-
-  φ : Pos → Pos
-  φ = proj₁ tables
-
-  Put : Pos → Pos → Set
-  Put = proj₁ (proj₂ tables)
+  T : ∀ N → Tables (φ N) (Put N) (CP.L₃ N) (CQ.L₃ N)
+  T N = corr-≃ (complete (CP.ex₃ N)) (sound (CP.ex₃ N)) (complete (CQ.ex₃ N)) (sound (CQ.ex₃ N)) (proj₁ (proj₂ (proj₂ corr)) N)
 
   postulate
     -- THE LIFTING: two plain cuts agreeing up to a table row put the two
     -- elaborated cuts in agreement up to its image; and back.
     elab-causal : ∀ {N N′ k e} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo k (CP.c₃ N′) (CP.c₃ N)
-                → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
-    stable← : ∀ {N N′ k e} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
+                → AgreeTo (φ N k) (CQ.c₃ N′) (CQ.c₃ N)
+    stable← : ∀ {N N′ k e} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ N k) (CQ.c₃ N′) (CQ.c₃ N)
             → AgreeTo k (CP.c₃ N′) (CP.c₃ N)
     -- And up to a late placement found where the plain cut agrees.
-    stable-put : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k t (CP.c₃ N) → Rows (CQ.L₃ N) l e′ → Put k l
+    stable-put : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k t (CP.c₃ N) → Rows (CQ.L₃ N) l e′ → Put N k l
                → AgreeTo l (CQ.c₃ N′) (CQ.c₃ N)
     -- And from a row of the instant a table row leads to that row's image.
-    stable-lead : ∀ {N N′ k e m} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (proj₁ (proj₂ (proj₂ tables)) N) k
-                → instantOf m ≡ instantOf (φ k) → AgreeTo m (CQ.c₃ N′) (CQ.c₃ N) → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
+    stable-lead : ∀ {N N′ k e m} → N ≤ N′ → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (T N) k
+                → instantOf m ≡ instantOf (φ N k) → AgreeTo m (CQ.c₃ N′) (CQ.c₃ N) → AgreeTo (φ N k) (CQ.c₃ N′) (CQ.c₃ N)
     -- And everywhere: two plain cuts agreeing at every row put the two
     -- elaborated cuts' rows in one another.
     elab-all : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (CP.c₃ N′) (CP.c₃ N)) → ∀ {y e} → CQ.c₃ N′ y e → CQ.c₃ N y e
@@ -463,7 +472,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- TWO ELABORATED CUTS AGREE UP TO AN IMAGE where the plain cuts are
   -- settled up to its row.
   stable : ∀ {N N′ k e} → N ≤ N′ → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e
-         → AgreeTo (φ k) (CQ.c₃ N′) (CQ.c₃ N)
+         → AgreeTo (φ N k) (CQ.c₃ N′) (CQ.c₃ N)
   stable le ag r un = elab-causal le r un (AgreeTo-trans (AgreeTo-sym (ag le)) (ag ≤-refl′))
 
   -- Where every deeper elaborated cut agrees with this one up to `l`, the
@@ -479,36 +488,36 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
 
   -- Settled up to a row of the instant a table row leads, settled up to
   -- its image.
-  lead : ∀ {N k e m} → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (proj₁ (proj₂ (proj₂ tables)) N) k
-       → instantOf m ≡ instantOf (φ k) → Settled u CQ.c₃ N m → Settled u CQ.c₃ N (φ k)
+  lead : ∀ {N k e m} → Rows (CP.L₃ N) k e → Unpinned e → Corr.Leads (T N) k
+       → instantOf m ≡ instantOf (φ N k) → Settled u CQ.c₃ N m → Settled u CQ.c₃ N (φ N k)
   lead {N} {k} r un ld ie ag* {N′} le =
-    AgreeTo-trans (agree-at {N} {φ k} (λ le′ → stable-lead le′ r un ld ie (AgreeTo-trans (AgreeTo-sym (ag* le′)) (ag* ≤-refl′))))
+    AgreeTo-trans (agree-at {N} {φ N k} (λ le′ → stable-lead le′ r un ld ie (AgreeTo-trans (AgreeTo-sym (ag* le′)) (ag* ≤-refl′))))
       (AgreeTo-sym (stable-lead le r un ld ie (AgreeTo-trans (AgreeTo-sym (ag* le)) (ag* ≤-refl′))))
 
   -- An agreed table row's image: the elaborated run agrees with the cut
   -- up to it.
-  img-agree : ∀ {N k e} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c₃ N)
+  img-agree : ∀ {N k e} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ N k) u (CQ.c₃ N)
   img-agree ag r un = agree-at (λ le → stable le ag r un)
 
   -- A late placement found in a table is a row of the approximant.
-  put-row : ∀ {N k l e′} → Settled t CP.c₃ N k → Rows (CQ.L₃ N) l e′ → Put k l → u l e′
+  put-row : ∀ {N k l e′} → Settled t CP.c₃ N k → Rows (CQ.L₃ N) l e′ → Put N k l → u l e′
   put-row {l = l} ag m pl = CQ.R₃.of-row (agree-at (λ le → stable-put le (ag ≤-refl′) m pl)) (≼-refl {l}) m
 
   -- A table's image of a plain row at a cut agreeing up to the row is the
   -- approximant's, with finitely many rows before it.
-  img-row : ∀ {N k e e′} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ k) e′ → u (φ k) e′
-  img-row {N} {k} ag r un m = CQ.R₃.of-row (img-agree ag r un) (≼-refl {φ k}) m
+  img-row : ∀ {N k e e′} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ N k) e′ → u (φ N k) e′
+  img-row {N} {k} ag r un m = CQ.R₃.of-row (img-agree ag r un) (≼-refl {φ N k}) m
 
-  img-few : ∀ {N k e e′} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ k) e′ → Few u (φ k)
+  img-few : ∀ {N k e e′} → Settled t CP.c₃ N k → Rows (CP.L₃ N) k e → Unpinned e → Rows (CQ.L₃ N) (φ N k) e′ → Few u (φ N k)
   img-few ag r un _ = CQ.R₃.few-at (img-agree ag r un)
 
   -- Where the elaborated cut agrees up to a table row's image, the plain
   -- cut agrees up to the row.
-  causal-now : ∀ {N k e} → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ k) u (CQ.c₃ N) → AgreeTo k t (CP.c₃ N)
+  causal-now : ∀ {N k e} → Rows (CP.L₃ N) k e → Unpinned e → AgreeTo (φ N k) u (CQ.c₃ N) → AgreeTo k t (CP.c₃ N)
   causal-now {N} {k} r un ag* =
     AgreeTo-trans (CP.cut-at₃ fk (⊔₁ (CP.bound fk) N (CQ.bound fu))) (back (⊔₂ (CP.bound fk) N (CQ.bound fu)) (⊔₃ (CP.bound fk) N (CQ.bound fu)))
     where
-      fu : Few u (φ k)
+      fu : Few u (φ N k)
       fu = CQ.R₃.few-at ag*
 
       back : ∀ {N′} → N ≤ N′ → CQ.bound fu ≤ N′ → AgreeTo k (CP.c₃ N′) (CP.c₃ N)
@@ -521,9 +530,21 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
         in ∈-map⁺ proj₁ (complete (CP.ex₃ N) (proj₁ (upto b {y} {e} (≺→≼ {y} {k} yk)) x′))
 
   -- And from every deeper cut on.
-  causal← : ∀ {N k e} → Rows (CP.L₃ N) k e → Unpinned e → Settled u CQ.c₃ N (φ k) → Settled t CP.c₃ N k
+  causal← : ∀ {N k e} → Rows (CP.L₃ N) k e → Unpinned e → Settled u CQ.c₃ N (φ N k) → Settled t CP.c₃ N k
   causal← r un ag* le =
     AgreeTo-trans (causal-now r un (ag* ≤-refl′)) (AgreeTo-sym (stable← le r un (AgreeTo-trans (AgreeTo-sym (ag* le)) (ag* ≤-refl′))))
+
+  φ-agree : ∀ {N N′ k} → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → φ N k ≡ φ N′ k
+  φ-agree = proj₁ (proj₂ (proj₂ (proj₂ corr)))
+
+  bk : Pos → List Pos
+  bk = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ corr))))
+
+  in-bk : ∀ {N k e} → CP.c₃ N k e → Unpinned e → k ∈ bk (φ N k)
+  in-bk = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ corr)))))
+
+  pb-few : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks
+  pb-few = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ corr)))))
 
   -- A FINITE PLAIN RUN HAS A FINITE ELABORATED RUN: one cut's table lists it.
   whole-ahead : (ks : List Pos) → (∀ {k e} → t k e → k ∈ ks) → Σ (List Pos) λ ls → ∀ {l e} → u l e → l ∈ ls
@@ -537,7 +558,6 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   erasingᵀ : Attribution Every (One valuesOf) (Reads valuesOf) t u root root
   erasingᵀ = Erase.erasing t u CP.c₃ CQ.c₃ CP.L₃ CQ.L₃ CP.ex₃ CQ.ex₃
     (λ {q} → CP.bound {q}) (λ {q} fw {N} → CP.cut-at₃ {q} fw {N}) (λ {q} → CQ.bound {q}) (λ {q} fw {N} → CQ.cut-at₃ {q} fw {N})
-    φ (proj₁ (proj₂ tables)) (proj₁ (proj₂ (proj₂ tables)))
-    (proj₁ (proj₂ (proj₂ (proj₂ tables)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ tables))))) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ tables)))))
+    φ Put T (λ {N} {N′} {k} → φ-agree {N} {N′} {k}) bk (λ {N} {k} {e} r → in-bk {N} {k} {e} (sound (CP.ex₃ N) r)) pb-few
     (λ {N} {k} {e} {e′} → img-row {N} {k} {e} {e′}) (λ {N} {k} {e} {e′} → img-few {N} {k} {e} {e′}) (λ {N} {k} {e} → causal← {N} {k} {e}) (λ {N} {k} {l} {e′} → put-row {N} {k} {l} {e′})
     (λ {N} {k} {e} {m} → lead {N} {k} {e} {m}) whole-ahead
