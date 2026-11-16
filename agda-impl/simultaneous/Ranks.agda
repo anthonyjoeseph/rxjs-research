@@ -37,7 +37,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (mk⇔; Equivalence)
 open import Relation.Binary.Definitions using (DecidableEquality)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; subst; subst₂)
 open import Relation.Nullary using (yes; no; ¬?)
 
 open import denotation.Position using (Pos; _≟ᵖ_; Instant; frame; root; _≟ⁱ_)
@@ -51,9 +51,11 @@ open import simultaneous.Relations using (Met; values; ranked; Rank; Before; sta
 open import simultaneous.Instants using (_≺ⁱ_; Sorted; irrⁱ; transⁱ; triⁱ; frame-least; insertⁱ; sorted-insert; ∈-insert⁻; ∈-insert⁺; sorted-⊆; sorted-⊂; ≺-instant; instant-≺)
 open import simultaneous.Protocol using (named)
 open import simultaneous.Listing using (Listed; Listing; listed)
+open import simultaneous.Reach using (module Reached)
+open import denotation.Laws using (inv-⟦⟧)
 import simultaneous.Spec as Spec
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elaborate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elaborate; IE)
 open Equivalence using (to; from)
 
 ------------------------------------------------------------------------
@@ -184,13 +186,27 @@ rank-of {t = t} {q} (ks , cover , sound) = length is , is , filter⁺ ne? (sorte
 ------------------------------------------------------------------------
 -- One instant, one rank
 
+-- Rows of one instant have the instants before them in common, read
+-- off two sets whose rows lie in the same instants.
+carry-before : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B}
+             → (∀ {k e} → t k e → Σ Pos λ k′ → Σ (Ev B) λ e′ → t′ k′ e′ × instantOf k′ ≡ instantOf k)
+             → ∀ {q q′ i} → instantOf q ≡ instantOf q′ → Before t q i → Before t′ q′ i
+carry-before home same (ne , inj₁ f) = (λ e → ne (trans e (sym same))) , inj₁ f
+carry-before home {q} {q′} same (ne , inj₂ (k , e , row , lt , eq)) with home row
+... | k′ , e′ , row′ , eq′ =
+  (λ e″ → ne (trans e″ (sym same))) ,
+  inj₂ (k′ , e′ , row′ , instant-≺ k′ q′ (subst₂ _≺ⁱ_ (sym eq′) same (≺-instant k q lt λ e″ → ne (trans (sym eq) e″))) , trans eq′ eq)
+
+-- Rows with the instants before them in common share a rank.
+before-rank : ∀ {A B} {t : EmissionSet A} {t′ : EmissionSet B} {q q′ n m}
+            → (∀ {i} → Before t q i → Before t′ q′ i) → (∀ {i} → Before t′ q′ i → Before t q i)
+            → Rank t q n → Rank t′ q′ m → n ≡ m
+before-rank f g (is , s , refl , iff) (js , s′ , refl , iff′) =
+  ≤-antisym (sorted-⊆ s s′ λ m → from iff′ (f (to iff m))) (sorted-⊆ s′ s λ m → from iff (g (to iff′ m)))
+
 private
-  -- Rows of one instant have the instants before them in common.
   same-before : ∀ {A} {t : EmissionSet A} {q q′ i} → instantOf q ≡ instantOf q′ → Before t q i → Before t q′ i
-  same-before same (ne , inj₁ f) = (λ e → ne (trans e (sym same))) , inj₁ f
-  same-before {q = q} {q′} same (ne , inj₂ (k , e , row , lt , eq)) =
-    (λ e′ → ne (trans e′ (sym same))) ,
-    inj₂ (k , e , row , instant-≺ k q′ (subst (instantOf k ≺ⁱ_) same (≺-instant k q lt λ e″ → ne (trans (sym eq) e″))) , eq)
+  same-before = carry-before (λ {k} {e} r → k , e , r , refl)
 
   -- A row of a later instant has every instant before an earlier row.
   later-before : ∀ {A} {t : EmissionSet A} {q q′ i} → instantOf q ≺ⁱ instantOf q′ → Before t q i → Before t q′ i
@@ -210,9 +226,7 @@ private
 
 -- Rows of one instant share a rank.
 instant-rank : ∀ {A} {t : EmissionSet A} {q q′ n m} → Rank t q n → Rank t q′ m → instantOf q ≡ instantOf q′ → n ≡ m
-instant-rank (is , s , refl , iff) (js , s′ , refl , iff′) same =
-  ≤-antisym (sorted-⊆ s s′ λ m → from iff′ (same-before same (to iff m)))
-            (sorted-⊆ s′ s λ m → from iff (same-before (sym same) (to iff′ m)))
+instant-rank r r′ same = before-rank (same-before same) (same-before (sym same)) r r′
 
 -- Rows of two instants do not.
 rank-instant : ∀ {A} {t : EmissionSet A} {q q′ e e′ n} → t q e → t q′ e′ → Rank t q n → Rank t q′ n → instantOf q ≡ instantOf q′
@@ -246,6 +260,10 @@ ranked→ {e = out _} r = proj₁ r
 ranked→ {e = skip}  r = r
 ranked→ {e = end}   r = r
 ranked→ {e = pin _} r = r
+
+-- A seen row, ranked.
+seen-ranked : ∀ {A} {t : EmissionSet A} {q a n} → Seen t q (out a) → Rank t q n → Seen (ranked t) q (out (n , a))
+seen-ranked {t = t} ((x , ends) , ks , cov) rk = ((x , rk) , ends) , ks , λ {k} {e} y lt → cov (ranked→ {t = t} {k} {e} y) lt
 
 unrank-visible : ∀ {A} {e : Ev (ℕ × A)} → Visible e → Visible (unrankᴱ e)
 unrank-visible {e = out _} v = v
@@ -293,9 +311,31 @@ postulate
                  → elaborated o q′ (out (instEmit (value v′) p′)) → instantOf q ≡ instantOf q′ → p ≡ p′
 
 -- A BATCH LEAVES IN ITS OWN INSTANT: released when its instant is over,
--- it leaves within it, at the rank its values carry.
+-- it leaves within it, an instant holding a value of its name.
 postulate
-  batch-rank : ∀ {A} (o : SObs [] A) {p n} → Carries (batched o) p n → Carries (elaborated o) p n
+  batch-home : ∀ {A} (o : SObs [] A) {q vs p} → batched o q (out (instEmit (value vs) p))
+             → Σ Pos λ q′ → Σ A λ v → elaborated o q′ (out (instEmit (value v) p)) × instantOf q′ ≡ instantOf q
+
+-- THE BATCHER KEEPS THE INSTANTS: an `each` over a `scan`, every row of
+-- it lies in an instant a row of its source does, and every row of its
+-- source in one of its own.
+postulate
+  batch-instant : ∀ {A} (o : SObs [] A) {k e} → batched o k e
+                → Σ Pos λ k′ → Σ (Ev (IE A)) λ e′ → elaborated o k′ e′ × instantOf k′ ≡ instantOf k
+  elab-instant  : ∀ {A} (o : SObs [] A) {k e} → elaborated o k e
+                → Σ Pos λ k′ → Σ (Ev (IE (List A))) λ e′ → batched o k′ e′ × instantOf k′ ≡ instantOf k
+
+-- So a batch leaves at the rank its values carry: the rows before it
+-- lie in the instants the rows before them do.
+batch-rank : ∀ {A} (o : SObs [] A) {p n} → Carries (batched o) p n → Carries (elaborated o) p n
+batch-rank o {p} {n} (q , vs , ((rb , rk) , _) , _) with batch-home o rb
+... | q′ , v , x , same with rank-of (listed (elaborate (plain o)) (enter-few (⟦ elaborate (plain o) ⟧ []) root x tt))
+...   | m , rk′ =
+  q′ , v , seen-ranked (seen x tt)
+    (subst (Rank (elaborated o) q′)
+      (sym (before-rank (carry-before (λ {k} {e} → batch-instant o {k} {e}) (sym same)) (carry-before (λ {k} {e} → elab-instant o {k} {e}) same) rk rk′)) rk′)
+  where
+    open Reached (⟦ elaborate (plain o) ⟧ []) root (inv-⟦⟧ (elaborate (plain o)) [] (λ ()) root (tt , λ ())) using (seen)
 
 module _ {A : Set} (o : SObs [] A) where
   private

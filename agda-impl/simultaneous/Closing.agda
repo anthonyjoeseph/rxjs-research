@@ -13,7 +13,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++; ∈-++⁻; ∈-map⁻; ∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᴬ)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Bool.Properties using (T?)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
@@ -25,7 +25,7 @@ open import Data.Unit using (⊤; tt)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _∸_; z≤n; s≤s; _≟_)
 open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
 import Data.List.Relation.Binary.Pointwise as Pointwise
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary using (Dec; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
 open import Tree using (scan)
@@ -52,8 +52,9 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
 open import simultaneous.Relations using (Met; values; values-++; ranked; Left; Exits; Over; lastValue; carried; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
-open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name)
-open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; run-has; from≺)
+open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name; enter-few; visible-unpinned)
+open import simultaneous.Erasure using (module Reaching)
+open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; run-has; from≺; run-det; run-++; after-≺)
 open import simultaneous.Batcher using (released; released-held; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
@@ -371,20 +372,101 @@ Covers t rs y = ∀ {k e} → t k e → Visible e → k ≼ y → After (cursor 
 Dry : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Set
 Dry t rs = ∀ {k e} → t k e → Visible e → After (cursor nothing rs) k → ⊥
 
--- A RUN IS MET ON PAST ANY ROW WITH FINITELY MANY BEFORE IT: some
--- extension meets every visible row up to it.  The rows before `y` are
--- listed (`listed`) and the latest visible one past the run is met as
--- `Reaching.reach` meets a row, the two runs comparable by `run-det`;
--- what is open is `y` itself, whose row a listing before `y` omits — a
--- listing up to a position just past `y`.
-postulate
-  pass : ∀ {A : Set} (o : SObs [] A) {rs y} → Met (elaborated o) rs → Few (elaborated o) y
-       → Σ _ λ ext → Met (elaborated o) (rs ++ ext) × Covers (elaborated o) (rs ++ ext) y
+-- One list a prefix of another: the other, extended.
+prefix-ext : ∀ {X : Set} {xs ys : List X} → Prefix _≡_ xs ys → Σ (List X) λ zs → ys ≡ xs ++ zs
+prefix-ext {ys = ys} Prefix.[] = ys , refl
+prefix-ext (refl Prefix.∷ p) with prefix-ext p
+... | zs , refl = zs , refl
+
+prefix-in : ∀ {X : Set} {xs ys : List X} {x} → Prefix _≡_ xs ys → x ∈ xs → x ∈ ys
+prefix-in (refl Prefix.∷ _) (here refl) = here refl
+prefix-in (_ Prefix.∷ p)    (there m)   = there (prefix-in p m)
+
+vis? : ∀ {A} (e : Ev A) → Dec (Visible e)
+vis? (out _) = yes tt
+vis? end     = yes tt
+vis? skip    = no λ ()
+vis? (pin _) = no λ ()
+
+after? : ∀ c q → Dec (After c q)
+after? nothing  q = yes tt
+after? (just c) q = T? (c <ᵖ q)
+
+-- No visible row before `y` is left past the run.
+Covers< : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Pos → Set
+Covers< t rs y = ∀ {k e} → t k e → Visible e → k ≺ y → After (cursor nothing rs) k → ⊥
+
+module Pass {A : Set} (o : SObs [] A) where
+  private
+    X = elaborated o
+    open Reached (⟦ elaborate (plain o) ⟧ []ᴬ) root (inv-⟦⟧ (elaborate (plain o)) []ᴬ (λ ()) root (tt , λ ())) using (seen)
+    module RX = Reaching {IE A} {X} (at-func (elaborate (plain o))) (λ {q} {e} r v → enter-few (⟦ elaborate (plain o) ⟧ []ᴬ) root {q} {e} r (visible-unpinned v))
+      (λ {q} → listed (elaborate (plain o)) {q})
+
+    -- The latest visible listed row past a cursor, if any.
+    Latest : Maybe Pos → List Pos → Set
+    Latest c ks = (∀ {k e} → k ∈ ks → X k e → Visible e → After c k → ⊥)
+                ⊎ Σ Pos λ u → Σ (Ev (IE A)) λ eu → u ∈ ks × X u eu × Visible eu × After c u
+                  × (∀ {k e} → k ∈ ks → X k e → Visible e → After c k → k ≼ u)
+
+    -- A listed row not counted.
+    drop : ∀ {c k ks} → (∀ {e} → X k e → Visible e → After c k → ⊥) → Latest c ks → Latest c (k ∷ ks)
+    drop nk (inj₁ none) = inj₁ λ { (here refl) x v a → nk x v a ; (there m) → none m }
+    drop nk (inj₂ (u , eu , m , xu , vu , au , all)) =
+      inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) x v a → ⊥-elim (nk x v a) ; (there m′) → all m′ })
+
+    latest : ∀ c (ks : List Pos) → (∀ {k} → k ∈ ks → Σ _ (X k)) → Latest c ks
+    latest c []       _ = inj₁ λ ()
+    latest c (k ∷ ks) s with latest c ks (λ m → s (there m)) | s (here refl)
+    ... | r | e₁ , x₁ with vis? e₁ | after? c k
+    ...   | no nv  | _      = drop {c} {k} {ks} (λ x v _ → nv (subst Visible ((at-func (elaborate (plain o))) x x₁) v)) r
+    ...   | yes _  | no na  = drop {c} {k} {ks} (λ _ _ a → na a) r
+    ...   | yes v₁ | yes a₁ with r
+    ...     | inj₁ none = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ , λ { (here refl) _ _ _ → ≼-refl {k} ; (there m) x v a → ⊥-elim (none m x v a) })
+    ...     | inj₂ (u , eu , m , xu , vu , au , all) with T? (u <ᵖ k)
+    ...       | yes uk = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ ,
+                  λ { (here refl) _ _ _ → ≼-refl {k} ; {k′} (there m′) x v a → ≼-trans {k′} {u} {k} (all m′ x v a) (≺→≼ {u} {k} uk) })
+    ...       | no ku  = inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) _ _ _ → ku ; (there m′) x v a → all m′ x v a })
+
+    cases : ∀ {P Q R : Set} → (P → R) → (Q → R) → P ⊎ Q → R
+    cases f g (inj₁ p) = f p
+    cases f g (inj₂ q) = g q
+
+  -- A RUN IS MET ON PAST ANY ROW WITH FINITELY MANY BEFORE IT, up to it:
+  -- the latest visible row listed before it, past the run, is met as
+  -- `Reaching.reach` meets a row, the two runs comparable by `run-det`.
+  pass< : ∀ {rs y} → Met X rs → Few X y → Σ _ λ ext → Met X (rs ++ ext) × Covers< X (rs ++ ext) y
+  pass< {rs} {y} mx F with listed (elaborate (plain o)) F
+  ... | ks , cover , sound with latest (cursor nothing rs) ks (λ m → proj₂ (sound m))
+  ...   | inj₁ none = [] , subst (Met X) (sym (++-identityʳ rs)) mx ,
+            λ {k} x v ky a → none (cover x ky) x v (subst (λ c → After c k) (cong (cursor nothing) (++-identityʳ rs)) a)
+  ...   | inj₂ (u , eu , m , xu , vu , au , all) with RX.reach xu (proj₂ (proj₁ (seen xu vu))) vu
+  ...     | rs′ , run′ with run-det (at-func (elaborate (plain o))) mx run′
+  ...       | inj₂ p = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
+  ...       | inj₁ p with prefix-ext p
+  ...         | zs , eq = zs , subst (Met X) eq run′ ,
+              λ {k} x v ky a → all (cover x ky) x v (after-≺ (cursor nothing rs) au (uk k a)) (uk k a)
+    where
+      uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k
+      uk k a = subst (λ c → After c k) (trans (cong (cursor nothing) (sym eq)) (cursor-snoc nothing rs′)) a
+
+  -- With the row at `y` in hand, up to and including it: one more step.
+  pass : ∀ {rs y e} → Met X rs → Seen X y e → Σ _ λ ext → Met X (rs ++ ext) × Covers X (rs ++ ext) y
+  pass {rs} {y} {e} mx sy@((xy , _) , fy) with pass< mx fy
+  ... | ext , mx′ , cv with vis? e | after? (cursor nothing (rs ++ ext)) y
+  ...   | no nv | _ = ext , mx′ , λ {k} x v ky a → cases (λ lt → cv x v lt a) (λ { refl → nv (subst Visible ((at-func (elaborate (plain o))) x xy) v) }) (≼-split {k} {y} ky)
+  ...   | yes _ | no na = ext , mx′ , λ {k} x v ky a → cases (λ lt → cv x v lt a) (λ { refl → na a }) (≼-split {k} {y} ky)
+  ...   | yes vi | yes ay =
+    ext ++ [ (y , e) ] ,
+    subst (Met X) (++-assoc rs ext [ (y , e) ]) (run-++ mx′ ((sy , vi , ay , λ x′ v′ a′ ky → cv x′ v′ ky a′) ∷ [])) ,
+    λ {k} x v ky a → ky (subst (λ c → After c k) (trans (cong (cursor nothing) (sym (++-assoc rs ext [ (y , e) ]))) (cursor-snoc nothing (rs ++ ext))) a)
+
+open Pass using (pass<; pass)
 
 -- A visible row past a run is met on it.
 meet : ∀ {A : Set} (o : SObs [] A) {rs y e} → Met (elaborated o) rs → Seen (elaborated o) y e → Visible e
      → After (cursor nothing rs) y → Σ _ λ ext → Met (elaborated o) (rs ++ ext) × (y , e) ∈ ext
-meet {A} o {rs} {y} {e} mx ((xy , _) , fy) vi ay with pass o mx fy
+meet {A} o {rs} {y} {e} mx sy@((xy , _) , fy) vi ay with pass o mx sy
 ... | ext , mx′ , cv = found (cursor-cases (rs ++ ext))
   where
     found : (cursor nothing (rs ++ ext) ≡ nothing ⊎ Σ Pos λ c → cursor nothing (rs ++ ext) ≡ just c)
@@ -756,10 +838,11 @@ releases {A} o {rx} mxr cl ne = go (lastValue valuesOf rx) refl cl
     open Reached (⟦ elaborate (plain o) ⟧ []ᴬ) root (inv-⟦⟧ (elaborate (plain o)) []ᴬ (λ ()) root (tt , λ ())) using (seen)
 
     leave : ∀ {q} → Σ (IE A) (λ x → X q (out x)) → Exits X q → Σ _ λ ext → Met X (unrank rx ++ ext) × Gone o q (unrank rx ++ ext)
-    leave _ (inj₁ (k , e , ((xk , _) , fk) , qk , ne′)) with pass o mx fk
+    leave _ (inj₁ (k , e , ((xk , pk) , fk) , qk , ne′)) with pass o mx ((xk , pk) , fk)
     ... | ext , mx′ , cv = ext , mx′ , moved xk qk ne′ cv
-    leave {q} (_ , xq) (inj₂ (ks , h)) with pass o mx (few-past (proj₂ (seen xq tt)) (λ xy qy → proj₁ (h xy qy)) {maxᵖ q ks})
-    ... | ext , mx′ , cv = ext , mx′ , dry λ {k} xk vi ak → cv xk vi (below k xk) ak
+    leave {q} (_ , xq) (inj₂ (ks , h)) with pass< o mx (few-past (proj₂ (seen xq tt)) (λ xy qy → proj₁ (h xy qy)) {maxᵖ q ks ⊕ [ ix 0 ]})
+    ... | ext , mx′ , cv = ext , mx′ , dry λ {k} xk vi ak →
+      cv xk vi (≼-≺-≺ {k} {maxᵖ q ks} {maxᵖ q ks ⊕ [ ix 0 ]} (below k xk) (≺-ext (maxᵖ q ks) {ix 0} [])) ak
       where
         below : ∀ k {e} → X k e → k ≼ maxᵖ q ks
         below k xk with T? (q <ᵖ k)
