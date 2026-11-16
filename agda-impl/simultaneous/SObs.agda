@@ -215,6 +215,12 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   each : ∀ {Γ X Y} → (X → List Y) → E Γ X → E Γ Y
   each f s = flatMap (mergeᶠ nothing) (λ x → of (f x)) s
 
+  -- Two lists from each emit, from two lanes of their own: the first's
+  -- rows, then the second's.  No row of the second sits at an index the
+  -- first's length decides.
+  each₂ : ∀ {Γ X Y} → (X → List Y) → (X → List Y) → E Γ X → E Γ Y
+  each₂ f g s = flatMap (mergeᶠ nothing) (λ x → flatMap (mergeᶠ nothing) (λ b → of (if b then f x else g x)) (of (true ∷ false ∷ []))) s
+
   -- A child shared by a body, subscribed as the lane of a trigger fired
   -- past the body's subscribe: within the connect's burst, never as its
   -- source, so a cut below stops it.
@@ -262,14 +268,15 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   ... | false = []
   joins (m , k) _ = replicate k (instEmit (mark begin) m)
 
-  joinStep : ∀ {A} → Bool × List (IE A) → AIE A → Bool × List (IE A)
-  joinStep (true  , _) (r , just e)  = false , joins r e ++ e ∷ []
-  joinStep (true  , _) (r , nothing) = false , replicate (proj₂ r) (instEmit (mark begin) (proj₁ r))
-  joinStep (false , _) (r , just e)  = false , e ∷ []
-  joinStep (false , _) (r , nothing) = false , []
+  -- The joins, then the emit.
+  joinStep : ∀ {A} → Bool × (List (IE A) × List (IE A)) → AIE A → Bool × (List (IE A) × List (IE A))
+  joinStep (true  , _) (r , just e)  = false , (joins r e , e ∷ [])
+  joinStep (true  , _) (r , nothing) = false , (replicate (proj₂ r) (instEmit (mark begin) (proj₁ r)) , [])
+  joinStep (false , _) (r , just e)  = false , ([] , e ∷ [])
+  joinStep (false , _) (r , nothing) = false , ([] , [])
 
   reader : ∀ {Γ A} → E Γ (AIE A) → E Γ (IE A)
-  reader s = each proj₂ (scan joinStep (true , []) s)
+  reader s = each₂ (λ x → proj₁ (proj₂ x)) (λ x → proj₂ (proj₂ x)) (scan joinStep (true , ([] , [])) s)
 
   -- The routes a connect holds past an emit, or past its end.
   past : ∀ {X} → AIE X → Routes
@@ -358,13 +365,14 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   framed : ∀ {Θ B} → Part → E (IE B ∷ Θ) (IE B)
   framed k = flatMap (mergeᶠ (just 1)) (piece k) (of (0 ∷ 1 ∷ 2 ∷ []))
 
-  -- A lane counts its routes, and tells them as it ends.
-  laneStep : ∀ {A} → Routes × List (IE A) → IE A → Routes × List (IE A)
-  laneStep (r , _) (instEmit (mark laneDone) n) = r , replicate (proj₂ r) (marked carry) ++ instEmit (mark laneDone) n ∷ []
-  laneStep (r , _) e = count r e , e ∷ []
+  -- A lane counts its routes, and tells them as it ends: the carries,
+  -- then the emit.
+  laneStep : ∀ {A} → Routes × (List (IE A) × List (IE A)) → IE A → Routes × (List (IE A) × List (IE A))
+  laneStep (r , _) (instEmit (mark laneDone) n) = r , (replicate (proj₂ r) (marked carry) , instEmit (mark laneDone) n ∷ [])
+  laneStep (r , _) e = count r e , ([] , e ∷ [])
 
   counted : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
-  counted s = each proj₂ (scan laneStep ((name , 0) , []) s)
+  counted s = each₂ (λ x → proj₁ (proj₂ x)) (λ x → proj₂ (proj₂ x)) (scan laneStep ((name , 0) , ([] , [])) s)
 
   undone : ∀ {B} → IE B → Bool
   undone (instEmit (mark laneDone) _) = false
