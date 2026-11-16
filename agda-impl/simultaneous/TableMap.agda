@@ -31,7 +31,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; Cons; coh-of; tr-few)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
 
@@ -167,10 +167,10 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
 
   -- Agreement back through the map, by the child's coherence.
   ag← : ∀ {N N′ k} → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → AgreeTo k (TR (P N)) (TR (P N′))
-  ag← {N} {N′} ag = R.coh (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) (sh-of ag))
+  ag← {N} {N′} ag = coh-of (tr-few (P N) (P N′)) R.cons R.cons (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) (sh-of ag))
 
   ag←* : ∀ {N N′ k} → AgreeTo k (TR (Q′ N)) (TR (Q′ N′)) → AgreeTo k (TR (Q N)) (TR (Q N′))
-  ag←* {N} {N′} ag = R.coh* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) (sh-of ag))
+  ag←* {N} {N′} ag = coh-of (tr-few (Q N) (Q N′)) R.cons* R.cons* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) (sh-of ag))
 
   back-row : ∀ N {k e} → TR (P′ N) k e → Unpinned e → Σ (Ev A) λ e₀ → TR (P N) k e₀ × Unpinned e₀
   back-row N x un with tr-map→ f (P N) x
@@ -252,27 +252,26 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = R.φ ; Put = R.Put ; corr = corr′
-    ; φ-agree = λ ag → R.φ-agree (ag← ag)
+    ; φ-agree = λ {N} x ag → R.φ-agree (proj₁ (proj₂ (tr-map→ f (P N) x))) (ag← ag)
     ; bk = R.bk
     ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.in-bk x₀ u₀
     ; pb-few = R.pb-few
     ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = back-row N x un in ag-map g (R.elab-causal le x₀ u₀ (ag← ag))
-    ; stable← = λ {N} le x un ag* → let (_ , x₀ , u₀) = back-row N x un in ag-map f (R.stable← le x₀ u₀ (ag←* ag*))
+    ; stable← = λ {N} le x un y ag* → let (_ , x₀ , u₀) = back-row N x un in
+        ag-map f (R.stable← le x₀ u₀ (proj₁ (proj₂ (tr-map→ g (Q N) y))) (ag←* ag*))
     ; stable-put = λ {N} le ag y pl → ag-map g (R.stable-put le (ag← ag) (proj₁ (proj₂ (tr-map→ g (Q N) y))) pl)
-    ; stable-lead = λ {N} le x un ld ie ag* → let (_ , x₀ , u₀) = back-row N x un in
-        ag-map g (R.stable-lead le x₀ u₀ (leads← ld) ie (ag←* ag*))
+    ; stable-lead = λ {N} le x un y ld z ie ag* → let (_ , x₀ , u₀) = back-row N x un in
+        ag-map g (R.stable-lead le x₀ u₀ (proj₁ (proj₂ (tr-map→ g (Q N) y))) (leads← ld) (proj₁ (proj₂ (tr-map→ g (Q N) z))) ie (ag←* ag*))
     ; elab-all = λ {N} {N′} le all y → let (_ , y₀ , eq) = tr-map→ g (Q N′) y in
         subst (TR (Q′ N) _) (sym eq) (tr-map← g (Q N) (R.elab-all le (λ q → ag← (all q)) y₀))
-    ; coh = λ {N} {N′} ag → ag-map f (R.coh (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) ag))
-    ; coh* = λ {N} {N′} ag → ag-map g (R.coh* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) ag))
     ; func = λ {N} → func-map f (P N) R.func
     ; func* = λ {N} → func-map g (Q N) R.func*
     ; flat = λ {N} → flat-map f (P N) R.flat
     ; flat* = λ {N} → flat-map g (Q N) R.flat*
     ; pin-in = λ {N} → pin-in-map f (P N) R.pin-in
     ; pin-in* = λ {N} → pin-in-map g (Q N) R.pin-in*
-    ; cons = λ {N} {N′} → cons-map f {P N} {P N′} ag← R.cons
-    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* R.cons* }
+    ; cons = λ {N} {N′} → cons-map f {P N} {P N′} ag← (R.cons {N} {N′})
+    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* (R.cons* {N} {N′}) }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))
