@@ -94,7 +94,11 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SimPos using (UpTo)
 open import simultaneous.SObs using (lone; module Elaborate)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; undone)
+-- The elaboration, applied once: each application is a fresh copy, so a
+-- term built through another agrees with this one only by unfolding, and
+-- the unfolding of an elaborated former is the whole tree beneath it.
+module El = Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone
+open El using (IE; AIE; elab; annotate; undone)
 
 ------------------------------------------------------------------------
 -- Maps of positions

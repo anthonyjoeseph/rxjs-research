@@ -46,11 +46,10 @@ import denotation.Laws.Connect as LC
 open import denotation.Laws.Shows using (few-reach)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ticks; entered-few; ≼-trans; ≺→≼; ≼-refl)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.ElabUndone using (Undone; elab-undone; env-u)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; m-out; m-end; Carried; c-out; c-end;
   Upto; Under; Mapped; ListedB; Shows; Shown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Joins; Apart; SimIH; sih; foot; outerAt;
-  Live; env-live; outer-⊑)
+  Live; env-live; outer-⊑; module El)
 open import simultaneous.ReadMap using (upto-dn; under-down; listed-up)
 open import simultaneous.SimReader using (hots-at)
 open import simultaneous.Listing using (Listed)
@@ -63,7 +62,7 @@ open import simultaneous.SimConnect using (Pair; hot-up; img-upto; env-row)
 
 open import simultaneous.FlatRows using (Jn; merge∞; sw; ex; RunsOf; CutOf; inst; laneAt; frameAt; framed; module Rows)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; E; elab; trackers)
+open El using (IE; AIE; E; elab; trackers)
 
 -- One value shown is shown, and is that value.
 shown-one : ∀ {X} {x : IE X} {a} → valuesOf x ≡ a ∷ [] → Shown x
@@ -97,7 +96,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
             (es : EnvSim ρ Amb env env′) (en : EnvNeeds ρ env env′ es) (em : Emb Amb)
             (p p′ : Pos) (pp : Amb p (foot s (outerAt p′))) (fr : Fresh (Hots env) (Hots env′) Amb p (foot s (outerAt p′)))
             (ok : Ok (Hots env) p) (ok′ : Ok (Hots env′) p′) (nh : ¬ Hots env p)
-            (U : EmissionSet (IE B)) (U≡ : enter (approx n (elab ρ (flatMap op f s)) env′) p′ ≡ U) where
+            (u : E Δ (IE B)) (u≡ : elab ρ (flatMap op f s) ≡ u) (U : EmissionSet (IE B)) (U≡ : enter (approx n u env′) p′ ≡ U) where
 
   ----------------------------------------------------------------------
   -- The plain flatMap
@@ -134,7 +133,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   g′ : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   g′ a = elab ρₗ (f a)
 
-  module RW = Rows n env′ j s′ g′ (trackers Γ 0 ρₜ) p′ (elab ρ (flatMap op f s)) refl U U≡
+  module RW = Rows n env′ j s′ g′ (trackers Γ 0 ρₜ) p′ u u≡ U U≡
   open RW using (σtt; env₀′; o₂; g₂; rd; relay; q₀′; body; U₀)
 
   -- The real flatMap.
@@ -658,7 +657,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     lane-at L {k} {l₀} tl uk iₗ =
       let (y , a) = Run.anchor (Rₗ L) A′ incₗ emA tl c-out envk lstk
           (y₀ , a₀ , yl) = Run.ext (Rₗ L) iₗ
-      in under-listed (just k) (Sim.upto (Run.sim (Rₗ L) A′ incₗ emA (just k) (y , incₗ a) envk lstk)) (y₀ , incₗ a₀ , inj₂ yl)
+      in under-listed {U = UL L} {A′ = A′} (just k) (Sim.upto (Run.sim (Rₗ L) A′ incₗ emA (just k) (y , incₗ a) envk lstk)) (y₀ , incₗ a₀ , inj₂ yl)
       where
         incₗ : (Ambₗ L ∪ᴹ Mₗ L) ⊆ᴹ A′
         incₗ m = inc (lane-⊆ L m)
@@ -842,13 +841,18 @@ postulate
               → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
               → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap (mergeᶠ (just k)) f s)
 
+-- One clause over every unbounded joiner, its operator left abstract: a
+-- concrete operator would let the comparison unfold the elaborated tree.
+sim-joined : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {op} (j : Jn op) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+           → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
+           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
+sim-joined n ρ j f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
+  Flat.result n ρ j f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl _ refl
+
 sim-flatMap : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
             → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
 sim-flatMap n ρ (mergeᶠ (just k)) f s ihs ihf = sim-bounded n ρ k f s ihs ihf
-sim-flatMap n ρ (mergeᶠ nothing) f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ {op = mergeᶠ nothing} merge∞ f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
-sim-flatMap n ρ switchᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ {op = switchᶠ} sw f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
-sim-flatMap n ρ exhaustᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ {op = exhaustᶠ} ex f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
+sim-flatMap n ρ (mergeᶠ nothing) f s ihs ihf = sim-joined n ρ merge∞ f s ihs ihf
+sim-flatMap n ρ switchᶠ f s ihs ihf = sim-joined n ρ sw f s ihs ihf
+sim-flatMap n ρ exhaustᶠ f s ihs ihf = sim-joined n ρ ex f s ihs ihf
