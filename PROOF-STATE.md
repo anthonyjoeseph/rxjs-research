@@ -35,23 +35,15 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE TABLES
 
 A rewrite, finished before any other proof work, in order: (1) the
-engine: no row index depends on data (a reader's first value, a lane's
-`laneDone`), TS mirrored, the oracle green in CI; (2) THE CUTS'
-STABILITY; (3) a map per former alongside `listC`, agreeing cuts giving
-the same map; (4) one relabelling lemma per operator, flatMap first; (5)
-`corr` replaced by a tree recursion giving each subterm its map, late
-placement, cut correspondence and lifting facts, over related
+engine (no row index depends on data) green in CI's oracle, spec-check
+and bug-cache; (2) a map per former alongside `listC`, agreeing cuts
+giving the same map; (3) one relabelling lemma per operator, flatMap
+first; (4) `corr` replaced by a tree recursion giving each subterm its
+map, late placement, cut correspondence and lifting facts (up to an
+image, back, at a late placement, everywhere), over related
 environments. Out of scope: the flatMap and connect content itself.
 
-Members: `corr`, `elab-causal`, `stable←`, `stable-put`.
-
-#### THE CUTS' STABILITY
-
-Untried: one general cut lemma: a deeper plain cut agrees wherever a
-shallower one does, and a finite plain run has a depth past which
-elaborated cuts stop growing. Plain only, per former.
-
-Members: `deeper`, `stable-all`.
+Members: `corr`, `elab-causal`, `elab-all`, `stable←`, `stable-put`.
 
 ## Tier 3 — the simultaneous spec
 
