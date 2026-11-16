@@ -34,17 +34,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-A rewrite, finished before any other proof work, in order: (1) the
-engine (no row index depends on data) green in CI's oracle, spec-check
-and bug-cache; (2) a map per former alongside `listC`, agreeing cuts
-giving the same map; (3) one relabelling lemma per operator, flatMap
-first; (4) `corr` replaced by a tree recursion giving each subterm its
-map, late placement, cut correspondence and lifting facts (up to an
-image, back, at a late placement, everywhere), over related
-environments. Out of scope: the flatMap and connect content itself.
+The rewrite, finished before any other proof work: each one-to-one
+former carries its child's record through its operator's table, and
+each leaf, the spin and the batcher's own plumbing has a record of its
+own. Untried: the leaves' maps rename the creator inside an async
+instant; `scan-tab` matches values only where both accumulators read
+the same values in order. Settled when each is a body.
 
-Members: `corr`, `elab-causal`, `elab-all`, `stable←`, `stable-put`,
-`stable-lead`.
+Members: `map-tab`, `scan-tab`, `take-tab`, `defer-tab`, `spin-tab`,
+`empty-rel`, `of-rel`, `cold-rel`, `top-rel`.
+
+#### THE FLATMAP AND CONNECT CASES
+
+Out of the rewrite's scope: the maps themselves and the
+switch/exhaust/take decisions. Untried: whether the record carries
+enough for lanes' rows to keep their order across lanes (ticks, the
+creators inside async instants) and for a connect's body to meet its
+hot. Settled when each is a body.
+
+Members: `flat-rel`, `conn-rel`.
 
 ## Tier 3 — the simultaneous spec
 
