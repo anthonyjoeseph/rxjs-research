@@ -44,6 +44,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; sto
 open import simultaneous.SObs using (lone; isZero; flat; Part; lanePart; burstPart; isLane; Branch; outerB; laneB; closeB; Flat; module Elaborate)
 open import simultaneous.Sim using (Shown; outerAt)
 open import simultaneous.ToldRows using (sib-≺)
+open import simultaneous.Listing using (Listed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; Routes; Out; Input; laneˢ; each; combined; closer;
   setAt; react; onMark; unpark; cut; arrive; ended; burstOver; left; begun; stopped; overed; stops; anyHolds; share; laneStep; undone;
@@ -691,23 +692,34 @@ module Framing (n : ℕ) {Θ B} (x : E (⊤ ∷ Θ) (IE B)) (ρ : DenEnv Θ) whe
 
   postulate
     -- A lane's own row past its subscription and before its end, where
-    -- none of its rows ends a lane: the lane's value, framed.
+    -- none of its rows ends a lane and its rows before it are listed: the
+    -- lane's value, framed.  The listing is the bound's, an implementation
+    -- detail that leaves the spec unaffected (Anthony); from it the lane
+    -- count's fold is constructed (`simultaneous.ReadFold.foldᵈ`).
     --
     -- DEAD ROUTE: forward through each layer's reach alone.  The lane
     --   count is a scan, and its row needs its fold (`Acc`), built from
     --   every earlier value in order; a reach lists positions, not
     --   events, and which are rows is not decidable without excluded middle.
-    lane-fwd : ∀ w {K₀ b} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+    lane-fwd : ∀ w {K₀ b} → Listed (enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
+             → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
              → (∀ {c} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
              → (∀ {k y} → enter (approx n x (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
              → enter (approx n (laneˢ x) ρ) w (framed w K₀) (out b)
 
 ------------------------------------------------------------------------
--- The elaborated flatMap's rows
+-- The elaborated flatMap's rows: the program and its rows given, each
+-- with its equation, so a consumer compares them by name, never by the
+-- tree their meaning unfolds to.
 
 module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
             (s′ : E (⊤ ∷ Δ) (IE A)) (g′ : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
-            (tk : E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)) (p′ : Pos) where
+            (tk : E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)) (p′ : Pos)
+            (u : E Δ (IE B))
+            (u≡ : connect (of (tt ∷ [])) (connect (flatMap (mergeᶠ nothing) (λ _ → s′) (connected (here refl)))
+                    (connect closer (connect (flatMap op (λ a → laneˢ (g′ a)) (each valuesOf (connected (there (here refl))))) (combined op tk))))
+                  ≡ u)
+            (U : EmissionSet (IE B)) (U≡ : enter (approx n u env′) p′ ≡ U) where
 
   -- The closer, each lane and the scan, sealed: a type compared through
   -- them compares their environments instead of unfolding them.
@@ -795,15 +807,19 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
   body : E (⊤ ∷ Δ) (IE B)
   body = connect (flatMap (mergeᶠ nothing) (λ _ → s′) (connected (here refl))) (connect CL (connect RF CB))
 
-  U : EmissionSet (IE B)
-  U = enter (approx n (connect (of (tt ∷ [])) body) env′) p′
-
   -- The body, unsealed: the elaborated flatMap's.
   opaque
     unfolding CL LS CB
     body-eq : body ≡ connect (flatMap (mergeᶠ nothing) (λ _ → s′) (connected (here refl)))
                        (connect closer (connect (flatMap op (λ a → laneˢ (g′ a)) (each valuesOf (connected (there (here refl))))) (combined op tk)))
     body-eq = refl
+
+  -- The elaborated flatMap is the trigger's one row running the body.
+  u-body : connect (of (tt ∷ [])) body ≡ u
+  u-body = trans (cong (connect (of (tt ∷ []))) body-eq) u≡
+
+  from-U : ∀ {l e} → U l e → enter (approx n (connect (of (tt ∷ [])) body) env′) p′ l e
+  from-U {l} {e} x = subst (λ v → enter (approx n v env′) p′ l e) (sym u-body) (subst (λ V → V l e) (sym U≡) x)
 
   U₀ : EmissionSet (IE A)
   U₀ = enter (approx n s′ env₀′) q₀′
@@ -820,7 +836,7 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
       (conn-out (approx n CL env₁′) (λ h → approx n (connect RF CB) (h ∷ᴬ env₁′)) ((p′ ⊕ [ ix 0 ]) ⊕ [ ix 0 ])
         (conn-out (approx n (flatMap (mergeᶠ nothing) (λ _ → s′) (connected (here refl))) env₀′)
                   (λ h → approx n (connect CL (connect RF CB)) (h ∷ᴬ env₀′)) (p′ ⊕ [ ix 0 ])
-          (conn-out (Op.of (tt ∷ [])) (λ h → approx n body (h ∷ᴬ env′)) p′ u)))
+          (conn-out (Op.of (tt ∷ [])) (λ h → approx n body (h ∷ᴬ env′)) p′ (from-U u))))
 
   -- The scan's input: the connects in scope, then its own branches.
   BR : E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (Maybe (Input B))
@@ -891,15 +907,20 @@ module Rows (n : ℕ) {Δ A B} (env′ : DenEnv Δ) {op : FlatOp} (j : Jn op)
     lane-back a w r sh = Framing.lane-back n (g′ a) envY w r sh
 
     -- A lane's own row, framed: the real flatMap's lane's.
-    lane-fwd : ∀ a w {K₀ b} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
+    lane-fwd : ∀ a w {K₀ b} → Listed (enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w)) K₀
+             → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) K₀ (out b) → laneAt w ≺ K₀
              → (∀ {c} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) c end → K₀ ≼ c)
              → (∀ {k y} → enter (approx n (g′ a) (envW ((w ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))) (laneAt w) k (out y) → T (undone y))
              → enter (g₂ a) w (framed w K₀) (out b)
-    lane-fwd a w r lt pr ud = Framing.lane-fwd n (g′ a) envY w r lt pr ud
+    lane-fwd a w ls r lt pr ud = Framing.lane-fwd n (g′ a) envY w ls r lt pr ud
 
   postulate
-    -- A value the real flatMap shows, before its end: the scan relays it.
-    relay-fwd : ∀ {K b} → Proper σRF K (out b) → Shown b → U (relay K) (out b)
+    -- A value the real flatMap shows, before its end, the scan's input
+    -- before it listed: the scan relays it.  The listing is the bound's,
+    -- an implementation detail that leaves the spec unaffected (Anthony);
+    -- from it the scan's fold is constructed
+    -- (`simultaneous.ReadFold.foldᵈ`).
+    relay-fwd : ∀ {K b} → Listed (enter Dtk p₄) (K ⊕ [ sub z₃ ]) → Proper σRF K (out b) → Shown b → U (relay K) (out b)
 
   ----------------------------------------------------------------------
   -- Read back

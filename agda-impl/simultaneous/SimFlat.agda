@@ -21,6 +21,7 @@ module simultaneous.SimFlat where
 import Data.List as L
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-filter⁺; ∈-filter⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᴬ_)
 open import Data.Empty using (⊥-elim)
@@ -29,7 +30,7 @@ open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; subst₂; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Relation.Nullary using (¬_; Dec)
 open import Relation.Nullary.Decidable using (_×-dec_)
 open import Relation.Nullary.Decidable.Core using (T?)
@@ -40,7 +41,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; hot; DenEnv; Proper; Truncate; Reach; Few; _≺_; _≼_; enter; approx; module Op;
   module Joiner; module Switch; module Exhaust; LaneOf)
 open import denotation.Laws using (inv-approx; good-cons)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; ok-step; Lawful; InvAt; world-after; inW; plain-ix; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-≼)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; ok-step; Lawful; InvAt; world-after; inW; plain-ix; _⊑_; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-≼; ⊑-inside)
 import denotation.Laws.Connect as LC
 open import denotation.Laws.Shows using (few-reach)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ticks; entered-few; ≼-trans; ≺→≼; ≼-refl)
@@ -50,13 +51,15 @@ open import simultaneous.ElabUndone using (Undone; elab-undone; env-u)
 open import simultaneous.Sim using (PMap; _∪ᴹ_; _⊆ᴹ_; Emb; Fresh; Local; NoneUnder; Sim; Run; Lates; Mt; m-out; m-end; Carried; c-out; c-end;
   Upto; Under; Mapped; ListedB; Shows; Shown; HotSim; EnvSim; EnvListed; EnvNeeds; EnvJoins; Joins; Apart; SimIH; sih; foot; outerAt;
   Live; env-live; outer-⊑)
-open import simultaneous.ReadMap using (upto-dn; under-down)
+open import simultaneous.ReadMap using (upto-dn; under-down; listed-up)
+open import simultaneous.SimReader using (hots-at)
+open import simultaneous.Listing using (Listed)
 open import simultaneous.AnnRun using (under-⊑; Upto?)
 open import simultaneous.ToldRows using (sib-≺)
 open import simultaneous.ExMove using (run←)
 open import simultaneous.FlatFwd using (trig-fwd; vals-fwd; proper-out; sib-⊑; ⊑³)
 open import simultaneous.FlatOrder using (emb-≺; row-apart; row-kid; apart-⊑; upto-or; upto-≼; ≼-elim; module Outs; module Earliest)
-open import simultaneous.SimConnect using (Pair; hot-up; img-upto)
+open import simultaneous.SimConnect using (Pair; hot-up; img-upto; env-row)
 
 open import simultaneous.FlatRows using (Jn; merge∞; sw; ex; RunsOf; CutOf; inst; laneAt; frameAt; framed; module Rows)
 
@@ -70,10 +73,22 @@ shown-one e e′ with trans (sym e) e′
 one-eq : ∀ {X : Set} {a b : X} → a ∷ [] ≡ b ∷ [] → a ≡ b
 one-eq refl = refl
 
+-- The rows a simulation lists under a bound's image, before a position
+-- under it: listed.
+under-listed : ∀ {B} {U : EmissionSet B} {A′ : PMap} c {l₀}
+             → (Σ (List Pos) λ ls → (∀ {l e′} → U l e′ → Under A′ c l → l ∈ ls) × (∀ {l} → l ∈ ls → Σ (Ev B) (U l)))
+             → Under A′ c l₀ → Listed U l₀
+under-listed c {l₀} (ls , cov , back) un =
+  L.filter (λ l → T? (l <ᵖ l₀)) ls
+  , (λ {l} x lt → ∈-filter⁺ (λ l′ → T? (l′ <ᵖ l₀)) (cov x (under-down c {l₀} {l} lt un)) lt)
+  , λ {l} m → let (m′ , lt) = ∈-filter⁻ (λ l′ → T? (l′ <ᵖ l₀)) {xs = ls} m in lt , back m′
+
 -- A value's match is a value.
 mt-out : ∀ {A B : Set} {V : A → B → Set} {a} {e′ : Ev B} {X : Ev B → Set} → X e′ → Mt V (out a) e′ → Σ B λ b → X (out b) × V a b
 mt-out x (m-out v) = _ , x , v
 
+-- The elaborated rows are given with their equation, so the consumer,
+-- whose operator is concrete, compares them by name.
 module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) {op : FlatOp} (j : Jn op)
             (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             (ihs : ∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ s)
@@ -81,7 +96,8 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
             (env : DenEnv Γ) (env′ : DenEnv Δ) (Amb : PMap) (ge : GoodEnv env) (ge′ : GoodEnv env′) (ap : Apart env)
             (es : EnvSim ρ Amb env env′) (en : EnvNeeds ρ env env′ es) (em : Emb Amb)
             (p p′ : Pos) (pp : Amb p (foot s (outerAt p′))) (fr : Fresh (Hots env) (Hots env′) Amb p (foot s (outerAt p′)))
-            (ok : Ok (Hots env) p) (ok′ : Ok (Hots env′) p′) (nh : ¬ Hots env p) where
+            (ok : Ok (Hots env) p) (ok′ : Ok (Hots env′) p′) (nh : ¬ Hots env p)
+            (U : EmissionSet (IE B)) (U≡ : enter (approx n (elab ρ (flatMap op f s)) env′) p′ ≡ U) where
 
   ----------------------------------------------------------------------
   -- The plain flatMap
@@ -118,19 +134,11 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   g′ : A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   g′ a = elab ρₗ (f a)
 
-  module RW = Rows n env′ j s′ g′ (trackers Γ 0 ρₜ) p′
-  open RW using (σtt; env₀′; o₂; g₂; rd; relay; q₀′; body; U; U₀)
-
+  module RW = Rows n env′ j s′ g′ (trackers Γ 0 ρₜ) p′ (elab ρ (flatMap op f s)) refl U U≡
+  open RW using (σtt; env₀′; o₂; g₂; rd; relay; q₀′; body; U₀)
 
   -- The real flatMap.
   module J₂ = Joiner g₂ o₂ (RunsOf j g₂ o₂) (CutOf j g₂ o₂)
-
-  -- The elaborated flatMap is the trigger's one row running the body.
-  body≡ : connect (of (tt ∷ [])) body ≡ elab ρ (flatMap op f s)
-  body≡ = cong (connect (of (tt ∷ []))) RW.body-eq
-
-
-
 
   lawtt : Lawful (Proper σtt)
   lawtt = LC.lawful {s = Op.of (tt ∷ [])} {F = λ h → approx n body (h ∷ᴬ env′)}
@@ -644,6 +652,24 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
     SL : ∀ L → Sim Shows Shown A′ (Run.Img (Rₗ L)) (laneB L) (TL L) (UL L)
     SL L = Run.sim (Rₗ L) A′ (λ m → inc (lane-⊆ L m)) emA (laneB L) (mapped-b j (lq L)) (lane-env L) (lane-listed L)
 
+    -- A lane row up to its bound: the lane's rows before its carrier,
+    -- listed, by the lane's simulation up to the row.
+    lane-at : ∀ L {k l₀ b} → TL L k (out b) → Upto (laneB L) k → Run.Img (Rₗ L) k l₀ → Listed (UL L) l₀
+    lane-at L {k} {l₀} tl uk iₗ =
+      let (y , a) = Run.anchor (Rₗ L) A′ incₗ emA tl c-out envk lstk
+          (y₀ , a₀ , yl) = Run.ext (Rₗ L) iₗ
+      in under-listed (just k) (Sim.upto (Run.sim (Rₗ L) A′ incₗ emA (just k) (y , incₗ a) envk lstk)) (y₀ , incₗ a₀ , inj₂ yl)
+      where
+        incₗ : (Ambₗ L ∪ᴹ Mₗ L) ⊆ᴹ A′
+        incₗ m = inc (lane-⊆ L m)
+
+        envk : EnvListed ρₗ env (envₗ′ L) (esₗ L) (TL L) A′ (just k)
+        envk = env-row {Γ} {_} {λ {X} → ρₗ {X}} {Ambₗ L} {env} {envₗ′ L} (esₗ L) {T = TL L} uk (λ i y kh → proj₂ (ok-l L) (hots-at env i (HotSim.isP (esₗ L i)) y) (InvAt.world (IL L) tl) (⊑-inside kh))
+                 {A′} (lane-env L)
+
+        lstk : ListedB (TL L) (just k)
+        lstk = listed-up (λ {y} {e} {l} {ys} {e′} → InvAt.flat (IL L) {y} {e} {l} {ys} {e′}) (laneB L) tl uk (lane-listed L)
+
     -- UNRELAYED: a value the elaborated flatMap shows up to the bound's
     -- image is a running lane's value, framed and relayed, uncut, up to
     -- the lane's bound's image.
@@ -666,38 +692,50 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
         L : LaneIx
         L = q , Bk.k′ , Bk.a , oq′ , i₀
 
+    -- Each decision forward is taken up to the bound, an implementation
+    -- detail that leaves the spec unaffected (Anthony): below it the outer
+    -- and each lane are simulated, so a value read back is a plain value.
     postulate
       -- AN EXHAUST'S RUN, READ: a value whose lane the plain exhaust runs
       -- runs the real flatMap's lane at its carrier, read.
-      ex-run→ : ∀ {q k′ a} → o q (out a) → Run.Img R₀ q k′ → Exhaust.Run g o q → Exhaust.Run g₂ o₂ (rd k′)
+      ex-run→ : ∀ {q k′ a} → o q (out a) → Upto c q → Run.Img R₀ q k′ → Exhaust.Run g o q → Exhaust.Run g₂ o₂ (rd k′)
       -- A SWITCH'S CUT, READ: a lane row no later value cuts, framed, is
       -- cut by no later value read.
-      cut-sw→ : ∀ L {k l₀ b} → TL L k (out b) → Run.Img (Rₗ L) k l₀ → ¬ Switch.Cut g o (lq L) k
+      cut-sw→ : ∀ L {k l₀ b} → TL L k (out b) → Upto c k → Run.Img (Rₗ L) k l₀ → ¬ Switch.Cut g o (lq L) k
               → ¬ Switch.Cut g₂ o₂ (rd (lk′ L)) (framed (lw L) l₀)
       -- THE REAL FLATMAP'S ROWS BEFORE A LANE ROW, FRAMED: few, wherever the
       -- plain flatMap's before the plain row are.
-      few₂ : ∀ L {k l₀ b b₁} → TL L k (out b) → Reach J.JoinT k (out b) → Run.Img (Rₗ L) k l₀ → UL L l₀ (out b₁)
+      few₂ : ∀ L {k l₀ b b₁} → TL L k (out b) → Upto c k → Reach J.JoinT k (out b) → Run.Img (Rₗ L) k l₀ → UL L l₀ (out b₁)
            → Few J₂.JoinT (framed (lw L) l₀)
+      -- THE RELAY'S INPUT BEFORE A LANE ROW, FRAMED: listed.  Its rows are
+      -- the shared outer's, the real flatMap's and the trackers' before
+      -- it, each under the bound's image and so listed by the outer's,
+      -- each lane's and each hot's simulation up to the row.
+      relay-at : ∀ L {k l₀ b} → TL L k (out b) → Upto c k → Run.Img (Rₗ L) k l₀
+               → Listed (enter RW.Dtk RW.p₄) (framed (lw L) l₀ ⊕ [ sub RW.z₃ ])
 
-    runs→ : ∀ {op′} (j′ : Jn op′) {q k′ a} → o q (out a) → Run.Img R₀ q k′ → RunsOf j′ g o q → RunsOf j′ g₂ o₂ (rd k′)
-    runs→ merge∞ _  _ _ = tt
-    runs→ sw     _  _ _ = tt
-    runs→ ex     oq i r = ex-run→ oq i r
+    runs→ : ∀ {op′} (j′ : Jn op′) {q k′ a} → o q (out a) → Upto c q → Run.Img R₀ q k′ → RunsOf j′ g o q → RunsOf j′ g₂ o₂ (rd k′)
+    runs→ merge∞ _  _  _ _ = tt
+    runs→ sw     _  _  _ _ = tt
+    runs→ ex     oq uq i r = ex-run→ oq uq i r
 
-    uncut→ : ∀ {op′} (j′ : Jn op′) L {k l₀ b} → TL L k (out b) → Run.Img (Rₗ L) k l₀ → ¬ CutOf j′ g o (lq L) k
+    uncut→ : ∀ {op′} (j′ : Jn op′) L {k l₀ b} → TL L k (out b) → Upto c k → Run.Img (Rₗ L) k l₀ → ¬ CutOf j′ g o (lq L) k
            → ¬ CutOf j′ g₂ o₂ (rd (lk′ L)) (framed (lw L) l₀)
-    uncut→ merge∞ L _  _  _  ()
-    uncut→ sw     L tl iₗ nc = cut-sw→ L tl iₗ nc
-    uncut→ ex     L _  _  _  ()
+    uncut→ merge∞ L _  _ _  _  ()
+    uncut→ sw     L tl u iₗ nc = cut-sw→ L tl u iₗ nc
+    uncut→ ex     L _  _ _  _  ()
 
     -- RELAYED: a lane value the plain flatMap runs uncut, at an outer
     -- value whose carrier shows it, the real flatMap runs at the carrier,
     -- read, and the scan relays, its carrier's value framed.
-    lane-row→ : ∀ L {k l₀ b b₀ b₁} → TL L k (out b) → (lq L ⊕ [ ix 1 ]) ≺ k → RunsOf j g o (lq L) → ¬ CutOf j g o (lq L) k
+    lane-row→ : ∀ L {k l₀ b b₀ b₁} → TL L k (out b) → Upto c k → (lq L ⊕ [ ix 1 ]) ≺ k → RunsOf j g o (lq L) → ¬ CutOf j g o (lq L) k
               → Reach J.JoinT k (out b) → U₀ (lk′ L) (out b₀) → Shows (la L) b₀ → Run.Img (Rₗ L) k l₀ → UL L l₀ (out b₁) → Shown b₁
               → U (relay (framed (lw L) l₀)) (out b₁)
-    lane-row→ L {k} {l₀} {b} {b₀} {b₁} tl ql rq nc re u₀ sh₀ iₗ ul sh₁ = RW.relay-fwd (r , proper-out Irf r) sh₁
+    lane-row→ L {k} {l₀} {b} {b₀} {b₁} tl u ql rq nc re u₀ sh₀ iₗ ul sh₁ = RW.relay-fwd (relay-at L tl u iₗ) (r , proper-out Irf r) sh₁
       where
+        uq : Upto c (lq L)
+        uq = upto-dn c {k} {lq L} (≺-trans {lq L} {lq L ⊕ [ ix 1 ]} {k} (≺-ext (lq L) {ix 1} []) ql) u
+
         K : Pos
         K = framed (lw L) l₀
 
@@ -708,16 +746,16 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
         aft = world-after (InvAt.world IUL ul) (InvAt.real IUL ul)
 
         lr : enter (g₂ (la L)) (lw L) K (out b₁)
-        lr = RW.lane-fwd (la L) (lw L) ul aft (λ {c} ce → proper-out IUL ul ce) (λ {k′} {y} r → undone-l L (lsub′ L) {k′} {y} r)
+        lr = RW.lane-fwd (la L) (lw L) (lane-at L tl (upto-b j nc u) iₗ) ul aft (λ {c} ce → proper-out IUL ul ce) (λ {k′} {y} r → undone-l L (lsub′ L) {k′} {y} r)
 
         ql₂ : lw L ≺ K
         ql₂ = ≼-≺-≺ {lw L} {lsub′ L} {K} (⊑-≼ (at-⊑ (lw L))) (≺-≼-≺ {lsub′ L} {l₀} {K} aft (⊑-≼ (framed-⊑ (lw L) l₀)))
 
         x₂ : J₂.JoinT K (out b₁)
-        x₂ = J₂.lane (o₂-fwd u₀ sh₀) (runs→ j (lo L) (li L) rq) (lr , ql₂) (uncut→ j L tl iₗ nc) tt
+        x₂ = J₂.lane (o₂-fwd u₀ sh₀) (runs→ j (lo L) uq (li L) rq) (lr , ql₂) (uncut→ j L tl u iₗ nc) tt
 
         r : RW.σRF K (out b₁)
-        r = rf-in (x₂ , few-reach {q = K} {e = out b₁} (few₂ L tl re iₗ ul))
+        r = rf-in (x₂ , few-reach {q = K} {e = out b₁} (few₂ L tl u re iₗ ul))
 
     postulate
       lane-reach : ∀ L {k l₀ a b} (x : J.JoinT k (out a)) → Run.Img (Rₗ L) k l₀ → U (relay (framed (lw L) l₀)) (out b)
@@ -734,7 +772,7 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
           L = (q , k′ , a , oq , i₀)
           (l₀ , iₗ , _ , ulx , m₁) = Sim.fwd (SL L) lr c-out (upto-b j nc u)
           (b₁ , ulr , sh₁) = mt-out {X = UL L l₀} ulx m₁
-      in relay (framed (lw L) l₀) , inj₁ (L , l₀ , iₗ , (b , lr) , refl) , out b₁ , lane-row→ L lr ql rq nc re u₀r sh₀ iₗ ulr (shown-one sh₁)
+      in relay (framed (lw L) l₀) , inj₁ (L , l₀ , iₗ , (b , lr) , refl) , out b₁ , lane-row→ L lr u ql rq nc re u₀r sh₀ iₗ ulr (shown-one sh₁)
        , m-out sh₁
     fw (J.run () _ , _) c-out u
     fw {k} x c-end u = let (l , ul) = flat-end→ x in l , inj₂ (x , ul) , end , ul , m-end
@@ -791,20 +829,8 @@ module Flat (n : ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈
   result₀ : Goal T U
   result₀ = M , local-f , emb-f , none-f , flat-joins , run
 
-  result₁ : Goal (enter (Op.flatMap op g ds) p) U
-  result₁ = subst (λ T′ → Goal T′ U) (sym (inst j g ds p)) result₀
-
-  -- The elaborated flatMap, as its former reads it.
-  Uₑ : EmissionSet (IE B)
-  Uₑ = enter (approx n (elab ρ (flatMap op f s)) env′) p′
-
-  -- The body's goal is any equal program's.
-  goal-at : ∀ {o′} → connect (of (tt ∷ [])) body ≡ o′ → Goal (enter (Op.flatMap op g ds) p) U
-          → Goal (enter (Op.flatMap op g ds) p) (enter (approx n o′ env′) p′)
-  goal-at refl r = r
-
-  result : Goal (enter (Op.flatMap op g ds) p) Uₑ
-  result = goal-at {elab ρ (flatMap op f s)} body≡ result₁
+  result : Goal (enter (Op.flatMap op g ds) p) U
+  result = subst (λ T′ → Goal T′ U) (sym (inst j g ds p)) result₀
 
 ------------------------------------------------------------------------
 -- The former
@@ -821,8 +847,8 @@ sim-flatMap : ∀ n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ �
             → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → SimIH n ρ′ (f a)) → SimIH n ρ (flatMap op f s)
 sim-flatMap n ρ (mergeᶠ (just k)) f s ihs ihf = sim-bounded n ρ k f s ihs ihf
 sim-flatMap n ρ (mergeᶠ nothing) f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ merge∞ f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh
+  Flat.result n ρ merge∞ f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
 sim-flatMap n ρ switchᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ sw f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh
+  Flat.result n ρ sw f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
 sim-flatMap n ρ exhaustᶠ f s ihs ihf = sih λ env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh →
-  Flat.result n ρ ex f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh
+  Flat.result n ρ ex f s ihs ihf env env′ Amb ge ge′ ap es en em p p′ pp fr ok ok′ nh _ refl
