@@ -107,9 +107,10 @@ corr-≃ : ∀ {A s s* φ Put} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)
        → Corr s s* φ Put L L* → Corr s s* φ Put K K*
 corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
   { row→ = λ x un → [ (λ im → inj₁ (imaged im)) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
-  ; pin→ = λ x → putAt (C.pin→ (from x))
+  ; pin→ = λ x lv → pinAt (C.pin→ (from x) (λ xc → lv (to xc)))
+  ; put-before = λ x pl x′ un′ lt → C.put-before (from x) pl (from x′) un′ lt
   ; shown← = λ y sh → let (k , e , eq , x , un , m) = C.shown← (from* y) sh in k , e , eq , to x , un , m
-  ; place = λ {m} y → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y))
+  ; place = λ {m} y lv → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y) (λ yc → lv (to* yc)))
   ; mono = λ x x′ → C.mono (from x) (from x′)
   ; inst = λ x x′ → C.inst (from x) (from x′)
   ; home = λ x → C.home (from x)
@@ -137,6 +138,10 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
     putAt : ∀ {k} → C.PutAt k → (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → K* l e′ × Put k l) × Homed k
     putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
 
+    pinAt : ∀ {k p} → C.PinAt k p
+          → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ e₀} → K k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
+    pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x un lt → past (from x) un lt) , homed h
+
 -- Every cut from depth `N` on agrees with the run up to `q`.
 Settled : ∀ {X : Set} → EmissionSet X → (ℕ → EmissionSet X) → ℕ → Pos → Set
 Settled a c N q = ∀ {N′} → N ≤ N′ → AgreeTo q a (c N′)
@@ -145,6 +150,12 @@ Settled a c N q = ∀ {N′} → N ≤ N′ → AgreeTo q a (c N′)
 module Rowed {X : Set} (a : EmissionSet X) (c : ℕ → EmissionSet X) (L : ℕ → Tb.Listed X) (ex : ∀ N → Exact (L N) (c N)) where
   now : ∀ {N q} → Settled a c N q → AgreeTo q a (c N)
   now s = s ≤-refl′
+
+  -- A row live in the run is live in a cut agreeing up to it.
+  live-cut : ∀ {N q} → AgreeTo q a (c N) → Live a q → Live (Rows (L N)) q
+  live-cut {N} {q} ag lv {c₀} m with ≼-or-≻ q c₀
+  ... | inj₁ le = le
+  ... | inj₂ lt = ⊥-elim (lv (proj₂ (upto ag {c₀} (≺→≼ {c₀} {q} lt)) (sound (ex N) m)) lt)
 
   sdown : ∀ {N q k} → Settled a c N q → k ≼ q → Settled a c N k
   sdown {q = q} {k} s kq le = ⟨ (λ {y} {e} yk → upto (s le) {y} {e} (≼-trans {y} {k} {q} yk kq)) ⟩
@@ -263,8 +274,8 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   home {k} (N , ag , refl , e , x , un , _) = Corr.home (T N) (RP.to-row ag (≼-refl {k}) x) un
 
   place : ∀ {m e} → u m e → Live u m → Few u m → instantOf m ≡ instantOf root ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
-  place {m} y _ fw with cutQS fw {bQ fw} ≤-refl′
-  ... | ag* with Corr.place (T (bQ fw)) (RQ.to-row (RQ.now ag*) (≼-refl {m}) y)
+  place {m} y lv fw with cutQS fw {bQ fw} ≤-refl′
+  ... | ag* with Corr.place (T (bQ fw)) (RQ.to-row (RQ.now ag*) (≼-refl {m}) y) (RQ.live-cut (RQ.now ag*) lv)
   ...   | inj₁ e = inj₁ e
   ...   | inj₂ (k , e , r , un , im , at , ie) =
     let ag = causal← r un (upto-img at)
@@ -294,7 +305,9 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
   ...         | inj₂ refl = ⊥-elim (≺-irrefl {φ N₁ k} (subst (_≺ φ N₁ k) (same ag a₁) lt))
 
   pinned : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB root k
-  pinned {k} x _ fw = let ag = cutS fw {bP fw} ≤-refl′ in into ag (Corr.pin→ (T (bP fw)) (RP.to-row (RP.now ag) (≼-refl {k}) x))
+  pinned {k} x lv fw with cutS fw {bP fw} ≤-refl′
+  ... | ag with Corr.pin→ (T (bP fw)) (RP.to-row (RP.now ag) (≼-refl {k}) x) (RP.live-cut (RP.now ag) lv)
+  ...   | (l , p′ , m , pk , _) , h = into ag ((l , pin p′ , m , pk) , h)
 
   -- Past a row, a plain run with finitely many rows is all listed, and
   -- so is the elaborated run.

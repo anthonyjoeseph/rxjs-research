@@ -5,17 +5,19 @@
 -- rows (`TR`) and shapes (`Sh`) it is stated over.
 module simultaneous.TableCorr where
 
-open import Data.List using (List)
+open import Data.List using (List; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤; tt)
+open import Data.Empty using (⊥)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩)
@@ -24,7 +26,7 @@ open import quickcheck.Tabled using (rows)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Attribution using (Every; One; Reads; Match; Shown)
+open import simultaneous.Attribution using (Every; One; Reads; Match; Shown; Live)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
@@ -58,12 +60,17 @@ M = Match Every (One valuesOf) (Reads valuesOf)
 
 -- TWO RUNS CORRESPOND along `φ`, subscribed at `s` and `s*`: each
 -- unpinned plain row on its image, a skip possibly put late instead, as
--- a pin is (`put`, homed in the subscription's instant or a carried
+-- a live pin is (`put`, homed in the subscription's instant or a carried
 -- row's before it); each shown elaborated row back on a plain one; each
--- elaborated row in the subscription's instant or a carried row's, the
--- image at or before it unless the row leads its instant (an async
+-- live elaborated row in the subscription's instant or a carried row's,
+-- the image at or before it unless the row leads its instant (an async
 -- step's `begin` comes before the step's value); the images keeping the
 -- order and the instants of the rows they image.
+--
+-- A pin is put on an elaborated pin whose connect has no image of a row
+-- past the plain connect before it, and a skip no later than the image
+-- of any row after it: what a takeWhile keeps of one, it keeps of the
+-- other.
 record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set) (L : EmissionSet A) (L* : EmissionSet (IE A)) : Set where
   Imaged : Pos → Ev A → Set
   Imaged k e = Σ (Ev (IE A)) λ e′ → L* (φ k) e′ × M e e′
@@ -78,12 +85,19 @@ record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set
   Leads : Pos → Set
   Leads k = ∀ {k′ e′} → L k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
 
+  -- A pin put on an elaborated pin, its connect's past the plain one's.
+  PinAt : Pos → Pos → Set
+  PinAt k p = (Σ Pos λ l → Σ Pos λ p′ → L* l (pin p′) × Put k l
+                × (∀ {k₀ e₀} → L k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p))
+            × Homed k
+
   field
     row→   : ∀ {k e} → L k e → Unpinned e → Imaged k e ⊎ (e ≡ skip × PutAt k)
-    pin→   : ∀ {k p} → L k (pin p) → PutAt k
+    pin→   : ∀ {k p} → L k (pin p) → Live L k → PinAt k p
+    put-before : ∀ {k l k′ e′} → L k skip → Put k l → L k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ k′
     shown← : ∀ {l e′} → L* l e′ → Shown (One valuesOf) e′
            → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ k × L k e × Unpinned e × M e e′
-    place  : ∀ {m e′} → L* m e′
+    place  : ∀ {m e′} → L* m e′ → Live L* m
            → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × Imaged k e × (φ k ≼ m ⊎ Leads k) × instantOf (φ k) ≡ instantOf m
     mono   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ k ≺ φ k′
     inst   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′
@@ -98,6 +112,11 @@ record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set
 -- to its image, and everywhere; and two cuts of either side agreeing in
 -- shape up to a row agree there outright, a value a truncation changes
 -- showing first as a row it removes.
+--
+-- Each table is a run's: one event per position, none under another's,
+-- a pin inside its connect.  Two cuts agreeing below a value, one with a
+-- row at or past it, both hold the value: a cut is truncated before it
+-- differs.
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
@@ -118,3 +137,13 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
     coh         : ∀ {N N′ k} → AgreeTo k (Sh (TR (P N))) (Sh (TR (P N′))) → AgreeTo k (TR (P N)) (TR (P N′))
     coh*        : ∀ {N N′ k} → AgreeTo k (Sh (TR (Q N))) (Sh (TR (Q N′))) → AgreeTo k (TR (Q N)) (TR (Q N′))
+    func        : ∀ {N y e e′} → TR (P N) y e → TR (P N) y e′ → e ≡ e′
+    func*       : ∀ {N y e e′} → TR (Q N) y e → TR (Q N) y e′ → e ≡ e′
+    flat        : ∀ {N y e l ys e′} → TR (P N) y e → TR (P N) (y ⊕ (l ∷ ys)) e′ → ⊥
+    flat*       : ∀ {N y e l ys e′} → TR (Q N) y e → TR (Q N) (y ⊕ (l ∷ ys)) e′ → ⊥
+    pin-in      : ∀ {N l r} → TR (P N) l (pin r) → T (inside r l)
+    pin-in*     : ∀ {N l r} → TR (Q N) l (pin r) → T (inside r l)
+    cons        : ∀ {N N′ y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (P N)) (TR (P N′)))
+                → TR (P N) y (out a) → TR (P N′) y′ e′ → y ≼ y′ → TR (P N′) y (out a)
+    cons*       : ∀ {N N′ y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (Q N)) (TR (Q N′)))
+                → TR (Q N) y (out a) → TR (Q N′) y′ e′ → y ≼ y′ → TR (Q N′) y (out a)

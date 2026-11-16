@@ -9,7 +9,8 @@
 -- it, mapped alike.
 module simultaneous.TableMap where
 
-open import Data.Empty using (⊥-elim)
+open import Data.Bool using (T)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻)
@@ -20,7 +21,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto)
@@ -29,7 +30,7 @@ open import quickcheck.Tabled using (rows; bind; mapRow; mapRows)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Attribution using (One; Shown)
+open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
@@ -93,6 +94,60 @@ un← f (out a) _ = tt
 un← f skip    _ = tt
 un← f end     _ = tt
 un← f (pin r) ()
+
+-- A mapped row's constructor is its source row's.
+ev-pin : ∀ {A B : Set} (f : A → B) (e₀ : Ev A) {r} → ev f e₀ ≡ pin r → e₀ ≡ pin r
+ev-pin f (out _) ()
+ev-pin f skip    ()
+ev-pin f end     ()
+ev-pin f (pin r) refl = refl
+
+ev-skip : ∀ {A B : Set} (f : A → B) (e₀ : Ev A) → ev f e₀ ≡ skip → e₀ ≡ skip
+ev-skip f (out _) ()
+ev-skip f skip    refl = refl
+ev-skip f end     ()
+ev-skip f (pin r) ()
+
+ev-out : ∀ {A B : Set} (f : A → B) (e₀ : Ev A) {b} → ev f e₀ ≡ out b → Σ A λ a → e₀ ≡ out a × b ≡ f a
+ev-out f (out a) refl = a , refl , refl
+ev-out f skip    ()
+ev-out f end     ()
+ev-out f (pin r) ()
+
+module _ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) where
+  tr-pin← : ∀ {k r} → TR (Mapped f m) k (pin r) → TR m k (pin r)
+  tr-pin← x with tr-map→ f m x
+  ... | e₀ , x₀ , eq = subst (TR m _) (ev-pin f e₀ (sym eq)) x₀
+
+  tr-skip← : ∀ {k} → TR (Mapped f m) k skip → TR m k skip
+  tr-skip← x with tr-map→ f m x
+  ... | e₀ , x₀ , eq = subst (TR m _) (ev-skip f e₀ (sym eq)) x₀
+
+  -- Live alike: an end maps to an end.
+  live-map← : ∀ {k} → Live (TR (Mapped f m)) k → Live (TR m) k
+  live-map← lv x = lv (tr-map← f m x)
+
+  -- A run's table, mapped, is a run's.
+  func-map : (∀ {y e e′} → TR m y e → TR m y e′ → e ≡ e′) → ∀ {y e e′} → TR (Mapped f m) y e → TR (Mapped f m) y e′ → e ≡ e′
+  func-map fn x x′ with tr-map→ f m x | tr-map→ f m x′
+  ... | e₀ , x₀ , refl | e₁ , x₁ , refl = cong (ev f) (fn x₀ x₁)
+
+  flat-map : (∀ {y e l ys e′} → TR m y e → TR m (y ⊕ (l ∷ ys)) e′ → ⊥) → ∀ {y e l ys e′} → TR (Mapped f m) y e → TR (Mapped f m) (y ⊕ (l ∷ ys)) e′ → ⊥
+  flat-map fl x x′ = fl (proj₁ (proj₂ (tr-map→ f m x))) (proj₁ (proj₂ (tr-map→ f m x′)))
+
+  pin-in-map : (∀ {l r} → TR m l (pin r) → T (inside r l)) → ∀ {l r} → TR (Mapped f m) l (pin r) → T (inside r l)
+  pin-in-map pi x = pi (tr-pin← x)
+
+-- Two mapped tables agreeing below a value, one with a row at or past it:
+-- their sources do, so both hold the source's value.
+cons-map : ∀ {A B : Set} (f : A → B) {m m′ : Maybe (Tb.Listed A)}
+         → (∀ {q} → AgreeTo q (TR (Mapped f m)) (TR (Mapped f m′)) → AgreeTo q (TR m) (TR m′))
+         → (∀ {y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR m) (TR m′)) → TR m y (out a) → TR m′ y′ e′ → y ≼ y′ → TR m′ y (out a))
+         → ∀ {y y′ b e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (Mapped f m)) (TR (Mapped f m′)))
+         → TR (Mapped f m) y (out b) → TR (Mapped f m′) y′ e′ → y ≼ y′ → TR (Mapped f m′) y (out b)
+cons-map f {m} {m′} ag← cn below x x′ yy with tr-map→ f m x | tr-map→ f m′ x′
+... | e₀ , x₀ , eq | e₁ , x₁ , _ with ev-out f e₀ (sym eq)
+...   | a , refl , refl = tr-map← f m′ (cn (λ lt → ag← (below lt)) x₀ x₁ yy)
 
 ------------------------------------------------------------------------
 -- The record, mapped
@@ -161,12 +216,18 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   ...   | inj₁ im          = inj₁ (img→ im)
   ...   | inj₂ (refl , pa) = inj₂ (refl , put→ pa)
 
-  pin→′ : ∀ N {k p} → TR (P′ N) k (pin p) → PutAt′ N k
-  pin→′ N x with tr-map→ f (P N) x
-  ... | pin r , x₀ , refl = put→ (Corr.pin→ (R.corr N) x₀)
-  ... | out _ , _ , ()
-  ... | skip  , _ , ()
-  ... | end   , _ , ()
+  PinAt′ : ℕ → Pos → Pos → Set
+  PinAt′ N k p = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × R.Put N k l
+                   × (∀ {k₀ e₀} → TR (P′ N) k₀ e₀ → Unpinned e₀ → R.φ N k₀ ≺ p′ → k₀ ≺ p))
+               × Homed′ N k
+
+  pin→′ : ∀ N {k p} → TR (P′ N) k (pin p) → Live (TR (P′ N)) k → PinAt′ N k p
+  pin→′ N x lv with Corr.pin→ (R.corr N) (tr-pin← f (P N) x) (live-map← f (P N) lv)
+  ... | (l , p′ , y , pl , past) , h =
+    (l , p′ , tr-map← g (Q N) y , pl , λ x′ un′ lt → let (_ , x₀ , u₀) = back-row N x′ un′ in past x₀ u₀ lt) , homed→ h
+
+  put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ R.φ N k′
+  put-before′ N x pl x′ un′ lt = let (_ , x₀ , u₀) = back-row N x′ un′ in Corr.put-before (R.corr N) (tr-skip← f (P N) x) pl x₀ u₀ lt
 
   shown←′ : ∀ N {l e′} → TR (Q′ N) l e′ → Shown (One valuesOf) e′
           → Σ Pos λ k → Σ (Ev B) λ e → l ≡ R.φ N k × TR (P′ N) k e × Unpinned e × M e e′
@@ -174,16 +235,16 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   ... | e₀′ , y₀ , refl with Corr.shown← (R.corr N) y₀ (back e₀′ sh)
   ...   | k , e , eq , x , un , mt = k , ev f e , eq , tr-map← f (P N) x , un← f e un , lift mt
 
-  place′ : ∀ N {m e′} → TR (Q′ N) m e′
+  place′ : ∀ N {m e′} → TR (Q′ N) m e′ → Live (TR (Q′ N)) m
          → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × Img′ N k e × (R.φ N k ≼ m ⊎ Leads′ N k) × instantOf (R.φ N k) ≡ instantOf m
-  place′ N {m} y with tr-map→ g (Q N) y
-  ... | e₀′ , y₀ , refl with Corr.place (R.corr N) y₀
+  place′ N {m} y lv with tr-map→ g (Q N) y
+  ... | e₀′ , y₀ , refl with Corr.place (R.corr N) y₀ (live-map← g (Q N) lv)
   ...   | inj₁ e = inj₁ e
   ...   | inj₂ (k , e , x , un , im , le , ie) = inj₂ (k , ev f e , tr-map← f (P N) x , un← f e un , img→ im , leadsOr {m = m} le , ie)
 
   corr′ : ∀ N → Corr s s* (R.φ N) (R.Put N) (TR (P′ N)) (TR (Q′ N))
   corr′ N = record
-    { row→ = row→′ N ; pin→ = pin→′ N ; shown← = shown←′ N ; place = place′ N
+    { row→ = row→′ N ; pin→ = pin→′ N ; put-before = put-before′ N ; shown← = shown←′ N ; place = place′ N
     ; mono = λ x x′ un un′ lt → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.mono (R.corr N) x₀ x₁ u₀ u₁ lt
     ; inst = λ x x′ un un′ → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.inst (R.corr N) x₀ x₁ u₀ u₁
     ; home = λ x un → let (_ , x₀ , u₀) = back-row N x un in Corr.home (R.corr N) x₀ u₀ }
@@ -203,7 +264,15 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
     ; elab-all = λ {N} {N′} le all y → let (_ , y₀ , eq) = tr-map→ g (Q N′) y in
         subst (TR (Q′ N) _) (sym eq) (tr-map← g (Q N) (R.elab-all le (λ q → ag← (all q)) y₀))
     ; coh = λ {N} {N′} ag → ag-map f (R.coh (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) ag))
-    ; coh* = λ {N} {N′} ag → ag-map g (R.coh* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) ag)) }
+    ; coh* = λ {N} {N′} ag → ag-map g (R.coh* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) ag))
+    ; func = λ {N} → func-map f (P N) R.func
+    ; func* = λ {N} → func-map g (Q N) R.func*
+    ; flat = λ {N} → flat-map f (P N) R.flat
+    ; flat* = λ {N} → flat-map g (Q N) R.flat*
+    ; pin-in = λ {N} → pin-in-map f (P N) R.pin-in
+    ; pin-in* = λ {N} → pin-in-map g (Q N) R.pin-in*
+    ; cons = λ {N} {N′} → cons-map f {P N} {P N′} ag← R.cons
+    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* R.cons* }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))
