@@ -26,30 +26,38 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-## Tier 3 — the simultaneous spec
+## Tier 2.5 — the position map
 
-**The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
+**The position map:** computed per stream from its children's, never asserted; no former's erasure case unfolds a child's elaboration.
 
 ### Ledger
 
 #### THE TABLES
 
-Undesigned: the plain and elaborated cuts correspond at every depth
-along one position map and one late placement, and the map lifts plain
-agreement to elaborated agreement, both ways. The map is a witness the
-lifting leaves mention, so all are one per-former induction over `elab`,
-its hypothesis relating environments (annotated hots, readers). Open: a
-uniform map over rows past a cut's truncation, which erasure never reads.
+A rewrite, finished before any other proof work, in order: (1) the
+engine: no row index depends on data (a reader's first value, a lane's
+`laneDone`), TS mirrored, the oracle green in CI; (2) THE CUTS'
+STABILITY; (3) a map per former alongside `listC`, agreeing cuts giving
+the same map; (4) one relabelling lemma per operator, flatMap first; (5)
+`corr` replaced by a tree recursion giving each subterm its map, late
+placement, cut correspondence and lifting facts, over related
+environments. Out of scope: the flatMap and connect content itself.
 
 Members: `corr`, `elab-causal`, `stable←`, `stable-put`.
 
 #### THE CUTS' STABILITY
 
-Untried: a deeper plain cut agrees wherever a shallower one does, and a
-finite plain run has a depth past which elaborated cuts stop growing.
-Plain only, per former; switch and exhaust need care.
+Untried: one general cut lemma: a deeper plain cut agrees wherever a
+shallower one does, and a finite plain run has a depth past which
+elaborated cuts stop growing. Plain only, per former.
 
 Members: `deeper`, `stable-all`.
+
+## Tier 3 — the simultaneous spec
+
+**The spec:** the batched run, each batch stamped by its instant, is the spec's grouping of the plain run, each value stamped by its instant.
+
+### Ledger
 
 #### THE HELD STREAMS
 
