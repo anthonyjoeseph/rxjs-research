@@ -63,6 +63,7 @@ open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import simultaneous.Routed using (nameOf; nm; Valued; opos)
+open import simultaneous.Layers using () renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
@@ -156,8 +157,14 @@ postulate
                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
   cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
-  -- A cold step's rows past its over are finitely many.
-  cold-rest    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
+  -- A cold's step makes finitely many rows, past its over or not.
+  cold-step-few : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {q n} → enter (ev m (coldˢ c) env) p q (out (instEmit (mark begin) n))
+                → Σ (List Pos) λ ks → ∀ {y e} → enter (ev m (coldˢ c) env) p y e → rootOf y ≡ rootOf q → y ∈ ks
+
+-- So past a zero count, the instant last begun has finitely many rows left.
+cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
+cold-rest m c env p mt _ bq with cold-step-few m c env p (proj₁ (run-row∈ mt bq))
+... | ks , h = ks , λ xy _ ry → h xy ry
 
 private
   same-≺ : ∀ i x y → T (isLt (cmpPath x y)) → (i ∙ x) ≺ (i ∙ y)

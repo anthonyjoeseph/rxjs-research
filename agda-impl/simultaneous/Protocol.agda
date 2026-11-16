@@ -24,7 +24,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; cong; cong₂; sym; trans; subst)
 
-open import denotation.Position using (Pos; root; frame; _∙_; _≟ᵖ_)
+open import denotation.Position using (Pos; root; frame; cascade; ix; sub; last; _∙_; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
 open import denotation.Laws.Worlds using (here)
@@ -33,7 +33,7 @@ open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; �
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 import simultaneous.InstEmit as Marks
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
-open import simultaneous.Routed using (Held; Valued; opos)
+open import simultaneous.Routed using (Held; Valued; opos; nm; nameOf; Carried; c-value; c-stop; c-over; r-begin; r-stop; r-over; r-subscribed; r-completed)
 open import simultaneous.Held using (held)
 open import simultaneous.HeldConnect using (⊑-≼)
 open import simultaneous.Readings using (instantOf; stamped)
@@ -218,14 +218,21 @@ module Split {A : Set} where
 ------------------------------------------------------------------------
 -- The positions of an elaborated program's emits
 
--- THE INSTANT STRUCTURE: every emit is named for its instant, and the
--- begins of one instant name it alike; the subscribe mark sits at most
--- once, before every begin, every value past it async, and every value precedes the
--- completion.
+-- A root's name lies in its instant.
+name-instant : ∀ k → instantOf (nameOf k) ≡ instantOf k
+name-instant (frame ∙ _)                = refl
+name-instant (cascade t e last ∙ _)     = refl
+name-instant (cascade t e (ix _) ∙ _)   = refl
+name-instant (cascade t e (sub _) ∙ _)  = refl
+
+-- THE INSTANT STRUCTURE: every emit but a begin is named for its
+-- instant (a begin is, by its root); the subscribe mark sits at most
+-- once, before every begin, every value past it async, and every value
+-- precedes the completion.
 postulate
-  named     : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
-  one-name  : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
-            → elaborated o k′ (out (instEmit (mark Marks.begin) n′)) → instantOf k ≡ instantOf k′ → n ≡ n′
+  named-carried : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → Carried (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
+  named-sub     : ∀ {A} (o : SObs [] A) {k n} → elaborated o k (out (instEmit (mark Marks.subscribed) n)) → instantOf n ≡ instantOf k
+  named-done    : ∀ {A} (o : SObs [] A) {k n} → elaborated o k (out (instEmit (mark Marks.completed) n)) → instantOf n ≡ instantOf k
   sub-first : ∀ {A} (o : SObs [] A) {k n} → elaborated o k (out (instEmit (mark Marks.begin) n))
             → Σ Pos λ ks → Σ Pos λ m → elaborated o ks (out (instEmit (mark Marks.subscribed) m)) × ks ≺ k
   sub-one   : ∀ {A} (o : SObs [] A) {k k′ m m′} → elaborated o k (out (instEmit (mark Marks.subscribed) m))
@@ -234,6 +241,21 @@ postulate
             → elaborated o k (out (instEmit (value a) j)) → ks ≺ k → Async k
   done-last : ∀ {A} (o : SObs [] A) {kv a n kc m} → elaborated o kv (out (instEmit (value a) n))
             → elaborated o kc (out (instEmit (mark Marks.completed) m)) → kv ≺ kc
+
+-- Every emit is named for its instant.
+named : ∀ {A} (o : SObs [] A) {k x} → elaborated o k (out x) → instantOf (InstEmit.instant x) ≡ instantOf k
+named o {x = instEmit (value _) _} xk = named-carried o xk c-value
+named o {k} {instEmit (mark m) n} xk with Held.routing (held o) xk
+... | r-begin      = trans (cong instantOf (Held.named (held o) xk)) (name-instant k)
+... | r-stop       = named-carried o xk c-stop
+... | r-over       = named-carried o xk c-over
+... | r-subscribed = named-sub o xk
+... | r-completed  = named-done o xk
+
+-- The begins of one instant name it alike: each is named for its root.
+one-name : ∀ {A} (o : SObs [] A) {k k′ n n′} → elaborated o k (out (instEmit (mark Marks.begin) n))
+         → elaborated o k′ (out (instEmit (mark Marks.begin) n′)) → instantOf k ≡ instantOf k′ → n ≡ n′
+one-name o xk xk′ same = trans (Held.named (held o) xk) (trans (cong (λ i → nm (i ∙ [])) same) (sym (Held.named (held o) xk′)))
 
 -- An instant's values precede its overs: the value lies before where
 -- the over is sent from, the over at or under it.

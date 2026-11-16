@@ -34,55 +34,22 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-Undesigned: the plain and elaborated tables of one cut correspond along
-one position map and one late placement. The connect and flatMap maps
-and decisions all live here now. Settled when `tables` is a body over a
-per-former induction whose hypothesis relates environments (hots, joins).
+Undesigned: the plain and elaborated cuts correspond at every depth
+along one position map and one late placement, and the map lifts plain
+agreement to elaborated agreement, both ways. The map is a witness the
+lifting leaves mention, so all are one per-former induction over `elab`,
+its hypothesis relating environments (annotated hots, readers). Open: a
+uniform map over rows past a cut's truncation, which erasure never reads.
 
-Members: `tables`.
+Members: `corr`, `elab-causal`, `stable←`, `stable-put`.
 
 #### THE CUTS' STABILITY
 
-Untried: deeper cuts agree with shallower ones up to an image, both
-ways, and some cut is final past every plain row. Per-former and
-finite. Settled when each is a body over the tables' per-former steps.
+Untried: a deeper plain cut agrees wherever a shallower one does, and a
+finite plain run has a depth past which elaborated cuts stop growing.
+Plain only, per former; switch and exhaust need care.
 
-Members: `stable`, `stable←`, `stable-all`.
-
-#### THE WELL-ORDER
-
-Untried: an approximant's rows are well-founded under `≺`, so induction
-reaches a row no cut lists. Decision-free; rekeyed sub labels and
-cascades need care. Settled when `rows-ind` is a body over `approx`.
-
-Members: `rows-ind`.
-
-#### THE CONSUMPTION
-
-Untried: an elaborated cut's row paired with a plain row agreed with is
-a row of the run. Settled when `put-row` is a body over `cut-ne` and
-the tables.
-
-Members: `put-row`.
-
-#### THE BATCH RANK
-
-Untried: a batch leaves within its own instant, at the rank its values
-carry. Needs the layers' positions to keep instants, and the release
-mark to sit in the instant it releases. Settled when `batch-rank` is a
-body over the layers and the release protocol.
-
-Members: `batch-rank`.
-
-#### THE RELEASE
-
-Untried: the batcher releases exactly at the protocol's marks — past
-the last value with nothing held, a mark past it released it, of one of
-four kinds; a held batch is released by marks before the run leaves its
-instant. Settled when each is a body over `Walk`'s tally and the
-protocol.
-
-Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+Members: `deeper`, `stable-all`.
 
 #### THE HELD STREAMS
 
@@ -106,30 +73,39 @@ Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`,
 `held-trigger`.
 
+#### THE RELEASE
+
+Untried: the batcher releases exactly at the protocol's marks. Past the
+last value with nothing held, a mark released it: a begin of another
+instant, over or last stop (batcher state is `cnt` once subscribed), the
+completion, or the subscribe mark, whose values lie in the frame. A held
+batch is released before the run leaves its instant.
+
+Members: `release-at`, `release-on`, `done-end`, `sub-rest`.
+
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
-begun remain — a route is held while its instant can still make a row.
-Settled when each is a body: connect's rows beyond its body's (bursts,
-echoes), the combinator scan's, a cold's.
+begun remain. A cold needs no run: one step makes finitely many rows.
+Connect and the combinator scan can loop synchronously, so theirs need
+the count: a route is held while its instant can still make a row.
 
-Members: `cold-rest`, `scan-rest`, `conn-rest`.
+Members: `cold-step-few`, `scan-rest`, `conn-rest`.
+
+#### THE BATCH RANK
+
+Untried: the batcher keeps the elaborated run's instants, an `each`
+over a `scan` adding rows only within an instant of its source, and a
+batch leaves in an instant holding a value of its name.
+
+Members: `batch-home`, `batch-instant`, `elab-instant`.
 
 #### THE PROTOCOL
 
-Untried: every emit is named for its own instant, one begin and one
-value name per instant — the elaboration mints both per async value,
-which is per instant; the subscribe mark sits once before every begin
-with every value past it async; every value precedes the completion.
-Settled when each is a body over the elaboration's layers.
+Untried: carried emits are named for their instant (a run reaching the
+row stamps it with the count's name, `Held.covered`, once `stamps-of`
+sits below this); one value name per instant; the subscribe mark sits
+once, before every begin, every value past it async, and every value
+precedes the completion.
 
-Members: `named`, `one-name`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
-
-#### THE PASS
-
-Untried: a run meets on to every visible row up to one with finitely
-many rows before it. `listed`, `Reaching.reach` and `run-det` are each
-proven; open is the row at the bound itself, which a listing before it
-omits. Settled when it is a body over them.
-
-Members: `pass`.
+Members: `named-carried`, `named-sub`, `named-done`, `one-value-name`, `sub-first`, `sub-one`, `sub-async`, `done-last`.
