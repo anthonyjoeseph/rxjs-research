@@ -65,25 +65,36 @@ Members: `joins-σ`, `joins-sub`, `emb-s`, `fresh-s`, `nh-s`, `joins-b`,
 `emb-b`, `fresh-b`, `apart-b`, `nh-b`, `below-b`, `below-b′`, `below-s`,
 `below-s′`, `body-s`, `src-b`, `pairs-none`.
 
+#### FLATMAP: THE RELAY'S LISTING
+
+Probed: `lane-row→` is a body, bounded; the lane's rows before its
+carrier are listed by its simulation up to the row (`lane-at`). Open:
+the relay's input listed the same way — the outer's, every lane's and the
+trackers' rows before it — and each scan's forward step a body over
+`foldᵈ`. Risk: the trackers read hots, listed only by their own runs.
+Settled when `relay-at` is a body over the sims up to the row.
+
+Members: `relay-at`, `few₂`, `relay-fwd`, `lane-fwd`.
+
 #### FLATMAP: THE DECISIONS
 
-Untried: a lane the plain joiner runs and leaves uncut, the elaborated
-real flatMap runs, over the outer's re-read values, and leaves uncut,
-framed and relayed by the scan; and back. Risk: an exhaust decides by
-earlier lanes' ends, which the elaboration frames and ends at its own
-`laneDone`; a switch cuts at the next value, which the elaboration
-reads through two connects. Settled when each is a body over the
-outer's and the lanes' simulations and the frame.
+Probed: read back, every elaborated lane value is a plain running lane's,
+uncut; read forward, each decision is taken up to the bound. Open: an
+exhaust's run and a switch's cut, read forward, and a lane's end, read
+both ways. Risk: each moves along other values' carriers, simulated only
+up to the bound. Settled when each is a body over `run←` and the outer's
+simulation up to the row.
 
-Members: `lane-row→`, `lane-uncut`, `unrelay`.
+Members: `ex-run→`, `cut-sw→`, `lane-end←`, `lane-end→`.
 
 #### FLATMAP: THE LANE BOUND
 
-Untried: a running lane is simulated up to the flatMap's bound, or its
-own cut. Risk: a switched-out lane may run on unlisted past its cut.
-Settled when `lane-bound` is a body over the cut and the listing.
+Untried: a running lane's rows and hots are listed up to the flatMap's
+bound, or a switch's next value. Risk: a switched-out lane may run on
+unlisted past its cut. Settled when each is a body over the cut and the
+flatMap's listing.
 
-Members: `lane-bound`.
+Members: `lane-env`, `lane-listed`.
 
 #### FLATMAP: THE BOUNDED MERGE
 

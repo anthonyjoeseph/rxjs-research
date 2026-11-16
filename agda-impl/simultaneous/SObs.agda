@@ -178,9 +178,9 @@ private
   isTick tick = true
   isTick _    = false
 
-  isLane : Part → Bool
-  isLane lanePart  = true
-  isLane burstPart = false
+isLane : Part → Bool
+isLane lanePart  = true
+isLane burstPart = false
 
 -- A renaming under one more binder.
 ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ
