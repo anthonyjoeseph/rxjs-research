@@ -42,7 +42,7 @@ open import quickcheck.Tabled using (rows)
 open import quickcheck.Tabled.Exact.Base using (complete)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; Raw; Uncut; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableCorr using (TR; Corr)
 open import simultaneous.TableEnv using (_⊕ˡ_; Tab; DenOf; den; den-ex; den-ok; Admits; admits-ix; admits-step; admits-at; admits-trig)
 open import simultaneous.DenRows using (merge-out)
 open import simultaneous.ElabUndone using (Undone)
@@ -55,6 +55,13 @@ open import simultaneous.LaneEndSched using (laneX; readerR; emitAt; later; late
 
 ------------------------------------------------------------------------
 -- One layer's row, read forward
+
+-- A plain end's image, an end.
+corr-end : ∀ {A s s* φ Put L L*} → Corr {A} s s* φ Put L L* → ∀ {k} → L k end → L* (φ k) end
+corr-end C x with Corr.row→ C x tt
+... | inj₂ (() , _)
+... | inj₁ (_ , y , m) with proj₁ m tt
+...   | refl = y
 
 -- A connect's row, its body's.
 conn-raw : ∀ {Γ X Y} K n (s : Obs Timeline Γ X) (b : Obs Timeline (X ∷ Γ) Y) (ρ : DenEnv Γ) p {k e}

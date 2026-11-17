@@ -58,7 +58,7 @@ open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-
 
 open import simultaneous.ElabUndone using (elab-undone)
 open import simultaneous.LaneEndSched using (laneXt; trigXs; laneL; laneX; readerR; emitAt; later; later-cases)
-open import simultaneous.LaneEnd using (module Lane)
+open import simultaneous.LaneEnd using (corr-end; module Lane)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -488,13 +488,11 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- `laneDone` taken by the take.
     lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
                    → TR (Tab n (laneˢ (elab ρι⁴ (f (LaneRec.a R)))) ρ*c (LaneRec.stE R) N) (LaneRec.endImage R c) end
-    lane-end-image {N} R {c} cx with Corr.row→ (Rel.corr (Out.rel (LaneRec.lane R)) N) cx tt
-    ... | inj₂ (() , _)
-    ... | inj₁ (e′ , y , m) with proj₁ m tt
-    ...   | refl = Lane.lane-end n (elab ρι⁴ (f (LaneRec.a R))) uρ*c Dc (LaneRec.stE R) (LaneRec.adm* R) N
+    lane-end-image {N} R {c} cx = Lane.lane-end n (elab ρι⁴ (f (LaneRec.a R))) uρ*c Dc (LaneRec.stE R) (LaneRec.adm* R) N
                      (λ h → elab-undone (3 + N) n ρι⁴ (f (LaneRec.a R)) (h ∷ den Dc N) (λ i → unended env N i))
                      {t = trig (LaneRec.stE R) N} {o = laneˢ (elab ρι⁴ (f (LaneRec.a R)))} {q = LaneRec.endImage R c}
-                     {e = Rel.φ (Out.rel (LaneRec.lane R)) N c} refl refl refl y
+                     {e = Rel.φ (Out.rel (LaneRec.lane R)) N c} refl refl refl
+                     (corr-end (Rel.corr (Out.rel (LaneRec.lane R)) N) cx)
 
     -- A lane's end, past its trigger's: its own facts there, or, where
     -- the trigger's end is the later, the trigger's.  The trigger's end
