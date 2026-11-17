@@ -39,11 +39,11 @@ lane branch's reader, the flatMap's end at the `nothing` past the last
 of the three branches' ends (probed, kind `whole`). Untried: its fields,
 the scan emitting nothing but marks besides. Settled by bodies.
 
-Members: `cb-corr`, `cb-φ-agree`, `cb-in-bk`, `cb-pb-few`, `cb-back`,
-`cb-put-up`, `cb-back-put`, `cb-elab-causal`, `cb-stable←`,
-`cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func`, `cb-func*`,
-`cb-flat`, `cb-flat*`, `cb-pin-in`, `cb-pin-in*`, `cb-cons`, `cb-cons*`,
-`cb-got`, `cb-got*`, `cb-after`, `cb-after*`, `cb-after-φ`,
+Members: `cb-corr`, `cb-φ-agree`, `cb-back`,
+`cb-back-put`, `cb-elab-causal`, `cb-stable←`,
+`cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func*`,
+`cb-flat*`, `cb-pin-in*`, `cb-cons*`,
+`cb-got*`, `cb-after*`, `cb-after-φ`,
 `cb-pin-after*`, `cb-pin-stable`.
 
 #### THE FLATMAP'S ORDER FACTS
@@ -116,18 +116,18 @@ Each record is its body's, the connect showing its body's rows as they
 are and its source's only as pins and skips. Untried: the fields.
 Settled by bodies.
 
-Members: `cz-corr`, `cz-φ-agree`, `cz-in-bk`, `cz-pb-few`, `cz-back`,
-`cz-put-up`, `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
-`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func`, `cz-func*`,
-`cz-flat`, `cz-flat*`, `cz-pin-in`, `cz-pin-in*`, `cz-cons`, `cz-cons*`,
-`cz-got`, `cz-got*`, `cz-after`, `cz-after*`, `cz-after-φ`,
+Members: `cz-corr`, `cz-back`,
+`cz-back-put`, `cz-elab-causal`, `cz-stable←`,
+`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func*`,
+`cz-flat*`, `cz-pin-in*`, `cz-cons*`,
+`cz-got*`, `cz-after*`, `cz-after-φ`,
 `cz-pin-after*`, `cz-pin-stable`.
 
-Members: `sr-corr`, `sr-φ-agree`, `sr-in-bk`, `sr-pb-few`, `sr-back`,
-`sr-put-up`, `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
-`sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func`, `sr-func*`,
-`sr-flat`, `sr-flat*`, `sr-pin-in`, `sr-pin-in*`, `sr-cons`, `sr-cons*`,
-`sr-got`, `sr-got*`, `sr-after`, `sr-after*`, `sr-after-φ`,
+Members: `sr-corr`, `sr-back`,
+`sr-back-put`, `sr-elab-causal`, `sr-stable←`,
+`sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
+`sr-flat*`, `sr-pin-in*`, `sr-cons*`,
+`sr-got*`, `sr-after*`, `sr-after-φ`,
 `sr-pin-after*`, `sr-pin-stable`.
 
 #### THE BACK FACT

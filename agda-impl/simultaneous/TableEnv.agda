@@ -32,7 +32,7 @@ open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
@@ -68,14 +68,23 @@ Tab n o ρ p N = listC (3 + N) n o (ρ N) p
 Tab* : ∀ {Γ Δ A} → ℕ → Ren Γ Δ → Obs Timeline Γ A → (ℕ → All Tb.Listed Δ) → Pos → ℕ → Maybe (Tb.Listed (IE A))
 Tab* n ρι o ρ* p N = listC (3 + N) n (elab ρι o) (ρ* N) p
 
+private
+  dropLast : List Label → List Label
+  dropLast []           = []
+  dropLast (_ ∷ [])     = []
+  dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
+
+  dropLast-++ : ∀ ys l → dropLast (ys L.++ [ l ]) ≡ ys
+  dropLast-++ []           l = refl
+  dropLast-++ (y ∷ [])     l = refl
+  dropLast-++ (y ∷ z ∷ zs) l = cong (y ∷_) (dropLast-++ (z ∷ zs) l)
+
 -- One label up.
 up : Pos → Pos
 up (i ∙ ys) = i ∙ dropLast ys
-  where
-    dropLast : List Label → List Label
-    dropLast []           = []
-    dropLast (_ ∷ [])     = []
-    dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
+
+up-⊕ : ∀ q l → up (q ⊕ [ l ]) ≡ q
+up-⊕ (i ∙ ys) l = cong (i ∙_) (dropLast-++ ys l)
 
 -- A path walked one label at a time, as the listing walks it.
 infixl 5 _⊕ˡ_
