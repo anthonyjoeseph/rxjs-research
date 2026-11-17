@@ -38,7 +38,7 @@ open import Relation.Nullary using (does; yes; no)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_)
+open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (AgreeTo; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (any⁻)
@@ -163,6 +163,21 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ups zero    y = y
   ups (suc i) y = ups i (up y)
 
+  -- The later of two positions.
+  pick : Bool → Pos → Pos → Pos
+  pick true  e t = t
+  pick false e t = e
+
+  later : Pos → Pos → Pos
+  later e t = pick (e <ᵖ t) e t
+
+  later-cases : ∀ e t → later e t ≡ e ⊎ (later e t ≡ t × e ≺ t)
+  later-cases e t = go (e <ᵖ t) refl
+    where
+      go : ∀ b → (e <ᵖ t) ≡ b → pick b e t ≡ e ⊎ (pick b e t ≡ t × e ≺ t)
+      go true  eq = inj₂ (refl , subst T (sym eq) tt)
+      go false eq = inj₁ refl
+
   ----------------------------------------------------------------------
   -- The children's records
 
@@ -285,10 +300,36 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- Its row's image as the lanes' flatMap shows it: read by
       -- `laneˢ`'s reader and emitted by `counted`; an end at its
-      -- `laneDone`'s.
+      -- `laneDone`'s, which follows the share's end.
+      -- The share ends at the later of the lane's end and its trigger's:
+      -- a lane ended in its subscribe frame ends first.
+      trigEnd : Pos
+      trigEnd = laneL stE ⊕ˡ (ix 1 ∷ last ∷ sub (laneL stE ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ [])
+
+      endφ : Pos → Pos
+      endφ y = later (Rel.φ (Out.rel lane) N y) trigEnd
+
       outImage endImage : Pos → Pos
       outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
-      endImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+      endImage y = emitAt (endφ y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+
+    -- A lane's end, past its trigger's: its own facts there, or, where
+    -- the trigger's end is the later, the trigger's.
+    postulate
+      trig-cuts   : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+                  → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Aligned (maps env) ρ c (LaneRec.trigEnd R)
+      trig-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+                  → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Linked c (LaneRec.trigEnd R)
+
+    end-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Aligned (maps env) ρ c (LaneRec.endφ R c)
+    end-cuts {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
+    ... | inj₁ eq        = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₂ (eq , lt) = subst (Aligned (maps env) ρ c) (sym eq) (trig-cuts R cx lt)
+
+    end-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Linked c (LaneRec.endφ R c)
+    end-linked {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
+    ... | inj₁ eq        = subst (Linked c) (sym eq) (Rest.linked (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₂ (eq , lt) = subst (Linked c) (sym eq) (trig-linked R cx lt)
 
     -- A value's lane, subscribed under its row: the source's facts at the
     -- row align the lane's pair.
@@ -307,10 +348,9 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
     queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (c ⊕ [ ix 1 ]) (laneX st)
-         (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest O) N cx tt) (ix 1) (sub r)) ys)
-         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest O) N cx tt) (ix 1)) (sub r)) ys))
+         (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (end-cuts R cx) (ix 1) (sub r)) ys)
+         (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys))
       where
-        O  = LaneRec.lane R
         r  = readerR (LaneRec.stE R)
         st = LaneRec.endImage R c ⊕ [ ix 1 ]
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
@@ -385,7 +425,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           rowφ (just R) _        = if endAt (LaneRec.tab R) y then LaneRec.endImage R y else LaneRec.outImage R y
           rowφ nothing  (just R) = LaneRec.endImage R (up y) ⊕ [ ix 0 ]
           rowφ nothing  nothing  = if isMarker N y then val* N (up y) ⊕ [ ix 0 ]
-                                   else if endAt (S N) y then (if Rel.φ (Out.rel Os) N y <ᵖ ttEnd then ttEnd else Rel.φ (Out.rel Os) N y) ⊕ [ sub c₁ ]
+                                   else if endAt (S N) y then later (Rel.φ (Out.rel Os) N y) ttEnd ⊕ [ sub c₁ ]
                                    else srcφ N y
 
       Put′ : ℕ → Pos → Pos → Set

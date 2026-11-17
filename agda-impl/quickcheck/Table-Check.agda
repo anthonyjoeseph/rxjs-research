@@ -41,7 +41,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
@@ -367,13 +367,15 @@ mutual
 
       formula : Pos × Vis → Pos
       -- The source's end is the shared flatMap's: the later of its own
-      -- lane's end and its trigger's, read through the share's reader.
+      -- lane's end and its trigger's, read through the share's reader.  A
+      -- lane's end likewise, through its own share.
       formula (k , v) with laneOf k walked | v
       ... | nothing | vout = phi srcMap k ⊕ [ sub c₁ ]
       ... | nothing | vend = (if phi srcMap k <ᵖ ttEnd then ttEnd else phi srcMap k) ⊕ [ sub c₁ ]
         where ttEnd = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
       ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
-      ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
+      ... | just (st* , m) | vend = emitAt ((if phi m k <ᵖ lnEnd then lnEnd else phi m k) ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
+        where lnEnd = laneL st* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (laneL st* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
 
       -- The ends of the lanes whose ends the flatMap's table keeps.
       endsM : ∀ {X} → Maybe (Listed X) → List Pos
@@ -514,6 +516,10 @@ private
   sameRows ((r , a) ∷ xs) ((r′ , a′) ∷ ys) = does (r ≟ᵖ r′) ∧ (a ≡ᵇ a′) ∧ sameRows xs ys
   sameRows _              _              = false
 
+  -- The cuts a table's relation ranges over: `Tab` lists at `3 + N`.
+  relCuts : List ℕ
+  relCuts = mapL (3 +_) (upTo (suc N₀ ∸ 3))
+
   hasRow : ∀ {A} → Pos → Maybe (Listed A) → Bool
   hasRow q nothing  = false
   hasRow q (just l) = anyᵇ (λ { (r , _) → does (r ≟ᵖ q) }) (rows l)
@@ -536,7 +542,7 @@ private
   ... | o with listC N₀ n₀ o [] root | listC N₀ n₀ (elab (λ i → i) o) [] root*
   ...   | t | t* with plainV t | elabV t*
   ...     | just ks | just ks* with pairing ks ks*
-  ...       | just m = concatMap at (upTo N₀) , 1 , 0
+  ...       | just m = concatMap at relCuts , 1 , 0
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ o [] root | listC N′ n₀ (elab (λ i → i) o) [] root*
@@ -569,7 +575,7 @@ private
   coreBack {B} (flatMap {A = A} op f s) with listC N₀ n₀ (flatMap op f s) [] root | coreAt op f s N₀
   ... | t | t* with plainV t | elabV {B} t*
   ...   | just ks | just ks* with pairing ks ks*
-  ...     | just m = concatMap at (upTo N₀) , 0 , 0
+  ...     | just m = concatMap at relCuts , 0 , 0
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′
