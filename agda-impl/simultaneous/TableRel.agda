@@ -26,22 +26,22 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; [])
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Product using (_,_; proj₂)
+open import Data.Product using (_,_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (skip)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows; short; bind; _⊣_; mapRows; scanRows)
-open import simultaneous.InstEmit using (begin)
+open import quickcheck.Tabled using (rows; short; bind; _⊣_)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv; spinRows)
 open import simultaneous.TableCorr using (Rel)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab)
+open import simultaneous.TableScan using (scan-tab)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate; mapIE; scanIE; passes; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate)
 
 ------------------------------------------------------------------------
 -- The subterm's two families of tables
@@ -81,9 +81,6 @@ postulate
   spin-tab  : ∀ {A} p p* → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p*
 
   -- THE ONE-TO-ONE FORMERS carry a record through their operator.
-  scan-tab  : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
-            → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
-                  (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (mapRows proj₂ l)) s s*
   defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
             → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
                   (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*

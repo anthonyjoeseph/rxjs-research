@@ -40,11 +40,10 @@ leaf, the spin and the batcher's plumbing has its own. Every record,
 `flat-rel`'s and `conn-rel`'s too, owes coherence, run-shaped tables
 and cuts truncated before they differ (`cons`). Untried: whether `cons`
 holds of spun cuts; the leaves' maps rename the creator in an async
-instant; `scan-tab` matches values only where both accumulators read
-the same values in order. Settled when each is a body.
+instant. Settled when each is a body.
 
-Members: `scan-tab`, `defer-tab`, `spin-tab`, `empty-rel`, `of-rel`,
-`cold-rel`, `top-rel`.
+Members: `defer-tab`, `spin-tab`, `empty-rel`, `of-rel`, `cold-rel`,
+`top-rel`.
 
 #### THE TAKE'S LATE PINS
 
