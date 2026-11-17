@@ -44,7 +44,7 @@ open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_;
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter; Proper; module Op; at-out; at-end; on-out)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; Ok; InvAt; GoodEnv; Hots; Lawful; _∪ʰ_; ok-step;
   W; W⁼; step; timer; join; here; inW; Real; real-snoc; real-sub; plain-ix; shrink; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
@@ -285,12 +285,16 @@ squeeze {a} {b} {c} ab bc e with triⁱ (instantOf b) (instantOf c)
 -- DEAD ROUTE: func and flat over an arbitrary aligned environment.  A hot
 --   row the alignment exempts may sit in the subscription's world, and the
 --   table then lists rows the invariant does not cover.
+--
+-- Each hot's connect subscribes its body first (`lo`): a reader of the
+-- hot is one of the body's, subscribed at or past it.
 record DenOf {Γ} (ρ : ℕ → All Tb.Listed Γ) : Set₁ where
   constructor denOf
   field
     den    : ℕ → DenEnv Γ
     den-ex : ∀ N → EnvRel (ρ N) (den N)
     den-ok : ∀ N → GoodEnv (den N)
+    lo     : List Pos
 open DenOf public
 
 -- More hot rows, the world no smaller.
@@ -315,22 +319,33 @@ HotsAll D h = Σ ℕ λ N → Hots (den D N) h
 
 -- No hots: nothing listed, nothing to keep.
 none : DenOf {[]} (λ _ → All.[])
-none = denOf (λ _ → All.[]) (λ _ → Ex.[]) (λ _ ())
+none = denOf (λ _ → All.[]) (λ _ → Ex.[]) (λ _ ()) []
+
+-- At or past each of them.
+Past : List Pos → Pos → Set
+Past fs p = All (_≼ p) fs
+
+past-up : ∀ {fs} p p′ → Past fs p → p ≼ p′ → Past fs p′
+past-up p p′ fp pp′ = All.map (λ {f} fp₁ → ≼-trans {f} {p} {p′} fp₁ pp′) fp
+
+past-⊕ : ∀ {fs} p l ls → Past fs p → Past fs (p ⊕ (l ∷ ls))
+past-⊕ p l ls fp = past-up p (p ⊕ (l ∷ ls)) fp (≺→≼ {p} {p ⊕ (l ∷ ls)} (≺-ext p {l} ls))
 
 -- ADMISSIBLE: reachable, and no cut's hot row in its world.  Every cut's
 -- at once, because a lane subscribed under a row of one cut is read at
--- every cut, where that row's world may join other cuts' rows.
+-- every cut, where that row's world may join other cuts' rows.  And in
+-- each hot's scope: at or past its connect's body.
 Admits : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} → DenOf ρ → Pos → Set
-Admits D p = Ok (HotsAll D) p
+Admits D p = Ok (HotsAll D) p × Past (lo D) p
 
 admits-at : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Admits D p → ∀ N → Ok (Hots (den D N)) p
-admits-at D a N = ok-mono (λ hh → N , hh) a
+admits-at D a N = ok-mono (λ hh → N , hh) (proj₁ a)
 
 admits-step : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Admits D p → Admits D (p ⊕ [ ix 1 ])
-admits-step D {p} a = ok-step p a
+admits-step D {p} (o , fp) = ok-step p o , past-⊕ p (ix 1) [] fp
 
 admits-ix : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} i → Admits D p → Admits D (p ⊕ [ ix i ])
-admits-ix D {p} i (r , dj) = real-snoc p plain-ix r , λ hh w ins → dj hh (shrink w) ins
+admits-ix D {p} i ((r , dj) , fp) = (real-snoc p plain-ix r , λ hh w ins → dj hh (shrink w) ins) , past-⊕ p (ix i) [] fp
 
 -- A table listed at an admissible subscription keeps the invariant.
 tab-inv : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD → GoodEnv ρD → UncutEnv ρL
@@ -354,7 +369,9 @@ tab-flat n o u D a {N} = InvAt.flat (tab-at n o u D a N)
 -- A row of a table listed admissibly: admissible past its plain child.
 admits-row : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ)
            → ∀ {q} → Admits D q → ∀ {N k e} → TR (Tab n o ρ q N) k e → Admits D (k ⊕ [ ix 1 ])
-admits-row n o u D a {N} {k} x = ok-step k (ok-in a (w-mono (λ hh → N , hh) (InvAt.world I x)) (InvAt.real I x))
+admits-row n o u D {q} a {N} {k} x =
+  ok-step k (ok-in (proj₁ a) (w-mono (λ hh → N , hh) (InvAt.world I x)) (InvAt.real I x)) ,
+  past-⊕ k (ix 1) [] (past-up q k (proj₂ a) (after-ok (3 + N) n o q x))
   where I = tab-at n o u D a N
 
 -- A hot listed exactly off a lawful emission set.
@@ -364,19 +381,20 @@ record HotD {X : Set} (t : ℕ → Tb.Listed X) : Set₁ where
     hev  : ℕ → EmissionSet X
     hex  : ∀ N p → Exactly (rejoin p (t N)) (enter (ES.hot (hev N)) p)
     hlaw : ∀ N → Lawful (hev N)
+    hlo  : Pos
 open HotD public
 
 den-cons : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} → HotD t → DenOf ρ → DenOf (λ N → t N ∷ ρ N)
-den-cons h D = denOf (λ N → ES.hot (hev h N) ∷ den D N) (λ N → hex h N ∷ den-ex D N) (λ N → good-cons (hlaw h N) (den-ok D N))
+den-cons h D = denOf (λ N → ES.hot (hev h N) ∷ den D N) (λ N → hex h N ∷ den-ex D N) (λ N → good-cons (hlaw h N) (den-ok D N)) (hlo h ∷ lo D)
 
 -- One hot more, a world no smaller.
 admits-wk : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} (h : HotD t) (D : DenOf ρ) {p} → Admits (den-cons h D) p → Admits D p
-admits-wk h D = ok-mono λ { (N , hh) → N , inj₂ hh }
+admits-wk h D (o , _ ∷ fp) = ok-mono (λ { (N , hh) → N , inj₂ hh }) o , fp
 
 -- A CONNECT'S HOT: its source listed under the connect's second label.
 listHot : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c → Admits D c
         → HotD (λ N → hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))
-listHot {X = X} n o u D c a = hotD hv hx hl
+listHot {X = X} n o u D c a = hotD hv hx hl (c ⊕ [ ix 0 ])
   where
     hv : ℕ → EmissionSet _
     hv N = Proper (enter (capprox (3 + N) n o (den D N)) (c ⊕ [ ix 1 ]))
@@ -387,10 +405,14 @@ listHot {X = X} n o u D c a = hotD hv hx hl
     hl : ∀ N → Lawful (hv N)
     hl N = Cn.lawful {s = capprox (3 + N) n o (den D N)} {F = λ _ → Op.empty {X}} (inv-capprox (3 + N) n o (den D N) (den-ok D N)) (λ _ → empty-inv) c (admits-at D a N)
 
+-- A connect's body is past every connect it lies in.
+past-body : ∀ {fs} c → Past fs c → Past ((c ⊕ [ ix 0 ]) ∷ fs) (c ⊕ [ ix 0 ])
+past-body c fp = ≼-refl {c ⊕ [ ix 0 ]} ∷ past-⊕ c (ix 0) [] fp
+
 -- Its body admissible where the connect is.
 admits-body : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
             → Admits (den-cons (listHot n o u D c a) D) (c ⊕ [ ix 0 ])
-admits-body {X = X} n o u D c a = ok-mono into (Cn.Apart.ok₀ σ∞ c a σw)
+admits-body {X = X} n o u D c a = ok-mono into (Cn.Apart.ok₀ σ∞ c (proj₁ a) σw) , past-body c (proj₂ a)
   where
     hD = listHot n o u D c a
 
@@ -411,7 +433,9 @@ admits-body {X = X} n o u D c a = ok-mono into (Cn.Apart.ok₀ σ∞ c a σw)
 -- body.  The lane under the value is admissible.
 admits-trig : ∀ {Γ} n {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
             → Admits (den-cons (listHot n (of (tt ∷ [])) u D c a) D) (c ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub (c ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ ix 1 ])
-admits-trig n u D c a = ok-step (h ⊕ [ sub r ]) (ok-in ar (join (inj₁ hh) here lt) (real-sub h rh (proj₁ ar) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h []))))
+admits-trig n u D c a =
+  ok-step (h ⊕ [ sub r ]) (ok-in (proj₁ ar) (join (inj₁ hh) here lt) (real-sub h rh (proj₁ (proj₁ ar)) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h [])))) ,
+  past-⊕ (h ⊕ [ sub r ]) (ix 1) [] (past-⊕ h (sub r) [] (past-up r h (proj₂ ar) (≺→≼ {r} {h} lt)))
   where
     hD = listHot n (of (tt ∷ [])) u D c a
     r h : Pos
@@ -422,7 +446,7 @@ admits-trig n u D c a = ok-step (h ⊕ [ sub r ]) (ok-in ar (join (inj₁ hh) he
     ar = admits-step (den-cons hD D) (admits-body n (of (tt ∷ [])) u D c a)
 
     rh : Real h
-    rh = real-snoc (c ⊕ [ ix 1 ]) plain-ix (real-snoc c plain-ix (proj₁ a))
+    rh = real-snoc (c ⊕ [ ix 1 ]) plain-ix (real-snoc c plain-ix (proj₁ (proj₁ a)))
 
     lt : r ≺ h
     lt = subst₂ _≺_ (sym (⊕-assoc c [ ix 0 ] [ ix 1 ])) (sym (⊕-assoc c [ ix 1 ] [ ix 0 ]))
