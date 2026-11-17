@@ -377,13 +377,20 @@ core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*�
     module X  = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
     module X′ = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′
     os≡ : ∀ N y → Rel.φ (Out.rel X.Os) N y ≡ Rel.φ (Out.rel X′.Os) N y
-    os≡ = cs ρ uρ (wk ρι) X.F.ρ*s X.F.uρ*s (env-wk X.F.ttD E) (env-wk X′.F.ttD E′) (env-wk-eq X.F.ttD X′.F.ttD ee) p X.F.sp* a a′
+    os≡ = cs ρ uρ (wk ρι) X.F.ρ*s X.F.uρ*s (env-wk X.F.ttD E) (env-wk X′.F.ttD E′) (env-wk-eq X.F.ttD X′.F.ttD {E} {E′} ee) p X.F.sp* a a′
              (admits-trig n uρ* (lw* E) p* a*) (admits-trig n uρ* (lw* E′) p* a*′)
              (aligned-r* {Ψ = maps E} {ρ = ρ} al X.path) (aligned-r* {Ψ = maps E′} {ρ = ρ} al′ X.path) (linked-r* lk X.path) (linked-r* lk′ X.path)
     ls≡ : Two.LanesX n f s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Ls X′.Ls
     ls≡ b t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₂′ h₃ h₃′ h₄ h₄′ =
-      Ffc b ρ uρ X.F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u _ _
-          (env-wk-eq h₁ h₁′ (env-wk-eq h₂ h₂′ (env-wk-eq h₃ h₃′ (env-wk-eq h₄ h₄′ ee))))
+      Ffc b ρ uρ X.F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E₂) (env-wk h₁′ E₂′)
+          (env-wk-eq h₁ h₁′ {E₂} {E₂′} (env-wk-eq h₂ h₂′ {E₃} {E₃′} (env-wk-eq h₃ h₃′ {E₄} {E₄′} (env-wk-eq h₄ h₄′ {E} {E′} ee))))
+      where
+        E₄  = env-wk h₄ E
+        E₄′ = env-wk h₄′ E′
+        E₃  = env-wk h₃ E₄
+        E₃′ = env-wk h₃′ E₄′
+        E₂  = env-wk h₂ E₃
+        E₂′ = env-wk h₂′ E₃′
 
 -- A flatMap's map is its lanes' flatMap's, re-emitted by the combined
 -- scan: coherent where the lanes' flatMap is.
@@ -391,6 +398,7 @@ flat-coh : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs T
            (Fs : Full n s) (Ff : ∀ a → Full n (f a)) (Ffc : ∀ a → Coh n (f a) (Ff a))
          → Coh n s Fs → Coh n (flatMap op f s) (flat-rel n op f s Fs Ff Ffc)
 flat-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
-  if-≡ refl (λ _ → refl) (λ _ → cong (X.G.CombTab.reEmit op X.Rc)
-    (core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y))
-  where module X = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E p p* a a* al lk
+  if-≡ {b = X.F.endAt (X.G.CombTab.P′ op X.Rc N) y} {b′ = X.F.endAt (X′.G.CombTab.P′ op X′.Rc N) y} refl (λ _ → refl)
+    (λ _ → cong (X.G.CombTab.reEmit op X.Rc) (core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y))
+  where module X  = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
+        module X′ = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′
