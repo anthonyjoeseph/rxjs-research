@@ -34,24 +34,37 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-A rewrite, finished before any other proof work, in order: (1) the
-engine: no row index depends on data (a reader's first value, a lane's
-`laneDone`), TS mirrored, the oracle green in CI; (2) THE CUTS'
-STABILITY; (3) a map per former alongside `listC`, agreeing cuts giving
-the same map; (4) one relabelling lemma per operator, flatMap first; (5)
-`corr` replaced by a tree recursion giving each subterm its map, late
-placement, cut correspondence and lifting facts, over related
-environments. Out of scope: the flatMap and connect content itself.
+The rewrite, finished before any other proof work: each one-to-one
+former carries its child's record through its operator's table; each
+leaf, the spin and the batcher's plumbing has its own. Every record,
+`flat-rel`'s and `conn-rel`'s too, owes coherence, run-shaped tables
+and cuts truncated before they differ (`cons`). Untried: whether `cons`
+holds of spun cuts; the leaves' maps rename the creator in an async
+instant; `scan-tab` matches values only where both accumulators read
+the same values in order. Settled when each is a body.
 
-Members: `corr`, `elab-causal`, `stable←`, `stable-put`.
+Members: `scan-tab`, `defer-tab`, `spin-tab`, `empty-rel`, `of-rel`,
+`cold-rel`, `top-rel`.
 
-#### THE CUTS' STABILITY
+#### THE TAKE'S LATE PINS
 
-Untried: one general cut lemma: a deeper plain cut agrees wherever a
-shallower one does, and a finite plain run has a depth past which
-elaborated cuts stop growing. Plain only, per former.
+Untried, possibly false: past the elaborated first failure a take keeps
+only pins whose connect lies before it, and the plain takes agreeing
+need not make the children agree there. Settled by a body, or by two
+cuts agreeing on the plain take whose elaborated takes keep different
+pins.
 
-Members: `deeper`, `stable-all`.
+Members: `take-pins`.
+
+#### THE FLATMAP AND CONNECT CASES
+
+Out of the rewrite's scope: the maps themselves and the
+switch/exhaust/take decisions. Untried: whether the record carries
+enough for lanes' rows to keep their order across lanes (ticks, the
+creators inside async instants) and for a connect's body to meet its
+hot. Settled when each is a body.
+
+Members: `flat-rel`, `conn-rel`.
 
 ## Tier 3 — the simultaneous spec
 
