@@ -34,13 +34,26 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLATMAP'S LAYERS
 
-The plain merge is written (`MergeTab`): each lane row read through its
-lane's record at the cut holding its value row. Untried: concat's queued
-lanes, positioned by the run, the riskiest; then switch and exhaust,
-whose lanes are cut short. Settled by the three bodies.
+The merges are written (`MergeTab`, `ConcatTab`). Untried: switch and
+exhaust, whose lanes are cut short; then the layers past the lanes'
+flatMap. Settled by the two bodies.
 
-Members: `flat-concat`, `flat-switch`, `flat-exhaust`,
+Members: `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+
+#### THE BOUNDED MERGE
+
+The bounded merge's record is written: lanes enumerated level by level,
+a queued lane's record had from the lane it waited on, at its end, and
+subscribed under that end's image (probed, kind `lane-sub`). Untried:
+its fields, the queue's state a run's. Settled by bodies.
+
+Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-pb-few`, `cc-back`,
+`cc-put-up`, `cc-back-put`, `cc-elab-causal`, `cc-stable←`,
+`cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
+`cc-flat`, `cc-flat*`, `cc-pin-in`, `cc-pin-in*`, `cc-cons`, `cc-cons*`,
+`cc-got`, `cc-got*`, `cc-after`, `cc-after*`, `cc-after-φ`,
+`cc-pin-after*`, `cc-pin-stable`.
 
 #### THE PLAIN MERGE
 

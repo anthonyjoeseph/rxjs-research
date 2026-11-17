@@ -25,21 +25,22 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _+_; _≤_)
+open import Data.Maybe using (Maybe; just; nothing; maybe)
+import Data.Maybe as M
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Relation.Nullary using (does)
+open import Relation.Nullary using (does; yes; no)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; out; pin; _≼_)
+open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ)
+open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; module BoundedL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
@@ -211,14 +212,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     ... | nothing = []
     ... | just Lo = L.map (λ { (q , a , m) → valAt q a (Lo , eq , m) }) (valsIn (rows Lo))
 
-    -- The value whose lane holds `y`.
-    laneOf : ∀ N → Pos → Maybe (ValAt N)
-    laneOf N y = first (valsAt N)
-      where
-        first : List (ValAt N) → Maybe (ValAt N)
-        first []       = nothing
-        first (v ∷ vs) = if inside (ValAt.q v ⊕ [ ix 1 ]) y then just v else first vs
-
     -- A value's elaborated row: the shared hot's row of its image, read by
     -- the lanes' flatMap, and the value `each` lists from it.
     val* : ℕ → Pos → Pos
@@ -228,27 +221,88 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     st* : ℕ → Pos → Pos
     st* N q = val* N q ⊕ [ ix 1 ]
 
-    -- A value's lane, related wherever its value's row is: the source's
-    -- facts at the row align the lane's pair.
-    laneOut : ∀ N (v : ValAt N) → Out n (f (ValAt.a v)) ρ ρι⁴ (λ N′ → trig (st* N (ValAt.q v)) N′ ∷ ρ*c N′) (maps env)
-                                      (ValAt.q v ⊕ [ ix 1 ]) (laneX (st* N (ValAt.q v)))
-    laneOut N (valAt q a x) =
+    -- `laneˢ`'s path from an elaborated lane's subscription to the lane.
+    laneXs : Pos → List Label
+    laneXs st = ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ sub (laneL st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
+
+    -- A lane related at a cut: its value, its two subscriptions, its
+    -- record.
+    record LaneRec (N : ℕ) : Set₁ where
+      constructor laneRec
+      field
+        a   : A
+        st  : Pos
+        stE : Pos
+        lane : Out n (f a) ρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (maps env) st (laneX stE)
+
+      -- The lane's plain tables.
+      tab : Maybe (Tb.Listed B)
+      tab = Tab n (f a) ρ st N
+
+      -- Its row's image as the lanes' flatMap shows it: read by
+      -- `laneˢ`'s reader and emitted by `counted`; an end at its
+      -- `laneDone`'s.
+      outImage endImage : Pos → Pos
+      outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
+      endImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+
+    -- A value's lane, subscribed under its row: the source's facts at the
+    -- row align the lane's pair.
+    valRec : ∀ N → ValAt N → LaneRec N
+    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (q ⊕ [ ix 1 ]) (laneX st)
          (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁)) ys)
-         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt) (ix 1)) (sub c₁)) ys)
+         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt) (ix 1)) (sub c₁)) ys))
       where
         st = st* N q
-        ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ sub (laneL st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
+        ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ laneXs st
 
-    -- A lane row's image: the lane's own, read by `laneˢ`'s reader and
-    -- emitted by `counted`; an end at its `laneDone`'s.
-    laneφ : ∀ N → ValAt N → Pos → Pos
-    laneφ N v y = if endAt (Tab n (f (ValAt.a v)) ρ (ValAt.q v ⊕ [ ix 1 ]) N) y
-                  then emitAt (φl ⊕ˡ (sub r ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
-                  else emitAt (φl ⊕ [ sub r ])
+    -- A value's lane, queued under the end of the lane it waited on: that
+    -- lane's facts at its end align the pair, the elaborated lane queued
+    -- under the end's image.
+    queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
+    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st (
+      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (c ⊕ [ ix 1 ]) (laneX st)
+         (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest O) N cx tt) (ix 1) (sub r)) ys)
+         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest O) N cx tt) (ix 1)) (sub r)) ys))
       where
-        φl = Rel.φ (Out.rel (laneOut N v)) N y
-        r  = readerR (st* N (ValAt.q v))
+        O  = LaneRec.lane R
+        r  = readerR (LaneRec.stE R)
+        st = LaneRec.endImage R c ⊕ [ ix 1 ]
+        ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
+
+    -- The deepest of some lanes holding `y`: a queued lane lies inside the
+    -- lane it waited on.
+    deepest : ∀ {N} → List (LaneRec N) → Pos → Maybe (LaneRec N)
+    deepest []       y = nothing
+    deepest (R ∷ Rs) y with deepest Rs y
+    ... | just R′ = just R′
+    ... | nothing = if inside (LaneRec.st R) y then just R else nothing
+
+    -- The source's value at a row.
+    valAtPos : ∀ N → Pos → Maybe (ValAt N)
+    valAtPos N q = first (valsAt N)
+      where
+        first : List (ValAt N) → Maybe (ValAt N)
+        first []       = nothing
+        first (v ∷ vs) = if does (ValAt.q v ≟ᵖ q) then just v else first vs
+
+    -- An end among some rows.
+    endIn : ∀ {X : Set} (rs : List (Row X)) c → Maybe ((c , end) ∈ rs)
+    endIn []               c = nothing
+    endIn ((k , end) ∷ rs) c with k ≟ᵖ c
+    ... | yes refl = just (here refl)
+    ... | no _     = M.map there (endIn rs c)
+    endIn (_ ∷ rs)         c = M.map there (endIn rs c)
+
+    -- The lane among some that ends at `c`.
+    waitedOn : ∀ {N} → List (LaneRec N) → ∀ c → Maybe (Σ (LaneRec N) λ R → TR (LaneRec.tab R) c end)
+    waitedOn []       c = nothing
+    waitedOn (R ∷ Rs) c with LaneRec.tab R in eq
+    ... | nothing = waitedOn Rs c
+    ... | just Lx with endIn (rows Lx) c
+    ...   | just m  = just (R , Lx , eq , m)
+    ...   | nothing = waitedOn Rs c
 
     -- The trigger's end, read by the share.
     ttEnd : Pos
@@ -258,40 +312,52 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     srcφ : ℕ → Pos → Pos
     srcφ N k = Rel.φ (Out.rel Os) N k ⊕ [ sub c₁ ]
 
-    ----------------------------------------------------------------------
-    -- THE PLAIN MERGE: every value's lane subscribed under its row, every
-    -- lane row shown.  A lane row is imaged through its lane's record at
-    -- the cut; a value's marker at the marker of its elaborated value; the
-    -- source's end at the later of its own and the trigger's, as the share
-    -- ends; any other source row through the shared hot.
-    module MergeTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
-      P′ Q′ : ℕ → _
-      P′ = P (mergeᶠ nothing)
-      Q′ = λ N → listC (3 + N) n (core (mergeᶠ nothing)) (ρ*c N) c₁
+    isMarker : ℕ → Pos → Bool
+    isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
 
-      isMarker : ℕ → Pos → Bool
-      isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
+    ups : ℕ → Pos → Pos
+    ups zero    y = y
+    ups (suc i) y = ups i (up y)
 
+    -- THE MERGES' MAP, given each cut's lanes.  A lane row is imaged
+    -- through its lane's record at the cut, the skip a queue leaves past a
+    -- lane's end at its end image's; a value's marker at the marker of its
+    -- elaborated value; the source's end at the later of its own and the
+    -- trigger's, as the share ends; any other source row through the
+    -- shared hot.
+    module Tabs (lanes : ∀ N → List (LaneRec N)) where
       φ′ : ℕ → Pos → Pos
-      φ′ N y with laneOf N y
-      ... | just v  = laneφ N v y
+      φ′ N y with deepest (lanes N) y
+      ... | just R  = if endAt (LaneRec.tab R) y then LaneRec.endImage R y
+                      else if endAt (LaneRec.tab R) (up y) then LaneRec.endImage R (up y) ⊕ [ ix 0 ]
+                      else LaneRec.outImage R y
       ... | nothing = if isMarker N y then val* N (up y) ⊕ [ ix 0 ]
                       else if endAt (S N) y then (if Rel.φ (Out.rel Os) N y <ᵖ ttEnd then ttEnd else Rel.φ (Out.rel Os) N y) ⊕ [ sub c₁ ]
                       else srcφ N y
 
       Put′ : ℕ → Pos → Pos → Set
-      Put′ N y l with laneOf N y
-      ... | just v  = Σ Pos λ l′ → Rel.Put (Out.rel (laneOut N v)) N y l′ × l ≡ emitAt (l′ ⊕ [ sub (readerR (st* N (ValAt.q v))) ])
+      Put′ N y l with deepest (lanes N) y
+      ... | just R  = Σ Pos λ l′ → Rel.Put (Out.rel (LaneRec.lane R)) N y l′ × l ≡ emitAt (l′ ⊕ [ sub (readerR (LaneRec.stE R)) ])
       ... | nothing = (Σ Pos λ l′ → Rel.Put (Out.rel Os) N y l′ × l ≡ l′ ⊕ [ sub c₁ ]) ⊎ l ≡ φ′ N y
 
-      -- Generous: every lane's preimages of the image stripped either way,
+      -- Generous: every lane's preimages of the image stripped each way,
       -- the source's of it stripped, the markers', and the source's ends.
       bk′ : ℕ → Pos → List Pos
-      bk′ N l = L.concatMap (λ v → let R = Out.rel (laneOut N v) in Rel.bk R N (up (up (up (up (up l)))))
-                                     ++ Rel.bk R N (up (up (up (up (up (up (up (up l))))))))) (valsAt N)
+      bk′ N l = L.concatMap (λ R → let Rl = Out.rel (LaneRec.lane R) in
+                                     Rel.bk Rl N (ups 5 l) ++ Rel.bk Rl N (ups 8 l) ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk Rl N (ups 9 l))) (lanes N)
              ++ Rel.bk (Out.rel Os) N (up l)
-             ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Os) N (up (up (up (up (up l))))))
+             ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Os) N (ups 5 l))
              ++ endsOf (S N)
+
+    ----------------------------------------------------------------------
+    -- THE PLAIN MERGE: every value's lane subscribed under its row, every
+    -- lane row shown.
+    module MergeTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
+      P′ Q′ : ℕ → _
+      P′ = P (mergeᶠ nothing)
+      Q′ = λ N → listC (3 + N) n (core (mergeᶠ nothing)) (ρ*c N) c₁
+
+      open Tabs (λ N → L.map (valRec N) (valsAt N))
 
       postulate
         mg-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
@@ -338,14 +404,85 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; pin-in = mg-pin-in ; pin-in* = mg-pin-in* ; cons = mg-cons ; cons* = mg-cons* ; got = mg-got ; got* = mg-got*
         ; after = mg-after ; after* = mg-after* ; after-φ = mg-after-φ ; pin-after* = mg-pin-after* ; pin-stable = mg-pin-stable }
 
-  postulate
-    -- A value's lane is subscribed under its row when fewer than `k`
-    -- lanes are live there, else queued under the end of the lane whose
-    -- end frees its slot: the queue's state is a run's, so the pair is
-    -- aligned by the source's facts or by that earlier lane's, and the
-    -- earlier lane is the same one on both sides.
-    flat-concat : ∀ k → Core (mergeᶠ (just k))
+    ----------------------------------------------------------------------
+    -- THE BOUNDED MERGE: a value's lane subscribed under its row when
+    -- fewer than `k` lanes are live there, else queued under the end of
+    -- the lane whose end frees its slot.  The queue's state is a run's,
+    -- so the lanes are enumerated level by level as the listing
+    -- subscribes them; a queued lane's record is had from the lane it
+    -- waited on, at its end.
+    module ConcatTab (k : ℕ) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
+      P′ Q′ : ℕ → _
+      P′ = P (mergeᶠ (just k))
+      Q′ = λ N → listC (3 + N) n (core (mergeᶠ (just k))) (ρ*c N) c₁
 
+      -- The listing's entries at a cut: each value with its subscriptions.
+      entriesAt : ∀ N → List (ℕ × Pos × A × List (Pos × Tb.Listed B))
+      entriesAt N with S N
+      ... | nothing = []
+      ... | just o with BoundedL.levels k (afterL (λ a → listC (3 + N) n (f a) (ρ N))) o
+                          (L.length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)
+      ...   | nothing = []
+      ...   | just gs = gs
+
+      -- Each entry's lanes, after those of the levels before.
+      recs : ∀ N → List (ℕ × Pos × A × List (Pos × Tb.Listed B)) → List (LaneRec N) → List (LaneRec N)
+      recs N []                       acc = acc
+      recs N ((_ , q , a , ss) ∷ es) acc = recs N es (acc ++ L.concatMap one ss)
+        where
+          one : Pos × Tb.Listed B → List (LaneRec N)
+          one (st , _) = if does (st ≟ᵖ (q ⊕ [ ix 1 ]))
+                         then maybe (λ v → [ valRec N v ]) [] (valAtPos N q)
+                         else maybe (λ { (R , cx) → [ queuedRec N R cx a ] }) [] (waitedOn acc (up st))
+
+      open Tabs (λ N → recs N (entriesAt N) [])
+
+      postulate
+        cc-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+        cc-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+        cc-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+        cc-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+        cc-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                       → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        cc-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+        cc-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+        cc-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        cc-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        cc-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                       → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+        cc-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cc-corr N) k
+                       → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        cc-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+        cc-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+        cc-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+        cc-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        cc-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        cc-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+        cc-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+        cc-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+        cc-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+        cc-got         : ∀ N → Got (P′ N)
+        cc-got*        : ∀ N → Got (Q′ N)
+        cc-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+        cc-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
+        cc-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
+        cc-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₁ ≼ r
+        cc-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                       → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      rel′ : Rel P′ Q′ p c₁
+      rel′ = record
+        { φ = φ′ ; Put = Put′ ; corr = cc-corr ; φ-agree = cc-φ-agree ; bk = bk′ ; in-bk = cc-in-bk ; pb-few = cc-pb-few
+        ; back = cc-back ; put-up = cc-put-up ; back-put = cc-back-put
+        ; elab-causal = cc-elab-causal ; stable← = cc-stable← ; stable-put = cc-stable-put ; stable-lead = cc-stable-lead
+        ; elab-all = cc-elab-all ; func = cc-func ; func* = cc-func* ; flat = cc-flat ; flat* = cc-flat*
+        ; pin-in = cc-pin-in ; pin-in* = cc-pin-in* ; cons = cc-cons ; cons* = cc-cons* ; got = cc-got ; got* = cc-got*
+        ; after = cc-after ; after* = cc-after* ; after-φ = cc-after-φ ; pin-after* = cc-pin-after* ; pin-stable = cc-pin-stable }
+
+  postulate
     -- Every value's lane is subscribed under its row, and a lane's rows
     -- are shown only before the next value's row: the cut is the source's
     -- row, aligned by the source's facts at both rows.
@@ -358,7 +495,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   flat-core : ∀ op → Core op
   flat-core (mergeᶠ nothing)  = λ Os Ls al lk → Parts.MergeTab.rel′ Os Ls al lk
-  flat-core (mergeᶠ (just k)) = flat-concat k
+  flat-core (mergeᶠ (just k)) = λ Os Ls al lk → Parts.ConcatTab.rel′ Os Ls k al lk
   flat-core switchᶠ           = flat-switch
   flat-core exhaustᶠ          = flat-exhaust
 
