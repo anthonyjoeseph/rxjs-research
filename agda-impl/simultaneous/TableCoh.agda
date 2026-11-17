@@ -52,6 +52,11 @@ module _ {a b r : Level} {X : Set a} {Y : Set b} {R : X → Y → Set r} where
   maybe-pw (just q) k = k q
   maybe-pw nothing  _ = []
 
+  maybe-same : ∀ {w : Level} {W : Set w} {g : W → List X} {g′ : W → List Y} m → (∀ v → Pointwise R (g v) (g′ v))
+             → Pointwise R (maybe g [] m) (maybe g′ [] m)
+  maybe-same (just v) k = k v
+  maybe-same nothing  _ = []
+
   cm-pw : ∀ {i : Level} {I : Set i} {g : I → List X} {g′ : I → List Y} → (∀ x → Pointwise R (g x) (g′ x))
         → ∀ xs → Pointwise R (L.concatMap g xs) (L.concatMap g′ xs)
   cm-pw k []       = []
@@ -72,7 +77,7 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   module X  = Flat n f s ρ uρ ρι ρ* uρ* E  p p* a  a*
   module X′ = Flat n f s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′
-  open Vals n s ρ p using (ValAt; valAt; valsAt)
+  open Vals n s ρ p using (S; ValAt; valAt; valsAt; valAtPos; isMarker)
 
   -- Two environments' lanes, mapping alike however their hots are
   -- recorded and their subscriptions admitted.
@@ -151,14 +156,14 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     lastWith-x : ∀ {N} (h : P.LaneRec N → Bool) (h′ : P′.LaneRec N → Bool) → (∀ {R R′} → LaneX R R′ → h R ≡ h′ R′)
                → ∀ {Rs Rs′} → LanesX′ Rs Rs′ → PickX (P.lastWith h Rs) (P′.lastWith h′ Rs′)
     lastWith-x h h′ hh [] = nothing
-    lastWith-x h h′ hh (_∷_ {R} {R′} {Rs} {Rs′} x xs) with P.lastWith h Rs | P′.lastWith h′ Rs′ | lastWith-x h h′ hh xs
+    lastWith-x {N} h h′ hh (_∷_ {R} {R′} {Rs} {Rs′} x xs) with P.lastWith h Rs | P′.lastWith h′ Rs′ | lastWith-x h h′ hh xs
     ... | just _  | just _  | m       = m
     ... | nothing | nothing | nothing with h R | hh x
     ...   | true  | e = subst′ e (just x)
-      where subst′ : ∀ {c} → true ≡ c → PickX (just R) (just R′) → PickX (just R) (if c then just R′ else nothing)
+      where subst′ : ∀ {c} → true ≡ c → PickX {N} (just R) (just R′) → PickX {N} (just R) (if c then just R′ else nothing)
             subst′ refl m = m
     ...   | false | e = subst′ e nothing
-      where subst′ : ∀ {c} → false ≡ c → PickX nothing nothing → PickX nothing (if c then just R′ else nothing)
+      where subst′ : ∀ {c} → false ≡ c → PickX {N} nothing nothing → PickX {N} nothing (if c then just R′ else nothing)
             subst′ refl m = m
 
     -- The lane each list ends at a row on, alike.
@@ -176,8 +181,8 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       rowφ-x {N} {y} (just x) _ = if-≡ (cong (λ t → endAt t y) (tab-x x)) (λ _ → end-x x y) (λ _ → out-x x y)
       rowφ-x {N} {y} nothing (just x) = cong (_⊕ [ ix 0 ]) (end-x x (up y))
       rowφ-x {N} {y} nothing nothing =
-        if-≡ refl (λ _ → cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 0 ]) (os≡ N (up y)))
-                  (λ _ → if-≡ refl (λ _ → cong (λ u → later u P.ttEnd ⊕ [ sub X.c₁ ]) (os≡ N y))
+        if-≡ {b = isMarker N y} {b′ = isMarker N y} refl (λ _ → cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 0 ]) (os≡ N (up y)))
+                  (λ _ → if-≡ {b = endAt (S N) y} {b′ = endAt (S N) y} refl (λ _ → cong (λ u → later u P.ttEnd ⊕ [ sub X.c₁ ]) (os≡ N y))
                                    (λ _ → cong (_⊕ [ sub X.c₁ ]) (os≡ N y)))
 
       tabs-x : ∀ {N} → LanesX′ (lanes N) (lanes′ N) → ∀ y → P.Tabs.φ′ op lanes N y ≡ P′.Tabs.φ′ op lanes′ N y
@@ -201,7 +206,7 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         where
           one-x : ∀ x → LanesX′ (CT.one N q b acc x) (CT′.one N q b acc′ x)
           one-x (st , _) = if-pw (does (st ≟ᵖ (q ⊕ [ ix 1 ])))
-            (λ _ → maybe-pw (MP.refl refl) (λ { {v} refl → valRec-x v ∷ [] }))
+            (λ _ → maybe-same (valAtPos N q) (λ v → valRec-x v ∷ []))
             (λ _ → maybe-pw (waitedOn-x pw (up st)) (λ { {R , cx} {R′ , cx′} x → queuedRec-x x cx cx′ b ∷ [] }))
 
       concat-x : ∀ N y → Rel.φ (CT.rel′) N y ≡ Rel.φ (CT′.rel′) N y
