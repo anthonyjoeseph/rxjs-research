@@ -524,15 +524,19 @@ private
   hasRow q nothing  = false
   hasRow q (just l) = anyᵇ (λ { (r , _) → does (r ≟ᵖ q) }) (rows l)
 
-  -- A table's pins whose connect lies at or before `q`.
-  pinsTo : ∀ {A} → Pos → Maybe (Listed A) → List (Pos × Pos)
-  pinsTo q nothing  = []
-  pinsTo q (just l) = concatMap (λ { (y , pin r) → when ((r <ᵖ q) ∨ does (r ≟ᵖ q)) (y , r) ; _ → [] }) (rows l)
+  -- A table's pins: each row and its connect.
+  pinsOf : ∀ {A} → Maybe (Listed A) → List (Pos × Pos)
+  pinsOf nothing  = []
+  pinsOf (just l) = concatMap (λ { (y , pin r) → (y , r) ∷ [] ; _ → [] }) (rows l)
 
-  -- Each pin held by a table.
-  pinsIn : ∀ {A} → List (Pos × Pos) → Maybe (Listed A) → Bool
-  pinsIn [] _ = true
-  pinsIn ((y , r) ∷ ps) m = anyᵇ (λ { (y′ , r′) → does (y ≟ᵖ y′) ∧ does (r ≟ᵖ r′) }) (pinsTo r m) ∧ pinsIn ps m
+  -- Those whose connect lies at or before `q`.
+  pinsTo : Pos → List (Pos × Pos) → List (Pos × Pos)
+  pinsTo q = concatMap (λ { (y , r) → when ((r <ᵖ q) ∨ does (r ≟ᵖ q)) (y , r) })
+
+  -- Each held among some.
+  pinsIn : List (Pos × Pos) → List (Pos × Pos) → Bool
+  pinsIn []             qs = true
+  pinsIn ((y , r) ∷ ps) qs = anyᵇ (λ { (y′ , r′) → does (y ≟ᵖ y′) ∧ does (r ≟ᵖ r′) }) qs ∧ pinsIn ps qs
 
   -- Three ways at once: up to an image settles the row (`back`); a cut
   -- holding a row and agreeing up to it agrees up to its image
@@ -540,12 +544,15 @@ private
   -- connect lies at or before the row holds the whole's elaborated pins
   -- whose connect lies at or before its image (`pin-stable`).
   backCausal : ∀ {A A*} → String → String → String → ℕ → Maybe (Listed A) → Maybe (Listed A) → Maybe (Listed A*) → Maybe (Listed A*)
-             → List (Pos × Pos) → List (String × String)
-  backCausal kb kc kp N′ c t c* t* = concatMap (λ { (k , l) →
-      let up* = sameRows (upToᵖ l c*) (upToᵖ l t*) ; up = sameRows (upToᵖ k c) (upToᵖ k t) in
-      (if up* ∧ not up then fail kb (showℕ N′) k l else [])
-      ++ (if hasRow k c ∧ up ∧ not up* then fail kc (showℕ N′) k l else [])
-      ++ (if hasRow k c ∧ up ∧ pinsIn (pinsTo k t) c ∧ not (pinsIn (pinsTo l t*) c*) then fail kp (showℕ N′) k l else []) })
+             → List (Pos × Pos) → List (Pos × Pos) → List (Pos × Pos) → List (Pos × Pos) → List (Pos × Pos) → List (String × String)
+  backCausal kb kc kp N′ c t c* t* pc pt pc* pt* = concatMap (λ { (k , l) →
+      chk k l (sameRows (upToᵖ l c*) (upToᵖ l t*)) (sameRows (upToᵖ k c) (upToᵖ k t)) })
+    where
+      chk : Pos → Pos → Bool → Bool → List (String × String)
+      chk k l up* up =
+        (if up* ∧ not up then fail kb (showℕ N′) k l else [])
+        ++ (if hasRow k c ∧ up ∧ not up* then fail kc (showℕ N′) k l else [])
+        ++ (if hasRow k c ∧ up ∧ pinsIn (pinsTo k pt) pc ∧ not (pinsIn (pinsTo l pt*) pc*) then fail kp (showℕ N′) k l else [])
 
 
   -- The back fact a cut-indexed `bk` needs: a cut whose elaborated table
@@ -560,7 +567,7 @@ private
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ o [] root | listC N′ n₀ (elab (λ i → i) o) [] root*
-      ... | c | c* = backCausal "back" "causal" "pin-stable" N′ c t c* t* m
+      ... | c | c* = backCausal "back" "causal" "pin-stable" N′ c t c* t* m (pinsOf c) (pinsOf t) (pinsOf c*) (pinsOf t*)
   ...       | nothing = none
   backRes seed | o | t | t* | _ | _ = none
 
@@ -593,7 +600,7 @@ private
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′
-      ... | c | c* = backCausal "core-back" "core-causal" "core-pin-stable" N′ c t c* t* m
+      ... | c | c* = backCausal "core-back" "core-causal" "core-pin-stable" N′ c t c* t* m (pinsOf c) (pinsOf t) (pinsOf c*) (pinsOf t*)
   ...     | nothing = none
   coreBack (flatMap op f s) | t | t* | _ | _ = none
   coreBack _ = none
