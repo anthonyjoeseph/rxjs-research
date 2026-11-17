@@ -5,7 +5,7 @@
 -- two's one of its two lanes'.
 module simultaneous.DenRows where
 
-open import Data.Bool using (Bool; true; false; T; not)
+open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)

@@ -4,25 +4,24 @@
 -- part at one label.
 module simultaneous.TableRows where
 
-open import Data.Bool using (Bool; true; T)
-open import Data.List using (List; []; _∷_; [_]; _++_; length)
+open import Data.Bool using (true; T)
+open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.Nat using (suc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.List.Properties using (++-identityʳ)
 open import Data.Maybe using (Maybe; just)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (_×_; _,_)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; Label; ix; sub; _<ˡ_; _<ᵖ_; _⊕_; _∙_)
-open import denotation.Events using (<ᵖ-part; Events; ofᴱ)
-open import denotation.EmissionSet using (Ev; out; end; _≺_; _≼_)
+open import denotation.Position using (Pos; ix; sub; _<ˡ_; _⊕_)
+open import denotation.Events using (<ᵖ-part; ofᴱ)
+open import denotation.EmissionSet using (out; end; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext)
-open import denotation.Laws.Worlds using (⊕-assoc)
-open import quickcheck.Tabled using (Row; Listed; rows; _⊣_; bind; lanes; values; mergeRows; proper; rejoin; pastRows)
+open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
+open import quickcheck.Tabled using (Row; Listed; rows; bind; lanes; mergeRows; proper; rejoin; pastRows)
 open import quickcheck.Tabled.Exact.Base using (cm⁺; when⁺; all⁺; T-not; ends⁻; mapM⁺; fromT; pastRows⁺)
 open import simultaneous.Listing using (walkN)
 open import simultaneous.TableEnv using (_⊕ˡ_)
@@ -33,11 +32,8 @@ open import simultaneous.TableEnv using (_⊕ˡ_)
 toT : ∀ {b} → b ≡ true → T b
 toT refl = tt
 
-⊕-[] : ∀ q → q ⊕ [] ≡ q
-⊕-[] (i ∙ p) = cong (i ∙_) (++-identityʳ p)
-
 ⊕ˡ-⊕ : ∀ q ls → q ⊕ˡ ls ≡ q ⊕ ls
-⊕ˡ-⊕ q []       = sym (⊕-[] q)
+⊕ˡ-⊕ q []       = sym (⊕-identityʳ q)
 ⊕ˡ-⊕ q (l ∷ ls) = trans (⊕ˡ-⊕ (q ⊕ [ l ]) ls) (⊕-assoc q [ l ] ls)
 
 -- Two positions parting at one label, ordered by it.

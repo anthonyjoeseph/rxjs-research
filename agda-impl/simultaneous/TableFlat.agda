@@ -54,7 +54,10 @@ open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; got-bind; ke
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l;
   linked-r; linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; env-wk; Holds; Admits; admits-step; admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
+  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; unended; den; env-wk; Holds; Admits; admits-step; admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
+
+open import simultaneous.ElabUndone using (elab-undone)
+open import simultaneous.LaneEnd using (laneXt; trigXs; laneL; laneX; readerR; emitAt; later; later-cases; module Ending)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -237,21 +240,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ups zero    y = y
   ups (suc i) y = ups i (up y)
 
-  -- The later of two positions.
-  pick : Bool → Pos → Pos → Pos
-  pick true  e t = t
-  pick false e t = e
-
-  later : Pos → Pos → Pos
-  later e t = pick (e <ᵖ t) e t
-
-  later-cases : ∀ e t → later e t ≡ e ⊎ (later e t ≡ t × e ≺ t)
-  later-cases e t = go (e <ᵖ t) refl
-    where
-      go : ∀ b → (e <ᵖ t) ≡ b → pick b e t ≡ e ⊎ (pick b e t ≡ t × e ≺ t)
-      go true  eq = inj₂ (refl , subst T (sym eq) tt)
-      go false eq = inj₁ refl
-
   ----------------------------------------------------------------------
   -- The children's records
 
@@ -340,21 +328,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   -- What the source's and lanes' records give, for every operator.
   module Parts (Os : Src) (Ls : Lanes) where
-
-    -- `laneˢ` under an elaborated lane's subscription: its trigger, its
-    -- shared run, the lane itself, and the reader its rows are read by.
-    laneXt trigXs : Pos → List Label
-    laneXt st = ix 1 ∷ ix 0 ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
-    trigXs st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ []
-
-    laneL laneX readerR : Pos → Pos
-    laneL st = st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])
-    laneX st = laneL st ⊕ˡ laneXt st
-    readerR st = laneL st ⊕ˡ (ix 0 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
-
-    -- Where `counted` emits what the reader at `r` reads.
-    emitAt : Pos → Pos
-    emitAt r = r ⊕ˡ (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
 
     emit-ups : ∀ l′ x → ups 5 (emitAt (l′ ⊕ [ x ])) ≡ l′
     emit-ups l′ x rewrite up-⊕ ((((l′ ⊕ [ x ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ix 0)
@@ -510,11 +483,15 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
       endImage y = emitAt (endφ y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
 
-    postulate
-      -- THE ELABORATED LANE'S END: where `laneˢ` shows the lane's end, its
-      -- `laneDone` taken by the take.
-      lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
-                → TR (Tab n (laneˢ (elab ρι⁴ (f (LaneRec.a R)))) ρ*c (LaneRec.stE R) N) (LaneRec.endImage R c) end
+    -- THE ELABORATED LANE'S END: where `laneˢ` shows the lane's end, its
+    -- `laneDone` taken by the take.
+    lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+                   → TR (Tab n (laneˢ (elab ρι⁴ (f (LaneRec.a R)))) ρ*c (LaneRec.stE R) N) (LaneRec.endImage R c) end
+    lane-end-image {N} R {c} cx with Corr.row→ (Rel.corr (Out.rel (LaneRec.lane R)) N) cx tt
+    ... | inj₂ (() , _)
+    ... | inj₁ (e′ , y , m) with proj₁ m tt
+    ...   | refl = Ending.lane-end n (elab ρι⁴ (f (LaneRec.a R))) uρ*c Dc (LaneRec.stE R) (LaneRec.adm* R) N
+                     (λ h → elab-undone (3 + N) n ρι⁴ (f (LaneRec.a R)) (h ∷ den Dc N) (λ i → unended env N i)) y
 
     -- A lane's end, past its trigger's: its own facts there, or, where
     -- the trigger's end is the later, the trigger's.  The trigger's end
@@ -542,12 +519,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     end-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Aligned (maps env) ρ c (LaneRec.endφ R c)
     end-cuts {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
-    ... | inj₁ eq        = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₁ (eq , _)  = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt)
     ... | inj₂ (eq , lt) = subst (Aligned (maps env) ρ c) (sym eq) (trig-cuts R cx lt)
 
     end-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Linked c (LaneRec.endφ R c)
     end-linked {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
-    ... | inj₁ eq        = subst (Linked c) (sym eq) (Rest.linked (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₁ (eq , _)  = subst (Linked c) (sym eq) (Rest.linked (Out.rest (LaneRec.lane R)) N cx tt)
     ... | inj₂ (eq , lt) = subst (Linked c) (sym eq) (trig-linked R cx lt)
 
     -- A value's lane, subscribed under its row: the source's facts at the
