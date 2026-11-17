@@ -67,7 +67,7 @@ open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ; showPos)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; sort; hotOf; values; afterL; module BoundedL; module Order;
-  concatMap; when; anyᵇ; ends)
+  concatMap; when; anyᵇ; allᵇ; ends)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; each; laneˢ; closer)
 
@@ -448,6 +448,29 @@ mutual
                            then [] else fail "core-place" nm y c₁
       ... | _ | _ = []
 
+      -- Each live pin of the flatMap, the source's or a lane's: the lanes'
+      -- flatMap holds a pin whose connect has no image of a value past the
+      -- plain connect before it.
+      pinRes : List (Pos × Pos) → List (String × String)
+      pinRes m with o | listC N n (flatMap op f s) ρ p | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
+      ... | just so | just t | just t* = if short t ∨ short t* then [] else concatMap chk (rows t)
+        where
+          vals : List Pos
+          vals = concatMap (λ { (k , out _) → [ k ] ; _ → [] }) (rows t)
+          past : Pos → Pos → Bool
+          past q p′ = allᵇ (λ { (k₀ , w) → not (memᵖ k₀ vals ∧ (w <ᵖ p′)) ∨ (k₀ <ᵖ q) }) m
+          pinned : Pos → Bool
+          pinned q = anyᵇ (λ { (_ , pin p′) → past q p′ ; _ → false }) (rows t*)
+          live : Pos → Bool
+          live k = allᵇ (λ c → not (c <ᵖ k)) (ends (rows t))
+          fromSrc : Pos → Bool
+          fromSrc k = anyᵇ (λ { (k′ , pin _) → does (k′ ≟ᵖ k) ; _ → false }) (rows so)
+          chk : Row B → List (String × String)
+          chk (k , pin q) = if not (live k) ∨ pinned q then []
+                            else fail (if fromSrc k then "core-pin-src" else "core-pin-lane") nm k q
+          chk _ = []
+      ... | _ | _ | _ = []
+
       -- Each value of the lanes' flatMap's source, written out: the
       -- shared hot's row of the plain value's image, rejoined, and the
       -- first value `each` lists from it.
@@ -479,7 +502,7 @@ mutual
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ checks (nm +++ "/core") p c₁ [] m
+      ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ pinRes m ++ checks (nm +++ "/core") p c₁ [] m
                        ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
         where
@@ -652,7 +675,7 @@ private
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ "core-pin-src" ∷ "core-pin-lane" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
