@@ -22,6 +22,19 @@
 -- row before it in the shallower cut's finite table; and an approximant
 -- shows its hangs (`shows-approx`), so where the table lists every
 -- reached row before a position, it lists every row.
+--
+-- DEAD ROUTE: the erasure as an invariant over the emission sets
+--   themselves, by induction on the program, with no cut.  A row is a
+--   run's only past finitely many rows (`Truncate`), and an open subterm
+--   cannot decide that from its own few rows: a lane reading a hot past
+--   an accumulation a takeWhile hid from it meets a later row iff the
+--   accumulation is finite, so a scan over that lane and a timer has a
+--   row at the timer whose state decides it.  An image is then
+--   constructive only where the environment is listed, and a listing
+--   exists only for a closed program cut finite.  A classical image
+--   (`¬¬`) is not made constructive at the root by search: a value's
+--   match is not decidable at an arbitrary value type.
+-- RECOVERY: git show 5da952e2^ restores that route, its switch cut proven.
 module simultaneous.TableErasure where
 
 open import Data.Empty using (⊥-elim)
