@@ -51,15 +51,6 @@ Settled by its body.
 
 Members: `flatmap-order`.
 
-#### THE LANES' SUBSCRIPTIONS
-
-A lane is admissible because its subscribing row is: untried that a
-source row reappears in the elaborated `each` at its value's image, and
-a lane's end at its end image. Settled by their bodies over the core's
-map.
-
-Members: `each-row`, `lane-end-image`.
-
 #### THE SWITCH
 
 The switch's record is the merge's map over every value's lane. Untried:

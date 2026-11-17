@@ -11,6 +11,7 @@
 module simultaneous.Listing where
 
 open import Data.Bool using (Bool; false; _∨_)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; _++_; [_]; length; applyUpTo; filter) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻; ∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻)
@@ -33,7 +34,7 @@ open import denotation.Events using (Events; Timeline; timelineAt; start; ofᴱ)
 open import denotation.Position using (Pos; _<ᵖ_; ix; last; root; _⊕_)
 open import denotation.EmissionSet
   using (out; skip; end; EmissionSet; _≺_; Few; InE; at-out; at-skip; at-end; on-out; on-skip; enter;
-  After; DenEnv; ⟦_⟧; approx; Spin; spin)
+  After; DenEnv; ⟦_⟧; approx; Spin; spin; Den; hot; coldAt; Rejoin)
 open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; ≼-refl; upto)
 open import denotation.Laws.Count using (Cnt; AgC; ag-cnt; AgC-sym)
 open import denotation.Laws.Worlds using (⊑-refl)
@@ -145,51 +146,86 @@ listC N zero    (defer l)         ρ p = just (spinRows N p ⊣ false)
 listC N (suc n) (defer l)         ρ p =
   bind (listC N n (Later.force l) ρ (p ⊕ [ ix 1 ])) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)
 
--- WHAT `listC` LISTS UNCUT IS EXACTLY THE CUT PROGRAM'S ROWS.
-listC-exact : ∀ {Γ A} N n (o : Obs Timeline Γ A) {ρL : All Tb.Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD
-  → ∀ p {l} → listC N n o ρL p ≡ just l → Exactly l (enter (capprox N n o ρD) p)
-listC-exact N n (cold c)  ρ p refl = truncate-exact (λ _ → walkN-exact N _)
-listC-exact N n empty     ρ p refl = truncate-exact (λ _ → record { sound = λ { (here refl) → at-end ; (there ()) } ; complete = λ { at-end → here refl } })
-listC-exact N n (of xs)   ρ p refl = truncate-exact (λ _ → of-exact p xs)
-listC-exact N n (map f s) {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (l₀ , e₀ , refl) = truncate-exact (map-exact f (listC-exact N n s ρ p e₀))
-listC-exact N n (scan f z s) {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (l₀ , e₀ , refl) = truncate-exact (scan-exact f z l₀ (listC-exact N n s ρ p e₀))
-listC-exact N n (takeWhile i q s) {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (l₀ , e₀ , refl) = truncate-exact (take-exact i q l₀ (listC-exact N n s ρ p e₀))
-listC-exact N n (flatMap (mergeᶠ nothing) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
-... | (ls , els , refl) = truncate-exact (merge-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
-  (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
-    (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
-  (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els))
-listC-exact N n (flatMap (mergeᶠ (just k)) f s) {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (o , eo , e₁) =
-  truncate-exact (bounded-exact k (λ a → capprox N n (f a) ρD) _ (afterL (λ a → listC N n (f a) ρL)) o (listC-exact N n s ρ p eo)
-    (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) e₁)
-listC-exact N n (flatMap switchᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
-... | (ls , els , refl) = truncate-exact (switch-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
-  (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
-    (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
-  (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els))
-listC-exact N n (flatMap exhaustᶠ f s) {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
-... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
-... | (ls , els , refl) = truncate-exact (exhaust-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
-  (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
-    (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
-  (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els))
-listC-exact N n (connect s b) {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL (p ⊕ [ ix 1 ])} e
-... | (σl , eσ , e₁) with bind⁻ {m = listC N n b (hotOf σl ∷ ρL) (p ⊕ [ ix 0 ])} e₁
-... | (βl , eβ , refl) =
-  truncate-exact (conn-exact (capprox N n s ρD) (λ h → capprox N n b (h ∷ ρD)) p σl βl σx
-    (listC-exact N n b ((λ p′ → truncate-exact (rejoin-exact (proper-exact σx) p′)) ∷ ρ) (p ⊕ [ ix 0 ]) eβ))
-  where
-    σx = listC-exact N n s ρ (p ⊕ [ ix 1 ]) eσ
-listC-exact N n (connected i) ρ p refl = env-lookup ρ i p
-listC-exact N zero    (defer l) ρ p refl = truncate-exact (λ _ → spin-exact N p)
-listC-exact N (suc n) (defer l) {ρL} ρ p e with bind⁻ {m = listC N n (Later.force l) ρL (p ⊕ [ ix 1 ])} e
-... | (b , eb , refl) = truncate-exact (defer-exact (listC-exact N n (Later.force l) ρ (p ⊕ [ ix 1 ]) eb))
+-- What a reading shows before it is truncated to what it reaches.
+Raw : ∀ {A} → Den A → Pos → EmissionSet A
+Raw (hot t)    p = Rejoin p t
+Raw (coldAt f) p = f p
+
+-- Not a hot's reader: the cut program's own operator.
+Own : ∀ {Γ A} → Obs Timeline Γ A → Set
+Own (connected i) = ⊥
+Own _             = ⊤
+
+mutual
+  -- AN OPERATOR'S ROWS BEFORE TRUNCATION ARE ITS LISTING'S: each is read
+  -- off its operands' listings.
+  raw-exact : ∀ {Γ A} N n (o : Obs Timeline Γ A) → Own o → {ρL : All Tb.Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD
+    → ∀ p {l} → listC N n o ρL p ≡ just l → Exactly l (Raw (capprox N n o ρD) p)
+  raw-exact N n (cold c) _ ρ p refl = λ _ → walkN-exact N _
+  raw-exact N n empty    _ ρ p refl = λ _ → record { sound = λ { (here refl) → at-end ; (there ()) } ; complete = λ { at-end → here refl } }
+  raw-exact N n (of xs)  _ ρ p refl = λ _ → of-exact p xs
+  raw-exact N n (map f s) _ {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (l₀ , e₀ , refl) = map-exact f (listC-exact N n s ρ p e₀)
+  raw-exact N n (scan f z s) _ {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (l₀ , e₀ , refl) = scan-exact f z l₀ (listC-exact N n s ρ p e₀)
+  raw-exact N n (takeWhile i q s) _ {ρL} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (l₀ , e₀ , refl) = take-exact i q l₀ (listC-exact N n s ρ p e₀)
+  raw-exact N n (flatMap (mergeᶠ nothing) f s) _ {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+  ... | (ls , els , refl) = merge-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
+    (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
+      (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
+    (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els)
+  raw-exact N n (flatMap (mergeᶠ (just k)) f s) _ {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (o , eo , e₁) =
+    bounded-exact k (λ a → capprox N n (f a) ρD) _ (afterL (λ a → listC N n (f a) ρL)) o (listC-exact N n s ρ p eo)
+      (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) e₁
+  raw-exact N n (flatMap switchᶠ f s) _ {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+  ... | (ls , els , refl) = switch-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
+    (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
+      (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
+    (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els)
+  raw-exact N n (flatMap exhaustᶠ f s) _ {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL p} e
+  ... | (o , eo , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+  ... | (ls , els , refl) = exhaust-exact (λ a → capprox N n (f a) ρD) o ls (listC-exact N n s ρ p eo)
+    (lanes-from {ln = afterL (λ a → listC N n (f a) ρL)} {D = λ a → After (capprox N n (f a) ρD)}
+      (afterL-exact {ln = λ a → listC N n (f a) ρL} {D = λ a → enter (capprox N n (f a) ρD)} (λ {a} {s′} el → listC-exact N n (f a) ρ s′ el)) els)
+    (lanes-to {ln = afterL (λ a → listC N n (f a) ρL)} els)
+  raw-exact N n (connect s b) _ {ρL} {ρD} ρ p e with bind⁻ {m = listC N n s ρL (p ⊕ [ ix 1 ])} e
+  ... | (σl , eσ , e₁) with bind⁻ {m = listC N n b (hotOf σl ∷ ρL) (p ⊕ [ ix 0 ])} e₁
+  ... | (βl , eβ , refl) =
+    conn-exact (capprox N n s ρD) (λ h → capprox N n b (h ∷ ρD)) p σl βl σx
+      (listC-exact N n b ((λ p′ → truncate-exact (rejoin-exact (proper-exact σx) p′)) ∷ ρ) (p ⊕ [ ix 0 ]) eβ)
+    where
+      σx = listC-exact N n s ρ (p ⊕ [ ix 1 ]) eσ
+  raw-exact N n (connected i) () ρ p e
+  raw-exact N zero    (defer l) _ ρ p refl = λ _ → spin-exact N p
+  raw-exact N (suc n) (defer l) _ {ρL} ρ p e with bind⁻ {m = listC N n (Later.force l) ρL (p ⊕ [ ix 1 ])} e
+  ... | (b , eb , refl) = defer-exact (listC-exact N n (Later.force l) ρ (p ⊕ [ ix 1 ]) eb)
+
+  -- WHAT `listC` LISTS UNCUT IS EXACTLY THE CUT PROGRAM'S ROWS.
+  listC-exact : ∀ {Γ A} N n (o : Obs Timeline Γ A) {ρL : All Tb.Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD
+    → ∀ p {l} → listC N n o ρL p ≡ just l → Exactly l (enter (capprox N n o ρD) p)
+  listC-exact N n       (cold c)          ρ p e = truncate-exact (raw-exact N n (cold c) tt ρ p e)
+  listC-exact N n       empty             ρ p e = truncate-exact (raw-exact N n empty tt ρ p e)
+  listC-exact N n       (of xs)           ρ p e = truncate-exact (raw-exact N n (of xs) tt ρ p e)
+  listC-exact N n       (map f s)         ρ p e = truncate-exact (raw-exact N n (map f s) tt ρ p e)
+  listC-exact N n       (scan f z s)      ρ p e = truncate-exact (raw-exact N n (scan f z s) tt ρ p e)
+  listC-exact N n       (takeWhile i q s) ρ p e = truncate-exact (raw-exact N n (takeWhile i q s) tt ρ p e)
+  listC-exact N n       (flatMap (mergeᶠ nothing) f s)  ρ p e = truncate-exact (raw-exact N n (flatMap (mergeᶠ nothing) f s) tt ρ p e)
+  listC-exact N n       (flatMap (mergeᶠ (just k)) f s) ρ p e = truncate-exact (raw-exact N n (flatMap (mergeᶠ (just k)) f s) tt ρ p e)
+  listC-exact N n       (flatMap switchᶠ f s)           ρ p e = truncate-exact (raw-exact N n (flatMap switchᶠ f s) tt ρ p e)
+  listC-exact N n       (flatMap exhaustᶠ f s)          ρ p e = truncate-exact (raw-exact N n (flatMap exhaustᶠ f s) tt ρ p e)
+  listC-exact N n       (connect s b)     ρ p e = truncate-exact (raw-exact N n (connect s b) tt ρ p e)
+  listC-exact N n       (connected i)     ρ p refl = env-lookup ρ i p
+  listC-exact N zero    (defer l)         ρ p e = truncate-exact (raw-exact N zero (defer l) tt ρ p e)
+  listC-exact N (suc n) (defer l)         ρ p e = truncate-exact (raw-exact N (suc n) (defer l) tt ρ p e)
+
+-- A row a reading shows before truncation, listed in full, it shows.
+in-raw : ∀ {A} (d : Den A) p {l : Tb.Listed A} → Exactly l (Raw d p) → short l ≡ false → ∀ {q e} → Raw d p q e → enter d p q e
+in-raw (hot t)    p ex u x = sound (truncate-exact ex u) (complete (ex u) x)
+in-raw (coldAt f) p ex u x = sound (truncate-exact ex u) (complete (ex u) x)
 
 ------------------------------------------------------------------------
 -- The cut program's listing is never cut short
