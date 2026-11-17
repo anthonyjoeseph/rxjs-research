@@ -26,20 +26,19 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; [])
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Product using (_,_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (skip)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows; short; bind; _⊣_)
+open import quickcheck.Tabled using (_⊣_)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv; spinRows)
 open import simultaneous.TableCorr using (Rel)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab)
 open import simultaneous.TableScan using (scan-tab)
+open import simultaneous.TableDefer using (defer-tab)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate)
 
@@ -79,11 +78,6 @@ postulate
   empty-rel : ∀ {Γ A} n → Full {Γ} {A} n empty
   of-rel    : ∀ {Γ A} n (xs : List A) → Full {Γ} n (of xs)
   spin-tab  : ∀ {A} p p* → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p*
-
-  -- THE ONE-TO-ONE FORMERS carry a record through their operator.
-  defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
-            → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
-                  (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*
 
   -- THE TWO FORMERS WITH CONTENT, over their children's records in
   -- every environment.

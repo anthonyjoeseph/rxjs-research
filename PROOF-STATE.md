@@ -34,15 +34,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-The rewrite, finished before any other proof work: each one-to-one
-former carries its child's record through its operator's table; each
-leaf, the spin and the batcher's plumbing has its own. Every record,
+The rewrite, finished before any other proof work: each leaf, the spin
+and the batcher's plumbing has its own record. Every record,
 `flat-rel`'s and `conn-rel`'s too, owes coherence, run-shaped tables
 and cuts truncated before they differ (`cons`). Untried: whether `cons`
 holds of spun cuts; the leaves' maps rename the creator in an async
 instant. Settled when each is a body.
 
-Members: `defer-tab`, `spin-tab`, `empty-rel`, `of-rel`, `cold-rel`,
+Members: `spin-tab`, `empty-rel`, `of-rel`, `cold-rel`,
 `top-rel`.
 
 #### THE TAKE'S LATE PINS
