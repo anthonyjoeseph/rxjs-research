@@ -279,7 +279,7 @@ mutual
                     else [ "hot-image" , nm +++ " " +++ showPos y +++ " ~ " +++ showPos (phi m y) +++ " among "
                                           +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ] }) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
-    proj₂ src ⊹ (lanesRes ⊹ coreRes)
+    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (startRes , 0 , 0)))
     where
       tt-tab : Listed ⊤
       tt-tab = hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
@@ -366,6 +366,18 @@ mutual
       ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
       ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
 
+      -- Each value of the lanes' flatMap's source, written out: the
+      -- shared hot's row of the plain value's image, rejoined, and the
+      -- first value `each` lists from it.
+      startRes : List (String × String)
+      startRes = go vs vs*
+        where
+          go : List (Pos × A) → List (Pos × A) → List (String × String)
+          go ((q , _) ∷ xs) ((q* , _) ∷ ys) =
+            let w = phi srcMap q ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] in
+            (if does (w ≟ᵖ q*) then [] else fail "lane-start" nm q* w) ++ go xs ys
+          go _ _ = []
+
       coreRes : Res
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
@@ -426,7 +438,7 @@ private
   backRes seed | o | t | t* | _ | _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "lane-start" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
