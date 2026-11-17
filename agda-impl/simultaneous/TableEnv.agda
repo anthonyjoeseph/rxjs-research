@@ -58,6 +58,8 @@ open import quickcheck.Tabled.Exact using (EnvRel; _∷_; truncate-exact; rejoin
 import quickcheck.Tabled.Exact as Ex
 open import quickcheck.Tabled.Exact.Base using (Exactly; sound)
 open import simultaneous.SObs using (lone; module Elaborate)
+open import simultaneous.ElabUndone using (EnvU; AUndone; ann-u; elab-undone)
+open import simultaneous.DenRows using (hot-out)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; UncutEnv)
 open import simultaneous.ListTR using (tr-at)
 open import simultaneous.ListPin using (listC-pin)
@@ -67,7 +69,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
 ------------------------------------------------------------------------
 -- The subterm's two families of tables
@@ -494,6 +496,8 @@ record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : �
     lw   : DenOf ρ
     lw*  : DenOf ρ*
     hot  : ∀ {X} (i : X ∈ Γ) → HotR i ρ ρι ρ* maps lw lw*
+    -- No elaborated hot a program reads ends a lane.
+    unended : ∀ N → EnvU ρι (den lw* N)
 open EnvR public
 
 -- Wherever the two are subscribed alike, each admissibly.
@@ -508,5 +512,11 @@ Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ 
 -- An elaborated binder no plain subterm reads changes no reader.
 env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
        → HotD t → EnvR ρ ρι ρ* → EnvR ρ (wk ρι) (λ N → t N ∷ ρ* N)
-env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) λ i n p p* a a* al lk →
-  let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O
+env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i n p p* a a* al lk →
+  let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O) (λ N i → unended env N i)
+
+-- An elaborated connect's hot ends no lane, wherever its scope's hots end none.
+listHot-u : ∀ {Γ Δ X} n {ρι : Ren Γ Δ} (s : Obs Timeline Γ X) {ρ* : ℕ → All Tb.Listed Δ} (u : ∀ N → UncutEnv (ρ* N)) (D : DenOf ρ*) c a
+          → (∀ N → EnvU ρι (den D N)) → ∀ N → AUndone (ES.hot (hev (listHot n (annotate (elab ρι s)) u D c a) N))
+listHot-u n {ρι} s u D c a eu N p r with hot-out r
+... | _ , (x , _) , _ = ann-u (3 + N) n (elab ρι s) (den D N) (elab-undone (3 + N) n ρι s (den D N) (eu N)) (c ⊕ [ ix 1 ]) x

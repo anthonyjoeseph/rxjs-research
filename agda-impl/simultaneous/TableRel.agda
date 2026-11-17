@@ -53,7 +53,8 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
          Maps; Aligned; aligned-⊕;
-         Rest; Out; _⊢_; HotR; EnvR; envR; maps; lw; lw*; hot; Full; Admits; admits-step; admits-wk; admits-body; listHot; den-cons; tab-func; tab-flat)
+         Rest; Out; _⊢_; HotR; EnvR; envR; maps; lw; lw*; hot; Full; Admits; admits-step; admits-wk; admits-body; listHot; listHot-u; unended; den-cons; tab-func; tab-flat)
+open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab)
 open import simultaneous.TableScan using (scan-tab)
@@ -213,7 +214,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       cuts′ N x un (there i)   N′ = Rest.cuts (Out.rest O) N x un i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
-  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots
+  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
     where
       hots : ∀ {X} (i : X ∈ A ∷ Γ) → HotR i ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
       hots (here refl) = conn-hot Rs
