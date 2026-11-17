@@ -609,6 +609,15 @@ private
   sameRows ((r , a) ∷ xs) ((r′ , a′) ∷ ys) = does (r ≟ᵖ r′) ∧ (a ≡ᵇ a′) ∧ sameRows xs ys
   sameRows _              _              = false
 
+  -- Where two tables' rows up to a row first differ: the cut's, then the
+  -- whole's.
+  unlike : List (Pos × ℕ) → List (Pos × ℕ) → String
+  unlike ((r , a) ∷ xs) ((r′ , a′) ∷ ys) =
+    if does (r ≟ᵖ r′) ∧ (a ≡ᵇ a′) then unlike xs ys else showPos r +++ "/" +++ showℕ a +++ " vs " +++ showPos r′ +++ "/" +++ showℕ a′
+  unlike ((r , a) ∷ _) [] = showPos r +++ "/" +++ showℕ a +++ " vs none"
+  unlike [] ((r′ , a′) ∷ _) = "none vs " +++ showPos r′ +++ "/" +++ showℕ a′
+  unlike [] [] = "nowhere"
+
   -- The cuts a table's relation ranges over: `Tab` lists at `3 + N`.
   relCuts : List ℕ
   relCuts = mapL (3 +_) (upTo (suc N₀ ∸ 3))
@@ -643,7 +652,7 @@ private
     where
       chk : Pos → Pos → Bool → Bool → List (String × String)
       chk k l up* up =
-        (if up* ∧ not up then fail kb (showℕ N′) k l else [])
+        (if up* ∧ not up then [ kb , showℕ N′ +++ " " +++ showPos k +++ " ~ " +++ showPos l +++ " | first unlike " +++ unlike (upToᵖ k c) (upToᵖ k t) ] else [])
         ++ (if hasRow k c ∧ up ∧ not up* then fail kc (showℕ N′) k l else [])
         ++ (if hasRow k c ∧ up ∧ pinsIn (pinsTo k pt) pc ∧ not (pinsIn (pinsTo l pt*) pc*) then fail kp (showℕ N′) k l else [])
 
