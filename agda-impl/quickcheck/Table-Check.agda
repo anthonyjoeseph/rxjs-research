@@ -275,7 +275,9 @@ mutual
       hot-image : Res
       -- The annotated hot lists each source row at its image; a reader
       -- rejoins it under its own subscription (`ψ`).
-      hot-image = concatMap (λ { (y , _) → if memᵖ (phi m y) (annRows σ*) then [] else fail "hot-image" nm y (phi m y) }) (hotV σ) , 0 , 0
+      hot-image = concatMap (λ { (y , _) → if memᵖ (phi m y) (annRows σ*) then []
+                    else [ "hot-image" , nm +++ " " +++ showPos y +++ " ~ " +++ showPos (phi m y) +++ " among "
+                                          +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ] }) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
     proj₂ src ⊹ (lanesRes ⊹ coreRes)
     where
@@ -356,11 +358,13 @@ mutual
       ... | just m  = m
 
       formula : Pos × Vis → Pos
-      formula (k , v) with laneOf k walked
-      ... | nothing = phi srcMap k ⊕ [ sub c₁ ]
-      ... | just (st* , m) with v
-      ...   | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
-      ...   | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
+      -- The source's end is the shared flatMap's own, read through the
+      -- share's reader.
+      formula (k , v) with laneOf k walked | v
+      ... | nothing | vout = phi srcMap k ⊕ [ sub c₁ ]
+      ... | nothing | vend = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ sub c₁ ]
+      ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
+      ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
 
       coreRes : Res
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
