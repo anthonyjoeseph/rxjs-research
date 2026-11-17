@@ -28,9 +28,9 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
-open import denotation.Events using (Timeline; fresh)
+open import denotation.Events using (Timeline; From; fixed; fresh)
 import quickcheck.Tabled as Tb
-open import simultaneous.SObs using (lone; module Elaborate)
+open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (Rel)
 open import simultaneous.TableMap using (map-tab)
@@ -74,9 +74,11 @@ Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ 
 -- Each former's case
 
 postulate
-  -- THE LEAVES.
+  -- THE LEAVES.  An author's cold only: a `fresh` cold emits the
+  -- position it is subscribed at, and its elaboration is subscribed
+  -- deeper, so no map matches its value to the plain one.
   -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over the tables for its former's case.
-  cold-rel : ∀ {Γ A} n (c : Timeline A) → Full {Γ} n (cold c)
+  cold-rel : ∀ {Γ A} n (m : From A 0) → Full {Γ} n (cold (fixed m))
 
   -- THE TWO FORMERS WITH CONTENT, over their children's records in
   -- every environment.
@@ -91,16 +93,16 @@ postulate
             → Rel (Tab n o (λ _ → []) root) (Tab* n (λ i → i) o (λ _ → []) (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
             → Rel (Tab n o (λ _ → []) root) (λ N → listC (3 + N) n (elaborate o) [] root) root root
 
--- EVERY SUBTERM'S CUTS CORRESPOND.
-rel : ∀ {Γ A} n (o : Obs Timeline Γ A) → Full n o
-rel n (cold c)          = cold-rel n c
+-- EVERY AUTHOR SUBTERM'S CUTS CORRESPOND.
+rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
+rel n (cold (fixedˢ m)) = cold-rel n m
 rel n empty             ρ uρ ρι ρ* uρ* env p p* = of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* = of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* = map-tab f (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (scan f z s)      ρ uρ ρι ρ* uρ* env p p* = scan-tab f z (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (takeWhile i q s) ρ uρ ρι ρ* uρ* env p p* = take-tab i q (rel n s ρ uρ ρι ρ* uρ* env p p*)
-rel n (flatMap op f s)  = flat-rel n op f s (rel n s) (λ a → rel n (f a))
-rel n (connect s b)     = conn-rel n s b (rel n s) (rel n b)
+rel n (flatMap op f s)  = flat-rel n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a))
+rel n (connect s b)     = conn-rel n (plain s) (plain b) (rel n s) (rel n b)
 rel n (connected i)     ρ uρ ρι ρ* uρ* env = env i n
 rel zero    (defer l)   ρ uρ ρι ρ* uρ* env p p* = spin-tab p p*
 rel (suc n) (defer l)   ρ uρ ρι ρ* uρ* env p p* = defer-tab p p* (rel n (Later.force l) ρ uρ ρι ρ* uρ* env (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]))

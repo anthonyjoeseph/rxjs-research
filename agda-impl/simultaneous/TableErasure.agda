@@ -370,7 +370,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- THE CUTS CORRESPOND at every depth, read off the program's
   -- elaboration under the batcher's plumbing.
   R : Rel (λ N → listC (3 + N) n P [] root) (λ N → listC (3 + N) n Q [] root) root root
-  R = top-rel n P (rel n P (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (λ ()) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ [])))
+  R = top-rel n P (rel n o (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (λ ()) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ [])))
 
   module R = Rel R
 
