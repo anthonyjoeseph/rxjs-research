@@ -45,12 +45,11 @@ Members: `top-rel`.
 
 The rewrite: the elaborated cold's table is its rows written out
 (`CRow`); the top merge, the scan, its merge, the concat's schedule and
-each render are matched. Untried: the renders end before the scan; the
+each render are matched. Untried: the
 rows are functional, flat, causal across cuts. Settled by bodies, or a
 listed row `CRow` lacks.
 
-Members: `srow-lane-end`, `rows-func`, `rows-flat`, `rows-causal`,
-`rows-cons`.
+Members: `rows-func`, `rows-flat`, `rows-causal`, `rows-cons`.
 
 #### THE COLD'S WALK
 
@@ -58,7 +57,8 @@ The rewrite: the plain cold's cuts, renamed onto the elaborated
 cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
-Members: `walk-past`, `walk-under`, `walk-end`, `walk-ren→`,
+Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`,
+`walk-apart`, `walk-ren→`,
 `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-agree`, `walk-cons`,
 `walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
 `φ-back`.
