@@ -38,12 +38,13 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
+open import simultaneous.Listing using (walkN; listC; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
 open import simultaneous.ColdOrder using (walk-past; walk-nopin)
 open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
 open import simultaneous.TakeCut using (inst-⊕)
+open import simultaneous.TableEnv using (got-ok)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ)
 
@@ -187,8 +188,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   cold-after* {N} t = crow-after (I-after {N}) (rows→ t)
 
   cold-got* : ∀ N → Got (Q N)
-  cold-got* N with listC-ok (3 + N) n (coldˢ (fixed m)) (uρ* N) p*
-  ... | L , eq , _ = L , eq
+  cold-got* N = got-ok (3 + N) n (coldˢ (fixed m)) {ρ* N} (uρ* N) p*
 
   walk-pin : ∀ {N k r} → (k , pin r) ∈ W N → ⊥
   walk-pin {N} = walk-nopin (3 + N) _

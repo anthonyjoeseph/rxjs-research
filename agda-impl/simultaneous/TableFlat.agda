@@ -48,7 +48,7 @@ open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.TableEnv using (Ren; wk; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r; linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Holds; Full)
+open import simultaneous.TableEnv using (Ren; wk; got-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r; linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Holds; Full)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -425,8 +425,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
         mg-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         mg-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-        mg-got         : ∀ N → Got (P′ N)
-        mg-got*        : ∀ N → Got (Q′ N)
         mg-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
         mg-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
         mg-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -434,6 +432,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                        → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      mg-got : ∀ N → Got (P′ N)
+      mg-got N = got-ok (3 + N) n (flatMap (mergeᶠ nothing) f s) {ρ N} (uρ N) p
+
+      mg-got* : ∀ N → Got (Q′ N)
+      mg-got* N = got-ok (3 + N) n (core (mergeᶠ nothing)) {ρ*c N} (uρ*c N) c₁
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
@@ -503,8 +507,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         cc-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
         cc-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         cc-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-        cc-got         : ∀ N → Got (P′ N)
-        cc-got*        : ∀ N → Got (Q′ N)
         cc-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
         cc-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
         cc-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -512,6 +514,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         cc-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                        → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      cc-got : ∀ N → Got (P′ N)
+      cc-got N = got-ok (3 + N) n (flatMap (mergeᶠ (just k)) f s) {ρ N} (uρ N) p
+
+      cc-got* : ∀ N → Got (Q′ N)
+      cc-got* N = got-ok (3 + N) n (core (mergeᶠ (just k))) {ρ*c N} (uρ*c N) c₁
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
@@ -558,8 +566,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         sw-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
         sw-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         sw-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-        sw-got         : ∀ N → Got (P′ N)
-        sw-got*        : ∀ N → Got (Q′ N)
         sw-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
         sw-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
         sw-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -567,6 +573,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         sw-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                        → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      sw-got : ∀ N → Got (P′ N)
+      sw-got N = got-ok (3 + N) n (flatMap switchᶠ f s) {ρ N} (uρ N) p
+
+      sw-got* : ∀ N → Got (Q′ N)
+      sw-got* N = got-ok (3 + N) n (core switchᶠ) {ρ*c N} (uρ*c N) c₁
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
@@ -621,8 +633,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ex-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
         ex-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         ex-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-        ex-got         : ∀ N → Got (P′ N)
-        ex-got*        : ∀ N → Got (Q′ N)
         ex-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
         ex-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
         ex-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -630,6 +640,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ex-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                        → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      ex-got : ∀ N → Got (P′ N)
+      ex-got N = got-ok (3 + N) n (flatMap exhaustᶠ f s) {ρ N} (uρ N) p
+
+      ex-got* : ∀ N → Got (Q′ N)
+      ex-got* N = got-ok (3 + N) n (core exhaustᶠ) {ρ*c N} (uρ*c N) c₁
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
@@ -709,7 +725,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       cb-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
       cb-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      cb-got*        : ∀ N → Got (Q′ N)
       cb-after*      : ∀ {N l e} → TR (Q′ N) l e → c₂ ≼ l
       cb-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₂ ≼ r
       cb-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
@@ -743,6 +758,9 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     cb-put-up : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
     cb-put-up le ag (l′ , pt , eq) = l′ , Rel.put-up R le ag pt , eq
+
+    cb-got* : ∀ N → Got (Q′ N)
+    cb-got* N = got-ok (3 + N) n (inner op) {ρ*c N} (uρ*c N) c₂
 
     rel′ : Rel P′ Q′ p c₂
     rel′ = record
@@ -789,13 +807,15 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cz-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       cz-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
       cz-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      cz-got*        : ∀ N → Got (Q′ N)
       cz-after*      : ∀ {N l e} → TR (Q′ N) l e → c₃ ≼ l
       cz-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₃ ≼ φ′ N k
       cz-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₃ ≼ r
       cz-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                      → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    cz-got* : ∀ N → Got (Q′ N)
+    cz-got* N = got-ok (3 + N) n (body op) {ρ*h N} (uρ*h N) c₃
 
     rel′ : Rel P′ Q′ p c₃
     rel′ = record
@@ -841,13 +861,15 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       sr-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
       sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      sr-got*        : ∀ N → Got (Q′ N)
       sr-after*      : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
       sr-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
       sr-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
       sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                      → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    sr-got* : ∀ N → Got (Q′ N)
+    sr-got* N = got-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} (uρ* N) p*
 
     rel′ : Rel P′ Q′ p p*
     rel′ = record

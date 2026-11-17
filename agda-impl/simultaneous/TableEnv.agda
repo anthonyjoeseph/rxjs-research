@@ -44,10 +44,10 @@ open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc)
 open import denotation.Laws.Count using (child)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Listing using (listC; UncutEnv)
+open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.TableCorr using (Rel; Rows; TR)
+open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab)
 
@@ -67,6 +67,11 @@ Tab n o ρ p N = listC (3 + N) n o (ρ N) p
 
 Tab* : ∀ {Γ Δ A} → ℕ → Ren Γ Δ → Obs Timeline Γ A → (ℕ → All Tb.Listed Δ) → Pos → ℕ → Maybe (Tb.Listed (IE A))
 Tab* n ρι o ρ* p N = listC (3 + N) n (elab ρι o) (ρ* N) p
+
+-- A table listed under an uncut environment is there.
+got-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} → UncutEnv ρL → ∀ q → Got (listC N n o ρL q)
+got-ok N n o u q with listC-ok N n o u q
+... | L , eq , _ = L , eq
 
 private
   dropLast : List Label → List Label
