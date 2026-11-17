@@ -62,6 +62,7 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC)
+open import simultaneous.TableEnv using (up)
 open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ; showPos)
@@ -283,7 +284,7 @@ mutual
                     else [ "hot-image" , nm +++ " " +++ showPos (proj₁ yv) +++ " ~ " +++ showPos (annAt yv) +++ " among "
                                           +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ]) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
-    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (startRes , 0 , 0)))
+    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (startRes ++ subRes , 0 , 0)))
     where
       tt-tab : Listed ⊤
       tt-tab = hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
@@ -351,9 +352,14 @@ mutual
       emitAt : Pos → Pos
       emitAt r = r ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
 
+      -- The deepest lane holding `k`: a queued lane is subscribed under
+      -- the end of the lane it waited on, so inside it too, and listed
+      -- after it.
       laneOf : Pos → List (Pos × Pos × Maybe (List (Pos × Pos)) × Res) → Maybe (Pos × List (Pos × Pos))
       laneOf k [] = nothing
-      laneOf k ((st , st* , just m , _) ∷ ws) = if inside st k then just (st* , m) else laneOf k ws
+      laneOf k ((st , st* , just m , _) ∷ ws) with laneOf k ws
+      ... | just r  = just r
+      ... | nothing = if inside st k then just (st* , m) else nothing
       laneOf k (_ ∷ ws) = laneOf k ws
 
       srcMap : List (Pos × Pos)
@@ -382,6 +388,21 @@ mutual
             let w = phi srcMap q ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] in
             (if does (w ≟ᵖ q*) then [] else fail "lane-start" nm q* w) ++ go xs ys
           go _ _ = []
+
+      -- Each lane's subscription, written out: under its value's
+      -- elaborated row, or, queued, under the end of the lane it waited
+      -- on.
+      subRes : List (String × String)
+      subRes with starts op
+      ... | nothing = []
+      ... | just ls = concatMap check ls
+        where
+          check : A × Pos × Pos → List (String × String)
+          check (_ , st , st*) =
+            let w = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 1 ]) ≟ᵖ st) }) vs
+                    then phi srcMap (up st) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+                    else formula (up st , vend) ⊕ [ ix 1 ] in
+            if does (w ≟ᵖ st*) then [] else fail "lane-sub" nm st* w
 
       coreRes : Res
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
@@ -443,7 +464,7 @@ private
   backRes seed | o | t | t* | _ | _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "lane-start" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
