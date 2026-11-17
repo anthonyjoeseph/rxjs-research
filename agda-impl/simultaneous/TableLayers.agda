@@ -8,7 +8,6 @@ module simultaneous.TableLayers where
 
 
 open import Data.Bool using (T; if_then_else_)
-open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -33,7 +32,7 @@ open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Full)
+  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; env-wk; Full; Admits; admits-trig; tab-func; tab-flat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -41,9 +40,9 @@ open import simultaneous.TableFlat using (module Flat; in-if; max-ge; ≼-ˡ; an
 
 module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (env : EnvR ρ ρι ρ*) (p p* : Pos) where
+  (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
 
-  open Flat n f s ρ uρ ρι ρ* uρ* env p p*
+  open Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
 
   ----------------------------------------------------------------------
   -- THE COMBINED SCAN: each row of the lanes' flatMap read by the scan's
@@ -104,8 +103,6 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cb-corr N) k
                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       cb-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      cb-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      cb-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       cb-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
       cb-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
@@ -159,7 +156,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       { φ = φ′ ; Put = Put′ ; corr = cb-corr ; φ-agree = cb-φ-agree ; bk = bk′ ; in-bk = cb-in-bk ; pb-few = cb-pb-few
       ; back = cb-back ; put-up = cb-put-up ; back-put = cb-back-put
       ; elab-causal = cb-elab-causal ; stable← = cb-stable← ; stable-put = cb-stable-put ; stable-lead = cb-stable-lead
-      ; elab-all = cb-elab-all ; func = Rel.func R ; func* = cb-func* ; flat = Rel.flat R ; flat* = cb-flat*
+      ; elab-all = cb-elab-all ; func = Rel.func R ; func* = tab-func n (inner op) uρ*c Dc ad₂ ; flat = Rel.flat R ; flat* = tab-flat n (inner op) uρ*c Dc ad₂
       ; pin-in = Rel.pin-in R ; pin-in* = cb-pin-in* ; cons = Rel.cons R ; cons* = cb-cons* ; got = Rel.got R ; got* = cb-got*
       ; after = Rel.after R ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after* ; pin-stable = cb-pin-stable }
 
@@ -195,8 +192,6 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cz-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cz-corr N) k
                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       cz-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      cz-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      cz-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       cz-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
       cz-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
@@ -223,7 +218,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       { φ = φ′ ; Put = Put′ ; corr = cz-corr ; φ-agree = Rel.φ-agree R ; bk = bk′ ; in-bk = Rel.in-bk R ; pb-few = Rel.pb-few R
       ; back = cz-back ; put-up = Rel.put-up R ; back-put = cz-back-put
       ; elab-causal = cz-elab-causal ; stable← = cz-stable← ; stable-put = cz-stable-put ; stable-lead = cz-stable-lead
-      ; elab-all = cz-elab-all ; func = Rel.func R ; func* = cz-func* ; flat = Rel.flat R ; flat* = cz-flat*
+      ; elab-all = cz-elab-all ; func = Rel.func R ; func* = tab-func n (body op) uρ*h Dh ad₃ ; flat = Rel.flat R ; flat* = tab-flat n (body op) uρ*h Dh ad₃
       ; pin-in = Rel.pin-in R ; pin-in* = cz-pin-in* ; cons = Rel.cons R ; cons* = cz-cons* ; got = Rel.got R ; got* = cz-got*
       ; after = Rel.after R ; after* = cz-after* ; after-φ = cz-after-φ ; pin-after* = cz-pin-after* ; pin-stable = cz-pin-stable }
 
@@ -264,10 +259,6 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       sr-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sr-corr N) k
                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       sr-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      sr-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
-      sr-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      sr-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-      sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       sr-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
       sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
       sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
@@ -319,7 +310,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       { φ = φ′ ; Put = Put′ ; corr = sr-corr ; φ-agree = sr-φ-agree ; bk = bk′ ; in-bk = sr-in-bk ; pb-few = sr-pb-few
       ; back = sr-back ; put-up = sr-put-up ; back-put = sr-back-put
       ; elab-causal = sr-elab-causal ; stable← = sr-stable← ; stable-put = sr-stable-put ; stable-lead = sr-stable-lead
-      ; elab-all = sr-elab-all ; func = sr-func ; func* = sr-func* ; flat = sr-flat ; flat* = sr-flat*
+      ; elab-all = sr-elab-all ; func = tab-func n (flatMap op f s) uρ (lw env) ad ; func* = tab-func n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
+      ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; cons = sr-cons ; cons* = sr-cons* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
 
@@ -335,17 +327,17 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
 flat-rel : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
          → Full n s → (∀ a → Full n (f a)) → Full n (flatMap op f s)
-flat-rel n op f s Fs Ff ρ uρ ρι ρ* uρ* env p p* al lk = G.flat-tab op Os Ls al lk ⊢ G.flatmap-order op Os Ls al lk
+flat-rel n op f s Fs Ff ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab op Os Ls al lk ⊢ G.flatmap-order op Os Ls al lk
   where
-    module F = Flat n f s ρ uρ ρι ρ* uρ* env p p*
-    module G = Layers n f s ρ uρ ρι ρ* uρ* env p p*
+    module F = Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
+    module G = Layers n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
 
     path : List Label
     path = ix 1 ∷ ix 0 ∷ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ∷ ix 1 ∷ []
 
     Os : F.Src
-    Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.tt-tab env) p F.sp*
+    Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.ttD env) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)
            (aligned-r* {Ψ = maps env} {ρ = ρ} al path) (linked-r* lk path)
 
     Ls : F.Lanes
-    Ls a t₁ t₂ t₃ t₄ u = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk t₁ (env-wk t₂ (env-wk t₃ (env-wk t₄ env))))
+    Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
