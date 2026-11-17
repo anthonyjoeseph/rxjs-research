@@ -17,26 +17,26 @@ open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Maybe using (just)
-open import Data.Nat using (ℕ; zero; suc; s≤s; z≤n)
+open import Data.Nat using (ℕ; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; flatMap; cold; of; map)
 open import denotation.Position using (Pos; ix; last; _⊕_)
 open import denotation.Events using (Timeline; From; fixed; start)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; Ended; Work; After; MapT; _≺_; _≼_;
-  map-out; map-skip; map-pin; map-end; module Values; module Bounded)
+open import denotation.EmissionSet using (Ev; out; skip; end; EmissionSet; Den; Ended; Work; After; MapT; _≺_; _≼_; map-out; map-skip;
+  map-pin; map-end; module Values; module Bounded)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans; ≺-irrefl; ≺-absurd)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (Tag; val; cdone)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.ListTR using (laneD; ent; cold-tr; map-tr; bounded-tr; Of1; Of2; o₀; o₁; oₑ; of1; of2)
-open import simultaneous.ColdOrder using (walk-past; walk-end; walk-nopin; ≺-≢; ⊕1-inj; down; module Ord)
+open import simultaneous.ColdOrder using (walk-end; walk-nopin; ≺-≢; ⊕1-inj; down; module Ord)
 open import simultaneous.ColdRows using (module At)
 
 module Cat {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where

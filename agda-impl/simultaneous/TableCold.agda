@@ -29,20 +29,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; last; _∙_; _⊕_; frame; cascade; instant; path; tick)
-open import denotation.Events using (Events; Timeline; From; fixed; fresh; start)
+open import denotation.Events using (Timeline; From; fixed; fresh; start)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≼-trans)
-open import denotation.Laws.Cut using (ine-unpinned)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≼-trans; ≺→≼)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.Listing using (walkN; walkN-exact; listC; listC-ok; UncutEnv)
-open import quickcheck.Tabled.Exact.Base using (sound)
+open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
+open import simultaneous.ColdOrder using (walk-past; walk-nopin)
 open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
 open import simultaneous.TakeCut using (inst-⊕)
 
@@ -56,10 +55,6 @@ kindIn []             k = ks
 kindIn ((y , e) ∷ rs) k with y ≟ᵖ k
 ... | yes _ = kind e
 ... | no _  = kindIn rs k
-
--- A walk lists no pin.
-walk-nopin : ∀ {A} K (ev : Events A) {k r} → (k , pin r) ∈ walkN K ev → ⊥
-walk-nopin K ev x = ine-unpinned (proj₁ (sound (walkN-exact K ev) x))
 
 ------------------------------------------------------------------------
 -- The record
@@ -112,6 +107,9 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   bk′ : Pos → List Pos
   bk′ l = ψ⁻ l ∷ ψ⁻ (trim 2 l) ∷ ψ⁻ (trim 4 l) ∷ (p ⊕ [ last ]) ∷ []
 
+  walk-at : ∀ K s {k e} → (k , e) ∈ walkN K (start s m) → s ≼ k
+  walk-at K s {k} x = ≺→≼ {s} {k} (walk-past K s m x)
+
   postulate
     -- THE COLD'S WALK: the plain cuts, and the renaming onto the
     -- elaborated cold's.
@@ -120,7 +118,6 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     walk-kind  : ∀ {N k e} → (k , e) ∈ W N → kindIn (W N) k ≡ kind e
     walk-func  : ∀ {N k e e′} → (k , e) ∈ W N → (k , e′) ∈ W N → e ≡ e′
     walk-flat  : ∀ {N y e l ys e′} → (y , e) ∈ W N → (y ⊕ (l ∷ ys) , e′) ∈ W N → ⊥
-    walk-at    : ∀ K s {k e} → (k , e) ∈ walkN K (start s m) → s ≼ k
     walk-agree : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N → AgreeTo k (TR (P N′)) (TR (P N))
     walk-cons  : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
     walk-all   : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → I N ≡ I N′

@@ -9,24 +9,24 @@
 -- (`late`).
 module simultaneous.ColdOrder where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (true; false)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 
 open import denotation.Position using (Pos; Label; _∙_; _≟ⁱ_; _<ˡ_; ix; last; _⊕_; instant)
 open import denotation.Events using (<ᵖ-part; Events; From; start)
 import denotation.Events as Ev
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_; _≼_)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-assoc; ∙-inj)
 open import quickcheck.Tabled using (Row)
