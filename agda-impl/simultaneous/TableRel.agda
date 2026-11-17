@@ -487,12 +487,20 @@ rel-coh n (map f s)         ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ 
 rel-coh n (scan f z s)      ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
   rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′
 rel-coh n (takeWhile i q s) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  take-cong i q _ _ (rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
+  take-cong i q (Out.rel (rel n s ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (rel n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′))
+    (rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
 rel-coh n (flatMap op f s)  =
   flat-coh n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a)) (λ a → rel-coh n (f a)) (rel-coh n s)
 rel-coh n (connect s b)     = conn-coh n (plain s) (plain b) (rel n s) (rel n b) (rel-coh n s) (rel-coh n b)
 rel-coh n (connected i)     ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ = ee i n p p* a a′ a* a*′ al al′ lk lk′
 rel-coh zero    (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = refl
 rel-coh (suc n) (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  defer-cong p p* _ _ (rel-coh n (Later.force l) ρ uρ ρι ρ* uρ* E E′ ee (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
-    (admits-step (lw E) a) (admits-step (lw E′) a′) (admits-step (lw* E) a*) (admits-step (lw* E′) a*′) _ _ _ _)
+  defer-cong p p* (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E) a) (admits-step (lw* E) a*) al₁ lk₁))
+                  (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E′ (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E′) a′) (admits-step (lw* E′) a*′) al₁′ lk₁′))
+    (rel-coh n (Later.force l) ρ uρ ρι ρ* uρ* E E′ ee (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
+      (admits-step (lw E) a) (admits-step (lw E′) a′) (admits-step (lw* E) a*) (admits-step (lw* E′) a*′) al₁ al₁′ lk₁ lk₁′)
+  where
+    al₁  = aligned-⊕ {Ψ = maps E}  {ρ = ρ} al  (ix 1) (ix 1)
+    al₁′ = aligned-⊕ {Ψ = maps E′} {ρ = ρ} al′ (ix 1) (ix 1)
+    lk₁  = linked-r (linked-l lk  (ix 1)) (ix 1)
+    lk₁′ = linked-r (linked-l lk′ (ix 1)) (ix 1)
