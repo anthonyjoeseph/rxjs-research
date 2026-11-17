@@ -40,7 +40,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; module BoundedL; module Order)
+open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
@@ -482,22 +482,129 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; pin-in = cc-pin-in ; pin-in* = cc-pin-in* ; cons = cc-cons ; cons* = cc-cons* ; got = cc-got ; got* = cc-got*
         ; after = cc-after ; after* = cc-after* ; after-φ = cc-after-φ ; pin-after* = cc-pin-after* ; pin-stable = cc-pin-stable }
 
-  postulate
-    -- Every value's lane is subscribed under its row, and a lane's rows
-    -- are shown only before the next value's row: the cut is the source's
-    -- row, aligned by the source's facts at both rows.
-    flat-switch : Core switchᶠ
+    ----------------------------------------------------------------------
+    -- THE SWITCH: every value's lane subscribed under its row, its rows
+    -- shown only before the next value's row; the map is the merge's.
+    module SwitchTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
+      P′ Q′ : ℕ → _
+      P′ = P (switchᶠ)
+      Q′ = λ N → listC (3 + N) n (core (switchᶠ)) (ρ*c N) c₁
 
-    -- Every value's lane is subscribed under its row and shown only when
-    -- no earlier shown lane is live at that row: whether one is live is
-    -- read off the lanes' ends, aligned by the lanes' own records.
-    flat-exhaust : Core exhaustᶠ
+      open Tabs (λ N → L.map (valRec N) (valsAt N))
+
+      postulate
+        sw-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+        sw-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+        sw-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+        sw-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+        sw-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                       → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        sw-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+        sw-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+        sw-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        sw-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        sw-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                       → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+        sw-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sw-corr N) k
+                       → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        sw-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+        sw-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+        sw-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+        sw-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        sw-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        sw-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+        sw-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+        sw-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+        sw-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+        sw-got         : ∀ N → Got (P′ N)
+        sw-got*        : ∀ N → Got (Q′ N)
+        sw-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+        sw-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
+        sw-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
+        sw-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₁ ≼ r
+        sw-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                       → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      rel′ : Rel P′ Q′ p c₁
+      rel′ = record
+        { φ = φ′ ; Put = Put′ ; corr = sw-corr ; φ-agree = sw-φ-agree ; bk = bk′ ; in-bk = sw-in-bk ; pb-few = sw-pb-few
+        ; back = sw-back ; put-up = sw-put-up ; back-put = sw-back-put
+        ; elab-causal = sw-elab-causal ; stable← = sw-stable← ; stable-put = sw-stable-put ; stable-lead = sw-stable-lead
+        ; elab-all = sw-elab-all ; func = sw-func ; func* = sw-func* ; flat = sw-flat ; flat* = sw-flat*
+        ; pin-in = sw-pin-in ; pin-in* = sw-pin-in* ; cons = sw-cons ; cons* = sw-cons* ; got = sw-got ; got* = sw-got*
+        ; after = sw-after ; after* = sw-after* ; after-φ = sw-after-φ ; pin-after* = sw-pin-after* ; pin-stable = sw-pin-stable }
+
+    ----------------------------------------------------------------------
+    -- THE EXHAUST: the lanes the plain exhaust runs, each subscribed under
+    -- its value's row; the map is the merge's over those lanes.
+    module ExhaustTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
+      P′ Q′ : ℕ → _
+      P′ = P (exhaustᶠ)
+      Q′ = λ N → listC (3 + N) n (core (exhaustᶠ)) (ρ*c N) c₁
+
+      -- The values whose lane the plain exhaust runs.
+      ranAt : ℕ → List Pos
+      ranAt N with S N
+      ... | nothing = []
+      ... | just o with Tb.lanes (afterL (λ a → listC (3 + N) n (f a) (ρ N))) (values (rows o))
+      ...   | nothing = []
+      ...   | just ls = ExhaustL.runs o ls
+
+      open Tabs (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
+
+      postulate
+        ex-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+        ex-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+        ex-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+        ex-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+        ex-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                       → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        ex-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+        ex-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+        ex-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        ex-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                       → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+        ex-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                       → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+        ex-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (ex-corr N) k
+                       → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+        ex-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+        ex-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+        ex-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+        ex-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        ex-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+        ex-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+        ex-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+        ex-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+        ex-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+        ex-got         : ∀ N → Got (P′ N)
+        ex-got*        : ∀ N → Got (Q′ N)
+        ex-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+        ex-after*      : ∀ {N l e} → TR (Q′ N) l e → c₁ ≼ l
+        ex-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
+        ex-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₁ ≼ r
+        ex-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                       → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                       → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      rel′ : Rel P′ Q′ p c₁
+      rel′ = record
+        { φ = φ′ ; Put = Put′ ; corr = ex-corr ; φ-agree = ex-φ-agree ; bk = bk′ ; in-bk = ex-in-bk ; pb-few = ex-pb-few
+        ; back = ex-back ; put-up = ex-put-up ; back-put = ex-back-put
+        ; elab-causal = ex-elab-causal ; stable← = ex-stable← ; stable-put = ex-stable-put ; stable-lead = ex-stable-lead
+        ; elab-all = ex-elab-all ; func = ex-func ; func* = ex-func* ; flat = ex-flat ; flat* = ex-flat*
+        ; pin-in = ex-pin-in ; pin-in* = ex-pin-in* ; cons = ex-cons ; cons* = ex-cons* ; got = ex-got ; got* = ex-got*
+        ; after = ex-after ; after* = ex-after* ; after-φ = ex-after-φ ; pin-after* = ex-pin-after* ; pin-stable = ex-pin-stable }
 
   flat-core : ∀ op → Core op
   flat-core (mergeᶠ nothing)  = λ Os Ls al lk → Parts.MergeTab.rel′ Os Ls al lk
   flat-core (mergeᶠ (just k)) = λ Os Ls al lk → Parts.ConcatTab.rel′ Os Ls k al lk
-  flat-core switchᶠ           = flat-switch
-  flat-core exhaustᶠ          = flat-exhaust
+  flat-core switchᶠ           = λ Os Ls al lk → Parts.SwitchTab.rel′ Os Ls al lk
+  flat-core exhaustᶠ          = λ Os Ls al lk → Parts.ExhaustTab.rel′ Os Ls al lk
 
   postulate
     -- THE COMBINED SCAN: the lanes' flatMap read through its hot by the

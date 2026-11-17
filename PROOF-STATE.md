@@ -34,12 +34,38 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLATMAP'S LAYERS
 
-The merges are written (`MergeTab`, `ConcatTab`). Untried: switch and
-exhaust, whose lanes are cut short; then the layers past the lanes'
-flatMap. Settled by the two bodies.
+Each operator's lanes' flatMap is written (`MergeTab`, `ConcatTab`,
+`SwitchTab`, `ExhaustTab`). Untried: the layers past it, the combined
+scan, the closer and the share. Settled by bodies.
 
-Members: `flat-switch`, `flat-exhaust`,
-`flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+Members: `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+
+#### THE SWITCH
+
+The switch's record is the merge's map over every value's lane. Untried:
+a cut lane's rows unshown alike, its pins kept alike, its end shown at
+the same `done`. Settled by bodies, or a lane cut at one side's row only.
+
+Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-pb-few`, `sw-back`,
+`sw-put-up`, `sw-back-put`, `sw-elab-causal`, `sw-stable←`,
+`sw-stable-put`, `sw-stable-lead`, `sw-elab-all`, `sw-func`, `sw-func*`,
+`sw-flat`, `sw-flat*`, `sw-pin-in`, `sw-pin-in*`, `sw-cons`, `sw-cons*`,
+`sw-got`, `sw-got*`, `sw-after`, `sw-after*`, `sw-after-φ`,
+`sw-pin-after*`, `sw-pin-stable`.
+
+#### THE EXHAUST
+
+The exhaust's record is the merge's map over the lanes the plain
+exhaust runs. Untried: the elaborated exhaust runs the same lanes,
+though its lanes end at their end images. Settled by bodies, or a value
+run on one side only.
+
+Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-pb-few`, `ex-back`,
+`ex-put-up`, `ex-back-put`, `ex-elab-causal`, `ex-stable←`,
+`ex-stable-put`, `ex-stable-lead`, `ex-elab-all`, `ex-func`, `ex-func*`,
+`ex-flat`, `ex-flat*`, `ex-pin-in`, `ex-pin-in*`, `ex-cons`, `ex-cons*`,
+`ex-got`, `ex-got*`, `ex-after`, `ex-after*`, `ex-after-φ`,
+`ex-pin-after*`, `ex-pin-stable`.
 
 #### THE BOUNDED MERGE
 
