@@ -34,15 +34,35 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-The rewrite, finished before any other proof work: the cold leaf and
-the batcher's plumbing each have their own record. Every record, `flat-rel`'s and
-`conn-rel`'s too, owes coherence, run-shaped tables, cuts truncated
-before they differ (`cons`) and rows past the subscription (`after`).
-Untried: the cold leaf's map renames the creator in an async instant.
-Settled when each is a body.
+The rewrite, finished before any other proof work: the batcher's
+plumbing has its own record, owing coherence, run-shaped tables, cuts
+truncated before they differ (`cons`) and rows past the subscription
+(`after`). Settled when it is a body.
 
-Members: `cold-rel`,
-`top-rel`.
+Members: `top-rel`.
+
+#### THE COLD'S PLUMBING
+
+The rewrite: the elaborated cold's table read off the cold's own rows.
+Untried: every row not an image is unshown and in the subscribe burst
+or an async row's instant; a longer cut changes nothing up to an
+image; cuts are truncated before they differ. Settled by bodies, or a
+cold whose elaborated table breaks one.
+
+Members: `cold-bwd`, `cold-causal`, `cold-cons`, `cold-same`,
+`cold-fwd`, `cold-func*`, `cold-flat*`, `cold-pin*`, `cold-after*`,
+`cold-got*`.
+
+#### THE COLD'S WALK
+
+The rewrite: the plain cold's cuts, renamed onto the elaborated
+cold's, keep order, instants and kinds. Untried; each is about one
+walk of one timeline. Settled by bodies.
+
+Members: `walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`,
+`walk-flat`, `walk-pin`, `walk-after`, `walk-agree`, `walk-cons`,
+`walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
+`φ-back`.
 
 #### THE TAKE'S LATE PINS
 
