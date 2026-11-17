@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; keys; in-keys; tr-few; ends; m-back; m-val; m-ee)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; keys; in-keys; tr-few; ends; m-back; m-val; m-ee; got-bind)
 open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; sh-map→; sh-map←; sh-of; ag-map; func-map; flat-map; pin-in-map)
 open import simultaneous.TableTake using (ex-just)
 
@@ -455,14 +455,14 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
 
     PinAt′ : Pos → Pos → Set
     PinAt′ k p = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × R.Put N k l
-                   × (∀ {k₀ e₀} → TR (P′ N) k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p))
+                   × (∀ {k₀ b} → TR (P′ N) k₀ (out b) → φ k₀ ≺ p′ → k₀ ≺ p))
                × Homed′ k
 
     pin→′ : ∀ {k p} → TR (P′ N) k (pin p) → Live (TR (P′ N)) k → PinAt′ k p
     pin→′ x lv with tr-scan→ f z (P N) x
     ... | spin xp with C.pin→ xp (λ xe → lv (tr-scan← f z (P N) (send xe)))
     ...   | (l , p′ , y , pl , past) , h =
-      (l , p′ , q′← (spin y) , pl , λ x′ un′ lt → let (_ , x₀ , u₀) = back-row x′ un′ in past x₀ u₀ lt) , homed→ h
+      (l , p′ , q′← (spin y) , pl , λ x′ lt → past (proj₂ (acc-val (sval-inv f z (tr-scan→ f z (P N) x′)))) lt) , homed→ h
 
     put-before′ : ∀ {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ k′
     put-before′ x pl x′ un′ lt with tr-scan→ f z (P N) x
@@ -563,7 +563,12 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; pin-in = λ {N} x → pin-sc (tr-scan→ f z (P N) x) R.pin-in
     ; pin-in* = λ {N} → pin-in-map proj₂ (S* N) λ x → pin-sc (tr-scan→ (scanIE f) z* (Q N) x) R.pin-in*
     ; cons = cons′
-    ; cons* = cons*′ }
+    ; cons* = cons*′
+    ; got = λ N → got-bind (scanRows f z) (R.got N)
+    ; got* = λ N → got-bind (Tb.mapRows proj₂) (got-bind (scanRows (scanIE f) z*) (R.got* N))
+    ; after = λ {N} x → R.after (proj₂ (row-of f z (tr-scan→ f z (P N) x)))
+    ; after* = λ {N} y → R.after* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y)))))
+    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀ }
     where
       pin-sc : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → (∀ {l r} → t l (pin r) → T (inside r l)) → T (inside r l)
       pin-sc (spin x) pi = pi x
