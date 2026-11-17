@@ -160,6 +160,12 @@ module _ {X : Set} (i : Bool) (keep : X → Bool) where
   ... | yes (y , _ , l , _) = φ y ⊕ [ l ]
   ... | no _ = φ w
 
+  -- Children mapping alike, moved alike.
+  moved-cong : ∀ {φ φ′ : Pos → Pos} m → (∀ w → φ w ≡ φ′ w) → ∀ w → moved φ m w ≡ moved φ′ m w
+  moved-cong m e w with under? m w
+  ... | yes (y , _ , l , _) = cong (_⊕ [ l ]) (e y)
+  ... | no _ = e w
+
   moved-old : ∀ φ m → (∀ {y e l ys e′} → TR m y e → TR m (y ⊕ (l ∷ ys)) e′ → ⊥) → ∀ {k e} → TR m k e → moved φ m k ≡ φ k
   moved-old φ m fl {k} x with under? m k
   ... | yes (y , _ , l , xy , _ , _ , refl) = ⊥-elim (fl xy x)
@@ -527,3 +533,8 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
 take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
          → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
 take-tab i q R = TakeTab.rel′ i q R
+
+-- Children mapping alike, taken alike.
+take-cong : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} (R R′ : Rel P Q s s*)
+          → (∀ N y → Rel.φ R N y ≡ Rel.φ R′ N y) → ∀ N y → Rel.φ (take-tab i q R) N y ≡ Rel.φ (take-tab i q R′) N y
+take-cong i q {P} R R′ e N = moved-cong i q (P N) (e N)

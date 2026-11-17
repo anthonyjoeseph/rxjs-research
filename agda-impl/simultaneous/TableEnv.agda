@@ -538,11 +538,12 @@ env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i n p p* a a*
   (λ i n p p* a a′ a* a*′ al al′ lk lk′ → hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
   (λ N i → unended env N i)
 
--- One environment weakened by two records of one hot: its hots map alike.
+-- Two environments whose hots map alike, weakened by two records of one
+-- hot: their hots map alike.
 env-wk-eq : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
-          → (h h′ : HotD t) (env : EnvR ρ ρι ρ*) → EnvEq (env-wk h env) (env-wk h′ env)
-env-wk-eq h h′ env i n p p* a a′ a* a*′ al al′ lk lk′ =
-  hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h′ (lw* env) a*′) al al′ lk lk′
+          → (h h′ : HotD t) {E E′ : EnvR ρ ρι ρ*} → EnvEq E E′ → EnvEq (env-wk h E) (env-wk h′ E′)
+env-wk-eq h h′ {E} {E′} ee i n p p* a a′ a* a*′ al al′ lk lk′ =
+  ee i n p p* a a′ (admits-wk h (lw* E) a*) (admits-wk h′ (lw* E′) a*′) al al′ lk lk′
 
 -- An elaborated connect's hot ends no lane, wherever its scope's hots end none.
 listHot-u : ∀ {Γ Δ X} n {ρι : Ren Γ Δ} (s : Obs Timeline Γ X) {ρ* : ℕ → All Tb.Listed Δ} (u : ∀ N → UncutEnv (ρ* N)) (D : DenOf ρ*) c a

@@ -127,6 +127,19 @@ module _ {X : Set} (q : Pos) where
 ------------------------------------------------------------------------
 -- The record, guarded
 
+-- A guard's map over its child's: the guard on its image, any other row
+-- along the child's.
+guardφ : Pos → Pos → (Pos → Pos) → Pos → Pos
+guardφ g g* ψ k with k ≟ᵖ g
+... | yes _ = g*
+... | no _  = ψ k
+
+-- Children mapping alike, guarded alike.
+guardφ-cong : ∀ g g* {ψ ψ′ : Pos → Pos} → (∀ k → ψ k ≡ ψ′ k) → ∀ k → guardφ g g* ψ k ≡ guardφ g g* ψ′ k
+guardφ-cong g g* e k with k ≟ᵖ g
+... | yes _ = refl
+... | no _  = e k
+
 module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))}
   (R : Rel P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])) where
 
@@ -172,9 +185,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
 
   -- The map: the guard on the guard, the child's rows on their images.
   φ′ : ℕ → Pos → Pos
-  φ′ N k with k ≟ᵖ g
-  ... | yes _ = g*
-  ... | no _  = R.φ N k
+  φ′ N = guardφ g g* (R.φ N)
 
   φ-g : ∀ {N} → φ′ N g ≡ g*
   φ-g with g ≟ᵖ g
@@ -462,3 +473,8 @@ defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]
           → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
                 (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*
 defer-tab p p* R = DeferTab.rel′ p p* R
+
+-- Children mapping alike, deferred alike.
+defer-cong : ∀ {A} p p* {P Q} (R R′ : Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]))
+           → (∀ N y → Rel.φ R N y ≡ Rel.φ R′ N y) → ∀ N y → Rel.φ (defer-tab p p* R) N y ≡ Rel.φ (defer-tab p p* R′) N y
+defer-cong p p* R R′ e N = guardφ-cong (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (e N)

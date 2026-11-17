@@ -18,7 +18,7 @@ import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (Obs; FlatOp; flatMap)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
@@ -32,12 +32,13 @@ open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; env-wk; env-wk-eq; Full; Coh; Admits; admits-trig; tab-func; tab-flat)
+  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; admits-trig; tab-func; tab-flat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
-open import simultaneous.TableFlat using (module Flat; in-if; max-ge; ≼-ˡ; any-≟)
+open import simultaneous.TableFlat using (module Flat; in-if; max-ge; ≼-ˡ; any-≟; if-≡)
 open import simultaneous.TableJoin using (module Joiners)
+open import simultaneous.TableCoh using (module Two)
 
 module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
@@ -327,24 +328,77 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- earlier pair that cuts the flatMap alike.
     flatmap-order : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) → Rest (maps env) ρ (flat-tab op Os Ls Lc al lk)
 
+-- THE FLATMAP'S PARTS: its source's record, under the trigger's hot, and
+-- each lane's, under the hots the lane's elaboration subscribes.
+module FlatRel {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+  (Fs : Full n s) (Ff : ∀ a → Full n (f a)) (Ffc : ∀ a → Coh n (f a) (Ff a))
+  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
+  (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
+  module F = Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
+  module G = Layers n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
+
+  path : List Label
+  path = ix 1 ∷ ix 0 ∷ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ∷ ix 1 ∷ []
+
+  Os : F.Src
+  Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.ttD env) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)
+         (aligned-r* {Ψ = maps env} {ρ = ρ} al path) (linked-r* lk path)
+
+  Ls : F.Lanes
+  Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+
+  Lc : F.LanesCoh Ls
+  Lc a t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₃ h₄ =
+    Ffc a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E₄) (env-wk h₁′ E₄) (env-wk-eq h₁ h₁′ {E₄} {E₄} (hot-coh E₄))
+    where E₄ = env-wk h₂ (env-wk h₃ (env-wk h₄ env))
+
+  -- The lanes' flatMap's record.
+  Rc : Rel (F.Pd op) (λ N → listC (3 + N) n (F.core op) (F.ρ*c N) F.c₁) p F.c₁
+  Rc = Joiners.flat-core n f s ρ uρ ρι ρ* uρ* env p p* ad ad* op Os Ls Lc al lk
+
 flat-rel : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
          → Full n s → (Ff : ∀ a → Full n (f a)) → (∀ a → Coh n (f a) (Ff a)) → Full n (flatMap op f s)
 flat-rel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab op Os Ls Lc al lk ⊢ G.flatmap-order op Os Ls Lc al lk
+  where open FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk
+
+-- THE LANES' MAP IS THE SUBSCRIPTIONS': two environments whose hots map
+-- alike give the lanes' flatMap one map, the source's map alike by the
+-- source's coherence and each lane's by the lane's.
+core-coh : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+           (Fs : Full n s) (Ff : ∀ a → Full n (f a)) (Ffc : ∀ a → Coh n (f a) (Ff a)) → Coh n s Fs
+         → ∀ (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ* (E E′ : EnvR ρ ρι ρ*) → EnvEq E E′
+         → ∀ p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
+             (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
+         → Rel.φ (FlatRel.Rc n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E p p* a a* al lk) N y
+           ≡ Rel.φ (FlatRel.Rc n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′) N y
+core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
+  Two.joiners-coh n f s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Os X′.Os X.Ls X′.Ls X.Lc X′.Lc os≡ ls≡ op al al′ lk lk′
   where
-    module F = Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
-    module G = Layers n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
+    module X  = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
+    module X′ = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′
+    os≡ : ∀ N y → Rel.φ (Out.rel X.Os) N y ≡ Rel.φ (Out.rel X′.Os) N y
+    os≡ = cs ρ uρ (wk ρι) X.F.ρ*s X.F.uρ*s (env-wk X.F.ttD E) (env-wk X′.F.ttD E′) (env-wk-eq X.F.ttD X′.F.ttD {E} {E′} ee) p X.F.sp* a a′
+             (admits-trig n uρ* (lw* E) p* a*) (admits-trig n uρ* (lw* E′) p* a*′)
+             (aligned-r* {Ψ = maps E} {ρ = ρ} al X.path) (aligned-r* {Ψ = maps E′} {ρ = ρ} al′ X.path) (linked-r* lk X.path) (linked-r* lk′ X.path)
+    ls≡ : Two.LanesX n f s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Ls X′.Ls
+    ls≡ b t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₂′ h₃ h₃′ h₄ h₄′ =
+      Ffc b ρ uρ X.F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E₂) (env-wk h₁′ E₂′)
+          (env-wk-eq h₁ h₁′ {E₂} {E₂′} (env-wk-eq h₂ h₂′ {E₃} {E₃′} (env-wk-eq h₃ h₃′ {E₄} {E₄′} (env-wk-eq h₄ h₄′ {E} {E′} ee))))
+      where
+        E₄  = env-wk h₄ E
+        E₄′ = env-wk h₄′ E′
+        E₃  = env-wk h₃ E₄
+        E₃′ = env-wk h₃′ E₄′
+        E₂  = env-wk h₂ E₃
+        E₂′ = env-wk h₂′ E₃′
 
-    path : List Label
-    path = ix 1 ∷ ix 0 ∷ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ∷ ix 1 ∷ []
-
-    Os : F.Src
-    Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.ttD env) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)
-           (aligned-r* {Ψ = maps env} {ρ = ρ} al path) (linked-r* lk path)
-
-    Ls : F.Lanes
-    Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
-
-    Lc : F.LanesCoh Ls
-    Lc a t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₃ h₄ =
-      Ffc a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E) (env-wk h₁′ E) (env-wk-eq h₁ h₁′ E)
-      where E = env-wk h₂ (env-wk h₃ (env-wk h₄ env))
+-- A flatMap's map is its lanes' flatMap's, re-emitted by the combined
+-- scan: coherent where the lanes' flatMap is.
+flat-coh : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+           (Fs : Full n s) (Ff : ∀ a → Full n (f a)) (Ffc : ∀ a → Coh n (f a) (Ff a))
+         → Coh n s Fs → Coh n (flatMap op f s) (flat-rel n op f s Fs Ff Ffc)
+flat-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
+  if-≡ {b = X.F.endAt (X.G.CombTab.P′ op X.Rc N) y} {b′ = X.F.endAt (X′.G.CombTab.P′ op X′.Rc N) y} refl (λ _ → refl)
+    (λ _ → cong (X.G.CombTab.reEmit op X.Rc) (core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y))
+  where module X  = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
+        module X′ = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′

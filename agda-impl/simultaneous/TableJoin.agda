@@ -52,9 +52,31 @@ open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Cut using (capprox)
 open import quickcheck.Tabled.Exact.Base using (complete)
 open import simultaneous.Listing using (listC-exact)
-open import simultaneous.TableFlat using (module Flat)
+open import simultaneous.TableFlat using (module Flat; module Vals)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
+
+-- What the plain joiners run, the same in every environment.
+module Runs {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p : Pos) where
+  open Vals n s ρ p using (S)
+
+  -- The bounded merge's entries at a cut: each value with its
+  -- subscriptions.
+  entriesAt : ℕ → ∀ N → List (ℕ × Pos × A × List (Pos × Tb.Listed B))
+  entriesAt k N with S N
+  ... | nothing = []
+  ... | just o with BoundedL.levels k (afterL (λ a → listC (3 + N) n (f a) (ρ N))) o
+                      (L.length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)
+  ...   | nothing = []
+  ...   | just gs = gs
+
+  -- The values whose lane the plain exhaust runs.
+  ranAt : ℕ → List Pos
+  ranAt N with S N
+  ... | nothing = []
+  ... | just o with Tb.lanes (afterL (λ a → listC (3 + N) n (f a) (ρ N))) (values (rows o))
+  ...   | nothing = []
+  ...   | just ls = ExhaustL.runs o ls
 
 module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
@@ -205,24 +227,20 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = Pd (mergeᶠ (just k))
       Q′ = λ N → listC (3 + N) n (core (mergeᶠ (just k))) (ρ*c N) c₁
 
-      -- The listing's entries at a cut: each value with its subscriptions.
       entriesAt : ∀ N → List (ℕ × Pos × A × List (Pos × Tb.Listed B))
-      entriesAt N with S N
-      ... | nothing = []
-      ... | just o with BoundedL.levels k (afterL (λ a → listC (3 + N) n (f a) (ρ N))) o
-                          (L.length (values (rows o))) 0 [] (Order.nths (values (rows o)) 0)
-      ...   | nothing = []
-      ...   | just gs = gs
+      entriesAt = Runs.entriesAt n f s ρ p k
+
+      -- A subscription's lane: its value's, under the value's row, or a
+      -- queued one, under the end of the lane it waited on.
+      one : ∀ N → Pos → A → List (LaneRec N) → Pos × Tb.Listed B → List (LaneRec N)
+      one N q a acc (st , _) = if does (st ≟ᵖ (q ⊕ [ ix 1 ]))
+                               then maybe (λ v → [ valRec N v ]) [] (valAtPos N q)
+                               else maybe (λ { (R , cx) → [ queuedRec N R cx a ] }) [] (waitedOn acc (up st))
 
       -- Each entry's lanes, after those of the levels before.
       recs : ∀ N → List (ℕ × Pos × A × List (Pos × Tb.Listed B)) → List (LaneRec N) → List (LaneRec N)
       recs N []                       acc = acc
-      recs N ((_ , q , a , ss) ∷ es) acc = recs N es (acc ++ L.concatMap one ss)
-        where
-          one : Pos × Tb.Listed B → List (LaneRec N)
-          one (st , _) = if does (st ≟ᵖ (q ⊕ [ ix 1 ]))
-                         then maybe (λ v → [ valRec N v ]) [] (valAtPos N q)
-                         else maybe (λ { (R , cx) → [ queuedRec N R cx a ] }) [] (waitedOn acc (up st))
+      recs N ((_ , q , a , ss) ∷ es) acc = recs N es (acc ++ L.concatMap (one N q a acc) ss)
 
       open Tabs (mergeᶠ (just k)) (λ N → recs N (entriesAt N) [])
 
@@ -402,13 +420,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = Pd (exhaustᶠ)
       Q′ = λ N → listC (3 + N) n (core (exhaustᶠ)) (ρ*c N) c₁
 
-      -- The values whose lane the plain exhaust runs.
       ranAt : ℕ → List Pos
-      ranAt N with S N
-      ... | nothing = []
-      ... | just o with Tb.lanes (afterL (λ a → listC (3 + N) n (f a) (ρ N))) (values (rows o))
-      ...   | nothing = []
-      ...   | just ls = ExhaustL.runs o ls
+      ranAt = Runs.ranAt n f s ρ p
 
       open Tabs exhaustᶠ (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
 
