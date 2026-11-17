@@ -28,7 +28,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
-open import denotation.Events using (Timeline; From; fixed; fresh)
+open import denotation.Events using (Timeline; fresh)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
@@ -39,6 +39,7 @@ open import simultaneous.TableScan using (scan-tab)
 open import simultaneous.TableDefer using (defer-tab)
 open import simultaneous.TableSpin using (spin-tab)
 open import simultaneous.TableOf using (of-tab)
+open import simultaneous.TableCold using (cold-tab)
 open import simultaneous.InstEmit using (instEmit; value)
 open import Relation.Binary.PropositionalEquality using (refl)
 
@@ -74,14 +75,9 @@ Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ 
 -- Each former's case
 
 postulate
-  -- THE LEAVES.  An author's cold only: a `fresh` cold emits the
-  -- position it is subscribed at, and its elaboration is subscribed
-  -- deeper, so no map matches its value to the plain one.
-  -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over the tables for its former's case.
-  cold-rel : ∀ {Γ A} n (m : From A 0) → Full {Γ} n (cold (fixed m))
-
   -- THE TWO FORMERS WITH CONTENT, over their children's records in
   -- every environment.
+  -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over the tables for its former's case.
   flat-rel  : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             → Full n s → (∀ a → Full n (f a)) → Full n (flatMap op f s)
   conn-rel  : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
@@ -93,9 +89,12 @@ postulate
             → Rel (Tab n o (λ _ → []) root) (Tab* n (λ i → i) o (λ _ → []) (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
             → Rel (Tab n o (λ _ → []) root) (λ N → listC (3 + N) n (elaborate o) [] root) root root
 
--- EVERY AUTHOR SUBTERM'S CUTS CORRESPOND.
+-- EVERY AUTHOR SUBTERM'S CUTS CORRESPOND.  An author's cold only: a
+-- `fresh` cold emits the position it is subscribed at, and its
+-- elaboration is subscribed deeper, so no map matches its value to the
+-- plain one.
 rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
-rel n (cold (fixedˢ m)) = cold-rel n m
+rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* = cold-tab m n ρ* p p*
 rel n empty             ρ uρ ρι ρ* uρ* env p p* = of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* = of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* = map-tab f (rel n s ρ uρ ρι ρ* uρ* env p p*)
