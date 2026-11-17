@@ -1,4 +1,4 @@
-.PHONY: all help agda gate gate-cheap bug-cache entry-check cursor-check table-check spec-check spec-check-selftest oracle oracle-build bg bg-check bg-wait \
+.PHONY: all help agda gate gate-cheap bug-cache spec-check spec-check-selftest oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
         roadmap-check roadmap-selftest find find-prose postulates notify split \
@@ -40,9 +40,6 @@ help:
 	@echo "  agda          typecheck $(SRC)/Main.agda — everything Main reaches"
 	@echo "  check         typecheck one module and what IT imports:  make check F=simultaneous/Statement.agda"
 	@echo "  bug-cache     compile the bug cache's runner and run every row"
-	@echo "  entry-check   probe: every node's reading stays inside its entry (CI only)"
-	@echo "  cursor-check  probe: every live node owes its entry past one cursor (CI only)"
-	@echo "  table-check   probe: each subterm's tables correspond to its elaboration's (CI only)"
 	@echo "  spec-check    the simultaneous spec, decided per seed over the elaboration (CI only)"
 	@echo "  spec-check-selftest  every statement's sabotage is caught (CI only)"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
@@ -128,64 +125,6 @@ bug-cache: $(BUG_CACHE_BIN)
 	  if echo "$$out" | grep -q '^bug-cache: FAIL '; then \
 	    echo "bug-cache: RED — a known counterexample still fails"; exit 1; fi; \
 	  echo "bug-cache: GREEN"
-
-# THE SETTLED-ENTRY PROBE: every node's reading, at every settled step of
-# the pure run, inside the reading it entered with.  A probe gathering
-# evidence for a design question, run in CI only, never in the gate.
-ENTRY_BIN := $(SRC)/_cli/Entry-Check
-
-$(ENTRY_BIN): $(AGDA_SRC)
-	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Entry-Check.agda
-	@touch $@
-
-entry-check: $(ENTRY_BIN)
-	@out=$$($(ENTRY_BIN)); echo "$$out"; \
-	  echo "$$out" | grep -q '^entry-check: done ' \
-	    || { echo "entry-check: RED — the probe never reached its closing line"; exit 1; }; \
-	  if echo "$$out" | grep -q '^entry-check: FAIL '; then \
-	    echo "entry-check: RED — a reading grew past its entry"; exit 1; fi; \
-	  echo "entry-check: GREEN"
-
-# THE CURSOR PROBE: every live node, at every settled step of the pure
-# run, has delivered exactly its entry's rows up to the latest position
-# delivered, and that position never runs back.  A probe gathering
-# evidence for a design question, run in CI only, never in the gate.
-CURSOR_BIN := $(SRC)/_cli/Cursor-Check
-
-$(CURSOR_BIN): $(AGDA_SRC)
-	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Cursor-Check.agda
-	@touch $@
-
-cursor-check: $(CURSOR_BIN)
-	@out=$$($(CURSOR_BIN)); echo "$$out"; \
-	  echo "$$out" | grep -q '^cursor-check: done ' \
-	    || { echo "cursor-check: RED — the probe never reached its closing line"; exit 1; }; \
-	  if echo "$$out" | grep -q '^cursor-check: FAIL '; then \
-	    echo "cursor-check: RED — a node strayed from its entry past the cursor"; exit 1; fi; \
-	  echo "cursor-check: GREEN"
-
-# THE TABLE PROBE: each subterm's plain table against its elaboration's,
-# at the positions `simultaneous.TableRel.rel` pairs them, over the map
-# read off the visible rows.  A probe gathering evidence for a design
-# question, run in CI only, never in the gate.
-TABLE_BIN := $(SRC)/_cli/Table-Check
-
-$(TABLE_BIN): $(AGDA_SRC)
-	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Table-Check.agda
-	@touch $@
-
-TABLE_LOG := $(SRC)/_cli/table-check.log
-
-# The probe's lines reach the job's log as they come, so a run the job's
-# timeout cuts short still shows how far it got.  Its verdict is read off
-# the log, so the pipe's status is not consulted.
-table-check: $(TABLE_BIN)
-	@$(TABLE_BIN) | tee $(TABLE_LOG); \
-	  grep -q '^table-check: done ' $(TABLE_LOG) \
-	    || { echo "table-check: RED — the probe never reached its closing line"; exit 1; }; \
-	  if grep -q '^table-check: FAIL ' $(TABLE_LOG); then \
-	    echo "table-check: RED — a subterm's tables do not correspond"; exit 1; fi; \
-	  echo "table-check: GREEN"
 
 # THE SIMULTANEOUS SPEC, TESTED: `left-to-right`, `coherent` and `batchable`
 # decided per seed over the elaboration (quickcheck/Spec-Check.agda).  One

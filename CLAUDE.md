@@ -105,6 +105,7 @@ Each cost real time at least once, and they share a shape: **Agda reports them a
 Datatypes, primitives and end goals first; link with postulates; top-line results stated and typechecking *in terms of postulates*; only then chip away, one at a time.
 
 - **A Σ-receipt has content only through its witness.** If every conjunct is upward-closed in the witness, the statement is vacuously satisfiable — check BEFORE grinding. Pin the witness to the one the consumers bound, or put the bound in as a conjunct. A face of this development was machine-refuted as vacuous by exactly this shape.
+- **No probes (Anthony).** Unsure a definition is right → try to prove it; the attempt settles it. Don't build a QuickCheck/CI probe first.
 - **Recursively: never prove pieces before their assembly exists.** State the assembly with the pieces as postulates, make it typecheck, then prove pieces starting with the MOST UNCERTAIN. Pieces proven ahead of their assembly are speculative inventory, and their sunk cost biases the design toward keeping them.
 
 ## SEARCH FIRST — assume it already exists
@@ -139,7 +140,7 @@ Every definition used somewhere; only the top-level exports are exempt. No back-
 Per tier: a one-line description (≤150 chars), then a **ledger** of GROUPS. No rules in the file — they live here.
 
 - **A group = postulates sharing one design issue:** an undecided invariant, or a fact suspected false. Block: the issue, what would settle it, then its member names. Every live postulate in exactly one group (`make roadmap-check`).
-- **Ranked riskiest first, by judgement.** Untried outranks probed; refutations and dead routes raise risk. Re-rank freely.
+- **Ranked riskiest first, by judgement.** Untried outranks attempted; refutations and dead routes raise risk. Re-rank freely.
 - **A group's issue says only what is still open.** As the top group narrows, rewrite its issue and settle test smaller; findings go to source headers.
 - **The only work is the top group of the lowest open tier.** Carve-out: answering a design question.
 - Names, never numbers. No history — a settled group is deleted, git holds it. Research in source headers.
