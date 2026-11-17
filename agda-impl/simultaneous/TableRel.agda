@@ -38,6 +38,9 @@ open import simultaneous.TableTake using (take-tab)
 open import simultaneous.TableScan using (scan-tab)
 open import simultaneous.TableDefer using (defer-tab)
 open import simultaneous.TableSpin using (spin-tab)
+open import simultaneous.TableOf using (of-tab)
+open import simultaneous.InstEmit using (instEmit; value)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate)
 
@@ -74,8 +77,6 @@ postulate
   -- THE LEAVES.
   -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over the tables for its former's case.
   cold-rel : ∀ {Γ A} n (c : Timeline A) → Full {Γ} n (cold c)
-  empty-rel : ∀ {Γ A} n → Full {Γ} {A} n empty
-  of-rel    : ∀ {Γ A} n (xs : List A) → Full {Γ} n (of xs)
 
   -- THE TWO FORMERS WITH CONTENT, over their children's records in
   -- every environment.
@@ -93,8 +94,8 @@ postulate
 -- EVERY SUBTERM'S CUTS CORRESPOND.
 rel : ∀ {Γ A} n (o : Obs Timeline Γ A) → Full n o
 rel n (cold c)          = cold-rel n c
-rel n empty             = empty-rel n
-rel n (of xs)           = of-rel n xs
+rel n empty             ρ uρ ρι ρ* uρ* env p p* = of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*
+rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* = of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* = map-tab f (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (scan f z s)      ρ uρ ρι ρ* uρ* env p p* = scan-tab f z (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (takeWhile i q s) ρ uρ ρι ρ* uρ* env p p* = take-tab i q (rel n s ρ uρ ρι ρ* uρ* env p p*)

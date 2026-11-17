@@ -34,14 +34,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE TABLES
 
-The rewrite, finished before any other proof work: each leaf and the
-batcher's plumbing has its own record. Every record, `flat-rel`'s and
+The rewrite, finished before any other proof work: the cold leaf and
+the batcher's plumbing each have their own record. Every record, `flat-rel`'s and
 `conn-rel`'s too, owes coherence, run-shaped tables, cuts truncated
 before they differ (`cons`) and rows past the subscription (`after`).
-Untried: the leaves' maps rename the creator in an async instant.
+Untried: the cold leaf's map renames the creator in an async instant.
 Settled when each is a body.
 
-Members: `empty-rel`, `of-rel`, `cold-rel`,
+Members: `cold-rel`,
 `top-rel`.
 
 #### THE TAKE'S LATE PINS

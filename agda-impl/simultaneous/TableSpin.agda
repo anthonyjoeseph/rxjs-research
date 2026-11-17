@@ -21,7 +21,7 @@ open import Data.Sum using (_⊎_; inj₁)
 open import Function using (mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 
-open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; _∙_; _⊕_)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _∙_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; _≺_; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺→≼; ≺-ext)
@@ -52,26 +52,35 @@ sp→ {q = q} (_ , refl , r) with ∈-applyUpTo⁻ (λ i → q ⊕ [ ix i ] , sk
 sp← : ∀ {X : Set} {M q i} → i < M → TR {X} (S M q) (q ⊕ [ ix i ]) skip
 sp← {q = q} lt = _ , refl , ∈-applyUpTo⁺ (λ i → q ⊕ [ ix i ] , skip) lt
 
--- A tick's index, read off its position.
-ixOf : Label → ℕ
-ixOf (ix j) = j
-ixOf _      = 0
+-- A position's last label: a leaf's row, one step past its subscription,
+-- read back off its position.
+lastOf : List Label → Label
+lastOf []           = last
+lastOf (l ∷ [])     = l
+lastOf (_ ∷ l ∷ ls) = lastOf (l ∷ ls)
 
-lastIx : List Label → ℕ
-lastIx []           = 0
-lastIx (l ∷ [])     = ixOf l
-lastIx (_ ∷ l ∷ ls) = lastIx (l ∷ ls)
+lastL : Pos → Label
+lastL (_ ∙ x) = lastOf x
 
-idx : Pos → ℕ
-idx (_ ∙ x) = lastIx x
-
-idx-ix : ∀ q i → idx (q ⊕ [ ix i ]) ≡ i
-idx-ix (c ∙ x) i = go x
+lastL-⊕ : ∀ q l → lastL (q ⊕ [ l ]) ≡ l
+lastL-⊕ (c ∙ x) l = go x
   where
-    go : ∀ x → lastIx (x ++ [ ix i ]) ≡ i
+    go : ∀ x → lastOf (x ++ [ l ]) ≡ l
     go []           = refl
     go (_ ∷ [])     = refl
-    go (_ ∷ l ∷ xs) = go (l ∷ xs)
+    go (_ ∷ m ∷ xs) = go (m ∷ xs)
+
+-- One step past a subscription, two positions differ by their labels.
+step-inj : ∀ q {a b} → q ⊕ [ a ] ≡ q ⊕ [ b ] → a ≡ b
+step-inj q {a} {b} eq = trans (sym (lastL-⊕ q a)) (trans (cong lastL eq) (lastL-⊕ q b))
+
+ix-inj : ∀ {i j} → ix i ≡ ix j → i ≡ j
+ix-inj refl = refl
+
+-- Nothing lies under a step.
+step-flat : ∀ q {a b l ys} → (q ⊕ [ a ]) ⊕ (l ∷ ys) ≡ q ⊕ [ b ] → ⊥
+step-flat q {a} {b} {l} {ys} eq with ⊕-cancelˡ q [ b ] (a ∷ l ∷ ys) (trans (sym eq) (⊕-assoc q [ a ] (l ∷ ys)))
+... | ()
 
 -- A shallower spin's ticks, a deeper one's.
 widen : ∀ {X : Set} {M M′ q y} {e : Ev X} → M ≤ M′ → TR (S M q) y e → TR (S M′ q) y e
@@ -88,10 +97,9 @@ spin-ag le lt = ⟨ (λ yk → shrink lt yk , widen le) ⟩
 
 -- No tick lies under another.
 spin-flat : ∀ {X : Set} {M q y l ys} {e e′ : Ev X} → TR (S M q) y e → TR (S M q) (y ⊕ (l ∷ ys)) e′ → ⊥
-spin-flat {q = q} {l = l} {ys} x x′ with sp→ x
+spin-flat {q = q} x x′ with sp→ x
 ... | i , _ , refl , _ with sp→ x′
-...   | j , _ , eq , _ with ⊕-cancelˡ q [ ix j ] (ix i ∷ l ∷ ys) (trans (sym eq) (⊕-assoc q [ ix i ] (l ∷ ys)))
-...     | ()
+...   | j , _ , eq , _ = step-flat q eq
 
 ------------------------------------------------------------------------
 -- The record
@@ -105,10 +113,10 @@ module SpinTab {A : Set} (p p* : Pos) where
   Q N = S (3 + N) p*
 
   φ′ : ℕ → Pos → Pos
-  φ′ _ k = p* ⊕ [ ix (idx k) ]
+  φ′ _ k = p* ⊕ [ lastL k ]
 
   φ-ix : ∀ {N} i → φ′ N (p ⊕ [ ix i ]) ≡ p* ⊕ [ ix i ]
-  φ-ix i = cong (λ j → p* ⊕ [ ix j ]) (idx-ix p i)
+  φ-ix i = cong (λ l → p* ⊕ [ l ]) (lastL-⊕ p (ix i))
 
   Put′ : ℕ → Pos → Pos → Set
   Put′ _ _ _ = ⊥
@@ -131,8 +139,8 @@ module SpinTab {A : Set} (p p* : Pos) where
     ; mono = mono′
     ; inst = λ {k} {k′} x x′ _ _ →
         mk⇔ (λ _ → trans (same x) (sym (same x′)))
-            (λ _ → trans (inst-⊕ p* [ ix (idx k) ]) (sym (inst-⊕ p* [ ix (idx k′) ])))
-    ; home = λ {k} x _ → mk⇔ (λ _ → same x) (λ _ → inst-⊕ p* [ ix (idx k) ]) }
+            (λ _ → trans (inst-⊕ p* [ lastL k ]) (sym (inst-⊕ p* [ lastL k′ ])))
+    ; home = λ {k} x _ → mk⇔ (λ _ → same x) (λ _ → inst-⊕ p* [ lastL k ]) }
     where
       row→′ : ∀ {k e} → TR (P N) k e → Unpinned e
             → (Σ (Ev (IE A)) λ e′ → TR (Q N) (φ′ N k) e′ × M e e′) ⊎ (e ≡ skip × Corr.PutAt (corr′ N) k)
@@ -156,7 +164,7 @@ module SpinTab {A : Set} (p p* : Pos) where
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ _ _ _ → refl
-    ; bk = λ l → [ p ⊕ [ ix (idx l) ] ]
+    ; bk = λ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = in-bk′
     ; pb-few = λ _ → [] , λ ()
     ; elab-causal = λ le x un _ → elab-causal′ le x un
@@ -176,7 +184,7 @@ module SpinTab {A : Set} (p p* : Pos) where
     ; got* = λ _ → _ , refl
     ; after = after′
     ; after* = after′
-    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ ix (idx k) ]} (≺-ext p* []) }
+    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* []) }
     where
       pin-no : ∀ {X : Set} {M q k r} → TR {X} (S M q) k (pin r) → ⊥
       pin-no x with sp→ x
@@ -186,9 +194,9 @@ module SpinTab {A : Set} (p p* : Pos) where
       out-no x with sp→ x
       ... | _ , _ , _ , ()
 
-      in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ ix (idx (φ′ N k)) ] ]
+      in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ {N} x _ with sp→ x
-      ... | i , _ , refl , _ = here (cong (λ j → p ⊕ [ ix j ]) (sym (trans (idx-ix p* (idx (p ⊕ [ ix i ]))) (idx-ix p i))))
+      ... | i , _ , refl , _ = here (cong (λ l → p ⊕ [ l ]) (sym (trans (lastL-⊕ p* (lastL (p ⊕ [ ix i ]))) (lastL-⊕ p (ix i)))))
 
       elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
       elab-causal′ {N} le x _ with sp→ x
@@ -202,7 +210,7 @@ module SpinTab {A : Set} (p p* : Pos) where
       elab-all′ : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
       elab-all′ {N} {N′} _ all y with sp→ y
       ... | j , lj , refl , refl with sp→ {M = 3 + N} (proj₁ (upto (all (p ⊕ [ ix j ])) {p ⊕ [ ix j ]} {skip} (≼-refl {p ⊕ [ ix j ]})) (sp← lj))
-      ...   | j′ , lj′ , eq , _ = sp← (subst (_< 3 + N) (sym (trans (sym (idx-ix p j)) (trans (cong idx eq) (idx-ix p j′)))) lj′)
+      ...   | j′ , lj′ , eq , _ = sp← (subst (_< 3 + N) (sym (ix-inj (step-inj p eq))) lj′)
 
       after′ : ∀ {X : Set} {N q k} {e : Ev X} → TR (S (3 + N) q) k e → q ≼ k
       after′ {q = q} x with sp→ x
