@@ -32,26 +32,45 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE FLATMAP'S LANES
+#### THE FLATMAP'S LAYERS
 
-Refuted as quantified (`flat-rel`): a lane, subscribed past its
-creator, cuts each hot in scope by where the creator falls among the
-hot's rows, and per-stream maps need not agree on it. Open: one map
-shared by every stream of a run, which the hots' maps and each record's
-map restrict. Settled by restating `Full` over it and `flat-rel` as a
-body over its layers: share, lanes, the inner flatMap with the combined
-scan, the closer.
+Untried: the flatMap's elaboration grown outward from the lanes'
+flatMap through the combined scan, the closer and the share, over one
+map per hot shared by every reader. Hardest: `flat-core` owes each
+lane's alignment, an unqueued lane's from the source's order facts at
+its value row, a queued lane's from an earlier lane's at its end.
+Settled by bodies, or a lane pair no creator's facts align.
 
-Members: `flat-rel`.
+Members: `flat-core`, `flat-comb`, `flat-close`, `flat-share`,
+`flatmap-order`.
 
 #### THE CONNECT
 
-Untried: the source's hot related from its record (`conn-hot`), the
-body's subscription cutting it alike (`conn-cut`), and the connect's
-rows, the first former making pins, so the first test of `pin-stable`
-(`conn-tab`). Settled by bodies.
+Untried: the source's hot related along the source's map rejoined
+under the annotation's reader (`conn-hot`), an old hot's reader cutting
+the new hot alike (`conn-old-cut`), and the connect's rows, the first
+former making pins, so the first test of `pin-stable` (`conn-tab`).
+Settled by bodies.
 
-Members: `conn-hot`, `conn-cut`, `conn-tab`.
+Members: `conn-hot`, `conn-old-cut`, `conn-tab`, `conn-order`.
+
+#### THE ORDER FACTS
+
+Untried: each former's rows carry the record's order facts (`Rest`):
+linked to their images, cutting every hot in scope alike up each
+creator chain. A leaf former's rows lie at steps of timers it created
+at its subscription; a one-to-one former's are its child's. Settled by
+bodies, or a row whose creator chain is cut unlike its image's.
+
+Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
+`scan-order`, `take-order`, `defer-order`.
+
+#### THE CUT ARITHMETIC
+
+Untried, order arithmetic: the body's subscription cuts the source's
+alike up the link, and a cut survives a label under a row not over it.
+
+Members: `cut-body`, `lvl-sub`, `past-src`.
 
 #### THE TOP
 

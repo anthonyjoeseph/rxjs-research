@@ -63,7 +63,8 @@ open import simultaneous.Relations using (Spent)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact)
 open import simultaneous.Attribution using (Live; Attribution; Every; One; Reads; Shown; Into)
 open import simultaneous.TableCorr using (Rows; TR; M; Corr; Rel; module Rel; ag-≃; corr-≃; ends)
-open import simultaneous.TableRel using (rel; envR)
+open import simultaneous.TableEnv using (Out; envR; framed)
+open import simultaneous.TableRel using (rel)
 open import simultaneous.TableTop using (top-rel)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elaborate)
@@ -371,7 +372,8 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- THE CUTS CORRESPOND at every depth, read off the program's
   -- elaboration under the batcher's plumbing.
   R : Rel (λ N → listC (3 + N) n P [] root) (λ N → listC (3 + N) n Q [] root) root root
-  R = top-rel n P (rel n o (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (envR (λ ())) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ [])) (λ ()))
+  R = top-rel n P (Out.rel (rel n o (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (envR (λ ()) (λ ())) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
+                                 (λ ()) (framed refl refl)))
 
   module R = Rel R
 
