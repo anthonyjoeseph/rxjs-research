@@ -44,13 +44,14 @@ Members: `top-rel`.
 #### THE COLD'S ROWS
 
 The rewrite: the elaborated cold's table is its rows written out
-(`CRow`): scan, merge, concat and render around each cold row. Untried:
-the listing matches them through four joiners' semantics, the concat's
-schedule hardest; the rows are functional, flat, causal across cuts.
-Settled by bodies, or a cold whose table lists a row `CRow` does not.
+(`CRow`); the top merge is matched. Untried: the scan's rows through the
+merge, concat and scan semantics, the concat's schedule hardest; each
+render's rows; the renders end before the scan; the rows are functional,
+flat, causal across cuts. Settled by bodies, or a listed row `CRow`
+lacks.
 
-Members: `rows→`, `rows←`, `rows-func`, `rows-flat`, `rows-causal`,
-`rows-cons`.
+Members: `scan-rows`, `rend-rows`, `srow-lane-end`, `rows-func`,
+`rows-flat`, `rows-causal`, `rows-cons`.
 
 #### THE COLD'S WALK
 
