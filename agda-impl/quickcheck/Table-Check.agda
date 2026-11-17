@@ -402,6 +402,28 @@ mutual
             if (e <ᵖ k) ∧ not (we <ᵖ w) ∨ (k <ᵖ e) ∧ not (w <ᵖ we)
             then [ "end-order" , nm +++ " " +++ showPos e +++ " ~ " +++ showPos we +++ " vs " +++ showPos k +++ " ~ " +++ showPos w ] else []
 
+      -- Each skip the flatMap makes, written out: a value's marker under
+      -- its elaborated value, a lane's or the source's end, not the last,
+      -- at its end image, a queued lane's end one label below it; the
+      -- lanes' flatMap holds a row there.
+      skipRes : List (String × String)
+      skipRes with listC N n (flatMap op f s) ρ p | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
+      ... | just t | just t* = if short t ∨ short t* then [] else concatMap chk (rows t)
+        where
+          isEnd : Pos → Bool
+          isEnd e = memᵖ e laneEnds ∨ memᵖ e (endsM o)
+          at : Pos → Maybe Pos
+          at k = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 0 ]) ≟ᵖ k) }) vs then just (phi srcMap (up k) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ])
+                 else if isEnd k then just (formula (k , vend))
+                 else if isEnd (up k) ∧ does (k ≟ᵖ (up k ⊕ [ ix 0 ])) then just (formula (up k , vend) ⊕ [ ix 0 ])
+                 else nothing
+          chk : Row B → List (String × String)
+          chk (k , skip) with at k
+          ... | just w  = if memᵖ w (mapL proj₁ (rows t*)) then [] else fail "core-skip" nm k w
+          ... | nothing = []
+          chk _ = []
+      ... | _ | _ = []
+
       -- Each value of the lanes' flatMap's source, written out: the
       -- shared hot's row of the plain value's image, rejoined, and the
       -- first value `each` lists from it.
@@ -433,7 +455,7 @@ mutual
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = endOrd ++ checks (nm +++ "/core") p c₁ [] m
+      ...   | just m  = endOrd ++ skipRes ++ checks (nm +++ "/core") p c₁ [] m
                        ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
         where
@@ -606,7 +628,7 @@ private
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
