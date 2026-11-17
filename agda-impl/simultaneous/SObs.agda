@@ -87,7 +87,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _<ᵇ_; _⊓_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_; z≤n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -147,9 +147,8 @@ record Flat (N : Set) : Set where
   field
     at : N
     active queue : ℕ
-    -- the outer completed; the next lane started is a queued one; the
-    -- last lane started has ended
-    finished popping dead : Bool
+    -- the outer completed; the last lane started has ended
+    finished dead : Bool
     -- the instant's over has passed
     spent : Bool
     -- routes open through the outer and through the lanes; routes of an
@@ -424,11 +423,11 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   ... | false = record s { parked = 0 } , stops (Flat.parked s) n
 
   -- How the flatMap takes an outer value: a switch stops its lane's
-  -- routes.
+  -- routes; a bounded merge counts it queued until its lane's
+  -- `laneStart`, which follows at once unless rxjs queued it.  The scan
+  -- reads the queue off the marks and never models the bound.
   arrive : ∀ {B} → FlatOp → N → Flat N → Out B
-  arrive (mergeᶠ (just k)) n s with Flat.active s <ᵇ k
-  ... | true  = s , []
-  ... | false = record s { queue = suc (Flat.queue s) } , []
+  arrive (mergeᶠ (just _)) n s = record s { queue = suc (Flat.queue s) } , []
   arrive (mergeᶠ nothing) n s = s , []
   arrive switchᶠ          n s = cut (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
   arrive exhaustᶠ         n s = s , []
@@ -501,12 +500,11 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   onMark op b s outerClose n = s , []
   onMark op b s laneStart  n =
     record s { active = suc (Flat.active s)
-             ; queue = if Flat.popping s then Flat.queue s ∸ 1 else Flat.queue s
-             ; popping = false ; dead = false } , []
+             ; queue = Flat.queue s ∸ 1 ; dead = false } , []
   onMark op b s laneDone   n =
     ended (Flat.acc s ⊓ Flat.lanes s) n
       (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                ; popping = not (isZero (Flat.queue s)) ; dead = true })
+                ; dead = true })
   onMark op b s burstEnd   n = burstOver (isZero (Flat.held s) ∨ Flat.dead s) n s
   onMark op b s outerDone  n = left n (record s { finished = true })
   onMark op b s m          n = s , instEmit (mark m) n ∷ []
@@ -543,7 +541,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   combined op tk = each proj₂
-    (scan (react op) (flat name 0 0 false false false false 0 0 0 0 0 [] , [])
+    (scan (react op) (flat name 0 0 false false false 0 0 0 0 0 [] , [])
       (takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))))
 
   -- The outer `O` is read first by the scan, then by the real flatMap,

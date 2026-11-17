@@ -52,7 +52,7 @@ ev (just n) o ρ = approx n o ρ
 
 -- The scan's first state: nothing counted, no output.
 init : ∀ {B} → Out B
-init = flat root 0 0 false false false false 0 0 0 0 0 [] , []
+init = flat root 0 0 false false false 0 0 0 0 0 [] , []
 
 -- A step's outputs, laid under the row that caused them.
 lay : ∀ {B} → Pos → ℕ → List (IE B) → List (Pos × Ev (IE B))
