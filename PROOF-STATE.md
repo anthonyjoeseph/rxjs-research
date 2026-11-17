@@ -37,8 +37,8 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 A lane's record is had only from a cut holding its value row, but
 `Rel.bk` and `pb-few`'s list are cut-free, so no lanes' flatMap body can
 name a lane row's preimages. Settled by cut-indexed lists read at the
-cut settling the row, once a preimage (and a put) provably lies in every
-cut agreeing up to its image, or refuted by a probe pair of cuts.
+cut settling the row (the erasure now asks only that), once a preimage
+and a put provably lie in every cut agreeing up to their image.
 
 Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
@@ -60,9 +60,9 @@ Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
 
 #### THE ORDER FACTS
 
-Untried: each former's rows carry the record's order facts (`Rest`):
-linked to their images, cutting every hot in scope alike up each
-creator chain. A leaf former's rows lie at steps of timers it created
+Probed (`make table-check`, every uncut subterm), unproven: each
+former's rows carry the record's order facts (`Rest`): linked to their
+images, cutting every hot in scope alike up each creator chain. A leaf former's rows lie at steps of timers it created
 at its subscription; a one-to-one former's are its child's. Settled by
 bodies, or a row whose creator chain is cut unlike its image's.
 
