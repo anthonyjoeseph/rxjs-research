@@ -174,11 +174,16 @@ $(TABLE_BIN): $(AGDA_SRC)
 	@cd $(SRC) && $(AGDA) --compile --compile-dir=_cli quickcheck/Table-Check.agda
 	@touch $@
 
+TABLE_LOG := $(SRC)/_cli/table-check.log
+
+# The probe's lines reach the job's log as they come, so a run the job's
+# timeout cuts short still shows how far it got.  Its verdict is read off
+# the log, so the pipe's status is not consulted.
 table-check: $(TABLE_BIN)
-	@out=$$($(TABLE_BIN)); echo "$$out"; \
-	  echo "$$out" | grep -q '^table-check: done ' \
+	@$(TABLE_BIN) | tee $(TABLE_LOG); \
+	  grep -q '^table-check: done ' $(TABLE_LOG) \
 	    || { echo "table-check: RED — the probe never reached its closing line"; exit 1; }; \
-	  if echo "$$out" | grep -q '^table-check: FAIL '; then \
+	  if grep -q '^table-check: FAIL ' $(TABLE_LOG); then \
 	    echo "table-check: RED — a subterm's tables do not correspond"; exit 1; fi; \
 	  echo "table-check: GREEN"
 
