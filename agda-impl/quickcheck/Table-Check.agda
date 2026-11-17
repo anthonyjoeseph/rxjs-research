@@ -273,7 +273,9 @@ mutual
       ψ : Pos → Pos
       ψ k = phi m k ⊕ [ sub reader* ]
       hot-image : Res
-      hot-image = concatMap (λ { (y , _) → if memᵖ (ψ y) (annRows σ*) then [] else fail "hot-image" nm y (ψ y) }) (hotV σ) , 0 , 0
+      -- The annotated hot lists each source row at its image; a reader
+      -- rejoins it under its own subscription (`ψ`).
+      hot-image = concatMap (λ { (y , _) → if memᵖ (phi m y) (annRows σ*) then [] else fail "hot-image" nm y (phi m y) }) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
     proj₂ src ⊹ (lanesRes ⊹ coreRes)
     where
