@@ -153,6 +153,9 @@ m-val rd = (λ _ → _ , refl , rd) , (λ n → ⊥-elim (n tt))
 m-ee : ∀ {A : Set} → M {A} end end
 m-ee = (λ _ → refl) , (λ n → ⊥-elim (n tt))
 
+m-ss : ∀ {A : Set} → M {A} skip skip
+m-ss = (λ ()) , (λ _ ())
+
 -- TWO RUNS CORRESPOND along `φ`, subscribed at `s` and `s*`: each
 -- unpinned plain row on its image, a skip possibly put late instead, as
 -- a live pin is (`put`, homed in the subscription's instant or a carried

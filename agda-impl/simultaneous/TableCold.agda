@@ -14,31 +14,34 @@
 -- agrees between cuts up to itself, and the elaboration up to its image.
 module simultaneous.TableCold where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; length; drop; take)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; _≤_; _+_; _∸_)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
-open import Relation.Nullary using (yes; no; does)
+open import Relation.Nullary using (yes; no)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; last; _∙_; _⊕_; frame; cascade; instant; path; tick)
-open import denotation.Events using (Timeline; From; fixed; fresh; start)
+open import denotation.Events using (Events; Timeline; From; fixed; fresh; start)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ≼-refl)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Cut using (ine-unpinned)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.Listing using (walkN; listC)
+open import simultaneous.Listing using (walkN; walkN-exact; listC; listC-ok; UncutEnv)
+open import quickcheck.Tabled.Exact.Base using (sound)
+open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
 open import simultaneous.TakeCut using (inst-⊕)
 
@@ -47,29 +50,22 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ------------------------------------------------------------------------
 -- A row's kind, and the kind a table lists at a position
 
-data Kind : Set where
-  kv ks ke : Kind
-
-kind : ∀ {X : Set} → Ev X → Kind
-kind (out _) = kv
-kind skip    = ks
-kind end     = ke
-kind (pin _) = ks
-
 kindIn : ∀ {X : Set} → List (Row X) → Pos → Kind
 kindIn []             k = ks
 kindIn ((y , e) ∷ rs) k with y ≟ᵖ k
 ... | yes _ = kind e
 ... | no _  = kindIn rs k
 
+-- A walk lists no pin.
+walk-nopin : ∀ {A} K (ev : Events A) {k r} → (k , pin r) ∈ walkN K ev → ⊥
+walk-nopin K ev x = ine-unpinned (proj₁ (sound (walkN-exact K ev) x))
+
 ------------------------------------------------------------------------
 -- The record
 
-module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ → All Tb.Listed Δ) (p p* : Pos) where
+module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (p p* : Pos) where
 
-  -- Where the elaboration subscribes the cold.
-  c₀ : Pos
-  c₀ = p* ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+  open At {A} p* using (c₀; sync; σ; im; CRow; crow-fwd; crow-bwd; crow-pin; crow-after)
 
   -- A plain row's position, renamed onto the elaborated cold's.
   ψ : Pos → Pos
@@ -87,18 +83,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
 
   -- In the subscribe burst.
   sync* : Pos → Bool
-  sync* y = does (instantOf y ≟ⁱ instantOf p*)
-
-  -- An elaborated cold's row of a kind, imaged.
-  σ : Kind → Bool → Pos → Pos
-  σ kv true  y = y ⊕ (ix 1 ∷ ix 0 ∷ [])
-  σ kv false y = y ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
-  σ ks _     y = y
-  σ ke true  y = p* ⊕ [ last ]
-  σ ke false y = y ⊕ (ix 1 ∷ last ∷ [])
-
-  im : ∀ {X : Set} → Pos → Ev X → Pos
-  im y e = σ (kind e) (sync* y) y
+  sync* = sync
 
   -- The two cuts, and the elaborated cold's own.
   W : ℕ → List (Row A)
@@ -134,8 +119,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     walk-kind  : ∀ {N k e} → (k , e) ∈ W N → kindIn (W N) k ≡ kind e
     walk-func  : ∀ {N k e e′} → (k , e) ∈ W N → (k , e′) ∈ W N → e ≡ e′
     walk-flat  : ∀ {N y e l ys e′} → (y , e) ∈ W N → (y ⊕ (l ∷ ys) , e′) ∈ W N → ⊥
-    walk-pin   : ∀ {N k r} → (k , pin r) ∈ W N → ⊥
-    walk-after : ∀ {N k e} → (k , e) ∈ W N → p ≼ k
+    walk-at    : ∀ K s {k e} → (k , e) ∈ walkN K (start s m) → s ≼ k
     walk-agree : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N → AgreeTo k (TR (P N′)) (TR (P N))
     walk-cons  : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
     walk-all   : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → I N ≡ I N′
@@ -146,21 +130,68 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     φ-after    : ∀ {N k e} → (k , e) ∈ W N → p* ≼ φ′ N k
     φ-back     : ∀ {N k e} → (k , e) ∈ W N → k ∈ bk′ (φ′ N k)
 
-    -- THE COLD'S PLUMBING: the elaborated table, read off the
-    -- elaborated cold's rows.
-    cold-fwd    : ∀ {N y e} → (y , e) ∈ I N → Σ (Ev (IE A)) λ e′ → TR (Q N) (im y e) e′ × M e e′
-    cold-bwd    : ∀ {N l e′} → TR (Q N) l e′
-                → (Σ Pos λ y → Σ (Ev A) λ e → (y , e) ∈ I N × l ≡ im y e × M e e′)
-                ⊎ ((Shown (One valuesOf) e′ → ⊥)
-                   × (instantOf l ≡ instantOf p* ⊎ Σ Pos λ y → Σ (Ev A) λ e → (y , e) ∈ I N × sync* y ≡ false × instantOf y ≡ instantOf l))
-    cold-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (TR (Q N′)) (TR (Q N))
-    cold-cons   : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
-    cold-same   : ∀ {N N′} → I N ≡ I N′ → ∀ {l e′} → TR (Q N′) l e′ → TR (Q N) l e′
-    cold-func*  : ∀ {N l e e′} → TR (Q N) l e → TR (Q N) l e′ → e ≡ e′
-    cold-flat*  : ∀ {N y e l ys e′} → TR (Q N) y e → TR (Q N) (y ⊕ (l ∷ ys)) e′ → ⊥
-    cold-pin*   : ∀ {N l r} → TR (Q N) l (pin r) → ⊥
-    cold-after* : ∀ {N l e} → TR (Q N) l e → p* ≼ l
-    cold-got*   : ∀ N → Got (Q N)
+    -- THE COLD'S ROWS: the elaborated table is the rows written out,
+    -- and those rows hang together.
+    rows→       : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
+    rows←       : ∀ {N l e′} → CRow (I N) l e′ → TR (Q N) l e′
+    rows-func   : ∀ {N l e e′} → CRow (I N) l e → CRow (I N) l e′ → e ≡ e′
+    rows-flat   : ∀ {N y e l ys e′} → CRow (I N) y e → CRow (I N) (y ⊕ (l ∷ ys)) e′ → ⊥
+    rows-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (CRow (I N′)) (CRow (I N))
+    rows-cons   : ∀ {N N′} → Cons (CRow (I N)) (CRow (I N′))
+
+  -- The elaborated cold's rows lie past its subscription.
+  I-after : ∀ {N y e} → (y , e) ∈ I N → p* ≼ y
+  I-after {N} {y} x = ≼-trans {p*} {c₀} {y} (≺→≼ {p*} {c₀} (≺-ext p* (ix 1 ∷ ix 0 ∷ ix 1 ∷ []))) (walk-at (3 + N) c₀ x)
+
+  -- Agreement read across the written-out rows.
+  ag→ : ∀ {N N′ q} → AgreeTo q (CRow (I N)) (CRow (I N′)) → AgreeTo q (TR (Q N)) (TR (Q N′))
+  ag→ a = ⟨ (λ yq → (λ t → rows← (proj₁ (upto a yq) (rows→ t))) , (λ t → rows← (proj₂ (upto a yq) (rows→ t)))) ⟩
+
+  ag← : ∀ {N N′ q} → AgreeTo q (TR (Q N)) (TR (Q N′)) → AgreeTo q (CRow (I N)) (CRow (I N′))
+  ag← a = ⟨ (λ yq → (λ t → rows→ (proj₁ (upto a yq) (rows← t))) , (λ t → rows→ (proj₂ (upto a yq) (rows← t)))) ⟩
+
+  -- THE COLD'S PLUMBING: the elaborated table, read off the elaborated
+  -- cold's rows.
+  cold-fwd : ∀ {N y e} → (y , e) ∈ I N → Σ (Ev (IE A)) λ e′ → TR (Q N) (im y e) e′ × M e e′
+  cold-fwd {N} x with crow-fwd (walk-nopin (3 + N) _) x
+  ... | e′ , c , mm = e′ , rows← c , mm
+
+  cold-bwd : ∀ {N l e′} → TR (Q N) l e′
+           → (Σ Pos λ y → Σ (Ev A) λ e → (y , e) ∈ I N × l ≡ im y e × M e e′)
+           ⊎ ((Shown (One valuesOf) e′ → ⊥)
+              × (instantOf l ≡ instantOf p* ⊎ Σ Pos λ y → Σ (Ev A) λ e → (y , e) ∈ I N × sync* y ≡ false × instantOf y ≡ instantOf l))
+  cold-bwd t = crow-bwd (rows→ t)
+
+  cold-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (TR (Q N′)) (TR (Q N))
+  cold-causal le x = ag→ (rows-causal le x)
+
+  cold-cons : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
+  cold-cons below t t′ yy = rows← (rows-cons (λ lt → ag← (below lt)) (rows→ t) (rows→ t′) yy)
+
+  cold-same : ∀ {N N′} → I N ≡ I N′ → ∀ {l e′} → TR (Q N′) l e′ → TR (Q N) l e′
+  cold-same eq t = rows← (subst (λ J → CRow J _ _) (sym eq) (rows→ t))
+
+  cold-func* : ∀ {N l e e′} → TR (Q N) l e → TR (Q N) l e′ → e ≡ e′
+  cold-func* t t′ = rows-func (rows→ t) (rows→ t′)
+
+  cold-flat* : ∀ {N y e l ys e′} → TR (Q N) y e → TR (Q N) (y ⊕ (l ∷ ys)) e′ → ⊥
+  cold-flat* t t′ = rows-flat (rows→ t) (rows→ t′)
+
+  cold-pin* : ∀ {N l r} → TR (Q N) l (pin r) → ⊥
+  cold-pin* t = crow-pin (rows→ t)
+
+  cold-after* : ∀ {N l e} → TR (Q N) l e → p* ≼ l
+  cold-after* {N} t = crow-after (I-after {N}) (rows→ t)
+
+  cold-got* : ∀ N → Got (Q N)
+  cold-got* N with listC-ok (3 + N) n (coldˢ (fixed m)) (uρ* N) p*
+  ... | L , eq , _ = L , eq
+
+  walk-pin : ∀ {N k r} → (k , pin r) ∈ W N → ⊥
+  walk-pin {N} = walk-nopin (3 + N) _
+
+  walk-after : ∀ {N k e} → (k , e) ∈ W N → p ≼ k
+  walk-after {N} = walk-at (3 + N) p
 
   unp : ∀ {N k e} → (k , e) ∈ W N → Unpinned e
   unp {e = out _} _ = tt
@@ -253,5 +284,5 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; after* = cold-after*
     ; after-φ = λ { (_ , refl , x) _ → φ-after x } }
 
-cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) p p* → Rel (ColdTab.P m n ρ* p p*) (ColdTab.Q m n ρ* p p*) p p*
-cold-tab m n ρ* p p* = ColdTab.rel′ m n ρ* p p*
+cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p* → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*
+cold-tab m n ρ* uρ* p p* = ColdTab.rel′ m n ρ* uρ* p p*

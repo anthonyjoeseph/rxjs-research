@@ -34,7 +34,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Got; Cons; Corr; Rel; module Rel; got-bind)
+open import simultaneous.TableCorr using (TR; M; Got; Cons; Corr; Rel; module Rel; got-bind; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -55,9 +55,6 @@ tr-g← q _ (L , refl , r) = _ , refl , there r
 
 tr-g0 : ∀ {X : Set} q (m : Maybe (Tb.Listed X)) → Got m → TR (Guarded q m) q skip
 tr-g0 q _ (L , refl) = _ , refl , here refl
-
-m-ss : ∀ {A : Set} → M {A} skip skip
-m-ss = (λ ()) , (λ _ ())
 
 -- Every row of `m` past `q`.
 Past : ∀ {X : Set} → Pos → Maybe (Tb.Listed X) → Set

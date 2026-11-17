@@ -41,17 +41,16 @@ truncated before they differ (`cons`) and rows past the subscription
 
 Members: `top-rel`.
 
-#### THE COLD'S PLUMBING
+#### THE COLD'S ROWS
 
-The rewrite: the elaborated cold's table read off the cold's own rows.
-Untried: every row not an image is unshown and in the subscribe burst
-or an async row's instant; a longer cut changes nothing up to an
-image; cuts are truncated before they differ. Settled by bodies, or a
-cold whose elaborated table breaks one.
+The rewrite: the elaborated cold's table is its rows written out
+(`CRow`): scan, merge, concat and render around each cold row. Untried:
+the listing matches them through four joiners' semantics, the concat's
+schedule hardest; the rows are functional, flat, causal across cuts.
+Settled by bodies, or a cold whose table lists a row `CRow` does not.
 
-Members: `cold-bwd`, `cold-causal`, `cold-cons`, `cold-same`,
-`cold-fwd`, `cold-func*`, `cold-flat*`, `cold-pin*`, `cold-after*`,
-`cold-got*`.
+Members: `rows→`, `rows←`, `rows-func`, `rows-flat`, `rows-causal`,
+`rows-cons`.
 
 #### THE COLD'S WALK
 
@@ -60,7 +59,7 @@ cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
 Members: `walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`,
-`walk-flat`, `walk-pin`, `walk-after`, `walk-agree`, `walk-cons`,
+`walk-flat`, `walk-at`, `walk-agree`, `walk-cons`,
 `walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
 `φ-back`.
 
