@@ -51,7 +51,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
+  using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
          Maps; Aligned; aligned-⊕;
          Rest; Out; _⊢_; HotR; EnvR; envR; maps; hot; Full)
 open import simultaneous.TableMap using (map-tab)
@@ -282,7 +282,6 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ct-cons        : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
       ct-cons*       : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
       ct-after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → p* ≼ φ′ N k
-      ct-pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → p* ≼ r
       ct-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
                      → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
                      → ∀ {y r} → r ≼ φ′ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)
@@ -304,6 +303,9 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
 
     ct-after* : ∀ {N l e} → TR (Q N) l e → p* ≼ l
     ct-after* {N} = after-ok (3 + N) n (elab ρι (connect s b)) {ρ* N} p*
+
+    ct-pin-after* : ∀ {N l r} → TR (Q N) l (pin r) → p* ≼ r
+    ct-pin-after* {N} = pin-after-ok (3 + N) n (elab ρι (connect s b)) {ρ* N} p*
 
     rel′ : Rel P Q p p*
     rel′ = record

@@ -39,17 +39,48 @@ open import simultaneous.ColdOrder using (walk-nopin)
 PinsIn : ∀ {A} → List (Row A) → Set
 PinsIn rs = ∀ {k r} → (k , pin r) ∈ rs → T (inside r k)
 
+-- An end shown as an end or a skip is no pin.
+no-endpin : ∀ {B : Set} b {r} → pin {B} r ≡ (if b then end else skip) → ⊥
+no-endpin true  ()
+no-endpin false ()
+
+-- A lane end a bounded merge queues on or shows is no pin.
+queued-endpin : ∀ {B : Set} b d c {y r} → (y , pin {B} r) ≡ (if b then (c ⊕ [ ix 0 ] , skip) else (c , (if d then end else skip))) → ⊥
+queued-endpin true  d c ()
+queued-endpin false d c eq = no-endpin d (cong proj₂ eq)
+
+-- A lane's rows mapped by a former keeping every pin where it is.
+Keeps : ∀ {B : Set} → (Row B → Row B) → Set
+Keeps {B} lr = ∀ x {y r} → (y , pin r) ≡ lr x → x ≡ (y , pin r)
+
+-- A reader shows no pin.
+rejoin-nopin : ∀ {A : Set} p (rs : List (Row A)) {y r} → (y , pin r) ∈ concatMap (rejoinRow p) rs → ⊥
+rejoin-nopin p rs m with cm⁻ {f = rejoinRow p} {xs = rs} m
+... | ((q , out _) , _ , h) with when⁻ h
+...   | (_ , ())
+rejoin-nopin p rs m | ((q , skip) , _ , h) with when⁻ h
+...   | (_ , ())
+rejoin-nopin p rs m | ((q , pin _) , _ , h) with when⁻ h
+...   | (_ , ())
+rejoin-nopin p rs m | ((q , end) , _ , h) with if⁻ {b = p <ᵖ q} h
+...   | inj₁ (_ , here ())
+...   | inj₁ (_ , there ())
+...   | inj₂ (_ , here ())
+...   | inj₂ (_ , there ())
+
+merge-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) es → Keeps (MergeL.Ended.laneRow o ls es)
+merge-keeps o ls es (c , end)   eq = ⊥-elim (no-endpin (MergeL.Ended.done o ls es c) (cong proj₂ eq))
+merge-keeps o ls es (k , out _) ()
+merge-keeps o ls es (k , skip)  ()
+merge-keeps o ls es (k , pin _) refl = refl
+
+exhaust-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) rs → Keeps (ExhaustL.Ran.laneRow o ls rs)
+exhaust-keeps o ls rs (c , end)   eq = ⊥-elim (no-endpin (ExhaustL.Ran.done o ls rs c) (cong proj₂ eq))
+exhaust-keeps o ls rs (k , out _) ()
+exhaust-keeps o ls rs (k , skip)  ()
+exhaust-keeps o ls rs (k , pin _) refl = refl
+
 private
-  -- An end shown as an end or a skip is no pin.
-  no-endpin : ∀ {B : Set} b {r} → pin {B} r ≡ (if b then end else skip) → ⊥
-  no-endpin true  ()
-  no-endpin false ()
-
-  -- A lane end a bounded merge queues on or shows is no pin.
-  queued-endpin : ∀ {B : Set} b d c {y r} → (y , pin {B} r) ≡ (if b then (c ⊕ [ ix 0 ] , skip) else (c , (if d then end else skip))) → ⊥
-  queued-endpin true  d c ()
-  queued-endpin false d c eq = no-endpin d (cong proj₂ eq)
-
   outer-pin : ∀ {A B : Set} (d : Pos → Bool) {rs : List (Row A)} → PinsIn rs → ∀ {x} → x ∈ rs
             → ∀ {y r} → (y , pin r) ∈ outerRow {A} {B} d x → T (inside r y)
   outer-pin d h {q , out _} xm (here ())
@@ -64,10 +95,6 @@ private
   outers-pin : ∀ {A B : Set} (d : Pos → Bool) {rs : List (Row A)} → PinsIn rs → PinsIn (concatMap (outerRow {A} {B} d) rs)
   outers-pin d {rs} h m with cm⁻ {f = outerRow d} {xs = rs} m
   ... | (x , xm , h′) = outer-pin d h xm h′
-
-  -- A lane's rows mapped by a former keeping every pin where it is.
-  Keeps : ∀ {B : Set} → (Row B → Row B) → Set
-  Keeps {B} lr = ∀ x {y r} → (y , pin r) ≡ lr x → x ≡ (y , pin r)
 
   mapped-pin : ∀ {B : Set} (lr : Row B → Row B) → Keeps lr → (rs : List (Row B)) → PinsIn rs → PinsIn (mapL lr rs)
   mapped-pin lr kp rs h m with ∈-map⁻ lr m
@@ -123,21 +150,6 @@ private
   conn-pin p σ β hσ hβ m | inj₂ h | ((k , end) , km , h′) | inj₂ (_ , u) with when⁻ u
   ... | (_ , ())
 
-  -- A reader shows no pin.
-  rejoin-nopin : ∀ {A : Set} p (rs : List (Row A)) {y r} → (y , pin r) ∈ concatMap (rejoinRow p) rs → ⊥
-  rejoin-nopin p rs m with cm⁻ {f = rejoinRow p} {xs = rs} m
-  ... | ((q , out _) , _ , h) with when⁻ h
-  ...   | (_ , ())
-  rejoin-nopin p rs m | ((q , skip) , _ , h) with when⁻ h
-  ...   | (_ , ())
-  rejoin-nopin p rs m | ((q , pin _) , _ , h) with when⁻ h
-  ...   | (_ , ())
-  rejoin-nopin p rs m | ((q , end) , _ , h) with if⁻ {b = p <ᵖ q} h
-  ...   | inj₁ (_ , here ())
-  ...   | inj₁ (_ , there ())
-  ...   | inj₂ (_ , here ())
-  ...   | inj₂ (_ , there ())
-
   map-pin : ∀ {A B : Set} (f : A → B) (rs : List (Row A)) → PinsIn rs → PinsIn (mapL (mapRow f) rs)
   map-pin f rs h m with ∈-map⁻ (mapRow f) m
   ... | ((q , pin _) , rm , refl) = h rm
@@ -183,24 +195,12 @@ private
   ... | inj₂ (_ , here ())
   ... | inj₂ (_ , there ())
 
-  merge-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) es → Keeps (MergeL.Ended.laneRow o ls es)
-  merge-keeps o ls es (c , end)   eq = ⊥-elim (no-endpin (MergeL.Ended.done o ls es c) (cong proj₂ eq))
-  merge-keeps o ls es (k , out _) ()
-  merge-keeps o ls es (k , skip)  ()
-  merge-keeps o ls es (k , pin _) refl = refl
-
   merge-pin : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) → PinsIn (rows o)
             → (∀ {q a l} → (q , a , l) ∈ ls → PinsIn (rows l)) → PinsIn (rows (mergeRows o ls))
   merge-pin {A} {B} o ls ho hl m with ∈-++⁻ (concatMap (outerRow (MergeL.Ended.done o ls (Tb.ends (rows o)))) (rows o)) m
   ... | inj₁ h = outers-pin (MergeL.Ended.done o ls (Tb.ends (rows o))) ho h
   ... | inj₂ h with cm⁻ {f = λ { (_ , _ , l) → mapL (MergeL.Ended.laneRow o ls (Tb.ends (rows o))) (rows l) }} {xs = ls} h
   ...   | ((q , a , l) , lm , h′) = mapped-pin _ (merge-keeps o ls (Tb.ends (rows o))) (rows l) (hl lm) h′
-
-  exhaust-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) rs → Keeps (ExhaustL.Ran.laneRow o ls rs)
-  exhaust-keeps o ls rs (c , end)   eq = ⊥-elim (no-endpin (ExhaustL.Ran.done o ls rs c) (cong proj₂ eq))
-  exhaust-keeps o ls rs (k , out _) ()
-  exhaust-keeps o ls rs (k , skip)  ()
-  exhaust-keeps o ls rs (k , pin _) refl = refl
 
   exhaust-pin : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) → PinsIn (rows o)
               → (∀ {q a l} → (q , a , l) ∈ ls → PinsIn (rows l)) → PinsIn (rows (exhaustRows o ls))

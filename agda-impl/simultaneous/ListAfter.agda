@@ -3,12 +3,14 @@
 -- lists at steps under it, a former places its rows at or under its
 -- children's, a lane is read past its own start, and a reader keeps only
 -- the hot's rows past it, under them, or ends one label past itself.
+-- Likewise every listed pin names a connect past it: only a connect pins.
 ------------------------------------------------------------------------
 
 module simultaneous.ListAfter where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
 open import Data.Bool.Properties using (T-≡)
+open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; length) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-map⁻; ∈-applyUpTo⁻)
@@ -25,7 +27,7 @@ open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty
 open import denotation.Position using (Pos; inside; ix; sub; last; _⊕_; _<ᵖ_)
 open import denotation.Events using (Timeline; timelineAt)
 open import denotation.EmissionSet using (out; skip; end; pin; _≺_; _≼_)
-open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-≼-≺)
 open import denotation.Laws.Worlds using (⊑-≼)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; mapRow; scanRows; takeRows; mergeRows; switchRows; exhaustRows;
@@ -33,7 +35,8 @@ open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; mapRow; scanRows;
   module MergeL; module SwitchL; module ExhaustL; module BoundedL; module ConnL)
 open import quickcheck.Tabled.Exact.Base using (cm⁻; when⁻; if⁻; bind⁻; mapM⁻; pastRows⁻; ∧-true; values⁻)
 open import simultaneous.Listing using (listC)
-open import simultaneous.ColdOrder using (walk-past)
+open import simultaneous.ColdOrder using (walk-past; walk-nopin)
+open import simultaneous.ListPin using (no-endpin; queued-endpin; Keeps; rejoin-nopin; merge-keeps; exhaust-keeps)
 open import simultaneous.TableOf using (after-W)
 
 -- Every row of a table lies at or past `p`.
@@ -57,10 +60,10 @@ private
   past-≺ {p} {s} {k} h sk = ≼-trans {p} {s} {k} h (≺→≼ {s} {k} sk)
 
   -- A row a former passes on at its child row's position.
-  Keeps : ∀ {B : Set} → (Row B → Row B) → Set
-  Keeps lr = ∀ x → proj₁ (lr x) ≡ proj₁ x
+  Stays : ∀ {B : Set} → (Row B → Row B) → Set
+  Stays lr = ∀ x → proj₁ (lr x) ≡ proj₁ x
 
-  mapped-past : ∀ {B : Set} {p} (lr : Row B → Row B) → Keeps lr → (rs : List (Row B)) → Past p rs → Past p (mapL lr rs)
+  mapped-past : ∀ {B : Set} {p} (lr : Row B → Row B) → Stays lr → (rs : List (Row B)) → Past p rs → Past p (mapL lr rs)
   mapped-past {p = p} lr kp rs h m with ∈-map⁻ lr m
   ... | (x , xm , eq) = subst (p ≼_) (sym (trans (cong proj₁ eq) (kp x))) (h xm)
 
@@ -188,24 +191,24 @@ private
   take-past i keep o h m with cm⁻ {f = TakeL.takeRow i keep o (TakeL.failures i keep o)} {xs = rows o} m
   ... | (x , xm , w) = take-row i keep o (TakeL.failures i keep o) x (h xm) w
 
-  merge-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) es → Keeps (MergeL.Ended.laneRow o ls es)
-  merge-keeps o ls es (c , end)   = refl
-  merge-keeps o ls es (k , out _) = refl
-  merge-keeps o ls es (k , skip)  = refl
-  merge-keeps o ls es (k , pin _) = refl
+  merge-stays : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) es → Stays (MergeL.Ended.laneRow o ls es)
+  merge-stays o ls es (c , end)   = refl
+  merge-stays o ls es (k , out _) = refl
+  merge-stays o ls es (k , skip)  = refl
+  merge-stays o ls es (k , pin _) = refl
 
   merge-past : ∀ {A B : Set} {p} (o : Listed A) (ls : List (Pos × A × Listed B)) → Past p (rows o) → LanesPast p ls
              → Past p (rows (mergeRows o ls))
   merge-past o ls ho hl m with ∈-++⁻ (concatMap (outerRow (MergeL.Ended.done o ls (Tb.ends (rows o)))) (rows o)) m
   ... | inj₁ h = outers-past (MergeL.Ended.done o ls (Tb.ends (rows o))) ho h
   ... | inj₂ h with cm⁻ {f = λ { (_ , _ , l) → mapL (MergeL.Ended.laneRow o ls (Tb.ends (rows o))) (rows l) }} {xs = ls} h
-  ...   | ((q , a , l) , lm , h′) = mapped-past _ (merge-keeps o ls (Tb.ends (rows o))) (rows l) (hl lm) h′
+  ...   | ((q , a , l) , lm , h′) = mapped-past _ (merge-stays o ls (Tb.ends (rows o))) (rows l) (hl lm) h′
 
-  exhaust-keeps : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) rs → Keeps (ExhaustL.Ran.laneRow o ls rs)
-  exhaust-keeps o ls rs (c , end)   = refl
-  exhaust-keeps o ls rs (k , out _) = refl
-  exhaust-keeps o ls rs (k , skip)  = refl
-  exhaust-keeps o ls rs (k , pin _) = refl
+  exhaust-stays : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) rs → Stays (ExhaustL.Ran.laneRow o ls rs)
+  exhaust-stays o ls rs (c , end)   = refl
+  exhaust-stays o ls rs (k , out _) = refl
+  exhaust-stays o ls rs (k , skip)  = refl
+  exhaust-stays o ls rs (k , pin _) = refl
 
   exhaust-past : ∀ {A B : Set} {p} (o : Listed A) (ls : List (Pos × A × Listed B)) → Past p (rows o) → LanesPast p ls
                → Past p (rows (exhaustRows o ls))
@@ -214,7 +217,7 @@ private
   ... | inj₂ h with cm⁻ {f = λ { (q , _ , l) → if ExhaustL.Ran.ranᵇ o ls (ExhaustL.runs o ls) q then mapL (ExhaustL.Ran.laneRow o ls (ExhaustL.runs o ls)) (rows l) else [] }} {xs = ls} h
   ...   | ((q , a , l) , lm , h′) with if⁻ {b = ExhaustL.Ran.ranᵇ o ls (ExhaustL.runs o ls) q} h′
   ...     | inj₂ (_ , ())
-  ...     | inj₁ (_ , h″) = mapped-past _ (exhaust-keeps o ls (ExhaustL.runs o ls)) (rows l) (hl lm) h″
+  ...     | inj₁ (_ , h″) = mapped-past _ (exhaust-stays o ls (ExhaustL.runs o ls)) (rows l) (hl lm) h″
 
   switch-row : ∀ {A B : Set} (o : Listed A) (ls : List (Pos × A × Listed B)) q (x : Row B) → ∀ {y} → y ∈ SwitchL.laneRow o ls q x → proj₁ y ≡ proj₁ x
   switch-row o ls q (k , pin r) w with if⁻ {b = SwitchL.cutᵇ o ls q k} w
@@ -372,3 +375,210 @@ listC-past N (suc n) (defer l) {ρL}    p e {k} m with bind⁻ {m = listC N n (L
 ... | (b , eb , refl) with m
 ...   | here refl = ≼-⊕ p [ ix 0 ]
 ...   | there m′  = down {p} {k} [ ix 1 ] (listC-past N n (Later.force l) (p ⊕ [ ix 1 ]) eb m′)
+
+-- Every pin of a table names a connect at or past `p`.
+PinsPast : ∀ {A} → Pos → List (Row A) → Set
+PinsPast p rs = ∀ {k r} → (k , pin r) ∈ rs → p ≼ r
+
+private
+  outer-pp : ∀ {A B : Set} {p} (d : Pos → Bool) {rs : List (Row A)} → PinsPast p rs → ∀ {x} → x ∈ rs
+           → ∀ {y r} → (y , pin r) ∈ outerRow {A} {B} d x → p ≼ r
+  outer-pp d h {q , out _} xm (here ())
+  outer-pp d h {q , out _} xm (there ())
+  outer-pp d h {q , skip}  xm (here ())
+  outer-pp d h {q , skip}  xm (there ())
+  outer-pp d h {q , pin _} xm (here refl) = h xm
+  outer-pp d h {q , pin _} xm (there ())
+  outer-pp d h {c , end}   xm (here eq) = ⊥-elim (no-endpin (d c) (cong proj₂ eq))
+  outer-pp d h {c , end}   xm (there ())
+
+  outers-pp : ∀ {A B : Set} {p} (d : Pos → Bool) {rs : List (Row A)} → PinsPast p rs → PinsPast p (concatMap (outerRow {A} {B} d) rs)
+  outers-pp d {rs} h m with cm⁻ {f = outerRow d} {xs = rs} m
+  ... | (x , xm , h′) = outer-pp d h xm h′
+
+  mapped-pp : ∀ {B : Set} {p} (lr : Row B → Row B) → Keeps lr → (rs : List (Row B)) → PinsPast p rs → PinsPast p (mapL lr rs)
+  mapped-pp lr kp rs h m with ∈-map⁻ lr m
+  ... | (x , xm , eq) with kp x eq
+  ...   | refl = h xm
+
+  -- A lane read past its start keeps its pins, which name connects past it.
+  afterL-pp : ∀ {A B : Set} {ln : A → Pos → Maybe (Listed B)} → (∀ {a s l} → ln a s ≡ just l → PinsPast s (rows l))
+            → ∀ {a s l} → afterL ln a s ≡ just l → PinsPast s (rows l)
+  afterL-pp {ln = ln} ih {a} {s} e with bind⁻ {m = ln a s} e
+  ... | ((rs ⊣ b) , e₀ , refl) = λ m → ih e₀ (proj₁ (pastRows⁻ rs m))
+
+  LanesPP : ∀ {A B : Set} → Pos → List (Pos × A × Listed B) → Set
+  LanesPP p ls = ∀ {q a l} → (q , a , l) ∈ ls → PinsPast p (rows l)
+
+  lanes-pp : ∀ {A B : Set} {p} {ln : A → Pos → Maybe (Listed B)} {rs : List (Row A)} {ls}
+           → Past p rs → (∀ {a s l} → ln a s ≡ just l → PinsPast s (rows l)) → lanes (afterL ln) (values rs) ≡ just ls → LanesPP p ls
+  lanes-pp {p = p} {ln = ln} {rs = rs} h ih e m {k} {r} km with mapM⁻ {xs = values rs} e m
+  ... | ((q′ , a′) , vm , fx) with bind⁻ {m = afterL ln a′ (q′ ⊕ [ ix 1 ])} fx
+  ... | (_ , el , refl) = ≼-trans {p} {q′ ⊕ [ ix 1 ]} {r} (up {p} {q′} [ ix 1 ] (values-past h vm)) (afterL-pp {ln = ln} ih el km)
+
+  map-pp : ∀ {A B : Set} {p} (f : A → B) (rs : List (Row A)) → PinsPast p rs → PinsPast p (mapL (mapRow f) rs)
+  map-pp f rs h m with ∈-map⁻ (mapRow f) m
+  ... | ((q , pin _) , rm , refl) = h rm
+  ... | ((q , out _) , _ , ())
+  ... | ((q , skip) , _ , ())
+  ... | ((q , end) , _ , ())
+
+  scan-pp : ∀ {A B : Set} {p} (f : B → A → B) z (o : Listed A) → PinsPast p (rows o) → PinsPast p (rows (scanRows f z o))
+  scan-pp f z o h m with ∈-++⁻ (concatMap (ScanL.folds f z o) (ScanL.table f z o)) m
+  ... | inj₁ fm with cm⁻ {xs = ScanL.table f z o} fm
+  ...   | (_ , _ , fm′) with ∈-map⁻ _ fm′
+  ...     | (_ , _ , ())
+  scan-pp f z o h m | inj₂ om with cm⁻ {xs = rows o} om
+  ... | ((q , pin _) , rm , here refl) = h rm
+  ... | ((q , pin _) , rm , there ())
+  ... | ((q , out _) , _ , ())
+  ... | ((q , skip) , _ , here ())
+  ... | ((q , skip) , _ , there ())
+  ... | ((q , end) , _ , here ())
+  ... | ((q , end) , _ , there ())
+
+  take-pp : ∀ {A : Set} {p} i (keep : A → Bool) (o : Listed A) → PinsPast p (rows o) → PinsPast p (rows (takeRows i keep o))
+  take-pp {A} i keep o h m with cm⁻ {f = TakeL.takeRow i keep o fs} {xs = rows o} m
+    where fs = TakeL.failures i keep o
+  ... | ((q , pin _) , xm , w) with when⁻ w
+  ...   | (_ , refl) = h xm
+  take-pp i keep o h m | ((q , out a) , _ , w) with if⁻ {b = TakeL.failed i keep o (TakeL.failures i keep o) q} w
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , w′) with if⁻ {b = keep a} w′
+  ...   | inj₁ (_ , here ())
+  ...   | inj₁ (_ , there ())
+  ...   | inj₂ (_ , w″) with ∈-++⁻ (when i (q ⊕ [ ix 0 ] , out a)) w″
+  ...     | inj₁ v with when⁻ v
+  ...       | (_ , ())
+  take-pp i keep o h m | ((q , out a) , _ , w) | inj₂ (_ , w′) | inj₂ (_ , w″) | inj₂ (here ())
+  take-pp i keep o h m | ((q , out a) , _ , w) | inj₂ (_ , w′) | inj₂ (_ , w″) | inj₂ (there ())
+  take-pp i keep o h m | ((q , skip) , _ , w) with if⁻ {b = TakeL.failed i keep o (TakeL.failures i keep o) q} w
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , here ())
+  ... | inj₂ (_ , there ())
+  take-pp i keep o h m | ((q , end) , _ , w) with if⁻ {b = TakeL.failed i keep o (TakeL.failures i keep o) q} w
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , here ())
+  ... | inj₂ (_ , there ())
+
+  merge-pp : ∀ {A B : Set} {p} (o : Listed A) (ls : List (Pos × A × Listed B)) → PinsPast p (rows o) → LanesPP p ls
+           → PinsPast p (rows (mergeRows o ls))
+  merge-pp o ls ho hl m with ∈-++⁻ (concatMap (outerRow (MergeL.Ended.done o ls (Tb.ends (rows o)))) (rows o)) m
+  ... | inj₁ h = outers-pp (MergeL.Ended.done o ls (Tb.ends (rows o))) ho h
+  ... | inj₂ h with cm⁻ {f = λ { (_ , _ , l) → mapL (MergeL.Ended.laneRow o ls (Tb.ends (rows o))) (rows l) }} {xs = ls} h
+  ...   | ((q , a , l) , lm , h′) = mapped-pp _ (merge-keeps o ls (Tb.ends (rows o))) (rows l) (hl lm) h′
+
+  exhaust-pp : ∀ {A B : Set} {p} (o : Listed A) (ls : List (Pos × A × Listed B)) → PinsPast p (rows o) → LanesPP p ls
+             → PinsPast p (rows (exhaustRows o ls))
+  exhaust-pp o ls ho hl m with ∈-++⁻ (concatMap (outerRow (ExhaustL.Ran.done o ls (ExhaustL.runs o ls))) (rows o)) m
+  ... | inj₁ h = outers-pp (ExhaustL.Ran.done o ls (ExhaustL.runs o ls)) ho h
+  ... | inj₂ h with cm⁻ {f = λ { (q , _ , l) → if ExhaustL.Ran.ranᵇ o ls (ExhaustL.runs o ls) q then mapL (ExhaustL.Ran.laneRow o ls (ExhaustL.runs o ls)) (rows l) else [] }} {xs = ls} h
+  ...   | ((q , a , l) , lm , h′) with if⁻ {b = ExhaustL.Ran.ranᵇ o ls (ExhaustL.runs o ls) q} h′
+  ...     | inj₂ (_ , ())
+  ...     | inj₁ (_ , h″) = mapped-pp _ (exhaust-keeps o ls (ExhaustL.runs o ls)) (rows l) (hl lm) h″
+
+  switch-pp : ∀ {A B : Set} {p} (o : Listed A) (ls : List (Pos × A × Listed B)) → PinsPast p (rows o) → LanesPP p ls
+            → PinsPast p (rows (switchRows o ls))
+  switch-pp o ls ho hl m with ∈-++⁻ (concatMap (outerRow (SwitchL.done o ls)) (rows o)) m
+  ... | inj₁ h = outers-pp (SwitchL.done o ls) ho h
+  ... | inj₂ h with cm⁻ {f = λ { (q , _ , l) → concatMap (SwitchL.laneRow o ls q) (rows l) }} {xs = ls} h
+  ...   | ((q , a , l) , lm , h′) with cm⁻ {f = SwitchL.laneRow o ls q} {xs = rows l} h′
+  ...     | ((k , pin r) , xm , h″) with if⁻ {b = SwitchL.cutᵇ o ls q k} h″
+  ...       | inj₁ (_ , w) with when⁻ {b = not (SwitchL.cutᵇ o ls q r) ∧ inside r k} {x = (k , pin r)} w
+  ...         | (_ , refl) = hl lm xm
+  switch-pp o ls ho hl m | inj₂ h | ((q , a , l) , lm , h′) | ((k , pin r) , xm , h″) | inj₂ (_ , here refl) = hl lm xm
+  switch-pp o ls ho hl m | inj₂ h | ((q , a , l) , lm , h′) | ((k , pin r) , xm , h″) | inj₂ (_ , there ())
+  switch-pp o ls ho hl m | inj₂ h | ((q , a , l) , lm , h′) | ((k , out _) , xm , h″) with if⁻ {b = SwitchL.cutᵇ o ls q k} h″
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , here ())
+  ... | inj₂ (_ , there ())
+  switch-pp o ls ho hl m | inj₂ h | ((q , a , l) , lm , h′) | ((k , skip) , xm , h″) with if⁻ {b = SwitchL.cutᵇ o ls q k} h″
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , here ())
+  ... | inj₂ (_ , there ())
+  switch-pp o ls ho hl m | inj₂ h | ((q , a , l) , lm , h′) | ((c , end) , xm , h″) with if⁻ {b = SwitchL.cutᵇ o ls q c} h″
+  ... | inj₁ (_ , ())
+  ... | inj₂ (_ , here eq) = ⊥-elim (no-endpin (SwitchL.done o ls c) (cong proj₂ eq))
+  ... | inj₂ (_ , there ())
+
+  bounded-pp : ∀ {A B : Set} {p} k (lr : A → Pos → Maybe (Listed B)) (o : Listed A) → Past p (rows o) → PinsPast p (rows o)
+             → (∀ {a s l} → lr a s ≡ just l → PinsPast s (rows l))
+             → ∀ {l} → BoundedL.listB k (afterL lr) o ≡ just l → PinsPast p (rows l)
+  bounded-pp {A} {B} {p} k lr o hp ho ih e with bind⁻ {m = BoundedL.levels k (afterL lr) o (length (BoundedL.vals k (afterL lr) o)) 0 [] (Tb.Order.nths (BoundedL.vals k (afterL lr) o) 0)} e
+  ... | (G , eG , refl) = go
+    where
+      ln = afterL lr
+      vals = BoundedL.vals k ln o
+      nth0 : ∀ {q a} → (q , a) ∈ Tb.Order.nths vals 0 → (q , a) ∈ vals
+      nth0 am with cm⁻ {f = λ { (q , a) → when (Tb.Order.minᵇ vals q) (q , a) }} {xs = vals} am
+      ... | ((q′ , a′) , vm , w) with when⁻ {b = Tb.Order.minᵇ vals q′} {x = (q′ , a′)} w
+      ...   | (_ , refl) = vm
+      go : PinsPast p (rows (BoundedL.boundedRows k ln o G))
+      go m with ∈-++⁻ (concatMap (outerRow (BoundedL.done k ln o G)) (rows o)) m
+      ... | inj₁ h = outers-pp (BoundedL.done k ln o G) ho h
+      ... | inj₂ h with cm⁻ {f = λ { (_ , _ , _ , ss) → concatMap (λ { (_ , l) → mapL (BoundedL.laneRow k ln o G) (rows l) }) ss }} {xs = G} h
+      ...   | ((j , q , a , ss) , gm , h′) with cm⁻ {f = λ { (_ , l) → mapL (BoundedL.laneRow k ln o G) (rows l) }} {xs = ss} h′
+      ...     | ((s , l) , sm , h″) with ∈-map⁻ (BoundedL.laneRow k ln o G) h″
+      ...       | ((y , out _) , _ , ())
+      ...       | ((y , skip) , _ , ())
+      ...       | ((c , end) , _ , eq) = ⊥-elim (queued-endpin (BoundedL.queued k ln o G c) (BoundedL.done k ln o G c) c eq)
+      ...       | ((y , pin r) , xm , refl) with levels-past k ln o (length vals) 0 [] (Tb.Order.nths vals 0) eG nth0 gm sm
+      ...         | (vm , qs , el) = ≼-trans {p} {s} {r} (≼-trans {p} {q} {s} (values-past hp vm) qs) (afterL-pp {ln = lr} ih el xm)
+
+  conn-pp : ∀ {A B : Set} p (σ : Listed A) (β : Listed B) → PinsPast (p ⊕ [ ix 1 ]) (rows σ) → PinsPast (p ⊕ [ ix 0 ]) (rows β)
+          → PinsPast p (rows (connRows p σ β))
+  conn-pp p σ β hσ hβ {y} {r} m with ∈-++⁻ (rows β) m
+  ... | inj₁ bm = down {p} {r} [ ix 0 ] (hβ bm)
+  ... | inj₂ h with cm⁻ {f = ConnL.shown p σ β (Tb.ends (rows β))} {xs = rows σ} h
+  ...   | ((k , e) , km , w) with if⁻ {b = inside (p ⊕ [ ix 1 ]) k} w
+  ...     | inj₁ (_ , here refl) = ≼-refl {p}
+  ...     | inj₁ (_ , there ())
+  conn-pp p σ β hσ hβ {y} {r} m | inj₂ h | ((k , pin r′) , km , w) | inj₂ (_ , u) with when⁻ {b = ConnL.alive p σ β (Tb.ends (rows β)) r′ ∧ inside r′ k} {x = (k ⊕ [ ix 0 ] , pin r′)} u
+  ... | (_ , refl) = down {p} {r} [ ix 1 ] (hσ km)
+  conn-pp p σ β hσ hβ m | inj₂ h | ((k , out _) , km , w) | inj₂ (_ , u) with when⁻ {b = ConnL.alive p σ β (Tb.ends (rows β)) k} {x = (k ⊕ [ ix 0 ] , skip)} u
+  ... | (_ , ())
+  conn-pp p σ β hσ hβ m | inj₂ h | ((k , skip) , km , w) | inj₂ (_ , u) with when⁻ {b = ConnL.alive p σ β (Tb.ends (rows β)) k} {x = (k ⊕ [ ix 0 ] , skip)} u
+  ... | (_ , ())
+  conn-pp p σ β hσ hβ m | inj₂ h | ((k , end) , km , w) | inj₂ (_ , u) with when⁻ {b = ConnL.alive p σ β (Tb.ends (rows β)) k} {x = (k ⊕ [ ix 0 ] , skip)} u
+  ... | (_ , ())
+
+-- A LISTED PIN NAMES A CONNECT PAST ITS SUBSCRIPTION: a connect pins its
+-- source's rows with its own subscription, a reader turns a hot's pins to
+-- skips, and every other former passes a child's pin on.
+listC-pinpast : ∀ {Γ A} N n (o : Obs Timeline Γ A) {ρL : All Listed Γ} p {l} → listC N n o ρL p ≡ just l → PinsPast p (rows l)
+listC-pinpast N n       (cold c)          p refl m = ⊥-elim (walk-nopin N _ m)
+listC-pinpast N n       empty             p refl (here ())
+listC-pinpast N n       empty             p refl (there ())
+listC-pinpast N n       (of xs)           p refl m = ⊥-elim (walk-nopin (suc (length xs)) _ m)
+listC-pinpast N n       (map f s) {ρL}    p e with bind⁻ {m = listC N n s ρL p} e
+... | ((rs ⊣ b) , e₀ , refl) = map-pp f rs (listC-pinpast N n s p e₀)
+listC-pinpast N n       (scan f z s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , refl) = scan-pp f z o (listC-pinpast N n s p e₀)
+listC-pinpast N n       (takeWhile i q s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , refl) = take-pp i q o (listC-pinpast N n s p e₀)
+listC-pinpast N n       (flatMap (mergeᶠ nothing) f s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+... | (ls , els , refl) = merge-pp o ls (listC-pinpast N n s p e₀)
+        (lanes-pp {ln = λ a → listC N n (f a) ρL} {rs = rows o} (listC-past N n s p e₀) (λ {a} {s′} → listC-pinpast N n (f a) s′) els)
+listC-pinpast N n       (flatMap (mergeᶠ (just k)) f s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , e₁) = bounded-pp k (λ a → listC N n (f a) ρL) o (listC-past N n s p e₀) (listC-pinpast N n s p e₀)
+                        (λ {a} {s′} → listC-pinpast N n (f a) s′) e₁
+listC-pinpast N n       (flatMap switchᶠ f s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+... | (ls , els , refl) = switch-pp o ls (listC-pinpast N n s p e₀)
+        (lanes-pp {ln = λ a → listC N n (f a) ρL} {rs = rows o} (listC-past N n s p e₀) (λ {a} {s′} → listC-pinpast N n (f a) s′) els)
+listC-pinpast N n       (flatMap exhaustᶠ f s) {ρL} p e with bind⁻ {m = listC N n s ρL p} e
+... | (o , e₀ , e₁) with bind⁻ {m = lanes (afterL (λ a → listC N n (f a) ρL)) (values (rows o))} e₁
+... | (ls , els , refl) = exhaust-pp o ls (listC-pinpast N n s p e₀)
+        (lanes-pp {ln = λ a → listC N n (f a) ρL} {rs = rows o} (listC-past N n s p e₀) (λ {a} {s′} → listC-pinpast N n (f a) s′) els)
+listC-pinpast N n       (connect s b) {ρL} p e with bind⁻ {m = listC N n s ρL (p ⊕ [ ix 1 ])} e
+... | (σ , eσ , e₁) with bind⁻ {m = listC N n b (Tb.hotOf σ ∷ ρL) (p ⊕ [ ix 0 ])} e₁
+... | (β , eβ , refl) = conn-pp p σ β (listC-pinpast N n s (p ⊕ [ ix 1 ]) eσ) (listC-pinpast N n b (p ⊕ [ ix 0 ]) eβ)
+listC-pinpast N n       (connected i) {ρL} p refl with lookup ρL i
+... | rs ⊣ b = λ m → ⊥-elim (rejoin-nopin p rs m)
+listC-pinpast N zero    (defer l)         p refl m with ∈-applyUpTo⁻ _ m
+... | (_ , _ , ())
+listC-pinpast N (suc n) (defer l) {ρL}    p e {k} {r} m with bind⁻ {m = listC N n (Later.force l) ρL (p ⊕ [ ix 1 ])} e
+... | (b , eb , refl) with m
+...   | here ()
+...   | there m′ = down {p} {r} [ ix 1 ] (listC-pinpast N n (Later.force l) (p ⊕ [ ix 1 ]) eb m′)

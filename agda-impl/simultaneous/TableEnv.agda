@@ -47,7 +47,7 @@ import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.ListPin using (listC-pin)
-open import simultaneous.ListAfter using (listC-past)
+open import simultaneous.ListAfter using (listC-past; listC-pinpast)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
@@ -83,6 +83,10 @@ pin-ok N n o q (_ , eq , m) = listC-pin N n o q eq m
 -- A row listed in any environment lies past its subscription.
 after-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {k e} → TR (listC N n o ρL q) k e → q ≼ k
 after-ok N n o q (_ , eq , m) = listC-past N n o q eq m
+
+-- A pin listed in any environment names a connect past its subscription.
+pin-after-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {l r} → TR (listC N n o ρL q) l (pin r) → q ≼ r
+pin-after-ok N n o q (_ , eq , m) = listC-pinpast N n o q eq m
 
 private
   dropLast : List Label → List Label

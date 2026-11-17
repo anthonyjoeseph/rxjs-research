@@ -43,7 +43,7 @@ Members: `cb-corr`, `cb-φ-agree`, `cb-back`,
 `cb-back-put`, `cb-elab-causal`, `cb-stable←`,
 `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func*`,
 `cb-flat*`, `cb-cons*`,
-`cb-pin-after*`, `cb-pin-stable`.
+`cb-pin-stable`.
 
 #### THE FLATMAP'S ORDER FACTS
 
@@ -64,7 +64,7 @@ Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-pb-few`, `sw-back`,
 `sw-stable-put`, `sw-stable-lead`, `sw-elab-all`, `sw-func`, `sw-func*`,
 `sw-flat`, `sw-flat*`, `sw-cons`, `sw-cons*`,
 `sw-after-φ`,
-`sw-pin-after*`, `sw-pin-stable`.
+`sw-pin-stable`.
 
 #### THE EXHAUST
 
@@ -78,7 +78,7 @@ Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-pb-few`, `ex-back`,
 `ex-stable-put`, `ex-stable-lead`, `ex-elab-all`, `ex-func`, `ex-func*`,
 `ex-flat`, `ex-flat*`, `ex-cons`, `ex-cons*`,
 `ex-after-φ`,
-`ex-pin-after*`, `ex-pin-stable`.
+`ex-pin-stable`.
 
 #### THE BOUNDED MERGE
 
@@ -92,7 +92,7 @@ Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-pb-few`, `cc-back`,
 `cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
 `cc-flat`, `cc-flat*`, `cc-cons`, `cc-cons*`,
 `cc-after-φ`,
-`cc-pin-after*`, `cc-pin-stable`.
+`cc-pin-stable`.
 
 #### THE PLAIN MERGE
 
@@ -107,7 +107,7 @@ Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-pb-few`, `mg-back`,
 `mg-stable-put`, `mg-stable-lead`, `mg-elab-all`, `mg-func`, `mg-func*`,
 `mg-flat`, `mg-flat*`, `mg-cons`, `mg-cons*`,
 `mg-after-φ`,
-`mg-pin-after*`, `mg-pin-stable`.
+`mg-pin-stable`.
 
 #### THE CLOSER AND THE SHARE
 
@@ -119,13 +119,13 @@ Members: `cz-corr`, `cz-back`,
 `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
 `cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func*`,
 `cz-flat*`, `cz-cons*`,
-`cz-pin-after*`, `cz-pin-stable`.
+`cz-pin-stable`.
 
 Members: `sr-corr`, `sr-back`,
 `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
 `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
 `sr-flat*`, `sr-cons*`,
-`sr-pin-after*`, `sr-pin-stable`.
+`sr-pin-stable`.
 
 #### THE BACK FACT
 
@@ -150,8 +150,7 @@ Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
 `ct-in-bk`, `ct-pb-few`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
 `ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
 `ct-flat*`, `ct-cons`, `ct-cons*`,
-`ct-after-φ`, `ct-pin-after*`,
-`ct-pin-stable`.
+`ct-after-φ`, `ct-pin-stable`.
 
 #### THE ORDER FACTS
 
