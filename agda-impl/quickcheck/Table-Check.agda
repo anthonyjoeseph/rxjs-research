@@ -401,6 +401,18 @@ mutual
       coreImg (k , vout) = formula (k , vout)
       coreImg (k , vend) = flatEnd
 
+      -- A kept lane's end against every value the flatMap shows and the
+      -- source's end: the end image keeps the plain order.
+      endOrd : List (String × String)
+      endOrd with plainV (listC N n (flatMap op f s) ρ p)
+      ... | nothing = []
+      ... | just ks = concatMap (λ e → concatMap (cmp e) (mapL (λ k → k , formula (k , vout)) (ofKind true ks) ++ mapL (λ k → k , formula (k , vend)) (endsM o))) laneEnds
+        where
+          cmp : Pos → Pos × Pos → List (String × String)
+          cmp e (k , w) = let we = formula (e , vend) in
+            if (e <ᵖ k) ∧ not (we <ᵖ w) ∨ (k <ᵖ e) ∧ not (w <ᵖ we)
+            then [ "end-order" , nm +++ " " +++ showPos e +++ " ~ " +++ showPos we +++ " vs " +++ showPos k +++ " ~ " +++ showPos w ] else []
+
       -- Each value of the lanes' flatMap's source, written out: the
       -- shared hot's row of the plain value's image, rejoined, and the
       -- first value `each` lists from it.
@@ -432,7 +444,7 @@ mutual
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = checks (nm +++ "/core") p c₁ [] m
+      ...   | just m  = endOrd ++ checks (nm +++ "/core") p c₁ [] m
                        ++ concatMap (λ { (k , k*) → let w = coreImg (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
         where
@@ -555,7 +567,7 @@ private
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
