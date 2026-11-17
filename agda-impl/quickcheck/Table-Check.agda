@@ -433,8 +433,23 @@ mutual
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
       ...   | just m  = endOrd ++ checks (nm +++ "/core") p c₁ [] m
                        ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
-                                    else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
+                                    else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
         where
+          showEnds : ∀ {X} → Maybe (Listed X) → String
+          showEnds nothing  = "none"
+          showEnds (just l) = L.foldr (λ r acc → showPos r +++ " " +++ acc) (if short l then "short" else "whole") (ends (rows l))
+
+          -- The lane holding `k`: its ends walked alone, and as the
+          -- core lists it.
+          laneDiag : Pos → String
+          laneDiag k with laneOf k walked | starts op
+          ... | just (st* , _) | just ls = L.foldr (λ { (a , st , s*) acc → (if does (s* ≟ᵖ st*) then
+                  " | lane " +++ showPos st +++ " ~ " +++ showPos s*
+                  +++ " | alone " +++ showEnds (listC N n (elab ρι⁴ (f a)) (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) (laneX st*))
+                  +++ " | in core " +++ showEnds (listC N n (laneˢ (elab ρι⁴ (f a))) ρ*c st*)
+                  +++ " | plain " +++ showEnds (listC N n (f a) ρ st) else "") +++ acc }) "" ls
+          ... | _ | _ = ""
+
           kindOf : Pos → Vis
           kindOf k = if memᵖ k (ofKind false ks) then vend else vout
       coreRes | _ | _ = none
