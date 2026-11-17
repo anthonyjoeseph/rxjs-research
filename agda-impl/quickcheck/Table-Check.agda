@@ -449,10 +449,10 @@ mutual
       ... | _ | _ = []
 
       -- Each live pin of the flatMap, the source's or a lane's: the lanes'
-      -- flatMap holds a pin whose connect has no image of a value past the
-      -- plain connect before it.
-      pinRes : List (Pos × Pos) → List (String × String)
-      pinRes m with o | listC N n (flatMap op f s) ρ p | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
+      -- flatMap, or the whole, holds a pin whose connect has no image of a
+      -- value past the plain connect before it.
+      pinRes : String → Maybe (Listed (IE B)) → List (Pos × Pos) → List (String × String)
+      pinRes w tw m with o | listC N n (flatMap op f s) ρ p | tw
       ... | just so | just t | just t* = if short t ∨ short t* then [] else concatMap chk (rows t)
         where
           vals : List Pos
@@ -467,7 +467,7 @@ mutual
           fromSrc k = anyᵇ (λ { (k′ , pin _) → does (k′ ≟ᵖ k) ; _ → false }) (rows so)
           chk : Row B → List (String × String)
           chk (k , pin q) = if not (live k) ∨ pinned q then []
-                            else fail (if fromSrc k then "core-pin-src" else "core-pin-lane") nm k q
+                            else fail (w +++ (if fromSrc k then "-pin-src" else "-pin-lane")) nm k q
           chk _ = []
       ... | _ | _ | _ = []
 
@@ -502,7 +502,7 @@ mutual
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ pinRes m ++ checks (nm +++ "/core") p c₁ [] m
+      ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ pinRes "core" (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁) m ++ checks (nm +++ "/core") p c₁ [] m
                        ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
         where
@@ -548,7 +548,8 @@ mutual
       wholeRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (elab ρι (flatMap op f s)) ρ* p*)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = none
-      ...   | just m  = concatMap (λ { (k , k*) → let w = whole (k , kindOf k) in if does (w ≟ᵖ k*) then []
+      ...   | just m  = pinRes "whole" (listC N n (elab ρι (flatMap op f s)) ρ* p*) m
+                       ++ concatMap (λ { (k , k*) → let w = whole (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "whole" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
         where
           kindOf : Pos → Vis
@@ -675,7 +676,7 @@ private
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ "core-pin-src" ∷ "core-pin-lane" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ "core-pin-src" ∷ "core-pin-lane" ∷ "whole-pin-src" ∷ "whole-pin-lane" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
