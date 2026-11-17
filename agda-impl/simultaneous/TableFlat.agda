@@ -40,10 +40,13 @@ open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMa
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
-open import denotation.Laws.Modulus using (AgreeTo; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (AgreeTo; ≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻)
-open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; module BoundedL; module ExhaustL; module Order)
+open import quickcheck.Tabled.Exact.Base using (any⁻; bind⁻; values⁺; pastRows⁺)
+open import Data.Maybe.Properties using (just-injective)
+open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
+open import denotation.Laws.Worlds using (InvAt; PinBy; world-after)
+open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; bind; lanes; past; rejoin; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
@@ -51,7 +54,7 @@ open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; got-bind; ke
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l;
   linked-r; linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; env-wk; Holds; Admits; admits-step; admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func; tab-flat)
+  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; env-wk; Holds; Admits; admits-step; admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -408,11 +411,63 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     eachS : Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) A
     eachS = each valuesOf (connected (there (here refl)))
 
-    postulate
-      -- THE READER'S ROWS: each value of the source is a row of the share
-      -- at its image, read under the lanes' flatMap and listed by `each`
-      -- one lane down.
-      each-row : ∀ {N q a} → TR (S N) q (out a) → TR (Tab n eachS ρ*c c₁ N) (val* N q) (out a)
+    -- The share's subscription, and the shared flatMap's table there.
+    shp : Pos
+    shp = p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+
+    shL : ℕ → Tb.Listed (IE A)
+    shL N = proj₁ (listC-ok (3 + N) n shared {ρ*s N} (uρ*s N) shp)
+
+    shL-eq : ∀ N → listC (3 + N) n shared (ρ*s N) shp ≡ just (shL N)
+    shL-eq N = proj₁ (proj₂ (listC-ok (3 + N) n shared {ρ*s N} (uρ*s N) shp))
+
+    -- `each`'s table under the lanes' flatMap.
+    okE : ∀ N → _
+    okE N = listC-ok (3 + N) n eachS {ρ*c N} (uρ*c N) c₁
+
+    -- The trigger's value, kept before its end and rejoined under the
+    -- share.
+    trig-row : ∀ N → (p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub shp ] , out tt) ∈ rows (rejoin shp (tt-tab N))
+    trig-row N = rejoin-in shp (tt-tab N) r₁ (part-≺ p* (ix 1 ∷ []) (ix 0 ∷ []) refl)
+      where
+        r₁ = proper-in ((p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] , out tt) ∷ (p* ⊕ [ ix 1 ] ⊕ [ last ] , end) ∷ []) (here refl) λ { (here ()) ; (there (here refl)) → ≺→≼ {p* ⊕ [ ix 1 ] ⊕ [ ix 0 ]} (part-≺ (p* ⊕ [ ix 1 ]) [] [] refl)
+                                         ; (there (there ())) }
+
+    -- An elaborated source value is the trigger lane's, which the shared
+    -- flatMap shows and, quiet past its end, keeps.
+    shared-row : ∀ {N k x′} → TR (Tab n s* ρ*s sp* N) k (out x′) → sp* ≺ k → (k , out x′) ∈ rows (sh-tab N)
+    shared-row {N} {k} {x′} (L′ , eqL′ , m′) sk
+      with bind⁻ {m = lanes (afterL (λ _ → listC (3 + N) n s* (ρ*s N))) (values (rows (rejoin shp (tt-tab N))))} (shL-eq N)
+    ... | (ls , els , e₂) = proper-in (rows (shL N)) r λ cm lt → noPin (InvAt.quiet Ish (shL N , shL-eq N , cm) (shL N , shL-eq N , r) lt)
+      where
+        Ish = tab-at n shared uρ*s Ds (admits-step Ds ad₄) N
+        lm = lane-of {ln = afterL (λ _ → listC (3 + N) n s* (ρ*s N))} els (values⁺ (trig-row N)) (cong (λ m → bind m λ l → just (past sp* l)) eqL′)
+        r : (k , out x′) ∈ rows (shL N)
+        r = subst (λ L → (k , out x′) ∈ rows L) (just-injective e₂) (merge-lane-out (rejoin shp (tt-tab N)) ls lm (pastRows⁺ (rows L′) m′ sk))
+        noPin : ∀ {c} → PinBy c (out x′) → ⊥
+        noPin (_ , () , _)
+
+    -- A value the shared hot keeps past the lanes' flatMap's subscription
+    -- is listed by `each` one lane down.
+    each-at : ∀ {N k x′ a} → (k , out x′) ∈ rows (sh-tab N) → c₁ ≺ k → valuesOf x′ ≡ a ∷ []
+            → TR (Tab n eachS ρ*c c₁ N) (k ⊕ˡ (sub c₁ ∷ ix 1 ∷ ix 0 ∷ [])) (out a)
+    each-at {N} {k} {x′} {a} r ck rd
+      with bind⁻ {m = lanes (afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))) (values (rows (rejoin c₁ (sh-tab N))))} (proj₁ (proj₂ (okE N)))
+    ... | (ls , els , e₂) = proj₁ (okE N) , proj₁ (proj₂ (okE N)) , subst (λ L → _ ∈ rows L) (just-injective e₂)
+            (merge-lane-out (rejoin c₁ (sh-tab N)) ls (lane-of {ln = afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))} els (values⁺ (rejoin-in c₁ (sh-tab N) r ck)) refl) (of-past (k ⊕ [ sub c₁ ] ⊕ [ ix 1 ]) (valuesOf x′) rd))
+
+    -- THE READER'S ROWS: each value of the source is the elaborated
+    -- source's value at its image, which the shared flatMap keeps; the
+    -- lanes' flatMap reads it under its subscription.
+    each-row : ∀ {N q a} → TR (S N) q (out a) → TR (Tab n eachS ρ*c c₁ N) (val* N q) (out a)
+    each-row {N} {q} {a} x with Corr.row→ (Rel.corr (Out.rel Os) N) x tt
+    ... | inj₂ (() , _)
+    ... | inj₁ (e′ , y , mt) with proj₁ mt tt
+    ...   | x′ , refl , rd = each-at (shared-row y sk) (≺-trans {c₁} {sp*} (part-≺ p* (ix 0 ∷ ix 0 ∷ ix 1 ∷ []) (ix 0 ∷ sub shp ∷ ix 1 ∷ []) refl) sk) rd
+      where
+        Isp = tab-at n s* uρ*s Ds (admits-trig n uρ* (lw* env) p* ad*) N
+        sk : sp* ≺ Rel.φ (Out.rel Os) N q
+        sk = world-after (InvAt.world Isp y) (InvAt.real Isp y)
 
     -- A lane's trigger, listed off its lawful source, and the lane's
     -- elaborated subscription admissible under it.
