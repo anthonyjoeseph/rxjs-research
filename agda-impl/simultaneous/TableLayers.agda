@@ -37,12 +37,14 @@ open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
 open import simultaneous.TableFlat using (module Flat; in-if; max-ge; ≼-ˡ; any-≟)
+open import simultaneous.TableJoin using (module Joiners)
 
 module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
   (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
 
   open Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
+  open Joiners n f s ρ uρ ρι ρ* uρ* env p p* ad ad* using (flat-core)
 
   ----------------------------------------------------------------------
   -- THE COMBINED SCAN: each row of the lanes' flatMap read by the scan's

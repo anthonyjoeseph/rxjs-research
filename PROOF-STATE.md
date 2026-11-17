@@ -57,7 +57,8 @@ The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-back`, `sw-put-up`,
+Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-src-back`, `sw-lane-back`,
+`sw-lane-left`, `sw-put-up`,
 `sw-back-put`, `sw-elab-causal`, `sw-stable←`, `sw-stable-put`,
 `sw-stable-lead`, `sw-elab-all`, `sw-cons`, `sw-cons*`, `sw-after-φ`,
 `sw-pin-stable`.
@@ -94,7 +95,8 @@ source's end at the later of its own and the trigger's. Visible images
 probed; skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`, `mg-put-up`,
+Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-src-back`, `mg-lane-back`,
+`mg-put-up`,
 `mg-back-put`, `mg-elab-causal`, `mg-stable←`, `mg-stable-put`,
 `mg-stable-lead`, `mg-elab-all`, `mg-cons`, `mg-cons*`, `mg-after-φ`,
 `mg-pin-stable`.
