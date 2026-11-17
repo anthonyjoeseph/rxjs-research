@@ -51,7 +51,7 @@ open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; got-bind; ke
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l;
   linked-r; linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; env-wk; Holds)
+  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; env-wk; Holds; Admits; admits-step; admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func; tab-flat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -121,7 +121,7 @@ max-ge b (x ∷ xs) = in-if (x <ᵖ r) (λ v → b ≼ v) (λ _ → max-ge b xs)
 
 module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (env : EnvR ρ ρι ρ*) (p p* : Pos) where
+  (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
 
   ----------------------------------------------------------------------
   -- The elaborated parts
@@ -187,6 +187,37 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   uρ*c : ∀ N → UncutEnv (ρ*c N)
   uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
 
+  -- Each hot listed off its lawful source, each body admissible.
+  ttD : HotD tt-tab
+  ttD = listHot n (of (tt ∷ [])) uρ* (lw* env) p* ad*
+
+  Ds : DenOf ρ*s
+  Ds = den-cons ttD (lw* env)
+
+  ad₄ : Admits Ds (p* ⊕ [ ix 0 ])
+  ad₄ = admits-body n (of (tt ∷ [])) uρ* (lw* env) p* ad*
+
+  shD : HotD sh-tab
+  shD = listHot n shared uρ*s Ds (p* ⊕ [ ix 0 ]) ad₄
+
+  Dh : DenOf ρ*h
+  Dh = den-cons shD Ds
+
+  ad₃ : Admits Dh c₃
+  ad₃ = admits-body n shared uρ*s Ds (p* ⊕ [ ix 0 ]) ad₄
+
+  clD : HotD cl-tab
+  clD = listHot n closer uρ*h Dh c₃ ad₃
+
+  Dc : DenOf ρ*c
+  Dc = den-cons clD Dh
+
+  ad₂ : Admits Dc c₂
+  ad₂ = admits-body n closer uρ*h Dh c₃ ad₃
+
+  ad₁ : Admits Dc c₁
+  ad₁ = admits-step Dc ad₂
+
   -- A table's ends.
   endsOf : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
   endsOf nothing   = []
@@ -229,7 +260,8 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   Lanes : Set₁
   Lanes = ∀ a (t₁ : ℕ → Tb.Listed ⊤) (t₂ : ℕ → Tb.Listed (IE B)) (t₃ : ℕ → Tb.Listed (IE A)) (t₄ : ℕ → Tb.Listed ⊤)
         → (∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
-        → Holds n (f a) ρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) (env-wk t₁ (env-wk t₂ (env-wk t₃ (env-wk t₄ env))))
+        → (h₁ : HotD t₁) (h₂ : HotD t₂) (h₃ : HotD t₃) (h₄ : HotD t₄)
+        → Holds n (f a) ρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
 
   -- The plain flatMap's tables.
   P : FlatOp → ℕ → _
@@ -264,6 +296,20 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- source's: a row of either is the source's or a lane's, and no lane
     -- row sits where a source row does.
     pd-agree : ∀ {op N N′ k} → AgreeTo k (TR (P op N)) (TR (P op N′)) → AgreeTo k (TR (Pd op N)) (TR (Pd op N′))
+
+  -- One event at a position, none under another: each table is listed
+  -- off its lawful emission set.
+  pd-func : ∀ {op N y e e′} → TR (Pd op N) y e → TR (Pd op N) y e′ → e ≡ e′
+  pd-func {op} {N} x x′ = tab-func n (flatMap op f s) uρ (lw env) ad (pd-sub {op} {N} x) (pd-sub {op} {N} x′)
+
+  pd-flat : ∀ {op N y e l ys e′} → TR (Pd op N) y e → TR (Pd op N) (y ⊕ (l ∷ ys)) e′ → ⊥
+  pd-flat {op} {N} x x′ = tab-flat n (flatMap op f s) uρ (lw env) ad (pd-sub {op} {N} x) (pd-sub {op} {N} x′)
+
+  core-func : ∀ {op N y e e′} → TR (listC (3 + N) n (core op) (ρ*c N) c₁) y e → TR (listC (3 + N) n (core op) (ρ*c N) c₁) y e′ → e ≡ e′
+  core-func {op} = tab-func n (core op) uρ*c Dc ad₁
+
+  core-flat : ∀ {op N y e l ys e′} → TR (listC (3 + N) n (core op) (ρ*c N) c₁) y e → TR (listC (3 + N) n (core op) (ρ*c N) c₁) (y ⊕ (l ∷ ys)) e′ → ⊥
+  core-flat {op} = tab-flat n (core op) uρ*c Dc ad₁
 
   -- The lanes' flatMap related to the plain flatMap.
   Core : FlatOp → Set₁
@@ -358,6 +404,25 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     laneXs : Pos → List Label
     laneXs st = ix 0 ∷ ix 1 ∷ laneXt st
 
+    -- The source's values read by `each` at the share's reader.
+    eachS : Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) A
+    eachS = each valuesOf (connected (there (here refl)))
+
+    postulate
+      -- THE READER'S ROWS: each value of the source is a row of the share
+      -- at its image, read under the lanes' flatMap and listed by `each`
+      -- one lane down.
+      each-row : ∀ {N q a} → TR (S N) q (out a) → TR (Tab n eachS ρ*c c₁ N) (val* N q) (out a)
+
+    -- A lane's trigger, listed off its lawful source, and the lane's
+    -- elaborated subscription admissible under it.
+    trigD : ∀ st → Admits Dc st → HotD (trig st)
+    trigD st a = listHot n (of (tt ∷ [])) uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))
+
+    laneAdm : ∀ st (a : Admits Dc st) → Admits (den-cons (trigD st a) Dc) (laneX st)
+    laneAdm st a = admits-ix D′ 1 (admits-ix D′ 0 (admits-trig n uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))))
+      where D′ = den-cons (trigD st a) Dc
+
     -- A lane related at a cut: its value, its two subscriptions, its
     -- record.
     record LaneRec (N : ℕ) : Set₁ where
@@ -367,6 +432,8 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         st  : Pos
         stE : Pos
         alL : Aligned (maps env) ρ st (laneL stE)
+        adm : Admits (lw env) st
+        adm* : Admits Dc stE
         lane : Out n (f a) ρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (maps env) st (laneX stE)
 
       -- The lane's plain tables.
@@ -387,6 +454,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       outImage endImage : Pos → Pos
       outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
       endImage y = emitAt (endφ y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+
+    postulate
+      -- THE ELABORATED LANE'S END: where `laneˢ` shows the lane's end, its
+      -- `laneDone` taken by the take.
+      lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+                → TR (Tab n (laneˢ (elab ρι⁴ (f (LaneRec.a R)))) ρ*c (LaneRec.stE R) N) (LaneRec.endImage R c) end
 
     -- A lane's end, past its trigger's: its own facts there, or, where
     -- the trigger's end is the later, the trigger's.  The trigger's end
@@ -425,13 +498,17 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- A value's lane, subscribed under its row: the source's facts at the
     -- row align the lane's pair.
     valRec : ∀ N → ValAt N → LaneRec N
-    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL (
-      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (q ⊕ [ ix 1 ]) (laneX st)
+    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL ad₀ ad₀* (
+      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (q ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt) (ix 1)) (sub c₁)) ys))
       where
         st = st* N q
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ laneXs st
+        ad₀ : Admits (lw env) (q ⊕ [ ix 1 ])
+        ad₀ = admits-row n s uρ (lw env) ad x
+        ad₀* : Admits Dc st
+        ad₀* = admits-row n eachS uρ*c Dc ad₁ (each-row x)
         alL : Aligned (maps env) ρ (q ⊕ [ ix 1 ]) (laneL st)
         alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁))
                 (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
@@ -440,13 +517,17 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- lane's facts at its end align the pair, the elaborated lane queued
     -- under the end's image.
     queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
-    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL (
-      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (c ⊕ [ ix 1 ]) (laneX st)
+    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL ad₀ ad₀* (
+      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (c ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys))
       where
         r  = readerR (LaneRec.stE R)
         st = LaneRec.endImage R c ⊕ [ ix 1 ]
+        ad₀ : Admits (lw env) (c ⊕ [ ix 1 ])
+        ad₀ = admits-row n (f (LaneRec.a R)) uρ (lw env) (LaneRec.adm R) cx
+        ad₀* : Admits Dc st
+        ad₀* = admits-row n (laneˢ (elab ρι⁴ (f (LaneRec.a R)))) uρ*c Dc (LaneRec.adm* R) (lane-end-image R cx)
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
         alL : Aligned (maps env) ρ (c ⊕ [ ix 1 ]) (laneL st)
         alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (end-cuts R cx) (ix 1) (sub r))
@@ -592,10 +673,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (mg-corr N) k
                        → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
         mg-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-        mg-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
-        mg-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-        mg-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-        mg-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
         mg-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         mg-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
         mg-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -629,7 +706,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         { φ = φ′ ; Put = Put′ ; corr = mg-corr ; φ-agree = mg-φ-agree ; bk = bk′ ; in-bk = mg-in-bk ; pb-few = pb-few′
         ; back = mg-back ; put-up = mg-put-up ; back-put = mg-back-put
         ; elab-causal = mg-elab-causal ; stable← = mg-stable← ; stable-put = mg-stable-put ; stable-lead = mg-stable-lead
-        ; elab-all = mg-elab-all ; func = mg-func ; func* = mg-func* ; flat = mg-flat ; flat* = mg-flat*
+        ; elab-all = mg-elab-all ; func = pd-func {(mergeᶠ nothing)} ; func* = core-func {(mergeᶠ nothing)} ; flat = pd-flat {(mergeᶠ nothing)} ; flat* = core-flat {(mergeᶠ nothing)}
         ; pin-in = mg-pin-in ; pin-in* = mg-pin-in* ; cons = mg-cons ; cons* = mg-cons* ; got = mg-got ; got* = mg-got*
         ; after = mg-after ; after* = mg-after* ; after-φ = mg-after-φ ; pin-after* = mg-pin-after* ; pin-stable = mg-pin-stable }
 
@@ -683,10 +760,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         cc-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cc-corr N) k
                        → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
         cc-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-        cc-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
-        cc-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-        cc-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-        cc-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
         cc-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         cc-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
         cc-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -720,7 +793,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         { φ = φ′ ; Put = Put′ ; corr = cc-corr ; φ-agree = cc-φ-agree ; bk = bk′ ; in-bk = cc-in-bk ; pb-few = pb-few′
         ; back = cc-back ; put-up = cc-put-up ; back-put = cc-back-put
         ; elab-causal = cc-elab-causal ; stable← = cc-stable← ; stable-put = cc-stable-put ; stable-lead = cc-stable-lead
-        ; elab-all = cc-elab-all ; func = cc-func ; func* = cc-func* ; flat = cc-flat ; flat* = cc-flat*
+        ; elab-all = cc-elab-all ; func = pd-func {(mergeᶠ (just k))} ; func* = core-func {(mergeᶠ (just k))} ; flat = pd-flat {(mergeᶠ (just k))} ; flat* = core-flat {(mergeᶠ (just k))}
         ; pin-in = cc-pin-in ; pin-in* = cc-pin-in* ; cons = cc-cons ; cons* = cc-cons* ; got = cc-got ; got* = cc-got*
         ; after = cc-after ; after* = cc-after* ; after-φ = cc-after-φ ; pin-after* = cc-pin-after* ; pin-stable = cc-pin-stable }
 
@@ -751,10 +824,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         sw-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sw-corr N) k
                        → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
         sw-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-        sw-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
-        sw-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-        sw-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-        sw-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
         sw-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         sw-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
         sw-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -788,7 +857,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         { φ = φ′ ; Put = Put′ ; corr = sw-corr ; φ-agree = sw-φ-agree ; bk = bk′ ; in-bk = sw-in-bk ; pb-few = pb-few′
         ; back = sw-back ; put-up = sw-put-up ; back-put = sw-back-put
         ; elab-causal = sw-elab-causal ; stable← = sw-stable← ; stable-put = sw-stable-put ; stable-lead = sw-stable-lead
-        ; elab-all = sw-elab-all ; func = sw-func ; func* = sw-func* ; flat = sw-flat ; flat* = sw-flat*
+        ; elab-all = sw-elab-all ; func = pd-func {switchᶠ} ; func* = core-func {switchᶠ} ; flat = pd-flat {switchᶠ} ; flat* = core-flat {switchᶠ}
         ; pin-in = sw-pin-in ; pin-in* = sw-pin-in* ; cons = sw-cons ; cons* = sw-cons* ; got = sw-got ; got* = sw-got*
         ; after = sw-after ; after* = sw-after* ; after-φ = sw-after-φ ; pin-after* = sw-pin-after* ; pin-stable = sw-pin-stable }
 
@@ -827,10 +896,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ex-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (ex-corr N) k
                        → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
         ex-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-        ex-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
-        ex-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-        ex-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-        ex-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
         ex-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
         ex-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
         ex-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₁ ≼ φ′ N k
@@ -864,7 +929,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         { φ = φ′ ; Put = Put′ ; corr = ex-corr ; φ-agree = ex-φ-agree ; bk = bk′ ; in-bk = ex-in-bk ; pb-few = pb-few′
         ; back = ex-back ; put-up = ex-put-up ; back-put = ex-back-put
         ; elab-causal = ex-elab-causal ; stable← = ex-stable← ; stable-put = ex-stable-put ; stable-lead = ex-stable-lead
-        ; elab-all = ex-elab-all ; func = ex-func ; func* = ex-func* ; flat = ex-flat ; flat* = ex-flat*
+        ; elab-all = ex-elab-all ; func = pd-func {exhaustᶠ} ; func* = core-func {exhaustᶠ} ; flat = pd-flat {exhaustᶠ} ; flat* = core-flat {exhaustᶠ}
         ; pin-in = ex-pin-in ; pin-in* = ex-pin-in* ; cons = ex-cons ; cons* = ex-cons* ; got = ex-got ; got* = ex-got*
         ; after = ex-after ; after* = ex-after* ; after-φ = ex-after-φ ; pin-after* = ex-pin-after* ; pin-stable = ex-pin-stable }
 

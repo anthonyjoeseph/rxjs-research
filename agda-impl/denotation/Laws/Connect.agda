@@ -31,17 +31,18 @@ open import denotation.Laws.Worlds
   ⊑-inside; inside-⊑; diverge; same-lead; flat-under; world-anc; world-anc⁼; anc-≼; apart;
   anc-lead; Plain; widen⁼; nest⁼; w-up; PinBy; ⊑-unit; ⊕-assoc; ⊕-identityʳ; ⊕-injˡ)
 
-module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
-         (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t)))
-         (p : Pos) (ok : Ok H p) where
+-- A BODY'S WORLD AND ITS SOURCE'S MEET ONLY THROUGH JOINED ROWS, whichever
+-- source rows the body may join, so long as they lie in the source's
+-- world.
+module Apart {A : Set} {H : Pos → Set} (σ′ : EmissionSet A) (p : Pos) (ok : Ok H p)
+             (σw : ∀ {h e} → σ′ h e → W H (p ⊕ [ ix 1 ]) h) where
 
-  open Connect s F p
+  private
+    r : Pos
+    r = p ⊕ [ ix 1 ]
 
   p₀ : Pos
   p₀ = p ⊕ [ ix 0 ]
-
-  σ′ : EmissionSet A
-  σ′ = Proper σ
 
   H₀ : Pos → Set
   H₀ = H ∪ʰ σ′
@@ -49,11 +50,8 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
   rp : Real p
   rp = proj₁ ok
 
-  Iσ : InvAt H r σ
-  Iσ = Is r (ok-step p ok)
-
   σ-wp : ∀ {h e} → σ′ h e → W H p h
-  σ-wp x = shrink (InvAt.world Iσ (proj₁ x))
+  σ-wp x = shrink (σw x)
 
   -- A BODY POSITION LEADS NO SOURCE POSITION.
   mutual
@@ -108,6 +106,27 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
     ... | inj₁ le′  = later (source-leads′ sx bh le′) (⊑-snoc⁺ h)
     ... | inj₂ refl = ⊥-elim (apart rp (world-anc (join (inj₂ bh) by eh)) (world-anc⁼ sx))
 
+  ok₀ : Ok H₀ p₀
+  ok₀ = real-snoc p plain-ix rp , dj
+    where
+      dj : ∀ {h w} → H₀ h → W H₀ p₀ w → T (inside w h) → ⊥
+      dj (inj₂ hh)      w i = proj₂ ok hh (narrow σ-wp w) i
+      dj (inj₁ (_ , x)) w i = body-leads (inW w) (inW (σw x)) (inside-⊑ _ _ i)
+
+module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
+         (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t)))
+         (p : Pos) (ok : Ok H p) where
+
+  open Connect s F p
+
+  σ′ : EmissionSet A
+  σ′ = Proper σ
+
+  Iσ : InvAt H r σ
+  Iσ = Is r (ok-step p ok)
+
+  open Apart σ′ p ok (λ x → InvAt.world Iσ (proj₁ x)) public
+
   lawful : Lawful σ′
   lawful = record
     { real   = λ x → InvAt.real Iσ (proj₁ x)
@@ -115,13 +134,6 @@ module _ {A B : Set} {H : Pos → Set} {s : Den A} {F : Den A → Den B}
     ; flat   = λ x x′ → InvAt.flat Iσ (proj₁ x) (proj₁ x′)
     ; proper = λ c y → proj₂ y (proj₁ c)
     }
-
-  ok₀ : Ok H₀ p₀
-  ok₀ = real-snoc p plain-ix rp , dj
-    where
-      dj : ∀ {h w} → H₀ h → W H₀ p₀ w → T (inside w h) → ⊥
-      dj (inj₂ hh)      w i = proj₂ ok hh (narrow σ-wp w) i
-      dj (inj₁ (_ , x)) w i = body-leads (inW w) (inW (InvAt.world Iσ (proj₁ x))) (inside-⊑ _ _ i)
 
   Iβ : InvAt H₀ p₀ β
   Iβ = IF lawful p₀ ok₀

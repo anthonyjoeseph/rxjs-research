@@ -39,10 +39,8 @@ lane branch's reader, the flatMap's end at the `nothing` past the last
 of the three branches' ends (probed, kind `whole`). Untried: its fields,
 the scan emitting nothing but marks besides. Settled by bodies.
 
-Members: `cb-corr`, `cb-φ-agree`, `cb-back`,
-`cb-back-put`, `cb-elab-causal`, `cb-stable←`,
-`cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func*`,
-`cb-flat*`, `cb-cons*`,
+Members: `cb-corr`, `cb-φ-agree`, `cb-back`, `cb-back-put`, `cb-elab-causal`,
+`cb-stable←`, `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-cons*`,
 `cb-pin-stable`.
 
 #### THE FLATMAP'S ORDER FACTS
@@ -53,17 +51,24 @@ Settled by its body.
 
 Members: `flatmap-order`.
 
+#### THE LANES' SUBSCRIPTIONS
+
+A lane is admissible because its subscribing row is: untried that a
+source row reappears in the elaborated `each` at its value's image, and
+a lane's end at its end image. Settled by their bodies over the core's
+map.
+
+Members: `each-row`, `lane-end-image`.
+
 #### THE SWITCH
 
 The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-back`,
-`sw-put-up`, `sw-back-put`, `sw-elab-causal`, `sw-stable←`,
-`sw-stable-put`, `sw-stable-lead`, `sw-elab-all`, `sw-func`, `sw-func*`,
-`sw-flat`, `sw-flat*`, `sw-cons`, `sw-cons*`,
-`sw-after-φ`,
+Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-back`, `sw-put-up`,
+`sw-back-put`, `sw-elab-causal`, `sw-stable←`, `sw-stable-put`,
+`sw-stable-lead`, `sw-elab-all`, `sw-cons`, `sw-cons*`, `sw-after-φ`,
 `sw-pin-stable`.
 
 #### THE EXHAUST
@@ -73,11 +78,9 @@ exhaust runs. Untried: the elaborated exhaust runs the same lanes,
 though its lanes end at their end images. Settled by bodies, or a value
 run on one side only.
 
-Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`,
-`ex-put-up`, `ex-back-put`, `ex-elab-causal`, `ex-stable←`,
-`ex-stable-put`, `ex-stable-lead`, `ex-elab-all`, `ex-func`, `ex-func*`,
-`ex-flat`, `ex-flat*`, `ex-cons`, `ex-cons*`,
-`ex-after-φ`,
+Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`, `ex-put-up`,
+`ex-back-put`, `ex-elab-causal`, `ex-stable←`, `ex-stable-put`,
+`ex-stable-lead`, `ex-elab-all`, `ex-cons`, `ex-cons*`, `ex-after-φ`,
 `ex-pin-stable`.
 
 #### THE BOUNDED MERGE
@@ -87,11 +90,9 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed, kind `lane-sub`). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`,
-`cc-put-up`, `cc-back-put`, `cc-elab-causal`, `cc-stable←`,
-`cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
-`cc-flat`, `cc-flat*`, `cc-cons`, `cc-cons*`,
-`cc-after-φ`,
+Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`, `cc-put-up`,
+`cc-back-put`, `cc-elab-causal`, `cc-stable←`, `cc-stable-put`,
+`cc-stable-lead`, `cc-elab-all`, `cc-cons`, `cc-cons*`, `cc-after-φ`,
 `cc-pin-stable`.
 
 #### THE PLAIN MERGE
@@ -102,11 +103,9 @@ source's end at the later of its own and the trigger's. Visible images
 probed (`make table-check`, kind `core`); skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`,
-`mg-put-up`, `mg-back-put`, `mg-elab-causal`, `mg-stable←`,
-`mg-stable-put`, `mg-stable-lead`, `mg-elab-all`, `mg-func`, `mg-func*`,
-`mg-flat`, `mg-flat*`, `mg-cons`, `mg-cons*`,
-`mg-after-φ`,
+Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`, `mg-put-up`,
+`mg-back-put`, `mg-elab-causal`, `mg-stable←`, `mg-stable-put`,
+`mg-stable-lead`, `mg-elab-all`, `mg-cons`, `mg-cons*`, `mg-after-φ`,
 `mg-pin-stable`.
 
 #### THE CLOSER AND THE SHARE
@@ -116,17 +115,11 @@ are and its source's only as pins and skips; the share puts the
 source's pins where its connect shows them, the layers inside relating
 the plain flatMap without them. Untried: the fields. Settled by bodies.
 
-Members: `cz-corr`, `cz-back`,
-`cz-back-put`, `cz-elab-causal`, `cz-stable←`,
-`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func*`,
-`cz-flat*`, `cz-cons*`,
-`cz-pin-stable`.
-
-Members: `sr-corr`, `sr-back`, `sr-put-up`,
-`sr-back-put`, `sr-elab-causal`, `sr-stable←`,
-`sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
-`sr-func`, `sr-flat`, `sr-flat*`, `sr-cons`, `sr-cons*`,
-`sr-pin-stable`.
+Members: `cz-corr`, `cz-back`, `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
+`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-cons*`, `cz-pin-stable`,
+`sr-corr`, `sr-back`, `sr-put-up`, `sr-back-put`, `sr-elab-causal`,
+`sr-stable←`, `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-cons`,
+`sr-cons*`, `sr-pin-stable`.
 
 #### THE SOURCE'S PINS
 
@@ -157,10 +150,9 @@ the source's hot (`conn-hot`), an old hot cutting the new alike
 Settled by bodies.
 
 Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
-`ct-in-bk`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
-`ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
-`ct-flat*`, `ct-cons`, `ct-cons*`,
-`ct-after-φ`, `ct-pin-stable`.
+`ct-in-bk`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`,
+`ct-stable←`, `ct-stable-put`, `ct-stable-lead`, `ct-elab-all`, `ct-cons`,
+`ct-cons*`, `ct-after-φ`, `ct-pin-stable`.
 
 #### THE ORDER FACTS
 
