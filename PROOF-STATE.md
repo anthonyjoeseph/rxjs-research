@@ -130,9 +130,10 @@ Members: `sr-corr`, `sr-back`, `sr-put-up`,
 
 #### THE SOURCE'S PINS
 
-Untried: two cuts of the plain flatMap agreeing up to a row agree on
-which pins below it are the source's, no lane row sitting where a
-source row does. Settled by its body.
+Probed at a flatMap the root reaches (`make table-check`, kind
+`pd-agree`), unproven: two cuts of the plain flatMap agreeing up to a
+row agree on which pins below it are the source's, no lane row sitting
+where a source row does. Settled by its body.
 
 Members: `pd-agree`.
 
