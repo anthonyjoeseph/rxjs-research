@@ -21,6 +21,7 @@
 -- later instant is ordered against a hot's row by where the creators lie.
 module simultaneous.TableEnv where
 
+open import Data.Bool using (T)
 open import Data.Empty using (⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -36,15 +37,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade)
+open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_)
+open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; pin)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc)
 open import denotation.Laws.Count using (child)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
+open import simultaneous.ListPin using (listC-pin)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
@@ -72,6 +74,10 @@ Tab* n ρι o ρ* p N = listC (3 + N) n (elab ρι o) (ρ* N) p
 got-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} → UncutEnv ρL → ∀ q → Got (listC N n o ρL q)
 got-ok N n o u q with listC-ok N n o u q
 ... | L , eq , _ = L , eq
+
+-- A pin listed in any environment lies inside its connect.
+pin-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {l r} → TR (listC N n o ρL q) l (pin r) → T (inside r l)
+pin-ok N n o q (_ , eq , m) = listC-pin N n o q eq m
 
 private
   dropLast : List Label → List Label

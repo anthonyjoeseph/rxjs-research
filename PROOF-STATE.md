@@ -42,7 +42,7 @@ the scan emitting nothing but marks besides. Settled by bodies.
 Members: `cb-corr`, `cb-φ-agree`, `cb-back`,
 `cb-back-put`, `cb-elab-causal`, `cb-stable←`,
 `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func*`,
-`cb-flat*`, `cb-pin-in*`, `cb-cons*`,
+`cb-flat*`, `cb-cons*`,
 `cb-after*`,
 `cb-pin-after*`, `cb-pin-stable`.
 
@@ -63,7 +63,7 @@ the same `done`. Settled by bodies, or a lane cut at one side's row only.
 Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-pb-few`, `sw-back`,
 `sw-put-up`, `sw-back-put`, `sw-elab-causal`, `sw-stable←`,
 `sw-stable-put`, `sw-stable-lead`, `sw-elab-all`, `sw-func`, `sw-func*`,
-`sw-flat`, `sw-flat*`, `sw-pin-in`, `sw-pin-in*`, `sw-cons`, `sw-cons*`,
+`sw-flat`, `sw-flat*`, `sw-cons`, `sw-cons*`,
 `sw-after`, `sw-after*`, `sw-after-φ`,
 `sw-pin-after*`, `sw-pin-stable`.
 
@@ -77,7 +77,7 @@ run on one side only.
 Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-pb-few`, `ex-back`,
 `ex-put-up`, `ex-back-put`, `ex-elab-causal`, `ex-stable←`,
 `ex-stable-put`, `ex-stable-lead`, `ex-elab-all`, `ex-func`, `ex-func*`,
-`ex-flat`, `ex-flat*`, `ex-pin-in`, `ex-pin-in*`, `ex-cons`, `ex-cons*`,
+`ex-flat`, `ex-flat*`, `ex-cons`, `ex-cons*`,
 `ex-after`, `ex-after*`, `ex-after-φ`,
 `ex-pin-after*`, `ex-pin-stable`.
 
@@ -91,7 +91,7 @@ its fields, the queue's state a run's. Settled by bodies.
 Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-pb-few`, `cc-back`,
 `cc-put-up`, `cc-back-put`, `cc-elab-causal`, `cc-stable←`,
 `cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
-`cc-flat`, `cc-flat*`, `cc-pin-in`, `cc-pin-in*`, `cc-cons`, `cc-cons*`,
+`cc-flat`, `cc-flat*`, `cc-cons`, `cc-cons*`,
 `cc-after`, `cc-after*`, `cc-after-φ`,
 `cc-pin-after*`, `cc-pin-stable`.
 
@@ -106,7 +106,7 @@ Settled by bodies.
 Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-pb-few`, `mg-back`,
 `mg-put-up`, `mg-back-put`, `mg-elab-causal`, `mg-stable←`,
 `mg-stable-put`, `mg-stable-lead`, `mg-elab-all`, `mg-func`, `mg-func*`,
-`mg-flat`, `mg-flat*`, `mg-pin-in`, `mg-pin-in*`, `mg-cons`, `mg-cons*`,
+`mg-flat`, `mg-flat*`, `mg-cons`, `mg-cons*`,
 `mg-after`, `mg-after*`, `mg-after-φ`,
 `mg-pin-after*`, `mg-pin-stable`.
 
@@ -119,14 +119,14 @@ Settled by bodies.
 Members: `cz-corr`, `cz-back`,
 `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
 `cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func*`,
-`cz-flat*`, `cz-pin-in*`, `cz-cons*`,
+`cz-flat*`, `cz-cons*`,
 `cz-after*`, `cz-after-φ`,
 `cz-pin-after*`, `cz-pin-stable`.
 
 Members: `sr-corr`, `sr-back`,
 `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
 `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
-`sr-flat*`, `sr-pin-in*`, `sr-cons*`,
+`sr-flat*`, `sr-cons*`,
 `sr-after*`, `sr-after-φ`,
 `sr-pin-after*`, `sr-pin-stable`.
 
@@ -152,7 +152,7 @@ Settled by bodies.
 Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
 `ct-in-bk`, `ct-pb-few`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
 `ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
-`ct-flat*`, `ct-pin-in`, `ct-pin-in*`, `ct-cons`, `ct-cons*`,
+`ct-flat*`, `ct-cons`, `ct-cons*`,
 `ct-after`, `ct-after*`, `ct-after-φ`, `ct-pin-after*`,
 `ct-pin-stable`.
 
