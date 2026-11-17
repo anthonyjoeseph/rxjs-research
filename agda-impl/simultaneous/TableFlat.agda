@@ -39,7 +39,7 @@ open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMa
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo)
+open import denotation.Laws.Modulus using (AgreeTo; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (any⁻)
 open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; module BoundedL; module ExhaustL; module Order)
@@ -67,6 +67,17 @@ private
   in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
   in-if true  Q t e = t refl
   in-if false Q t e = e refl
+
+  ≼-ˡ : ∀ x ys → x ≼ (x ⊕ˡ ys)
+  ≼-ˡ x []       = ≼-refl {x}
+  ≼-ˡ x (l ∷ ls) = ≼-trans {x} {x ⊕ [ l ]} {(x ⊕ [ l ]) ⊕ˡ ls} (≺→≼ {x} {x ⊕ [ l ]} (≺-ext x [])) (≼-ˡ (x ⊕ [ l ]) ls)
+
+  -- The latest of some positions and a floor lies past the floor.
+  max-ge : ∀ b xs → b ≼ L.foldr (λ x y → if x <ᵖ y then y else x) b xs
+  max-ge b []       = ≼-refl {b}
+  max-ge b (x ∷ xs) = in-if (x <ᵖ r) (λ v → b ≼ v) (λ _ → max-ge b xs)
+                        (λ eq → ≼-trans {b} {r} {x} (max-ge b xs) (λ h → subst T eq h))
+    where r = L.foldr (λ x y → if x <ᵖ y then y else x) b xs
 
 module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
@@ -666,10 +677,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     core-hot N = hotOf (proj₁ (listC-ok (3 + N) n (core op) {ρ*c N} (uρ*c N) c₁))
 
     -- The last of the branches' ends, as the merge over them ends.
+    aEnds : ℕ → List Pos
+    aEnds N = readEnd (rB 0) (ends (rows (sh-tab N))) ++ readEnd (rB 1) (ends (rows (core-hot N)))
+              ++ readEnd (rB 2) (ends (rows (cl-tab N)))
+
     aEnd : ℕ → Pos
-    aEnd N = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
-               (readEnd (rB 0) (ends (rows (sh-tab N))) ++ readEnd (rB 1) (ends (rows (core-hot N)))
-                ++ readEnd (rB 2) (ends (rows (cl-tab N))))
+    aEnd N = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ]) (aEnds N)
 
     reEmit : Pos → Pos
     reEmit l = l ⊕ˡ (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ [])
@@ -704,7 +717,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
       cb-got*        : ∀ N → Got (Q′ N)
       cb-after*      : ∀ {N l e} → TR (Q′ N) l e → c₂ ≼ l
-      cb-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₂ ≼ φ′ N k
       cb-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₂ ≼ r
       cb-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
@@ -727,6 +739,14 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       (λ _ → ∈-++⁺ˡ (subst (λ y → k ∈ Rel.bk R N y) (sym (ups-re (Rel.φ R N k))) (Rel.in-bk R x u)))
 
     -- A put is the lanes' flatMap's, re-emitted.
+    cb-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₂ ≼ φ′ N k
+    cb-after-φ {N} {k} x u = in-if (endAt (P′ N) k) (λ l → c₂ ≼ l)
+      (λ _ → ≼-trans {c₂} {aEnd N} {aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ [])}
+               (≼-trans {c₂} {cA ⊕ [ last ]} {aEnd N} (≼-ˡ c₂ (ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ last ∷ [])) (max-ge (cA ⊕ [ last ]) (aEnds N)))
+               (≼-ˡ (aEnd N) (ix 1 ∷ ix 0 ∷ last ∷ [])))
+      (λ _ → ≼-trans {c₂} {c₁} {reEmit (Rel.φ R N k)} (≺→≼ {c₂} {c₁} (≺-ext c₂ []))
+               (≼-trans {c₁} {Rel.φ R N k} {reEmit (Rel.φ R N k)} (Rel.after-φ R x u) (≼-ˡ (Rel.φ R N k) (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ []))))
+
     cb-put-up : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
     cb-put-up le ag (l′ , pt , eq) = l′ , Rel.put-up R le ag pt , eq
 

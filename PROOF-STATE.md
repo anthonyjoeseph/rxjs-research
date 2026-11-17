@@ -43,7 +43,7 @@ Members: `cb-corr`, `cb-φ-agree`, `cb-back`,
 `cb-back-put`, `cb-elab-causal`, `cb-stable←`,
 `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func*`,
 `cb-flat*`, `cb-pin-in*`, `cb-cons*`,
-`cb-got*`, `cb-after*`, `cb-after-φ`,
+`cb-got*`, `cb-after*`,
 `cb-pin-after*`, `cb-pin-stable`.
 
 #### THE FLATMAP'S ORDER FACTS
