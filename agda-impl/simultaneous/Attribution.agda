@@ -149,9 +149,9 @@ Into {B} Img u PB s k =
 -- no other.  A row of `u` that shows anything carries one; any other lies
 -- in the subscribe frame or in the instant of one that carries.  Past a
 -- row carrying a `k` past which `t` has finitely many rows and no end,
--- `u` has finitely many: what a run left without exiting asks.  `bk`
--- over-approximates, as a list, the rows `l` carries; `PB`, finitely
--- many per row, those it carries into their instant: the pins, and the
+-- `u` has finitely many: what a run left without exiting asks.  A row of
+-- `u` with finitely many before it carries finitely many rows (`bk-few`);
+-- `PB`, finitely many per row, those it carries into their instant: the pins, and the
 -- skips a reader hears from them.
 record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → B → Set)
                    (t : EmissionSet A) (u : EmissionSet B) (s s′ : Pos) : Set₁ where
@@ -170,8 +170,7 @@ record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → 
     place    : ∀ {m e} → u m e → Live u m → Few u m → instantOf m ≡ instantOf s′ ⊎ Σ Pos λ k → Σ Pos λ l → Img k l × instantOf l ≡ instantOf m
     live     : ∀ {k l} → Img k l → Live t k → Live u l
     spent    : ∀ {k l} → Img k l → Spent t (just k) → (∀ {c} → t c end → ⊥) → Σ (List Pos) λ ls → ∀ {r e} → u r e → l ≺ r → r ∈ ls
-    bk       : Pos → List Pos
-    in-bk    : ∀ {k l} → Img k l → k ∈ bk l
+    bk-few   : ∀ {l e} → u l e → Few u l → Σ (List Pos) λ ks → ∀ {k} → Img k l → k ∈ ks
     pinned   : ∀ {k p} → t k (pin p) → Live t k → Few t k → Into Img u PB s k
 
 -- A plain run shows every value; an elaborated one, those `f` reads one
@@ -544,7 +543,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
     exits-ut al ul tk (inj₂ (ks , sp)) with PU.ends? ks (proj₂ (seenU ul tt)) (λ ur lr → proj₁ (sp ur lr))
     ... | inj₁ (c , uc) with end-back uc
     ...   | c′ , _ , tc = inj₁ (c′ , end , seenT tc tt , past-t tk tc , inj₂ refl)
-    exits-ut {k} {l} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (every bk ks ++ pbs , row)
+    exits-ut {k} {l} al ul tk (inj₂ (ks , sp)) | inj₂ absent = inj₂ (bks ++ pbs , row)
       where
         unended : ∀ {c} → t c end → ⊥
         unended tc with end-img tc
@@ -567,7 +566,17 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
         ...   | inj₁ lm′  = ≼-≺-≺ {m} {PU.top l ks} {q} (PU.top-≥ l ks (there (after um lm′))) (≺-ext (PU.top l ks) [])
         ...   | inj₂ refl = lq
 
-        W = listU (PU.bound ks (proj₂ (seenU ul tt)) after)
+        fq : Few u q
+        fq = PU.bound ks (proj₂ (seenU ul tt)) after
+
+        W = listU fq
+
+        -- What each row's preimages are.
+        bkm : ∀ {m} → m ∈ proj₁ W → List Pos
+        bkm m = proj₁ (bk-few (proj₂ (proj₂ (proj₂ (proj₂ W) m))) (few-≺ fq (proj₁ (proj₂ (proj₂ W) m))))
+
+        bks : List Pos
+        bks = every (λ z → z) (mapWith (proj₁ W) bkm)
 
         -- What each row carries into its instant.
         pb : ∀ {m} → m ∈ proj₁ W → List Pos
@@ -576,33 +585,36 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
         pbs : List Pos
         pbs = every (λ z → z) (mapWith (proj₁ W) pb)
 
-        put-few : ∀ {r e} → t r e → k ≺ r → Few t r → r ∈ every bk ks ++ pbs
+        put-few : ∀ {r e} → t r e → k ≺ r → Few t r → r ∈ bks ++ pbs
         put-few tr kr fr with carried? tr (λ tc → ⊥-elim (unended tc)) fr
-        ... | inj₁ (r′ , ar , _ , ur , _ , _) = ∈-++⁺ˡ (∈-every bk ks (proj₁ (sp ur (img-mono al ar kr))) (in-bk ar))
+        ... | inj₁ (r′ , ar , _ , ur , _ , _) =
+          let mw = proj₁ (proj₂ W) ur (within ur) in
+          ∈-++⁺ˡ (∈-every (λ z → z) (mapWith (proj₁ W) bkm) (∈-mapWith⁺ (proj₁ W) bkm mw)
+                    (proj₂ (bk-few (proj₂ (proj₂ (proj₂ (proj₂ W) mw))) (few-≺ fq (proj₁ (proj₂ (proj₂ W) mw)))) ar))
         ... | inj₂ (_ , (m , (e′ , um) , rm) , _) =
           let mw = proj₁ (proj₂ W) um (within um) in
-          ∈-++⁺ʳ (every bk ks) (∈-every (λ z → z) (mapWith (proj₁ W) pb) (∈-mapWith⁺ (proj₁ W) pb mw)
+          ∈-++⁺ʳ bks (∈-every (λ z → z) (mapWith (proj₁ W) pb) (∈-mapWith⁺ (proj₁ W) pb mw)
                                   (proj₂ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) mw)))) rm))
 
         -- Every row past `k`: those with few rows before them are listed,
         -- so a hang shows, and each has few before it.
-        put : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks ++ pbs
-        put {r} tr kr = decidable-stable (any? (r ≟ᵖ_) (every bk ks ++ pbs)) λ n → showsT cover λ fr → n (put-few tr kr fr)
+        put : ∀ {r e} → t r e → k ≺ r → r ∈ bks ++ pbs
+        put {r} tr kr = decidable-stable (any? (r ≟ᵖ_) (bks ++ pbs)) λ n → showsT cover λ fr → n (put-few tr kr fr)
           where
             fk : Few t k
             fk = fewT tk tt
 
             cover : Σ (List Pos) λ js → ∀ {k′ e′} → t k′ e′ → Few t k′ → k′ ≺ r → k′ ∈ js
-            cover = proj₁ fk ++ k ∷ every bk ks ++ pbs , pick
+            cover = proj₁ fk ++ k ∷ bks ++ pbs , pick
               where
-                pick : ∀ {k′ e′} → t k′ e′ → Few t k′ → k′ ≺ r → k′ ∈ proj₁ fk ++ k ∷ every bk ks ++ pbs
+                pick : ∀ {k′ e′} → t k′ e′ → Few t k′ → k′ ≺ r → k′ ∈ proj₁ fk ++ k ∷ bks ++ pbs
                 pick {k′} tk′ fk′ _ with T? (k′ <ᵖ k)
                 ... | yes kk = ∈-++⁺ˡ (proj₂ fk tk′ kk)
                 ... | no nkk with ≼-split {k} {k′} nkk
                 ...   | inj₁ kk′  = ∈-++⁺ʳ (proj₁ fk) (there (put-few tk′ kk′ fk′))
                 ...   | inj₂ refl = ∈-++⁺ʳ (proj₁ fk) (here refl)
 
-        row : ∀ {r e} → t r e → k ≺ r → r ∈ every bk ks ++ pbs × (t r e × (∀ {c} → t c end → r ≼ c))
+        row : ∀ {r e} → t r e → k ≺ r → r ∈ bks ++ pbs × (t r e × (∀ {c} → t c end → r ≼ c))
         row tr kr = put tr kr , tr , (λ tc → ⊥-elim (unended tc))
 
     exits-tu : ∀ {k l x b} → Img k l → u l (out x) → t k (out b) → Exits t k → Exits u l

@@ -288,7 +288,7 @@ module Erase {A : Set} (t : EmissionSet A) (u : EmissionSet (IE A))
     ; img-fun = λ { (_ , a₁ , refl , _ , x , un , _) (_ , a₂ , refl , _) → same x un a₁ a₂ }
     ; img-mono = img-mono ; inst = inst ; home = home ; place = place ; live = live
     ; spent = λ { {l = l} (_ , _ , _ , _ , _ , _ , fw , _) sp _ → rest {l = l} fw sp }
-    ; bk = bk ; in-bk = λ { {k} (_ , ag , refl , _ , x , un , _) → in-bk (RP.to-row ag (≼-refl {k}) x) un }
+    ; bk-few = λ {l} _ _ → bk l , λ { {k} (_ , ag , refl , _ , x , un , _) → in-bk (RP.to-row ag (≼-refl {k}) x) un }
     ; pinned = pinned }
 
 module At (n : ℕ) {A : Set} (o : SObs [] A) where

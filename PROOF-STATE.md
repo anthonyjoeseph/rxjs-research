@@ -36,8 +36,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 A lane's record is had only from a cut holding its value row, but
 `Rel.bk` and `pb-few`'s list are cut-free, so no lanes' flatMap body can
-name a lane row's preimages. Settled by a cut-indexed `bk` the erasure
-accepts, or a value-free lane preimage list.
+name a lane row's preimages. Settled by cut-indexed lists read at the
+cut settling the row, once a preimage (and a put) provably lies in every
+cut agreeing up to its image, or refuted by a probe pair of cuts.
 
 Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
