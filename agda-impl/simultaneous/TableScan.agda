@@ -548,6 +548,9 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; bk = R.bk
     ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.in-bk x₀ u₀
     ; pb-few = R.pb-few
+    ; back = λ {N} {N′} le x un ag* → let (_ , x₀ , u₀) = At.back-row N′ x un in ag-sc f z (P N′) (P N) (R.back le x₀ u₀ (ag←* ag*))
+    ; put-up = λ le ag → R.put-up le (ag← ag)
+    ; back-put = λ le pl ag* → R.back-put le pl (ag←* ag*)
     ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = At.back-row N x un in ag→* (R.elab-causal le x₀ u₀ (ag← ag))
     ; stable← = λ {N} {N′} le x un y ag* → let (_ , x₀ , u₀) = At.back-row N x un in
         ag-sc f z (P N′) (P N) (R.stable← le x₀ u₀ (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (ag←* ag*))

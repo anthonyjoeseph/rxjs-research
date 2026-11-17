@@ -323,9 +323,12 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = φ-agree′
-    ; bk = λ l → g ∷ R.bk l
+    ; bk = λ N l → g ∷ R.bk N l
     ; in-bk = in-bk′
-    ; pb-few = λ l → proj₁ (R.pb-few l) , λ pt → proj₂ (R.pb-few l) (proj₂ pt)
+    ; pb-few = λ N l → proj₁ (R.pb-few N l) , λ pt → proj₂ (R.pb-few N l) (proj₂ pt)
+    ; back = back′
+    ; put-up = λ { {N} {N′} le ag (ok , pl) → ok , R.put-up le (ag-strip g (ab N′) (ab N) ag) pl }
+    ; back-put = λ { {N} {N′} le (ok , pl) ag* → ok , R.back-put le pl (ag-strip g* (ab* N′) (ab* N) ag*) }
     ; elab-causal = elab-causal′
     ; stable← = stable←′
     ; stable-put = stable-put′
@@ -353,10 +356,18 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
       ... | inj₂ x₀ =
         trans (φ-c {N} {k} (ab N x₀)) (trans (R.φ-agree x₀ un (ag-strip g (ab N) (ab N′) ag)) (sym (φ-c {N′} {k} (ab N x₀))))
 
-      in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ (g ∷ R.bk (φ′ N k))
+      in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ (g ∷ R.bk N (φ′ N k))
       in-bk′ {N} {k} x un with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = here refl
-      ... | inj₂ x₀ = there (subst (λ z → k ∈ R.bk z) (sym (φ-c {N} {k} (ab N x₀))) (R.in-bk x₀ un))
+      ... | inj₂ x₀ = there (subst (λ z → k ∈ R.bk N z) (sym (φ-c {N} {k} (ab N x₀))) (R.in-bk x₀ un))
+
+      back′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+            → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      back′ {N} {N′} {k} le x un ag* with tr-g→ g (P N′) x
+      ... | inj₁ (refl , _) = ag-low g (ab N′) (ab N) (R.got N′) (R.got N)
+      ... | inj₂ x₀ =
+        let a₀ = ag-strip g* (ab* N′) (ab* N) (subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (φ-c {N′} {k} (ab N′ x₀)) ag*)
+        in ag-add g (R.got N′) (R.got N) (R.back le x₀ un a₀)
 
       elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                    → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))

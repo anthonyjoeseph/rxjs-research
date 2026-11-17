@@ -261,6 +261,9 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
     ; bk = R.bk
     ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.in-bk x₀ u₀
     ; pb-few = R.pb-few
+    ; back = λ {_} {N′} le x un ag* → let (_ , x₀ , u₀) = back-row N′ x un in ag-map f (R.back le x₀ u₀ (ag←* ag*))
+    ; put-up = λ le ag → R.put-up le (ag← ag)
+    ; back-put = λ le pl ag* → R.back-put le pl (ag←* ag*)
     ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = back-row N x un in ag-map g (R.elab-causal le x₀ u₀ (ag← ag))
     ; stable← = λ {N} le x un y ag* → let (_ , x₀ , u₀) = back-row N x un in
         ag-map f (R.stable← le x₀ u₀ (proj₁ (proj₂ (tr-map→ g (Q N) y))) (ag←* ag*))

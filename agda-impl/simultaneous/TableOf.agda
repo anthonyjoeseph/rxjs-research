@@ -171,9 +171,12 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ _ _ _ → refl
-    ; bk = λ l → [ p ⊕ [ lastL l ] ]
+    ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = λ {N} → in-bk′ {N}
-    ; pb-few = λ _ → [] , λ ()
+    ; pb-few = λ _ _ → [] , λ ()
+    ; back = λ _ _ _ _ → ag-id
+    ; put-up = λ _ _ ()
+    ; back-put = λ _ ()
     ; elab-causal = λ _ _ _ _ → ag-id
     ; stable← = λ _ _ _ _ _ → ag-id
     ; stable-put = λ _ _ _ ()

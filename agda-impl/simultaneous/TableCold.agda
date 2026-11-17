@@ -119,6 +119,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     walk-func  : ∀ {N k e e′} → (k , e) ∈ W N → (k , e′) ∈ W N → e ≡ e′
     walk-flat  : ∀ {N y e l ys e′} → (y , e) ∈ W N → (y ⊕ (l ∷ ys) , e′) ∈ W N → ⊥
     walk-agree : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N → AgreeTo k (TR (P N′)) (TR (P N))
+    walk-back  : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N′ → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
     walk-cons  : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
     walk-all   : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → I N ≡ I N′
     walk-alone : ∀ {N k e k′ e′} → (k , e) ∈ W N → (k′ , e′) ∈ W N → instantOf k′ ≡ instantOf k → sync* (ψ k) ≡ false → k ≡ k′
@@ -265,9 +266,12 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ { (_ , refl , x) _ a → agree-φ x a }
-    ; bk = bk′
+    ; bk = λ _ → bk′
     ; in-bk = λ { (_ , refl , x) _ → φ-back x }
-    ; pb-few = λ _ → [] , λ ()
+    ; pb-few = λ _ _ → [] , λ ()
+    ; back = λ { le (_ , refl , x) _ a → walk-back le x a }
+    ; put-up = λ _ _ ()
+    ; back-put = λ _ ()
     ; elab-causal = λ { le (_ , refl , x) _ _ → causal le x }
     ; stable← = λ { le (_ , refl , x) _ _ _ → walk-agree le x }
     ; stable-put = λ _ _ _ ()

@@ -263,14 +263,18 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     Put′ : ℕ → Pos → Pos → Set
     Put′ N y l = if isBody N y then Rel.Put Rb N y l else l ≡ φ′ N y
 
-    bk′ : Pos → List Pos
-    bk′ l = Rel.bk Rb l ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Rs) (up (up l)))
+    bk′ : ℕ → Pos → List Pos
+    bk′ N l = Rel.bk Rb N l ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Rs) N (up (up l)))
 
     postulate
       ct-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
       ct-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ′ N k ≡ φ′ N′ k
-      ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk′ (φ′ N k)
-      ct-pb-few      : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put′ N k l → k ∈ ks
+      ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+      ct-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+      ct-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N))
+                     → AgreeTo k (TR (P N′)) (TR (P N))
+      ct-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → Put′ N k l → Put′ N′ k l
+      ct-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put′ N k l
       ct-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
                      → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
       ct-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′
@@ -301,6 +305,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     rel′ : Rel P Q p p*
     rel′ = record
       { φ = φ′ ; Put = Put′ ; corr = ct-corr ; φ-agree = ct-φ-agree ; bk = bk′ ; in-bk = ct-in-bk ; pb-few = ct-pb-few
+      ; back = ct-back ; put-up = ct-put-up ; back-put = ct-back-put
       ; elab-causal = ct-elab-causal ; stable← = ct-stable← ; stable-put = ct-stable-put ; stable-lead = ct-stable-lead
       ; elab-all = ct-elab-all ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; cons = ct-cons ; cons* = ct-cons* ; got = ct-got ; got* = ct-got*

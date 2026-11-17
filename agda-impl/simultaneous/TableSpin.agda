@@ -161,9 +161,12 @@ module SpinTab {A : Set} (p p* : Pos) where
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ _ _ _ → refl
-    ; bk = λ l → [ p ⊕ [ lastL l ] ]
+    ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = in-bk′
-    ; pb-few = λ _ → [] , λ ()
+    ; pb-few = λ _ _ → [] , λ ()
+    ; back = back′
+    ; put-up = λ _ _ ()
+    ; back-put = λ _ ()
     ; elab-causal = λ le x un _ → elab-causal′ le x un
     ; stable← = stable←′
     ; stable-put = λ _ _ _ ()
@@ -205,6 +208,13 @@ module SpinTab {A : Set} (p p* : Pos) where
                → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
       stable←′ le x _ _ _ with sp→ x
       ... | i , lt , refl , _ = spin-ag (+-monoʳ-≤ 3 le) lt
+
+      -- A shallower cut holding a tick's image holds the tick.
+      back′ : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
+      back′ {N} {N′} le x _ ag with sp→ x
+      ... | i , lt , refl , refl
+        with sp→ {M = 3 + N} (proj₁ (upto (subst (λ z → AgreeTo z (TR (Q N′)) (TR (Q N))) (φ-ix {N′} i) ag) {p* ⊕ [ ix i ]} {skip} (≼-refl {p* ⊕ [ ix i ]})) (sp← lt))
+      ...   | j , lj , eq , _ = spin-ag (+-monoʳ-≤ 3 le) (subst (_< 3 + N) (sym (ix-inj (step-inj p* eq))) lj)
 
       elab-all′ : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
       elab-all′ {N} {N′} _ all y with sp→ y

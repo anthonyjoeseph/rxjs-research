@@ -34,14 +34,25 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLATMAP'S LAYERS
 
-A lane's record is had only from a cut holding its value row, but
-`Rel.bk` and `pb-few`'s list are cut-free, so no lanes' flatMap body can
-name a lane row's preimages. Settled by cut-indexed lists read at the
-cut settling the row (the erasure now asks only that), once a preimage
-and a put provably lie in every cut agreeing up to their image.
+A lane's record is had only from a cut holding its value row; the
+preimage lists are now per cut, so each lane row's map, put and
+preimages read through its lane's record at that cut. Untried as bodies;
+concat's queued lanes, positioned by the run, the riskiest. Settled by
+the four bodies.
 
 Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+
+#### THE BACK FACT
+
+A cut whose elaborated table agrees up to a row's image agrees up to the
+row, and a put moves between cuts agreeing up to its row or its place:
+what lets the erasure read preimages at the cut settling an image.
+Probed at the root (`make table-check`, kind `back`); proven for of,
+spin, map, scan, defer. Settled by bodies, or a cut holding an image
+but not its row.
+
+Members: `walk-back`, `take-back`, `take-put-up`, `take-back-put`.
 
 #### THE CONNECT
 
@@ -52,7 +63,7 @@ the source's hot (`conn-hot`), an old hot cutting the new alike
 Settled by bodies.
 
 Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
-`ct-in-bk`, `ct-pb-few`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
+`ct-in-bk`, `ct-pb-few`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
 `ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
 `ct-flat*`, `ct-pin-in`, `ct-pin-in*`, `ct-cons`, `ct-cons*`, `ct-got`,
 `ct-got*`, `ct-after`, `ct-after*`, `ct-after-φ`, `ct-pin-after*`,

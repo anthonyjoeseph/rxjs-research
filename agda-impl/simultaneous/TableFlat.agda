@@ -138,20 +138,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   --
   -- A lane's record is had only from a cut: `Lanes` wants the lane's
   -- value and its pair's alignment, and both are read off the source's
-  -- row `TR (Ps N) q (out a)` and `Rest.cuts` at it.  So `φ` and `Put` are
-  -- written per cut, each lane row through its own lane's record at that
-  -- cut.
-  --
-  -- DEAD ROUTE: a body over the lanes' records.  `Rel.bk` and `pb-few`'s
-  --   list are cut-free functions of an elaborated position, and a lane
-  --   row's preimages are its lane's `bk`, a record of `f a` had only from
-  --   a cut holding the value row: decoding the position gives the source
-  --   row's candidates through the source's `bk`, never the value nor the
-  --   alignment evidence.  The erasure asks preimages only of a row with
-  --   finitely many before it (`bk-few` in `simultaneous.Attribution`), so
-  --   a cut-indexed `bk` read at the cut settling the row suffices, given
-  --   that a preimage lies in every cut whose elaborated table agrees up
-  --   to its image.
+  -- row `TR (Ps N) q (out a)` and `Rest.cuts` at it.  So `φ`, `Put` and
+  -- the preimage lists are written per cut, each lane row through its own
+  -- lane's record at that cut; `back` is what lets the erasure read them
+  -- at the cut settling the image.
 
   postulate
     -- Every value's lane is subscribed under its row, and every lane row

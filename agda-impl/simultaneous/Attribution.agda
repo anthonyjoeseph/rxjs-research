@@ -151,14 +151,14 @@ Into {B} Img u PB s k =
 -- row carrying a `k` past which `t` has finitely many rows and no end,
 -- `u` has finitely many: what a run left without exiting asks.  A row of
 -- `u` with finitely many before it carries finitely many rows (`bk-few`);
--- `PB`, finitely many per row, those it carries into their instant: the pins, and the
--- skips a reader hears from them.
+-- `PB`, finitely many per such row, those it carries into their instant:
+-- the pins, and the skips a reader hears from them.
 record Attribution {A B : Set} (ShA : A → Set) (ShB : B → Set) (Val : A → B → Set)
                    (t : EmissionSet A) (u : EmissionSet B) (s s′ : Pos) : Set₁ where
   field
     Img      : Pos → Pos → Set
     PB       : Pos → Pos → Set
-    pb-few   : ∀ {l e} → u l e → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
+    pb-few   : ∀ {l e} → u l e → Few u l → Σ (List Pos) λ ks → ∀ {k} → PB k l → k ∈ ks
     img      : ∀ {k e} → t k e → Unpinned e → Live t k → Few t k
              → (Σ Pos λ l → Img k l × Σ (Ev B) λ e′ → u l e′ × Few u l × Match ShA ShB Val e e′) ⊎ (e ≡ skip × Into Img u PB s k)
     shown    : ∀ {l e} → u l e → Shown ShB e → Live u l → Few u l → Σ Pos λ k → Img k l × Σ (Ev A) λ e₀ → t k e₀ × Match ShA ShB Val e₀ e
@@ -580,7 +580,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
 
         -- What each row carries into its instant.
         pb : ∀ {m} → m ∈ proj₁ W → List Pos
-        pb m = proj₁ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) m))))
+        pb m = proj₁ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) m))) (few-≺ fq (proj₁ (proj₂ (proj₂ W) m))))
 
         pbs : List Pos
         pbs = every (λ z → z) (mapWith (proj₁ W) pb)
@@ -594,7 +594,7 @@ module Attributed {A X : Set} {f : X → List A} (sv : Single f) {t : EmissionSe
         ... | inj₂ (_ , (m , (e′ , um) , rm) , _) =
           let mw = proj₁ (proj₂ W) um (within um) in
           ∈-++⁺ʳ bks (∈-every (λ z → z) (mapWith (proj₁ W) pb) (∈-mapWith⁺ (proj₁ W) pb mw)
-                                  (proj₂ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) mw)))) rm))
+                                  (proj₂ (pb-few (proj₂ (proj₂ (proj₂ (proj₂ W) mw))) (few-≺ fq (proj₁ (proj₂ (proj₂ W) mw)))) rm))
 
         -- Every row past `k`: those with few rows before them are listed,
         -- so a hang shows, and each has few before it.
