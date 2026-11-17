@@ -178,9 +178,10 @@ TABLE_LOG := $(SRC)/_cli/table-check.log
 
 # The probe's lines reach the job's log as they come, so a run the job's
 # timeout cuts short still shows how far it got.  Its verdict is read off
-# the log, so the pipe's status is not consulted.
+# the log, so the pipe's status is not consulted.  `SHARD="i k"` runs the
+# seeds congruent to i modulo k; unset, all of them.
 table-check: $(TABLE_BIN)
-	@$(TABLE_BIN) | tee $(TABLE_LOG); \
+	@$(TABLE_BIN) $(SHARD) | tee $(TABLE_LOG); \
 	  grep -q '^table-check: done ' $(TABLE_LOG) \
 	    || { echo "table-check: RED — the probe never reached its closing line"; exit 1; }; \
 	  if grep -q '^table-check: FAIL ' $(TABLE_LOG); then \

@@ -42,7 +42,7 @@ open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_; _%_)
-open import Data.Nat.Show using () renaming (show to showℕ)
+open import Data.Nat.Show using (readMaybe) renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
 open import Data.String.Properties using (_==_)
@@ -50,6 +50,7 @@ open import Data.Unit using (⊤; tt)
 open import IO.Primitive.Core using (_>>=_; return)
 open import IO.Primitive.Finite using (putStrLn)
 open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
+open import System.Environment.Primitive using (getArgs)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (does)
 
@@ -445,10 +446,23 @@ mutual
                   leads k = not (anyᵇ (λ k′ → (inst k′ ==ⁱ inst k) ∧ (k′ <ᵖ k)) plain)
                   live : Pos → Bool
                   live y = not (anyᵇ (λ c → c <ᵖ y) (ends (rows t*)))
+                  showRows : List (Row (IE B)) → String
+                  showRows = L.foldr (λ { (r , e) acc → showPos r +++ "/" +++ tg e +++ " " +++ acc }) ""
+                    where
+                      tg : Ev (IE B) → String
+                      tg (out _) = "out"
+                      tg end     = "end"
+                      tg skip    = "skip"
+                      tg (pin _) = "pin"
+                  -- The instant's rows, the core's ends, and the images.
+                  diag : Pos → String
+                  diag y = " | instant " +++ showRows (L.take 8 (L.filterᵇ (λ { (r , _) → inst r ==ⁱ inst y }) (sort (rows t*))))
+                           +++ "| ends " +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (ends (rows t*))
+                           +++ "| images " +++ L.foldr (λ { (k , w) acc → showPos k +++ "=>" +++ showPos w +++ " " +++ acc }) "" (L.take 10 imgs)
                   chk : List (Pos × Bool) → Row (IE B) → List (String × String)
                   chk ws (y , _) = if not (live y) ∨ (inst y ==ⁱ inst c₁)
                                      ∨ anyᵇ (λ { (w , ld) → (inst w ==ⁱ inst y) ∧ ((w <ᵖ y) ∨ does (w ≟ᵖ y) ∨ ld) }) ws
-                                   then [] else fail "core-place" nm y c₁
+                                   then [] else [ "core-place" , nm +++ " " +++ showPos y +++ " ~ " +++ showPos c₁ +++ diag y ]
               go _ _ = []
 
           -- Each live pin of the flatMap, the source's or a lane's: the lanes'
@@ -733,7 +747,7 @@ private
     putStrLn ("table-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ nodes +++ " subterms checked, "
               +++ showℕ skipped +++ " cut short; failing seeds by kind: " +++ showTally t)
   report (seed ∷ seeds) bad nodes skipped t =
-    (if seed % 25 ≡ᵇ 0 then putStrLn ("table-check: at seed " +++ showℕ seed +++ ", " +++ showℕ bad +++ " failing so far") else return _) >>= λ _ →
+    putStrLn ("table-check: at seed " +++ showℕ seed +++ ", " +++ showℕ bad +++ " failing so far") >>= λ _ →
     step (probe seed ⊹ (backRes seed ⊹ coreBack (toObs timeline 3 (program seed) [] [] [])))
     where
       step : Res → IO Unit
@@ -743,5 +757,13 @@ private
         say (concatMap (λ k → mapL (λ w → "table-check: FAIL seed " +++ showℕ seed +++ " " +++ k +++ " " +++ w) (firstOf k fs)) kinds) >>= λ _ →
         report seeds (suc bad) (nodes + c) (skipped + s) (bump fs t)
 
+-- The seeds of one shard: `shard i k` runs those congruent to `i` modulo
+-- `k`, so CI can spread the seeds over parallel jobs; no arguments, all.
+shardOf : List String → List ℕ
+shardOf (i ∷ k ∷ []) with readMaybe 10 i | readMaybe 10 k
+... | just i′ | just (suc k′) = L.filterᵇ (λ s → s % suc k′ ≡ᵇ i′) (upTo 300)
+... | _ | _ = upTo 300
+shardOf _ = upTo 300
+
 main : IO Unit
-main = hSetBuffering stdout lineBuffering >>= λ _ → report (upTo 300) 0 0 0 (mapL (_, 0) kinds)
+main = hSetBuffering stdout lineBuffering >>= λ _ → getArgs >>= λ as → report (shardOf as) 0 0 0 (mapL (_, 0) kinds)

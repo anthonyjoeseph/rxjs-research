@@ -152,11 +152,16 @@ jobs:
 
   # A PROBE, not a gate: each subterm's plain table corresponds to its
   # elaboration's where the relation pairs them.  Informational while the
-  # erasure's design question is open.
+  # erasure's design question is open.  The seeds are spread over shards,
+  # one job each: a seed can cost minutes.
   table-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -171,7 +176,7 @@ jobs:
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
 
       - name: make table-check
-        run: make table-check
+        run: make table-check SHARD="${{ matrix.shard }} 8"
 
   # The simultaneous spec over the elaboration: no seed may refute it, and
   # the selftest proves the check can fire.  Run only when the elaboration
