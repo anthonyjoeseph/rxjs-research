@@ -766,7 +766,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       { stE≡ = st≡
       ; tab≈ = tab≈
       ; φ≡   = λ {y} yk ty un → trans (Rel.φ-agree (Out.rel (LaneRec.lane (valRec N (valAt q a x)))) {N} {N′} ty un (ag-down yk tab≈))
-                                      (lane-coh st≡ _ _ _ _ _ _ _ _ N′ y)
+                                      (lane-coh st≡ (LaneRec.adm* (valRec N (valAt q a x))) (LaneRec.adm* (valRec N′ (valAt q a x′))) _ _ _ _ _ _ N′ y)
       }
 
     -- Two cuts' values, alike up to `k` in order, each unmatched one's
@@ -831,7 +831,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
               → (m ≡ nothing → e ≡ nothing → SrcAt N N′ k)
               → rowφ N k m e ≡ rowφ N′ k m′ e′
       rowφ-eq {k = k} (both {R} {R′} E) _ un _ _ with un refl
-      ... | ev , x , u = if-≡ (endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} (≼-refl {k}) (LaneEq.tab≈ E))
+      ... | ev , x , u = if-≡ (endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
                               (λ h → end-eq E (≼-refl {k}) (endAt-T (LaneRec.tab R) h) tt) (λ _ → out-eq E (≼-refl {k}) x u)
       rowφ-eq {k = k} none (both E) _ en _ = cong (_⊕ [ ix 0 ]) (end-eq E (up-≼ k) (en refl) tt)
       rowφ-eq none none _ _ src with src refl refl
@@ -847,10 +847,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                    → (holder (lanes N) k ≡ nothing → ends-above k (lanes N) ≡ nothing → SrcAt N N′ k)
                    → φ′ N k ≡ φ′ N′ k
       tabs-φ-agree {N} {N′} {k} es un src =
-        rowφ-eq (lastWith-eq hr hr′ (λ {R} {R′} E → rowAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} (≼-refl {k}) (LaneEq.tab≈ E))
-                             (λ {R} Q → rowAt-F {m = LaneRec.tab R} (≼-refl {k}) Q) (λ {R′} Q → rowAt-F {m = LaneRec.tab R′} (≼-refl {k}) Q) es)
-                (lastWith-eq he he′ (λ {R} {R′} E → endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} (up-≼ k) (LaneEq.tab≈ E))
-                             (λ {R} Q → endAt-F {m = LaneRec.tab R} (up-≼ k) Q) (λ {R′} Q → endAt-F {m = LaneRec.tab R′} (up-≼ k) Q) es)
+        rowφ-eq (lastWith-eq hr hr′ (λ {R} {R′} E → rowAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
+                             (λ {R} Q → rowAt-F {m = LaneRec.tab R} {k = k} {y = k} (≼-refl {k}) Q) (λ {R′} Q → rowAt-F {m = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) Q) es)
+                (lastWith-eq he he′ (λ {R} {R′} E → endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = up k} (up-≼ k) (LaneEq.tab≈ E))
+                             (λ {R} Q → endAt-F {m = LaneRec.tab R} {k = k} {y = up k} (up-≼ k) Q) (λ {R′} Q → endAt-F {m = LaneRec.tab R′} {k = k} {y = up k} (up-≼ k) Q) es)
                 un (λ {R} e → endAt-T (LaneRec.tab R) (lastWith-h he (lanes N) e)) src
         where
           hr : LaneRec N → Bool
