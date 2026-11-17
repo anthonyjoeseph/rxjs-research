@@ -53,7 +53,7 @@ open import IO.Primitive.Handle using (hSetBuffering; stdout; lineBuffering)
 open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; Later; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
+open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
   defer)
 open import denotation.Position using (Pos; Instant; frame; cascade; root; ix; sub; last; _⊕_; _≟ᵖ_; _≟ⁱ_; _≟ˡ_; _<ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
@@ -377,6 +377,30 @@ mutual
       ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
       ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
 
+      -- The flatMap's end: the latest of its source's end's image and the
+      -- end images of the lanes it waits on, those whose ends its table
+      -- keeps.
+      endsM : ∀ {X} → Maybe (Listed X) → List Pos
+      endsM nothing  = []
+      endsM (just l) = ends (rows l)
+
+      laneEnds : List Pos
+      laneEnds with starts op | listC N n (flatMap op f s) ρ p
+      ... | just ls | just t = concatMap (λ e → when (anyᵇ (λ { (c , _) → does (c ≟ᵖ e) }) (rows t)) e)
+                                 (concatMap (λ { (a , st , _) → endsM (listC N n (f a) ρ st) }) ls)
+      ... | _ | _ = []
+
+      srcEnd : List Pos → Pos
+      srcEnd (k ∷ _) = formula (k , vend)
+      srcEnd []      = root
+
+      flatEnd : Pos
+      flatEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (srcEnd (endsM o)) (mapL (λ e → formula (e , vend)) laneEnds)
+
+      coreImg : Pos × Vis → Pos
+      coreImg (k , vout) = formula (k , vout)
+      coreImg (k , vend) = flatEnd
+
       -- Each value of the lanes' flatMap's source, written out: the
       -- shared hot's row of the plain value's image, rejoined, and the
       -- first value `each` lists from it.
@@ -408,7 +432,8 @@ mutual
       coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
+      ...   | just m  = checks (nm +++ "/core") p c₁ [] m
+                       ++ concatMap (λ { (k , k*) → let w = coreImg (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
         where
           kindOf : Pos → Vis
@@ -431,7 +456,7 @@ mutual
       aEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
                (readEnd (rB 0) (ends (rows sh-tab)) ++ readEnd (rB 1) (ends (rows core-hot)) ++ readEnd (rB 2) (ends (rows cl-tab)))
       whole : Pos × Vis → Pos
-      whole (k , vout) = formula (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+      whole (k , vout) = coreImg (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
       whole (k , vend) = aEnd ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ last ]
 
       wholeRes : Res
@@ -493,8 +518,44 @@ private
   ...       | nothing = none
   backRes seed | o | t | t* | _ | _ = none
 
+  -- The back fact at the lanes' flatMap, for a flatMap reached from the
+  -- root through one-to-one formers, whose tables need no environment: a
+  -- cut whose lanes' flatMap agrees with the whole up to a row's image
+  -- agrees with the plain whole up to the row.
+  -- The lanes' flatMap of a flatMap at the root, at cut `N`.
+  coreAt : ∀ {A B} → FlatOp → (A → Obs Timeline [] B) → Obs Timeline [] A → ℕ → Maybe (Listed (IE B))
+  coreAt {A} {B} op f s N = listC N n₀ (flatMap op (λ a → laneˢ (elab (λ ()) (f a))) (each valuesOf (connected (there (here refl))))) ρ*c c₁
+    where
+      c₃ c₁ : Pos
+      c₃ = root* ⊕ [ ix 0 ] ⊕ [ ix 0 ]
+      c₁ = c₃ ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+      tt-tab : Listed ⊤
+      tt-tab = hotL (listC N n₀ (of (tt ∷ [])) [] (root* ⊕ [ ix 1 ]))
+      sh-tab : Listed (IE A)
+      sh-tab = hotL (listC N n₀ (flatMap (mergeᶠ nothing) (λ _ → elab (λ ()) s) (connected (here refl))) (tt-tab ∷ []) (root* ⊕ [ ix 0 ] ⊕ [ ix 1 ]))
+      ρ*c : All Listed (IE B ∷ IE A ∷ ⊤ ∷ [])
+      ρ*c = hotL (listC N n₀ (closer {A = A} {B = B}) (sh-tab ∷ tt-tab ∷ []) (c₃ ⊕ [ ix 1 ])) ∷ sh-tab ∷ tt-tab ∷ []
+
+  coreBack : ∀ {A} → Obs Timeline [] A → Res
+  coreBack (map _ s)         = coreBack s
+  coreBack (scan _ _ s)      = coreBack s
+  coreBack (takeWhile _ _ s) = coreBack s
+  coreBack {B} (flatMap {A = A} op f s) with listC N₀ n₀ (flatMap op f s) [] root | coreAt op f s N₀
+  ... | t | t* with plainV t | elabV {B} t*
+  ...   | just ks | just ks* with pairing ks ks*
+  ...     | just m = concatMap at (upTo N₀) , 0 , 0
+    where
+      at : ℕ → List (String × String)
+      at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′
+      ... | c | c* = concatMap (λ { (k , l) →
+              if sameRows (upToᵖ l c*) (upToᵖ l t*) ∧ not (sameRows (upToᵖ k c) (upToᵖ k t))
+              then fail "core-back" (showℕ N′) k l else [] }) m
+  ...     | nothing = none
+  coreBack (flatMap op f s) | t | t* | _ | _ = none
+  coreBack _ = none
+
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
@@ -522,7 +583,7 @@ private
   report [] bad nodes skipped t =
     putStrLn ("table-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ nodes +++ " subterms checked, "
               +++ showℕ skipped +++ " cut short; failing seeds by kind: " +++ showTally t)
-  report (seed ∷ seeds) bad nodes skipped t with probe seed ⊹ backRes seed
+  report (seed ∷ seeds) bad nodes skipped t with probe seed ⊹ (backRes seed ⊹ coreBack (toObs timeline 3 (program seed) [] [] []))
   ... | [] , c , s = report seeds bad (nodes + c) (skipped + s) t
   ... | fs , c , s =
     putStrLn ("table-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →

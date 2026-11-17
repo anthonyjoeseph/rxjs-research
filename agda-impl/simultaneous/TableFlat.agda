@@ -144,6 +144,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
   endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
 
+  rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
+  rowAt nothing   y = false
+  rowAt (just Lx) y = anyᵇ (λ r → does (proj₁ r ≟ᵖ y)) (rows Lx)
+
   ups : ℕ → Pos → Pos
   ups zero    y = y
   ups (suc i) y = ups i (up y)
@@ -337,21 +341,34 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     isMarker : ℕ → Pos → Bool
     isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
 
-    -- THE MERGES' MAP, given each cut's lanes.  A lane row is imaged
-    -- through its lane's record at the cut, the skip a queue leaves past a
-    -- lane's end at its end image's; a value's marker at the marker of its
-    -- elaborated value; the source's end at the later of its own and the
-    -- trigger's, as the share ends; any other source row through the
-    -- shared hot.
-    module Tabs (lanes : ∀ N → List (LaneRec N)) where
+    -- The source's end's image: the later of its own and the trigger's, as
+    -- the share ends.
+    srcEndφ : ℕ → Pos → Pos
+    srcEndφ N y = (if Rel.φ (Out.rel Os) N y <ᵖ ttEnd then ttEnd else Rel.φ (Out.rel Os) N y) ⊕ [ sub c₁ ]
+
+    -- THE MERGES' MAP, given the plain flatMap's tables and each cut's
+    -- lanes.  The flatMap's end at the latest of the source's end's image
+    -- and the end images of the lanes whose ends its table keeps: an
+    -- elaborated lane can end past the source's image when its plain lane
+    -- ended first.  A lane row is imaged through its lane's record at the
+    -- cut, the skip a queue leaves past a lane's end at its end image's; a
+    -- value's marker at the marker of its elaborated value; the source's
+    -- end as above; any other source row through the shared hot.
+    module Tabs (F : ℕ → Maybe (Tb.Listed B)) (lanes : ∀ N → List (LaneRec N)) where
+      flatEnd : ℕ → Pos
+      flatEnd N = L.foldr (λ x y → if x <ᵖ y then y else x) (L.foldr (λ k _ → srcEndφ N k) c₁ (endsOf (S N)))
+                    (L.concatMap (λ R → L.concatMap (λ e → if rowAt (F N) e then [ LaneRec.endImage R e ] else []) (endsOf (LaneRec.tab R))) (lanes N))
+
       φ′ : ℕ → Pos → Pos
-      φ′ N y with deepest (lanes N) y
-      ... | just R  = if endAt (LaneRec.tab R) y then LaneRec.endImage R y
-                      else if endAt (LaneRec.tab R) (up y) then LaneRec.endImage R (up y) ⊕ [ ix 0 ]
-                      else LaneRec.outImage R y
-      ... | nothing = if isMarker N y then val* N (up y) ⊕ [ ix 0 ]
-                      else if endAt (S N) y then (if Rel.φ (Out.rel Os) N y <ᵖ ttEnd then ttEnd else Rel.φ (Out.rel Os) N y) ⊕ [ sub c₁ ]
-                      else srcφ N y
+      φ′ N y = if endAt (F N) y then flatEnd N else rowφ (deepest (lanes N) y)
+        where
+          rowφ : Maybe (LaneRec N) → Pos
+          rowφ (just R) = if endAt (LaneRec.tab R) y then LaneRec.endImage R y
+                          else if endAt (LaneRec.tab R) (up y) then LaneRec.endImage R (up y) ⊕ [ ix 0 ]
+                          else LaneRec.outImage R y
+          rowφ nothing  = if isMarker N y then val* N (up y) ⊕ [ ix 0 ]
+                          else if endAt (S N) y then srcEndφ N y
+                          else srcφ N y
 
       Put′ : ℕ → Pos → Pos → Set
       Put′ N y l with deepest (lanes N) y
@@ -375,7 +392,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = P (mergeᶠ nothing)
       Q′ = λ N → listC (3 + N) n (core (mergeᶠ nothing)) (ρ*c N) c₁
 
-      open Tabs (λ N → L.map (valRec N) (valsAt N))
+      open Tabs P′ (λ N → L.map (valRec N) (valsAt N))
 
       postulate
         mg-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
@@ -453,7 +470,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                          then maybe (λ v → [ valRec N v ]) [] (valAtPos N q)
                          else maybe (λ { (R , cx) → [ queuedRec N R cx a ] }) [] (waitedOn acc (up st))
 
-      open Tabs (λ N → recs N (entriesAt N) [])
+      open Tabs P′ (λ N → recs N (entriesAt N) [])
 
       postulate
         cc-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
@@ -508,7 +525,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = P (switchᶠ)
       Q′ = λ N → listC (3 + N) n (core (switchᶠ)) (ρ*c N) c₁
 
-      open Tabs (λ N → L.map (valRec N) (valsAt N))
+      open Tabs P′ (λ N → L.map (valRec N) (valsAt N))
 
       postulate
         sw-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
@@ -571,7 +588,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ...   | nothing = []
       ...   | just ls = ExhaustL.runs o ls
 
-      open Tabs (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
+      open Tabs P′ (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
 
       postulate
         ex-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
