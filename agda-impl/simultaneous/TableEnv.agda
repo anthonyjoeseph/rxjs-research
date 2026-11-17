@@ -39,7 +39,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; connected)
 open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; pin)
+open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc)
 open import denotation.Laws.Count using (child)
@@ -47,6 +47,7 @@ import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.ListPin using (listC-pin)
+open import simultaneous.ListAfter using (listC-past)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
@@ -78,6 +79,10 @@ got-ok N n o u q with listC-ok N n o u q
 -- A pin listed in any environment lies inside its connect.
 pin-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {l r} → TR (listC N n o ρL q) l (pin r) → T (inside r l)
 pin-ok N n o q (_ , eq , m) = listC-pin N n o q eq m
+
+-- A row listed in any environment lies past its subscription.
+after-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {k e} → TR (listC N n o ρL q) k e → q ≼ k
+after-ok N n o q (_ , eq , m) = listC-past N n o q eq m
 
 private
   dropLast : List Label → List Label
