@@ -2,54 +2,52 @@
 
 -- THE ELABORATED COLD'S LISTING IS ITS WRITTEN-OUT ROWS (`cold-rows`).
 -- The elaborated cold is the merge of the scan's rows (`scan-rows`) and
--- each tag's render, so its rows are `CRow`'s once each render's are.
+-- each tag's render (`rend-rows`), so its rows are `CRow`'s.  They are
+-- read at depth `3 + N`, where a render's mint is listed whole.
 --
 -- The joiner's two side conditions come from one fact about the order
 -- (`srow-lane-end`): every tag's render ends before the scan does.  So
 -- the scan's end has every part ended, and a render's end never does.
 module simultaneous.ColdList where
 
-open import Data.Bool using (Bool)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; [_])
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_,_)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; From; fixed; fresh)
-open import denotation.EmissionSet using (out; end; Den; LaneOf; _≺_; module Merge)
+open import denotation.EmissionSet using (out; end; _≺_; module Merge)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼)
 import quickcheck.Tabled as Tb
-open import simultaneous.SObs using (Tag; lone; module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.ColdRows using (module At)
 open import simultaneous.ColdOrder using (module Ord)
 open import simultaneous.ColdScan using (module Phase)
-open import simultaneous.ListTR using (laneD; merge-tr)
+open import simultaneous.ColdRend using (module Rnd)
+open import simultaneous.ListTR using (merge-tr)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render)
 
 ------------------------------------------------------------------------
 -- The elaborated cold
 
-module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
+module Cold {A : Set} (N n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
   open At {A} P using (C₀; c₀; SRow; Rend; CRow; r-end; c-skp; c-end; c-val; c-lane; c-lend)
 
+  open Rnd {A} N n ρ uρ P using (K; fR; rend-rows)
   open Ord {A} P K m using (J)
   open Phase K n ρ uρ m P using (scanned; scan-rows)
-
-  fR : Bool × Tag A → Den (IE A)
-  fR = laneD K n render ρ
 
   open Merge fR (TR (listC K n scanned ρ P)) using (JoinT; Done; val; step; opin; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand)
 
   postulate
     -- THE COLD'S ROWS.
-    rend-rows     : ∀ q x {k e} → LaneOf fR q x k e ⇔ Rend q x k e
     srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ [ ix 1 ] ⊕ [ last ]) ≺ c
 
   private

@@ -36,12 +36,12 @@ open import simultaneous.SObs using (Tag; val; cdone)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.ListTR using (laneD; ent; cold-tr; map-tr; bounded-tr; Of1; Of2; o₀; o₁; oₑ; of1; of2)
-open import simultaneous.ColdOrder using (walk-end; walk-nopin; ≺-≢; ⊕1-inj; down; module Ord)
+open import simultaneous.ColdOrder using (dn2; walk-end; walk-nopin; ≺-≢; ⊕1-inj; down; module Ord)
 open import simultaneous.ColdRows using (module At)
 
 module Cat {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
   open At {A} P using (C₀; c₀; sync)
-  open Ord {A} P K m using (J; sync-or; sync-at; early; late; past; inP; C₀-in; lt01; lt0L; lt1L; lt11L; C0c₀; dn2)
+  open Ord {A} P K m using (J; sync-or; sync-at; early; late; past; inP; C₀-in; lt01; lt0L; lt1L; lt11L; C0c₀)
 
   ------------------------------------------------------------------------
   -- The rows

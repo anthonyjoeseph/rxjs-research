@@ -136,10 +136,10 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
-  rows→ {N} = Equivalence.to (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
+  rows→ {N} = Equivalence.to (Cold.cold-rows N n (ρ* N) (uρ* N) m p*)
 
   rows← : ∀ {N l e′} → CRow (I N) l e′ → TR (Q N) l e′
-  rows← {N} = Equivalence.from (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
+  rows← {N} = Equivalence.from (Cold.cold-rows N n (ρ* N) (uρ* N) m p*)
 
   -- The elaborated cold's rows lie past its subscription.
   I-after : ∀ {N y e} → (y , e) ∈ I N → p* ≼ y

@@ -82,6 +82,13 @@ part x ys zs h = Equivalence.from T-≡ (<ᵖ-part x ys zs h)
 down : ∀ x l → x ≺ (x ⊕ [ l ])
 down x l = ≺-ext x []
 
+-- Two and three labels down.
+dn2 : ∀ c a b → c ≺ (c ⊕ [ a ] ⊕ [ b ])
+dn2 c a b = ≺-trans {c} {c ⊕ [ a ]} {c ⊕ [ a ] ⊕ [ b ]} (down c a) (down (c ⊕ [ a ]) b)
+
+dn3 : ∀ c a b d → c ≺ (c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ])
+dn3 c a b d = ≺-trans {c} {c ⊕ [ a ] ⊕ [ b ]} {c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ]} (dn2 c a b) (down (c ⊕ [ a ] ⊕ [ b ]) d)
+
 ≺-≢ : ∀ {x y} → x ≺ y → x ≡ y → ⊥
 ≺-≢ {x} lt refl = ≺-irrefl {x} lt
 
@@ -182,9 +189,3 @@ module Ord {A : Set} (P : Pos) (K : ℕ) (m : From A 0) where
   C110-T = ≺-flat (nest5 P (ix 0) (ix 1) (ix 1) (ix 1) (ix 0)) (nest3 P (ix 1) (ix 1) (ix 0))
     (part P (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ []) (ix 1 ∷ ix 0 ∷ []) refl)
 
-  -- Past an end, two labels down.
-  dn2 : ∀ c a b → c ≺ (c ⊕ [ a ] ⊕ [ b ])
-  dn2 c a b = ≺-trans {c} {c ⊕ [ a ]} {c ⊕ [ a ] ⊕ [ b ]} (down c a) (down (c ⊕ [ a ]) b)
-
-  dn3 : ∀ c a b d → c ≺ (c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ])
-  dn3 c a b d = ≺-trans {c} {c ⊕ [ a ] ⊕ [ b ]} {c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ]} (dn2 c a b) (down (c ⊕ [ a ] ⊕ [ b ]) d)
