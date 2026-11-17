@@ -10,8 +10,8 @@
 -- it to the image, and the take carries it forward (`push`, `push-fail`).
 --
 -- Past the elaborated first failure only pins survive, kept where their
--- connect lies before it; whether two cuts agreeing on the plain take
--- keep the same such pins is owed (`take-pins`).
+-- connect lies before it; two cuts agreeing on the plain take keep the
+-- same such pins because the child's pins stay (`pin-stable`).
 module simultaneous.TableTake where
 
 open import Data.Bool using (Bool; true; false; T; not)
@@ -171,14 +171,6 @@ module _ {X : Set} (i : Bool) (keep : X → Bool) where
   ...   | refl | refl = refl
   moved-new φ m {y} {a} {l} x nk lb | no n = ⊥-elim (n (y , a , l , x , nk , lb , refl))
 
-postulate
-  -- THE TAKE'S LATE PINS.  Two cuts agreeing on the whole plain take keep
-  -- the same elaborated pins: those past the elaborated first failure
-  -- read rows the plain take no longer constrains.
-  take-pins : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s* → ∀ {N N′} → N ≤ N′
-            → (∀ k → AgreeTo k (TR (Took i q (P N′))) (TR (Took i q (P N))))
-            → ∀ {y r} → TR (Took i (passes q) (Q N′)) y (pin r) → TR (Took i (passes q) (Q N)) y (pin r)
-
 ------------------------------------------------------------------------
 -- The record
 
@@ -247,6 +239,15 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   under≼ : ∀ o l → o ≼ (o ⊕ [ l ])
   under≼ o l = ≺→≼ {o} {o ⊕ [ l ]} (≺-ext o [])
 
+  pin-of : ∀ {N y r} → K.TT N y (pin r) → TR (P N) y (pin r)
+  pin-of (K.W.left x _ _) = x
+
+  -- A child's pin whose connect no failure precedes is the take's.
+  hp-take : ∀ {N N′ k} → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+          → ¬ K.W.Failed N′ k → ∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r)
+  hp-take {N} {N′} {k} hp nF {r = r} rk x₀ =
+    pin-of {N} (from {N} (hp rk (to {N′} (K.W.left x₀ (λ F → nF (K.O.failed-≼ N′ {r} {k} rk F)) (R.pin-in x₀)))))
+
   ----------------------------------------------------------------------
   -- The lifting facts
 
@@ -260,16 +261,16 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
         agt = T2.lift-fail N N′ (ag→ ag) (from x) (under≼ o l) xo nk nF
     in trans (new N xo nk lb) (trans (cong (_⊕ [ l ]) (R.φ-agree xo tt agt)) (sym (new N′ (proj₁ (upto agt (≼-refl {o})) xo) nk lb)))
 
-  in-bk : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ under-bk R.bk (φ′ N k)
+  in-bk : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ under-bk (R.bk N) (φ′ N k)
   in-bk {N} {k} x un with K.O.kind N (from x) un
-  ... | K.O.kept xk _ _ = subst (λ z → k ∈ under-bk R.bk z) (sym (old N xk)) (∈-++⁺ˡ (R.in-bk xk un))
+  ... | K.O.kept xk _ _ = subst (λ z → k ∈ under-bk (R.bk N) z) (sym (old N xk)) (∈-++⁺ˡ (R.in-bk xk un))
   ... | K.O.made {o} xo nk _ (l , refl , m) =
-    subst (λ z → (o ⊕ [ l ]) ∈ under-bk R.bk z) (sym (new N xo nk (Tp.made-lab m))) (in-under R.bk (Tp.made-lab m) (R.in-bk xo tt))
+    subst (λ z → (o ⊕ [ l ]) ∈ under-bk (R.bk N) z) (sym (new N xo nk (Tp.made-lab m))) (in-under (R.bk N) (Tp.made-lab m) (R.in-bk xo tt))
 
-  pb-in : ∀ l {N k} → K.Put′ N k l → k ∈ (proj₁ (R.pb-few l) ++ proj₁ (R.pb-few (parent l)))
-  pb-in l (_ , _ , inj₁ (pl , _)) = ∈-++⁺ˡ (proj₂ (R.pb-few l) pl)
-  pb-in l {k = k} (_ , _ , inj₂ (y , pl , _ , eq)) =
-    ∈-++⁺ʳ (proj₁ (R.pb-few l)) (subst (λ z → k ∈ proj₁ (R.pb-few z)) (sym (trans (cong parent eq) (parent-snoc y (lab i)))) (proj₂ (R.pb-few y) pl))
+  pb-in : ∀ N l {k} → K.Put′ N k l → k ∈ (proj₁ (R.pb-few N l) ++ proj₁ (R.pb-few N (parent l)))
+  pb-in N l (_ , _ , inj₁ (pl , _)) = ∈-++⁺ˡ (proj₂ (R.pb-few N l) pl)
+  pb-in N l {k = k} (_ , _ , inj₂ (y , pl , _ , eq)) =
+    ∈-++⁺ʳ (proj₁ (R.pb-few N l)) (subst (λ z → k ∈ proj₁ (R.pb-few N z)) (sym (trans (cong parent eq) (parent-snoc y (lab i)))) (proj₂ (R.pb-few N y) pl))
 
   elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
               → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
@@ -443,7 +444,11 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
       ...   | refl = ≼-last {R.φ N kf} (Te.made-lab mm) ly
 
       beyond : ∀ {y e} → (R.φ N kf ⊕ [ last ]) ≺ y → K.UU N′ y e → K.UU N y e
-      beyond {e = pin r} ly uy = from* (take-pins i q R le all (to* uy))
+      beyond {e = pin r} ly (K.W*.left y′ nF′ ins) =
+        let rk : r ≼ R.φ N kf
+            rk lt = nF′ (R.φ N kf , proj₁ img , ykf′ , nk* , lt)
+        in K.W*.left (R.pin-stable le xkfN tt agtk (hp-take (λ {y₁} _ x₁ → proj₁ (upto (all y₁) (≼-refl {y₁})) x₁) nFkf) rk y′)
+                     (T2*.unfail N′ N agu rk nF′) ins
       beyond {e = out _} ly uy = ⊥-elim (gone ly uy tt)
       beyond {e = skip}  ly uy = ⊥-elim (gone ly uy tt)
       beyond {e = end}   ly uy = ⊥-elim (gone ly uy tt)
@@ -464,10 +469,46 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   ... | K.O.made {o} xo nk _ (l , refl , m) =
     subst (s* ≼_) (sym (new N xo nk (Tp.made-lab m))) (≼-trans {s*} {R.φ N o} {R.φ N o ⊕ [ l ]} (R.after-φ xo tt) (under≼ (R.φ N o) l))
 
+  pin-after* : ∀ {N l r} → TR (Q′ N) l (pin r) → s* ≼ r
+  pin-after* {N} y with from* {N} y
+  ... | K.W*.left y′ _ _ = R.pin-after* y′
+
+  pin-stable : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+             → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+             → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+  pin-stable {N} {N′} {k} le x un ag hp {r = r} rk yq with from* {N′} yq | K.O.kind N (from x) un
+  ... | K.W*.left y′ nF′ ins | K.O.kept xk nF nf =
+    let agt = AgreeTo-sym (T2.lift N N′ (AgreeTo-sym (ag→ ag)) (from x) (≼-refl {k}) nF nf)
+        rφ  = subst (r ≼_) (old N xk) rk
+        agu = R.elab-causal le xk un agt
+    in to* (K.W*.left (R.pin-stable le xk un agt (hp-take hp (T2.unfail N N′ (AgreeTo-sym agt) (≼-refl {k}) nF)) rφ y′)
+                      (T2*.unfail N′ N agu rφ nF′) ins)
+  ... | K.W*.left y′ nF′ ins | K.O.made {o} xo nk nF (l , refl , m) =
+    let agt = AgreeTo-sym (T2.lift-fail N N′ (AgreeTo-sym (ag→ ag)) (from x) (under≼ o l) xo nk nF)
+        agu = R.elab-causal le xo tt agt
+        (x* , yo , rd) = K.img-out N xo
+        yo′ = proj₂ (upto agu (≼-refl {R.φ N o})) yo
+        rφ : r ≼ R.φ N o
+        rφ lt = nF′ (R.φ N o , x* , yo′ , K.nk* N rd nk , lt)
+        hp′ : ∀ {y r₀} → r₀ ≼ o → TR (P′ N′) y (pin r₀) → TR (P′ N) y (pin r₀)
+        hp′ {r₀ = r₀} r₀o = hp (≼-trans {r₀} {o} {o ⊕ [ l ]} r₀o (under≼ o l))
+    in to* (K.W*.left (R.pin-stable le xo tt agt (hp-take hp′ (T2.unfail N N′ (AgreeTo-sym agt) (≼-refl {o}) nF)) rφ y′)
+                      (T2*.unfail N′ N agu rφ nF′) ins)
+
+  postulate
+    -- THE TAKE'S CUTS BACK: a cut agreeing up to a row's image agrees up
+    -- to the row, and a late placement moves between cuts agreeing up to
+    -- its row or its place.
+    take-back     : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                  → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+    take-put-up   : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → K.Put′ N k l → K.Put′ N′ k l
+    take-back-put : ∀ {N N′ k l} → N ≤ N′ → K.Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → K.Put′ N k l
+
   rel′ : Rel P′ Q′ s s*
   rel′ = record
-    { φ = φ′ ; Put = K.Put′ ; corr = corr ; φ-agree = φ-agree ; bk = under-bk R.bk ; in-bk = in-bk
-    ; pb-few = λ l → (proj₁ (R.pb-few l) ++ proj₁ (R.pb-few (parent l))) , pb-in l
+    { φ = φ′ ; Put = K.Put′ ; corr = corr ; φ-agree = φ-agree ; bk = λ N → under-bk (R.bk N) ; in-bk = in-bk
+    ; pb-few = λ N l → (proj₁ (R.pb-few N l) ++ proj₁ (R.pb-few N (parent l))) , pb-in N l
+    ; back = take-back ; put-up = take-put-up ; back-put = take-back-put
     ; elab-causal = elab-causal ; stable← = stable← ; stable-put = stable-put ; stable-lead = stable-lead ; elab-all = elab-all
     ; func = λ {N} x x′ → Run.func (K.O.run-T N) (from x) (from x′)
     ; func* = λ {N} y y′ → Run.func (K.O*.run-T N) (from* y) (from* y′)
@@ -481,7 +522,7 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
     ; got* = λ N → got-bind (takeRows i (passes q)) (R.got* N)
     ; after = λ {N} {k} x → let (y , _ , x₀ , le) = take-row i q (from x) in ≼-trans {s} {y} {k} (R.after x₀) le
     ; after* = λ {N} {l} y → let (w , _ , y₀ , le) = take-row i (passes q) (from* y) in ≼-trans {s*} {w} {l} (R.after* y₀) le
-    ; after-φ = after-φ }
+    ; after-φ = after-φ ; pin-after* = pin-after* ; pin-stable = pin-stable }
 
 take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
          → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*

@@ -39,7 +39,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; keys; in-keys; tr-few; ends; m-back; m-val; m-ee; got-bind)
-open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; sh-map→; sh-map←; sh-of; ag-map; func-map; flat-map; pin-in-map)
+open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; sh-map→; sh-map←; sh-of; ag-map; func-map; flat-map; pin-in-map; tr-pin←)
 open import simultaneous.TableTake using (ex-just)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; scanIE; marked)
@@ -548,6 +548,9 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; bk = R.bk
     ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.in-bk x₀ u₀
     ; pb-few = R.pb-few
+    ; back = λ {N} {N′} le x un ag* → let (_ , x₀ , u₀) = At.back-row N′ x un in ag-sc f z (P N′) (P N) (R.back le x₀ u₀ (ag←* ag*))
+    ; put-up = λ le ag → R.put-up le (ag← ag)
+    ; back-put = λ le pl ag* → R.back-put le pl (ag←* ag*)
     ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = At.back-row N x un in ag→* (R.elab-causal le x₀ u₀ (ag← ag))
     ; stable← = λ {N} {N′} le x un y ag* → let (_ , x₀ , u₀) = At.back-row N x un in
         ag-sc f z (P N′) (P N) (R.stable← le x₀ u₀ (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (ag←* ag*))
@@ -568,8 +571,16 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; got* = λ N → got-bind (Tb.mapRows proj₂) (got-bind (scanRows (scanIE f) z*) (R.got* N))
     ; after = λ {N} x → R.after (proj₂ (row-of f z (tr-scan→ f z (P N) x)))
     ; after* = λ {N} y → R.after* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y)))))
-    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀ }
+    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀
+    ; pin-after* = λ {N} y → R.pin-after* (sc-pin (tr-scan→ (scanIE f) z* (Q N) (tr-pin← proj₂ (S* N) y)))
+    ; pin-stable = λ {N} {N′} le x un ag hp rk y → let (_ , x₀ , u₀) = At.back-row N x un in
+        q′← {N} (spin (R.pin-stable le x₀ u₀ (ag← ag)
+          (λ r₀k x₁ → sc-pin (tr-scan→ f z (P N) (hp r₀k (tr-scan← f z (P N′) (spin x₁)))))
+          rk (sc-pin (tr-scan→ (scanIE f) z* (Q N′) (tr-pin← proj₂ (S* N′) y))))) }
     where
+      sc-pin : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → t l (pin r)
+      sc-pin (spin x) = x
+
       pin-sc : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → (∀ {l r} → t l (pin r) → T (inside r l)) → T (inside r l)
       pin-sc (spin x) pi = pi x
 

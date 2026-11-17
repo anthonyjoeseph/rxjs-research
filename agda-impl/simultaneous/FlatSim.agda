@@ -10,7 +10,7 @@
 -- sends always finds a route.
 module simultaneous.FlatSim where
 
-open import Data.Bool using (true; false; _∧_; _∨_; not; if_then_else_)
+open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
 open import Data.List using ([])
 import Data.List as L
 open import Data.Maybe using (Maybe; just; nothing)
@@ -18,7 +18,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Nullary using (does)
 open import simultaneous.Routed using (Routing; r-begin; r-over; r-subscribed; r-completed)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _⊓_; z≤n; s≤s; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _⊓_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; +-suc; n≤1+n; ∸-monoˡ-≤; 0∸n≡0; ⊓-zeroʳ; +-identityʳ; m+n∸m≡n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -53,7 +53,7 @@ data Inv : Routes → Flat Pos → Set where
   dead : ∀ {s} → Flat.spent s ≡ true → tot s ≡ 0 → Inv (Flat.at s , 0) s
 
 -- The scan starts with nothing counted.
-inv₀ : Inv (root , 0) (flat root 0 0 false false false false 0 0 0 0 0 [])
+inv₀ : Inv (root , 0) (flat root 0 0 false false false 0 0 0 0 0 [])
 inv₀ = live refl z≤n
 
 ------------------------------------------------------------------------
@@ -196,9 +196,7 @@ overed-inv n s (live sp le) rewrite sp = dead refl refl
 overed-inv n s (dead sp z) rewrite sp = dead sp z
 
 arrive-inv : ∀ {B} op n s {c} → Inv c s → Inv (after c (arrive {B} op n s)) (proj₁ (arrive {B} op n s))
-arrive-inv (mergeᶠ (just j)) n s i with Flat.active s <ᵇ j
-... | true  = i
-... | false = keep refl refl refl i
+arrive-inv (mergeᶠ (just j)) n s i = keep refl refl refl i
 arrive-inv (mergeᶠ nothing) n s i = i
 arrive-inv switchᶠ n s (live {k} sp le) =
   cut-inv (Flat.lanes s) n _ (fits-live sp (subst (_≤ k) (sym (lanes₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))) le))
@@ -253,7 +251,7 @@ ended-hand s₁ k n ea es et kz i with Flat.queue s₁
 laneDone-inv : ∀ {B} op b n s {c} → Inv c s → Inv (after c (onMark {B} op b s laneDone n)) (proj₁ (onMark {B} op b s laneDone n))
 laneDone-inv op b n s i =
   ended-hand (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                       ; popping = not (isZero (Flat.queue s)) ; dead = true }) _ n refl refl (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s)) (spent-k s i) i
+                       ; dead = true }) _ n refl refl (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s)) (spent-k s i) i
 
 burstEnd-inv : ∀ {B} op b n s {c} → Inv c s → Inv (after c (onMark {B} op b s burstEnd n)) (proj₁ (onMark {B} op b s burstEnd n))
 burstEnd-inv op b n s i with isZero (Flat.held s) ∨ Flat.dead s
@@ -343,9 +341,7 @@ private
   ... | false = stops-sent (Flat.parked s) n i
 
   arrive-sent : ∀ {B} {x : Maybe (Input B)} op n s {v} → v ∈ proj₂ (arrive {B} op n s) → Sent x v
-  arrive-sent (mergeᶠ (just k)) n s i with Flat.active s <ᵇ k
-  ... | true  = none i
-  ... | false = none i
+  arrive-sent (mergeᶠ (just k)) n s i = none i
   arrive-sent (mergeᶠ nothing) n s i = none i
   arrive-sent switchᶠ n s i = cut-sent (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }) i
   arrive-sent exhaustᶠ n s i = none i
@@ -397,7 +393,7 @@ private
   onMark-sent op b laneDone   n s i =
     ended-sent (Flat.acc s ⊓ Flat.lanes s) n
       (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                ; popping = not (isZero (Flat.queue s)) ; dead = true }) i
+                ; dead = true }) i
   onMark-sent op b burstEnd   n s i = burst-sent (isZero (Flat.held s) ∨ Flat.dead s) n s i
   onMark-sent op b outerDone  n s i = left-sent n (record s { finished = true }) i
   onMark-sent op b subscribed n s (here refl) = routed r-subscribed refl
@@ -508,9 +504,7 @@ overed-exact n s (live sp le) e rewrite sp = refl
 overed-exact n s (dead sp z) e rewrite sp = e
 
 arrive-exact : ∀ {B} op n s {c} → Inv c s → proj₂ c ≡ tot s → proj₂ (after c (arrive {B} op n s)) ≡ tot (proj₁ (arrive {B} op n s))
-arrive-exact (mergeᶠ (just j)) n s i e with Flat.active s <ᵇ j
-... | true  = e
-... | false = e
+arrive-exact (mergeᶠ (just j)) n s i e = e
 arrive-exact (mergeᶠ nothing) n s i e = e
 arrive-exact switchᶠ n s i e =
   cut-exact (Flat.lanes s) n _ i e refl (lanes₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))
@@ -536,7 +530,7 @@ onMark-exact op b outerClose n s nc i e = e
 onMark-exact op b laneStart  n s nc i e = e
 onMark-exact op b laneDone   n s nc i e =
   ended-exact (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                        ; popping = not (isZero (Flat.queue s)) ; dead = true }) _ n i e refl
+                        ; dead = true }) _ n i e refl
     (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s))
 onMark-exact op b burstEnd   n s nc i e with isZero (Flat.held s) ∨ Flat.dead s
 ... | true  = e

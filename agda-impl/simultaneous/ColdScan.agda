@@ -43,7 +43,7 @@ open import simultaneous.TableCorr using (TR)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.ListTR using (laneD; ent; merge-tr; scan-tr; self-exact; Of1; Of2; o₀; o₁; oₑ; of1; of2;
   module NthAny; module AccOf)
-open import simultaneous.ColdOrder using (down; part; module Ord)
+open import simultaneous.ColdOrder using (dn2; dn3; down; part; module Ord)
 open import simultaneous.ColdRows using (module At)
 open import simultaneous.ColdCat using (module Cat)
 
@@ -51,7 +51,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (pha
 
 module Phase {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
   open At {A} P using (C₀; c₀; sync; SRow; mv₀; mv₁; cv₀; cv₁; tk; tke; ce; cval; cskp; se-c; se-d; se-k; se-e; ae-h; ae-d; ae-e; me-p)
-  open Ord {A} P K m using (J; T₀; inP; sync-or; past; early; late; T₀-in; C₀≺c₀; C1-T; C110-T; CL-PL; TL-PL; dn2; dn3)
+  open Ord {A} P K m using (J; T₀; inP; sync-or; past; early; late; T₀-in; C₀≺c₀; C1-T; C110-T; CL-PL; TL-PL)
   open Cat K n ρ uρ m P using (CatRow; k-v₀; k-v₁; k-val; k-skp; ks-c; ks-d; ks-k; ks-e; ka-h; ka-d; ka-e; ka-p; catted; cat-rows)
 
   ------------------------------------------------------------------------

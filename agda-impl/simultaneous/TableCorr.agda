@@ -258,24 +258,36 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
 
 -- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
 -- placement, read off the two families of tables: two cuts agreeing up to
--- a row map it alike; each position is imaged by finitely many, whatever
--- the cut; agreement crosses between cuts along the map, up to an image
--- and back from one the cut holds, up to a late placement, from a row of
--- the instant a row leads to its image, and everywhere.
+-- a row map it alike; each position is imaged by finitely many in each
+-- cut; agreement crosses between cuts along the map, up to an image and
+-- back from one either cut holds, up to a late placement, from a row of
+-- the instant a row leads to its image, and everywhere.  A late placement
+-- survives into a cut agreeing up to its row, and back into one agreeing
+-- up to its place.
 --
 -- Each table is a run's: there is one, of one event per position, none
 -- under another's, a pin inside its connect, every row and every image
--- at or past its subscription.  Two cuts are truncated before they
--- differ (`Cons`).
+-- at or past its subscription, every elaborated pin's connect too.  Two
+-- cuts are truncated before they differ (`Cons`).
+--
+-- PINS STAY (`pin-stable`): two cuts agreeing up to a row and holding
+-- alike the plain pins whose connect lies at or before it hold alike the
+-- elaborated pins whose connect lies at or before its image.  Past a
+-- take's first failure only such pins survive, and the plain take fixes
+-- nothing else of its child there.
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
     Put         : ℕ → Pos → Pos → Set
     corr        : ∀ N → Corr s s* (φ N) (Put N) (TR (P N)) (TR (Q N))
     φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
-    bk          : Pos → List Pos
-    in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk (φ N k)
-    pb-few      : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put N k l → k ∈ ks
+    bk          : ℕ → Pos → List Pos
+    in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk N (φ N k)
+    pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put N k l → k ∈ ks
+    back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ N′ k) (TR (Q N′)) (TR (Q N))
+                → AgreeTo k (TR (P N′)) (TR (P N))
+    put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → Put N k l → Put N′ k l
+    back-put    : ∀ {N N′ k l} → N ≤ N′ → Put N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put N k l
     elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
                 → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
     stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ N k) e′
@@ -298,3 +310,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     after       : ∀ {N k e} → TR (P N) k e → s ≼ k
     after*      : ∀ {N l e} → TR (Q N) l e → s* ≼ l
     after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → s* ≼ φ N k
+    pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → s* ≼ r
+    pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+                → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
+                → ∀ {y r} → r ≼ φ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)

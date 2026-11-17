@@ -2,8 +2,9 @@
 
 -- WHERE THE ELABORATED COLD'S ROWS FALL.  A cold subscribed at `s` lists
 -- every row past `s` (`walk-past`); in `s`'s own instant one label down
--- (`walk-under`), so one of the subscribe burst; and one end at most
--- (`walk-end`).  The elaboration's cold is subscribed at `c₀`, in the
+-- (`walk-under`), so one of the subscribe burst; one end at most
+-- (`walk-end`), after every other row (`walk-before`); and past the
+-- burst each row in an instant of its own (`walk-apart`).  The elaboration's cold is subscribed at `c₀`, in the
 -- burst at `P`: a row of the burst lies below the concat's first lane,
 -- before its second (`early`); any later row lies past the whole burst
 -- (`late`).
@@ -26,7 +27,7 @@ open import Relation.Nullary using (yes; no)
 open import denotation.Position using (Pos; Label; _∙_; _≟ⁱ_; _<ˡ_; ix; last; _⊕_; instant)
 open import denotation.Events using (<ᵖ-part; Events; From; start)
 import denotation.Events as Ev
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≺_)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Work; _≺_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-assoc; ∙-inj)
 open import quickcheck.Tabled using (Row)
@@ -45,6 +46,10 @@ postulate
   walk-under : ∀ {A} K s (m : From A 0) {k e} → (k , e) ∈ walkN K (start s m)
              → instantOf k ≡ instantOf s → Σ Label λ l → k ≡ s ⊕ [ l ]
   walk-end   : ∀ {A} K s (m : From A 0) {c c′} → (c , end) ∈ walkN K (start s m) → (c′ , end) ∈ walkN K (start s m) → c ≡ c′
+  walk-before : ∀ {A} K s (m : From A 0) {c k e} → (c , end) ∈ walkN K (start s m) → (k , e) ∈ walkN K (start s m)
+              → Work e → k ≺ c
+  walk-apart : ∀ {A} K s (m : From A 0) {k e k′ e′} → (k , e) ∈ walkN K (start s m) → (k′ , e′) ∈ walkN K (start s m)
+             → instantOf k ≡ instantOf k′ → (instantOf k ≡ instantOf s → ⊥) → k ≡ k′
 
 -- A walk shows no pin.
 walk-nopin : ∀ {A} K (ev : Events A) {k r} → (k , pin r) ∈ walkN K ev → ⊥
@@ -81,6 +86,13 @@ part x ys zs h = Equivalence.from T-≡ (<ᵖ-part x ys zs h)
 
 down : ∀ x l → x ≺ (x ⊕ [ l ])
 down x l = ≺-ext x []
+
+-- Two and three labels down.
+dn2 : ∀ c a b → c ≺ (c ⊕ [ a ] ⊕ [ b ])
+dn2 c a b = ≺-trans {c} {c ⊕ [ a ]} {c ⊕ [ a ] ⊕ [ b ]} (down c a) (down (c ⊕ [ a ]) b)
+
+dn3 : ∀ c a b d → c ≺ (c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ])
+dn3 c a b d = ≺-trans {c} {c ⊕ [ a ] ⊕ [ b ]} {c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ]} (dn2 c a b) (down (c ⊕ [ a ] ⊕ [ b ]) d)
 
 ≺-≢ : ∀ {x y} → x ≺ y → x ≡ y → ⊥
 ≺-≢ {x} lt refl = ≺-irrefl {x} lt
@@ -182,9 +194,3 @@ module Ord {A : Set} (P : Pos) (K : ℕ) (m : From A 0) where
   C110-T = ≺-flat (nest5 P (ix 0) (ix 1) (ix 1) (ix 1) (ix 0)) (nest3 P (ix 1) (ix 1) (ix 0))
     (part P (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ []) (ix 1 ∷ ix 0 ∷ []) refl)
 
-  -- Past an end, two labels down.
-  dn2 : ∀ c a b → c ≺ (c ⊕ [ a ] ⊕ [ b ])
-  dn2 c a b = ≺-trans {c} {c ⊕ [ a ]} {c ⊕ [ a ] ⊕ [ b ]} (down c a) (down (c ⊕ [ a ]) b)
-
-  dn3 : ∀ c a b d → c ≺ (c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ])
-  dn3 c a b d = ≺-trans {c} {c ⊕ [ a ] ⊕ [ b ]} {c ⊕ [ a ] ⊕ [ b ] ⊕ [ d ]} (dn2 c a b) (down (c ⊕ [ a ] ⊕ [ b ]) d)

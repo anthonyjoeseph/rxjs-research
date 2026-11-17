@@ -38,12 +38,13 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
+open import simultaneous.Listing using (walkN; listC; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
 open import simultaneous.ColdOrder using (walk-past; walk-nopin)
 open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
 open import simultaneous.TakeCut using (inst-⊕)
+open import simultaneous.TableEnv using (got-ok)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ)
 
@@ -119,6 +120,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     walk-func  : ∀ {N k e e′} → (k , e) ∈ W N → (k , e′) ∈ W N → e ≡ e′
     walk-flat  : ∀ {N y e l ys e′} → (y , e) ∈ W N → (y ⊕ (l ∷ ys) , e′) ∈ W N → ⊥
     walk-agree : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N → AgreeTo k (TR (P N′)) (TR (P N))
+    walk-back  : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N′ → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
     walk-cons  : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
     walk-all   : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → I N ≡ I N′
     walk-alone : ∀ {N k e k′ e′} → (k , e) ∈ W N → (k′ , e′) ∈ W N → instantOf k′ ≡ instantOf k → sync* (ψ k) ≡ false → k ≡ k′
@@ -136,10 +138,10 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
-  rows→ {N} = Equivalence.to (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
+  rows→ {N} = Equivalence.to (Cold.cold-rows N n (ρ* N) (uρ* N) m p*)
 
   rows← : ∀ {N l e′} → CRow (I N) l e′ → TR (Q N) l e′
-  rows← {N} = Equivalence.from (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
+  rows← {N} = Equivalence.from (Cold.cold-rows N n (ρ* N) (uρ* N) m p*)
 
   -- The elaborated cold's rows lie past its subscription.
   I-after : ∀ {N y e} → (y , e) ∈ I N → p* ≼ y
@@ -186,8 +188,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   cold-after* {N} t = crow-after (I-after {N}) (rows→ t)
 
   cold-got* : ∀ N → Got (Q N)
-  cold-got* N with listC-ok (3 + N) n (coldˢ (fixed m)) (uρ* N) p*
-  ... | L , eq , _ = L , eq
+  cold-got* N = got-ok (3 + N) n (coldˢ (fixed m)) {ρ* N} (uρ* N) p*
 
   walk-pin : ∀ {N k r} → (k , pin r) ∈ W N → ⊥
   walk-pin {N} = walk-nopin (3 + N) _
@@ -265,9 +266,12 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ { (_ , refl , x) _ a → agree-φ x a }
-    ; bk = bk′
+    ; bk = λ _ → bk′
     ; in-bk = λ { (_ , refl , x) _ → φ-back x }
-    ; pb-few = λ _ → [] , λ ()
+    ; pb-few = λ _ _ → [] , λ ()
+    ; back = λ { le (_ , refl , x) _ a → walk-back le x a }
+    ; put-up = λ _ _ ()
+    ; back-put = λ _ ()
     ; elab-causal = λ { le (_ , refl , x) _ _ → causal le x }
     ; stable← = λ { le (_ , refl , x) _ _ _ → walk-agree le x }
     ; stable-put = λ _ _ _ ()
@@ -285,7 +289,9 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; got* = cold-got*
     ; after = λ { (_ , refl , x) → walk-after x }
     ; after* = cold-after*
-    ; after-φ = λ { (_ , refl , x) _ → φ-after x } }
+    ; after-φ = λ { (_ , refl , x) _ → φ-after x }
+    ; pin-after* = λ y → ⊥-elim (cold-pin* y)
+    ; pin-stable = λ _ _ _ _ _ _ y → ⊥-elim (cold-pin* y) }
 
 cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p* → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*
 cold-tab m n ρ* uρ* p p* = ColdTab.rel′ m n ρ* uρ* p p*

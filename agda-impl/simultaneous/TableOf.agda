@@ -66,6 +66,11 @@ step q i xs m with shape q i xs m
 ... | inj₁ (j , _ , eq , _) = ix j , at-ix j , eq
 ... | inj₂ (eq , _)         = last , at-last , eq
 
+-- A leaf's rows lie past its subscription.
+after-W : ∀ {X : Set} q i (ys : List X) {k e} → (k , e) ∈ W q i ys → q ≼ k
+after-W q i ys m with step q i ys m
+... | a , _ , refl = ≺→≼ {q} {q ⊕ [ a ]} (≺-ext q [])
+
 unp : ∀ {X : Set} q i (xs : List X) {k e} → (k , e) ∈ W q i xs → Unpinned e
 unp q i xs m with shape q i xs m
 ... | inj₁ (_ , _ , _ , _ , refl) = tt
@@ -171,9 +176,12 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
   rel′ = record
     { φ = φ′ ; Put = Put′ ; corr = corr′
     ; φ-agree = λ _ _ _ → refl
-    ; bk = λ l → [ p ⊕ [ lastL l ] ]
+    ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = λ {N} → in-bk′ {N}
-    ; pb-few = λ _ → [] , λ ()
+    ; pb-few = λ _ _ → [] , λ ()
+    ; back = λ _ _ _ _ → ag-id
+    ; put-up = λ _ _ ()
+    ; back-put = λ _ ()
     ; elab-causal = λ _ _ _ _ → ag-id
     ; stable← = λ _ _ _ _ _ → ag-id
     ; stable-put = λ _ _ _ ()
@@ -191,15 +199,13 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
     ; got* = λ _ → _ , refl
     ; after = λ { (_ , refl , m) → after-W p 0 xs m }
     ; after* = λ { (_ , refl , m) → after-W p* 0 (map v xs) m }
-    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* []) }
+    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
+    ; pin-after* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
+    ; pin-stable = λ _ _ _ _ _ _ y → y }
     where
       in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ (_ , refl , m) _ with step p 0 xs m
       ... | a , _ , refl = here (cong (λ l → p ⊕ [ l ]) (sym (trans (lastL-⊕ p* (lastL (p ⊕ [ a ]))) (lastL-⊕ p a))))
-
-      after-W : ∀ {X : Set} q i (ys : List X) {k e} → (k , e) ∈ W q i ys → q ≼ k
-      after-W q i ys m with step q i ys m
-      ... | a , _ , refl = ≺→≼ {q} {q ⊕ [ a ]} (≺-ext q [])
 
 of-tab : ∀ {A} (xs : List A) (v : A → IE A) → (∀ x → valuesOf (v x) ≡ x ∷ []) → ∀ p p*
        → Rel {A} (λ _ → just (W p 0 xs ⊣ false)) (λ _ → just (W p* 0 (map v xs) ⊣ false)) p p*

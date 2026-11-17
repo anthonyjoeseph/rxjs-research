@@ -2,55 +2,117 @@
 
 -- THE ELABORATED COLD'S LISTING IS ITS WRITTEN-OUT ROWS (`cold-rows`).
 -- The elaborated cold is the merge of the scan's rows (`scan-rows`) and
--- each tag's render, so its rows are `CRow`'s once each render's are.
+-- each tag's render (`rend-rows`), so its rows are `CRow`'s.  They are
+-- read at depth `3 + N`, where a render's mint is listed whole.
 --
 -- The joiner's two side conditions come from one fact about the order
 -- (`srow-lane-end`): every tag's render ends before the scan does.  So
 -- the scan's end has every part ended, and a render's end never does.
+-- An end in the burst lies under the merge's last label, past every
+-- value's render under its first; a later end lies past the burst, and
+-- past every other row of the cold an instant apart.
 module simultaneous.ColdList where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (true; false)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; [_])
+open import Data.List using (List; []; _∷_; [_])
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_,_)
+open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst₂)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _<ˡ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; From; fixed; fresh)
-open import denotation.EmissionSet using (out; end; Den; LaneOf; _≺_; module Merge)
-open import denotation.Laws.Modulus using (≼-refl; ≺→≼)
+open import denotation.EmissionSet using (out; end; _≺_; module Merge)
+open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans; ≺-absurd)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊕-assoc)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
+open import simultaneous.Readings using (instantOf)
+open import simultaneous.TakeCut using (inst-⊕)
 import quickcheck.Tabled as Tb
-open import simultaneous.SObs using (Tag; lone; module Elaborate)
+open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.ColdRows using (module At)
-open import simultaneous.ColdOrder using (module Ord)
+open import simultaneous.ColdOrder using (walk-under; walk-end; walk-before; walk-apart; part; ≺-flat; ≺-≢; nest2; dn2; module Ord)
 open import simultaneous.ColdScan using (module Phase)
-open import simultaneous.ListTR using (laneD; merge-tr)
+open import simultaneous.ColdRend using (module Rnd)
+open import simultaneous.ListTR using (merge-tr)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render)
 
 ------------------------------------------------------------------------
+-- Order under positions
+
+private
+  sn : ∀ {w z} → w ⊑ z → ∀ l → w ⊑ (z ⊕ [ l ])
+  sn {z = z} wz l = ⊑-trans wz (⊑-snoc⁺ z)
+
+  -- Two subtrees apart, in their labels' order, at any depth.
+  lt-⊑ : ∀ x {a b} → a <ˡ b ≡ true → ∀ {u v} → (x ⊕ [ a ]) ⊑ u → (x ⊕ [ b ]) ⊑ v → u ≺ v
+  lt-⊑ x {a} {b} h (us , refl) (vs , refl) = ≺-flat (⊕-assoc x [ a ] us) (⊕-assoc x [ b ] vs) (part x us vs h)
+
+  -- Two instants apart stay apart below.
+  apart-⊕ : ∀ {x y} → x ≺ y → (instantOf x ≡ instantOf y → ⊥) → ∀ xs ys → (x ⊕ xs) ≺ (y ⊕ ys)
+  apart-⊕ {x} {y} lt ne xs ys = instant-≺ (x ⊕ xs) (y ⊕ ys)
+    (subst₂ _≺ⁱ_ (sym (inst-⊕ x xs)) (sym (inst-⊕ y ys)) (≺-instant x y lt ne))
+
+------------------------------------------------------------------------
 -- The elaborated cold
 
-module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
-  open At {A} P using (C₀; c₀; SRow; Rend; CRow; r-end; c-skp; c-end; c-val; c-lane; c-lend)
+module Cold {A : Set} (N n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
+  open At {A} P using (C₀; c₀; sync; sync-in; SRow; tk; cval; se-d; se-e; ae-d; ae-e; Rend; CRow; r-end; c-skp; c-end; c-val; c-lane; c-lend)
 
-  open Ord {A} P K m using (J)
+  open Rnd {A} N n ρ uρ P using (K; fR; rend-rows)
+  open Ord {A} P K m using (J; T₀; inP; c₀-in; T₀-in; sync-or; sync-out; late)
   open Phase K n ρ uρ m P using (scanned; scan-rows)
-
-  fR : Bool × Tag A → Den (IE A)
-  fR = laneD K n render ρ
 
   open Merge fR (TR (listC K n scanned ρ P)) using (JoinT; Done; val; step; opin; oend; opass; lane; lend; lpass; hand; left; run; rend; rpass; rhand)
 
-  postulate
-    -- THE COLD'S ROWS.
-    rend-rows     : ∀ q x {k e} → LaneOf fR q x k e ⇔ Rend q x k e
-    srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ [ ix 1 ] ⊕ [ last ]) ≺ c
+  private
+    lateQ : ∀ {c} → (c , end) ∈ J → sync c ≡ false → ∀ z → instantOf z ≡ instantOf P → z ≺ (c ⊕ [ ix 1 ] ⊕ [ last ])
+    lateQ {c} y s z iz = ≺-trans {z} {c} {c ⊕ [ ix 1 ] ⊕ [ last ]} (late y s z iz) (dn2 c (ix 1) last)
+
+    -- A value's place under the merge's first lane, for an end in the burst.
+    under0 : ∀ {u} → (P ⊕ [ ix 0 ]) ⊑ u → (u ⊕ [ ix 1 ] ⊕ [ last ]) ≺ (P ⊕ [ last ])
+    under0 {u} w = lt-⊑ P refl (sn (sn w (ix 1)) last) (⊑-refl (P ⊕ [ last ]))
+
+    -- A value of the burst: one label under the cold.
+    sync-row : ∀ {y e} → (y , e) ∈ J → sync y ≡ true → (P ⊕ [ ix 0 ]) ⊑ y
+    sync-row {y} x s with walk-under K c₀ m x (trans (sync-in {y} s) (sym c₀-in))
+    ... | l , refl = sn (sn (sn (sn (⊑-refl (P ⊕ [ ix 0 ])) (ix 1)) (ix 0)) (ix 1)) l
+
+  -- Every tag's render ends before the scan does.
+  srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ [ ix 1 ] ⊕ [ last ]) ≺ c
+  srow-lane-end tk (se-e _ _) =
+    lt-⊑ P refl (sn (sn (sn (sn (⊑-refl (P ⊕ [ ix 1 ])) (ix 1)) (ix 0)) (ix 1)) last) (⊑-refl (P ⊕ [ last ]))
+  srow-lane-end tk (ae-e y s) = lateQ y s (T₀ ⊕ [ ix 1 ] ⊕ [ last ]) (inP (T₀ ⊕ [ ix 1 ]) last (inP T₀ (ix 1) T₀-in))
+  srow-lane-end (cval {y} x _) (se-e {c} y′ s′) with sync-or y
+  ... | inj₁ s = under0 (sync-row x s)
+  ... | inj₂ s = ⊥-elim (≺-absurd {y} {c} (walk-before K c₀ m y′ x tt) (late {y} x s c (sync-in {c} s′)))
+  srow-lane-end (cval {y} x _) (ae-e {c} y′ s′) = ≺-flat (nest2 y (ix 1) last) (nest2 c (ix 1) last) (apart-⊕ {y} {c} lt ne (ix 1 ∷ last ∷ []) (ix 1 ∷ last ∷ []))
+    where
+      lt : y ≺ c
+      lt = walk-before K c₀ m y′ x tt
+
+      ne : instantOf y ≡ instantOf c → ⊥
+      ne eq with sync-or y
+      ... | inj₁ s = sync-out {c} s′ (trans (sym eq) (sync-in {y} s))
+      ... | inj₂ s = ≺-≢ {y} {c} lt (walk-apart K c₀ m x y′ eq (λ e → sync-out {y} s (trans e c₀-in)))
+  srow-lane-end (se-d _ _) (se-e _ _) =
+    under0 (sn (sn (sn (sn (⊑-refl (P ⊕ [ ix 0 ])) (ix 1)) (ix 1)) (ix 1)) (ix 0))
+  srow-lane-end (se-d y s) (ae-e y′ s′) with walk-end K c₀ m y y′
+  ... | refl with trans (sym s) s′
+  ...   | ()
+  srow-lane-end (ae-d y s) (se-e y′ s′) with walk-end K c₀ m y y′
+  ... | refl with trans (sym s′) s
+  ...   | ()
+  srow-lane-end (ae-d {c} y _) (ae-e y′ _) with walk-end K c₀ m y y′
+  ... | refl = lt-⊑ (c ⊕ [ ix 1 ]) refl (sn (sn (⊑-refl (c ⊕ [ ix 1 ] ⊕ [ ix 0 ])) (ix 1)) last) (⊑-refl (c ⊕ [ ix 1 ] ⊕ [ last ]))
 
   private
     to-s : ∀ {k e} → TR (listC K n scanned ρ P) k e → SRow J k e

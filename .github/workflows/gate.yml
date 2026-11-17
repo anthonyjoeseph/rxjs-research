@@ -150,6 +150,29 @@ jobs:
       - name: make cursor-check
         run: make cursor-check
 
+  # A PROBE, not a gate: each subterm's plain table corresponds to its
+  # elaboration's where the relation pairs them.  Informational while the
+  # erasure's design question is open.
+  table-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda-impl/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      - name: make table-check
+        run: make table-check
+
   # The simultaneous spec over the elaboration: no seed may refute it, and
   # the selftest proves the check can fire.  Run only when the elaboration
   # changed (Anthony): a green run leaves a marker keyed on the hash of
