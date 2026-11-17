@@ -67,7 +67,7 @@ open import quickcheck.Code using (toObs; timeline; showCode)
 open import quickcheck.Quickcheck using (program)
 open import quickcheck.Ty using (natᵗ; showPos)
 open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; short; sort; hotOf; values; afterL; module BoundedL; module Order;
-  concatMap; when; anyᵇ)
+  concatMap; when; anyᵇ; ends)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; each; laneˢ; closer)
 
@@ -284,7 +284,7 @@ mutual
                     else [ "hot-image" , nm +++ " " +++ showPos (proj₁ yv) +++ " ~ " +++ showPos (annAt yv) +++ " among "
                                           +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ]) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
-    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (startRes ++ subRes , 0 , 0)))
+    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (wholeRes ⊹ (startRes ++ subRes , 0 , 0))))
     where
       tt-tab : Listed ⊤
       tt-tab = hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
@@ -415,6 +415,36 @@ mutual
           kindOf k = if memᵖ k (ofKind false ks) then vend else vout
       coreRes | _ | _ = none
 
+      -- The whole flatMap against the plain, along the combined scan's
+      -- re-emit: a lanes' value at the lane branch's reader, then `each`'s
+      -- one emit; the flatMap's end at the `nothing` the scan's concat
+      -- sends past the last of its three branches' ends.
+      cA : Pos
+      cA = c₂ ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+      rB : ℕ → Pos
+      rB i = cA ⊕ [ ix i ] ⊕ [ ix 1 ]
+      readEnd : Pos → List Pos → List Pos
+      readEnd r = mapL (λ e → if r <ᵖ e then e ⊕ [ sub r ] else r ⊕ [ last ])
+      core-hot : Listed (IE B)
+      core-hot = hotL (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
+      aEnd : Pos
+      aEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
+               (readEnd (rB 0) (ends (rows sh-tab)) ++ readEnd (rB 1) (ends (rows core-hot)) ++ readEnd (rB 2) (ends (rows cl-tab)))
+      whole : Pos × Vis → Pos
+      whole (k , vout) = formula (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+      whole (k , vend) = aEnd ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ last ]
+
+      wholeRes : Res
+      wholeRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (elab ρι (flatMap op f s)) ρ* p*)
+      ... | just ks | just ks* with pairing ks ks*
+      ...   | nothing = none
+      ...   | just m  = concatMap (λ { (k , k*) → let w = whole (k , kindOf k) in if does (w ≟ᵖ k*) then []
+                                    else [ "whole" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
+        where
+          kindOf : Pos → Vis
+          kindOf k = if memᵖ k (ofKind false ks) then vend else vout
+      wholeRes | _ | _ = none
+
 ------------------------------------------------------------------------
 -- The run
 
@@ -464,7 +494,7 @@ private
   backRes seed | o | t | t* | _ | _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
