@@ -115,6 +115,21 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ρ*c : ℕ → All Tb.Listed (IE B ∷ IE A ∷ ⊤ ∷ Δ)
   ρ*c N = cl-tab N ∷ ρ*h N
 
+  uρ*c : ∀ N → UncutEnv (ρ*c N)
+  uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
+
+  -- A table's ends.
+  endsOf : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
+  endsOf nothing   = []
+  endsOf (just Lx) = ends (rows Lx)
+
+  endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
+  endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
+
+  ups : ℕ → Pos → Pos
+  ups zero    y = y
+  ups (suc i) y = ups i (up y)
+
   ----------------------------------------------------------------------
   -- The children's records
 
@@ -170,23 +185,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     emitAt : Pos → Pos
     emitAt r = r ⊕ˡ (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
 
-    uρ*c : ∀ N → UncutEnv (ρ*c N)
-    uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
-
     -- A lane's trigger, under its subscription.
     trig : Pos → ℕ → Tb.Listed ⊤
     trig st N = hotOf (proj₁ (listC-ok (3 + N) n (of (tt ∷ [])) {ρ*c N} (uρ*c N) (laneL st ⊕ [ ix 1 ])))
 
     utrig : ∀ st N → UncutEnv (trig st N ∷ ρ*c N)
     utrig st N = proj₂ (proj₂ (listC-ok (3 + N) n (of (tt ∷ [])) {ρ*c N} (uρ*c N) (laneL st ⊕ [ ix 1 ]))) , uρ*c N
-
-    -- A table's ends.
-    endsOf : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
-    endsOf nothing   = []
-    endsOf (just Lx) = ends (rows Lx)
-
-    endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
-    endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
 
     -- The source's tables.
     S : ℕ → Maybe (Tb.Listed A)
@@ -314,10 +318,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     isMarker : ℕ → Pos → Bool
     isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
-
-    ups : ℕ → Pos → Pos
-    ups zero    y = y
-    ups (suc i) y = ups i (up y)
 
     -- THE MERGES' MAP, given each cut's lanes.  A lane row is imaged
     -- through its lane's record at the cut, the skip a queue leaves past a
@@ -606,25 +606,220 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   flat-core switchᶠ           = λ Os Ls al lk → Parts.SwitchTab.rel′ Os Ls al lk
   flat-core exhaustᶠ          = λ Os Ls al lk → Parts.ExhaustTab.rel′ Os Ls al lk
 
-  postulate
-    -- THE COMBINED SCAN: the lanes' flatMap read through its hot by the
-    -- scan over its routes and the trackers', each value re-emitted in
-    -- place with its marks.
-    flat-comb : ∀ op → Rel (P op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁
-              → Rel (P op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂
+  ----------------------------------------------------------------------
+  -- THE COMBINED SCAN: each row of the lanes' flatMap read by the scan's
+  -- lane branch and re-emitted by `each` as it is, the scan's other emits
+  -- all marks; the flatMap's end at the `nothing` the scan's concat sends
+  -- past the last of its three branches' ends.
+  module CombTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁) where
+    P′ Q′ : ℕ → _
+    P′ = P op
+    Q′ = λ N → listC (3 + N) n (inner op) (ρ*c N) c₂
 
-    -- THE CLOSER: the combined run past the closer's subscription, the
-    -- closer's marks unshown and in the instants of the source's ends.
-    flat-close : ∀ op → Rel (P op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂
-               → Rel (P op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃
+    -- The scan's three branches, under its concat's first lane: the
+    -- outer, the lanes and the closer, each read at `rB`.
+    cA : Pos
+    cA = c₂ ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
-    -- THE SHARE: the body read past the share's two connects; the
-    -- trigger's and the shared hot's own rows are never shown.
-    flat-share : ∀ op → Rel (P op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃
-               → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
+    rB : ℕ → Pos
+    rB i = cA ⊕ˡ (ix i ∷ ix 1 ∷ [])
+
+    readEnd : Pos → List Pos → List Pos
+    readEnd r = L.map (λ e → if r <ᵖ e then e ⊕ [ sub r ] else r ⊕ [ last ])
+
+    core-hot : ℕ → Tb.Listed (IE B)
+    core-hot N = hotOf (proj₁ (listC-ok (3 + N) n (core op) {ρ*c N} (uρ*c N) c₁))
+
+    -- The last of the branches' ends, as the merge over them ends.
+    aEnd : ℕ → Pos
+    aEnd N = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
+               (readEnd (rB 0) (ends (rows (sh-tab N))) ++ readEnd (rB 1) (ends (rows (core-hot N)))
+                ++ readEnd (rB 2) (ends (rows (cl-tab N))))
+
+    reEmit : Pos → Pos
+    reEmit l = l ⊕ˡ (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ [])
+
+    φ′ : ℕ → Pos → Pos
+    φ′ N k = if endAt (P′ N) k then aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ []) else reEmit (Rel.φ R N k)
+
+    Put′ : ℕ → Pos → Pos → Set
+    Put′ N k l = Σ Pos λ l′ → Rel.Put R N k l′ × l ≡ reEmit l′
+
+    bk′ : ℕ → Pos → List Pos
+    bk′ N l = Rel.bk R N (ups 3 l) ++ endsOf (P′ N)
+
+    postulate
+      cb-corr        : ∀ N → Corr p c₂ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+      cb-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      cb-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+      cb-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+      cb-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      cb-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+      cb-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+      cb-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      cb-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      cb-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+      cb-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cb-corr N) k
+                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      cb-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+      cb-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+      cb-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+      cb-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      cb-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      cb-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+      cb-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+      cb-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+      cb-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+      cb-got         : ∀ N → Got (P′ N)
+      cb-got*        : ∀ N → Got (Q′ N)
+      cb-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+      cb-after*      : ∀ {N l e} → TR (Q′ N) l e → c₂ ≼ l
+      cb-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₂ ≼ φ′ N k
+      cb-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₂ ≼ r
+      cb-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    rel′ : Rel P′ Q′ p c₂
+    rel′ = record
+      { φ = φ′ ; Put = Put′ ; corr = cb-corr ; φ-agree = cb-φ-agree ; bk = bk′ ; in-bk = cb-in-bk ; pb-few = cb-pb-few
+      ; back = cb-back ; put-up = cb-put-up ; back-put = cb-back-put
+      ; elab-causal = cb-elab-causal ; stable← = cb-stable← ; stable-put = cb-stable-put ; stable-lead = cb-stable-lead
+      ; elab-all = cb-elab-all ; func = cb-func ; func* = cb-func* ; flat = cb-flat ; flat* = cb-flat*
+      ; pin-in = cb-pin-in ; pin-in* = cb-pin-in* ; cons = cb-cons ; cons* = cb-cons* ; got = cb-got ; got* = cb-got*
+      ; after = cb-after ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after* ; pin-stable = cb-pin-stable }
+
+  ----------------------------------------------------------------------
+  -- THE CLOSER: the combined run is the closer's connect's body, its rows
+  -- shown as they are; the closer, that connect's source, shows only
+  -- pins and skips.
+  module CloseTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂) where
+    P′ Q′ : ℕ → _
+    P′ = P op
+    Q′ = λ N → listC (3 + N) n (body op) (ρ*h N) c₃
+
+    φ′ : ℕ → Pos → Pos
+    φ′ = Rel.φ R
+
+    Put′ : ℕ → Pos → Pos → Set
+    Put′ = Rel.Put R
+
+    bk′ : ℕ → Pos → List Pos
+    bk′ = Rel.bk R
+
+    postulate
+      cz-corr        : ∀ N → Corr p c₃ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+      cz-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      cz-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+      cz-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+      cz-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      cz-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+      cz-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+      cz-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      cz-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      cz-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+      cz-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cz-corr N) k
+                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      cz-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+      cz-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+      cz-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+      cz-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      cz-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      cz-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+      cz-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+      cz-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+      cz-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+      cz-got         : ∀ N → Got (P′ N)
+      cz-got*        : ∀ N → Got (Q′ N)
+      cz-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+      cz-after*      : ∀ {N l e} → TR (Q′ N) l e → c₃ ≼ l
+      cz-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₃ ≼ φ′ N k
+      cz-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₃ ≼ r
+      cz-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    rel′ : Rel P′ Q′ p c₃
+    rel′ = record
+      { φ = φ′ ; Put = Put′ ; corr = cz-corr ; φ-agree = cz-φ-agree ; bk = bk′ ; in-bk = cz-in-bk ; pb-few = cz-pb-few
+      ; back = cz-back ; put-up = cz-put-up ; back-put = cz-back-put
+      ; elab-causal = cz-elab-causal ; stable← = cz-stable← ; stable-put = cz-stable-put ; stable-lead = cz-stable-lead
+      ; elab-all = cz-elab-all ; func = cz-func ; func* = cz-func* ; flat = cz-flat ; flat* = cz-flat*
+      ; pin-in = cz-pin-in ; pin-in* = cz-pin-in* ; cons = cz-cons ; cons* = cz-cons* ; got = cz-got ; got* = cz-got*
+      ; after = cz-after ; after* = cz-after* ; after-φ = cz-after-φ ; pin-after* = cz-pin-after* ; pin-stable = cz-pin-stable }
+
+  ----------------------------------------------------------------------
+  -- THE SHARE: the body is the share's two connects' body, its rows shown
+  -- as they are; the trigger's and the shared hot's are pins.
+  module ShareTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃) where
+    P′ Q′ : ℕ → _
+    P′ = P op
+    Q′ = Tab* n ρι (flatMap op f s) ρ* p*
+
+    φ′ : ℕ → Pos → Pos
+    φ′ = Rel.φ R
+
+    Put′ : ℕ → Pos → Pos → Set
+    Put′ = Rel.Put R
+
+    bk′ : ℕ → Pos → List Pos
+    bk′ = Rel.bk R
+
+    postulate
+      sr-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+      sr-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      sr-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+      sr-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+      sr-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
+                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      sr-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
+      sr-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
+      sr-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      sr-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      sr-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
+      sr-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sr-corr N) k
+                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      sr-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+      sr-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
+      sr-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+      sr-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      sr-pin-in      : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+      sr-pin-in*     : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
+      sr-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
+      sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
+      sr-got         : ∀ N → Got (P′ N)
+      sr-got*        : ∀ N → Got (Q′ N)
+      sr-after       : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+      sr-after*      : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
+      sr-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
+      sr-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
+      sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    rel′ : Rel P′ Q′ p p*
+    rel′ = record
+      { φ = φ′ ; Put = Put′ ; corr = sr-corr ; φ-agree = sr-φ-agree ; bk = bk′ ; in-bk = sr-in-bk ; pb-few = sr-pb-few
+      ; back = sr-back ; put-up = sr-put-up ; back-put = sr-back-put
+      ; elab-causal = sr-elab-causal ; stable← = sr-stable← ; stable-put = sr-stable-put ; stable-lead = sr-stable-lead
+      ; elab-all = sr-elab-all ; func = sr-func ; func* = sr-func* ; flat = sr-flat ; flat* = sr-flat*
+      ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; cons = sr-cons ; cons* = sr-cons* ; got = sr-got ; got* = sr-got*
+      ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
 
   flat-tab : ∀ op → Src → Lanes → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
-  flat-tab op Os Ls al lk = flat-share op (flat-close op (flat-comb op (flat-core op Os Ls al lk)))
+  flat-tab op Os Ls al lk = ShareTab.rel′ op (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls al lk)))
 
   postulate
     -- THE FLATMAP'S ORDER FACTS: each row is a source row or a lane row

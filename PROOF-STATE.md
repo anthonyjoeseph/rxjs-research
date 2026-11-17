@@ -32,13 +32,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE FLATMAP'S LAYERS
+#### THE COMBINED SCAN
 
-Each operator's lanes' flatMap is written (`MergeTab`, `ConcatTab`,
-`SwitchTab`, `ExhaustTab`). Untried: the layers past it, the combined
-scan, the closer and the share. Settled by bodies.
+The combined scan's record is written: a lanes' row re-emitted at the
+lane branch's reader, the flatMap's end at the `nothing` past the last
+of the three branches' ends (probed, kind `whole`). Untried: its fields,
+the scan emitting nothing but marks besides. Settled by bodies.
 
-Members: `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+Members: `cb-corr`, `cb-φ-agree`, `cb-in-bk`, `cb-pb-few`, `cb-back`,
+`cb-put-up`, `cb-back-put`, `cb-elab-causal`, `cb-stable←`,
+`cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-func`, `cb-func*`,
+`cb-flat`, `cb-flat*`, `cb-pin-in`, `cb-pin-in*`, `cb-cons`, `cb-cons*`,
+`cb-got`, `cb-got*`, `cb-after`, `cb-after*`, `cb-after-φ`,
+`cb-pin-after*`, `cb-pin-stable`.
+
+#### THE FLATMAP'S ORDER FACTS
+
+Untried: the whole flatMap's rows carry the order facts, each row a
+source or lane row imaged along its stream's map through the layers.
+Settled by its body.
+
+Members: `flatmap-order`.
 
 #### THE SWITCH
 
@@ -95,6 +109,26 @@ Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-pb-few`, `mg-back`,
 `mg-flat`, `mg-flat*`, `mg-pin-in`, `mg-pin-in*`, `mg-cons`, `mg-cons*`,
 `mg-got`, `mg-got*`, `mg-after`, `mg-after*`, `mg-after-φ`,
 `mg-pin-after*`, `mg-pin-stable`.
+
+#### THE CLOSER AND THE SHARE
+
+Each record is its body's, the connect showing its body's rows as they
+are and its source's only as pins and skips. Untried: the fields.
+Settled by bodies.
+
+Members: `cz-corr`, `cz-φ-agree`, `cz-in-bk`, `cz-pb-few`, `cz-back`,
+`cz-put-up`, `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
+`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func`, `cz-func*`,
+`cz-flat`, `cz-flat*`, `cz-pin-in`, `cz-pin-in*`, `cz-cons`, `cz-cons*`,
+`cz-got`, `cz-got*`, `cz-after`, `cz-after*`, `cz-after-φ`,
+`cz-pin-after*`, `cz-pin-stable`.
+
+Members: `sr-corr`, `sr-φ-agree`, `sr-in-bk`, `sr-pb-few`, `sr-back`,
+`sr-put-up`, `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
+`sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func`, `sr-func*`,
+`sr-flat`, `sr-flat*`, `sr-pin-in`, `sr-pin-in*`, `sr-cons`, `sr-cons*`,
+`sr-got`, `sr-got*`, `sr-after`, `sr-after*`, `sr-after-φ`,
+`sr-pin-after*`, `sr-pin-stable`.
 
 #### THE BACK FACT
 
