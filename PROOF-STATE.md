@@ -32,15 +32,34 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE TABLES
+#### THE FLATMAP'S LANES
 
-The rewrite, finished before any other proof work: the batcher's
-plumbing has its own record, owing coherence, run-shaped tables, cuts
-truncated before they differ (`cons`), rows past the subscription
-(`after`) and its burst pins kept by agreeing cuts (`pin-stable`).
-Settled when it is a body.
+Refuted as quantified (`flat-rel`): a lane, subscribed past its
+creator, cuts each hot in scope by where the creator falls among the
+hot's rows, and per-stream maps need not agree on it. Open: one map
+shared by every stream of a run, which the hots' maps and each record's
+map restrict. Settled by restating `Full` over it and `flat-rel` as a
+body over its layers: share, lanes, the inner flatMap with the combined
+scan, the closer.
 
-Members: `top-rel`.
+Members: `flat-rel`.
+
+#### THE CONNECT
+
+Untried: the source's hot related from its record (`conn-hot`), the
+body's subscription cutting it alike (`conn-cut`), and the connect's
+rows, the first former making pins, so the first test of `pin-stable`
+(`conn-tab`). Settled by bodies.
+
+Members: `conn-hot`, `conn-cut`, `conn-tab`.
+
+#### THE TOP
+
+Untried: the program carried through the told run, the merge and take
+with the completion mark, and the restamp. The closed run owes that
+the program never emits a completion mark. Settled by bodies.
+
+Members: `told-rel`, `closed-rel`, `stamped-rel`.
 
 #### THE COLD'S ROWS
 
@@ -63,16 +82,6 @@ Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`,
 `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-agree`, `walk-cons`,
 `walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
 `φ-back`.
-
-#### THE FLATMAP AND CONNECT CASES
-
-Out of the rewrite's scope: the maps themselves and the
-switch/exhaust/take decisions. Untried: whether the record carries
-enough for lanes' rows to keep their order across lanes (ticks, the
-creators inside async instants) and for a connect's body to meet its
-hot. Settled when each is a body.
-
-Members: `flat-rel`, `conn-rel`.
 
 ## Tier 3 — the simultaneous spec
 
