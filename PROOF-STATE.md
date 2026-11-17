@@ -35,12 +35,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE MAP IS THE SUBSCRIPTIONS'
 
 A record's map is had from its subscriptions and its environment's maps,
-never from how they are admitted (`Coh`): a lane is related at each cut
-from that cut's row, so every joiner's cross-cut field compares two
-records of one lane. Untried: the induction over `rel`, the connect's
-hot. Settled by `rel-coh`'s body.
+never from how they are admitted (`Coh`); `rel-coh` is the induction,
+`joiners-coh` the lanes' flatMap. Open: the connect's hot, a postulate
+whose map must be its source's. Settled by `conn-hot`'s body.
 
-Members: `rel-coh`, `conn-hot-coh`.
+Members: `conn-hot-coh`.
 
 #### THE COMBINED SCAN
 

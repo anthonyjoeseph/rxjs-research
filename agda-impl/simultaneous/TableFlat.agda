@@ -142,6 +142,123 @@ max-ge b (x ∷ xs) = in-if (x <ᵖ r) (λ v → b ≼ v) (λ _ → max-ge b xs)
                       (λ eq → ≼-trans {b} {r} {x} (max-ge b xs) (λ h → subst T eq h))
   where r = L.foldr (λ x y → if x <ᵖ y then y else x) b xs
 
+-- Tables read row by row, the same in every environment.
+module TabRows where
+  -- A table's ends.
+  endsOf : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
+  endsOf nothing   = []
+  endsOf (just Lx) = ends (rows Lx)
+
+  endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
+  endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
+
+  rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
+  rowAt nothing   y = false
+  rowAt (just Lx) y = anyᵇ (λ r → does (proj₁ r ≟ᵖ y)) (rows Lx)
+
+  rowAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → rowAt m y ≡ true → Σ (Ev X) λ e → TR m y e
+  rowAt-T nothing ()
+  rowAt-T (just Lx) {y} h with any⁻ {xs = rows Lx} h
+  ... | (k , e) , m , hk with ≟-true k y hk
+  ...   | refl = e , Lx , refl , m
+
+  rowAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y e} → TR m y e → rowAt m y ≡ true
+  rowAt-I nothing (_ , () , _)
+  rowAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ r → does (proj₁ r ≟ᵖ y)} m (dec-true (y ≟ᵖ y) refl)
+
+  endAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → endAt m y ≡ true → TR m y end
+  endAt-T nothing ()
+  endAt-T (just Lx) h = Lx , refl , ends⁻ {rs = rows Lx} (any-≟ h)
+
+  endAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → TR m y end → endAt m y ≡ true
+  endAt-I nothing (_ , () , _)
+  endAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ k → does (k ≟ᵖ y)} (ends⁺ m) (dec-true (y ≟ᵖ y) refl)
+
+  -- A table quiet up to `k`.
+  Quiet : ∀ {X : Set} → Pos → Maybe (Tb.Listed X) → Set
+  Quiet {X} k m = ∀ {y} {e : Ev X} → y ≼ k → TR m y e → ⊥
+
+  -- Two tables agreeing up to `k` hold rows and ends alike at or below it.
+  rowAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → rowAt m y ≡ rowAt m′ y
+  rowAt-agree {m = m} {m′} yk ag =
+    bool-≡ (λ h → rowAt-I m′ (proj₁ (upto ag yk) (proj₂ (rowAt-T m h)))) (λ h → rowAt-I m (proj₂ (upto ag yk) (proj₂ (rowAt-T m′ h))))
+
+  endAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → endAt m y ≡ endAt m′ y
+  endAt-agree {m = m} {m′} yk ag =
+    bool-≡ (λ h → endAt-I m′ (proj₁ (upto ag yk) (endAt-T m h))) (λ h → endAt-I m (proj₂ (upto ag yk) (endAt-T m′ h)))
+
+  rowAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → rowAt m y ≡ false
+  rowAt-F {m = m} {y = y} yk q with rowAt m y in h
+  ... | true  = ⊥-elim (q yk (proj₂ (rowAt-T m h)))
+  ... | false = refl
+
+  endAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → endAt m y ≡ false
+  endAt-F {m = m} {y = y} yk q with endAt m y in h
+  ... | true  = ⊥-elim (q yk (endAt-T m h))
+  ... | false = refl
+
+  -- One label up lies at or before.
+  up-≼ : ∀ y → up y ≼ y
+  up-≼ (i ∙ ys) with initLast ys
+  ... | InitLast.[]          = ≼-refl {i ∙ []}
+  ... | zs InitLast.∷ʳ′ l   =
+    subst (λ u → u ≼ (i ∙ (zs ∷ʳ l))) (sym (up-⊕ (i ∙ zs) l)) (≺→≼ {i ∙ zs} {i ∙ (zs ∷ʳ l)} (≺-ext (i ∙ zs) {l} []))
+
+  ups : ℕ → Pos → Pos
+  ups zero    y = y
+  ups (suc i) y = ups i (up y)
+
+  -- An end among some rows.
+  endIn : ∀ {X : Set} (rs : List (Row X)) c → Maybe ((c , end) ∈ rs)
+  endIn []               c = nothing
+  endIn ((k , end) ∷ rs) c with k ≟ᵖ c
+  ... | yes refl = just (here refl)
+  ... | no _     = M.map there (endIn rs c)
+  endIn (_ ∷ rs)         c = M.map there (endIn rs c)
+
+  -- A table's end at a row.
+  endsAt : ∀ {X : Set} (m : Maybe (Tb.Listed X)) c → Maybe (TR m c end)
+  endsAt nothing   c = nothing
+  endsAt (just Lx) c = M.map (λ e → Lx , refl , e) (endIn (rows Lx) c)
+
+-- The source's values, the same in every environment.
+module Vals {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p : Pos) where
+  -- The source's tables.
+  S : ℕ → Maybe (Tb.Listed A)
+  S = Tab n s ρ p
+
+  -- A value of the source at a cut, with its row.
+  record ValAt (N : ℕ) : Set where
+    constructor valAt
+    field
+      q   : Pos
+      a   : A
+      row : TR (S N) q (out a)
+
+  -- The values among some rows, each with its membership.
+  valsIn : (rs : List (Row A)) → List (Σ Pos λ q → Σ A λ a → (q , out a) ∈ rs)
+  valsIn []                 = []
+  valsIn ((q , out a) ∷ rs) = (q , a , here refl) ∷ L.map (λ { (q′ , a′ , m) → q′ , a′ , there m }) (valsIn rs)
+  valsIn (_ ∷ rs)           = L.map (λ { (q′ , a′ , m) → q′ , a′ , there m }) (valsIn rs)
+
+  -- The source's values at a cut.
+  valsAt : ∀ N → List (ValAt N)
+  valsAt N with S N in eq
+  ... | nothing = []
+  ... | just Lo = L.map (λ { (q , a , m) → valAt q a (Lo , eq , m) }) (valsIn (rows Lo))
+
+  -- The source's value at a row.
+  valAtPos : ∀ N → Pos → Maybe (ValAt N)
+  valAtPos N q = first (valsAt N)
+    where
+      first : List (ValAt N) → Maybe (ValAt N)
+      first []       = nothing
+      first (v ∷ vs) = if does (ValAt.q v ≟ᵖ q) then just v else first vs
+
+  -- A value's marker at a row.
+  isMarker : ℕ → Pos → Bool
+  isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
+
 module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
   (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
@@ -241,69 +358,9 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ad₁ : Admits Dc c₁
   ad₁ = admits-step Dc ad₂
 
-  -- A table's ends.
-  endsOf : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
-  endsOf nothing   = []
-  endsOf (just Lx) = ends (rows Lx)
 
-  endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
-  endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
-
-  rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
-  rowAt nothing   y = false
-  rowAt (just Lx) y = anyᵇ (λ r → does (proj₁ r ≟ᵖ y)) (rows Lx)
-
-  rowAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → rowAt m y ≡ true → Σ (Ev X) λ e → TR m y e
-  rowAt-T nothing ()
-  rowAt-T (just Lx) {y} h with any⁻ {xs = rows Lx} h
-  ... | (k , e) , m , hk with ≟-true k y hk
-  ...   | refl = e , Lx , refl , m
-
-  rowAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y e} → TR m y e → rowAt m y ≡ true
-  rowAt-I nothing (_ , () , _)
-  rowAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ r → does (proj₁ r ≟ᵖ y)} m (dec-true (y ≟ᵖ y) refl)
-
-  endAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → endAt m y ≡ true → TR m y end
-  endAt-T nothing ()
-  endAt-T (just Lx) h = Lx , refl , ends⁻ {rs = rows Lx} (any-≟ h)
-
-  endAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → TR m y end → endAt m y ≡ true
-  endAt-I nothing (_ , () , _)
-  endAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ k → does (k ≟ᵖ y)} (ends⁺ m) (dec-true (y ≟ᵖ y) refl)
-
-  -- A table quiet up to `k`.
-  Quiet : ∀ {X : Set} → Pos → Maybe (Tb.Listed X) → Set
-  Quiet {X} k m = ∀ {y} {e : Ev X} → y ≼ k → TR m y e → ⊥
-
-  -- Two tables agreeing up to `k` hold rows and ends alike at or below it.
-  rowAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → rowAt m y ≡ rowAt m′ y
-  rowAt-agree {m = m} {m′} yk ag =
-    bool-≡ (λ h → rowAt-I m′ (proj₁ (upto ag yk) (proj₂ (rowAt-T m h)))) (λ h → rowAt-I m (proj₂ (upto ag yk) (proj₂ (rowAt-T m′ h))))
-
-  endAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → endAt m y ≡ endAt m′ y
-  endAt-agree {m = m} {m′} yk ag =
-    bool-≡ (λ h → endAt-I m′ (proj₁ (upto ag yk) (endAt-T m h))) (λ h → endAt-I m (proj₂ (upto ag yk) (endAt-T m′ h)))
-
-  rowAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → rowAt m y ≡ false
-  rowAt-F {m = m} {y = y} yk q with rowAt m y in h
-  ... | true  = ⊥-elim (q yk (proj₂ (rowAt-T m h)))
-  ... | false = refl
-
-  endAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → endAt m y ≡ false
-  endAt-F {m = m} {y = y} yk q with endAt m y in h
-  ... | true  = ⊥-elim (q yk (endAt-T m h))
-  ... | false = refl
-
-  -- One label up lies at or before.
-  up-≼ : ∀ y → up y ≼ y
-  up-≼ (i ∙ ys) with initLast ys
-  ... | InitLast.[]          = ≼-refl {i ∙ []}
-  ... | zs InitLast.∷ʳ′ l   =
-    subst (λ u → u ≼ (i ∙ (zs ∷ʳ l))) (sym (up-⊕ (i ∙ zs) l)) (≺→≼ {i ∙ zs} {i ∙ (zs ∷ʳ l)} (≺-ext (i ∙ zs) {l} []))
-
-  ups : ℕ → Pos → Pos
-  ups zero    y = y
-  ups (suc i) y = ups i (up y)
+  open TabRows public
+  open Vals n s ρ p public
 
   ----------------------------------------------------------------------
   -- The children's records
@@ -417,30 +474,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     utrig : ∀ st N → UncutEnv (trig st N ∷ ρ*c N)
     utrig st N = proj₂ (proj₂ (listC-ok (3 + N) n (of (tt ∷ [])) {ρ*c N} (uρ*c N) (laneL st ⊕ [ ix 1 ]))) , uρ*c N
-
-    -- The source's tables.
-    S : ℕ → Maybe (Tb.Listed A)
-    S = Tab n s ρ p
-
-    -- A value of the source at a cut, with its row.
-    record ValAt (N : ℕ) : Set where
-      constructor valAt
-      field
-        q   : Pos
-        a   : A
-        row : TR (S N) q (out a)
-
-    -- The values among some rows, each with its membership.
-    valsIn : (rs : List (Row A)) → List (Σ Pos λ q → Σ A λ a → (q , out a) ∈ rs)
-    valsIn []                 = []
-    valsIn ((q , out a) ∷ rs) = (q , a , here refl) ∷ L.map (λ { (q′ , a′ , m) → q′ , a′ , there m }) (valsIn rs)
-    valsIn (_ ∷ rs)           = L.map (λ { (q′ , a′ , m) → q′ , a′ , there m }) (valsIn rs)
-
-    -- The source's values at a cut.
-    valsAt : ∀ N → List (ValAt N)
-    valsAt N with S N in eq
-    ... | nothing = []
-    ... | just Lo = L.map (λ { (q , a , m) → valAt q a (Lo , eq , m) }) (valsIn (rows Lo))
 
     -- A value's elaborated row: the shared hot's row of its image, read by
     -- the lanes' flatMap, and the value `each` lists from it.
@@ -660,30 +693,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     ... | nothing with h R
     lastWith-∈ h (R ∷ Rs) refl | nothing | true = here refl
 
-    -- The source's value at a row.
-    valAtPos : ∀ N → Pos → Maybe (ValAt N)
-    valAtPos N q = first (valsAt N)
-      where
-        first : List (ValAt N) → Maybe (ValAt N)
-        first []       = nothing
-        first (v ∷ vs) = if does (ValAt.q v ≟ᵖ q) then just v else first vs
-
-    -- An end among some rows.
-    endIn : ∀ {X : Set} (rs : List (Row X)) c → Maybe ((c , end) ∈ rs)
-    endIn []               c = nothing
-    endIn ((k , end) ∷ rs) c with k ≟ᵖ c
-    ... | yes refl = just (here refl)
-    ... | no _     = M.map there (endIn rs c)
-    endIn (_ ∷ rs)         c = M.map there (endIn rs c)
-
     -- The lane among some that ends at `c`.
     waitedOn : ∀ {N} → List (LaneRec N) → ∀ c → Maybe (Σ (LaneRec N) λ R → TR (LaneRec.tab R) c end)
     waitedOn []       c = nothing
-    waitedOn (R ∷ Rs) c with LaneRec.tab R in eq
+    waitedOn (R ∷ Rs) c with endsAt (LaneRec.tab R) c
+    ... | just x  = just (R , x)
     ... | nothing = waitedOn Rs c
-    ... | just Lx with endIn (rows Lx) c
-    ...   | just m  = just (R , Lx , eq , m)
-    ...   | nothing = waitedOn Rs c
 
     -- The last of some lanes `h` picks, `h` picks.
     lastWith-h : ∀ {N} h (Rs : List (LaneRec N)) {R} → lastWith h Rs ≡ just R → h R ≡ true
@@ -790,9 +805,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- A source row's image, read through the shared hot.
     srcφ : ℕ → Pos → Pos
     srcφ N k = Rel.φ (Out.rel Os) N k ⊕ [ sub c₁ ]
-
-    isMarker : ℕ → Pos → Bool
-    isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
 
     -- THE MERGES' MAP, given each cut's lanes.  A lane row is imaged
     -- through its lane's record at the cut, a lane's put also where
