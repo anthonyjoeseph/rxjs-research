@@ -23,14 +23,14 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-concatMap⁺)
 open import Data.List.Relation.Unary.All using (All; _∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
 import Data.Maybe as M
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (does; yes; no)
@@ -46,7 +46,7 @@ open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; aft
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
+open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r; linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Holds; Full)
 
@@ -218,6 +218,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     emitAt : Pos → Pos
     emitAt r = r ⊕ˡ (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
 
+    emit-ups : ∀ l′ x → ups 5 (emitAt (l′ ⊕ [ x ])) ≡ l′
+    emit-ups l′ x rewrite up-⊕ ((((l′ ⊕ [ x ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ix 0)
+                        | up-⊕ (((l′ ⊕ [ x ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ix 1)
+                        | up-⊕ ((l′ ⊕ [ x ]) ⊕ [ ix 1 ]) (ix 1)
+                        | up-⊕ (l′ ⊕ [ x ]) (ix 1)
+                        | up-⊕ l′ x = refl
+
     -- A lane's trigger, under its subscription.
     trig : Pos → ℕ → Tb.Listed ⊤
     trig st N = hotOf (proj₁ (listC-ok (3 + N) n (of (tt ∷ [])) {ρ*c N} (uρ*c N) (laneL st ⊕ [ ix 1 ])))
@@ -322,6 +329,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     holder : ∀ {N} → List (LaneRec N) → Pos → Maybe (LaneRec N)
     holder Rs y = lastWith (λ R → rowAt (LaneRec.tab R) y) Rs
 
+    lastWith-∈ : ∀ {N} h (Rs : List (LaneRec N)) {R} → lastWith h Rs ≡ just R → R ∈ Rs
+    lastWith-∈ h (R ∷ Rs) e with lastWith h Rs in eq
+    lastWith-∈ h (R ∷ Rs) refl | just R′ = there (lastWith-∈ h Rs eq)
+    ... | nothing with h R
+    lastWith-∈ h (R ∷ Rs) refl | nothing | true = here refl
+
     -- The source's value at a row.
     valAtPos : ∀ N → Pos → Maybe (ValAt N)
     valAtPos N q = first (valsAt N)
@@ -364,7 +377,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- elaborated value; the source's end at the later of its own and the
     -- trigger's, as the share ends; any other source row through the
     -- shared hot.
-    module Tabs (lanes : ∀ N → List (LaneRec N)) where
+    module Tabs (op : FlatOp) (lanes : ∀ N → List (LaneRec N)) where
       φ′ : ℕ → Pos → Pos
       φ′ N y = rowφ (holder (lanes N) y) (lastWith (λ R → endAt (LaneRec.tab R) (up y)) (lanes N))
         where
@@ -378,7 +391,26 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       Put′ : ℕ → Pos → Pos → Set
       Put′ N y l with holder (lanes N) y
       ... | just R  = Σ Pos λ l′ → Rel.Put (Out.rel (LaneRec.lane R)) N y l′ × l ≡ emitAt (l′ ⊕ [ sub (readerR (LaneRec.stE R)) ])
-      ... | nothing = (Σ Pos λ l′ → Rel.Put (Out.rel Os) N y l′ × l ≡ l′ ⊕ [ sub c₁ ]) ⊎ l ≡ φ′ N y
+      ... | nothing = (Σ Pos λ l′ → Rel.Put (Out.rel Os) N y l′ × l ≡ l′ ⊕ [ sub c₁ ]) ⊎ ((Σ _ λ e → TR (P op N) y e) × l ≡ φ′ N y)
+
+      -- Few rows put on one image: a lane's put through its lane's, a
+      -- source's through the source's, any other a plain row.
+      pb-few′ : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+      pb-few′ N l = ks , λ {k} → go k
+        where
+          lk : LaneRec N → List Pos
+          lk R = proj₁ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l))
+          ks = L.concatMap lk (lanes N) ++ proj₁ (Rel.pb-few (Out.rel Os) N (up l)) ++ keys (P op N)
+          go : ∀ k → Put′ N k l → k ∈ ks
+          go k pt with holder (lanes N) k in eh
+          go k (l′ , pu , e) | just R =
+            ∈-++⁺ˡ (∈-concatMap⁺ lk (any-map (λ { refl → proj₂ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l))
+                                                          (subst (Rel.Put (Out.rel (LaneRec.lane R)) N k) (sym (trans (cong (ups 5) e) (emit-ups l′ _))) pu) })
+                                               (lastWith-∈ _ (lanes N) eh)))
+          go k (inj₁ (l′ , pu , e)) | nothing =
+            ∈-++⁺ʳ (L.concatMap lk (lanes N)) (∈-++⁺ˡ (proj₂ (Rel.pb-few (Out.rel Os) N (up l)) (subst (Rel.Put (Out.rel Os) N k) (sym (trans (cong up e) (up-⊕ l′ _))) pu)))
+          go k (inj₂ ((_ , x) , _)) | nothing =
+            ∈-++⁺ʳ (L.concatMap lk (lanes N)) (∈-++⁺ʳ (proj₁ (Rel.pb-few (Out.rel Os) N (up l))) (in-keys x))
 
       -- Generous: every lane's preimages of the image stripped each way,
       -- the source's of it stripped, the markers', and the source's ends.
@@ -397,13 +429,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = P (mergeᶠ nothing)
       Q′ = λ N → listC (3 + N) n (core (mergeᶠ nothing)) (ρ*c N) c₁
 
-      open Tabs (λ N → L.map (valRec N) (valsAt N))
+      open Tabs (mergeᶠ nothing) (λ N → L.map (valRec N) (valsAt N))
 
       postulate
         mg-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
         mg-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
         mg-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-        mg-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
         mg-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                        → AgreeTo k (TR (P′ N′)) (TR (P′ N))
         mg-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
@@ -451,7 +482,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
-        { φ = φ′ ; Put = Put′ ; corr = mg-corr ; φ-agree = mg-φ-agree ; bk = bk′ ; in-bk = mg-in-bk ; pb-few = mg-pb-few
+        { φ = φ′ ; Put = Put′ ; corr = mg-corr ; φ-agree = mg-φ-agree ; bk = bk′ ; in-bk = mg-in-bk ; pb-few = pb-few′
         ; back = mg-back ; put-up = mg-put-up ; back-put = mg-back-put
         ; elab-causal = mg-elab-causal ; stable← = mg-stable← ; stable-put = mg-stable-put ; stable-lead = mg-stable-lead
         ; elab-all = mg-elab-all ; func = mg-func ; func* = mg-func* ; flat = mg-flat ; flat* = mg-flat*
@@ -489,13 +520,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                          then maybe (λ v → [ valRec N v ]) [] (valAtPos N q)
                          else maybe (λ { (R , cx) → [ queuedRec N R cx a ] }) [] (waitedOn acc (up st))
 
-      open Tabs (λ N → recs N (entriesAt N) [])
+      open Tabs (mergeᶠ (just k)) (λ N → recs N (entriesAt N) [])
 
       postulate
         cc-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
         cc-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
         cc-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-        cc-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
         cc-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                        → AgreeTo k (TR (P′ N′)) (TR (P′ N))
         cc-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
@@ -543,7 +573,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
-        { φ = φ′ ; Put = Put′ ; corr = cc-corr ; φ-agree = cc-φ-agree ; bk = bk′ ; in-bk = cc-in-bk ; pb-few = cc-pb-few
+        { φ = φ′ ; Put = Put′ ; corr = cc-corr ; φ-agree = cc-φ-agree ; bk = bk′ ; in-bk = cc-in-bk ; pb-few = pb-few′
         ; back = cc-back ; put-up = cc-put-up ; back-put = cc-back-put
         ; elab-causal = cc-elab-causal ; stable← = cc-stable← ; stable-put = cc-stable-put ; stable-lead = cc-stable-lead
         ; elab-all = cc-elab-all ; func = cc-func ; func* = cc-func* ; flat = cc-flat ; flat* = cc-flat*
@@ -558,13 +588,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       P′ = P (switchᶠ)
       Q′ = λ N → listC (3 + N) n (core (switchᶠ)) (ρ*c N) c₁
 
-      open Tabs (λ N → L.map (valRec N) (valsAt N))
+      open Tabs switchᶠ (λ N → L.map (valRec N) (valsAt N))
 
       postulate
         sw-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
         sw-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
         sw-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-        sw-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
         sw-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                        → AgreeTo k (TR (P′ N′)) (TR (P′ N))
         sw-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
@@ -612,7 +641,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
-        { φ = φ′ ; Put = Put′ ; corr = sw-corr ; φ-agree = sw-φ-agree ; bk = bk′ ; in-bk = sw-in-bk ; pb-few = sw-pb-few
+        { φ = φ′ ; Put = Put′ ; corr = sw-corr ; φ-agree = sw-φ-agree ; bk = bk′ ; in-bk = sw-in-bk ; pb-few = pb-few′
         ; back = sw-back ; put-up = sw-put-up ; back-put = sw-back-put
         ; elab-causal = sw-elab-causal ; stable← = sw-stable← ; stable-put = sw-stable-put ; stable-lead = sw-stable-lead
         ; elab-all = sw-elab-all ; func = sw-func ; func* = sw-func* ; flat = sw-flat ; flat* = sw-flat*
@@ -635,13 +664,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ...   | nothing = []
       ...   | just ls = ExhaustL.runs o ls
 
-      open Tabs (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
+      open Tabs exhaustᶠ (λ N → L.concatMap (λ v → if anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (ranAt N) then [ valRec N v ] else []) (valsAt N))
 
       postulate
         ex-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
         ex-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
         ex-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-        ex-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
         ex-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                        → AgreeTo k (TR (P′ N′)) (TR (P′ N))
         ex-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
@@ -689,7 +717,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       rel′ : Rel P′ Q′ p c₁
       rel′ = record
-        { φ = φ′ ; Put = Put′ ; corr = ex-corr ; φ-agree = ex-φ-agree ; bk = bk′ ; in-bk = ex-in-bk ; pb-few = ex-pb-few
+        { φ = φ′ ; Put = Put′ ; corr = ex-corr ; φ-agree = ex-φ-agree ; bk = bk′ ; in-bk = ex-in-bk ; pb-few = pb-few′
         ; back = ex-back ; put-up = ex-put-up ; back-put = ex-back-put
         ; elab-causal = ex-elab-causal ; stable← = ex-stable← ; stable-put = ex-stable-put ; stable-lead = ex-stable-lead
         ; elab-all = ex-elab-all ; func = ex-func ; func* = ex-func* ; flat = ex-flat ; flat* = ex-flat*

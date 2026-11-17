@@ -59,7 +59,7 @@ The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-pb-few`, `sw-back`,
+Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-back`,
 `sw-put-up`, `sw-back-put`, `sw-elab-causal`, `sw-stable←`,
 `sw-stable-put`, `sw-stable-lead`, `sw-elab-all`, `sw-func`, `sw-func*`,
 `sw-flat`, `sw-flat*`, `sw-cons`, `sw-cons*`,
@@ -73,7 +73,7 @@ exhaust runs. Untried: the elaborated exhaust runs the same lanes,
 though its lanes end at their end images. Settled by bodies, or a value
 run on one side only.
 
-Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-pb-few`, `ex-back`,
+Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`,
 `ex-put-up`, `ex-back-put`, `ex-elab-causal`, `ex-stable←`,
 `ex-stable-put`, `ex-stable-lead`, `ex-elab-all`, `ex-func`, `ex-func*`,
 `ex-flat`, `ex-flat*`, `ex-cons`, `ex-cons*`,
@@ -87,7 +87,7 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed, kind `lane-sub`). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-pb-few`, `cc-back`,
+Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`,
 `cc-put-up`, `cc-back-put`, `cc-elab-causal`, `cc-stable←`,
 `cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
 `cc-flat`, `cc-flat*`, `cc-cons`, `cc-cons*`,
@@ -102,7 +102,7 @@ source's end at the later of its own and the trigger's. Visible images
 probed (`make table-check`, kind `core`); skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-pb-few`, `mg-back`,
+Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`,
 `mg-put-up`, `mg-back-put`, `mg-elab-causal`, `mg-stable←`,
 `mg-stable-put`, `mg-stable-lead`, `mg-elab-all`, `mg-func`, `mg-func*`,
 `mg-flat`, `mg-flat*`, `mg-cons`, `mg-cons*`,
@@ -147,7 +147,7 @@ the source's hot (`conn-hot`), an old hot cutting the new alike
 Settled by bodies.
 
 Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
-`ct-in-bk`, `ct-pb-few`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
+`ct-in-bk`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
 `ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
 `ct-flat*`, `ct-cons`, `ct-cons*`,
 `ct-after-φ`, `ct-pin-stable`.

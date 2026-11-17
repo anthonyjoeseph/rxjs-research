@@ -23,14 +23,14 @@ module simultaneous.TableRel where
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Bool using (Bool; T; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Relation.Nullary using (¬_; does)
@@ -48,7 +48,7 @@ open import quickcheck.Tabled.Exact.Base using (when⁻)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; UncutEnv)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys)
+open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
@@ -252,7 +252,17 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     φ′ N y = if isBody N y then Rel.φ Rb N y else Ψ′ Rs (here refl) N (up y) ⊕ [ ix 0 ]
 
     Put′ : ℕ → Pos → Pos → Set
-    Put′ N y l = if isBody N y then Rel.Put Rb N y l else l ≡ φ′ N y
+    Put′ N y l = if isBody N y then Rel.Put Rb N y l else (Σ _ λ e → TR (P N) y e) × l ≡ φ′ N y
+
+    -- Few rows put on one image: a body row's through the body's, any
+    -- other a plain row.
+    ct-pb-few : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+    ct-pb-few N l = proj₁ (Rel.pb-few Rb N l) ++ keys (P N) , λ {k} → go k
+      where
+        go : ∀ k → Put′ N k l → k ∈ proj₁ (Rel.pb-few Rb N l) ++ keys (P N)
+        go k pt with isBody N k
+        ... | true  = ∈-++⁺ˡ (proj₂ (Rel.pb-few Rb N l) pt)
+        ... | false = ∈-++⁺ʳ (proj₁ (Rel.pb-few Rb N l)) (in-keys (proj₂ (proj₁ pt)))
 
     bk′ : ℕ → Pos → List Pos
     bk′ N l = Rel.bk Rb N l ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Rs) N (up (up l)))
@@ -261,7 +271,6 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ct-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
       ct-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ′ N k ≡ φ′ N′ k
       ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-      ct-pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
       ct-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N))
                      → AgreeTo k (TR (P N′)) (TR (P N))
       ct-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → Put′ N k l → Put′ N′ k l
