@@ -112,8 +112,9 @@ Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`,
 #### THE CLOSER AND THE SHARE
 
 Each record is its body's, the connect showing its body's rows as they
-are and its source's only as pins and skips. Untried: the fields.
-Settled by bodies.
+are and its source's only as pins and skips; the share puts the
+source's pins where its connect shows them, the layers inside relating
+the plain flatMap without them. Untried: the fields. Settled by bodies.
 
 Members: `cz-corr`, `cz-back`,
 `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
@@ -121,11 +122,19 @@ Members: `cz-corr`, `cz-back`,
 `cz-flat*`, `cz-cons*`,
 `cz-pin-stable`.
 
-Members: `sr-corr`, `sr-back`,
+Members: `sr-corr`, `sr-back`, `sr-put-up`,
 `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
 `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
-`sr-flat*`, `sr-cons*`,
+`sr-func`, `sr-flat`, `sr-flat*`, `sr-cons`, `sr-cons*`,
 `sr-pin-stable`.
+
+#### THE SOURCE'S PINS
+
+Untried: two cuts of the plain flatMap agreeing up to a row agree on
+which pins below it are the source's, no lane row sitting where a
+source row does. Settled by its body.
+
+Members: `pd-agree`.
 
 #### THE BACK FACT
 
