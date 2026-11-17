@@ -84,12 +84,10 @@ Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`,
 
 The bounded merge's record is written: lanes enumerated level by level,
 a queued lane's record had from the lane it waited on, at its end, and
-subscribed under that end's image (probed, kind `lane-sub`). That image
-is the later of the lane's end and its trigger's; where the trigger's
-wins, the pair's cuts and links there are untried. Untried: its fields,
-the queue's state a run's. Settled by bodies.
+subscribed under that end's image (probed, kind `lane-sub`). Untried:
+its fields, the queue's state a run's. Settled by bodies.
 
-Members: `trig-cuts`, `trig-linked`, `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`,
+Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`,
 `cc-put-up`, `cc-back-put`, `cc-elab-causal`, `cc-stable←`,
 `cc-stable-put`, `cc-stable-lead`, `cc-elab-all`, `cc-func`, `cc-func*`,
 `cc-flat`, `cc-flat*`, `cc-cons`, `cc-cons*`,

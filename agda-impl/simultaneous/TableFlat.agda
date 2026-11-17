@@ -1,9 +1,10 @@
 {-# OPTIONS --guardedness #-}
 
--- THE FLATMAP'S CASE (`flat-rel`): the plain flatMap's record against its
--- elaboration, one layer at a time.  The plain side stays the flatMap's
--- own table; the elaborated side grows outward from the lanes' flatMap
--- (`core`) through the combined scan, the closer and the share.
+-- THE FLATMAP'S CORE (`flat-core`): the plain flatMap's record against
+-- its elaboration's innermost layer, the lanes' flatMap (`core`).  The
+-- plain side stays the flatMap's own table; `simultaneous.TableLayers`
+-- carries the elaborated side out through the combined scan, the closer
+-- and the share.
 --
 -- The source is related once, at the share's subscription, in the
 -- environment the share's trigger extends; its hot is the shared table
@@ -48,36 +49,37 @@ open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r; linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Holds; Full)
+open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l;
+  linked-r; linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
+  aligned-r*; Rest; Out; EnvR; maps; env-wk; Holds)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
-private
-  ≟-true : ∀ x y → does (x ≟ᵖ y) ≡ true → x ≡ y
-  ≟-true x y with x ≟ᵖ y
-  ... | yes e = λ _ → e
-  ... | no _  = λ ()
+≟-true : ∀ x y → does (x ≟ᵖ y) ≡ true → x ≡ y
+≟-true x y with x ≟ᵖ y
+... | yes e = λ _ → e
+... | no _  = λ ()
 
-  -- A position some row of a list equals is in it.
-  any-≟ : ∀ {xs k} → anyᵇ (λ k′ → does (k′ ≟ᵖ k)) xs ≡ true → k ∈ xs
-  any-≟ {k = k} h with any⁻ h
-  ... | k′ , k′∈ , hk with ≟-true k′ k hk
-  ...   | refl = k′∈
+-- A position some row of a list equals is in it.
+any-≟ : ∀ {xs k} → anyᵇ (λ k′ → does (k′ ≟ᵖ k)) xs ≡ true → k ∈ xs
+any-≟ {k = k} h with any⁻ h
+... | k′ , k′∈ , hk with ≟-true k′ k hk
+...   | refl = k′∈
 
-  in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
-  in-if true  Q t e = t refl
-  in-if false Q t e = e refl
+in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
+in-if true  Q t e = t refl
+in-if false Q t e = e refl
 
-  ≼-ˡ : ∀ x ys → x ≼ (x ⊕ˡ ys)
-  ≼-ˡ x []       = ≼-refl {x}
-  ≼-ˡ x (l ∷ ls) = ≼-trans {x} {x ⊕ [ l ]} {(x ⊕ [ l ]) ⊕ˡ ls} (≺→≼ {x} {x ⊕ [ l ]} (≺-ext x [])) (≼-ˡ (x ⊕ [ l ]) ls)
+≼-ˡ : ∀ x ys → x ≼ (x ⊕ˡ ys)
+≼-ˡ x []       = ≼-refl {x}
+≼-ˡ x (l ∷ ls) = ≼-trans {x} {x ⊕ [ l ]} {(x ⊕ [ l ]) ⊕ˡ ls} (≺→≼ {x} {x ⊕ [ l ]} (≺-ext x [])) (≼-ˡ (x ⊕ [ l ]) ls)
 
-  -- The latest of some positions and a floor lies past the floor.
-  max-ge : ∀ b xs → b ≼ L.foldr (λ x y → if x <ᵖ y then y else x) b xs
-  max-ge b []       = ≼-refl {b}
-  max-ge b (x ∷ xs) = in-if (x <ᵖ r) (λ v → b ≼ v) (λ _ → max-ge b xs)
-                        (λ eq → ≼-trans {b} {r} {x} (max-ge b xs) (λ h → subst T eq h))
-    where r = L.foldr (λ x y → if x <ᵖ y then y else x) b xs
+-- The latest of some positions and a floor lies past the floor.
+max-ge : ∀ b xs → b ≼ L.foldr (λ x y → if x <ᵖ y then y else x) b xs
+max-ge b []       = ≼-refl {b}
+max-ge b (x ∷ xs) = in-if (x <ᵖ r) (λ v → b ≼ v) (λ _ → max-ge b xs)
+                      (λ eq → ≼-trans {b} {r} {x} (max-ge b xs) (λ h → subst T eq h))
+  where r = L.foldr (λ x y → if x <ᵖ y then y else x) b xs
 
 module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
@@ -224,9 +226,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- `laneˢ` under an elaborated lane's subscription: its trigger, its
     -- shared run, the lane itself, and the reader its rows are read by.
+    laneXt trigXs : Pos → List Label
+    laneXt st = ix 1 ∷ ix 0 ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
+    trigXs st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ []
+
     laneL laneX readerR : Pos → Pos
     laneL st = st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])
-    laneX st = laneL st ⊕ˡ (ix 1 ∷ ix 0 ∷ sub (laneL st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+    laneX st = laneL st ⊕ˡ laneXt st
     readerR st = laneL st ⊕ˡ (ix 0 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
 
     -- Where `counted` emits what the reader at `r` reads.
@@ -282,7 +288,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- `laneˢ`'s path from an elaborated lane's subscription to the lane.
     laneXs : Pos → List Label
-    laneXs st = ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ sub (laneL st ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
+    laneXs st = ix 0 ∷ ix 1 ∷ laneXt st
 
     -- A lane related at a cut: its value, its two subscriptions, its
     -- record.
@@ -292,6 +298,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         a   : A
         st  : Pos
         stE : Pos
+        alL : Aligned (maps env) ρ st (laneL stE)
         lane : Out n (f a) ρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (maps env) st (laneX stE)
 
       -- The lane's plain tables.
@@ -304,7 +311,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- The share ends at the later of the lane's end and its trigger's:
       -- a lane ended in its subscribe frame ends first.
       trigEnd : Pos
-      trigEnd = laneL stE ⊕ˡ (ix 1 ∷ last ∷ sub (laneL stE ⊕ˡ (ix 0 ∷ ix 1 ∷ [])) ∷ [])
+      trigEnd = laneL stE ⊕ˡ trigXs stE
 
       endφ : Pos → Pos
       endφ y = later (Rel.φ (Out.rel lane) N y) trigEnd
@@ -314,12 +321,28 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       endImage y = emitAt (endφ y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
 
     -- A lane's end, past its trigger's: its own facts there, or, where
-    -- the trigger's end is the later, the trigger's.
-    postulate
-      trig-cuts   : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
-                  → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Aligned (maps env) ρ c (LaneRec.trigEnd R)
-      trig-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
-                  → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Linked c (LaneRec.trigEnd R)
+    -- the trigger's end is the later, the trigger's.  The trigger's end
+    -- is then in the lane's instant, and under the lane's subscription,
+    -- which no hot's image is under.
+    trig-inst : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R
+              → instantOf (Rel.φ (Out.rel (LaneRec.lane R)) N c) ≡ instantOf (LaneRec.trigEnd R)
+    trig-inst {N} R {c} cx lt =
+      squeeze {laneX stE} {Rel.φ (Out.rel lane) N c} {trigEnd} (Rel.after-φ (Out.rel lane) cx tt) lt
+        (trans (inst-⊕ˡ (laneL stE) (laneXt stE)) (sym (inst-⊕ˡ (laneL stE) (trigXs stE))))
+      where open LaneRec R
+
+    trig-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+                → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Linked c (LaneRec.trigEnd R)
+    trig-linked {N} R {c} cx lt = linked-later (Rest.linked (Out.rest lane) N cx tt) (trig-inst R cx lt) lt
+      where open LaneRec R
+
+    trig-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
+              → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Aligned (maps env) ρ c (LaneRec.trigEnd R)
+    trig-cuts {N} R {c} cx lt =
+      aligned-past {Ψ = maps env} {ρ = ρ} alL
+        (≼-trans {laneL stE} {laneX stE} {Rel.φ (Out.rel lane) N c} (≼-ˡ (laneL stE) (laneXt stE)) (Rel.after-φ (Out.rel lane) cx tt))
+        lt (⊑-⊕ˡ (laneL stE) (trigXs stE)) (trig-inst R cx lt) (Rest.cuts (Out.rest lane) N cx tt)
+      where open LaneRec R
 
     end-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Aligned (maps env) ρ c (LaneRec.endφ R c)
     end-cuts {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
@@ -334,26 +357,32 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- A value's lane, subscribed under its row: the source's facts at the
     -- row align the lane's pair.
     valRec : ∀ N → ValAt N → LaneRec N
-    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st (
+    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (q ⊕ [ ix 1 ]) (laneX st)
-         (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁)) ys)
+         (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt) (ix 1)) (sub c₁)) ys))
       where
         st = st* N q
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ laneXs st
+        alL : Aligned (maps env) ρ (q ⊕ [ ix 1 ]) (laneL st)
+        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁))
+                (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
     -- A value's lane, queued under the end of the lane it waited on: that
     -- lane's facts at its end align the pair, the elaborated lane queued
     -- under the end's image.
     queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
-    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st (
+    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (c ⊕ [ ix 1 ]) (laneX st)
-         (aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (end-cuts R cx) (ix 1) (sub r)) ys)
+         (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys))
       where
         r  = readerR (LaneRec.stE R)
         st = LaneRec.endImage R c ⊕ [ ix 1 ]
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
+        alL : Aligned (maps env) ρ (c ⊕ [ ix 1 ]) (laneL st)
+        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (end-cuts R cx) (ix 1) (sub r))
+                (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
     -- The last of some lanes that `h` picks: a queued lane is listed after
     -- the lane it waited on.
@@ -769,271 +798,3 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   flat-core (mergeᶠ (just k)) = λ Os Ls al lk → Parts.ConcatTab.rel′ Os Ls k al lk
   flat-core switchᶠ           = λ Os Ls al lk → Parts.SwitchTab.rel′ Os Ls al lk
   flat-core exhaustᶠ          = λ Os Ls al lk → Parts.ExhaustTab.rel′ Os Ls al lk
-
-  ----------------------------------------------------------------------
-  -- THE COMBINED SCAN: each row of the lanes' flatMap read by the scan's
-  -- lane branch and re-emitted by `each` as it is, the scan's other emits
-  -- all marks; the flatMap's end at the `nothing` the scan's concat sends
-  -- past the last of its three branches' ends.
-  module CombTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁) where
-    P′ Q′ : ℕ → _
-    P′ = P op
-    Q′ = λ N → listC (3 + N) n (inner op) (ρ*c N) c₂
-
-    -- The scan's three branches, under its concat's first lane: the
-    -- outer, the lanes and the closer, each read at `rB`.
-    cA : Pos
-    cA = c₂ ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
-
-    rB : ℕ → Pos
-    rB i = cA ⊕ˡ (ix i ∷ ix 1 ∷ [])
-
-    readEnd : Pos → List Pos → List Pos
-    readEnd r = L.map (λ e → if r <ᵖ e then e ⊕ [ sub r ] else r ⊕ [ last ])
-
-    core-hot : ℕ → Tb.Listed (IE B)
-    core-hot N = hotOf (proj₁ (listC-ok (3 + N) n (core op) {ρ*c N} (uρ*c N) c₁))
-
-    -- The last of the branches' ends, as the merge over them ends.
-    aEnds : ℕ → List Pos
-    aEnds N = readEnd (rB 0) (ends (rows (sh-tab N))) ++ readEnd (rB 1) (ends (rows (core-hot N)))
-              ++ readEnd (rB 2) (ends (rows (cl-tab N)))
-
-    aEnd : ℕ → Pos
-    aEnd N = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ]) (aEnds N)
-
-    reEmit : Pos → Pos
-    reEmit l = l ⊕ˡ (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ [])
-
-    φ′ : ℕ → Pos → Pos
-    φ′ N k = if endAt (P′ N) k then aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ []) else reEmit (Rel.φ R N k)
-
-    Put′ : ℕ → Pos → Pos → Set
-    Put′ N k l = Σ Pos λ l′ → Rel.Put R N k l′ × l ≡ reEmit l′
-
-    bk′ : ℕ → Pos → List Pos
-    bk′ N l = Rel.bk R N (ups 3 l) ++ endsOf (P′ N)
-
-    postulate
-      cb-corr        : ∀ N → Corr p c₂ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
-      cb-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
-      cb-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
-                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      cb-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
-      cb-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      cb-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      cb-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
-                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
-      cb-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cb-corr N) k
-                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      cb-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      cb-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      cb-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-      cb-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      cb-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
-                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
-
-    -- Three labels up undo the re-emit.
-    ups-re : ∀ l → ups 3 (reEmit l) ≡ l
-    ups-re l = trans (cong (ups 2) (up-⊕ _ _)) (trans (cong (ups 1) (up-⊕ _ _)) (up-⊕ _ _))
-
-    -- A put's preimages are the lanes' flatMap's at the image re-emitted.
-    cb-pb-few : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
-    cb-pb-few N l = proj₁ (Rel.pb-few R N (ups 3 l))
-                  , λ P → proj₂ (Rel.pb-few R N (ups 3 l))
-                            (subst (Rel.Put R N _) (trans (sym (ups-re (proj₁ P))) (cong (ups 3) (sym (proj₂ (proj₂ P))))) (proj₁ (proj₂ P)))
-
-    -- A value's preimage is listed at its re-emit, an end among the ends.
-    cb-in-bk : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-    cb-in-bk {N} {k} x u = in-if (endAt (P′ N) k) (λ l → k ∈ bk′ N l)
-      (λ eq → ∈-++⁺ʳ (Rel.bk R N _) (any-≟ eq))
-      (λ _ → ∈-++⁺ˡ (subst (λ y → k ∈ Rel.bk R N y) (sym (ups-re (Rel.φ R N k))) (Rel.in-bk R x u)))
-
-    -- A put is the lanes' flatMap's, re-emitted.
-    cb-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₂ ≼ φ′ N k
-    cb-after-φ {N} {k} x u = in-if (endAt (P′ N) k) (λ l → c₂ ≼ l)
-      (λ _ → ≼-trans {c₂} {aEnd N} {aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ [])}
-               (≼-trans {c₂} {cA ⊕ [ last ]} {aEnd N} (≼-ˡ c₂ (ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ last ∷ [])) (max-ge (cA ⊕ [ last ]) (aEnds N)))
-               (≼-ˡ (aEnd N) (ix 1 ∷ ix 0 ∷ last ∷ [])))
-      (λ _ → ≼-trans {c₂} {c₁} {reEmit (Rel.φ R N k)} (≺→≼ {c₂} {c₁} (≺-ext c₂ []))
-               (≼-trans {c₁} {Rel.φ R N k} {reEmit (Rel.φ R N k)} (Rel.after-φ R x u) (≼-ˡ (Rel.φ R N k) (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ []))))
-
-    cb-put-up : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
-    cb-put-up le ag (l′ , pt , eq) = l′ , Rel.put-up R le ag pt , eq
-
-    cb-got* : ∀ N → Got (Q′ N)
-    cb-got* N = got-ok (3 + N) n (inner op) {ρ*c N} (uρ*c N) c₂
-
-    cb-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
-    cb-pin-in* {N} = pin-ok (3 + N) n (inner op) {ρ*c N} c₂
-
-    cb-after* : ∀ {N l e} → TR (Q′ N) l e → c₂ ≼ l
-    cb-after* {N} = after-ok (3 + N) n (inner op) {ρ*c N} c₂
-
-    cb-pin-after* : ∀ {N l r} → TR (Q′ N) l (pin r) → c₂ ≼ r
-    cb-pin-after* {N} = pin-after-ok (3 + N) n (inner op) {ρ*c N} c₂
-
-    rel′ : Rel P′ Q′ p c₂
-    rel′ = record
-      { φ = φ′ ; Put = Put′ ; corr = cb-corr ; φ-agree = cb-φ-agree ; bk = bk′ ; in-bk = cb-in-bk ; pb-few = cb-pb-few
-      ; back = cb-back ; put-up = cb-put-up ; back-put = cb-back-put
-      ; elab-causal = cb-elab-causal ; stable← = cb-stable← ; stable-put = cb-stable-put ; stable-lead = cb-stable-lead
-      ; elab-all = cb-elab-all ; func = Rel.func R ; func* = cb-func* ; flat = Rel.flat R ; flat* = cb-flat*
-      ; pin-in = Rel.pin-in R ; pin-in* = cb-pin-in* ; cons = Rel.cons R ; cons* = cb-cons* ; got = Rel.got R ; got* = cb-got*
-      ; after = Rel.after R ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after* ; pin-stable = cb-pin-stable }
-
-  ----------------------------------------------------------------------
-  -- THE CLOSER: the combined run is the closer's connect's body, its rows
-  -- shown as they are; the closer, that connect's source, shows only
-  -- pins and skips.
-  module CloseTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂) where
-    P′ Q′ : ℕ → _
-    P′ = P op
-    Q′ = λ N → listC (3 + N) n (body op) (ρ*h N) c₃
-
-    φ′ : ℕ → Pos → Pos
-    φ′ = Rel.φ R
-
-    Put′ : ℕ → Pos → Pos → Set
-    Put′ = Rel.Put R
-
-    bk′ : ℕ → Pos → List Pos
-    bk′ = Rel.bk R
-
-    postulate
-      cz-corr        : ∀ N → Corr p c₃ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
-      cz-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
-                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      cz-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
-      cz-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      cz-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      cz-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
-                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
-      cz-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (cz-corr N) k
-                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      cz-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      cz-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      cz-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-      cz-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      cz-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
-                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
-
-    cz-got* : ∀ N → Got (Q′ N)
-    cz-got* N = got-ok (3 + N) n (body op) {ρ*h N} (uρ*h N) c₃
-
-    cz-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
-    cz-pin-in* {N} = pin-ok (3 + N) n (body op) {ρ*h N} c₃
-
-    -- The body's images lie past the closer's body, one label up.
-    cz-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₃ ≼ φ′ N k
-    cz-after-φ {N} {k} x u = ≼-trans {c₃} {c₂} {φ′ N k} (≼-ˡ c₃ (ix 0 ∷ [])) (Rel.after-φ R x u)
-
-    cz-after* : ∀ {N l e} → TR (Q′ N) l e → c₃ ≼ l
-    cz-after* {N} = after-ok (3 + N) n (body op) {ρ*h N} c₃
-
-    cz-pin-after* : ∀ {N l r} → TR (Q′ N) l (pin r) → c₃ ≼ r
-    cz-pin-after* {N} = pin-after-ok (3 + N) n (body op) {ρ*h N} c₃
-
-    rel′ : Rel P′ Q′ p c₃
-    rel′ = record
-      { φ = φ′ ; Put = Put′ ; corr = cz-corr ; φ-agree = Rel.φ-agree R ; bk = bk′ ; in-bk = Rel.in-bk R ; pb-few = Rel.pb-few R
-      ; back = cz-back ; put-up = Rel.put-up R ; back-put = cz-back-put
-      ; elab-causal = cz-elab-causal ; stable← = cz-stable← ; stable-put = cz-stable-put ; stable-lead = cz-stable-lead
-      ; elab-all = cz-elab-all ; func = Rel.func R ; func* = cz-func* ; flat = Rel.flat R ; flat* = cz-flat*
-      ; pin-in = Rel.pin-in R ; pin-in* = cz-pin-in* ; cons = Rel.cons R ; cons* = cz-cons* ; got = Rel.got R ; got* = cz-got*
-      ; after = Rel.after R ; after* = cz-after* ; after-φ = cz-after-φ ; pin-after* = cz-pin-after* ; pin-stable = cz-pin-stable }
-
-  ----------------------------------------------------------------------
-  -- THE SHARE: the body is the share's two connects' body, its rows shown
-  -- as they are; the trigger's and the shared hot's are pins.
-  module ShareTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃) where
-    P′ Q′ : ℕ → _
-    P′ = P op
-    Q′ = Tab* n ρι (flatMap op f s) ρ* p*
-
-    φ′ : ℕ → Pos → Pos
-    φ′ = Rel.φ R
-
-    Put′ : ℕ → Pos → Pos → Set
-    Put′ = Rel.Put R
-
-    bk′ : ℕ → Pos → List Pos
-    bk′ = Rel.bk R
-
-    postulate
-      sr-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
-      sr-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
-                     → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      sr-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
-      sr-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      sr-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
-                     → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      sr-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
-                     → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
-      sr-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sr-corr N) k
-                     → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      sr-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      sr-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
-      sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
-      sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                     → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
-                     → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
-
-    sr-got* : ∀ N → Got (Q′ N)
-    sr-got* N = got-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} (uρ* N) p*
-
-    sr-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
-    sr-pin-in* {N} = pin-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
-
-    -- The closer's images lie past the share, two labels up.
-    sr-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
-    sr-after-φ {N} {k} x u = ≼-trans {p*} {c₃} {φ′ N k} (≼-ˡ p* (ix 0 ∷ ix 0 ∷ [])) (Rel.after-φ R x u)
-
-    sr-after* : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
-    sr-after* {N} = after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
-
-    sr-pin-after* : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
-    sr-pin-after* {N} = pin-after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
-
-    rel′ : Rel P′ Q′ p p*
-    rel′ = record
-      { φ = φ′ ; Put = Put′ ; corr = sr-corr ; φ-agree = Rel.φ-agree R ; bk = bk′ ; in-bk = Rel.in-bk R ; pb-few = Rel.pb-few R
-      ; back = sr-back ; put-up = Rel.put-up R ; back-put = sr-back-put
-      ; elab-causal = sr-elab-causal ; stable← = sr-stable← ; stable-put = sr-stable-put ; stable-lead = sr-stable-lead
-      ; elab-all = sr-elab-all ; func = Rel.func R ; func* = sr-func* ; flat = Rel.flat R ; flat* = sr-flat*
-      ; pin-in = Rel.pin-in R ; pin-in* = sr-pin-in* ; cons = Rel.cons R ; cons* = sr-cons* ; got = Rel.got R ; got* = sr-got*
-      ; after = Rel.after R ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
-
-  flat-tab : ∀ op → Src → Lanes → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
-  flat-tab op Os Ls al lk = ShareTab.rel′ op (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls al lk)))
-
-  postulate
-    -- THE FLATMAP'S ORDER FACTS: each row is a source row or a lane row
-    -- at its own position, imaged along its stream's map, so each fact is
-    -- the source's or the lane's; a lane's subscription is past every
-    -- earlier pair that cuts the flatMap alike.
-    flatmap-order : ∀ op (Os : Src) (Ls : Lanes) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) → Rest (maps env) ρ (flat-tab op Os Ls al lk)
-
-flat-rel : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
-         → Full n s → (∀ a → Full n (f a)) → Full n (flatMap op f s)
-flat-rel n op f s Fs Ff ρ uρ ρι ρ* uρ* env p p* al lk = F.flat-tab op Os Ls al lk ⊢ F.flatmap-order op Os Ls al lk
-  where
-    module F = Flat n f s ρ uρ ρι ρ* uρ* env p p*
-
-    path : List Label
-    path = ix 1 ∷ ix 0 ∷ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ∷ ix 1 ∷ []
-
-    Os : F.Src
-    Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.tt-tab env) p F.sp*
-           (aligned-r* {Ψ = maps env} {ρ = ρ} al path) (linked-r* lk path)
-
-    Ls : F.Lanes
-    Ls a t₁ t₂ t₃ t₄ u = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk t₁ (env-wk t₂ (env-wk t₃ (env-wk t₄ env))))

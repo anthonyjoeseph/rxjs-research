@@ -61,7 +61,7 @@ open import simultaneous.TableDefer using (defer-tab)
 open import simultaneous.TableSpin using (spin-tab)
 open import simultaneous.TableOf using (of-tab)
 open import simultaneous.TableCold using (cold-tab)
-open import simultaneous.TableFlat using (flat-rel)
+open import simultaneous.TableLayers using (flat-rel)
 open import simultaneous.InstEmit using (instEmit; value)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)

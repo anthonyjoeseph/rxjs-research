@@ -33,15 +33,15 @@ open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
 open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin)
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺)
+open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺)
 open import denotation.Laws.Count using (child)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -50,6 +50,7 @@ open import simultaneous.ListPin using (listC-pin)
 open import simultaneous.ListAfter using (listC-past; listC-pinpast)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
+open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab)
@@ -187,6 +188,45 @@ alike-r* : ∀ {X : Set} {ψ : Pos → Pos} {t : EmissionSet X} {q q*} → Alike
 alike-r* a []       = a
 alike-r* a (l ∷ ls) = alike-r* (alike-r a l) ls
 
+------------------------------------------------------------------------
+-- Going past, under a position no image is under
+
+⊑-⊕ˡ : ∀ q ls → q ⊑ (q ⊕ˡ ls)
+⊑-⊕ˡ q []       = ⊑-refl q
+⊑-⊕ˡ q (l ∷ ls) = ⊑-trans (⊑-snoc⁺ q) (⊑-⊕ˡ (q ⊕ [ l ]) ls)
+
+-- Past `v` and not under it: past all that lies under it.
+under-past : ∀ {v z y} → v ⊑ z → v ≺ y → ¬ (v ⊑ y) → z ≺ y
+under-past {v} {y = y} (zs , refl) = go v zs
+  where
+    go : ∀ w ws → w ≺ y → ¬ (w ⊑ y) → (w ⊕ ws) ≺ y
+    go w []       lt nw = subst (_≺ y) (sym (⊕-identityʳ w)) lt
+    go w (l ∷ ws) lt nw = subst (_≺ y) (⊕-assoc w [ l ] ws) (go (w ⊕ [ l ]) ws (down w l lt nw) (λ u → nw (up⊑ w l u)))
+
+lvl-past : ∀ {q q* y y* L z} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z → ¬ (L ⊑ y*)
+         → Lvl q q* y y* → Lvl q z y y*
+lvl-past {q} {q*} {y} {y*} {L} {z} Lq qz Lz iz nL (lt , ie , nq , _) =
+  mk⇔ (λ h → under-past Lz (≼-≺-≺ {L} {q*} {y*} Lq (Equivalence.to lt h)) nL)
+      (λ h → Equivalence.from lt (≺-trans {q*} {z} {y*} qz h))
+  , subst (λ a → instantOf y ≡ instantOf q ⇔ instantOf y* ≡ a) iz ie
+  , nq , (λ u → nL (⊑-trans Lz u))
+
+private
+  lead : ∀ {s L y y*} → Cut s L y y* → ¬ (L ⊑ y*)
+  lead (at-frame (_ , _ , _ , n) _ _)  = n
+  lead (at-step (_ , _ , _ , n) _ _ _) = n
+
+  creator : ∀ {s L y y* t c c* l} → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l → Cut s L y y* → Cut s L c c*
+  creator a _ (at-frame _ a′ _) with trans (sym a) a′
+  ... | ()
+  creator a b (at-step _ a′ b′ C) with trans (sym a) a′ | trans (sym b) b′
+  ... | refl | refl = C
+
+cut-past : ∀ {q q* s L z y y*} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z
+         → Cut q q* y y* → Cut s L y y* → Cut q z y y*
+cut-past Lq qz Lz iz (at-frame v a b)  C′ = at-frame (lvl-past Lq qz Lz iz (lead C′) v) a b
+cut-past Lq qz Lz iz (at-step v a b C) C′ = at-step (lvl-past Lq qz Lz iz (lead C′) v) a b (cut-past Lq qz Lz iz C (creator a b C′))
+
 linked-l : ∀ {y y*} → Linked y y* → ∀ l → Linked (y ⊕ [ l ]) y*
 linked-l {y} (framed a b)             l = framed (trans (inst-⊕ y [ l ]) a) b
 linked-l {y} (cascaded {c = c} a b lt lt* d d* L)  l =
@@ -202,6 +242,23 @@ linked-r {y* = y*} (cascaded {c* = c*} a b lt lt* d d* L)  l* =
 linked-r* : ∀ {y y*} → Linked y y* → ∀ ys → Linked y (y* ⊕ˡ ys)
 linked-r* L []       = L
 linked-r* L (l ∷ ls) = linked-r* (linked-r L l) ls
+
+-- Later in the second's instant, still alike.
+linked-later : ∀ {y y* z} → Linked y y* → instantOf y* ≡ instantOf z → y* ≺ z → Linked y z
+linked-later (framed a b) e _ = framed a (trans (sym e) b)
+linked-later {y* = y*} {z} (cascaded {c* = c*} a b l l* d d* L) e lt =
+  cascaded a (trans (sym e) b) l (≺-trans {c*} {y*} {z} l* lt) d (λ q → d* (trans q (sym e))) L
+
+inst-⊕ˡ : ∀ q ls → instantOf (q ⊕ˡ ls) ≡ instantOf q
+inst-⊕ˡ q []       = refl
+inst-⊕ˡ q (l ∷ ls) = trans (inst-⊕ˡ (q ⊕ [ l ]) ls) (inst-⊕ q [ l ])
+
+-- Between two positions of one instant, a third is in it too.
+squeeze : ∀ {a b c} → a ≼ b → b ≺ c → instantOf a ≡ instantOf c → instantOf b ≡ instantOf c
+squeeze {a} {b} {c} ab bc e with triⁱ (instantOf b) (instantOf c)
+... | inj₁ lt        = ⊥-elim (ab (instant-≺ b a (subst (instantOf b ≺ⁱ_) (sym e) lt)))
+... | inj₂ (inj₁ eq) = eq
+... | inj₂ (inj₂ gt) = ⊥-elim (≺-absurd {b} {c} bc (instant-≺ c b gt))
 
 ------------------------------------------------------------------------
 -- The hots in scope
@@ -219,6 +276,12 @@ aligned-r* al ys i N = alike-r* (al i N) ys
 
 aligned-⊕ : ∀ {Γ} {Ψ : Maps Γ} {ρ q q*} → Aligned Ψ ρ q q* → ∀ l l* → Aligned Ψ ρ (q ⊕ [ l ]) (q* ⊕ [ l* ])
 aligned-⊕ al l l* i N = alike-r (alike-l (al i N) l) l*
+
+-- Past an image, in its instant and under a position some pair aligns:
+-- aligned there too.
+aligned-past : ∀ {Γ} {Ψ : Maps Γ} {ρ q q* s L z} → Aligned Ψ ρ s L → L ≼ q* → q* ≺ z → L ⊑ z
+             → instantOf q* ≡ instantOf z → Aligned Ψ ρ q q* → Aligned Ψ ρ q z
+aligned-past aL Lq qz Lz iz al i N = alike λ x un → cut-past Lq qz Lz iz (cut (al i N) x un) (cut (aL i N) x un)
 
 ------------------------------------------------------------------------
 -- The record and what it carries past the correspondence
