@@ -24,14 +24,14 @@ open import Data.List.Relation.Unary.Any using (here; there) renaming (map to an
 open import Data.Maybe using (just; nothing; maybe)
 import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_; _≤_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; out; pin; _≼_; _≺_)
+open import denotation.EmissionSet using (Ev; Unpinned; out; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (AgreeTo; ≼-refl)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
@@ -96,8 +96,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ----------------------------------------------------------------------
   -- The joiners
 
-  module Joins (Os : Src) (Ls : Lanes) where
-    open Parts Os Ls
+  module Joins (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) where
+    open Parts Os Ls Lc
 
     ----------------------------------------------------------------------
     -- THE PLAIN MERGE: every value's lane subscribed under its row, every
@@ -111,7 +111,14 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       postulate
         mg-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
-        mg-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+        -- THE MERGE'S MAP ACROSS CUTS: each value's lane runs uncut, so two
+        -- cuts agreeing up to a row hold its values alike below it, each
+        -- lane listing alike; a value past the row has a lane quiet up to it.
+        mg-vals-eq     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → ValsEq k (valsAt N) (valsAt N′)
+        mg-lane-un     : ∀ {N k e} → TR (P′ N) k e → Unpinned e
+                       → ∀ {R} → holder (L.map (valRec N) (valsAt N)) k ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev
+        mg-src-at      : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′))
+                       → holder (L.map (valRec N) (valsAt N)) k ≡ nothing → ends-above k (L.map (valRec N) (valsAt N)) ≡ nothing → SrcAt N N′ k
         mg-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
         -- THE MERGE'S CUTS BACK, ITS OUTER AND ITS LANES: the core agreeing
         -- up to a row's image puts the source, and every lane subscribed at
@@ -152,6 +159,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           L = MJ.lanes
                 (λ {q} {a} xq _ qk k₀k _ → ag-den (f a) (q ⊕ [ ix 1 ]) (mg-lane-back le x un ag* (den-tr s p xq) qk k₀k))
                 (λ {q} {a} {k₀} xq _ qk k₀k _ _ → upto (ag-den (f a) (q ⊕ [ ix 1 ]) (mg-lane-back le x un ag* (den-tr s p xq) qk k₀k)) (≼-refl {k₀}))
+
+      mg-φ-agree : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      mg-φ-agree x un ag = tabs-φ-agree (vals-lanes (mg-vals-eq x un ag)) (mg-lane-un x un) (mg-src-at x un ag)
 
       mg-got : ∀ N → Got (P′ N)
       mg-got N = pd-got (mergeᶠ nothing) N
@@ -218,7 +228,16 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       postulate
         cc-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
-        cc-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+        -- THE QUEUE'S MAP ACROSS CUTS: two cuts agreeing up to a row run
+        -- the same queue below it, so each level's lanes are alike, a
+        -- queued lane waiting on alike lanes; a lane subscribed past the row
+        -- is quiet up to it.
+        cc-lanes-eq    : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′))
+                       → LanesEq k (recs N (entriesAt N) []) (recs N′ (entriesAt N′) [])
+        cc-lane-un     : ∀ {N k e} → TR (P′ N) k e → Unpinned e
+                       → ∀ {R} → holder (recs N (entriesAt N) []) k ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev
+        cc-src-at      : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′))
+                       → holder (recs N (entriesAt N) []) k ≡ nothing → ends-above k (recs N (entriesAt N) []) ≡ nothing → SrcAt N N′ k
         cc-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
         cc-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                        → AgreeTo k (TR (P′ N′)) (TR (P′ N))
@@ -239,6 +258,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         cc-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                        → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+      cc-φ-agree : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      cc-φ-agree x un ag = tabs-φ-agree (cc-lanes-eq x un ag) (cc-lane-un x un) (cc-src-at x un ag)
 
       cc-got : ∀ N → Got (P′ N)
       cc-got N = pd-got (mergeᶠ (just k)) N
@@ -282,8 +304,17 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       postulate
         sw-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+        -- THE SWITCH'S MAP ACROSS CUTS: the plain switch's rows agreeing up
+        -- to a row say nothing of a cut lane's rows past its cut, which the
+        -- switch never shows, yet the holder and the ends above read every
+        -- lane's whole table.
+        -- DEAD ROUTE: `tabs-φ-agree` as the merge's body: its `LanesEq`
+        --   needs every lane's table agreeing up to the row, a cut lane's
+        --   included, and the switch's agreement reaches a cut lane's table
+        --   only up to the next value's row.
         sw-φ-agree     : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
         sw-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+
         -- THE SWITCH'S CUTS BACK, ITS OUTER AND ITS LANES: as the merge's,
         -- each lane read only up to its cut, and past it only the pins its
         -- uncut connects keep.
@@ -436,7 +467,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; after = ex-after ; after* = ex-after* ; after-φ = ex-after-φ ; pin-after* = ex-pin-after* ; pin-stable = ex-pin-stable }
 
   flat-core : ∀ op → Core op
-  flat-core (mergeᶠ nothing)  = λ Os Ls al lk → Joins.MergeTab.rel′ Os Ls al lk
-  flat-core (mergeᶠ (just k)) = λ Os Ls al lk → Joins.ConcatTab.rel′ Os Ls k al lk
-  flat-core switchᶠ           = λ Os Ls al lk → Joins.SwitchTab.rel′ Os Ls al lk
-  flat-core exhaustᶠ          = λ Os Ls al lk → Joins.ExhaustTab.rel′ Os Ls al lk
+  flat-core (mergeᶠ nothing)  = λ Os Ls Lc al lk → Joins.MergeTab.rel′ Os Ls Lc al lk
+  flat-core (mergeᶠ (just k)) = λ Os Ls Lc al lk → Joins.ConcatTab.rel′ Os Ls Lc k al lk
+  flat-core switchᶠ           = λ Os Ls Lc al lk → Joins.SwitchTab.rel′ Os Ls Lc al lk
+  flat-core exhaustᶠ          = λ Os Ls Lc al lk → Joins.ExhaustTab.rel′ Os Ls Lc al lk

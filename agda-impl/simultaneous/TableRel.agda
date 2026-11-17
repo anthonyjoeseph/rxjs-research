@@ -53,7 +53,7 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
          Maps; Aligned; aligned-⊕;
-         Rest; Out; _⊢_; HotR; EnvR; envR; maps; lw; lw*; hot; Full; Admits; admits-step; admits-wk; admits-body; listHot; listHot-u; unended; den-cons; tab-func; tab-flat)
+         Rest; Out; _⊢_; HotR; EnvR; envR; maps; lw; lw*; hot; hot-coh; Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot; listHot-u; unended; den-cons; tab-func; tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab)
@@ -189,6 +189,10 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     -- readers correspond wherever they cut it alike.
     conn-hot : (Rs : Src) → HotR (here refl) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
 
+    -- Its map is its readers' subscriptions', as every record's.
+    conn-hot-coh : (Rs : Src) → ∀ n′ q q* (ad ad′ : Admits D′ q) (ad* ad*′ : Admits D*′ q*) (al al′ : Aligned (Ψ′ Rs) ρ′ q q*) (lk lk′ : Linked q q*) N y
+                 → Rel.φ (Out.rel (conn-hot Rs n′ q q* ad ad* al lk)) N y ≡ Rel.φ (Out.rel (conn-hot Rs n′ q q* ad′ ad*′ al′ lk′)) N y
+
     -- AN OLD HOT'S READER CUTS THE NEW HOT ALIKE.  The reader's rows are
     -- the old hot's, which the source's rows cut alike with their images
     -- (the source's `cuts`); seen from the other side, the old rows cut
@@ -214,11 +218,18 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       cuts′ N x un (there i)   N′ = Rest.cuts (Out.rest O) N x un i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
-  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
+  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
     where
       hots : ∀ {X} (i : X ∈ A ∷ Γ) → HotR i ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
       hots (here refl) = conn-hot Rs
       hots (there j)   = old Rs j
+
+      hots-coh : ∀ {X} (i : X ∈ A ∷ Γ) n′ q q* (ad ad′ : Admits D′ q) (ad* ad*′ : Admits D*′ q*) (al al′ : Aligned (Ψ′ Rs) ρ′ q q*) (lk lk′ : Linked q q*) N y
+               → Rel.φ (Out.rel (hots i n′ q q* ad ad* al lk)) N y ≡ Rel.φ (Out.rel (hots i n′ q q* ad′ ad*′ al′ lk′)) N y
+      hots-coh (here refl) = conn-hot-coh Rs
+      hots-coh (there j) n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ =
+        hot-coh env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD (lw env) ad′) (admits-wk hD* (lw* env) ad*) (admits-wk hD* (lw* env) ad*′)
+          (λ i → al (there i)) (λ i → al′ (there i)) lk lk′
 
   -- The body's subscriptions cut the source's hot alike: the source sees
   -- the body's pair, before it and cutting it alike, cutting its rows
@@ -381,6 +392,11 @@ conn-rel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk = C.conn-tab Rs Ob
 -- elaboration is subscribed deeper, so no map matches its value to the
 -- plain one.
 rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
+
+postulate
+  -- Every author subterm's map is its subscriptions' (`Coh`).
+  rel-coh : ∀ {Γ A} n (o : SObs Γ A) → Coh n (plain o) (rel n o)
+
 rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* a a* al lk = cold-tab m n ρ* uρ* p p* ⊢ cold-order m n ρ* uρ* (maps env) p p* al lk
 rel n empty             ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p* ⊢ of-order [] _ _ (maps env) ρ p p* al lk
@@ -392,7 +408,7 @@ rel n (scan f z s)      ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   let O = rel n s ρ uρ ρι ρ* uρ* env p p* a a* al lk in scan-tab f z (Out.rel O) ⊢ scan-order f z (Out.rel O) (Out.rest O)
 rel n (takeWhile i q s) ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   let O = rel n s ρ uρ ρι ρ* uρ* env p p* a a* al lk in take-tab i q (Out.rel O) ⊢ take-order i q (Out.rel O) (Out.rest O)
-rel n (flatMap op f s)  = flat-rel n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a))
+rel n (flatMap op f s)  = flat-rel n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a)) (λ a → rel-coh n (f a))
 rel n (connect s b)     = conn-rel n (plain s) (plain b) (rel n s) (rel n b)
 rel n (connected i)     ρ uρ ρι ρ* uρ* env p p* a a* al lk = hot env i n p p* a a* al lk
 rel zero    (defer l)   ρ uρ ρι ρ* uρ* env p p* a a* al lk = spin-tab p p* ⊢ spin-order (maps env) ρ p p* al lk

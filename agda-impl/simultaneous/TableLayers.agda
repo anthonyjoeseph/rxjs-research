@@ -32,7 +32,7 @@ open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; env-wk; Full; Admits; admits-trig; tab-func; tab-flat)
+  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; env-wk; env-wk-eq; Full; Coh; Admits; admits-trig; tab-func; tab-flat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -317,19 +317,19 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; cons = sr-cons ; cons* = sr-cons* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
 
-  flat-tab : ∀ op → Src → Lanes → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
-  flat-tab op Os Ls al lk = ShareTab.rel′ op Os (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls al lk)))
+  flat-tab : ∀ op → Src → (Ls : Lanes) → LanesCoh Ls → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
+  flat-tab op Os Ls Lc al lk = ShareTab.rel′ op Os (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls Lc al lk)))
 
   postulate
     -- THE FLATMAP'S ORDER FACTS: each row is a source row or a lane row
     -- at its own position, imaged along its stream's map, so each fact is
     -- the source's or the lane's; a lane's subscription is past every
     -- earlier pair that cuts the flatMap alike.
-    flatmap-order : ∀ op (Os : Src) (Ls : Lanes) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) → Rest (maps env) ρ (flat-tab op Os Ls al lk)
+    flatmap-order : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) → Rest (maps env) ρ (flat-tab op Os Ls Lc al lk)
 
 flat-rel : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
-         → Full n s → (∀ a → Full n (f a)) → Full n (flatMap op f s)
-flat-rel n op f s Fs Ff ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab op Os Ls al lk ⊢ G.flatmap-order op Os Ls al lk
+         → Full n s → (Ff : ∀ a → Full n (f a)) → (∀ a → Coh n (f a) (Ff a)) → Full n (flatMap op f s)
+flat-rel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab op Os Ls Lc al lk ⊢ G.flatmap-order op Os Ls Lc al lk
   where
     module F = Flat n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
     module G = Layers n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
@@ -343,3 +343,8 @@ flat-rel n op f s Fs Ff ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab 
 
     Ls : F.Lanes
     Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+
+    Lc : F.LanesCoh Ls
+    Lc a t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₃ h₄ =
+      Ffc a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E) (env-wk h₁′ E) (env-wk-eq h₁ h₁′ E)
+      where E = env-wk h₂ (env-wk h₃ (env-wk h₄ env))

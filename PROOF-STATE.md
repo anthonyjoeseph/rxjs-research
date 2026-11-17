@@ -32,6 +32,16 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE MAP IS THE SUBSCRIPTIONS'
+
+A record's map is had from its subscriptions and its environment's maps,
+never from how they are admitted (`Coh`): a lane is related at each cut
+from that cut's row, so every joiner's cross-cut field compares two
+records of one lane. Untried: the induction over `rel`, the connect's
+hot. Settled by `rel-coh`'s body.
+
+Members: `rel-coh`, `conn-hot-coh`.
+
 #### THE COMBINED SCAN
 
 The combined scan's record is written: a lanes' row re-emitted at the
@@ -82,7 +92,7 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`, `cc-put-up`,
+Members: `cc-corr`, `cc-lanes-eq`, `cc-lane-un`, `cc-src-at`, `cc-in-bk`, `cc-back`, `cc-put-up`,
 `cc-back-put`, `cc-elab-causal`, `cc-stable←`, `cc-stable-put`,
 `cc-stable-lead`, `cc-elab-all`, `cc-cons`, `cc-cons*`, `cc-after-φ`,
 `cc-pin-stable`.
@@ -95,7 +105,7 @@ source's end at the later of its own and the trigger's. Visible images
 probed; skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-src-back`, `mg-lane-back`,
+Members: `mg-corr`, `mg-vals-eq`, `mg-lane-un`, `mg-src-at`, `mg-in-bk`, `mg-src-back`, `mg-lane-back`,
 `mg-put-up`,
 `mg-back-put`, `mg-elab-causal`, `mg-stable←`, `mg-stable-put`,
 `mg-stable-lead`, `mg-elab-all`, `mg-cons`, `mg-cons*`, `mg-after-φ`,
