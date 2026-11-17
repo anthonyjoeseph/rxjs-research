@@ -15,20 +15,18 @@ open import Data.Bool using (Bool; false)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]) renaming (map to mapL)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; mergeᶠ; flatMap; cold; of; map; scan; merge)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; From; fixed; fresh; start)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; Den; coldAt; enter; After; LaneOf; Reach; Ended; Work; _≺_; _≼_; module Merge)
+open import denotation.EmissionSet using (out; end; Den; coldAt; enter; After; LaneOf; _≺_; module Merge)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; rows; afterL)
@@ -52,10 +50,6 @@ at-tr {L = L} eq x = L , eq , x
 
 self-exact : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {L} → m ≡ just L → Exactly L (TR m)
 self-exact eq _ = record { sound = at-tr eq ; complete = tr-at eq }
-
--- Every row of a listed table waits on finitely many: the listing's.
-reach-tr : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {L k e} → m ≡ just L → Reach (TR m) k e
-reach-tr {L = L} eq = mapL proj₁ (rows L) , λ x _ _ → ∈-map⁺ proj₁ (tr-at eq x)
 
 ------------------------------------------------------------------------
 -- A merge's listing
@@ -99,7 +93,7 @@ module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ :
     -- THE COLD'S ROWS.
     scan-rows     : ∀ {k e} → TR (listC K n scanned ρ P) k e ⇔ SRow J k e
     rend-rows     : ∀ q x {k e} → LaneOf fR q x k e ⇔ Rend q x k e
-    srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ (ix 1 ∷ last ∷ [])) ≺ c
+    srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ [ ix 1 ] ⊕ [ last ]) ≺ c
 
   private
     to-s : ∀ {k e} → TR (listC K n scanned ρ P) k e → SRow J k e
@@ -111,11 +105,11 @@ module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ :
     -- At the scan's end every part has ended.
     done : ∀ {c} → SRow J c end → Done c
     done {c} s = (c , fr-s s , ≼-refl {c})
-               , λ {q} {a} x _ _ _ → q ⊕ (ix 1 ∷ last ∷ []) , Equivalence.from (rend-rows q a) r-end
-                                   , ≺→≼ {q ⊕ (ix 1 ∷ last ∷ [])} {c} (srow-lane-end (to-s x) s)
+               , λ {q} {a} x _ _ _ → q ⊕ [ ix 1 ] ⊕ [ last ] , Equivalence.from (rend-rows q a) r-end
+                                   , ≺→≼ {q ⊕ [ ix 1 ] ⊕ [ last ]} {c} (srow-lane-end (to-s x) s)
 
     -- At a render's end the scan has not.
-    undone : ∀ {q x} → SRow J q (out x) → Done (q ⊕ (ix 1 ∷ last ∷ [])) → ⊥
+    undone : ∀ {q x} → SRow J q (out x) → Done (q ⊕ [ ix 1 ] ⊕ [ last ]) → ⊥
     undone {q} s ((c₁ , t , le) , _) = le (srow-lane-end {q} {c = c₁} s (to-s t))
 
   top-to : ∀ {k e} → JoinT k e → CRow J k e

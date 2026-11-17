@@ -31,7 +31,7 @@ open import Relation.Nullary using (yes; no)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; last; _∙_; _⊕_; frame; cascade; instant; path; tick)
 open import denotation.Events using (Events; Timeline; From; fixed; fresh; start)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≼-trans)
 open import denotation.Laws.Cut using (ine-unpinned)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
@@ -66,7 +66,7 @@ walk-nopin K ev x = ine-unpinned (proj₁ (sound (walkN-exact K ev) x))
 
 module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (p p* : Pos) where
 
-  open At {A} p* using (c₀; sync; σ; im; CRow; crow-fwd; crow-bwd; crow-pin; crow-after)
+  open At {A} p* using (c₀; P≼c₀; sync; σ; im; CRow; crow-fwd; crow-bwd; crow-pin; crow-after)
 
   -- A plain row's position, renamed onto the elaborated cold's.
   ψ : Pos → Pos
@@ -146,7 +146,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
 
   -- The elaborated cold's rows lie past its subscription.
   I-after : ∀ {N y e} → (y , e) ∈ I N → p* ≼ y
-  I-after {N} {y} x = ≼-trans {p*} {c₀} {y} (≺→≼ {p*} {c₀} (≺-ext p* (ix 1 ∷ ix 0 ∷ ix 1 ∷ []))) (walk-at (3 + N) c₀ x)
+  I-after {N} {y} x = ≼-trans {p*} {c₀} {y} P≼c₀ (walk-at (3 + N) c₀ x)
 
   -- Agreement read across the written-out rows.
   ag→ : ∀ {N N′ q} → AgreeTo q (CRow (I N)) (CRow (I N′)) → AgreeTo q (TR (Q N)) (TR (Q N′))
@@ -210,9 +210,10 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
 
   -- Past the subscribe burst, an image stays in its row's instant.
   σ-inst : ∀ kd y → instantOf (σ kd false y) ≡ instantOf y
-  σ-inst kv y = inst-⊕ y (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
+  σ-inst kv y = trans (inst-⊕ (y ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) [ ix 1 ]) (trans (inst-⊕ (y ⊕ [ ix 1 ] ⊕ [ ix 0 ]) [ ix 1 ])
+                  (trans (inst-⊕ (y ⊕ [ ix 1 ]) [ ix 0 ]) (inst-⊕ y [ ix 1 ])))
   σ-inst ks y = refl
-  σ-inst ke y = inst-⊕ y (ix 1 ∷ last ∷ [])
+  σ-inst ke y = trans (inst-⊕ (y ⊕ [ ix 1 ]) [ last ]) (inst-⊕ y [ ix 1 ])
 
   img : ∀ {N k e} → (k , e) ∈ W N → Σ (Ev (IE A)) λ e′ → TR (Q N) (φ′ N k) e′ × M e e′
   img x with cold-fwd (walk-ren→ x)

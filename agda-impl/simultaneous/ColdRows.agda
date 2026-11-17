@@ -35,7 +35,7 @@ open import Relation.Nullary using (yes; does)
 
 open import denotation.Position using (Pos; _≟ⁱ_; ix; last; _⊕_; root)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≼_; Work)
-open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext)
 open import quickcheck.Tabled using (Row)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; valuesOf)
 open import simultaneous.SObs using (Tag; val; cdone; tick)
@@ -63,10 +63,10 @@ module At {A : Set} (P : Pos) where
 
   -- Where the concat is subscribed, and the cold.
   C₀ : Pos
-  C₀ = P ⊕ (ix 0 ∷ ix 1 ∷ [])
+  C₀ = P ⊕ [ ix 0 ] ⊕ [ ix 1 ]
 
   c₀ : Pos
-  c₀ = P ⊕ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+  c₀ = C₀ ⊕ [ ix 0 ] ⊕ [ ix 1 ]
 
   -- In the subscribe burst.
   sync : Pos → Bool
@@ -80,11 +80,11 @@ module At {A : Set} (P : Pos) where
   -- Where each kind of row is shown
 
   σ : Kind → Bool → Pos → Pos
-  σ kv true  y = y ⊕ (ix 1 ∷ ix 0 ∷ [])
-  σ kv false y = y ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
+  σ kv true  y = y ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+  σ kv false y = y ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]
   σ ks _     y = y
   σ ke true  y = P ⊕ [ last ]
-  σ ke false y = y ⊕ (ix 1 ∷ last ∷ [])
+  σ ke false y = y ⊕ [ ix 1 ] ⊕ [ last ]
 
   im : ∀ {X : Set} → Pos → Ev X → Pos
   im y e = σ (kind e) (sync y) y
@@ -94,36 +94,36 @@ module At {A : Set} (P : Pos) where
 
   -- The scan's.
   data SRow (J : List (Row A)) : Pos → Ev (Bool × Tag A) → Set where
-    mv₀  : SRow J (P ⊕ (ix 0 ∷ ix 0 ∷ [])) skip
-    mv₁  : SRow J (P ⊕ (ix 1 ∷ ix 0 ∷ [])) skip
-    cv₀  : SRow J (C₀ ⊕ (ix 0 ∷ ix 0 ∷ [])) skip
-    cv₁  : SRow J (C₀ ⊕ (ix 1 ∷ ix 0 ∷ [])) skip
-    tk   : SRow J (P ⊕ (ix 1 ∷ ix 1 ∷ ix 0 ∷ [])) (out (true , tick))
-    tke  : SRow J (P ⊕ (ix 1 ∷ ix 1 ∷ last ∷ [])) skip
+    mv₀  : SRow J (P ⊕ [ ix 0 ] ⊕ [ ix 0 ]) skip
+    mv₁  : SRow J (P ⊕ [ ix 1 ] ⊕ [ ix 0 ]) skip
+    cv₀  : SRow J (C₀ ⊕ [ ix 0 ] ⊕ [ ix 0 ]) skip
+    cv₁  : SRow J (C₀ ⊕ [ ix 1 ] ⊕ [ ix 0 ]) skip
+    tk   : SRow J (P ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (true , tick))
+    tke  : SRow J (P ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ last ]) skip
     ce   : SRow J (C₀ ⊕ [ last ]) skip
     cval : ∀ {y a b} → (y , out a) ∈ J → not (sync y) ≡ b → SRow J y (out (b , val a))
     cskp : ∀ {y} → (y , skip) ∈ J → SRow J y skip
     se-c : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J c skip
-    se-d : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J (C₀ ⊕ (ix 1 ∷ ix 1 ∷ ix 0 ∷ [])) (out (false , cdone))
-    se-k : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J (C₀ ⊕ (ix 1 ∷ ix 1 ∷ last ∷ [])) skip
+    se-d : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (false , cdone))
+    se-k : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ last ]) skip
     se-e : ∀ {c} → (c , end) ∈ J → sync c ≡ true → SRow J (P ⊕ [ last ]) end
     ae-h : ∀ {c} → (c , end) ∈ J → sync c ≡ false → SRow J (c ⊕ [ ix 0 ]) skip
-    ae-d : ∀ {c} → (c , end) ∈ J → sync c ≡ false → SRow J (c ⊕ (ix 1 ∷ ix 0 ∷ [])) (out (true , cdone))
-    ae-e : ∀ {c} → (c , end) ∈ J → sync c ≡ false → SRow J (c ⊕ (ix 1 ∷ last ∷ [])) end
+    ae-d : ∀ {c} → (c , end) ∈ J → sync c ≡ false → SRow J (c ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (true , cdone))
+    ae-e : ∀ {c} → (c , end) ∈ J → sync c ≡ false → SRow J (c ⊕ [ ix 1 ] ⊕ [ last ]) end
     me-p : (∀ {c} → (c , end) ∈ J → sync c ≡ false) → SRow J (P ⊕ [ last ]) skip
 
   -- A tag's render, for the tag at `q`.
   data Rend (q : Pos) : Bool × Tag A → Pos → Ev IE → Set where
-    r-end : ∀ {x} → Rend q x (q ⊕ (ix 1 ∷ last ∷ [])) end
-    r-sv  : ∀ {a} → Rend q (false , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ [])) (out (instEmit (value a) root))
-    r-mn  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 0 ∷ [])) skip
-    r-mv  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 1 ∷ [])) skip
-    r-mc  : Rend q (true , cdone) (q ⊕ (ix 1 ∷ ix 1 ∷ [])) skip
-    r-ab  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ [])) (out (instEmit (mark begin) (q ⊕ [ ix 1 ])))
-    r-av  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])) (out (instEmit (value a) (q ⊕ [ ix 1 ])))
-    r-ao  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ [])) (out (instEmit (mark over) (q ⊕ [ ix 1 ])))
-    r-ae  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ last ∷ [])) skip
-    r-cb  : Rend q (true , cdone) (q ⊕ (ix 1 ∷ ix 0 ∷ [])) (out (instEmit (mark begin) (q ⊕ [ ix 1 ])))
+    r-end : ∀ {x} → Rend q x (q ⊕ [ ix 1 ] ⊕ [ last ]) end
+    r-sv  : ∀ {a} → Rend q (false , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (instEmit (value a) root))
+    r-mn  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ]) skip
+    r-mv  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 1 ]) skip
+    r-mc  : Rend q (true , cdone) (q ⊕ [ ix 1 ] ⊕ [ ix 1 ]) skip
+    r-ab  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (instEmit (mark begin) (q ⊕ [ ix 1 ])))
+    r-av  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (out (instEmit (value a) (q ⊕ [ ix 1 ])))
+    r-ao  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 2 ]) (out (instEmit (mark over) (q ⊕ [ ix 1 ])))
+    r-ae  : ∀ {a} → Rend q (true , val a) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ last ]) skip
+    r-cb  : Rend q (true , cdone) (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (out (instEmit (mark begin) (q ⊕ [ ix 1 ])))
 
   -- The elaboration's.
   data CRow (J : List (Row A)) : Pos → Ev IE → Set where
@@ -131,7 +131,7 @@ module At {A : Set} (P : Pos) where
     c-end  : ∀ {q} → SRow J q end → CRow J q end
     c-val  : ∀ {q x} → SRow J q (out x) → CRow J (q ⊕ [ ix 0 ]) skip
     c-lane : ∀ {q x k e} → SRow J q (out x) → Rend q x k e → Work e → CRow J k e
-    c-lend : ∀ {q x} → SRow J q (out x) → CRow J (q ⊕ (ix 1 ∷ last ∷ [])) skip
+    c-lend : ∀ {q x} → SRow J q (out x) → CRow J (q ⊕ [ ix 1 ] ⊕ [ last ]) skip
 
   ------------------------------------------------------------------------
   -- Each row in the subscribe burst's instant or a late row's
@@ -148,42 +148,46 @@ module At {A : Set} (P : Pos) where
   ... | true  = inj₁ (sync-in {y} s)
   ... | false = inj₂ (y , e , x , s , refl)
 
-  placed-P : ∀ {J} ys → Placed J (P ⊕ ys)
-  placed-P ys = inj₁ (inst-⊕ P ys)
+  -- A label down.
+  dn : ∀ {J} q l → Placed J q → Placed J (q ⊕ [ l ])
+  dn q l pq = placed-⊕ q pq [ l ]
 
-  placed-C : ∀ {J} ys → Placed J (C₀ ⊕ ys)
-  placed-C ys = inj₁ (trans (inst-⊕ C₀ ys) (inst-⊕ P (ix 0 ∷ ix 1 ∷ [])))
+  placed-P : ∀ {J} → Placed J P
+  placed-P = inj₁ refl
+
+  placed-C : ∀ {J} → Placed J C₀
+  placed-C = dn (P ⊕ [ ix 0 ]) (ix 1) (dn P (ix 0) placed-P)
 
   srow-placed : ∀ {J q e} → SRow J q e → Placed J q
-  srow-placed mv₀        = placed-P _
-  srow-placed mv₁        = placed-P _
-  srow-placed cv₀        = placed-C _
-  srow-placed cv₁        = placed-C _
-  srow-placed tk         = placed-P _
-  srow-placed tke        = placed-P _
-  srow-placed ce         = placed-C _
+  srow-placed mv₀        = dn (P ⊕ [ ix 0 ]) (ix 0) (dn P (ix 0) placed-P)
+  srow-placed mv₁        = dn (P ⊕ [ ix 1 ]) (ix 0) (dn P (ix 1) placed-P)
+  srow-placed cv₀        = dn (C₀ ⊕ [ ix 0 ]) (ix 0) (dn C₀ (ix 0) placed-C)
+  srow-placed cv₁        = dn (C₀ ⊕ [ ix 1 ]) (ix 0) (dn C₀ (ix 1) placed-C)
+  srow-placed tk         = dn (P ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (ix 0) (dn (P ⊕ [ ix 1 ]) (ix 1) (dn P (ix 1) placed-P))
+  srow-placed tke        = dn (P ⊕ [ ix 1 ] ⊕ [ ix 1 ]) last (dn (P ⊕ [ ix 1 ]) (ix 1) (dn P (ix 1) placed-P))
+  srow-placed ce         = dn C₀ last placed-C
   srow-placed (cval x _) = placed-row x
   srow-placed (cskp x)   = placed-row x
   srow-placed (se-c x _) = placed-row x
-  srow-placed (se-d _ _) = placed-C _
-  srow-placed (se-k _ _) = placed-C _
-  srow-placed (se-e _ _) = placed-P _
-  srow-placed (ae-h {c = c} x _) = placed-⊕ c (placed-row x) [ ix 0 ]
-  srow-placed (ae-d {c = c} x _) = placed-⊕ c (placed-row x) (ix 1 ∷ ix 0 ∷ [])
-  srow-placed (ae-e {c = c} x _) = placed-⊕ c (placed-row x) (ix 1 ∷ last ∷ [])
-  srow-placed (me-p _)   = placed-P _
+  srow-placed (se-d _ _) = dn (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (ix 0) (dn (C₀ ⊕ [ ix 1 ]) (ix 1) (dn C₀ (ix 1) placed-C))
+  srow-placed (se-k _ _) = dn (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ]) last (dn (C₀ ⊕ [ ix 1 ]) (ix 1) (dn C₀ (ix 1) placed-C))
+  srow-placed (se-e _ _) = dn P last placed-P
+  srow-placed (ae-h {c = c} x _) = dn c (ix 0) (placed-row x)
+  srow-placed (ae-d {c = c} x _) = dn (c ⊕ [ ix 1 ]) (ix 0) (dn c (ix 1) (placed-row x))
+  srow-placed (ae-e {c = c} x _) = dn (c ⊕ [ ix 1 ]) last (dn c (ix 1) (placed-row x))
+  srow-placed (me-p _)   = dn P last placed-P
 
   rend-placed : ∀ {J x k e} q → Placed J q → Rend q x k e → Placed J k
-  rend-placed q pq r-end = placed-⊕ q pq (ix 1 ∷ last ∷ [])
-  rend-placed q pq r-sv  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ [])
-  rend-placed q pq r-mn  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ ix 0 ∷ [])
-  rend-placed q pq r-mv  = placed-⊕ q pq (ix 1 ∷ ix 1 ∷ [])
-  rend-placed q pq r-mc  = placed-⊕ q pq (ix 1 ∷ ix 1 ∷ [])
-  rend-placed q pq r-ab  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ [])
-  rend-placed q pq r-av  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
-  rend-placed q pq r-ao  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ [])
-  rend-placed q pq r-ae  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ ix 1 ∷ last ∷ [])
-  rend-placed q pq r-cb  = placed-⊕ q pq (ix 1 ∷ ix 0 ∷ [])
+  rend-placed q pq r-end = dn (q ⊕ [ ix 1 ]) last (dn q (ix 1) pq)
+  rend-placed q pq r-sv  = dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)
+  rend-placed q pq r-mn  = dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 0) (dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq))
+  rend-placed q pq r-mv  = dn (q ⊕ [ ix 1 ]) (ix 1) (dn q (ix 1) pq)
+  rend-placed q pq r-mc  = dn (q ⊕ [ ix 1 ]) (ix 1) (dn q (ix 1) pq)
+  rend-placed q pq r-ab  = dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 0) (dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)))
+  rend-placed q pq r-av  = dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 1) (dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)))
+  rend-placed q pq r-ao  = dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 2) (dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)))
+  rend-placed q pq r-ae  = dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) last (dn (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)))
+  rend-placed q pq r-cb  = dn (q ⊕ [ ix 1 ]) (ix 0) (dn q (ix 1) pq)
 
   crow-placed : ∀ {J l e} → CRow J l e → Placed J l
   crow-placed (c-skp s)    = srow-placed s
@@ -253,45 +257,52 @@ module At {A : Set} (P : Pos) where
     ≼-⊕ : ∀ x {l} ys → x ≼ (x ⊕ (l ∷ ys))
     ≼-⊕ x {l} ys = ≺→≼ {x} {x ⊕ (l ∷ ys)} (≺-ext x ys)
 
-    P≼C : ∀ {l} ys → P ≼ (C₀ ⊕ (l ∷ ys))
-    P≼C {l} ys = ≼-trans {P} {C₀} {C₀ ⊕ (l ∷ ys)} (≼-⊕ P {ix 0} (ix 1 ∷ [])) (≼-⊕ C₀ {l} ys)
+  -- A label down.
+  d≼ : ∀ q l → P ≼ q → P ≼ (q ⊕ [ l ])
+  d≼ q l pq = ≼-trans {P} {q} {q ⊕ [ l ]} pq (≼-⊕ q {l} [])
+
+  P≼C : P ≼ C₀
+  P≼C = d≼ (P ⊕ [ ix 0 ]) (ix 1) (d≼ P (ix 0) (≼-refl {P}))
+
+  P≼c₀ : P ≼ c₀
+  P≼c₀ = d≼ (C₀ ⊕ [ ix 0 ]) (ix 1) (d≼ C₀ (ix 0) P≼C)
 
   module _ {J : List (Row A)} (aft : ∀ {y e} → (y , e) ∈ J → P ≼ y) where
 
     srow-after : ∀ {q e} → SRow J q e → P ≼ q
-    srow-after mv₀        = ≼-⊕ P {ix 0} (ix 0 ∷ [])
-    srow-after mv₁        = ≼-⊕ P {ix 1} (ix 0 ∷ [])
-    srow-after cv₀        = P≼C {ix 0} (ix 0 ∷ [])
-    srow-after cv₁        = P≼C {ix 1} (ix 0 ∷ [])
-    srow-after tk         = ≼-⊕ P {ix 1} (ix 1 ∷ ix 0 ∷ [])
-    srow-after tke        = ≼-⊕ P {ix 1} (ix 1 ∷ last ∷ [])
-    srow-after ce         = P≼C {last} []
+    srow-after mv₀        = d≼ (P ⊕ [ ix 0 ]) (ix 0) (d≼ P (ix 0) (≼-refl {P}))
+    srow-after mv₁        = d≼ (P ⊕ [ ix 1 ]) (ix 0) (d≼ P (ix 1) (≼-refl {P}))
+    srow-after cv₀        = d≼ (C₀ ⊕ [ ix 0 ]) (ix 0) (d≼ C₀ (ix 0) P≼C)
+    srow-after cv₁        = d≼ (C₀ ⊕ [ ix 1 ]) (ix 0) (d≼ C₀ (ix 1) P≼C)
+    srow-after tk         = d≼ (P ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (ix 0) (d≼ (P ⊕ [ ix 1 ]) (ix 1) (d≼ P (ix 1) (≼-refl {P})))
+    srow-after tke        = d≼ (P ⊕ [ ix 1 ] ⊕ [ ix 1 ]) last (d≼ (P ⊕ [ ix 1 ]) (ix 1) (d≼ P (ix 1) (≼-refl {P})))
+    srow-after ce         = d≼ C₀ last P≼C
     srow-after (cval x _) = aft x
     srow-after (cskp x)   = aft x
     srow-after (se-c x _) = aft x
-    srow-after (se-d _ _) = P≼C {ix 1} (ix 1 ∷ ix 0 ∷ [])
-    srow-after (se-k _ _) = P≼C {ix 1} (ix 1 ∷ last ∷ [])
-    srow-after (se-e _ _) = ≼-⊕ P {last} []
-    srow-after (ae-h {c = c} x _) = ≼-trans {P} {c} {c ⊕ [ ix 0 ]} (aft x) (≼-⊕ c {ix 0} [])
-    srow-after (ae-d {c = c} x _) = ≼-trans {P} {c} {c ⊕ (ix 1 ∷ ix 0 ∷ [])} (aft x) (≼-⊕ c {ix 1} (ix 0 ∷ []))
-    srow-after (ae-e {c = c} x _) = ≼-trans {P} {c} {c ⊕ (ix 1 ∷ last ∷ [])} (aft x) (≼-⊕ c {ix 1} (last ∷ []))
-    srow-after (me-p _)   = ≼-⊕ P {last} []
+    srow-after (se-d _ _) = d≼ (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (ix 0) (d≼ (C₀ ⊕ [ ix 1 ]) (ix 1) (d≼ C₀ (ix 1) P≼C))
+    srow-after (se-k _ _) = d≼ (C₀ ⊕ [ ix 1 ] ⊕ [ ix 1 ]) last (d≼ (C₀ ⊕ [ ix 1 ]) (ix 1) (d≼ C₀ (ix 1) P≼C))
+    srow-after (se-e _ _) = d≼ P last (≼-refl {P})
+    srow-after (ae-h {c = c} x _) = d≼ c (ix 0) (aft x)
+    srow-after (ae-d {c = c} x _) = d≼ (c ⊕ [ ix 1 ]) (ix 0) (d≼ c (ix 1) (aft x))
+    srow-after (ae-e {c = c} x _) = d≼ (c ⊕ [ ix 1 ]) last (d≼ c (ix 1) (aft x))
+    srow-after (me-p _)   = d≼ P last (≼-refl {P})
 
     rend-after : ∀ {q x k e} → P ≼ q → Rend q x k e → P ≼ k
-    rend-after {q = q} pq r-end = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ last ∷ [])} pq (≼-⊕ q {ix 1} (last ∷ []))
-    rend-after {q = q} pq r-sv  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ []))
-    rend-after {q = q} pq r-mn  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ ix 0 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ ix 0 ∷ []))
-    rend-after {q = q} pq r-mv  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 1 ∷ [])} pq (≼-⊕ q {ix 1} (ix 1 ∷ []))
-    rend-after {q = q} pq r-mc  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 1 ∷ [])} pq (≼-⊕ q {ix 1} (ix 1 ∷ []))
-    rend-after {q = q} pq r-ab  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
-    rend-after {q = q} pq r-av  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
-    rend-after {q = q} pq r-ao  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
-    rend-after {q = q} pq r-ae  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ ix 1 ∷ last ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ ix 1 ∷ last ∷ []))
-    rend-after {q = q} pq r-cb  = ≼-trans {P} {q} {q ⊕ (ix 1 ∷ ix 0 ∷ [])} pq (≼-⊕ q {ix 1} (ix 0 ∷ []))
+    rend-after {q = q} pq r-end = d≼ (q ⊕ [ ix 1 ]) last (d≼ q (ix 1) pq)
+    rend-after {q = q} pq r-sv  = d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)
+    rend-after {q = q} pq r-mn  = d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 0) (d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq))
+    rend-after {q = q} pq r-mv  = d≼ (q ⊕ [ ix 1 ]) (ix 1) (d≼ q (ix 1) pq)
+    rend-after {q = q} pq r-mc  = d≼ (q ⊕ [ ix 1 ]) (ix 1) (d≼ q (ix 1) pq)
+    rend-after {q = q} pq r-ab  = d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 0) (d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)))
+    rend-after {q = q} pq r-av  = d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 1) (d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)))
+    rend-after {q = q} pq r-ao  = d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) (ix 2) (d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)))
+    rend-after {q = q} pq r-ae  = d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]) last (d≼ (q ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (ix 1) (d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)))
+    rend-after {q = q} pq r-cb  = d≼ (q ⊕ [ ix 1 ]) (ix 0) (d≼ q (ix 1) pq)
 
     crow-after : ∀ {l e} → CRow J l e → P ≼ l
     crow-after (c-skp s)    = srow-after s
     crow-after (c-end s)    = srow-after s
-    crow-after (c-val {q = q} s) = ≼-trans {P} {q} {q ⊕ [ ix 0 ]} (srow-after s) (≼-⊕ q {ix 0} [])
+    crow-after (c-val {q = q} s) = d≼ q (ix 0) (srow-after s)
     crow-after (c-lane s r _) = rend-after (srow-after s) r
     crow-after (c-lend {q = q} {x = x} s) = rend-after {q = q} {x = x} (srow-after s) r-end
