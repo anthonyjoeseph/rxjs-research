@@ -2,9 +2,9 @@
 
 -- THE FLATMAP'S CORE (`flat-core`): the plain flatMap's record against
 -- its elaboration's innermost layer, the lanes' flatMap (`core`).  The
--- plain side stays the flatMap's own table; `simultaneous.TableLayers`
--- carries the elaborated side out through the combined scan, the closer
--- and the share.
+-- plain side is the flatMap's own table without its source's pins
+-- (`Pd`); `simultaneous.TableLayers` carries the elaborated side out
+-- through the combined scan, the closer and the share, where they return.
 --
 -- The source is related once, at the share's subscription, in the
 -- environment the share's trigger extends; its hot is the shared table
@@ -19,7 +19,7 @@
 -- merge queues a lane under an earlier lane's end, a run-dependent row.
 module simultaneous.TableFlat where
 
-open import Data.Bool using (Bool; true; false; T; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; if_then_else_; not)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
@@ -39,7 +39,7 @@ open import Relation.Nullary using (does; yes; no)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; out; end; pin; _≼_; _≺_)
+open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (AgreeTo; ≼-refl; ≼-trans; ≺→≼; ≺-ext)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (any⁻)
@@ -47,7 +47,7 @@ open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; aft
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got; got-bind; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l;
   linked-r; linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
@@ -65,6 +65,44 @@ any-≟ : ∀ {xs k} → anyᵇ (λ k′ → does (k′ ≟ᵖ k)) xs ≡ true �
 any-≟ {k = k} h with any⁻ h
 ... | k′ , k′∈ , hk with ≟-true k′ k hk
 ...   | refl = k′∈
+
+-- A row kept unless it is a pin at one of some positions.
+keepRow : ∀ {X : Set} → List Pos → Row X → Bool
+keepRow ks (k , pin _) = not (anyᵇ (λ k′ → does (k′ ≟ᵖ k)) ks)
+keepRow ks _           = true
+
+keep-un : ∀ {X : Set} ks {k} {e : Ev X} → Unpinned e → keepRow ks (k , e) ≡ true
+keep-un ks {e = out _} _ = refl
+keep-un ks {e = skip}  _ = refl
+keep-un ks {e = end}   _ = refl
+keep-un ks {e = pin _} ()
+
+filt-sub : ∀ {X : Set} (g : X → Bool) (rs : List X) {x} → x ∈ L.filterᵇ g rs → x ∈ rs
+filt-sub g (r ∷ rs) m with g r | m
+... | true  | here eq  = here eq
+... | true  | there m′ = there (filt-sub g rs m′)
+... | false | m′       = there (filt-sub g rs m′)
+
+filt-keep : ∀ {X : Set} (g : X → Bool) (rs : List X) {x} → x ∈ rs → g x ≡ true → x ∈ L.filterᵇ g rs
+filt-keep g (r ∷ rs) (here refl) gx rewrite gx = here refl
+filt-keep g (r ∷ rs) (there m) gx with g r
+... | true  = there (filt-keep g rs m gx)
+... | false = filt-keep g rs m gx
+
+-- The pins' positions among some rows.
+pinKeys : ∀ {X : Set} → List (Row X) → List Pos
+pinKeys = L.concatMap λ { (k , pin _) → [ k ] ; _ → [] }
+
+-- A table without its pins at some positions.
+unpinAt : ∀ {X : Set} → List Pos → Tb.Listed X → Tb.Listed X
+unpinAt ks Lx = L.filterᵇ (keepRow ks) (rows Lx) Tb.⊣ Tb.short Lx
+
+unpin-sub : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k e} → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k e → TR m k e
+unpin-sub ks (just Lx) (_ , refl , r) = Lx , refl , filt-sub (keepRow ks) (rows Lx) r
+unpin-sub ks nothing   (_ , () , _)
+
+unpin-keep : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k e} → TR m k e → Unpinned e → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k e
+unpin-keep ks (just Lx) (_ , refl , r) u = unpinAt ks Lx , refl , filt-keep (keepRow ks) (rows Lx) r (keep-un ks u)
 
 in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
 in-if true  Q t e = t refl
@@ -197,10 +235,40 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   P : FlatOp → ℕ → _
   P op = Tab n (flatMap op f s) ρ p
 
+  -- THE SOURCE'S PINS are not the lanes' flatMap's to show: it reads the
+  -- source off a hot, which shows a pin as a skip.  The share shows them,
+  -- so the layers inside it relate the plain flatMap without them.
+  srcPins : ℕ → List Pos
+  srcPins N = M.maybe (λ Lo → pinKeys (rows Lo)) [] (Tab n s ρ p N)
+
+  Pd : FlatOp → ℕ → Maybe (Tb.Listed B)
+  Pd op N = Tb.bind (P op N) λ Lp → just (unpinAt (srcPins N) Lp)
+
+  pd-sub : ∀ {op N k e} → TR (Pd op N) k e → TR (P op N) k e
+  pd-sub {op} {N} = unpin-sub (srcPins N) (P op N)
+
+  pd-keep : ∀ {op N k e} → TR (P op N) k e → Unpinned e → TR (Pd op N) k e
+  pd-keep {op} {N} = unpin-keep (srcPins N) (P op N)
+
+  pd-got : ∀ op N → Got (Pd op N)
+  pd-got op N = got-bind (unpinAt (srcPins N)) (got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p)
+
+  pd-pin-in : ∀ {op N l r} → TR (Pd op N) l (pin r) → T (inside r l)
+  pd-pin-in {op} {N} x = pin-ok (3 + N) n (flatMap op f s) {ρ N} p (pd-sub {op} {N} x)
+
+  pd-after : ∀ {op N k e} → TR (Pd op N) k e → p ≼ k
+  pd-after {op} {N} x = after-ok (3 + N) n (flatMap op f s) {ρ N} p (pd-sub {op} {N} x)
+
+  postulate
+    -- Two cuts agreeing up to a row agree on which pins below it are the
+    -- source's: a row of either is the source's or a lane's, and no lane
+    -- row sits where a source row does.
+    pd-agree : ∀ {op N N′ k} → AgreeTo k (TR (P op N)) (TR (P op N′)) → AgreeTo k (TR (Pd op N)) (TR (Pd op N′))
+
   -- The lanes' flatMap related to the plain flatMap.
   Core : FlatOp → Set₁
   Core op = Src → Lanes → Aligned (maps env) ρ p p* → Linked p p*
-          → Rel (P op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁
+          → Rel (Pd op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁
 
   ----------------------------------------------------------------------
   -- The layers
@@ -441,7 +509,8 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
 
     -- THE MERGES' MAP, given each cut's lanes.  A lane row is imaged
-    -- through its lane's record at the cut, the skip a queue leaves past a
+    -- through its lane's record at the cut, a lane's put also where
+    -- `laneˢ`'s share shows the lane's row, so its pins; the skip a queue leaves past a
     -- lane's end at its end image's; a value's marker at the marker of its
     -- elaborated value; the source's end at the later of its own and the
     -- trigger's, as the share ends; any other source row through the
@@ -459,7 +528,8 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       Put′ : ℕ → Pos → Pos → Set
       Put′ N y l with holder (lanes N) y
-      ... | just R  = Σ Pos λ l′ → Rel.Put (Out.rel (LaneRec.lane R)) N y l′ × l ≡ emitAt (l′ ⊕ [ sub (readerR (LaneRec.stE R)) ])
+      ... | just R  = Σ Pos λ l′ → Rel.Put (Out.rel (LaneRec.lane R)) N y l′
+                        × (l ≡ emitAt (l′ ⊕ [ sub (readerR (LaneRec.stE R)) ]) ⊎ l ≡ l′ ⊕ [ ix 0 ])
       ... | nothing = (Σ Pos λ l′ → Rel.Put (Out.rel Os) N y l′ × l ≡ l′ ⊕ [ sub c₁ ]) ⊎ ((Σ _ λ e → TR (P op N) y e) × l ≡ φ′ N y)
 
       -- Few rows put on one image: a lane's put through its lane's, a
@@ -468,13 +538,18 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       pb-few′ N l = ks , λ {k} → go k
         where
           lk : LaneRec N → List Pos
-          lk R = proj₁ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l))
+          lk R = proj₁ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l)) ++ proj₁ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (up l))
           ks = L.concatMap lk (lanes N) ++ proj₁ (Rel.pb-few (Out.rel Os) N (up l)) ++ keys (P op N)
           go : ∀ k → Put′ N k l → k ∈ ks
           go k pt with holder (lanes N) k in eh
-          go k (l′ , pu , e) | just R =
-            ∈-++⁺ˡ (∈-concatMap⁺ lk (any-map (λ { refl → proj₂ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l))
-                                                          (subst (Rel.Put (Out.rel (LaneRec.lane R)) N k) (sym (trans (cong (ups 5) e) (emit-ups l′ _))) pu) })
+          go k (l′ , pu , inj₁ e) | just R =
+            ∈-++⁺ˡ (∈-concatMap⁺ lk (any-map (λ { refl → ∈-++⁺ˡ (proj₂ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l))
+                                                          (subst (Rel.Put (Out.rel (LaneRec.lane R)) N k) (sym (trans (cong (ups 5) e) (emit-ups l′ _))) pu)) })
+                                               (lastWith-∈ _ (lanes N) eh)))
+          go k (l′ , pu , inj₂ e) | just R =
+            ∈-++⁺ˡ (∈-concatMap⁺ lk (any-map (λ { refl → ∈-++⁺ʳ (proj₁ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (ups 5 l)))
+                                                          (proj₂ (Rel.pb-few (Out.rel (LaneRec.lane R)) N (up l))
+                                                            (subst (Rel.Put (Out.rel (LaneRec.lane R)) N k) (sym (trans (cong up e) (up-⊕ l′ _))) pu)) })
                                                (lastWith-∈ _ (lanes N) eh)))
           go k (inj₁ (l′ , pu , e)) | nothing =
             ∈-++⁺ʳ (L.concatMap lk (lanes N)) (∈-++⁺ˡ (proj₂ (Rel.pb-few (Out.rel Os) N (up l)) (subst (Rel.Put (Out.rel Os) N k) (sym (trans (cong up e) (up-⊕ l′ _))) pu)))
@@ -495,7 +570,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- lane row shown.
     module MergeTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
       P′ Q′ : ℕ → _
-      P′ = P (mergeᶠ nothing)
+      P′ = Pd (mergeᶠ nothing)
       Q′ = λ N → listC (3 + N) n (core (mergeᶠ nothing)) (ρ*c N) c₁
 
       open Tabs (mergeᶠ nothing) (λ N → L.map (valRec N) (valsAt N))
@@ -529,13 +604,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
 
       mg-got : ∀ N → Got (P′ N)
-      mg-got N = got-ok (3 + N) n (flatMap (mergeᶠ nothing) f s) {ρ N} (uρ N) p
+      mg-got N = pd-got (mergeᶠ nothing) N
 
       mg-pin-in : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
-      mg-pin-in {N} = pin-ok (3 + N) n (flatMap (mergeᶠ nothing) f s) {ρ N} p
+      mg-pin-in {N} = pd-pin-in {mergeᶠ nothing} {N}
 
       mg-after : ∀ {N k e} → TR (P′ N) k e → p ≼ k
-      mg-after {N} = after-ok (3 + N) n (flatMap (mergeᶠ nothing) f s) {ρ N} p
+      mg-after {N} = pd-after {mergeᶠ nothing} {N}
 
       mg-got* : ∀ N → Got (Q′ N)
       mg-got* N = got-ok (3 + N) n (core (mergeᶠ nothing)) {ρ*c N} (uρ*c N) c₁
@@ -567,7 +642,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- waited on, at its end.
     module ConcatTab (k : ℕ) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
       P′ Q′ : ℕ → _
-      P′ = P (mergeᶠ (just k))
+      P′ = Pd (mergeᶠ (just k))
       Q′ = λ N → listC (3 + N) n (core (mergeᶠ (just k))) (ρ*c N) c₁
 
       -- The listing's entries at a cut: each value with its subscriptions.
@@ -620,13 +695,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
 
       cc-got : ∀ N → Got (P′ N)
-      cc-got N = got-ok (3 + N) n (flatMap (mergeᶠ (just k)) f s) {ρ N} (uρ N) p
+      cc-got N = pd-got (mergeᶠ (just k)) N
 
       cc-pin-in : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
-      cc-pin-in {N} = pin-ok (3 + N) n (flatMap (mergeᶠ (just k)) f s) {ρ N} p
+      cc-pin-in {N} = pd-pin-in {mergeᶠ (just k)} {N}
 
       cc-after : ∀ {N k e} → TR (P′ N) k e → p ≼ k
-      cc-after {N} = after-ok (3 + N) n (flatMap (mergeᶠ (just k)) f s) {ρ N} p
+      cc-after {N} = pd-after {mergeᶠ (just k)} {N}
 
       cc-got* : ∀ N → Got (Q′ N)
       cc-got* N = got-ok (3 + N) n (core (mergeᶠ (just k))) {ρ*c N} (uρ*c N) c₁
@@ -654,7 +729,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- shown only before the next value's row; the map is the merge's.
     module SwitchTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
       P′ Q′ : ℕ → _
-      P′ = P (switchᶠ)
+      P′ = Pd (switchᶠ)
       Q′ = λ N → listC (3 + N) n (core (switchᶠ)) (ρ*c N) c₁
 
       open Tabs switchᶠ (λ N → L.map (valRec N) (valsAt N))
@@ -688,13 +763,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
 
       sw-got : ∀ N → Got (P′ N)
-      sw-got N = got-ok (3 + N) n (flatMap switchᶠ f s) {ρ N} (uρ N) p
+      sw-got N = pd-got (switchᶠ) N
 
       sw-pin-in : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
-      sw-pin-in {N} = pin-ok (3 + N) n (flatMap switchᶠ f s) {ρ N} p
+      sw-pin-in {N} = pd-pin-in {switchᶠ} {N}
 
       sw-after : ∀ {N k e} → TR (P′ N) k e → p ≼ k
-      sw-after {N} = after-ok (3 + N) n (flatMap switchᶠ f s) {ρ N} p
+      sw-after {N} = pd-after {switchᶠ} {N}
 
       sw-got* : ∀ N → Got (Q′ N)
       sw-got* N = got-ok (3 + N) n (core switchᶠ) {ρ*c N} (uρ*c N) c₁
@@ -722,7 +797,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- its value's row; the map is the merge's over those lanes.
     module ExhaustTab (al : Aligned (maps env) ρ p p*) (lk : Linked p p*) where
       P′ Q′ : ℕ → _
-      P′ = P (exhaustᶠ)
+      P′ = Pd (exhaustᶠ)
       Q′ = λ N → listC (3 + N) n (core (exhaustᶠ)) (ρ*c N) c₁
 
       -- The values whose lane the plain exhaust runs.
@@ -764,13 +839,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                        → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
 
       ex-got : ∀ N → Got (P′ N)
-      ex-got N = got-ok (3 + N) n (flatMap exhaustᶠ f s) {ρ N} (uρ N) p
+      ex-got N = pd-got (exhaustᶠ) N
 
       ex-pin-in : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
-      ex-pin-in {N} = pin-ok (3 + N) n (flatMap exhaustᶠ f s) {ρ N} p
+      ex-pin-in {N} = pd-pin-in {exhaustᶠ} {N}
 
       ex-after : ∀ {N k e} → TR (P′ N) k e → p ≼ k
-      ex-after {N} = after-ok (3 + N) n (flatMap exhaustᶠ f s) {ρ N} p
+      ex-after {N} = pd-after {exhaustᶠ} {N}
 
       ex-got* : ∀ N → Got (Q′ N)
       ex-got* N = got-ok (3 + N) n (core exhaustᶠ) {ρ*c N} (uρ*c N) c₁

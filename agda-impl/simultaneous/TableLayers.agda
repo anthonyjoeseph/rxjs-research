@@ -18,6 +18,7 @@ open import Data.List.Relation.Unary.Any using (here; there) renaming (map to an
 import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
 open import Tree using (Obs; FlatOp; flatMap)
@@ -31,8 +32,8 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableCorr using (Rel; TR; Corr; Cons; Got)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab*; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; _⊢_; EnvR; maps; env-wk; Full)
+open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
+  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; env-wk; Full)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -49,9 +50,9 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- lane branch and re-emitted by `each` as it is, the scan's other emits
   -- all marks; the flatMap's end at the `nothing` the scan's concat sends
   -- past the last of its three branches' ends.
-  module CombTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁) where
+  module CombTab (op : FlatOp) (R : Rel (Pd op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁) where
     P′ Q′ : ℕ → _
-    P′ = P op
+    P′ = Pd op
     Q′ = λ N → listC (3 + N) n (inner op) (ρ*c N) c₂
 
     -- The scan's three branches, under its concat's first lane: the
@@ -83,7 +84,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     φ′ N k = if endAt (P′ N) k then aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ []) else reEmit (Rel.φ R N k)
 
     Put′ : ℕ → Pos → Pos → Set
-    Put′ N k l = Σ Pos λ l′ → Rel.Put R N k l′ × l ≡ reEmit l′
+    Put′ N k l = Σ Pos λ l′ → Rel.Put R N k l′ × (l ≡ reEmit l′ ⊎ l ≡ l′ ⊕ [ ix 0 ])
 
     bk′ : ℕ → Pos → List Pos
     bk′ N l = Rel.bk R N (ups 3 l) ++ endsOf (P′ N)
@@ -114,11 +115,14 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     ups-re : ∀ l → ups 3 (reEmit l) ≡ l
     ups-re l = trans (cong (ups 2) (up-⊕ _ _)) (trans (cong (ups 1) (up-⊕ _ _)) (up-⊕ _ _))
 
-    -- A put's preimages are the lanes' flatMap's at the image re-emitted.
+    -- A put's preimages are the lanes' flatMap's at the image re-emitted,
+    -- or shown by the combined connect.
     cb-pb-few : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
-    cb-pb-few N l = proj₁ (Rel.pb-few R N (ups 3 l))
-                  , λ P → proj₂ (Rel.pb-few R N (ups 3 l))
-                            (subst (Rel.Put R N _) (trans (sym (ups-re (proj₁ P))) (cong (ups 3) (sym (proj₂ (proj₂ P))))) (proj₁ (proj₂ P)))
+    cb-pb-few N l = proj₁ (Rel.pb-few R N (ups 3 l)) ++ proj₁ (Rel.pb-few R N (up l)) , go
+      where
+        go : ∀ {k} → Put′ N k l → k ∈ proj₁ (Rel.pb-few R N (ups 3 l)) ++ proj₁ (Rel.pb-few R N (up l))
+        go (l′ , pt , inj₁ e) = ∈-++⁺ˡ (proj₂ (Rel.pb-few R N (ups 3 l)) (subst (Rel.Put R N _) (trans (sym (ups-re l′)) (cong (ups 3) (sym e))) pt))
+        go (l′ , pt , inj₂ e) = ∈-++⁺ʳ (proj₁ (Rel.pb-few R N (ups 3 l))) (proj₂ (Rel.pb-few R N (up l)) (subst (Rel.Put R N _) (sym (trans (cong up e) (up-⊕ l′ _))) pt))
 
     -- A value's preimage is listed at its re-emit, an end among the ends.
     cb-in-bk : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
@@ -163,9 +167,9 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- THE CLOSER: the combined run is the closer's connect's body, its rows
   -- shown as they are; the closer, that connect's source, shows only
   -- pins and skips.
-  module CloseTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂) where
+  module CloseTab (op : FlatOp) (R : Rel (Pd op) (λ N → listC (3 + N) n (inner op) (ρ*c N) c₂) p c₂) where
     P′ Q′ : ℕ → _
-    P′ = P op
+    P′ = Pd op
     Q′ = λ N → listC (3 + N) n (body op) (ρ*h N) c₃
 
     φ′ : ℕ → Pos → Pos
@@ -225,8 +229,10 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   ----------------------------------------------------------------------
   -- THE SHARE: the body is the share's two connects' body, its rows shown
-  -- as they are; the trigger's and the shared hot's are pins.
-  module ShareTab (op : FlatOp) (R : Rel (P op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃) where
+  -- as they are; the trigger's are pins, the shared run's are shown one
+  -- label down, so the source's pins return, the layers inside lacking
+  -- them.
+  module ShareTab (op : FlatOp) (Os : Src) (R : Rel (Pd op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃) where
     P′ Q′ : ℕ → _
     P′ = P op
     Q′ = Tab* n ρι (flatMap op f s) ρ* p*
@@ -234,8 +240,11 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     φ′ : ℕ → Pos → Pos
     φ′ = Rel.φ R
 
+    -- The body's puts, and a source's pin put where the share's connect
+    -- shows the source's row.
     Put′ : ℕ → Pos → Pos → Set
-    Put′ = Rel.Put R
+    Put′ N k l = Rel.Put R N k l
+               ⊎ (Σ Pos λ r → TR (Tab n s ρ p N) k (pin r)) × (Σ Pos λ l′ → Rel.Put (Out.rel Os) N k l′ × l ≡ l′ ⊕ [ ix 0 ])
 
     bk′ : ℕ → Pos → List Pos
     bk′ = Rel.bk R
@@ -244,6 +253,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       sr-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
       sr-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
                      → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      sr-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → Put′ N k l → Put′ N′ k l
       sr-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q′ N′)) (TR (Q′ N)) → Put′ N k l
       sr-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
@@ -254,12 +264,39 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       sr-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (sr-corr N) k
                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       sr-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+      sr-func        : ∀ {N y e e′} → TR (P′ N) y e → TR (P′ N) y e′ → e ≡ e′
       sr-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
+      sr-flat        : ∀ {N y e l ys e′} → TR (P′ N) y e → TR (P′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      sr-cons        : ∀ {N N′} → Cons (TR (P′ N)) (TR (P′ N′))
       sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
       sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                      → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+
+    -- A put's preimages are the body's, or the source's one label up.
+    sr-pb-few : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put′ N k l → k ∈ ks
+    sr-pb-few N l = proj₁ (Rel.pb-few R N l) ++ proj₁ (Rel.pb-few (Out.rel Os) N (up l)) , go
+      where
+        go : ∀ {k} → Put′ N k l → k ∈ proj₁ (Rel.pb-few R N l) ++ proj₁ (Rel.pb-few (Out.rel Os) N (up l))
+        go (inj₁ pt) = ∈-++⁺ˡ (proj₂ (Rel.pb-few R N l) pt)
+        go (inj₂ (_ , l′ , pt , e)) = ∈-++⁺ʳ (proj₁ (Rel.pb-few R N l))
+          (proj₂ (Rel.pb-few (Out.rel Os) N (up l)) (subst (Rel.Put (Out.rel Os) N _) (sym (trans (cong up e) (up-⊕ l′ _))) pt))
+
+    sr-φ-agree : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+    sr-φ-agree {N} {N′} x u ag = Rel.φ-agree R (pd-keep {op} {N} x u) u (pd-agree {op} {N} {N′} ag)
+
+    sr-in-bk : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
+    sr-in-bk {N} x u = Rel.in-bk R (pd-keep {op} {N} x u) u
+
+    sr-got : ∀ N → Got (P′ N)
+    sr-got N = got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p
+
+    sr-pin-in : ∀ {N l r} → TR (P′ N) l (pin r) → T (inside r l)
+    sr-pin-in {N} = pin-ok (3 + N) n (flatMap op f s) {ρ N} p
+
+    sr-after : ∀ {N k e} → TR (P′ N) k e → p ≼ k
+    sr-after {N} = after-ok (3 + N) n (flatMap op f s) {ρ N} p
 
     sr-got* : ∀ N → Got (Q′ N)
     sr-got* N = got-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} (uρ* N) p*
@@ -269,7 +306,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- The closer's images lie past the share, two labels up.
     sr-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
-    sr-after-φ {N} {k} x u = ≼-trans {p*} {c₃} {φ′ N k} (≼-ˡ p* (ix 0 ∷ ix 0 ∷ [])) (Rel.after-φ R x u)
+    sr-after-φ {N} {k} x u = ≼-trans {p*} {c₃} {φ′ N k} (≼-ˡ p* (ix 0 ∷ ix 0 ∷ [])) (Rel.after-φ R (pd-keep {op} {N} x u) u)
 
     sr-after* : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
     sr-after* {N} = after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
@@ -279,15 +316,15 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     rel′ : Rel P′ Q′ p p*
     rel′ = record
-      { φ = φ′ ; Put = Put′ ; corr = sr-corr ; φ-agree = Rel.φ-agree R ; bk = bk′ ; in-bk = Rel.in-bk R ; pb-few = Rel.pb-few R
-      ; back = sr-back ; put-up = Rel.put-up R ; back-put = sr-back-put
+      { φ = φ′ ; Put = Put′ ; corr = sr-corr ; φ-agree = sr-φ-agree ; bk = bk′ ; in-bk = sr-in-bk ; pb-few = sr-pb-few
+      ; back = sr-back ; put-up = sr-put-up ; back-put = sr-back-put
       ; elab-causal = sr-elab-causal ; stable← = sr-stable← ; stable-put = sr-stable-put ; stable-lead = sr-stable-lead
-      ; elab-all = sr-elab-all ; func = Rel.func R ; func* = sr-func* ; flat = Rel.flat R ; flat* = sr-flat*
-      ; pin-in = Rel.pin-in R ; pin-in* = sr-pin-in* ; cons = Rel.cons R ; cons* = sr-cons* ; got = Rel.got R ; got* = sr-got*
-      ; after = Rel.after R ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
+      ; elab-all = sr-elab-all ; func = sr-func ; func* = sr-func* ; flat = sr-flat ; flat* = sr-flat*
+      ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; cons = sr-cons ; cons* = sr-cons* ; got = sr-got ; got* = sr-got*
+      ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after* ; pin-stable = sr-pin-stable }
 
   flat-tab : ∀ op → Src → Lanes → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
-  flat-tab op Os Ls al lk = ShareTab.rel′ op (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls al lk)))
+  flat-tab op Os Ls al lk = ShareTab.rel′ op Os (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls al lk)))
 
   postulate
     -- THE FLATMAP'S ORDER FACTS: each row is a source row or a lane row

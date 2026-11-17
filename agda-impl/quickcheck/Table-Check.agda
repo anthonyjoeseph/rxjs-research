@@ -634,6 +634,24 @@ private
         ++ (if hasRow k c ∧ up ∧ pinsIn (pinsTo k pt) pc ∧ not (pinsIn (pinsTo l pt*) pc*) then fail kp (showℕ N′) k l else [])
 
 
+  -- A table without the pins at some rows: the source's, in a flatMap.
+  unpinL : ∀ {A} → List Pos → Maybe (Listed A) → Maybe (Listed A)
+  unpinL ks nothing  = nothing
+  unpinL {A} ks (just l) = just (concatMap keep (rows l) ⊣ short l)
+    where
+      keep : Row A → List (Row A)
+      keep (y , pin r) = if memᵖ y ks then [] else [ y , pin r ]
+      keep x           = [ x ]
+
+  -- A cut of the plain flatMap agreeing with the whole up to a row agrees
+  -- with it there once each drops its own source's pins (`pd-agree`).
+  pdAgree : ∀ {A} → ℕ → Maybe (Listed A) → Maybe (Listed A) → List Pos → List Pos → List (String × String)
+  pdAgree {A} N′ c t ks ks₀ = concatMap chk (maybe (λ l → rows l) [] t)
+    where
+      chk : Row A → List (String × String)
+      chk (k , _) = if sameRows (upToᵖ k c) (upToᵖ k t) ∧ not (sameRows (upToᵖ k (unpinL ks c)) (upToᵖ k (unpinL ks₀ t)))
+                    then fail "pd-agree" (showℕ N′) k k else []
+
   -- The back fact a cut-indexed `bk` needs: a cut whose elaborated table
   -- agrees with the whole up to a row's image agrees with the plain
   -- whole up to the row.
@@ -672,20 +690,21 @@ private
   coreBack (map _ s)         = coreBack s
   coreBack (scan _ _ s)      = coreBack s
   coreBack (takeWhile _ _ s) = coreBack s
-  coreBack {B} (flatMap {A = A} op f s) with listC N₀ n₀ (flatMap op f s) [] root | coreAt op f s N₀
-  ... | t | t* with plainV t | elabV {B} t*
+  coreBack {B} (flatMap {A = A} op f s) with listC N₀ n₀ (flatMap op f s) [] root | coreAt op f s N₀ | listC N₀ n₀ s [] root
+  ... | t | t* | so with plainV t | elabV {B} t*
   ...   | just ks | just ks* with pairing ks ks*
   ...     | just m = concatMap at relCuts , 0 , 0
     where
       at : ℕ → List (String × String)
-      at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′
-      ... | c | c* = backCausal "core-back" "core-causal" "core-pin-stable" N′ c t c* t* m (pinsOf c) (pinsOf t) (pinsOf c*) (pinsOf t*)
+      at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′ | listC N′ n₀ s [] root
+      ... | c | c* | sc = backCausal "core-back" "core-causal" "core-pin-stable" N′ c t c* t* m (pinsOf c) (pinsOf t) (pinsOf c*) (pinsOf t*)
+                          ++ pdAgree N′ c t (mapL proj₁ (pinsOf sc)) (mapL proj₁ (pinsOf so))
   ...     | nothing = none
-  coreBack (flatMap op f s) | t | t* | _ | _ = none
+  coreBack (flatMap op f s) | t | t* | _ | _ | _ = none
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ "core-pin-src" ∷ "core-pin-lane" ∷ "whole-pin-src" ∷ "whole-pin-lane" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ "core-skip" ∷ "core-place" ∷ "core-pin-src" ∷ "core-pin-lane" ∷ "whole-pin-src" ∷ "whole-pin-lane" ∷ "pd-agree" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
