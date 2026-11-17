@@ -352,14 +352,12 @@ mutual
       emitAt : Pos → Pos
       emitAt r = r ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
 
-      -- The deepest lane holding `k`: a queued lane is subscribed under
-      -- the end of the lane it waited on, so inside it too, and listed
-      -- after it.
+      -- The lane whose map holds `k`: a lane's row need not lie under its
+      -- subscription, read off a hot or in a cascade its timer made.
       laneOf : Pos → List (Pos × Pos × Maybe (List (Pos × Pos)) × Res) → Maybe (Pos × List (Pos × Pos))
       laneOf k [] = nothing
-      laneOf k ((st , st* , just m , _) ∷ ws) with laneOf k ws
-      ... | just r  = just r
-      ... | nothing = if inside st k then just (st* , m) else nothing
+      laneOf k ((st , st* , just m , _) ∷ ws) =
+        if anyᵇ (λ { (a , _) → does (a ≟ᵖ k) }) m then just (st* , m) else laneOf k ws
       laneOf k (_ ∷ ws) = laneOf k ws
 
       srcMap : List (Pos × Pos)
@@ -377,9 +375,7 @@ mutual
       ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
       ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
 
-      -- The flatMap's end: the latest of its source's end's image and the
-      -- end images of the lanes it waits on, those whose ends its table
-      -- keeps.
+      -- The ends of the lanes whose ends the flatMap's table keeps.
       endsM : ∀ {X} → Maybe (Listed X) → List Pos
       endsM nothing  = []
       endsM (just l) = ends (rows l)
@@ -390,16 +386,7 @@ mutual
                                  (concatMap (λ { (a , st , _) → endsM (listC N n (f a) ρ st) }) ls)
       ... | _ | _ = []
 
-      srcEnd : List Pos → Pos
-      srcEnd (k ∷ _) = formula (k , vend)
-      srcEnd []      = root
 
-      flatEnd : Pos
-      flatEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (srcEnd (endsM o)) (mapL (λ e → formula (e , vend)) laneEnds)
-
-      coreImg : Pos × Vis → Pos
-      coreImg (k , vout) = formula (k , vout)
-      coreImg (k , vend) = flatEnd
 
       -- A kept lane's end against every value the flatMap shows and the
       -- source's end: the end image keeps the plain order.
@@ -445,7 +432,7 @@ mutual
       ... | just ks | just ks* with pairing ks ks*
       ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
       ...   | just m  = endOrd ++ checks (nm +++ "/core") p c₁ [] m
-                       ++ concatMap (λ { (k , k*) → let w = coreImg (k , kindOf k) in if does (w ≟ᵖ k*) then []
+                       ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
                                     else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
         where
           kindOf : Pos → Vis
@@ -468,7 +455,7 @@ mutual
       aEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
                (readEnd (rB 0) (ends (rows sh-tab)) ++ readEnd (rB 1) (ends (rows core-hot)) ++ readEnd (rB 2) (ends (rows cl-tab)))
       whole : Pos × Vis → Pos
-      whole (k , vout) = coreImg (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+      whole (k , vout) = formula (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
       whole (k , vend) = aEnd ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ last ]
 
       wholeRes : Res
