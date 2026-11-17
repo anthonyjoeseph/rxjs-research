@@ -524,15 +524,29 @@ private
   hasRow q nothing  = false
   hasRow q (just l) = anyᵇ (λ { (r , _) → does (r ≟ᵖ q) }) (rows l)
 
-  -- Both ways at once: up to an image settles the row (`back`), and a
-  -- cut holding a row and agreeing up to it agrees up to its image
-  -- (`elab-causal`).
-  backCausal : ∀ {A A*} → String → String → ℕ → Maybe (Listed A) → Maybe (Listed A) → Maybe (Listed A*) → Maybe (Listed A*)
+  -- A table's pins whose connect lies at or before `q`.
+  pinsTo : ∀ {A} → Pos → Maybe (Listed A) → List (Pos × Pos)
+  pinsTo q nothing  = []
+  pinsTo q (just l) = concatMap (λ { (y , pin r) → when ((r <ᵖ q) ∨ does (r ≟ᵖ q)) (y , r) ; _ → [] }) (rows l)
+
+  -- Each pin held by a table.
+  pinsIn : ∀ {A} → List (Pos × Pos) → Maybe (Listed A) → Bool
+  pinsIn [] _ = true
+  pinsIn ((y , r) ∷ ps) m = anyᵇ (λ { (y′ , r′) → does (y ≟ᵖ y′) ∧ does (r ≟ᵖ r′) }) (pinsTo r m) ∧ pinsIn ps m
+
+  -- Three ways at once: up to an image settles the row (`back`); a cut
+  -- holding a row and agreeing up to it agrees up to its image
+  -- (`elab-causal`); and one holding besides the whole's pins whose
+  -- connect lies at or before the row holds the whole's elaborated pins
+  -- whose connect lies at or before its image (`pin-stable`).
+  backCausal : ∀ {A A*} → String → String → String → ℕ → Maybe (Listed A) → Maybe (Listed A) → Maybe (Listed A*) → Maybe (Listed A*)
              → List (Pos × Pos) → List (String × String)
-  backCausal kb kc N′ c t c* t* = concatMap (λ { (k , l) →
+  backCausal kb kc kp N′ c t c* t* = concatMap (λ { (k , l) →
       let up* = sameRows (upToᵖ l c*) (upToᵖ l t*) ; up = sameRows (upToᵖ k c) (upToᵖ k t) in
       (if up* ∧ not up then fail kb (showℕ N′) k l else [])
-      ++ (if hasRow k c ∧ up ∧ not up* then fail kc (showℕ N′) k l else []) })
+      ++ (if hasRow k c ∧ up ∧ not up* then fail kc (showℕ N′) k l else [])
+      ++ (if hasRow k c ∧ up ∧ pinsIn (pinsTo k t) c ∧ not (pinsIn (pinsTo l t*) c*) then fail kp (showℕ N′) k l else []) })
+
 
   -- The back fact a cut-indexed `bk` needs: a cut whose elaborated table
   -- agrees with the whole up to a row's image agrees with the plain
@@ -546,7 +560,7 @@ private
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ o [] root | listC N′ n₀ (elab (λ i → i) o) [] root*
-      ... | c | c* = backCausal "back" "causal" N′ c t c* t* m
+      ... | c | c* = backCausal "back" "causal" "pin-stable" N′ c t c* t* m
   ...       | nothing = none
   backRes seed | o | t | t* | _ | _ = none
 
@@ -579,13 +593,13 @@ private
     where
       at : ℕ → List (String × String)
       at N′ with listC N′ n₀ (flatMap op f s) [] root | coreAt op f s N′
-      ... | c | c* = backCausal "core-back" "core-causal" N′ c t c* t* m
+      ... | c | c* = backCausal "core-back" "core-causal" "core-pin-stable" N′ c t c* t* m
   ...     | nothing = none
   coreBack (flatMap op f s) | t | t* | _ | _ = none
   coreBack _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "whole" ∷ "core-back" ∷ "core-causal" ∷ "causal" ∷ "end-order" ∷ "lane-start" ∷ "lane-sub" ∷ "back" ∷ "pin-stable" ∷ "core-pin-stable" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
