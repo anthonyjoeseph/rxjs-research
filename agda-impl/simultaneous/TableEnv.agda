@@ -36,7 +36,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _⊕_; frame; cascade)
+open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
@@ -67,6 +67,15 @@ Tab n o ρ p N = listC (3 + N) n o (ρ N) p
 
 Tab* : ∀ {Γ Δ A} → ℕ → Ren Γ Δ → Obs Timeline Γ A → (ℕ → All Tb.Listed Δ) → Pos → ℕ → Maybe (Tb.Listed (IE A))
 Tab* n ρι o ρ* p N = listC (3 + N) n (elab ρι o) (ρ* N) p
+
+-- One label up.
+up : Pos → Pos
+up (i ∙ ys) = i ∙ dropLast ys
+  where
+    dropLast : List Label → List Label
+    dropLast []           = []
+    dropLast (_ ∷ [])     = []
+    dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
 
 -- A path walked one label at a time, as the listing walks it.
 infixl 5 _⊕ˡ_
@@ -114,22 +123,22 @@ private
   ... | inj₁ u   = ⊥-elim (nv u)
   ... | inj₂ lt′ = lt′
 
-  up : ∀ v l {y} → (v ⊕ [ l ]) ⊑ y → v ⊑ y
-  up v l (zs , refl) = l ∷ zs , ⊕-assoc v [ l ] zs
+  up⊑ : ∀ v l {y} → (v ⊕ [ l ]) ⊑ y → v ⊑ y
+  up⊑ v l (zs , refl) = l ∷ zs , ⊕-assoc v [ l ] zs
 
 lvl-l : ∀ {q q* y y*} → Lvl q q* y y* → ∀ l → Lvl (q ⊕ [ l ]) q* y y*
 lvl-l {q} {q*} {y} {y*} (lt , ie , nq , nq*) l =
   mk⇔ (λ h → Equivalence.to lt (≺-trans {q} {q ⊕ [ l ]} {y} (≺-ext q []) h))
       (λ h → down q l (Equivalence.from lt h) nq)
   , subst₂ (λ a b → instantOf y ≡ a ⇔ instantOf y* ≡ b) (sym (inst-⊕ q [ l ])) refl ie
-  , (λ u → nq (up q l u)) , nq*
+  , (λ u → nq (up⊑ q l u)) , nq*
 
 lvl-r : ∀ {q q* y y*} → Lvl q q* y y* → ∀ l* → Lvl q (q* ⊕ [ l* ]) y y*
 lvl-r {q} {q*} {y} {y*} (lt , ie , nq , nq*) l* =
   mk⇔ (λ h → down q* l* (Equivalence.to lt h) nq*)
       (λ h → Equivalence.from lt (≺-trans {q*} {q* ⊕ [ l* ]} {y*} (≺-ext q* []) h))
   , subst₂ (λ a b → instantOf y ≡ a ⇔ instantOf y* ≡ b) refl (sym (inst-⊕ q* [ l* ])) ie
-  , nq , (λ u → nq* (up q* l* u))
+  , nq , (λ u → nq* (up⊑ q* l* u))
 
 cut-l : ∀ {q q* y y*} → Cut q q* y y* → ∀ l → Cut (q ⊕ [ l ]) q* y y*
 cut-l (at-frame v a b)   l = at-frame (lvl-l v l) a b

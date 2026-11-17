@@ -272,12 +272,16 @@ mutual
       reader* = p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
       ψ : Pos → Pos
       ψ k = phi m k ⊕ [ sub reader* ]
+      -- The annotated hot lists each source value at `ψ`, rejoined under
+      -- the annotation's reader, and the source's end as the `nothing`
+      -- the concat's second lane sends past it.
+      annAt : Pos × Vis → Pos
+      annAt (y , vout) = ψ y
+      annAt (y , vend) = ψ y ⊕ [ ix 1 ] ⊕ [ ix 0 ]
       hot-image : Res
-      -- The annotated hot lists each source row at its image; a reader
-      -- rejoins it under its own subscription (`ψ`).
-      hot-image = concatMap (λ { (y , _) → if memᵖ (phi m y) (annRows σ*) then []
-                    else [ "hot-image" , nm +++ " " +++ showPos y +++ " ~ " +++ showPos (phi m y) +++ " among "
-                                          +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ] }) (hotV σ) , 0 , 0
+      hot-image = concatMap (λ yv → if memᵖ (annAt yv) (annRows σ*) then []
+                    else [ "hot-image" , nm +++ " " +++ showPos (proj₁ yv) +++ " ~ " +++ showPos (annAt yv) +++ " among "
+                                          +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ]) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
     proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (startRes , 0 , 0)))
     where
@@ -358,11 +362,12 @@ mutual
       ... | just m  = m
 
       formula : Pos × Vis → Pos
-      -- The source's end is the shared flatMap's own, read through the
-      -- share's reader.
+      -- The source's end is the shared flatMap's: the later of its own
+      -- lane's end and its trigger's, read through the share's reader.
       formula (k , v) with laneOf k walked | v
       ... | nothing | vout = phi srcMap k ⊕ [ sub c₁ ]
-      ... | nothing | vend = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ sub c₁ ]
+      ... | nothing | vend = (if phi srcMap k <ᵖ ttEnd then ttEnd else phi srcMap k) ⊕ [ sub c₁ ]
+        where ttEnd = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
       ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
       ... | just (st* , m) | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
 

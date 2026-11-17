@@ -36,7 +36,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; ix; sub; inside; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _⊕_)
 open import denotation.Events using (Timeline; From; fresh)
 open import denotation.EmissionSet using (Unpinned; pin; _≼_)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
@@ -51,7 +51,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; Tab; Tab*; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
+  using (Ren; Tab; Tab*; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
          Maps; Aligned; aligned-⊕;
          Rest; Out; _⊢_; HotR; EnvR; envR; maps; hot; Full)
 open import simultaneous.TableMap using (map-tab)
@@ -133,15 +133,6 @@ postulate
   -- `p* ⊕ [ix 0]`: what is over it precedes it, and it precedes the
   -- source.
   past-src : ∀ {p* y*} → (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) ≼ y* → ¬ (y* ⊑ (p* ⊕ [ ix 0 ]))
-
--- One label up.
-up : Pos → Pos
-up (i ∙ ys) = i ∙ dropLast ys
-  where
-    dropLast : List Label → List Label
-    dropLast []           = []
-    dropLast (_ ∷ [])     = []
-    dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
 
 cut-sub : ∀ {q q* y y*} → Cut q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut q q* y (y* ⊕ [ l ])
 cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
