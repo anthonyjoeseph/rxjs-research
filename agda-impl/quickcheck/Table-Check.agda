@@ -41,7 +41,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≡ᵇ_; _%_)
 open import Data.Nat.Show using () renaming (show to showℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String) renaming (_++_ to _+++_)
@@ -242,319 +242,328 @@ private
 mutual
   -- A subterm's map, and the findings at and below it.
   walkM : ∀ {Γ Δ A} → ℕ → ℕ → Obs Timeline Γ A → Ren Γ Δ → All Listed Γ → All Listed Δ → Hots → Pos → Pos → String → Maybe (List (Pos × Pos)) × Res
-  walkM N n o ρι ρ ρ* hs p p* nm with node nm p p* hs (listC N n o ρ p) (listC N n (elab ρι o) ρ* p*)
-  ... | m , r = m , (r ⊹ below N n o ρι ρ ρ* hs p p* nm)
+  walkM N n o ρι ρ ρ* hs p p* nm with listC N n o ρ p | listC N n (elab ρι o) ρ* p*
+  ... | t | t* with node nm p p* hs t t*
+  ... | m , r = m , (r ⊹ below N n o ρι ρ ρ* hs p p* nm t t*)
 
   walk : ∀ {Γ Δ A} → ℕ → ℕ → Obs Timeline Γ A → Ren Γ Δ → All Listed Γ → All Listed Δ → Hots → Pos → Pos → String → Res
   walk N n o ρι ρ ρ* hs p p* nm = proj₂ (walkM N n o ρι ρ ρ* hs p p* nm)
 
-  below : ∀ {Γ Δ A} → ℕ → ℕ → Obs Timeline Γ A → Ren Γ Δ → All Listed Γ → All Listed Δ → Hots → Pos → Pos → String → Res
-  below N n       (cold _)          ρι ρ ρ* hs p p* nm = none
-  below N n       empty             ρι ρ ρ* hs p p* nm = none
-  below N n       (of _)            ρι ρ ρ* hs p p* nm = none
-  below N n       (connected _)     ρι ρ ρ* hs p p* nm = none
-  below N n       (map _ s)         ρι ρ ρ* hs p p* nm = walk N n s ρι ρ ρ* hs p p* (nm +++ "/map")
-  below N n       (scan _ _ s)      ρι ρ ρ* hs p p* nm = walk N n s ρι ρ ρ* hs p p* (nm +++ "/scan")
-  below N n       (takeWhile _ _ s) ρι ρ ρ* hs p p* nm = walk N n s ρι ρ ρ* hs p p* (nm +++ "/take")
-  below N zero    (defer _)         ρι ρ ρ* hs p p* nm = none
-  below N (suc n) (defer l)         ρι ρ ρ* hs p p* nm =
+  below : ∀ {Γ Δ A} → ℕ → ℕ → Obs Timeline Γ A → Ren Γ Δ → All Listed Γ → All Listed Δ → Hots → Pos → Pos → String
+        → Maybe (Listed A) → Maybe (Listed (IE A)) → Res
+  below N n       (cold _)          ρι ρ ρ* hs p p* nm _ _ = none
+  below N n       empty             ρι ρ ρ* hs p p* nm _ _ = none
+  below N n       (of _)            ρι ρ ρ* hs p p* nm _ _ = none
+  below N n       (connected _)     ρι ρ ρ* hs p p* nm _ _ = none
+  below N n       (map _ s)         ρι ρ ρ* hs p p* nm _ _ = walk N n s ρι ρ ρ* hs p p* (nm +++ "/map")
+  below N n       (scan _ _ s)      ρι ρ ρ* hs p p* nm _ _ = walk N n s ρι ρ ρ* hs p p* (nm +++ "/scan")
+  below N n       (takeWhile _ _ s) ρι ρ ρ* hs p p* nm _ _ = walk N n s ρι ρ ρ* hs p p* (nm +++ "/take")
+  below N zero    (defer _)         ρι ρ ρ* hs p p* nm _ _ = none
+  below N (suc n) (defer l)         ρι ρ ρ* hs p p* nm _ _ =
     walk N n (Later.force l) ρι ρ ρ* hs (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (nm +++ "/defer")
-  below {Γ} {Δ} {A} N n (connect {A = S} s b) ρι ρ ρ* hs p p* nm =
-    proj₂ src ⊹ (hot-image ⊹ walk N n b (ext ρι) (hotL σ ∷ ρ) (hotL σ* ∷ ρ*) ((hotV σ , ψ) ∷ hs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (nm +++ "/body"))
+  below {Γ} {Δ} {A} N n (connect {A = S} s b) ρι ρ ρ* hs p p* nm _ _ = run
     where
-      σ  = listC N n s ρ (p ⊕ [ ix 1 ])
-      σ* = listC N n (annotate (elab ρι s)) ρ* (p* ⊕ [ ix 1 ])
-      src = walkM N n s ρι ρ ρ* hs (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (nm +++ "/src")
-      m : List (Pos × Pos)
-      m with proj₁ src
-      ... | nothing = []
-      ... | just m′ = m′
-      reader* : Pos
-      reader* = p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
-      ψ : Pos → Pos
-      ψ k = phi m k ⊕ [ sub reader* ]
-      -- The annotated hot lists each source value at `ψ`, rejoined under
-      -- the annotation's reader, and the source's end as the `nothing`
-      -- the concat's second lane sends past it.
-      annAt : Pos × Vis → Pos
-      annAt (y , vout) = ψ y
-      annAt (y , vend) = ψ y ⊕ [ ix 1 ] ⊕ [ ix 0 ]
-      hot-image : Res
-      hot-image = concatMap (λ yv → if memᵖ (annAt yv) (annRows σ*) then []
-                    else [ "hot-image" , nm +++ " " +++ showPos (proj₁ yv) +++ " ~ " +++ showPos (annAt yv) +++ " among "
-                                          +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ]) (hotV σ) , 0 , 0
-  below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
-    proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (wholeRes ⊹ (startRes ++ subRes , 0 , 0))))
+      -- Each table listed once, as a `with`: the compiled probe shares a
+      -- function's argument between its uses, but not a `where` binding.
+      run : Res
+      run with listC N n s ρ (p ⊕ [ ix 1 ]) | listC N n (annotate (elab ρι s)) ρ* (p* ⊕ [ ix 1 ])
+             | walkM N n s ρι ρ ρ* hs (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (nm +++ "/src")
+      ... | σ | σ* | src =
+        proj₂ src ⊹ (hot-image ⊹ walk N n b (ext ρι) (hotL σ ∷ ρ) (hotL σ* ∷ ρ*) ((hotV σ , ψ) ∷ hs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (nm +++ "/body"))
+        where
+          m : List (Pos × Pos)
+          m with proj₁ src
+          ... | nothing = []
+          ... | just m′ = m′
+          reader* : Pos
+          reader* = p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+          ψ : Pos → Pos
+          ψ k = phi m k ⊕ [ sub reader* ]
+          -- The annotated hot lists each source value at `ψ`, rejoined under
+          -- the annotation's reader, and the source's end as the `nothing`
+          -- the concat's second lane sends past it.
+          annAt : Pos × Vis → Pos
+          annAt (y , vout) = ψ y
+          annAt (y , vend) = ψ y ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+          hot-image : Res
+          hot-image = concatMap (λ yv → if memᵖ (annAt yv) (annRows σ*) then []
+                        else [ "hot-image" , nm +++ " " +++ showPos (proj₁ yv) +++ " ~ " +++ showPos (annAt yv) +++ " among "
+                                              +++ L.foldr (λ r acc → showPos r +++ " " +++ acc) "" (L.take 6 (annRows σ*)) ]) (hotV σ) , 0 , 0
+  below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm pt wt = run
     where
-      tt-tab : Listed ⊤
-      tt-tab = hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
       sp* : Pos
       sp* = p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ ix 1 ]
-      src = walkM N n s (λ i → there (ρι i)) ρ (tt-tab ∷ ρ*) hs p sp* (nm +++ "/src")
       s* : Obs Timeline (⊤ ∷ Δ) (IE A)
       s* = elab (λ i → there (ρι i)) s
-      sh-tab : Listed (IE A)
-      sh-tab = hotL (listC N n (flatMap (mergeᶠ nothing) (λ _ → s*) (connected (here refl))) (tt-tab ∷ ρ*) (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]))
       c₃ c₂ c₁ : Pos
       c₃ = p* ⊕ [ ix 0 ] ⊕ [ ix 0 ]
       c₂ = c₃ ⊕ [ ix 0 ]
       c₁ = c₂ ⊕ [ ix 1 ]
-      cl-tab : Listed (IE B)
-      cl-tab = hotL (listC N n (closer {A = A} {B = B}) (sh-tab ∷ tt-tab ∷ ρ*) (c₃ ⊕ [ ix 1 ]))
-      ρ*c : All Listed (IE B ∷ IE A ∷ ⊤ ∷ Δ)
-      ρ*c = cl-tab ∷ sh-tab ∷ tt-tab ∷ ρ*
       ρι⁴ : Ren Γ (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ)
       ρι⁴ i = there (there (there (there (ρι i))))
       core-src : Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) A
       core-src = each valuesOf (connected (there (here refl)))
-      o  = listC N n s ρ p
-      o* = listC N n core-src ρ*c c₁
-      vs vs* : List (Pos × A)
-      vs with o
-      ... | nothing = []
-      ... | just l  = values (rows l)
-      vs* with o*
-      ... | nothing = []
-      ... | just l  = values (rows l)
+
+      valsOf : Maybe (Listed A) → List (Pos × A)
+      valsOf nothing  = []
+      valsOf (just l) = values (rows l)
 
       -- Each value's lanes, at their plain starts and the lanes' flatMap's.
-      starts : _ → Maybe (List (A × Pos × Pos))
-      starts (mergeᶠ (just k)) with o | o*
-      ... | just l | just l* = pairStarts
+      starts : All Listed (IE B ∷ IE A ∷ ⊤ ∷ Δ) → Maybe (Listed A) → Maybe (Listed A) → List (Pos × A) → List (Pos × A) → FlatOp → Maybe (List (A × Pos × Pos))
+      starts ρ*c (just l) (just l*) vs vs* (mergeᶠ (just k)) = pairStarts
             (entryStarts (BoundedL.levels k (afterL (λ a → listC N n (f a) ρ)) l (length vs) 0 [] (Order.nths vs 0)))
             (mapL proj₂ (entryStarts (BoundedL.levels k (afterL (λ a → listC N n (laneˢ (elab ρι⁴ (f a))) ρ*c)) l* (length vs*) 0 [] (Order.nths vs* 0))))
-      ... | _ | _ = just []
-      starts _ = pairStarts (mapL (λ { (q , a) → a , q ⊕ [ ix 1 ] }) vs) (mapL (λ { (q* , _) → q* ⊕ [ ix 1 ] }) vs*)
+      starts ρ*c _ _ vs vs* (mergeᶠ (just k)) = just []
+      starts ρ*c _ _ vs vs* _ = pairStarts (mapL (λ { (q , a) → a , q ⊕ [ ix 1 ] }) vs) (mapL (λ { (q* , _) → q* ⊕ [ ix 1 ] }) vs*)
 
       -- One lane, at its plain start and its lanes' flatMap's: the two
       -- starts, the lane's map, its findings.
-      lane : A × Pos × Pos → Pos × Pos × Maybe (List (Pos × Pos)) × Res
-      lane (a , st , st*) with walkM N n (f a) ρι⁴ ρ (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) hs st (laneX st*) (nm +++ "/lane")
+      lane : All Listed (IE B ∷ IE A ∷ ⊤ ∷ Δ) → A × Pos × Pos → Pos × Pos × Maybe (List (Pos × Pos)) × Res
+      lane ρ*c (a , st , st*) with walkM N n (f a) ρι⁴ ρ (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) hs st (laneX st*) (nm +++ "/lane")
       ... | m , r = st , st* , m , r
 
-      walked : List (Pos × Pos × Maybe (List (Pos × Pos)) × Res)
-      walked with starts op
-      ... | nothing = []
-      ... | just ls = mapL lane ls
-
-      lanesRes : Res
-      lanesRes with starts op
-      ... | nothing = fail "lanes" nm p p* , 0 , 0
-      ... | just _  = L.foldr (λ { (_ , _ , _ , r) acc → r ⊹ acc }) none walked
-
-      -- The lanes' flatMap's table against the plain flatMap's, along the
-      -- map written out: a lane row through `laneˢ`'s reader and
-      -- `counted`'s emit, its end at its `laneDone`'s; a source row
-      -- through the shared hot's reader.
-      readerR : Pos → Pos
-      readerR st* = laneL st* ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]
-
-      emitAt : Pos → Pos
-      emitAt r = r ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
-
-      -- The lane whose map holds `k`: a lane's row need not lie under its
-      -- subscription, read off a hot or in a cascade its timer made.
-      laneOf : Pos → List (Pos × Pos × Maybe (List (Pos × Pos)) × Res) → Maybe (Pos × List (Pos × Pos))
-      laneOf k [] = nothing
-      laneOf k ((st , st* , just m , _) ∷ ws) =
-        if anyᵇ (λ { (a , _) → does (a ≟ᵖ k) }) m then just (st* , m) else laneOf k ws
-      laneOf k (_ ∷ ws) = laneOf k ws
-
-      srcMap : List (Pos × Pos)
-      srcMap with proj₁ src
-      ... | nothing = []
-      ... | just m  = m
-
-      formula : Pos × Vis → Pos
-      -- The source's end is the shared flatMap's: the later of its own
-      -- lane's end and its trigger's, read through the share's reader.  A
-      -- lane's end likewise, through its own share.
-      formula (k , v) with laneOf k walked | v
-      ... | nothing | vout = phi srcMap k ⊕ [ sub c₁ ]
-      ... | nothing | vend = (if phi srcMap k <ᵖ ttEnd then ttEnd else phi srcMap k) ⊕ [ sub c₁ ]
-        where ttEnd = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
-      ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
-      ... | just (st* , m) | vend = emitAt ((if phi m k <ᵖ lnEnd then lnEnd else phi m k) ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
-        where lnEnd = laneL st* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (laneL st* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
-
-      -- The ends of the lanes whose ends the flatMap's table keeps.
-      endsM : ∀ {X} → Maybe (Listed X) → List Pos
-      endsM nothing  = []
-      endsM (just l) = ends (rows l)
-
-      laneEnds : List Pos
-      laneEnds with starts op | listC N n (flatMap op f s) ρ p
-      ... | just ls | just t = concatMap (λ e → when (anyᵇ (λ { (c , _) → does (c ≟ᵖ e) }) (rows t)) e)
-                                 (concatMap (λ { (a , st , _) → endsM (listC N n (f a) ρ st) }) ls)
-      ... | _ | _ = []
-
-
-
-      -- A kept lane's end against every value the flatMap shows and the
-      -- source's end: the end image keeps the plain order.
-      endOrd : List (String × String)
-      endOrd with plainV (listC N n (flatMap op f s) ρ p)
-      ... | nothing = []
-      ... | just ks = concatMap (λ e → concatMap (cmp e) (mapL (λ k → k , formula (k , vout)) (ofKind true ks) ++ mapL (λ k → k , formula (k , vend)) (endsM o))) laneEnds
+      -- Each table listed once, as a `with`: the compiled probe shares a
+      -- function's argument between its uses, but not a `where` binding.
+      run : Res
+      run with hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
+      ... | tt-tab with hotL (listC N n (flatMap (mergeᶠ nothing) (λ _ → s*) (connected (here refl))) (tt-tab ∷ ρ*) (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]))
+      ... | sh-tab with hotL (listC N n (closer {A = A} {B = B}) (sh-tab ∷ tt-tab ∷ ρ*) (c₃ ⊕ [ ix 1 ]))
+      ... | cl-tab with cl-tab ∷ sh-tab ∷ tt-tab ∷ ρ*
+      ... | ρ*c with walkM N n s (λ i → there (ρι i)) ρ (tt-tab ∷ ρ*) hs p sp* (nm +++ "/src") | listC N n s ρ p | listC N n core-src ρ*c c₁
+                   | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
+      ... | src | o | o* | ct with valsOf o | valsOf o*
+      ... | vs | vs* with starts ρ*c o o* vs vs* op
+      ... | sts with maybe (mapL (lane ρ*c)) [] sts
+      ... | walked = proj₂ src ⊹ (lanesRes ⊹ (coreRes ⊹ (wholeRes ⊹ (startRes ++ subRes , 0 , 0))))
         where
-          cmp : Pos → Pos × Pos → List (String × String)
-          cmp e (k , w) = let we = formula (e , vend) in
-            if (e <ᵖ k) ∧ not (we <ᵖ w) ∨ (k <ᵖ e) ∧ not (w <ᵖ we)
-            then [ "end-order" , nm +++ " " +++ showPos e +++ " ~ " +++ showPos we +++ " vs " +++ showPos k +++ " ~ " +++ showPos w ] else []
+          lanesRes : Res
+          lanesRes = maybe (λ _ → L.foldr (λ { (_ , _ , _ , r) acc → r ⊹ acc }) none walked) (fail "lanes" nm p p* , 0 , 0) sts
 
-      isEnd : Pos → Bool
-      isEnd e = memᵖ e laneEnds ∨ memᵖ e (endsM o)
+          -- The lanes' flatMap's table against the plain flatMap's, along the
+          -- map written out: a lane row through `laneˢ`'s reader and
+          -- `counted`'s emit, its end at its `laneDone`'s; a source row
+          -- through the shared hot's reader.
+          readerR : Pos → Pos
+          readerR st* = laneL st* ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]
 
-      skipAt : Pos → Maybe Pos
-      skipAt k = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 0 ]) ≟ᵖ k) }) vs then just (phi srcMap (up k) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ])
-                 else if isEnd k then just (formula (k , vend))
-                 else if isEnd (up k) ∧ does (k ≟ᵖ (up k ⊕ [ ix 0 ])) then just (formula (up k , vend) ⊕ [ ix 0 ])
-                 else nothing
+          emitAt : Pos → Pos
+          emitAt r = r ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
 
-      -- Each skip the flatMap makes, written out: a value's marker under
-      -- its elaborated value, a lane's or the source's end, not the last,
-      -- at its end image, a queued lane's end one label below it; the
-      -- lanes' flatMap holds a row there.
-      skipRes : List (String × String)
-      skipRes with listC N n (flatMap op f s) ρ p | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
-      ... | just t | just t* = if short t ∨ short t* then [] else concatMap chk (rows t)
-        where
-          chk : Row B → List (String × String)
-          chk (k , skip) with skipAt k
-          ... | just w  = if memᵖ w (mapL proj₁ (rows t*)) then [] else fail "core-skip" nm k w
+          -- The lane whose map holds `k`: a lane's row need not lie under its
+          -- subscription, read off a hot or in a cascade its timer made.
+          laneOf : Pos → List (Pos × Pos × Maybe (List (Pos × Pos)) × Res) → Maybe (Pos × List (Pos × Pos))
+          laneOf k [] = nothing
+          laneOf k ((st , st* , just m , _) ∷ ws) =
+            if anyᵇ (λ { (a , _) → does (a ≟ᵖ k) }) m then just (st* , m) else laneOf k ws
+          laneOf k (_ ∷ ws) = laneOf k ws
+
+          srcMap : List (Pos × Pos)
+          srcMap with proj₁ src
           ... | nothing = []
-          chk _ = []
-      ... | _ | _ = []
+          ... | just m  = m
 
-      -- Each row of the lanes' flatMap before its end, placed: in its
-      -- subscription's instant, or of the instant of some plain row's
-      -- image (a visible row's, or a skip's written out above), at or
-      -- past that image or that row leading its own instant.
-      placeRes : List (Pos × Pos) → List (String × String)
-      placeRes m with listC N n (flatMap op f s) ρ p | listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁
-      ... | just t | just t* = if short t ∨ short t* then [] else concatMap (chk (mapL (λ { (k , w) → w , leads k }) imgs)) (rows t*)
-        where
-          plain : List Pos
-          plain = concatMap (λ { (k , pin _) → [] ; (k , _) → [ k ] }) (rows t)
-          imgs : List (Pos × Pos)
-          imgs = m ++ concatMap (λ { (k , skip) → maybe (λ w → [ k , w ]) [] (skipAt k) ; _ → [] }) (rows t)
-          leads : Pos → Bool
-          leads k = not (anyᵇ (λ k′ → (inst k′ ==ⁱ inst k) ∧ (k′ <ᵖ k)) plain)
-          live : Pos → Bool
-          live y = not (anyᵇ (λ c → c <ᵖ y) (ends (rows t*)))
-          chk : List (Pos × Bool) → Row (IE B) → List (String × String)
-          chk ws (y , _) = if not (live y) ∨ (inst y ==ⁱ inst c₁)
-                             ∨ anyᵇ (λ { (w , ld) → (inst w ==ⁱ inst y) ∧ ((w <ᵖ y) ∨ does (w ≟ᵖ y) ∨ ld) }) ws
-                           then [] else fail "core-place" nm y c₁
-      ... | _ | _ = []
+          formula : Pos × Vis → Pos
+          -- The source's end is the shared flatMap's: the later of its own
+          -- lane's end and its trigger's, read through the share's reader.  A
+          -- lane's end likewise, through its own share.
+          formula (k , v) with laneOf k walked | v
+          ... | nothing | vout = phi srcMap k ⊕ [ sub c₁ ]
+          ... | nothing | vend = (if phi srcMap k <ᵖ ttEnd then ttEnd else phi srcMap k) ⊕ [ sub c₁ ]
+            where ttEnd = p* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
+          ... | just (st* , m) | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
+          ... | just (st* , m) | vend = emitAt ((if phi m k <ᵖ lnEnd then lnEnd else phi m k) ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
+            where lnEnd = laneL st* ⊕ [ ix 1 ] ⊕ [ last ] ⊕ [ sub (laneL st* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ]
 
-      -- Each live pin of the flatMap, the source's or a lane's: the lanes'
-      -- flatMap, or the whole, holds a pin whose connect has no image of a
-      -- value past the plain connect before it.
-      pinRes : String → Maybe (Listed (IE B)) → List (Pos × Pos) → List (String × String)
-      pinRes w tw m with o | listC N n (flatMap op f s) ρ p | tw
-      ... | just so | just t | just t* = if short t ∨ short t* then [] else concatMap chk (rows t)
-        where
-          vals : List Pos
-          vals = concatMap (λ { (k , out _) → [ k ] ; _ → [] }) (rows t)
-          past : Pos → Pos → Bool
-          past q p′ = allᵇ (λ { (k₀ , w) → not (memᵖ k₀ vals ∧ (w <ᵖ p′)) ∨ (k₀ <ᵖ q) }) m
-          pinned : Pos → Bool
-          pinned q = anyᵇ (λ { (_ , pin p′) → past q p′ ; _ → false }) (rows t*)
-          live : Pos → Bool
-          live k = allᵇ (λ c → not (c <ᵖ k)) (ends (rows t))
-          fromSrc : Pos → Bool
-          fromSrc k = anyᵇ (λ { (k′ , pin _) → does (k′ ≟ᵖ k) ; _ → false }) (rows so)
-          chk : Row B → List (String × String)
-          chk (k , pin q) = if not (live k) ∨ pinned q then []
-                            else fail (w +++ (if fromSrc k then "-pin-src" else "-pin-lane")) nm k q
-          chk _ = []
-      ... | _ | _ | _ = []
+          -- The ends of the lanes whose ends the flatMap's table keeps.
+          endsM : ∀ {X} → Maybe (Listed X) → List Pos
+          endsM nothing  = []
+          endsM (just l) = ends (rows l)
 
-      -- Each value of the lanes' flatMap's source, written out: the
-      -- shared hot's row of the plain value's image, rejoined, and the
-      -- first value `each` lists from it.
-      startRes : List (String × String)
-      startRes = go vs vs*
-        where
-          go : List (Pos × A) → List (Pos × A) → List (String × String)
-          go ((q , _) ∷ xs) ((q* , _) ∷ ys) =
-            let w = phi srcMap q ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] in
-            (if does (w ≟ᵖ q*) then [] else fail "lane-start" nm q* w) ++ go xs ys
-          go _ _ = []
+          laneEnds : List Pos
+          laneEnds = go sts pt
+            where
+              go : Maybe (List (A × Pos × Pos)) → Maybe (Listed B) → List Pos
+              go (just ls) (just t) = concatMap (λ e → when (anyᵇ (λ { (c , _) → does (c ≟ᵖ e) }) (rows t)) e)
+                                         (concatMap (λ { (a , st , _) → endsM (listC N n (f a) ρ st) }) ls)
+              go _ _ = []
 
-      -- Each lane's subscription, written out: under its value's
-      -- elaborated row, or, queued, under the end of the lane it waited
-      -- on.
-      subRes : List (String × String)
-      subRes with starts op
-      ... | nothing = []
-      ... | just ls = concatMap check ls
-        where
-          check : A × Pos × Pos → List (String × String)
-          check (_ , st , st*) =
-            let w = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 1 ]) ≟ᵖ st) }) vs
-                    then phi srcMap (up st) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
-                    else formula (up st , vend) ⊕ [ ix 1 ] in
-            if does (w ≟ᵖ st*) then [] else fail "lane-sub" nm st* w
 
-      coreRes : Res
-      coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
-      ... | just ks | just ks* with pairing ks ks*
-      ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
-      ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ pinRes "core" (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁) m ++ checks (nm +++ "/core") p c₁ [] m
-                       ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
-                                    else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
-        where
-          showEnds : ∀ {X} → Maybe (Listed X) → String
-          showEnds nothing  = "none"
-          showEnds (just l) = L.foldr (λ r acc → showPos r +++ " " +++ acc) (if short l then "short" else "whole") (ends (rows l))
 
-          -- The lane holding `k`: its ends walked alone, and as the
-          -- core lists it.
-          laneDiag : Pos → String
-          laneDiag k with laneOf k walked | starts op
-          ... | just (st* , _) | just ls = L.foldr (λ { (a , st , s*) acc → (if does (s* ≟ᵖ st*) then
-                  " | lane " +++ showPos st +++ " ~ " +++ showPos s*
-                  +++ " | alone " +++ showEnds (listC N n (elab ρι⁴ (f a)) (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) (laneX st*))
-                  +++ " | in core " +++ showEnds (listC N n (laneˢ (elab ρι⁴ (f a))) ρ*c st*)
-                  +++ " | plain " +++ showEnds (listC N n (f a) ρ st) else "") +++ acc }) "" ls
-          ... | _ | _ = ""
+          -- A kept lane's end against every value the flatMap shows and the
+          -- source's end: the end image keeps the plain order.
+          endOrd : List (String × String)
+          endOrd with plainV (pt)
+          ... | nothing = []
+          ... | just ks = concatMap (λ e → concatMap (cmp e) (mapL (λ k → k , formula (k , vout)) (ofKind true ks) ++ mapL (λ k → k , formula (k , vend)) (endsM o))) laneEnds
+            where
+              cmp : Pos → Pos × Pos → List (String × String)
+              cmp e (k , w) = let we = formula (e , vend) in
+                if (e <ᵖ k) ∧ not (we <ᵖ w) ∨ (k <ᵖ e) ∧ not (w <ᵖ we)
+                then [ "end-order" , nm +++ " " +++ showPos e +++ " ~ " +++ showPos we +++ " vs " +++ showPos k +++ " ~ " +++ showPos w ] else []
 
-          kindOf : Pos → Vis
-          kindOf k = if memᵖ k (ofKind false ks) then vend else vout
-      coreRes | _ | _ = none
+          isEnd : Pos → Bool
+          isEnd e = memᵖ e laneEnds ∨ memᵖ e (endsM o)
 
-      -- The whole flatMap against the plain, along the combined scan's
-      -- re-emit: a lanes' value at the lane branch's reader, then `each`'s
-      -- one emit; the flatMap's end at the `nothing` the scan's concat
-      -- sends past the last of its three branches' ends.
-      cA : Pos
-      cA = c₂ ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
-      rB : ℕ → Pos
-      rB i = cA ⊕ [ ix i ] ⊕ [ ix 1 ]
-      readEnd : Pos → List Pos → List Pos
-      readEnd r = mapL (λ e → if r <ᵖ e then e ⊕ [ sub r ] else r ⊕ [ last ])
-      core-hot : Listed (IE B)
-      core-hot = hotL (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
-      aEnd : Pos
-      aEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
-               (readEnd (rB 0) (ends (rows sh-tab)) ++ readEnd (rB 1) (ends (rows core-hot)) ++ readEnd (rB 2) (ends (rows cl-tab)))
-      whole : Pos × Vis → Pos
-      whole (k , vout) = formula (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
-      whole (k , vend) = aEnd ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ last ]
+          skipAt : Pos → Maybe Pos
+          skipAt k = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 0 ]) ≟ᵖ k) }) vs then just (phi srcMap (up k) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 0 ])
+                     else if isEnd k then just (formula (k , vend))
+                     else if isEnd (up k) ∧ does (k ≟ᵖ (up k ⊕ [ ix 0 ])) then just (formula (up k , vend) ⊕ [ ix 0 ])
+                     else nothing
 
-      wholeRes : Res
-      wholeRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (elab ρι (flatMap op f s)) ρ* p*)
-      ... | just ks | just ks* with pairing ks ks*
-      ...   | nothing = none
-      ...   | just m  = pinRes "whole" (listC N n (elab ρι (flatMap op f s)) ρ* p*) m
-                       ++ concatMap (λ { (k , k*) → let w = whole (k , kindOf k) in if does (w ≟ᵖ k*) then []
-                                    else [ "whole" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
-        where
-          kindOf : Pos → Vis
-          kindOf k = if memᵖ k (ofKind false ks) then vend else vout
-      wholeRes | _ | _ = none
+          -- Each skip the flatMap makes, written out: a value's marker under
+          -- its elaborated value, a lane's or the source's end, not the last,
+          -- at its end image, a queued lane's end one label below it; the
+          -- lanes' flatMap holds a row there.
+          skipRes : List (String × String)
+          skipRes = go pt ct
+            where
+              go : Maybe (Listed B) → Maybe (Listed (IE B)) → List (String × String)
+              go (just t) (just t*) = if short t ∨ short t* then [] else concatMap chk (rows t)
+                where
+                  chk : Row B → List (String × String)
+                  chk (k , skip) with skipAt k
+                  ... | just w  = if memᵖ w (mapL proj₁ (rows t*)) then [] else fail "core-skip" nm k w
+                  ... | nothing = []
+                  chk _ = []
+              go _ _ = []
+
+          -- Each row of the lanes' flatMap before its end, placed: in its
+          -- subscription's instant, or of the instant of some plain row's
+          -- image (a visible row's, or a skip's written out above), at or
+          -- past that image or that row leading its own instant.
+          placeRes : List (Pos × Pos) → List (String × String)
+          placeRes m = go pt ct
+            where
+              go : Maybe (Listed B) → Maybe (Listed (IE B)) → List (String × String)
+              go (just t) (just t*) = if short t ∨ short t* then [] else concatMap (chk (mapL (λ { (k , w) → w , leads k }) imgs)) (rows t*)
+                where
+                  plain : List Pos
+                  plain = concatMap (λ { (k , pin _) → [] ; (k , _) → [ k ] }) (rows t)
+                  imgs : List (Pos × Pos)
+                  imgs = m ++ concatMap (λ { (k , skip) → maybe (λ w → [ k , w ]) [] (skipAt k) ; _ → [] }) (rows t)
+                  leads : Pos → Bool
+                  leads k = not (anyᵇ (λ k′ → (inst k′ ==ⁱ inst k) ∧ (k′ <ᵖ k)) plain)
+                  live : Pos → Bool
+                  live y = not (anyᵇ (λ c → c <ᵖ y) (ends (rows t*)))
+                  chk : List (Pos × Bool) → Row (IE B) → List (String × String)
+                  chk ws (y , _) = if not (live y) ∨ (inst y ==ⁱ inst c₁)
+                                     ∨ anyᵇ (λ { (w , ld) → (inst w ==ⁱ inst y) ∧ ((w <ᵖ y) ∨ does (w ≟ᵖ y) ∨ ld) }) ws
+                                   then [] else fail "core-place" nm y c₁
+              go _ _ = []
+
+          -- Each live pin of the flatMap, the source's or a lane's: the lanes'
+          -- flatMap, or the whole, holds a pin whose connect has no image of a
+          -- value past the plain connect before it.
+          pinRes : String → Maybe (Listed (IE B)) → List (Pos × Pos) → List (String × String)
+          pinRes w tw m = go o pt tw
+            where
+              go : Maybe (Listed A) → Maybe (Listed B) → Maybe (Listed (IE B)) → List (String × String)
+              go (just so) (just t) (just t*) = if short t ∨ short t* then [] else concatMap chk (rows t)
+                where
+                  vals : List Pos
+                  vals = concatMap (λ { (k , out _) → [ k ] ; _ → [] }) (rows t)
+                  past : Pos → Pos → Bool
+                  past q p′ = allᵇ (λ { (k₀ , w) → not (memᵖ k₀ vals ∧ (w <ᵖ p′)) ∨ (k₀ <ᵖ q) }) m
+                  pinned : Pos → Bool
+                  pinned q = anyᵇ (λ { (_ , pin p′) → past q p′ ; _ → false }) (rows t*)
+                  live : Pos → Bool
+                  live k = allᵇ (λ c → not (c <ᵖ k)) (ends (rows t))
+                  fromSrc : Pos → Bool
+                  fromSrc k = anyᵇ (λ { (k′ , pin _) → does (k′ ≟ᵖ k) ; _ → false }) (rows so)
+                  chk : Row B → List (String × String)
+                  chk (k , pin q) = if not (live k) ∨ pinned q then []
+                                    else fail (w +++ (if fromSrc k then "-pin-src" else "-pin-lane")) nm k q
+                  chk _ = []
+              go _ _ _ = []
+
+          -- Each value of the lanes' flatMap's source, written out: the
+          -- shared hot's row of the plain value's image, rejoined, and the
+          -- first value `each` lists from it.
+          startRes : List (String × String)
+          startRes = go vs vs*
+            where
+              go : List (Pos × A) → List (Pos × A) → List (String × String)
+              go ((q , _) ∷ xs) ((q* , _) ∷ ys) =
+                let w = phi srcMap q ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] in
+                (if does (w ≟ᵖ q*) then [] else fail "lane-start" nm q* w) ++ go xs ys
+              go _ _ = []
+
+          -- Each lane's subscription, written out: under its value's
+          -- elaborated row, or, queued, under the end of the lane it waited
+          -- on.
+          subRes : List (String × String)
+          subRes = go sts
+            where
+              go : Maybe (List (A × Pos × Pos)) → List (String × String)
+              go nothing = []
+              go (just ls) = concatMap check ls
+                where
+                  check : A × Pos × Pos → List (String × String)
+                  check (_ , st , st*) =
+                    let w = if anyᵇ (λ { (q , _) → does ((q ⊕ [ ix 1 ]) ≟ᵖ st) }) vs
+                            then phi srcMap (up st) ⊕ [ sub c₁ ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+                            else formula (up st , vend) ⊕ [ ix 1 ] in
+                    if does (w ≟ᵖ st*) then [] else fail "lane-sub" nm st* w
+
+          coreRes : Res
+          coreRes with plainV (pt) | elabV {B} (ct)
+          ... | just ks | just ks* with pairing ks ks*
+          ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
+          ...   | just m  = endOrd ++ skipRes ++ placeRes m ++ pinRes "core" (ct) m ++ checks (nm +++ "/core") p c₁ [] m
+                           ++ concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
+                                        else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w +++ laneDiag k ] }) m , 0 , 0
+            where
+              showEnds : ∀ {X} → Maybe (Listed X) → String
+              showEnds nothing  = "none"
+              showEnds (just l) = L.foldr (λ r acc → showPos r +++ " " +++ acc) (if short l then "short" else "whole") (ends (rows l))
+
+              -- The lane holding `k`: its ends walked alone, and as the
+              -- core lists it.
+              laneDiag : Pos → String
+              laneDiag k = go (laneOf k walked) sts
+                where
+                  go : Maybe (Pos × List (Pos × Pos)) → Maybe (List (A × Pos × Pos)) → String
+                  go (just (st* , _)) (just ls) = L.foldr (λ { (a , st , s*) acc → (if does (s* ≟ᵖ st*) then
+                          " | lane " +++ showPos st +++ " ~ " +++ showPos s*
+                          +++ " | alone " +++ showEnds (listC N n (elab ρι⁴ (f a)) (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) (laneX st*))
+                          +++ " | in core " +++ showEnds (listC N n (laneˢ (elab ρι⁴ (f a))) ρ*c st*)
+                          +++ " | plain " +++ showEnds (listC N n (f a) ρ st) else "") +++ acc }) "" ls
+                  go _ _ = ""
+
+              kindOf : Pos → Vis
+              kindOf k = if memᵖ k (ofKind false ks) then vend else vout
+          coreRes | _ | _ = none
+
+          -- The whole flatMap against the plain, along the combined scan's
+          -- re-emit: a lanes' value at the lane branch's reader, then `each`'s
+          -- one emit; the flatMap's end at the `nothing` the scan's concat
+          -- sends past the last of its three branches' ends.
+          cA : Pos
+          cA = c₂ ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+          rB : ℕ → Pos
+          rB i = cA ⊕ [ ix i ] ⊕ [ ix 1 ]
+          readEnd : Pos → List Pos → List Pos
+          readEnd r = mapL (λ e → if r <ᵖ e then e ⊕ [ sub r ] else r ⊕ [ last ])
+          core-hot : Listed (IE B)
+          core-hot = hotL (ct)
+          aEnd : Pos
+          aEnd = L.foldr (λ x y → if x <ᵖ y then y else x) (cA ⊕ [ last ])
+                   (readEnd (rB 0) (ends (rows sh-tab)) ++ readEnd (rB 1) (ends (rows core-hot)) ++ readEnd (rB 2) (ends (rows cl-tab)))
+          whole : Pos × Vis → Pos
+          whole (k , vout) = formula (k , vout) ⊕ [ sub (rB 1) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+          whole (k , vend) = aEnd ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ last ]
+
+          wholeRes : Res
+          wholeRes with plainV (pt) | elabV {B} (wt)
+          ... | just ks | just ks* with pairing ks ks*
+          ...   | nothing = none
+          ...   | just m  = pinRes "whole" (wt) m
+                           ++ concatMap (λ { (k , k*) → let w = whole (k , kindOf k) in if does (w ≟ᵖ k*) then []
+                                        else [ "whole" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
+            where
+              kindOf : Pos → Vis
+              kindOf k = if memᵖ k (ofKind false ks) then vend else vout
+          wholeRes | _ | _ = none
 
 ------------------------------------------------------------------------
 -- The run
@@ -704,12 +713,16 @@ private
   report [] bad nodes skipped t =
     putStrLn ("table-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ nodes +++ " subterms checked, "
               +++ showℕ skipped +++ " cut short; failing seeds by kind: " +++ showTally t)
-  report (seed ∷ seeds) bad nodes skipped t with probe seed ⊹ (backRes seed ⊹ coreBack (toObs timeline 3 (program seed) [] [] []))
-  ... | [] , c , s = report seeds bad (nodes + c) (skipped + s) t
-  ... | fs , c , s =
-    putStrLn ("table-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
-    say (concatMap (λ k → mapL (λ w → "table-check: FAIL seed " +++ showℕ seed +++ " " +++ k +++ " " +++ w) (firstOf k fs)) kinds) >>= λ _ →
-    report seeds (suc bad) (nodes + c) (skipped + s) (bump fs t)
+  report (seed ∷ seeds) bad nodes skipped t =
+    (if seed % 25 ≡ᵇ 0 then putStrLn ("table-check: at seed " +++ showℕ seed +++ ", " +++ showℕ bad +++ " failing so far") else return _) >>= λ _ →
+    step (probe seed ⊹ (backRes seed ⊹ coreBack (toObs timeline 3 (program seed) [] [] [])))
+    where
+      step : Res → IO Unit
+      step ([] , c , s) = report seeds bad (nodes + c) (skipped + s) t
+      step (fs , c , s) =
+        putStrLn ("table-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
+        say (concatMap (λ k → mapL (λ w → "table-check: FAIL seed " +++ showℕ seed +++ " " +++ k +++ " " +++ w) (firstOf k fs)) kinds) >>= λ _ →
+        report seeds (suc bad) (nodes + c) (skipped + s) (bump fs t)
 
 main : IO Unit
 main = hSetBuffering stdout lineBuffering >>= λ _ → report (upTo 300) 0 0 0 (mapL (_, 0) kinds)
