@@ -16,10 +16,11 @@
 -- the last part, and neither is the merge's unless the cold ended in the
 -- burst.
 --
--- A tag's render (`Rend`) is subscribed one step down and ends there,
--- silent: an early value is shown at once; a late value and a late
+-- A tag's render (`Rend`, its own rows) is subscribed one step down and
+-- ends there: an early value is shown at once; a late value and a late
 -- completion mint a name, and the value sits between `begin` and `over`
--- under it.  The last part to end is the scan's, so the end is its end.
+-- under it.  The last part to end is the scan's, so the end is its end
+-- and every render's end is silent.
 module simultaneous.ColdRows where
 
 open import Data.Bool using (Bool; true; false; not)
@@ -27,12 +28,13 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product using (Σ; _×_; _,_)
+open import Data.Unit using (tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 open import Relation.Nullary using (yes; does)
 
 open import denotation.Position using (Pos; _≟ⁱ_; ix; last; _⊕_; root)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≼_)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; _≼_; Work)
 open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext)
 open import quickcheck.Tabled using (Row)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; valuesOf)
@@ -112,7 +114,7 @@ module At {A : Set} (P : Pos) where
 
   -- A tag's render, for the tag at `q`.
   data Rend (q : Pos) : Bool × Tag A → Pos → Ev IE → Set where
-    r-end : ∀ {x} → Rend q x (q ⊕ (ix 1 ∷ last ∷ [])) skip
+    r-end : ∀ {x} → Rend q x (q ⊕ (ix 1 ∷ last ∷ [])) end
     r-sv  : ∀ {a} → Rend q (false , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ [])) (out (instEmit (value a) root))
     r-mn  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 0 ∷ ix 0 ∷ [])) skip
     r-mv  : ∀ {a} → Rend q (true , val a) (q ⊕ (ix 1 ∷ ix 1 ∷ [])) skip
@@ -128,7 +130,8 @@ module At {A : Set} (P : Pos) where
     c-skp  : ∀ {q} → SRow J q skip → CRow J q skip
     c-end  : ∀ {q} → SRow J q end → CRow J q end
     c-val  : ∀ {q x} → SRow J q (out x) → CRow J (q ⊕ [ ix 0 ]) skip
-    c-lane : ∀ {q x k e} → SRow J q (out x) → Rend q x k e → CRow J k e
+    c-lane : ∀ {q x k e} → SRow J q (out x) → Rend q x k e → Work e → CRow J k e
+    c-lend : ∀ {q x} → SRow J q (out x) → CRow J (q ⊕ (ix 1 ∷ last ∷ [])) skip
 
   ------------------------------------------------------------------------
   -- Each row in the subscribe burst's instant or a late row's
@@ -186,7 +189,8 @@ module At {A : Set} (P : Pos) where
   crow-placed (c-skp s)    = srow-placed s
   crow-placed (c-end s)    = srow-placed s
   crow-placed (c-val {q = q} s) = placed-⊕ q (srow-placed s) [ ix 0 ]
-  crow-placed (c-lane {q = q} s r) = rend-placed q (srow-placed s) r
+  crow-placed (c-lane {q = q} s r _) = rend-placed q (srow-placed s) r
+  crow-placed (c-lend {q = q} {x = x} s) = rend-placed {x = x} q (srow-placed s) r-end
 
   ------------------------------------------------------------------------
   -- Each shown row is a cold row's image
@@ -214,24 +218,25 @@ module At {A : Set} (P : Pos) where
   crow-bwd (c-end (se-e {c = c} x s)) = inj₁ (c , end , x , ke-at c true s , m-ee)
   crow-bwd (c-end (ae-e {c = c} x s)) = inj₁ (c , end , x , ke-at c false s , m-ee)
   crow-bwd (c-val {q = q} s)        = inj₂ ((λ ()) , placed-⊕ q (srow-placed s) [ ix 0 ])
-  crow-bwd (c-lane (cval {y = y} {a = a} x nb) r-sv) = inj₁ (y , out a , x , kv-at y {a} true (not-f nb) , m-val refl)
-  crow-bwd (c-lane (cval {y = y} {a = a} x nb) r-av) = inj₁ (y , out a , x , kv-at y {a} false (not-t nb) , m-val refl)
-  crow-bwd (c-lane s r-end)         = inj₂ ((λ ()) , crow-placed (c-lane s r-end))
-  crow-bwd (c-lane s r-mn)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mn))
-  crow-bwd (c-lane s r-mv)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mv))
-  crow-bwd (c-lane s r-mc)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mc))
-  crow-bwd (c-lane s r-ae)          = inj₂ ((λ ()) , crow-placed (c-lane s r-ae))
-  crow-bwd (c-lane {q = q} s r-ab)  = inj₂ (mark-hid {begin} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-ab))
-  crow-bwd (c-lane {q = q} s r-ao)  = inj₂ (mark-hid {over} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-ao))
-  crow-bwd (c-lane {q = q} s r-cb)  = inj₂ (mark-hid {begin} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-cb))
+  crow-bwd (c-lane (cval {y = y} {a = a} x nb) r-sv _) = inj₁ (y , out a , x , kv-at y {a} true (not-f nb) , m-val refl)
+  crow-bwd (c-lane (cval {y = y} {a = a} x nb) r-av _) = inj₁ (y , out a , x , kv-at y {a} false (not-t nb) , m-val refl)
+  crow-bwd (c-lane s r-end ())
+  crow-bwd (c-lane s r-mn w)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mn w))
+  crow-bwd (c-lane s r-mv w)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mv w))
+  crow-bwd (c-lane s r-mc w)          = inj₂ ((λ ()) , crow-placed (c-lane s r-mc w))
+  crow-bwd (c-lane s r-ae w)          = inj₂ ((λ ()) , crow-placed (c-lane s r-ae w))
+  crow-bwd (c-lane {q = q} s r-ab w)  = inj₂ (mark-hid {begin} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-ab w))
+  crow-bwd (c-lane {q = q} s r-ao w)  = inj₂ (mark-hid {over} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-ao w))
+  crow-bwd (c-lane {q = q} s r-cb w)  = inj₂ (mark-hid {begin} {q ⊕ [ ix 1 ]} , crow-placed (c-lane s r-cb w))
+  crow-bwd (c-lend s)                 = inj₂ ((λ ()) , crow-placed (c-lend s))
 
   ------------------------------------------------------------------------
   -- Each cold row on its image
 
   crow-fwd : ∀ {J y e} → (∀ {k r} → (k , pin r) ∈ J → ⊥) → (y , e) ∈ J → Σ (Ev IE) λ e′ → CRow J (im y e) e′ × M e e′
   crow-fwd {y = y} {e = out a} _ x with sync y in s
-  ... | true  = out (instEmit (value a) root) , c-lane (cval x (cong not s)) r-sv , m-val refl
-  ... | false = out (instEmit (value a) (y ⊕ [ ix 1 ])) , c-lane (cval x (cong not s)) r-av , m-val refl
+  ... | true  = out (instEmit (value a) root) , c-lane (cval x (cong not s)) r-sv tt , m-val refl
+  ... | false = out (instEmit (value a) (y ⊕ [ ix 1 ])) , c-lane (cval x (cong not s)) r-av tt , m-val refl
   crow-fwd {e = skip} _ x = skip , c-skp (cskp x) , m-ss {A}
   crow-fwd {y = y} {e = end} _ x with sync y in s
   ... | true  = end , c-end (se-e x s) , m-ee
@@ -242,7 +247,7 @@ module At {A : Set} (P : Pos) where
   -- No pin, and nothing before the subscription
 
   crow-pin : ∀ {J l r} → CRow J l (pin r) → ⊥
-  crow-pin (c-lane _ ())
+  crow-pin (c-lane _ () _)
 
   private
     ≼-⊕ : ∀ x {l} ys → x ≼ (x ⊕ (l ∷ ys))
@@ -288,4 +293,5 @@ module At {A : Set} (P : Pos) where
     crow-after (c-skp s)    = srow-after s
     crow-after (c-end s)    = srow-after s
     crow-after (c-val {q = q} s) = ≼-trans {P} {q} {q ⊕ [ ix 0 ]} (srow-after s) (≼-⊕ q {ix 0} [])
-    crow-after (c-lane s r) = rend-after (srow-after s) r
+    crow-after (c-lane s r _) = rend-after (srow-after s) r
+    crow-after (c-lend {q = q} {x = x} s) = rend-after {q = q} {x = x} (srow-after s) r-end

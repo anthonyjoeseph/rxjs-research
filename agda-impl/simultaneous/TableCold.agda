@@ -24,7 +24,7 @@ open import Data.Nat using (ℕ; _≤_; _+_; _∸_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Function using (_⇔_)
+open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 
@@ -42,6 +42,7 @@ open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Listing using (walkN; walkN-exact; listC; listC-ok; UncutEnv)
 open import quickcheck.Tabled.Exact.Base using (sound)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
+open import simultaneous.ColdList using (module Cold)
 open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
 open import simultaneous.TakeCut using (inst-⊕)
 
@@ -130,14 +131,18 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     φ-after    : ∀ {N k e} → (k , e) ∈ W N → p* ≼ φ′ N k
     φ-back     : ∀ {N k e} → (k , e) ∈ W N → k ∈ bk′ (φ′ N k)
 
-    -- THE COLD'S ROWS: the elaborated table is the rows written out,
-    -- and those rows hang together.
-    rows→       : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
-    rows←       : ∀ {N l e′} → CRow (I N) l e′ → TR (Q N) l e′
+    -- THE COLD'S ROWS: the written-out rows hang together.
     rows-func   : ∀ {N l e e′} → CRow (I N) l e → CRow (I N) l e′ → e ≡ e′
     rows-flat   : ∀ {N y e l ys e′} → CRow (I N) y e → CRow (I N) (y ⊕ (l ∷ ys)) e′ → ⊥
     rows-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (CRow (I N′)) (CRow (I N))
     rows-cons   : ∀ {N N′} → Cons (CRow (I N)) (CRow (I N′))
+
+  -- The elaborated table is the rows written out.
+  rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
+  rows→ {N} = Equivalence.to (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
+
+  rows← : ∀ {N l e′} → CRow (I N) l e′ → TR (Q N) l e′
+  rows← {N} = Equivalence.from (Cold.cold-rows (3 + N) n (ρ* N) (uρ* N) m p*)
 
   -- The elaborated cold's rows lie past its subscription.
   I-after : ∀ {N y e} → (y , e) ∈ I N → p* ≼ y
