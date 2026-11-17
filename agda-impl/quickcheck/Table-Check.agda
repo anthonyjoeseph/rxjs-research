@@ -25,6 +25,10 @@
 -- A flatMap's lanes are walked at every value, the plain lane under its
 -- start and the elaborated lane where `laneˢ` subscribes it under the
 -- lanes' flatMap's start; a bounded merge's starts are its levels'.
+-- The lanes' flatMap's own table (`flat-core`'s) is checked against the
+-- map written out: a lane row under `laneˢ`'s reader and `counted`'s
+-- emit, a lane's end at its `laneDone`'s, a source row under the shared
+-- hot's reader.
 -- A probe for `make table-check`: no proof reads it.
 module quickcheck.Table-Check where
 
@@ -51,7 +55,7 @@ open import Relation.Nullary using (does)
 
 open import Tree using (Obs; Later; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
   defer)
-open import denotation.Position using (Pos; Instant; frame; cascade; root; ix; sub; _⊕_; _≟ᵖ_; _≟ⁱ_; _≟ˡ_; _<ᵖ_; inside)
+open import denotation.Position using (Pos; Instant; frame; cascade; root; ix; sub; last; _⊕_; _≟ᵖ_; _≟ⁱ_; _≟ˡ_; _<ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; end)
 open import simultaneous.Readings using (instantOf)
@@ -271,12 +275,13 @@ mutual
       hot-image : Res
       hot-image = concatMap (λ { (y , _) → if memᵖ (ψ y) (annRows σ*) then [] else fail "hot-image" nm y (ψ y) }) (hotV σ) , 0 , 0
   below {Γ} {Δ} {B} N n (flatMap {A = A} op f s) ρι ρ ρ* hs p p* nm =
-    walk N n s (λ i → there (ρι i)) ρ (tt-tab ∷ ρ*) hs p sp* (nm +++ "/src") ⊹ lanes op
+    proj₂ src ⊹ (lanesRes ⊹ coreRes)
     where
       tt-tab : Listed ⊤
       tt-tab = hotL (listC N n (of (tt ∷ [])) ρ* (p* ⊕ [ ix 1 ]))
       sp* : Pos
       sp* = p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ ix 1 ]
+      src = walkM N n s (λ i → there (ρι i)) ρ (tt-tab ∷ ρ*) hs p sp* (nm +++ "/src")
       s* : Obs Timeline (⊤ ∷ Δ) (IE A)
       s* = elab (λ i → there (ρι i)) s
       sh-tab : Listed (IE A)
@@ -303,28 +308,68 @@ mutual
       ... | nothing = []
       ... | just l  = values (rows l)
 
-      -- One lane, at its plain start and its lanes' flatMap's.
-      lane : A × Pos × Pos → Res
-      lane (a , st , st*) =
-        walk N n (f a) ρι⁴ ρ (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) hs st (laneX st*) (nm +++ "/lane")
-
-      unqueued : Res
-      unqueued with pairStarts (mapL (λ { (q , a) → a , q ⊕ [ ix 1 ] }) vs) (mapL (λ { (q* , _) → q* ⊕ [ ix 1 ] }) vs*)
-      ... | nothing = fail "lanes" nm p p* , 0 , 0
-      ... | just ls = L.foldr (λ x r → lane x ⊹ r) none ls
-
-      queued : ℕ → Res
-      queued k with o | o*
-      ... | just l | just l* with pairStarts
+      -- Each value's lanes, at their plain starts and the lanes' flatMap's.
+      starts : _ → Maybe (List (A × Pos × Pos))
+      starts (mergeᶠ (just k)) with o | o*
+      ... | just l | just l* = pairStarts
             (entryStarts (BoundedL.levels k (afterL (λ a → listC N n (f a) ρ)) l (length vs) 0 [] (Order.nths vs 0)))
             (mapL proj₂ (entryStarts (BoundedL.levels k (afterL (λ a → listC N n (laneˢ (elab ρι⁴ (f a))) ρ*c)) l* (length vs*) 0 [] (Order.nths vs* 0))))
-      ...   | nothing = fail "lanes" nm p p* , 0 , 0
-      ...   | just ls = L.foldr (λ x r → lane x ⊹ r) none ls
-      queued k | _ | _ = none
+      ... | _ | _ = just []
+      starts _ = pairStarts (mapL (λ { (q , a) → a , q ⊕ [ ix 1 ] }) vs) (mapL (λ { (q* , _) → q* ⊕ [ ix 1 ] }) vs*)
 
-      lanes : _ → Res
-      lanes (mergeᶠ (just k)) = queued k
-      lanes _                 = unqueued
+      -- One lane, at its plain start and its lanes' flatMap's: the two
+      -- starts, the lane's map, its findings.
+      lane : A × Pos × Pos → Pos × Pos × Maybe (List (Pos × Pos)) × Res
+      lane (a , st , st*) with walkM N n (f a) ρι⁴ ρ (hotL (listC N n (of (tt ∷ [])) ρ*c (laneL st* ⊕ [ ix 1 ])) ∷ ρ*c) hs st (laneX st*) (nm +++ "/lane")
+      ... | m , r = st , st* , m , r
+
+      walked : List (Pos × Pos × Maybe (List (Pos × Pos)) × Res)
+      walked with starts op
+      ... | nothing = []
+      ... | just ls = mapL lane ls
+
+      lanesRes : Res
+      lanesRes with starts op
+      ... | nothing = fail "lanes" nm p p* , 0 , 0
+      ... | just _  = L.foldr (λ { (_ , _ , _ , r) acc → r ⊹ acc }) none walked
+
+      -- The lanes' flatMap's table against the plain flatMap's, along the
+      -- map written out: a lane row through `laneˢ`'s reader and
+      -- `counted`'s emit, its end at its `laneDone`'s; a source row
+      -- through the shared hot's reader.
+      readerR : Pos → Pos
+      readerR st* = laneL st* ⊕ [ ix 0 ] ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]
+
+      emitAt : Pos → Pos
+      emitAt r = r ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+
+      laneOf : Pos → List (Pos × Pos × Maybe (List (Pos × Pos)) × Res) → Maybe (Pos × List (Pos × Pos))
+      laneOf k [] = nothing
+      laneOf k ((st , st* , just m , _) ∷ ws) = if inside st k then just (st* , m) else laneOf k ws
+      laneOf k (_ ∷ ws) = laneOf k ws
+
+      srcMap : List (Pos × Pos)
+      srcMap with proj₁ src
+      ... | nothing = []
+      ... | just m  = m
+
+      formula : Pos × Vis → Pos
+      formula (k , v) with laneOf k walked
+      ... | nothing = phi srcMap k ⊕ [ sub c₁ ]
+      ... | just (st* , m) with v
+      ...   | vout = emitAt (phi m k ⊕ [ sub (readerR st*) ])
+      ...   | vend = emitAt (phi m k ⊕ [ sub (readerR st*) ] ⊕ [ ix 1 ] ⊕ [ ix 0 ]) ⊕ [ last ]
+
+      coreRes : Res
+      coreRes with plainV (listC N n (flatMap op f s) ρ p) | elabV {B} (listC N n (flatMap op (λ a → laneˢ (elab ρι⁴ (f a))) core-src) ρ*c c₁)
+      ... | just ks | just ks* with pairing ks ks*
+      ...   | nothing = fail "core-count" nm p c₁ , 0 , 0
+      ...   | just m  = concatMap (λ { (k , k*) → let w = formula (k , kindOf k) in if does (w ≟ᵖ k*) then []
+                                    else [ "core" , nm +++ " " +++ showPos k +++ " ~ " +++ showPos k* +++ " written " +++ showPos w ] }) m , 0 , 0
+        where
+          kindOf : Pos → Vis
+          kindOf k = if memᵖ k (ofKind false ks) then vend else vout
+      coreRes | _ | _ = none
 
 ------------------------------------------------------------------------
 -- The run
@@ -338,7 +383,7 @@ private
   probe seed = walk N₀ n₀ (toObs timeline 3 (program seed) [] [] []) (λ i → i) [] [] [] root (root ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]) ""
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k

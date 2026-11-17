@@ -20,31 +20,36 @@
 -- the elaboration's own leaves.
 module simultaneous.TableRel where
 
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using (List; []; _∷_; [_]; _++_)
+import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Bool using (Bool)
-open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Bool using (Bool; T; if_then_else_)
+open import Data.Empty using (⊥)
+open import Data.Maybe using (Maybe)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (refl; trans)
-open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
+open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
+open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; ix; sub; inside; _⊕_)
 open import denotation.Events using (Timeline; From; fresh)
-open import denotation.EmissionSet using (Unpinned; _≼_)
+open import denotation.EmissionSet using (Unpinned; pin; _≼_)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
+open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; _≼ᵇ_)
+open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_)
 open import quickcheck.Tabled.Exact.Base using (when⁻)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; UncutEnv)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.TableCorr using (Rel; Rows; TR)
+open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys)
+open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; Tab; Tab*; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
          Maps; Aligned; aligned-⊕;
@@ -128,6 +133,15 @@ postulate
   -- `p* ⊕ [ix 0]`: what is over it precedes it, and it precedes the
   -- source.
   past-src : ∀ {p* y*} → (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) ≼ y* → ¬ (y* ⊑ (p* ⊕ [ ix 0 ]))
+
+-- One label up.
+up : Pos → Pos
+up (i ∙ ys) = i ∙ dropLast ys
+  where
+    dropLast : List Label → List Label
+    dropLast []           = []
+    dropLast (_ ∷ [])     = []
+    dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
 
 cut-sub : ∀ {q q* y y*} → Cut q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut q q* y (y* ⊕ [ l ])
 cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
@@ -219,14 +233,83 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     where
       seen = Rest.seen (Out.rest Rs) (aligned-⊕ {Ψ = maps env} {ρ = ρ} al (ix 0) (ix 0)) (cut-body lk) (under-guard p (⊑-refl (p ⊕ [ ix 0 ]))) N
 
-  postulate
-    -- THE CONNECT'S ROWS: the body's, then the source's own past the
-    -- body's subscription, its subscribe burst as pins of the connect
-    -- and the rest unsubscribed while the body runs.  The connect makes
-    -- pins, so `pin-stable` is first met here.
-    conn-tab : (Rs : Src) → Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
-             → Rel (Tab n (connect s b) ρ p) (Tab* n ρι (connect s b) ρ* p*) p p*
+  ----------------------------------------------------------------------
+  -- The connect's record
 
+  P Q : ℕ → _
+  P = Tab n (connect s b) ρ p
+  Q = Tab* n ρι (connect s b) ρ* p*
+
+  -- The body's tables.
+  Bp : ℕ → Maybe (Tb.Listed B)
+  Bp = Tab n b ρ′ (p ⊕ [ ix 0 ])
+
+  isBody : ℕ → Pos → Bool
+  isBody N y = anyᵇ (λ k → does (k ≟ᵖ y)) (keys (Bp N))
+
+  -- THE CONNECT'S ROWS: the body's, then the source's own past the
+  -- body's subscription, one label down, its subscribe burst as pins of
+  -- the connect and the rest unsubscribed while the body runs.  A body
+  -- row is imaged along the body's map; a source row at its annotated
+  -- image, one label down, as the elaborated connect shows it.  The
+  -- connect makes pins, so `pin-stable` is first met here.
+  module ConnTab (Rs : Src) (Ob : Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])) where
+    Rb : Rel Bp (Tab* n (ext ρι) b ρ*′ (p* ⊕ [ ix 0 ])) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
+    Rb = Out.rel Ob
+
+    φ′ : ℕ → Pos → Pos
+    φ′ N y = if isBody N y then Rel.φ Rb N y else Ψ′ Rs (here refl) N (up y) ⊕ [ ix 0 ]
+
+    Put′ : ℕ → Pos → Pos → Set
+    Put′ N y l = if isBody N y then Rel.Put Rb N y l else l ≡ φ′ N y
+
+    bk′ : Pos → List Pos
+    bk′ l = Rel.bk Rb l ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Rs) (up (up l)))
+
+    postulate
+      ct-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
+      ct-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ′ N k ≡ φ′ N′ k
+      ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk′ (φ′ N k)
+      ct-pb-few      : ∀ l → Σ (List Pos) λ ks → ∀ {N k} → Put′ N k l → k ∈ ks
+      ct-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+                     → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
+      ct-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′
+                     → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
+      ct-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put′ N k l
+                     → AgreeTo l (TR (Q N′)) (TR (Q N))
+      ct-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′ → Corr.Leads (ct-corr N) k
+                     → TR (Q N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
+      ct-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
+      ct-func        : ∀ {N y e e′} → TR (P N) y e → TR (P N) y e′ → e ≡ e′
+      ct-func*       : ∀ {N y e e′} → TR (Q N) y e → TR (Q N) y e′ → e ≡ e′
+      ct-flat        : ∀ {N y e l ys e′} → TR (P N) y e → TR (P N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      ct-flat*       : ∀ {N y e l ys e′} → TR (Q N) y e → TR (Q N) (y ⊕ (l ∷ ys)) e′ → ⊥
+      ct-pin-in      : ∀ {N l r} → TR (P N) l (pin r) → T (inside r l)
+      ct-pin-in*     : ∀ {N l r} → TR (Q N) l (pin r) → T (inside r l)
+      ct-cons        : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
+      ct-cons*       : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
+      ct-got         : ∀ N → Got (P N)
+      ct-got*        : ∀ N → Got (Q N)
+      ct-after       : ∀ {N k e} → TR (P N) k e → p ≼ k
+      ct-after*      : ∀ {N l e} → TR (Q N) l e → p* ≼ l
+      ct-after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → p* ≼ φ′ N k
+      ct-pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → p* ≼ r
+      ct-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+                     → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
+                     → ∀ {y r} → r ≼ φ′ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)
+
+    rel′ : Rel P Q p p*
+    rel′ = record
+      { φ = φ′ ; Put = Put′ ; corr = ct-corr ; φ-agree = ct-φ-agree ; bk = bk′ ; in-bk = ct-in-bk ; pb-few = ct-pb-few
+      ; elab-causal = ct-elab-causal ; stable← = ct-stable← ; stable-put = ct-stable-put ; stable-lead = ct-stable-lead
+      ; elab-all = ct-elab-all ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
+      ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; cons = ct-cons ; cons* = ct-cons* ; got = ct-got ; got* = ct-got*
+      ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after* ; pin-stable = ct-pin-stable }
+
+  conn-tab : (Rs : Src) → Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
+  conn-tab = ConnTab.rel′
+
+  postulate
     -- The connect's rows are the body's and the source's, each carrying
     -- its own order facts; the source's pins are its subscribe burst.
     conn-order : (Rs : Src) (Ob : Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]))

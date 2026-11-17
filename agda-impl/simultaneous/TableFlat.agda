@@ -135,6 +135,22 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- elaborated lane is the plain lane's, run through `laneˢ`.  Its rows
   -- are the plain flatMap's values and ends, along the source's map for
   -- the source's rows and each lane's for its own.
+  --
+  -- A lane's record is had only from a cut: `Lanes` wants the lane's
+  -- value and its pair's alignment, and both are read off the source's
+  -- row `TR (Ps N) q (out a)` and `Rest.cuts` at it.  So `φ` and `Put` are
+  -- written per cut, each lane row through its own lane's record at that
+  -- cut.
+  --
+  -- DEAD ROUTE: a body over the lanes' records.  `Rel.bk` and `pb-few`'s
+  --   list are cut-free functions of an elaborated position, and a lane
+  --   row's preimages are its lane's `bk`, a record of `f a` had only from
+  --   a cut holding the value row: decoding the position gives the source
+  --   row's candidates through the source's `bk`, never the value nor the
+  --   alignment evidence.  The erasure (`Erase` in `simultaneous.Attribution`)
+  --   reads `bk` only at elaborated rows a known cut settles, so a
+  --   cut-indexed `bk` is the restatement to try.
+
   postulate
     -- Every value's lane is subscribed under its row, and every lane row
     -- is shown: each lane's pair is aligned by the source's facts at its

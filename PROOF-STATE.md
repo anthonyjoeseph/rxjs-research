@@ -34,24 +34,28 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLATMAP'S LAYERS
 
-Untried: the flatMap's elaboration grown outward from the lanes'
-flatMap through the combined scan, the closer and the share, over one
-map per hot shared by every reader. The lanes' flatMap is split by
-operator; only the bounded merge queues a lane at a run-dependent row.
-Settled by bodies, or a lane pair no creator's facts align.
+A lane's record is had only from a cut holding its value row, but
+`Rel.bk` and `pb-few`'s list are cut-free, so no lanes' flatMap body can
+name a lane row's preimages. Settled by a cut-indexed `bk` the erasure
+accepts, or a value-free lane preimage list.
 
 Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
 
 #### THE CONNECT
 
-Untried: the source's hot related along the source's map rejoined
-under the annotation's reader (`conn-hot`), an old hot's reader cutting
-the new hot alike (`conn-old-cut`), and the connect's rows, the first
-former making pins, so the first test of `pin-stable` (`conn-tab`).
+The connect's record is written: body rows along the body's map, source
+rows one label down at their annotated image. Untried: its field leaves,
+the source's hot (`conn-hot`), an old hot cutting the new alike
+(`conn-old-cut`); the first former making pins, so `ct-pin-stable`.
 Settled by bodies.
 
-Members: `conn-hot`, `conn-old-cut`, `conn-tab`, `conn-order`.
+Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
+`ct-in-bk`, `ct-pb-few`, `ct-elab-causal`, `ct-stable←`, `ct-stable-put`,
+`ct-stable-lead`, `ct-elab-all`, `ct-func`, `ct-func*`, `ct-flat`,
+`ct-flat*`, `ct-pin-in`, `ct-pin-in*`, `ct-cons`, `ct-cons*`, `ct-got`,
+`ct-got*`, `ct-after`, `ct-after*`, `ct-after-φ`, `ct-pin-after*`,
+`ct-pin-stable`.
 
 #### THE ORDER FACTS
 
