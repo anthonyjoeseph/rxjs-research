@@ -34,14 +34,28 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE FLATMAP'S LAYERS
 
-A lane's record is had only from a cut holding its value row; the
-preimage lists are now per cut, so each lane row's map, put and
-preimages read through its lane's record at that cut. Untried as bodies;
-concat's queued lanes, positioned by the run, the riskiest. Settled by
-the four bodies.
+The plain merge is written (`MergeTab`): each lane row read through its
+lane's record at the cut holding its value row. Untried: concat's queued
+lanes, positioned by the run, the riskiest; then switch and exhaust,
+whose lanes are cut short. Settled by the three bodies.
 
-Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
+Members: `flat-concat`, `flat-switch`, `flat-exhaust`,
 `flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
+
+#### THE PLAIN MERGE
+
+The merge's record is written: lane rows through `laneˢ`'s reader and
+`counted`'s emit, a value's marker at its elaborated value's, the
+source's end at the later of its own and the trigger's. Visible images
+probed (`make table-check`, kind `core`); skip images and puts untried.
+Settled by bodies.
+
+Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-pb-few`, `mg-back`,
+`mg-put-up`, `mg-back-put`, `mg-elab-causal`, `mg-stable←`,
+`mg-stable-put`, `mg-stable-lead`, `mg-elab-all`, `mg-func`, `mg-func*`,
+`mg-flat`, `mg-flat*`, `mg-pin-in`, `mg-pin-in*`, `mg-cons`, `mg-cons*`,
+`mg-got`, `mg-got*`, `mg-after`, `mg-after*`, `mg-after-φ`,
+`mg-pin-after*`, `mg-pin-stable`.
 
 #### THE BACK FACT
 
