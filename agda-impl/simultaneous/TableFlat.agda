@@ -842,7 +842,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cz-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
       cz-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       cz-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      cz-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₃ ≼ φ′ N k
       cz-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → c₃ ≼ r
       cz-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
@@ -853,6 +852,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     cz-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
     cz-pin-in* {N} = pin-ok (3 + N) n (body op) {ρ*h N} c₃
+
+    -- The body's images lie past the closer's body, one label up.
+    cz-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → c₃ ≼ φ′ N k
+    cz-after-φ {N} {k} x u = ≼-trans {c₃} {c₂} {φ′ N k} (≼-ˡ c₃ (ix 0 ∷ [])) (Rel.after-φ R x u)
 
     cz-after* : ∀ {N l e} → TR (Q′ N) l e → c₃ ≼ l
     cz-after* {N} = after-ok (3 + N) n (body op) {ρ*h N} c₃
@@ -900,7 +903,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       sr-func*       : ∀ {N y e e′} → TR (Q′ N) y e → TR (Q′ N) y e′ → e ≡ e′
       sr-flat*       : ∀ {N y e l ys e′} → TR (Q′ N) y e → TR (Q′ N) (y ⊕ (l ∷ ys)) e′ → ⊥
       sr-cons*       : ∀ {N N′} → Cons (TR (Q′ N)) (TR (Q′ N′))
-      sr-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
       sr-pin-after*  : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
       sr-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                      → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
@@ -911,6 +913,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     sr-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
     sr-pin-in* {N} = pin-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
+
+    -- The closer's images lie past the share, two labels up.
+    sr-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
+    sr-after-φ {N} {k} x u = ≼-trans {p*} {c₃} {φ′ N k} (≼-ˡ p* (ix 0 ∷ ix 0 ∷ [])) (Rel.after-φ R x u)
 
     sr-after* : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
     sr-after* {N} = after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*

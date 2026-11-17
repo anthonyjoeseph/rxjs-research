@@ -119,14 +119,12 @@ Members: `cz-corr`, `cz-back`,
 `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
 `cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-func*`,
 `cz-flat*`, `cz-cons*`,
-`cz-after-φ`,
 `cz-pin-after*`, `cz-pin-stable`.
 
 Members: `sr-corr`, `sr-back`,
 `sr-back-put`, `sr-elab-causal`, `sr-stable←`,
 `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-func*`,
 `sr-flat*`, `sr-cons*`,
-`sr-after-φ`,
 `sr-pin-after*`, `sr-pin-stable`.
 
 #### THE BACK FACT
