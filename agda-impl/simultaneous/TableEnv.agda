@@ -496,6 +496,9 @@ record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : �
     lw   : DenOf ρ
     lw*  : DenOf ρ*
     hot  : ∀ {X} (i : X ∈ Γ) → HotR i ρ ρι ρ* maps lw lw*
+    -- A hot's map is its readers' subscriptions', never their admissions'.
+    hot-coh : ∀ {X} (i : X ∈ Γ) n p p* (a a′ : Admits lw p) (a* a*′ : Admits lw* p*) (al al′ : Aligned maps ρ p p*) (lk lk′ : Linked p p*) N y
+            → Rel.φ (Out.rel (hot i n p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (hot i n p p* a′ a*′ al′ lk′)) N y
     -- No elaborated hot a program reads ends a lane.
     unended : ∀ N → EnvU ρι (den lw* N)
 open EnvR public
@@ -509,11 +512,37 @@ Full : ∀ {Γ A} → ℕ → Obs Timeline Γ A → Set₁
 Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ N))
              → ∀ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) → (∀ N → UncutEnv (ρ* N)) → (env : EnvR ρ ρι ρ*) → Holds n o ρ ρι ρ* env
 
+-- Two environments whose hots map alike, however their readers are
+-- admitted.
+EnvEq : ∀ {Γ Δ} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} → EnvR ρ ρι ρ* → EnvR ρ ρι ρ* → Set₁
+EnvEq {Γ} {ρ = ρ} E E′ = ∀ {X} (i : X ∈ Γ) n p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
+                 (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
+               → Rel.φ (Out.rel (hot E i n p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (hot E′ i n p p* a′ a*′ al′ lk′)) N y
+
+-- THE MAP IS THE SUBSCRIPTIONS': a record's map is had from its
+-- subscriptions and its environment's maps, never from how either is
+-- admitted.  A flatMap's lane is related at each cut from that cut's
+-- row, so two cuts' records of one lane are two records, which only
+-- this relates.
+Coh : ∀ {Γ A} n (o : Obs Timeline Γ A) → Full n o → Set₁
+Coh {Γ} n o F = ∀ (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ* (E E′ : EnvR ρ ρι ρ*) → EnvEq E E′
+              → ∀ p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
+                  (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
+              → Rel.φ (Out.rel (F ρ uρ ρι ρ* uρ* E p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (F ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′)) N y
+
 -- An elaborated binder no plain subterm reads changes no reader.
 env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
        → HotD t → EnvR ρ ρι ρ* → EnvR ρ (wk ρι) (λ N → t N ∷ ρ* N)
 env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i n p p* a a* al lk →
-  let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O) (λ N i → unended env N i)
+  let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O)
+  (λ i n p p* a a′ a* a*′ al al′ lk lk′ → hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
+  (λ N i → unended env N i)
+
+-- One environment weakened by two records of one hot: its hots map alike.
+env-wk-eq : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
+          → (h h′ : HotD t) (env : EnvR ρ ρι ρ*) → EnvEq (env-wk h env) (env-wk h′ env)
+env-wk-eq h h′ env i n p p* a a′ a* a*′ al al′ lk lk′ =
+  hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h′ (lw* env) a*′) al al′ lk lk′
 
 -- An elaborated connect's hot ends no lane, wherever its scope's hots end none.
 listHot-u : ∀ {Γ Δ X} n {ρι : Ren Γ Δ} (s : Obs Timeline Γ X) {ρ* : ℕ → All Tb.Listed Δ} (u : ∀ N → UncutEnv (ρ* N)) (D : DenOf ρ*) c a
