@@ -265,8 +265,14 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
 --
 -- Each table is a run's: there is one, of one event per position, none
 -- under another's, a pin inside its connect, every row and every image
--- at or past its subscription.  Two cuts are truncated before they
--- differ (`Cons`).
+-- at or past its subscription, every elaborated pin's connect too.  Two
+-- cuts are truncated before they differ (`Cons`).
+--
+-- PINS STAY (`pin-stable`): two cuts agreeing up to a row and holding
+-- alike the plain pins whose connect lies at or before it hold alike the
+-- elaborated pins whose connect lies at or before its image.  Past a
+-- take's first failure only such pins survive, and the plain take fixes
+-- nothing else of its child there.
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
@@ -298,3 +304,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     after       : ∀ {N k e} → TR (P N) k e → s ≼ k
     after*      : ∀ {N l e} → TR (Q N) l e → s* ≼ l
     after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → s* ≼ φ N k
+    pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → s* ≼ r
+    pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+                → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
+                → ∀ {y r} → r ≼ φ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)

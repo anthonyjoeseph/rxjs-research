@@ -181,7 +181,9 @@ module SpinTab {A : Set} (p p* : Pos) where
     ; got* = λ _ → _ , refl
     ; after = after′
     ; after* = after′
-    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* []) }
+    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
+    ; pin-after* = λ y → ⊥-elim (pin-no y)
+    ; pin-stable = λ _ _ _ _ _ _ y → ⊥-elim (pin-no y) }
     where
       pin-no : ∀ {X : Set} {M q k r} → TR {X} (S M q) k (pin r) → ⊥
       pin-no x with sp→ x

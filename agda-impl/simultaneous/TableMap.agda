@@ -281,7 +281,10 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
     ; got* = λ N → got-bind (mapRows g) (R.got* N)
     ; after = λ {N} x → R.after (proj₁ (proj₂ (tr-map→ f (P N) x)))
     ; after* = λ {N} y → R.after* (proj₁ (proj₂ (tr-map→ g (Q N) y)))
-    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.after-φ x₀ u₀ }
+    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.after-φ x₀ u₀
+    ; pin-after* = λ {N} y → R.pin-after* (tr-pin← g (Q N) y)
+    ; pin-stable = λ {N} {N′} le x un ag hp rk y → let (_ , x₀ , u₀) = back-row N x un in
+        tr-map← g (Q N) (R.pin-stable le x₀ u₀ (ag← ag) (λ r₀k x₁ → tr-pin← f (P N) (hp r₀k (tr-map← f (P N′) x₁))) rk (tr-pin← g (Q N′) y)) }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))

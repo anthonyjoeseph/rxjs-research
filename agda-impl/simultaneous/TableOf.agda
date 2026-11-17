@@ -191,7 +191,9 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
     ; got* = λ _ → _ , refl
     ; after = λ { (_ , refl , m) → after-W p 0 xs m }
     ; after* = λ { (_ , refl , m) → after-W p* 0 (map v xs) m }
-    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* []) }
+    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
+    ; pin-after* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
+    ; pin-stable = λ _ _ _ _ _ _ y → y }
     where
       in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ (_ , refl , m) _ with step p 0 xs m

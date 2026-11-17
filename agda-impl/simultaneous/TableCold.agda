@@ -285,7 +285,9 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; got* = cold-got*
     ; after = λ { (_ , refl , x) → walk-after x }
     ; after* = cold-after*
-    ; after-φ = λ { (_ , refl , x) _ → φ-after x } }
+    ; after-φ = λ { (_ , refl , x) _ → φ-after x }
+    ; pin-after* = λ y → ⊥-elim (cold-pin* y)
+    ; pin-stable = λ _ _ _ _ _ _ y → ⊥-elim (cold-pin* y) }
 
 cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p* → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*
 cold-tab m n ρ* uρ* p p* = ColdTab.rel′ m n ρ* uρ* p p*

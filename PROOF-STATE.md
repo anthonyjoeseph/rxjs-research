@@ -36,8 +36,9 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 The rewrite, finished before any other proof work: the batcher's
 plumbing has its own record, owing coherence, run-shaped tables, cuts
-truncated before they differ (`cons`) and rows past the subscription
-(`after`). Settled when it is a body.
+truncated before they differ (`cons`), rows past the subscription
+(`after`) and its burst pins kept by agreeing cuts (`pin-stable`).
+Settled when it is a body.
 
 Members: `top-rel`.
 
@@ -62,16 +63,6 @@ Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`,
 `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-agree`, `walk-cons`,
 `walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
 `φ-back`.
-
-#### THE TAKE'S LATE PINS
-
-Untried, possibly false: past the elaborated first failure a take keeps
-only pins whose connect lies before it, and the plain takes agreeing
-need not make the children agree there. Settled by a body, or by two
-cuts agreeing on the plain take whose elaborated takes keep different
-pins.
-
-Members: `take-pins`.
 
 #### THE FLATMAP AND CONNECT CASES
 

@@ -15,7 +15,7 @@ open import Data.List using ([]; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -343,7 +343,9 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     ; got* = λ N → got-bind (λ b → ((g* , skip) ∷ rows b) ⊣ short b) (R.got* N)
     ; after = after′
     ; after* = after*′
-    ; after-φ = after-φ′ }
+    ; after-φ = after-φ′
+    ; pin-after* = pin-after*′
+    ; pin-stable = pin-stable′ }
     where
       φ-agree′ : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
       φ-agree′ {N} {N′} {k} x un ag with tr-g→ g (P N) x
@@ -356,7 +358,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
       ... | inj₁ (refl , _) = here refl
       ... | inj₂ x₀ = there (subst (λ z → k ∈ R.bk z) (sym (φ-c {N} {k} (ab N x₀))) (R.in-bk x₀ un))
 
-      elab-causal′ : ∀ {N N′ k e} → N Data.Nat.≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                    → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       elab-causal′ {N} {N′} {k} le x un ag with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (sym (φ-g {N})) (ag-low g* (ab* N′) (ab* N) (R.got* N′) (R.got* N))
@@ -364,7 +366,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
         subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (sym (φ-c {N} {k} (ab N x₀)))
               (ag-add g* (R.got* N′) (R.got* N) (R.elab-causal le x₀ un (ag-strip g (ab N′) (ab N) ag)))
 
-      stable←′ : ∀ {N N′ k e e′} → N Data.Nat.≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
+      stable←′ : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
                → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
       stable←′ {N} {N′} {k} {e′ = e′} le x un y ag* with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = ag-low g (ab N′) (ab N) (R.got N′) (R.got N)
@@ -380,7 +382,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
       ... | inj₁ (refl , _) = ag-low g* (ab* N′) (ab* N) (R.got* N′) (R.got* N)
       ... | inj₂ y₀ = ag-add g* (R.got* N′) (R.got* N) (R.stable-put le (ag-strip g (ab N′) (ab N) ag) y₀ pl)
 
-      stable-lead′ : ∀ {N N′ k e e′ m e*} → N Data.Nat.≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Leads′ N k
+      stable-lead′ : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Leads′ N k
                    → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N))
                    → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
       stable-lead′ {N} {N′} {k} {e′ = e′} le x un y ld z ie ag* with tr-g→ g (P N) x
@@ -415,6 +417,30 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
       after*′ {N} {l} y with tr-g→ g* (Q N) y
       ... | inj₁ (refl , _) = ≺→≼ {p*} {g*} (≺-ext p* [])
       ... | inj₂ y₀ = ≼-trans {p*} {o*} {l} p*≼o* (R.after* y₀)
+
+      pin-after*′ : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
+      pin-after*′ {N} {r = r} y with tr-g→ g* (Q N) y
+      ... | inj₁ (_ , ())
+      ... | inj₂ y₀ = ≼-trans {p*} {o*} {r} p*≼o* (R.pin-after* y₀)
+
+      -- A child's pin, read off the guarded table.
+      unguard : ∀ {X : Set} q (m : Maybe (Tb.Listed X)) {l r} → TR (Guarded q m) l (pin r) → TR m l (pin r)
+      unguard q m y with tr-g→ q m y
+      ... | inj₁ (_ , ())
+      ... | inj₂ y₀ = y₀
+
+      -- Below the guard no pin's connect lies: the child's lie past its
+      -- subscription, the guard's second tick.
+      pin-stable′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+                  → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
+                  → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
+      pin-stable′ {N} {N′} {k} le x un ag hp {y} {r} rk yq with tr-g→ g (P N) x
+      ... | inj₁ (refl , _) =
+        ⊥-elim (subst (r ≼_) (φ-g {N}) rk (≺-≼-≺ {g*} {o*} {r} (ticks p* 0) (R.pin-after* (unguard g* (Q N′) yq))))
+      ... | inj₂ x₀ =
+        tr-g← g* (Q N) (R.pin-stable le x₀ un (ag-strip g (ab N′) (ab N) ag)
+          (λ r₀k x₁ → unguard g (P N) (hp r₀k (tr-g← g (P N′) x₁)))
+          (subst (r ≼_) (φ-c {N} {k} (ab N x₀)) rk) (unguard g* (Q N′) yq))
 
       after-φ′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
       after-φ′ {N} {k} x un with tr-g→ g (P N) x
