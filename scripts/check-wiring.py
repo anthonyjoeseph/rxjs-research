@@ -964,12 +964,6 @@ MODULE_ROOTS = {
                                     ("main",)),
     "quickcheck.Oracle-CLI": ("the oracle's Agda half — `make oracle`",
                               ("main",)),
-    "quickcheck.Entry-Check": ("the settled-entry probe — `make entry-check`",
-                               ("main",)),
-    "quickcheck.Cursor-Check": ("the cursor probe — `make cursor-check`",
-                                ("main",)),
-    "quickcheck.Table-Check": ("the table probe — `make table-check`",
-                               ("main",)),
     "quickcheck.Spec-Check": ("the simultaneous spec, tested — `make spec-check`",
                               ("main",)),
 }

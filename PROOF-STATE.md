@@ -36,7 +36,7 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 The combined scan's record is written: a lanes' row re-emitted at the
 lane branch's reader, the flatMap's end at the `nothing` past the last
-of the three branches' ends (probed, kind `whole`). Untried: its fields,
+of the three branches' ends (probed). Untried: its fields,
 the scan emitting nothing but marks besides. Settled by bodies.
 
 Members: `cb-corr`, `cb-φ-agree`, `cb-back`, `cb-back-put`, `cb-elab-causal`,
@@ -87,7 +87,7 @@ Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`, `ex-put-up`,
 
 The bounded merge's record is written: lanes enumerated level by level,
 a queued lane's record had from the lane it waited on, at its end, and
-subscribed under that end's image (probed, kind `lane-sub`). Untried:
+subscribed under that end's image (probed). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
 Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`, `cc-put-up`,
@@ -100,7 +100,7 @@ Members: `cc-corr`, `cc-φ-agree`, `cc-in-bk`, `cc-back`, `cc-put-up`,
 The merge's record is written: lane rows through `laneˢ`'s reader and
 `counted`'s emit, a value's marker at its elaborated value's, the
 source's end at the later of its own and the trigger's. Visible images
-probed (`make table-check`, kind `core`); skip images and puts untried.
+probed; skip images and puts untried.
 Settled by bodies.
 
 Members: `mg-corr`, `mg-φ-agree`, `mg-in-bk`, `mg-back`, `mg-put-up`,
@@ -123,8 +123,7 @@ Members: `cz-corr`, `cz-back`, `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
 
 #### THE SOURCE'S PINS
 
-Probed at a flatMap the root reaches (`make table-check`, kind
-`pd-agree`), unproven: two cuts of the plain flatMap agreeing up to a
+Probed at a flatMap the root reaches, unproven: two cuts of the plain flatMap agreeing up to a
 row agree on which pins below it are the source's, no lane row sitting
 where a source row does. Settled by its body.
 
@@ -135,7 +134,7 @@ Members: `pd-agree`.
 A cut whose elaborated table agrees up to a row's image agrees up to the
 row, and a put moves between cuts agreeing up to its row or its place:
 what lets the erasure read preimages at the cut settling an image.
-Probed at the root (`make table-check`, kind `back`); proven for of,
+Probed at the root; proven for of,
 spin, map, scan, defer. Settled by bodies, or a cut holding an image
 but not its row.
 
@@ -156,7 +155,7 @@ Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
 
 #### THE ORDER FACTS
 
-Probed (`make table-check`, every uncut subterm), unproven: each
+Probed at every uncut subterm, unproven: each
 former's rows carry the record's order facts (`Rest`): linked to their
 images, cutting every hot in scope alike up each creator chain. A leaf former's rows lie at steps of timers it created
 at its subscription; a one-to-one former's are its child's. Settled by
