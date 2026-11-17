@@ -1,75 +1,37 @@
 {-# OPTIONS --guardedness #-}
 
 -- THE ELABORATED COLD'S LISTING IS ITS WRITTEN-OUT ROWS (`cold-rows`).
--- A merge's listing is the merge of its parts' listings, each lane read
--- off its own listing (`merge-tr`); the elaborated cold is the merge of
--- the scan's rows and each tag's render, so its rows are `CRow`'s once
--- the scan's and each render's are.
+-- The elaborated cold is the merge of the scan's rows (`scan-rows`) and
+-- each tag's render, so its rows are `CRow`'s once each render's are.
 --
 -- The joiner's two side conditions come from one fact about the order
 -- (`srow-lane-end`): every tag's render ends before the scan does.  So
 -- the scan's end has every part ended, and a render's end never does.
 module simultaneous.ColdList where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]) renaming (map to mapL)
-open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List using (List; [_])
 open import Data.List.Relation.Unary.All using (All)
-open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Tree using (Obs; mergeᶠ; flatMap; cold; of; map; scan; merge)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
-open import denotation.Events using (Timeline; From; fixed; fresh; start)
-open import denotation.EmissionSet using (out; end; Den; coldAt; enter; After; LaneOf; _≺_; module Merge)
+open import denotation.Events using (Timeline; From; fixed; fresh)
+open import denotation.EmissionSet using (out; end; Den; LaneOf; _≺_; module Merge)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (Row; rows; afterL)
-open import quickcheck.Tabled.Exact using (merge-exact; truncate-exact)
-open import quickcheck.Tabled.Exact.Base using (Exact; Exactly; sound; complete; bind⁻; lanes-from; lanes-to; afterL-exact)
-open import simultaneous.SObs using (Tag; val; cdone; tick; lone; module Elaborate)
-open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
+open import simultaneous.SObs using (Tag; lone; module Elaborate)
+open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.ColdRows using (module At)
+open import simultaneous.ColdOrder using (module Ord)
+open import simultaneous.ColdScan using (module Phase)
+open import simultaneous.ListTR using (laneD; merge-tr)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; concatˢ; phase; render)
-
-------------------------------------------------------------------------
--- A listing is exact for its own table
-
-tr-at : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {L k e} → m ≡ just L → TR m k e → (k , e) ∈ rows L
-tr-at refl (_ , refl , x) = x
-
-at-tr : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {L k e} → m ≡ just L → (k , e) ∈ rows L → TR m k e
-at-tr {L = L} eq x = L , eq , x
-
-self-exact : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {L} → m ≡ just L → Exactly L (TR m)
-self-exact eq _ = record { sound = at-tr eq ; complete = tr-at eq }
-
-------------------------------------------------------------------------
--- A merge's listing
-
--- Each lane read off its own listing, wherever it is subscribed.
-laneD : ∀ {Γ} {X Y : Set} → ℕ → ℕ → (X → Obs Timeline Γ Y) → All Tb.Listed Γ → X → Den Y
-laneD K n f ρ x = coldAt (λ s → TR (listC K n (f x) ρ s))
-
-merge-tr : ∀ {Γ} {X Y : Set} K n (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) {ρ : All Tb.Listed Γ} → UncutEnv ρ → ∀ p {k e}
-  → TR (listC K n (flatMap (mergeᶠ nothing) f s) ρ p) k e ⇔ Merge.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)) k e
-merge-tr K n f s {ρ} uρ p with listC-ok K n (flatMap (mergeᶠ nothing) f s) uρ p
-... | L , eq , u with bind⁻ {m = listC K n s ρ p} eq
-... | o , eo , e₁ with bind⁻ {m = Tb.lanes (afterL (λ a → listC K n (f a) ρ)) (Tb.values (rows o))} e₁
-... | ls , els , refl = mk⇔ (λ x → sound ex (tr-at eq x)) (λ x → at-tr eq (complete ex x))
-  where
-    ex : Exact L (Merge.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)))
-    ex = merge-exact (laneD K n f ρ) o ls (self-exact eo)
-      (lanes-from {ln = afterL (λ a → listC K n (f a) ρ)} {D = λ a → After (laneD K n f ρ a)}
-        (afterL-exact {ln = λ a → listC K n (f a) ρ} {D = λ a → enter (laneD K n f ρ a)} (λ el → truncate-exact (self-exact el))) els)
-      (lanes-to {ln = afterL (λ a → listC K n (f a) ρ)} els) u
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render)
 
 ------------------------------------------------------------------------
 -- The elaborated cold
@@ -77,12 +39,8 @@ merge-tr K n f s {ρ} uρ p with listC-ok K n (flatMap (mergeᶠ nothing) f s) u
 module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ : UncutEnv ρ) (m : From A 0) (P : Pos) where
   open At {A} P using (C₀; c₀; SRow; Rend; CRow; r-end; c-skp; c-end; c-val; c-lane; c-lend)
 
-  J : List (Row A)
-  J = walkN K (start c₀ m)
-
-  -- The scan the renders hang off.
-  scanned : Obs Timeline Δ (Bool × Tag A)
-  scanned = scan phase (false , tick) (merge (concatˢ (map val (cold (fixed m))) (of (cdone ∷ []))) (of (tick ∷ [])))
+  open Ord {A} P K m using (J)
+  open Phase K n ρ uρ m P using (scanned; scan-rows)
 
   fR : Bool × Tag A → Den (IE A)
   fR = laneD K n render ρ
@@ -91,7 +49,6 @@ module Cold {A : Set} (K n : ℕ) {Δ : List Set} (ρ : All Tb.Listed Δ) (uρ :
 
   postulate
     -- THE COLD'S ROWS.
-    scan-rows     : ∀ {k e} → TR (listC K n scanned ρ P) k e ⇔ SRow J k e
     rend-rows     : ∀ q x {k e} → LaneOf fR q x k e ⇔ Rend q x k e
     srow-lane-end : ∀ {q x c} → SRow J q (out x) → SRow J c end → (q ⊕ [ ix 1 ] ⊕ [ last ]) ≺ c
 

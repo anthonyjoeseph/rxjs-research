@@ -44,14 +44,13 @@ Members: `top-rel`.
 #### THE COLD'S ROWS
 
 The rewrite: the elaborated cold's table is its rows written out
-(`CRow`); the top merge is matched. Untried: the scan's rows through the
-merge, concat and scan semantics, the concat's schedule hardest; each
-render's rows; the renders end before the scan; the rows are functional,
-flat, causal across cuts. Settled by bodies, or a listed row `CRow`
-lacks.
+(`CRow`); the top merge, the scan, its merge and the concat's schedule
+are matched. Untried: each render's rows; the renders end before the
+scan; the rows are functional, flat, causal across cuts. Settled by
+bodies, or a listed row `CRow` lacks.
 
-Members: `scan-rows`, `rend-rows`, `srow-lane-end`, `rows-func`,
-`rows-flat`, `rows-causal`, `rows-cons`.
+Members: `rend-rows`, `srow-lane-end`, `rows-func`, `rows-flat`,
+`rows-causal`, `rows-cons`.
 
 #### THE COLD'S WALK
 
@@ -59,8 +58,8 @@ The rewrite: the plain cold's cuts, renamed onto the elaborated
 cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
-Members: `walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`,
-`walk-flat`, `walk-at`, `walk-agree`, `walk-cons`,
+Members: `walk-past`, `walk-under`, `walk-end`, `walk-ren→`,
+`walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-agree`, `walk-cons`,
 `walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
 `φ-back`.
 
