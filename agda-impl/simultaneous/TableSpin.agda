@@ -34,7 +34,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Listing using (spinRows)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -121,9 +121,6 @@ module SpinTab {A : Set} (p p* : Pos) where
   Put′ : ℕ → Pos → Pos → Set
   Put′ _ _ _ = ⊥
 
-  m-ss : M {A} skip skip
-  m-ss = (λ ()) , (λ _ ())
-
   -- Every tick in the subscription's instant.
   same : ∀ {X : Set} {N q k} {e : Ev X} → TR (S N q) k e → instantOf k ≡ instantOf q
   same {q = q} x with sp→ x
@@ -145,7 +142,7 @@ module SpinTab {A : Set} (p p* : Pos) where
       row→′ : ∀ {k e} → TR (P N) k e → Unpinned e
             → (Σ (Ev (IE A)) λ e′ → TR (Q N) (φ′ N k) e′ × M e e′) ⊎ (e ≡ skip × Corr.PutAt (corr′ N) k)
       row→′ x _ with sp→ x
-      ... | i , lt , refl , refl = inj₁ (skip , subst (λ z → TR (Q N) z skip) (sym (φ-ix {N} i)) (sp← lt) , m-ss)
+      ... | i , lt , refl , refl = inj₁ (skip , subst (λ z → TR (Q N) z skip) (sym (φ-ix {N} i)) (sp← lt) , m-ss {A})
 
       pin→′ : ∀ {k r} → TR (P N) k (pin r) → Live (TR (P N)) k → Corr.PinAt (corr′ N) k r
       pin→′ x _ with sp→ x

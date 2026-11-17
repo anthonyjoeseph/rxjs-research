@@ -94,7 +94,7 @@ postulate
 -- elaboration is subscribed deeper, so no map matches its value to the
 -- plain one.
 rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
-rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* = cold-tab m n ρ* p p*
+rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* = cold-tab m n ρ* uρ* p p*
 rel n empty             ρ uρ ρι ρ* uρ* env p p* = of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* = of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* = map-tab f (rel n s ρ uρ ρι ρ* uρ* env p p*)
