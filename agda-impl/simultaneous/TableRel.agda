@@ -19,7 +19,7 @@
 -- past the elaboration's own leaves.
 module simultaneous.TableRel where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (false)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -33,12 +33,13 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (skip)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows; short; bind; _⊣_; mapRows; scanRows; takeRows)
+open import quickcheck.Tabled using (rows; short; bind; _⊣_; mapRows; scanRows)
 open import simultaneous.InstEmit using (begin)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv; spinRows)
 open import simultaneous.TableCorr using (Rel)
 open import simultaneous.TableMap using (map-tab)
+open import simultaneous.TableTake using (take-tab)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate; mapIE; scanIE; passes; marked)
 
@@ -83,8 +84,6 @@ postulate
   scan-tab  : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
             → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
                   (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (mapRows proj₂ l)) s s*
-  take-tab  : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
-            → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
   defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
             → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
                   (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*

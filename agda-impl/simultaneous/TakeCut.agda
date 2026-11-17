@@ -15,11 +15,11 @@
 -- through the row put under it.
 module simultaneous.TakeCut where
 
-open import Data.Bool using (Bool; true; false; T; not)
+open import Data.Bool using (Bool; T; not)
 open import Data.Bool.Properties using (T-≡)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥-elim)
 open import Data.List using ([]; _∷_; [_])
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
@@ -30,14 +30,14 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _∙_; _�
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
 open import denotation.Laws.Worlds using (⊕-injˡ)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (T-not; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≼-≺-≺; ≺-ext)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import denotation.Simultaneity using (between)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (M; Corr; ends; m-back; m-val; m-ee)
-open import simultaneous.TakeKit using (Run; Lab; lab; lab-cases; snoc-≺; clash; module Take)
+open import simultaneous.TableCorr using (M; Corr; m-back; m-val; m-ee)
+open import simultaneous.TakeKit using (Run; Lab; lab; snoc-≺; module Take)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; passes)
 
@@ -131,7 +131,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ... | inj₁ p  = p
   ... | inj₂ nk with shown-fail y nk
   ...   | k₀ , a , eq , x₀ , nk₀ , _ with φ-inj x x₀ un tt eq
-  ...     | refl = ⊥-elim (clash (nf x₀) nk₀)
+  ...     | refl = ⊥-elim (T-not (nf x₀) nk₀)
 
   -- A kept plain row lies before every failing value.
   before-fail : ∀ {k e o a} → t k e → ¬ Failed k → O.NoFail k → t o (out a) → T (not (keep a)) → k ≺ o
@@ -139,7 +139,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ... | inj₂ ok = ⊥-elim (nF (o , a , x₀ , nk , ok))
   ... | inj₁ ko with ≼-split {k} {o} ko
   ...   | inj₁ lt   = lt
-  ...   | inj₂ refl = ⊥-elim (clash (nf x₀) nk)
+  ...   | inj₂ refl = ⊥-elim (T-not (nf x₀) nk)
 
   -- The elaborated failure no failure precedes is the first plain one's image.
   first-img : ∀ {f x o a} → u f (out x) → T (not (passes keep x)) → ¬ W*.Failed f
@@ -290,7 +290,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       nf {a} x′ with Tp.dec-keep a
       ... | inj₁ p = p
       ... | inj₂ nk with img-out x′
-      ...   | x″ , y′ , rd = ⊥-elim (clash (nf* (subst (λ z → u z (out x″)) (sym eq) y′)) (nk* rd nk))
+      ...   | x″ , y′ , rd = ⊥-elim (T-not (nf* (subst (λ z → u z (out x″)) (sym eq) y′)) (nk* rd nk))
   shown←′ ul sh | O*.made {o} y nk nF* (l₀ , refl , m*) with shown-fail y nk
   ... | kf , a , refl , xf , nkf , rd = move m*
     where
@@ -347,7 +347,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       ... | inj₁ p = p
       ... | inj₂ nk with img-out x′ | ≼-split {φ k} {m} km
       ...   | x″ , y′ , rd | inj₁ lt   = ⊥-elim (nFm (φ k , x″ , y′ , nk* rd nk , lt))
-      ...   | x″ , y′ , rd | inj₂ refl = ⊥-elim (clash (nfm y′) (nk* rd nk))
+      ...   | x″ , y′ , rd | inj₂ refl = ⊥-elim (T-not (nfm y′) (nk* rd nk))
 
       leads′ : C.Leads k → Leads′ k
       leads′ ld tk′ un′ ie″ with O.kind tk′ un′
@@ -370,7 +370,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
               before-k : k ≺ _
               before-k with ≼-split {k} (ld x′ un′ (trans ie″ (inst-⊕ k [ lab incl ])))
               ... | inj₁ lt = lt
-              ... | inj₂ refl = ⊥-elim (clash (nf′ xk) nk)
+              ... | inj₂ refl = ⊥-elim (T-not (nf′ xk) nk)
           ... | O.made x₀ nk₀ nF₀ (l₀ , refl , m₀) with O.first-uniq xk nk nFk x₀ nk₀ nF₀
           ...   | refl = Tp.lab-≼ {k} m₀
 
@@ -383,7 +383,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       ...   | x′ , y′ , rd with ≼-or-≻ m (φ f)
       ...     | inj₂ fm = ⊥-elim (nFm (φ f , x′ , y′ , nk* rd nkf , fm))
       ...     | inj₁ mf with ≼-split {m} {φ f} mf
-      ...       | inj₂ refl = ⊥-elim (clash (nfm y′) (nk* rd nkf))
+      ...       | inj₂ refl = ⊥-elim (T-not (nfm y′) (nk* rd nkf))
       ...       | inj₁ mf′ =
         let fkk = C.mono xf x tt un fk′
             if = between {m} {φ f} {φ k} (Equivalence.to T-≡ mf′) (Equivalence.to T-≡ fkk) (sym ie)

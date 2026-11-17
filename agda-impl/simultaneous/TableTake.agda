@@ -31,8 +31,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (AgreeTo; upto; AgreeTo-sym; ag-down; ≺-trans; ≺-irrefl; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-≺-≺; ≺-ext)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_; module TakeWhile)
+open import denotation.Laws.Modulus using (AgreeTo; upto; AgreeTo-sym; ag-down; ≺-trans; ≼-refl; ≺→≼; ≼-or-≻; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; takeRows)
@@ -314,3 +314,155 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
             nF* = K.under-unfailed N yz (subst (λ w → K.UU N w e′) eq (from* y))
             pf  = T2*.push-fail N′ N agu (proj₂ (upto agu (≼-refl {z})) yz) nk* (T2*.unfail N N′ (AgreeTo-sym agu) (≼-refl {z}) nF*)
         in subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym eq) (ag←* (ag-down {q = z ⊕ [ last ]} {z ⊕ [ lab i ]} (≼-last {z} (lab-Lab i)) pf))
+
+  -- Agreement up to the elaborated first failure's last row, read from
+  -- agreement at a row past it.
+  upto-fail : ∀ {N N′ m e* f b} → TR (Q′ N) m e* → AgreeTo m (TR (Q′ N′)) (TR (Q′ N))
+            → TR (Q N) f (out b) → T (not (passes q b)) → ¬ K.W*.Failed N f → f ≼ m
+            → AgreeTo (f ⊕ [ last ]) (TR (Q′ N′)) (TR (Q′ N))
+  upto-fail {N} {N′} {f = f} z ag* yf nkf nFf fm =
+    let aguf = T2*.lift-fail N N′ (AgreeTo-sym (ag→* ag*)) (from* z) fm yf nkf nFf
+    in ag←* (T2*.push-fail N′ N (AgreeTo-sym aguf) (proj₁ (upto aguf (≼-refl {f})) yf) nkf (T2*.unfail N N′ aguf (≼-refl {f}) nFf))
+
+  stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Corr.Leads (corr N) k
+              → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N))
+              → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+  stable-lead {N} {N′} {k} {e} {e′} {m} le x un y ld z ie ag* with K.O.kind N (from x) un | failed? i (passes q) (Q N) m
+  ... | K.O.kept xk nF nf | yes (f₀ , _ , y₀ , nk₀ , lt₀) with K.fst* N y₀ nk₀
+  ...   | f , _ , yf , nkf , nFf , ff₀ with K.shown-fail N yf nkf
+  ...     | kf , _ , refl , xkf , nkkf , _ =
+    subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym (old N xk))
+      (ag-down {q = R.φ N kf ⊕ [ last ]} {R.φ N k}
+        (≺→≼ {R.φ N k} {R.φ N kf ⊕ [ last ]} (≺-trans {R.φ N k} {R.φ N kf} {R.φ N kf ⊕ [ last ]}
+          (Corr.mono (R.corr N) xk xkf un tt (K.before-fail N xk nF nf xkf nkkf)) (≺-ext (R.φ N kf) [])))
+        (upto-fail z ag* yf nkf nFf (≺→≼ {R.φ N kf} {m} (≼-≺-≺ {R.φ N kf} {f₀} {m} ff₀ lt₀))))
+  stable-lead {N} {N′} {k} {e} {e′} {m} le x un y ld z ie ag* | K.O.made {o} xo nk nF (l , refl , mm) | yes (f₀ , _ , y₀ , nk₀ , lt₀) with K.fst* N y₀ nk₀
+  ...   | f , _ , yf , nkf , nFf , ff₀ with K.first-img N yf nkf nFf xo nk nF
+  ...     | refl =
+    subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym (new N xo nk (Tp.made-lab mm)))
+      (ag-down {q = R.φ N o ⊕ [ last ]} {R.φ N o ⊕ [ l ]} (≼-last {R.φ N o} (Tp.made-lab mm))
+        (upto-fail z ag* yf nkf nFf (≺→≼ {R.φ N o} {m} (≼-≺-≺ {R.φ N o} {f₀} {m} ff₀ lt₀))))
+  stable-lead {N} {N′} {k} {e} {e′} {m} le x un y ld z ie ag* | K.O.kept xk nF nf | no nFm =
+    subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym eq) (ag←* (T2*.push N′ N agφ))
+    where
+      eq : φ′ N k ≡ R.φ N k
+      eq = old N xk
+
+      um = from* z
+      agu = T2*.lift N N′ (AgreeTo-sym (ag→* ag*)) um (≼-refl {m}) nFm (K.O*.nofail N um nFm)
+
+      cld : Corr.Leads (R.corr N) k
+      cld {k′} x′ un′ ie′ with ≼-or-≻ k k′
+      ... | inj₁ h = h
+      ... | inj₂ k′k = ld (to (K.O.keep-row N x′ (λ F → nF (K.O.failed-≼ N (≺→≼ {k′} {k} k′k) F)) (K.O.nofail< N nF k′k))) un′ ie′
+
+      agφ = R.stable-lead le xk un (K.kept-self N xk un nF nf (subst (λ w → K.UU N w e′) eq (from* y))) cld
+              (K.unfailed-self N um nFm) (trans ie (cong instantOf eq)) (AgreeTo-sym agu)
+  stable-lead {N} {N′} {k} {e} {e′} {m} le x un y ld z ie ag* | K.O.made {o} xo nk nF (l , refl , mm) | no nFm =
+    subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym eq) (ag←* (ag-down {q = R.φ N o ⊕ [ last ]} {R.φ N o ⊕ [ l ]} (≼-last {R.φ N o} lb) pf))
+    where
+      lb = Tp.made-lab mm
+      eq = new N xo nk lb
+      img = K.img-out N xo
+
+      um = from* z
+      agu = T2*.lift N N′ (AgreeTo-sym (ag→* ag*)) um (≼-refl {m}) nFm (K.O*.nofail N um nFm)
+
+      cld : Corr.Leads (R.corr N) o
+      cld {k′} x′ un′ ie′ with ≼-or-≻ o k′
+      ... | inj₁ h = h
+      ... | inj₂ k′o =
+        ⊥-elim (ld (to (K.O.keep-row N x′ (λ F → nF (K.O.failed-≼ N (≺→≼ {k′} {o} k′o) F)) (K.O.nofail< N nF k′o))) un′
+                  (trans ie′ (sym (inst-⊕ o [ l ]))) (≺-trans {k′} {o} {o ⊕ [ l ]} k′o (≺-ext o [])))
+
+      agφ = R.stable-lead le xo tt (proj₁ (proj₂ img)) cld (K.unfailed-self N um nFm)
+              (trans ie (trans (cong instantOf eq) (inst-⊕ (R.φ N o) [ l ]))) (AgreeTo-sym agu)
+      pf = T2*.push-fail N′ N agφ (proj₂ (upto agφ (≼-refl {R.φ N o})) (proj₁ (proj₂ img))) (K.nk* N (proj₂ (proj₂ img)) nk)
+             (T2*.unfail N N′ (AgreeTo-sym agφ) (≼-refl {R.φ N o}) (λ F → nF (K.fail← N xo tt F)))
+
+  -- With no failing value, the takes keep every row; their children agree.
+  no-fail : ∀ {N N′} → N ≤ N′ → (∀ w → AgreeTo w (TR (P′ N′)) (TR (P′ N)))
+          → ¬ (Σ Pos λ y → Σ A λ a → TR (P N′) y (out a) × T (not (q a))) → ∀ {y e} → K.UU N′ y e → K.UU N y e
+  no-fail {N} {N′} le all none {y} {e} uy = go (K.O*.from N′ uy)
+    where
+      nf′ : ∀ {z} → K.O.NoFail N′ z
+      nf′ {z} {a} x′ with Tp.dec-keep a
+      ... | inj₁ p  = p
+      ... | inj₂ nk = ⊥-elim (none (z , a , x′ , nk))
+
+      agt : ∀ w → AgreeTo w (TR (P N′)) (TR (P N))
+      agt = T2.lift-all N′ N (λ w → ag→ (all w)) (λ {z} → nf′ {z})
+
+      noneN : ∀ {z x} → TR (Q N) z (out x) → T (not (passes q x)) → ⊥
+      noneN yz nk with K.shown-fail N yz nk
+      ... | kf , a , _ , xkf , nkf , _ = none (kf , a , proj₂ (upto (agt kf) (≼-refl {kf})) xkf , nkf)
+
+      noneN′ : ∀ {z x} → TR (Q N′) z (out x) → T (not (passes q x)) → ⊥
+      noneN′ yz nk with K.shown-fail N′ yz nk
+      ... | kf , a , _ , xkf , nkf , _ = none (kf , a , xkf , nkf)
+
+      nf* : K.O*.NoFail N y
+      nf* {x} yx with Te.dec-keep x
+      ... | inj₁ p  = p
+      ... | inj₂ nk = ⊥-elim (noneN yx nk)
+
+      go : K.O*.From N′ y e → K.UU N y e
+      go (K.O*.self y′ _)     = K.O*.keep-row N (R.elab-all le agt y′) (λ { (_ , _ , yf , nkf , _) → noneN yf nkf }) nf*
+      go (K.O*.new yo nk _ _) = ⊥-elim (noneN′ yo nk)
+
+  -- Past a failing value, the takes agree up to its image's last row,
+  -- and keep only pins beyond it.
+  past-fail : ∀ {N N′ kf a} → N ≤ N′ → (∀ w → AgreeTo w (TR (P′ N′)) (TR (P′ N)))
+            → TR (P N′) kf (out a) → T (not (q a)) → ¬ K.W.Failed N′ kf → ∀ {y e} → K.UU N′ y e → K.UU N y e
+  past-fail {N} {N′} {kf} {a} le all xkf nkf nFkf {y} {e} uy = go (≼-or-≻ y (R.φ N kf ⊕ [ last ])) uy
+    where
+      agtk : AgreeTo kf (TR (P N′)) (TR (P N))
+      agtk = T2.lift-fail N′ N (ag→ (all (kf ⊕ [ last ]))) (K.O.made-row N′ xkf nkf nFkf Tp.atl) (under≼ kf last) xkf nkf nFkf
+
+      xkfN = proj₁ (upto agtk (≼-refl {kf})) xkf
+      agu = R.elab-causal le xkfN tt agtk
+      img = K.img-out N xkfN
+      ykf′ = proj₂ (upto agu (≼-refl {R.φ N kf})) (proj₁ (proj₂ img))
+      nk* = K.nk* N (proj₂ (proj₂ img)) nkf
+      nF*′ = T2*.unfail N N′ (AgreeTo-sym agu) (≼-refl {R.φ N kf}) (λ F → T2.unfail N′ N agtk (≼-refl {kf}) nFkf (K.fail← N xkfN tt F))
+      pf = T2*.push-fail N′ N agu ykf′ nk* nF*′
+
+      gone : ∀ {y e} → (R.φ N kf ⊕ [ last ]) ≺ y → K.UU N′ y e → Unpinned e → ⊥
+      gone {y} ly uy un with K.O*.kind N′ uy un
+      ... | K.O*.kept _ nF′ _ = nF′ (R.φ N kf , proj₁ img , ykf′ , nk* , ≺-trans {R.φ N kf} {R.φ N kf ⊕ [ last ]} {y} (≺-ext (R.φ N kf) []) ly)
+      ... | K.O*.made {o} yo nk′ nFo (l , refl , mm) with K.O*.first-uniq N′ yo nk′ nFo ykf′ nk* nF*′
+      ...   | refl = ≼-last {R.φ N kf} (Te.made-lab mm) ly
+
+      beyond : ∀ {y e} → (R.φ N kf ⊕ [ last ]) ≺ y → K.UU N′ y e → K.UU N y e
+      beyond {e = pin r} ly uy = from* (take-pins i q R le all (to* uy))
+      beyond {e = out _} ly uy = ⊥-elim (gone ly uy tt)
+      beyond {e = skip}  ly uy = ⊥-elim (gone ly uy tt)
+      beyond {e = end}   ly uy = ⊥-elim (gone ly uy tt)
+
+      go : y ≼ (R.φ N kf ⊕ [ last ]) ⊎ (R.φ N kf ⊕ [ last ]) ≺ y → K.UU N′ y e → K.UU N y e
+      go (inj₁ yl) uy′ = proj₁ (upto pf yl) uy′
+      go (inj₂ ly) uy′ = beyond ly uy′
+
+  elab-all : ∀ {N N′} → N ≤ N′ → (∀ w → AgreeTo w (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+  elab-all {N} {N′} le all yr with fails? i q (P N′)
+  ... | no none = to* (no-fail le all none (from* yr))
+  ... | yes (_ , _ , x₀ , nk₀) with K.fst N′ x₀ nk₀
+  ...   | _ , _ , xkf , nkf , nFkf , _ = to* (past-fail le all xkf nkf nFkf (from* yr))
+
+  rel′ : Rel P′ Q′ s s*
+  rel′ = record
+    { φ = φ′ ; Put = K.Put′ ; corr = corr ; φ-agree = φ-agree ; bk = under-bk R.bk ; in-bk = in-bk
+    ; pb-few = λ l → (proj₁ (R.pb-few l) ++ proj₁ (R.pb-few (parent l))) , pb-in l
+    ; elab-causal = elab-causal ; stable← = stable← ; stable-put = stable-put ; stable-lead = stable-lead ; elab-all = elab-all
+    ; func = λ {N} x x′ → Run.func (K.O.run-T N) (from x) (from x′)
+    ; func* = λ {N} y y′ → Run.func (K.O*.run-T N) (from* y) (from* y′)
+    ; flat = λ {N} x x′ → Run.flat (K.O.run-T N) (from x) (from x′)
+    ; flat* = λ {N} y y′ → Run.flat (K.O*.run-T N) (from* y) (from* y′)
+    ; pin-in = λ {N} x → Run.pin-in (K.O.run-T N) (from x)
+    ; pin-in* = λ {N} y → Run.pin-in (K.O*.run-T N) (from* y)
+    ; cons = λ {N} {N′} below x x′ yy → to (T2.cons-T N N′ (λ lt → ag→ (below lt)) (from x) (from x′) yy)
+    ; cons* = λ {N} {N′} below y y′ yy → to* (T2*.cons-T N N′ (λ lt → ag→* (below lt)) (from* y) (from* y′) yy) }
+
+take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
+         → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
+take-tab i q R = TakeTab.rel′ i q R

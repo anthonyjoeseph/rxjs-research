@@ -44,7 +44,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Tree using (Obs)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; enter; approx)
+open import denotation.EmissionSet using (Ev; skip; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; enter; approx)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺→≼; ≼-trans; ≼-split; ≼-or-≻; ≺-irrefl; ≺-absurd;
   AgreeTo-trans; AgreeTo-sym)
 open import denotation.Laws.Count using (AgC-sym; ag-cnt)

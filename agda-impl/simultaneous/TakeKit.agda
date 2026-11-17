@@ -19,18 +19,19 @@ open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_; [_])
 open import Data.List.Properties using (∷-injectiveʳ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
 open import Relation.Nullary using (¬_; Dec; yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import denotation.Position using (Pos; Path; Label; ix; last; inside; _⊕_)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ag-down; few-ind; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≼-antisym; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (T-not; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ag-down; few-ind; ≺-trans; ≺-irrefl; ≺-absurd;
+  ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊑-≼; ⊑-snoc; inside-⊑; ⊕-injˡ; ⊕-injʳ; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ext≢)
 open import simultaneous.Attribution using (Live)
 open import simultaneous.TableCorr using (Cons; ag-ind)
@@ -42,15 +43,8 @@ record Run {A : Set} (t : EmissionSet A) : Set where
     flat   : ∀ {y e l ys e′} → t y e → t (y ⊕ (l ∷ ys)) e′ → ⊥
     pin-in : ∀ {l r} → t l (pin r) → T (inside r l)
 
-ix≢last : ∀ {n} → ix n ≡ last → ⊥
-ix≢last ()
-
 []≢∷ : ∀ {X : Set} {x : X} {xs} → [] ≡ x ∷ xs → ⊥
 []≢∷ ()
-
-clash : ∀ {b} → T b → T (not b) → ⊥
-clash {true}  _ ()
-clash {false} ()
 
 -- Past a row and not under it: past everything under it.
 apart : ∀ {A} {t : EmissionSet A} → Run t → ∀ {y c e e′} (ws : Path) → t y e → t c e′ → y ≺ c → (y ⊕ ws) ≺ c
@@ -270,7 +264,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     ...   | l′ , eq with ⊑-snoc o {l′} (l ∷ ys , sym eq)
     ...     | inj₂ eq₂ = ext≢ y ys (trans eq (sym eq₂))
     ...     | inj₁ (zs , eq₁) with sub-or zs eq₁
-    ...       | inj₁ eo = clash (ok (func x (subst (λ z → t z (out a)) eo x₀))) nk
+    ...       | inj₁ eo = T-not (ok (func x (subst (λ z → t z (out a)) eo x₀))) nk
     ...       | inj₂ (_ , _ , eo) = flat x (subst (λ z → t z (out a)) eo x₀)
     flat-T {y} {e} {l} {ys} {e′} tk tk′ | new {o} {a} x₀ _ _ loc | self x′ _ with at-new {e = e} {a = a} loc
     ... | l₀ , eq = flat x₀ (subst (λ z → t z e′) (trans (cong (_⊕ (l ∷ ys)) eq) (⊕-assoc o [ l₀ ] (l ∷ ys))) x′)
@@ -390,7 +384,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             nf′y {a} x′ with dec-keep a
             ... | inj₁ kp = kp
             ... | inj₂ nk with O.past (O.from tw) (≼-trans {y} {k} {w} yk kw)
-            ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (clash (nfy (cba (sym< below) x′ xo yo)) nk)
+            ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (T-not (nfy (cba (sym< below) x′ xo yo)) nk)
             ...   | inj₂ F = ⊥-elim (nFy F)
 
     -- With no failing value in the first source, takes agreeing
@@ -399,7 +393,7 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     lift-all agT nf k = ag-ind fin step
       where
         nF : ∀ {y} → ¬ W.Failed y
-        nF (_ , _ , x , nk , _) = clash (nf x) nk
+        nF (_ , _ , x , nk , _) = T-not (nf x) nk
 
         step : ∀ {y} → y ≼ k → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {e} → (t y e → t′ y e) × (t′ y e → t y e)
         step {y} _ below = point1 below (proj₁ (upto (agT y) (≼-refl {y}))) nF nf , D′.point1 (sym< below) (proj₂ (upto (agT y) (≼-refl {y}))) nF′ nf′
@@ -411,8 +405,8 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             nf′ {a} x′ with dec-keep a
             ... | inj₁ kp = kp
             ... | inj₂ nk with O.from (proj₂ (upto (agT (y ⊕ [ last ])) (≼-refl {y ⊕ [ last ]})) (W′.stop x′ nk nF′))
-            ...   | O.self x₀ _ = ⊥-elim (clash (nf (cba (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
-            ...   | O.new x₀ nk₀ _ _ = ⊥-elim (clash (nf x₀) nk₀)
+            ...   | O.self x₀ _ = ⊥-elim (T-not (nf (cba (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
+            ...   | O.new x₀ nk₀ _ _ = ⊥-elim (T-not (nf x₀) nk₀)
 
     -- Up to a failing value, for one of its rows.
     lift-fail : ∀ {w e y a} → AgreeTo w W.TakeT W′.TakeT → W.TakeT w e → y ≼ w

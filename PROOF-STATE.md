@@ -39,14 +39,22 @@ former carries its child's record through its operator's table; each
 leaf, the spin and the batcher's plumbing has its own. Every record,
 `flat-rel`'s and `conn-rel`'s too, owes coherence, run-shaped tables
 and cuts truncated before they differ (`cons`). Untried: whether `cons`
-holds of spun cuts; `take-tab` puts a skip whose put the elaborated
-failure drops under that failure; the leaves' maps rename the creator
-in an async instant; `scan-tab` matches values only where both
-accumulators read the same values in order. Settled when each is a
-body.
+holds of spun cuts; the leaves' maps rename the creator in an async
+instant; `scan-tab` matches values only where both accumulators read
+the same values in order. Settled when each is a body.
 
-Members: `scan-tab`, `take-tab`, `defer-tab`, `spin-tab`, `empty-rel`,
-`of-rel`, `cold-rel`, `top-rel`.
+Members: `scan-tab`, `defer-tab`, `spin-tab`, `empty-rel`, `of-rel`,
+`cold-rel`, `top-rel`.
+
+#### THE TAKE'S LATE PINS
+
+Untried, possibly false: past the elaborated first failure a take keeps
+only pins whose connect lies before it, and the plain takes agreeing
+need not make the children agree there. Settled by a body, or by two
+cuts agreeing on the plain take whose elaborated takes keep different
+pins.
+
+Members: `take-pins`.
 
 #### THE FLATMAP AND CONNECT CASES
 
