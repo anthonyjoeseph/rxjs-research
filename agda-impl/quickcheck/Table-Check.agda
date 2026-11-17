@@ -57,7 +57,7 @@ open import Tree using (Obs; Later; mergeᶠ; cold; empty; of; map; scan; takeWh
   defer)
 open import denotation.Position using (Pos; Instant; frame; cascade; root; ix; sub; last; _⊕_; _≟ᵖ_; _≟ⁱ_; _≟ˡ_; _<ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (out; end)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
@@ -385,11 +385,48 @@ private
   N₀ = 8
   n₀ = 3
 
+  root* : Pos
+  root* = root ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]
+
   probe : ℕ → Res
-  probe seed = walk N₀ n₀ (toObs timeline 3 (program seed) [] [] []) (λ i → i) [] [] [] root (root ⊕ [ ix 0 ] ⊕ [ ix 1 ] ⊕ [ ix 1 ]) ""
+  probe seed = walk N₀ n₀ (toObs timeline 3 (program seed) [] [] []) (λ i → i) [] [] [] root root* ""
+
+  -- A row's position and its event's former.
+  tagOf : ∀ {A} → Ev A → ℕ
+  tagOf (out _) = 0
+  tagOf end     = 1
+  tagOf (pin _) = 2
+  tagOf skip    = 3
+
+  upToᵖ : ∀ {A} → Pos → Maybe (Listed A) → List (Pos × ℕ)
+  upToᵖ q nothing  = []
+  upToᵖ q (just l) = concatMap (λ { (r , e) → when ((r <ᵖ q) ∨ does (r ≟ᵖ q)) (r , tagOf e) }) (sort (rows l))
+
+  sameRows : List (Pos × ℕ) → List (Pos × ℕ) → Bool
+  sameRows []             []             = true
+  sameRows ((r , a) ∷ xs) ((r′ , a′) ∷ ys) = does (r ≟ᵖ r′) ∧ (a ≡ᵇ a′) ∧ sameRows xs ys
+  sameRows _              _              = false
+
+  -- The back fact a cut-indexed `bk` needs: a cut whose elaborated table
+  -- agrees with the whole up to a row's image agrees with the plain
+  -- whole up to the row.
+  backRes : ℕ → Res
+  backRes seed with toObs timeline 3 (program seed) [] [] []
+  ... | o with listC N₀ n₀ o [] root | listC N₀ n₀ (elab (λ i → i) o) [] root*
+  ...   | t | t* with plainV t | elabV t*
+  ...     | just ks | just ks* with pairing ks ks*
+  ...       | just m = concatMap at (upTo N₀) , 1 , 0
+    where
+      at : ℕ → List (String × String)
+      at N′ with listC N′ n₀ o [] root | listC N′ n₀ (elab (λ i → i) o) [] root*
+      ... | c | c* = concatMap (λ { (k , l) →
+              if sameRows (upToᵖ l c*) (upToᵖ l t*) ∧ not (sameRows (upToᵖ k c) (upToᵖ k t))
+              then fail "back" (showℕ N′) k l else [] }) m
+  ...       | nothing = none
+  backRes seed | o | t | t* | _ | _ = none
 
   kinds : List String
-  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ []
+  kinds = "count" ∷ "order" ∷ "instant" ∷ "home" ∷ "linked" ∷ "cuts" ∷ "self" ∷ "hot-image" ∷ "lanes" ∷ "core-count" ∷ "core" ∷ "back" ∷ []
 
   has : String → List (String × String) → Bool
   has k = anyᵇ λ f → proj₁ f == k
@@ -417,7 +454,7 @@ private
   report [] bad nodes skipped t =
     putStrLn ("table-check: done " +++ showℕ bad +++ " failing seeds, " +++ showℕ nodes +++ " subterms checked, "
               +++ showℕ skipped +++ " cut short; failing seeds by kind: " +++ showTally t)
-  report (seed ∷ seeds) bad nodes skipped t with probe seed
+  report (seed ∷ seeds) bad nodes skipped t with probe seed ⊹ backRes seed
   ... | [] , c , s = report seeds bad (nodes + c) (skipped + s) t
   ... | fs , c , s =
     putStrLn ("table-check: program " +++ showℕ seed +++ " " +++ showCode natᵗ (program seed)) >>= λ _ →
