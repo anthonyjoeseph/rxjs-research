@@ -968,6 +968,8 @@ MODULE_ROOTS = {
                                ("main",)),
     "quickcheck.Cursor-Check": ("the cursor probe — `make cursor-check`",
                                 ("main",)),
+    "quickcheck.Table-Check": ("the table probe — `make table-check`",
+                               ("main",)),
     "quickcheck.Spec-Check": ("the simultaneous spec, tested — `make spec-check`",
                               ("main",)),
 }

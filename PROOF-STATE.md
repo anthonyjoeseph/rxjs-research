@@ -36,13 +36,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 Untried: the flatMap's elaboration grown outward from the lanes'
 flatMap through the combined scan, the closer and the share, over one
-map per hot shared by every reader. Hardest: `flat-core` owes each
-lane's alignment, an unqueued lane's from the source's order facts at
-its value row, a queued lane's from an earlier lane's at its end.
+map per hot shared by every reader. The lanes' flatMap is split by
+operator; only the bounded merge queues a lane at a run-dependent row.
 Settled by bodies, or a lane pair no creator's facts align.
 
-Members: `flat-core`, `flat-comb`, `flat-close`, `flat-share`,
-`flatmap-order`.
+Members: `flat-merge`, `flat-concat`, `flat-switch`, `flat-exhaust`,
+`flat-comb`, `flat-close`, `flat-share`, `flatmap-order`.
 
 #### THE CONNECT
 
