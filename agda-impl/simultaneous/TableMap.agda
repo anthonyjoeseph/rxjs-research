@@ -31,7 +31,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; tr-few)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; tr-few; got-bind)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
 
@@ -218,13 +218,18 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
 
   PinAt′ : ℕ → Pos → Pos → Set
   PinAt′ N k p = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × R.Put N k l
-                   × (∀ {k₀ e₀} → TR (P′ N) k₀ e₀ → Unpinned e₀ → R.φ N k₀ ≺ p′ → k₀ ≺ p))
+                   × (∀ {k₀ b} → TR (P′ N) k₀ (out b) → R.φ N k₀ ≺ p′ → k₀ ≺ p))
                × Homed′ N k
+
+  out-back : ∀ N {k b} → TR (P′ N) k (out b) → Σ A λ a → TR (P N) k (out a)
+  out-back N x with tr-map→ f (P N) x
+  ... | e₀ , x₀ , eq with ev-out f e₀ (sym eq)
+  ...   | a , refl , _ = a , x₀
 
   pin→′ : ∀ N {k p} → TR (P′ N) k (pin p) → Live (TR (P′ N)) k → PinAt′ N k p
   pin→′ N x lv with Corr.pin→ (R.corr N) (tr-pin← f (P N) x) (live-map← f (P N) lv)
   ... | (l , p′ , y , pl , past) , h =
-    (l , p′ , tr-map← g (Q N) y , pl , λ x′ un′ lt → let (_ , x₀ , u₀) = back-row N x′ un′ in past x₀ u₀ lt) , homed→ h
+    (l , p′ , tr-map← g (Q N) y , pl , λ x′ lt → past (proj₂ (out-back N x′)) lt) , homed→ h
 
   put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ R.φ N k′
   put-before′ N x pl x′ un′ lt = let (_ , x₀ , u₀) = back-row N x′ un′ in Corr.put-before (R.corr N) (tr-skip← f (P N) x) pl x₀ u₀ lt
@@ -271,7 +276,12 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
     ; pin-in = λ {N} → pin-in-map f (P N) R.pin-in
     ; pin-in* = λ {N} → pin-in-map g (Q N) R.pin-in*
     ; cons = λ {N} {N′} → cons-map f {P N} {P N′} ag← (R.cons {N} {N′})
-    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* (R.cons* {N} {N′}) }
+    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* (R.cons* {N} {N′})
+    ; got = λ N → got-bind (mapRows f) (R.got N)
+    ; got* = λ N → got-bind (mapRows g) (R.got* N)
+    ; after = λ {N} x → R.after (proj₁ (proj₂ (tr-map→ f (P N) x)))
+    ; after* = λ {N} y → R.after* (proj₁ (proj₂ (tr-map→ g (Q N) y)))
+    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.after-φ x₀ u₀ }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))

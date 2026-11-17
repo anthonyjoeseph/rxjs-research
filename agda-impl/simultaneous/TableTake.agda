@@ -31,8 +31,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (AgreeTo; upto; AgreeTo-sym; ag-down; ≺-trans; ≼-refl; ≺→≼; ≼-or-≻; ≼-≺-≺; ≺-ext)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; module TakeWhile)
+open import denotation.Laws.Modulus using (AgreeTo; upto; AgreeTo-sym; ag-down; ≺-trans; ≼-refl; ≼-trans; ≺→≼; ≼-or-≻; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; takeRows)
@@ -40,7 +40,7 @@ open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (module TakeX)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf; parent; parent-snoc)
-open import simultaneous.TableCorr using (TR; Corr; Rel; module Rel; ag-≃; corr-≃; keys; in-keys; tr-few)
+open import simultaneous.TableCorr using (TR; Corr; Rel; module Rel; ag-≃; corr-≃; keys; in-keys; tr-few; got-bind)
 open import simultaneous.TakeKit using (Run; Lab; lab; ≼-last; module Take)
 open import simultaneous.TakeCut using (inst-⊕; module TakeCut)
 
@@ -89,6 +89,15 @@ module _ {X : Set} (i : Bool) (keep : X → Bool) where
   tr-take← : ∀ (m : Maybe (Tb.Listed X)) {k e} → TakeT (TR m) k e → TR (Took i keep m) k e
   tr-take← nothing tk = ⊥-elim (none tk)
   tr-take← (just L) tk = takeRows i keep L , refl , TakeX.complete-t i keep (TR (just L)) L (ex-just L) tk
+
+  -- A take's row lies at or under its child's.
+  take-row : ∀ {t : EmissionSet X} {k e} → TakeT t k e → Σ Pos λ y → Σ (Ev X) λ e₀ → t y e₀ × y ≼ k
+  take-row {k = k} (pass x _ _)      = k , _ , x , ≼-refl {k}
+  take-row (fail {q} x _ _ _)        = q , _ , x , ≺→≼ {q} {q ⊕ [ ix 0 ]} (≺-ext q [])
+  take-row (stop {q} x _ _)          = q , _ , x , ≺→≼ {q} {q ⊕ [ last ]} (≺-ext q [])
+  take-row {k = k} (step x _)        = k , _ , x , ≼-refl {k}
+  take-row {k = k} (tend x _)        = k , _ , x , ≼-refl {k}
+  take-row {k = k} (left x _ _)      = k , _ , x , ≼-refl {k}
 
   -- Whether a row fails before `k`, a table fails at all, a position is
   -- under a failing value: each read off the table's rows.
@@ -449,6 +458,12 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   ... | yes (_ , _ , x₀ , nk₀) with K.fst N′ x₀ nk₀
   ...   | _ , _ , xkf , nkf , nFkf , _ = to* (past-fail le all xkf nkf nFkf (from* yr))
 
+  after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → s* ≼ φ′ N k
+  after-φ {N} x un with K.O.kind N (from x) un
+  ... | K.O.kept xk _ _ = subst (s* ≼_) (sym (old N xk)) (R.after-φ xk un)
+  ... | K.O.made {o} xo nk _ (l , refl , m) =
+    subst (s* ≼_) (sym (new N xo nk (Tp.made-lab m))) (≼-trans {s*} {R.φ N o} {R.φ N o ⊕ [ l ]} (R.after-φ xo tt) (under≼ (R.φ N o) l))
+
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = φ′ ; Put = K.Put′ ; corr = corr ; φ-agree = φ-agree ; bk = under-bk R.bk ; in-bk = in-bk
@@ -461,7 +476,12 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
     ; pin-in = λ {N} x → Run.pin-in (K.O.run-T N) (from x)
     ; pin-in* = λ {N} y → Run.pin-in (K.O*.run-T N) (from* y)
     ; cons = λ {N} {N′} below x x′ yy → to (T2.cons-T N N′ (λ lt → ag→ (below lt)) (from x) (from x′) yy)
-    ; cons* = λ {N} {N′} below y y′ yy → to* (T2*.cons-T N N′ (λ lt → ag→* (below lt)) (from* y) (from* y′) yy) }
+    ; cons* = λ {N} {N′} below y y′ yy → to* (T2*.cons-T N N′ (λ lt → ag→* (below lt)) (from* y) (from* y′) yy)
+    ; got = λ N → got-bind (takeRows i q) (R.got N)
+    ; got* = λ N → got-bind (takeRows i (passes q)) (R.got* N)
+    ; after = λ {N} {k} x → let (y , _ , x₀ , le) = take-row i q (from x) in ≼-trans {s} {y} {k} (R.after x₀) le
+    ; after* = λ {N} {l} y → let (w , _ , y₀ , le) = take-row i (passes q) (from* y) in ≼-trans {s*} {w} {l} (R.after* y₀) le
+    ; after-φ = after-φ }
 
 take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
          → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*

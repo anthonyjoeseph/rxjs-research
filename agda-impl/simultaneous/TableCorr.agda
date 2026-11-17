@@ -23,7 +23,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; few-ind; ≼-refl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ≼-split)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows)
+open import quickcheck.Tabled using (rows; bind)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
@@ -116,6 +116,14 @@ coh-of fin cab cba sh = ag-ind fin λ yk below → half cab below sh yk , half c
 Rows : ∀ {X : Set} → Tb.Listed X → Pos → Ev X → Set
 Rows L k e = (k , e) ∈ rows L
 
+-- A table there is.
+Got : ∀ {X : Set} → Maybe (Tb.Listed X) → Set
+Got {X} m = Σ (Tb.Listed X) λ L → m ≡ just L
+
+-- A table read on is one.
+got-bind : ∀ {X Y : Set} {m : Maybe (Tb.Listed X)} (g : Tb.Listed X → Tb.Listed Y) → Got m → Got (bind m λ l → just (g l))
+got-bind g (L , refl) = g L , refl
+
 -- Rows of a table, if there is one.
 TR : ∀ {X : Set} → Maybe (Tb.Listed X) → EmissionSet X
 TR {X} m k e = Σ (Tb.Listed X) λ L → m ≡ just L × Rows L k e
@@ -154,7 +162,7 @@ m-ee = (λ _ → refl) , (λ n → ⊥-elim (n tt))
 -- step's `begin` comes before the step's value); the images keeping the
 -- order and the instants of the rows they image.
 --
--- A pin is put on an elaborated pin whose connect has no image of a row
+-- A pin is put on an elaborated pin whose connect has no image of a value
 -- past the plain connect before it, and a skip no later than the image
 -- of any row after it: what a takeWhile keeps of one, it keeps of the
 -- other.
@@ -175,7 +183,7 @@ record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set
   -- A pin put on an elaborated pin, its connect's past the plain one's.
   PinAt : Pos → Pos → Set
   PinAt k p = (Σ Pos λ l → Σ Pos λ p′ → L* l (pin p′) × Put k l
-                × (∀ {k₀ e₀} → L k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p))
+                × (∀ {k₀ a} → L k₀ (out a) → φ k₀ ≺ p′ → k₀ ≺ p))
             × Homed k
 
   field
@@ -242,8 +250,8 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
     putAt ((l , e′ , y , pl) , h) = (l , e′ , to* y , pl) , homed h
 
     pinAt : ∀ {k p} → C.PinAt k p
-          → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ e₀} → K k₀ e₀ → Unpinned e₀ → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
-    pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x un lt → past (from x) un lt) , homed h
+          → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ a} → K k₀ (out a) → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
+    pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x lt → past (from x) lt) , homed h
 
 -- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
 -- placement, read off the two families of tables: two cuts agreeing up to
@@ -252,9 +260,10 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
 -- and back from one the cut holds, up to a late placement, from a row of
 -- the instant a row leads to its image, and everywhere.
 --
--- Each table is a run's: one event per position, none under another's,
--- a pin inside its connect.  Two cuts are truncated before they differ
--- (`Cons`).
+-- Each table is a run's: there is one, of one event per position, none
+-- under another's, a pin inside its connect, every row and every image
+-- at or past its subscription.  Two cuts are truncated before they
+-- differ (`Cons`).
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
@@ -281,3 +290,8 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     pin-in*     : ∀ {N l r} → TR (Q N) l (pin r) → T (inside r l)
     cons        : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
     cons*       : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
+    got         : ∀ N → Got (P N)
+    got*        : ∀ N → Got (Q N)
+    after       : ∀ {N k e} → TR (P N) k e → s ≼ k
+    after*      : ∀ {N l e} → TR (Q N) l e → s* ≼ l
+    after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → s* ≼ φ N k

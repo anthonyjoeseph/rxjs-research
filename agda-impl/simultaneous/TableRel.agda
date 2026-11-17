@@ -19,29 +19,30 @@
 -- past the elaboration's own leaves.
 module simultaneous.TableRel where
 
-open import Data.Bool using (false)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; [])
-open import Data.Maybe using (Maybe; just)
+open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Product using (_,_; proj₂)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (skip)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows; short; bind; _⊣_; mapRows; scanRows)
-open import simultaneous.InstEmit using (begin)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Listing using (listC; UncutEnv; spinRows)
+open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (Rel)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab)
+open import simultaneous.TableScan using (scan-tab)
+open import simultaneous.TableDefer using (defer-tab)
+open import simultaneous.TableSpin using (spin-tab)
+open import simultaneous.TableOf using (of-tab)
+open import simultaneous.InstEmit using (instEmit; value)
+open import Relation.Binary.PropositionalEquality using (refl)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate; mapIE; scanIE; passes; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; elaborate)
 
 ------------------------------------------------------------------------
 -- The subterm's two families of tables
@@ -76,17 +77,6 @@ postulate
   -- THE LEAVES.
   -- RECOVERY: git show e63b1f32 restores the per-former inversions of an elaborated run over approx (simultaneous/ReadRows.agda, ReadLane, ReadMap, ReadFold, FlatRows, ToldRows), each to be restated over the tables for its former's case.
   cold-rel : ∀ {Γ A} n (c : Timeline A) → Full {Γ} n (cold c)
-  empty-rel : ∀ {Γ A} n → Full {Γ} {A} n empty
-  of-rel    : ∀ {Γ A} n (xs : List A) → Full {Γ} n (of xs)
-  spin-tab  : ∀ {A} p p* → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p*
-
-  -- THE ONE-TO-ONE FORMERS carry a record through their operator.
-  scan-tab  : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
-            → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
-                  (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (mapRows proj₂ l)) s s*
-  defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
-            → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
-                  (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*
 
   -- THE TWO FORMERS WITH CONTENT, over their children's records in
   -- every environment.
@@ -104,8 +94,8 @@ postulate
 -- EVERY SUBTERM'S CUTS CORRESPOND.
 rel : ∀ {Γ A} n (o : Obs Timeline Γ A) → Full n o
 rel n (cold c)          = cold-rel n c
-rel n empty             = empty-rel n
-rel n (of xs)           = of-rel n xs
+rel n empty             ρ uρ ρι ρ* uρ* env p p* = of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*
+rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* = of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p*
 rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* = map-tab f (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (scan f z s)      ρ uρ ρι ρ* uρ* env p p* = scan-tab f z (rel n s ρ uρ ρι ρ* uρ* env p p*)
 rel n (takeWhile i q s) ρ uρ ρι ρ* uρ* env p p* = take-tab i q (rel n s ρ uρ ρι ρ* uρ* env p p*)

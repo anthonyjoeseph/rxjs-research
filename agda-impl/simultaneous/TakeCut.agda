@@ -232,7 +232,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   row→′ tk un | O.made x nk nF (l , refl , m) = inj₁ (made-img x nk nF m)
 
   pin→′ : ∀ {k p} → TT k (pin p) → Live TT k
-        → (Σ Pos λ l → Σ Pos λ p′ → UU l (pin p′) × Put′ k l × (∀ {k₀ e₀} → TT k₀ e₀ → Unpinned e₀ → φ′ k₀ ≺ p′ → k₀ ≺ p)) × Homed′ k
+        → (Σ Pos λ l → Σ Pos λ p′ → UU l (pin p′) × Put′ k l × (∀ {k₀ a} → TT k₀ (out a) → φ′ k₀ ≺ p′ → k₀ ≺ p)) × Homed′ k
   pin→′ {k} {p} tk@(W.left x nFp ins) lv with C.pin→ x (O.live← dec fst lv)
   ... | (l , p′ , y , pl , past) , h = (l , p′ , W*.left y nF* (Run.pin-in R* y) , ((pin p , tk) , nFk , inj₁ (pl , pin p′ , y)) , past′) , homed′ nFk h
     where
@@ -241,13 +241,13 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
 
       nF* : ¬ W*.Failed p′
       nF* (l₀ , x′ , y₀ , nk , lt) with shown-fail y₀ nk
-      ... | k₀ , a , refl , x₀ , nk₀ , _ = nFp (k₀ , a , x₀ , nk₀ , past x₀ tt lt)
+      ... | k₀ , a , refl , x₀ , nk₀ , _ = nFp (k₀ , a , x₀ , nk₀ , past x₀ lt)
 
-      past′ : ∀ {k₀ e₀} → TT k₀ e₀ → Unpinned e₀ → φ′ k₀ ≺ p′ → k₀ ≺ p
-      past′ tk₀ un lt with O.kind tk₀ un
-      ... | O.kept x₀ _ _ = past x₀ un (subst (_≺ p′) (φ-old x₀) lt)
+      past′ : ∀ {k₀ a} → TT k₀ (out a) → φ′ k₀ ≺ p′ → k₀ ≺ p
+      past′ tk₀ lt with O.kind tk₀ tt
+      ... | O.kept x₀ _ _ = past x₀ (subst (_≺ p′) (φ-old x₀) lt)
       ... | O.made {o} {a} x₀ nk₀ _ (l₀ , refl , m) =
-        ⊥-elim (nFp (o , a , x₀ , nk₀ , past x₀ tt (≺-trans {φ o} {φ o ⊕ [ l₀ ]} {p′} (≺-ext (φ o) []) (subst (_≺ p′) (φ-new x₀ nk₀ (Tp.made-lab m)) lt))))
+        ⊥-elim (nFp (o , a , x₀ , nk₀ , past x₀ (≺-trans {φ o} {φ o ⊕ [ l₀ ]} {p′} (≺-ext (φ o) []) (subst (_≺ p′) (φ-new x₀ nk₀ (Tp.made-lab m)) lt))))
 
   put-before′ : ∀ {k l k′ e′} → TT k skip → Put′ k l → TT k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ′ k′
   put-before′ tk (_ , nFk , br) tk′ un′ lt with O.kind tk tt
