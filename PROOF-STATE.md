@@ -144,9 +144,8 @@ back to the source's. Settled by bodies.
 
 Members: `rd-corr`, `rd-φ-agree`, `rd-late-agree`, `rd-back`, `rd-put-up`,
 `rd-back-put`, `rd-elab-causal`, `rd-stable←`, `rd-stable-put`,
-`rd-stable-lead`, `rd-elab-all`, `rd-cons`, `rd-cons*`, `rd-after-φ`,
-`rd-pin-stable`, `rd-linked`, `rd-cuts`, `rd-self`, `rd-self-at`,
-`rd-self-flat`, `rd-seen`.
+`rd-stable-lead`, `rd-elab-all`, `rd-cons*`, `rd-pin-stable`, `rd-linked`,
+`rd-cuts`, `rd-self`, `rd-self-at`, `rd-seen`.
 
 #### THE CONNECT
 
