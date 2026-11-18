@@ -19,19 +19,20 @@ open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
+open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto)
+open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺→≼)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; mapRow; mapRows)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; tr-few; got-bind)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; Scope; module Scope; Cons; ev; Sh; ag-≃; coh-of; tr-few; got-bind)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
 
@@ -140,14 +141,13 @@ module _ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) where
 
 -- Two mapped tables agreeing below a value, one with a row at or past it:
 -- their sources do, so both hold the source's value.
-cons-map : ∀ {A B : Set} (f : A → B) {m m′ : Maybe (Tb.Listed A)}
-         → (∀ {q} → AgreeTo q (TR (Mapped f m)) (TR (Mapped f m′)) → AgreeTo q (TR m) (TR m′))
-         → (∀ {y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR m) (TR m′)) → TR m y (out a) → TR m′ y′ e′ → y ≼ y′ → TR m′ y (out a))
-         → ∀ {y y′ b e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (Mapped f m)) (TR (Mapped f m′)))
-         → TR (Mapped f m) y (out b) → TR (Mapped f m′) y′ e′ → y ≼ y′ → TR (Mapped f m′) y (out b)
-cons-map f {m} {m′} ag← cn below x x′ yy with tr-map→ f m x | tr-map→ f m′ x′
+cons-map : ∀ {A B : Set} (f : A → B) {m m′ : Maybe (Tb.Listed A)} {G : Pos → Set}
+         → (∀ {y y′} → y ≼ y′ → G y′ → G y)
+         → (∀ {q} → G q → AgreeTo q (TR (Mapped f m)) (TR (Mapped f m′)) → AgreeTo q (TR m) (TR m′))
+         → Cons G (TR m) (TR m′) → Cons G (TR (Mapped f m)) (TR (Mapped f m′))
+cons-map f {m} {m′} gd ag← cn {y} g below x x′ yy with tr-map→ f m x | tr-map→ f m′ x′
 ... | e₀ , x₀ , eq | e₁ , x₁ , _ with ev-out f e₀ (sym eq)
-...   | a , refl , refl = tr-map← f m′ (cn (λ lt → ag← (below lt)) x₀ x₁ yy)
+...   | a , refl , refl = tr-map← f m′ (cn g (λ {y₀} lt → ag← (gd (≺→≼ {y₀} {y} lt) g) (below lt)) x₀ x₁ yy)
 
 ------------------------------------------------------------------------
 -- The record, mapped
@@ -155,9 +155,10 @@ cons-map f {m} {m′} ag← cn below x x′ yy with tr-map→ f m x | tr-map→ 
 module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   (lift : ∀ {e e′} → M e e′ → M (ev f e) (ev g e′))
   (back : ∀ e′ → Shown (One valuesOf) (ev g e′) → Shown (One valuesOf) e′)
-  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} (R : Rel P Q s s*) where
+  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} {S : Scope} (R : Rel P Q s s* S) where
 
   module R = Rel R
+  module Sc = Scope S
 
   P′ : ℕ → Maybe (Tb.Listed B)
   P′ N = Mapped f (P N)
@@ -166,11 +167,13 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   Q′ N = Mapped g (Q N)
 
   -- Agreement back through the map, by the child's coherence.
-  ag← : ∀ {N N′ k} → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → AgreeTo k (TR (P N)) (TR (P N′))
-  ag← {N} {N′} ag = coh-of (tr-few (P N) (P N′)) R.cons R.cons (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) (sh-of ag))
+  ag← : ∀ {N N′ k} → Sc.G N N′ k → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → AgreeTo k (TR (P N)) (TR (P N′))
+  ag← {N} {N′} gk ag = coh-of (tr-few (P N) (P N′)) R.cons R.cons (λ yk → Sc.g-down yk gk) (λ yk → Sc.g-sym (Sc.g-down yk gk))
+    (ag-≃ (sh-map→ f (P N)) (sh-map← f (P N)) (sh-map→ f (P N′)) (sh-map← f (P N′)) (sh-of ag))
 
-  ag←* : ∀ {N N′ k} → AgreeTo k (TR (Q′ N)) (TR (Q′ N′)) → AgreeTo k (TR (Q N)) (TR (Q N′))
-  ag←* {N} {N′} ag = coh-of (tr-few (Q N) (Q N′)) R.cons* R.cons* (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) (sh-of ag))
+  ag←* : ∀ {N N′ k} → Sc.G* N N′ k → AgreeTo k (TR (Q′ N)) (TR (Q′ N′)) → AgreeTo k (TR (Q N)) (TR (Q N′))
+  ag←* {N} {N′} gk ag = coh-of (tr-few (Q N) (Q N′)) R.cons* R.cons* (λ yk → Sc.g*-down yk gk) (λ yk → Sc.g*-sym (Sc.g*-down yk gk))
+    (ag-≃ (sh-map→ g (Q N)) (sh-map← g (Q N)) (sh-map→ g (Q N′)) (sh-map← g (Q N′)) (sh-of ag))
 
   back-row : ∀ N {k e} → TR (P′ N) k e → Unpinned e → Σ (Ev A) λ e₀ → TR (P N) k e₀ × Unpinned e₀
   back-row N x un with tr-map→ f (P N) x
@@ -184,11 +187,11 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
 
   Homed′ : ℕ → Pos → Set
   Homed′ N k = instantOf k ≡ instantOf s
-             ⊎ Σ Pos λ k₀ → Σ (Ev B) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × Img′ N k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+             ⊎ Σ Pos λ k₀ → Σ (Ev B) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × ¬ R.Late N k₀ × Img′ N k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
   homed→ : ∀ {N k} → Corr.Homed (R.corr N) k → Homed′ N k
   homed→ (inj₁ e) = inj₁ e
-  homed→ {N} (inj₂ (k₀ , e₀ , x , un , im , lt , ie)) = inj₂ (k₀ , ev f e₀ , tr-map← f (P N) x , un← f e₀ un , img→ im , lt , ie)
+  homed→ {N} (inj₂ (k₀ , e₀ , x , un , nl , im , lt , ie)) = inj₂ (k₀ , ev f e₀ , tr-map← f (P N) x , un← f e₀ un , nl , img→ im , lt , ie)
 
   PutAt′ : ℕ → Pos → Set
   PutAt′ N k = (Σ Pos λ l → Σ (Ev (IE B)) λ e′ → TR (Q′ N) l e′ × R.Put N k l) × Homed′ N k
@@ -210,11 +213,16 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   leadsOr (inj₁ le) = inj₁ le
   leadsOr (inj₂ ld) = inj₂ (leads→ ld)
 
-  row→′ : ∀ N {k e} → TR (P′ N) k e → Unpinned e → Img′ N k e ⊎ (e ≡ skip × PutAt′ N k)
+  row→′ : ∀ N {k e} → TR (P′ N) k e → Unpinned e → (Img′ N k e × ¬ R.Late N k) ⊎ (e ≡ skip × PutAt′ N k)
   row→′ N x un with tr-map→ f (P N) x
   ... | e₀ , x₀ , refl with Corr.row→ (R.corr N) x₀ (un→ f e₀ un)
-  ...   | inj₁ im          = inj₁ (img→ im)
+  ...   | inj₁ (im , nl)   = inj₁ (img→ im , nl)
   ...   | inj₂ (refl , pa) = inj₂ (refl , put→ pa)
+
+  late-put′ : ∀ N {k e} → R.Late N k → TR (P′ N) k e → e ≡ skip × PutAt′ N k
+  late-put′ N lt x with tr-map→ f (P N) x
+  ... | e₀ , x₀ , refl with Corr.late-put (R.corr N) lt x₀
+  ...   | refl , pa = refl , put→ pa
 
   PinAt′ : ℕ → Pos → Pos → Set
   PinAt′ N k p = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × R.Put N k l
@@ -231,68 +239,74 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   ... | (l , p′ , y , pl , past) , h =
     (l , p′ , tr-map← g (Q N) y , pl , λ x′ lt → past (proj₂ (out-back N x′)) lt) , homed→ h
 
-  put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ R.φ N k′
-  put-before′ N x pl x′ un′ lt = let (_ , x₀ , u₀) = back-row N x′ un′ in Corr.put-before (R.corr N) (tr-skip← f (P N) x) pl x₀ u₀ lt
+  put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ R.Late N k′ → k ≺ k′ → l ≼ R.φ N k′
+  put-before′ N x pl x′ un′ nl′ lt = let (_ , x₀ , u₀) = back-row N x′ un′ in Corr.put-before (R.corr N) (tr-skip← f (P N) x) pl x₀ u₀ nl′ lt
+
+  pin-before′ : ∀ N {k p l k′ e′} → TR (P′ N) k (pin p) → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ R.Late N k′ → k ≺ k′ → l ≼ R.φ N k′
+  pin-before′ N x pl x′ un′ nl′ lt = let (_ , x₀ , u₀) = back-row N x′ un′ in Corr.pin-before (R.corr N) (tr-pin← f (P N) x) pl x₀ u₀ nl′ lt
 
   shown←′ : ∀ N {l e′} → TR (Q′ N) l e′ → Shown (One valuesOf) e′
-          → Σ Pos λ k → Σ (Ev B) λ e → l ≡ R.φ N k × TR (P′ N) k e × Unpinned e × M e e′
+          → Σ Pos λ k → Σ (Ev B) λ e → l ≡ R.φ N k × TR (P′ N) k e × Unpinned e × ¬ R.Late N k × M e e′
   shown←′ N y sh with tr-map→ g (Q N) y
   ... | e₀′ , y₀ , refl with Corr.shown← (R.corr N) y₀ (back e₀′ sh)
-  ...   | k , e , eq , x , un , mt = k , ev f e , eq , tr-map← f (P N) x , un← f e un , lift mt
+  ...   | k , e , eq , x , un , nl , mt = k , ev f e , eq , tr-map← f (P N) x , un← f e un , nl , lift mt
 
   place′ : ∀ N {m e′} → TR (Q′ N) m e′ → Live (TR (Q′ N)) m
-         → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × Img′ N k e × (R.φ N k ≼ m ⊎ Leads′ N k) × instantOf (R.φ N k) ≡ instantOf m
+         → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × ¬ R.Late N k × Img′ N k e
+             × (R.φ N k ≼ m ⊎ Leads′ N k) × instantOf (R.φ N k) ≡ instantOf m
   place′ N {m} y lv with tr-map→ g (Q N) y
   ... | e₀′ , y₀ , refl with Corr.place (R.corr N) y₀ (live-map← g (Q N) lv)
   ...   | inj₁ e = inj₁ e
-  ...   | inj₂ (k , e , x , un , im , le , ie) = inj₂ (k , ev f e , tr-map← f (P N) x , un← f e un , img→ im , leadsOr {m = m} le , ie)
+  ...   | inj₂ (k , e , x , un , nl , im , le , ie) = inj₂ (k , ev f e , tr-map← f (P N) x , un← f e un , nl , img→ im , leadsOr {m = m} le , ie)
 
-  corr′ : ∀ N → Corr s s* (R.φ N) (R.Put N) (TR (P′ N)) (TR (Q′ N))
+  corr′ : ∀ N → Corr s s* (R.φ N) (R.Put N) (R.Late N) (TR (P′ N)) (TR (Q′ N))
   corr′ N = record
-    { row→ = row→′ N ; pin→ = pin→′ N ; put-before = put-before′ N ; shown← = shown←′ N ; place = place′ N
-    ; mono = λ x x′ un un′ lt → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.mono (R.corr N) x₀ x₁ u₀ u₁ lt
-    ; inst = λ x x′ un un′ → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.inst (R.corr N) x₀ x₁ u₀ u₁
-    ; home = λ x un → let (_ , x₀ , u₀) = back-row N x un in Corr.home (R.corr N) x₀ u₀ }
+    { row→ = row→′ N ; late-put = late-put′ N ; pin→ = pin→′ N ; put-before = put-before′ N ; pin-before = pin-before′ N
+    ; shown← = shown←′ N ; place = place′ N
+    ; mono = λ x x′ un un′ nl nl′ lt → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.mono (R.corr N) x₀ x₁ u₀ u₁ nl nl′ lt
+    ; inst = λ x x′ un un′ nl nl′ → let (_ , x₀ , u₀) = back-row N x un ; (_ , x₁ , u₁) = back-row N x′ un′ in Corr.inst (R.corr N) x₀ x₁ u₀ u₁ nl nl′
+    ; home = λ x un nl → let (_ , x₀ , u₀) = back-row N x un in Corr.home (R.corr N) x₀ u₀ nl }
 
-  rel′ : Rel P′ Q′ s s*
+  rel′ : Rel P′ Q′ s s* S
   rel′ = record
-    { φ = R.φ ; Put = R.Put ; corr = corr′
-    ; φ-agree = λ {N} x un ag → let (_ , x₀ , u₀) = back-row N x un in R.φ-agree x₀ u₀ (ag← ag)
+    { φ = R.φ ; Put = R.Put ; Late = R.Late ; corr = corr′
+    ; φ-agree = λ {N} x un nl gk g* ag → let (_ , x₀ , u₀) = back-row N x un in R.φ-agree x₀ u₀ nl gk g* (ag← gk ag)
+    ; late-agree = λ {N} x un nl gk g* ag → let (_ , x₀ , u₀) = back-row N x un in R.late-agree x₀ u₀ nl gk g* (ag← gk ag)
     ; bk = R.bk
-    ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.in-bk x₀ u₀
+    ; in-bk = λ {N} x un nl → let (_ , x₀ , u₀) = back-row N x un in R.in-bk x₀ u₀ nl
     ; pb-few = R.pb-few
-    ; back = λ {_} {N′} le x un ag* → let (_ , x₀ , u₀) = back-row N′ x un in ag-map f (R.back le x₀ u₀ (ag←* ag*))
-    ; put-up = λ le ag → R.put-up le (ag← ag)
-    ; back-put = λ le pl ag* → R.back-put le pl (ag←* ag*)
-    ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = back-row N x un in ag-map g (R.elab-causal le x₀ u₀ (ag← ag))
-    ; stable← = λ {N} le x un y ag* → let (_ , x₀ , u₀) = back-row N x un in
-        ag-map f (R.stable← le x₀ u₀ (proj₁ (proj₂ (tr-map→ g (Q N) y))) (ag←* ag*))
-    ; stable-put = λ {N} le ag y pl → ag-map g (R.stable-put le (ag← ag) (proj₁ (proj₂ (tr-map→ g (Q N) y))) pl)
-    ; stable-lead = λ {N} le x un y ld z ie ag* → let (_ , x₀ , u₀) = back-row N x un in
-        ag-map g (R.stable-lead le x₀ u₀ (proj₁ (proj₂ (tr-map→ g (Q N) y))) (leads← ld) (proj₁ (proj₂ (tr-map→ g (Q N) z))) ie (ag←* ag*))
-    ; elab-all = λ {N} {N′} le all y → let (_ , y₀ , eq) = tr-map→ g (Q N′) y in
-        subst (TR (Q′ N) _) (sym eq) (tr-map← g (Q N) (R.elab-all le (λ q → ag← (all q)) y₀))
+    ; back = λ {_} {N′} le x un nl gk g* ag* → let (_ , x₀ , u₀) = back-row N′ x un in ag-map f (R.back le x₀ u₀ nl gk g* (ag←* g* ag*))
+    ; put-up = λ le gk g* ag → R.put-up le gk g* (ag← gk ag)
+    ; back-put = λ le gk g* pl ag* → R.back-put le gk g* pl (ag←* g* ag*)
+    ; elab-causal = λ {N} le x un nl gk g* ag → let (_ , x₀ , u₀) = back-row N x un in ag-map g (R.elab-causal le x₀ u₀ nl gk g* (ag← gk ag))
+    ; stable← = λ {N} le x un nl gk g* y ag* → let (_ , x₀ , u₀) = back-row N x un in
+        ag-map f (R.stable← le x₀ u₀ nl gk g* (proj₁ (proj₂ (tr-map→ g (Q N) y))) (ag←* g* ag*))
+    ; stable-put = λ {N} le gk g* ag y pl → ag-map g (R.stable-put le gk g* (ag← gk ag) (proj₁ (proj₂ (tr-map→ g (Q N) y))) pl)
+    ; stable-lead = λ {N} le x un nl gk g* y ld z gm ie ag* → let (_ , x₀ , u₀) = back-row N x un in
+        ag-map g (R.stable-lead le x₀ u₀ nl gk g* (proj₁ (proj₂ (tr-map→ g (Q N) y))) (leads← ld) (proj₁ (proj₂ (tr-map→ g (Q N) z))) gm ie (ag←* gm ag*))
+    ; elab-all = λ {N} {N′} le gs gs* all y → let (_ , y₀ , eq) = tr-map→ g (Q N′) y in
+        subst (TR (Q′ N) _) (sym eq) (tr-map← g (Q N) (R.elab-all le gs gs* (λ q → ag← (gs q) (all q)) y₀))
     ; func = λ {N} → func-map f (P N) R.func
     ; func* = λ {N} → func-map g (Q N) R.func*
     ; flat = λ {N} → flat-map f (P N) R.flat
     ; flat* = λ {N} → flat-map g (Q N) R.flat*
     ; pin-in = λ {N} → pin-in-map f (P N) R.pin-in
     ; pin-in* = λ {N} → pin-in-map g (Q N) R.pin-in*
-    ; cons = λ {N} {N′} → cons-map f {P N} {P N′} ag← (R.cons {N} {N′})
-    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} ag←* (R.cons* {N} {N′})
+    ; cons = λ {N} {N′} → cons-map f {P N} {P N′} Sc.g-down ag← (R.cons {N} {N′})
+    ; cons* = λ {N} {N′} → cons-map g {Q N} {Q N′} Sc.g*-down ag←* (R.cons* {N} {N′})
     ; got = λ N → got-bind (mapRows f) (R.got N)
     ; got* = λ N → got-bind (mapRows g) (R.got* N)
     ; after = λ {N} x → R.after (proj₁ (proj₂ (tr-map→ f (P N) x)))
     ; after* = λ {N} y → R.after* (proj₁ (proj₂ (tr-map→ g (Q N) y)))
-    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = back-row N x un in R.after-φ x₀ u₀
+    ; after-φ = λ {N} x un nl → let (_ , x₀ , u₀) = back-row N x un in R.after-φ x₀ u₀ nl
     ; pin-after* = λ {N} y → R.pin-after* (tr-pin← g (Q N) y)
-    ; pin-stable = λ {N} {N′} le x un ag hp rk y → let (_ , x₀ , u₀) = back-row N x un in
-        tr-map← g (Q N) (R.pin-stable le x₀ u₀ (ag← ag) (λ r₀k x₁ → tr-pin← f (P N) (hp r₀k (tr-map← f (P N′) x₁))) rk (tr-pin← g (Q N′) y)) }
+    ; pin-stable = λ {N} {N′} le x un nl gk g* ag hp rk y → let (_ , x₀ , u₀) = back-row N x un in
+        tr-map← g (Q N) (R.pin-stable le x₀ u₀ nl gk g* (ag← gk ag) (λ r₀k x₁ → tr-pin← f (P N) (hp r₀k (tr-map← f (P N′) x₁))) rk (tr-pin← g (Q N′) y)) }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))
        → (∀ e′ → Shown (One valuesOf) (ev g e′) → Shown (One valuesOf) e′)
-       → ∀ {P Q s s*} → Rel P Q s s* → Rel (λ N → Mapped f (P N)) (λ N → Mapped g (Q N)) s s*
+       → ∀ {P Q s s* S} → Rel P Q s s* S → Rel (λ N → Mapped f (P N)) (λ N → Mapped g (Q N)) s s* S
 ev-tab f g lift back R = EvTab.rel′ f g lift back R
 
 ------------------------------------------------------------------------
@@ -318,6 +332,6 @@ private
   m-map f {skip} {e′} (_ , d) = (λ ()) , (λ _ sh → d (λ ()) (shown-map f e′ sh))
   m-map f {pin r} {e′} (_ , d) = (λ ()) , (λ _ sh → d (λ ()) (shown-map f e′ sh))
 
-map-tab : ∀ {A B} (f : A → B) {P Q s s*} → Rel P Q s s*
-        → Rel (λ N → bind (P N) λ l → just (mapRows f l)) (λ N → bind (Q N) λ l → just (mapRows (mapIE f) l)) s s*
+map-tab : ∀ {A B} (f : A → B) {P Q s s* S} → Rel P Q s s* S
+        → Rel (λ N → bind (P N) λ l → just (mapRows f l)) (λ N → bind (Q N) λ l → just (mapRows (mapIE f) l)) s s* S
 map-tab f = ev-tab f (mapIE f) (m-map f) (shown-map f)

@@ -336,17 +336,18 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     ...   | _ , eq = ⊥-elim (nF (refail< below (o , a , x₀ , nk , subst (o ≺_) (sym eq) (≺-ext o []))))
 
     -- A row the other holds at or past a value carries it.
-    row-past : ∀ {y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → Cons t t′ → ¬ W.Failed y
+    row-past : ∀ {G : Pos → Set} {y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → Cons G t t′ → G y → ¬ W.Failed y
              → t y (out a) → W′.TakeT y′ e′ → y ≼ y′ → t′ y (out a)
-    row-past below cab nF x tk′ yy′ with O′.past (O′.from tk′) yy′
-    ... | inj₁ (o , e₀ , xo , yo) = cab below x xo yo
+    row-past below cab g nF x tk′ yy′ with O′.past (O′.from tk′) yy′
+    ... | inj₁ (o , e₀ , xo , yo) = cab g below x xo yo
     ... | inj₂ F = ⊥-elim (nF (refail< below F))
 
   ----------------------------------------------------------------------
   -- Two takes
 
   module Two {t t′ : EmissionSet A} (R : Run t) (R′ : Run t′)
-    (fin : ∀ q → Few (λ y e → t y e ⊎ t′ y e) q) (cab : Cons t t′) (cba : Cons t′ t) where
+    (fin : ∀ q → Few (λ y e → t y e ⊎ t′ y e) q) (G : Pos → Set) (gd : ∀ {y y′} → y ≼ y′ → G y′ → G y)
+    (cab : Cons G t t′) (cba : Cons G t′ t) where
     open Dir R R′ public
     module D′ = Dir R′ R
 
@@ -363,8 +364,8 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
       sym< below {y₀} lt = AgreeTo-sym (below {y₀} lt)
 
     -- AGREEMENT CARRIES BACK, up to a row of the first take's, no failure before it.
-    lift : ∀ {k w e} → AgreeTo k W.TakeT W′.TakeT → W.TakeT w e → k ≼ w → ¬ W.Failed k → O.NoFail k → AgreeTo k t t′
-    lift {k} {w} agT tw kw nF nf = ag-ind fin step
+    lift : ∀ {k w e} → G k → AgreeTo k W.TakeT W′.TakeT → W.TakeT w e → k ≼ w → ¬ W.Failed k → O.NoFail k → AgreeTo k t t′
+    lift {k} {w} gk agT tw kw nF nf = ag-ind fin step
       where
         step : ∀ {y} → y ≼ k → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {e} → (t y e → t′ y e) × (t′ y e → t y e)
         step {y} yk below = point1 below (proj₁ (upto agT yk)) nFy nfy , D′.point1 (sym< below) (proj₂ (upto agT yk)) (unfail< nFy) nf′y
@@ -384,13 +385,13 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             nf′y {a} x′ with dec-keep a
             ... | inj₁ kp = kp
             ... | inj₂ nk with O.past (O.from tw) (≼-trans {y} {k} {w} yk kw)
-            ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (T-not (nfy (cba (sym< below) x′ xo yo)) nk)
+            ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (T-not (nfy (cba (gd yk gk) (sym< below) x′ xo yo)) nk)
             ...   | inj₂ F = ⊥-elim (nFy F)
 
     -- With no failing value in the first source, takes agreeing
     -- everywhere have sources agreeing everywhere.
-    lift-all : (∀ q → AgreeTo q W.TakeT W′.TakeT) → (∀ {y} → O.NoFail y) → ∀ k → AgreeTo k t t′
-    lift-all agT nf k = ag-ind fin step
+    lift-all : (∀ q → G q) → (∀ q → AgreeTo q W.TakeT W′.TakeT) → (∀ {y} → O.NoFail y) → ∀ k → AgreeTo k t t′
+    lift-all g agT nf k = ag-ind fin step
       where
         nF : ∀ {y} → ¬ W.Failed y
         nF (_ , _ , x , nk , _) = T-not (nf x) nk
@@ -405,21 +406,21 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             nf′ {a} x′ with dec-keep a
             ... | inj₁ kp = kp
             ... | inj₂ nk with O.from (proj₂ (upto (agT (y ⊕ [ last ])) (≼-refl {y ⊕ [ last ]})) (W′.stop x′ nk nF′))
-            ...   | O.self x₀ _ = ⊥-elim (T-not (nf (cba (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
+            ...   | O.self x₀ _ = ⊥-elim (T-not (nf (cba (g y) (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
             ...   | O.new x₀ nk₀ _ _ = ⊥-elim (T-not (nf x₀) nk₀)
 
     -- Up to a failing value, for one of its rows.
-    lift-fail : ∀ {w e y a} → AgreeTo w W.TakeT W′.TakeT → W.TakeT w e → y ≼ w
+    lift-fail : ∀ {w e y a} → G y → AgreeTo w W.TakeT W′.TakeT → W.TakeT w e → y ≼ w
               → t y (out a) → T (not (keep a)) → ¬ W.Failed y → AgreeTo y t t′
-    lift-fail {w} {y = y} {a} agT tw yw x nk nF = ⟨ at ⟩
+    lift-fail {w} {y = y} {a} gy agT tw yw x nk nF = ⟨ at ⟩
       where
         below : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
         below {y₀} lt =
           let y₀w = ≺→≼ {y₀} {w} (≺-≼-≺ {y₀} {y} {w} lt yw)
-          in lift (ag-down {q = w} {y₀} y₀w agT) tw y₀w (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
+          in lift (gd (≺→≼ {y₀} {y} lt) gy) (ag-down {q = w} {y₀} y₀w agT) tw y₀w (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
 
         x′ : t′ y (out a)
-        x′ = row-past below cab nF x (proj₁ (upto agT (≼-refl {w})) tw) yw
+        x′ = row-past below cab gy nF x (proj₁ (upto agT (≼-refl {w})) tw) yw
 
         at : ∀ {z e} → z ≼ y → (t z e → t′ z e) × (t′ z e → t z e)
         at {z} zy with ≼-split {z} {y} zy
@@ -427,15 +428,18 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
         ... | inj₂ refl = (λ x₁ → subst (t′ y) (Run.func R x x₁) x′) , (λ x₁ → subst (t y) (Run.func R′ x′ x₁) x)
 
     -- TWO TAKES ARE TRUNCATED BEFORE THEY DIFFER.
-    cons-T : Cons W.TakeT W′.TakeT
-    cons-T {y} below (W.pass x kp nF) tk′ yy′ = W′.pass (row-past cb cab nF x tk′ yy′) kp (λ F → nF (refail< cb F))
+    cons-T : Cons G W.TakeT W′.TakeT
+    cons-T {y} g below (W.pass x kp nF) tk′ yy′ = W′.pass (row-past cb cab g nF x tk′ yy′) kp (λ F → nF (refail< cb F))
       where
         cb : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
-        cb {y₀} lt = lift (below {y₀} lt) (W.pass x kp nF) (≺→≼ {y₀} {y} lt) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
-    cons-T {y′ = y′} below (W.fail {o} x nk nF i) tk′ yy′ =
-      W′.fail (row-past cb cab nF x tk′ (≼-trans {o} {o ⊕ [ ix 0 ]} {y′} (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) yy′)) nk (λ F → nF (refail< cb F)) i
+        cb {y₀} lt = lift (gd (≺→≼ {y₀} {y} lt) g) (below {y₀} lt) (W.pass x kp nF) (≺→≼ {y₀} {y} lt) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
+    cons-T {y′ = y′} g below (W.fail {o} x nk nF i) tk′ yy′ =
+      W′.fail (row-past cb cab go nF x tk′ (≼-trans {o} {o ⊕ [ ix 0 ]} {y′} (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) yy′)) nk (λ F → nF (refail< cb F)) i
       where
+        go : G o
+        go = gd (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) g
+
         cb : ∀ {y₀} → y₀ ≺ o → AgreeTo y₀ t t′
         cb {y₀} lt =
           let lt′ = ≺-trans {y₀} {o} {o ⊕ [ ix 0 ]} lt (≺-ext o [])
-          in lift (below {y₀} lt′) (W.fail x nk nF i) (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {o} lt) F)) (O.nofail< nF lt)
+          in lift (gd (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) g) (below {y₀} lt′) (W.fail x nk nF i) (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {o} lt) F)) (O.nofail< nF lt)

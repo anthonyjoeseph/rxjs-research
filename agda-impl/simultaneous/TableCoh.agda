@@ -21,7 +21,7 @@ open import Data.Nat using (ℕ)
 open import Data.Product using (_,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
-open import Relation.Nullary using (does)
+open import Relation.Nullary using (does; ¬_)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; _≟ᵖ_; ix; sub; last; _⊕_)
@@ -30,7 +30,7 @@ open import denotation.EmissionSet using (end)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (anyᵇ)
 open import simultaneous.Listing using (UncutEnv)
-open import simultaneous.TableCorr using (Rel; TR)
+open import simultaneous.TableCorr using (Same; module Same; same; Rel; TR)
 open import simultaneous.TableEnv using (Ren; Tab; up; _⊕ˡ_; Aligned; Linked; EnvR; maps; lw; lw*; Admits; Out; HotD; den-cons)
 open import simultaneous.LaneEndSched using (laneX; laneL; trigXs; readerR; emitAt; later)
 open import simultaneous.TableFlat using (module Flat; module Vals; module TabRows; if-≡)
@@ -87,22 +87,22 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                     (ad* : Admits (den-cons h₁ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* E))))) q*)
                     (ad*′ : Admits (den-cons h₁′ (den-cons h₂′ (den-cons h₃′ (den-cons h₄′ (lw* E′))))) q*)
                     (al : Aligned (maps E) ρ q q*) (al′ : Aligned (maps E′) ρ q q*) (lk lk′ : Linked q q*) N y
-                → Rel.φ (Out.rel (Ls b t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) N y
-                ≡ Rel.φ (Out.rel (Ls′ b t₁ t₂ t₃ t₄ u h₁′ h₂′ h₃′ h₄′ q q* ad′ ad*′ al′ lk′)) N y
+                → Same (Out.rel (Ls b t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) (Out.rel (Ls′ b t₁ t₂ t₃ t₄ u h₁′ h₂′ h₃′ h₄′ q q* ad′ ad*′ al′ lk′)) N y
 
   module _ (Os : X.Src) (Os′ : X′.Src) (Ls : X.Lanes) (Ls′ : X′.Lanes) (Lc : X.LanesCoh Ls) (Lc′ : X′.LanesCoh Ls′)
-           (os≡ : ∀ N y → Rel.φ (Out.rel Os) N y ≡ Rel.φ (Out.rel Os′) N y) (ls≡ : LanesX Ls Ls′) where
+           (os≡ : ∀ N y → Same (Out.rel Os) (Out.rel Os′) N y) (ls≡ : LanesX Ls Ls′) where
     module P  = X.Parts Os Ls Lc
     module P′ = X′.Parts Os′ Ls′ Lc′
 
     -- TWO ENVIRONMENTS' RECORDS OF ONE LANE: one value, one pair of
-    -- subscriptions, one map.
+    -- subscriptions, one map, late alike.
     record LaneX {N} (R : P.LaneRec N) (R′ : P′.LaneRec N) : Set where
       field
         a≡   : P.LaneRec.a R ≡ P′.LaneRec.a R′
         st≡  : P.LaneRec.st R ≡ P′.LaneRec.st R′
         stE≡ : P.LaneRec.stE R ≡ P′.LaneRec.stE R′
         φ≡   : ∀ y → Rel.φ (Out.rel (P.LaneRec.lane R)) N y ≡ Rel.φ (Out.rel (P′.LaneRec.lane R′)) N y
+        late→ : ∀ y → ¬ Rel.Late (Out.rel (P.LaneRec.lane R)) N y → ¬ Rel.Late (Out.rel (P′.LaneRec.lane R′)) N y
 
     tab-x : ∀ {N} {R : P.LaneRec N} {R′ : P′.LaneRec N} → LaneX R R′ → P.LaneRec.tab R ≡ P′.LaneRec.tab R′
     tab-x {N} x = cong₂ (λ b q → Tab n (f b) ρ q N) (LaneX.a≡ x) (LaneX.st≡ x)
@@ -114,37 +114,40 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     end-x x y = cong₂ (λ u v → emitAt (later u (laneL v ⊕ˡ trigXs v) ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
                       (LaneX.φ≡ x y) (LaneX.stE≡ x)
 
-    -- A lane at alike subscriptions maps alike in the two environments.
+    -- A lane at alike subscriptions maps alike and is late alike in the
+    -- two environments.
     lane-x : ∀ {b q st st′} → st ≡ st′ → (ad* : Admits X.Dc st) (ad*′ : Admits X′.Dc st′)
            → (ad : Admits (lw E) q) (ad′ : Admits (lw E′) q)
            → (al : Aligned (maps E) ρ q (laneX st)) (al′ : Aligned (maps E′) ρ q (laneX st′))
            → (lk : Linked q (laneX st)) (lk′ : Linked q (laneX st′)) → ∀ N y
-           → Rel.φ (Out.rel (Ls b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) (P.trigD st ad*) X.clD X.shD X.ttD
-                               q (laneX st) ad (P.laneAdm st ad*) al lk)) N y
-           ≡ Rel.φ (Out.rel (Ls′ b (P′.trig st′) X′.cl-tab X′.sh-tab X′.tt-tab (P′.utrig st′) (P′.trigD st′ ad*′) X′.clD X′.shD X′.ttD
-                               q (laneX st′) ad′ (P′.laneAdm st′ ad*′) al′ lk′)) N y
+           → Same (Out.rel (Ls b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) (P.trigD st ad*) X.clD X.shD X.ttD
+                                q (laneX st) ad (P.laneAdm st ad*) al lk))
+                  (Out.rel (Ls′ b (P′.trig st′) X′.cl-tab X′.sh-tab X′.tt-tab (P′.utrig st′) (P′.trigD st′ ad*′) X′.clD X′.shD X′.ttD
+                                q (laneX st′) ad′ (P′.laneAdm st′ ad*′) al′ lk′)) N y
     lane-x {b} {q} {st} refl ad* ad*′ ad ad′ al al′ lk lk′ =
       ls≡ b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) (P.trigD st ad*) (P′.trigD st ad*′) X.clD X′.clD X.shD X′.shD X.ttD X′.ttD
           q (laneX st) ad ad′ (P.laneAdm st ad*) (P′.laneAdm st ad*′) al al′ lk lk′
 
     -- A value's two lanes.
     valRec-x : ∀ {N} v → LaneX (P.valRec N v) (P′.valRec N v)
-    valRec-x {N} v@(valAt q b x) = record { a≡ = refl ; st≡ = refl ; stE≡ = st≡ ; φ≡ = lane-x st≡
-      (P.LaneRec.adm* (P.valRec N v)) (P′.LaneRec.adm* (P′.valRec N v)) (P.LaneRec.adm (P.valRec N v)) (P′.LaneRec.adm (P′.valRec N v)) _ _ _ _ N }
+    valRec-x {N} v@(valAt q b x) = record { a≡ = refl ; st≡ = refl ; stE≡ = st≡ ; φ≡ = λ y → Same.φ≡ (lx y) ; late→ = λ y → Same.nl→ (lx y) }
       where
         st≡ : P.LaneRec.stE (P.valRec N v) ≡ P′.LaneRec.stE (P′.valRec N v)
-        st≡ = cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 1 ]) (os≡ N q)
+        st≡ = cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 1 ]) (Same.φ≡ (os≡ N q))
+        lx : ∀ y → Same (Out.rel (P.LaneRec.lane (P.valRec N v))) (Out.rel (P′.LaneRec.lane (P′.valRec N v))) N y
+        lx = lane-x st≡ (P.LaneRec.adm* (P.valRec N v)) (P′.LaneRec.adm* (P′.valRec N v)) (P.LaneRec.adm (P.valRec N v)) (P′.LaneRec.adm (P′.valRec N v)) _ _ _ _ N
 
     -- A queued value's two lanes, after two records of the lane it
     -- waited on.
     queuedRec-x : ∀ {N} {R : P.LaneRec N} {R′ : P′.LaneRec N} {c} → LaneX R R′ → (cx : TR (P.LaneRec.tab R) c end) (cx′ : TR (P′.LaneRec.tab R′) c end)
                 → ∀ b → LaneX (P.queuedRec N R cx b) (P′.queuedRec N R′ cx′ b)
-    queuedRec-x {N} {R} {R′} {c} x cx cx′ b = record { a≡ = refl ; st≡ = refl ; stE≡ = st≡ ; φ≡ = lane-x st≡
-      (P.LaneRec.adm* (P.queuedRec N R cx b)) (P′.LaneRec.adm* (P′.queuedRec N R′ cx′ b))
-      (P.LaneRec.adm (P.queuedRec N R cx b)) (P′.LaneRec.adm (P′.queuedRec N R′ cx′ b)) _ _ _ _ N }
+    queuedRec-x {N} {R} {R′} {c} x cx cx′ b = record { a≡ = refl ; st≡ = refl ; stE≡ = st≡ ; φ≡ = λ y → Same.φ≡ (lx y) ; late→ = λ y → Same.nl→ (lx y) }
       where
         st≡ : P.LaneRec.stE (P.queuedRec N R cx b) ≡ P′.LaneRec.stE (P′.queuedRec N R′ cx′ b)
         st≡ = cong (_⊕ [ ix 1 ]) (end-x x c)
+        lx : ∀ y → Same (Out.rel (P.LaneRec.lane (P.queuedRec N R cx b))) (Out.rel (P′.LaneRec.lane (P′.queuedRec N R′ cx′ b))) N y
+        lx = lane-x st≡ (P.LaneRec.adm* (P.queuedRec N R cx b)) (P′.LaneRec.adm* (P′.queuedRec N R′ cx′ b))
+                        (P.LaneRec.adm (P.queuedRec N R cx b)) (P′.LaneRec.adm (P′.queuedRec N R′ cx′ b)) _ _ _ _ N
 
     LanesX′ : ∀ {N} → List (P.LaneRec N) → List (P′.LaneRec N) → Set₁
     LanesX′ = Pointwise LaneX
@@ -181,14 +184,25 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       rowφ-x {N} {y} (just x) _ = if-≡ (cong (λ t → endAt t y) (tab-x x)) (λ _ → end-x x y) (λ _ → out-x x y)
       rowφ-x {N} {y} nothing (just x) = cong (_⊕ [ ix 0 ]) (end-x x (up y))
       rowφ-x {N} {y} nothing nothing =
-        if-≡ {b = isMarker N y} {b′ = isMarker N y} refl (λ _ → cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 0 ]) (os≡ N (up y)))
-                  (λ _ → if-≡ {b = endAt (S N) y} {b′ = endAt (S N) y} refl (λ _ → cong (λ u → later u P.ttEnd ⊕ [ sub X.c₁ ]) (os≡ N y))
-                                   (λ _ → cong (_⊕ [ sub X.c₁ ]) (os≡ N y)))
+        if-≡ {b = isMarker N y} {b′ = isMarker N y} refl (λ _ → cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 0 ]) (Same.φ≡ (os≡ N (up y))))
+                  (λ _ → if-≡ {b = endAt (S N) y} {b′ = endAt (S N) y} refl (λ _ → cong (λ u → later u P.ttEnd ⊕ [ sub X.c₁ ]) (Same.φ≡ (os≡ N y)))
+                                   (λ _ → cong (_⊕ [ sub X.c₁ ]) (Same.φ≡ (os≡ N y))))
+
+      -- The holder late alike, or a source row late alike in the source.
+      late-x : ∀ {N y m m′} → PickX m m′ → ¬ P.Tabs.lateAt op lanes N y m → ¬ P′.Tabs.lateAt op lanes′ N y m′
+      late-x {y = y} (just x) nl = LaneX.late→ x y nl
+      late-x {N} {y} nothing nl (r , lt) = Same.nl→ (os≡ N y) (λ lt₀ → nl (r , lt₀)) lt
+
+      hold-x : ∀ {N} → LanesX′ (lanes N) (lanes′ N) → ∀ y → PickX (P.holder (lanes N) y) (P′.holder (lanes′ N) y)
+      hold-x pw y = lastWith-x (λ R → rowAt (P.LaneRec.tab R) y) (λ R → rowAt (P′.LaneRec.tab R) y) (λ x → cong (λ t → rowAt t y) (tab-x x)) pw
 
       tabs-x : ∀ {N} → LanesX′ (lanes N) (lanes′ N) → ∀ y → P.Tabs.φ′ op lanes N y ≡ P′.Tabs.φ′ op lanes′ N y
       tabs-x pw y =
-        rowφ-x (lastWith-x (λ R → rowAt (P.LaneRec.tab R) y) (λ R → rowAt (P′.LaneRec.tab R) y) (λ x → cong (λ t → rowAt t y) (tab-x x)) pw)
+        rowφ-x (hold-x pw y)
                (lastWith-x (λ R → endAt (P.LaneRec.tab R) (up y)) (λ R → endAt (P′.LaneRec.tab R) (up y)) (λ x → cong (λ t → endAt t (up y)) (tab-x x)) pw)
+
+      tabs-late-x : ∀ {N} → LanesX′ (lanes N) (lanes′ N) → ∀ y → ¬ P.Tabs.Late′ op lanes N y → ¬ P′.Tabs.Late′ op lanes′ N y
+      tabs-late-x pw y = late-x (hold-x pw y)
 
     -- Each value's lane, alike.
     map-x : ∀ N vs → LanesX′ (L.map (P.valRec N) vs) (L.map (P′.valRec N) vs)
@@ -209,9 +223,12 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             (λ _ → maybe-same (valAtPos N q) (λ v → valRec-x v ∷ []))
             (λ _ → maybe-pw (waitedOn-x pw (up st)) (λ { {R , cx} {R′ , cx′} x → queuedRec-x x cx cx′ b ∷ [] }))
 
-      concat-x : ∀ N y → Rel.φ (CT.rel′) N y ≡ Rel.φ (CT′.rel′) N y
-      concat-x N y = tabs-x (mergeᶠ (just k)) (λ N → CT.recs N (CT.entriesAt N) []) (λ N → CT′.recs N (CT′.entriesAt N) [])
-                            (recs-x N (Runs.entriesAt n f s ρ p k N) []) y
+      concat-x : ∀ N y → Same CT.rel′ CT′.rel′ N y
+      concat-x N y = same (tabs-x (mergeᶠ (just k)) lanes lanes′ pw y) (tabs-late-x (mergeᶠ (just k)) lanes lanes′ pw y)
+        where
+          lanes  = λ N → CT.recs N (CT.entriesAt N) []
+          lanes′ = λ N → CT′.recs N (CT′.entriesAt N) []
+          pw = recs-x N (Runs.entriesAt n f s ρ p k N) []
 
     -- The exhaust's lanes, alike.
     ranLanes : ∀ N → List (P.LaneRec N)
@@ -223,14 +240,18 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     ran-x : ∀ N → LanesX′ (ranLanes N) (ranLanes′ N)
     ran-x N = cm-pw (λ v → if-pw (anyᵇ (λ q → does (q ≟ᵖ ValAt.q v)) (Runs.ranAt n f s ρ p N)) (λ _ → valRec-x v ∷ []) (λ _ → [])) (valsAt N)
 
-    -- THE JOINERS' MAP IS THE SUBSCRIPTIONS'.
+    -- THE JOINERS' MAP AND LATE ROWS ARE THE SUBSCRIPTIONS'.
     joiners-coh : ∀ op (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
-                → Rel.φ (Joiners.flat-core n f s ρ uρ ρι ρ* uρ* E  p p* a  a*  op Os  Ls  Lc  al  lk)  N y
-                ≡ Rel.φ (Joiners.flat-core n f s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ op Os′ Ls′ Lc′ al′ lk′) N y
+                → Same (Joiners.flat-core n f s ρ uρ ρι ρ* uρ* E  p p* a  a*  op Os  Ls  Lc  al  lk)
+                       (Joiners.flat-core n f s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ op Os′ Ls′ Lc′ al′ lk′) N y
     joiners-coh (mergeᶠ nothing) al al′ lk lk′ N y =
-      tabs-x (mergeᶠ nothing) (λ N → L.map (P.valRec N) (valsAt N)) (λ N → L.map (P′.valRec N) (valsAt N)) (map-x N (valsAt N)) y
+      same (tabs-x (mergeᶠ nothing) vl vl′ (map-x N (valsAt N)) y) (tabs-late-x (mergeᶠ nothing) vl vl′ (map-x N (valsAt N)) y)
+      where vl  = λ N → L.map (P.valRec N) (valsAt N)
+            vl′ = λ N → L.map (P′.valRec N) (valsAt N)
     joiners-coh (mergeᶠ (just k)) al al′ lk lk′ = concat-x k al al′ lk lk′
     joiners-coh switchᶠ al al′ lk lk′ N y =
-      tabs-x switchᶠ (λ N → L.map (P.valRec N) (valsAt N)) (λ N → L.map (P′.valRec N) (valsAt N)) (map-x N (valsAt N)) y
+      same (tabs-x switchᶠ vl vl′ (map-x N (valsAt N)) y) (tabs-late-x switchᶠ vl vl′ (map-x N (valsAt N)) y)
+      where vl  = λ N → L.map (P.valRec N) (valsAt N)
+            vl′ = λ N → L.map (P′.valRec N) (valsAt N)
     joiners-coh exhaustᶠ al al′ lk lk′ N y =
-      tabs-x exhaustᶠ ranLanes ranLanes′ (ran-x N) y
+      same (tabs-x exhaustᶠ ranLanes ranLanes′ (ran-x N) y) (tabs-late-x exhaustᶠ ranLanes ranLanes′ (ran-x N) y)

@@ -34,7 +34,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Got; Cons; Corr; Rel; module Rel; got-bind; m-ss)
+open import simultaneous.TableCorr using (TR; M; Got; Cons; Corr; Rel; module Rel; Same; same; φ≡; nl→; Scope; module Scope; got-bind; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -118,11 +118,11 @@ module _ {X : Set} (q : Pos) where
   ... | inj₁ (_ , ())
   ... | inj₂ x₀ = pi x₀
 
-  cons-g : ∀ {m m′ : Maybe (Tb.Listed X)} → Past q m → Past q m′ → Cons (TR m) (TR m′) → Cons (TR (Guarded q m)) (TR (Guarded q m′))
-  cons-g {m} {m′} ab ab′ cn below x x′ yy with tr-g→ q m x | tr-g→ q m′ x′
+  cons-g : ∀ {m m′ : Maybe (Tb.Listed X)} {G : Pos → Set} → Past q m → Past q m′ → Cons G (TR m) (TR m′) → Cons G (TR (Guarded q m)) (TR (Guarded q m′))
+  cons-g {m} {m′} ab ab′ cn gy below x x′ yy with tr-g→ q m x | tr-g→ q m′ x′
   ... | inj₁ (_ , ())  | _
   ... | inj₂ x₀ | inj₁ (refl , _) = ⊥-elim (yy (ab x₀))
-  ... | inj₂ x₀ | inj₂ x₁         = tr-g← q m′ (cn (λ lt → ag-strip ab ab′ (below lt)) x₀ x₁ yy)
+  ... | inj₂ x₀ | inj₂ x₁         = tr-g← q m′ (cn gy (λ lt → ag-strip ab ab′ (below lt)) x₀ x₁ yy)
 
 ------------------------------------------------------------------------
 -- The record, guarded
@@ -141,9 +141,10 @@ guardφ-cong g g* e k with k ≟ᵖ g
 ... | no _  = e k
 
 module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))}
-  (R : Rel P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])) where
+  {S : Scope} (R : Rel P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) S) where
 
   module R = Rel R
+  module Sc = Scope S
 
   g g* o o* : Pos
   g  = p ⊕ [ ix 0 ]
@@ -197,12 +198,25 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
   ... | yes refl = ⊥-elim (≺-irrefl {g} lt)
   ... | no _     = refl
 
-  ab-φ : ∀ {N k e} → TR (P N) k e → Unpinned e → g* ≺ R.φ N k
-  ab-φ {N} {k} x un = ≺-≼-≺ {g*} {o*} {R.φ N k} (ticks p* 0) (R.after-φ x un)
+  ab-φ : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ R.Late N k → g* ≺ R.φ N k
+  ab-φ {N} {k} x un nl = ≺-≼-≺ {g*} {o*} {R.φ N k} (ticks p* 0) (R.after-φ x un nl)
 
-  -- A late placement only of the child's rows.
+  -- A late placement only of the child's rows, and only they are late.
   Put′ : ℕ → Pos → Pos → Set
   Put′ N k l = o ≼ k × R.Put N k l
+
+  Late′ : ℕ → Pos → Set
+  Late′ N k = o ≼ k × R.Late N k
+
+  nl-c : ∀ {N k e} → TR (P N) k e → ¬ Late′ N k → ¬ R.Late N k
+  nl-c x nl lt = nl (R.after x , lt)
+
+  nl-g : ∀ {N} → ¬ Late′ N g
+  nl-g (ok , _) = ok (ticks p 0)
+
+  -- A guard on the child's image moves to its own.
+  g*-c : ∀ {N N′ M k e} → TR (P M) k e → Sc.G* N N′ (φ′ M k) → Sc.G* N N′ (R.φ M k)
+  g*-c {N} {N′} {M} {k} x = subst (Sc.G* N N′) (φ-c {M} {k} (ab M x))
 
   Img′ : ℕ → Pos → Ev A → Set
   Img′ N k e = Σ (Ev (IE A)) λ e′ → TR (Q′ N) (φ′ N k) e′ × M e e′
@@ -215,11 +229,11 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
 
   Homed′ : ℕ → Pos → Set
   Homed′ N k = instantOf k ≡ instantOf p
-             ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × Img′ N k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+             ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × ¬ Late′ N k₀ × Img′ N k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
   homed→ : ∀ {N k} → Corr.Homed (R.corr N) k → Homed′ N k
   homed→ (inj₁ e) = inj₁ (trans e (inst-⊕ p [ ix 1 ]))
-  homed→ {N} (inj₂ (k₀ , e₀ , x , un , im , lt , ie)) = inj₂ (k₀ , e₀ , tr-g← g (P N) x , un , img→ x im , lt , ie)
+  homed→ {N} (inj₂ (k₀ , e₀ , x , un , nl , im , lt , ie)) = inj₂ (k₀ , e₀ , tr-g← g (P N) x , un , (λ { (_ , l) → nl l }) , img→ x im , lt , ie)
 
   PutAt′ : ℕ → Pos → Set
   PutAt′ N k = (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → TR (Q′ N) l e′ × Put′ N k l) × Homed′ N k
@@ -237,12 +251,18 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
   leads← : ∀ {N k} → Leads′ N k → Corr.Leads (R.corr N) k
   leads← {N} ld x′ un′ ie′ = ld (tr-g← g (P N) x′) un′ ie′
 
-  row→′ : ∀ N {k e} → TR (P′ N) k e → Unpinned e → Img′ N k e ⊎ (e ≡ skip × PutAt′ N k)
+  row→′ : ∀ N {k e} → TR (P′ N) k e → Unpinned e → (Img′ N k e × ¬ Late′ N k) ⊎ (e ≡ skip × PutAt′ N k)
   row→′ N x un with tr-g→ g (P N) x
-  ... | inj₁ (refl , refl) = inj₁ (img-g N)
+  ... | inj₁ (refl , refl) = inj₁ (img-g N , nl-g {N})
   ... | inj₂ x₀ with Corr.row→ (R.corr N) x₀ un
-  ...   | inj₁ im                         = inj₁ (img→ x₀ im)
+  ...   | inj₁ (im , nl)                  = inj₁ (img→ x₀ im , λ { (_ , l) → nl l })
   ...   | inj₂ (eq , (l , e′ , y , pl) , h) = inj₂ (eq , (l , e′ , tr-g← g* (Q N) y , R.after x₀ , pl) , homed→ h)
+
+  late-put′ : ∀ N {k e} → Late′ N k → TR (P′ N) k e → e ≡ skip × PutAt′ N k
+  late-put′ N (ok , lt) x with tr-g→ g (P N) x
+  ... | inj₁ (refl , _) = ⊥-elim (ok (ticks p 0))
+  ... | inj₂ x₀ with Corr.late-put (R.corr N) lt x₀
+  ...   | eq , (l , e′ , y , pl) , h = eq , (l , e′ , tr-g← g* (Q N) y , R.after x₀ , pl) , homed→ h
 
   PinAt′ : ℕ → Pos → Pos → Set
   PinAt′ N k r = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × Put′ N k l
@@ -260,86 +280,96 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
       ... | inj₁ (_ , ())
       ... | inj₂ x₁ = past x₁ (subst (_≺ p′) (φ-c {N} {k₀} (ab N x₁)) lt)
 
-  put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → Put′ N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ′ N k′
-  put-before′ N {k} {l} {k′} x (ok , pl) x′ un′ lt with tr-g→ g (P N) x | tr-g→ g (P N) x′
+  put-before′ : ∀ N {k l k′ e′} → TR (P′ N) k skip → Put′ N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ Late′ N k′ → k ≺ k′ → l ≼ φ′ N k′
+  put-before′ N {k} {l} {k′} x (ok , pl) x′ un′ nl′ lt with tr-g→ g (P N) x | tr-g→ g (P N) x′
   ... | inj₁ (refl , _) | _               = ⊥-elim (ok (ticks p 0))
   ... | inj₂ x₀         | inj₁ (refl , _) = ⊥-elim (≺-absurd {g} {k} (ab N x₀) lt)
   ... | inj₂ x₀         | inj₂ x₁         =
-    subst (l ≼_) (sym (φ-c {N} {k′} (ab N x₁))) (Corr.put-before (R.corr N) x₀ pl x₁ un′ lt)
+    subst (l ≼_) (sym (φ-c {N} {k′} (ab N x₁))) (Corr.put-before (R.corr N) x₀ pl x₁ un′ (nl-c x₁ nl′) lt)
+
+  pin-before′ : ∀ N {k r l k′ e′} → TR (P′ N) k (pin r) → Put′ N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ Late′ N k′ → k ≺ k′ → l ≼ φ′ N k′
+  pin-before′ N {k} {l = l} {k′} x (ok , pl) x′ un′ nl′ lt with tr-g→ g (P N) x | tr-g→ g (P N) x′
+  ... | inj₁ (_ , ())   | _
+  ... | inj₂ x₀         | inj₁ (refl , _) = ⊥-elim (≺-absurd {g} {k} (ab N x₀) lt)
+  ... | inj₂ x₀         | inj₂ x₁         =
+    subst (l ≼_) (sym (φ-c {N} {k′} (ab N x₁))) (Corr.pin-before (R.corr N) x₀ pl x₁ un′ (nl-c x₁ nl′) lt)
 
   shown←′ : ∀ N {l e′} → TR (Q′ N) l e′ → Shown (One valuesOf) e′
-          → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P′ N) k e × Unpinned e × M e e′
+          → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P′ N) k e × Unpinned e × ¬ Late′ N k × M e e′
   shown←′ N y sh with tr-g→ g* (Q N) y
   ... | inj₁ (refl , refl) = ⊥-elim sh
   ... | inj₂ y₀ with Corr.shown← (R.corr N) y₀ sh
-  ...   | k , e , eq , x , un , mt = k , e , trans eq (sym (φ-c {N} {k} (ab N x))) , tr-g← g (P N) x , un , mt
+  ...   | k , e , eq , x , un , nl , mt = k , e , trans eq (sym (φ-c {N} {k} (ab N x))) , tr-g← g (P N) x , un , (λ { (_ , l) → nl l }) , mt
 
   place′ : ∀ N {m e′} → TR (Q′ N) m e′ → Live (TR (Q′ N)) m
-         → instantOf m ≡ instantOf p* ⊎ Σ Pos λ k → Σ (Ev A) λ e → TR (P′ N) k e × Unpinned e × Img′ N k e × (φ′ N k ≼ m ⊎ Leads′ N k) × instantOf (φ′ N k) ≡ instantOf m
+         → instantOf m ≡ instantOf p* ⊎ Σ Pos λ k → Σ (Ev A) λ e → TR (P′ N) k e × Unpinned e × ¬ Late′ N k × Img′ N k e
+             × (φ′ N k ≼ m ⊎ Leads′ N k) × instantOf (φ′ N k) ≡ instantOf m
   place′ N {m} y lv with tr-g→ g* (Q N) y
   ... | inj₁ (refl , refl) = inj₁ (inst-⊕ p* [ ix 0 ])
   ... | inj₂ y₀ with Corr.place (R.corr N) y₀ (λ yc → lv (tr-g← g* (Q N) yc))
   ...   | inj₁ e = inj₁ (trans e (inst-⊕ p* [ ix 1 ]))
-  ...   | inj₂ (k , e , x , un , im , inj₁ le , ie) =
-    inj₂ (k , e , tr-g← g (P N) x , un , img→ x im , inj₁ (subst (_≼ m) (sym (φ-c {N} {k} (ab N x))) le)
+  ...   | inj₂ (k , e , x , un , nl , im , inj₁ le , ie) =
+    inj₂ (k , e , tr-g← g (P N) x , un , (λ { (_ , l) → nl l }) , img→ x im , inj₁ (subst (_≼ m) (sym (φ-c {N} {k} (ab N x))) le)
          , trans (cong instantOf (φ-c {N} {k} (ab N x))) ie)
-  ...   | inj₂ (k , e , x , un , im , inj₂ ld , ie) with instantOf k ≟ⁱ instantOf o
-  ...     | yes eq = inj₁ (trans (sym ie) (trans (Equivalence.from (Corr.home (R.corr N) x un) eq) (inst-⊕ p* [ ix 1 ])))
-  ...     | no ne  = inj₂ (k , e , tr-g← g (P N) x , un , img→ x im , inj₂ (leads→ ld ne) , trans (cong instantOf (φ-c {N} {k} (ab N x))) ie)
+  ...   | inj₂ (k , e , x , un , nl , im , inj₂ ld , ie) with instantOf k ≟ⁱ instantOf o
+  ...     | yes eq = inj₁ (trans (sym ie) (trans (Equivalence.from (Corr.home (R.corr N) x un nl) eq) (inst-⊕ p* [ ix 1 ])))
+  ...     | no ne  = inj₂ (k , e , tr-g← g (P N) x , un , (λ { (_ , l) → nl l }) , img→ x im , inj₂ (leads→ ld ne) , trans (cong instantOf (φ-c {N} {k} (ab N x))) ie)
 
   -- The guard's instant and a child row's, mapped.
-  inst-gc : ∀ {N k e} → TR (P N) k e → Unpinned e → (instantOf g* ≡ instantOf (R.φ N k) ⇔ instantOf g ≡ instantOf k)
-  inst-gc {N} x un =
-    mk⇔ (λ h → trans ig (sym (Equivalence.to (Corr.home (R.corr N) x un) (trans (sym h) ig*))))
-        (λ h → trans ig* (sym (Equivalence.from (Corr.home (R.corr N) x un) (trans (sym h) ig))))
+  inst-gc : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ R.Late N k → (instantOf g* ≡ instantOf (R.φ N k) ⇔ instantOf g ≡ instantOf k)
+  inst-gc {N} x un nl =
+    mk⇔ (λ h → trans ig (sym (Equivalence.to (Corr.home (R.corr N) x un nl) (trans (sym h) ig*))))
+        (λ h → trans ig* (sym (Equivalence.from (Corr.home (R.corr N) x un nl) (trans (sym h) ig))))
 
   ⇔-sym : ∀ {a b c d : Pos} → (instantOf a ≡ instantOf b ⇔ instantOf c ≡ instantOf d) → (instantOf b ≡ instantOf a ⇔ instantOf d ≡ instantOf c)
   ⇔-sym h = mk⇔ (λ e → sym (Equivalence.to h (sym e))) (λ e → sym (Equivalence.from h (sym e)))
 
-  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P′ N)) (TR (Q′ N))
+  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (Late′ N) (TR (P′ N)) (TR (Q′ N))
   corr′ N = record
-    { row→ = row→′ N ; pin→ = pin→′ N ; put-before = put-before′ N ; shown← = shown←′ N ; place = place′ N
+    { row→ = row→′ N ; late-put = late-put′ N ; pin→ = pin→′ N ; put-before = put-before′ N ; pin-before = pin-before′ N
+    ; shown← = shown←′ N ; place = place′ N
     ; mono = mono′ ; inst = inst′ ; home = home′ }
     where
-      mono′ : ∀ {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ′ N k ≺ φ′ N k′
-      mono′ {k} {k′} x x′ un un′ lt with tr-g→ g (P N) x | tr-g→ g (P N) x′
+      mono′ : ∀ {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ N k → ¬ Late′ N k′ → k ≺ k′ → φ′ N k ≺ φ′ N k′
+      mono′ {k} {k′} x x′ un un′ nl nl′ lt with tr-g→ g (P N) x | tr-g→ g (P N) x′
       ... | inj₁ (refl , _) | inj₁ (refl , _) = ⊥-elim (≺-irrefl {g} lt)
-      ... | inj₁ (refl , _) | inj₂ x₁         = subst₂ _≺_ (sym (φ-g {N})) (sym (φ-c {N} {k′} (ab N x₁))) (ab-φ x₁ un′)
+      ... | inj₁ (refl , _) | inj₂ x₁         = subst₂ _≺_ (sym (φ-g {N})) (sym (φ-c {N} {k′} (ab N x₁))) (ab-φ x₁ un′ (nl-c x₁ nl′))
       ... | inj₂ x₀         | inj₁ (refl , _) = ⊥-elim (≺-absurd {g} {k} (ab N x₀) lt)
       ... | inj₂ x₀         | inj₂ x₁         =
-        subst₂ _≺_ (sym (φ-c {N} {k} (ab N x₀))) (sym (φ-c {N} {k′} (ab N x₁))) (Corr.mono (R.corr N) x₀ x₁ un un′ lt)
+        subst₂ _≺_ (sym (φ-c {N} {k} (ab N x₀))) (sym (φ-c {N} {k′} (ab N x₁))) (Corr.mono (R.corr N) x₀ x₁ un un′ (nl-c x₀ nl) (nl-c x₁ nl′) lt)
 
-      inst′ : ∀ {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′
+      inst′ : ∀ {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ N k → ¬ Late′ N k′
             → (instantOf (φ′ N k) ≡ instantOf (φ′ N k′) ⇔ instantOf k ≡ instantOf k′)
-      inst′ {k} {k′} x x′ un un′ with tr-g→ g (P N) x | tr-g→ g (P N) x′
+      inst′ {k} {k′} x x′ un un′ nl nl′ with tr-g→ g (P N) x | tr-g→ g (P N) x′
       ... | inj₁ (refl , _) | inj₁ (refl , _) = mk⇔ (λ _ → refl) (λ _ → refl)
       ... | inj₁ (refl , _) | inj₂ x₁         =
-        subst₂ (λ a b → instantOf a ≡ instantOf b ⇔ instantOf g ≡ instantOf k′) (sym (φ-g {N})) (sym (φ-c {N} {k′} (ab N x₁))) (inst-gc x₁ un′)
+        subst₂ (λ a b → instantOf a ≡ instantOf b ⇔ instantOf g ≡ instantOf k′) (sym (φ-g {N})) (sym (φ-c {N} {k′} (ab N x₁))) (inst-gc x₁ un′ (nl-c x₁ nl′))
       ... | inj₂ x₀         | inj₁ (refl , _) =
         subst₂ (λ a b → instantOf a ≡ instantOf b ⇔ instantOf k ≡ instantOf g) (sym (φ-c {N} {k} (ab N x₀))) (sym (φ-g {N}))
-               (⇔-sym {g*} {R.φ N k} {g} {k} (inst-gc x₀ un))
+               (⇔-sym {g*} {R.φ N k} {g} {k} (inst-gc x₀ un (nl-c x₀ nl)))
       ... | inj₂ x₀         | inj₂ x₁         =
         subst₂ (λ a b → instantOf a ≡ instantOf b ⇔ instantOf k ≡ instantOf k′) (sym (φ-c {N} {k} (ab N x₀))) (sym (φ-c {N} {k′} (ab N x₁)))
-               (Corr.inst (R.corr N) x₀ x₁ un un′)
+               (Corr.inst (R.corr N) x₀ x₁ un un′ (nl-c x₀ nl) (nl-c x₁ nl′))
 
-      home′ : ∀ {k e} → TR (P′ N) k e → Unpinned e → (instantOf (φ′ N k) ≡ instantOf p* ⇔ instantOf k ≡ instantOf p)
-      home′ {k} x un with tr-g→ g (P N) x
+      home′ : ∀ {k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → (instantOf (φ′ N k) ≡ instantOf p* ⇔ instantOf k ≡ instantOf p)
+      home′ {k} x un nl with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = mk⇔ (λ _ → inst-⊕ p [ ix 0 ]) (λ _ → subst (λ z → instantOf z ≡ instantOf p*) (sym (φ-g {N})) (inst-⊕ p* [ ix 0 ]))
       ... | inj₂ x₀ =
-        let φk = φ-c {N} {k} (ab N x₀) ; H = Corr.home (R.corr N) x₀ un in
+        let φk = φ-c {N} {k} (ab N x₀) ; H = Corr.home (R.corr N) x₀ un (nl-c x₀ nl) in
         mk⇔ (λ h → trans (Equivalence.to H (trans (sym (cong instantOf φk)) (trans h (sym (inst-⊕ p* [ ix 1 ]))))) (inst-⊕ p [ ix 1 ]))
             (λ h → trans (cong instantOf φk) (trans (Equivalence.from H (trans h (sym (inst-⊕ p [ ix 1 ])))) (inst-⊕ p* [ ix 1 ])))
 
-  rel′ : Rel P′ Q′ p p*
+  rel′ : Rel P′ Q′ p p* S
   rel′ = record
-    { φ = φ′ ; Put = Put′ ; corr = corr′
+    { φ = φ′ ; Put = Put′ ; Late = Late′ ; corr = corr′
     ; φ-agree = φ-agree′
+    ; late-agree = late-agree′
     ; bk = λ N l → g ∷ R.bk N l
     ; in-bk = in-bk′
     ; pb-few = λ N l → proj₁ (R.pb-few N l) , λ pt → proj₂ (R.pb-few N l) (proj₂ pt)
     ; back = back′
-    ; put-up = λ { {N} {N′} le ag (ok , pl) → ok , R.put-up le (ag-strip g (ab N′) (ab N) ag) pl }
-    ; back-put = λ { {N} {N′} le (ok , pl) ag* → ok , R.back-put le pl (ag-strip g* (ab* N′) (ab* N) ag*) }
+    ; put-up = λ { {N} {N′} le gk gq* ag (ok , pl) → ok , R.put-up le gk gq* (ag-strip g (ab N′) (ab N) ag) pl }
+    ; back-put = λ { {N} {N′} le gk gq* (ok , pl) ag* → ok , R.back-put le gk gq* pl (ag-strip g* (ab* N′) (ab* N) ag*) }
     ; elab-causal = elab-causal′
     ; stable← = stable←′
     ; stable-put = stable-put′
@@ -361,68 +391,79 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     ; pin-after* = pin-after*′
     ; pin-stable = pin-stable′ }
     where
-      φ-agree′ : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
-      φ-agree′ {N} {N′} {k} x un ag with tr-g→ g (P N) x
+      φ-agree′ : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N N′ k → Sc.G* N N′ (φ′ N k)
+               → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → φ′ N k ≡ φ′ N′ k
+      φ-agree′ {N} {N′} {k} x un nl gk gq* ag with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = trans (φ-g {N}) (sym (φ-g {N′}))
       ... | inj₂ x₀ =
-        trans (φ-c {N} {k} (ab N x₀)) (trans (R.φ-agree x₀ un (ag-strip g (ab N) (ab N′) ag)) (sym (φ-c {N′} {k} (ab N x₀))))
+        trans (φ-c {N} {k} (ab N x₀)) (trans (R.φ-agree x₀ un (nl-c x₀ nl) gk (g*-c x₀ gq*) (ag-strip g (ab N) (ab N′) ag)) (sym (φ-c {N′} {k} (ab N x₀))))
 
-      in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → k ∈ (g ∷ R.bk N (φ′ N k))
-      in-bk′ {N} {k} x un with tr-g→ g (P N) x
+      late-agree′ : ∀ {N N′ k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N N′ k → Sc.G* N N′ (φ′ N k)
+                  → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → ¬ Late′ N′ k
+      late-agree′ {N} {N′} {k} x un nl gk gq* ag with tr-g→ g (P N) x
+      ... | inj₁ (refl , _) = nl-g {N′}
+      ... | inj₂ x₀ = λ lt → R.late-agree x₀ un (nl-c x₀ nl) gk (g*-c x₀ gq*) (ag-strip g (ab N) (ab N′) ag) (proj₂ lt)
+
+      in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → k ∈ (g ∷ R.bk N (φ′ N k))
+      in-bk′ {N} {k} x un nl with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = here refl
-      ... | inj₂ x₀ = there (subst (λ z → k ∈ R.bk N z) (sym (φ-c {N} {k} (ab N x₀))) (R.in-bk x₀ un))
+      ... | inj₂ x₀ = there (subst (λ z → k ∈ R.bk N z) (sym (φ-c {N} {k} (ab N x₀))) (R.in-bk x₀ un (nl-c x₀ nl)))
 
-      back′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N))
-            → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      back′ {N} {N′} {k} le x un ag* with tr-g→ g (P N′) x
+      back′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ Late′ N′ k → Sc.G N′ N k → Sc.G* N′ N (φ′ N′ k)
+            → AgreeTo (φ′ N′ k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      back′ {N} {N′} {k} le x un nl gk gq* ag* with tr-g→ g (P N′) x
       ... | inj₁ (refl , _) = ag-low g (ab N′) (ab N) (R.got N′) (R.got N)
       ... | inj₂ x₀ =
         let a₀ = ag-strip g* (ab* N′) (ab* N) (subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (φ-c {N′} {k} (ab N′ x₀)) ag*)
-        in ag-add g (R.got N′) (R.got N) (R.back le x₀ un a₀)
+        in ag-add g (R.got N′) (R.got N) (R.back le x₀ un (nl-c x₀ nl) gk (g*-c x₀ gq*) a₀)
 
-      elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-                   → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      elab-causal′ {N} {N′} {k} le x un ag with tr-g→ g (P N) x
+      elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N′ N k → Sc.G* N′ N (φ′ N k)
+                   → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
+      elab-causal′ {N} {N′} {k} le x un nl gk gq* ag with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (sym (φ-g {N})) (ag-low g* (ab* N′) (ab* N) (R.got* N′) (R.got* N))
       ... | inj₂ x₀ =
         subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) (sym (φ-c {N} {k} (ab N x₀)))
-              (ag-add g* (R.got* N′) (R.got* N) (R.elab-causal le x₀ un (ag-strip g (ab N′) (ab N) ag)))
+              (ag-add g* (R.got* N′) (R.got* N) (R.elab-causal le x₀ un (nl-c x₀ nl) gk (g*-c x₀ gq*) (ag-strip g (ab N′) (ab N) ag)))
 
-      stable←′ : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′
-               → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
-      stable←′ {N} {N′} {k} {e′ = e′} le x un y ag* with tr-g→ g (P N) x
+      stable←′ : ∀ {N N′ k e e′} → N ≤ N′ → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N′ N k → Sc.G* N′ N (φ′ N k)
+               → TR (Q′ N) (φ′ N k) e′ → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N)) → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      stable←′ {N} {N′} {k} {e′ = e′} le x un nl gk gq* y ag* with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = ag-low g (ab N′) (ab N) (R.got N′) (R.got N)
       ... | inj₂ x₀ =
         let φk = φ-c {N} {k} (ab N x₀)
-            y₀ = strip g* (Q N) (ab-φ x₀ un) (subst (λ z → TR (Q′ N) z e′) φk y)
+            nl₀ = nl-c x₀ nl
+            y₀ = strip g* (Q N) (ab-φ x₀ un nl₀) (subst (λ z → TR (Q′ N) z e′) φk y)
             a₀ = ag-strip g* (ab* N′) (ab* N) (subst (λ z → AgreeTo z (TR (Q′ N′)) (TR (Q′ N))) φk ag*)
-        in ag-add g (R.got N′) (R.got N) (R.stable← le x₀ un y₀ a₀)
+        in ag-add g (R.got N′) (R.got N) (R.stable← le x₀ un nl₀ gk (g*-c x₀ gq*) y₀ a₀)
 
-      stable-put′ : ∀ {N N′ k l e′} → N Data.Nat.≤ N′ → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
+      stable-put′ : ∀ {N N′ k l e′} → N Data.Nat.≤ N′ → Sc.G N′ N k → Sc.G* N′ N l → AgreeTo k (TR (P′ N′)) (TR (P′ N)) → TR (Q′ N) l e′ → Put′ N k l
                   → AgreeTo l (TR (Q′ N′)) (TR (Q′ N))
-      stable-put′ {N} {N′} le ag y (_ , pl) with tr-g→ g* (Q N) y
+      stable-put′ {N} {N′} le gk gq* ag y (_ , pl) with tr-g→ g* (Q N) y
       ... | inj₁ (refl , _) = ag-low g* (ab* N′) (ab* N) (R.got* N′) (R.got* N)
-      ... | inj₂ y₀ = ag-add g* (R.got* N′) (R.got* N) (R.stable-put le (ag-strip g (ab N′) (ab N) ag) y₀ pl)
+      ... | inj₂ y₀ = ag-add g* (R.got* N′) (R.got* N) (R.stable-put le gk gq* (ag-strip g (ab N′) (ab N) ag) y₀ pl)
 
-      stable-lead′ : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → TR (Q′ N) (φ′ N k) e′ → Leads′ N k
-                   → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N))
+      stable-lead′ : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N′ N k → Sc.G* N′ N (φ′ N k)
+                   → TR (Q′ N) (φ′ N k) e′ → Leads′ N k
+                   → TR (Q′ N) m e* → Sc.G* N′ N m → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q′ N′)) (TR (Q′ N))
                    → AgreeTo (φ′ N k) (TR (Q′ N′)) (TR (Q′ N))
-      stable-lead′ {N} {N′} {k} {e′ = e′} le x un y ld z ie ag* with tr-g→ g (P N) x
+      stable-lead′ {N} {N′} {k} {e′ = e′} le x un nl gk gq* y ld z gm ie ag* with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym (φ-g {N})) (ag-low g* (ab* N′) (ab* N) (R.got* N′) (R.got* N))
       ... | inj₂ x₀ with tr-g→ g* (Q N) z
       ...   | inj₁ (refl , _) =
-        ⊥-elim (ld (tr-g0 g (P N) (R.got N)) tt (Equivalence.to (inst-gc x₀ un) (trans ie (cong instantOf (φ-c {N} {k} (ab N x₀))))) (ab N x₀))
+        ⊥-elim (ld (tr-g0 g (P N) (R.got N)) tt (Equivalence.to (inst-gc x₀ un (nl-c x₀ nl)) (trans ie (cong instantOf (φ-c {N} {k} (ab N x₀))))) (ab N x₀))
       ...   | inj₂ z₀ =
         let φk = φ-c {N} {k} (ab N x₀)
-            y₀ = strip g* (Q N) (ab-φ x₀ un) (subst (λ w → TR (Q′ N) w e′) φk y)
+            nl₀ = nl-c x₀ nl
+            y₀ = strip g* (Q N) (ab-φ x₀ un nl₀) (subst (λ w → TR (Q′ N) w e′) φk y)
         in subst (λ w → AgreeTo w (TR (Q′ N′)) (TR (Q′ N))) (sym φk)
                  (ag-add g* (R.got* N′) (R.got* N)
-                   (R.stable-lead le x₀ un y₀ (leads← ld) z₀ (trans ie (cong instantOf φk)) (ag-strip g* (ab* N′) (ab* N) ag*)))
+                   (R.stable-lead le x₀ un nl₀ gk (g*-c x₀ gq*) y₀ (leads← ld) z₀ gm (trans ie (cong instantOf φk)) (ag-strip g* (ab* N′) (ab* N) ag*)))
 
-      elab-all′ : ∀ {N N′} → N Data.Nat.≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-      elab-all′ {N} {N′} le all y with tr-g→ g* (Q N′) y
+      elab-all′ : ∀ {N N′} → N Data.Nat.≤ N′ → (∀ q → Sc.G N′ N q) → (∀ q → Sc.G* N′ N q) → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N)))
+                → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+      elab-all′ {N} {N′} le gs gs* all y with tr-g→ g* (Q N′) y
       ... | inj₁ (refl , refl) = tr-g0 g* (Q N) (R.got* N)
-      ... | inj₂ y₀ = tr-g← g* (Q N) (R.elab-all le (λ q → ag-strip g (ab N′) (ab N) (all q)) y₀)
+      ... | inj₂ y₀ = tr-g← g* (Q N) (R.elab-all le gs gs* (λ q → ag-strip g (ab N′) (ab N) (all q)) y₀)
 
       p≼o : p ≼ o
       p≼o = ≺→≼ {p} {o} (≺-ext p [])
@@ -453,28 +494,29 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
 
       -- Below the guard no pin's connect lies: the child's lie past its
       -- subscription, the guard's second tick.
-      pin-stable′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → AgreeTo k (TR (P′ N′)) (TR (P′ N))
+      pin-stable′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → Sc.G N′ N k → Sc.G* N′ N (φ′ N k)
+                  → AgreeTo k (TR (P′ N′)) (TR (P′ N))
                   → (∀ {y r} → r ≼ k → TR (P′ N′) y (pin r) → TR (P′ N) y (pin r))
                   → ∀ {y r} → r ≼ φ′ N k → TR (Q′ N′) y (pin r) → TR (Q′ N) y (pin r)
-      pin-stable′ {N} {N′} {k} le x un ag hp {y} {r} rk yq with tr-g→ g (P N) x
+      pin-stable′ {N} {N′} {k} le x un nl gk gq* ag hp {y} {r} rk yq with tr-g→ g (P N) x
       ... | inj₁ (refl , _) =
         ⊥-elim (subst (r ≼_) (φ-g {N}) rk (≺-≼-≺ {g*} {o*} {r} (ticks p* 0) (R.pin-after* (unguard g* (Q N′) yq))))
       ... | inj₂ x₀ =
-        tr-g← g* (Q N) (R.pin-stable le x₀ un (ag-strip g (ab N′) (ab N) ag)
+        tr-g← g* (Q N) (R.pin-stable le x₀ un (nl-c x₀ nl) gk (g*-c x₀ gq*) (ag-strip g (ab N′) (ab N) ag)
           (λ r₀k x₁ → unguard g (P N) (hp r₀k (tr-g← g (P N′) x₁)))
           (subst (r ≼_) (φ-c {N} {k} (ab N x₀)) rk) (unguard g* (Q N′) yq))
 
-      after-φ′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → p* ≼ φ′ N k
-      after-φ′ {N} {k} x un with tr-g→ g (P N) x
+      after-φ′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → p* ≼ φ′ N k
+      after-φ′ {N} {k} x un nl with tr-g→ g (P N) x
       ... | inj₁ (refl , _) = subst (p* ≼_) (sym (φ-g {N})) (≺→≼ {p*} {g*} (≺-ext p* []))
-      ... | inj₂ x₀ = subst (p* ≼_) (sym (φ-c {N} {k} (ab N x₀))) (≼-trans {p*} {o*} {R.φ N k} p*≼o* (R.after-φ x₀ un))
+      ... | inj₂ x₀ = subst (p* ≼_) (sym (φ-c {N} {k} (ab N x₀))) (≼-trans {p*} {o*} {R.φ N k} p*≼o* (R.after-φ x₀ un (nl-c x₀ nl)))
 
-defer-tab : ∀ {A} p p* {P Q} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
+defer-tab : ∀ {A} p p* {P Q S} → Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) S
           → Rel (λ N → bind (P N) λ b → just (((p ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b))
-                (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p*
+                (λ N → bind (Q N) λ b → just (((p* ⊕ [ ix 0 ] , skip) ∷ rows b) ⊣ short b)) p p* S
 defer-tab p p* R = DeferTab.rel′ p p* R
 
 -- Children mapping alike, deferred alike.
-defer-cong : ∀ {A} p p* {P Q} (R R′ : Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]))
-           → (∀ N y → Rel.φ R N y ≡ Rel.φ R′ N y) → ∀ N y → Rel.φ (defer-tab p p* R) N y ≡ Rel.φ (defer-tab p p* R′) N y
-defer-cong p p* R R′ e N = guardφ-cong (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (e N)
+defer-cong : ∀ {A} p p* {P Q S} (R R′ : Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) S)
+           → (∀ N y → Same R R′ N y) → ∀ N y → Same (defer-tab p p* R) (defer-tab p p* R′) N y
+defer-cong p p* R R′ e N y = same (guardφ-cong (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (λ y → φ≡ (e N y)) y) (λ { nl (o , lt) → nl→ (e N y) (λ lt₀ → nl (o , lt₀)) lt })

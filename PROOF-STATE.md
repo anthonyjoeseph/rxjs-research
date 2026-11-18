@@ -32,15 +32,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE MAP IS THE SUBSCRIPTIONS'
-
-A record's map is had from its subscriptions and its environment's maps,
-never from how they are admitted (`Coh`); `rel-coh` is the induction,
-`joiners-coh` the lanes' flatMap. Open: the connect's hot, a postulate
-whose map must be its source's. Settled by `conn-hot`'s body.
-
-Members: `conn-hot-coh`.
-
 #### THE COMBINED SCAN
 
 The combined scan's record is written: a lanes' row re-emitted at the
@@ -50,7 +41,7 @@ the scan emitting nothing but marks besides. Settled by bodies.
 
 Members: `cb-corr`, `cb-φ-agree`, `cb-back`, `cb-back-put`, `cb-elab-causal`,
 `cb-stable←`, `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-cons*`,
-`cb-pin-stable`.
+`cb-pin-stable`, `cb-late-agree`.
 
 #### THE FLATMAP'S ORDER FACTS
 
@@ -70,7 +61,7 @@ Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-src-back`, `sw-lane-back`,
 `sw-lane-left`, `sw-put-up`,
 `sw-back-put`, `sw-elab-causal`, `sw-stable←`, `sw-stable-put`,
 `sw-stable-lead`, `sw-elab-all`, `sw-cons`, `sw-cons*`, `sw-after-φ`,
-`sw-pin-stable`.
+`sw-pin-stable`, `sw-late-agree`.
 
 #### THE EXHAUST
 
@@ -82,7 +73,7 @@ run on one side only.
 Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`, `ex-put-up`,
 `ex-back-put`, `ex-elab-causal`, `ex-stable←`, `ex-stable-put`,
 `ex-stable-lead`, `ex-elab-all`, `ex-cons`, `ex-cons*`, `ex-after-φ`,
-`ex-pin-stable`.
+`ex-pin-stable`, `ex-late-agree`.
 
 #### THE BOUNDED MERGE
 
@@ -94,7 +85,7 @@ its fields, the queue's state a run's. Settled by bodies.
 Members: `cc-corr`, `cc-lanes-eq`, `cc-lane-un`, `cc-src-at`, `cc-in-bk`, `cc-back`, `cc-put-up`,
 `cc-back-put`, `cc-elab-causal`, `cc-stable←`, `cc-stable-put`,
 `cc-stable-lead`, `cc-elab-all`, `cc-cons`, `cc-cons*`, `cc-after-φ`,
-`cc-pin-stable`.
+`cc-pin-stable`, `cc-src-late`.
 
 #### THE PLAIN MERGE
 
@@ -108,7 +99,7 @@ Members: `mg-corr`, `mg-vals-eq`, `mg-lane-un`, `mg-src-at`, `mg-in-bk`, `mg-src
 `mg-put-up`,
 `mg-back-put`, `mg-elab-causal`, `mg-stable←`, `mg-stable-put`,
 `mg-stable-lead`, `mg-elab-all`, `mg-cons`, `mg-cons*`, `mg-after-φ`,
-`mg-pin-stable`.
+`mg-pin-stable`, `mg-src-late`.
 
 #### THE CLOSER AND THE SHARE
 
@@ -142,18 +133,31 @@ but not its row.
 
 Members: `walk-back`, `take-back`, `take-put-up`, `take-back-put`.
 
+#### THE CONNECT'S HOT
+
+A reader of the connect's hot is related wherever it is subscribed:
+its rows are the source's hot rows one label down, its images the
+source's carried under the annotation's reader and its own. Open: its
+rows' order against the hot's own rows across cuts (`rd-cuts`), which
+no record carries; the elaborated reader's rows read back to the
+source's. Settled by bodies, or two cuts' hot rows cut unalike.
+
+Members: `rd-corr`, `rd-φ-agree`, `rd-late-agree`, `rd-back`, `rd-put-up`,
+`rd-back-put`, `rd-elab-causal`, `rd-stable←`, `rd-stable-put`,
+`rd-stable-lead`, `rd-elab-all`, `rd-cons`, `rd-cons*`, `rd-after-φ`,
+`rd-pin-stable`, `rd-linked`, `rd-cuts`, `rd-seen`.
+
 #### THE CONNECT
 
 The connect's record is written: body rows along the body's map, source
 rows one label down at their annotated image. Untried: its field leaves,
-the source's hot (`conn-hot`), an old hot cutting the new alike
-(`conn-old-cut`); the first former making pins, so `ct-pin-stable`.
-Settled by bodies.
+an old hot cutting the new alike (`conn-old-cut`); the first former
+making pins, so `ct-pin-stable`. Settled by bodies.
 
-Members: `conn-hot`, `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`,
-`ct-in-bk`, `ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`,
-`ct-stable←`, `ct-stable-put`, `ct-stable-lead`, `ct-elab-all`, `ct-cons`,
-`ct-cons*`, `ct-after-φ`, `ct-pin-stable`.
+Members: `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`, `ct-in-bk`,
+`ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`,
+`ct-stable-put`, `ct-stable-lead`, `ct-elab-all`, `ct-cons`, `ct-cons*`,
+`ct-after-φ`, `ct-pin-stable`, `ct-late-agree`.
 
 #### THE ORDER FACTS
 

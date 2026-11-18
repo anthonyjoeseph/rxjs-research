@@ -17,6 +17,7 @@ open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
@@ -49,9 +50,14 @@ ag-≃ : ∀ {X : Set} {a a′ b b′ : EmissionSet X} {q}
 ag-≃ f f′ g g′ ⟨ a ⟩ = ⟨ (λ {y} {e} yq → (λ x → g (proj₁ (a {y} {e} yq) (f′ x))) , (λ x → f (proj₂ (a {y} {e} yq) (g′ x)))) ⟩
 
 -- Two runs are truncated before they differ: agreeing below a value of
--- the first, the second holding a row at or past it, the second holds it.
-Cons : ∀ {X : Set} → EmissionSet X → EmissionSet X → Set
-Cons {X} a b = ∀ {y y′ e′} {v : X} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ a b) → a y (out v) → b y′ e′ → y ≼ y′ → b y (out v)
+-- the first where the scope agrees (`G`), the second holding a row at or
+-- past it, the second holds it.
+Cons : ∀ {X : Set} → (Pos → Set) → EmissionSet X → EmissionSet X → Set
+Cons {X} G a b = ∀ {y y′ e′} {v : X} → G y → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ a b) → a y (out v) → b y′ e′ → y ≼ y′ → b y (out v)
+
+-- A guard no weaker.
+cons-≤ : ∀ {X : Set} {G G′ : Pos → Set} {a b : EmissionSet X} → (∀ {y} → G′ y → G y) → Cons G a b → Cons G′ a b
+cons-≤ f c g = c (f g)
 
 -- AGREEMENT BY INDUCTION ON ROWS: two runs with few rows below each
 -- position agree up to `k` once they agree at each position up to it
@@ -98,19 +104,19 @@ private
   same-sh (pin _) skip    ()
   same-sh (pin _) end     ()
 
-  half : ∀ {X : Set} {a b : EmissionSet X} {k y} → Cons a b → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ a b) → AgreeTo k (Sh a) (Sh b)
+  half : ∀ {X : Set} {G : Pos → Set} {a b : EmissionSet X} {k y} → Cons G a b → G y → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ a b) → AgreeTo k (Sh a) (Sh b)
        → y ≼ k → ∀ {e} → a y e → b y e
-  half {y = y} cab below sh yk {e} x with proj₁ (upto sh yk) (e , x , refl)
+  half {y = y} cab g below sh yk {e} x with proj₁ (upto sh yk) (e , x , refl)
   ... | e₀ , x′ , eq with same-sh e e₀ eq
   ...   | inj₁ refl = x′
-  ...   | inj₂ (v , w , refl , refl) = cab below x x′ (≼-refl {y})
+  ...   | inj₂ (v , w , refl , refl) = cab g below x x′ (≼-refl {y})
 
--- COHERENCE: two runs truncated before they differ, agreeing in shape,
--- agree outright: a value a truncation changes shows first as a row it
--- removes.
-coh-of : ∀ {X : Set} {a b : EmissionSet X} {k} → (∀ q → Few (λ y e → a y e ⊎ b y e) q) → Cons a b → Cons b a
-       → AgreeTo k (Sh a) (Sh b) → AgreeTo k a b
-coh-of fin cab cba sh = ag-ind fin λ yk below → half cab below sh yk , half cba (λ lt → AgreeTo-sym (below lt)) (AgreeTo-sym sh) yk
+-- COHERENCE: two runs truncated before they differ, agreeing in shape
+-- where the scope agrees, agree outright: a value a truncation changes
+-- shows first as a row it removes.
+coh-of : ∀ {X : Set} {G G′ : Pos → Set} {a b : EmissionSet X} {k} → (∀ q → Few (λ y e → a y e ⊎ b y e) q) → Cons G a b → Cons G′ b a
+       → (∀ {y} → y ≼ k → G y) → (∀ {y} → y ≼ k → G′ y) → AgreeTo k (Sh a) (Sh b) → AgreeTo k a b
+coh-of fin cab cba g g′ sh = ag-ind fin λ yk below → half cab (g yk) below sh yk , half cba (g′ yk) (λ lt → AgreeTo-sym (below lt)) (AgreeTo-sym sh) yk
 
 -- Rows of a cut program's table.
 Rows : ∀ {X : Set} → Tb.Listed X → Pos → Ev X → Set
@@ -166,15 +172,19 @@ m-ss = (λ ()) , (λ _ ())
 -- order and the instants of the rows they image.
 --
 -- A pin is put on an elaborated pin whose connect has no image of a value
--- past the plain connect before it, and a skip no later than the image
--- of any row after it: what a takeWhile keeps of one, it keeps of the
--- other.
-record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set) (L : EmissionSet A) (L* : EmissionSet (IE A)) : Set where
+-- past the plain connect before it, and a pin or a skip no later than the
+-- image of any row after it: what a takeWhile keeps of one, it keeps of
+-- the other.
+--
+-- A LATE row (`Late`) has no image to speak of, only a late placement: a
+-- skip a hot's pin or late row became for its reader, whose image the
+-- source never placed.  The order facts are over the rest.
+record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set) (Late : Pos → Set) (L : EmissionSet A) (L* : EmissionSet (IE A)) : Set where
   Imaged : Pos → Ev A → Set
   Imaged k e = Σ (Ev (IE A)) λ e′ → L* (φ k) e′ × M e e′
 
   Homed : Pos → Set
-  Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → L k₀ e₀ × Unpinned e₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+  Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → L k₀ e₀ × Unpinned e₀ × ¬ Late k₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
   PutAt : Pos → Set
   PutAt k = (Σ Pos λ l → Σ (Ev (IE A)) λ e′ → L* l e′ × Put k l) × Homed k
@@ -190,17 +200,24 @@ record Corr {A : Set} (s s* : Pos) (φ : Pos → Pos) (Put : Pos → Pos → Set
             × Homed k
 
   field
-    row→   : ∀ {k e} → L k e → Unpinned e → Imaged k e ⊎ (e ≡ skip × PutAt k)
+    row→   : ∀ {k e} → L k e → Unpinned e → (Imaged k e × ¬ Late k) ⊎ (e ≡ skip × PutAt k)
+    late-put : ∀ {k e} → Late k → L k e → e ≡ skip × PutAt k
     pin→   : ∀ {k p} → L k (pin p) → Live L k → PinAt k p
-    put-before : ∀ {k l k′ e′} → L k skip → Put k l → L k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ k′
+    put-before : ∀ {k l k′ e′} → L k skip → Put k l → L k′ e′ → Unpinned e′ → ¬ Late k′ → k ≺ k′ → l ≼ φ k′
+    pin-before : ∀ {k p l k′ e′} → L k (pin p) → Put k l → L k′ e′ → Unpinned e′ → ¬ Late k′ → k ≺ k′ → l ≼ φ k′
     shown← : ∀ {l e′} → L* l e′ → Shown (One valuesOf) e′
-           → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ k × L k e × Unpinned e × M e e′
+           → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ k × L k e × Unpinned e × ¬ Late k × M e e′
     place  : ∀ {m e′} → L* m e′ → Live L* m
-           → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × Imaged k e × (φ k ≼ m ⊎ Leads k) × instantOf (φ k) ≡ instantOf m
-    mono   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ k ≺ φ k′
-    inst   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′
+           → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → L k e × Unpinned e × ¬ Late k × Imaged k e × (φ k ≼ m ⊎ Leads k) × instantOf (φ k) ≡ instantOf m
+    mono   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → ¬ Late k → ¬ Late k′ → k ≺ k′ → φ k ≺ φ k′
+    inst   : ∀ {k k′ e e′} → L k e → L k′ e′ → Unpinned e → Unpinned e′ → ¬ Late k → ¬ Late k′
            → (instantOf (φ k) ≡ instantOf (φ k′) ⇔ instantOf k ≡ instantOf k′)
-    home   : ∀ {k e} → L k e → Unpinned e → (instantOf (φ k) ≡ instantOf s* ⇔ instantOf k ≡ instantOf s)
+    home   : ∀ {k e} → L k e → Unpinned e → ¬ Late k → (instantOf (φ k) ≡ instantOf s* ⇔ instantOf k ≡ instantOf s)
+
+-- A late row is a skip: a row that is not is not late.
+nl-ev : ∀ {A s s* φ Put Late} {L : EmissionSet A} {L* : EmissionSet (IE A)} → Corr s s* φ Put Late L L*
+      → ∀ {k e} → L k e → ¬ e ≡ skip → ¬ Late k
+nl-ev C x ns lt = ns (proj₁ (Corr.late-put C lt x))
 
 -- A table's positions.
 keys : ∀ {X : Set} → Maybe (Tb.Listed X) → List Pos
@@ -215,16 +232,18 @@ tr-few : ∀ {X : Set} (m m′ : Maybe (Tb.Listed X)) q → Few (λ y e → TR m
 tr-few m m′ q = keys m ++ keys m′ , λ { (inj₁ x) _ → ∈-++⁺ˡ (in-keys x) ; (inj₂ x) _ → ∈-++⁺ʳ (keys m) (in-keys x) }
 
 -- A correspondence carries to runs holding the same rows.
-corr-≃ : ∀ {A s s* φ Put} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)}
+corr-≃ : ∀ {A s s* φ Put Late} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)}
        → (∀ {k e} → L k e → K k e) → (∀ {k e} → K k e → L k e)
        → (∀ {k e} → L* k e → K* k e) → (∀ {k e} → K* k e → L* k e)
-       → Corr s s* φ Put L L* → Corr s s* φ Put K K*
-corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
-  { row→ = λ x un → [ (λ im → inj₁ (imaged im)) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
+       → Corr s s* φ Put Late L L* → Corr s s* φ Put Late K K*
+corr-≃ {A} {s} {s*} {φ} {Put} {Late} {L} {K} {L*} {K*} to from to* from* C = record
+  { row→ = λ x un → [ (λ { (im , nl) → inj₁ (imaged im , nl) }) , (λ { (eq , pa) → inj₂ (eq , putAt pa) }) ] (C.row→ (from x) un)
+  ; late-put = λ lt x → let (eq , pa) = C.late-put lt (from x) in eq , putAt pa
   ; pin→ = λ x lv → pinAt (C.pin→ (from x) (λ xc → lv (to xc)))
-  ; put-before = λ x pl x′ un′ lt → C.put-before (from x) pl (from x′) un′ lt
-  ; shown← = λ y sh → let (k , e , eq , x , un , m) = C.shown← (from* y) sh in k , e , eq , to x , un , m
-  ; place = λ {m} y lv → [ inj₁ , (λ { (k , e , x , un , im , le , eq) → inj₂ (k , e , to x , un , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y) (λ yc → lv (to* yc)))
+  ; put-before = λ x pl x′ un′ nl lt → C.put-before (from x) pl (from x′) un′ nl lt
+  ; pin-before = λ x pl x′ un′ nl lt → C.pin-before (from x) pl (from x′) un′ nl lt
+  ; shown← = λ y sh → let (k , e , eq , x , un , nl , m) = C.shown← (from* y) sh in k , e , eq , to x , un , nl , m
+  ; place = λ {m} y lv → [ inj₁ , (λ { (k , e , x , un , nl , im , le , eq) → inj₂ (k , e , to x , un , nl , imaged im , leadsOr {k} {m} le , eq) }) ] (C.place (from* y) (λ yc → lv (to* yc)))
   ; mono = λ x x′ → C.mono (from x) (from x′)
   ; inst = λ x x′ → C.inst (from x) (from x′)
   ; home = λ x → C.home (from x)
@@ -239,11 +258,11 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
     imaged (e′ , y , m) = e′ , to* y , m
 
     Homed : Pos → Set
-    Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → K k₀ e₀ × Unpinned e₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+    Homed k = instantOf k ≡ instantOf s ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → K k₀ e₀ × Unpinned e₀ × ¬ Late k₀ × Imaged k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
     homed : ∀ {k} → C.Homed k → Homed k
     homed (inj₁ eq) = inj₁ eq
-    homed (inj₂ (k₀ , e₀ , x , un , im , lt , eq)) = inj₂ (k₀ , e₀ , to x , un , imaged im , lt , eq)
+    homed (inj₂ (k₀ , e₀ , x , un , nl , im , lt , eq)) = inj₂ (k₀ , e₀ , to x , un , nl , imaged im , lt , eq)
 
     leadsOr : ∀ {k m} → φ k ≼ m ⊎ C.Leads k → φ k ≼ m ⊎ (∀ {k′ e′} → K k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
     leadsOr (inj₁ le) = inj₁ le
@@ -275,42 +294,76 @@ corr-≃ {A} {s} {s*} {φ} {Put} {L} {K} {L*} {K*} to from to* from* C = record
 -- elaborated pins whose connect lies at or before its image.  Past a
 -- take's first failure only such pins survive, and the plain take fixes
 -- nothing else of its child there.
-record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
+--
+-- IN AN AGREEING SCOPE: every fact across two cuts holds where the hots
+-- in scope agree between them, up to its plain position (`G`) and its
+-- elaborated one (`G*`).  A hot's reader reads its rows as the hot holds
+-- them at that cut, and the hot's rows move with its own truncation.
+--
+-- LATE ROWS (`Late`) have no image: the order facts and the facts across
+-- cuts that go through the map are over the rest, and a row that is not
+-- late stays so at a cut agreeing up to it.
+record Scope : Set₁ where
+  field
+    G      : ℕ → ℕ → Pos → Set
+    G*     : ℕ → ℕ → Pos → Set
+    g-down : ∀ {N N′ y y′} → y ≼ y′ → G N N′ y′ → G N N′ y
+    g-sym  : ∀ {N N′ y} → G N N′ y → G N′ N y
+    g*-down : ∀ {N N′ y y′} → y ≼ y′ → G* N N′ y′ → G* N N′ y
+    g*-sym  : ∀ {N N′ y} → G* N N′ y → G* N′ N y
+
+record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) (S : Scope) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
     Put         : ℕ → Pos → Pos → Set
-    corr        : ∀ N → Corr s s* (φ N) (Put N) (TR (P N)) (TR (Q N))
-    φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
+    Late        : ℕ → Pos → Set
+    corr        : ∀ N → Corr s s* (φ N) (Put N) (Late N) (TR (P N)) (TR (Q N))
+    φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N N′ k → Scope.G* S N N′ (φ N k)
+                → AgreeTo k (TR (P N)) (TR (P N′)) → φ N k ≡ φ N′ k
+    late-agree  : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N N′ k → Scope.G* S N N′ (φ N k)
+                → AgreeTo k (TR (P N)) (TR (P N′)) → ¬ Late N′ k
     bk          : ℕ → Pos → List Pos
-    in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk N (φ N k)
+    in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ Late N k → k ∈ bk N (φ N k)
     pb-few      : ∀ N l → Σ (List Pos) λ ks → ∀ {k} → Put N k l → k ∈ ks
-    back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ N′ k) (TR (Q N′)) (TR (Q N))
-                → AgreeTo k (TR (P N′)) (TR (P N))
-    put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → Put N k l → Put N′ k l
-    back-put    : ∀ {N N′ k l} → N ≤ N′ → Put N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put N k l
-    elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
-                → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
-    stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ N k) e′
+    back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → ¬ Late N′ k → Scope.G S N′ N k → Scope.G* S N′ N (φ N′ k)
+                → AgreeTo (φ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
+    put-up      : ∀ {N N′ k l} → N ≤ N′ → Scope.G S N′ N k → Scope.G* S N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → Put N k l → Put N′ k l
+    back-put    : ∀ {N N′ k l} → N ≤ N′ → Scope.G S N′ N k → Scope.G* S N′ N l → Put N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put N k l
+    elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N′ N k → Scope.G* S N′ N (φ N k)
+                → AgreeTo k (TR (P N′)) (TR (P N)) → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
+    stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N′ N k → Scope.G* S N′ N (φ N k) → TR (Q N) (φ N k) e′
                 → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-    stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put N k l
+    stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → Scope.G S N′ N k → Scope.G* S N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put N k l
                 → AgreeTo l (TR (Q N′)) (TR (Q N))
-    stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ N k) e′ → Corr.Leads (corr N) k
-                → TR (Q N) m e* → instantOf m ≡ instantOf (φ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
-    elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
+    stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N′ N k → Scope.G* S N′ N (φ N k)
+                → TR (Q N) (φ N k) e′ → Corr.Leads (corr N) k
+                → TR (Q N) m e* → Scope.G* S N′ N m → instantOf m ≡ instantOf (φ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ N k) (TR (Q N′)) (TR (Q N))
+    elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → Scope.G S N′ N q) → (∀ q → Scope.G* S N′ N q) → (∀ q → AgreeTo q (TR (P N′)) (TR (P N)))
+                → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
     func        : ∀ {N y e e′} → TR (P N) y e → TR (P N) y e′ → e ≡ e′
     func*       : ∀ {N y e e′} → TR (Q N) y e → TR (Q N) y e′ → e ≡ e′
     flat        : ∀ {N y e l ys e′} → TR (P N) y e → TR (P N) (y ⊕ (l ∷ ys)) e′ → ⊥
     flat*       : ∀ {N y e l ys e′} → TR (Q N) y e → TR (Q N) (y ⊕ (l ∷ ys)) e′ → ⊥
     pin-in      : ∀ {N l r} → TR (P N) l (pin r) → T (inside r l)
     pin-in*     : ∀ {N l r} → TR (Q N) l (pin r) → T (inside r l)
-    cons        : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
-    cons*       : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
+    cons        : ∀ {N N′} → Cons (Scope.G S N N′) (TR (P N)) (TR (P N′))
+    cons*       : ∀ {N N′} → Cons (Scope.G* S N N′) (TR (Q N)) (TR (Q N′))
     got         : ∀ N → Got (P N)
     got*        : ∀ N → Got (Q N)
     after       : ∀ {N k e} → TR (P N) k e → s ≼ k
     after*      : ∀ {N l e} → TR (Q N) l e → s* ≼ l
-    after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → s* ≼ φ N k
+    after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ Late N k → s* ≼ φ N k
     pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → s* ≼ r
-    pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+    pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late N k → Scope.G S N′ N k → Scope.G* S N′ N (φ N k)
+                → AgreeTo k (TR (P N′)) (TR (P N))
                 → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
                 → ∀ {y r} → r ≼ φ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)
+
+-- Two records of one stream alike at a row: one image, and the row late
+-- in the second only where it is late in the first.
+record Same {A} {P P′ : ℕ → Maybe (Tb.Listed A)} {Q Q′ : ℕ → Maybe (Tb.Listed (IE A))} {s s′ s* s*′ S S′} (R : Rel P Q s s* S) (R′ : Rel P′ Q′ s′ s*′ S′) (N : ℕ) (y : Pos) : Set where
+  constructor same
+  field
+    φ≡  : Rel.φ R N y ≡ Rel.φ R′ N y
+    nl→ : ¬ Rel.Late R N y → ¬ Rel.Late R′ N y
+open Same public

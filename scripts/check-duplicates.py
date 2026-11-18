@@ -94,6 +94,12 @@ DELIBERATE = {
     frozenset(("less",)):
         "each restage module's own new tree `t′` against its parameter "
         "`T₀`; the text matches, the trees differ.",
+    # NOT TWO PROOFS OF ONE FACT — one correspondence per leaf table.
+    # `P`, `Q`, `φ′` and `Put′` are each module's own, so the text is
+    # shared and the tables are not.
+    frozenset(("corr′",)):
+        "each leaf table module's own tables `P`/`Q` and map `φ′`; the "
+        "text matches, the tables differ.",
     frozenset(("ShareFits", "ShareHop")):
         "certificate and obligation over one telescope, both `Set`-"
         "valued; the shared `<` is the fan-out's accessibility argument.",

@@ -23,7 +23,7 @@ module simultaneous.TableRel where
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
@@ -31,7 +31,7 @@ open import Data.Empty using (⊥)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (¬_; does)
 
@@ -43,17 +43,18 @@ open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_)
-open import quickcheck.Tabled.Exact.Base using (when⁻)
+open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
-open import simultaneous.Listing using (listC-ok; UncutEnv)
+open import simultaneous.Listing using (UncutEnv)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.TableCorr using (Rel; Rows; TR; Corr; Cons; Got; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; module Rel; cons-≤; Same; same; φ≡; nl→; Scope; module Scope; Rows; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; alike-l; alike-r; linked-l; linked-r;
-         Maps; Aligned; aligned-⊕;
-         Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot; listHot-u; unended; den-cons; tab-func; tab-flat)
+  using (Ren; ψ; π; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Lvl; Cut;
+  at-frame; at-step; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
+  Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh;
+  Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
+  tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab; take-cong)
@@ -64,6 +65,7 @@ open import simultaneous.TableOf using (of-tab)
 open import simultaneous.TableCold using (cold-tab)
 open import simultaneous.TableLayers using (flat-rel; flat-coh)
 open import simultaneous.TableFlat using (if-≡)
+open import simultaneous.TableHot using (reader*; module ConnEnv; conn-hot; conn-hot-coh)
 open import simultaneous.InstEmit using (instEmit; value)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -76,47 +78,34 @@ postulate
   -- subscription's instant or at steps of timers it created there, each
   -- imaged at the alike step of the elaborated subscription; so each row
   -- inherits its subscription's link and its cuts of the hots in scope.
-  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (Ψ : Maps Γ) p p*
-            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* p p*)
-  of-order   : ∀ {Γ A} (xs : List A) v vals (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
-            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (of-tab xs v vals p p*)
-  spin-order : ∀ {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
-            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (spin-tab {A} p p*)
+  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (Ψ : Maps Γ) p p* {S}
+            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* p p* {S})
+  of-order   : ∀ {Γ A} (xs : List A) v vals (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p* {S}
+            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (of-tab xs v vals p p* {S})
+  spin-order : ∀ {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p* {S}
+            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (spin-tab {A} p p* {S})
 
   -- A ONE-TO-ONE FORMER'S ROWS: map's and take's rows are the child's
   -- rows at the child's positions, along the child's map; scan's are the
   -- child's renamed in place.  Each order fact is the child's, read
   -- through the inversion of the former's rows.
-  map-order  : ∀ {Γ A B} (f : A → B) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
+  map-order  : ∀ {Γ A B} (f : A → B) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s* S} (R : Rel P Q s s* S)
             → Rest Ψ ρ R → Rest Ψ ρ (map-tab f R)
-  scan-order : ∀ {Γ A B} (f : B → A → B) z {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
+  scan-order : ∀ {Γ A B} (f : B → A → B) z {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s* S} (R : Rel P Q s s* S)
             → Rest Ψ ρ R → Rest Ψ ρ (scan-tab f z R)
-  take-order : ∀ {Γ A} i (q : A → Bool) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
+  take-order : ∀ {Γ A} i (q : A → Bool) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s* S} (R : Rel P Q s s* S)
             → Rest Ψ ρ R → Rest Ψ ρ (take-tab i q R)
 
   -- THE DEFER'S ROWS: its marker under its first label, then the body's,
   -- subscribed one label down.  A pair before the defer is before the
   -- body, and cuts it alike: the body's subscription is in the defer's
   -- instant, past it, and under neither of the pair.
-  defer-order : ∀ {Γ A} {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} p p* {P Q} (R : Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]))
+  defer-order : ∀ {Γ A} {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} p p* {P Q S} (R : Rel {A} P Q (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) S)
              → Rest Ψ ρ R → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (defer-tab p p* R)
 
 ------------------------------------------------------------------------
 ------------------------------------------------------------------------
 -- The connect
-
--- The annotated hot rows: the elaborated source's own, rejoined under the
--- reader that the annotation's concat subscribes first.
-reader* : Pos → Pos
-reader* p* = p* ⊕ˡ (ix 1 ∷ ix 0 ∷ ix 0 ∷ ix 1 ∷ [])
-
--- A hot's proper rows are among its rows.
-proper⊆ : ∀ {X} es (rs : List (Row X)) {r} → r ∈ properAt es rs → r ∈ rs
-proper⊆ es []             ()
-proper⊆ es ((q , e) ∷ rs) m with ∈-++⁻ _ m
-... | inj₂ h = there (proper⊆ es rs h)
-... | inj₁ h with when⁻ {b = allᵇ (q ≼ᵇ_) es} {x = (q , e)} h
-...   | (_ , refl) = here refl
 
 postulate
   -- THE BODY CUTS ITS SOURCE ALIKE.  Subscribed first, at the first
@@ -140,80 +129,29 @@ cut-sub : ∀ {q q* y y*} → Cut q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut
 cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
 cut-sub {y* = y*} (at-step v a b c) n l = at-step (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b) c
 
--- THE CONNECT'S SCOPE: the source subscribed under the connect's second
--- label, its two hots listed off it, and the maps a body reads them by.
--- The elaborated source is annotated, one label deeper.
-module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
-  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (env : EnvR ρ ρι ρ*) (p p* : Pos) (a : Admits (lw env) p) (a* : Admits (lw* env) p*) where
-
-  -- The two sources' tables, listed in full.
-  σ : ℕ → Tb.Listed A
-  σ N = proj₁ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))
-
-  σ* : ℕ → Tb.Listed (AIE A)
-  σ* N = proj₁ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))
-
-  ρ′ : ℕ → All Tb.Listed (A ∷ Γ)
-  ρ′ N = hotOf (σ N) ∷ ρ N
-
-  ρ*′ : ℕ → All Tb.Listed (AIE A ∷ Δ)
-  ρ*′ N = hotOf (σ* N) ∷ ρ* N
-
-  uρ′ : ∀ N → UncutEnv (ρ′ N)
-  uρ′ N = proj₂ (proj₂ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))) , uρ N
-
-  uρ*′ : ∀ N → UncutEnv (ρ*′ N)
-  uρ*′ N = proj₂ (proj₂ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))) , uρ* N
-
-  Src : Set₁
-  Src = Out n s ρ ρι ρ* (maps env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
-
-  -- The two hots, each listed off its lawful source.
-  hD = listHot n s uρ (lw env) p a
-  hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
-  D′ = den-cons hD (lw env)
-  D*′ = den-cons hD* (lw* env)
-
-  -- The source's hot maps each row to its annotated image.
-  Ψ′ : Src → Maps (A ∷ Γ)
-  Ψ′ Rs (here refl) N k = Rel.φ (Out.rel Rs) N k ⊕ [ sub (reader* p*) ]
-  Ψ′ Rs (there j)       = maps env j
-
-  -- A source row is a row of the source's table.
-  src-row : ∀ N {k e} → Rows (hotOf (σ N)) k e → TR (Tab n s ρ (p ⊕ [ ix 1 ]) N) k e
-  src-row N x = σ N , proj₁ (proj₂ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))) , proper⊆ (ends (rows (σ N))) (rows (σ N)) x
-
-  -- The new hot, read by a body subscribed in this scope.
-  HotS : Src → Set₁
-  HotS Rs = HotR (here refl) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
-
-postulate
-  -- THE CONNECT'S HOT: the elaborated source annotated, each value at
-  -- its source image rejoined under the annotation's reader; two
-  -- readers correspond wherever they cut it alike.
-  conn-hot : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
-               (env : EnvR ρ ρι ρ*) p p* (a : Admits (lw env) p) (a* : Admits (lw* env) p*)
-           → (Rs : ConnEnv.Src n s ρ uρ ρι ρ* uρ* env p p* a a*) → ConnEnv.HotS n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
-
--- THE HOT'S MAP IS ITS SOURCE'S: two scopes whose sources map alike give
--- their hots one map, however the scopes and the readers are admitted.
-module ConnTwo {Γ A} n (s : Obs Timeline Γ A)
-  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (E E′ : EnvR ρ ρι ρ*) (p p* : Pos) (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*) where
-  module C  = ConnEnv n s ρ uρ ρι ρ* uρ* E  p p* a  a*
-  module C′ = ConnEnv n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′
-
-  HotCoh : Set₁
-  HotCoh = (Rs : C.Src) (Rs′ : C′.Src) → (∀ N y → Rel.φ (Out.rel Rs) N y ≡ Rel.φ (Out.rel Rs′) N y)
-         → ∀ n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
-             (al : Aligned (C.Ψ′ Rs) C.ρ′ q q*) (al′ : Aligned (C′.Ψ′ Rs′) C′.ρ′ q q*) (lk lk′ : Linked q q*) N y
-         → Rel.φ (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs n′ q q* ad ad* al lk)) N y
-           ≡ Rel.φ (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ n′ q q* ad′ ad*′ al′ lk′)) N y
-
-postulate
-  conn-hot-coh : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
-                   (E E′ : EnvR ρ ρι ρ*) p p* a a′ a* a*′ → ConnTwo.HotCoh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′
+-- A record holds under any guard no weaker than its own.
+rel-≤ : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s*} {S S′ : Scope}
+      → (∀ {N N′ y} → Scope.G S′ N N′ y → Scope.G S N N′ y) → (∀ {N N′ y} → Scope.G* S′ N N′ y → Scope.G* S N N′ y)
+      → Rel P Q s s* S → Rel P Q s s* S′
+rel-≤ g g* R = record
+  { φ = φ ; Put = Put ; Late = Late ; corr = corr
+  ; φ-agree     = λ x un nl a b → φ-agree x un nl (g a) (g* b)
+  ; late-agree  = λ x un nl a b → late-agree x un nl (g a) (g* b)
+  ; bk = bk ; in-bk = in-bk ; pb-few = pb-few
+  ; back        = λ le x un nl a b → back le x un nl (g a) (g* b)
+  ; put-up      = λ le a b → put-up le (g a) (g* b)
+  ; back-put    = λ le a b → back-put le (g a) (g* b)
+  ; elab-causal = λ le x un nl a b → elab-causal le x un nl (g a) (g* b)
+  ; stable←     = λ le x un nl a b → stable← le x un nl (g a) (g* b)
+  ; stable-put  = λ le a b → stable-put le (g a) (g* b)
+  ; stable-lead = λ le x un nl a b te ld tm gm → stable-lead le x un nl (g a) (g* b) te ld tm (g* gm)
+  ; elab-all    = λ le ga gb → elab-all le (λ q → g (ga q)) (λ q → g* (gb q))
+  ; func = func ; func* = func* ; flat = flat ; flat* = flat* ; pin-in = pin-in ; pin-in* = pin-in*
+  ; cons = cons-≤ g cons ; cons* = cons-≤ g* cons*
+  ; got = got ; got* = got* ; after = after ; after* = after* ; after-φ = after-φ ; pin-after* = pin-after*
+  ; pin-stable  = λ le x un nl a b → pin-stable le x un nl (g a) (g* b)
+  }
+  where open Rel R
 
 -- THE CONNECT: the body subscribed under the connect's first label, in
 -- the environment the source's hot extends.
@@ -229,23 +167,23 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     -- the source's alike, each creator chain compared at its own levels.
     conn-old-cut : (Rs : Src) → ∀ {X} (j : X ∈ Γ) n′ q q* (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) (lk : Linked q q*)
                  → let R = Out.rel (hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk) in
-                   ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e
+                   ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e → ¬ Rel.Late R N k
                  → ∀ N′ → Alike (Ψ′ Rs (here refl) N′) (Rows (hotOf (σ N′))) k (Rel.φ R N k)
 
   -- An old hot is read as before; its rows cut the new hot alike.
   old : (Rs : Src) → ∀ {X} (j : X ∈ Γ) → HotR (there j) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
-  old Rs j n′ q q* ad ad* al lk = Out.rel O ⊢ record
+  old Rs j n′ q q* ad ad* al lk = rel-≤ proj₂ proj₂ (Out.rel O) ⊢ record
     { linked = Rest.linked (Out.rest O)
     ; cuts   = cuts′
-    ; self   = Rest.self (Out.rest O)
     ; seen   = λ al′ → Rest.seen (Out.rest O) (λ i → al′ (there i))
     }
     where
       O = hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk
 
-      cuts′ : ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e → Aligned (Ψ′ Rs) ρ′ k (Rel.φ (Out.rel O) N k)
-      cuts′ N x un (here refl) N′ = conn-old-cut Rs j n′ q q* ad ad* al lk N x un N′
-      cuts′ N x un (there i)   N′ = Rest.cuts (Out.rest O) N x un i N′
+      cuts′ : ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e → ¬ Rel.Late (Out.rel O) N k
+            → Aligned (Ψ′ Rs) ρ′ k (Rel.φ (Out.rel O) N k)
+      cuts′ N x un nl (here refl) N′ = conn-old-cut Rs j n′ q q* ad ad* al lk N x un nl N′
+      cuts′ N x un nl (there i)   N′ = Rest.cuts (Out.rest O) N x un nl i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
   env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
@@ -255,11 +193,12 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       hots (there j)   = old Rs j
 
       hots-coh : ∀ {X} (i : X ∈ A ∷ Γ) n′ q q* (ad ad′ : Admits D′ q) (ad* ad*′ : Admits D*′ q*) (al al′ : Aligned (Ψ′ Rs) ρ′ q q*) (lk lk′ : Linked q q*) N y
-               → Rel.φ (Out.rel (hots i n′ q q* ad ad* al lk)) N y ≡ Rel.φ (Out.rel (hots i n′ q q* ad′ ad*′ al′ lk′)) N y
-      hots-coh (here refl) = conn-hot-coh n s ρ uρ ρι ρ* uρ* env env p p* a a a* a* Rs Rs (λ _ _ → refl)
-      hots-coh (there j) n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ =
-        hot-coh env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD (lw env) ad′) (admits-wk hD* (lw* env) ad*) (admits-wk hD* (lw* env) ad*′)
-          (λ i → al (there i)) (λ i → al′ (there i)) lk lk′
+               → Same (Out.rel (hots i n′ q q* ad ad* al lk)) (Out.rel (hots i n′ q q* ad′ ad*′ al′ lk′)) N y
+      hots-coh (here refl) = conn-hot-coh n s ρ uρ ρι ρ* uρ* env env p p* a a a* a* Rs Rs (λ _ _ → same refl (λ nl → nl))
+      hots-coh (there j) n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
+        let x = hot-coh env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD (lw env) ad′) (admits-wk hD* (lw* env) ad*) (admits-wk hD* (lw* env) ad*′)
+                  (λ i → al (there i)) (λ i → al′ (there i)) lk lk′ N y
+        in same (φ≡ x) (nl→ x)
 
   -- The body's subscriptions cut the source's hot alike: the source sees
   -- the body's pair, before it and cutting it alike, cutting its rows
@@ -267,8 +206,9 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
   -- reader they stay cut alike.
   conn-cut : (Rs : Src) → Aligned (maps env) ρ p p* → Linked p p*
            → ∀ N → Alike (Ψ′ Rs (here refl) N) (Rows (hotOf (σ N))) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
-  conn-cut Rs al lk N = alike λ x un →
-    cut-sub (cut seen (src-row N x) un) (past-src (Rel.after-φ (Out.rel Rs) (src-row N x) un)) (sub (reader* p*))
+  conn-cut Rs al lk N = alike
+    (λ x un nl → cut-sub (cut seen (src-row N x) un nl) (past-src (Rel.after-φ (Out.rel Rs) (src-row N x) un nl)) (sub (reader* p*)))
+    (λ { x (l , (pt , e′ , y) , refl) → cut-sub (cut-put seen (src-row N x) (pt , e′ , y)) (past-src (Rel.after* (Out.rel Rs) y)) (sub (reader* p*)) })
     where
       seen = Rest.seen (Out.rest Rs) (aligned-⊕ {Ψ = maps env} {ρ = ρ} al (ix 0) (ix 0)) (cut-body lk) (under-guard p (⊑-refl (p ⊕ [ ix 0 ]))) N
 
@@ -278,6 +218,14 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
   P Q : ℕ → _
   P = Tab n (connect s b) ρ p
   Q = Tab* n ρι (connect s b) ρ* p*
+
+  -- The hots in scope guarding the connect's record.
+  Sc : Scope
+  Sc = scopeOf ρ ρι ρ*
+
+  G G* : ℕ → ℕ → Pos → Set
+  G  = Scope.G Sc
+  G* = Scope.G* Sc
 
   -- The body's tables.
   Bp : ℕ → Maybe (Tb.Listed B)
@@ -293,14 +241,24 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
   -- image, one label down, as the elaborated connect shows it.  The
   -- connect makes pins, so `pin-stable` is first met here.
   module ConnTab (Rs : Src) (Ob : Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])) where
-    Rb : Rel Bp (Tab* n (ext ρι) b ρ*′ (p* ⊕ [ ix 0 ])) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
+    Rb : Rel Bp (Tab* n (ext ρι) b ρ*′ (p* ⊕ [ ix 0 ])) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (scopeOf ρ′ (ext ρι) ρ*′)
     Rb = Out.rel Ob
 
     φ′ : ℕ → Pos → Pos
-    φ′ N y = if isBody N y then Rel.φ Rb N y else Ψ′ Rs (here refl) N (up y) ⊕ [ ix 0 ]
+    φ′ N y = if isBody N y then Rel.φ Rb N y else ψ (srcMap Rs N) (up y) ⊕ [ ix 0 ]
 
+    -- A source row's skip, past the body's subscription, put at its image
+    -- or where the hot's map puts the source's row.
     Put′ : ℕ → Pos → Pos → Set
-    Put′ N y l = if isBody N y then Rel.Put Rb N y l else (Σ _ λ e → TR (P N) y e) × l ≡ φ′ N y
+    Put′ N y l = if isBody N y then Rel.Put Rb N y l
+                 else (Σ _ λ e → TR (P N) y e) × (l ≡ φ′ N y ⊎ Σ Pos λ l′ → π (srcMap Rs N) (up y) l′ × l ≡ l′ ⊕ [ ix 0 ])
+
+    -- A body row is late as the body says; a source row's skip is late
+    -- where the source's row is late or a pin, whose image the source
+    -- never placed.
+    Late′ : ℕ → Pos → Set
+    Late′ N y = if isBody N y then Rel.Late Rb N y
+                else (Rel.Late (Out.rel Rs) N (up y) ⊎ Σ Pos λ r → TR (Tab n s ρ (p ⊕ [ ix 1 ]) N) (up y) (pin r))
 
     -- Few rows put on one image: a body row's through the body's, any
     -- other a plain row.
@@ -316,26 +274,27 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     bk′ N l = Rel.bk Rb N l ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Rs) N (up (up l)))
 
     postulate
-      ct-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
-      ct-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N)) (TR (P N′)) → φ′ N k ≡ φ′ N′ k
-      ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ bk′ N (φ′ N k)
-      ct-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N))
+      ct-corr        : ∀ N → Corr p p* (φ′ N) (Put′ N) (Late′ N) (TR (P N)) (TR (Q N))
+      ct-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N N′ k → G* N N′ (φ′ N k) → AgreeTo k (TR (P N)) (TR (P N′)) → φ′ N k ≡ φ′ N′ k
+      ct-late-agree  : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N N′ k → G* N N′ (φ′ N k) → AgreeTo k (TR (P N)) (TR (P N′)) → ¬ Late′ N′ k
+      ct-in-bk       : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ Late′ N k → k ∈ bk′ N (φ′ N k)
+      ct-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → ¬ Late′ N′ k → G N′ N k → G* N′ N (φ′ N′ k) → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N))
                      → AgreeTo k (TR (P N′)) (TR (P N))
-      ct-put-up      : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → Put′ N k l → Put′ N′ k l
-      ct-back-put    : ∀ {N N′ k l} → N ≤ N′ → Put′ N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put′ N k l
-      ct-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+      ct-put-up      : ∀ {N N′ k l} → N ≤ N′ → G N′ N k → G* N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → Put′ N k l → Put′ N′ k l
+      ct-back-put    : ∀ {N N′ k l} → N ≤ N′ → G N′ N k → G* N′ N l → Put′ N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Put′ N k l
+      ct-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N′ N k → G* N′ N (φ′ N k) → AgreeTo k (TR (P N′)) (TR (P N))
                      → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
-      ct-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′
+      ct-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N′ N k → G* N′ N (φ′ N k) → TR (Q N) (φ′ N k) e′
                      → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-      ct-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put′ N k l
+      ct-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → G N′ N k → G* N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Put′ N k l
                      → AgreeTo l (TR (Q N′)) (TR (Q N))
-      ct-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′ → Corr.Leads (ct-corr N) k
-                     → TR (Q N) m e* → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
-      ct-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
-      ct-cons        : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
-      ct-cons*       : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
-      ct-after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → p* ≼ φ′ N k
-      ct-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo k (TR (P N′)) (TR (P N))
+      ct-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N′ N k → G* N′ N (φ′ N k) → TR (Q N) (φ′ N k) e′ → Corr.Leads (ct-corr N) k
+                     → TR (Q N) m e* → G* N′ N m → instantOf m ≡ instantOf (φ′ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
+      ct-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ q → G N′ N q) → (∀ q → G* N′ N q) → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
+      ct-cons        : ∀ {N N′} → Cons (G N N′) (TR (P N)) (TR (P N′))
+      ct-cons*       : ∀ {N N′} → Cons (G* N N′) (TR (Q N)) (TR (Q N′))
+      ct-after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ Late′ N k → p* ≼ φ′ N k
+      ct-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Late′ N k → G N′ N k → G* N′ N (φ′ N k) → AgreeTo k (TR (P N′)) (TR (P N))
                      → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
                      → ∀ {y r} → r ≼ φ′ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)
 
@@ -374,16 +333,16 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ct-pin-after* : ∀ {N l r} → TR (Q N) l (pin r) → p* ≼ r
     ct-pin-after* {N} = pin-after-ok (3 + N) n (elab ρι (connect s b)) {ρ* N} p*
 
-    rel′ : Rel P Q p p*
+    rel′ : Rel P Q p p* Sc
     rel′ = record
-      { φ = φ′ ; Put = Put′ ; corr = ct-corr ; φ-agree = ct-φ-agree ; bk = bk′ ; in-bk = ct-in-bk ; pb-few = ct-pb-few
+      { φ = φ′ ; Put = Put′ ; Late = Late′ ; corr = ct-corr ; φ-agree = ct-φ-agree ; late-agree = ct-late-agree ; bk = bk′ ; in-bk = ct-in-bk ; pb-few = ct-pb-few
       ; back = ct-back ; put-up = ct-put-up ; back-put = ct-back-put
       ; elab-causal = ct-elab-causal ; stable← = ct-stable← ; stable-put = ct-stable-put ; stable-lead = ct-stable-lead
       ; elab-all = ct-elab-all ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; cons = ct-cons ; cons* = ct-cons* ; got = ct-got ; got* = ct-got*
       ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after* ; pin-stable = ct-pin-stable }
 
-  conn-tab : (Rs : Src) → Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
+  conn-tab : (Rs : Src) → Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p* Sc
   conn-tab = ConnTab.rel′
 
   postulate
@@ -421,29 +380,39 @@ conn-rel : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B
 conn-rel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk = C.conn-tab Rs Ob ⊢ C.conn-order Rs Ob al lk
   where open ConnRel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk
 
--- A connect's map is its body's on the body's rows and its source's one
--- label down on the rest: coherent where both children are, the body's
+-- Rows late alike on each branch of a test are late alike under it.
+late-if : ∀ (c : Bool) {A A′ B B′ : Set} → (c ≡ true → ¬ A → ¬ A′) → (c ≡ false → ¬ B → ¬ B′)
+        → ¬ (if c then A else B) → ¬ (if c then A′ else B′)
+late-if true  t _ = t refl
+late-if false _ f = f refl
+
+-- A connect's map and late rows are its body's on the body's rows and
+-- its source's one label down on the rest: coherent where both children are, the body's
 -- scopes related by the hot's coherence and the outer environments'.
 conn-coh : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) (Fs : Full n s) (Fb : Full n b)
          → Coh n s Fs → Coh n b Fb → Coh n (connect s b) (conn-rel n s b Fs Fb)
 conn-coh n s b Fs Fb cs cb ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
-  if-≡ refl (λ _ → cb X.CE.ρ′ X.CE.uρ′ (ext ρι) X.CE.ρ*′ X.CE.uρ*′ (X.C.env′ X.Rs) (X′.C.env′ X′.Rs) ee′
-                      (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) _ _ _ _ _ _ _ _ N y)
-            (λ _ → cong (λ u → (u ⊕ [ sub (reader* p*) ]) ⊕ [ ix 0 ]) (sφ N (up y)))
+  same (if-≡ refl (λ _ → φ≡ (bφ N y)) (λ _ → cong (λ u → (u ⊕ [ sub (reader* p*) ]) ⊕ [ ix 0 ]) (φ≡ (sφ N (up y)))))
+       (late-if (X.C.isBody N y) (λ _ → nl→ (bφ N y))
+                (λ _ nl → λ { (inj₁ lt) → nl→ (sφ N (up y)) (λ lt₀ → nl (inj₁ lt₀)) lt ; (inj₂ pn) → nl (inj₂ pn) }))
   where
     module X  = ConnRel n s b Fs Fb ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
     module X′ = ConnRel n s b Fs Fb ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′
 
-    sφ : ∀ N y → Rel.φ (Out.rel X.Rs) N y ≡ Rel.φ (Out.rel X′.Rs) N y
+    sφ : ∀ N y → Same (Out.rel X.Rs) (Out.rel X′.Rs) N y
     sφ = cs ρ uρ ρι ρ* uρ* E E′ ee (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
            (admits-step (lw E) a) (admits-step (lw E′) a′)
            (admits-step (lw* E) (admits-step (lw* E) a*)) (admits-step (lw* E′) (admits-step (lw* E′) a*′)) _ _ _ _
 
     ee′ : EnvEq (X.C.env′ X.Rs) (X′.C.env′ X′.Rs)
     ee′ (here refl) = conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Rs X′.Rs sφ
-    ee′ (there j) n′ q q* ad ad′ ad* ad*′ al₁ al₁′ lk₁ lk₁′ =
-      ee j n′ q q* (admits-wk X.CE.hD (lw E) ad) (admits-wk X′.CE.hD (lw E′) ad′)
-         (admits-wk X.CE.hD* (lw* E) ad*) (admits-wk X′.CE.hD* (lw* E′) ad*′) (λ i → al₁ (there i)) (λ i → al₁′ (there i)) lk₁ lk₁′
+    ee′ (there j) n′ q q* ad ad′ ad* ad*′ al₁ al₁′ lk₁ lk₁′ N′ y′ =
+      let x = ee j n′ q q* (admits-wk X.CE.hD (lw E) ad) (admits-wk X′.CE.hD (lw E′) ad′)
+                 (admits-wk X.CE.hD* (lw* E) ad*) (admits-wk X′.CE.hD* (lw* E′) ad*′) (λ i → al₁ (there i)) (λ i → al₁′ (there i)) lk₁ lk₁′ N′ y′
+      in same (φ≡ x) (nl→ x)
+
+    bφ : ∀ N y → Same (Out.rel X.Ob) (Out.rel X′.Ob) N y
+    bφ = cb X.CE.ρ′ X.CE.uρ′ (ext ρι) X.CE.ρ*′ X.CE.uρ*′ (X.C.env′ X.Rs) (X′.C.env′ X′.Rs) ee′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) _ _ _ _ _ _ _ _
 
 ------------------------------------------------------------------------
 -- Every author subterm
@@ -454,7 +423,7 @@ conn-coh n s b Fs Fb cs cb ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ a
 -- plain one.
 rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
 
--- EVERY AUTHOR SUBTERM'S MAP IS ITS SUBSCRIPTIONS' (`Coh`): a leaf's map
+-- EVERY AUTHOR SUBTERM'S MAP AND LATE ROWS ARE ITS SUBSCRIPTIONS' (`Coh`): a leaf's map
 -- reads no environment, a one-to-one former's is its child's through its
 -- table, a `connected`'s is its hot's, and a `flatMap`'s and a
 -- `connect`'s are their children's.
@@ -479,13 +448,13 @@ rel (suc n) (defer l)   ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   let O = rel n (Later.force l) ρ uρ ρι ρ* uρ* env (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw env) a) (admits-step (lw* env) a*) (aligned-⊕ {Ψ = maps env} {ρ = ρ} al (ix 1) (ix 1)) (linked-r (linked-l lk (ix 1)) (ix 1))
   in defer-tab p p* (Out.rel O) ⊢ defer-order p p* (Out.rel O) (Out.rest O) al lk
 
-rel-coh n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = refl
-rel-coh n empty             ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = refl
-rel-coh n (of xs)           ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = refl
-rel-coh n (map f s)         ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′
-rel-coh n (scan f z s)      ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′
+rel-coh n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
+rel-coh n empty             ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
+rel-coh n (of xs)           ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
+rel-coh n (map f s)         ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
+  let c = rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
+rel-coh n (scan f z s)      ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
+  let c = rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
 rel-coh n (takeWhile i q s) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
   take-cong i q (Out.rel (rel n s ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (rel n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′))
     (rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
@@ -493,7 +462,7 @@ rel-coh n (flatMap op f s)  =
   flat-coh n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a)) (λ a → rel-coh n (f a)) (rel-coh n s)
 rel-coh n (connect s b)     = conn-coh n (plain s) (plain b) (rel n s) (rel n b) (rel-coh n s) (rel-coh n b)
 rel-coh n (connected i)     ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ = ee i n p p* a a′ a* a*′ al al′ lk lk′
-rel-coh zero    (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = refl
+rel-coh zero    (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
 rel-coh (suc n) (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
   defer-cong p p* (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E) a) (admits-step (lw* E) a*) al₁ lk₁))
                   (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E′ (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E′) a′) (admits-step (lw* E′) a*′) al₁′ lk₁′))

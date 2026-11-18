@@ -22,6 +22,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence; mk⇔)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part)
@@ -35,7 +36,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown)
 open import simultaneous.Listing using (walkN)
-open import simultaneous.TableCorr using (TR; M; ev; m-val; m-ee; Corr; Rel)
+open import simultaneous.TableCorr using (TR; M; ev; m-val; m-ee; Corr; Rel; Scope)
 open import simultaneous.TableSpin using (lastL; lastL-⊕; step-inj; step-flat; ix-inj)
 open import simultaneous.TakeCut using (inst-⊕)
 
@@ -110,7 +111,7 @@ flat-W q i xs m m′ with step q i xs m
 ------------------------------------------------------------------------
 -- The record
 
-module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf (v x) ≡ x ∷ []) (p p* : Pos) where
+module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf (v x) ≡ x ∷ []) (p p* : Pos) {S′ : Scope} where
 
   P : ℕ → Maybe (Tb.Listed A)
   P _ = just (W p 0 xs ⊣ false)
@@ -150,63 +151,66 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
   ag-id : ∀ {X : Set} {t : Pos → Ev X → Set} {k} → AgreeTo k t t
   ag-id = ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
 
-  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
+  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (λ _ → ⊥) (TR (P N)) (TR (Q N))
   corr′ N = record
-    { row→ = λ { {e = e} (_ , refl , m) _ → inj₁ (ev v e , (_ , refl , fwd 0 xs m) , m-v e) }
+    { row→ = λ { {e = e} (_ , refl , m) _ → inj₁ ((ev v e , (_ , refl , fwd 0 xs m) , m-v e) , (λ ())) }
+    ; late-put = λ ()
     ; pin→ = λ { (_ , refl , m) _ → ⊥-elim (no-pin p 0 xs m) }
     ; put-before = λ _ ()
+    ; pin-before = λ _ ()
     ; shown← = shown←′
     ; place = λ { (_ , refl , m) _ → inj₁ (same m) }
-    ; mono = mono′
-    ; inst = λ { {k} {k′} (_ , refl , m) (_ , refl , m′) _ _ →
+    ; mono = λ x x′ un un′ _ _ → mono′ x x′ un un′
+    ; inst = λ { {k} {k′} (_ , refl , m) (_ , refl , m′) _ _ _ _ →
         mk⇔ (λ _ → trans (same m) (sym (same m′))) (λ _ → trans (inst-⊕ p* [ lastL k ]) (sym (inst-⊕ p* [ lastL k′ ]))) }
-    ; home = λ { {k} (_ , refl , m) _ → mk⇔ (λ _ → same m) (λ _ → inst-⊕ p* [ lastL k ]) } }
+    ; home = λ { {k} (_ , refl , m) _ _ → mk⇔ (λ _ → same m) (λ _ → inst-⊕ p* [ lastL k ]) } }
     where
       shown←′ : ∀ {l e′} → TR (Q N) l e′ → Shown (One valuesOf) e′
-              → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P N) k e × Unpinned e × M e e′
+              → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P N) k e × Unpinned e × ¬ ⊥ × M e e′
       shown←′ (_ , refl , m) _ with bwd 0 xs m
-      ... | k , e , m′ , eq , refl = k , e , eq , (_ , refl , m′) , unp p 0 xs m′ , m-v e
+      ... | k , e , m′ , eq , refl = k , e , eq , (_ , refl , m′) , unp p 0 xs m′ , (λ ()) , m-v e
 
       mono′ : ∀ {k k′ e e′} → TR (P N) k e → TR (P N) k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ′ N k ≺ φ′ N k′
       mono′ (_ , refl , m) (_ , refl , m′) _ _ lt with step p 0 xs m | step p 0 xs m′
       ... | a , sa , refl | b , sb , refl =
         subst₂ (λ c d → (p* ⊕ [ c ]) ≺ (p* ⊕ [ d ])) (sym (lastL-⊕ p a)) (sym (lastL-⊕ p b)) (shift p p* sa sb lt)
 
-  rel′ : Rel P Q p p*
+  rel′ : Rel P Q p p* S′
   rel′ = record
-    { φ = φ′ ; Put = Put′ ; corr = corr′
-    ; φ-agree = λ _ _ _ → refl
+    { φ = φ′ ; Put = Put′ ; Late = λ _ _ → ⊥ ; corr = corr′
+    ; φ-agree = λ _ _ _ _ _ _ → refl
+    ; late-agree = λ _ _ _ _ _ _ ()
     ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
-    ; in-bk = λ {N} → in-bk′ {N}
+    ; in-bk = λ {N} x un _ → in-bk′ {N} x un
     ; pb-few = λ _ _ → [] , λ ()
-    ; back = λ _ _ _ _ → ag-id
-    ; put-up = λ _ _ ()
-    ; back-put = λ _ ()
-    ; elab-causal = λ _ _ _ _ → ag-id
-    ; stable← = λ _ _ _ _ _ → ag-id
-    ; stable-put = λ _ _ _ ()
-    ; stable-lead = λ _ _ _ _ _ _ _ _ → ag-id
-    ; elab-all = λ _ _ y → y
+    ; back = λ _ _ _ _ _ _ _ → ag-id
+    ; put-up = λ _ _ _ _ ()
+    ; back-put = λ _ _ _ ()
+    ; elab-causal = λ _ _ _ _ _ _ _ → ag-id
+    ; stable← = λ _ _ _ _ _ _ _ _ → ag-id
+    ; stable-put = λ _ _ _ _ _ ()
+    ; stable-lead = λ _ _ _ _ _ _ _ _ _ _ _ _ → ag-id
+    ; elab-all = λ _ _ _ _ y → y
     ; func = λ { (_ , refl , m) (_ , refl , m′) → func-W p 0 xs m m′ }
     ; func* = λ { (_ , refl , m) (_ , refl , m′) → func-W p* 0 (map v xs) m m′ }
     ; flat = λ { (_ , refl , m) (_ , refl , m′) → flat-W p 0 xs m m′ }
     ; flat* = λ { (_ , refl , m) (_ , refl , m′) → flat-W p* 0 (map v xs) m m′ }
     ; pin-in = λ { (_ , refl , m) → ⊥-elim (no-pin p 0 xs m) }
     ; pin-in* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
-    ; cons = λ _ x _ _ → x
-    ; cons* = λ _ y _ _ → y
+    ; cons = λ _ _ x _ _ → x
+    ; cons* = λ _ _ y _ _ → y
     ; got = λ _ → _ , refl
     ; got* = λ _ → _ , refl
     ; after = λ { (_ , refl , m) → after-W p 0 xs m }
     ; after* = λ { (_ , refl , m) → after-W p* 0 (map v xs) m }
-    ; after-φ = λ {_} {k} _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
+    ; after-φ = λ {_} {k} _ _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
     ; pin-after* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
-    ; pin-stable = λ _ _ _ _ _ _ y → y }
+    ; pin-stable = λ _ _ _ _ _ _ _ _ _ y → y }
     where
       in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ (_ , refl , m) _ with step p 0 xs m
       ... | a , _ , refl = here (cong (λ l → p ⊕ [ l ]) (sym (trans (lastL-⊕ p* (lastL (p ⊕ [ a ]))) (lastL-⊕ p a))))
 
-of-tab : ∀ {A} (xs : List A) (v : A → IE A) → (∀ x → valuesOf (v x) ≡ x ∷ []) → ∀ p p*
-       → Rel {A} (λ _ → just (W p 0 xs ⊣ false)) (λ _ → just (W p* 0 (map v xs) ⊣ false)) p p*
-of-tab xs v vals p p* = OfTab.rel′ xs v vals p p*
+of-tab : ∀ {A} (xs : List A) (v : A → IE A) → (∀ x → valuesOf (v x) ≡ x ∷ []) → ∀ p p* {S′}
+       → Rel {A} (λ _ → just (W p 0 xs ⊣ false)) (λ _ → just (W p* 0 (map v xs) ⊣ false)) p p* S′
+of-tab xs v vals p p* {S′} = OfTab.rel′ xs v vals p p* {S′}
