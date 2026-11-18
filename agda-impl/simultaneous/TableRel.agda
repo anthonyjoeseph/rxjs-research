@@ -32,7 +32,7 @@ open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -46,12 +46,11 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv)
-open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; module Rel; cons-≤; Same; same; φ≡; nl→; Scope; module Scope; Rows; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; ψ; π; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Lvl; Cut;
-  at-frame; at-step; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
+  using (Ren; ψ; π; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
+  Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
   Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh;
   Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
   tab-flat)
@@ -113,21 +112,12 @@ postulate
   -- image is, and before both sources' subscriptions.  By induction on
   -- the link: each creator lies in an earlier instant than the position
   -- it creates.
-  cut-body : ∀ {p p*} → Linked p p* → Cut (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
-
-  -- A ROW NOT OVER THE CUT STAYS CUT ALIKE ONE LABEL DOWN.  Order
-  -- arithmetic: past the cut exactly when its parent is, since nothing
-  -- strictly between a position and its child lies outside the position.
-  lvl-sub : ∀ {q q* y y*} → Lvl q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Lvl q q* y (y* ⊕ [ l ])
+  cut-body : ∀ {p p*} → Linked p p* → Cut true (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
 
   -- A position at or past `p* ⊕ [ix 1] ⊕ [ix 1]` is not over
   -- `p* ⊕ [ix 0]`: what is over it precedes it, and it precedes the
   -- source.
   past-src : ∀ {p* y*} → (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) ≼ y* → ¬ (y* ⊑ (p* ⊕ [ ix 0 ]))
-
-cut-sub : ∀ {q q* y y*} → Cut q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut q q* y (y* ⊕ [ l ])
-cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
-cut-sub {y* = y*} (at-step v a b c) n l = at-step (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b) c
 
 -- A record holds under any guard no weaker than its own.
 rel-≤ : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s*} {S S′ : Scope}
@@ -167,23 +157,26 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     -- the source's alike, each creator chain compared at its own levels.
     conn-old-cut : (Rs : Src) → ∀ {X} (j : X ∈ Γ) n′ q q* (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) (lk : Linked q q*)
                  → let R = Out.rel (hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk) in
-                   ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e → ¬ Rel.Late R N k
+                   ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → T (shownᵇ e)
                  → ∀ N′ → Alike (Ψ′ Rs (here refl) N′) (Rows (hotOf (σ N′))) k (Rel.φ R N k)
 
   -- An old hot is read as before; its rows cut the new hot alike.
   old : (Rs : Src) → ∀ {X} (j : X ∈ Γ) → HotR (there j) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
   old Rs j n′ q q* ad ad* al lk = rel-≤ proj₂ proj₂ (Out.rel O) ⊢ record
-    { linked = Rest.linked (Out.rest O)
-    ; cuts   = cuts′
-    ; seen   = λ al′ → Rest.seen (Out.rest O) (λ i → al′ (there i))
+    { linked    = Rest.linked (Out.rest O)
+    ; cuts      = cuts′
+    ; self      = Rest.self (Out.rest O)
+    ; self-at   = Rest.self-at (Out.rest O)
+    ; self-flat = Rest.self-flat (Out.rest O)
+    ; seen      = λ al′ → Rest.seen (Out.rest O) (λ i → al′ (there i))
     }
     where
       O = hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk
 
-      cuts′ : ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → Unpinned e → ¬ Rel.Late (Out.rel O) N k
+      cuts′ : ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → T (shownᵇ e)
             → Aligned (Ψ′ Rs) ρ′ k (Rel.φ (Out.rel O) N k)
-      cuts′ N x un nl (here refl) N′ = conn-old-cut Rs j n′ q q* ad ad* al lk N x un nl N′
-      cuts′ N x un nl (there i)   N′ = Rest.cuts (Out.rest O) N x un nl i N′
+      cuts′ N x sh (here refl) N′ = conn-old-cut Rs j n′ q q* ad ad* al lk N x sh N′
+      cuts′ N x sh (there i)   N′ = Rest.cuts (Out.rest O) N x sh i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
   env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)

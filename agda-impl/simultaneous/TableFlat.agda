@@ -648,12 +648,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     trig-cuts {N} R {c} cx lt =
       aligned-past {Ψ = maps env} {ρ = ρ} alL
         (≼-trans {laneL stE} {laneX stE} {Rel.φ (Out.rel lane) N c} (≼-ˡ (laneL stE) (laneXt stE)) (Rel.after-φ (Out.rel lane) cx tt (end-nl R cx)))
-        lt (⊑-⊕ˡ (laneL stE) (trigXs stE)) (trig-inst R cx lt) (Rest.cuts (Out.rest lane) N cx tt (end-nl R cx))
+        lt (⊑-⊕ˡ (laneL stE) (trigXs stE)) (trig-inst R cx lt) (Rest.cuts (Out.rest lane) N cx tt)
       where open LaneRec R
 
     end-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Aligned (maps env) ρ c (LaneRec.endφ R c)
     end-cuts {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
-    ... | inj₁ (eq , _)  = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt (end-nl R cx))
+    ... | inj₁ (eq , _)  = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt)
     ... | inj₂ (eq , lt) = subst (Aligned (maps env) ρ c) (sym eq) (trig-cuts R cx lt)
 
     end-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Linked c (LaneRec.endφ R c)
@@ -677,7 +677,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ad₀* : Admits Dc st
         ad₀* = admits-row n eachS uρ*c Dc ad₁ (each-row x)
         alL : Aligned (maps env) ρ (q ⊕ [ ix 1 ]) (laneL st)
-        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt nlx) (ix 1) (sub c₁))
+        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁))
                 (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
     -- A value's lane, queued under the end of the lane it waited on: that

@@ -11,17 +11,17 @@
 -- THEIR MAPS.  A flatMap's lane is subscribed past its creator, a row of
 -- the source, so it cuts each hot in scope where that row falls among
 -- the hot's rows.  So the record carries, past the correspondence itself
--- (`Rest`): every row is linked to its image, every row cuts every hot in
--- scope alike with its image, the rows cut the stream's own rows alike
--- just under each, and every pair cutting the subscription alike from
--- before it cuts the stream's rows alike.
+-- (`Rest`): every row is linked to its image, every shown row cuts every
+-- hot in scope and the stream's own rows of every cut alike with its
+-- image, and every pair cutting the subscription alike from before it
+-- cuts the stream's rows alike.
 --
 -- An alike cut is checked up an instant's creators too (`Cut`): two
 -- steps of one tick are ordered by their timers' creators, so a row of a
 -- later instant is ordered against a hot's row by where the creators lie.
 module simultaneous.TableEnv where
 
-open import Data.Bool using (T)
+open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -36,17 +36,17 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
-open import Function using (_⇔_; mk⇔; Equivalence)
+open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected; of)
 open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix; sub; last)
-open import denotation.Events using (Timeline; fresh; <ᵖ-part)
+open import denotation.Events using (Timeline; fresh; <ᵖ-part; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter; Proper; module Op; at-out; at-end; on-out)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (AgreeTo; AgreeTo-sym; ag-down; ≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; Ok; InvAt; GoodEnv; Hots; Lawful; _∪ʰ_; ok-step;
+open import denotation.Laws.Modulus using (AgreeTo; AgreeTo-sym; ag-down; ≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl; ≼-or-≻; ≼-false)
+open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; Ok; InvAt; GoodEnv; Hots; Lawful; _∪ʰ_; ok-step;
   W; W⁼; step; timer; join; here; inW; Real; real-snoc; real-sub; plain-ix; shrink; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Count using (child)
@@ -142,17 +142,33 @@ data Linked : Pos → Pos → Set where
            → c ≺ y → c* ≺ y* → ¬ (instantOf c ≡ instantOf y) → ¬ (instantOf c* ≡ instantOf y*)
            → Linked c c* → Linked y y*
 
+-- An event a reader shows: a value or an end.
+shownᵇ : ∀ {X : Set} → ES.Ev X → Bool
+shownᵇ (out _) = true
+shownᵇ ES.end  = true
+shownᵇ _       = false
+
 -- A position seen from one subscription as its image is from the other:
--- past the one exactly when past the other, in its instant exactly when
--- the image is in the other's, and under neither.
-Lvl : Pos → Pos → Pos → Pos → Set
-Lvl q q* y y* = (q ≺ y ⇔ q* ≺ y*) × (instantOf y ≡ instantOf q ⇔ instantOf y* ≡ instantOf q*) × ¬ (q ⊑ y) × ¬ (q* ⊑ y*)
+-- the image past the other when the position is past the one, and,
+-- where the position is shown (`b`), back; in its instant exactly when
+-- the image is in the other's; and under neither.
+--
+-- An unshown position need not come back.  A cut that truncates a lane
+-- shows a flatMap's outer end as a skip where a longer cut shows its
+-- end, and a reader images the two apart: the end at the annotation's
+-- end, under `ix 1`, the skip under its own `sub`.  So a row of one cut
+-- whose image lies between the two is past the skip's image though not
+-- past its position.  What such a skip's image is past, the reader's
+-- elaborated table shows only as an unshown row.
+Lvl : Bool → Pos → Pos → Pos → Pos → Set
+Lvl b q q* y y* = (q ≺ y → q* ≺ y*) × (T b → q* ≺ y* → q ≺ y) × (instantOf y ≡ instantOf q ⇔ instantOf y* ≡ instantOf q*)
+                × ¬ (q ⊑ y) × ¬ (q* ⊑ y*)
 
 -- And so every creator up its instants, each step of one tick and label.
-data Cut (q q* : Pos) : Pos → Pos → Set where
-  at-frame : ∀ {y y*} → Lvl q q* y y* → instantOf y ≡ frame → instantOf y* ≡ frame → Cut q q* y y*
-  at-step  : ∀ {y y* t c c* l} → Lvl q q* y y* → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l
-           → Cut q q* c c* → Cut q q* y y*
+data Cut (b : Bool) (q q* : Pos) : Pos → Pos → Set where
+  at-frame : ∀ {y y*} → Lvl b q q* y y* → instantOf y ≡ frame → instantOf y* ≡ frame → Cut b q q* y y*
+  at-step  : ∀ {y y* t c c* l} → Lvl b q q* y y* → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l
+           → Cut true q q* c c* → Cut b q q* y y*
 
 -- A run's map onto its elaborated run: each row's image, each row's late
 -- placements, and its late rows.
@@ -169,8 +185,8 @@ open HotMap public
 record Alike {X : Set} (h : HotMap) (t : EmissionSet X) (q q* : Pos) : Set where
   constructor alike
   field
-    cut     : ∀ {k e} → t k e → Unpinned e → ¬ late h k → Cut q q* k (ψ h k)
-    cut-put : ∀ {k e l} → t k e → π h k l → Cut q q* k l
+    cut     : ∀ {k e} → t k e → Unpinned e → ¬ late h k → Cut (shownᵇ e) q q* k (ψ h k)
+    cut-put : ∀ {k e l} → t k e → π h k l → Cut false q q* k l
 open Alike public
 
 ------------------------------------------------------------------------
@@ -186,27 +202,54 @@ private
   up⊑ : ∀ v l {y} → (v ⊕ [ l ]) ⊑ y → v ⊑ y
   up⊑ v l (zs , refl) = l ∷ zs , ⊕-assoc v [ l ] zs
 
-lvl-l : ∀ {q q* y y*} → Lvl q q* y y* → ∀ l → Lvl (q ⊕ [ l ]) q* y y*
-lvl-l {q} {q*} {y} {y*} (lt , ie , nq , nq*) l =
-  mk⇔ (λ h → Equivalence.to lt (≺-trans {q} {q ⊕ [ l ]} {y} (≺-ext q []) h))
-      (λ h → down q l (Equivalence.from lt h) nq)
+lvl-l : ∀ {b q q* y y*} → Lvl b q q* y y* → ∀ l → Lvl b (q ⊕ [ l ]) q* y y*
+lvl-l {b} {q} {q*} {y} {y*} (to , fr , ie , nq , nq*) l =
+  (λ h → to (≺-trans {q} {q ⊕ [ l ]} {y} (≺-ext q []) h))
+  , (λ t h → down q l (fr t h) nq)
   , subst₂ (λ a b → instantOf y ≡ a ⇔ instantOf y* ≡ b) (sym (inst-⊕ q [ l ])) refl ie
   , (λ u → nq (up⊑ q l u)) , nq*
 
-lvl-r : ∀ {q q* y y*} → Lvl q q* y y* → ∀ l* → Lvl q (q* ⊕ [ l* ]) y y*
-lvl-r {q} {q*} {y} {y*} (lt , ie , nq , nq*) l* =
-  mk⇔ (λ h → down q* l* (Equivalence.to lt h) nq*)
-      (λ h → Equivalence.from lt (≺-trans {q*} {q* ⊕ [ l* ]} {y*} (≺-ext q* []) h))
+lvl-r : ∀ {b q q* y y*} → Lvl b q q* y y* → ∀ l* → Lvl b q (q* ⊕ [ l* ]) y y*
+lvl-r {b} {q} {q*} {y} {y*} (to , fr , ie , nq , nq*) l* =
+  (λ h → down q* l* (to h) nq*)
+  , (λ t h → fr t (≺-trans {q*} {q* ⊕ [ l* ]} {y*} (≺-ext q* []) h))
   , subst₂ (λ a b → instantOf y ≡ a ⇔ instantOf y* ≡ b) refl (sym (inst-⊕ q* [ l* ])) ie
   , nq , (λ u → nq* (up⊑ q* l* u))
 
-cut-l : ∀ {q q* y y*} → Cut q q* y y* → ∀ l → Cut (q ⊕ [ l ]) q* y y*
+cut-l : ∀ {b q q* y y*} → Cut b q q* y y* → ∀ l → Cut b (q ⊕ [ l ]) q* y y*
 cut-l (at-frame v a b)   l = at-frame (lvl-l v l) a b
 cut-l (at-step v a b c)  l = at-step (lvl-l v l) a b (cut-l c l)
 
-cut-r : ∀ {q q* y y*} → Cut q q* y y* → ∀ l* → Cut q (q* ⊕ [ l* ]) y y*
+cut-r : ∀ {b q q* y y*} → Cut b q q* y y* → ∀ l* → Cut b q (q* ⊕ [ l* ]) y y*
 cut-r (at-frame v a b)   l* = at-frame (lvl-r v l*) a b
 cut-r (at-step v a b c)  l* = at-step (lvl-r v l*) a b (cut-r c l*)
+
+-- A ROW NOT OVER THE CUT STAYS CUT ALIKE ONE LABEL DOWN: nothing strictly
+-- between a position and its child lies outside the position.
+lvl-sub : ∀ {b q q* y y*} → Lvl b q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Lvl b q q* y (y* ⊕ [ l ])
+lvl-sub {b} {q} {q*} {y} {y*} (to , fr , ie , nq , nq*) ny l =
+  (λ h → ≺-trans {q*} {y*} {y* ⊕ [ l ]} (to h) (≺-ext y* []))
+  , (λ t h → fr t (back h))
+  , subst (λ a → instantOf y ≡ instantOf q ⇔ a ≡ instantOf q*) (sym (inst-⊕ y* [ l ])) ie
+  , nq , nsub
+  where
+    nsub : ¬ (q* ⊑ (y* ⊕ [ l ]))
+    nsub u with ⊑-snoc y* u
+    ... | inj₁ v  = nq* v
+    ... | inj₂ eq = ny (subst (y* ⊑_) (sym eq) (⊑-snoc⁺ y*))
+
+    back : q* ≺ (y* ⊕ [ l ]) → q* ≺ y*
+    back h with ≼-or-≻ q* y*
+    ... | inj₂ yq with child l yq
+    ...   | inj₁ u  = ⊥-elim (ny u)
+    ...   | inj₂ lt = ⊥-elim (≺-absurd {q*} {y* ⊕ [ l ]} h lt)
+    back h | inj₁ qy with <ᵖ-split q* y* (≼-false {q*} {y*} qy)
+    ... | inj₁ lt   = Equivalence.from T-≡ lt
+    ... | inj₂ refl = ⊥-elim (nq* (⊑-refl q*))
+
+cut-sub : ∀ {b q q* y y*} → Cut b q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut b q q* y (y* ⊕ [ l ])
+cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
+cut-sub {y* = y*} (at-step v a b c) n l = at-step (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b) c
 
 alike-l : ∀ {X : Set} {h : HotMap} {t : EmissionSet X} {q q*} → Alike h t q q* → ∀ l → Alike h t (q ⊕ [ l ]) q*
 alike-l a l = alike (λ x un nl → cut-l (cut a x un nl) l) (λ x pl → cut-l (cut-put a x pl) l)
@@ -233,27 +276,27 @@ under-past {v} {y = y} (zs , refl) = go v zs
     go w []       lt nw = subst (_≺ y) (sym (⊕-identityʳ w)) lt
     go w (l ∷ ws) lt nw = subst (_≺ y) (⊕-assoc w [ l ] ws) (go (w ⊕ [ l ]) ws (down w l lt nw) (λ u → nw (up⊑ w l u)))
 
-lvl-past : ∀ {q q* y y* L z} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z → ¬ (L ⊑ y*)
-         → Lvl q q* y y* → Lvl q z y y*
-lvl-past {q} {q*} {y} {y*} {L} {z} Lq qz Lz iz nL (lt , ie , nq , _) =
-  mk⇔ (λ h → under-past Lz (≼-≺-≺ {L} {q*} {y*} Lq (Equivalence.to lt h)) nL)
-      (λ h → Equivalence.from lt (≺-trans {q*} {z} {y*} qz h))
+lvl-past : ∀ {b q q* y y* L z} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z → ¬ (L ⊑ y*)
+         → Lvl b q q* y y* → Lvl b q z y y*
+lvl-past {b} {q} {q*} {y} {y*} {L} {z} Lq qz Lz iz nL (to , fr , ie , nq , _) =
+  (λ h → under-past Lz (≼-≺-≺ {L} {q*} {y*} Lq (to h)) nL)
+  , (λ t h → fr t (≺-trans {q*} {z} {y*} qz h))
   , subst (λ a → instantOf y ≡ instantOf q ⇔ instantOf y* ≡ a) iz ie
   , nq , (λ u → nL (⊑-trans Lz u))
 
 private
-  lead : ∀ {s L y y*} → Cut s L y y* → ¬ (L ⊑ y*)
-  lead (at-frame (_ , _ , _ , n) _ _)  = n
-  lead (at-step (_ , _ , _ , n) _ _ _) = n
+  lead : ∀ {b s L y y*} → Cut b s L y y* → ¬ (L ⊑ y*)
+  lead (at-frame (_ , _ , _ , _ , n) _ _)  = n
+  lead (at-step (_ , _ , _ , _ , n) _ _ _) = n
 
-  creator : ∀ {s L y y* t c c* l} → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l → Cut s L y y* → Cut s L c c*
+  creator : ∀ {b s L y y* t c c* l} → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l → Cut b s L y y* → Cut true s L c c*
   creator a _ (at-frame _ a′ _) with trans (sym a) a′
   ... | ()
   creator a b (at-step _ a′ b′ C) with trans (sym a) a′ | trans (sym b) b′
   ... | refl | refl = C
 
-cut-past : ∀ {q q* s L z y y*} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z
-         → Cut q q* y y* → Cut s L y y* → Cut q z y y*
+cut-past : ∀ {b b′ q q* s L z y y*} → L ≼ q* → q* ≺ z → L ⊑ z → instantOf q* ≡ instantOf z
+         → Cut b q q* y y* → Cut b′ s L y y* → Cut b q z y y*
 cut-past Lq qz Lz iz (at-frame v a b)  C′ = at-frame (lvl-past Lq qz Lz iz (lead C′) v) a b
 cut-past Lq qz Lz iz (at-step v a b C) C′ = at-step (lvl-past Lq qz Lz iz (lead C′) v) a b (cut-past Lq qz Lz iz C (creator a b C′))
 
@@ -535,15 +578,28 @@ scopeOf ρ ρι ρ* = record
 relMap : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S} → Rel P Q p p* S → ℕ → HotMap
 relMap {Q = Q} R N = hotMap (Rel.φ R N) (λ k l → Rel.Put R N k l × Σ _ λ e′ → TR (Q N) l e′) (Rel.Late R N)
 
--- Every row not late linked to its image and cutting every hot in scope
--- alike with it; and every pair before the subscription, cutting it
+-- A table's rows but those under a position.
+Off : ∀ {X : Set} → Pos → EmissionSet X → EmissionSet X
+Off k t y e = t y e × ¬ (k ⊑ y)
+
+-- Every row not late linked to its image; every shown row cutting every
+-- hot in scope alike with it, and the stream's own rows of every cut
+-- but those under it, which no cut has; a shown row's image one in every
+-- cut showing it; and every pair before the subscription, cutting it
 -- alike, cuts the stream's rows alike.
+--
+-- The stream's own rows are what a reader of it reads once a connect
+-- shares it, so a reader's shown row cuts that hot alike by the source's
+-- `self`, carried one label down.
 record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S}
             (R : Rel P Q p p* S) : Set₁ where
   field
-    linked : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Linked k (Rel.φ R N k)
-    cuts   : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Aligned Ψ ρ k (Rel.φ R N k)
-    seen   : ∀ {q q*} → Aligned Ψ ρ q q* → Cut q q* p p* → q ≺ p → ∀ N → Alike (relMap R N) (TR (P N)) q q*
+    linked    : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Linked k (Rel.φ R N k)
+    cuts      : ∀ N {k e} → TR (P N) k e → T (shownᵇ e) → Aligned Ψ ρ k (Rel.φ R N k)
+    self      : ∀ N {k e} → TR (P N) k e → T (shownᵇ e) → ∀ N′ → Alike (relMap R N′) (Off k (TR (P N′))) k (Rel.φ R N k)
+    self-at   : ∀ {N N′ k e e′} → TR (P N) k e → T (shownᵇ e) → TR (P N′) k e′ → T (shownᵇ e′) → Rel.φ R N k ≡ Rel.φ R N′ k
+    self-flat : ∀ {N N′ k e l ys e′} → TR (P N) k e → T (shownᵇ e) → TR (P N′) (k ⊕ (l ∷ ys)) e′ → ⊥
+    seen      : ∀ {q q*} → Aligned Ψ ρ q q* → Cut true q q* p p* → q ≺ p → ∀ N → Alike (relMap R N) (TR (P N)) q q*
 
 record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ)
            (Ψ : Maps Γ) (p p* : Pos) : Set₁ where
