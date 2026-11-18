@@ -52,7 +52,7 @@ open import simultaneous.TableEnv
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
   Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
-open import simultaneous.TableRows using (rejoin-in)
+open import simultaneous.TableRows using (rejoin-in; toT)
 open import simultaneous.LaneEndSched using (emitAt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -175,9 +175,6 @@ shown-unpin (pin _) ()
 ... | inj₂ e = ⊥-elim (≺-irrefl {y} (subst (y ≺_) (sym (trans e eq)) (≺-ext y {l} ys)))
 
 private
-  onT : ∀ {b} → b ≡ true → T b
-  onT refl = tt
-
   false≢true : ¬ (false ≡ true)
   false≢true ()
 
@@ -191,13 +188,13 @@ RjRow {X} q L k e = (Σ Pos λ h → Σ (Ev X) λ e₀ → (h , e₀) ∈ rows L
 rejoin-inv : ∀ {X : Set} q (L : Tb.Listed X) {k e} → (k , e) ∈ rows (Tb.rejoin q L) → RjRow q L k e
 rejoin-inv q (rs ⊣ _) m with cm⁻ {f = Tb.rejoinRow q} {xs = rs} m
 ... | ((h , out a) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , out a)} w
-...   | (b , refl) = inj₁ (h , out a , hm , onT b , refl , refl)
+...   | (b , refl) = inj₁ (h , out a , hm , toT b , refl , refl)
 rejoin-inv q (rs ⊣ _) m | ((h , skip) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , skip , hm , onT b , refl , refl)
+...   | (b , refl) = inj₁ (h , skip , hm , toT b , refl , refl)
 rejoin-inv q (rs ⊣ _) m | ((h , pin r) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , pin r , hm , onT b , refl , refl)
+...   | (b , refl) = inj₁ (h , pin r , hm , toT b , refl , refl)
 rejoin-inv q (rs ⊣ _) m | ((h , end) , hm , w) with if⁻ {b = q <ᵖ h} w
-...   | inj₁ (b , here refl) = inj₁ (h , end , hm , onT b , refl , refl)
+...   | inj₁ (b , here refl) = inj₁ (h , end , hm , toT b , refl , refl)
 ...   | inj₁ (_ , there ())
 ...   | inj₂ (b , here refl) = inj₂ (h , hm , offT b , refl , refl)
 ...   | inj₂ (_ , there ())
