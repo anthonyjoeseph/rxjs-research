@@ -18,7 +18,7 @@ open import Data.Maybe using (Maybe; just; nothing; maybe)
 import Data.Maybe.Relation.Binary.Pointwise as MP
 open MP using (just; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (_,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 open import Relation.Nullary using (does; ¬_)

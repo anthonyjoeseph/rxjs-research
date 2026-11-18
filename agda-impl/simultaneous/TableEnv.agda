@@ -296,12 +296,12 @@ squeeze {a} {b} {c} ab bc e with triⁱ (instantOf b) (instantOf c)
 -- Each cut's hots listed exactly off a lawful environment, so a table's
 -- func and flat are its denotation's, read at an admissible subscription.
 --
+-- Each hot's connect subscribes its body first (`lo`): a reader of the
+-- hot is one of the body's, subscribed at or past it.
+--
 -- DEAD ROUTE: func and flat over an arbitrary aligned environment.  A hot
 --   row the alignment exempts may sit in the subscription's world, and the
 --   table then lists rows the invariant does not cover.
---
--- Each hot's connect subscribes its body first (`lo`): a reader of the
--- hot is one of the body's, subscribed at or past it.
 record DenOf {Γ} (ρ : ℕ → All Tb.Listed Γ) : Set₁ where
   constructor denOf
   field
@@ -509,10 +509,6 @@ aligned-past aL Lq qz Lz iz al i N =
 AllIx : (Γ : List Set) → (∀ {X} → X ∈ Γ → Set) → Set
 AllIx []      P = ⊤
 AllIx (X ∷ Γ) P = P (here refl) × AllIx Γ (λ i → P (there i))
-
-ix-at : ∀ {Γ} {P : ∀ {X} → X ∈ Γ → Set} → AllIx Γ P → ∀ {X} (i : X ∈ Γ) → P i
-ix-at (p , _)  (here refl) = p
-ix-at (_ , ps) (there i)   = ix-at ps i
 
 ix-map : ∀ {Γ} {P Q : ∀ {X} → X ∈ Γ → Set} → (∀ {X} {i : X ∈ Γ} → P i → Q i) → AllIx Γ P → AllIx Γ Q
 ix-map {[]}    f _        = tt

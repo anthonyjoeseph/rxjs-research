@@ -23,7 +23,7 @@ module simultaneous.TableRel where
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
@@ -43,17 +43,18 @@ open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_)
-open import quickcheck.Tabled.Exact.Base using (when⁻)
+open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
-open import simultaneous.Listing using (listC-ok; UncutEnv)
+open import simultaneous.Listing using (UncutEnv)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; module Rel; cons-≤; Same; same; φ≡; nl→; Scope; module Scope; Rows; TR; Corr; Cons; Got; keys; in-keys)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; HotMap; hotMap; ψ; π; relMap; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; _⊕ˡ_; Linked; Lvl; Cut; at-frame; at-step; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r;
-         Maps; Aligned; aligned-⊕;
-         Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot; listHot-u; unended; den-cons; tab-func; tab-flat)
+  using (Ren; ψ; π; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Lvl; Cut;
+  at-frame; at-step; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
+  Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh;
+  Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
+  tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab; take-cong)
@@ -64,6 +65,7 @@ open import simultaneous.TableOf using (of-tab)
 open import simultaneous.TableCold using (cold-tab)
 open import simultaneous.TableLayers using (flat-rel; flat-coh)
 open import simultaneous.TableFlat using (if-≡)
+open import simultaneous.TableHot using (reader*; module ConnEnv; conn-hot; conn-hot-coh)
 open import simultaneous.InstEmit using (instEmit; value)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -105,19 +107,6 @@ postulate
 ------------------------------------------------------------------------
 -- The connect
 
--- The annotated hot rows: the elaborated source's own, rejoined under the
--- reader that the annotation's concat subscribes first.
-reader* : Pos → Pos
-reader* p* = p* ⊕ˡ (ix 1 ∷ ix 0 ∷ ix 0 ∷ ix 1 ∷ [])
-
--- A hot's proper rows are among its rows.
-proper⊆ : ∀ {X} es (rs : List (Row X)) {r} → r ∈ properAt es rs → r ∈ rs
-proper⊆ es []             ()
-proper⊆ es ((q , e) ∷ rs) m with ∈-++⁻ _ m
-... | inj₂ h = there (proper⊆ es rs h)
-... | inj₁ h with when⁻ {b = allᵇ (q ≼ᵇ_) es} {x = (q , e)} h
-...   | (_ , refl) = here refl
-
 postulate
   -- THE BODY CUTS ITS SOURCE ALIKE.  Subscribed first, at the first
   -- label, the body is past each creator up its instant exactly as its
@@ -139,88 +128,6 @@ postulate
 cut-sub : ∀ {q q* y y*} → Cut q q* y y* → ¬ (y* ⊑ q*) → ∀ l → Cut q q* y (y* ⊕ [ l ])
 cut-sub {y* = y*} (at-frame v a b)  n l = at-frame (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b)
 cut-sub {y* = y*} (at-step v a b c) n l = at-step (lvl-sub v n l) a (trans (inst-⊕ y* [ l ]) b) c
-
--- THE CONNECT'S SCOPE: the source subscribed under the connect's second
--- label, its two hots listed off it, and the maps a body reads them by.
--- The elaborated source is annotated, one label deeper.
-module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
-  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (env : EnvR ρ ρι ρ*) (p p* : Pos) (a : Admits (lw env) p) (a* : Admits (lw* env) p*) where
-
-  -- The two sources' tables, listed in full.
-  σ : ℕ → Tb.Listed A
-  σ N = proj₁ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))
-
-  σ* : ℕ → Tb.Listed (AIE A)
-  σ* N = proj₁ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))
-
-  ρ′ : ℕ → All Tb.Listed (A ∷ Γ)
-  ρ′ N = hotOf (σ N) ∷ ρ N
-
-  ρ*′ : ℕ → All Tb.Listed (AIE A ∷ Δ)
-  ρ*′ N = hotOf (σ* N) ∷ ρ* N
-
-  uρ′ : ∀ N → UncutEnv (ρ′ N)
-  uρ′ N = proj₂ (proj₂ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))) , uρ N
-
-  uρ*′ : ∀ N → UncutEnv (ρ*′ N)
-  uρ*′ N = proj₂ (proj₂ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))) , uρ* N
-
-  Src : Set₁
-  Src = Out n s ρ ρι ρ* (maps env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
-
-  -- The two hots, each listed off its lawful source.
-  hD = listHot n s uρ (lw env) p a
-  hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
-  D′ = den-cons hD (lw env)
-  D*′ = den-cons hD* (lw* env)
-
-  -- The source's hot maps each row to its annotated image, each late
-  -- placement to its annotated one; its late rows are the source's.
-  srcMap : Src → ℕ → HotMap
-  srcMap Rs N = hotMap (λ k → Rel.φ (Out.rel Rs) N k ⊕ [ sub (reader* p*) ])
-                       (λ k l′ → Σ Pos λ l → π (relMap (Out.rel Rs) N) k l × l′ ≡ l ⊕ [ sub (reader* p*) ])
-                       (Rel.Late (Out.rel Rs) N)
-
-  Ψ′ : Src → Maps (A ∷ Γ)
-  Ψ′ Rs (here refl) = srcMap Rs
-  Ψ′ Rs (there j)   = maps env j
-
-  -- A source row is a row of the source's table.
-  src-row : ∀ N {k e} → Rows (hotOf (σ N)) k e → TR (Tab n s ρ (p ⊕ [ ix 1 ]) N) k e
-  src-row N x = σ N , proj₁ (proj₂ (listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]))) , proper⊆ (ends (rows (σ N))) (rows (σ N)) x
-
-  -- The new hot, read by a body subscribed in this scope.
-  HotS : Src → Set₁
-  HotS Rs = HotR (here refl) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
-
-postulate
-  -- THE CONNECT'S HOT: the elaborated source annotated, each value at
-  -- its source image rejoined under the annotation's reader; two
-  -- readers correspond wherever they cut it alike.
-  conn-hot : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
-               (env : EnvR ρ ρι ρ*) p p* (a : Admits (lw env) p) (a* : Admits (lw* env) p*)
-           → (Rs : ConnEnv.Src n s ρ uρ ρι ρ* uρ* env p p* a a*) → ConnEnv.HotS n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
-
--- THE HOT'S MAP IS ITS SOURCE'S: two scopes whose sources map alike and
--- are late alike give their hots one map and late rows, however the
--- scopes and the readers are admitted.
-module ConnTwo {Γ A} n (s : Obs Timeline Γ A)
-  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (E E′ : EnvR ρ ρι ρ*) (p p* : Pos) (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*) where
-  module C  = ConnEnv n s ρ uρ ρι ρ* uρ* E  p p* a  a*
-  module C′ = ConnEnv n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′
-
-  HotCoh : Set₁
-  HotCoh = (Rs : C.Src) (Rs′ : C′.Src) → (∀ N y → Same (Out.rel Rs) (Out.rel Rs′) N y)
-         → ∀ n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
-             (al : Aligned (C.Ψ′ Rs) C.ρ′ q q*) (al′ : Aligned (C′.Ψ′ Rs′) C′.ρ′ q q*) (lk lk′ : Linked q q*) N y
-         → Same (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs n′ q q* ad ad* al lk))
-                (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ n′ q q* ad′ ad*′ al′ lk′)) N y
-
-postulate
-  conn-hot-coh : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
-                   (E E′ : EnvR ρ ρι ρ*) p p* a a′ a* a*′ → ConnTwo.HotCoh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′
 
 -- A record holds under any guard no weaker than its own.
 rel-≤ : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s*} {S S′ : Scope}
