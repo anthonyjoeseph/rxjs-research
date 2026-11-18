@@ -17,9 +17,9 @@ module simultaneous.TakeCut where
 
 open import Data.Bool using (Bool; T; not)
 open import Data.Bool.Properties using (T-≡)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
@@ -44,8 +44,8 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 inst-⊕ : ∀ x ys → instantOf (x ⊕ ys) ≡ instantOf x
 inst-⊕ (_ ∙ _) _ = refl
 
-module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Pos → Pos} {Put : Pos → Pos → Set}
-  {t : EmissionSet A} {u : EmissionSet (IE A)} (C : Corr s s* φ Put t u) (R : Run t) (R* : Run u)
+module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Pos → Pos} {Put : Pos → Pos → Set} {Late : Pos → Set}
+  {t : EmissionSet A} {u : EmissionSet (IE A)} (C : Corr s s* φ Put Late t u) (R : Run t) (R* : Run u)
   (fin : ∀ q → Few t q) (fin* : ∀ q → Few u q)
   (dec : ∀ w → Dec (TakeWhile.Failed incl keep t w)) (dec* : ∀ w → Dec (TakeWhile.Failed incl (passes keep) u w))
   (φ′ : Pos → Pos) (φ-old : ∀ {k e} → t k e → φ′ k ≡ φ k)
@@ -75,6 +75,27 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   fst* = O*.first dec* fin*
 
   ----------------------------------------------------------------------
+  -- Late rows: the child's, which the take keeps where they are
+
+  Late′ : Pos → Set
+  Late′ k = Σ (Ev A) (t k) × Late k
+
+  -- A value is never late.
+  nl-out : ∀ {k a} → t k (out a) → ¬ Late k
+  nl-out x lt with C.late-put lt x
+  ... | () , _
+
+  nl-kept : ∀ {k e} → t k e → ¬ Late′ k → ¬ Late k
+  nl-kept x nl lt = nl ((_ , x) , lt)
+
+  nl-up : ∀ {k} → ¬ Late k → ¬ Late′ k
+  nl-up nl (_ , lt) = nl lt
+
+  -- A row made under a value is not the child's.
+  nl-new : ∀ {o a l} → t o (out a) → ¬ Late′ (o ⊕ [ l ])
+  nl-new x ((_ , x′) , _) = Run.flat R x x′
+
+  ----------------------------------------------------------------------
   -- Values read across
 
   vals-passes : ∀ {x a} → valuesOf x ≡ a ∷ [] → passes keep x ≡ keep a
@@ -91,7 +112,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   -- A plain value's image: a value read the same.
   img-out : ∀ {k a} → t k (out a) → Σ (IE A) λ x → u (φ k) (out x) × valuesOf x ≡ a ∷ []
   img-out x with C.row→ x tt
-  ... | inj₁ (e′ , y , m) with proj₁ m tt
+  ... | inj₁ ((e′ , y , m) , _) with proj₁ m tt
   ...   | x′ , refl , rd = x′ , y , rd
   img-out x | inj₂ (() , _)
 
@@ -99,38 +120,38 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   shown-fail : ∀ {l x} → u l (out x) → T (not (passes keep x))
              → Σ Pos λ k → Σ A λ a → l ≡ φ k × t k (out a) × T (not (keep a)) × valuesOf x ≡ a ∷ []
   shown-fail y nk with C.shown← y (fail-shown nk)
-  ... | k , e , eq , x , un , m with m-back un m (fail-shown nk)
+  ... | k , e , eq , x , un , _ , m with m-back un m (fail-shown nk)
   ...   | a , refl , rd = k , a , eq , x , subst (λ b → T (not b)) (vals-passes rd) nk , rd
 
   -- The map is one-to-one on unpinned rows.
-  φ-inj : ∀ {k k′ e e′} → t k e → t k′ e′ → Unpinned e → Unpinned e′ → φ k ≡ φ k′ → k ≡ k′
-  φ-inj {k} {k′} x x′ un un′ eq with ≼-or-≻ k k′
-  ... | inj₂ lt = ⊥-elim (≺-irrefl {φ k′} (subst (φ k′ ≺_) eq (C.mono x′ x un′ un lt)))
+  φ-inj : ∀ {k k′ e e′} → t k e → t k′ e′ → Unpinned e → Unpinned e′ → ¬ Late k → ¬ Late k′ → φ k ≡ φ k′ → k ≡ k′
+  φ-inj {k} {k′} x x′ un un′ nl nl′ eq with ≼-or-≻ k k′
+  ... | inj₂ lt = ⊥-elim (≺-irrefl {φ k′} (subst (φ k′ ≺_) eq (C.mono x′ x un′ un nl′ nl lt)))
   ... | inj₁ le with ≼-split {k} {k′} le
-  ...   | inj₁ lt = ⊥-elim (≺-irrefl {φ k′} (subst (_≺ φ k′) eq (C.mono x x′ un un′ lt)))
+  ...   | inj₁ lt = ⊥-elim (≺-irrefl {φ k′} (subst (_≺ φ k′) eq (C.mono x x′ un un′ nl nl′ lt)))
   ...   | inj₂ e  = e
 
   ----------------------------------------------------------------------
   -- A failure reflected across the map
 
-  fail→ : ∀ {k e} → t k e → Unpinned e → Failed k → W*.Failed (φ k)
-  fail→ x un (q , a , xq , nk , qk) with img-out xq
-  ... | x′ , y , rd = φ q , x′ , y , nk* rd nk , C.mono xq x tt un qk
+  fail→ : ∀ {k e} → t k e → Unpinned e → ¬ Late k → Failed k → W*.Failed (φ k)
+  fail→ x un nl (q , a , xq , nk , qk) with img-out xq
+  ... | x′ , y , rd = φ q , x′ , y , nk* rd nk , C.mono xq x tt un (nl-out xq) nl qk
 
-  fail← : ∀ {k e} → t k e → Unpinned e → W*.Failed (φ k) → Failed k
-  fail← {k} x un (l , x′ , y , nk , lt) with shown-fail y nk
+  fail← : ∀ {k e} → t k e → Unpinned e → ¬ Late k → W*.Failed (φ k) → Failed k
+  fail← {k} x un nl (l , x′ , y , nk , lt) with shown-fail y nk
   ... | k₀ , a , refl , x₀ , nk₀ , _ with ≼-or-≻ k k₀
   ...   | inj₂ k₀k = k₀ , a , x₀ , nk₀ , k₀k
   ...   | inj₁ kk₀ with ≼-split {k} {k₀} kk₀
-  ...     | inj₁ lt′ = ⊥-elim (≺-absurd {φ k} {φ k₀} (C.mono x x₀ un tt lt′) lt)
+  ...     | inj₁ lt′ = ⊥-elim (≺-absurd {φ k} {φ k₀} (C.mono x x₀ un tt nl (nl-out x₀) lt′) lt)
   ...     | inj₂ refl = ⊥-elim (≺-irrefl {φ k} lt)
 
   -- A kept plain row's image holds no failing value.
-  img-nofail : ∀ {k e} → t k e → Unpinned e → O.NoFail k → O*.NoFail (φ k)
-  img-nofail x un nf {x′} y with Te.dec-keep x′
+  img-nofail : ∀ {k e} → t k e → Unpinned e → ¬ Late k → O.NoFail k → O*.NoFail (φ k)
+  img-nofail x un nl nf {x′} y with Te.dec-keep x′
   ... | inj₁ p  = p
   ... | inj₂ nk with shown-fail y nk
-  ...   | k₀ , a , eq , x₀ , nk₀ , _ with φ-inj x x₀ un tt eq
+  ...   | k₀ , a , eq , x₀ , nk₀ , _ with φ-inj x x₀ un tt nl (nl-out x₀) eq
   ...     | refl = ⊥-elim (T-not (nf x₀) nk₀)
 
   -- A kept plain row lies before every failing value.
@@ -145,7 +166,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   first-img : ∀ {f x o a} → u f (out x) → T (not (passes keep x)) → ¬ W*.Failed f
             → t o (out a) → T (not (keep a)) → ¬ Failed o → f ≡ φ o
   first-img y nk nF* x nk₀ nF with shown-fail y nk
-  ... | k , a , eq , xk , nkk , _ with O.first-uniq xk nkk (λ F → nF* (subst W*.Failed (sym eq) (fail→ xk tt F))) x nk₀ nF
+  ... | k , a , eq , xk , nkk , _ with O.first-uniq xk nkk (λ F → nF* (subst W*.Failed (sym eq) (fail→ xk tt (nl-out xk) F))) x nk₀ nF
   ...   | refl = eq
 
   ----------------------------------------------------------------------
@@ -156,7 +177,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
 
   Homed′ : Pos → Set
   Homed′ k = instantOf k ≡ instantOf s
-           ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → TT k₀ e₀ × Unpinned e₀ × Imaged′ k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+           ⊎ Σ Pos λ k₀ → Σ (Ev A) λ e₀ → TT k₀ e₀ × Unpinned e₀ × ¬ Late′ k₀ × Imaged′ k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
   Leads′ : Pos → Set
   Leads′ k = ∀ {k′ e′} → TT k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
@@ -170,20 +191,20 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   Put′ k l = Σ (Ev A) (TT k) × ¬ Failed k
            × ((Put k l × Σ (Ev (IE A)) (u l)) ⊎ Σ Pos λ y → Put k y × Failing* y × l ≡ y ⊕ [ lab incl ])
 
-  kept-img : ∀ {k e} → t k e → Unpinned e → ¬ Failed k → O.NoFail k → C.Imaged k e → Imaged′ k e
-  kept-img {k} x un nF nf (e′ , y , m) =
-    e′ , subst (λ z → UU z e′) (sym (φ-old x)) (O*.keep-row y (λ F → nF (fail← x un F)) (img-nofail x un nf)) , m
+  kept-img : ∀ {k e} → t k e → Unpinned e → ¬ Late k → ¬ Failed k → O.NoFail k → C.Imaged k e → Imaged′ k e
+  kept-img {k} x un nl nF nf (e′ , y , m) =
+    e′ , subst (λ z → UU z e′) (sym (φ-old x)) (O*.keep-row y (λ F → nF (fail← x un nl F)) (img-nofail x un nl nf)) , m
 
   made-img : ∀ {o a l e} → t o (out a) → T (not (keep a)) → ¬ Failed o → Tp.Made a l e → Imaged′ (o ⊕ [ l ]) e
   made-img {o} x nk nF (Tp.at0 i) with img-out x
-  ... | x′ , y , rd = out x′ , subst (λ z → UU z (out x′)) (sym (φ-new x nk (inj₁ refl))) (W*.fail y (nk* rd nk) (λ F → nF (fail← x tt F)) i) , m-val rd
+  ... | x′ , y , rd = out x′ , subst (λ z → UU z (out x′)) (sym (φ-new x nk (inj₁ refl))) (W*.fail y (nk* rd nk) (λ F → nF (fail← x tt (nl-out x) F)) i) , m-val rd
   made-img {o} x nk nF Tp.atl with img-out x
-  ... | x′ , y , rd = end , subst (λ z → UU z end) (sym (φ-new x nk (inj₂ refl))) (W*.stop y (nk* rd nk) (λ F → nF (fail← x tt F))) , m-ee
+  ... | x′ , y , rd = end , subst (λ z → UU z end) (sym (φ-new x nk (inj₂ refl))) (W*.stop y (nk* rd nk) (λ F → nF (fail← x tt (nl-out x) F))) , m-ee
 
   homed′ : ∀ {k} → ¬ Failed k → C.Homed k → Homed′ k
   homed′ nF (inj₁ eq) = inj₁ eq
-  homed′ {k} nF (inj₂ (k₀ , e₀ , x , un , im , lt , ie)) =
-    inj₂ (k₀ , e₀ , O.keep-row x nF₀ nf₀ , un , kept-img x un nF₀ nf₀ im , lt , ie)
+  homed′ {k} nF (inj₂ (k₀ , e₀ , x , un , nl , im , lt , ie)) =
+    inj₂ (k₀ , e₀ , O.keep-row x nF₀ nf₀ , un , nl-up nl , kept-img x un nl nF₀ nf₀ im , lt , ie)
     where
       nF₀ : ¬ Failed k₀
       nF₀ F = nF (O.failed-≼ (≺→≼ {k₀} {k} lt) F)
@@ -197,7 +218,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ... | k₀ , a , refl , x₀ , nk₀ , _ with ≼-or-≻ k k₀
   ...   | inj₂ k₀k = nF (k₀ , a , x₀ , nk₀ , k₀k)
   ...   | inj₁ kk₀ with ≼-split {k} {k₀} kk₀
-  ...     | inj₁ lt′ = C.put-before x pl x₀ tt lt′ lt
+  ...     | inj₁ lt′ = C.put-before x pl x₀ tt (nl-out x₀) lt′ lt
   ...     | inj₂ refl with Run.func R x x₀
   ...       | ()
 
@@ -224,12 +245,12 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ----------------------------------------------------------------------
   -- The correspondence
 
-  row→′ : ∀ {k e} → TT k e → Unpinned e → Imaged′ k e ⊎ (e ≡ skip × ((Σ Pos λ l → Σ (Ev (IE A)) λ e′ → UU l e′ × Put′ k l) × Homed′ k))
+  row→′ : ∀ {k e} → TT k e → Unpinned e → (Imaged′ k e × ¬ Late′ k) ⊎ (e ≡ skip × ((Σ Pos λ l → Σ (Ev (IE A)) λ e′ → UU l e′ × Put′ k l) × Homed′ k))
   row→′ tk un with O.kind tk un
   ... | O.kept x nF nf with C.row→ x un
-  ...   | inj₁ im = inj₁ (kept-img x un nF nf im)
+  ...   | inj₁ (im , nl) = inj₁ (kept-img x un nl nF nf im , nl-up nl)
   ...   | inj₂ (refl , ((l , e′ , y , pl) , h)) = inj₂ (refl , put-at x nF pl y , homed′ nF h)
-  row→′ tk un | O.made x nk nF (l , refl , m) = inj₁ (made-img x nk nF m)
+  row→′ tk un | O.made x nk nF (l , refl , m) = inj₁ (made-img x nk nF m , nl-new x)
 
   pin→′ : ∀ {k p} → TT k (pin p) → Live TT k
         → (Σ Pos λ l → Σ Pos λ p′ → UU l (pin p′) × Put′ k l × (∀ {k₀ a} → TT k₀ (out a) → φ′ k₀ ≺ p′ → k₀ ≺ p)) × Homed′ k
@@ -249,42 +270,55 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       ... | O.made {o} {a} x₀ nk₀ _ (l₀ , refl , m) =
         ⊥-elim (nFp (o , a , x₀ , nk₀ , past x₀ (≺-trans {φ o} {φ o ⊕ [ l₀ ]} {p′} (≺-ext (φ o) []) (subst (_≺ p′) (φ-new x₀ nk₀ (Tp.made-lab m)) lt))))
 
-  put-before′ : ∀ {k l k′ e′} → TT k skip → Put′ k l → TT k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ′ k′
-  put-before′ tk (_ , nFk , br) tk′ un′ lt with O.kind tk tt
+  -- A row put late, a skip or a pin: no later than any later row's image.
+  module Before {k e} (x : t k e) (nfk : O.NoFail k) (nFk : ¬ Failed k)
+    (bef : ∀ {l k′ e′} → Put k l → t k′ e′ → Unpinned e′ → ¬ Late k′ → k ≺ k′ → l ≼ φ k′) where
+    before′ : ∀ {l k′ e′} → Put′ k l → TT k′ e′ → Unpinned e′ → ¬ Late′ k′ → k ≺ k′ → l ≼ φ′ k′
+    before′ (_ , _ , br) tk′ un′ nl′ lt with O.kind tk′ un′
+    before′ {l} (_ , _ , inj₁ (pl , _)) tk′ un′ nl′ lt | O.kept x′ _ _ =
+      subst (l ≼_) (sym (φ-old x′)) (bef pl x′ un′ (nl-kept x′ nl′) lt)
+    before′ (_ , _ , inj₂ (y , pl , (x* , yr , nk*) , refl)) tk′ un′ nl′ lt | O.kept x′ nF′ nf′ with shown-fail yr nk*
+    ... | kf , a , refl , xf , nkf , _ =
+      ⊥-elim (bef pl x′ un′ (nl-kept x′ nl′) lt (C.mono x′ xf un′ tt (nl-kept x′ nl′) (nl-out xf) (before-fail x′ nF′ nf′ xf nkf)))
+    before′ {l} (_ , _ , br) tk′ un′ nl′ lt | O.made {o} {a} x₀ nk₀ nF₀ (l₀ , refl , m) =
+      subst (l ≼_) (sym (φ-new x₀ nk₀ (Tp.made-lab m))) (go br)
+      where
+        ko : k ≺ o
+        ko = before-fail x nFk nfk x₀ nk₀
+
+        go : (Put k l × Σ (Ev (IE A)) (u l)) ⊎ (Σ Pos λ y → Put k y × Failing* y × l ≡ y ⊕ [ lab incl ]) → l ≼ (φ o ⊕ [ l₀ ])
+        go (inj₁ (pl , _)) = ≼-trans {l} {φ o} {φ o ⊕ [ l₀ ]} (bef pl x₀ tt (nl-out x₀) ko) (≺→≼ {φ o} {φ o ⊕ [ l₀ ]} (≺-ext (φ o) []))
+        go (inj₂ (y , pl , (x* , yr , nk*) , refl)) with shown-fail yr nk*
+        ... | kf , a′ , refl , xf , nkf , _ with ≼-or-≻ kf o
+        ...   | inj₂ okf = ⊥-elim (bef pl x₀ tt (nl-out x₀) ko (C.mono x₀ xf tt tt (nl-out x₀) (nl-out xf) okf))
+        ...   | inj₁ kfo with ≼-split {kf} {o} kfo
+        ...     | inj₁ lt′ = ⊥-elim (nF₀ (kf , a′ , xf , nkf , lt′))
+        ...     | inj₂ refl = Tp.lab-≼ {φ kf} m
+
+  put-before′ : ∀ {k l k′ e′} → TT k skip → Put′ k l → TT k′ e′ → Unpinned e′ → ¬ Late′ k′ → k ≺ k′ → l ≼ φ′ k′
+  put-before′ tk pt tk′ un′ nl′ lt with O.kind tk tt
   ... | O.made _ _ _ (_ , _ , ())
-  ... | O.kept x _ _ with O.kind tk′ un′
-  put-before′ {k} {l} {k′} tk (_ , nFk , inj₁ (pl , _)) tk′ un′ lt | O.kept x _ _ | O.kept x′ _ _ =
-    subst (l ≼_) (sym (φ-old x′)) (C.put-before x pl x′ un′ lt)
-  put-before′ {k} {l} {k′} tk (_ , nFk , inj₂ (y , pl , (x* , yr , nk*) , refl)) tk′ un′ lt | O.kept x _ _ | O.kept x′ nF′ nf′ with shown-fail yr nk*
-  ... | kf , a , refl , xf , nkf , _ =
-    ⊥-elim (C.put-before x pl x′ un′ lt (C.mono x′ xf un′ tt (before-fail x′ nF′ nf′ xf nkf)))
-  put-before′ {k} {l} tk (_ , nFk , br) tk′ un′ lt | O.kept x nF nf | O.made {o} {a} x₀ nk₀ nF₀ (l₀ , refl , m) =
-    subst (l ≼_) (sym (φ-new x₀ nk₀ (Tp.made-lab m))) (go br)
+  ... | O.kept x _ nf = Before.before′ x nf (proj₁ (proj₂ pt)) (λ pl x′ un′ nl′ lt → C.put-before x pl x′ un′ nl′ lt) pt tk′ un′ nl′ lt
+
+  pin-before′ : ∀ {k p l k′ e′} → TT k (pin p) → Put′ k l → TT k′ e′ → Unpinned e′ → ¬ Late′ k′ → k ≺ k′ → l ≼ φ′ k′
+  pin-before′ (W.left x nFp ins) pt tk′ un′ nl′ lt =
+    Before.before′ x (λ x′ → ⊥-elim (pin≢ (Run.func R x x′))) (proj₁ (proj₂ pt)) (λ pl x′ un′ nl′ lt → C.pin-before x pl x′ un′ nl′ lt) pt tk′ un′ nl′ lt
     where
-      ko : k ≺ o
-      ko = before-fail x nFk nf x₀ nk₀
+      pin≢ : ∀ {p a} → pin p ≡ out a → ⊥
+      pin≢ ()
 
-      go : (Put k l × Σ (Ev (IE A)) (u l)) ⊎ (Σ Pos λ y → Put k y × Failing* y × l ≡ y ⊕ [ lab incl ]) → l ≼ (φ o ⊕ [ l₀ ])
-      go (inj₁ (pl , _)) = ≼-trans {l} {φ o} {φ o ⊕ [ l₀ ]} (C.put-before x pl x₀ tt ko) (≺→≼ {φ o} {φ o ⊕ [ l₀ ]} (≺-ext (φ o) []))
-      go (inj₂ (y , pl , (x* , yr , nk*) , refl)) with shown-fail yr nk*
-      ... | kf , a′ , refl , xf , nkf , _ with ≼-or-≻ kf o
-      ...   | inj₂ okf = ⊥-elim (C.put-before x pl x₀ tt ko (C.mono x₀ xf tt tt okf))
-      ...   | inj₁ kfo with ≼-split {kf} {o} kfo
-      ...     | inj₁ lt′ = ⊥-elim (nF₀ (kf , a′ , xf , nkf , lt′))
-      ...     | inj₂ refl = Tp.lab-≼ {φ kf} m
-
-  shown←′ : ∀ {l e′} → UU l e′ → Shown (One valuesOf) e′ → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ k × TT k e × Unpinned e × M e e′
+  shown←′ : ∀ {l e′} → UU l e′ → Shown (One valuesOf) e′ → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ k × TT k e × Unpinned e × ¬ Late′ k × M e e′
   shown←′ {l} {e′} ul sh with O*.kind ul (shown-un e′ sh)
     where
       shown-un : ∀ (e′ : Ev (IE A)) → Shown (One valuesOf) e′ → Unpinned e′
       shown-un (out _) _ = tt
       shown-un end     _ = tt
   ... | O*.kept y nF* nf* with C.shown← y sh
-  ...   | k , e , eq , x , un , m =
-    k , e , trans eq (sym (φ-old x)) , O.keep-row x nF nf , un , m
+  ...   | k , e , eq , x , un , nl , m =
+    k , e , trans eq (sym (φ-old x)) , O.keep-row x nF nf , un , nl-up nl , m
     where
       nF : ¬ Failed k
-      nF F = nF* (subst W*.Failed (sym eq) (fail→ x un F))
+      nF F = nF* (subst W*.Failed (sym eq) (fail→ x un nl F))
 
       nf : O.NoFail k
       nf {a} x′ with Tp.dec-keep a
@@ -295,36 +329,36 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ... | kf , a , refl , xf , nkf , rd = move m*
     where
       nF : ¬ Failed kf
-      nF F = nF* (fail→ xf tt F)
+      nF F = nF* (fail→ xf tt (nl-out xf) F)
 
       at : ∀ {l} → Lab l → φ kf ⊕ [ l ] ≡ φ′ (kf ⊕ [ l ])
       at lb = sym (φ-new xf nkf lb)
 
-      move : ∀ {e′} → Te.Made _ l₀ e′ → Σ Pos λ k → Σ (Ev A) λ e → (φ kf ⊕ [ l₀ ]) ≡ φ′ k × TT k e × Unpinned e × M e e′
-      move (Te.at0 i) = kf ⊕ [ ix 0 ] , out a , at (inj₁ refl) , W.fail xf nkf nF i , tt , m-val rd
-      move Te.atl     = kf ⊕ [ last ] , end , at (inj₂ refl) , W.stop xf nkf nF , tt , m-ee
+      move : ∀ {e′} → Te.Made _ l₀ e′ → Σ Pos λ k → Σ (Ev A) λ e → (φ kf ⊕ [ l₀ ]) ≡ φ′ k × TT k e × Unpinned e × ¬ Late′ k × M e e′
+      move (Te.at0 i) = kf ⊕ [ ix 0 ] , out a , at (inj₁ refl) , W.fail xf nkf nF i , tt , nl-new xf , m-val rd
+      move Te.atl     = kf ⊕ [ last ] , end , at (inj₂ refl) , W.stop xf nkf nF , tt , nl-new xf , m-ee
 
   place′ : ∀ {m e′} → UU m e′ → Live UU m
-         → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × Imaged′ k e × (φ′ k ≼ m ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf m
+         → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × ¬ Late′ k × Imaged′ k e × (φ′ k ≼ m ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf m
   place′ {m} um lv with O*.from um
   place′ {m} um lv | O*.new {o} {x} y nk nF* (l , refl , m*) with shown-fail y nk
   ... | kf , a , refl , xf , nkf , rd = inj₂ (move m*)
     where
       nF : ¬ Failed kf
-      nF F = nF* (fail→ xf tt F)
+      nF F = nF* (fail→ xf tt (nl-out xf) F)
 
-      move : ∀ {e′} → Te.Made x l e′ → Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × Imaged′ k e × (φ′ k ≼ (φ kf ⊕ [ l ]) ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf (φ kf ⊕ [ l ])
+      move : ∀ {e′} → Te.Made x l e′ → Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × ¬ Late′ k × Imaged′ k e × (φ′ k ≼ (φ kf ⊕ [ l ]) ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf (φ kf ⊕ [ l ])
       move (Te.at0 i) =
         let eq = φ-new xf nkf (inj₁ refl)
-        in kf ⊕ [ ix 0 ] , out a , W.fail xf nkf nF i , tt , made-img xf nkf nF (Tp.at0 i)
+        in kf ⊕ [ ix 0 ] , out a , W.fail xf nkf nF i , tt , nl-new xf , made-img xf nkf nF (Tp.at0 i)
          , inj₁ (subst (_≼ (φ kf ⊕ [ ix 0 ])) (sym eq) (≼-refl {φ kf ⊕ [ ix 0 ]})) , cong instantOf eq
       move Te.atl =
         let eq = φ-new xf nkf (inj₂ refl)
-        in kf ⊕ [ last ] , end , W.stop xf nkf nF , tt , made-img xf nkf nF Tp.atl
+        in kf ⊕ [ last ] , end , W.stop xf nkf nF , tt , nl-new xf , made-img xf nkf nF Tp.atl
          , inj₁ (subst (_≼ (φ kf ⊕ [ last ])) (sym eq) (≼-refl {φ kf ⊕ [ last ]})) , cong instantOf eq
   place′ {m} um lv | O*.self y _ with C.place y (O*.live← dec* fst* lv)
   ... | inj₁ eq = inj₁ eq
-  ... | inj₂ (k , e , x , un , im , at , ie) = inj₂ (go at)
+  ... | inj₂ (k , e , x , un , nl , im , at , ie) = inj₂ (go at)
     where
       nFm : ¬ W*.Failed m
       nFm = O*.live-ok fst* y lv
@@ -333,14 +367,14 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       nfm = O*.nofail um nFm
 
       Out : Set
-      Out = Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × Imaged′ k e × (φ′ k ≼ m ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf m
+      Out = Σ Pos λ k → Σ (Ev A) λ e → TT k e × Unpinned e × ¬ Late′ k × Imaged′ k e × (φ′ k ≼ m ⊎ Leads′ k) × instantOf (φ′ k) ≡ instantOf m
 
       ie′ : instantOf (φ′ k) ≡ instantOf m
       ie′ = trans (cong instantOf (φ-old x)) ie
 
       -- A row put after `k`'s image fails nowhere before it.
       unfailed-at : φ k ≼ m → ¬ Failed k
-      unfailed-at km F = nFm (O*.failed-≼ km (fail→ x un F))
+      unfailed-at km F = nFm (O*.failed-≼ km (fail→ x un nl F))
 
       nofail-at : φ k ≼ m → O.NoFail k
       nofail-at km {a} x′ with Tp.dec-keep a
@@ -360,7 +394,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       first-at : C.Leads k → (Σ A λ a → t k (out a) × T (not (keep a)) × ¬ Failed k) → Out
       first-at ld (a , xk , nk , nFk) with Tp.lab-made a
       ... | e₁ , mm =
-        k ⊕ [ lab incl ] , e₁ , O.made-row xk nk nFk mm , Tp.made-un mm , made-img xk nk nFk mm , inj₂ leads
+        k ⊕ [ lab incl ] , e₁ , O.made-row xk nk nFk mm , Tp.made-un mm , nl-new xk , made-img xk nk nFk mm , inj₂ leads
         , trans (cong instantOf (φ-new xk nk (Tp.made-lab mm))) (trans (inst-⊕ (φ k) [ lab incl ]) ie)
         where
           leads : Leads′ (k ⊕ [ lab incl ])
@@ -385,9 +419,9 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       ...     | inj₁ mf with ≼-split {m} {φ f} mf
       ...       | inj₂ refl = ⊥-elim (T-not (nfm y′) (nk* rd nkf))
       ...       | inj₁ mf′ =
-        let fkk = C.mono xf x tt un fk′
+        let fkk = C.mono xf x tt un (nl-out xf) nl fk′
             if = between {m} {φ f} {φ k} (Equivalence.to T-≡ mf′) (Equivalence.to T-≡ fkk) (sym ie)
-        in ⊥-elim (≺-irrefl {k} (≼-≺-≺ {k} {f} {k} (ld xf tt (Equivalence.to (C.inst xf x tt un) (trans if (sym ie)))) fk′))
+        in ⊥-elim (≺-irrefl {k} (≼-≺-≺ {k} {f} {k} (ld xf tt (Equivalence.to (C.inst xf x tt un (nl-out xf) nl) (trans if (sym ie)))) fk′))
 
       out-inj : ∀ {a b : A} → out a ≡ out b → a ≡ b
       out-inj refl = refl
@@ -406,7 +440,7 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
 
       go : φ k ≼ m ⊎ C.Leads k → Out
       go (inj₁ km) =
-        k , e , O.keep-row x (unfailed-at km) (nofail-at km) , un , kept-img x un (unfailed-at km) (nofail-at km) im
+        k , e , O.keep-row x (unfailed-at km) (nofail-at km) , un , nl-up nl , kept-img x un nl (unfailed-at km) (nofail-at km) im
         , inj₁ (subst (_≼ m) (sym (φ-old x)) km) , ie′
       go (inj₂ ld) with dec k
       ... | yes (q , a , xq , nk , qk) with fst xq nk
@@ -414,14 +448,14 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
       ...     | refl = ⊥-elim (nFf (q , a , xq , nk , ≼-≺-≺ {q} {q} {f} (≼-refl {q}) qk))
       go (inj₂ ld) | no nFk with split x un
       ... | inj₂ (a , xk , nk) = first-at ld (a , xk , nk , nFk)
-      ... | inj₁ nf = k , e , O.keep-row x nFk nf , un , kept-img x un nFk nf im , inj₂ (leads′ ld) , ie′
+      ... | inj₁ nf = k , e , O.keep-row x nFk nf , un , nl-up nl , kept-img x un nl nFk nf im , inj₂ (leads′ ld) , ie′
 
-  mono′ : ∀ {k k′ e e′} → TT k e → TT k′ e′ → Unpinned e → Unpinned e′ → k ≺ k′ → φ′ k ≺ φ′ k′
-  mono′ {k} {k′} tk tk′ un un′ lt with O.kind tk un | O.kind tk′ un′
-  ... | O.kept x _ _ | O.kept x′ _ _ = subst₂ _≺_ (sym (φ-old x)) (sym (φ-old x′)) (C.mono x x′ un un′ lt)
+  mono′ : ∀ {k k′ e e′} → TT k e → TT k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ k → ¬ Late′ k′ → k ≺ k′ → φ′ k ≺ φ′ k′
+  mono′ {k} {k′} tk tk′ un un′ nl nl′ lt with O.kind tk un | O.kind tk′ un′
+  ... | O.kept x _ _ | O.kept x′ _ _ = subst₂ _≺_ (sym (φ-old x)) (sym (φ-old x′)) (C.mono x x′ un un′ (nl-kept x nl) (nl-kept x′ nl′) lt)
   ... | O.kept x nF nf | O.made {o} x₀ nk₀ _ (l₀ , refl , m₀) =
     subst (φ′ k ≺_) (sym (φ-new x₀ nk₀ (Tp.made-lab m₀))) (subst (_≺ (φ o ⊕ [ l₀ ])) (sym (φ-old x))
-      (≺-trans {φ k} {φ o} {φ o ⊕ [ l₀ ]} (C.mono x x₀ un tt (before-fail x nF nf x₀ nk₀)) (≺-ext (φ o) [])))
+      (≺-trans {φ k} {φ o} {φ o ⊕ [ l₀ ]} (C.mono x x₀ un tt (nl-kept x nl) (nl-out x₀) (before-fail x nF nf x₀ nk₀)) (≺-ext (φ o) [])))
   ... | O.made {o} x₀ nk₀ _ (l₀ , refl , _) | O.kept x′ nF′ nf′ =
     ⊥-elim (≺-irrefl {o} (≺-trans {o} {o ⊕ [ l₀ ]} {o} (≺-ext o []) (≺-trans {o ⊕ [ l₀ ]} {k′} {o} lt (before-fail x′ nF′ nf′ x₀ nk₀))))
   ... | O.made {o} x₀ nk₀ nF₀ (l₀ , refl , m₀) | O.made {o′} x₁ nk₁ nF₁ (l₁ , refl , m₁) with O.first-uniq x₀ nk₀ nF₀ x₁ nk₁ nF₁
@@ -430,42 +464,52 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
 
   -- A take's row stands for a plain row of its instant and its image's.
   Rep : Pos → Set
-  Rep k = Σ Pos λ r → Σ (Ev A) λ e₀ → t r e₀ × Unpinned e₀ × instantOf k ≡ instantOf r × instantOf (φ′ k) ≡ instantOf (φ r)
+  Rep k = Σ Pos λ r → Σ (Ev A) λ e₀ → t r e₀ × Unpinned e₀ × ¬ Late r × instantOf k ≡ instantOf r × instantOf (φ′ k) ≡ instantOf (φ r)
 
-  rep : ∀ {k e} → TT k e → Unpinned e → Rep k
-  rep {k} {e} tk un with O.kind tk un
-  ... | O.kept x _ _ = k , e , x , un , refl , cong instantOf (φ-old x)
+  rep : ∀ {k e} → TT k e → Unpinned e → ¬ Late′ k → Rep k
+  rep {k} {e} tk un nl with O.kind tk un
+  ... | O.kept x _ _ = k , e , x , un , nl-kept x nl , refl , cong instantOf (φ-old x)
   ... | O.made {o} {a} x₀ nk₀ _ (l₀ , refl , m₀) =
-    o , out a , x₀ , tt , inst-⊕ o [ l₀ ] , trans (cong instantOf (φ-new x₀ nk₀ (Tp.made-lab m₀))) (inst-⊕ (φ o) [ l₀ ])
+    o , out a , x₀ , tt , nl-out x₀ , inst-⊕ o [ l₀ ] , trans (cong instantOf (φ-new x₀ nk₀ (Tp.made-lab m₀))) (inst-⊕ (φ o) [ l₀ ])
 
-  inst′ : ∀ {k k′ e e′} → TT k e → TT k′ e′ → Unpinned e → Unpinned e′
+  inst′ : ∀ {k k′ e e′} → TT k e → TT k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ k → ¬ Late′ k′
         → (instantOf (φ′ k) ≡ instantOf (φ′ k′) ⇔ instantOf k ≡ instantOf k′)
-  inst′ tk tk′ un un′ with rep tk un | rep tk′ un′
-  ... | _ , _ , x , u , ik , iφ | _ , _ , x′ , u′ , ik′ , iφ′ =
-    mk⇔ (λ h → trans ik (trans (Equivalence.to (C.inst x x′ u u′) (trans (sym iφ) (trans h iφ′))) (sym ik′)))
-        (λ h → trans iφ (trans (Equivalence.from (C.inst x x′ u u′) (trans (sym ik) (trans h ik′))) (sym iφ′)))
+  inst′ tk tk′ un un′ nl nl′ with rep tk un nl | rep tk′ un′ nl′
+  ... | _ , _ , x , u , n , ik , iφ | _ , _ , x′ , u′ , n′ , ik′ , iφ′ =
+    mk⇔ (λ h → trans ik (trans (Equivalence.to (C.inst x x′ u u′ n n′) (trans (sym iφ) (trans h iφ′))) (sym ik′)))
+        (λ h → trans iφ (trans (Equivalence.from (C.inst x x′ u u′ n n′) (trans (sym ik) (trans h ik′))) (sym iφ′)))
 
-  home′ : ∀ {k e} → TT k e → Unpinned e → (instantOf (φ′ k) ≡ instantOf s* ⇔ instantOf k ≡ instantOf s)
-  home′ tk un with rep tk un
-  ... | _ , _ , x , u , ik , iφ =
-    mk⇔ (λ h → trans ik (Equivalence.to (C.home x u) (trans (sym iφ) h)))
-        (λ h → trans iφ (Equivalence.from (C.home x u) (trans (sym ik) h)))
+  home′ : ∀ {k e} → TT k e → Unpinned e → ¬ Late′ k → (instantOf (φ′ k) ≡ instantOf s* ⇔ instantOf k ≡ instantOf s)
+  home′ tk un nl with rep tk un nl
+  ... | _ , _ , x , u , n , ik , iφ =
+    mk⇔ (λ h → trans ik (Equivalence.to (C.home x u n) (trans (sym iφ) h)))
+        (λ h → trans iφ (Equivalence.from (C.home x u n) (trans (sym ik) h)))
 
-  corr-take : Corr s s* φ′ Put′ TT UU
+  -- A late row of the take: a kept skip, put where the child put it.
+  late-put′ : ∀ {k e} → Late′ k → TT k e → e ≡ skip × ((Σ Pos λ l → Σ (Ev (IE A)) λ e′ → UU l e′ × Put′ k l) × Homed′ k)
+  late-put′ ((e₀ , x₀) , lt) tk with C.late-put lt x₀
+  ... | refl , ((l , e′ , y , pl) , h) with O.from tk
+  ...   | O.new xo _ _ (_ , refl , _) = ⊥-elim (Run.flat R xo x₀)
+  ...   | O.self x′ _ with Run.func R x₀ x′
+  ...     | refl with O.kind tk tt
+  ...       | O.made _ _ _ (_ , _ , ())
+  ...       | O.kept x nF _ = refl , put-at x nF pl y , homed′ nF h
+
+  corr-take : Corr s s* φ′ Put′ Late′ TT UU
   corr-take = record
-    { row→ = row→′ ; pin→ = pin→′ ; put-before = put-before′ ; shown← = shown←′
+    { row→ = row→′ ; late-put = late-put′ ; pin→ = pin→′ ; put-before = put-before′ ; pin-before = pin-before′ ; shown← = shown←′
     ; place = place′ ; mono = mono′ ; inst = inst′ ; home = home′ }
 
   ----------------------------------------------------------------------
   -- Rows the lifting reads
 
   -- A kept row's image row is the elaborated run's own.
-  kept-self : ∀ {k e e′} → t k e → Unpinned e → ¬ Failed k → O.NoFail k → UU (φ k) e′ → u (φ k) e′
-  kept-self {k} x un nF nf uu with O*.from uu
+  kept-self : ∀ {k e e′} → t k e → Unpinned e → ¬ Late k → ¬ Failed k → O.NoFail k → UU (φ k) e′ → u (φ k) e′
+  kept-self {k} x un nl nF nf uu with O*.from uu
   ... | O*.self y _ = y
   ... | O*.new y nk _ (l , eq , _) with shown-fail y nk
   ...   | kf , _ , refl , xf , nkf , _ =
-    ⊥-elim (≺-irrefl {φ k} (≺-trans {φ k} {φ kf} {φ k} (C.mono x xf un tt (before-fail x nF nf xf nkf)) (subst (φ kf ≺_) (sym eq) (≺-ext (φ kf) []))))
+    ⊥-elim (≺-irrefl {φ k} (≺-trans {φ k} {φ kf} {φ k} (C.mono x xf un tt nl (nl-out xf) (before-fail x nF nf xf nkf)) (subst (φ kf ≺_) (sym eq) (≺-ext (φ kf) []))))
 
   -- A row under an elaborated value is made from it, no failure before it.
   under-unfailed : ∀ {y x l e′} → u y (out x) → UU (y ⊕ [ l ]) e′ → ¬ W*.Failed y

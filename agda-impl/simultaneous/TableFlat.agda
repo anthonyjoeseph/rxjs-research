@@ -34,7 +34,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
-open import Relation.Nullary using (does; yes; no)
+open import Relation.Nullary using (¬_; does; yes; no)
 open import Relation.Nullary.Decidable using (dec-true)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; of; flatMap; connect; connected)
@@ -51,11 +51,11 @@ open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; aft
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.TableCorr using (Rel; TR; Corr; Got; got-bind; keys; in-keys)
+open import simultaneous.TableCorr using (Same; φ≡; nl→; Rel; Scope; module Scope; TR; Corr; Got; got-bind; keys; in-keys; nl-ev)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
   linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; unended; den; env-wk; Holds; Admits; admits-step;
+  aligned-r*; Rest; Out; scopeOf; EnvR; maps; lw; lw*; unended; den; env-wk; Holds; Admits; admits-step;
   admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func;
   tab-flat; tab-at)
 
@@ -365,6 +365,14 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ----------------------------------------------------------------------
   -- The children's records
 
+  -- The hots in scope, plain and elaborated, guarding every record here.
+  Sc : Scope
+  Sc = scopeOf ρ ρι ρ*
+
+  G G* : ℕ → ℕ → Pos → Set
+  G  = Scope.G Sc
+  G* = Scope.G* Sc
+
   -- The source, at the share's subscription.
   Src : Set₁
   Src = Out n s ρ (wk ρι) ρ*s (maps env) p sp*
@@ -377,14 +385,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         → Holds n (f a) ρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
 
   -- Two records of one lane, its trigger's hot recorded twice: they map
-  -- alike (`simultaneous.TableEnv.Coh`).
+  -- alike and are late alike (`simultaneous.TableEnv.Coh`).
   LanesCoh : Lanes → Set₁
   LanesCoh Ls = ∀ a t₁ t₂ t₃ t₄ u (h₁ h₁′ : HotD t₁) h₂ h₃ h₄ q q* (ad ad′ : Admits (lw env) q)
                   (ad* : Admits (den-cons h₁ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* env))))) q*)
                   (ad*′ : Admits (den-cons h₁′ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* env))))) q*)
                   (al al′ : Aligned (maps env) ρ q q*) (lk lk′ : Linked q q*) N y
-              → Rel.φ (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) N y
-              ≡ Rel.φ (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁′ h₂ h₃ h₄ q q* ad′ ad*′ al′ lk′)) N y
+              → Same (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁′ h₂ h₃ h₄ q q* ad′ ad*′ al′ lk′)) N y
 
   -- The plain flatMap's tables.
   P : FlatOp → ℕ → _
@@ -437,7 +444,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- The lanes' flatMap related to the plain flatMap.
   Core : FlatOp → Set₁
   Core op = Src → (Ls : Lanes) → LanesCoh Ls → Aligned (maps env) ρ p p* → Linked p p*
-          → Rel (Pd op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁
+          → Rel (Pd op) (λ N → listC (3 + N) n (core op) (ρ*c N) c₁) p c₁ Sc
 
   ----------------------------------------------------------------------
   -- The layers
@@ -543,7 +550,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     each-row : ∀ {N q a} → TR (S N) q (out a) → TR (Tab n eachS ρ*c c₁ N) (val* N q) (out a)
     each-row {N} {q} {a} x with Corr.row→ (Rel.corr (Out.rel Os) N) x tt
     ... | inj₂ (() , _)
-    ... | inj₁ (e′ , y , mt) with proj₁ mt tt
+    ... | inj₁ ((e′ , y , mt) , _) with proj₁ mt tt
     ...   | x′ , refl , rd = each-at (shared-row y sk) (≺-trans {c₁} {sp*} (part-≺ p* (ix 0 ∷ ix 0 ∷ ix 1 ∷ []) (ix 0 ∷ sub shp ∷ ix 1 ∷ []) refl) sk) rd
       where
         Isp = tab-at n s* uρ*s Ds (admits-trig n uρ* (lw* env) p* ad*) N
@@ -591,6 +598,25 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
       endImage y = emitAt (endφ y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
 
+    -- A lane's end is never late.
+    end-nl : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N c
+    end-nl {N} R cx = nl-ev (Rel.corr (Out.rel (LaneRec.lane R)) N) cx (λ ())
+
+    -- A lane row's lane image lies under its images here.
+    out-≼ : ∀ {N} (R : LaneRec N) y → Rel.φ (Out.rel (LaneRec.lane R)) N y ≼ LaneRec.outImage R y
+    out-≼ {N} R y = ≼-ˡ (Rel.φ (Out.rel (LaneRec.lane R)) N y) (sub (readerR (LaneRec.stE R)) ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
+
+    end-≼ : ∀ {N} (R : LaneRec N) y → Rel.φ (Out.rel (LaneRec.lane R)) N y ≼ LaneRec.endImage R y
+    end-≼ {N} R y = ≼-trans {φy} {e} {LaneRec.endImage R y} (≼-trans {φy} {LaneRec.endφ R y} {e} φ-e (≼-ˡ (LaneRec.endφ R y) ys)) (≼-ˡ e (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ []))
+      where
+        φy = Rel.φ (Out.rel (LaneRec.lane R)) N y
+        ys = sub (readerR (LaneRec.stE R)) ∷ ix 1 ∷ ix 0 ∷ []
+        e  = LaneRec.endφ R y ⊕ˡ ys
+        φ-e : φy ≼ LaneRec.endφ R y
+        φ-e with later-cases φy (LaneRec.trigEnd R)
+        ... | inj₁ (eq , _)  = subst (φy ≼_) (sym eq) (≼-refl {φy})
+        ... | inj₂ (eq , lt) = subst (φy ≼_) (sym eq) (≺→≼ {φy} {LaneRec.trigEnd R} lt)
+
     -- THE ELABORATED LANE'S END: where `laneˢ` shows the lane's end, its
     -- `laneDone` taken by the take.
     lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
@@ -608,31 +634,31 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     trig-inst : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R
               → instantOf (Rel.φ (Out.rel (LaneRec.lane R)) N c) ≡ instantOf (LaneRec.trigEnd R)
     trig-inst {N} R {c} cx lt =
-      squeeze {laneX stE} {Rel.φ (Out.rel lane) N c} {trigEnd} (Rel.after-φ (Out.rel lane) cx tt) lt
+      squeeze {laneX stE} {Rel.φ (Out.rel lane) N c} {trigEnd} (Rel.after-φ (Out.rel lane) cx tt (end-nl R cx)) lt
         (trans (inst-⊕ˡ (laneL stE) (laneXt stE)) (sym (inst-⊕ˡ (laneL stE) (trigXs stE))))
       where open LaneRec R
 
     trig-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
                 → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Linked c (LaneRec.trigEnd R)
-    trig-linked {N} R {c} cx lt = linked-later (Rest.linked (Out.rest lane) N cx tt) (trig-inst R cx lt) lt
+    trig-linked {N} R {c} cx lt = linked-later (Rest.linked (Out.rest lane) N cx tt (end-nl R cx)) (trig-inst R cx lt) lt
       where open LaneRec R
 
     trig-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
               → Rel.φ (Out.rel (LaneRec.lane R)) N c ≺ LaneRec.trigEnd R → Aligned (maps env) ρ c (LaneRec.trigEnd R)
     trig-cuts {N} R {c} cx lt =
       aligned-past {Ψ = maps env} {ρ = ρ} alL
-        (≼-trans {laneL stE} {laneX stE} {Rel.φ (Out.rel lane) N c} (≼-ˡ (laneL stE) (laneXt stE)) (Rel.after-φ (Out.rel lane) cx tt))
-        lt (⊑-⊕ˡ (laneL stE) (trigXs stE)) (trig-inst R cx lt) (Rest.cuts (Out.rest lane) N cx tt)
+        (≼-trans {laneL stE} {laneX stE} {Rel.φ (Out.rel lane) N c} (≼-ˡ (laneL stE) (laneXt stE)) (Rel.after-φ (Out.rel lane) cx tt (end-nl R cx)))
+        lt (⊑-⊕ˡ (laneL stE) (trigXs stE)) (trig-inst R cx lt) (Rest.cuts (Out.rest lane) N cx tt (end-nl R cx))
       where open LaneRec R
 
     end-cuts : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Aligned (maps env) ρ c (LaneRec.endφ R c)
     end-cuts {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
-    ... | inj₁ (eq , _)  = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₁ (eq , _)  = subst (Aligned (maps env) ρ c) (sym eq) (Rest.cuts (Out.rest (LaneRec.lane R)) N cx tt (end-nl R cx))
     ... | inj₂ (eq , lt) = subst (Aligned (maps env) ρ c) (sym eq) (trig-cuts R cx lt)
 
     end-linked : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → Linked c (LaneRec.endφ R c)
     end-linked {N} R {c} cx with later-cases (Rel.φ (Out.rel (LaneRec.lane R)) N c) (LaneRec.trigEnd R)
-    ... | inj₁ (eq , _)  = subst (Linked c) (sym eq) (Rest.linked (Out.rest (LaneRec.lane R)) N cx tt)
+    ... | inj₁ (eq , _)  = subst (Linked c) (sym eq) (Rest.linked (Out.rest (LaneRec.lane R)) N cx tt (end-nl R cx))
     ... | inj₂ (eq , lt) = subst (Linked c) (sym eq) (trig-linked R cx lt)
 
     -- A value's lane, subscribed under its row: the source's facts at the
@@ -641,8 +667,9 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL ad₀ ad₀* (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (q ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
-         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt) (ix 1)) (sub c₁)) ys))
+         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt nlx) (ix 1)) (sub c₁)) ys))
       where
+        nlx = nl-ev (Rel.corr (Out.rel Os) N) x (λ ())
         st = st* N q
         ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ laneXs st
         ad₀ : Admits (lw env) (q ⊕ [ ix 1 ])
@@ -650,7 +677,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ad₀* : Admits Dc st
         ad₀* = admits-row n eachS uρ*c Dc ad₁ (each-row x)
         alL : Aligned (maps env) ρ (q ⊕ [ ix 1 ]) (laneL st)
-        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt) (ix 1) (sub c₁))
+        alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (Rest.cuts (Out.rest Os) N x tt nlx) (ix 1) (sub c₁))
                 (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
     -- A value's lane, queued under the end of the lane it waited on: that
@@ -708,22 +735,28 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     lastWith-h h (R ∷ Rs) refl | nothing | true = hR
 
     -- TWO CUTS' RECORDS OF ONE LANE, alike up to `k`: subscribed alike,
-    -- listing alike, and mapping each row alike.
+    -- listing alike, and mapping each row alike, late alike.
     record LaneEq {N N′} (k : Pos) (R : LaneRec N) (R′ : LaneRec N′) : Set where
       field
         stE≡ : LaneRec.stE R ≡ LaneRec.stE R′
         tab≈ : AgreeTo k (TR (LaneRec.tab R)) (TR (LaneRec.tab R′))
-        φ≡   : ∀ {y e} → y ≼ k → TR (LaneRec.tab R) y e → Unpinned e
+        φ≡   : ∀ {y e} → y ≼ k → TR (LaneRec.tab R) y e → Unpinned e → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N y
+             → G N N′ y → G* N N′ (Rel.φ (Out.rel (LaneRec.lane R)) N y)
              → Rel.φ (Out.rel (LaneRec.lane R)) N y ≡ Rel.φ (Out.rel (LaneRec.lane R′)) N′ y
+        nl≡  : ∀ {y e} → y ≼ k → TR (LaneRec.tab R) y e → Unpinned e → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N y
+             → G N N′ y → G* N N′ (Rel.φ (Out.rel (LaneRec.lane R)) N y)
+             → ¬ Rel.Late (Out.rel (LaneRec.lane R′)) N′ y
 
     out-eq : ∀ {N N′ k} {R : LaneRec N} {R′ : LaneRec N′} → LaneEq k R R′ → ∀ {y e} → y ≼ k → TR (LaneRec.tab R) y e → Unpinned e
+           → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N y → G N N′ y → G* N N′ (Rel.φ (Out.rel (LaneRec.lane R)) N y)
            → LaneRec.outImage R y ≡ LaneRec.outImage R′ y
-    out-eq E yk x un = cong₂ (λ u v → emitAt (u ⊕ [ sub (readerR v) ])) (LaneEq.φ≡ E yk x un) (LaneEq.stE≡ E)
+    out-eq E yk x un nl g g* = cong₂ (λ u v → emitAt (u ⊕ [ sub (readerR v) ])) (LaneEq.φ≡ E yk x un nl g g*) (LaneEq.stE≡ E)
 
     end-eq : ∀ {N N′ k} {R : LaneRec N} {R′ : LaneRec N′} → LaneEq k R R′ → ∀ {y e} → y ≼ k → TR (LaneRec.tab R) y e → Unpinned e
+           → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N y → G N N′ y → G* N N′ (Rel.φ (Out.rel (LaneRec.lane R)) N y)
            → LaneRec.endImage R y ≡ LaneRec.endImage R′ y
-    end-eq E yk x un = cong₂ (λ u v → emitAt (later u (laneL v ⊕ˡ trigXs v) ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
-                             (LaneEq.φ≡ E yk x un) (LaneEq.stE≡ E)
+    end-eq E yk x un nl g g* = cong₂ (λ u v → emitAt (later u (laneL v ⊕ˡ trigXs v) ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
+                             (LaneEq.φ≡ E yk x un nl g g*) (LaneEq.stE≡ E)
 
     -- Two cuts' lanes, alike up to `k` in order, each unmatched one quiet.
     data LanesEq {N N′} (k : Pos) : List (LaneRec N) → List (LaneRec N′) → Set₁ where
@@ -756,13 +789,14 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     ... | just A′ | m = m
     ... | nothing | m rewrite q′ {R′} Qr = m
 
-    -- A lane related at two cuts' alike subscriptions maps alike: the
-    -- records differ only in how the subscriptions are admitted.
+    -- A lane related at two cuts' alike subscriptions maps alike and is
+    -- late alike: the records differ only in how the subscriptions are
+    -- admitted.
     lane-coh : ∀ {a q st st′} → st ≡ st′ → (ad* : Admits Dc st) (ad*′ : Admits Dc st′)
              → (ad ad′ : Admits (lw env) q) (al : Aligned (maps env) ρ q (laneX st)) (al′ : Aligned (maps env) ρ q (laneX st′))
              → (lk : Linked q (laneX st)) (lk′ : Linked q (laneX st′)) → ∀ N y
-             → Rel.φ (Out.rel (Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad*) clD shD ttD q (laneX st) ad (laneAdm st ad*) al lk)) N y
-             ≡ Rel.φ (Out.rel (Ls a (trig st′) cl-tab sh-tab tt-tab (utrig st′) (trigD st′ ad*′) clD shD ttD q (laneX st′) ad′ (laneAdm st′ ad*′) al′ lk′)) N y
+             → Same (Out.rel (Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad*) clD shD ttD q (laneX st) ad (laneAdm st ad*) al lk))
+                    (Out.rel (Ls a (trig st′) cl-tab sh-tab tt-tab (utrig st′) (trigD st′ ad*′) clD shD ttD q (laneX st′) ad′ (laneAdm st′ ad*′) al′ lk′)) N y
     lane-coh {a} {q} {st} refl ad* ad*′ ad ad′ al al′ lk lk′ =
       Lc a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad*) (trigD st ad*′) clD shD ttD q (laneX st) ad ad′ (laneAdm st ad*) (laneAdm st ad*′) al al′ lk lk′
 
@@ -780,8 +814,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     valRec-eq {N} {N′} {k} {valAt q a x} {valAt .q .a x′} record { q≡ = refl ; a≡ = refl ; st≡ = st≡ ; tab≈ = tab≈ } = record
       { stE≡ = st≡
       ; tab≈ = tab≈
-      ; φ≡   = λ {y} yk ty un → trans (Rel.φ-agree (Out.rel (LaneRec.lane (valRec N (valAt q a x)))) {N} {N′} ty un (ag-down yk tab≈))
-                                      (lane-coh st≡ (LaneRec.adm* (valRec N (valAt q a x))) (LaneRec.adm* (valRec N′ (valAt q a x′))) _ _ _ _ _ _ N′ y)
+      ; φ≡   = λ {y} yk ty un nl g g* → trans (Rel.φ-agree (Out.rel (LaneRec.lane (valRec N (valAt q a x)))) {N} {N′} ty un nl g g* (ag-down yk tab≈))
+                                      (φ≡ (lane-coh st≡ (LaneRec.adm* (valRec N (valAt q a x))) (LaneRec.adm* (valRec N′ (valAt q a x′))) _ _ _ _ _ _ N′ y))
+      ; nl≡  = λ {y} yk ty un nl g g* → nl→ (lane-coh st≡ (LaneRec.adm* (valRec N (valAt q a x))) (LaneRec.adm* (valRec N′ (valAt q a x′))) _ _ _ _ _ _ N′ y)
+                                      (Rel.late-agree (Out.rel (LaneRec.lane (valRec N (valAt q a x)))) {N} {N′} ty un nl g g* (ag-down yk tab≈))
       }
 
     -- Two cuts' values, alike up to `k` in order, each unmatched one's
@@ -829,6 +865,15 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       φ′ : ℕ → Pos → Pos
       φ′ N y = rowφ N y (holder (lanes N) y) (ends-above y (lanes N))
 
+      -- A row is late as the lane holding it says, or else a source row
+      -- as the source says.
+      lateAt : ∀ N → Pos → Maybe (LaneRec N) → Set
+      lateAt N y (just R) = Rel.Late (Out.rel (LaneRec.lane R)) N y
+      lateAt N y nothing  = (Σ _ λ e → TR (S N) y e) × Rel.Late (Out.rel Os) N y
+
+      Late′ : ℕ → Pos → Set
+      Late′ N y = lateAt N y (holder (lanes N) y)
+
       -- What the map reads off the source where no lane holds the row.
       record SrcAt (N N′ : ℕ) (k : Pos) : Set where
         field
@@ -838,15 +883,22 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           src≡  : isMarker N k ≡ false → Rel.φ (Out.rel Os) N k ≡ Rel.φ (Out.rel Os) N′ k
 
       rowφ-eq : ∀ {N N′ k} {m e : Maybe (LaneRec N)} {m′ e′ : Maybe (LaneRec N′)} → Match k m m′ → Match k e e′
-              → (∀ {R} → m ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev)
+              → (∀ {R} → m ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev × ¬ Rel.Late (Out.rel (LaneRec.lane R)) N k)
               → (∀ {R} → e ≡ just R → TR (LaneRec.tab R) (up k) end)
               → (m ≡ nothing → e ≡ nothing → SrcAt N N′ k)
+              → G N N′ k → G* N N′ (rowφ N k m e)
               → rowφ N k m e ≡ rowφ N′ k m′ e′
-      rowφ-eq {k = k} (both {R} {R′} E) _ un _ _ with un refl
-      ... | ev , x , u = if-≡ (endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
-                              (λ h → end-eq E (≼-refl {k}) (endAt-T (LaneRec.tab R) h) tt) (λ _ → out-eq E (≼-refl {k}) x u)
-      rowφ-eq {k = k} none (both E) _ en _ = cong (_⊕ [ ix 0 ]) (end-eq E (up-≼ k) (en refl) tt)
-      rowφ-eq none none _ _ src with src refl refl
+      rowφ-eq {N} {k = k} (both {R} {R′} E) _ un _ _ g g* with un refl
+      ... | ev , x , u , nl = if-≡ (endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
+                                   (λ h → end-eq E (≼-refl {k}) (endAt-T (LaneRec.tab R) h) tt nl g gφ) (λ _ → out-eq E (≼-refl {k}) x u nl g gφ)
+        where
+          gφ : G* _ _ (Rel.φ (Out.rel (LaneRec.lane R)) N k)
+          gφ = Scope.g*-down Sc (in-if (endAt (LaneRec.tab R) k) (λ z → Rel.φ (Out.rel (LaneRec.lane R)) N k ≼ z) (λ _ → end-≼ R k) (λ _ → out-≼ R k)) g*
+      rowφ-eq {N} {k = k} none (both {R} E) _ en _ g g* =
+        cong (_⊕ [ ix 0 ]) (end-eq E (up-≼ k) (en refl) tt (end-nl R (en refl)) (Scope.g-down Sc (up-≼ k) g)
+          (Scope.g*-down Sc (≼-trans {Rel.φ (Out.rel (LaneRec.lane R)) N (up k)} {LaneRec.endImage R (up k)} {LaneRec.endImage R (up k) ⊕ [ ix 0 ]}
+                               (end-≼ R (up k)) (≼-ˡ (LaneRec.endImage R (up k)) (ix 0 ∷ []))) g*))
+      rowφ-eq none none _ _ src _ _ with src refl refl
       ... | S≡ = if-≡ (SrcAt.mark≡ S≡) (λ h → cong (_⊕ [ ix 0 ]) (SrcAt.val≡ S≡ h))
                       (λ h → if-≡ (SrcAt.end≡ S≡) (λ _ → cong (λ u → later u ttEnd ⊕ [ sub c₁ ]) (SrcAt.src≡ S≡ h))
                                                  (λ _ → cong (_⊕ [ sub c₁ ]) (SrcAt.src≡ S≡ h)))
@@ -854,16 +906,17 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- THE MAP AGREES ACROSS CUTS, for every joiner: given two cuts'
       -- lanes alike up to a row, the holder's row unpinned, and the
       -- source read alike where no lane holds it.
-      tabs-φ-agree : ∀ {N N′ k} → LanesEq k (lanes N) (lanes N′)
+      tabs-φ-agree : ∀ {N N′ k} → ¬ Late′ N k → G N N′ k → G* N N′ (φ′ N k) → LanesEq k (lanes N) (lanes N′)
                    → (∀ {R} → holder (lanes N) k ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev)
                    → (holder (lanes N) k ≡ nothing → ends-above k (lanes N) ≡ nothing → SrcAt N N′ k)
                    → φ′ N k ≡ φ′ N′ k
-      tabs-φ-agree {N} {N′} {k} es un src =
+      tabs-φ-agree {N} {N′} {k} nl g g* es un src =
         rowφ-eq (lastWith-eq hr hr′ (λ {R} {R′} E → rowAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
                              (λ {R} Q → rowAt-F {m = LaneRec.tab R} {k = k} {y = k} (≼-refl {k}) Q) (λ {R′} Q → rowAt-F {m = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) Q) es)
                 (lastWith-eq he he′ (λ {R} {R′} E → endAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = up k} (up-≼ k) (LaneEq.tab≈ E))
                              (λ {R} Q → endAt-F {m = LaneRec.tab R} {k = k} {y = up k} (up-≼ k) Q) (λ {R′} Q → endAt-F {m = LaneRec.tab R′} {k = k} {y = up k} (up-≼ k) Q) es)
-                un (λ {R} e → endAt-T (LaneRec.tab R) (lastWith-h he (lanes N) e)) src
+                (λ {R} e → let (ev , x , u) = un e in ev , x , u , λ lt → nl (subst (lateAt N k) (sym e) lt))
+                (λ {R} e → endAt-T (LaneRec.tab R) (lastWith-h he (lanes N) e)) src g g*
         where
           hr : LaneRec N → Bool
           hr R = rowAt (LaneRec.tab R) k
@@ -873,6 +926,33 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           he R = endAt (LaneRec.tab R) (up k)
           he′ : LaneRec N′ → Bool
           he′ R = endAt (LaneRec.tab R) (up k)
+
+      -- A row not late stays so at a cut whose lanes are alike up to it,
+      -- the holder's through its lane, a source row's through the source.
+      late-eq : ∀ {N N′ k} {m e : Maybe (LaneRec N)} {m′ : Maybe (LaneRec N′)} → Match k m m′
+              → (∀ {R} → m ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev)
+              → (m ≡ nothing → ¬ lateAt N k nothing → ¬ lateAt N′ k nothing)
+              → ¬ lateAt N k m → G N N′ k → G* N N′ (rowφ N k m e) → ¬ lateAt N′ k m′
+      late-eq {N} {k = k} (both {R} E) un _ nl g g* with un refl
+      ... | ev , x , u = LaneEq.nl≡ E (≼-refl {k}) x u nl g gφ
+        where
+          gφ : G* _ _ (Rel.φ (Out.rel (LaneRec.lane R)) N k)
+          gφ = Scope.g*-down Sc (in-if (endAt (LaneRec.tab R) k) (λ z → Rel.φ (Out.rel (LaneRec.lane R)) N k ≼ z) (λ _ → end-≼ R k) (λ _ → out-≼ R k)) g*
+      late-eq none _ src nl _ _ = src refl nl
+
+      tabs-late-agree : ∀ {N N′ k} → ¬ Late′ N k → G N N′ k → G* N N′ (φ′ N k) → LanesEq k (lanes N) (lanes N′)
+                      → (∀ {R} → holder (lanes N) k ≡ just R → Σ (Ev B) λ ev → TR (LaneRec.tab R) k ev × Unpinned ev)
+                      → (holder (lanes N) k ≡ nothing → ¬ lateAt N k nothing → ¬ lateAt N′ k nothing)
+                      → ¬ Late′ N′ k
+      tabs-late-agree {N} {N′} {k} nl g g* es un src =
+        late-eq (lastWith-eq hr hr′ (λ {R} {R′} E → rowAt-agree {m = LaneRec.tab R} {m′ = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) (LaneEq.tab≈ E))
+                             (λ {R} Q → rowAt-F {m = LaneRec.tab R} {k = k} {y = k} (≼-refl {k}) Q) (λ {R′} Q → rowAt-F {m = LaneRec.tab R′} {k = k} {y = k} (≼-refl {k}) Q) es)
+                un src nl g g*
+        where
+          hr : LaneRec N → Bool
+          hr R = rowAt (LaneRec.tab R) k
+          hr′ : LaneRec N′ → Bool
+          hr′ R = rowAt (LaneRec.tab R) k
 
       Put′ : ℕ → Pos → Pos → Set
       Put′ N y l with holder (lanes N) y

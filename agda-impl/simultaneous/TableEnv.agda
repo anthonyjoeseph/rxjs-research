@@ -26,6 +26,7 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 import Data.List.Relation.Unary.All as All
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -33,7 +34,7 @@ open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
@@ -44,7 +45,7 @@ open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_;
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter; Proper; module Op; at-out; at-end; on-out)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl)
+open import denotation.Laws.Modulus using (AgreeTo; AgreeTo-sym; ag-down; ≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; Ok; InvAt; GoodEnv; Hots; Lawful; _∪ʰ_; ok-step;
   W; W⁼; step; timer; join; here; inW; Real; real-snoc; real-sub; plain-ix; shrink; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
@@ -67,7 +68,7 @@ open import simultaneous.ListAfter using (listC-past; listC-pinpast)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
-open import simultaneous.TableCorr using (Rel; Rows; TR; Got)
+open import simultaneous.TableCorr using (Rel; Same; Scope; Rows; TR; Got)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -153,10 +154,23 @@ data Cut (q q* : Pos) : Pos → Pos → Set where
   at-step  : ∀ {y y* t c c* l} → Lvl q q* y y* → instantOf y ≡ cascade t c l → instantOf y* ≡ cascade t c* l
            → Cut q q* c c* → Cut q q* y y*
 
--- A table's rows cut alike, along a map.
-record Alike {X : Set} (ψ : Pos → Pos) (t : EmissionSet X) (q q* : Pos) : Set where
+-- A run's map onto its elaborated run: each row's image, each row's late
+-- placements, and its late rows.
+record HotMap : Set₁ where
+  constructor hotMap
+  field
+    ψ    : Pos → Pos
+    π    : Pos → Pos → Set
+    late : Pos → Set
+open HotMap public
+
+-- A table's rows cut alike, along a map: each row not late with its
+-- image, each row with its late placements.
+record Alike {X : Set} (h : HotMap) (t : EmissionSet X) (q q* : Pos) : Set where
   constructor alike
-  field cut : ∀ {k e} → t k e → Unpinned e → Cut q q* k (ψ k)
+  field
+    cut     : ∀ {k e} → t k e → Unpinned e → ¬ late h k → Cut q q* k (ψ h k)
+    cut-put : ∀ {k e l} → t k e → π h k l → Cut q q* k l
 open Alike public
 
 ------------------------------------------------------------------------
@@ -194,13 +208,13 @@ cut-r : ∀ {q q* y y*} → Cut q q* y y* → ∀ l* → Cut q (q* ⊕ [ l* ]) y
 cut-r (at-frame v a b)   l* = at-frame (lvl-r v l*) a b
 cut-r (at-step v a b c)  l* = at-step (lvl-r v l*) a b (cut-r c l*)
 
-alike-l : ∀ {X : Set} {ψ : Pos → Pos} {t : EmissionSet X} {q q*} → Alike ψ t q q* → ∀ l → Alike ψ t (q ⊕ [ l ]) q*
-alike-l a l = alike λ x un → cut-l (cut a x un) l
+alike-l : ∀ {X : Set} {h : HotMap} {t : EmissionSet X} {q q*} → Alike h t q q* → ∀ l → Alike h t (q ⊕ [ l ]) q*
+alike-l a l = alike (λ x un nl → cut-l (cut a x un nl) l) (λ x pl → cut-l (cut-put a x pl) l)
 
-alike-r : ∀ {X : Set} {ψ : Pos → Pos} {t : EmissionSet X} {q q*} → Alike ψ t q q* → ∀ l* → Alike ψ t q (q* ⊕ [ l* ])
-alike-r a l* = alike λ x un → cut-r (cut a x un) l*
+alike-r : ∀ {X : Set} {h : HotMap} {t : EmissionSet X} {q q*} → Alike h t q q* → ∀ l* → Alike h t q (q* ⊕ [ l* ])
+alike-r a l* = alike (λ x un nl → cut-r (cut a x un nl) l*) (λ x pl → cut-r (cut-put a x pl) l*)
 
-alike-r* : ∀ {X : Set} {ψ : Pos → Pos} {t : EmissionSet X} {q q*} → Alike ψ t q q* → ∀ ys → Alike ψ t q (q* ⊕ˡ ys)
+alike-r* : ∀ {X : Set} {h : HotMap} {t : EmissionSet X} {q q*} → Alike h t q q* → ∀ ys → Alike h t q (q* ⊕ˡ ys)
 alike-r* a []       = a
 alike-r* a (l ∷ ls) = alike-r* (alike-r a l) ls
 
@@ -468,7 +482,7 @@ admits-trig n u D c a =
 
 -- Each hot's map onto its elaborated hot, one per cut.
 Maps : List Set → Set₁
-Maps Γ = ∀ {X} → X ∈ Γ → ℕ → Pos → Pos
+Maps Γ = ∀ {X} → X ∈ Γ → ℕ → HotMap
 
 -- Two subscriptions cutting every hot in scope alike.
 Aligned : ∀ {Γ} → Maps Γ → (ℕ → All Tb.Listed Γ) → Pos → Pos → Set₁
@@ -484,28 +498,62 @@ aligned-⊕ al l l* i N = alike-r (alike-l (al i N) l) l*
 -- aligned there too.
 aligned-past : ∀ {Γ} {Ψ : Maps Γ} {ρ q q* s L z} → Aligned Ψ ρ s L → L ≼ q* → q* ≺ z → L ⊑ z
              → instantOf q* ≡ instantOf z → Aligned Ψ ρ q q* → Aligned Ψ ρ q z
-aligned-past aL Lq qz Lz iz al i N = alike λ x un → cut-past Lq qz Lz iz (cut (al i N) x un) (cut (aL i N) x un)
+aligned-past aL Lq qz Lz iz al i N =
+  alike (λ x un nl → cut-past Lq qz Lz iz (cut (al i N) x un nl) (cut (aL i N) x un nl))
+        (λ x pl → cut-past Lq qz Lz iz (cut-put (al i N) x pl) (cut-put (aL i N) x pl))
+
+------------------------------------------------------------------------
+-- The scope's agreement
+
+-- A fact at every index of a scope, as one small proposition.
+AllIx : (Γ : List Set) → (∀ {X} → X ∈ Γ → Set) → Set
+AllIx []      P = ⊤
+AllIx (X ∷ Γ) P = P (here refl) × AllIx Γ (λ i → P (there i))
+
+ix-at : ∀ {Γ} {P : ∀ {X} → X ∈ Γ → Set} → AllIx Γ P → ∀ {X} (i : X ∈ Γ) → P i
+ix-at (p , _)  (here refl) = p
+ix-at (_ , ps) (there i)   = ix-at ps i
+
+ix-map : ∀ {Γ} {P Q : ∀ {X} → X ∈ Γ → Set} → (∀ {X} {i : X ∈ Γ} → P i → Q i) → AllIx Γ P → AllIx Γ Q
+ix-map {[]}    f _        = tt
+ix-map {X ∷ Γ} f (p , ps) = f p , ix-map f ps
+
+-- Two cuts' hots in scope agreeing up to a position, plain and
+-- elaborated.
+Gs : ∀ {Γ} → (ℕ → All Tb.Listed Γ) → ℕ → ℕ → Pos → Set
+Gs {Γ} ρ N N′ y = AllIx Γ λ i → AgreeTo y (Rows (lookup (ρ N) i)) (Rows (lookup (ρ N′) i))
+
+Gs* : ∀ {Γ Δ} → Ren Γ Δ → (ℕ → All Tb.Listed Δ) → ℕ → ℕ → Pos → Set
+Gs* {Γ} ρι ρ* N N′ y = AllIx Γ λ i → AgreeTo y (Rows (lookup (ρ* N) (ρι (∈-map⁺ AIE i)))) (Rows (lookup (ρ* N′) (ρι (∈-map⁺ AIE i))))
+
+scopeOf : ∀ {Γ Δ} → (ℕ → All Tb.Listed Γ) → Ren Γ Δ → (ℕ → All Tb.Listed Δ) → Scope
+scopeOf ρ ρι ρ* = record
+  { G = Gs ρ ; G* = Gs* ρι ρ*
+  ; g-down = λ yy → ix-map (ag-down yy) ; g-sym = ix-map AgreeTo-sym
+  ; g*-down = λ yy → ix-map (ag-down yy) ; g*-sym = ix-map AgreeTo-sym }
 
 ------------------------------------------------------------------------
 -- The record and what it carries past the correspondence
 
--- Every row linked to its image; cutting every hot in scope alike with
--- it; the stream's own rows cut alike just under each row and its image;
--- and every pair before the subscription, cutting it alike, cuts the
--- stream's rows alike.
-record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p*}
-            (R : Rel P Q p p*) : Set₁ where
+-- A record's map at a cut, as a hot's.
+relMap : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S} → Rel P Q p p* S → ℕ → HotMap
+relMap {Q = Q} R N = hotMap (Rel.φ R N) (λ k l → Rel.Put R N k l × Σ _ λ e′ → TR (Q N) l e′) (Rel.Late R N)
+
+-- Every row not late linked to its image and cutting every hot in scope
+-- alike with it; and every pair before the subscription, cutting it
+-- alike, cuts the stream's rows alike.
+record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S}
+            (R : Rel P Q p p* S) : Set₁ where
   field
-    linked : ∀ N {k e} → TR (P N) k e → Unpinned e → Linked k (Rel.φ R N k)
-    cuts   : ∀ N {k e} → TR (P N) k e → Unpinned e → Aligned Ψ ρ k (Rel.φ R N k)
-    self   : ∀ N {k e} → TR (P N) k e → Unpinned e → ∀ l l* N′ → Alike (Rel.φ R N′) (TR (P N′)) (k ⊕ [ l ]) (Rel.φ R N k ⊕ [ l* ])
-    seen   : ∀ {q q*} → Aligned Ψ ρ q q* → Cut q q* p p* → q ≺ p → ∀ N → Alike (Rel.φ R N) (TR (P N)) q q*
+    linked : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Linked k (Rel.φ R N k)
+    cuts   : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Aligned Ψ ρ k (Rel.φ R N k)
+    seen   : ∀ {q q*} → Aligned Ψ ρ q q* → Cut q q* p p* → q ≺ p → ∀ N → Alike (relMap R N) (TR (P N)) q q*
 
 record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ)
            (Ψ : Maps Γ) (p p* : Pos) : Set₁ where
   constructor _⊢_
   field
-    rel  : Rel (Tab n o ρ p) (Tab* n ρι o ρ* p*) p p*
+    rel  : Rel (Tab n o ρ p) (Tab* n ρι o ρ* p*) p p* (scopeOf ρ ρι ρ*)
     rest : Rest Ψ ρ rel
 
 -- A hot in scope: its two readers' record wherever they are subscribed
@@ -522,7 +570,7 @@ record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : �
     hot  : ∀ {X} (i : X ∈ Γ) → HotR i ρ ρι ρ* maps lw lw*
     -- A hot's map is its readers' subscriptions', never their admissions'.
     hot-coh : ∀ {X} (i : X ∈ Γ) n p p* (a a′ : Admits lw p) (a* a*′ : Admits lw* p*) (al al′ : Aligned maps ρ p p*) (lk lk′ : Linked p p*) N y
-            → Rel.φ (Out.rel (hot i n p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (hot i n p p* a′ a*′ al′ lk′)) N y
+            → Same (Out.rel (hot i n p p* a a* al lk)) (Out.rel (hot i n p p* a′ a*′ al′ lk′)) N y
     -- No elaborated hot a program reads ends a lane.
     unended : ∀ N → EnvU ρι (den lw* N)
 open EnvR public
@@ -541,18 +589,18 @@ Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ 
 EnvEq : ∀ {Γ Δ} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} → EnvR ρ ρι ρ* → EnvR ρ ρι ρ* → Set₁
 EnvEq {Γ} {ρ = ρ} E E′ = ∀ {X} (i : X ∈ Γ) n p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
                  (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
-               → Rel.φ (Out.rel (hot E i n p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (hot E′ i n p p* a′ a*′ al′ lk′)) N y
+               → Same (Out.rel (hot E i n p p* a a* al lk)) (Out.rel (hot E′ i n p p* a′ a*′ al′ lk′)) N y
 
--- THE MAP IS THE SUBSCRIPTIONS': a record's map is had from its
--- subscriptions and its environment's maps, never from how either is
--- admitted.  A flatMap's lane is related at each cut from that cut's
+-- THE MAP IS THE SUBSCRIPTIONS': a record's map and its late rows are
+-- had from its subscriptions and its environment's maps, never from how
+-- either is admitted.  A flatMap's lane is related at each cut from that cut's
 -- row, so two cuts' records of one lane are two records, which only
 -- this relates.
 Coh : ∀ {Γ A} n (o : Obs Timeline Γ A) → Full n o → Set₁
 Coh {Γ} n o F = ∀ (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ* (E E′ : EnvR ρ ρι ρ*) → EnvEq E E′
               → ∀ p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
                   (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
-              → Rel.φ (Out.rel (F ρ uρ ρι ρ* uρ* E p p* a a* al lk)) N y ≡ Rel.φ (Out.rel (F ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′)) N y
+              → Same (Out.rel (F ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (F ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′)) N y
 
 -- An elaborated binder no plain subterm reads changes no reader.
 env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}

@@ -20,7 +20,7 @@ open import Data.Bool using (T)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Nullary using (Dec; yes; no)
+open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
@@ -38,7 +38,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; ev; Sh; ag-≃; coh-of; keys; in-keys; tr-few; ends; m-back; m-val; m-ee; got-bind)
+open import simultaneous.TableCorr using (TR; M; Corr; Rel; module Rel; Scope; module Scope; Cons; ev; Sh; ag-≃; coh-of; keys; in-keys; tr-few; ends; m-back; m-val; m-ee; got-bind)
 open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; sh-map→; sh-map←; sh-of; ag-map; func-map; flat-map; pin-in-map; tr-pin←)
 open import simultaneous.TableTake using (ex-just)
 
@@ -199,9 +199,10 @@ private
 -- The record, scanned
 
 module ScanTab {A B : Set} (f : B → A → B) (z : B)
-  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} (R : Rel P Q s s*) where
+  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} {S : Scope} (R : Rel P Q s s* S) where
 
   module R = Rel R
+  module Sc = Scope S
 
   z* : B × IE B
   z* = z , marked begin
@@ -223,12 +224,12 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
   ... | e₁ , y₁ , eq = e₁ , tr-scan→ (scanIE f) z* (Q N) y₁ , eq
 
   -- Agreement back through the scan, by the child's coherence.
-  ag← : ∀ {N N′ k} → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → AgreeTo k (TR (P N)) (TR (P N′))
-  ag← {N} {N′} ag = coh-of (tr-few (P N) (P N′)) R.cons R.cons
+  ag← : ∀ {N N′ k} → Sc.G N N′ k → AgreeTo k (TR (P′ N)) (TR (P′ N′)) → AgreeTo k (TR (P N)) (TR (P N′))
+  ag← {N} {N′} gk ag = coh-of (tr-few (P N) (P N′)) R.cons R.cons (λ yk → Sc.g-down yk gk) (λ yk → Sc.g-sym (Sc.g-down yk gk))
     (ag-≃ (sh-sc→ f z (P N)) (sh-sc← f z (P N)) (sh-sc→ f z (P N′)) (sh-sc← f z (P N′)) (sh-of ag))
 
-  ag←* : ∀ {N N′ k} → AgreeTo k (TR (Q′ N)) (TR (Q′ N′)) → AgreeTo k (TR (Q N)) (TR (Q N′))
-  ag←* {N} {N′} ag = coh-of (tr-few (Q N) (Q N′)) R.cons* R.cons*
+  ag←* : ∀ {N N′ k} → Sc.G* N N′ k → AgreeTo k (TR (Q′ N)) (TR (Q′ N′)) → AgreeTo k (TR (Q N)) (TR (Q N′))
+  ag←* {N} {N′} gk ag = coh-of (tr-few (Q N) (Q N′)) R.cons* R.cons* (λ yk → Sc.g*-down yk gk) (λ yk → Sc.g*-sym (Sc.g*-down yk gk))
     (ag-≃ (λ x → sh-sc→ (scanIE f) z* (Q N) (sh-map→ proj₂ (S* N) x)) (λ x → sh-map← proj₂ (S* N) (sh-sc← (scanIE f) z* (Q N) x))
           (λ x → sh-sc→ (scanIE f) z* (Q N′) (sh-map→ proj₂ (S* N′) x)) (λ x → sh-map← proj₂ (S* N′) (sh-sc← (scanIE f) z* (Q N′) x))
           (sh-of ag))
@@ -261,26 +262,34 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     acc-func : ∀ {q q′ b b′} → q ≡ q′ → Acc f z t q b → Acc f z t q′ b′ → b ≡ b′
     acc-func = AccF.acc-func f z fu
 
+    -- A value is never late.
+    nl-out : ∀ {k a} → t k (out a) → ¬ R.Late N k
+    nl-out x lt with C.late-put lt x
+    ... | () , _
+
     -- A plain value's image is a shown value.
     img-out : ∀ {k a} → t k (out a) → Σ (IE A) λ x₀ → u (φ k) (out x₀) × valuesOf x₀ ≡ a ∷ []
     img-out x with C.row→ x tt
-    ... | inj₁ (e′ , y , mt) with proj₁ mt tt
+    ... | inj₁ ((e′ , y , mt) , _) with proj₁ mt tt
     ...   | x₀ , refl , rd = x₀ , y , rd
     img-out x | inj₂ (() , _)
 
-    φ-le : ∀ {k k′ e e′} → t k e → t k′ e′ → Unpinned e → Unpinned e′ → φ k′ ≼ φ k → k′ ≼ k
-    φ-le x x′ un un′ le lt = le (C.mono x x′ un un′ lt)
+    φ-le : ∀ {k k′ a a′} → t k (out a) → t k′ (out a′) → φ k′ ≼ φ k → k′ ≼ k
+    φ-le x x′ le lt = le (C.mono x x′ tt tt (nl-out x) (nl-out x′) lt)
 
-    φ-back : ∀ {k₀ k e₀ e} → t k₀ e₀ → t k e → Unpinned e₀ → Unpinned e → φ k₀ ≺ φ k → k₀ ≺ k
-    φ-back {k₀} {k} x₀ x u₀ un lt with ≼-or-≻ k k₀
+    φ-back : ∀ {k₀ k a₀ a} → t k₀ (out a₀) → t k (out a) → φ k₀ ≺ φ k → k₀ ≺ k
+    φ-back {k₀} {k} x₀ x lt with ≼-or-≻ k k₀
     ... | inj₂ k₀k = k₀k
     ... | inj₁ le with ≼-split {k} {k₀} le
-    ...   | inj₁ kk₀  = ⊥-elim (≺-absurd {φ k₀} {φ k} lt (C.mono x x₀ un u₀ kk₀))
+    ...   | inj₁ kk₀  = ⊥-elim (≺-absurd {φ k₀} {φ k} lt (C.mono x x₀ tt tt (nl-out x) (nl-out x₀) kk₀))
     ...   | inj₂ refl = ⊥-elim (≺-irrefl {φ k} lt)
 
-    φ-inj : ∀ {k k′ e e′} → t k e → t k′ e′ → Unpinned e → Unpinned e′ → φ k ≡ φ k′ → k ≡ k′
-    φ-inj {k} {k′} x x′ un un′ eq =
-      ≼-antisym {k} {k′} (φ-le x′ x un′ un (subst (φ k ≼_) eq (≼-refl {φ k}))) (φ-le x x′ un un′ (subst (_≼ φ k) eq (≼-refl {φ k})))
+    φ-inj : ∀ {k k′ a a′} → t k (out a) → t k′ (out a′) → φ k ≡ φ k′ → k ≡ k′
+    φ-inj {k} {k′} x x′ eq =
+      ≼-antisym {k} {k′} (φ-le x′ x (subst (φ k ≼_) eq (≼-refl {φ k}))) (φ-le x x′ (subst (_≼ φ k) eq (≼-refl {φ k})))
+
+    mono-out : ∀ {k k′ a a′} → t k (out a) → t k′ (out a′) → k ≺ k′ → φ k ≺ φ k′
+    mono-out x x′ = C.mono x x′ tt tt (nl-out x) (nl-out x′)
 
     -- An image is not a mark.
     mark-img : ∀ {y m n k′ a′} → u y (out (instEmit (mark m) n)) → t k′ (out a′) → φ k′ ≡ y → ⊥
@@ -314,27 +323,27 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     -- A shown elaborated value read back to its plain value.
     shown-val : ∀ {y a n} → u y (out (instEmit (value a) n)) → Σ Pos λ k → y ≡ φ k × t k (out a)
     shown-val xu with C.shown← xu (_ , refl)
-    ... | k , e , eq , x , un , mt with m-back un mt (_ , refl)
+    ... | k , e , eq , x , un , _ , mt with m-back un mt (_ , refl)
     ...   | a′ , refl , refl = k , eq , x
 
     acc*→ : ∀ {y w} → Acc (scanIE f) z* u y w → Before y (proj₁ w) × Says y w
     acc*→ (acc₀ {a = instEmit (value a) n} xu mn) with shown-val xu
-    ... | k , refl , x = inj₁ (k , pac , ≼-refl {φ k} , λ x′ le → φ-le x x′ tt tt le) , λ { refl → refl , k , refl , pac }
+    ... | k , refl , x = inj₁ (k , pac , ≼-refl {φ k} , λ x′ le → φ-le x x′ le) , λ { refl → refl , k , refl , pac }
       where
         pac : Acc f z t k (f z a)
-        pac = acc₀ x λ x′ k′k → mn (proj₁ (proj₂ (img-out x′))) (C.mono x′ x tt tt k′k)
+        pac = acc₀ x λ x′ k′k → mn (proj₁ (proj₂ (img-out x′))) (mono-out x′ x k′k)
     acc*→ {y} (acc₀ {a = instEmit (mark m) n} xu mn) =
       inj₂ (refl , λ {k′} x′ le → mark-img xu x′ (≼-antisym {φ k′} {y} le (mn (proj₁ (proj₂ (img-out x′)))))) , λ ()
     acc*→ (acc {q = y₀} {b = w₀} {a′ = instEmit (value a) n} ac xu lt nx) with shown-val xu
-    ... | k , refl , x = inj₁ (k , pac , ≼-refl {φ k} , λ x′ le → φ-le x x′ tt tt le) , λ { refl → refl , k , refl , pac }
+    ... | k , refl , x = inj₁ (k , pac , ≼-refl {φ k} , λ x′ le → φ-le x x′ le) , λ { refl → refl , k , refl , pac }
       where
         pac : Acc f z t k (f (proj₁ w₀) a)
         pac with proj₁ (acc*→ ac)
         ... | inj₁ (k₀ , ac₀ , le₀ , lat) =
-          acc ac₀ x (φ-back (proj₂ (acc-val ac₀)) x tt tt (≼-≺-≺ {φ k₀} {y₀} {φ k} le₀ lt))
-            λ x′ k₀k′ k′k → lat x′ (below-prev {y₀} {φ k} nx x′ (C.mono x′ x tt tt k′k)) k₀k′
+          acc ac₀ x (φ-back (proj₂ (acc-val ac₀)) x (≼-≺-≺ {φ k₀} {y₀} {φ k} le₀ lt))
+            λ x′ k₀k′ k′k → lat x′ (below-prev {y₀} {φ k} nx x′ (mono-out x′ x k′k)) k₀k′
         ... | inj₂ (eq , none) =
-          subst (λ b → Acc f z t k (f b a)) (sym eq) (acc₀ x λ x′ k′k → none x′ (below-prev {y₀} {φ k} nx x′ (C.mono x′ x tt tt k′k)))
+          subst (λ b → Acc f z t k (f b a)) (sym eq) (acc₀ x λ x′ k′k → none x′ (below-prev {y₀} {φ k} nx x′ (mono-out x′ x k′k)))
     acc*→ {y} (acc {q = y₀} {b = w₀} {a′ = instEmit (mark m) n} ac xu lt nx) = before (proj₁ (acc*→ ac)) , λ ()
       where
         shift : ∀ {k′ a′} → t k′ (out a′) → φ k′ ≼ y → φ k′ ≼ y₀
@@ -366,7 +375,7 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ...   | x₀ , y₀ , rd with fold? (scanIE f) z* (Q N) y₀
     ...     | w , ac* with shown-w ac* y₀ rd
     ...       | sw with proj₂ (acc*→ ac*) sw
-    ...         | _ , k″ , eq , ac″ with φ-inj x (proj₂ (acc-val ac″)) tt tt eq
+    ...         | _ , k″ , eq , ac″ with φ-inj x (proj₂ (acc-val ac″)) eq
     ...           | refl with acc-func refl ac ac″
     ...             | refl = proj₂ w , ac* , sw
 
@@ -420,12 +429,12 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
 
     Homed′ : Pos → Set
     Homed′ k = instantOf k ≡ instantOf s
-             ⊎ Σ Pos λ k₀ → Σ (Ev B) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × Imaged′ k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+             ⊎ Σ Pos λ k₀ → Σ (Ev B) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × ¬ R.Late N k₀ × Imaged′ k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
 
     homed→ : ∀ {k} → C.Homed k → Homed′ k
     homed→ (inj₁ e) = inj₁ e
-    homed→ (inj₂ (k₀ , e₀ , x , un , im , lt , ie)) =
-      let (e , x′ , un′) = fwd-row x un in inj₂ (k₀ , e , x′ , un′ , img-of x un im x′ , lt , ie)
+    homed→ (inj₂ (k₀ , e₀ , x , un , nl , im , lt , ie)) =
+      let (e , x′ , un′) = fwd-row x un in inj₂ (k₀ , e , x′ , un′ , nl , img-of x un im x′ , lt , ie)
 
     PutAt′ : Pos → Set
     PutAt′ k = (Σ Pos λ l → Σ (Ev (IE B)) λ e′ → TR (Q′ N) l e′ × R.Put N k l) × Homed′ k
@@ -442,16 +451,26 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     leads← : ∀ {k} → Leads′ k → C.Leads k
     leads← ld x′ un′ ie′ = let (_ , x₁ , u₁) = fwd-row x′ un′ in ld x₁ u₁ ie′
 
-    row→′ : ∀ {k e} → TR (P′ N) k e → Unpinned e → Imaged′ k e ⊎ (e ≡ skip × PutAt′ k)
+    row→′ : ∀ {k e} → TR (P′ N) k e → Unpinned e → (Imaged′ k e × ¬ R.Late N k) ⊎ (e ≡ skip × PutAt′ k)
     row→′ x un with tr-scan→ f z (P N) x
-    ... | sval ac = inj₁ (img-val ac)
+    ... | sval ac = inj₁ (img-val ac , nl-out (proj₂ (acc-val ac)))
     ... | sstep xs with C.row→ xs tt
-    ...   | inj₁ im       = inj₁ (img-skip im)
-    ...   | inj₂ (_ , pa) = inj₂ (refl , put→ pa)
+    ...   | inj₁ (im , nl) = inj₁ (img-skip im , nl)
+    ...   | inj₂ (_ , pa)  = inj₂ (refl , put→ pa)
     row→′ x un | send xe with C.row→ xe tt
-    ... | inj₁ im      = inj₁ (img-end im)
+    ... | inj₁ (im , nl) = inj₁ (img-end im , nl)
     ... | inj₂ (() , _)
     row→′ x un | spin _ = ⊥-elim un
+
+    late-put′ : ∀ {k e} → R.Late N k → TR (P′ N) k e → e ≡ skip × PutAt′ k
+    late-put′ lt x with tr-scan→ f z (P N) x
+    ... | sval ac = ⊥-elim (nl-out (proj₂ (acc-val ac)) lt)
+    ... | sstep xs with C.late-put lt xs
+    ...   | _ , pa = refl , put→ pa
+    late-put′ lt x | send xe with C.late-put lt xe
+    ... | () , _
+    late-put′ lt x | spin xp with C.late-put lt xp
+    ... | () , _
 
     PinAt′ : Pos → Pos → Set
     PinAt′ k p = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × R.Put N k l
@@ -464,18 +483,22 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ...   | (l , p′ , y , pl , past) , h =
       (l , p′ , q′← (spin y) , pl , λ x′ lt → past (proj₂ (acc-val (sval-inv f z (tr-scan→ f z (P N) x′)))) lt) , homed→ h
 
-    put-before′ : ∀ {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → k ≺ k′ → l ≼ φ k′
-    put-before′ x pl x′ un′ lt with tr-scan→ f z (P N) x
-    ... | sstep xs = let (_ , x₀ , u₀) = back-row x′ un′ in C.put-before xs pl x₀ u₀ lt
+    put-before′ : ∀ {k l k′ e′} → TR (P′ N) k skip → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ R.Late N k′ → k ≺ k′ → l ≼ φ k′
+    put-before′ x pl x′ un′ nl′ lt with tr-scan→ f z (P N) x
+    ... | sstep xs = let (_ , x₀ , u₀) = back-row x′ un′ in C.put-before xs pl x₀ u₀ nl′ lt
+
+    pin-before′ : ∀ {k p l k′ e′} → TR (P′ N) k (pin p) → R.Put N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ R.Late N k′ → k ≺ k′ → l ≼ φ k′
+    pin-before′ x pl x′ un′ nl′ lt with tr-scan→ f z (P N) x
+    ... | spin xp = let (_ , x₀ , u₀) = back-row x′ un′ in C.pin-before xp pl x₀ u₀ nl′ lt
 
     shown←′ : ∀ {l e′} → TR (Q′ N) l e′ → Shown (One valuesOf) e′
-            → Σ Pos λ k → Σ (Ev B) λ e → l ≡ φ k × TR (P′ N) k e × Unpinned e × M e e′
+            → Σ Pos λ k → Σ (Ev B) λ e → l ≡ φ k × TR (P′ N) k e × Unpinned e × ¬ R.Late N k × M e e′
     shown←′ y sh with q′→ {N} y
     ... | out w , sval ac* , refl with proj₂ (acc*→ ac*) (proj₂ sh)
-    ...   | refl , k , eq , ac = k , out (proj₁ w) , eq , tr-scan← f z (P N) (sval ac) , tt , m-val (proj₂ sh)
+    ...   | refl , k , eq , ac = k , out (proj₁ w) , eq , tr-scan← f z (P N) (sval ac) , tt , nl-out (proj₂ (acc-val ac)) , m-val (proj₂ sh)
     shown←′ y sh | end , send xe , refl with C.shown← xe tt
-    ... | k , e , eq , x , un , mt with ends un mt
-    ...   | refl = k , end , eq , tr-scan← f z (P N) (send x) , tt , m-ee
+    ... | k , e , eq , x , un , nl , mt with ends un mt
+    ...   | refl = k , end , eq , tr-scan← f z (P N) (send x) , tt , nl , m-ee
 
     leadsOr : ∀ {k m} → φ k ≼ m ⊎ C.Leads k → φ k ≼ m ⊎ Leads′ k
     leadsOr (inj₁ le) = inj₁ le
@@ -485,29 +508,30 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     row-of* = row-of (scanIE f) z*
 
     place′ : ∀ {m e′} → TR (Q′ N) m e′ → Live (TR (Q′ N)) m
-           → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × Imaged′ k e × (φ k ≼ m ⊎ Leads′ k) × instantOf (φ k) ≡ instantOf m
+           → instantOf m ≡ instantOf s* ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × ¬ R.Late N k × Imaged′ k e × (φ k ≼ m ⊎ Leads′ k) × instantOf (φ k) ≡ instantOf m
     place′ {m} y lv with q′→ {N} y
     ... | e₁ , sc , _ with C.place (proj₂ (row-of* sc)) (λ xe → lv (q′← (send xe)))
     ...   | inj₁ e = inj₁ e
-    ...   | inj₂ (k , e₀ , x , un , im , le , ie) =
-      let (e , x′ , un′) = fwd-row x un in inj₂ (k , e , x′ , un′ , img-of x un im x′ , leadsOr {k} {m} le , ie)
+    ...   | inj₂ (k , e₀ , x , un , nl , im , le , ie) =
+      let (e , x′ , un′) = fwd-row x un in inj₂ (k , e , x′ , un′ , nl , img-of x un im x′ , leadsOr {k} {m} le , ie)
 
-    corr′ : Corr s s* φ (R.Put N) (TR (P′ N)) (TR (Q′ N))
+    corr′ : Corr s s* φ (R.Put N) (R.Late N) (TR (P′ N)) (TR (Q′ N))
     corr′ = record
-      { row→ = row→′ ; pin→ = pin→′ ; put-before = put-before′ ; shown← = shown←′ ; place = place′
-      ; mono = λ x x′ un un′ lt → let (_ , x₀ , u₀) = back-row x un ; (_ , x₁ , u₁) = back-row x′ un′ in C.mono x₀ x₁ u₀ u₁ lt
-      ; inst = λ x x′ un un′ → let (_ , x₀ , u₀) = back-row x un ; (_ , x₁ , u₁) = back-row x′ un′ in C.inst x₀ x₁ u₀ u₁
-      ; home = λ x un → let (_ , x₀ , u₀) = back-row x un in C.home x₀ u₀ }
+      { row→ = row→′ ; late-put = late-put′ ; pin→ = pin→′ ; put-before = put-before′ ; pin-before = pin-before′ ; shown← = shown←′ ; place = place′
+      ; mono = λ x x′ un un′ nl nl′ lt → let (_ , x₀ , u₀) = back-row x un ; (_ , x₁ , u₁) = back-row x′ un′ in C.mono x₀ x₁ u₀ u₁ nl nl′ lt
+      ; inst = λ x x′ un un′ nl nl′ → let (_ , x₀ , u₀) = back-row x un ; (_ , x₁ , u₁) = back-row x′ un′ in C.inst x₀ x₁ u₀ u₁ nl nl′
+      ; home = λ x un nl → let (_ , x₀ , u₀) = back-row x un in C.home x₀ u₀ nl }
 
   -- Every elaborated row of the deeper cut, the shallower holds, once the
   -- plain scans agree everywhere: a value's fold is a plain fold both read.
-  elab-all′ : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N))) → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
-  elab-all′ {N} {N′} le all y with q′→ {N′} y
-  ... | _ , sstep x , refl = q′← (sstep (R.elab-all le (λ q → ag← (all q)) x))
-  ... | _ , spin x , refl  = q′← (spin (R.elab-all le (λ q → ag← (all q)) x))
-  ... | _ , send x , refl  = q′← (send (R.elab-all le (λ q → ag← (all q)) x))
+  elab-all′ : ∀ {N N′} → N ≤ N′ → (∀ q → Sc.G N′ N q) → (∀ q → Sc.G* N′ N q) → (∀ q → AgreeTo q (TR (P′ N′)) (TR (P′ N)))
+            → ∀ {y e} → TR (Q′ N′) y e → TR (Q′ N) y e
+  elab-all′ {N} {N′} le gs gs* all y with q′→ {N′} y
+  ... | _ , sstep x , refl = q′← (sstep (R.elab-all le gs gs* (λ q → ag← (gs q) (all q)) x))
+  ... | _ , spin x , refl  = q′← (spin (R.elab-all le gs gs* (λ q → ag← (gs q) (all q)) x))
+  ... | _ , send x , refl  = q′← (send (R.elab-all le gs gs* (λ q → ag← (gs q) (all q)) x))
   ... | out w , sval ac* , refl with At.last* N′ ac*
-  ...   | x₀ , xu , w₀ , refl with R.elab-all le (λ q → ag← (all q)) xu
+  ...   | x₀ , xu , w₀ , refl with R.elab-all le gs gs* (λ q → ag← (gs q) (all q)) xu
   ...     | xu′ with fold? (scanIE f) z* (Q N) xu′
   ...       | w′ , ac*′ with At.last* N ac*′
   ...         | x₁ , xu″ , w₁ , refl with R.func* xu′ xu″
@@ -517,47 +541,50 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
       same (instEmit (mark m) n)  _    = refl
       same (instEmit (value a) n) refl with proj₂ (At.acc*→ N′ ac*) refl | proj₂ (At.acc*→ N ac*′) refl
       ... | _ , k , eq , pac | _ , k′ , eq′ , pac′ =
-        let agk  = ag← {N′} {N} (all k)
+        let agk  = ag← {N′} {N} (gs k) (all k)
             pacN = sval-inv f z (proj₁ (upto (scan-ag f z agk) (≼-refl {k})) (sval pac))
             xk   = proj₂ (At.acc-val N pacN)
-            φeq  = R.φ-agree xk tt (AgreeTo-sym agk)
-            kk′  = At.φ-inj N xk (proj₂ (At.acc-val N pac′)) tt tt (trans φeq (trans (sym eq) eq′))
+            φeq  = R.φ-agree xk tt (At.nl-out N xk) (Sc.g-sym (gs k)) (Sc.g*-sym (gs* (R.φ N k))) (AgreeTo-sym agk)
+            kk′  = At.φ-inj N xk (proj₂ (At.acc-val N pac′)) (trans φeq (trans (sym eq) eq′))
         in cong (λ b → instEmit (value b) n) (sym (At.acc-func N kk′ pacN pac′))
 
   -- Two cuts' scans truncated before they differ.
-  cons′ : ∀ {N N′} → (∀ {y y′ e′} {v : B} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (P′ N)) (TR (P′ N′))) → TR (P′ N) y (out v) → TR (P′ N′) y′ e′ → y ≼ y′ → TR (P′ N′) y (out v))
-  cons′ {N} {N′} {y} below x x′ yy with tr-scan→ f z (P N) x
+  cons′ : ∀ {N N′} → Cons (Sc.G N N′) (TR (P′ N)) (TR (P′ N′))
+  cons′ {N} {N′} {y} g below x x′ yy with tr-scan→ f z (P N) x
   ... | sval ac =
     let (_ , x₀) = At.acc-val N ac
-        x₁ = R.cons (λ lt → ag← (below lt)) x₀ (proj₂ (row-of f z (tr-scan→ f z (P N′) x′))) yy
-        agy = ag-at (λ lt → ag← (below lt)) R.func R.func x₀ x₁
+        bl = λ {y₀} (lt : y₀ ≺ y) → ag← (Sc.g-down (≺→≼ {y₀} {y} lt) g) (below lt)
+        x₁ = R.cons g bl x₀ (proj₂ (row-of f z (tr-scan→ f z (P N′) x′))) yy
+        agy = ag-at bl R.func R.func x₀ x₁
     in tr-scan← f z (P N′) (proj₁ (upto (scan-ag f z agy) (≼-refl {y})) (sval ac))
 
-  cons*′ : ∀ {N N′} → (∀ {y y′ e′} {v : IE B} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ (TR (Q′ N)) (TR (Q′ N′))) → TR (Q′ N) y (out v) → TR (Q′ N′) y′ e′ → y ≼ y′ → TR (Q′ N′) y (out v))
-  cons*′ {N} {N′} {y} below x x′ yy with q′→ {N} x
+  cons*′ : ∀ {N N′} → Cons (Sc.G* N N′) (TR (Q′ N)) (TR (Q′ N′))
+  cons*′ {N} {N′} {y} g below x x′ yy with q′→ {N} x
   ... | out w , sval ac* , refl =
     let (_ , xu , _ , _) = At.last* N ac*
-        x₁ = R.cons* (λ lt → ag←* (below lt)) xu (proj₂ (At.row-of* N′ (proj₁ (proj₂ (q′→ {N′} x′))))) yy
-        agy = ag-at (λ lt → ag←* (below lt)) R.func* R.func* xu x₁
+        bl = λ {y₀} (lt : y₀ ≺ y) → ag←* (Sc.g*-down (≺→≼ {y₀} {y} lt) g) (below lt)
+        x₁ = R.cons* g bl xu (proj₂ (At.row-of* N′ (proj₁ (proj₂ (q′→ {N′} x′))))) yy
+        agy = ag-at bl R.func* R.func* xu x₁
     in q′← (proj₁ (upto (scan-ag (scanIE f) z* agy) (≼-refl {y})) (sval ac*))
 
-  rel′ : Rel P′ Q′ s s*
+  rel′ : Rel P′ Q′ s s* S
   rel′ = record
-    { φ = R.φ ; Put = R.Put ; corr = At.corr′
-    ; φ-agree = λ {N} x un ag → let (_ , x₀ , u₀) = At.back-row N x un in R.φ-agree x₀ u₀ (ag← ag)
+    { φ = R.φ ; Put = R.Put ; Late = R.Late ; corr = At.corr′
+    ; φ-agree = λ {N} x un nl g g* ag → let (_ , x₀ , u₀) = At.back-row N x un in R.φ-agree x₀ u₀ nl g g* (ag← g ag)
+    ; late-agree = λ {N} x un nl g g* ag → let (_ , x₀ , u₀) = At.back-row N x un in R.late-agree x₀ u₀ nl g g* (ag← g ag)
     ; bk = R.bk
-    ; in-bk = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.in-bk x₀ u₀
+    ; in-bk = λ {N} x un nl → let (_ , x₀ , u₀) = At.back-row N x un in R.in-bk x₀ u₀ nl
     ; pb-few = R.pb-few
-    ; back = λ {N} {N′} le x un ag* → let (_ , x₀ , u₀) = At.back-row N′ x un in ag-sc f z (P N′) (P N) (R.back le x₀ u₀ (ag←* ag*))
-    ; put-up = λ le ag → R.put-up le (ag← ag)
-    ; back-put = λ le pl ag* → R.back-put le pl (ag←* ag*)
-    ; elab-causal = λ {N} le x un ag → let (_ , x₀ , u₀) = At.back-row N x un in ag→* (R.elab-causal le x₀ u₀ (ag← ag))
-    ; stable← = λ {N} {N′} le x un y ag* → let (_ , x₀ , u₀) = At.back-row N x un in
-        ag-sc f z (P N′) (P N) (R.stable← le x₀ u₀ (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (ag←* ag*))
-    ; stable-put = λ {N} le ag y pl → ag→* (R.stable-put le (ag← ag) (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) pl)
-    ; stable-lead = λ {N} le x un y ld w ie ag* → let (_ , x₀ , u₀) = At.back-row N x un in
-        ag→* (R.stable-lead le x₀ u₀ (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (At.leads← N ld)
-                (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} w))))) ie (ag←* ag*))
+    ; back = λ {N} {N′} le x un nl g g* ag* → let (_ , x₀ , u₀) = At.back-row N′ x un in ag-sc f z (P N′) (P N) (R.back le x₀ u₀ nl g g* (ag←* g* ag*))
+    ; put-up = λ le g g* ag → R.put-up le g g* (ag← g ag)
+    ; back-put = λ le g g* pl ag* → R.back-put le g g* pl (ag←* g* ag*)
+    ; elab-causal = λ {N} le x un nl g g* ag → let (_ , x₀ , u₀) = At.back-row N x un in ag→* (R.elab-causal le x₀ u₀ nl g g* (ag← g ag))
+    ; stable← = λ {N} {N′} le x un nl g g* y ag* → let (_ , x₀ , u₀) = At.back-row N x un in
+        ag-sc f z (P N′) (P N) (R.stable← le x₀ u₀ nl g g* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (ag←* g* ag*))
+    ; stable-put = λ {N} le g g* ag y pl → ag→* (R.stable-put le g g* (ag← g ag) (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) pl)
+    ; stable-lead = λ {N} le x un nl g g* y ld w gm ie ag* → let (_ , x₀ , u₀) = At.back-row N x un in
+        ag→* (R.stable-lead le x₀ u₀ nl g g* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) (At.leads← N ld)
+                (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} w))))) gm ie (ag←* gm ag*))
     ; elab-all = elab-all′
     ; func = λ {N} x x′ → func-sc f z R.func (tr-scan→ f z (P N) x) (tr-scan→ f z (P N) x′)
     ; func* = λ {N} → func-map proj₂ (S* N) λ x x′ → func-sc (scanIE f) z* R.func* (tr-scan→ (scanIE f) z* (Q N) x) (tr-scan→ (scanIE f) z* (Q N) x′)
@@ -571,10 +598,10 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; got* = λ N → got-bind (Tb.mapRows proj₂) (got-bind (scanRows (scanIE f) z*) (R.got* N))
     ; after = λ {N} x → R.after (proj₂ (row-of f z (tr-scan→ f z (P N) x)))
     ; after* = λ {N} y → R.after* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y)))))
-    ; after-φ = λ {N} x un → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀
+    ; after-φ = λ {N} x un nl → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀ nl
     ; pin-after* = λ {N} y → R.pin-after* (sc-pin (tr-scan→ (scanIE f) z* (Q N) (tr-pin← proj₂ (S* N) y)))
-    ; pin-stable = λ {N} {N′} le x un ag hp rk y → let (_ , x₀ , u₀) = At.back-row N x un in
-        q′← {N} (spin (R.pin-stable le x₀ u₀ (ag← ag)
+    ; pin-stable = λ {N} {N′} le x un nl g g* ag hp rk y → let (_ , x₀ , u₀) = At.back-row N x un in
+        q′← {N} (spin (R.pin-stable le x₀ u₀ nl g g* (ag← g ag)
           (λ r₀k x₁ → sc-pin (tr-scan→ f z (P N) (hp r₀k (tr-scan← f z (P N′) (spin x₁)))))
           rk (sc-pin (tr-scan→ (scanIE f) z* (Q N′) (tr-pin← proj₂ (S* N′) y))))) }
     where
@@ -584,7 +611,7 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
       pin-sc : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → (∀ {l r} → t l (pin r) → T (inside r l)) → T (inside r l)
       pin-sc (spin x) pi = pi x
 
-scan-tab : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
+scan-tab : ∀ {A B} (f : B → A → B) (z : B) {P Q s s* S} → Rel P Q s s* S
          → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
-               (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (Tb.mapRows proj₂ l)) s s*
+               (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (Tb.mapRows proj₂ l)) s s* S
 scan-tab f z R = ScanTab.rel′ f z R

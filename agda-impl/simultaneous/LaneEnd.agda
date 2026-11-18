@@ -57,10 +57,10 @@ open import simultaneous.LaneEndSched using (laneX; readerR; emitAt; later; late
 -- One layer's row, read forward
 
 -- A plain end's image, an end.
-corr-end : ∀ {A s s* φ Put L L*} → Corr {A} s s* φ Put L L* → ∀ {k} → L k end → L* (φ k) end
+corr-end : ∀ {A s s* φ Put Late L L*} → Corr {A} s s* φ Put Late L L* → ∀ {k} → L k end → L* (φ k) end
 corr-end C x with Corr.row→ C x tt
 ... | inj₂ (() , _)
-... | inj₁ (_ , y , m) with proj₁ m tt
+... | inj₁ ((_ , y , m) , _) with proj₁ m tt
 ...   | refl = y
 
 -- A connect's row, its body's.

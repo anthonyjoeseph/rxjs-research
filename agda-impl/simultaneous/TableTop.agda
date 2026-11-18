@@ -26,7 +26,7 @@ open import denotation.Events using (Timeline; fresh)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC)
-open import simultaneous.TableCorr using (Rel)
+open import simultaneous.TableCorr using (Rel; Scope)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; elaborate; completing; wrapped)
 
@@ -54,30 +54,30 @@ postulate
   -- reads them back, and its second leaves the mark and the end past the
   -- source's end.
   -- RECOVERY: git show a0945587 restores the told run carried over approx (simultaneous/CarryTold.agda over the inventory and inversion of simultaneous/ToldRows.agda), each to be restated over the tables.
-  told-rel : ∀ {A} n (o : Obs Timeline [] A)
-           → Rel (Plain n o) (At n (elab (λ i → i) o) core₀) root core₀
-           → Rel (Plain n o) (At n (completing (elab (λ i → i) o)) lane₀) root lane₀
+  told-rel : ∀ {A} {S : Scope} n (o : Obs Timeline [] A)
+           → Rel (Plain n o) (At n (elab (λ i → i) o) core₀) root core₀ S
+           → Rel (Plain n o) (At n (completing (elab (λ i → i) o)) lane₀) root lane₀ S
 
   -- THE CLOSED RUN: the told run merged with the subscribe mark's lane,
   -- taken through the completion mark.  Owes that the program never
   -- emits a completion mark, so the take's first failure is the told
   -- run's; the subscribe mark lies in the subscription's instant.
   -- RECOVERY: git show a0945587 restores the merge and take carried over approx (simultaneous/WrapTake.agda, simultaneous/CarryWrap.agda) and the core's emits (simultaneous/CoreOuts.agda), each to be restated over the tables.
-  closed-rel : ∀ {A} n (o : Obs Timeline [] A)
-             → Rel (Plain n o) (At n (completing (elab (λ i → i) o)) lane₀) root lane₀
-             → Rel (Plain n o) (At n (wrapped (elab (λ i → i) o)) root) root root
+  closed-rel : ∀ {A} {S : Scope} n (o : Obs Timeline [] A)
+             → Rel (Plain n o) (At n (completing (elab (λ i → i) o)) lane₀) root lane₀ S
+             → Rel (Plain n o) (At n (wrapped (elab (λ i → i) o)) root) root root S
 
   -- THE RESTAMP: every emit renamed for the last `begin` before it, a
   -- scan read through `proj₂`.  Positions, constructors and values stay;
   -- as `scan-tab`'s elaborated half, agreement back is by coherence.
-  stamped-rel : ∀ {A} n (o : Obs Timeline [] A)
-              → Rel (Plain n o) (At n (wrapped (elab (λ i → i) o)) root) root root
-              → Rel (Plain n o) (At n (elaborate o) root) root root
+  stamped-rel : ∀ {A} {S : Scope} n (o : Obs Timeline [] A)
+              → Rel (Plain n o) (At n (wrapped (elab (λ i → i) o)) root) root root S
+              → Rel (Plain n o) (At n (elaborate o) root) root root S
 
 ------------------------------------------------------------------------
 -- The top
 
-top-rel : ∀ {A} n (o : Obs Timeline [] A)
-        → Rel (Plain n o) (At n (elab (λ i → i) o) core₀) root core₀
-        → Rel (Plain n o) (At n (elaborate o) root) root root
+top-rel : ∀ {A} {S : Scope} n (o : Obs Timeline [] A)
+        → Rel (Plain n o) (At n (elab (λ i → i) o) core₀) root core₀ S
+        → Rel (Plain n o) (At n (elaborate o) root) root root S
 top-rel n o R = stamped-rel n o (closed-rel n o (told-rel n o R))

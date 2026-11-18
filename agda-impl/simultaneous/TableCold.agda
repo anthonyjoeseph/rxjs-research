@@ -23,7 +23,7 @@ open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; _≤_; _+_; _∸_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
@@ -42,7 +42,7 @@ open import simultaneous.Listing using (walkN; listC; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
 open import simultaneous.ColdOrder using (walk-past; walk-nopin)
-open import simultaneous.TableCorr using (TR; M; Cons; Got; Corr; Rel)
+open import simultaneous.TableCorr using (TR; M; Cons; cons-≤; Got; Corr; Rel; Scope; module Scope)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableEnv using (got-ok)
 
@@ -121,7 +121,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     walk-flat  : ∀ {N y e l ys e′} → (y , e) ∈ W N → (y ⊕ (l ∷ ys) , e′) ∈ W N → ⊥
     walk-agree : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N → AgreeTo k (TR (P N′)) (TR (P N))
     walk-back  : ∀ {N N′ k e} → N ≤ N′ → (k , e) ∈ W N′ → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-    walk-cons  : ∀ {N N′} → Cons (TR (P N)) (TR (P N′))
+    walk-cons  : ∀ {N N′} → Cons (λ _ → ⊤) (TR (P N)) (TR (P N′))
     walk-all   : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → I N ≡ I N′
     walk-alone : ∀ {N k e k′ e′} → (k , e) ∈ W N → (k′ , e′) ∈ W N → instantOf k′ ≡ instantOf k → sync* (ψ k) ≡ false → k ≡ k′
     φ-mono     : ∀ {N k e k′ e′} → (k , e) ∈ W N → (k′ , e′) ∈ W N → k ≺ k′ → φ′ N k ≺ φ′ N k′
@@ -134,7 +134,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     rows-func   : ∀ {N l e e′} → CRow (I N) l e → CRow (I N) l e′ → e ≡ e′
     rows-flat   : ∀ {N y e l ys e′} → CRow (I N) y e → CRow (I N) (y ⊕ (l ∷ ys)) e′ → ⊥
     rows-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (CRow (I N′)) (CRow (I N))
-    rows-cons   : ∀ {N N′} → Cons (CRow (I N)) (CRow (I N′))
+    rows-cons   : ∀ {N N′} → Cons (λ _ → ⊤) (CRow (I N)) (CRow (I N′))
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
@@ -169,8 +169,8 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   cold-causal : ∀ {N N′ y e} → N ≤ N′ → (y , e) ∈ I N → AgreeTo (im y e) (TR (Q N′)) (TR (Q N))
   cold-causal le x = ag→ (rows-causal le x)
 
-  cold-cons : ∀ {N N′} → Cons (TR (Q N)) (TR (Q N′))
-  cold-cons below t t′ yy = rows← (rows-cons (λ lt → ag← (below lt)) (rows→ t) (rows→ t′) yy)
+  cold-cons : ∀ {N N′} → Cons (λ _ → ⊤) (TR (Q N)) (TR (Q N′))
+  cold-cons g below t t′ yy = rows← (rows-cons g (λ lt → ag← (below lt)) (rows→ t) (rows→ t′) yy)
 
   cold-same : ∀ {N N′} → I N ≡ I N′ → ∀ {l e′} → TR (Q N′) l e′ → TR (Q N) l e′
   cold-same eq t = rows← (subst (λ J → CRow J _ _) (sym eq) (rows→ t))
@@ -224,36 +224,38 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   agree-φ {N} {N′} {k} {e} x a with proj₁ (AgreeTo.upto a (≼-refl {k})) (_ , refl , x)
   ... | _ , refl , x′ = cong (λ kd → σ kd (sync* (ψ k)) (ψ k)) (trans (walk-kind x) (sym (walk-kind x′)))
 
-  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (TR (P N)) (TR (Q N))
+  corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (λ _ → ⊥) (TR (P N)) (TR (Q N))
   corr′ N = record
-    { row→ = λ { (_ , refl , x) _ → inj₁ (img x) }
+    { row→ = λ { (_ , refl , x) _ → inj₁ (img x , λ ()) }
+    ; late-put = λ ()
     ; pin→ = λ { (_ , refl , x) _ → ⊥-elim (walk-pin x) }
     ; put-before = λ _ ()
+    ; pin-before = λ _ ()
     ; shown← = shown′
     ; place = place′
-    ; mono = λ { (_ , refl , x) (_ , refl , x′) _ _ lt → φ-mono x x′ lt }
-    ; inst = λ { (_ , refl , x) (_ , refl , x′) _ _ → φ-inst x x′ }
-    ; home = λ { (_ , refl , x) _ → φ-home x } }
+    ; mono = λ { (_ , refl , x) (_ , refl , x′) _ _ _ _ lt → φ-mono x x′ lt }
+    ; inst = λ { (_ , refl , x) (_ , refl , x′) _ _ _ _ → φ-inst x x′ }
+    ; home = λ { (_ , refl , x) _ _ → φ-home x } }
     where
       shown′ : ∀ {l e′} → TR (Q N) l e′ → Shown (One valuesOf) e′
-             → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P N) k e × Unpinned e × M e e′
+             → Σ Pos λ k → Σ (Ev A) λ e → l ≡ φ′ N k × TR (P N) k e × Unpinned e × (⊥ → ⊥) × M e e′
       shown′ q sh with cold-bwd q
       ... | inj₂ (ns , _) = ⊥-elim (ns sh)
       ... | inj₁ (y , e , iy , eq , mm) with walk-ren← iy
-      ...   | k , x , refl = k , e , trans eq (sym (φ-im x)) , (_ , refl , x) , unp x , mm
+      ...   | k , x , refl = k , e , trans eq (sym (φ-im x)) , (_ , refl , x) , unp x , (λ ()) , mm
 
       place′ : ∀ {l e′} → TR (Q N) l e′ → Live (TR (Q N)) l
              → instantOf l ≡ instantOf p*
-             ⊎ Σ Pos λ k → Σ (Ev A) λ e → TR (P N) k e × Unpinned e × (Σ (Ev (IE A)) λ e′ → TR (Q N) (φ′ N k) e′ × M e e′)
+             ⊎ Σ Pos λ k → Σ (Ev A) λ e → TR (P N) k e × Unpinned e × (⊥ → ⊥) × (Σ (Ev (IE A)) λ e′ → TR (Q N) (φ′ N k) e′ × M e e′)
                × (φ′ N k ≼ l ⊎ (∀ {k′ e″} → TR (P N) k′ e″ → Unpinned e″ → instantOf k′ ≡ instantOf k → k ≼ k′))
                × instantOf (φ′ N k) ≡ instantOf l
       place′ {l} q _ with cold-bwd q
       ... | inj₂ (_ , inj₁ i) = inj₁ i
       ... | inj₁ (y , e , iy , eq , mm) with walk-ren← iy
       ...   | k , x , refl with trans eq (sym (φ-im x))
-      ...     | refl = inj₂ (k , e , (_ , refl , x) , unp x , img x , inj₁ (≼-refl {l}) , refl)
+      ...     | refl = inj₂ (k , e , (_ , refl , x) , unp x , (λ ()) , img x , inj₁ (≼-refl {l}) , refl)
       place′ {l} q _ | inj₂ (_ , inj₂ (y , e , iy , as , ieq)) with walk-ren← iy
-      ... | k , x , refl = inj₂ (k , e , (_ , refl , x) , unp x , img x , inj₂ leads , trans (cong instantOf (φ-im x)) inst)
+      ... | k , x , refl = inj₂ (k , e , (_ , refl , x) , unp x , (λ ()) , img x , inj₂ leads , trans (cong instantOf (φ-im x)) inst)
         where
           leads : ∀ {k′ e″} → TR (P N) k′ e″ → Unpinned e″ → instantOf k′ ≡ instantOf k → k ≼ k′
           leads (_ , refl , x′) _ eq′ with walk-alone x x′ eq′ as
@@ -262,36 +264,38 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
           inst : instantOf (im (ψ k) e) ≡ instantOf l
           inst rewrite as = trans (σ-inst (kind e) (ψ k)) ieq
 
-  rel′ : Rel P Q p p*
-  rel′ = record
-    { φ = φ′ ; Put = Put′ ; corr = corr′
-    ; φ-agree = λ { (_ , refl , x) _ a → agree-φ x a }
+  rel′ : ∀ {S} → Rel P Q p p* S
+  rel′ {S} = record
+    { φ = φ′ ; Put = Put′ ; Late = λ _ _ → ⊥ ; corr = corr′
+    ; φ-agree = λ { (_ , refl , x) _ _ _ _ a → agree-φ x a }
+    ; late-agree = λ _ _ _ _ _ _ ()
     ; bk = λ _ → bk′
-    ; in-bk = λ { (_ , refl , x) _ → φ-back x }
+    ; in-bk = λ { (_ , refl , x) _ _ → φ-back x }
     ; pb-few = λ _ _ → [] , λ ()
-    ; back = λ { le (_ , refl , x) _ a → walk-back le x a }
-    ; put-up = λ _ _ ()
-    ; back-put = λ _ ()
-    ; elab-causal = λ { le (_ , refl , x) _ _ → causal le x }
-    ; stable← = λ { le (_ , refl , x) _ _ _ → walk-agree le x }
-    ; stable-put = λ _ _ _ ()
-    ; stable-lead = λ { le (_ , refl , x) _ _ _ _ _ _ → causal le x }
-    ; elab-all = λ le a → cold-same (walk-all le a)
+    ; back = λ { le (_ , refl , x) _ _ _ _ a → walk-back le x a }
+    ; put-up = λ _ _ _ _ ()
+    ; back-put = λ _ _ _ ()
+    ; elab-causal = λ { le (_ , refl , x) _ _ _ _ _ → causal le x }
+    ; stable← = λ { le (_ , refl , x) _ _ _ _ _ _ → walk-agree le x }
+    ; stable-put = λ _ _ _ _ _ ()
+    ; stable-lead = λ { le (_ , refl , x) _ _ _ _ _ _ _ _ _ _ → causal le x }
+    ; elab-all = λ le _ _ a → cold-same (walk-all le a)
     ; func = λ { (_ , refl , x) (_ , refl , x′) → walk-func x x′ }
     ; func* = cold-func*
     ; flat = λ { (_ , refl , x) (_ , refl , x′) → walk-flat x x′ }
     ; flat* = cold-flat*
     ; pin-in = λ { (_ , refl , x) → ⊥-elim (walk-pin x) }
     ; pin-in* = λ y → ⊥-elim (cold-pin* y)
-    ; cons = walk-cons
-    ; cons* = cold-cons
+    ; cons = λ {N} {N′} → cons-≤ {G′ = Scope.G S N N′} (λ _ → tt) walk-cons
+    ; cons* = λ {N} {N′} → cons-≤ {G′ = Scope.G* S N N′} (λ _ → tt) cold-cons
     ; got = λ _ → _ , refl
     ; got* = cold-got*
     ; after = λ { (_ , refl , x) → walk-after x }
     ; after* = cold-after*
-    ; after-φ = λ { (_ , refl , x) _ → φ-after x }
+    ; after-φ = λ { (_ , refl , x) _ _ → φ-after x }
     ; pin-after* = λ y → ⊥-elim (cold-pin* y)
-    ; pin-stable = λ _ _ _ _ _ _ y → ⊥-elim (cold-pin* y) }
+    ; pin-stable = λ _ _ _ _ _ _ _ _ _ y → ⊥-elim (cold-pin* y) }
 
-cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p* → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*
-cold-tab m n ρ* uρ* p p* = ColdTab.rel′ m n ρ* uρ* p p*
+cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p* {S}
+         → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p* S
+cold-tab m n ρ* uρ* p p* {S} = ColdTab.rel′ m n ρ* uρ* p p* {S}
