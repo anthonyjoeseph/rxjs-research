@@ -272,6 +272,22 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   -- THE READER'S ORDER FACTS: each row linked to its image and cutting
   -- every hot alike with it, and every pair before the reader cutting
   -- its rows alike.
+  --
+  -- At an old hot (`there`) a row's cuts are its hot row's, the source's
+  -- `Rest.cuts` carried one label down on each side.  At the hot itself
+  -- (`here`) no record orders the source's rows against its own rows of
+  -- another cut, and as stated the claim fails one reader down.
+  -- DEAD ROUTE: `rd-cuts` at `here`, read by a reader of this reader.  A
+  --   flatMap source shows its outer end as an end in a cut whose lanes
+  --   all end and as a skip in a cut that truncates one.  This reader
+  --   images that end past the annotation's queued `nothing` lane, under
+  --   `ix 1`, and that skip under its own `sub`.  A reader of this reader
+  --   then has a row under the end whose image lies before the skip's
+  --   image, though its position lies past the skip's: one position, two
+  --   cuts, cut unalike.  `Rest.cuts` compares a row's pair with every
+  --   cut's hot rows; a restatement confines that to cuts agreeing up to
+  --   the row, or excuses rows over the pair, and adds a `Rest` field
+  --   ordering a stream's rows against its own rows of other cuts.
   postulate
     rd-linked : ∀ (ad : Admits D′ q) (ad* : Admits D*′ q*) → Aligned (Ψ′ Rs) ρ′ q q* → Linked q q*
               → ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → Linked k (φᵣ N k)

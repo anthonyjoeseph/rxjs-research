@@ -137,10 +137,10 @@ Members: `walk-back`, `take-back`, `take-put-up`, `take-back-put`.
 
 A reader of the connect's hot is related wherever it is subscribed:
 its rows are the source's hot rows one label down, its images the
-source's carried under the annotation's reader and its own. Open: its
-rows' order against the hot's own rows across cuts (`rd-cuts`), which
-no record carries; the elaborated reader's rows read back to the
-source's. Settled by bodies, or two cuts' hot rows cut unalike.
+source's carried under the annotation's reader and its own. Riskiest:
+`rd-cuts` at the hot itself fails a reader down, a flatMap's end and
+its truncated skip imaged apart; `Rest.cuts` wants restating. Then the
+elaborated reader's rows read back to the source's. Settled by bodies.
 
 Members: `rd-corr`, `rd-φ-agree`, `rd-late-agree`, `rd-back`, `rd-put-up`,
 `rd-back-put`, `rd-elab-causal`, `rd-stable←`, `rd-stable-put`,
