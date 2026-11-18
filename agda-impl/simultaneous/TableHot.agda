@@ -228,7 +228,7 @@ rejoin-flat q L L′ fl dj {ys = ys} (inj₁ (h , e₀ , m , qh , refl , refl)) 
 rejoin-flat q L L′ fl dj {ys = ys} (inj₂ (_ , _ , _ , refl , refl)) sh (inj₁ (h′ , _ , m′ , _ , eq , _)) =
   dj m′ (⊕-under h′ (q ⊕ [ last ]) ys (sym eq))
 rejoin-flat q L L′ fl dj {ys = ys} (inj₂ (_ , _ , _ , refl , refl)) sh (inj₂ (_ , _ , _ , eq , _)) =
-  ≺-irrefl {q ⊕ [ last ]} (subst (q ⊕ [ last ] ≺_) eq (≺-ext (q ⊕ [ last ]) ys))
+  ≺-irrefl {q ⊕ [ last ]} (subst ((q ⊕ [ last ]) ≺_) eq (≺-ext (q ⊕ [ last ]) ys))
 
 -- A READER OF THE CONNECT'S HOT, subscribed at `q` and `q*`: its rows
 -- and its elaborated rows, and the map between them.
