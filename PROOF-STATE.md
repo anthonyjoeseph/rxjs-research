@@ -138,14 +138,15 @@ Members: `walk-back`, `take-back`, `take-put-up`, `take-back-put`.
 A reader of the connect's hot is related wherever it is subscribed:
 its rows are the source's hot rows one label down, its images the
 source's carried under the annotation's reader and its own. Riskiest:
-`rd-cuts` at the hot itself fails a reader down, a flatMap's end and
-its truncated skip imaged apart; `Rest.cuts` wants restating. Then the
-elaborated reader's rows read back to the source's. Settled by bodies.
+a shown row cuts the hot and the reader's own rows of other cuts alike,
+off the source's `Rest.self`. Then the elaborated reader's rows read
+back to the source's. Settled by bodies.
 
 Members: `rd-corr`, `rd-φ-agree`, `rd-late-agree`, `rd-back`, `rd-put-up`,
 `rd-back-put`, `rd-elab-causal`, `rd-stable←`, `rd-stable-put`,
 `rd-stable-lead`, `rd-elab-all`, `rd-cons`, `rd-cons*`, `rd-after-φ`,
-`rd-pin-stable`, `rd-linked`, `rd-cuts`, `rd-seen`.
+`rd-pin-stable`, `rd-linked`, `rd-cuts`, `rd-self`, `rd-self-at`,
+`rd-self-flat`, `rd-seen`.
 
 #### THE CONNECT
 
@@ -163,7 +164,8 @@ Members: `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`, `ct-in-bk`,
 
 Probed at every uncut subterm, unproven: each
 former's rows carry the record's order facts (`Rest`): linked to their
-images, cutting every hot in scope alike up each creator chain. A leaf former's rows lie at steps of timers it created
+images, each shown row cutting every hot in scope and the stream's own
+rows of every cut alike up each creator chain. A leaf former's rows lie at steps of timers it created
 at its subscription; a one-to-one former's are its child's. Settled by
 bodies, or a row whose creator chain is cut unlike its image's.
 
@@ -262,6 +264,6 @@ Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`,
 #### THE CUT ARITHMETIC
 
 Untried, order arithmetic: the body's subscription cuts the source's
-alike up the link, and a cut survives a label under a row not over it.
+alike up the link, and what is past the source is not over the body.
 
-Members: `cut-body`, `lvl-sub`, `past-src`.
+Members: `cut-body`, `past-src`.
