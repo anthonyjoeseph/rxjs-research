@@ -363,7 +363,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   -- under the readers, still past it.
   img-past : ∀ N l → q* ≺ (l ⊕ [ sub (reader* p*) ]) → q* ≼ imgAt N l
   img-past N l lt = in-if (outAt (S* N) l) (q* ≼_)
-    (λ _ → ≺→≼ {q*} {emitAt (under l)} (≺-≼-≺ {q*} {under l} {emitAt (under l)} u (⊑-≼ {under l} {emitAt (under l)} (⊑-⊕ˡ (under l) _))))
+    (λ _ → ≺→≼ {q*} {emitAt (under l)} (≺-≼-≺ {q*} {under l} {emitAt (under l)} u (⊑-≼ {under l} {emitAt (under l)} (⊑-⊕ˡ (under l) (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])))))
     (λ _ → ≺→≼ {q*} {under l} u)
     where
       u : q* ≺ under l
