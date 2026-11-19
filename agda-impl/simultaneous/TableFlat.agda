@@ -42,7 +42,8 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻; bind⁻; values⁺; pastRows⁺)
+open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; bind⁻; values⁺; pastRows⁺)
+open import Relation.Nullary.Decidable using (dec-true)
 open import Data.Maybe.Properties using (just-injective)
 open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
 open import denotation.Laws.Worlds using (InvAt; PinBy; world-after)
@@ -144,6 +145,10 @@ module TabRows where
 
   endAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
   endAt m y = anyᵇ (λ k → does (k ≟ᵖ y)) (endsOf m)
+
+  endAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → TR m y end → endAt m y ≡ true
+  endAt-I nothing (_ , () , _)
+  endAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ k → does (k ≟ᵖ y)} (ends⁺ m) (dec-true (y ≟ᵖ y) refl)
 
   rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
   rowAt nothing   y = false
