@@ -87,6 +87,19 @@ stop-raw : ∀ {Γ X} K n (keep : X → Bool) (s : Obs Timeline Γ X) (ρ : DenE
          → Raw (capprox K n (takeWhile true keep s) ρ) p (q ⊕ [ last ]) end
 stop-raw K n keep s ρ p r nk nf = TakeWhile.stop r nk nf
 
+-- A row at one spelling of its program and environment, a row at
+-- another: the spellings are compared as programs and environments,
+-- never under their denotations, where a mismatch unfolds both.
+respell : ∀ {Γ X} K n (o o′ : Obs Timeline Γ X) (ρ ρ′ : DenEnv Γ) → o ≡ o′ → ρ ≡ ρ′ → ∀ p {q e}
+        → enter (capprox K n o ρ) p q e → enter (capprox K n o′ ρ′) p q e
+respell K n o .o ρ .ρ refl refl p x = x
+
+-- A merge's row, a lane's under a value of its source.
+merge-back : ∀ {Γ X Y} K n (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) (ρ : DenEnv Γ) p {k y}
+           → enter (capprox K n (flatMap (mergeᶠ nothing) f s) ρ) p k (out y)
+           → Σ Pos λ q → Σ X λ a → enter (capprox K n s ρ) p q (out a) × enter (capprox K n (f a) ρ) (q ⊕ [ ix 1 ]) k (out y) × (q ⊕ [ ix 1 ]) ≺ k
+merge-back K n f s ρ p x = merge-out (λ a → capprox K n (f a) ρ) (capprox K n s ρ) p x
+
 ------------------------------------------------------------------------
 -- The lane's end
 
@@ -268,8 +281,8 @@ module Lane {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {
 
     -- No earlier `laneDone` reaches the take.
     back : ∀ {q a} → enter (capprox K n M ρ₀) st q (out a) → T (not (undone a)) → q ≡ Q
-    back {q} {a} r = back-m (merge-out (λ k → capprox K n (shareˢ (G k) (counted (framed k))) ρ₀) (Op.of (lanePart ∷ burstPart ∷ [])) st {q} {a}
-      r)
+    back {q} {a} r = back-m (merge-back K n (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) ρ₀ st {q} {a}
+      (respell K n M (flatMap (mergeᶠ nothing) (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) ρ₀ ρ₀ refl refl st r))
 
     nf-at : ∀ {q} → q ≡ Q → q ≺ Q → ⊥
     nf-at refl lt = ≺-irrefl {Q} lt
@@ -324,9 +337,10 @@ module Lane {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {
       c₁-val = raw-in K n (connect (Sh lanePart) ccf) tt {ℓ₁ N} {env₁} (den-ex D₁ N) (u₁ N) (P₀ ⊕ [ ix 0 ])
         (conn-raw K n (Sh lanePart) ccf env₁ (P₀ ⊕ [ ix 0 ]) ct-val)
 
-      c₀-val : enter (capprox K n (shareˢ (G lanePart) ccf) ρ₀) P₀ Q (out ld)
-      c₀-val = raw-in K n (shareˢ (G lanePart) ccf) tt {ρ N} {ρ₀} (den-ex D N) (u N) P₀
-        (conn-raw K n (of (tt ∷ [])) (connect (Sh lanePart) ccf) ρ₀ P₀ c₁-val)
+      c₀-val : enter (capprox K n (shareˢ (G lanePart) (counted (framed lanePart))) ρ₀) P₀ Q (out ld)
+      c₀-val = respell K n (connect (of (tt ∷ [])) (connect (Sh lanePart) ccf)) (shareˢ (G lanePart) (counted (framed lanePart))) ρ₀ ρ₀ refl refl P₀
+        (raw-in K n (connect (of (tt ∷ [])) (connect (Sh lanePart) ccf)) tt {ρ N} {ρ₀} (den-ex D N) (u N) P₀
+          (conn-raw K n (of (tt ∷ [])) (connect (Sh lanePart) ccf) ρ₀ P₀ c₁-val))
 
       L-Q : P₀ ≺ Q
       L-Q = ≺-trans {L} {E} {Q} (≺-≼-≺ {L} {T′} {E} L-T T-E) (≺-ˡ E (sub R) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ []))
@@ -335,11 +349,13 @@ module Lane {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {
       oq = raw-in K n (of (lanePart ∷ burstPart ∷ [])) tt {ρ N} {ρ₀} (den-ex D N) (u N) st at-out
 
       m-val : enter (capprox K n M ρ₀) st Q (out ld)
-      m-val = raw-in K n M tt {ρ N} {ρ₀} (den-ex D N) (u N) st
-        (merge-raw K n (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) ρ₀ st oq c₀-val L-Q)
+      m-val = respell K n (flatMap (mergeᶠ nothing) (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) M ρ₀ ρ₀ refl refl st
+        (raw-in K n (flatMap (mergeᶠ nothing) (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) tt {ρ N} {ρ₀} (den-ex D N) (u N) st
+          (merge-raw K n (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) ρ₀ st oq c₀-val L-Q))
 
       final : enter (capprox K n (laneˢ x) ρ₀) st (Q ⊕ [ last ]) end
-      final = raw-in K n (laneˢ x) tt {ρ N} {ρ₀} (den-ex D N) (u N) st (stop-raw K n undone M ρ₀ st m-val tt nf)
+      final = respell K n (takeWhile true undone M) (laneˢ x) ρ₀ ρ₀ refl refl st
+        (raw-in K n (takeWhile true undone M) tt {ρ N} {ρ₀} (den-ex D N) (u N) st (stop-raw K n undone M ρ₀ st m-val tt nf))
 
     end-row : ¬ ¬ enter (capprox K n (laneˢ x) ρ₀) st (Q ⊕ [ last ]) end
     end-row ¬r = fold laneStep z₀ Fr few-fr fr-val λ { (_ , ac) → go ac }
@@ -353,7 +369,7 @@ module Lane {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {
     row-of : ∀ {l} → listC K n (laneˢ x) (ρ N) st ≡ just l → Uncut l → Dec ((Q ⊕ [ last ] , end) ∈ rows l)
            → TR (listC K n (laneˢ x) (ρ N) st) (Q ⊕ [ last ]) end
     row-of eq ul (yes m) = _ , eq , m
-    row-of eq ul (no ¬m) = ⊥-elim (end-row λ r → ¬m (complete (listC-exact K n (laneˢ x) (den-ex D N) st eq ul) r))
+    row-of eq ul (no ¬m) = ⊥-elim (end-row λ r → ¬m (complete (listC-exact K n (laneˢ x) (den-ex D N) st eq ul) (respell K n (laneˢ x) (laneˢ x) ρ₀ (den D N) refl refl st r)))
 
     row-at : (Σ (Tb.Listed (IE B)) λ l → listC K n (laneˢ x) (ρ N) st ≡ just l × Uncut l) → TR (listC K n (laneˢ x) (ρ N) st) (Q ⊕ [ last ]) end
     row-at (l , eq , ul) = row-of eq ul (dec-end (rows l) (Q ⊕ [ last ]))
