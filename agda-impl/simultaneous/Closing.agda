@@ -5,7 +5,7 @@
 -- the run has closed its last instant.
 module simultaneous.Closing where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
 import Data.List as L
