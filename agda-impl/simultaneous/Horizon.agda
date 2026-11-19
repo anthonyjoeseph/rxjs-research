@@ -26,7 +26,8 @@
 -- no failure precedes `q` (`TakeClear.Keep`), a connect while its body is
 -- alive at `q` (`ConnB.CBd.keptB`).  A connect makes every boundary of
 -- its source's burst held by itself (`ConnB.CBd.burstB`); a lane reading
--- a hot hears its pins as skips, so keeps its boundaries free (`RejoinB`).
+-- a hot keeps each boundary's tag (`RejoinB`), since a hang in the burst
+-- is a call still executing when the lane's reader unsubscribes.
 -- As a pin waits only on what came before its connect and the burst,
 -- pins of `q` settle past an unrelated hang, once every boundary is past
 -- `q` and every one held by `q` past the row (`Cuts.Bounded.fwd-pin`); a
@@ -676,10 +677,10 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
 ------------------------------------------------------------------------
 -- A lane reading a hot
 
--- A reader subscribed at `s` keeps every boundary of the hot, free: the
--- hot's pins are skips to it, and a hang before `s` lies before all its
--- rows.  The hot's boundaries lie in its own world, apart from the
--- reader's late end.
+-- A reader subscribed at `s` keeps every boundary of the hot with its
+-- tag: the hot's pins are skips to it, but a held hang sits in a call
+-- the reader cannot interrupt.  The hot's boundaries lie in its own
+-- world, apart from the reader's late end.
 module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Pos → Tag → Set) (Bh : Cuts.Bounded h Bdh)
   (apart-s : ∀ {N b g} → Bdh N b g → ¬ b ⊑ (s ⊕ [ last ]) × ¬ (s ⊕ [ last ]) ⊑ b)
   where
@@ -688,8 +689,7 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
   J N = Rejoin s (h N)
 
   JBd : ℕ → Pos → Tag → Set
-  JBd N b free     = Σ Tag (Bdh N b)
-  JBd N b (held _) = ⊥
+  JBd = Bdh
 
   under : ∀ {b q} → ¬ b ⊑ q × ¬ q ⊑ b → ¬ b ⊑ (q ⊕ [ sub s ]) × ¬ (q ⊕ [ sub s ]) ⊑ b
   under = under-child (sub s)
@@ -700,14 +700,13 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
 
   -- A hot row is under no boundary, nor a boundary under it.
   gap-j : ∀ {N b g y e} → JBd N b g → J N y e → ¬ b ⊑ y × ¬ y ⊑ b
-  gap-j {g = free} (g , bd) (shown x _ _) = under (BH.gap bd x)
-  gap-j {g = free} (g , bd) (heard x _)   = under (BH.gap bd x)
-  gap-j {g = free} (g , bd) (ended x _)   = under (BH.gap bd x)
-  gap-j {g = free} (g , bd) (late _ _)    = apart-s bd
-  gap-j {g = held _} ()
+  gap-j bd (shown x _ _) = under (BH.gap bd x)
+  gap-j bd (heard x _)   = under (BH.gap bd x)
+  gap-j bd (ended x _)   = under (BH.gap bd x)
+  gap-j bd (late _ _)    = apart-s bd
 
   held-in-j : ∀ {N b q} → JBd N b (held q) → q ≺ b
-  held-in-j ()
+  held-in-j {N} {b} {q} = BH.held-in {N} {b} {q}
 
   -- CLEAR, SO SETTLED: a row shown at `q ⊕ [ sub s ]` reads the hot up to
   -- `q`, and a late end up to `s`; every hot boundary lies past both.
@@ -717,7 +716,7 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
       hot-clear : ∀ {z} → z ≺ k → H.Clear N z
       hot-clear {z} zk {b} {g} bd with ≼-or-≻ b z
       ... | inj₂ zb = zb
-      ... | inj₁ bz = ⊥-elim (≺-absurd {k} {b} (cl {b} {free} (g , bd)) (≼-≺-≺ {b} {z} {k} bz zk))
+      ... | inj₁ bz = ⊥-elim (≺-absurd {k} {b} (cl {b} {g} bd) (≼-≺-≺ {b} {z} {k} bz zk))
 
       ag : ∀ {z} → z ≺ k → AgreeTo z (h N) (h N′)
       ag {z} zk = BH.fwd {N} {z} (hot-clear {z} zk) le

@@ -436,12 +436,10 @@ module ReaderReal {X : Set} (s : Pos) (h : ℕ → EmissionSet X) (Bdh : ℕ →
   J N = Rejoin s (h N)
 
   JBd : ℕ → Pos → Tag → Set
-  JBd N b free     = Σ Tag (Bdh N b)
-  JBd N b (held _) = ⊥
+  JBd = Bdh
 
   real-j : RealEnv.RealRel J JBd (λ N b → Σ Tag (Bdh N b))
-  real-j {g = free} bd = inj₂ bd
-  real-j {g = held _} ()
+  real-j {g = g} bd = inj₂ (g , bd)
 
 -- THE CONNECT OWNING A HOT DISCHARGES ITS BODY'S DEBTS TO IT: a body
 -- boundary borne by the hot is a boundary of the source, which the
