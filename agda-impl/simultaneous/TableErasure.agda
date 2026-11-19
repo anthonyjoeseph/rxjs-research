@@ -433,7 +433,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- THE CUTS CORRESPOND at every depth, read off the program's
   -- elaboration under the batcher's plumbing.
   R : Rel (λ N → listC (3 + N) n P [] root) (λ N → listC (3 + N) n Q [] root) root root
-  R = top-rel n P (Out.rel (rel n o (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (envR (λ ()) none none (λ ()) (λ ()) (λ _ ()) (λ ()) (record { hot-bounded = λ () ; hot-apart = λ () })) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
+  R = top-rel n P (Out.rel (rel n o (λ _ → []) (λ _ → tt) (λ i → i) (λ _ → []) (λ _ → tt) (envR (λ ()) none none (λ ()) (λ ()) λ _ ()) root (root ⊕ (ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
                                  ((tt , λ { (_ , ()) }) , []) ((tt , λ { (_ , ()) }) , []) (λ ()) (framed refl refl)))
 
   module R = Rel R

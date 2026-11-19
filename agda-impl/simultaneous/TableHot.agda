@@ -52,7 +52,9 @@ open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
-  Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat; EnvCut)
+  Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
+open import simultaneous.TreeBounded using (listHot; tree-bounded)
+open import simultaneous.HorizonTree using (bd)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
 open import simultaneous.TableRows using (toT)
 open import simultaneous.LaneEndSched using (emitAt)
@@ -366,19 +368,23 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   postulate
     rd-corr : ∀ N → Corr q q* (φᵣ N) (Putᵣ N) (Lateᵣ N) (TR (P N)) (TR (Q N))
 
+  -- The elaborated reader's boundaries: its tree's.
+  rd-bd* : ℕ → Pos → Tag → Set
+  rd-bd* = bd n′ (elab (ext ρι) (connected (here refl))) ρ*′ uρ*′ (dbd D*′) q*
+
   -- THE READER'S HANGS: the reader's table is its hot's rejoined at the
   -- subscription, so the source's boundaries bound it (`RejoinB`), none
-  -- at the reader's late end; the elaborated reader's are the annotated
-  -- source's, carried under the readers.  Each partner pair cuts every
+  -- at the reader's late end; the elaborated reader's are its tree's.  Each partner pair cuts every
   -- hot in scope alike, the read hot as the source's own pair cuts it.
   postulate
     rd-rejoin→  : ∀ {N y e} → TR (P N) y e → Rejoin q (TR (S N)) y e
     rd-rejoin←  : ∀ {N y e} → Rejoin q (TR (S N)) y e → TR (P N) y e
     rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
-    rd-bd*      : ℕ → Pos → Tag → Set
-    rd-bounded* : Cuts.Bounded (λ N → TR (Q N)) rd-bd*
     rd-bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
                                       (EnvCut (Ψ′ Rs) ρ′ N)
+
+  rd-bounded* : Admits D*′ q* → Cuts.Bounded (λ N → TR (Q N)) rd-bd*
+  rd-bounded* ad* = tree-bounded n′ (elab (ext ρι) (connected (here refl))) ρ*′ uρ*′ D*′ q* ad*
 
   rd-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
   rd-bcorr N = Inter.forget _ _ _ _ _ (rd-bcorr-env N)
@@ -393,7 +399,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
     ; func = Gen.rd-func ad ad* ; func* = Gen.rd-func* ad ad* ; flat = Gen.rd-flat ad ad* ; flat* = Gen.rd-flat* ad ad*
     ; pin-in = rd-pin-in ; pin-in* = rd-pin-in* ; got = rd-got ; got* = rd-got*
     ; after = rd-after ; after* = rd-after* ; after-φ = rd-after-φ al ; pin-after* = rd-pin-after*
-    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ; bcorr = rd-bcorr }
+    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ad* ; bcorr = rd-bcorr }
 
   -- THE READER'S ORDER FACTS: each row linked to its image; each shown
   -- row cutting every hot alike with it, and the reader's own rows of

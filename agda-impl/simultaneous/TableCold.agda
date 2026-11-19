@@ -42,14 +42,14 @@ open import simultaneous.Listing using (walkN; listC; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
 open import simultaneous.ColdOrder using (walk-past; walk-nopin)
-open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.Horizon using (Tag)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableCorr using (Corr; Rel)
 open import simultaneous.TableKit using (TR; M; Got)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.TableEnv using (got-ok)
-open import simultaneous.HorizonTree using (cold-bd)
-open import simultaneous.TreeBounded using (cold-bounded)
+open import simultaneous.TableEnv using (got-ok; DenOf; dbd; Admits)
+open import simultaneous.HorizonTree using (bd; cold-bd)
+open import simultaneous.TreeBounded using (cold-bounded; tree-bounded)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ)
 
@@ -65,7 +65,8 @@ kindIn ((y , e) ∷ rs) k with y ≟ᵖ k
 ------------------------------------------------------------------------
 -- The record
 
-module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (p p* : Pos) where
+module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
+  (D* : DenOf ρ*) (p p* : Pos) (a* : Admits D* p*) where
 
   open At {A} p* using (c₀; P≼c₀; sync; σ; im; CRow; crow-fwd; crow-bwd; crow-pin; crow-after)
 
@@ -135,11 +136,12 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     rows-func   : ∀ {N l e e′} → CRow (I N) l e → CRow (I N) l e′ → e ≡ e′
     rows-flat   : ∀ {N y e l ys e′} → CRow (I N) y e → CRow (I N) (y ⊕ (l ∷ ys)) e′ → ⊥
 
+  cold-bd* : ℕ → Pos → Tag → Set
+  cold-bd* = bd n (coldˢ (fixed m)) ρ* uρ* (dbd D*) p*
+
   postulate
-    -- THE COLD'S HANGS: the plain walk's are its tree's; each cut of the
-    -- elaborated cold stops at boundaries, the same plain rows before each.
-    cold-bd* : ℕ → Pos → Tag → Set
-    cold-bounded* : Cuts.Bounded (λ N → TR (Q N)) cold-bd*
+    -- THE COLD'S HANGS: each side's are its tree's, the same plain rows
+    -- before each.
     cold-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (λ _ → ⊥)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (cold-bd (fixed m) p N) (cold-bd* N)
 
   -- The elaborated table is the rows written out.
@@ -265,8 +267,8 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; after* = cold-after*
     ; after-φ = λ { (_ , refl , x) _ _ → φ-after x }
     ; pin-after* = λ y → ⊥-elim (cold-pin* y)
-    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = cold-bounded* ; bcorr = cold-bcorr }
+    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = tree-bounded n (coldˢ (fixed m)) ρ* uρ* D* p* a* ; bcorr = cold-bcorr }
 
-cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p*
-         → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*
-cold-tab m n ρ* uρ* p p* = ColdTab.rel′ m n ρ* uρ* p p*
+cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (D* : DenOf ρ*) p p* (a* : Admits D* p*)
+         → Rel (ColdTab.P m n ρ* uρ* D* p p* a*) (ColdTab.Q m n ρ* uρ* D* p p* a*) p p*
+cold-tab m n ρ* uρ* D* p p* a* = ColdTab.rel′ m n ρ* uρ* D* p p* a*
