@@ -491,16 +491,9 @@ take-rel n i q s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in take-tab i q (Out.rel O) ⊢ take-order i q (Out.rel O) (Out.rest O)
 
 take-coh : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (takeWhile i q s) (take-rel n i q s Fs)
-take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ = c
-  where
-    R  = Out.rel (Fs ρ uρ ρι ρ* uρ* E p p* a a* al lk)
-    R′ = Out.rel (Fs ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′)
-
-    c₀ : ∀ N y → Same R R′ N y
-    c₀ = cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′
-
-    c : ∀ N y → Same (take-tab i q R) (take-tab i q R′) N y
-    c = take-cong i q {Tab n s ρ p} {Tab* n ρι s ρ* p*} {p} {p*} R R′ c₀
+take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
+  take-cong i q (Out.rel (Fs ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (Fs ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′))
+    (cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
 
 defer-rel : ∀ {Γ A} n (l : Later Timeline Γ A) → Full n (Later.force l) → Full (suc n) (defer l)
 defer-rel n l Fl ρ uρ ρι ρ* uρ* env p p* a a* al lk =
