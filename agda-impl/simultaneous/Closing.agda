@@ -894,20 +894,21 @@ batches o = early , late
     groups : ∀ ov {rx} → Met (ranked X) rx → Pointwise.Pointwise Lab (byName ov (unrank rx)) (grouped ov (stampedᴮ rx))
     groups ov mx = closed-rel ov (group-rel (name-rank o) (rank-name o) (carried-rel mx))
 
-    early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
-           × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
-             ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
-    early₀ {rs} mb =
-      let sc , ms , pre , ok = each-out proj₂ S mb
-          rx , mx , eqs , ok′ = scan-out bstep bstart (elaborate (plain o)) ms
-          out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
-          run = grouped-run bstart (values rx) (good-run o mx)
-      in rx , mx , [ (λ e → inj₁ (e ,
-                       prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))))
-                   , (λ { (g , e) → inj₂
-                       (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
-                                                                (closed-snoc (stamped (released bstart (values rx))) g))))) }) ]′
-                   (pending-one (proj₁ (after bstart (values rx))))
+    opaque
+      early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
+             × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
+               ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
+      early₀ {rs} mb =
+        let sc , ms , pre , ok = each-out proj₂ S mb
+            rx , mx , eqs , ok′ = scan-out bstep bstart (elaborate (plain o)) ms
+            out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
+            run = grouped-run bstart (values rx) (good-run o mx)
+        in rx , mx , [ (λ e → inj₁ (e ,
+                         prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))))
+                     , (λ { (g , e) → inj₂
+                         (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
+                                                                  (closed-snoc (stamped (released bstart (values rx))) g))))) }) ]′
+                     (pending-one (proj₁ (after bstart (values rx))))
 
     early : ∀ {rs} → Met (ranked B) rs → Σ _ λ rx → Σ Bool λ ov → Met (ranked X) rx × Closes valuesOf X rx ov
           × Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴮ rx))
@@ -917,30 +918,31 @@ batches o = early , late
     ...     | inj₁ (e , pre) = rx , true , mxr , flush-closes o mxr e , prefix-rel (name-rank o) (bs-rel mbr) (groups true mxr) pre
     ...     | inj₂ pre       = rx , false , mxr , tt , prefix-rel (name-rank o) (bs-rel mbr) (groups false mxr) pre
 
-    -- what is met of the batched program, from what is met of the elaborated
-    met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
-    met-from mx =
-      let sc , ms , eqs , ok = scan-in bstep bstart (elaborate (plain o)) mx
-          rs , mb , eqb , ok′ = each-in proj₂ S ms
-      in rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
+    opaque
+      -- what is met of the batched program, from what is met of the elaborated
+      met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
+      met-from mx =
+        let sc , ms , eqs , ok = scan-in bstep bstart (elaborate (plain o)) mx
+            rs , mb , eqb , ok′ = each-in proj₂ S ms
+        in rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
 
-    late₀ : ∀ {rs′ ov} → Met X rs′ → Flushes o rs′ ov → Σ _ λ rs → Met B rs × Prefix _≡_ (byName ov rs′) (stamped (values rs))
-    late₀ {rs′} {false} mx _ =
-      let rs , mb , eq = met-from mx
-          run′ = grouped-run bstart (values rs′) (good-run o mx)
-      in rs , mb ,
-         [ (λ e → prefix-trans (closed-prefix false _)
-                    (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq))))))
-         , (λ { (g , e) → prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
-                                          (trans (closed-snoc _ g) (sym eq))) }) ]′
-         (pending-one (proj₁ (after bstart (values rs′))))
-    late₀ {rs′} {true} mx (ext , mx′ , pre) =
-      let rs , mb , eq = met-from mx′ in rs , mb ,
-          prefix-trans (prefix-≡ (sym (grouped-run bstart (values rs′) (good-run o mx))))
-            (prefix-trans (prefix-++ (stamped (released bstart (values rs′))) pre)
-              (prefix-≡ (sym (trans eq (trans (cong (λ ws → stamped (released bstart ws)) (values-++ rs′ ext))
-                (trans (cong stamped (released-++ bstart (values rs′) (values ext)))
-                       (stamped-++ (released bstart (values rs′)) _)))))))
+      late₀ : ∀ {rs′ ov} → Met X rs′ → Flushes o rs′ ov → Σ _ λ rs → Met B rs × Prefix _≡_ (byName ov rs′) (stamped (values rs))
+      late₀ {rs′} {false} mx _ =
+        let rs , mb , eq = met-from mx
+            run′ = grouped-run bstart (values rs′) (good-run o mx)
+        in rs , mb ,
+           [ (λ e → prefix-trans (closed-prefix false _)
+                      (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq))))))
+           , (λ { (g , e) → prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
+                                            (trans (closed-snoc _ g) (sym eq))) }) ]′
+           (pending-one (proj₁ (after bstart (values rs′))))
+      late₀ {rs′} {true} mx (ext , mx′ , pre) =
+        let rs , mb , eq = met-from mx′ in rs , mb ,
+            prefix-trans (prefix-≡ (sym (grouped-run bstart (values rs′) (good-run o mx))))
+              (prefix-trans (prefix-++ (stamped (released bstart (values rs′))) pre)
+                (prefix-≡ (sym (trans eq (trans (cong (λ ws → stamped (released bstart ws)) (values-++ rs′ ext))
+                  (trans (cong stamped (released-++ bstart (values rs′) (values ext)))
+                         (stamped-++ (released bstart (values rs′)) _)))))))
 
     flush : ∀ {rx} ov → Met (ranked X) rx → Closes valuesOf X rx ov → Flushes o (unrank rx) ov
     flush false _   _  = tt
