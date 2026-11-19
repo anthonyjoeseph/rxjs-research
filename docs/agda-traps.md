@@ -40,6 +40,25 @@ error message actively misdirects. Read the entry before reasoning from the erro
   `maybe′` for the same reason. To find the clause, check under a heap cap
   (`agda +RTS -M4G -RTS`) so it fails fast instead of swapping, and bisect by definition.
 
+- **A SLOW CHECK IS CHARGED TO THE DEFINITION THAT TRIGGERS THE UNFOLDING, NOT THE ONE
+  THAT IS LARGE.** Profile per definition (`make bg T=check F=… AGDA_PROFILE="--profile=definitions"`)
+  before rewriting anything; a clause split out into its own lemma gets its own line. Four
+  shapes, each measured at tens of seconds to minutes:
+  - A `with` that only destructures a Σ, or splits a ⊎ without refining the goal, pays for
+    its whole context (module parameters over the elaborated program). **Read a Σ with a
+    pattern `let`, split a ⊎ with `[_,_]′`, and match a `Dec`, an indexed constructor or a
+    `refl` in a small helper's clauses.**
+  - A definition whose body is a `let` unfolds into its consumers' `with`. **When the
+    consumers need only its type, make it `opaque`.**
+  - A large record value — a table built by a `record { … }` with many fields — is unfolded
+    whenever a conversion meets it under an application. **Make the value `opaque` and give
+    its own lemmas `unfolding` it**; a consumer that only passes it on never notices.
+  - An application whose result type is a transparent row of a large program — `enter
+    (capprox …) p q e` — has that type reduced to whnf for implicit insertion, which runs
+    the denotation. **Wrap the row in an `opaque` type and prove its step lemmas once, over
+    a variable program, inside an `unfolding` block.** Opaque names compare by argument, so
+    two spellings of the same program meet cheaply.
+
 - **A `with` INSIDE A CYCLE LOSES A MATCHED ACCESSIBILITY'S ORDER, AND THE ERROR NAMES
   EVERY MEMBER OF THE LOOP.** A clause matching `(acc rs)` hands its with-functions the
   FIELD `rs`, so a call in the with body re-applying `acc rs` reads as unrelated to the
