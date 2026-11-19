@@ -285,7 +285,7 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
       cf = TB*.clear-first {N} {z} {f} cl nFf (≼-≺-≺ {f} {q₀} {z} fq qz)
 
       go : CP.Clear N k
-      go {c} bd with K.shown-fail N′ (proj₁ (upto (Cuts.Bounded.fwd R.bounded* cf le) (≼-refl {f})) yf) nkf
+      go {c} bd with K.shown-fail N′ (proj₁ (upto (Cuts.Bounded.fwd R.bounded* {N} {f} cf le) (≼-refl {f})) yf) nkf
       ... | k₀ , a₀ , eq , x₀ , nk₀ , _ with ≼-or-≻ k k₀
       ...   | inj₂ k₀k = ⊥-elim (nF (k₀ , a₀ , x₀ , nk₀ , k₀k))
       ...   | inj₁ kk₀ = ≼-≺-≺ {k} {k₀} {c} kk₀
@@ -300,7 +300,7 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   -- A failing value clear at `N`: so are the rows the take puts under it.
   made-clear : ∀ {N N′ o l a} → N ≤ N′ → TR (P N′) o (out a) → CP.Clear N o → CP.Clear N (o ⊕ [ l ])
   made-clear {N} {N′} {o} {l} le xo clo {b} bd =
-    past-child l (clo bd) (proj₂ (Cuts.Bounded.gap R.bounded bd (proj₂ (upto (Cuts.Bounded.fwd R.bounded clo le) (≼-refl {o})) xo)))
+    past-child l (clo bd) (proj₂ (Cuts.Bounded.gap R.bounded bd (proj₂ (upto (Cuts.Bounded.fwd R.bounded {N} {o} clo le) (≼-refl {o})) xo)))
 
   back-clear′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ K.Late′ N′ k → TB*.Clear′ N (φ′ N′ k) → TB.Clear′ N k
   back-clear′ {N} {N′} {k} {e} le x un nl cl* with K.O.kind N′ (from x) un
@@ -339,9 +339,9 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   ... | K.O.kept xk nFk _ =
     only {N} {k} (lift {N} {N} {m} {k} ≤-refl cl* (λ nFm → Across.lead-clear R.across {N} {k} {e} {m} {e*} xk un (K.nl-kept N xk nl) (leads-kept {N} {k} nFk (λ {k′} {e′} → ld {k′} {e′}))
       (Src.src i (passes q) (TR (Q N)) (from* y) nFm) (trans ie (cong instantOf (old N xk)))) nFk)
-  ... | K.O.made {o} xo nk nFo (l , refl , m) =
+  ... | K.O.made {o} xo nk nFo (l , refl , md) =
     only {N} {o ⊕ [ l ]} (made-clear {N} {N} {o} {l} ≤-refl xo (lift {N} {N} {m} {o} ≤-refl cl* (λ nFm → Across.lead-clear R.across {N} {o} {_} {m} {e*} xo tt (K.nl-out N xo) (leads-made {N} {o} {l} nFo (λ {k′} {e′} → ld {k′} {e′}))
-      (Src.src i (passes q) (TR (Q N)) (from* y) nFm) (trans ie (trans (cong instantOf (new N xo nk (Tp.made-lab m))) (inst-⊕ (R.φ N o) [ l ])))) nFo))
+      (Src.src i (passes q) (TR (Q N)) (from* y) nFm) (trans ie (trans (cong instantOf (new N xo nk (Tp.made-lab md))) (inst-⊕ (R.φ N o) [ l ])))) nFo))
 
   take-across : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ K.Put′ K.Late′ TB.Bd′ TB*.Bd′
   take-across = record
