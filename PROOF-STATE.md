@@ -68,7 +68,7 @@ bodies, or a lane hang the join does not keep.
 
 Members: `cold-bd`, `join-bd`, `cold-bounded`, `scan-bounded`,
 `hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `join-bounded`,
-`later-bounded`, `pd-bounded`.
+`later-bounded`, `pd-bounded`, `cold-bd*`, `cold-bounded*`.
 
 #### THE JOINS' HANGS
 
@@ -122,11 +122,10 @@ Members: `cb-bd*`, `cb-bounded*`, `cb-keeps`, `cb-only`, `cb-moved`,
 #### THE ONE-CHILD HANGS
 
 Untried: the defer's bound across its marker row, the take's pair
-where a placement leaves its row, the defer's pair, the elaborated
-cold's boundaries and the cold's pair. Settled by bodies.
+where a placement leaves its row, the defer's pair, the cold's pair. Settled by bodies.
 
 Members: `defer-bounded`, `defer-bounded*`, `defer-bcorr`, `take-bcorr`,
-`cold-bd*`, `cold-bounded*`, `cold-bcorr`.
+`cold-bcorr`.
 
 #### THE COMBINED SCAN
 

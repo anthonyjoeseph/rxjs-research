@@ -69,7 +69,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
 open import simultaneous.TableCorr using (Rel; Same)
 open import simultaneous.TableKit using (Rows; TR; Got)
-open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Btw; PB; Own; OwnPut)
 open import simultaneous.HorizonTree using (BdEnv)
 

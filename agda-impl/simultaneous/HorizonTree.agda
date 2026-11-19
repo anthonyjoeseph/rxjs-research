@@ -15,7 +15,7 @@
 module simultaneous.HorizonTree where
 
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using (List; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
