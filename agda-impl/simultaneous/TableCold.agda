@@ -48,6 +48,8 @@ open import simultaneous.TableCorr using (Corr; Rel)
 open import simultaneous.TableKit using (TR; M; Got)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableEnv using (got-ok)
+open import simultaneous.HorizonTree using (cold-bd)
+open import simultaneous.TreeBounded using (cold-bounded)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ)
 
@@ -134,12 +136,11 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     rows-flat   : ∀ {N y e l ys e′} → CRow (I N) y e → CRow (I N) (y ⊕ (l ∷ ys)) e′ → ⊥
 
   postulate
-    -- THE COLD'S HANGS: each cut of the plain walk and of the elaborated
-    -- cold stops at boundaries, the same plain rows before each.
-    cold-bd cold-bd* : ℕ → Pos → Tag → Set
-    cold-bounded  : Cuts.Bounded (λ N → TR (P N)) cold-bd
+    -- THE COLD'S HANGS: the plain walk's are its tree's; each cut of the
+    -- elaborated cold stops at boundaries, the same plain rows before each.
+    cold-bd* : ℕ → Pos → Tag → Set
     cold-bounded* : Cuts.Bounded (λ N → TR (Q N)) cold-bd*
-    cold-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (λ _ → ⊥)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (cold-bd N) (cold-bd* N)
+    cold-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (λ _ → ⊥)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (cold-bd (fixed m) p N) (cold-bd* N)
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
@@ -264,7 +265,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; after* = cold-after*
     ; after-φ = λ { (_ , refl , x) _ _ → φ-after x }
     ; pin-after* = λ y → ⊥-elim (cold-pin* y)
-    ; Bd = cold-bd ; Bd* = cold-bd* ; bounded = cold-bounded ; bounded* = cold-bounded* ; bcorr = cold-bcorr }
+    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = cold-bounded* ; bcorr = cold-bcorr }
 
 cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) p p*
          → Rel (ColdTab.P m n ρ* uρ* p p*) (ColdTab.Q m n ρ* uρ* p p*) p p*

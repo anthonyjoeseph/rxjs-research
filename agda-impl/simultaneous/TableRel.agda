@@ -48,13 +48,15 @@ open import simultaneous.Listing using (UncutEnv; listC)
 open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; bounded-≃)
+open import simultaneous.HorizonTree using (bd; _∷ᵇ_)
+open import simultaneous.TreeBounded using (tree-bounded; hung-body; conn-tr→; conn-tr←)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv
   using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
   Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
   Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; EnvCut;
-  Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
+  Full; Coh; Admits; bds; hung; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
   tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
@@ -164,7 +166,10 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       cuts′ N x sh (there i)   N′ = Rest.cuts (Out.rest O) N x sh i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
-  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
+  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh (λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N))
+    (bd n s ρ uρ (bds env) (p ⊕ [ ix 1 ]) ∷ᵇ bds env)
+    (hung-body n s uρ (bds env) (lw env) (hung env) p a
+      (tree-bounded n s ρ uρ (bds env) (lw env) (hung env) (p ⊕ [ ix 1 ]) (admits-step (lw env) a)))
     where
       hots : ∀ {X} (i : X ∈ A ∷ Γ) → HotR i ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
       hots (here refl) = conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
@@ -274,11 +279,19 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     Pσ : ℕ → Pos → Pos → Set
     Pσ N k l = l ≡ ψ (srcMap Rs N) k ⊎ π (srcMap Rs N) k l
 
+    ct-conn→  : ∀ {N y e} → TR (P N) y e → Connecting.ConnT p (σc N) (βc N) y e
+    ct-conn→ {N} {y} {e} = conn-tr→ n s b uρ p {N} {y} {e}
+
+    ct-conn←  : ∀ {N y e} → Connecting.ConnT p (σc N) (βc N) y e → TR (P N) y e
+    ct-conn← {N} {y} {e} = conn-tr← n s b uρ p {N} {y} {e}
+
+    ct-conn*→ : ∀ {N y e} → TR (Q N) y e → Connecting.ConnT p* (σc* N) (βc* N) y e
+    ct-conn*→ {N} {y} {e} = conn-tr→ n (annotate (elab ρι s)) (elab (ext ρι) b) uρ* p* {N} {y} {e}
+
+    ct-conn*← : ∀ {N y e} → Connecting.ConnT p* (σc* N) (βc* N) y e → TR (Q N) y e
+    ct-conn*← {N} {y} {e} = conn-tr← n (annotate (elab ρι s)) (elab (ext ρι) b) uρ* p* {N} {y} {e}
+
     postulate
-      ct-conn→  : ∀ {N y e} → TR (P N) y e → Connecting.ConnT p (σc N) (βc N) y e
-      ct-conn←  : ∀ {N y e} → Connecting.ConnT p (σc N) (βc N) y e → TR (P N) y e
-      ct-conn*→ : ∀ {N y e} → TR (Q N) y e → Connecting.ConnT p* (σc* N) (βc* N) y e
-      ct-conn*← : ∀ {N y e} → Connecting.ConnT p* (σc* N) (βc* N) y e → TR (Q N) y e
       ct-src-after : ∀ {N b g} → Rel.Bd RS N b g → (p ⊕ [ ix 1 ]) ≺ b
       ct-src-held  : ∀ {N b q} → Rel.Bd RS N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
       ct-ann-bd*      : ℕ → Pos → Tag → Set

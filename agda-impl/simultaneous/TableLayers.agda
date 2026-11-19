@@ -230,7 +230,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- as they are; the trigger's are pins, the shared run's are shown one
   -- label down, so the source's pins return, the layers inside lacking
   -- them.
-  module ShareTab (op : FlatOp) (Os : Src) (R : Rel (Pd op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃) where
+  module ShareTab (op : FlatOp) (Os : Src) (R : Rel (Pd op) (λ N → listC (3 + N) n (body op) (ρ*h N) c₃) p c₃)
+    (sr-bounded : Cuts.Bounded (λ N → TR (P op N)) (Rel.Bd R)) where
     P′ Q′ : ℕ → _
     P′ = P op
     Q′ = Tab* n ρι (flatMap op f s) ρ* p*
@@ -271,10 +272,9 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     sr-in-bk {N} x u nl = Rel.in-bk R (pd-keep {op} {N} x u) u (nl-pd x u nl)
 
     -- THE SHARE'S HANGS: the share returns the source's pins the layers
-    -- inside lack, at the source's own boundaries; its elaborated side
-    -- wraps the body and the trigger.
+    -- inside lack, so its plain side is the flatMap itself, hanging as
+    -- its tree does; its elaborated side wraps the body and the trigger.
     postulate
-      sr-bounded  : Cuts.Bounded (λ N → TR (P′ N)) (Rel.Bd R)
       sr-bd*      : ℕ → Pos → Tag → Set
       sr-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) sr-bd*
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
@@ -313,8 +313,16 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after*
       ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr }
 
+  -- The layers pass the core's boundaries through: the flatMap's own.
+  flat-hangs : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*)
+             → Cuts.Bounded (λ N → TR (P op N)) (Rel.Bd (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls Lc al lk))))
+  flat-hangs (mergeᶠ nothing)  Os Ls Lc al lk = jtree (mergeᶠ nothing)
+  flat-hangs (mergeᶠ (just k)) Os Ls Lc al lk = jtree (mergeᶠ (just k))
+  flat-hangs switchᶠ           Os Ls Lc al lk = jtree switchᶠ
+  flat-hangs exhaustᶠ          Os Ls Lc al lk = jtree exhaustᶠ
+
   flat-tab : ∀ op → Src → (Ls : Lanes) → LanesCoh Ls → Aligned (maps env) ρ p p* → Linked p p* → Rel (P op) (Tab* n ρι (flatMap op f s) ρ* p*) p p*
-  flat-tab op Os Ls Lc al lk = ShareTab.rel′ op Os (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls Lc al lk)))
+  flat-tab op Os Ls Lc al lk = ShareTab.rel′ op Os (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls Lc al lk))) (flat-hangs op Os Ls Lc al lk)
 
   postulate
     -- THE FLATMAP'S ORDER FACTS: each row is a source row or a lane row

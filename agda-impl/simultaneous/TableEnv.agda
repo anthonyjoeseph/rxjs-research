@@ -69,7 +69,9 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
 open import simultaneous.TableCorr using (Rel; Same)
 open import simultaneous.TableKit using (Rows; TR; Got)
+open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Btw; PB; Own; OwnPut)
+open import simultaneous.HorizonTree using (BdEnv)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -602,6 +604,14 @@ record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.List
 HotR : ∀ {Γ Δ X} → X ∈ Γ → (ρ : ℕ → All Tb.Listed Γ) → Ren Γ Δ → (ρ* : ℕ → All Tb.Listed Δ) → Maps Γ → DenOf ρ → DenOf ρ* → Set₁
 HotR i ρ ρι ρ* Ψ D D* = ∀ n p p* → Admits D p → Admits D* p* → Aligned Ψ ρ p p* → Linked p p* → Out n (connected i) ρ ρι ρ* Ψ p p*
 
+-- A SCOPE WHOSE HOTS HANG: every hot in scope hangs at its boundaries,
+-- each apart from the late end of any reader admissibly subscribed.
+record Hung {Γ} (ρ : ℕ → All Tb.Listed Γ) (D : DenOf ρ) (β : BdEnv Γ) : Set₁ where
+  field
+    hot-bounded : ∀ {X : Set} (i : X ∈ Γ) → Cuts.Bounded (λ N → Rows (lookup (ρ N) i)) (β i)
+    hot-apart   : ∀ {X : Set} (i : X ∈ Γ) {p} → Admits D p → ∀ {N b g} → β i N b g → ¬ b ⊑ (p ⊕ [ last ]) × ¬ (p ⊕ [ last ]) ⊑ b
+open Hung public
+
 record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) : Set₁ where
   constructor envR
   field
@@ -614,6 +624,9 @@ record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : �
             → Same (Out.rel (hot i n p p* a a* al lk)) (Out.rel (hot i n p p* a′ a*′ al′ lk′)) N y
     -- No elaborated hot a program reads ends a lane.
     unended : ∀ N → EnvU ρι (den lw* N)
+    -- The plain hots' boundaries, each hot hanging at its own.
+    bds  : BdEnv Γ
+    hung : Hung ρ lw bds
 open EnvR public
 
 -- Wherever the two are subscribed alike, each admissibly.
@@ -649,7 +662,7 @@ env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* :
 env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i n p p* a a* al lk →
   let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O)
   (λ i n p p* a a′ a* a*′ al al′ lk lk′ → hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
-  (λ N i → unended env N i)
+  (λ N i → unended env N i) (bds env) (hung env)
 
 -- Two environments whose hots map alike, weakened by two records of one
 -- hot: their hots map alike.

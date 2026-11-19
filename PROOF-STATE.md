@@ -45,30 +45,52 @@ is clear, or a cross-cut pair in `Rel`.
 Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
 `root-φ-agree`, `root-late-agree`, `root-put-up`, `root-back-put`.
 
+#### THE SOURCE PAST ITS SUBSCRIPTION
+
+`Horizon.ConnB` asks every connect's source for boundaries past its
+subscription. Suspected false where the source is a hot's reader: its
+boundaries are its hot's, which may precede the reader. Settled by a
+proof over the tree, or by that reader and `ConnB` restated to take
+the hot's boundaries as they stand.
+
+Members: `src-after`, `src-held`, `src-apart`, `ct-src-after`, `ct-src-held`.
+
+#### THE TREE'S HANGS
+
+A tree's boundaries are `HorizonTree.bd` and `TreeBounded.tree-bounded`
+bounds its cuts by one induction; the plain side of every `Rel` reads
+both. Untried: the join's boundaries and their bound (outer's, and each
+running lane's before the lane's cut), the cold's, the scan's fold, the
+unrolled defer, a connect's table read as `Connecting.ConnT`. The
+elaborated sides still choose their own (`-bd*`): reading them off the
+elaboration's tree needs the hand-built scopes' hots hung. Settled by
+bodies, or a lane hang the join does not keep.
+
+Members: `cold-bd`, `join-bd`, `cold-bounded`, `scan-bounded`,
+`hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `join-bounded`,
+`later-bounded`, `pd-bounded`.
+
 #### THE JOINS' HANGS
 
-Untried: a join's boundaries are its outer's and each running lane's
-before the lane's cut, bounded, and paired over its parts' pairs (a
-pair over cross-part leaves is recoverable, see the merge's leaves).
-Settled by bodies, or a lane hang the join does not keep.
+Untried: each elaborated core's boundaries, bounded, and paired with
+the plain flatMap's over its parts' pairs (a pair over cross-part
+leaves is recoverable, see the merge's leaves). Settled by bodies.
 
-Members: `mg-bd`, `mg-bd*`, `mg-bounded`, `mg-bounded*`, `mg-bcorr`,
-`cc-bd`, `cc-bd*`, `cc-bounded`, `cc-bounded*`, `cc-bcorr`,
-`sw-bd`, `sw-bd*`, `sw-bounded`, `sw-bounded*`, `sw-bcorr`,
-`ex-bd`, `ex-bd*`, `ex-bounded`, `ex-bounded*`, `ex-bcorr`.
+Members: `mg-bd*`, `mg-bounded*`, `mg-bcorr`,
+`cc-bd*`, `cc-bounded*`, `cc-bcorr`,
+`sw-bd*`, `sw-bounded*`, `sw-bcorr`,
+`ex-bd*`, `ex-bounded*`, `ex-bcorr`.
 
 #### THE CONNECT'S HANGS
 
 The connect's bounded is `Horizon.ConnB`'s and its pair `HorizonConn.ConnPair`'s,
-each table read as `Connecting.ConnT` of its parts, the elaborated over
-the annotated source. The body's pair cuts its source alike through
+the elaborated over the annotated source. The body's pair cuts its source alike through
 `Rest.bcorr-env`. Riskiest: a pinned or late source row is placed at its
 image (`ct-src-img`), which the body's placements need; then the
 annotated source's pair and the cross-part leaves. Settled by bodies,
 or a late source row placed off its image.
 
-Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-conn→`, `ct-conn←`,
-`ct-conn*→`, `ct-conn*←`, `ct-src-after`, `ct-src-held`, `ct-ann-bd*`,
+Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-ann-bd*`,
 `ct-ann-bounded*`, `ct-ann-after*`, `ct-ann-held*`,
 `ct-φc-body`, `ct-φc-echo`, `ct-late-body`, `ct-late-echo`,
 `ct-put-split`, `ct-img`, `ct-put-row`, `ct-gap-src`, `ct-gap-src*`,
@@ -90,23 +112,21 @@ Members: `rd-rejoin→`, `rd-rejoin←`, `rd-apart`, `rd-bd*`,
 
 Each wrapping layer's pair is `HorizonCorr.Wrap` over its body's; the
 combined scan, closer and share owe which rows they keep, which they
-move and where, and their own boundaries bounded. Untried. Settled by
+move and where, and their elaborated boundaries bounded. Untried. Settled by
 bodies, or a kept row whose hang the layer drops.
 
 Members: `cb-bd*`, `cb-bounded*`, `cb-keeps`, `cb-only`, `cb-moved`,
 `cb-moved-q`, `cb-putw`, `cz-bd*`, `cz-bounded*`, `cz-keeps`, `cz-only`,
-`sr-bd*`, `sr-bounded`, `sr-bounded*`, `sr-bcorr`.
+`sr-bd*`, `sr-bounded*`, `sr-bcorr`.
 
 #### THE ONE-CHILD HANGS
 
-A scan, map or defer keeps its child's boundaries, a take its
-`TakeB`'s, a cold has its own. Untried: bounded across the row
-isomorphism, the take's pair where a placement leaves its row, the
-defer's pair, the cold's. Settled by bodies.
+Untried: the defer's bound across its marker row, the take's pair
+where a placement leaves its row, the defer's pair, the elaborated
+cold's boundaries and the cold's pair. Settled by bodies.
 
-Members: `scan-bounded`, `scan-bounded*`, `ev-bounded`, `ev-bounded*`,
-`defer-bounded`, `defer-bounded*`, `defer-bcorr`, `take-bcorr`,
-`cold-bd`, `cold-bd*`, `cold-bounded`, `cold-bounded*`, `cold-bcorr`.
+Members: `defer-bounded`, `defer-bounded*`, `defer-bcorr`, `take-bcorr`,
+`cold-bd*`, `cold-bounded*`, `cold-bcorr`.
 
 #### THE COMBINED SCAN
 

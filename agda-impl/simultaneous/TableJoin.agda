@@ -116,10 +116,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       --
       -- RECOVERY: git show 252f560:agda-impl/simultaneous/HorizonJoin.agda restores `JoinPair`, a join's pair over its parts' pairs; git show 252f560:agda-impl/simultaneous/TableJoin.agda restores `tr-den` and `den-tr`, a table read as its cut program.
       postulate
-        mg-bd mg-bd* : ℕ → Pos → Tag → Set
-        mg-bounded  : Cuts.Bounded (λ N → TR (P′ N)) mg-bd
+        mg-bd* : ℕ → Pos → Tag → Set
         mg-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) mg-bd*
-        mg-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (mg-bd N) (mg-bd* N)
+        mg-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ nothing) N) (mg-bd* N)
 
       mg-got : ∀ N → Got (P′ N)
       mg-got N = pd-got (mergeᶠ nothing) N
@@ -148,7 +147,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {(mergeᶠ nothing)} ; func* = core-func {(mergeᶠ nothing)} ; flat = pd-flat {(mergeᶠ nothing)} ; flat* = core-flat {(mergeᶠ nothing)}
         ; pin-in = mg-pin-in ; pin-in* = mg-pin-in* ; got = mg-got ; got* = mg-got*
         ; after = mg-after ; after* = mg-after* ; after-φ = mg-after-φ ; pin-after* = mg-pin-after*
-        ; Bd = mg-bd ; Bd* = mg-bd* ; bounded = mg-bounded ; bounded* = mg-bounded* ; bcorr = mg-bcorr }
+        ; Bd = jbd (mergeᶠ nothing) ; Bd* = mg-bd* ; bounded = jbounded (mergeᶠ nothing) ; bounded* = mg-bounded* ; bcorr = mg-bcorr }
 
     ----------------------------------------------------------------------
     -- THE BOUNDED MERGE: a value's lane subscribed under its row when
@@ -187,10 +186,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- THE BOUNDED MERGE'S HANGS: its outer's boundaries, and each running
       -- lane's before the lane's cut; each partnered with its image's.
       postulate
-        cc-bd cc-bd* : ℕ → Pos → Tag → Set
-        cc-bounded  : Cuts.Bounded (λ N → TR (P′ N)) cc-bd
+        cc-bd* : ℕ → Pos → Tag → Set
         cc-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) cc-bd*
-        cc-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (cc-bd N) (cc-bd* N)
+        cc-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ (just k)) N) (cc-bd* N)
 
       cc-got : ∀ N → Got (P′ N)
       cc-got N = pd-got (mergeᶠ (just k)) N
@@ -219,7 +217,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {(mergeᶠ (just k))} ; func* = core-func {(mergeᶠ (just k))} ; flat = pd-flat {(mergeᶠ (just k))} ; flat* = core-flat {(mergeᶠ (just k))}
         ; pin-in = cc-pin-in ; pin-in* = cc-pin-in* ; got = cc-got ; got* = cc-got*
         ; after = cc-after ; after* = cc-after* ; after-φ = cc-after-φ ; pin-after* = cc-pin-after*
-        ; Bd = cc-bd ; Bd* = cc-bd* ; bounded = cc-bounded ; bounded* = cc-bounded* ; bcorr = cc-bcorr }
+        ; Bd = jbd (mergeᶠ (just k)) ; Bd* = cc-bd* ; bounded = jbounded (mergeᶠ (just k)) ; bounded* = cc-bounded* ; bcorr = cc-bcorr }
 
     ----------------------------------------------------------------------
     -- THE SWITCH: every value's lane subscribed under its row, its rows
@@ -240,10 +238,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- THE SWITCH'S HANGS: its outer's boundaries, and each running
       -- lane's before the lane's cut; each partnered with its image's.
       postulate
-        sw-bd sw-bd* : ℕ → Pos → Tag → Set
-        sw-bounded  : Cuts.Bounded (λ N → TR (P′ N)) sw-bd
+        sw-bd* : ℕ → Pos → Tag → Set
         sw-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) sw-bd*
-        sw-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (sw-bd N) (sw-bd* N)
+        sw-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd switchᶠ N) (sw-bd* N)
 
       sw-got : ∀ N → Got (P′ N)
       sw-got N = pd-got (switchᶠ) N
@@ -272,7 +269,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {switchᶠ} ; func* = core-func {switchᶠ} ; flat = pd-flat {switchᶠ} ; flat* = core-flat {switchᶠ}
         ; pin-in = sw-pin-in ; pin-in* = sw-pin-in* ; got = sw-got ; got* = sw-got*
         ; after = sw-after ; after* = sw-after* ; after-φ = sw-after-φ ; pin-after* = sw-pin-after*
-        ; Bd = sw-bd ; Bd* = sw-bd* ; bounded = sw-bounded ; bounded* = sw-bounded* ; bcorr = sw-bcorr }
+        ; Bd = jbd switchᶠ ; Bd* = sw-bd* ; bounded = jbounded switchᶠ ; bounded* = sw-bounded* ; bcorr = sw-bcorr }
 
     ----------------------------------------------------------------------
     -- THE EXHAUST: the lanes the plain exhaust runs, each subscribed under
@@ -295,10 +292,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- THE EXHAUST'S HANGS: its outer's boundaries, and each running
       -- lane's before the lane's cut; each partnered with its image's.
       postulate
-        ex-bd ex-bd* : ℕ → Pos → Tag → Set
-        ex-bounded  : Cuts.Bounded (λ N → TR (P′ N)) ex-bd
+        ex-bd* : ℕ → Pos → Tag → Set
         ex-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) ex-bd*
-        ex-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (ex-bd N) (ex-bd* N)
+        ex-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd exhaustᶠ N) (ex-bd* N)
 
       ex-got : ∀ N → Got (P′ N)
       ex-got N = pd-got (exhaustᶠ) N
@@ -327,7 +323,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {exhaustᶠ} ; func* = core-func {exhaustᶠ} ; flat = pd-flat {exhaustᶠ} ; flat* = core-flat {exhaustᶠ}
         ; pin-in = ex-pin-in ; pin-in* = ex-pin-in* ; got = ex-got ; got* = ex-got*
         ; after = ex-after ; after* = ex-after* ; after-φ = ex-after-φ ; pin-after* = ex-pin-after*
-        ; Bd = ex-bd ; Bd* = ex-bd* ; bounded = ex-bounded ; bounded* = ex-bounded* ; bcorr = ex-bcorr }
+        ; Bd = jbd exhaustᶠ ; Bd* = ex-bd* ; bounded = jbounded exhaustᶠ ; bounded* = ex-bounded* ; bcorr = ex-bcorr }
 
   flat-core : ∀ op → Core op
   flat-core (mergeᶠ nothing)  = λ Os Ls Lc al lk → Joins.MergeTab.rel′ Os Ls Lc al lk
