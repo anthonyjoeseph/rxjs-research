@@ -1,41 +1,27 @@
 {-# OPTIONS --guardedness #-}
 
 -- A SPIN'S TABLE: a `defer` cut at depth zero lists skips at its
--- subscription's ticks (`S`), read back by index (`sp→`); a deeper cut
--- lists more ticks, agreeing up to any tick the shallower lists
--- (`spin-ag`).
+-- subscription's ticks (`S`), read back by index (`sp→`).
 module simultaneous.SpinKit where
 
 open import Data.Bool using (false)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-applyUpTo⁺; ∈-applyUpTo⁻)
-open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just)
-open import Data.Nat using (ℕ; _≤_; _<_; _+_)
-open import Data.Nat.Properties using (≤-<-trans; <-≤-trans; ≮⇒≥; +-monoʳ-≤)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁)
-open import Function using (mk⇔)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
-open import Relation.Nullary using (¬_)
+open import Data.Nat using (ℕ; _≤_; _<_)
+open import Data.Nat.Properties using (≤-<-trans; <-≤-trans; ≮⇒≥)
+open import Data.Product using (Σ; _×_; _,_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
-open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _∙_; _⊕_)
-open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≼-refl; ≺→≼; ≺-ext)
+open import denotation.Position using (Pos; Label; ix; last; _∙_; _⊕_)
+open import denotation.EmissionSet using (Ev; skip; _≼_)
 open import denotation.Laws.Worlds using (⊕-cancelˡ; ⊕-assoc)
-open import denotation.Laws.Cut using (ix-asc; ix-back)
+open import denotation.Laws.Cut using (ix-asc)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (_⊣_)
-open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Readings using (instantOf)
-open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Listing using (spinRows)
 open import simultaneous.TableKit using (TR)
-
 
 S : ∀ {X : Set} → ℕ → Pos → Maybe (Tb.Listed X)
 S M q = just (spinRows M q ⊣ false)
@@ -86,9 +72,6 @@ widen le x with sp→ x
 shrink : ∀ {X : Set} {M M′ q i y} {e : Ev X} → i < M → y ≼ (q ⊕ [ ix i ]) → TR (S M′ q) y e → TR (S M q) y e
 shrink {q = q} lt yk x with sp→ x
 ... | j , lj , refl , refl = sp← (≤-<-trans (≮⇒≥ (λ ij → yk (ix-asc q ij))) lt)
-
-spin-ag : ∀ {X : Set} {M M′ q i} → M ≤ M′ → i < M → AgreeTo (q ⊕ [ ix i ]) (TR {X} (S M′ q)) (TR (S M q))
-spin-ag le lt = ⟨ (λ yk → shrink lt yk , widen le) ⟩
 
 -- No tick lies under another.
 spin-flat : ∀ {X : Set} {M q y l ys} {e e′ : Ev X} → TR (S M q) y e → TR (S M q) (y ⊕ (l ∷ ys)) e′ → ⊥

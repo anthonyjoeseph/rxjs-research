@@ -27,7 +27,7 @@ open import Relation.Nullary using (¬_)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; ≺-irrefl; ≺-absurd; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
@@ -150,9 +150,6 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
   same : ∀ {X : Set} {q i} {ys : List X} {k e} → (k , e) ∈ W q i ys → instantOf k ≡ instantOf q
   same {q = q} {i} {ys} m with step q i ys m
   ... | a , _ , refl = inst-⊕ q [ a ]
-
-  ag-id : ∀ {X : Set} {t : Pos → Ev X → Set} {k} → AgreeTo k t t
-  ag-id = ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
 
   corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (λ _ → ⊥) (TR (P N)) (TR (Q N))
   corr′ N = record

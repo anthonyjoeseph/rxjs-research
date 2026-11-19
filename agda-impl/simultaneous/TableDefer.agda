@@ -15,10 +15,9 @@ open import Data.List using ([]; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _≤_)
+open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
 open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (yes; no; ¬_)
@@ -26,7 +25,7 @@ open import Relation.Nullary using (yes; no; ¬_)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; inside; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-irrefl; ≺-absurd; ≺→≼; ≺-≼-≺; ≼-trans; ≺-ext; ticks)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≺-≼-≺; ≼-trans; ≺-ext; ticks)
 open import denotation.Laws.Worlds using (⊕-assoc)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; short; bind; _⊣_)
@@ -35,7 +34,7 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→)
-open import simultaneous.TableKit using (TR; M; Got; Cons; got-bind; m-ss)
+open import simultaneous.TableKit using (TR; M; Got; got-bind; m-ss)
 open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TakeCut using (inst-⊕)
@@ -70,33 +69,6 @@ module _ {X : Set} (q : Pos) where
   ... | inj₁ (refl , _) = ⊥-elim (≺-irrefl {q} lt)
   ... | inj₂ x₀         = x₀
 
-  -- Agreement crosses the guard both ways.
-  ag-strip : ∀ {m m′ : Maybe (Tb.Listed X)} {k} → Past q m → Past q m′
-           → AgreeTo k (TR (Guarded q m)) (TR (Guarded q m′)) → AgreeTo k (TR m) (TR m′)
-  ag-strip {m} {m′} a a′ ag =
-    ⟨ (λ {y} {e} yk → (λ x → strip m′ (a x) (proj₁ (upto ag {y} {e} yk) (tr-g← q m x)))
-                    , (λ x → strip m (a′ x) (proj₂ (upto ag {y} {e} yk) (tr-g← q m′ x)))) ⟩
-
-  ag-add : ∀ {m m′ : Maybe (Tb.Listed X)} {k} → Got m → Got m′
-         → AgreeTo k (TR m) (TR m′) → AgreeTo k (TR (Guarded q m)) (TR (Guarded q m′))
-  ag-add {m} {m′} gm gm′ ag =
-    ⟨ (λ {y} yk → add m m′ gm′ (λ {e} → proj₁ (upto ag {y} {e} yk)) , add m′ m gm (λ {e} → proj₂ (upto ag {y} {e} yk))) ⟩
-    where
-      add : ∀ n n′ {y} → Got n′ → (∀ {e} → TR n y e → TR n′ y e) → ∀ {e} → TR (Guarded q n) y e → TR (Guarded q n′) y e
-      add n n′ gt h x with tr-g→ q n x
-      ... | inj₁ (refl , refl) = tr-g0 q n′ gt
-      ... | inj₂ x₀            = tr-g← q n′ (h x₀)
-
-  -- Up to the guard, two guarded tables hold only it.
-  ag-low : ∀ {m m′ : Maybe (Tb.Listed X)} → Past q m → Past q m′ → Got m → Got m′
-         → AgreeTo q (TR (Guarded q m)) (TR (Guarded q m′))
-  ag-low {m} {m′} a a′ gm gm′ = ⟨ (λ yq → low m m′ a gm′ yq , low m′ m a′ gm yq) ⟩
-    where
-      low : ∀ n n′ → Past q n → Got n′ → ∀ {y e} → y ≼ q → TR (Guarded q n) y e → TR (Guarded q n′) y e
-      low n n′ ab gt yq x with tr-g→ q n x
-      ... | inj₁ (refl , refl) = tr-g0 q n′ gt
-      ... | inj₂ x₀            = ⊥-elim (yq (ab x₀))
-
   -- A run's table, guarded, is a run's.
   func-g : ∀ {m : Maybe (Tb.Listed X)} → Past q m → (∀ {y e e′} → TR m y e → TR m y e′ → e ≡ e′)
          → ∀ {y e e′} → TR (Guarded q m) y e → TR (Guarded q m) y e′ → e ≡ e′
@@ -120,12 +92,6 @@ module _ {X : Set} (q : Pos) where
   pin-in-g {m} pi x with tr-g→ q m x
   ... | inj₁ (_ , ())
   ... | inj₂ x₀ = pi x₀
-
-  cons-g : ∀ {m m′ : Maybe (Tb.Listed X)} {G : Pos → Set} → Past q m → Past q m′ → Cons G (TR m) (TR m′) → Cons G (TR (Guarded q m)) (TR (Guarded q m′))
-  cons-g {m} {m′} ab ab′ cn gy below x x′ yy with tr-g→ q m x | tr-g→ q m′ x′
-  ... | inj₁ (_ , ())  | _
-  ... | inj₂ x₀ | inj₁ (refl , _) = ⊥-elim (yy (ab x₀))
-  ... | inj₂ x₀ | inj₂ x₁         = tr-g← q m′ (cn gy (λ lt → ag-strip ab ab′ (below lt)) x₀ x₁ yy)
 
 ------------------------------------------------------------------------
 -- The record, guarded
@@ -245,9 +211,6 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
   leads→ {N} ld ne x′ un′ ie′ with tr-g→ g (P N) x′
   ... | inj₁ (refl , refl) = ⊥-elim (ne (trans (sym ie′) ig))
   ... | inj₂ x₁            = ld x₁ un′ ie′
-
-  leads← : ∀ {N k} → Leads′ N k → Corr.Leads (R.corr N) k
-  leads← {N} ld x′ un′ ie′ = ld (tr-g← g (P N) x′) un′ ie′
 
   row→′ : ∀ N {k e} → TR (P′ N) k e → Unpinned e → (Img′ N k e × ¬ Late′ N k) ⊎ (e ≡ skip × PutAt′ N k)
   row→′ N x un with tr-g→ g (P N) x

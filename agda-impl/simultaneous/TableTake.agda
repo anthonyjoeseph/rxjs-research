@@ -9,16 +9,16 @@
 -- connect lies before it.
 module simultaneous.TableTake where
 
-open import Data.Bool using (Bool; true; false; T; not)
+open import Data.Bool using (Bool; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_; find; lose)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (any?)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _≤_)
+open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
@@ -27,18 +27,18 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (AgreeTo; upto; AgreeTo-sym; ag-down; ≺-trans; ≼-refl; ≼-trans; ≺→≼; ≼-or-≻; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; takeRows)
 open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (module TakeX)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Readings using (instantOf; parent; parent-snoc)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→; corr-≃; keys; in-keys; tr-few)
-open import simultaneous.TableKit using (TR; cons-≤; ag-≃; got-bind)
-open import simultaneous.TakeKit using (Run; Lab; lab; ≼-last; module Take)
-open import simultaneous.TakeCut using (inst-⊕; module TakeCut)
+open import simultaneous.Readings using (parent; parent-snoc)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→; corr-≃; keys; in-keys)
+open import simultaneous.TableKit using (TR; got-bind)
+open import simultaneous.TakeKit using (Run; Lab; lab; module Take)
+open import simultaneous.TakeCut using (module TakeCut)
 open import simultaneous.Horizon using (module TakeB; bounded-≃)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 
@@ -52,10 +52,6 @@ Took i keep m = bind m λ l → just (takeRows i keep l)
 
 ex-just : ∀ {X : Set} (L : Tb.Listed X) → Exact L (TR (just L))
 ex-just L = record { sound = λ r → L , refl , r ; complete = λ { (_ , refl , r) → r } }
-
-lab-Lab : ∀ b → Lab (lab b)
-lab-Lab true  = inj₁ refl
-lab-Lab false = inj₂ refl
 
 -- The rows a failing value's two rows go under.
 under-bk : (Pos → List Pos) → Pos → List Pos
@@ -133,13 +129,6 @@ module _ {X : Set} (i : Bool) (keep : X → Bool) where
   ... | yes h with find h
   ...   | (q , _) , mem , (a , refl , nk , lt) = yes (q , a , (L , refl , mem) , nk , lt)
   failed? (just L) w | no n = no λ { (q , a , (_ , refl , mem) , nk , lt) → n (lose mem (a , refl , nk , lt)) }
-
-  fails? : ∀ (m : Maybe (Tb.Listed X)) → Dec (Σ Pos λ y → Σ X λ a → TR m y (out a) × T (not (keep a)))
-  fails? nothing = no λ { (_ , _ , (_ , () , _) , _) }
-  fails? (just L) with any? val? (rows L)
-  ... | yes h with find h
-  ...   | (q , _) , mem , (a , refl , nk) = yes (q , a , (L , refl , mem) , nk)
-  fails? (just L) | no n = no λ { (q , a , (_ , refl , mem) , nk) → n (lose mem (a , refl , nk)) }
 
   UnderAt : Maybe (Tb.Listed X) → Pos → Set
   UnderAt m w = Σ Pos λ y → Σ X λ a → Σ Label λ l → TR m y (out a) × T (not (keep a)) × Lab l × w ≡ y ⊕ [ l ]

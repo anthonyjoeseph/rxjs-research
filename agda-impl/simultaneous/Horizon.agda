@@ -16,9 +16,7 @@
 -- A HANG HIDDEN BEHIND A TAKEWHILE.  A take keeps its source's
 -- boundaries only where no failing value precedes them (`TakeClear.Keep`),
 -- so a hang past the failure makes no row of anything above it
--- unsettled.  Its clearness at a row is its source's at the row read
--- (`TakeClear`), so a take's correspondence is its source's
--- (`TakeLayer`), at one cut.
+-- unsettled.
 --
 -- A HANG IN A SUBSCRIBE BURST OUTLIVES THE READER.  A boundary is `held q`
 -- when its hang's rows are pins of the connect at `q`, and every former
@@ -45,7 +43,7 @@ module simultaneous.Horizon where
 open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_])
+open import Data.List using ([]; [_])
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _+_)
 open import Data.Nat.Properties using (n≤1+n; n<1+n; <-irrefl; +-monoʳ-≤)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -328,22 +326,12 @@ module TakeClear {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → Emissi
   ... | inj₂ kb = kb
   ... | inj₁ bk = cl (bd , keep-≼ g bd nF bk)
 
-  kept-clear : ∀ {N k} → C.Clear N k → Clear′ N k
-  kept-clear cl (bd , _) = cl bd
-
   -- Before a position past the first failing value, the source is clear
   -- at that value.
   clear-first : ∀ {N z f} → Clear′ N z → ¬ Fl N f → f ≺ z → C.Clear N f
   clear-first {N} {z} {f} cl nF fz {b} {g} bd with ≼-or-≻ b f
   ... | inj₂ fb = fb
   ... | inj₁ bf = ⊥-elim (≺-absurd {z} {b} (cl (bd , keep-≼ g bd nF bf)) (≼-≺-≺ {b} {f} {z} bf fz))
-
-  -- Under the first failing value, the take's clearness is its source's there.
-  clear-made : ∀ {N o} l → ¬ Fl N o → Clear′ N (o ⊕ [ l ]) → C.Clear N o
-  clear-made {N} {o} l nF cl = clear-first cl nF (≺-ext o [])
-
-  made-clear : ∀ {N o e} l → c N o e → C.Clear N o → Clear′ N (o ⊕ [ l ])
-  made-clear l x cl (bd , _) = past-child l (cl bd) (proj₂ (gap bd x))
 
 ------------------------------------------------------------------------
 -- A takeWhile's cuts
@@ -474,41 +462,6 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
 
   bounded′ : T.Bounded
   bounded′ = record { gap = gap′ ; held-in = held-in′ ; fwd = fwd′ ; fwd-pin = λ {N} {q} {k} → fwd-pin′ {N} {q} {k} }
-
-------------------------------------------------------------------------
--- A takeWhile's correspondence is its source's
-
-module TakeLayer {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Bool)
-  (c : ℕ → EmissionSet A) (d : ℕ → EmissionSet X) (Bd Bd* : ℕ → Pos → Tag → Set)
-  (gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b)
-  (gap* : ∀ {N b g y e} → Bd* N b g → d N y e → ¬ b ⊑ y × ¬ y ⊑ b)
-  (held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b)
-  (held-in* : ∀ {N b q} → Bd* N b (held q) → q ≺ b)
-  (φ : ℕ → Pos → Pos)
-  -- the source's correspondence, at its rows
-  (ch→ : ∀ {N k e} → c N k e → Cuts.Clear c Bd N k → Cuts.Clear d Bd* N (φ N k))
-  (ch← : ∀ {N k e} → c N k e → Cuts.Clear d Bd* N (φ N k) → Cuts.Clear c Bd N k)
-  -- one cut's facts of it: a row is imaged, and no failure precedes the
-  -- image of a row no failure precedes
-  (img : ∀ {N k e} → c N k e → Σ (Ev X) (d N (φ N k)))
-  (unfail : ∀ {N k e} → c N k e → ¬ TakeWhile.Failed incl keep (c N) k → ¬ TakeWhile.Failed incl keep* (d N) (φ N k))
-  where
-  module P = TakeClear incl keep c Bd gap held-in
-  module E = TakeClear incl keep* d Bd* gap* held-in*
-
-  -- A row the take keeps sits on its source row's image.
-  kept→ : ∀ {N k e} → c N k e → ¬ P.Fl N k → P.Clear′ N k → E.Clear′ N (φ N k)
-  kept→ {N} {k} x nF cl = E.kept-clear {N} {φ N k} (ch→ x (P.clear-kept {N} {k} nF cl))
-
-  kept← : ∀ {N k e} → c N k e → ¬ P.Fl N k → E.Clear′ N (φ N k) → P.Clear′ N k
-  kept← {N} {k} x nF cl = P.kept-clear {N} {k} (ch← x (E.clear-kept {N} {φ N k} (unfail x nF) cl))
-
-  -- A row under the first failing value sits under its image.
-  made→ : ∀ {N o a} l → c N o (out a) → ¬ P.Fl N o → P.Clear′ N (o ⊕ [ l ]) → E.Clear′ N (φ N o ⊕ [ l ])
-  made→ {N} {o} l x nF cl = E.made-clear {N} {φ N o} l (proj₂ (img x)) (ch→ x (P.clear-made {N} {o} l nF cl))
-
-  made← : ∀ {N o a} l → c N o (out a) → ¬ P.Fl N o → E.Clear′ N (φ N o ⊕ [ l ]) → P.Clear′ N (o ⊕ [ l ])
-  made← {N} {o} l x nF cl = P.made-clear {N} {o} l x (ch← x (E.clear-made {N} {φ N o} l (unfail x nF) cl))
 
 ------------------------------------------------------------------------
 -- A connect's cuts

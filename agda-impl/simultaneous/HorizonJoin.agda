@@ -21,16 +21,15 @@
 -- former's boundaries keep from its rows.
 module simultaneous.HorizonJoin where
 
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using ([]; _∷_; [_])
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Empty using (⊥)
+open import Data.List using ([_])
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (¬_; yes; no)
 
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; module Joining)
-open import denotation.Laws.Modulus using (≺-trans)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.Horizon using (Tag; free; held)
 open import simultaneous.HorizonCorr using (Btw; PB; Own; OwnPut; _∪_; _∪²_; module Inter; first-child)

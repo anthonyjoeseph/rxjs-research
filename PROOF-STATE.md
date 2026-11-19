@@ -32,6 +32,73 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE ROOT'S CROSSINGS
+
+A row exists only if no hang came first. `At` reads stable, causal,
+lead and placements off `HorizonCorr.Root` from the closed program's
+boundaries and their pair. Riskiest, untried: a row settled on both
+sides is settled between two cuts (`root-back`); an instant's leading
+row is clear where its image's instant is (`root-lead`). The map read
+alike by agreeing cuts stays two-cut. Settled by bodies over
+`Root`, or two cuts agreeing on one side only.
+
+Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
+`root-φ-agree`, `root-late-agree`, `root-put-up`, `root-back-put`.
+
+#### THE JOINS' HANGS
+
+`HorizonJoin.JoinPair` proves a join's pair over its parts' pairs and
+cross-part leaves; the tables are not yet read as `Joining.JoinT`, and a
+join's boundaries are not proven bounded. Settled by wiring the pair
+over table-as-join leaves, or a lane hang the join does not keep.
+
+Members: `mg-bd`, `mg-bd*`, `mg-bounded`, `mg-bounded*`, `mg-bcorr`,
+`cc-bd`, `cc-bd*`, `cc-bounded`, `cc-bounded*`, `cc-bcorr`,
+`sw-bd`, `sw-bd*`, `sw-bounded`, `sw-bounded*`, `sw-bcorr`,
+`ex-bd`, `ex-bd*`, `ex-bounded`, `ex-bounded*`, `ex-bcorr`.
+
+#### THE CONNECT'S HANGS
+
+`Horizon.ConnB` proves the connect bounded and `HorizonConn.ConnPair`
+its pair, both over `Connecting.ConnT`; the table is not yet read as one.
+Open: a boundary never over a connect row (`gap-c`). Settled by wiring
+them over the table.
+
+Members: `ct-bd`, `ct-bd*`, `ct-bounded`, `ct-bounded*`, `ct-bcorr`,
+`gap-c`.
+
+#### THE HOT READER'S HANGS
+
+A reader is bounded by its hot's boundaries through `Horizon.RejoinB`,
+its table read as `Rejoin` at the subscription. Untried: that reading,
+the elaborated reader's boundaries and their pair. Settled by bodies,
+or a reader row the rejoined hot lacks.
+
+Members: `rd-rejoin→`, `rd-rejoin←`, `rd-apart`, `rd-bd*`,
+`rd-bounded*`, `rd-bcorr`.
+
+#### THE LAYERS' HANGS
+
+Each wrapping layer's pair is `HorizonCorr.Wrap` over its body's; the
+combined scan, closer and share owe which rows they keep, which they
+move and where, and their own boundaries bounded. Untried. Settled by
+bodies, or a kept row whose hang the layer drops.
+
+Members: `cb-bd*`, `cb-bounded*`, `cb-keeps`, `cb-only`, `cb-moved`,
+`cb-moved-q`, `cb-putw`, `cz-bd*`, `cz-bounded*`, `cz-keeps`, `cz-only`,
+`sr-bd*`, `sr-bounded`, `sr-bounded*`, `sr-bcorr`.
+
+#### THE ONE-CHILD HANGS
+
+A scan, map or defer keeps its child's boundaries, a take its
+`TakeB`'s, a cold has its own. Untried: bounded across the row
+isomorphism, the take's pair where a placement leaves its row, the
+defer's pair, the cold's. Settled by bodies.
+
+Members: `scan-bounded`, `scan-bounded*`, `ev-bounded`, `ev-bounded*`,
+`defer-bounded`, `defer-bounded*`, `defer-bcorr`, `take-bcorr`,
+`cold-bd`, `cold-bd*`, `cold-bounded`, `cold-bounded*`, `cold-bcorr`.
+
 #### THE COMBINED SCAN
 
 The combined scan's record is written: a lanes' row re-emitted at the
@@ -39,9 +106,7 @@ lane branch's reader, the flatMap's end at the `nothing` past the last
 of the three branches' ends (probed). Untried: its fields,
 the scan emitting nothing but marks besides. Settled by bodies.
 
-Members: `cb-corr`, `cb-φ-agree`, `cb-back`, `cb-back-put`, `cb-elab-causal`,
-`cb-stable←`, `cb-stable-put`, `cb-stable-lead`, `cb-elab-all`, `cb-cons*`,
-`cb-pin-stable`, `cb-late-agree`.
+Members: `cb-corr`.
 
 #### THE FLATMAP'S ORDER FACTS
 
@@ -57,11 +122,7 @@ The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-φ-agree`, `sw-in-bk`, `sw-src-back`, `sw-lane-back`,
-`sw-lane-left`, `sw-put-up`,
-`sw-back-put`, `sw-elab-causal`, `sw-stable←`, `sw-stable-put`,
-`sw-stable-lead`, `sw-elab-all`, `sw-cons`, `sw-cons*`, `sw-after-φ`,
-`sw-pin-stable`, `sw-late-agree`.
+Members: `sw-corr`, `sw-in-bk`, `sw-after-φ`.
 
 #### THE EXHAUST
 
@@ -70,10 +131,7 @@ exhaust runs. Untried: the elaborated exhaust runs the same lanes,
 though its lanes end at their end images. Settled by bodies, or a value
 run on one side only.
 
-Members: `ex-corr`, `ex-φ-agree`, `ex-in-bk`, `ex-back`, `ex-put-up`,
-`ex-back-put`, `ex-elab-causal`, `ex-stable←`, `ex-stable-put`,
-`ex-stable-lead`, `ex-elab-all`, `ex-cons`, `ex-cons*`, `ex-after-φ`,
-`ex-pin-stable`, `ex-late-agree`.
+Members: `ex-corr`, `ex-in-bk`, `ex-after-φ`.
 
 #### THE BOUNDED MERGE
 
@@ -82,10 +140,7 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-lanes-eq`, `cc-lane-un`, `cc-src-at`, `cc-in-bk`, `cc-back`, `cc-put-up`,
-`cc-back-put`, `cc-elab-causal`, `cc-stable←`, `cc-stable-put`,
-`cc-stable-lead`, `cc-elab-all`, `cc-cons`, `cc-cons*`, `cc-after-φ`,
-`cc-pin-stable`, `cc-src-late`.
+Members: `cc-corr`, `cc-in-bk`, `cc-after-φ`.
 
 #### THE PLAIN MERGE
 
@@ -95,11 +150,7 @@ source's end at the later of its own and the trigger's. Visible images
 probed; skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-vals-eq`, `mg-lane-un`, `mg-src-at`, `mg-in-bk`, `mg-src-back`, `mg-lane-back`,
-`mg-put-up`,
-`mg-back-put`, `mg-elab-causal`, `mg-stable←`, `mg-stable-put`,
-`mg-stable-lead`, `mg-elab-all`, `mg-cons`, `mg-cons*`, `mg-after-φ`,
-`mg-pin-stable`, `mg-src-late`.
+Members: `mg-corr`, `mg-in-bk`, `mg-after-φ`.
 
 #### THE CLOSER AND THE SHARE
 
@@ -108,30 +159,7 @@ are and its source's only as pins and skips; the share puts the
 source's pins where its connect shows them, the layers inside relating
 the plain flatMap without them. Untried: the fields. Settled by bodies.
 
-Members: `cz-corr`, `cz-back`, `cz-back-put`, `cz-elab-causal`, `cz-stable←`,
-`cz-stable-put`, `cz-stable-lead`, `cz-elab-all`, `cz-cons*`, `cz-pin-stable`,
-`sr-corr`, `sr-back`, `sr-put-up`, `sr-back-put`, `sr-elab-causal`,
-`sr-stable←`, `sr-stable-put`, `sr-stable-lead`, `sr-elab-all`, `sr-cons`,
-`sr-cons*`, `sr-pin-stable`.
-
-#### THE SOURCE'S PINS
-
-Probed at a flatMap the root reaches, unproven: two cuts of the plain flatMap agreeing up to a
-row agree on which pins below it are the source's, no lane row sitting
-where a source row does. Settled by its body.
-
-Members: `pd-agree`.
-
-#### THE BACK FACT
-
-A cut whose elaborated table agrees up to a row's image agrees up to the
-row, and a put moves between cuts agreeing up to its row or its place:
-what lets the erasure read preimages at the cut settling an image.
-Probed at the root; proven for of,
-spin, map, scan, defer. Settled by bodies, or a cut holding an image
-but not its row.
-
-Members: `walk-back`, `take-back`, `take-put-up`, `take-back-put`.
+Members: `cz-corr`, `sr-corr`.
 
 #### THE CONNECT'S HOT
 
@@ -142,22 +170,15 @@ a shown row cuts the hot and the reader's own rows of other cuts alike,
 off the source's `Rest.self`. Then the elaborated reader's rows read
 back to the source's. Settled by bodies.
 
-Members: `rd-corr`, `rd-φ-agree`, `rd-late-agree`, `rd-back`, `rd-put-up`,
-`rd-back-put`, `rd-elab-causal`, `rd-stable←`, `rd-stable-put`,
-`rd-stable-lead`, `rd-elab-all`, `rd-cons*`, `rd-pin-stable`, `rd-linked`,
-`rd-cuts`, `rd-self`, `rd-self-at`, `rd-seen`.
+Members: `rd-corr`, `rd-linked`, `rd-cuts`, `rd-self`, `rd-self-at`, `rd-seen`.
 
 #### THE CONNECT
 
 The connect's record is written: body rows along the body's map, source
 rows one label down at their annotated image. Untried: its field leaves,
-an old hot cutting the new alike (`conn-old-cut`); the first former
-making pins, so `ct-pin-stable`. Settled by bodies.
+an old hot cutting the new alike (`conn-old-cut`). Settled by bodies.
 
-Members: `conn-old-cut`, `conn-order`, `ct-corr`, `ct-φ-agree`, `ct-in-bk`,
-`ct-back`, `ct-put-up`, `ct-back-put`, `ct-elab-causal`, `ct-stable←`,
-`ct-stable-put`, `ct-stable-lead`, `ct-elab-all`, `ct-cons`, `ct-cons*`,
-`ct-after-φ`, `ct-pin-stable`, `ct-late-agree`.
+Members: `conn-old-cut`, `conn-order`, `ct-corr`, `ct-in-bk`, `ct-after-φ`.
 
 #### THE ORDER FACTS
 
@@ -246,7 +267,7 @@ each render are matched. Untried: the
 rows are functional, flat, causal across cuts. Settled by bodies, or a
 listed row `CRow` lacks.
 
-Members: `rows-func`, `rows-flat`, `rows-causal`, `rows-cons`.
+Members: `rows-func`, `rows-flat`.
 
 #### THE COLD'S WALK
 
@@ -254,11 +275,9 @@ The rewrite: the plain cold's cuts, renamed onto the elaborated
 cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
-Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`,
-`walk-apart`, `walk-ren→`,
-`walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-agree`, `walk-cons`,
-`walk-all`, `walk-alone`, `φ-mono`, `φ-inst`, `φ-home`, `φ-after`,
-`φ-back`.
+Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`, `walk-apart`,
+`walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-alone`,
+`φ-mono`, `φ-inst`, `φ-home`, `φ-after`, `φ-back`.
 
 #### THE CUT ARITHMETIC
 

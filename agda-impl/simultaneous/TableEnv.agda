@@ -26,7 +26,6 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 import Data.List.Relation.Unary.All as All
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -34,7 +33,7 @@ open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
@@ -45,7 +44,7 @@ open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_;
 open import denotation.Events using (Timeline; fresh; <ᵖ-part; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter; Proper; module Op; at-out; at-end; on-out)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (AgreeTo; AgreeTo-sym; ag-down; ≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl; ≼-or-≻; ≼-false)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-≺-≺; ≺→≼; ≼-trans; ≼-refl; ≼-or-≻; ≼-false)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; Ok; InvAt; GoodEnv; Hots; Lawful; _∪ʰ_; ok-step;
   W; W⁼; step; timer; join; here; inW; Real; real-snoc; real-sub; plain-ix; shrink; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)

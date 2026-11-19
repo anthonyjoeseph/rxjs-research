@@ -27,7 +27,7 @@ open import Data.Bool using (Bool; true; false; T; if_then_else_; _∧_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _+_; _≤_)
+open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; trans; subst)
@@ -36,8 +36,8 @@ open import Relation.Nullary using (¬_; does)
 open import Tree using (Obs; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
+open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin)
+open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_; _⊣_)
@@ -46,16 +46,15 @@ open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
-open import simultaneous.TableKit using (Rows; TR; Cons; Got)
-open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.TableKit using (Rows; TR; Got)
+open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounded-≃)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
-open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
   Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
-open import simultaneous.TableRows using (rejoin-in; toT)
+open import simultaneous.TableRows using (toT)
 open import simultaneous.LaneEndSched using (emitAt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -367,14 +366,21 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   postulate
     rd-corr : ∀ N → Corr q q* (φᵣ N) (Putᵣ N) (Lateᵣ N) (TR (P N)) (TR (Q N))
 
-  -- THE READER'S HANGS: a reader row sits under its hot row, so the
-  -- source's boundaries bound the reader; the elaborated reader's are
-  -- the annotated source's, carried under the readers.
+  -- THE READER'S HANGS: the reader's table is its hot's rejoined at the
+  -- subscription, so the source's boundaries bound it (`RejoinB`), none
+  -- at the reader's late end; the elaborated reader's are the annotated
+  -- source's, carried under the readers.
   postulate
+    rd-rejoin→  : ∀ {N y e} → TR (P N) y e → Rejoin q (TR (S N)) y e
+    rd-rejoin←  : ∀ {N y e} → Rejoin q (TR (S N)) y e → TR (P N) y e
+    rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
     rd-bd*      : ℕ → Pos → Tag → Set
-    rd-bounded  : Cuts.Bounded (λ N → TR (P N)) (Rel.Bd R₀)
     rd-bounded* : Cuts.Bounded (λ N → TR (Q N)) rd-bd*
     rd-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
+
+  rd-bounded : Cuts.Bounded (λ N → TR (P N)) (Rel.Bd R₀)
+  rd-bounded = bounded-≃ rd-rejoin← rd-rejoin→
+    (RejoinB.bounded-j q (λ N → TR (S N)) (Rel.Bd R₀) (Rel.bounded R₀) (λ {N} {b} {g} → rd-apart {N} {b} {g}))
 
   rel′ : Admits D′ q → Admits D*′ q* → Aligned (Ψ′ Rs) ρ′ q q* → Rel P Q q q*
   rel′ ad ad* al = record

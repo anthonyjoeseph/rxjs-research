@@ -15,21 +15,20 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_; find; lose)
 open import Data.List.Relation.Unary.Any using (any?; here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _≤_)
+open import Data.Nat using (ℕ)
 open import Data.Bool using (T)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; inside)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; module Scan; module Values)
-open import denotation.Laws using (scan-ag)
 open import denotation.Laws.Fold using (Latest)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; few-ind; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-antisym; ≼-or-≻; ≼-split; ≼-≺-≺)
+open import denotation.Laws.Modulus using (few-ind; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-antisym; ≼-or-≻; ≼-split; ≼-≺-≺)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; scanRows)
@@ -38,9 +37,9 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; keys; in-keys; tr-few)
-open import simultaneous.TableKit using (TR; M; Cons; ev; Sh; ag-≃; coh-of; ends; m-back; m-val; m-ee; got-bind)
-open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; sh-map→; sh-map←; sh-of; ag-map; func-map; flat-map; pin-in-map; tr-pin←)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; keys; in-keys)
+open import simultaneous.TableKit using (TR; M; ev; ends; m-back; m-val; m-ee; got-bind)
+open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; func-map; flat-map; pin-in-map; tr-pin←)
 open import simultaneous.TableTake using (ex-just)
 open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonCorr using (module Sub)
@@ -119,26 +118,11 @@ module _ {X B : Set} (f : B → X → B) (z : B) where
   row-of (spin x)             = _ , x
   row-of (send x)             = _ , x
 
-  sh-sc→ : ∀ (m : Maybe (Tb.Listed X)) {k e} → Sh (TR (Scanned f z m)) k e → Sh (TR m) k e
-  sh-sc→ m (_ , x , refl) with tr-scan→ m x
-  ... | sval (acc₀ y _)    = _ , y , refl
-  ... | sval (acc _ y _ _) = _ , y , refl
-  ... | sstep y            = _ , y , refl
-  ... | spin y             = _ , y , refl
-  ... | send y             = _ , y , refl
-
   row-to : ∀ (m : Maybe (Tb.Listed X)) {k e₀} → TR m k e₀ → Σ (Ev B) λ e → ScanT f z (TR m) k e × ev (λ _ → tt) e ≡ ev (λ _ → tt) e₀
   row-to m {e₀ = out a} x = let (b , ac) = fold? m x in out b , sval ac , refl
   row-to m {e₀ = skip}  x = skip , sstep x , refl
   row-to m {e₀ = end}   x = end , send x , refl
   row-to m {e₀ = pin r} x = pin r , spin x , refl
-
-  sh-sc← : ∀ (m : Maybe (Tb.Listed X)) {k e} → Sh (TR m) k e → Sh (TR (Scanned f z m)) k e
-  sh-sc← m (_ , x , refl) = let (e , s , eq) = row-to m x in e , tr-scan← m s , sym eq
-
-  -- Two tables agreeing, scanned, agree.
-  ag-sc : ∀ (m m′ : Maybe (Tb.Listed X)) {q} → AgreeTo q (TR m) (TR m′) → AgreeTo q (TR (Scanned f z m)) (TR (Scanned f z m′))
-  ag-sc m m′ ag = ag-≃ (tr-scan← m) (tr-scan→ m) (tr-scan← m′) (tr-scan→ m′) (scan-ag f z ag)
 
   -- A run's scan is a run's.
   func-sc : ∀ {t : EmissionSet X} → (∀ {y e e′} → t y e → t y e′ → e ≡ e′) → ∀ {y e e′} → ScanT f z t y e → ScanT f z t y e′ → e ≡ e′
@@ -174,17 +158,6 @@ module _ {X B : Set} (f : B → X → B) (z : B) where
 
   sval-inv : ∀ {t : EmissionSet X} {k b} → ScanT f z t k (out b) → Acc f z t k b
   sval-inv (sval ac) = ac
-
--- Two rows of one event at `y` and agreement below it: agreement at it.
-ag-at : ∀ {X : Set} {a b : EmissionSet X} {y e₀} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ a b)
-      → (∀ {k e e′} → a k e → a k e′ → e ≡ e′) → (∀ {k e e′} → b k e → b k e′ → e ≡ e′)
-      → a y e₀ → b y e₀ → AgreeTo y a b
-ag-at {a = a} {b} {y} below fa fb xa xb = ⟨ (λ {y′} y′y → at y′y) ⟩
-  where
-    at : ∀ {y′ e} → y′ ≼ y → (a y′ e → b y′ e) × (b y′ e → a y′ e)
-    at {y′} y′y with ≼-split {y′} {y} y′y
-    ... | inj₁ lt   = upto (below {y′} lt) (≼-refl {y′})
-    ... | inj₂ refl = (λ x → subst (b y′) (fa xa x) xb) , (λ x → subst (a y′) (fb xb x) xa)
 
 -- A scanned value shows the fold its value folds.
 private
@@ -441,9 +414,6 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
 
     leads→ : ∀ {k} → C.Leads k → Leads′ k
     leads→ ld x′ un′ ie′ = let (_ , x₀ , u₀) = back-row x′ un′ in ld x₀ u₀ ie′
-
-    leads← : ∀ {k} → Leads′ k → C.Leads k
-    leads← ld x′ un′ ie′ = let (_ , x₁ , u₁) = fwd-row x′ un′ in ld x₁ u₁ ie′
 
     row→′ : ∀ {k e} → TR (P′ N) k e → Unpinned e → (Imaged′ k e × ¬ R.Late N k) ⊎ (e ≡ skip × PutAt′ k)
     row→′ x un with tr-scan→ f z (P N) x

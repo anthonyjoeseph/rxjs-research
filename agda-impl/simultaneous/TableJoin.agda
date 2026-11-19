@@ -15,7 +15,6 @@
 module simultaneous.TableJoin where
 
 open import Data.Bool using (T; if_then_else_)
-open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -23,25 +22,22 @@ open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.Maybe using (just; nothing; maybe)
 import Data.Maybe as M
-open import Data.Nat using (ℕ; _+_; _≤_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Nat using (ℕ; _+_)
+open import Data.Product using (_×_; _,_)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; Unpinned; out; pin; _≼_; _≺_)
-open import denotation.Laws.Modulus using (AgreeTo; ≼-refl)
+open import denotation.EmissionSet using (Unpinned; pin; _≼_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Corr)
-open import simultaneous.TableKit using (TR; Cons; Got)
+open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
-open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; Linked; Aligned; EnvR; maps; lw; lw*;
   den; den-ex; Admits)
 
@@ -50,8 +46,6 @@ open import simultaneous.LaneEndSched using (tr-in)
 open import Relation.Nullary using (¬_)
 open import denotation.EmissionSet using (enter; DenEnv; Den)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (⟨_⟩; upto; trunc-to)
-open import denotation.Laws.Join using (module Join)
 open import denotation.Laws.Cut using (capprox)
 open import quickcheck.Tabled.Exact.Base using (complete)
 open import simultaneous.Listing using (listC-exact)
@@ -106,17 +100,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   den-tr : ∀ {X} (o : Obs Timeline Γ X) q {N y e} → enter (capprox (3 + N) n o (ρD N)) q y e → TR (Tab n o ρ q N) y e
   den-tr o q {N} x with listC-ok (3 + N) n o (uρ N) q
   ... | L , eq , uL = L , eq , complete (listC-exact (3 + N) n o (den-ex (lw env) N) q eq uL) x
-
-  -- Agreement crosses between two cuts' tables and their cut programs.
-  ag-den : ∀ {X} (o : Obs Timeline Γ X) q {N N′ k} → AgreeTo k (TR (Tab n o ρ q N)) (TR (Tab n o ρ q N′))
-         → AgreeTo k (enter (capprox (3 + N) n o (ρD N)) q) (enter (capprox (3 + N′) n o (ρD N′)) q)
-  ag-den o q {N} {N′} a = ⟨ (λ yk → (λ x → tr-den o q {N′} (proj₁ (upto a yk) (den-tr o q {N} x)))
-                                  , (λ x → tr-den o q {N} (proj₂ (upto a yk) (den-tr o q {N′} x)))) ⟩
-
-  den-ag : ∀ {X} (o : Obs Timeline Γ X) q {N N′ k} → AgreeTo k (enter (capprox (3 + N) n o (ρD N)) q) (enter (capprox (3 + N′) n o (ρD N′)) q)
-         → AgreeTo k (TR (Tab n o ρ q N)) (TR (Tab n o ρ q N′))
-  den-ag o q {N} {N′} a = ⟨ (λ yk → (λ x → den-tr o q {N′} (proj₁ (upto a yk) (tr-den o q {N} x)))
-                                  , (λ x → den-tr o q {N} (proj₂ (upto a yk) (tr-den o q {N′} x)))) ⟩
 
   ----------------------------------------------------------------------
   -- The joiners

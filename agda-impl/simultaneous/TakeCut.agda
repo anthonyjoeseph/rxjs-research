@@ -29,7 +29,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _∙_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Worlds using (⊕-injˡ)
 open import denotation.Laws.Modulus using (T-not; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≼-≺-≺; ≺-ext)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -162,13 +161,6 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ... | inj₁ ko with ≼-split {k} {o} ko
   ...   | inj₁ lt   = lt
   ...   | inj₂ refl = ⊥-elim (T-not (nf x₀) nk)
-
-  -- The elaborated failure no failure precedes is the first plain one's image.
-  first-img : ∀ {f x o a} → u f (out x) → T (not (passes keep x)) → ¬ W*.Failed f
-            → t o (out a) → T (not (keep a)) → ¬ Failed o → f ≡ φ o
-  first-img y nk nF* x nk₀ nF with shown-fail y nk
-  ... | k , a , eq , xk , nkk , _ with O.first-uniq xk nkk (λ F → nF* (subst W*.Failed (sym eq) (fail→ xk tt (nl-out xk) F))) x nk₀ nF
-  ...   | refl = eq
 
   ----------------------------------------------------------------------
   -- Images and placements carried into the takes
@@ -504,22 +496,3 @@ module TakeCut {A : Set} (incl : Bool) (keep : A → Bool) {s s* : Pos} {φ : Po
   ----------------------------------------------------------------------
   -- Rows the lifting reads
 
-  -- A kept row's image row is the elaborated run's own.
-  kept-self : ∀ {k e e′} → t k e → Unpinned e → ¬ Late k → ¬ Failed k → O.NoFail k → UU (φ k) e′ → u (φ k) e′
-  kept-self {k} x un nl nF nf uu with O*.from uu
-  ... | O*.self y _ = y
-  ... | O*.new y nk _ (l , eq , _) with shown-fail y nk
-  ...   | kf , _ , refl , xf , nkf , _ =
-    ⊥-elim (≺-irrefl {φ k} (≺-trans {φ k} {φ kf} {φ k} (C.mono x xf un tt nl (nl-out xf) (before-fail x nF nf xf nkf)) (subst (φ kf ≺_) (sym eq) (≺-ext (φ kf) []))))
-
-  -- A row under an elaborated value is made from it, no failure before it.
-  under-unfailed : ∀ {y x l e′} → u y (out x) → UU (y ⊕ [ l ]) e′ → ¬ W*.Failed y
-  under-unfailed {y} {l = l} yr uu with O*.from uu
-  ... | O*.self y′ _ = ⊥-elim (Run.flat R* yr y′)
-  ... | O*.new {o} _ _ nF* (_ , eq , _) = subst (λ z → ¬ W*.Failed z) (sym (⊕-injˡ y o eq)) nF*
-
-  -- An elaborated row past no failure is the elaborated run's own.
-  unfailed-self : ∀ {m e} → UU m e → ¬ W*.Failed m → u m e
-  unfailed-self um nF with O*.from um
-  ... | O*.self y _ = y
-  ... | O*.new {o} y nk _ (l , refl , _) = ⊥-elim (nF (o , _ , y , nk , ≺-ext o []))

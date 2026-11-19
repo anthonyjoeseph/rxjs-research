@@ -24,8 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺→≼)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; mapRow; mapRows)
 open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
@@ -34,8 +33,8 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonCorr using (module Sub)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; tr-few)
-open import simultaneous.TableKit using (TR; M; Cons; ev; Sh; ag-≃; coh-of; got-bind)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel)
+open import simultaneous.TableKit using (TR; M; ev; got-bind)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
 
@@ -60,32 +59,6 @@ tr-map→ f (just L) (_ , refl , r) with ∈-map⁻ (mapRow f) r
 
 tr-map← : ∀ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) {k e} → TR m k e → TR (Mapped f m) k (ev f e)
 tr-map← f m {k} {e} (L , refl , r) = mapRows f L , refl , subst (_∈ rows (mapRows f L)) (mapRow-ev f k e) (∈-map⁺ (mapRow f) r)
-
-ev-ev : ∀ {A B : Set} (f : A → B) (e : Ev A) → ev (λ _ → tt) (ev f e) ≡ ev (λ _ → tt) e
-ev-ev f (out a) = refl
-ev-ev f skip    = refl
-ev-ev f end     = refl
-ev-ev f (pin r) = refl
-
--- A mapped table keeps its child's shape.
-sh-map→ : ∀ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) {k e} → Sh (TR (Mapped f m)) k e → Sh (TR m) k e
-sh-map→ f m (e₁ , x , refl) with tr-map→ f m x
-... | e₀ , x₀ , refl = e₀ , x₀ , ev-ev f e₀
-
-sh-map← : ∀ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) {k e} → Sh (TR m) k e → Sh (TR (Mapped f m)) k e
-sh-map← f m (e₀ , x , refl) = ev f e₀ , tr-map← f m x , sym (ev-ev f e₀)
-
--- Two runs agreeing agree in shape.
-sh-of : ∀ {X : Set} {a b : EmissionSet X} {q} → AgreeTo q a b → AgreeTo q (Sh a) (Sh b)
-sh-of ag = ⟨ (λ yq → (λ { (e₀ , x , eq) → e₀ , proj₁ (upto ag yq) x , eq }) , (λ { (e₀ , x , eq) → e₀ , proj₂ (upto ag yq) x , eq })) ⟩
-
--- Two tables agreeing, mapped, agree.
-ag-map : ∀ {A B : Set} (f : A → B) {m m′ : Maybe (Tb.Listed A)} {q} → AgreeTo q (TR m) (TR m′) → AgreeTo q (TR (Mapped f m)) (TR (Mapped f m′))
-ag-map f {m} {m′} ag = ⟨ (λ {y} yq → mv m m′ (λ {e₀} → proj₁ (upto ag {y} {e₀} yq)) , mv m′ m (λ {e₀} → proj₂ (upto ag {y} {e₀} yq))) ⟩
-  where
-    mv : ∀ n n′ {y e} → (∀ {e₀} → TR n y e₀ → TR n′ y e₀) → TR (Mapped f n) y e → TR (Mapped f n′) y e
-    mv n n′ h x with tr-map→ f n x
-    ... | e₀ , x₀ , refl = tr-map← f n′ (h x₀)
 
 un→ : ∀ {A B : Set} (f : A → B) (e : Ev A) → Unpinned (ev f e) → Unpinned e
 un→ f (out a) _ = tt
@@ -142,16 +115,6 @@ module _ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) where
   pin-in-map : (∀ {l r} → TR m l (pin r) → T (inside r l)) → ∀ {l r} → TR (Mapped f m) l (pin r) → T (inside r l)
   pin-in-map pi x = pi (tr-pin← x)
 
--- Two mapped tables agreeing below a value, one with a row at or past it:
--- their sources do, so both hold the source's value.
-cons-map : ∀ {A B : Set} (f : A → B) {m m′ : Maybe (Tb.Listed A)} {G : Pos → Set}
-         → (∀ {y y′} → y ≼ y′ → G y′ → G y)
-         → (∀ {q} → G q → AgreeTo q (TR (Mapped f m)) (TR (Mapped f m′)) → AgreeTo q (TR m) (TR m′))
-         → Cons G (TR m) (TR m′) → Cons G (TR (Mapped f m)) (TR (Mapped f m′))
-cons-map f {m} {m′} gd ag← cn {y} g below x x′ yy with tr-map→ f m x | tr-map→ f m′ x′
-... | e₀ , x₀ , eq | e₁ , x₁ , _ with ev-out f e₀ (sym eq)
-...   | a , refl , refl = tr-map← f m′ (cn g (λ {y₀} lt → ag← (gd (≺→≼ {y₀} {y} lt) g) (below lt)) x₀ x₁ yy)
-
 ------------------------------------------------------------------------
 -- The record, mapped
 
@@ -204,9 +167,6 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   leads→ : ∀ {N k} → Corr.Leads (R.corr N) k → Leads′ N k
   leads→ {N} ld x′ un′ ie′ with tr-map→ f (P N) x′
   ... | e₀ , x₀ , refl = ld x₀ (un→ f e₀ un′) ie′
-
-  leads← : ∀ {N k} → Leads′ N k → Corr.Leads (R.corr N) k
-  leads← {N} ld {k′} {e′} x′ un′ ie′ = ld (tr-map← f (P N) x′) (un← f e′ un′) ie′
 
   leadsOr : ∀ {N k m} → R.φ N k ≼ m ⊎ Corr.Leads (R.corr N) k → R.φ N k ≼ m ⊎ Leads′ N k
   leadsOr (inj₁ le) = inj₁ le

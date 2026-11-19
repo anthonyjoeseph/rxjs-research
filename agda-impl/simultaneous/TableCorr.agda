@@ -5,34 +5,32 @@
 -- rows (`TR`) and shapes (`Sh`) it is stated over.
 module simultaneous.TableCorr where
 
-open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.List using (List; []; _∷_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _≤_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Nat using (ℕ)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
-open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Function using (_⇔_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; few-ind; ≼-refl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ≼-split)
+open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; EmissionSet; _≺_; _≼_)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (rows; bind)
+open import quickcheck.Tabled using (rows)
 open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Attribution using (Every; One; Reads; Match; Shown; Live)
+open import simultaneous.Attribution using (One; Shown; Live)
 
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
-open import simultaneous.TableKit using (ev; Sh; ag-≃; Cons; cons-≤; ag-ind; coh-of; Rows; Got; got-bind; TR; M; ends; m-back; m-val; m-ee; m-ss)
+open import simultaneous.TableKit using (Got; TR; M)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
@@ -100,10 +98,6 @@ keys (just L) = map proj₁ (rows L)
 
 in-keys : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k e} → TR m k e → k ∈ keys m
 in-keys (L , refl , r) = ∈-map⁺ proj₁ r
-
--- Two tables have few rows together.
-tr-few : ∀ {X : Set} (m m′ : Maybe (Tb.Listed X)) q → Few (λ y e → TR m y e ⊎ TR m′ y e) q
-tr-few m m′ q = keys m ++ keys m′ , λ { (inj₁ x) _ → ∈-++⁺ˡ (in-keys x) ; (inj₂ x) _ → ∈-++⁺ʳ (keys m) (in-keys x) }
 
 -- A correspondence carries to runs holding the same rows.
 corr-≃ : ∀ {A s s* φ Put Late} {L K : EmissionSet A} {L* K* : EmissionSet (IE A)}

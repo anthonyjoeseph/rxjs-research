@@ -20,8 +20,8 @@
 module simultaneous.TableFlat where
 
 open import Data.Bool using (Bool; true; false; T; if_then_else_; not)
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_; InitLast; initLast; _∷ʳ_)
+open import Data.Empty using (⊥)
+open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-concatMap⁺)
@@ -33,17 +33,16 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; does; yes; no)
-open import Relation.Nullary.Decidable using (dec-true)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; of; flatMap; connect; connected)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
-open import denotation.Laws.Modulus using (AgreeTo; upto; ag-down; ≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁻; ends⁺; bind⁻; values⁺; pastRows⁺)
+open import quickcheck.Tabled.Exact.Base using (any⁻; bind⁻; values⁺; pastRows⁺)
 open import Data.Maybe.Properties using (just-injective)
 open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
 open import denotation.Laws.Worlds using (InvAt; PinBy; world-after)
@@ -51,7 +50,7 @@ open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; aft
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.TableCorr using (Same; φ≡; nl→; Rel; Corr; keys; in-keys; nl-ev)
+open import simultaneous.TableCorr using (Same; Rel; Corr; keys; in-keys; nl-ev)
 open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
@@ -70,13 +69,6 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ≟-true x y with x ≟ᵖ y
 ... | yes e = λ _ → e
 ... | no _  = λ ()
-
--- Two booleans true together are equal.
-bool-≡ : ∀ {b b′ : Bool} → (b ≡ true → b′ ≡ true) → (b′ ≡ true → b ≡ true) → b ≡ b′
-bool-≡ {true}  {true}  _ _ = refl
-bool-≡ {false} {false} _ _ = refl
-bool-≡ {true}  {false} f _ = sym (f refl)
-bool-≡ {false} {true}  _ g = g refl
 
 -- Two conditionals alike branch for branch.
 if-≡ : ∀ {X : Set} {b b′ : Bool} {x y x′ y′ : X} → b ≡ b′ → (b ≡ true → x ≡ x′) → (b ≡ false → y ≡ y′)
@@ -156,54 +148,6 @@ module TabRows where
   rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
   rowAt nothing   y = false
   rowAt (just Lx) y = anyᵇ (λ r → does (proj₁ r ≟ᵖ y)) (rows Lx)
-
-  rowAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → rowAt m y ≡ true → Σ (Ev X) λ e → TR m y e
-  rowAt-T nothing ()
-  rowAt-T (just Lx) {y} h with any⁻ {xs = rows Lx} h
-  ... | (k , e) , m , hk with ≟-true k y hk
-  ...   | refl = e , Lx , refl , m
-
-  rowAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y e} → TR m y e → rowAt m y ≡ true
-  rowAt-I nothing (_ , () , _)
-  rowAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ r → does (proj₁ r ≟ᵖ y)} m (dec-true (y ≟ᵖ y) refl)
-
-  endAt-T : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → endAt m y ≡ true → TR m y end
-  endAt-T nothing ()
-  endAt-T (just Lx) h = Lx , refl , ends⁻ {rs = rows Lx} (any-≟ h)
-
-  endAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → TR m y end → endAt m y ≡ true
-  endAt-I nothing (_ , () , _)
-  endAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ k → does (k ≟ᵖ y)} (ends⁺ m) (dec-true (y ≟ᵖ y) refl)
-
-  -- A table quiet up to `k`.
-  Quiet : ∀ {X : Set} → Pos → Maybe (Tb.Listed X) → Set
-  Quiet {X} k m = ∀ {y} {e : Ev X} → y ≼ k → TR m y e → ⊥
-
-  -- Two tables agreeing up to `k` hold rows and ends alike at or below it.
-  rowAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → rowAt m y ≡ rowAt m′ y
-  rowAt-agree {m = m} {m′} yk ag =
-    bool-≡ (λ h → rowAt-I m′ (proj₁ (upto ag yk) (proj₂ (rowAt-T m h)))) (λ h → rowAt-I m (proj₂ (upto ag yk) (proj₂ (rowAt-T m′ h))))
-
-  endAt-agree : ∀ {X : Set} {m m′ : Maybe (Tb.Listed X)} {k y} → y ≼ k → AgreeTo k (TR m) (TR m′) → endAt m y ≡ endAt m′ y
-  endAt-agree {m = m} {m′} yk ag =
-    bool-≡ (λ h → endAt-I m′ (proj₁ (upto ag yk) (endAt-T m h))) (λ h → endAt-I m (proj₂ (upto ag yk) (endAt-T m′ h)))
-
-  rowAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → rowAt m y ≡ false
-  rowAt-F {m = m} {y = y} yk q with rowAt m y in h
-  ... | true  = ⊥-elim (q yk (proj₂ (rowAt-T m h)))
-  ... | false = refl
-
-  endAt-F : ∀ {X : Set} {m : Maybe (Tb.Listed X)} {k y} → y ≼ k → Quiet k m → endAt m y ≡ false
-  endAt-F {m = m} {y = y} yk q with endAt m y in h
-  ... | true  = ⊥-elim (q yk (endAt-T m h))
-  ... | false = refl
-
-  -- One label up lies at or before.
-  up-≼ : ∀ y → up y ≼ y
-  up-≼ (i ∙ ys) with initLast ys
-  ... | InitLast.[]          = ≼-refl {i ∙ []}
-  ... | zs InitLast.∷ʳ′ l   =
-    subst (λ u → u ≼ (i ∙ (zs ∷ʳ l))) (sym (up-⊕ (i ∙ zs) l)) (≺→≼ {i ∙ zs} {i ∙ (zs ∷ʳ l)} (≺-ext (i ∙ zs) {l} []))
 
   ups : ℕ → Pos → Pos
   ups zero    y = y
@@ -359,7 +303,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ad₁ : Admits Dc c₁
   ad₁ = admits-step Dc ad₂
 
-
   open TabRows public
   open Vals n s ρ p public
 
@@ -413,12 +356,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   pd-after : ∀ {op N k e} → TR (Pd op N) k e → p ≼ k
   pd-after {op} {N} x = after-ok (3 + N) n (flatMap op f s) {ρ N} p (pd-sub {op} {N} x)
-
-  postulate
-    -- Two cuts agreeing up to a row agree on which pins below it are the
-    -- source's: a row of either is the source's or a lane's, and no lane
-    -- row sits where a source row does.
-    pd-agree : ∀ {op N N′ k} → AgreeTo k (TR (P op N)) (TR (P op N′)) → AgreeTo k (TR (Pd op N)) (TR (Pd op N′))
 
   -- One event at a position, none under another: each table is listed
   -- off its lawful emission set.
@@ -595,21 +532,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     end-nl : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N c
     end-nl {N} R cx = nl-ev (Rel.corr (Out.rel (LaneRec.lane R)) N) cx (λ ())
 
-    -- A lane row's lane image lies under its images here.
-    out-≼ : ∀ {N} (R : LaneRec N) y → Rel.φ (Out.rel (LaneRec.lane R)) N y ≼ LaneRec.outImage R y
-    out-≼ {N} R y = ≼-ˡ (Rel.φ (Out.rel (LaneRec.lane R)) N y) (sub (readerR (LaneRec.stE R)) ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
-
-    end-≼ : ∀ {N} (R : LaneRec N) y → Rel.φ (Out.rel (LaneRec.lane R)) N y ≼ LaneRec.endImage R y
-    end-≼ {N} R y = ≼-trans {φy} {e} {LaneRec.endImage R y} (≼-trans {φy} {LaneRec.endφ R y} {e} φ-e (≼-ˡ (LaneRec.endφ R y) ys)) (≼-ˡ e (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ []))
-      where
-        φy = Rel.φ (Out.rel (LaneRec.lane R)) N y
-        ys = sub (readerR (LaneRec.stE R)) ∷ ix 1 ∷ ix 0 ∷ []
-        e  = LaneRec.endφ R y ⊕ˡ ys
-        φ-e : φy ≼ LaneRec.endφ R y
-        φ-e with later-cases φy (LaneRec.trigEnd R)
-        ... | inj₁ (eq , _)  = subst (φy ≼_) (sym eq) (≼-refl {φy})
-        ... | inj₂ (eq , lt) = subst (φy ≼_) (sym eq) (≺→≼ {φy} {LaneRec.trigEnd R} lt)
-
     -- THE ELABORATED LANE'S END: where `laneˢ` shows the lane's end, its
     -- `laneDone` taken by the take.
     lane-end-image : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end
@@ -719,13 +641,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     waitedOn (R ∷ Rs) c with endsAt (LaneRec.tab R) c
     ... | just x  = just (R , x)
     ... | nothing = waitedOn Rs c
-
-    -- The last of some lanes `h` picks, `h` picks.
-    lastWith-h : ∀ {N} h (Rs : List (LaneRec N)) {R} → lastWith h Rs ≡ just R → h R ≡ true
-    lastWith-h h (R ∷ Rs) e with lastWith h Rs in eq
-    lastWith-h h (R ∷ Rs) refl | just R′ = lastWith-h h Rs eq
-    ... | nothing with h R in hR
-    lastWith-h h (R ∷ Rs) refl | nothing | true = hR
 
     -- The trigger's end, read by the share.
     ttEnd : Pos

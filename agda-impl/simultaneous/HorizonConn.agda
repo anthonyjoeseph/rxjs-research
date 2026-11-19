@@ -29,7 +29,7 @@ module simultaneous.HorizonConn where
 
 open import Data.Bool using (T; not)
 open import Data.Empty using (⊥-elim)
-open import Data.List using ([]; _∷_; [_])
+open import Data.List using ([]; [_])
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)

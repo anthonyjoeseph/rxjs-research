@@ -24,19 +24,13 @@
 -- A RELOCATED SUBTERM NEEDS NO MORE: a correspondence is stated at a pair
 -- of subscriptions, so a source the elaboration subscribes inside a lane
 -- is the same pair entered there, its boundaries already in the lane.
---
--- A BOUNDARY A LANE INHERITS FROM A HOT IS REAL AT THE CONNECT OWNING IT.
--- A lane's boundary is real, or the hot's (`RealEnv.RealRel`); the
--- connect holds its source's rows as its own, so it discharges its
--- source's, wherever its body met them (`ConnReal`).  Closed, every
--- boundary is real (`RealEnv.closed`).
 module simultaneous.HorizonCorr where
 
 open import Data.Bool using (Bool; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
-open import Data.Nat using (ℕ; zero; suc; _<_; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
@@ -46,16 +40,15 @@ open import Relation.Nullary.Decidable.Core using (T?)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; EmissionSet; _≺_; _≼_; Rejoin; shown; heard; ended; late;
-  module TakeWhile)
-open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≺-irrefl; ≺→≼; ≼-or-≻)
+open import denotation.EmissionSet using (Ev; out; Unpinned; EmissionSet; _≺_; module TakeWhile)
+open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-irrefl; ≺→≼; ≼-or-≻)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-snoc⁺; ⊑-inside; inside-⊑)
 open import denotation.Laws.Cut using (ix-asc)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.TableKit using (TR)
 open import simultaneous.SpinKit using (S; sp→)
 open import simultaneous.TakeKit using (Run; module Take)
-open import simultaneous.Horizon using (Tag; free; held; module Cuts; module Settle; module SpinB; module ConnB; past-child; sub-between)
+open import simultaneous.Horizon using (Tag; free; held; module Cuts; module Settle; module SpinB; past-child; sub-between)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
@@ -83,13 +76,6 @@ _∪_ : (Pos → Set) → (Pos → Set) → Pos → Set
 
 _∪²_ : (Pos → Pos → Set) → (Pos → Pos → Set) → Pos → Pos → Set
 (P ∪² P′) k l = P k l ⊎ P′ k l
-
-btw-∪ : ∀ {R R′ φ z z*} → Btw R φ z z* → Btw R′ φ z z* → Btw (R ∪ R′) φ z z*
-btw-∪ b b′ (inj₁ r) = b r
-btw-∪ b b′ (inj₂ r) = b′ r
-
-btw-map : ∀ {R φ φ′ z z*} → (∀ {k} → R k → φ′ k ≡ φ k) → Btw R φ z z* → Btw R φ′ z z*
-btw-map {z = z} {z*} eq b {k} r = subst (λ w → (k ≺ z → w ≺ z*) × (w ≺ z* → k ≺ z)) (sym (eq r)) (b r)
 
 pb-∪ : ∀ {P P′ z z*} → PB P z z* → PB P′ z z* → PB (P ∪² P′) z z*
 pb-∪ b b′ (inj₁ x) = b x
@@ -294,7 +280,6 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   Keep* b (held q) = ¬ Fl* q
 
   Tk  = TakeWhile.TakeT incl keep c
-  Tk* = TakeWhile.TakeT incl keep* d
 
   Bd′ : Pos → Tag → Set
   Bd′ b g = Bd b g × Keep b g
@@ -436,66 +421,3 @@ module ReaderMove {X : Set} (s : Pos) (h : EmissionSet X)
 
   moved : ∀ {y e b} → h y e → ¬ y ⊑ b → (y ≺ b → (y ⊕ [ sub s ]) ≺ b) × ((y ⊕ [ sub s ]) ≺ b → y ≺ b)
   moved {y} {b = b} x ng = (λ lt → past-child (sub s) lt ng) , (λ lt → ≺-trans {y} {y ⊕ [ sub s ]} {b} (≺-ext y []) lt)
-
-------------------------------------------------------------------------
--- Real, or the environment's
-
-module RealEnv {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set) where
-  open Cuts c Bd
-
-  -- Each boundary is real, or borne by the environment.
-  RealRel : (ℕ → Pos → Set) → Set
-  RealRel Ext = ∀ {N b g} → Bd N b g → (Σ Pos λ y → Near b y × Diff N y) ⊎ Ext N b
-
-  -- With nothing in the environment, real.
-  closed : RealRel (λ _ _ → ⊥) → Real
-  closed rr bd with rr bd
-  ... | inj₁ r = r
-  ... | inj₂ ()
-
--- A reader's boundaries are all the hot's.
-module ReaderReal {X : Set} (s : Pos) (h : ℕ → EmissionSet X) (Bdh : ℕ → Pos → Tag → Set) where
-  J : ℕ → EmissionSet X
-  J N = Rejoin s (h N)
-
-  JBd : ℕ → Pos → Tag → Set
-  JBd = Bdh
-
-  real-j : RealEnv.RealRel J JBd (λ N b → Σ Tag (Bdh N b))
-  real-j {g = g} bd = inj₂ (g , bd)
-
--- THE CONNECT OWNING A HOT DISCHARGES ITS BODY'S DEBTS TO IT: a body
--- boundary borne by the hot is a boundary of the source, which the
--- connect holds, and a source row that differs near it shows.
-module ConnReal {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set)
-  (Bσ : Cuts.Bounded σ Bdσ) (Bβ : Cuts.Bounded β Bdβ)
-  (σ-after : ∀ {N b g} → Bdσ N b g → (p ⊕ [ ix 1 ]) ≺ b)
-  (σ-held : ∀ {N b q} → Bdσ N b (held q) → (p ⊕ [ ix 1 ]) ≼ q)
-  (Ext : ℕ → Pos → Set)
-  (Rσ : RealEnv.RealRel σ Bdσ Ext)
-  (Rβ : RealEnv.RealRel β Bdβ (λ N b → Σ Tag (Bdσ N b) ⊎ Ext N b))
-  where
-  open ConnB p σ β Bdσ Bdβ Bσ Bβ σ-after σ-held
-  module Sσ′ = Cuts σ Bdσ
-  module Sβ′ = Cuts β Bdβ
-
-  postulate
-    -- A body row that differs is the connect's.
-    body-diff : ∀ {N y} → Sβ′.Diff N y → SC.Diff N y
-    -- A source row differing near a boundary the connect holds shows,
-    -- or the body's end moved before it.
-    shows : ∀ {N b g g₀ y} → CBd N b g → Bdσ N b g₀ → Sσ′.Near b y → Sσ′.Diff N y → Σ Pos λ y′ → SC.Near b y′ × SC.Diff N y′
-
-  src : ∀ {N b g g₀} → CBd N b g → Bdσ N b g₀ → (Σ Pos λ y → SC.Near b y × SC.Diff N y) ⊎ Ext N b
-  src cb bd with Rσ bd
-  ... | inj₁ (y , near , d) = inj₁ (shows cb bd near d)
-  ... | inj₂ e = inj₂ e
-
-  real-c : RealEnv.RealRel Cc CBd Ext
-  real-c (bodyB bd) with Rβ bd
-  ... | inj₁ (y , near , d)    = inj₁ (y , near , body-diff d)
-  ... | inj₂ (inj₁ (_ , bdσ))  = src (bodyB bd) bdσ
-  ... | inj₂ (inj₂ e)          = inj₂ e
-  real-c cb@(burstB bd _)  = src cb bd
-  real-c cb@(echoB bd _ _) = src cb bd
-  real-c cb@(keptB bd _ _) = src cb bd

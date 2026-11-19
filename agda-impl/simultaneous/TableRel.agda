@@ -29,7 +29,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
@@ -40,17 +40,15 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _�
 open import denotation.Events using (Timeline; From; fresh)
 open import denotation.EmissionSet using (Unpinned; pin; _≼_)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
-open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv)
 open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
-open import simultaneous.TableKit using (Rows; TR; Cons; Got)
+open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
-open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
   Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;

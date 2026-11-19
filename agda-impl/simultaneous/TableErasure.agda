@@ -104,16 +104,6 @@ every-listed : ∀ {X} n (R : Obs Timeline [] X) (ls : List Pos)
              → ∀ {y e} → enter (approx n R []) root y e → y ∈ ls
 every-listed n R ls h {y} x = ∈-stable λ ¬in → shows-approx n R {y} (ls , λ x′ fy _ → h x′ fy) λ fy → ¬in (h x fy)
 
--- Three bounds under their join.
-⊔₁ : ∀ a b c → a ≤ a ⊔ (b ⊔ c)
-⊔₁ a b c = m≤m⊔n a (b ⊔ c)
-
-⊔₂ : ∀ a b c → b ≤ a ⊔ (b ⊔ c)
-⊔₂ a b c = ≤-trans (m≤m⊔n b c) (m≤n⊔m a (b ⊔ c))
-
-⊔₃ : ∀ a b c → c ≤ a ⊔ (b ⊔ c)
-⊔₃ a b c = ≤-trans (m≤n⊔m b c) (m≤n⊔m a (b ⊔ c))
-
 -- The two tables of one cut correspond.
 Tables : ∀ {A : Set} → (Pos → Pos) → (Pos → Pos → Set) → (Pos → Set) → Tb.Listed A → Tb.Listed (IE A) → Set
 Tables φ Put Late L L* = Corr root root φ Put Late (Rows L) (Rows L*)
@@ -473,6 +463,8 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- causal, read alike by cuts agreeing up to a row, and placements with
   -- it; a row settled on both sides is settled between the two cuts; and
   -- an instant's leading row is clear where a row of its image's instant is.
+  --
+  -- RECOVERY: git show b96dfae:agda-impl/simultaneous/HorizonCorr.agda restores `RealEnv`, `ReaderReal` and `ConnReal`, a boundary real or borne by the environment, discharged at the connect owning its hot, for `root-real`.
   postulate
     root-real  : Cuts.Real cP R.Bd
     root-real* : Cuts.Real cQ R.Bd*
