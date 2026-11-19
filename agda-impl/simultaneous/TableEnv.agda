@@ -33,7 +33,7 @@ open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
@@ -69,6 +69,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
 open import simultaneous.TableCorr using (Rel; Same)
 open import simultaneous.TableKit using (Rows; TR; Got)
+open import simultaneous.HorizonCorr using (module Inter; Btw; PB; Own; OwnPut)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -556,11 +557,23 @@ relMap {Q = Q} R N = hotMap (Rel.φ R N) (λ k l → Rel.Put R N k l × Σ _ λ 
 Off : ∀ {X : Set} → Pos → EmissionSet X → EmissionSet X
 Off k t y e = t y e × ¬ (k ⊑ y)
 
+-- Every hot in scope cut alike by a pair: its rows before the one exactly
+-- when their images are before the other, its placements before.
+EnvCut : ∀ {Γ} → Maps Γ → (ℕ → All Tb.Listed Γ) → ℕ → Pos → Pos → Set
+EnvCut {[]}    Ψ ρ N z z* = ⊤
+EnvCut {_ ∷ Γ} Ψ ρ N z z* =
+  (Btw (Own (Rows (All.head (ρ N))) (late (Ψ (here refl) N))) (ψ (Ψ (here refl) N)) z z*
+   × PB (OwnPut (Rows (All.head (ρ N))) (π (Ψ (here refl) N))) z z*)
+  × EnvCut {Γ} (λ i → Ψ (there i)) (λ N′ → All.tail (ρ N′)) N z z*
+
 -- Every row not late linked to its image; every shown row cutting every
 -- hot in scope alike with it, and the stream's own rows of every cut
 -- but those under it, which no cut has; a shown row's image one in every
 -- cut showing it; and every pair before the subscription, cutting it
--- alike, cuts the stream's rows alike.
+-- alike, cuts the stream's rows alike.  The stream's boundaries have
+-- partners whose pairs cut every hot in scope alike too (`bcorr-env`):
+-- a connect's body reads its source as a hot, and its boundaries must
+-- cut the source's rows as they cut its own.
 --
 -- The stream's own rows are what a reader of it reads once a connect
 -- shares it, so a reader's shown row cuts that hot alike by the source's
@@ -574,6 +587,8 @@ record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → M
     self-at   : ∀ {N N′ k e e′} → TR (P N) k e → T (shownᵇ e) → TR (P N′) k e′ → T (shownᵇ e′) → Rel.φ R N k ≡ Rel.φ R N′ k
     self-flat : ∀ {N N′ k e l ys e′} → TR (P N) k e → T (shownᵇ e) → TR (P N′) (k ⊕ (l ∷ ys)) e′ → ⊥
     seen      : ∀ {q q*} → Aligned Ψ ρ q q* → Cut true q q* p p* → q ≺ p → ∀ N → Alike (relMap R N) (TR (P N)) q q*
+    bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Rel.Late R N)) (Rel.φ R N) (OwnPut (TR (P N)) (Rel.Put R N)) (Rel.Bd R N) (Rel.Bd* R N)
+                                   (EnvCut Ψ ρ N)
 
 record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ)
            (Ψ : Maps Γ) (p p* : Pos) : Set₁ where

@@ -52,7 +52,7 @@ open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
-  Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat)
+  Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat; EnvCut)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
 open import simultaneous.TableRows using (toT)
 open import simultaneous.LaneEndSched using (emitAt)
@@ -369,14 +369,19 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   -- THE READER'S HANGS: the reader's table is its hot's rejoined at the
   -- subscription, so the source's boundaries bound it (`RejoinB`), none
   -- at the reader's late end; the elaborated reader's are the annotated
-  -- source's, carried under the readers.
+  -- source's, carried under the readers.  Each partner pair cuts every
+  -- hot in scope alike, the read hot as the source's own pair cuts it.
   postulate
     rd-rejoin→  : ∀ {N y e} → TR (P N) y e → Rejoin q (TR (S N)) y e
     rd-rejoin←  : ∀ {N y e} → Rejoin q (TR (S N)) y e → TR (P N) y e
     rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
     rd-bd*      : ℕ → Pos → Tag → Set
     rd-bounded* : Cuts.Bounded (λ N → TR (Q N)) rd-bd*
-    rd-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
+    rd-bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
+                                      (EnvCut (Ψ′ Rs) ρ′ N)
+
+  rd-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
+  rd-bcorr N = Inter.forget _ _ _ _ _ (rd-bcorr-env N)
 
   rd-bounded : Cuts.Bounded (λ N → TR (P N)) (Rel.Bd R₀)
   rd-bounded = bounded-≃ (λ {N} {y} {e} → rd-rejoin← {N} {y} {e}) (λ {N} {y} {e} → rd-rejoin→ {N} {y} {e})
@@ -421,7 +426,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   rest′ : ∀ (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) → Linked q q* → Rest (Ψ′ Rs) ρ′ (rel′ ad ad* al)
   rest′ ad ad* al lk = record
     { linked = rd-linked ad ad* al lk ; cuts = rd-cuts ad ad* al lk ; self = rd-self ad ad* al lk
-    ; self-at = rd-self-at ; self-flat = rd-self-flat ad ; seen = rd-seen ad ad* al lk }
+    ; self-at = rd-self-at ; self-flat = rd-self-flat ad ; seen = rd-seen ad ad* al lk ; bcorr-env = rd-bcorr-env }
 
 -- THE CONNECT'S HOT: each reader's record, wherever it is subscribed.
 opaque
