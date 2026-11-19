@@ -39,9 +39,9 @@ open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.TableCorr using (Corr; Rel; module Rel; keys; in-keys)
 open import simultaneous.TableKit using (TR; M; ev; ends; m-back; m-val; m-ee; got-bind)
-open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; func-map; flat-map; pin-in-map; tr-pin←)
+open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; func-map; flat-map; pin-in-map; tr-pin←; map-bounded)
 open import simultaneous.TableTake using (ex-just)
-open import simultaneous.Horizon using (module Cuts)
+open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Sub)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; scanIE; marked)
@@ -53,6 +53,13 @@ open Scan using (Acc; acc₀; acc; ScanT; sval; sstep; spin; send)
 
 Scanned : ∀ {X B : Set} → (B → X → B) → B → Maybe (Tb.Listed X) → Maybe (Tb.Listed B)
 Scanned f z m = bind m λ l → just (scanRows f z l)
+
+postulate
+  -- A SCAN KEEPS ITS CHILD'S HANGS: a scan neither adds nor removes a
+  -- position, and folds each value from the rows before it, so the
+  -- child's boundaries bound the scanned cuts.
+  scan-bounded : ∀ {X Y : Set} (f : Y → X → Y) (z : Y) (P : ℕ → Maybe (Tb.Listed X)) {Bd : ℕ → Pos → Tag → Set}
+               → Cuts.Bounded (λ N → TR (P N)) Bd → Cuts.Bounded (λ N → TR (Scanned f z (P N))) Bd
 
 -- The latest position before `w` among `ks` where a decidable `V` holds.
 latest? : ∀ (V : Pos → Set) → (∀ k → Dec (V k)) → ∀ w ks → Latest V w ks
@@ -198,11 +205,11 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
   q′→ {N} y with tr-map→ proj₂ (S* N) y
   ... | e₁ , y₁ , eq = e₁ , tr-scan→ (scanIE f) z* (Q N) y₁ , eq
 
-  -- THE SCAN KEEPS ITS CHILD'S HANGS: a scan neither adds nor removes a
-  -- position, so the child's boundaries bound the scanned cuts.
-  postulate
-    scan-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
-    scan-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
+  sc-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
+  sc-bounded  = scan-bounded f z P R.bounded
+
+  sc-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
+  sc-bounded* = map-bounded proj₂ S* (scan-bounded (scanIE f) z* Q R.bounded*)
 
   -- One cut.
   module At (N : ℕ) where
@@ -504,7 +511,7 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; after* = λ {N} y → R.after* (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y)))))
     ; after-φ = λ {N} x un nl → let (_ , x₀ , u₀) = At.back-row N x un in R.after-φ x₀ u₀ nl
     ; pin-after* = λ {N} y → R.pin-after* (sc-pin (tr-scan→ (scanIE f) z* (Q N) (tr-pin← proj₂ (S* N) y)))
-    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = scan-bounded ; bounded* = scan-bounded*
+    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = sc-bounded ; bounded* = sc-bounded*
     ; bcorr = λ N → Sub.restrict (λ { (_ , x , un , nl) → let (e₀ , x₀ , u₀) = At.back-row N x un in e₀ , x₀ , u₀ , nl })
         (λ { ((_ , x) , pl) → row-of f z (tr-scan→ f z (P N) x) , pl }) (R.bcorr N) }
     where

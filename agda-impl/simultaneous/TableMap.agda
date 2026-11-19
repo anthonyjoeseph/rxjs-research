@@ -31,7 +31,8 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.Horizon using (module Cuts)
+open import simultaneous.Horizon using (Tag; module Cuts)
+open import denotation.Laws.Modulus using (⟨_⟩; upto)
 open import simultaneous.HorizonCorr using (module Sub)
 open import simultaneous.TableCorr using (Corr; Rel; module Rel)
 open import simultaneous.TableKit using (TR; M; ev; got-bind)
@@ -59,6 +60,30 @@ tr-map→ f (just L) (_ , refl , r) with ∈-map⁻ (mapRow f) r
 
 tr-map← : ∀ {A B : Set} (f : A → B) (m : Maybe (Tb.Listed A)) {k e} → TR m k e → TR (Mapped f m) k (ev f e)
 tr-map← f m {k} {e} (L , refl , r) = mapRows f L , refl , subst (_∈ rows (mapRows f L)) (mapRow-ev f k e) (∈-map⁺ (mapRow f) r)
+
+-- A MAP KEEPS ITS CHILD'S HANGS: the mapped cuts hold the child's rows
+-- in place, so they stop where the child's do.
+map-bounded : ∀ {X Y : Set} (f : X → Y) (P : ℕ → Maybe (Tb.Listed X)) {Bd : ℕ → Pos → Tag → Set}
+            → Cuts.Bounded (λ N → TR (P N)) Bd → Cuts.Bounded (λ N → TR (Mapped f (P N))) Bd
+map-bounded {X} {Y} f P {Bd} B = record
+  { gap     = λ {N} bd′ x → B.gap bd′ (proj₁ (proj₂ (tr-map→ f (P N) x)))
+  ; held-in = λ {N} {b} {q} → B.held-in {N} {b} {q}
+  ; fwd     = λ {N} {k} cl {N′} le →
+      ⟨ (λ {y} yk → (λ x → mv N N′ (λ {e₀} → proj₁ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)
+                  , (λ x → mv N′ N (λ {e₀} → proj₂ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)) ⟩
+  ; fwd-pin = λ {N} {q} {k} cl hc {N′} le {y} yk →
+      (λ x → pn N N′ (proj₁ (B.fwd-pin {N} {q} {k} cl hc le yk)) x) , (λ x → pn N′ N (proj₂ (B.fwd-pin {N} {q} {k} cl hc le yk)) x)
+  }
+  where
+    module B = Cuts.Bounded B
+
+    mv : ∀ M M′ {y e} → (∀ {e₀} → TR (P M) y e₀ → TR (P M′) y e₀) → TR (Mapped f (P M)) y e → TR (Mapped f (P M′)) y e
+    mv M M′ h x with tr-map→ f (P M) x
+    ... | e₀ , x₀ , refl = tr-map← f (P M′) (h x₀)
+
+    pn : ∀ M M′ {y q} → (TR (P M) y (pin q) → TR (P M′) y (pin q)) → TR (Mapped f (P M)) y (pin q) → TR (Mapped f (P M′)) y (pin q)
+    pn M M′ {y} {q} h x with tr-map→ f (P M) x
+    ... | pin q′ , x₀ , refl = tr-map← f (P M′) (h x₀)
 
 un→ : ∀ {A B : Set} (f : A → B) (e : Ev A) → Unpinned (ev f e) → Unpinned e
 un→ f (out a) _ = tt
@@ -131,11 +156,11 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
   Q′ : ℕ → Maybe (Tb.Listed (IE B))
   Q′ N = Mapped g (Q N)
 
-  postulate
-    -- THE MAP KEEPS ITS CHILD'S HANGS: the mapped cuts stop where the
-    -- child's do.
-    ev-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
-    ev-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
+  ev-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
+  ev-bounded  = map-bounded f P R.bounded
+
+  ev-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
+  ev-bounded* = map-bounded g Q R.bounded*
 
   back-row : ∀ N {k e} → TR (P′ N) k e → Unpinned e → Σ (Ev A) λ e₀ → TR (P N) k e₀ × Unpinned e₀
   back-row N x un with tr-map→ f (P N) x

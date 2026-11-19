@@ -290,9 +290,7 @@ module SpinB {X : Set} (p : Pos) where
 ------------------------------------------------------------------------
 -- A takeWhile's clearness at a row, its source's at the row read
 
-module TakeClear {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set)
-  (gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b)
-  (held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b) where
+module TakeBd {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set) where
 
   Fl : ℕ → Pos → Set
   Fl N = TakeWhile.Failed incl keep (c N)
@@ -306,6 +304,12 @@ module TakeClear {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → Emissi
 
   Bd′ : ℕ → Pos → Tag → Set
   Bd′ N b g = Bd N b g × Keep N b g
+
+module TakeClear {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set)
+  (gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b)
+  (held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b) where
+
+  open TakeBd incl keep c Bd public
 
   module C = Cuts c Bd
 
@@ -468,11 +472,7 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
 
 -- The source's boundaries lie in its world, past its subscription, and so
 -- do the connects its held ones wait on.
-module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set)
-  (Bσ : Cuts.Bounded σ Bdσ) (Bβ : Cuts.Bounded β Bdβ)
-  (σ-after : ∀ {N b g} → Bdσ N b g → (p ⊕ [ ix 1 ]) ≺ b)
-  (σ-held : ∀ {N b q} → Bdσ N b (held q) → (p ⊕ [ ix 1 ]) ≼ q)
-  where
+module ConnBd {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set) where
 
   r : Pos
   r = p ⊕ [ ix 1 ]
@@ -491,6 +491,14 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
     burstB : ∀ {b g} → Bdσ N b g → T (inside r b) → CBd N b (held p)
     echoB  : ∀ {b} → Bdσ N b free → T (not (inside r b)) → Al N b → CBd N b free
     keptB  : ∀ {b q} → Bdσ N b (held q) → T (not (inside r b)) → Al N q → CBd N b (held q)
+
+module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set)
+  (Bσ : Cuts.Bounded σ Bdσ) (Bβ : Cuts.Bounded β Bdβ)
+  (σ-after : ∀ {N b g} → Bdσ N b g → (p ⊕ [ ix 1 ]) ≺ b)
+  (σ-held : ∀ {N b q} → Bdσ N b (held q) → (p ⊕ [ ix 1 ]) ≼ q)
+  where
+
+  open ConnBd p σ β Bdσ Bdβ public
 
   module Sσ = Cuts σ Bdσ
   module Sβ = Cuts β Bdβ
