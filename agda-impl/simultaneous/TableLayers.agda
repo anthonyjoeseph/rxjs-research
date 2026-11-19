@@ -217,9 +217,9 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- Every hang of the combined run is the closer's, partnered as it is:
     -- what lies before the closer's lies before the combined run's.
-    cz-clear : ∀ {N l} → Cuts.Clear (λ N → TR (Q′ N)) cz-bd* N l → ∀ {b g} → Rel.Bd* R N b g → l ≺ b
-    cz-clear {N} cl bd* with Inter.BCorr.from (Rel.bcorr R N) bd*
-    ... | _ , _ , bd , btw , _ = cl (cz-keeps N bd bd* btw)
+    cz-clear : ∀ {N l} → Cuts.Clear (λ N → TR (Q′ N)) cz-bd* N l → Cuts.Clear (λ N → TR (listC (3 + N) n (inner op) (ρ*c N) c₂)) (Rel.Bd* R) N l
+    cz-clear {N} {l} cl {b} {g} bd* = cl {b} {g} (cz-keeps N {_} {b} {_} {g} (proj₁ (proj₂ (proj₂ fr))) bd* (proj₁ (proj₂ (proj₂ (proj₂ fr)))))
+      where fr = Inter.BCorr.from (Rel.bcorr R N) bd*
 
     cz-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cz-bd* N)
     cz-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
@@ -250,9 +250,9 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; after = Rel.after R ; after* = cz-after* ; after-φ = cz-after-φ ; pin-after* = cz-pin-after*
       ; Bd = Rel.Bd R ; Bd* = cz-bd* ; bounded = Rel.bounded R ; bounded* = cz-bounded* ; bcorr = cz-bcorr
       ; across = record
-        { back-clear = λ le x un nl cl* → Across.back-clear (Rel.across R) le x un nl (cz-clear cl*)
-        ; put-clear = λ le x pl cl* → Across.put-clear (Rel.across R) le x pl (cz-clear cl*)
-        ; lead-clear = cz-lead-clear } }
+        { back-clear = λ {N} {N′} {k} {e} le x un nl cl* → Across.back-clear (Rel.across R) {N} {N′} {k} {e} le x un nl (cz-clear {N} {φ′ N′ k} cl*)
+        ; put-clear = λ {N} {N′} {k} {e} {l} le x pl cl* → Across.put-clear (Rel.across R) {N} {N′} {k} {e} {l} le x pl (cz-clear {N} {l} cl*)
+        ; lead-clear = λ {N} {k} {e} {m} {e*} → cz-lead-clear {N} {k} {e} {m} {e*} } }
 
   ----------------------------------------------------------------------
   -- THE SHARE: the body is the share's two connects' body, its rows shown
