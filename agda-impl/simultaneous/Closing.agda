@@ -417,16 +417,24 @@ module Pass {A : Set} (o : SObs [] A) where
 
     latest : ∀ c (ks : List Pos) → (∀ {k} → k ∈ ks → Σ _ (X k)) → Latest c ks
     latest c []       _ = inj₁ λ ()
-    latest c (k ∷ ks) s with latest c ks (λ m → s (there m)) | s (here refl)
-    ... | r | e₁ , x₁ with vis? e₁ | after? c k
-    ...   | no nv  | _      = drop {c} {k} {ks} (λ x v _ → nv (subst Visible ((at-func (elaborate (plain o))) x x₁) v)) r
-    ...   | yes _  | no na  = drop {c} {k} {ks} (λ _ _ a → na a) r
-    ...   | yes v₁ | yes a₁ with r
-    ...     | inj₁ none = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ , λ { (here refl) _ _ _ → ≼-refl {k} ; (there m) x v a → ⊥-elim (none m x v a) })
-    ...     | inj₂ (u , eu , m , xu , vu , au , all) with T? (u <ᵖ k)
-    ...       | yes uk = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ ,
+    latest c (k ∷ ks) s = step (latest c ks (λ m → s (there m))) (s (here refl))
+      where
+        step : Latest c ks → Σ _ (X k) → Latest c (k ∷ ks)
+        step r (e₁ , x₁) = dec (vis? e₁) (after? c k)
+          where
+            keep : Visible e₁ → After c k → Latest c ks → Latest c (k ∷ ks)
+            keep v₁ a₁ (inj₁ none) = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ , λ { (here refl) _ _ _ → ≼-refl {k} ; (there m) x v a → ⊥-elim (none m x v a) })
+            keep v₁ a₁ (inj₂ (u , eu , m , xu , vu , au , all)) = cmp (T? (u <ᵖ k))
+              where
+                cmp : Dec (T (u <ᵖ k)) → Latest c (k ∷ ks)
+                cmp (yes uk) = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ ,
                   λ { (here refl) _ _ _ → ≼-refl {k} ; {k′} (there m′) x v a → ≼-trans {k′} {u} {k} (all m′ x v a) (≺→≼ {u} {k} uk) })
-    ...       | no ku  = inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) _ _ _ → ku ; (there m′) x v a → all m′ x v a })
+                cmp (no ku) = inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) _ _ _ → ku ; (there m′) x v a → all m′ x v a })
+
+            dec : Dec (Visible e₁) → Dec (After c k) → Latest c (k ∷ ks)
+            dec (no nv) _ = drop {c} {k} {ks} (λ x v _ → nv (subst Visible ((at-func (elaborate (plain o))) x x₁) v)) r
+            dec (yes _) (no na) = drop {c} {k} {ks} (λ _ _ a → na a) r
+            dec (yes v₁) (yes a₁) = keep v₁ a₁ r
 
     cases : ∀ {P Q R : Set} → (P → R) → (Q → R) → P ⊎ Q → R
     cases f g (inj₁ p) = f p
@@ -958,6 +966,8 @@ batches o = early , late
     flush true  mxr cl = closes-flush o mxr cl
 
     late : ∀ {rx ov} → Met (ranked X) rx → Closes valuesOf X rx ov → Σ _ λ rs → Met (ranked B) rs × Prefix _≡_ (grouped ov (stampedᴮ rx)) (stampedᴮ rs)
-    late {rx} {ov} mxr cl with late₀ {unrank rx} {ov} (proj₂ (ranks-x o) mxr) (flush ov mxr cl)
-    ... | rs₀ , mb , pre with proj₁ (ranks-b o) mb
-    ...   | rs , mbr , refl = rs , mbr , prefix-rel (name-rank o) (groups ov mxr) (bs-rel mbr) pre
+    late {rx} {ov} mxr cl =
+      let rs₀ , mb , pre = late₀ {unrank rx} {ov} (proj₂ (ranks-x o) mxr) (flush ov mxr cl)
+          rs , mbr , eq = proj₁ (ranks-b o) mb
+      in rs , mbr , prefix-rel (name-rank o) (groups ov mxr) (bs-rel mbr)
+           (subst (λ r → Prefix _≡_ (byName ov (unrank rx)) (stamped (values r))) (sym eq) pre)
