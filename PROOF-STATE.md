@@ -59,13 +59,21 @@ Members: `mg-bd`, `mg-bd*`, `mg-bounded`, `mg-bounded*`, `mg-bcorr`,
 
 #### THE CONNECT'S HANGS
 
-`Horizon.ConnB` proves the connect bounded and `HorizonConn.ConnPair`
-its pair, both over `Connecting.ConnT`; the table is not yet read as one.
-Open: a boundary never over a connect row (`gap-c`). Settled by wiring
-them over the table.
+The connect's bounded is `Horizon.ConnB`'s and its pair `HorizonConn.ConnPair`'s,
+each table read as `Connecting.ConnT` of its parts, the elaborated over
+the annotated source. Riskiest: the body's pair must cover the source's
+rows as its environment (`ct-body-bcorr`), which `Rel.bcorr` does not
+carry. Then the annotated source's pair and the cross-part leaves.
+Settled by bodies, or a body boundary cut unlike its image by a source row.
 
-Members: `ct-bd`, `ct-bd*`, `ct-bounded`, `ct-bounded*`, `ct-bcorr`,
-`gap-c`.
+Members: `ct-body-bcorr`, `ct-src-bcorr`, `ct-conn→`, `ct-conn←`,
+`ct-conn*→`, `ct-conn*←`, `ct-src-after`, `ct-src-held`, `ct-ann-bd*`,
+`ct-ann-bounded*`, `ct-ann-after*`, `ct-ann-held*`, `ct-φβ-src`,
+`ct-φc-body`, `ct-φc-echo`, `ct-late-body`, `ct-late-echo`,
+`ct-put-split`, `ct-img`, `ct-put-row`, `ct-gap-src`, `ct-gap-src*`,
+`ct-held-src`, `ct-held-src*`, `ct-held-body`, `ct-held-body*`,
+`ct-body-src`, `ct-body-src-put`, `ct-home→`, `ct-home←`, `ct-end→`,
+`ct-end←`, `ct-rows-after`, `ct-rows-after*`, `gap-c`.
 
 #### THE HOT READER'S HANGS
 
