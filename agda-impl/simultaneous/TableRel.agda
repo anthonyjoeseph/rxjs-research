@@ -48,15 +48,15 @@ open import simultaneous.Listing using (UncutEnv; listC)
 open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; bounded-≃)
-open import simultaneous.HorizonTree using (bd; _∷ᵇ_)
-open import simultaneous.TreeBounded using (tree-bounded; hung-body; conn-tr→; conn-tr←)
+open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-after; src-held)
+open import simultaneous.HorizonTree using (bd)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv
   using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
   Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
   Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; EnvCut;
-  Full; Coh; Admits; bds; hung; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
+  Full; Coh; Admits; DenOf; dbd; admits-step; admits-wk; unended; tab-func;
   tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
@@ -81,8 +81,8 @@ postulate
   -- subscription's instant or at steps of timers it created there, each
   -- imaged at the alike step of the elaborated subscription; so each row
   -- inherits its subscription's link and its cuts of the hots in scope.
-  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (Ψ : Maps Γ) p p*
-            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* p p*)
+  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (D* : DenOf ρ*) (Ψ : Maps Γ) p p* (a* : Admits D* p*)
+            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* D* p p* a*)
   of-order   : ∀ {Γ A} (xs : List A) v vals (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
             → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (of-tab xs v vals p p*)
   spin-order : ∀ {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
@@ -166,10 +166,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       cuts′ N x sh (there i)   N′ = Rest.cuts (Out.rest O) N x sh i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
-  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh (λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N))
-    (bd n s ρ uρ (bds env) (p ⊕ [ ix 1 ]) ∷ᵇ bds env)
-    (hung-body n s uρ (bds env) (lw env) (hung env) p a
-      (tree-bounded n s ρ uρ (bds env) (lw env) (hung env) (p ⊕ [ ix 1 ]) (admits-step (lw env) a)))
+  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
     where
       hots : ∀ {X} (i : X ∈ A ∷ Γ) → HotR i ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
       hots (here refl) = conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
@@ -279,6 +276,19 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     Pσ : ℕ → Pos → Pos → Set
     Pσ N k l = l ≡ ψ (srcMap Rs N) k ⊎ π (srcMap Rs N) k l
 
+    -- The annotated source's hangs: its tree's.
+    ct-ann-bd* : ℕ → Pos → Tag → Set
+    ct-ann-bd* = bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ])
+
+    ct-ann-bounded* : Cuts.Bounded σc* ct-ann-bd*
+    ct-ann-bounded* = tree-bounded n (annotate (elab ρι s)) ρ* uρ* (lw* env) (p* ⊕ [ ix 1 ]) (admits-step (lw* env) a*)
+
+    ct-ann-after* : ∀ {N b g} → ct-ann-bd* N b g → (p* ⊕ [ ix 1 ]) ≺ b
+    ct-ann-after* {N} {b} {g} = src-after ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {g}
+
+    ct-ann-held* : ∀ {N b q} → ct-ann-bd* N b (held q) → (p* ⊕ [ ix 1 ]) ≼ q
+    ct-ann-held* {N} {b} {q} = src-held ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {q}
+
     ct-conn→  : ∀ {N y e} → TR (P N) y e → Connecting.ConnT p (σc N) (βc N) y e
     ct-conn→ {N} {y} {e} = conn-tr→ n s b uρ p {N} {y} {e}
 
@@ -294,10 +304,6 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     postulate
       ct-src-after : ∀ {N b g} → Rel.Bd RS N b g → (p ⊕ [ ix 1 ]) ≺ b
       ct-src-held  : ∀ {N b q} → Rel.Bd RS N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
-      ct-ann-bd*      : ℕ → Pos → Tag → Set
-      ct-ann-bounded* : Cuts.Bounded σc* ct-ann-bd*
-      ct-ann-after*   : ∀ {N b g} → ct-ann-bd* N b g → (p* ⊕ [ ix 1 ]) ≺ b
-      ct-ann-held*    : ∀ {N b q} → ct-ann-bd* N b (held q) → (p* ⊕ [ ix 1 ]) ≼ q
 
     module CB  = ConnB p σc βc (Rel.Bd RS) (Rel.Bd Rb) (Rel.bounded RS) (Rel.bounded Rb)
       (λ {N} {b} {g} → ct-src-after {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q})
@@ -571,7 +577,7 @@ rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
 -- `connect`'s are their children's.
 rel-coh : ∀ {Γ A} n (o : SObs Γ A) → Coh n (plain o) (rel n o)
 
-rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* a a* al lk = cold-tab m n ρ* uρ* p p* ⊢ cold-order m n ρ* uρ* (maps env) p p* al lk
+rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* a a* al lk = cold-tab m n ρ* uρ* (lw* env) p p* a* ⊢ cold-order m n ρ* uρ* (lw* env) (maps env) p p* a* al lk
 rel n empty             ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p* ⊢ of-order [] _ _ (maps env) ρ p p* al lk
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* a a* al lk =

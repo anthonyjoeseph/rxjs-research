@@ -49,37 +49,36 @@ Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
 
 `Horizon.ConnB` asks every connect's source for boundaries past its
 subscription. Suspected false where the source is a hot's reader: its
-boundaries are its hot's, which may precede the reader. Settled by a
-proof over the tree, or by that reader and `ConnB` restated to take
+boundaries are its hot's, which may precede the reader. `src-apart`
+reads only the hot's own rows and the body's subscription. Settled by
+a proof over the tree, or by that reader and `ConnB` restated to take
 the hot's boundaries as they stand.
 
 Members: `src-after`, `src-held`, `src-apart`, `ct-src-after`, `ct-src-held`.
 
 #### THE TREE'S HANGS
 
-A tree's boundaries are `HorizonTree.bd` and `TreeBounded.tree-bounded`
-bounds its cuts by one induction; the plain side of every `Rel` reads
-both. Untried: the join's boundaries and their bound (outer's, and each
-running lane's before the lane's cut), the cold's, the scan's fold, the
-unrolled defer, a connect's table read as `Connecting.ConnT`. The
-elaborated sides still choose their own (`-bd*`): reading them off the
-elaboration's tree needs the hand-built scopes' hots hung. Settled by
-bodies, or a lane hang the join does not keep.
+A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
+bounds its cuts by one induction; every `Rel`'s elaborated side and the
+plain leaves, joins and connects read both. Untried: the join's
+boundaries and their bound (outer's, and each running lane's before the
+lane's cut), the cold's, the scan's fold, the unrolled defer, a
+connect's table read as `Connecting.ConnT`. The plain side of a
+one-child former, a reader and a connect still passes its child's
+`Rel.Bd` through unpinned. Settled by bodies, or a lane hang the join
+does not keep.
 
 Members: `cold-bd`, `join-bd`, `cold-bounded`, `scan-bounded`,
 `hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `join-bounded`,
-`later-bounded`, `pd-bounded`, `cold-bd*`, `cold-bounded*`.
+`later-bounded`, `pd-bounded`.
 
 #### THE JOINS' HANGS
 
-Untried: each elaborated core's boundaries, bounded, and paired with
-the plain flatMap's over its parts' pairs (a pair over cross-part
-leaves is recoverable, see the merge's leaves). Settled by bodies.
+Untried: each core's pair with the plain flatMap's, over its parts'
+pairs (a pair over cross-part leaves is recoverable, see the merge's
+leaves). Settled by bodies.
 
-Members: `mg-bd*`, `mg-bounded*`, `mg-bcorr`,
-`cc-bd*`, `cc-bounded*`, `cc-bcorr`,
-`sw-bd*`, `sw-bounded*`, `sw-bcorr`,
-`ex-bd*`, `ex-bounded*`, `ex-bcorr`.
+Members: `mg-bcorr`, `cc-bcorr`, `sw-bcorr`, `ex-bcorr`.
 
 #### THE CONNECT'S HANGS
 
@@ -90,8 +89,7 @@ image (`ct-src-img`), which the body's placements need; then the
 annotated source's pair and the cross-part leaves. Settled by bodies,
 or a late source row placed off its image.
 
-Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-ann-bd*`,
-`ct-ann-bounded*`, `ct-ann-after*`, `ct-ann-held*`,
+Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`,
 `ct-φc-body`, `ct-φc-echo`, `ct-late-body`, `ct-late-echo`,
 `ct-put-split`, `ct-img`, `ct-put-row`, `ct-gap-src`, `ct-gap-src*`,
 `ct-held-src`, `ct-held-src*`, `ct-held-body`, `ct-held-body*`,
@@ -101,23 +99,21 @@ Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-ann-bd*`,
 #### THE HOT READER'S HANGS
 
 A reader is bounded by its hot's boundaries through `Horizon.RejoinB`,
-its table read as `Rejoin` at the subscription. Untried: that reading,
-the elaborated reader's boundaries and their pair. Settled by bodies,
+its table read as `Rejoin` at the subscription. Untried: that reading
+and the readers' pair. Settled by bodies,
 or a reader row the rejoined hot lacks.
 
-Members: `rd-rejoin→`, `rd-rejoin←`, `rd-apart`, `rd-bd*`,
-`rd-bounded*`, `rd-bcorr-env`.
+Members: `rd-rejoin→`, `rd-rejoin←`, `rd-apart`, `rd-bcorr-env`.
 
 #### THE LAYERS' HANGS
 
 Each wrapping layer's pair is `HorizonCorr.Wrap` over its body's; the
 combined scan, closer and share owe which rows they keep, which they
-move and where, and their elaborated boundaries bounded. Untried. Settled by
+move and where. Untried. Settled by
 bodies, or a kept row whose hang the layer drops.
 
-Members: `cb-bd*`, `cb-bounded*`, `cb-keeps`, `cb-only`, `cb-moved`,
-`cb-moved-q`, `cb-putw`, `cz-bd*`, `cz-bounded*`, `cz-keeps`, `cz-only`,
-`sr-bd*`, `sr-bounded*`, `sr-bcorr`.
+Members: `cb-keeps`, `cb-only`, `cb-moved`,
+`cb-moved-q`, `cb-putw`, `cz-keeps`, `cz-only`, `sr-bcorr`.
 
 #### THE ONE-CHILD HANGS
 

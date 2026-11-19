@@ -55,12 +55,12 @@ open import simultaneous.TableCorr using (Same; Rel; Corr; keys; in-keys; nl-ev)
 open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonTree using (bd)
-open import simultaneous.TreeBounded using (tree-bounded)
+open import simultaneous.TreeBounded using (tree-bounded; listHot; admits-body; admits-trig)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
   linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; unended; bds; hung; den; env-wk; Holds; Admits; admits-step;
-  admits-ix; admits-body; admits-row; admits-trig; listHot; den-cons; HotD; DenOf; tab-func;
+  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; unended; den; dbd; env-wk; Holds; Admits; admits-step;
+  admits-ix; admits-row; den-cons; HotD; DenOf; tab-func;
   tab-flat; tab-at)
 
 open import simultaneous.ElabUndone using (elab-undone)
@@ -357,13 +357,20 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   -- THE FLATMAP'S HANGS are its tree's, and the unpinned flatMap's with them.
   jbd : FlatOp → ℕ → Pos → Tag → Set
-  jbd op = bd n (flatMap op f s) ρ uρ (bds env) p
+  jbd op = bd n (flatMap op f s) ρ uρ (dbd (lw env)) p
 
   jtree : ∀ op → Cuts.Bounded (λ N → TR (P op N)) (jbd op)
-  jtree op = tree-bounded n (flatMap op f s) ρ uρ (bds env) (lw env) (hung env) p ad
+  jtree op = tree-bounded n (flatMap op f s) ρ uρ (lw env) p ad
 
   jbounded : ∀ op → Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
   jbounded op = pd-bounded {op} (jtree op)
+
+  -- THE LANES' FLATMAP'S HANGS are its tree's, in the closer's scope.
+  jbd* : FlatOp → ℕ → Pos → Tag → Set
+  jbd* op = bd n (core op) ρ*c uρ*c (dbd Dc) c₁
+
+  jbounded* : ∀ op → Cuts.Bounded (λ N → TR (listC (3 + N) n (core op) (ρ*c N) c₁)) (jbd* op)
+  jbounded* op = tree-bounded n (core op) ρ*c uρ*c Dc c₁ ad₁
 
   pd-sub : ∀ {op N k e} → TR (Pd op N) k e → TR (P op N) k e
   pd-sub {op} {N} = unpin-sub (srcPins N) (P op N)

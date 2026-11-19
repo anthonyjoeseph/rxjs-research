@@ -34,7 +34,9 @@ open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; admits-trig; tab-func; tab-flat)
+  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
+open import simultaneous.TreeBounded using (admits-trig; tree-bounded)
+open import simultaneous.HorizonTree using (bd)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -130,9 +132,13 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- THE COMBINED SCAN'S HANGS: the scan wraps the lanes' flatMap alone,
     -- re-emitting each of its rows; it keeps the boundaries a plain one
     -- partners, moving no row across one.
+    cb-bd* : ℕ → Pos → Tag → Set
+    cb-bd* = bd n (inner op) ρ*c uρ*c (dbd Dc) c₂
+
+    cb-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) cb-bd*
+    cb-bounded* = tree-bounded n (inner op) ρ*c uρ*c Dc c₂ ad₂
+
     postulate
-      cb-bd*      : ℕ → Pos → Tag → Set
-      cb-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) cb-bd*
       cb-keeps    : ∀ N {b b* g g*} → Rel.Bd R N b g → Rel.Bd* R N b* g* → Btw (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) b b* → cb-bd* N b* g*
       cb-only     : ∀ N {b g} → cb-bd* N b g → Σ Tag λ g₀ → Rel.Bd* R N b g₀ × (g ≡ g₀ ⊎ g ≡ free)
       cb-moved    : ∀ N {k b g} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b g → (Rel.φ R N k ≺ b → φ′ N k ≺ b) × (φ′ N k ≺ b → Rel.φ R N k ≺ b)
@@ -190,9 +196,13 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- THE CLOSER'S HANGS: the closer wraps the combined run alone, its
     -- rows where they were; it keeps the boundaries a plain one partners.
+    cz-bd* : ℕ → Pos → Tag → Set
+    cz-bd* = bd n (body op) ρ*h uρ*h (dbd Dh) c₃
+
+    cz-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) cz-bd*
+    cz-bounded* = tree-bounded n (body op) ρ*h uρ*h Dh c₃ ad₃
+
     postulate
-      cz-bd*      : ℕ → Pos → Tag → Set
-      cz-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) cz-bd*
       cz-keeps    : ∀ N {b b* g g*} → Rel.Bd R N b g → Rel.Bd* R N b* g* → Btw (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) b b* → cz-bd* N b* g*
       cz-only     : ∀ N {b g} → cz-bd* N b g → Σ Tag λ g₀ → Rel.Bd* R N b g₀ × (g ≡ g₀ ⊎ g ≡ free)
 
@@ -274,9 +284,13 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- THE SHARE'S HANGS: the share returns the source's pins the layers
     -- inside lack, so its plain side is the flatMap itself, hanging as
     -- its tree does; its elaborated side wraps the body and the trigger.
+    sr-bd* : ℕ → Pos → Tag → Set
+    sr-bd* = bd n (elab ρι (flatMap op f s)) ρ* uρ* (dbd (lw* env)) p*
+
+    sr-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) sr-bd*
+    sr-bounded* = tree-bounded n (elab ρι (flatMap op f s)) ρ* uρ* (lw* env) p* ad*
+
     postulate
-      sr-bd*      : ℕ → Pos → Tag → Set
-      sr-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) sr-bd*
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
 
     sr-got : ∀ N → Got (P′ N)

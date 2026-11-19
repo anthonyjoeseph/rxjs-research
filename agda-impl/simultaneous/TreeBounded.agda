@@ -3,49 +3,67 @@
 -- EVERY PROGRAM'S CUTS ARE BOUNDED BY ITS TREE'S BOUNDARIES
 -- (`tree-bounded`): a row before every boundary of a cut is a row of
 -- every deeper cut, so of the meaning, and nothing decides where the
--- program hangs.  One induction over the tree, in any lawful scope whose
--- hots hang at their own boundaries (`Hung`), at any admissible
--- subscription; it reads no elaboration, so it bounds a plain program
--- and its elaboration alike.
+-- program hangs.  One induction over the tree, in any lawful scope, at
+-- any admissible subscription; it reads no elaboration, so it bounds a
+-- plain program and its elaboration alike.
 --
 -- Each case is its former's: a leaf never moves, a spin has its next
 -- tick (`SpinB`), a map keeps its child's rows in place, a take is
 -- `TakeB`'s, a connect `ConnB`'s over its source and its body in the
 -- scope the source's hot extends, a reader `RejoinB`'s over its hot.
 --
+-- A hot carries its boundaries (`HotD`), and the one hot there is, a
+-- connect's (`listHot`), hangs at its source's by the theorem itself:
+-- the two are one recursion, the hot's on the same tree, the theorem's
+-- on a smaller.
+--
 -- A source's boundaries past its subscription (`src-after`, `src-held`)
 -- are owed of every tree, a hot's reader among them, whose boundaries
 -- are its hot's and may precede it.
 module simultaneous.TreeBounded where
 
-open import Data.List using (_∷_; [_])
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.All using (All; lookup)
+open import Data.Bool.Properties using (T-≡)
+open import Data.List using (List; []; _∷_; [_])
+open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _+_)
-open import Data.Product using (Σ; _×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (⊤; tt)
+open import Function using (Equivalence)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; ix; last; _⊕_)
-open import denotation.Events using (Timeline)
-open import denotation.EmissionSet using (Rejoin; _≺_; _≼_; module Connecting)
-open import denotation.Laws.Worlds using (_⊑_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_)
+open import denotation.Events using (Timeline; fresh; <ᵖ-part)
+open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; on-out; module Connecting)
+import denotation.EmissionSet as ES
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl)
+open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; ok-in)
+open import denotation.Laws.Worlds.Leaves using (empty-inv)
+open import denotation.Laws.Cut using (capprox; inv-capprox)
+import denotation.Laws.Connect as Cn
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rejoin)
-open import quickcheck.Tabled.Exact using (rejoin-exact)
-open import quickcheck.Tabled.Exact.Base using (Exact; sound; complete)
-open import simultaneous.Listing using (listC; listC-ok; UncutEnv; Uncut)
+open import quickcheck.Tabled.Exact using (truncate-exact; rejoin-exact; proper-exact)
+open import quickcheck.Tabled.Exact.Base using (Exact; Exactly; sound; complete)
+open import simultaneous.SObs using (lone; module Elaborate)
+open import simultaneous.ElabUndone using (EnvU; AUndone; ann-u; elab-undone)
+open import simultaneous.DenRows using (hot-out)
+open import simultaneous.Listing using (listC; listC-ok; listC-exact; UncutEnv; Uncut)
 open import simultaneous.TableKit using (Rows)
 open import simultaneous.TableCorr using (keys; in-keys)
 open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
-open import simultaneous.TableEnv using (Hung; hot-bounded; hot-apart; DenOf; Admits; admits-step; admits-body; admits-wk; listHot; den-cons; tab-func; tab-flat; pin-ok)
+open import simultaneous.TableEnv using (Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
+  Admits; admits-at; admits-step; den-cons; tab-func; tab-flat; pin-ok)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
-open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; BdEnv; _∷ᵇ_; bd; cold-bd)
+open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd; cold-bd)
+
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
 
 ------------------------------------------------------------------------
 -- A reader's table is its hot's, rejoined
@@ -53,6 +71,10 @@ open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; BdEnv; _�
 private
   rj : ∀ {X : Set} (L : Tb.Listed X) p → Σ (Tb.Listed X) (λ x → just (rejoin p L) ≡ just x × Uncut x) → Exact (rejoin p L) (Rejoin p (Rows L))
   rj L p (_ , refl , u) = rejoin-exact {l = L} {t = Rows L} (λ _ → record { sound = λ m → m ; complete = λ m → m }) p u
+
+-- A connect's source's proper rows, cut by cut: what its hot lists.
+listEv : ∀ {Γ X} → ℕ → Obs Timeline Γ X → {ρ : ℕ → All Tb.Listed Γ} → DenOf ρ → Pos → ℕ → EmissionSet X
+listEv n o D c N = Proper (enter (capprox (3 + N) n o (den D N)) (c ⊕ [ ix 1 ]))
 
 ------------------------------------------------------------------------
 -- The leaves owed
@@ -72,83 +94,147 @@ postulate
   conn-tr← : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
            → Connecting.ConnT p (Cut n s ρ (p ⊕ [ ix 1 ]) N) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]) N) y e → Cut n (connect s b) ρ p N y e
 
-module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) (D : DenOf ρ) (H : Hung ρ D β) where
+module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
     -- A SOURCE'S BOUNDARIES lie past its subscription, and so do the
     -- connects its held ones wait on.
-    src-after : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ β (p ⊕ [ ix 1 ]) N b g → (p ⊕ [ ix 1 ]) ≺ b
-    src-held  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ β (p ⊕ [ ix 1 ]) N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
+    src-after : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → (p ⊕ [ ix 1 ]) ≺ b
+    src-held  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
 
-    -- A SOURCE'S BOUNDARIES lie apart from the late end of any reader of
-    -- its hot.
-    src-apart : ∀ {A} n (s : Obs Timeline Γ A) p (a : Admits D p) {q} → Admits (den-cons (listHot n s uρ D p a) D) q
-              → ∀ {N b g} → bd n s ρ uρ β (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
+    -- A SOURCE'S BOUNDARIES lie apart from the late end of any reader its
+    -- hot's rows admit, subscribed at or past the connect's body.
+    src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
+              → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
 
     -- A JOIN'S CUTS: its outer's boundaries, and each running lane's
     -- before the lane's cut.
     join-bounded : ∀ {A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-                 → Cuts.Bounded (Cut n (flatMap op f s) ρ p) (bd n (flatMap op f s) ρ uρ β p)
+                 → Cuts.Bounded (Cut n (flatMap op f s) ρ p) (bd n (flatMap op f s) ρ uρ (dbd D) p)
 
     -- A DEFER'S CUTS: its marker under its first label, apart from every
     -- boundary of its body, subscribed one label down.
     later-bounded : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
-                  → Cuts.Bounded (Cut (suc n) (defer l) ρ p) (bd (suc n) (defer l) ρ uρ β p)
+                  → Cuts.Bounded (Cut (suc n) (defer l) ρ p) (bd (suc n) (defer l) ρ uρ (dbd D) p)
 
 ------------------------------------------------------------------------
--- Every tree
+-- Every tree, and the hot a connect lists
 
--- The scope a connect's body reads hangs: the source's hot at the
--- source's boundaries, the rest as before.
-hung-body : ∀ {Γ A} n (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) (D : DenOf ρ) (H : Hung ρ D β)
-          → ∀ p (a : Admits D p) → Cuts.Bounded (Cut n s ρ (p ⊕ [ ix 1 ])) (bd n s ρ uρ β (p ⊕ [ ix 1 ]))
-          → Hung (bodyρ n s uρ p) (den-cons (listHot n s uρ D p a) D) (bd n s ρ uρ β (p ⊕ [ ix 1 ]) ∷ᵇ β)
-hung-body n s {ρ} uρ β D H p a Bσ = record { hot-bounded = hb ; hot-apart = ha }
+-- A connect's body is past every connect it lies in.
+past-body : ∀ {fs} c → Past fs c → Past ((c ⊕ [ ix 0 ]) ∷ fs) (c ⊕ [ ix 0 ])
+past-body c fp = ≼-refl {c ⊕ [ ix 0 ]} ∷ past-⊕ c (ix 0) [] fp
+
+mutual
+  -- A CONNECT'S HOT: its source listed under the connect's second label.
+  listHot : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c → Admits D c
+          → HotD (λ N → hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))
+
+  -- Its body admissible where the connect is.
+  admits-body : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
+              → Admits (den-cons (listHot n o u D c a) D) (c ⊕ [ ix 0 ])
+
+  -- EVERY TREE'S CUTS ARE BOUNDED BY ITS BOUNDARIES.
+  tree-bounded : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ)
+               → ∀ p → Admits D p → Cuts.Bounded (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
+
+  listHot {X = X} n o {ρ} u D c a =
+    hotD hv hx hl (c ⊕ [ ix 0 ]) (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
+      (hot-rows-bounded n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
+      (λ {q} ok lp {N} {b} {g} → src-apart ρ u D n o c {q} ok lp {N} {b} {g})
+    where
+      hv : ℕ → EmissionSet _
+      hv = listEv n o D c
+
+      hx : ∀ N p → Exactly (rejoin p (hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))) (enter (ES.hot (hv N)) p)
+      hx N p = truncate-exact (rejoin-exact (proper-exact (listC-exact (3 + N) n o (den-ex D N) (c ⊕ [ ix 1 ]) (proj₁ (proj₂ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ])))))) p)
+
+      hl : ∀ N → Lawful (hv N)
+      hl N = Cn.lawful {s = capprox (3 + N) n o (den D N)} {F = λ _ → Op.empty {X}} (inv-capprox (3 + N) n o (den D N) (den-ok D N)) (λ _ → empty-inv) c (admits-at D a N)
+
+  admits-body {X = X} n o u D c a = ok-mono into (Cn.Apart.ok₀ σ∞ c (proj₁ a) σw) , past-body c (proj₂ a)
+    where
+      hD = listHot n o u D c a
+
+      -- The source's rows at every cut, each in the source's world.
+      σ∞ : EmissionSet X
+      σ∞ h e = Σ ℕ λ N → hev hD N h e
+
+      σw : ∀ {h e} → σ∞ h e → W (HotsAll D) (c ⊕ [ ix 1 ]) h
+      σw (N , x) = w-mono (λ hh → N , hh)
+        (InvAt.world (inv-capprox (3 + N) n o (den D N) (den-ok D N) (c ⊕ [ ix 1 ]) (ok-step c (admits-at D a N))) (proj₁ x))
+
+      into : ∀ {h} → HotsAll (den-cons hD D) h → (HotsAll D ∪ʰ σ∞) h
+      into (N , inj₁ (e , x)) = inj₁ (e , N , x)
+      into (N , inj₂ hh)      = inj₂ (N , hh)
+
+  tree-bounded n       (cold c)          ρ uρ D p a = cold-bounded n c ρ p
+  tree-bounded n       empty             ρ uρ D p a = const-bounded _
+  tree-bounded n       (of xs)           ρ uρ D p a = const-bounded _
+  tree-bounded n       (map f s)         ρ uρ D p a = map-bounded f (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ D p a)
+  tree-bounded n       (scan f z s)      ρ uρ D p a = scan-bounded f z (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ D p a)
+  tree-bounded n       (takeWhile i q s) ρ uρ D p a =
+    bounded-≃ (λ {N} → tr-take← i q (listC (3 + N) n s (ρ N) p)) (λ {N} → tr-take→ i q (listC (3 + N) n s (ρ N) p))
+      (TakeB.bounded′ i q (Cut n s ρ p) (bd n s ρ uρ (dbd D) p)
+        (λ N → record { func = tab-func n s uρ D a {N} ; flat = tab-flat n s uρ D a {N} ; pin-in = pin-ok (3 + N) n s p })
+        (λ N → failed? i q (listC (3 + N) n s (ρ N) p))
+        (λ N w → keys (listC (3 + N) n s (ρ N) p) , λ x _ → in-keys x)
+        (tree-bounded n s ρ uρ D p a))
+  tree-bounded n       (flatMap op f s)  ρ uρ D p a = join-bounded ρ uρ D n op f s p a
+  tree-bounded n       (connect s b)     ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → conn-tr← n s b uρ p {N} {y} {e}) (λ {N} {y} {e} → conn-tr→ n s b uρ p {N} {y} {e})
+      (ConnB.bounded p (Cut n s ρ (p ⊕ [ ix 1 ])) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]))
+        (bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]))
+        (bd n b (bodyρ n s uρ p) (bodyU n s uρ p) (dbd (den-cons (listHot n s uρ D p a) D)) (p ⊕ [ ix 0 ]))
+        (tree-bounded n s ρ uρ D (p ⊕ [ ix 1 ]) (admits-step D a))
+        (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (den-cons (listHot n s uρ D p a) D) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
+        (λ {N} {b′} {g} → src-after ρ uρ D n s p a {N} {b′} {g})
+        (λ {N} {b′} {q} → src-held ρ uρ D n s p a {N} {b′} {q}))
+  tree-bounded n       (connected i)     ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
+              (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })
+      (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (dbd D i) (dbounded D i) (λ {N} {b} {g} → dapart D i (proj₁ a) (proj₂ a) {N} {b} {g}))
+    where
+      ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
+      ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
+  tree-bounded zero    (defer l)         ρ uρ D p a = SpinB.bounded p
+  tree-bounded (suc n) (defer l)         ρ uρ D p a = later-bounded ρ uρ D n l p a
+
+-- A ONE-VALUE TRIGGER'S LANE: a connect at `c` whose source is `of
+-- [tt]`, its value read by a flatMap subscribed one label under the
+-- body.  The lane under the value is admissible.
+admits-trig : ∀ {Γ} n {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
+            → Admits (den-cons (listHot n (of (tt ∷ [])) u D c a) D) (c ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub (c ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ ix 1 ])
+admits-trig n u D c a =
+  ok-step (h ⊕ [ sub r ]) (ok-in (proj₁ ar) (join (inj₁ hh) here lt) (real-sub h rh (proj₁ (proj₁ ar)) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h [])))) ,
+  past-⊕ (h ⊕ [ sub r ]) (ix 1) [] (past-⊕ h (sub r) [] (past-up r h (proj₂ ar) (≺→≼ {r} {h} lt)))
   where
-    D′ = den-cons (listHot n s uρ D p a) D
-    β′ = bd n s ρ uρ β (p ⊕ [ ix 1 ]) ∷ᵇ β
+    hD = listHot n (of (tt ∷ [])) u D c a
+    r h : Pos
+    r = c ⊕ [ ix 0 ] ⊕ [ ix 1 ]
+    h = c ⊕ [ ix 1 ] ⊕ [ ix 0 ]
 
-    hb : ∀ {X : Set} (i : X ∈ _ ∷ _) → Cuts.Bounded (λ N → Rows (lookup (bodyρ n s uρ p N) i)) (β′ i)
-    hb (here refl) = hot-rows-bounded n s uρ p Bσ
-    hb (there i)   = hot-bounded H i
+    ar : Admits (den-cons hD D) r
+    ar = admits-step (den-cons hD D) (admits-body n (of (tt ∷ [])) u D c a)
 
-    ha : ∀ {X : Set} (i : X ∈ _ ∷ _) {q} → Admits D′ q → ∀ {N b g} → β′ i N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
-    ha (here refl) aq {N} {b} {g} = src-apart ρ uρ β D H n s p a aq {N} {b} {g}
-    ha (there i)   aq {N} {b} {g} = hot-apart H i (admits-wk (listHot n s uρ D p a) D aq) {N} {b} {g}
+    rh : Real h
+    rh = real-snoc (c ⊕ [ ix 1 ]) plain-ix (real-snoc c plain-ix (proj₁ (proj₁ a)))
 
--- EVERY TREE'S CUTS ARE BOUNDED BY ITS BOUNDARIES.
-tree-bounded : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) (D : DenOf ρ) → Hung ρ D β
-             → ∀ p → Admits D p → Cuts.Bounded (Cut n o ρ p) (bd n o ρ uρ β p)
-tree-bounded n       (cold c)          ρ uρ β D H p a = cold-bounded n c ρ p
-tree-bounded n       empty             ρ uρ β D H p a = const-bounded _
-tree-bounded n       (of xs)           ρ uρ β D H p a = const-bounded _
-tree-bounded n       (map f s)         ρ uρ β D H p a = map-bounded f (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ β D H p a)
-tree-bounded n       (scan f z s)      ρ uρ β D H p a = scan-bounded f z (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ β D H p a)
-tree-bounded n       (takeWhile i q s) ρ uρ β D H p a =
-  bounded-≃ (λ {N} → tr-take← i q (listC (3 + N) n s (ρ N) p)) (λ {N} → tr-take→ i q (listC (3 + N) n s (ρ N) p))
-    (TakeB.bounded′ i q (Cut n s ρ p) (bd n s ρ uρ β p)
-      (λ N → record { func = tab-func n s uρ D a {N} ; flat = tab-flat n s uρ D a {N} ; pin-in = pin-ok (3 + N) n s p })
-      (λ N → failed? i q (listC (3 + N) n s (ρ N) p))
-      (λ N w → keys (listC (3 + N) n s (ρ N) p) , λ x _ → in-keys x)
-      (tree-bounded n s ρ uρ β D H p a))
-tree-bounded n       (flatMap op f s)  ρ uρ β D H p a = join-bounded ρ uρ β D H n op f s p a
-tree-bounded n       (connect s b)     ρ uρ β D H p a =
-  bounded-≃ (λ {N} {y} {e} → conn-tr← n s b uρ p {N} {y} {e}) (λ {N} {y} {e} → conn-tr→ n s b uρ p {N} {y} {e})
-    (ConnB.bounded p (Cut n s ρ (p ⊕ [ ix 1 ])) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]))
-      (bd n s ρ uρ β (p ⊕ [ ix 1 ]))
-      (bd n b (bodyρ n s uρ p) (bodyU n s uρ p) (bd n s ρ uρ β (p ⊕ [ ix 1 ]) ∷ᵇ β) (p ⊕ [ ix 0 ]))
-      Bσ
-      (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (bd n s ρ uρ β (p ⊕ [ ix 1 ]) ∷ᵇ β)
-        (den-cons (listHot n s uρ D p a) D) (hung-body n s uρ β D H p a Bσ) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
-      (λ {N} {b′} {g} → src-after ρ uρ β D H n s p a {N} {b′} {g})
-      (λ {N} {b′} {q} → src-held ρ uρ β D H n s p a {N} {b′} {q}))
-  where
-    Bσ = tree-bounded n s ρ uρ β D H (p ⊕ [ ix 1 ]) (admits-step D a)
-tree-bounded n       (connected i)     ρ uρ β D H p a =
-  bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
-            (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })
-    (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (β i) (hot-bounded H i) (λ {N} {b} {g} → hot-apart H i a {N} {b} {g}))
-  where
-    ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
-    ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
-tree-bounded zero    (defer l)         ρ uρ β D H p a = SpinB.bounded p
-tree-bounded (suc n) (defer l)         ρ uρ β D H p a = later-bounded ρ uρ β D H n l p a
+    lt : r ≺ h
+    lt = subst₂ _≺_ (sym (⊕-assoc c [ ix 0 ] [ ix 1 ])) (sym (⊕-assoc c [ ix 1 ] [ ix 0 ]))
+           (Equivalence.from T-≡ (<ᵖ-part c (ix 1 ∷ []) (ix 0 ∷ []) refl))
+
+    s₁ : Pos
+    s₁ = c ⊕ [ ix 1 ]
+
+    -- The trigger's one value, before its end.
+    row : hev hD 0 h (out tt)
+    row = (at-out , (h ∷ (s₁ ⊕ [ last ]) ∷ []) , λ { at-out _ _ → here refl ; (on-out at-end) _ _ → there (here refl) })
+        , λ { (on-out at-end , _) → ≺→≼ {h} {s₁ ⊕ [ last ]} (Equivalence.from T-≡ (<ᵖ-part s₁ [] [] refl)) }
+
+    hh : HotsAll (den-cons hD D) h
+    hh = 0 , inj₁ (out tt , row)
+
+-- An elaborated connect's hot ends no lane, wherever its scope's hots end none.
+listHot-u : ∀ {Γ Δ X} n {ρι : Ren Γ Δ} (s : Obs Timeline Γ X) {ρ* : ℕ → All Tb.Listed Δ} (u : ∀ N → UncutEnv (ρ* N)) (D : DenOf ρ*) c a
+          → (∀ N → EnvU ρι (den D N)) → ∀ N → AUndone (ES.hot (hev (listHot n (annotate (elab ρι s)) u D c a) N))
+listHot-u n {ρι} s u D c a eu N p r with hot-out r
+... | _ , (x , _) , _ = ann-u (3 + N) n (elab ρι s) (den D N) (elab-undone (3 + N) n ρι s (den D N) (eu N)) (c ⊕ [ ix 1 ]) x
