@@ -379,7 +379,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
     rd-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
 
   rd-bounded : Cuts.Bounded (λ N → TR (P N)) (Rel.Bd R₀)
-  rd-bounded = bounded-≃ rd-rejoin← rd-rejoin→
+  rd-bounded = bounded-≃ (λ {N} {y} {e} → rd-rejoin← {N} {y} {e}) (λ {N} {y} {e} → rd-rejoin→ {N} {y} {e})
     (RejoinB.bounded-j q (λ N → TR (S N)) (Rel.Bd R₀) (Rel.bounded R₀) (λ {N} {b} {g} → rd-apart {N} {b} {g}))
 
   rel′ : Admits D′ q → Admits D*′ q* → Aligned (Ψ′ Rs) ρ′ q q* → Rel P Q q q*
