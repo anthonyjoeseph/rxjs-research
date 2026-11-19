@@ -758,8 +758,9 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
   beyond {y} (apart ne)     xy ky iy = ne (between {q} {k} {y} (from≺ q k past) (from≺ k y ky) (sym iy))
   beyond     (sub xs fq)    xy ky iy = sub-async o xs xy ky (trans iy fq)
   beyond {y} (done xc)      xy ky iy = ≺-absurd {k} {y} ky (done-last o xy xc)
-  beyond {y} (emptied z bm rb) xy ky iy with meet o mrk (seen xy tt) tt (subst (λ c → After c y) (sym ck) ky)
-  ... | ext , mx′ , yin = shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
+  beyond {y} (emptied z bm rb) xy ky iy =
+    let ext , mx′ , yin = meet o mrk (seen xy tt) tt (subst (λ c → After c y) (sym ck) ky)
+    in shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
 
   gone : ∀ {y a j} → X y (out (instEmit (value a) j)) → q ≺ y → instantOf y ≡ instantOf q → ⊥
   gone {y} xy qy iy with T? (y <ᵖ k)
