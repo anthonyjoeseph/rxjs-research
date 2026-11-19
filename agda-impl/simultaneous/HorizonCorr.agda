@@ -3,20 +3,27 @@
 -- THE PLAIN PROGRAM'S BOUNDARIES AND THE ELABORATION'S, AT ONE CUT.  Two
 -- boundaries correspond when the same plain rows lie before each: before
 -- the plain one exactly when their images lie before the elaborated one
--- (`Inter.Between`).  Every boundary has a partner on the other side
--- (`Inter.BCorr`), and a held one has a held partner, waiting on a
--- connect with the same rows before it (`Inter.TagTo`, `Inter.TagFrom`);
--- the elaborated side may hold free what the plain side holds, never the
--- reverse.  Then a plain row and its image are clear together
--- (`Inter.clear→`, `Inter.clear←`), so settled together (`Root`).
+-- (`Btw`).  The rows are a term's own and its environment's, each read
+-- through one map, so a body sees its connect's source as rows too.
+-- Every boundary has a partner on the other side (`Inter.BCorr`), and a
+-- held one has a held partner, waiting on a connect with the same rows
+-- before it (`Inter.TagTo`, `Inter.TagFrom`); the elaborated side may
+-- hold free what the plain side holds, never the reverse.  Then a plain
+-- row and its image are clear together (`Inter.clear→`, `Inter.clear←`),
+-- so settled together (`Root`).
 --
 -- A FORMER KEEPS THE CORRESPONDENCE: a take keeps a boundary where its
 -- partner's take does, since a failing value lies before the one exactly
 -- when its image lies before the other (`TakePair`).  A layer that wraps
 -- the elaborated side alone keeps every boundary in place, and its rows
 -- keep their order against them (`Wrap`), as a hot row read past a
--- subscription does (`ReaderMove`).
--- Two spins cut alike correspond (`SpinPair`).
+-- subscription does (`ReaderMove`).  Two spins cut alike correspond, the
+-- environment cut alike at their positions (`SpinPair`).  The connect and
+-- the joins are in `simultaneous.HorizonConn` and `simultaneous.HorizonJoin`.
+--
+-- A RELOCATED SUBTERM NEEDS NO MORE: a correspondence is stated at a pair
+-- of subscriptions, so a source the elaboration subscribes inside a lane
+-- is the same pair entered there, its boundaries already in the lane.
 --
 -- A BOUNDARY A LANE INHERITS FROM A HOT IS REAL AT THE CONNECT OWNING IT.
 -- A lane's boundary is real, or the hot's (`RealEnv.RealRel`); the
@@ -26,45 +33,107 @@
 module simultaneous.HorizonCorr where
 
 open import Data.Bool using (Bool; T; not)
+open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
-open import Data.Nat using (ℕ; _<_; _+_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Nullary.Decidable.Core using (T?)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
-open import denotation.Events using (Timeline; fresh)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; EmissionSet; _≺_; _≼_; Rejoin; shown; heard; ended; late;
   module TakeWhile)
-open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺)
-open import denotation.Laws.Worlds using (_⊑_)
+open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≺-irrefl; ≺→≼; ≼-or-≻)
+open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-snoc⁺; ⊑-inside; inside-⊑)
 open import denotation.Laws.Cut using (ix-asc)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.TableCorr using (TR)
 open import simultaneous.TableSpin using (S; sp→)
 open import simultaneous.TakeKit using (Run; module Take)
-open import simultaneous.Horizon using (Tag; free; held; module Cuts; module Settle; module SpinB; module ConnB; past-child)
+open import simultaneous.Horizon using (Tag; free; held; module Cuts; module Settle; module SpinB; module ConnB; past-child; sub-between)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
 ------------------------------------------------------------------------
+-- Order against a pair of positions
+
+-- The rows `R` lie before `z` exactly when their images lie before `z*`.
+Btw : (Pos → Set) → (Pos → Pos) → Pos → Pos → Set
+Btw R φ z z* = ∀ {k} → R k → (k ≺ z → φ k ≺ z*) × (φ k ≺ z* → k ≺ z)
+
+-- A late row before `z` has its placement before `z*`.
+PB : (Pos → Pos → Set) → Pos → Pos → Set
+PB P z z* = ∀ {k l} → P k l → k ≺ z → l ≺ z*
+
+-- A term's own rows: unpinned and not late.
+Own : ∀ {A} → EmissionSet A → (Pos → Set) → Pos → Set
+Own {A} L Late k = Σ (Ev A) λ e → L k e × Unpinned e × ¬ Late k
+
+OwnPut : ∀ {A} → EmissionSet A → (Pos → Pos → Set) → Pos → Pos → Set
+OwnPut {A} L Put k l = Σ (Ev A) (L k) × Put k l
+
+infixr 4 _∪_ _∪²_
+_∪_ : (Pos → Set) → (Pos → Set) → Pos → Set
+(R ∪ R′) k = R k ⊎ R′ k
+
+_∪²_ : (Pos → Pos → Set) → (Pos → Pos → Set) → Pos → Pos → Set
+(P ∪² P′) k l = P k l ⊎ P′ k l
+
+btw-∪ : ∀ {R R′ φ z z*} → Btw R φ z z* → Btw R′ φ z z* → Btw (R ∪ R′) φ z z*
+btw-∪ b b′ (inj₁ r) = b r
+btw-∪ b b′ (inj₂ r) = b′ r
+
+btw-map : ∀ {R φ φ′ z z*} → (∀ {k} → R k → φ′ k ≡ φ k) → Btw R φ z z* → Btw R φ′ z z*
+btw-map {z = z} {z*} eq b {k} r = subst (λ w → (k ≺ z → w ≺ z*) × (w ≺ z* → k ≺ z)) (sym (eq r)) (b r)
+
+pb-∪ : ∀ {P P′ z z*} → PB P z z* → PB P′ z z* → PB (P ∪² P′) z z*
+pb-∪ b b′ (inj₁ x) = b x
+pb-∪ b b′ (inj₂ x) = b′ x
+
+-- Past a position: past its first child, unless over that.
+ix0-first : ∀ {j z} → j ≺ z → ¬ (j ⊕ [ ix 0 ]) ⊑ z → (j ⊕ [ ix 0 ]) ≺ z
+ix0-first {j} {z} lt nj with T? (inside j z)
+... | no ni = past-child {j} {z} (ix 0) lt (λ h → ni (⊑-inside h))
+... | yes ins with inside-⊑ j z ins
+...   | [] , refl                  = ⊥-elim (≺-irrefl {j} (subst (j ≺_) (⊕-identityʳ j) lt))
+...   | (ix zero ∷ ys) , refl      = ⊥-elim (nj (ys , sym (⊕-assoc j [ ix 0 ] ys)))
+...   | (ix (suc _) ∷ ys) , refl   = Equivalence.from T-≡ (<ᵖ-part j [] ys refl)
+...   | (sub _ ∷ ys) , refl        = Equivalence.from T-≡ (<ᵖ-part j [] ys refl)
+...   | (last ∷ ys) , refl         = Equivalence.from T-≡ (<ᵖ-part j [] ys refl)
+
+-- A row made at a row's first child keeps that row's order against a pair
+-- no made row lies over.
+first-child : ∀ {j j* z z*} → (j ≺ z → j* ≺ z*) × (j* ≺ z* → j ≺ z)
+            → ¬ (j ⊕ [ ix 0 ]) ⊑ z → ¬ (j* ⊕ [ ix 0 ]) ⊑ z*
+            → ((j ⊕ [ ix 0 ]) ≺ z → (j* ⊕ [ ix 0 ]) ≺ z*) × ((j* ⊕ [ ix 0 ]) ≺ z* → (j ⊕ [ ix 0 ]) ≺ z)
+first-child {j} {j*} {z} {z*} (f , b) n n* =
+  (λ lt → ix0-first (f (≺-trans {j} {j ⊕ [ ix 0 ]} {z} (≺-ext j []) lt)) n*)
+  , (λ lt → ix0-first (b (≺-trans {j*} {j* ⊕ [ ix 0 ]} {z*} (≺-ext j* []) lt)) n)
+
+-- A position not under `p`: before `p`'s child exactly when before `p`.
+off-child : ∀ {p k} l → ¬ p ⊑ k → (k ≺ p → k ≺ (p ⊕ [ l ])) × (k ≺ (p ⊕ [ l ]) → k ≺ p)
+off-child {p} {k} l np = (λ lt → ≺-trans {k} {p} {p ⊕ [ l ]} lt (≺-ext p [])) , back
+  where
+    back : k ≺ (p ⊕ [ l ]) → k ≺ p
+    back lt with ≼-or-≻ p k
+    ... | inj₂ kp = kp
+    ... | inj₁ pk = ⊥-elim (np (sub-between {p} {p ⊕ [ l ]} {k} (⊑-snoc⁺ p) pk (≺→≼ {k} {p ⊕ [ l ]} lt)))
+
+------------------------------------------------------------------------
 -- Boundaries corresponding at one cut
 
-module Inter {A X : Set} (L : EmissionSet A) (L* : EmissionSet X) (φ : Pos → Pos) (Put : Pos → Pos → Set) (Late : Pos → Set)
-  (Bd Bd* : Pos → Tag → Set) where
+module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set) (Bd Bd* : Pos → Tag → Set) where
 
-  Row : Pos → Set
-  Row k = Σ (Ev A) λ e → L k e × Unpinned e × ¬ Late k
-
-  -- The same plain rows before each.
   Between : Pos → Pos → Set
-  Between b b* = ∀ {k} → Row k → (k ≺ b → φ k ≺ b*) × (φ k ≺ b* → k ≺ b)
+  Between = Btw Row φ
 
-  -- A late placement of a row before the plain one lies before the other.
   PutBefore : Pos → Pos → Set
-  PutBefore b b* = ∀ {k e l} → L k e → Put k l → k ≺ b → l ≺ b*
+  PutBefore = PB Puts
 
   -- A plain held boundary has a held partner.
   data TagTo : Tag → Tag → Set where
@@ -96,9 +165,9 @@ module Inter {A X : Set} (L : EmissionSet A) (L* : EmissionSet X) (φ : Pos → 
     clear← r cl* bd with to bd
     ... | _ , _ , bd* , btw , _ = proj₂ (btw r) (cl* bd*)
 
-    clear-put : ∀ {k e l} → L k e → Put k l → Clear k → Clear* l
-    clear-put x pl cl bd* with from bd*
-    ... | _ , _ , bd , _ , pb , _ = pb x pl (cl bd)
+    clear-put : ∀ {k l} → Puts k l → Clear k → Clear* l
+    clear-put x cl bd* with from bd*
+    ... | _ , _ , bd , _ , pb , _ = pb x (cl bd)
 
 ------------------------------------------------------------------------
 -- At the root: settled together
@@ -107,47 +176,62 @@ module Root {A : Set}
   (c : ℕ → EmissionSet A) (d : ℕ → EmissionSet (IE A)) (Bd Bd* : ℕ → Pos → Tag → Set)
   (B : Cuts.Bounded c Bd) (B* : Cuts.Bounded d Bd*) (R : Cuts.Real c Bd) (R* : Cuts.Real d Bd*)
   (φ : ℕ → Pos → Pos) (Put : ℕ → Pos → Pos → Set) (Late : ℕ → Pos → Set)
-  (C : ∀ N → Inter.BCorr (c N) (d N) (φ N) (Put N) (Late N) (Bd N) (Bd* N))
+  (C : ∀ N → Inter.BCorr (Own (c N) (Late N)) (φ N) (OwnPut (c N) (Put N)) (Bd N) (Bd* N))
   where
-  module I (N : ℕ) = Inter (c N) (d N) (φ N) (Put N) (Late N) (Bd N) (Bd* N)
+  module I (N : ℕ) = Inter (Own (c N) (Late N)) (φ N) (OwnPut (c N) (Put N)) (Bd N) (Bd* N)
 
   open Settle c d Bd Bd* B B* R R* φ Put Late
     (λ {N} x un nl → I.clear→ N (C N) (_ , x , un , nl))
     (λ {N} x un nl → I.clear← N (C N) (_ , x , un , nl))
-    (λ {N} x pl → I.clear-put N (C N) x pl)
+    (λ {N} x pl → I.clear-put N (C N) ((_ , x) , pl))
     public using (settle→; settle←; settle-put)
 
 ------------------------------------------------------------------------
 -- Two spins cut alike
 
-module SpinPair {X Y : Set} (p p* : Pos) (N : ℕ) where
+-- Every own row lies before the spin's boundary, on both sides; the
+-- environment lies before it as before the spin's subscription.
+module SpinPair {X Y : Set} (p p* : Pos) (N : ℕ) (φ : Pos → Pos)
+  (Env : Pos → Set) (EnvPut : Pos → Pos → Set)
+  (rows* : ∀ {k e} → SpinB.c {X} p N k e → Σ (Ev Y) (SpinB.c {Y} p* N (φ k)))
+  (env-at : Btw Env φ p p*) (env-off : ∀ {k} → Env k → ¬ p ⊑ k) (env-off* : ∀ {k} → Env k → ¬ p* ⊑ φ k)
+  (put-at : PB EnvPut p p*) (put-off : ∀ {k l} → EnvPut k l → ¬ p ⊑ k)
+  where
   module P = SpinB {X} p
   module E = SpinB {Y} p*
 
-  φ : Pos → Pos
-  φ k = k
+  b b* : Pos
+  b  = p ⊕ [ ix (3 + N) ]
+  b* = p* ⊕ [ ix (3 + N) ]
 
-  -- Each row lies before each boundary, on both sides.
-  module I = Inter (P.c N) (E.c N) (λ k → k) (λ _ _ → ⊥) (λ _ → ⊥) (P.Bd N) (E.Bd N)
+  module I = Inter (Own (P.c N) (λ _ → ⊥) ∪ Env) φ ((λ _ _ → ⊥) ∪² EnvPut) (P.Bd N) (E.Bd N)
 
   before : ∀ {Z} (q : Pos) {k e} → TR {Z} (S (3 + N) q) k e → k ≺ (q ⊕ [ ix (3 + N) ])
   before q x with sp→ x
   ... | i , lt , refl , _ = ix-asc q lt
 
-  -- Each spin's rows, read at the other's position.
-  module Moved (rows* : ∀ {k e} → P.c N k e → Σ (Ev Y) (E.c N k)) where
-    corr : I.BCorr
-    corr = record
-      { to   = λ { {g = .free} (refl , refl) → p* ⊕ [ ix (3 + N) ] , free , (refl , refl)
-                 , (λ { (_ , x , _ , _) → (λ _ → before p* (proj₂ (rows* x))) , (λ _ → before p x) }) , I.plain-free }
-      ; from = λ { {g* = .free} (refl , refl) → p ⊕ [ ix (3 + N) ] , free , (refl , refl)
-                 , (λ { (_ , x , _ , _) → (λ _ → before p* (proj₂ (rows* x))) , (λ _ → before p x) }) , (λ _ ()) , I.elab-free } }
+  between : I.Between b b*
+  between (inj₁ (_ , x , _ , _)) = (λ _ → before p* (proj₂ (rows* x))) , (λ _ → before p x)
+  between {k} (inj₂ en) =
+    (λ lt → proj₁ (off-child {p*} {φ k} (ix (3 + N)) (env-off* en)) (proj₁ (env-at en) (proj₂ (off-child {p} {k} (ix (3 + N)) (env-off en)) lt)))
+    , (λ lt → proj₁ (off-child {p} {k} (ix (3 + N)) (env-off en)) (proj₂ (env-at en) (proj₂ (off-child {p*} {φ k} (ix (3 + N)) (env-off* en)) lt)))
+
+  put-before : I.PutBefore b b*
+  put-before (inj₁ ())
+  put-before {k} {l} (inj₂ x) lt =
+    ≺-trans {l} {p*} {b*} (put-at x (proj₂ (off-child {p} {k} (ix (3 + N)) (put-off x)) lt)) (≺-ext p* [])
+
+  corr : I.BCorr
+  corr = record
+    { to   = λ { {g = .free} (refl , refl) → b* , free , (refl , refl) , between , I.plain-free }
+    ; from = λ { {g* = .free} (refl , refl) → b , free , (refl , refl) , between , put-before , I.elab-free } }
 
 ------------------------------------------------------------------------
 -- A take over corresponding sources
 
 module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Bool)
   (c : EmissionSet A) (d : EmissionSet X) (φ : Pos → Pos) (Put : Pos → Pos → Set) (Late : Pos → Set)
+  (Env : Pos → Set) (EnvPut : Pos → Pos → Set)
   (Bd Bd* : Pos → Tag → Set)
   (R : Run c)
   (gap  : ∀ {b g y e} → Bd b g → c y e → ¬ b ⊑ y × ¬ y ⊑ b)
@@ -157,7 +241,7 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   -- no row lies over a connect a boundary waits on
   (held-gap  : ∀ {b q y e} → Bd b (held q) → c y e → ¬ y ⊑ q)
   (held-gap* : ∀ {b q y e} → Bd* b (held q) → d y e → ¬ y ⊑ q)
-  (C : Inter.BCorr c d φ Put Late Bd Bd*)
+  (C : Inter.BCorr (Own c Late ∪ Env) φ (OwnPut c Put ∪² EnvPut) Bd Bd*)
   -- a failing value's image fails, and an elaborated failing value is one's image
   (nl-out : ∀ {o a} → c o (out a) → ¬ Late o)
   (fail→ : ∀ {f a} → c f (out a) → T (not (keep a)) → Σ X λ x → d (φ f) (out x) × T (not (keep* x)))
@@ -166,9 +250,10 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   (φ′ : Pos → Pos)
   (φ′-self : ∀ {k e} → c k e → φ′ k ≡ φ k)
   (φ′-new : ∀ {o a l} → c o (out a) → φ′ (o ⊕ [ l ]) ≡ φ o ⊕ [ l ])
+  (φ′-env : ∀ {k} → Env k → φ′ k ≡ φ k)
   where
   open Take incl keep using (module One)
-  module I = Inter c d φ Put Late Bd Bd*
+  module I = Inter (Own c Late ∪ Env) φ (OwnPut c Put ∪² EnvPut) Bd Bd*
   open Inter.BCorr C
 
   Fl : Pos → Set
@@ -194,19 +279,20 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   Bd*′ : Pos → Tag → Set
   Bd*′ b g = Bd* b g × Keep* b g
 
+  -- A late row of the take is its source's, placed as there.
   Put′ : Pos → Pos → Set
   Put′ k l = Σ (Ev A) (c k) × Put k l
 
-  module I′ = Inter Tk Tk* φ′ Put′ Late Bd′ Bd*′
+  module I′ = Inter (Own Tk Late ∪ Env) φ′ (OwnPut Tk Put′ ∪² EnvPut) Bd′ Bd*′
 
   -- A failure before a position carries to its partner, and back.
   fail-to : ∀ {z z*} → I.Between z z* → Fl z → Fl* z*
   fail-to btw (f , a , x , nk , fz) with fail→ x nk
-  ... | x* , y , nk* = φ _ , x* , y , nk* , proj₁ (btw (out a , x , _ , nl-out x)) fz
+  ... | x* , y , nk* = φ _ , x* , y , nk* , proj₁ (btw (inj₁ (out a , x , _ , nl-out x))) fz
 
   fail-from : ∀ {z z*} → I.Between z z* → Fl* z* → Fl z
   fail-from {z* = z*} btw (f* , x , y , nk* , fz*) with fail← y nk*
-  ... | f , a , xf , nk , refl = f , a , xf , nk , proj₂ (btw (out a , xf , _ , nl-out xf)) fz*
+  ... | f , a , xf , nk , refl = f , a , xf , nk , proj₂ (btw (inj₁ (out a , xf , _ , nl-out xf))) fz*
 
   either : ∀ (B : Pos → Tag → Set) {b} {Z : Set} → B b free ⊎ Σ Pos (λ q → B b (held q)) → (∀ {g} → B b g → Z) → Z
   either _ (inj₁ bd) k = k bd
@@ -215,24 +301,20 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   -- The take's rows keep the order against partners no row lies over.
   between-at : ∀ {b b*} → (∀ {y e} → c y e → ¬ y ⊑ b) → (∀ {y e} → d y e → ¬ y ⊑ b*)
              → I.Between b b* → I′.Between b b*
-  between-at {b} {b*} ng ng* btw {k} (e , tk , un , nl) with One.from R tk
-  ... | One.self x _ = subst (λ w → (k ≺ b → w ≺ b*) × (w ≺ b* → k ≺ b)) (sym (φ′-self x)) (btw (e , x , un , nl))
+  between-at {b} {b*} ng ng* btw {k} (inj₂ en) =
+    subst (λ w → (k ≺ b → w ≺ b*) × (w ≺ b* → k ≺ b)) (sym (φ′-env en)) (btw (inj₂ en))
+  between-at {b} {b*} ng ng* btw {k} (inj₁ (e , tk , un , nl)) with One.from R tk
+  ... | One.self x _ = subst (λ w → (k ≺ b → w ≺ b*) × (w ≺ b* → k ≺ b)) (sym (φ′-self x)) (btw (inj₁ (e , x , un , nl)))
   ... | One.new {o} {a} x nk _ (l , refl , _) = subst (λ w → (k ≺ b → w ≺ b*) × (w ≺ b* → k ≺ b)) (sym (φ′-new x)) (fw , bw)
     where
-      ob = btw (out a , x , _ , nl-out x)
+      ob = btw (inj₁ (out a , x , _ , nl-out x))
       img = proj₁ (proj₂ (fail→ x nk))
 
-      ngap : ¬ o ⊑ b
-      ngap = ng x
-
-      ngap* : ¬ φ o ⊑ b*
-      ngap* = ng* img
-
       fw : (o ⊕ [ l ]) ≺ b → (φ o ⊕ [ l ]) ≺ b*
-      fw lt = past-child l (proj₁ ob (≺-trans {o} {o ⊕ [ l ]} {b} (≺-ext o []) lt)) ngap*
+      fw lt = past-child l (proj₁ ob (≺-trans {o} {o ⊕ [ l ]} {b} (≺-ext o []) lt)) (ng* img)
 
       bw : (φ o ⊕ [ l ]) ≺ b* → (o ⊕ [ l ]) ≺ b
-      bw lt = past-child l (proj₂ ob (≺-trans {φ o} {φ o ⊕ [ l ]} {b*} (≺-ext (φ o) []) lt)) ngap
+      bw lt = past-child l (proj₂ ob (≺-trans {φ o} {φ o ⊕ [ l ]} {b*} (≺-ext (φ o) []) lt)) (ng x)
 
   between′ : ∀ {b b*} → Bd b free ⊎ Σ Pos (λ q → Bd b (held q)) → Bd* b* free ⊎ Σ Pos (λ q → Bd* b* (held q))
            → I.Between b b* → I′.Between b b*
@@ -275,46 +357,40 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
       case-from : ∀ {b*} g* → Bd* b* g* → Keep* b* g* → Σ Pos λ b → Σ Tag λ g → Bd′ b g × I′.Between b b* × I′.PutBefore b b* × I′.TagFrom g g*
       case-from g* bd* kp* with from bd*
       ... | b , g , bd , btw , pb , tf =
-        b , g , (bd , keep← bd btw tf kp*) , between′ (tagged Bd g bd) (tagged Bd* g* bd*) btw , (λ { _ ((_ , x) , pl) kb → pb x pl kb }) , tag← bd bd* tf
+        b , g , (bd , keep← bd btw tf kp*) , between′ (tagged Bd g bd) (tagged Bd* g* bd*) btw
+        , pb-∪ {OwnPut Tk Put′} {EnvPut} (λ {k} {l} → λ { (_ , (x , pl)) kb → pb {k} {l} (inj₁ (x , pl)) kb }) (λ {k} {l} x kb → pb {k} {l} (inj₂ x) kb) , tag← bd bd* tf
 
 ------------------------------------------------------------------------
 -- A layer wrapping the elaborated side alone
 
--- The wrapper holds every boundary of what it wraps, in place, with its
--- tag or free; it holds no other; and its rows read off the wrapped rows
--- keep their order against those boundaries.
-module Wrap {A X Y : Set} (L : EmissionSet A) (L* : EmissionSet X) (W : EmissionSet Y)
-  (φ : Pos → Pos) (Put : Pos → Pos → Set) (Late : Pos → Set) (Bd Bd* Bdw : Pos → Tag → Set)
-  (C : Inter.BCorr L L* φ Put Late Bd Bd*)
-  (move : Pos → Pos)
-  (keeps : ∀ {b g} → Bd* b g → Bdw b g)
+-- The wrapper holds the wrapped boundaries a plain one partners, in place
+-- with their tags; it holds no other, save freed; and its rows keep the
+-- wrapped rows' order against those boundaries and the connects they
+-- wait on.
+module Wrap (Row : Pos → Set) (φ φw : Pos → Pos) (Puts Putsw : Pos → Pos → Set) (Bd Bd* Bdw : Pos → Tag → Set)
+  (C : Inter.BCorr Row φ Puts Bd Bd*)
+  (keeps : ∀ {b b* g g*} → Bd b g → Bd* b* g* → Btw Row φ b b* → Bdw b* g*)
   (only : ∀ {b g} → Bdw b g → Σ Tag λ g₀ → Bd* b g₀ × (g ≡ g₀ ⊎ g ≡ free))
-  (moved : ∀ {k e b g} → L* (φ k) e → Bd* b g → (φ k ≺ b → move (φ k) ≺ b) × (move (φ k) ≺ b → φ k ≺ b))
-  (moved-q : ∀ {k e b q} → L* (φ k) e → Bd* b (held q) → (φ k ≺ q → move (φ k) ≺ q) × (move (φ k) ≺ q → φ k ≺ q))
-  (img : ∀ {k} → Inter.Row L L* φ Put Late Bd Bd* k → Σ (Ev X) λ e* → L* (φ k) e*)
-  (Putw : Pos → Pos → Set)
-  (putw : ∀ {k e l b b*} → L k e → Putw k l → Inter.PutBefore L L* φ Put Late Bd Bd* b b* → k ≺ b → l ≺ b*)
+  (moved : ∀ {k b g} → Row k → Bd* b g → (φ k ≺ b → φw k ≺ b) × (φw k ≺ b → φ k ≺ b))
+  (moved-q : ∀ {k b q} → Row k → Bd* b (held q) → (φ k ≺ q → φw k ≺ q) × (φw k ≺ q → φ k ≺ q))
+  (putw : ∀ {b b* g*} → Bd* b* g* → PB Puts b b* → PB Putsw b b*)
   where
-  module I  = Inter L L* φ Put Late Bd Bd*
-  module Iw = Inter L W (λ k → move (φ k)) Putw Late Bd Bdw
+  module I  = Inter Row φ Puts Bd Bd*
+  module Iw = Inter Row φw Putsw Bd Bdw
   open Inter.BCorr C
 
-  between-at : ∀ {b b*} → (∀ {k e} → L* (φ k) e → (φ k ≺ b* → move (φ k) ≺ b*) × (move (φ k) ≺ b* → φ k ≺ b*))
+  between-at : ∀ {b b*} → (∀ {k} → Row k → (φ k ≺ b* → φw k ≺ b*) × (φw k ≺ b* → φ k ≺ b*))
              → I.Between b b* → Iw.Between b b*
-  between-at mv btw r with img r
-  ... | _ , y = (λ lt → proj₁ (mv y) (proj₁ (btw r) lt)) , (λ lt → proj₂ (btw r) (proj₂ (mv y) lt))
-
-  between : ∀ {b b* g*} → Bd* b* g* → I.Between b b* → Iw.Between b b*
-  between bd* = between-at (λ y → moved y bd*)
+  between-at mv btw r = (λ lt → proj₁ (mv r) (proj₁ (btw r) lt)) , (λ lt → proj₂ (btw r) (proj₂ (mv r) lt))
 
   tag→ : ∀ {b* g g*} → Bd* b* g* → I.TagTo g g* → Iw.TagTo g g*
   tag→ _   I.plain-free       = Iw.plain-free
-  tag→ bd* (I.both-held btw)  = Iw.both-held (between-at (λ y → moved-q y bd*) btw)
+  tag→ bd* (I.both-held btw)  = Iw.both-held (between-at (λ r → moved-q r bd*) btw)
 
   tag← : ∀ {b* g g* g′} → Bd* b* g* → I.TagFrom g g* → (g′ ≡ g* ⊎ g′ ≡ free) → Iw.TagFrom g g′
   tag← _ _ (inj₂ refl)                     = Iw.elab-free
   tag← _ I.elab-free (inj₁ refl)           = Iw.elab-free
-  tag← bd* (I.both-held btw) (inj₁ refl)   = Iw.both-held (between-at (λ y → moved-q y bd*) btw)
+  tag← bd* (I.both-held btw) (inj₁ refl)   = Iw.both-held (between-at (λ r → moved-q r bd*) btw)
 
   corr : Iw.BCorr
   corr = record
@@ -323,12 +399,12 @@ module Wrap {A X Y : Set} (L : EmissionSet A) (L* : EmissionSet X) (W : Emission
     where
       case-to : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bdw b* g* × Iw.Between b b* × Iw.TagTo g g*
       case-to bd with to bd
-      ... | b* , g* , bd* , btw , tt = b* , g* , keeps bd* , between bd* btw , tag→ bd* tt
+      ... | b* , g* , bd* , btw , tt = b* , g* , keeps bd bd* btw , between-at (λ r → moved r bd*) btw , tag→ bd* tt
 
       case-from : ∀ {b* g′} → Bdw b* g′ → Σ Pos λ b → Σ Tag λ g → Bd b g × Iw.Between b b* × Iw.PutBefore b b* × Iw.TagFrom g g′
       case-from bdw with only bdw
       ... | g* , bd* , eq with from bd*
-      ...   | b , g , bd , btw , pb , tf = b , g , bd , between bd* btw , (λ x pl kb → putw x pl pb kb) , tag← bd* tf eq
+      ...   | b , g , bd , btw , pb , tf = b , g , bd , between-at (λ r → moved r bd*) btw , putw bd* pb , tag← bd* tf eq
 
 -- A hot row read past a reader's subscription keeps its order against
 -- every position no hot row lies over.
