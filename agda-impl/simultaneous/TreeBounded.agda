@@ -93,7 +93,7 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
 
     -- A DEFER'S CUTS: its marker under its first label, apart from every
     -- boundary of its body, subscribed one label down.
-    defer-bounded : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
+    later-bounded : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
                   → Cuts.Bounded (Cut (suc n) (defer l) ρ p) (bd (suc n) (defer l) ρ uρ β p)
 
 ------------------------------------------------------------------------
@@ -153,4 +153,4 @@ tree-bounded n       (connected i)     ρ uρ β D H p a =
     ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
     ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
 tree-bounded zero    (defer l)         ρ uρ β D H p a = SpinB.bounded p
-tree-bounded (suc n) (defer l)         ρ uρ β D H p a = defer-bounded ρ uρ β D H n l p a
+tree-bounded (suc n) (defer l)         ρ uρ β D H p a = later-bounded ρ uρ β D H n l p a
