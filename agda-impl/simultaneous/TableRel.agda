@@ -496,8 +496,11 @@ take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al
     R  = Out.rel (Fs ρ uρ ρι ρ* uρ* E p p* a a* al lk)
     R′ = Out.rel (Fs ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′)
 
+    c₀ : ∀ N y → Same R R′ N y
+    c₀ = cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′
+
     c : ∀ N y → Same (take-tab i q R) (take-tab i q R′) N y
-    c = take-cong i q R R′ (cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
+    c = take-cong i q {Tab n s ρ p} {Tab* n ρι s ρ* p*} {p} {p*} R R′ c₀
 
 defer-rel : ∀ {Γ A} n (l : Later Timeline Γ A) → Full n (Later.force l) → Full (suc n) (defer l)
 defer-rel n l Fl ρ uρ ρι ρ* uρ* env p p* a a* al lk =
