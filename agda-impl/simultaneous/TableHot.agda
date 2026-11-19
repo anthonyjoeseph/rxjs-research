@@ -47,9 +47,11 @@ open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Cons; Got)
+open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
-  using (Ren; HotMap; hotMap; π; relMap; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
+  using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
   Admits; HotsAll; den-ex; listHot; den-cons; tab-func; tab-flat)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
@@ -243,11 +245,8 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   Q : ℕ → Maybe (Tb.Listed (IE A))
   Q = Tab* n′ (ext ρι) (connected (here refl)) ρ*′ q*
 
-  Sc : Scope
-  Sc = scopeOf ρ′ (ext ρι) ρ*′
-
   -- The source's record and its two tables.
-  R₀ : Rel (Tab n s ρ (p ⊕ [ ix 1 ])) (Tab* n ρι s ρ* (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ]) (scopeOf ρ ρι ρ*)
+  R₀ : Rel (Tab n s ρ (p ⊕ [ ix 1 ])) (Tab* n ρι s ρ* (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
   R₀ = Out.rel Rs
 
   S : ℕ → Maybe (Tb.Listed A)
@@ -323,24 +322,9 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
   rd-pin-after* : ∀ {N l r} → TR (Q N) l (pin r) → q* ≼ r
   rd-pin-after* {N} = pin-after-ok (3 + N) n′ (elab (ext ρι) (connected (here refl))) {ρ*′ N} q*
 
-  G G* : ℕ → ℕ → Pos → Set
-  G  = Scope.G Sc
-  G* = Scope.G* Sc
-
   -- A reader row, read off its hot.
   rd-row : ∀ {N k e} → TR (P N) k e → RjRow q (hotOf (σ N)) k e
   rd-row {N} (_ , refl , r) = rejoin-inv q (hotOf (σ N)) r
-
-  -- A value the reader shows is its hot's, so another cut's hot agreeing
-  -- up to it shows it too.
-  rd-cons : ∀ {N N′} → Cons (G N N′) (TR (P N)) (TR (P N′))
-  rd-cons {N} {N′} g _ x _ _ with rd-row {N} x
-  ... | inj₁ (h , out v , hm , qh , refl , refl) =
-        _ , refl , rejoin-in q (hotOf (σ N′)) (proj₁ (AgreeTo.upto (proj₁ g) (≺→≼ {h} {h ⊕ [ sub q ]} (≺-ext h []))) hm) qh
-  ... | inj₁ (h , skip , _ , _ , _ , ())
-  ... | inj₁ (h , end , _ , _ , _ , ())
-  ... | inj₁ (h , pin _ , _ , _ , _ , ())
-  ... | inj₂ (_ , _ , _ , _ , ())
 
   -- A reader row off a hot row, not late: that row unpinned and not late
   -- for the source.
@@ -379,37 +363,26 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
       (λ {h} m qh kk ek → img-past N (Rel.φ R₀ N h)
          (proj₁ (cut-lvl (cut (al (here refl) N) m (proj₁ (rd-src kk ek m nl)) (proj₂ (rd-src kk ek m nl)))) qh))
 
-  -- THE READER'S CORRESPONDENCE AND ITS LIFTING FACTS.
+  -- THE READER'S CORRESPONDENCE.
   postulate
-    rd-corr        : ∀ N → Corr q q* (φᵣ N) (Putᵣ N) (Lateᵣ N) (TR (P N)) (TR (Q N))
-    rd-φ-agree     : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N N′ k → G* N N′ (φᵣ N k) → AgreeTo k (TR (P N)) (TR (P N′)) → φᵣ N k ≡ φᵣ N′ k
-    rd-late-agree  : ∀ {N N′ k e} → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N N′ k → G* N N′ (φᵣ N k) → AgreeTo k (TR (P N)) (TR (P N′)) → ¬ Lateᵣ N′ k
-    rd-back        : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → ¬ Lateᵣ N′ k → G N′ N k → G* N′ N (φᵣ N′ k) → AgreeTo (φᵣ N′ k) (TR (Q N′)) (TR (Q N))
-                   → AgreeTo k (TR (P N′)) (TR (P N))
-    rd-put-up      : ∀ {N N′ k l} → N ≤ N′ → G N′ N k → G* N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → Putᵣ N k l → Putᵣ N′ k l
-    rd-back-put    : ∀ {N N′ k l} → N ≤ N′ → G N′ N k → G* N′ N l → Putᵣ N′ k l → AgreeTo l (TR (Q N′)) (TR (Q N)) → Putᵣ N k l
-    rd-elab-causal : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N′ N k → G* N′ N (φᵣ N k) → AgreeTo k (TR (P N′)) (TR (P N))
-                   → AgreeTo (φᵣ N k) (TR (Q N′)) (TR (Q N))
-    rd-stable←     : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N′ N k → G* N′ N (φᵣ N k) → TR (Q N) (φᵣ N k) e′
-                   → AgreeTo (φᵣ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-    rd-stable-put  : ∀ {N N′ k l e′} → N ≤ N′ → G N′ N k → G* N′ N l → AgreeTo k (TR (P N′)) (TR (P N)) → TR (Q N) l e′ → Putᵣ N k l
-                   → AgreeTo l (TR (Q N′)) (TR (Q N))
-    rd-stable-lead : ∀ {N N′ k e e′ m e*} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N′ N k → G* N′ N (φᵣ N k) → TR (Q N) (φᵣ N k) e′ → Corr.Leads (rd-corr N) k
-                   → TR (Q N) m e* → G* N′ N m → instantOf m ≡ instantOf (φᵣ N k) → AgreeTo m (TR (Q N′)) (TR (Q N)) → AgreeTo (φᵣ N k) (TR (Q N′)) (TR (Q N))
-    rd-elab-all    : ∀ {N N′} → N ≤ N′ → (∀ y → G N′ N y) → (∀ y → G* N′ N y) → (∀ y → AgreeTo y (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
-    rd-cons*       : ∀ {N N′} → Cons (G* N N′) (TR (Q N)) (TR (Q N′))
-    rd-pin-stable  : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → ¬ Lateᵣ N k → G N′ N k → G* N′ N (φᵣ N k) → AgreeTo k (TR (P N′)) (TR (P N))
-                   → (∀ {y r} → r ≼ k → TR (P N′) y (pin r) → TR (P N) y (pin r))
-                   → ∀ {y r} → r ≼ φᵣ N k → TR (Q N′) y (pin r) → TR (Q N) y (pin r)
+    rd-corr : ∀ N → Corr q q* (φᵣ N) (Putᵣ N) (Lateᵣ N) (TR (P N)) (TR (Q N))
 
-  rel′ : Admits D′ q → Admits D*′ q* → Aligned (Ψ′ Rs) ρ′ q q* → Rel P Q q q* Sc
+  -- THE READER'S HANGS: a reader row sits under its hot row, so the
+  -- source's boundaries bound the reader; the elaborated reader's are
+  -- the annotated source's, carried under the readers.
+  postulate
+    rd-bd*      : ℕ → Pos → Tag → Set
+    rd-bounded  : Cuts.Bounded (λ N → TR (P N)) (Rel.Bd R₀)
+    rd-bounded* : Cuts.Bounded (λ N → TR (Q N)) rd-bd*
+    rd-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
+
+  rel′ : Admits D′ q → Admits D*′ q* → Aligned (Ψ′ Rs) ρ′ q q* → Rel P Q q q*
   rel′ ad ad* al = record
-    { φ = φᵣ ; Put = Putᵣ ; Late = Lateᵣ ; corr = rd-corr ; φ-agree = rd-φ-agree ; late-agree = rd-late-agree ; bk = bkᵣ ; in-bk = rd-in-bk ; pb-few = rd-pb-few
-    ; back = rd-back ; put-up = rd-put-up ; back-put = rd-back-put
-    ; elab-causal = rd-elab-causal ; stable← = rd-stable← ; stable-put = rd-stable-put ; stable-lead = rd-stable-lead
-    ; elab-all = rd-elab-all ; func = Gen.rd-func ad ad* ; func* = Gen.rd-func* ad ad* ; flat = Gen.rd-flat ad ad* ; flat* = Gen.rd-flat* ad ad*
-    ; pin-in = rd-pin-in ; pin-in* = rd-pin-in* ; cons = rd-cons ; cons* = rd-cons* ; got = rd-got ; got* = rd-got*
-    ; after = rd-after ; after* = rd-after* ; after-φ = rd-after-φ al ; pin-after* = rd-pin-after* ; pin-stable = rd-pin-stable }
+    { φ = φᵣ ; Put = Putᵣ ; Late = Lateᵣ ; corr = rd-corr ; bk = bkᵣ ; in-bk = rd-in-bk ; pb-few = rd-pb-few
+    ; func = Gen.rd-func ad ad* ; func* = Gen.rd-func* ad ad* ; flat = Gen.rd-flat ad ad* ; flat* = Gen.rd-flat* ad ad*
+    ; pin-in = rd-pin-in ; pin-in* = rd-pin-in* ; got = rd-got ; got* = rd-got*
+    ; after = rd-after ; after* = rd-after* ; after-φ = rd-after-φ al ; pin-after* = rd-pin-after*
+    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ; bcorr = rd-bcorr }
 
   -- THE READER'S ORDER FACTS: each row linked to its image; each shown
   -- row cutting every hot alike with it, and the reader's own rows of

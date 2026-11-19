@@ -3,15 +3,10 @@
 -- `takeWhile`'S CASE (`take-tab`): a plain takeWhile and the elaborated
 -- one carry their child's record.  The map is the child's, but for the
 -- two rows under the first failing value, which go under its image
--- (`moved`); each cut's correspondence is `TakeCut`'s.  Every lifting
--- fact reads a take's row as kept, so its child's row past no failure, or
--- made under the first failure: agreement crosses the take back at a kept
--- row (`lift`) or the first failure (`lift-fail`), the child's fact moves
--- it to the image, and the take carries it forward (`push`, `push-fail`).
+-- (`moved`); each cut's correspondence is `TakeCut`'s.
 --
 -- Past the elaborated first failure only pins survive, kept where their
--- connect lies before it; two cuts agreeing on the plain take keep the
--- same such pins because the child's pins stay (`pin-stable`).
+-- connect lies before it.
 module simultaneous.TableTake where
 
 open import Data.Bool using (Bool; true; false; T; not)
