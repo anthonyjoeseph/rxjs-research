@@ -20,7 +20,7 @@ import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-conicalʳ; foldl-++)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 import Data.Sum
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _∸_; z≤n; s≤s; _≟_)
 open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
@@ -673,10 +673,11 @@ exits-bounded {A} o {q} {x} xq (ks , h) = from-next (next (elaborate (plain o)) 
 
     -- Every end lies past the value.
     live-q : ∀ {k} → X k end → q ≺ k
-    live-q {k} xk with ≼-split {q} {k} (proj₂ (proj₁ sq) xk)
-    ... | inj₁ qk = qk
-    ... | inj₂ refl with at-func (elaborate (plain o)) xq xk
-    ...   | ()
+    live-q {k} xk = [ (λ qk → qk) , (λ qk → ⊥-elim (not-end (at-func (elaborate (plain o)) xq (subst (λ c → X c end) (sym qk) xk)))) ]′
+      (≼-split {q} {k} (proj₂ (proj₁ sq) xk))
+      where
+        not-end : out x ≡ end → ⊥
+        not-end ()
 
     no-end : ∀ {k e} → X k e → (e ≡ end → ⊥) → X k end → ⊥
     no-end xk ne xe = ne (at-func (elaborate (plain o)) xk xe)
@@ -896,20 +897,17 @@ batches o = early , late
     early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
            × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
              ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
-    early₀ {rs} mb with each-out proj₂ S mb
-    ... | sc , ms , pre , _ with scan-out bstep bstart (elaborate (plain o)) ms
-    ...   | rx , mx , eqs , _ with pending-one (proj₁ (after bstart (values rx)))
-    ...     | inj₁ e = rx , mx , inj₁ (e ,
-                prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run))))
-      where
-        out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
-        run = grouped-run bstart (values rx) (good-run o mx)
-    ...     | inj₂ (g , e) = rx , mx , inj₂
-                (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
-                                                         (closed-snoc (stamped (released bstart (values rx))) g)))))
-      where
-        out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
-        run = grouped-run bstart (values rx) (good-run o mx)
+    early₀ {rs} mb =
+      let sc , ms , pre , ok = each-out proj₂ S mb
+          rx , mx , eqs , ok′ = scan-out bstep bstart (elaborate (plain o)) ms
+          out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
+          run = grouped-run bstart (values rx) (good-run o mx)
+      in rx , mx , [ (λ e → inj₁ (e ,
+                       prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))))
+                   , (λ { (g , e) → inj₂
+                       (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
+                                                                (closed-snoc (stamped (released bstart (values rx))) g))))) }) ]′
+                   (pending-one (proj₁ (after bstart (values rx))))
 
     early : ∀ {rs} → Met (ranked B) rs → Σ _ λ rx → Σ Bool λ ov → Met (ranked X) rx × Closes valuesOf X rx ov
           × Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴮ rx))
@@ -921,22 +919,23 @@ batches o = early , late
 
     -- what is met of the batched program, from what is met of the elaborated
     met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
-    met-from mx with scan-in bstep bstart (elaborate (plain o)) mx
-    ... | sc , ms , eqs , _ with each-in proj₂ S ms
-    ...   | rs , mb , eqb , _ = rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
+    met-from mx =
+      let sc , ms , eqs , ok = scan-in bstep bstart (elaborate (plain o)) mx
+          rs , mb , eqb , ok′ = each-in proj₂ S ms
+      in rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
 
     late₀ : ∀ {rs′ ov} → Met X rs′ → Flushes o rs′ ov → Σ _ λ rs → Met B rs × Prefix _≡_ (byName ov rs′) (stamped (values rs))
-    late₀ {rs′} {false} mx _ with met-from mx | pending-one (proj₁ (after bstart (values rs′)))
-    ... | rs , mb , eq | inj₁ e = rs , mb ,
-          prefix-trans (closed-prefix false _)
-            (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq)))))
-      where run′ = grouped-run bstart (values rs′) (good-run o mx)
-    ... | rs , mb , eq | inj₂ (g , e) = rs , mb ,
-          prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
-                          (trans (closed-snoc _ g) (sym eq)))
-      where run′ = grouped-run bstart (values rs′) (good-run o mx)
-    late₀ {rs′} {true} mx (ext , mx′ , pre) with met-from mx′
-    ... | rs , mb , eq = rs , mb ,
+    late₀ {rs′} {false} mx _ =
+      let rs , mb , eq = met-from mx
+          run′ = grouped-run bstart (values rs′) (good-run o mx)
+      in rs , mb ,
+         [ (λ e → prefix-trans (closed-prefix false _)
+                    (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq))))))
+         , (λ { (g , e) → prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
+                                          (trans (closed-snoc _ g) (sym eq))) }) ]′
+         (pending-one (proj₁ (after bstart (values rs′))))
+    late₀ {rs′} {true} mx (ext , mx′ , pre) =
+      let rs , mb , eq = met-from mx′ in rs , mb ,
           prefix-trans (prefix-≡ (sym (grouped-run bstart (values rs′) (good-run o mx))))
             (prefix-trans (prefix-++ (stamped (released bstart (values rs′))) pre)
               (prefix-≡ (sym (trans eq (trans (cong (λ ws → stamped (released bstart ws)) (values-++ rs′ ext))
