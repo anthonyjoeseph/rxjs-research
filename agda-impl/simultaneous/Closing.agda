@@ -45,7 +45,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Held using (shut; held)
 open import simultaneous.Routed using (Held; cnt)
 open import simultaneous.Reach using (module Reached)
-open import simultaneous.Listing using (listed)
+open import simultaneous.Listing using (Listed; listed)
 open import simultaneous.NextRow using (next)
 open import simultaneous.Project using (run-prefix)
 import simultaneous.Spec as Spec
@@ -436,19 +436,28 @@ module Pass {A : Set} (o : SObs [] A) where
   -- the latest visible row listed before it, past the run, is met as
   -- `Reaching.reach` meets a row, the two runs comparable by `run-det`.
   pass< : ∀ {rs y} → Met X rs → Few X y → Σ _ λ ext → Met X (rs ++ ext) × Covers< X (rs ++ ext) y
-  pass< {rs} {y} mx F with listed (elaborate (plain o)) F
-  ... | ks , cover , sound with latest (cursor nothing rs) ks (λ m → proj₂ (sound m))
-  ...   | inj₁ none = [] , subst (Met X) (sym (++-identityʳ rs)) mx ,
-            λ {k} x v ky a → none (cover x ky) x v (subst (λ c → After c k) (cong (cursor nothing) (++-identityʳ rs)) a)
-  ...   | inj₂ (u , eu , m , xu , vu , au , all) with RX.reach xu (proj₂ (proj₁ (seen xu vu))) vu
-  ...     | rs′ , run′ with run-det (at-func (elaborate (plain o))) mx run′
-  ...       | inj₂ p = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
-  ...       | inj₁ p with prefix-ext p
-  ...         | zs , eq = zs , subst (Met X) eq run′ ,
-              λ {k} x v ky a → all (cover x ky) x v (after-≺ (cursor nothing rs) au (uk k a)) (uk k a)
+  pass< {rs} {y} mx F = go (listed (elaborate (plain o)) F)
     where
-      uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k
-      uk k a = subst (λ c → After c k) (trans (cong (cursor nothing) (sym eq)) (cursor-snoc nothing rs′)) a
+      Out = Σ _ λ ext → Met X (rs ++ ext) × Covers< X (rs ++ ext) y
+
+      go : Listed X y → Out
+      go (ks , cover , sound) = pick (latest (cursor nothing rs) ks (λ m → proj₂ (sound m)))
+        where
+          pick : Latest (cursor nothing rs) ks → Out
+          pick (inj₁ none) = [] , subst (Met X) (sym (++-identityʳ rs)) mx ,
+            λ {k} x v ky a → none (cover x ky) x v (subst (λ c → After c k) (cong (cursor nothing) (++-identityʳ rs)) a)
+          pick (inj₂ (u , eu , m , xu , vu , au , all)) =
+            let rs′ , run′ = RX.reach xu (proj₂ (proj₁ (seen xu vu))) vu
+            in fin rs′ run′ (run-det (at-func (elaborate (plain o))) mx run′)
+            where
+              fin : ∀ rs′ → Met X (rs′ ++ [ (u , eu) ]) → Prefix _≡_ rs (rs′ ++ [ (u , eu) ]) ⊎ Prefix _≡_ (rs′ ++ [ (u , eu) ]) rs → Out
+              fin rs′ run′ (inj₂ p) = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
+              fin rs′ run′ (inj₁ p) =
+                let zs , eq = prefix-ext p
+                    uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k
+                    uk k a = subst (λ c → After c k) (trans (cong (cursor nothing) (sym eq)) (cursor-snoc nothing rs′)) a
+                in zs , subst (Met X) eq run′ ,
+                   λ {k} x v ky a → all (cover x ky) x v (after-≺ (cursor nothing rs) au (uk k a)) (uk k a)
 
   -- With the row at `y` in hand, up to and including it: one more step.
   pass : ∀ {rs y e} → Met X rs → Seen X y e → Σ _ λ ext → Met X (rs ++ ext) × Covers X (rs ++ ext) y

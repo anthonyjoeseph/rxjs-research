@@ -341,42 +341,43 @@ module Erasing {A : Set} (o : SObs [] A) where
     -- there whose values run to the same index.
     to-e : ∀ xs {k a} → Enum valuesOf X 0 (xs ++ [ (k , a) ])
          → Σ _ λ rs′ → Met (ranked E) rs′ × length (picks [_] (unrank rs′)) ≡ length (xs ++ [ (k , a) ])
-    to-e xs {k} {a} en with enum-snoc xs en
-    ... | nx , lx with erase-x o nx lx
-    ...   | k′ , ne , le with RE.reach (e-row (NE.nth-val ne)) le tt
-    ...     | rs₀ , mE with proj₁ (ranks-e o) mE
-    ...       | rs′ , mr′ , eq = rs′ , mr′ ,
+    to-e xs {k} {a} en =
+      let nx , lx = enum-snoc xs en
+          k′ , ne , le = erase-x o nx lx
+          rs₀ , mE = RE.reach (e-row (NE.nth-val ne)) le tt
+          rs′ , mr′ , eq = proj₁ (ranks-e o) mE
+          en′ : Enum [_] E 0 (picks [_] rs₀ ++ [ (k′ , a) ])
+          en′ = subst (Enum [_] E 0) (picks-++ [_] rs₀ [ (k′ , out a) ]) (proj₁ (EE.run-enum mE))
+          idx : length (picks [_] rs₀) ≡ length xs
+          idx = NE.nth-inj (proj₁ (enum-snoc (picks [_] rs₀) en′)) ne
+      in rs′ , mr′ ,
       trans (cong (λ r → length (picks [_] r)) eq)
         (trans (cong length (picks-++ [_] rs₀ [ (k′ , out a) ]))
           (trans (length-++ (picks [_] rs₀)) (trans (cong (_+ 1) idx) (sym (length-++ xs)))))
-      where
-        en′ : Enum [_] E 0 (picks [_] rs₀ ++ [ (k′ , a) ])
-        en′ = subst (Enum [_] E 0) (picks-++ [_] rs₀ [ (k′ , out a) ]) (proj₁ (EE.run-enum mE))
-
-        idx : length (picks [_] rs₀) ≡ length xs
-        idx = NE.nth-inj (proj₁ (enum-snoc (picks [_] rs₀) en′)) ne
 
     to-x : ∀ ys {k′ a} → Enum [_] E 0 (ys ++ [ (k′ , a) ])
          → Σ _ λ rx → Met (ranked X) rx × length (picks valuesOf (unrank rx)) ≡ length (ys ++ [ (k′ , a) ])
-    to-x ys {k′} {a} en with enum-snoc ys en
-    ... | ne , le with erase-e o ne le
-    ...   | k , nx , lx with NX.nth-val nx
-    ...     | vrow {x = x} r fx with RX.reach r lx tt
-    ...       | rs₀ , mX with proj₁ (ranks-x o) mX
-    ...         | rx , mr , eq = rx , mr ,
-      trans (cong (λ r → length (picks valuesOf r)) eq)
-        (trans (cong length (trans (picks-++ valuesOf rs₀ [ (k , out x) ]) (cong (picks valuesOf rs₀ ++_) tail)))
-          (trans (length-++ (picks valuesOf rs₀)) (trans (cong (_+ 1) idx) (sym (length-++ ys)))))
+    to-x ys {k′} {a} en =
+      let ne , le = enum-snoc ys en
+          k , nx , lx = erase-e o ne le
+      in fin nx lx (NX.nth-val nx)
       where
-        tail : picks valuesOf [ (k , out x) ] ≡ [ (k , a) ]
-        tail = trans (++-identityʳ (L.map (k ,_) (valuesOf x))) (cong (L.map (k ,_)) fx)
-
-        en′ : Enum valuesOf X 0 (picks valuesOf rs₀ ++ [ (k , a) ])
-        en′ = subst (Enum valuesOf X 0) (trans (picks-++ valuesOf rs₀ [ (k , out x) ]) (cong (picks valuesOf rs₀ ++_) tail))
-                (proj₁ (EX.run-enum mX))
-
-        idx : length (picks valuesOf rs₀) ≡ length ys
-        idx = NX.nth-inj (proj₁ (enum-snoc (picks valuesOf rs₀) en′)) nx
+        fin : ∀ {k} → Nth (VX o) (0 + length ys) k a → Live X k → V valuesOf X k (out a)
+            → Σ _ λ rx → Met (ranked X) rx × length (picks valuesOf (unrank rx)) ≡ length (ys ++ [ (k′ , a) ])
+        fin {k} nx lx (vrow {x = x} r fx) =
+          let rs₀ , mX = RX.reach r lx tt
+              rx , mr , eq = proj₁ (ranks-x o) mX
+              tail : picks valuesOf [ (k , out x) ] ≡ [ (k , a) ]
+              tail = trans (++-identityʳ (L.map (k ,_) (valuesOf x))) (cong (L.map (k ,_)) fx)
+              en′ : Enum valuesOf X 0 (picks valuesOf rs₀ ++ [ (k , a) ])
+              en′ = subst (Enum valuesOf X 0) (trans (picks-++ valuesOf rs₀ [ (k , out x) ]) (cong (picks valuesOf rs₀ ++_) tail))
+                      (proj₁ (EX.run-enum mX))
+              idx : length (picks valuesOf rs₀) ≡ length ys
+              idx = NX.nth-inj (proj₁ (enum-snoc (picks valuesOf rs₀) en′)) nx
+          in rx , mr ,
+          trans (cong (λ r → length (picks valuesOf r)) eq)
+            (trans (cong length (trans (picks-++ valuesOf rs₀ [ (k , out x) ]) (cong (picks valuesOf rs₀ ++_) tail)))
+              (trans (length-++ (picks valuesOf rs₀)) (trans (cong (_+ 1) idx) (sym (length-++ ys)))))
 
   dir₁ : ∀ {rx ov} → Met (ranked X) rx → Closes valuesOf X rx ov
        → Σ _ λ rs′ → Met (ranked E) rs′ × Closes [_] E rs′ ov × stampedᴮ rx ≡ stampedᴰ rs′
@@ -469,24 +470,28 @@ module Erasing {A : Set} (o : SObs [] A) where
     ends-at rs c = AnyP.++⁺ʳ rs (here refl)
 
   dir₃ : ∀ {rx} → Met X rx → Ends rx → Σ _ λ rs′ → Met E rs′ × Ends rs′ × vals rx ≡ values rs′
-  dir₃ mx en with ended mx en
-  ... | xs , c , refl , xc , lc with to (erase-end o) (c , xc , lc)
-  ...   | c′ , ec′ , lc′ with RE.reach ec′ lc′ tt
-  ...     | ys , me = ys ++ [ (c′ , end) ] , me , ends-at ys c′ ,
-    trans (vals-picks (xs ++ [ (c , end) ]))
-      (trans (cong (L.map proj₂) (end-picks valuesOf xs c))
-        (trans (vmatch (proj₁ (EX.run-enum (run-prefix xs mx))) (proj₁ (EE.run-enum (run-prefix ys me))) (counts xs ys mx me))
-          (sym (trans (cong (L.map proj₂) (outs-picks (ys ++ [ (c′ , end) ]))) (cong (L.map proj₂) (end-picks [_] ys c′))))))
-
-  dir₄ : ∀ {rs′} → Met E rs′ → Ends rs′ → Σ _ λ rx → Met X rx × Ends rx × values rs′ ≡ vals rx
-  dir₄ me en with ended me en
-  ... | ys , c′ , refl , ec′ , lc′ with from (erase-end o) (c′ , ec′ , lc′)
-  ...   | c , xc , lc with RX.reach xc lc tt
-  ...     | xs , mx = xs ++ [ (c , end) ] , mx , ends-at xs c ,
-    sym (trans (vals-picks (xs ++ [ (c , end) ]))
+  dir₃ mx₀ en =
+    let xs , c , eq , xc , lc = ended mx₀ en
+        c′ , ec′ , lc′ = to (erase-end o) (c , xc , lc)
+        ys , me = RE.reach ec′ lc′ tt
+        mx = subst (Met X) eq mx₀
+    in ys ++ [ (c′ , end) ] , me , ends-at ys c′ ,
+    trans (cong vals eq) (trans (vals-picks (xs ++ [ (c , end) ]))
       (trans (cong (L.map proj₂) (end-picks valuesOf xs c))
         (trans (vmatch (proj₁ (EX.run-enum (run-prefix xs mx))) (proj₁ (EE.run-enum (run-prefix ys me))) (counts xs ys mx me))
           (sym (trans (cong (L.map proj₂) (outs-picks (ys ++ [ (c′ , end) ]))) (cong (L.map proj₂) (end-picks [_] ys c′)))))))
+
+  dir₄ : ∀ {rs′} → Met E rs′ → Ends rs′ → Σ _ λ rx → Met X rx × Ends rx × values rs′ ≡ vals rx
+  dir₄ me₀ en =
+    let ys , c′ , eq , ec′ , lc′ = ended me₀ en
+        c , xc , lc = from (erase-end o) (c′ , ec′ , lc′)
+        xs , mx = RX.reach xc lc tt
+        me = subst (Met E) eq me₀
+    in xs ++ [ (c , end) ] , mx , ends-at xs c ,
+    trans (cong values eq) (sym (trans (vals-picks (xs ++ [ (c , end) ]))
+      (trans (cong (L.map proj₂) (end-picks valuesOf xs c))
+        (trans (vmatch (proj₁ (EX.run-enum (run-prefix xs mx))) (proj₁ (EE.run-enum (run-prefix ys me))) (counts xs ys mx me))
+          (sym (trans (cong (L.map proj₂) (outs-picks (ys ++ [ (c′ , end) ]))) (cong (L.map proj₂) (end-picks [_] ys c′))))))))
 
 -- THE ERASURE: the elaborated run, marks dropped, is the plain run stamp
 -- for stamp, value by value.
