@@ -5,7 +5,7 @@
 -- the run has closed its last instant.
 module simultaneous.Closing where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_]; concatMap)
 import Data.List as L
@@ -20,7 +20,7 @@ import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ++-conicalʳ; foldl-++)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 import Data.Sum
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _∸_; z≤n; s≤s; _≟_)
 open import Data.Nat.Properties using (m≤n⇒m∸n≡0)
@@ -45,7 +45,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Held using (shut; held)
 open import simultaneous.Routed using (Held; cnt)
 open import simultaneous.Reach using (module Reached)
-open import simultaneous.Listing using (listed)
+open import simultaneous.Listing using (Listed; listed)
 open import simultaneous.NextRow using (next)
 open import simultaneous.Project using (run-prefix)
 import simultaneous.Spec as Spec
@@ -417,16 +417,24 @@ module Pass {A : Set} (o : SObs [] A) where
 
     latest : ∀ c (ks : List Pos) → (∀ {k} → k ∈ ks → Σ _ (X k)) → Latest c ks
     latest c []       _ = inj₁ λ ()
-    latest c (k ∷ ks) s with latest c ks (λ m → s (there m)) | s (here refl)
-    ... | r | e₁ , x₁ with vis? e₁ | after? c k
-    ...   | no nv  | _      = drop {c} {k} {ks} (λ x v _ → nv (subst Visible ((at-func (elaborate (plain o))) x x₁) v)) r
-    ...   | yes _  | no na  = drop {c} {k} {ks} (λ _ _ a → na a) r
-    ...   | yes v₁ | yes a₁ with r
-    ...     | inj₁ none = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ , λ { (here refl) _ _ _ → ≼-refl {k} ; (there m) x v a → ⊥-elim (none m x v a) })
-    ...     | inj₂ (u , eu , m , xu , vu , au , all) with T? (u <ᵖ k)
-    ...       | yes uk = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ ,
+    latest c (k ∷ ks) s = step (latest c ks (λ m → s (there m))) (s (here refl))
+      where
+        step : Latest c ks → Σ _ (X k) → Latest c (k ∷ ks)
+        step r (e₁ , x₁) = dec (vis? e₁) (after? c k)
+          where
+            keep : Visible e₁ → After c k → Latest c ks → Latest c (k ∷ ks)
+            keep v₁ a₁ (inj₁ none) = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ , λ { (here refl) _ _ _ → ≼-refl {k} ; (there m) x v a → ⊥-elim (none m x v a) })
+            keep v₁ a₁ (inj₂ (u , eu , m , xu , vu , au , all)) = cmp (T? (u <ᵖ k))
+              where
+                cmp : Dec (T (u <ᵖ k)) → Latest c (k ∷ ks)
+                cmp (yes uk) = inj₂ (k , e₁ , here refl , x₁ , v₁ , a₁ ,
                   λ { (here refl) _ _ _ → ≼-refl {k} ; {k′} (there m′) x v a → ≼-trans {k′} {u} {k} (all m′ x v a) (≺→≼ {u} {k} uk) })
-    ...       | no ku  = inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) _ _ _ → ku ; (there m′) x v a → all m′ x v a })
+                cmp (no ku) = inj₂ (u , eu , there m , xu , vu , au , λ { (here refl) _ _ _ → ku ; (there m′) x v a → all m′ x v a })
+
+            dec : Dec (Visible e₁) → Dec (After c k) → Latest c (k ∷ ks)
+            dec (no nv) _ = drop {c} {k} {ks} (λ x v _ → nv (subst Visible ((at-func (elaborate (plain o))) x x₁) v)) r
+            dec (yes _) (no na) = drop {c} {k} {ks} (λ _ _ a → na a) r
+            dec (yes v₁) (yes a₁) = keep v₁ a₁ r
 
     cases : ∀ {P Q R : Set} → (P → R) → (Q → R) → P ⊎ Q → R
     cases f g (inj₁ p) = f p
@@ -436,19 +444,28 @@ module Pass {A : Set} (o : SObs [] A) where
   -- the latest visible row listed before it, past the run, is met as
   -- `Reaching.reach` meets a row, the two runs comparable by `run-det`.
   pass< : ∀ {rs y} → Met X rs → Few X y → Σ _ λ ext → Met X (rs ++ ext) × Covers< X (rs ++ ext) y
-  pass< {rs} {y} mx F with listed (elaborate (plain o)) F
-  ... | ks , cover , sound with latest (cursor nothing rs) ks (λ m → proj₂ (sound m))
-  ...   | inj₁ none = [] , subst (Met X) (sym (++-identityʳ rs)) mx ,
-            λ {k} x v ky a → none (cover x ky) x v (subst (λ c → After c k) (cong (cursor nothing) (++-identityʳ rs)) a)
-  ...   | inj₂ (u , eu , m , xu , vu , au , all) with RX.reach xu (proj₂ (proj₁ (seen xu vu))) vu
-  ...     | rs′ , run′ with run-det (at-func (elaborate (plain o))) mx run′
-  ...       | inj₂ p = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
-  ...       | inj₁ p with prefix-ext p
-  ...         | zs , eq = zs , subst (Met X) eq run′ ,
-              λ {k} x v ky a → all (cover x ky) x v (after-≺ (cursor nothing rs) au (uk k a)) (uk k a)
+  pass< {rs} {y} mx F = go (listed (elaborate (plain o)) F)
     where
-      uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k
-      uk k a = subst (λ c → After c k) (trans (cong (cursor nothing) (sym eq)) (cursor-snoc nothing rs′)) a
+      Out = Σ _ λ ext → Met X (rs ++ ext) × Covers< X (rs ++ ext) y
+
+      go : Listed X y → Out
+      go (ks , cover , sound) = pick (latest (cursor nothing rs) ks (λ m → proj₂ (sound m)))
+        where
+          pick : Latest (cursor nothing rs) ks → Out
+          pick (inj₁ none) = [] , subst (Met X) (sym (++-identityʳ rs)) mx ,
+            λ {k} x v ky a → none (cover x ky) x v (subst (λ c → After c k) (cong (cursor nothing) (++-identityʳ rs)) a)
+          pick (inj₂ (u , eu , m , xu , vu , au , all)) =
+            let rs′ , run′ = RX.reach xu (proj₂ (proj₁ (seen xu vu))) vu
+            in fin rs′ run′ (run-det (at-func (elaborate (plain o))) mx run′)
+            where
+              fin : ∀ rs′ → Met X (rs′ ++ [ (u , eu) ]) → Prefix _≡_ rs (rs′ ++ [ (u , eu) ]) ⊎ Prefix _≡_ (rs′ ++ [ (u , eu) ]) rs → Out
+              fin rs′ run′ (inj₂ p) = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
+              fin rs′ run′ (inj₁ p) =
+                let zs , eq = prefix-ext p
+                    uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k
+                    uk k a = subst (λ c → After c k) (trans (cong (cursor nothing) (sym eq)) (cursor-snoc nothing rs′)) a
+                in zs , subst (Met X) eq run′ ,
+                   λ {k} x v ky a → all (cover x ky) x v (after-≺ (cursor nothing rs) au (uk k a)) (uk k a)
 
   -- With the row at `y` in hand, up to and including it: one more step.
   pass : ∀ {rs y e} → Met X rs → Seen X y e → Σ _ λ ext → Met X (rs ++ ext) × Covers X (rs ++ ext) y
@@ -472,11 +489,10 @@ meet {A} o {rs} {y} {e} mx sy@((xy , _) , fy) vi ay with pass o mx sy
     found : (cursor nothing (rs ++ ext) ≡ nothing ⊎ Σ Pos λ c → cursor nothing (rs ++ ext) ≡ just c)
           → Σ _ λ ext′ → Met (elaborated o) (rs ++ ext′) × (y , e) ∈ ext′
     found (inj₁ eq) = ⊥-elim (cv xy vi (≼-refl {y}) (subst (λ c → After c y) (sym eq) tt))
-    found (inj₂ (c , eq)) with cursor-in nothing (rs ++ ext) eq
-    ... | inj₁ ()
-    ... | inj₂ (_ , cm) with ∈-++⁻ rs (run-has (at-func (elaborate (plain o))) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)
-    ...   | inj₁ m = ⊥-elim (not-past mx m ay)
-    ...   | inj₂ m = ext , mx′ , m
+    found (inj₂ (c , eq)) = [ (λ ()) , (λ { (_ , cm) →
+        [ (λ m → ⊥-elim (not-past mx m ay)) , (λ m → ext , mx′ , m) ]′
+          (∈-++⁻ rs (run-has (at-func (elaborate (plain o))) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)) }) ]′
+      (cursor-in nothing (rs ++ ext) eq)
 
 -- Rows past one with finitely many before it, finitely many, leave
 -- finitely many before any row.
@@ -673,10 +689,11 @@ exits-bounded {A} o {q} {x} xq (ks , h) = from-next (next (elaborate (plain o)) 
 
     -- Every end lies past the value.
     live-q : ∀ {k} → X k end → q ≺ k
-    live-q {k} xk with ≼-split {q} {k} (proj₂ (proj₁ sq) xk)
-    ... | inj₁ qk = qk
-    ... | inj₂ refl with at-func (elaborate (plain o)) xq xk
-    ...   | ()
+    live-q {k} xk = [ (λ qk → qk) , (λ qk → ⊥-elim (not-end (at-func (elaborate (plain o)) xq (subst (λ c → X c end) (sym qk) xk)))) ]′
+      (≼-split {q} {k} (proj₂ (proj₁ sq) xk))
+      where
+        not-end : out x ≡ end → ⊥
+        not-end ()
 
     no-end : ∀ {k e} → X k e → (e ≡ end → ⊥) → X k end → ⊥
     no-end xk ne xe = ne (at-func (elaborate (plain o)) xk xe)
@@ -758,16 +775,19 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
   beyond {y} (apart ne)     xy ky iy = ne (between {q} {k} {y} (from≺ q k past) (from≺ k y ky) (sym iy))
   beyond     (sub xs fq)    xy ky iy = sub-async o xs xy ky (trans iy fq)
   beyond {y} (done xc)      xy ky iy = ≺-absurd {k} {y} ky (done-last o xy xc)
-  beyond {y} (emptied z bm rb) xy ky iy with meet o mrk (seen xy tt) tt (subst (λ c → After c y) (sym ck) ky)
-  ... | ext , mx′ , yin = shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
+  beyond {y} (emptied z bm rb) xy ky iy =
+    let ext , mx′ , yin = meet o mrk (seen xy tt) tt (subst (λ c → After c y) (sym ck) ky)
+    in shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
 
   gone : ∀ {y a j} → X y (out (instEmit (value a) j)) → q ≺ y → instantOf y ≡ instantOf q → ⊥
-  gone {y} xy qy iy with T? (y <ᵖ k)
-  ... | yes yk = none xy qy yk
-  ... | no ky with ≼-split {k} {y} ky
-  ...   | inj₁ ky′ = beyond how xy ky′ iy
-  ...   | inj₂ refl with at-func (elaborate (plain o)) xk xy
-  ...     | ()
+  gone {y} {a} {j} xy qy iy = cmp (T? (y <ᵖ k))
+    where
+      cmp : Dec (T (y <ᵖ k)) → ⊥
+      cmp (yes yk) = none xy qy yk
+      cmp (no ky) = [ (λ ky′ → beyond how xy ky′ iy) , (λ { refl → mk≢ (at-func (elaborate (plain o)) xk xy) }) ]′ (≼-split {k} {y} ky)
+        where
+          mk≢ : out (instEmit (mark mk) nk) ≡ out (instEmit (value a) j) → ⊥
+          mk≢ ()
 
   left : Left valuesOf X q
   left {a = instEmit (mark _) _}  _  _  _  = refl
@@ -790,13 +810,16 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
     where
       by : How o q rk k → Exits X q
       by (apart ne) = inj₁ (k , _ , seen xk tt , past , inj₁ ne)
-      by (done xc) with done-end o xc
-      ... | c , xe , kc = inj₁ (c , end , seen xe tt , ≺-trans {q} {k} {c} past kc , inj₂ refl)
-      by (sub xs fq) with sub-rest o xs
-      ... | ks , h = exits-bounded o (proj₂ xq) (bounded {ks} λ xy ky iy → h xy ky (trans iy fq))
-      by (emptied z bm rb) with Held.rest (held o) mrk z bm
-      ... | ks , h = exits-bounded o (proj₂ xq)
-                       (bounded {ks} λ {y} xy ky iy → h xy (subst (λ c → After c y) (sym ck) ky) (trans (cong (_∙ []) iy) (sym rb)))
+      by (done xc) =
+        let c , xe , kc = done-end o xc
+        in inj₁ (c , end , seen xe tt , ≺-trans {q} {k} {c} past kc , inj₂ refl)
+      by (sub xs fq) =
+        let ks , h = sub-rest o xs
+        in exits-bounded o (proj₂ xq) (bounded {ks} λ xy ky iy → h xy ky (trans iy fq))
+      by (emptied z bm rb) =
+        let ks , h = Held.rest (held o) mrk z bm
+        in exits-bounded o (proj₂ xq)
+             (bounded {ks} λ {y} xy ky iy → h xy (subst (λ c → After c y) (sym ck) ky) (trans (cong (_∙ []) iy) (sym rb)))
 
 -- THE RUN IS CLOSED WHERE NOTHING IS HELD: past every release, no value
 -- of the instant released, and the run leaves it.
@@ -887,28 +910,26 @@ batches o = early , late
 
     -- Names to ranks: the batches carry the ranks of the values they release.
     bs-rel : ∀ {rs} → Met (ranked B) rs → Pointwise.Pointwise Lab (stamped (values (unrank rs))) (stampedᴮ rs)
-    bs-rel mb = Pointwise.map (λ ce → batch-rank o (proj₁ ce) , proj₂ ce) (carried-rel mb)
+    bs-rel mb = Pointwise.map (λ ce → batch-rank o (proj₁ ce) , proj₂ ce) (carried-rel {t = B} mb)
 
     groups : ∀ ov {rx} → Met (ranked X) rx → Pointwise.Pointwise Lab (byName ov (unrank rx)) (grouped ov (stampedᴮ rx))
-    groups ov mx = closed-rel ov (group-rel (name-rank o) (rank-name o) (carried-rel mx))
+    groups ov mx = closed-rel ov (group-rel (name-rank o) (rank-name o) (carried-rel {t = X} mx))
 
-    early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
-           × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
-             ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
-    early₀ {rs} mb with each-out proj₂ S mb
-    ... | sc , ms , pre , _ with scan-out bstep bstart (elaborate (plain o)) ms
-    ...   | rx , mx , eqs , _ with pending-one (proj₁ (after bstart (values rx)))
-    ...     | inj₁ e = rx , mx , inj₁ (e ,
-                prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run))))
-      where
-        out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
-        run = grouped-run bstart (values rx) (good-run o mx)
-    ...     | inj₂ (g , e) = rx , mx , inj₂
-                (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
-                                                         (closed-snoc (stamped (released bstart (values rx))) g)))))
-      where
-        out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
-        run = grouped-run bstart (values rx) (good-run o mx)
+    opaque
+      early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
+             × ((pending (proj₁ (after bstart (values rx))) ≡ [] × Prefix _≡_ (stamped (values rs)) (byName true rx))
+               ⊎ Prefix _≡_ (stamped (values rs)) (byName false rx))
+      early₀ {rs} mb =
+        let sc , ms , pre , ok = each-out proj₂ S mb
+            rx , mx , eqs , ok′ = scan-out bstep bstart (elaborate (plain o)) ms
+            out⊑ = stamped-prefix (prefix-trans pre (prefix-≡ (cong (concatMap proj₂) eqs)))
+            run = grouped-run bstart (values rx) (good-run o mx)
+        in rx , mx , [ (λ e → inj₁ (e ,
+                         prefix-trans out⊑ (prefix-≡ (trans (sym (++-identityʳ _)) (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))))
+                     , (λ { (g , e) → inj₂
+                         (prefix-trans out⊑ (prefix-≡ (sym (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rx)) ++_) (sym e)) run)))
+                                                                  (closed-snoc (stamped (released bstart (values rx))) g))))) }) ]′
+                     (pending-one (proj₁ (after bstart (values rx))))
 
     early : ∀ {rs} → Met (ranked B) rs → Σ _ λ rx → Σ Bool λ ov → Met (ranked X) rx × Closes valuesOf X rx ov
           × Prefix _≡_ (stampedᴮ rs) (grouped ov (stampedᴮ rx))
@@ -918,35 +939,39 @@ batches o = early , late
     ...     | inj₁ (e , pre) = rx , true , mxr , flush-closes o mxr e , prefix-rel (name-rank o) (bs-rel mbr) (groups true mxr) pre
     ...     | inj₂ pre       = rx , false , mxr , tt , prefix-rel (name-rank o) (bs-rel mbr) (groups false mxr) pre
 
-    -- what is met of the batched program, from what is met of the elaborated
-    met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
-    met-from mx with scan-in bstep bstart (elaborate (plain o)) mx
-    ... | sc , ms , eqs , _ with each-in proj₂ S ms
-    ...   | rs , mb , eqb , _ = rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
+    opaque
+      -- what is met of the batched program, from what is met of the elaborated
+      met-from : ∀ {rx} → Met X rx → Σ _ λ rs → Met B rs × stamped (values rs) ≡ stamped (released bstart (values rx))
+      met-from mx =
+        let sc , ms , eqs , ok = scan-in bstep bstart (elaborate (plain o)) mx
+            rs , mb , eqb , ok′ = each-in proj₂ S ms
+        in rs , mb , cong stamped (trans eqb (cong (concatMap proj₂) eqs))
 
-    late₀ : ∀ {rs′ ov} → Met X rs′ → Flushes o rs′ ov → Σ _ λ rs → Met B rs × Prefix _≡_ (byName ov rs′) (stamped (values rs))
-    late₀ {rs′} {false} mx _ with met-from mx | pending-one (proj₁ (after bstart (values rs′)))
-    ... | rs , mb , eq | inj₁ e = rs , mb ,
-          prefix-trans (closed-prefix false _)
-            (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq)))))
-      where run′ = grouped-run bstart (values rs′) (good-run o mx)
-    ... | rs , mb , eq | inj₂ (g , e) = rs , mb ,
-          prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
-                          (trans (closed-snoc _ g) (sym eq)))
-      where run′ = grouped-run bstart (values rs′) (good-run o mx)
-    late₀ {rs′} {true} mx (ext , mx′ , pre) with met-from mx′
-    ... | rs , mb , eq = rs , mb ,
-          prefix-trans (prefix-≡ (sym (grouped-run bstart (values rs′) (good-run o mx))))
-            (prefix-trans (prefix-++ (stamped (released bstart (values rs′))) pre)
-              (prefix-≡ (sym (trans eq (trans (cong (λ ws → stamped (released bstart ws)) (values-++ rs′ ext))
-                (trans (cong stamped (released-++ bstart (values rs′) (values ext)))
-                       (stamped-++ (released bstart (values rs′)) _)))))))
+      late₀ : ∀ {rs′ ov} → Met X rs′ → Flushes o rs′ ov → Σ _ λ rs → Met B rs × Prefix _≡_ (byName ov rs′) (stamped (values rs))
+      late₀ {rs′} {false} mx _ =
+        let rs , mb , eq = met-from mx
+            run′ = grouped-run bstart (values rs′) (good-run o mx)
+        in rs , mb ,
+           [ (λ e → prefix-trans (closed-prefix false _)
+                      (prefix-≡ (trans (sym run′) (trans (cong (stamped (released bstart (values rs′)) ++_) e) (trans (++-identityʳ _) (sym eq))))))
+           , (λ { (g , e) → prefix-≡ (trans (cong (closed false) (sym (trans (cong (stamped (released bstart (values rs′)) ++_) (sym e)) run′)))
+                                            (trans (closed-snoc _ g) (sym eq))) }) ]′
+           (pending-one (proj₁ (after bstart (values rs′))))
+      late₀ {rs′} {true} mx (ext , mx′ , pre) =
+        let rs , mb , eq = met-from mx′ in rs , mb ,
+            prefix-trans (prefix-≡ (sym (grouped-run bstart (values rs′) (good-run o mx))))
+              (prefix-trans (prefix-++ (stamped (released bstart (values rs′))) pre)
+                (prefix-≡ (sym (trans eq (trans (cong (λ ws → stamped (released bstart ws)) (values-++ rs′ ext))
+                  (trans (cong stamped (released-++ bstart (values rs′) (values ext)))
+                         (stamped-++ (released bstart (values rs′)) _)))))))
 
     flush : ∀ {rx} ov → Met (ranked X) rx → Closes valuesOf X rx ov → Flushes o (unrank rx) ov
     flush false _   _  = tt
     flush true  mxr cl = closes-flush o mxr cl
 
     late : ∀ {rx ov} → Met (ranked X) rx → Closes valuesOf X rx ov → Σ _ λ rs → Met (ranked B) rs × Prefix _≡_ (grouped ov (stampedᴮ rx)) (stampedᴮ rs)
-    late {rx} {ov} mxr cl with late₀ {unrank rx} {ov} (proj₂ (ranks-x o) mxr) (flush ov mxr cl)
-    ... | rs₀ , mb , pre with proj₁ (ranks-b o) mb
-    ...   | rs , mbr , refl = rs , mbr , prefix-rel (name-rank o) (groups ov mxr) (bs-rel mbr) pre
+    late {rx} {ov} mxr cl =
+      let rs₀ , mb , pre = late₀ {unrank rx} {ov} (proj₂ (ranks-x o) mxr) (flush ov mxr cl)
+          rs , mbr , eq = proj₁ (ranks-b o) mb
+      in rs , mbr , prefix-rel (name-rank o) (groups ov mxr) (bs-rel mbr)
+           (subst (λ r → Prefix _≡_ (byName ov (unrank rx)) (stamped (values r))) (sym eq) pre)

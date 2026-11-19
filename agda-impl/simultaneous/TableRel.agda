@@ -43,7 +43,7 @@ open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
-open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
+open import simultaneous.SObs using (SObs; fixedˢ; plain; plainˡ; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv; listC)
 open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
@@ -468,6 +468,51 @@ conn-coh n s b Fs Fb cs cb ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ a
     bφ = cb X.CE.ρ′ X.CE.uρ′ (ext ρι) X.CE.ρ*′ X.CE.uρ*′ (X.C.env′ X.Rs) (X′.C.env′ X′.Rs) ee′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) _ _ _ _ _ _ _ _
 
 ------------------------------------------------------------------------
+-- The one-to-one formers and `defer`, over any child
+
+map-rel : ∀ {Γ A B} n (f : A → B) (s : Obs Timeline Γ A) → Full n s → Full n (map f s)
+map-rel n f s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in map-tab f (Out.rel O) ⊢ map-order f (Out.rel O) (Out.rest O)
+
+map-coh : ∀ {Γ A B} n (f : A → B) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (map f s) (map-rel n f s Fs)
+map-coh n f s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
+  let c = cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
+
+scan-rel : ∀ {Γ A B} n (f : B → A → B) (z : B) (s : Obs Timeline Γ A) → Full n s → Full n (scan f z s)
+scan-rel n f z s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in scan-tab f z (Out.rel O) ⊢ scan-order f z (Out.rel O) (Out.rest O)
+
+scan-coh : ∀ {Γ A B} n (f : B → A → B) (z : B) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (scan f z s) (scan-rel n f z s Fs)
+scan-coh n f z s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
+  let c = cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
+
+take-rel : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) → Full n s → Full n (takeWhile i q s)
+take-rel n i q s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in take-tab i q (Out.rel O) ⊢ take-order i q (Out.rel O) (Out.rest O)
+
+take-coh : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (takeWhile i q s) (take-rel n i q s Fs)
+take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
+  take-cong i q (Out.rel (Fs ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (Fs ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′))
+    (cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
+
+defer-rel : ∀ {Γ A} n (l : Later Timeline Γ A) → Full n (Later.force l) → Full (suc n) (defer l)
+defer-rel n l Fl ρ uρ ρι ρ* uρ* env p p* a a* al lk =
+  let O = Fl ρ uρ ρι ρ* uρ* env (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw env) a) (admits-step (lw* env) a*) (aligned-⊕ {Ψ = maps env} {ρ = ρ} al (ix 1) (ix 1)) (linked-r (linked-l lk (ix 1)) (ix 1))
+  in defer-tab p p* (Out.rel O) ⊢ defer-order p p* (Out.rel O) (Out.rest O) al lk
+
+defer-coh : ∀ {Γ A} n (l : Later Timeline Γ A) (Fl : Full n (Later.force l)) → Coh n (Later.force l) Fl → Coh (suc n) (defer l) (defer-rel n l Fl)
+defer-coh n l Fl cl ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
+  defer-cong p p* (Out.rel (Fl ρ uρ ρι ρ* uρ* E (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E) a) (admits-step (lw* E) a*) al₁ lk₁))
+                  (Out.rel (Fl ρ uρ ρι ρ* uρ* E′ (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E′) a′) (admits-step (lw* E′) a*′) al₁′ lk₁′))
+    (cl ρ uρ ρι ρ* uρ* E E′ ee (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
+      (admits-step (lw E) a) (admits-step (lw E′) a′) (admits-step (lw* E) a*) (admits-step (lw* E′) a*′) al₁ al₁′ lk₁ lk₁′)
+  where
+    al₁  = aligned-⊕ {Ψ = maps E}  {ρ = ρ} al  (ix 1) (ix 1)
+    al₁′ = aligned-⊕ {Ψ = maps E′} {ρ = ρ} al′ (ix 1) (ix 1)
+    lk₁  = linked-r (linked-l lk  (ix 1)) (ix 1)
+    lk₁′ = linked-r (linked-l lk′ (ix 1)) (ix 1)
+
+------------------------------------------------------------------------
 -- Every author subterm
 
 -- EVERY AUTHOR SUBTERM'S CUTS CORRESPOND.  An author's cold only: a
@@ -487,42 +532,24 @@ rel n empty             ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p* ⊢ of-order [] _ _ (maps env) ρ p p* al lk
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   of-tab xs (λ x → instEmit (value x) root) (λ _ → refl) p p* ⊢ of-order xs _ _ (maps env) ρ p p* al lk
-rel n (map f s)         ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = rel n s ρ uρ ρι ρ* uρ* env p p* a a* al lk in map-tab f (Out.rel O) ⊢ map-order f (Out.rel O) (Out.rest O)
-rel n (scan f z s)      ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = rel n s ρ uρ ρι ρ* uρ* env p p* a a* al lk in scan-tab f z (Out.rel O) ⊢ scan-order f z (Out.rel O) (Out.rest O)
-rel n (takeWhile i q s) ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = rel n s ρ uρ ρι ρ* uρ* env p p* a a* al lk in take-tab i q (Out.rel O) ⊢ take-order i q (Out.rel O) (Out.rest O)
+rel n (map f s)         = map-rel n f (plain s) (rel n s)
+rel n (scan f z s)      = scan-rel n f z (plain s) (rel n s)
+rel n (takeWhile i q s) = take-rel n i q (plain s) (rel n s)
 rel n (flatMap op f s)  = flat-rel n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a)) (λ a → rel-coh n (f a))
 rel n (connect s b)     = conn-rel n (plain s) (plain b) (rel n s) (rel n b)
 rel n (connected i)     ρ uρ ρι ρ* uρ* env p p* a a* al lk = hot env i n p p* a a* al lk
 rel zero    (defer l)   ρ uρ ρι ρ* uρ* env p p* a a* al lk = spin-tab p p* ⊢ spin-order (maps env) ρ p p* al lk
-rel (suc n) (defer l)   ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = rel n (Later.force l) ρ uρ ρι ρ* uρ* env (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw env) a) (admits-step (lw* env) a*) (aligned-⊕ {Ψ = maps env} {ρ = ρ} al (ix 1) (ix 1)) (linked-r (linked-l lk (ix 1)) (ix 1))
-  in defer-tab p p* (Out.rel O) ⊢ defer-order p p* (Out.rel O) (Out.rest O) al lk
+rel (suc n) (defer l)   = defer-rel n (plainˡ l) (rel n (Later.force l))
 
 rel-coh n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
 rel-coh n empty             ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
 rel-coh n (of xs)           ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
-rel-coh n (map f s)         ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
-  let c = rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
-rel-coh n (scan f z s)      ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
-  let c = rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y in same (φ≡ c) (nl→ c)
-rel-coh n (takeWhile i q s) ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  take-cong i q (Out.rel (rel n s ρ uρ ρι ρ* uρ* E p p* a a* al lk)) (Out.rel (rel n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′))
-    (rel-coh n s ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′)
+rel-coh n (map f s)         = map-coh n f (plain s) (rel n s) (rel-coh n s)
+rel-coh n (scan f z s)      = scan-coh n f z (plain s) (rel n s) (rel-coh n s)
+rel-coh n (takeWhile i q s) = take-coh n i q (plain s) (rel n s) (rel-coh n s)
 rel-coh n (flatMap op f s)  =
   flat-coh n op (λ a → plain (f a)) (plain s) (rel n s) (λ a → rel n (f a)) (λ a → rel-coh n (f a)) (rel-coh n s)
 rel-coh n (connect s b)     = conn-coh n (plain s) (plain b) (rel n s) (rel n b) (rel-coh n s) (rel-coh n b)
 rel-coh n (connected i)     ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ = ee i n p p* a a′ a* a*′ al al′ lk lk′
 rel-coh zero    (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y = same refl (λ nl → nl)
-rel-coh (suc n) (defer l)   ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
-  defer-cong p p* (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E) a) (admits-step (lw* E) a*) al₁ lk₁))
-                  (Out.rel (rel n (Later.force l) ρ uρ ρι ρ* uρ* E′ (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ]) (admits-step (lw E′) a′) (admits-step (lw* E′) a*′) al₁′ lk₁′))
-    (rel-coh n (Later.force l) ρ uρ ρι ρ* uρ* E E′ ee (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ])
-      (admits-step (lw E) a) (admits-step (lw E′) a′) (admits-step (lw* E) a*) (admits-step (lw* E′) a*′) al₁ al₁′ lk₁ lk₁′)
-  where
-    al₁  = aligned-⊕ {Ψ = maps E}  {ρ = ρ} al  (ix 1) (ix 1)
-    al₁′ = aligned-⊕ {Ψ = maps E′} {ρ = ρ} al′ (ix 1) (ix 1)
-    lk₁  = linked-r (linked-l lk  (ix 1)) (ix 1)
-    lk₁′ = linked-r (linked-l lk′ (ix 1)) (ix 1)
+rel-coh (suc n) (defer l)   = defer-coh n (plainˡ l) (rel n (Later.force l)) (rel-coh n (Later.force l))

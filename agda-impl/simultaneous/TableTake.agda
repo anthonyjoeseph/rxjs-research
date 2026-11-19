@@ -264,11 +264,16 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
     ; after* = λ {N} {l} y → let (w , _ , y₀ , le) = take-row i (passes q) (from* y) in ≼-trans {s*} {w} {l} (R.after* y₀) le
     ; after-φ = after-φ ; pin-after* = pin-after* }
 
-take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
-         → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
-take-tab i q R = TakeTab.rel′ i q R
+-- Kept folded: a consumer needs only its type, and unfolding the record
+-- in a conversion costs the whole table.
+opaque
+  take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
+           → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
+  take-tab i q R = TakeTab.rel′ i q R
 
 -- Children mapping alike, taken alike.
-take-cong : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} (R R′ : Rel P Q s s*)
-          → (∀ N y → Same R R′ N y) → ∀ N y → Same (take-tab i q R) (take-tab i q R′) N y
-take-cong i q {P} R R′ e N y = same (moved-cong i q (P N) (λ y → φ≡ (e N y)) y) (λ { nl (x , lt) → nl→ (e N y) (λ lt₀ → nl (x , lt₀)) lt })
+opaque
+  unfolding take-tab
+  take-cong : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} (R R′ : Rel P Q s s*)
+            → (∀ N y → Same R R′ N y) → ∀ N y → Same (take-tab i q R) (take-tab i q R′) N y
+  take-cong i q {P} R R′ e N y = same (moved-cong i q (P N) (λ y → φ≡ (e N y)) y) (λ { nl (x , lt) → nl→ (e N y) (λ lt₀ → nl (x , lt₀)) lt })

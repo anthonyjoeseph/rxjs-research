@@ -472,12 +472,13 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- A value the shared hot keeps past the lanes' flatMap's subscription
     -- is listed by `each` one lane down.
-    each-at : ∀ {N k x′ a} → (k , out x′) ∈ rows (sh-tab N) → c₁ ≺ k → valuesOf x′ ≡ a ∷ []
-            → TR (Tab n eachS ρ*c c₁ N) (k ⊕ˡ (sub c₁ ∷ ix 1 ∷ ix 0 ∷ [])) (out a)
-    each-at {N} {k} {x′} {a} r ck rd
-      with bind⁻ {m = lanes (afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))) (values (rows (rejoin c₁ (sh-tab N))))} (proj₁ (proj₂ (okE N)))
-    ... | (ls , els , e₂) = proj₁ (okE N) , proj₁ (proj₂ (okE N)) , subst (λ L → _ ∈ rows L) (just-injective e₂)
-            (merge-lane-out (rejoin c₁ (sh-tab N)) ls (lane-of {ln = afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))} els (values⁺ (rejoin-in c₁ (sh-tab N) r ck)) refl) (of-past (k ⊕ [ sub c₁ ] ⊕ [ ix 1 ]) (valuesOf x′) rd))
+    opaque
+      each-at : ∀ {N k x′ a} → (k , out x′) ∈ rows (sh-tab N) → c₁ ≺ k → valuesOf x′ ≡ a ∷ []
+              → TR (Tab n eachS ρ*c c₁ N) (k ⊕ˡ (sub c₁ ∷ ix 1 ∷ ix 0 ∷ [])) (out a)
+      each-at {N} {k} {x′} {a} r ck rd =
+        let ls , els , e₂ = bind⁻ {m = lanes (afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))) (values (rows (rejoin c₁ (sh-tab N))))} (proj₁ (proj₂ (okE N)))
+        in proj₁ (okE N) , proj₁ (proj₂ (okE N)) , subst (λ L → _ ∈ rows L) (just-injective e₂)
+              (merge-lane-out (rejoin c₁ (sh-tab N)) ls (lane-of {ln = afterL (λ x → listC (3 + N) n (of (valuesOf x)) (ρ*c N))} els (values⁺ (rejoin-in c₁ (sh-tab N) r ck)) refl) (of-past (k ⊕ [ sub c₁ ] ⊕ [ ix 1 ]) (valuesOf x′) rd))
 
     -- THE READER'S ROWS: each value of the source is the elaborated
     -- source's value at its image, which the shared flatMap keeps; the
