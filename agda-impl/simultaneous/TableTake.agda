@@ -35,7 +35,7 @@ open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (module TakeX)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (parent; parent-snoc)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→; corr-≃; keys; in-keys)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; Across; Same; same; φ≡; nl→; corr-≃; keys; in-keys)
 open import simultaneous.TableKit using (TR; got-bind)
 open import simultaneous.TakeKit using (Run; Lab; lab; module Take)
 open import simultaneous.TakeCut using (module TakeCut)
@@ -246,12 +246,13 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   -- `TakePair` proves the pair for placements that stay at their row.
   postulate
     take-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (K.Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (K.Put′ N)) (TB.Bd′ N) (TB*.Bd′ N)
+    take-across : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ K.Put′ K.Late′ TB.Bd′ TB*.Bd′
 
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = φ′ ; Put = K.Put′ ; Late = K.Late′ ; corr = corr ; bk = λ N → under-bk (R.bk N) ; in-bk = in-bk
     ; pb-few = λ N l → (proj₁ (R.pb-few N l) ++ proj₁ (R.pb-few N (parent l))) , pb-in N l
-    ; Bd = TB.Bd′ ; Bd* = TB*.Bd′ ; bounded = bounded-≃ to from TB.bounded′ ; bounded* = bounded-≃ to* from* TB*.bounded′ ; bcorr = take-bcorr
+    ; Bd = TB.Bd′ ; Bd* = TB*.Bd′ ; bounded = bounded-≃ to from TB.bounded′ ; bounded* = bounded-≃ to* from* TB*.bounded′ ; bcorr = take-bcorr ; across = take-across
     ; func = λ {N} x x′ → Run.func (K.O.run-T N) (from x) (from x′)
     ; func* = λ {N} y y′ → Run.func (K.O*.run-T N) (from* y) (from* y′)
     ; flat = λ {N} x x′ → Run.flat (K.O.run-T N) (from x) (from x′)

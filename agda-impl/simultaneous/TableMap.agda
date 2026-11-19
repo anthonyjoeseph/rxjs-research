@@ -34,7 +34,7 @@ open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import denotation.Laws.Modulus using (⟨_⟩; upto)
 open import simultaneous.HorizonCorr using (module Sub)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; module Across)
 open import simultaneous.TableKit using (TR; M; ev; got-bind)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; mapIE)
@@ -271,7 +271,13 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
     ; pin-after* = λ {N} y → R.pin-after* (tr-pin← g (Q N) y)
     ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = ev-bounded ; bounded* = ev-bounded*
     ; bcorr = λ N → Sub.restrict (λ { (_ , x , un , nl) → let (e₀ , x₀ , u₀) = back-row N x un in e₀ , x₀ , u₀ , nl })
-        (λ { ((_ , x) , pl) → (_ , proj₁ (proj₂ (tr-map→ f (P N) x))) , pl }) (R.bcorr N) }
+        (λ { ((_ , x) , pl) → (_ , proj₁ (proj₂ (tr-map→ f (P N) x))) , pl }) (R.bcorr N)
+    ; across = record
+      { back-clear = λ {N} {N′} le x un nl cl* → let (_ , x₀ , u₀) = back-row N′ x un in Across.back-clear R.across le x₀ u₀ nl cl*
+      ; put-clear = λ {N} {N′} le x pl cl* → Across.put-clear R.across le (proj₁ (proj₂ (tr-map→ f (P N′) x))) pl cl*
+      ; lead-clear = λ {N} x un nl ld y ie cl* → let (_ , x₀ , u₀) = back-row N x un in
+          Across.lead-clear R.across x₀ u₀ nl (λ {_} {e′} x′ un′ ie′ → ld (tr-map← f (P N) x′) (un← f e′ un′) ie′)
+            (proj₁ (proj₂ (tr-map→ g (Q N) y))) ie cl* } }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))

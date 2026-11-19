@@ -29,9 +29,10 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
-open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr)
+open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr; Across; module Across)
 open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
+open import simultaneous.Readings using (instantOf)
 open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
   Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
@@ -144,6 +145,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-moved    : ∀ N {k b g} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b g → (Rel.φ R N k ≺ b → φ′ N k ≺ b) × (φ′ N k ≺ b → Rel.φ R N k ≺ b)
       cb-moved-q  : ∀ N {k b q} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b (held q) → (Rel.φ R N k ≺ q → φ′ N k ≺ q) × (φ′ N k ≺ q → Rel.φ R N k ≺ q)
       cb-putw     : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PB (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PB (OwnPut (TR (P′ N)) (Put′ N)) b b*
+      cb-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
 
     cb-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cb-bd* N)
     cb-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
@@ -168,7 +170,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; func = Rel.func R ; func* = tab-func n (inner op) uρ*c Dc ad₂ ; flat = Rel.flat R ; flat* = tab-flat n (inner op) uρ*c Dc ad₂
       ; pin-in = Rel.pin-in R ; pin-in* = cb-pin-in* ; got = Rel.got R ; got* = cb-got*
       ; after = Rel.after R ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr }
+      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr ; across = cb-across }
 
   ----------------------------------------------------------------------
   -- THE CLOSER: the combined run is the closer's connect's body, its rows
@@ -205,6 +207,19 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     postulate
       cz-keeps    : ∀ N {b b* g g*} → Rel.Bd R N b g → Rel.Bd* R N b* g* → Btw (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) b b* → cz-bd* N b* g*
       cz-only     : ∀ N {b g} → cz-bd* N b g → Σ Tag λ g₀ → Rel.Bd* R N b g₀ × (g ≡ g₀ ⊎ g ≡ free)
+      -- An instant's leading row lies before the plain hangs where a row
+      -- of the combined run's, in its image's instant, lies before the
+      -- closer's.
+      cz-lead-clear : ∀ {N k e m e*} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k
+                    → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+                    → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → Cuts.Clear (λ N → TR (Q′ N)) cz-bd* N m
+                    → Cuts.Clear (λ N → TR (P′ N)) (Rel.Bd R) N k
+
+    -- Every hang of the combined run is the closer's, partnered as it is:
+    -- what lies before the closer's lies before the combined run's.
+    cz-clear : ∀ {N l} → Cuts.Clear (λ N → TR (Q′ N)) cz-bd* N l → ∀ {b g} → Rel.Bd* R N b g → l ≺ b
+    cz-clear {N} cl bd* with Inter.BCorr.from (Rel.bcorr R N) bd*
+    ... | _ , _ , bd , btw , _ = cl (cz-keeps N bd bd* btw)
 
     cz-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cz-bd* N)
     cz-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
@@ -233,7 +248,11 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; func = Rel.func R ; func* = tab-func n (body op) uρ*h Dh ad₃ ; flat = Rel.flat R ; flat* = tab-flat n (body op) uρ*h Dh ad₃
       ; pin-in = Rel.pin-in R ; pin-in* = cz-pin-in* ; got = Rel.got R ; got* = cz-got*
       ; after = Rel.after R ; after* = cz-after* ; after-φ = cz-after-φ ; pin-after* = cz-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = cz-bd* ; bounded = Rel.bounded R ; bounded* = cz-bounded* ; bcorr = cz-bcorr }
+      ; Bd = Rel.Bd R ; Bd* = cz-bd* ; bounded = Rel.bounded R ; bounded* = cz-bounded* ; bcorr = cz-bcorr
+      ; across = record
+        { back-clear = λ le x un nl cl* → Across.back-clear (Rel.across R) le x un nl (cz-clear cl*)
+        ; put-clear = λ le x pl cl* → Across.put-clear (Rel.across R) le x pl (cz-clear cl*)
+        ; lead-clear = cz-lead-clear } }
 
   ----------------------------------------------------------------------
   -- THE SHARE: the body is the share's two connects' body, its rows shown
@@ -292,6 +311,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     postulate
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
+      sr-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) sr-bd*
 
     sr-got : ∀ N → Got (P′ N)
     sr-got N = got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p
@@ -325,7 +345,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr }
+      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = sr-across }
 
   -- The layers pass the core's boundaries through: the flatMap's own.
   flat-hangs : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*)

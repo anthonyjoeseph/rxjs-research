@@ -10,7 +10,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Empty using (⊥)
@@ -143,6 +143,24 @@ corr-≃ {A} {s} {s*} {φ} {Put} {Late} {L} {K} {L*} {K*} to from to* from* C = 
           → (Σ Pos λ l → Σ Pos λ p′ → K* l (pin p′) × Put k l × (∀ {k₀ a} → K k₀ (out a) → φ k₀ ≺ p′ → k₀ ≺ p)) × Homed k
     pinAt ((l , p′ , y , pl , past) , h) = (l , p′ , to* y , pl , λ x lt → past (from x) lt) , homed h
 
+-- THE HANGS ACROSS CUTS.  A shallower cut's plain hangs lie past a
+-- deeper cut's own row where its elaborated hangs lie past the row's
+-- image (`back-clear`), or past its placement (`put-clear`); and, at one
+-- cut, past an instant's leading row where they lie past any elaborated
+-- row of its image's instant (`lead-clear`), a mark or pin `bcorr`
+-- orders against nothing.  Each is one way: a hang past a cut's first
+-- may sit in a lane no deeper cut runs, where no deeper row is ordered
+-- against it, but the first hang is real and settles all before it.
+record Across {A : Set} (P : ℕ → EmissionSet A) (Q : ℕ → EmissionSet (IE A)) (φ : ℕ → Pos → Pos)
+  (Put : ℕ → Pos → Pos → Set) (Late : ℕ → Pos → Set) (Bd Bd* : ℕ → Pos → Tag → Set) : Set where
+  field
+    back-clear : ∀ {N N′ k e} → N ≤ N′ → P N′ k e → Unpinned e → ¬ Late N′ k
+               → Cuts.Clear Q Bd* N (φ N′ k) → Cuts.Clear P Bd N k
+    put-clear  : ∀ {N N′ k e l} → N ≤ N′ → P N′ k e → Put N′ k l → Cuts.Clear Q Bd* N l → Cuts.Clear P Bd N k
+    lead-clear : ∀ {N k e m e*} → P N k e → Unpinned e → ¬ Late N k
+               → (∀ {k′ e′} → P N k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+               → Q N m e* → instantOf m ≡ instantOf (φ N k) → Cuts.Clear Q Bd* N m → Cuts.Clear P Bd N k
+
 -- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
 -- placement, read off the two families of tables: each position is
 -- imaged by finitely many in each cut.  Each table is a run's: there is
@@ -155,8 +173,8 @@ corr-≃ {A} {s} {s*} {φ} {Put} {Late} {L} {K} {L*} {K*} to from to* from* C = 
 -- (`bounded`, `simultaneous.Horizon.Cuts.Bounded`); the plain and the
 -- elaborated boundaries correspond at each cut, the same rows before
 -- each (`bcorr`).  Two cuts agree up to a row because no boundary lies
--- before it, so nothing across cuts is stated here: the subterm never
--- decides where a hang is, only that the two sides hang alike.
+-- before it: the subterm never decides where a hang is, only that the
+-- two sides hang alike, at one cut and across cuts (`across`).
 --
 -- LATE ROWS (`Late`) have no image: the order facts are over the rest.
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
@@ -173,6 +191,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     bounded     : Cuts.Bounded (λ N → TR (P N)) Bd
     bounded*    : Cuts.Bounded (λ N → TR (Q N)) Bd*
     bcorr       : ∀ N → Inter.BCorr (Own (TR (P N)) (Late N)) (φ N) (OwnPut (TR (P N)) (Put N)) (Bd N) (Bd* N)
+    across      : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ Put Late Bd Bd*
     func        : ∀ {N y e e′} → TR (P N) y e → TR (P N) y e′ → e ≡ e′
     func*       : ∀ {N y e e′} → TR (Q N) y e → TR (Q N) y e′ → e ≡ e′
     flat        : ∀ {N y e l ys e′} → TR (P N) y e → TR (P N) (y ⊕ (l ∷ ys)) e′ → ⊥
