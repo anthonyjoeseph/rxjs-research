@@ -40,7 +40,7 @@ open import quickcheck.Tabled.Exact.Bounded using (bounded-exact)
 open import quickcheck.Tabled.Exact.Base using (Exact; Exactly; sound; complete; bind⁻; lanes-from; lanes-to; afterL-exact;
   values⁺; values⁻; cnt; cnt-lt)
 open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 
 ------------------------------------------------------------------------
 -- A listing is exact for its own table

@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin;
 open import simultaneous.SObs using (Tag; val; cdone; tick)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown)
-open import simultaneous.TableCorr using (M; m-val; m-ee; m-ss)
+open import simultaneous.TableKit using (M; m-val; m-ee; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
 
 ------------------------------------------------------------------------

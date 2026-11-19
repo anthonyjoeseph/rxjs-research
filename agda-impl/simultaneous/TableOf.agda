@@ -27,7 +27,7 @@ open import Relation.Nullary using (¬_)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
-open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; ≺-irrefl; ≺-absurd; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≺-ext)
 open import denotation.Laws.Cut using (ix-asc; ix-back)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
@@ -36,8 +36,11 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown)
 open import simultaneous.Listing using (walkN)
-open import simultaneous.TableCorr using (TR; M; ev; m-val; m-ee; Corr; Rel; Scope)
-open import simultaneous.TableSpin using (lastL; lastL-⊕; step-inj; step-flat; ix-inj)
+open import simultaneous.Horizon using (const-bounded)
+open import simultaneous.HorizonCorr using (none-corr)
+open import simultaneous.TableCorr using (Corr; Rel)
+open import simultaneous.TableKit using (TR; M; ev; m-val; m-ee)
+open import simultaneous.SpinKit using (lastL; lastL-⊕; step-inj; step-flat; ix-inj)
 open import simultaneous.TakeCut using (inst-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -111,7 +114,7 @@ flat-W q i xs m m′ with step q i xs m
 ------------------------------------------------------------------------
 -- The record
 
-module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf (v x) ≡ x ∷ []) (p p* : Pos) {S′ : Scope} where
+module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf (v x) ≡ x ∷ []) (p p* : Pos) where
 
   P : ℕ → Maybe (Tb.Listed A)
   P _ = just (W p 0 xs ⊣ false)
@@ -148,9 +151,6 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
   same {q = q} {i} {ys} m with step q i ys m
   ... | a , _ , refl = inst-⊕ q [ a ]
 
-  ag-id : ∀ {X : Set} {t : Pos → Ev X → Set} {k} → AgreeTo k t t
-  ag-id = ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
-
   corr′ : ∀ N → Corr p p* (φ′ N) (Put′ N) (λ _ → ⊥) (TR (P N)) (TR (Q N))
   corr′ N = record
     { row→ = λ { {e = e} (_ , refl , m) _ → inj₁ ((ev v e , (_ , refl , fwd 0 xs m) , m-v e) , (λ ())) }
@@ -175,42 +175,32 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
       ... | a , sa , refl | b , sb , refl =
         subst₂ (λ c d → (p* ⊕ [ c ]) ≺ (p* ⊕ [ d ])) (sym (lastL-⊕ p a)) (sym (lastL-⊕ p b)) (shift p p* sa sb lt)
 
-  rel′ : Rel P Q p p* S′
+  rel′ : Rel P Q p p*
   rel′ = record
     { φ = φ′ ; Put = Put′ ; Late = λ _ _ → ⊥ ; corr = corr′
-    ; φ-agree = λ _ _ _ _ _ _ → refl
-    ; late-agree = λ _ _ _ _ _ _ ()
     ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = λ {N} x un _ → in-bk′ {N} x un
     ; pb-few = λ _ _ → [] , λ ()
-    ; back = λ _ _ _ _ _ _ _ → ag-id
-    ; put-up = λ _ _ _ _ ()
-    ; back-put = λ _ _ _ ()
-    ; elab-causal = λ _ _ _ _ _ _ _ → ag-id
-    ; stable← = λ _ _ _ _ _ _ _ _ → ag-id
-    ; stable-put = λ _ _ _ _ _ ()
-    ; stable-lead = λ _ _ _ _ _ _ _ _ _ _ _ _ → ag-id
-    ; elab-all = λ _ _ _ _ y → y
+    ; Bd = λ _ _ _ → ⊥ ; Bd* = λ _ _ _ → ⊥
+    ; bounded = const-bounded (TR (just (W p 0 xs ⊣ false))) ; bounded* = const-bounded (TR (just (W p* 0 (map v xs) ⊣ false)))
+    ; bcorr = λ _ → none-corr
     ; func = λ { (_ , refl , m) (_ , refl , m′) → func-W p 0 xs m m′ }
     ; func* = λ { (_ , refl , m) (_ , refl , m′) → func-W p* 0 (map v xs) m m′ }
     ; flat = λ { (_ , refl , m) (_ , refl , m′) → flat-W p 0 xs m m′ }
     ; flat* = λ { (_ , refl , m) (_ , refl , m′) → flat-W p* 0 (map v xs) m m′ }
     ; pin-in = λ { (_ , refl , m) → ⊥-elim (no-pin p 0 xs m) }
     ; pin-in* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
-    ; cons = λ _ _ x _ _ → x
-    ; cons* = λ _ _ y _ _ → y
     ; got = λ _ → _ , refl
     ; got* = λ _ → _ , refl
     ; after = λ { (_ , refl , m) → after-W p 0 xs m }
     ; after* = λ { (_ , refl , m) → after-W p* 0 (map v xs) m }
     ; after-φ = λ {_} {k} _ _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
-    ; pin-after* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) }
-    ; pin-stable = λ _ _ _ _ _ _ _ _ _ y → y }
+    ; pin-after* = λ { (_ , refl , m) → ⊥-elim (no-pin p* 0 (map v xs) m) } }
     where
       in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ (_ , refl , m) _ with step p 0 xs m
       ... | a , _ , refl = here (cong (λ l → p ⊕ [ l ]) (sym (trans (lastL-⊕ p* (lastL (p ⊕ [ a ]))) (lastL-⊕ p a))))
 
-of-tab : ∀ {A} (xs : List A) (v : A → IE A) → (∀ x → valuesOf (v x) ≡ x ∷ []) → ∀ p p* {S′}
-       → Rel {A} (λ _ → just (W p 0 xs ⊣ false)) (λ _ → just (W p* 0 (map v xs) ⊣ false)) p p* S′
-of-tab xs v vals p p* {S′} = OfTab.rel′ xs v vals p p* {S′}
+of-tab : ∀ {A} (xs : List A) (v : A → IE A) → (∀ x → valuesOf (v x) ≡ x ∷ []) → ∀ p p*
+       → Rel {A} (λ _ → just (W p 0 xs ⊣ false)) (λ _ → just (W p* 0 (map v xs) ⊣ false)) p p*
+of-tab xs v vals p p* = OfTab.rel′ xs v vals p p*

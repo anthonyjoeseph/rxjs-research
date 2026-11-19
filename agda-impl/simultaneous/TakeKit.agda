@@ -30,11 +30,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Position using (Pos; Path; Label; ix; last; inside; _⊕_)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Few; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (T-not; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; ag-down; few-ind; ≺-trans; ≺-irrefl; ≺-absurd;
-  ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
+open import denotation.Laws.Modulus using (T-not; AgreeTo; ⟨_⟩; upto; AgreeTo-sym; few-ind; ≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼;
+  ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊑-≼; ⊑-snoc; inside-⊑; ⊕-injˡ; ⊕-injʳ; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ext≢)
 open import simultaneous.Attribution using (Live)
-open import simultaneous.TableCorr using (Cons; ag-ind)
+open import simultaneous.TableKit using (Cons; ag-ind)
 
 -- One event per position, none under another's, a pin inside its connect.
 record Run {A : Set} (t : EmissionSet A) : Set where
@@ -335,13 +335,6 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
     ... | O′.new {o} {a} x₀ nk _ loc with at-new loc
     ...   | _ , eq = ⊥-elim (nF (refail< below (o , a , x₀ , nk , subst (o ≺_) (sym eq) (≺-ext o []))))
 
-    -- A row the other holds at or past a value carries it.
-    row-past : ∀ {G : Pos → Set} {y y′ a e′} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → Cons G t t′ → G y → ¬ W.Failed y
-             → t y (out a) → W′.TakeT y′ e′ → y ≼ y′ → t′ y (out a)
-    row-past below cab g nF x tk′ yy′ with O′.past (O′.from tk′) yy′
-    ... | inj₁ (o , e₀ , xo , yo) = cab g below x xo yo
-    ... | inj₂ F = ⊥-elim (nF (refail< below F))
-
   ----------------------------------------------------------------------
   -- Two takes
 
@@ -353,11 +346,6 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
 
     push : ∀ {k} → AgreeTo k t t′ → AgreeTo k W.TakeT W′.TakeT
     push ag = ⟨ (λ yk → push1 ag yk , D′.push1 (AgreeTo-sym ag) yk) ⟩
-
-    push-fail : ∀ {y a} → AgreeTo y t t′ → t y (out a) → T (not (keep a)) → ¬ W.Failed y
-              → AgreeTo (y ⊕ [ last ]) W.TakeT W′.TakeT
-    push-fail {y} ag x nk nF =
-      ⟨ (λ zl → push-fail1 ag x nk nF zl , D′.push-fail1 (AgreeTo-sym ag) (proj₁ (upto ag (≼-refl {y})) x) nk (unfail ag (≼-refl {y}) nF) zl) ⟩
 
     private
       sym< : ∀ {y} → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t′ t
@@ -388,58 +376,3 @@ module Take {A : Set} (incl : Bool) (keep : A → Bool) where
             ...   | inj₁ (o , e₀ , xo , yo) = ⊥-elim (T-not (nfy (cba (gd yk gk) (sym< below) x′ xo yo)) nk)
             ...   | inj₂ F = ⊥-elim (nFy F)
 
-    -- With no failing value in the first source, takes agreeing
-    -- everywhere have sources agreeing everywhere.
-    lift-all : (∀ q → G q) → (∀ q → AgreeTo q W.TakeT W′.TakeT) → (∀ {y} → O.NoFail y) → ∀ k → AgreeTo k t t′
-    lift-all g agT nf k = ag-ind fin step
-      where
-        nF : ∀ {y} → ¬ W.Failed y
-        nF (_ , _ , x , nk , _) = T-not (nf x) nk
-
-        step : ∀ {y} → y ≼ k → (∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′) → ∀ {e} → (t y e → t′ y e) × (t′ y e → t y e)
-        step {y} _ below = point1 below (proj₁ (upto (agT y) (≼-refl {y}))) nF nf , D′.point1 (sym< below) (proj₂ (upto (agT y) (≼-refl {y}))) nF′ nf′
-          where
-            nF′ : ¬ W′.Failed y
-            nF′ F = nF (refail< below F)
-
-            nf′ : O′.NoFail y
-            nf′ {a} x′ with dec-keep a
-            ... | inj₁ kp = kp
-            ... | inj₂ nk with O.from (proj₂ (upto (agT (y ⊕ [ last ])) (≼-refl {y ⊕ [ last ]})) (W′.stop x′ nk nF′))
-            ...   | O.self x₀ _ = ⊥-elim (T-not (nf (cba (g y) (sym< below) x′ x₀ (≺→≼ {y} {y ⊕ [ last ]} (≺-ext y [])))) nk)
-            ...   | O.new x₀ nk₀ _ _ = ⊥-elim (T-not (nf x₀) nk₀)
-
-    -- Up to a failing value, for one of its rows.
-    lift-fail : ∀ {w e y a} → G y → AgreeTo w W.TakeT W′.TakeT → W.TakeT w e → y ≼ w
-              → t y (out a) → T (not (keep a)) → ¬ W.Failed y → AgreeTo y t t′
-    lift-fail {w} {y = y} {a} gy agT tw yw x nk nF = ⟨ at ⟩
-      where
-        below : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
-        below {y₀} lt =
-          let y₀w = ≺→≼ {y₀} {w} (≺-≼-≺ {y₀} {y} {w} lt yw)
-          in lift (gd (≺→≼ {y₀} {y} lt) gy) (ag-down {q = w} {y₀} y₀w agT) tw y₀w (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
-
-        x′ : t′ y (out a)
-        x′ = row-past below cab gy nF x (proj₁ (upto agT (≼-refl {w})) tw) yw
-
-        at : ∀ {z e} → z ≼ y → (t z e → t′ z e) × (t′ z e → t z e)
-        at {z} zy with ≼-split {z} {y} zy
-        ... | inj₁ lt   = upto (below {z} lt) (≼-refl {z})
-        ... | inj₂ refl = (λ x₁ → subst (t′ y) (Run.func R x x₁) x′) , (λ x₁ → subst (t y) (Run.func R′ x′ x₁) x)
-
-    -- TWO TAKES ARE TRUNCATED BEFORE THEY DIFFER.
-    cons-T : Cons G W.TakeT W′.TakeT
-    cons-T {y} g below (W.pass x kp nF) tk′ yy′ = W′.pass (row-past cb cab g nF x tk′ yy′) kp (λ F → nF (refail< cb F))
-      where
-        cb : ∀ {y₀} → y₀ ≺ y → AgreeTo y₀ t t′
-        cb {y₀} lt = lift (gd (≺→≼ {y₀} {y} lt) g) (below {y₀} lt) (W.pass x kp nF) (≺→≼ {y₀} {y} lt) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {y} lt) F)) (O.nofail< nF lt)
-    cons-T {y′ = y′} g below (W.fail {o} x nk nF i) tk′ yy′ =
-      W′.fail (row-past cb cab go nF x tk′ (≼-trans {o} {o ⊕ [ ix 0 ]} {y′} (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) yy′)) nk (λ F → nF (refail< cb F)) i
-      where
-        go : G o
-        go = gd (≺→≼ {o} {o ⊕ [ ix 0 ]} (≺-ext o [])) g
-
-        cb : ∀ {y₀} → y₀ ≺ o → AgreeTo y₀ t t′
-        cb {y₀} lt =
-          let lt′ = ≺-trans {y₀} {o} {o ⊕ [ ix 0 ]} lt (≺-ext o [])
-          in lift (gd (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) g) (below {y₀} lt′) (W.fail x nk nF i) (≺→≼ {y₀} {o ⊕ [ ix 0 ]} lt′) (λ F → nF (O.failed-≼ (≺→≼ {y₀} {o} lt) F)) (O.nofail< nF lt)

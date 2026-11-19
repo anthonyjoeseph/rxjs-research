@@ -34,7 +34,7 @@ open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≺-trans; ≺-i
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (Tag; val; cdone)
 open import simultaneous.Listing using (listC; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 open import simultaneous.ListTR using (laneD; ent; cold-tr; map-tr; bounded-tr; Of1; Of2; o₀; o₁; oₑ; of1; of2)
 open import simultaneous.ColdOrder using (dn2; walk-end; walk-nopin; ≺-≢; ⊕1-inj; down; module Ord)
 open import simultaneous.ColdRows using (module At)

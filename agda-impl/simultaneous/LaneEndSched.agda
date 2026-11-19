@@ -37,7 +37,7 @@ open import quickcheck.Tabled.Exact using (EnvRel; rejoin-exact; proper-exact)
 open import quickcheck.Tabled.Exact.Base using (sound)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; isLane; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; raw-exact; in-raw; Raw; Own; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 open import simultaneous.TableEnv using (_⊕ˡ_; DenOf; den; den-ex; den-ok; den-cons; listHot; Admits; admits-ix; admits-at;
   admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
