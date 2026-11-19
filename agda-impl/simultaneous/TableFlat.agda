@@ -51,7 +51,8 @@ open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; aft
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
-open import simultaneous.TableCorr using (Same; φ≡; nl→; Rel; Scope; module Scope; TR; Corr; Got; got-bind; keys; in-keys; nl-ev)
+open import simultaneous.TableCorr using (Same; φ≡; nl→; Rel; Corr; keys; in-keys; nl-ev)
+open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
   linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;

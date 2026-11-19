@@ -46,7 +46,8 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv)
-open import simultaneous.TableCorr using (Rel; module Rel; cons-≤; Same; same; φ≡; nl→; Scope; module Scope; Rows; TR; Corr; Cons; Got; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.TableKit using (cons-≤; Rows; TR; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; ψ; π; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;

@@ -34,7 +34,7 @@ import quickcheck.Tabled as Tb
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over)
 open import simultaneous.SObs using (Tag; val; cdone; tick; lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 open import simultaneous.ListTR using (laneD; ent; merge-tr; map-tr; Of1; o₀; oₑ; of1)
 open import simultaneous.ColdOrder using (down; dn2; dn3; part; nest3; ≺-flat)
 open import simultaneous.ColdRows using (module At)

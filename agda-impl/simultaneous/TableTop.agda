@@ -26,7 +26,7 @@ open import denotation.Events using (Timeline; fresh)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC)
-open import simultaneous.TableCorr using (Rel; Scope)
+open import simultaneous.TableCorr using (Rel)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; elaborate; completing; wrapped)
 

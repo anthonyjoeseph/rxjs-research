@@ -41,7 +41,8 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (Shown; One; Live)
-open import simultaneous.TableCorr using (M; Corr; nl-ev)
+open import simultaneous.TableCorr using (Corr; nl-ev)
+open import simultaneous.TableKit using (M)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 

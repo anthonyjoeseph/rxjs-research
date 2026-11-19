@@ -36,7 +36,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 import quickcheck.Tabled as Tb
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 open import simultaneous.ColdRows using (module At)
 open import simultaneous.ColdOrder using (walk-under; walk-end; walk-before; walk-apart; part; ≺-flat; ≺-≢; nest2; dn2; module Ord)
 open import simultaneous.ColdScan using (module Phase)

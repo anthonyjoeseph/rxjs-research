@@ -52,8 +52,8 @@ open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≺-
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊕-identityʳ; ⊑-snoc⁺; ⊑-inside; inside-⊑)
 open import denotation.Laws.Cut using (ix-asc)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.TableCorr using (TR)
-open import simultaneous.TableSpin using (S; sp→)
+open import simultaneous.TableKit using (TR)
+open import simultaneous.SpinKit using (S; sp→)
 open import simultaneous.TakeKit using (Run; module Take)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts; module Settle; module SpinB; module ConnB; past-child; sub-between)
 
@@ -168,6 +168,29 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
     clear-put : ∀ {k l} → Puts k l → Clear k → Clear* l
     clear-put x cl bd* with from bd*
     ... | _ , _ , bd , _ , pb , _ = pb x (cl bd)
+
+-- No boundary on either side corresponds trivially.
+none-corr : ∀ {Row φ Puts} → Inter.BCorr Row φ Puts (λ _ _ → ⊥) (λ _ _ → ⊥)
+none-corr = record { to = λ () ; from = λ () }
+
+-- A correspondence over more rows and placements holds over fewer.
+module Sub {Row Row′ : Pos → Set} {φ : Pos → Pos} {Puts Puts′ : Pos → Pos → Set} {Bd Bd* : Pos → Tag → Set}
+  (r : ∀ {k} → Row k → Row′ k) (pt : ∀ {k l} → Puts k l → Puts′ k l) where
+  module I  = Inter Row φ Puts Bd Bd*
+  module I′ = Inter Row′ φ Puts′ Bd Bd*
+
+  tagTo : ∀ {g g*} → I′.TagTo g g* → I.TagTo g g*
+  tagTo I′.plain-free       = I.plain-free
+  tagTo (I′.both-held btw)  = I.both-held (λ x → btw (r x))
+
+  tagFrom : ∀ {g g*} → I′.TagFrom g g* → I.TagFrom g g*
+  tagFrom I′.elab-free      = I.elab-free
+  tagFrom (I′.both-held btw) = I.both-held (λ x → btw (r x))
+
+  restrict : I′.BCorr → I.BCorr
+  restrict C = record
+    { to   = λ bd → let (b* , g* , bd* , btw , tg) = I′.BCorr.to C bd in b* , g* , bd* , (λ x → btw (r x)) , tagTo tg
+    ; from = λ bd* → let (b , g , bd , btw , pb , tg) = I′.BCorr.from C bd* in b , g , bd , (λ x → btw (r x)) , (λ x → pb (pt x)) , tagFrom tg }
 
 ------------------------------------------------------------------------
 -- At the root: settled together

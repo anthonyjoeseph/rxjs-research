@@ -45,7 +45,8 @@ open import quickcheck.Tabled.Exact.Base using (when⁻; if⁻; cm⁻; offT; end
 open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
-open import simultaneous.TableCorr using (Rel; Same; same; φ≡; nl→; Scope; Rows; TR; Corr; Cons; Got; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.TableKit using (Rows; TR; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; scopeOf; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;

@@ -39,7 +39,7 @@ open import quickcheck.Tabled using (Row)
 open import quickcheck.Tabled.Exact.Base using (Exact)
 open import simultaneous.SObs using (Tag; val; cdone; tick; lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
-open import simultaneous.TableCorr using (TR)
+open import simultaneous.TableKit using (TR)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.ListTR using (laneD; ent; merge-tr; scan-tr; self-exact; Of1; Of2; o₀; o₁; oₑ; of1; of2;
   module NthAny; module AccOf)

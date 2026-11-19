@@ -68,7 +68,8 @@ open import simultaneous.ListAfter using (listC-past; listC-pinpast)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Instants using (_≺ⁱ_; triⁱ; instant-≺)
-open import simultaneous.TableCorr using (Rel; Same; Scope; Rows; TR; Got)
+open import simultaneous.TableCorr using (Rel; Same)
+open import simultaneous.TableKit using (Rows; TR; Got)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -546,36 +547,10 @@ aligned-past aL Lq qz Lz iz al i N =
         (λ x pl → cut-past Lq qz Lz iz (cut-put (al i N) x pl) (cut-put (aL i N) x pl))
 
 ------------------------------------------------------------------------
--- The scope's agreement
-
--- A fact at every index of a scope, as one small proposition.
-AllIx : (Γ : List Set) → (∀ {X} → X ∈ Γ → Set) → Set
-AllIx []      P = ⊤
-AllIx (X ∷ Γ) P = P (here refl) × AllIx Γ (λ i → P (there i))
-
-ix-map : ∀ {Γ} {P Q : ∀ {X} → X ∈ Γ → Set} → (∀ {X} {i : X ∈ Γ} → P i → Q i) → AllIx Γ P → AllIx Γ Q
-ix-map {[]}    f _        = tt
-ix-map {X ∷ Γ} f (p , ps) = f p , ix-map f ps
-
--- Two cuts' hots in scope agreeing up to a position, plain and
--- elaborated.
-Gs : ∀ {Γ} → (ℕ → All Tb.Listed Γ) → ℕ → ℕ → Pos → Set
-Gs {Γ} ρ N N′ y = AllIx Γ λ i → AgreeTo y (Rows (lookup (ρ N) i)) (Rows (lookup (ρ N′) i))
-
-Gs* : ∀ {Γ Δ} → Ren Γ Δ → (ℕ → All Tb.Listed Δ) → ℕ → ℕ → Pos → Set
-Gs* {Γ} ρι ρ* N N′ y = AllIx Γ λ i → AgreeTo y (Rows (lookup (ρ* N) (ρι (∈-map⁺ AIE i)))) (Rows (lookup (ρ* N′) (ρι (∈-map⁺ AIE i))))
-
-scopeOf : ∀ {Γ Δ} → (ℕ → All Tb.Listed Γ) → Ren Γ Δ → (ℕ → All Tb.Listed Δ) → Scope
-scopeOf ρ ρι ρ* = record
-  { G = Gs ρ ; G* = Gs* ρι ρ*
-  ; g-down = λ yy → ix-map (ag-down yy) ; g-sym = ix-map AgreeTo-sym
-  ; g*-down = λ yy → ix-map (ag-down yy) ; g*-sym = ix-map AgreeTo-sym }
-
-------------------------------------------------------------------------
 -- The record and what it carries past the correspondence
 
 -- A record's map at a cut, as a hot's.
-relMap : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S} → Rel P Q p p* S → ℕ → HotMap
+relMap : ∀ {A} {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p*} → Rel P Q p p* → ℕ → HotMap
 relMap {Q = Q} R N = hotMap (Rel.φ R N) (λ k l → Rel.Put R N k l × Σ _ λ e′ → TR (Q N) l e′) (Rel.Late R N)
 
 -- A table's rows but those under a position.
@@ -591,8 +566,8 @@ Off k t y e = t y e × ¬ (k ⊑ y)
 -- The stream's own rows are what a reader of it reads once a connect
 -- shares it, so a reader's shown row cuts that hot alike by the source's
 -- `self`, carried one label down.
-record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p* S}
-            (R : Rel P Q p p* S) : Set₁ where
+record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {p p*}
+            (R : Rel P Q p p*) : Set₁ where
   field
     linked    : ∀ N {k e} → TR (P N) k e → Unpinned e → ¬ Rel.Late R N k → Linked k (Rel.φ R N k)
     cuts      : ∀ N {k e} → TR (P N) k e → T (shownᵇ e) → Aligned Ψ ρ k (Rel.φ R N k)
@@ -605,7 +580,7 @@ record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.List
            (Ψ : Maps Γ) (p p* : Pos) : Set₁ where
   constructor _⊢_
   field
-    rel  : Rel (Tab n o ρ p) (Tab* n ρι o ρ* p*) p p* (scopeOf ρ ρι ρ*)
+    rel  : Rel (Tab n o ρ p) (Tab* n ρι o ρ* p*) p p*
     rest : Rest Ψ ρ rel
 
 -- A hot in scope: its two readers' record wherever they are subscribed

@@ -30,7 +30,8 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
-open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; TR; Corr; Cons; Got; module Scope)
+open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr)
+open import simultaneous.TableKit using (TR; Cons; Got)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
   Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; admits-trig; tab-func; tab-flat)

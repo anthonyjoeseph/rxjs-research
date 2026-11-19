@@ -34,7 +34,7 @@ open import denotation.Laws.Modulus using (T-not; AgreeTo; ⟨_⟩; upto; AgreeT
   ≼-refl; ≺→≼; ≼-trans; ≼-or-≻; ≼-split; ≺-≼-≺; ≼-≺-≺; ≺-ext)
 open import denotation.Laws.Worlds using (⊑-≼; ⊑-snoc; inside-⊑; ⊕-injˡ; ⊕-injʳ; ⊕-assoc; ⊕-identityʳ; ⊕-cancelˡ; ext≢)
 open import simultaneous.Attribution using (Live)
-open import simultaneous.TableCorr using (Cons; ag-ind)
+open import simultaneous.TableKit using (Cons; ag-ind)
 
 -- One event per position, none under another's, a pin inside its connect.
 record Run {A : Set} (t : EmissionSet A) : Set where

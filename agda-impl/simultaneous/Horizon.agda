@@ -63,8 +63,8 @@ open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; AgreeTo-sym; 
   ≼-or-≻; ≼-≺-≺; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; ⊑-snoc⁺; ⊑-trans; ⊑-≼; ⊑-snoc; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.TableCorr using (TR)
-open import simultaneous.TableSpin using (S; sp→; sp←; step-inj; ix-inj; widen)
+open import simultaneous.TableKit using (TR; ag-≃)
+open import simultaneous.SpinKit using (S; sp→; sp←; step-inj; ix-inj; widen)
 open import simultaneous.TakeKit using (Run; ≼-last; module Take)
 open import denotation.Laws.Cut using (ix-back)
 
@@ -180,6 +180,23 @@ module Cuts {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → 
 
     off-row : ∀ {N k e} → c N k e → Off N k
     off-row x bd = proj₁ (gap bd x)
+
+-- A cut that never moves hangs nowhere.
+const-bounded : ∀ {A} (t : EmissionSet A) → Cuts.Bounded (λ _ → t) (λ _ _ _ → ⊥)
+const-bounded t = record
+  { gap = λ () ; held-in = λ ()
+  ; fwd = λ _ _ → ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
+  ; fwd-pin = λ _ _ _ _ → (λ x → x) , (λ x → x) }
+
+-- Cuts holding the same rows hang at the same boundaries.
+bounded-≃ : ∀ {A} {c c′ : ℕ → EmissionSet A} {Bd : ℕ → Pos → Tag → Set}
+          → (∀ {N k e} → c N k e → c′ N k e) → (∀ {N k e} → c′ N k e → c N k e)
+          → Cuts.Bounded c Bd → Cuts.Bounded c′ Bd
+bounded-≃ {c = c} {c′} to from B = record
+  { gap = λ bd x → B.gap bd (from x) ; held-in = B.held-in
+  ; fwd = λ {N} {k} cl le → ag-≃ to from to from (B.fwd {N} {k} cl le)
+  ; fwd-pin = λ {N} {q} {k} cl hc le yk → let (f , g) = B.fwd-pin {N} {q} {k} cl hc le yk in (λ x → to (f (from x))) , (λ x → to (g (from x))) }
+  where module B = Cuts.Bounded B
 
 ------------------------------------------------------------------------
 -- The plain program and the elaboration, settled together

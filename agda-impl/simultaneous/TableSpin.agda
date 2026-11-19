@@ -35,77 +35,23 @@ open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.Listing using (spinRows)
-open import simultaneous.TableCorr using (TR; M; Corr; Rel; Scope; m-ss)
+open import simultaneous.TableCorr using (Corr; Rel)
+open import simultaneous.TableKit using (TR; M; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
+
+open import simultaneous.Horizon using (module SpinB)
+open import simultaneous.HorizonCorr using (module SpinPair; module Sub)
+open import simultaneous.SpinKit using (S; sp→; sp←; lastOf; lastL; lastL-⊕; step-inj; ix-inj; step-flat; widen; shrink; spin-ag; spin-flat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
 ------------------------------------------------------------------------
 -- A spin's table
 
-S : ∀ {X : Set} → ℕ → Pos → Maybe (Tb.Listed X)
-S M q = just (spinRows M q ⊣ false)
-
-sp→ : ∀ {X : Set} {M q k} {e : Ev X} → TR (S M q) k e → Σ ℕ λ i → i < M × k ≡ q ⊕ [ ix i ] × e ≡ skip
-sp→ {q = q} (_ , refl , r) with ∈-applyUpTo⁻ (λ i → q ⊕ [ ix i ] , skip) r
-... | i , lt , refl = i , lt , refl , refl
-
-sp← : ∀ {X : Set} {M q i} → i < M → TR {X} (S M q) (q ⊕ [ ix i ]) skip
-sp← {q = q} lt = _ , refl , ∈-applyUpTo⁺ (λ i → q ⊕ [ ix i ] , skip) lt
-
--- A position's last label: a leaf's row, one step past its subscription,
--- read back off its position.
-lastOf : List Label → Label
-lastOf []           = last
-lastOf (l ∷ [])     = l
-lastOf (_ ∷ l ∷ ls) = lastOf (l ∷ ls)
-
-lastL : Pos → Label
-lastL (_ ∙ x) = lastOf x
-
-lastL-⊕ : ∀ q l → lastL (q ⊕ [ l ]) ≡ l
-lastL-⊕ (c ∙ x) l = go x
-  where
-    go : ∀ x → lastOf (x ++ [ l ]) ≡ l
-    go []           = refl
-    go (_ ∷ [])     = refl
-    go (_ ∷ m ∷ xs) = go (m ∷ xs)
-
--- One step past a subscription, two positions differ by their labels.
-step-inj : ∀ q {a b} → q ⊕ [ a ] ≡ q ⊕ [ b ] → a ≡ b
-step-inj q {a} {b} eq = trans (sym (lastL-⊕ q a)) (trans (cong lastL eq) (lastL-⊕ q b))
-
-ix-inj : ∀ {i j} → ix i ≡ ix j → i ≡ j
-ix-inj refl = refl
-
--- Nothing lies under a step.
-step-flat : ∀ q {a b l ys} → (q ⊕ [ a ]) ⊕ (l ∷ ys) ≡ q ⊕ [ b ] → ⊥
-step-flat q {a} {b} {l} {ys} eq with ⊕-cancelˡ q [ b ] (a ∷ l ∷ ys) (trans (sym eq) (⊕-assoc q [ a ] (l ∷ ys)))
-... | ()
-
--- A shallower spin's ticks, a deeper one's.
-widen : ∀ {X : Set} {M M′ q y} {e : Ev X} → M ≤ M′ → TR (S M q) y e → TR (S M′ q) y e
-widen le x with sp→ x
-... | j , lj , refl , refl = sp← (<-≤-trans lj le)
-
--- A deeper spin's ticks up to one the shallower lists, the shallower's.
-shrink : ∀ {X : Set} {M M′ q i y} {e : Ev X} → i < M → y ≼ (q ⊕ [ ix i ]) → TR (S M′ q) y e → TR (S M q) y e
-shrink {q = q} lt yk x with sp→ x
-... | j , lj , refl , refl = sp← (≤-<-trans (≮⇒≥ (λ ij → yk (ix-asc q ij))) lt)
-
-spin-ag : ∀ {X : Set} {M M′ q i} → M ≤ M′ → i < M → AgreeTo (q ⊕ [ ix i ]) (TR {X} (S M′ q)) (TR (S M q))
-spin-ag le lt = ⟨ (λ yk → shrink lt yk , widen le) ⟩
-
--- No tick lies under another.
-spin-flat : ∀ {X : Set} {M q y l ys} {e e′ : Ev X} → TR (S M q) y e → TR (S M q) (y ⊕ (l ∷ ys)) e′ → ⊥
-spin-flat {q = q} x x′ with sp→ x
-... | i , _ , refl , _ with sp→ x′
-...   | j , _ , eq , _ = step-flat q eq
-
 ------------------------------------------------------------------------
 -- The record
 
-module SpinTab {A : Set} (p p* : Pos) {S′ : Scope} where
+module SpinTab {A : Set} (p p* : Pos) where
 
   P : ℕ → Maybe (Tb.Listed A)
   P N = S (3 + N) p
@@ -160,74 +106,43 @@ module SpinTab {A : Set} (p p* : Pos) {S′ : Scope} where
       mono′ x x′ _ _ lt with sp→ x | sp→ x′
       ... | i , _ , refl , _ | j , _ , refl , _ = subst₂ _≺_ (sym (φ-ix {N} i)) (sym (φ-ix {N} j)) (ix-asc p* (ix-back p lt))
 
-  rel′ : Rel P Q p p* S′
+  rel′ : Rel P Q p p*
   rel′ = record
     { φ = φ′ ; Put = Put′ ; Late = λ _ _ → ⊥ ; corr = corr′
-    ; φ-agree = λ _ _ _ _ _ _ → refl
-    ; late-agree = λ _ _ _ _ _ _ ()
     ; bk = λ _ l → [ p ⊕ [ lastL l ] ]
     ; in-bk = λ x un _ → in-bk′ x un
     ; pb-few = λ _ _ → [] , λ ()
-    ; back = λ le x un _ _ _ ag → back′ le x un ag
-    ; put-up = λ _ _ _ _ ()
-    ; back-put = λ _ _ _ ()
-    ; elab-causal = λ le x un _ _ _ _ → elab-causal′ le x un
-    ; stable← = λ le x un _ _ _ y ag → stable←′ le x un y ag
-    ; stable-put = λ _ _ _ _ _ ()
-    ; stable-lead = λ le x un _ _ _ _ _ _ _ _ _ → elab-causal′ le x un
-    ; elab-all = λ le _ _ all → elab-all′ le all
+    ; Bd = SpinB.Bd {A} p ; Bd* = SpinB.Bd {IE A} p* ; bounded = SpinB.bounded p ; bounded* = SpinB.bounded p*
+    ; bcorr = λ N → Sub.restrict inj₁ (λ { (_ , ()) })
+        (SpinPair.corr p p* N (φ′ N) (λ _ → ⊥) (λ _ _ → ⊥) rows* (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
     ; func = λ x x′ → trans (proj₂ (proj₂ (proj₂ (sp→ x)))) (sym (proj₂ (proj₂ (proj₂ (sp→ x′)))))
     ; func* = λ y y′ → trans (proj₂ (proj₂ (proj₂ (sp→ y)))) (sym (proj₂ (proj₂ (proj₂ (sp→ y′)))))
     ; flat = spin-flat
     ; flat* = spin-flat
     ; pin-in = λ x → ⊥-elim (pin-no x)
     ; pin-in* = λ y → ⊥-elim (pin-no y)
-    ; cons = λ _ _ x _ _ → ⊥-elim (out-no x)
-    ; cons* = λ _ _ y _ _ → ⊥-elim (out-no y)
     ; got = λ _ → _ , refl
     ; got* = λ _ → _ , refl
     ; after = after′
     ; after* = after′
     ; after-φ = λ {_} {k} _ _ _ → ≺→≼ {p*} {p* ⊕ [ lastL k ]} (≺-ext p* [])
-    ; pin-after* = λ y → ⊥-elim (pin-no y)
-    ; pin-stable = λ _ _ _ _ _ _ _ _ _ y → ⊥-elim (pin-no y) }
+    ; pin-after* = λ y → ⊥-elim (pin-no y) }
     where
       pin-no : ∀ {X : Set} {M q k r} → TR {X} (S M q) k (pin r) → ⊥
       pin-no x with sp→ x
       ... | _ , _ , _ , ()
 
-      out-no : ∀ {X : Set} {M q k} {v : X} → TR (S M q) k (out v) → ⊥
-      out-no x with sp→ x
-      ... | _ , _ , _ , ()
+      rows* : ∀ {N k e} → SpinB.c {A} p N k e → Σ (Ev (IE A)) (SpinB.c {IE A} p* N (φ′ N k))
+      rows* {N} x with sp→ x
+      ... | i , lt , refl , refl = skip , subst (λ z → TR (Q N) z skip) (sym (φ-ix {N} i)) (sp← lt)
 
       in-bk′ : ∀ {N k e} → TR (P N) k e → Unpinned e → k ∈ [ p ⊕ [ lastL (φ′ N k) ] ]
       in-bk′ {N} x _ with sp→ x
       ... | i , _ , refl , _ = here (cong (λ l → p ⊕ [ l ]) (sym (trans (lastL-⊕ p* (lastL (p ⊕ [ ix i ]))) (lastL-⊕ p (ix i)))))
 
-      elab-causal′ : ∀ {N N′ k e} → N ≤ N′ → TR (P N) k e → Unpinned e → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N))
-      elab-causal′ {N} le x _ with sp→ x
-      ... | i , lt , refl , _ = subst (λ z → AgreeTo z (TR (Q _)) (TR (Q N))) (sym (φ-ix {N} i)) (spin-ag (+-monoʳ-≤ 3 le) lt)
-
-      stable←′ : ∀ {N N′ k e e′} → N ≤ N′ → TR (P N) k e → Unpinned e → TR (Q N) (φ′ N k) e′
-               → AgreeTo (φ′ N k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-      stable←′ le x _ _ _ with sp→ x
-      ... | i , lt , refl , _ = spin-ag (+-monoʳ-≤ 3 le) lt
-
-      -- A shallower cut holding a tick's image holds the tick.
-      back′ : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e → AgreeTo (φ′ N′ k) (TR (Q N′)) (TR (Q N)) → AgreeTo k (TR (P N′)) (TR (P N))
-      back′ {N} {N′} le x _ ag with sp→ x
-      ... | i , lt , refl , refl
-        with sp→ {M = 3 + N} (proj₁ (upto (subst (λ z → AgreeTo z (TR (Q N′)) (TR (Q N))) (φ-ix {N′} i) ag) {p* ⊕ [ ix i ]} {skip} (≼-refl {p* ⊕ [ ix i ]})) (sp← lt))
-      ...   | j , lj , eq , _ = spin-ag (+-monoʳ-≤ 3 le) (subst (_< 3 + N) (sym (ix-inj (step-inj p* eq))) lj)
-
-      elab-all′ : ∀ {N N′} → N ≤ N′ → (∀ q → AgreeTo q (TR (P N′)) (TR (P N))) → ∀ {y e} → TR (Q N′) y e → TR (Q N) y e
-      elab-all′ {N} {N′} _ all y with sp→ y
-      ... | j , lj , refl , refl with sp→ {M = 3 + N} (proj₁ (upto (all (p ⊕ [ ix j ])) {p ⊕ [ ix j ]} {skip} (≼-refl {p ⊕ [ ix j ]})) (sp← lj))
-      ...   | j′ , lj′ , eq , _ = sp← (subst (_< 3 + N) (sym (ix-inj (step-inj p eq))) lj′)
-
       after′ : ∀ {X : Set} {N q k} {e : Ev X} → TR (S (3 + N) q) k e → q ≼ k
       after′ {q = q} x with sp→ x
       ... | i , _ , refl , _ = ≺→≼ {q} {q ⊕ [ ix i ]} (≺-ext q [])
 
-spin-tab : ∀ {A} p p* {S′} → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p* S′
-spin-tab p p* {S′} = SpinTab.rel′ p p* {S′}
+spin-tab : ∀ {A} p p* → Rel {A} (λ N → just (spinRows (3 + N) p ⊣ false)) (λ N → just (spinRows (3 + N) p* ⊣ false)) p p*
+spin-tab p p* = SpinTab.rel′ p p*
