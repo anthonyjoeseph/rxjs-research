@@ -112,7 +112,7 @@ opaque
   mergeR K n f s ex u p q a k y oq l lt = raw-in K n (flatMap (mergeᶠ nothing) f s) tt ex u p (merge-raw K n f s _ p oq l lt)
 
   stopR : ∀ {Γ X} (K n : ℕ) (keep : X → Bool) (s : Obs Timeline Γ X) {ρL ρD} → EnvRel ρL ρD → UncutEnv ρL → ∀ p q a
-        → Row K n s ρD p q (out a) → T (not (keep a)) → ¬ TakeWhile.Failed true keep (enter (capprox K n s ρD) p) q
+        → Row K n s ρD p q (out a) → T (not (keep a)) → ¬ TakeWhile.Failed true keep (Row K n s ρD p) q
         → Row K n (takeWhile true keep s) ρD p (q ⊕ [ last ]) end
   stopR K n keep s ex u p q a r nk nf = raw-in K n (takeWhile true keep s) tt ex u p (stop-raw K n keep s _ p r nk nf)
 
@@ -121,11 +121,12 @@ opaque
         → Row K n o ρD p q e → (q , e) ∈ rows l
   rowIn K n o ex p eq ul q e r = complete (listC-exact K n o ex p eq ul) r
 
--- A merge's row, a lane's under a value of its source.
-backR : ∀ {Γ X Y} (K n : ℕ) (o : Obs Timeline Γ Y) (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) (ρ : DenEnv Γ) → o ≡ flatMap (mergeᶠ nothing) f s → ∀ p k y
-      → enter (capprox K n o ρ) p k (out y)
-      → Σ Pos λ q → Σ X λ a → enter (capprox K n s ρ) p q (out a) × enter (capprox K n (f a) ρ) (q ⊕ [ ix 1 ]) k (out y) × (q ⊕ [ ix 1 ]) ≺ k
-backR K n o f s ρ refl p k y x = merge-out (λ a → capprox K n (f a) ρ) (capprox K n s ρ) p x
+  -- A merge's row, a lane's under a value of its source.
+  backR : ∀ {Γ X Y} (K n : ℕ) (o : Obs Timeline Γ Y) (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) (ρ : DenEnv Γ) → o ≡ flatMap (mergeᶠ nothing) f s → ∀ p k y
+        → Row K n o ρ p k (out y)
+        → Σ Pos λ q → Σ X λ a → enter (capprox K n s ρ) p q (out a) × enter (capprox K n (f a) ρ) (q ⊕ [ ix 1 ]) k (out y) × (q ⊕ [ ix 1 ]) ≺ k
+  backR K n o f s ρ refl p k y x = merge-out (λ a → capprox K n (f a) ρ) (capprox K n s ρ) p x
+
 
 ------------------------------------------------------------------------
 -- The lane's end
@@ -307,13 +308,13 @@ module Lane {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {
     back-m {q} {a} (q₁ , k , oq , l , _) nu = back-k {q₁} {k} {q} {a} oq l nu
 
     -- No earlier `laneDone` reaches the take.
-    back : ∀ {q a} → enter (capprox K n M ρ₀) st q (out a) → T (not (undone a)) → q ≡ Q
+    back : ∀ {q a} → Row K n M ρ₀ st q (out a) → T (not (undone a)) → q ≡ Q
     back {q} {a} r = back-m {q} {a} (backR K n M (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) ρ₀ refl st q a r)
 
     nf-at : ∀ {q} → q ≡ Q → q ≺ Q → ⊥
     nf-at refl lt = ≺-irrefl {Q} lt
 
-    nf : ¬ TakeWhile.Failed true undone (enter (capprox K n M ρ₀) st) Q
+    nf : ¬ TakeWhile.Failed true undone (Row K n M ρ₀ st) Q
     nf (q , a , mq , nu , lt) = nf-at {q} (back {q} {a} mq nu) lt
 
     -- Forward: the mark through `counted`, both connects, the merge and
