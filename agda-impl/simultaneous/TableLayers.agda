@@ -23,7 +23,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; flatMap)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; Unpinned; pin; _≼_)
+open import denotation.EmissionSet using (Ev; Unpinned; pin; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)

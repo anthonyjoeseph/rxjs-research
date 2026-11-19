@@ -47,7 +47,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.Maybe using (just)
 open import Data.Maybe.Properties using (just-injective)
 open import Data.Nat using (ℕ; suc; _≤_; _⊔_; _+_)
-open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m; m≤n+m; ≤-trans) renaming (≤-refl to ≤-refl′)
+open import Data.Nat.Properties using (m≤m⊔n; m≤n⊔m; m≤n+m; ≤-trans; n≤1+n) renaming (≤-refl to ≤-refl′)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Unit using (tt)
