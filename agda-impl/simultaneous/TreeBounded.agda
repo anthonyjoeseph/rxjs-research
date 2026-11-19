@@ -23,14 +23,14 @@
 module simultaneous.TreeBounded where
 
 open import Data.Bool.Properties using (T-≡)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
 open import Relation.Nullary using (¬_)
