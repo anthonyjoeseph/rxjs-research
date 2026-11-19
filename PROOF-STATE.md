@@ -47,10 +47,10 @@ Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
 
 #### THE JOINS' HANGS
 
-`HorizonJoin.JoinPair` proves a join's pair over its parts' pairs and
-cross-part leaves; the tables are not yet read as `Joining.JoinT`, and a
-join's boundaries are not proven bounded. Settled by wiring the pair
-over table-as-join leaves, or a lane hang the join does not keep.
+Untried: a join's boundaries are its outer's and each running lane's
+before the lane's cut, bounded, and paired over its parts' pairs (a
+pair over cross-part leaves is recoverable, see the merge's leaves).
+Settled by bodies, or a lane hang the join does not keep.
 
 Members: `mg-bd`, `mg-bd*`, `mg-bounded`, `mg-bounded*`, `mg-bcorr`,
 `cc-bd`, `cc-bd*`, `cc-bounded`, `cc-bounded*`, `cc-bcorr`,

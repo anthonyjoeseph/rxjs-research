@@ -18,8 +18,8 @@
 -- the elaborated side alone keeps every boundary in place, and its rows
 -- keep their order against them (`Wrap`), as a hot row read past a
 -- subscription does (`ReaderMove`).  Two spins cut alike correspond, the
--- environment cut alike at their positions (`SpinPair`).  The connect and
--- the joins are in `simultaneous.HorizonConn` and `simultaneous.HorizonJoin`.
+-- environment cut alike at their positions (`SpinPair`).  The connect is
+-- in `simultaneous.HorizonConn`.
 --
 -- A RELOCATED SUBTERM NEEDS NO MORE: a correspondence is stated at a pair
 -- of subscriptions, so a source the elaboration subscribes inside a lane

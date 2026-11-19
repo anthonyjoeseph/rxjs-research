@@ -33,22 +33,19 @@ open import denotation.EmissionSet using (Unpinned; pin; _≼_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
+open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Corr)
 open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
-open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; Tab; up; Linked; Aligned; EnvR; maps; lw; lw*;
-  den; den-ex; Admits)
+open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
+  Admits)
 
-open import simultaneous.LaneEndSched using (tr-in)
 
 open import Relation.Nullary using (¬_)
-open import denotation.EmissionSet using (enter; DenEnv; Den)
+open import denotation.EmissionSet using (DenEnv; Den)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Cut using (capprox)
-open import quickcheck.Tabled.Exact.Base using (complete)
-open import simultaneous.Listing using (listC-exact)
 open import simultaneous.TableFlat using (module Flat; module Vals)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
@@ -93,14 +90,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   fD : ℕ → A → Den B
   fD N a = capprox (3 + N) n (f a) (ρD N)
 
-  -- A table's rows are its cut program's.
-  tr-den : ∀ {X} (o : Obs Timeline Γ X) q {N y e} → TR (Tab n o ρ q N) y e → enter (capprox (3 + N) n o (ρD N)) q y e
-  tr-den o q {N} = tr-in (3 + N) n o (den-ex (lw env) N) (uρ N) q
-
-  den-tr : ∀ {X} (o : Obs Timeline Γ X) q {N y e} → enter (capprox (3 + N) n o (ρD N)) q y e → TR (Tab n o ρ q N) y e
-  den-tr o q {N} x with listC-ok (3 + N) n o (uρ N) q
-  ... | L , eq , uL = L , eq , complete (listC-exact (3 + N) n o (den-ex (lw env) N) q eq uL) x
-
   ----------------------------------------------------------------------
   -- The joiners
 
@@ -124,6 +113,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- THE MERGE'S HANGS: its outer's boundaries, and each running
       -- lane's before the lane's cut; each partnered with its image's.
+      --
+      -- RECOVERY: git show 252f560:agda-impl/simultaneous/HorizonJoin.agda restores `JoinPair`, a join's pair over its parts' pairs; git show 252f560:agda-impl/simultaneous/TableJoin.agda restores `tr-den` and `den-tr`, a table read as its cut program.
       postulate
         mg-bd mg-bd* : ℕ → Pos → Tag → Set
         mg-bounded  : Cuts.Bounded (λ N → TR (P′ N)) mg-bd
