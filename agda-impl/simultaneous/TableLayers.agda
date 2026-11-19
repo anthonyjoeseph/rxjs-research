@@ -20,7 +20,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; flatMap)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; pin; _≺_; _≼_)
@@ -316,8 +316,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- The layers pass the core's boundaries through: the flatMap's own.
   flat-hangs : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*)
              → Cuts.Bounded (λ N → TR (P op N)) (Rel.Bd (CloseTab.rel′ op (CombTab.rel′ op (flat-core op Os Ls Lc al lk))))
-  flat-hangs (mergeᶠ nothing)  Os Ls Lc al lk = jtree (mergeᶠ nothing)
-  flat-hangs (mergeᶠ (just k)) Os Ls Lc al lk = jtree (mergeᶠ (just k))
+  flat-hangs (mergeᶠ M.nothing)  Os Ls Lc al lk = jtree (mergeᶠ M.nothing)
+  flat-hangs (mergeᶠ (M.just k)) Os Ls Lc al lk = jtree (mergeᶠ (M.just k))
   flat-hangs switchᶠ           Os Ls Lc al lk = jtree switchᶠ
   flat-hangs exhaustᶠ          Os Ls Lc al lk = jtree exhaustᶠ
 
