@@ -363,7 +363,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   jtree op = tree-bounded n (flatMap op f s) ρ uρ (bds env) (lw env) (hung env) p ad
 
   jbounded : ∀ op → Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
-  jbounded op = pd-bounded (jtree op)
+  jbounded op = pd-bounded {op} (jtree op)
 
   pd-sub : ∀ {op N k e} → TR (Pd op N) k e → TR (P op N) k e
   pd-sub {op} {N} = unpin-sub (srcPins N) (P op N)
