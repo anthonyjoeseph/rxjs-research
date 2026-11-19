@@ -41,7 +41,7 @@ open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; on-out; module Connecting)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; ok-in)
+open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
