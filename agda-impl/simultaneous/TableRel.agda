@@ -53,7 +53,7 @@ open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPu
 open import simultaneous.TableEnv
   using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
   Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
-  Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh;
+  Aligned; aligned-⊕; Rest; Out; _⊢_; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; EnvCut;
   Full; Coh; Admits; admits-step; admits-wk; admits-body; listHot-u; unended; tab-func;
   tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
@@ -138,6 +138,12 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
                    ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → T (shownᵇ e)
                  → ∀ N′ → Alike (Ψ′ Rs (here refl) N′) (Rows (hotOf (σ N′))) k (Rel.φ R N k)
 
+    -- An old hot's reader's partners cut the new hot alike, with the old.
+    conn-old-bcorr : (Rs : Src) → ∀ {X} (j : X ∈ Γ) n′ q q* (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) (lk : Linked q q*)
+                   → let R = Out.rel (hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk) in
+                     ∀ N → Inter.BCorrX (Own (TR (Tab n′ (connected j) ρ q N)) (Rel.Late R N)) (Rel.φ R N)
+                                        (OwnPut (TR (Tab n′ (connected j) ρ q N)) (Rel.Put R N)) (Rel.Bd R N) (Rel.Bd* R N) (EnvCut (Ψ′ Rs) ρ′ N)
+
   -- An old hot is read as before; its rows cut the new hot alike.
   old : (Rs : Src) → ∀ {X} (j : X ∈ Γ) → HotR (there j) ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
   old Rs j n′ q q* ad ad* al lk = Out.rel O ⊢ record
@@ -147,6 +153,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ; self-at   = Rest.self-at (Out.rest O)
     ; self-flat = Rest.self-flat (Out.rest O)
     ; seen      = λ al′ → Rest.seen (Out.rest O) (λ i → al′ (there i))
+    ; bcorr-env = conn-old-bcorr Rs j n′ q q* ad ad* al lk
     }
     where
       O = hot env j n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk
@@ -290,14 +297,11 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       (λ _ → ⊥) (λ _ _ → ⊥) (φσ N) (Rel.φ Rb N) (φ′ N) (Rel.Late RS N) (Rel.Late Rb N) (Late′ N) (Pσ N) (Rel.Put Rb N) (Put′ N)
 
     -- WHAT THE PARTS OWE THE PAIR: the source's pair against the annotated
-    -- source; the body's, reading the source's rows as its environment;
-    -- one map and the parts' late rows and placements; the gaps; the
+    -- source; one map and the parts' late rows and placements; the gaps; the
     -- body cutting each source mark pair alike; the burst holding
     -- partners together; the body's ends each other's images.
     postulate
       ct-src-bcorr  : ∀ N → CP.IS.BCorr N
-      ct-body-bcorr : ∀ N → CP.IB.BCorr N
-      ct-φβ-src  : ∀ {N k} → CP.SrcRow N k → Rel.φ Rb N k ≡ φσ N k
       ct-φc-body : ∀ {N k e} → βc N k e → φ′ N k ≡ Rel.φ Rb N k
       ct-φc-echo : ∀ {N k e} → σc N k e → φ′ N (k ⊕ [ ix 0 ]) ≡ φσ N k ⊕ [ ix 0 ]
       ct-late-body : ∀ {N k} → Rel.Late Rb N k → Late′ N k
@@ -326,6 +330,33 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ct-rows-after  : ∀ {N k e} → CB.Cc N k e → p ≺ k
       ct-rows-after* : ∀ {N k e} → CB*.Cc N k e → p* ≺ k
 
+    -- THE BODY'S PAIR CUTS ITS SOURCE ALIKE: the source is the first hot
+    -- of the body's scope, so the body's partners cut it alike
+    -- (`Rest.bcorr-env`).  Its rows are the source's table's, its images
+    -- the annotated rows under the reader, its placements the source's.
+    postulate
+      -- No source row lies past the source's end.
+      ct-src-hot : ∀ {N k e} → σc N k e → Rows (hotOf (σ N)) k e
+      -- A source row that is pinned or late is placed at its image.
+      ct-src-img : ∀ {N k e} → σc N k e → (Unpinned e × ¬ Rel.Late RS N k) ⊎ π (srcMap Rs N) k (φσ N k)
+
+    src-cut : ∀ {N z z*} → EnvCut (Ψ′ Rs) ρ′ N z z* → CP.SrcCut N z z*
+    src-cut {N} {z} {z*} ((bs , pbs) , _) = btw , pb
+      where
+        btw : Btw (CP.SrcRow N) (φσ N) z z*
+        btw (inj₁ (e , x , un , nl)) = bs (e , ct-src-hot x , un , nl)
+        btw (inj₂ ())
+
+        pb : PB (CP.SrcPut N) z z*
+        pb (inj₁ ((e , x) , inj₂ pl)) kz = pbs ((e , ct-src-hot x) , pl) kz
+        pb (inj₁ ((e , x) , inj₁ refl)) kz with ct-src-img x
+        ... | inj₁ (un , nl) = proj₁ (bs (e , ct-src-hot x , un , nl)) kz
+        ... | inj₂ pl        = pbs ((e , ct-src-hot x) , pl) kz
+        pb (inj₂ ()) _
+
+    ct-body-bcorr : ∀ N → CP.IB.BCorrX N (CP.SrcCut N)
+    ct-body-bcorr N = Inter.weakenX _ _ _ _ _ (λ {z} {z*} → src-cut {N} {z} {z*}) (Rest.bcorr-env (Out.rest Ob) N)
+
     ct-bd ct-bd* : ℕ → Pos → Tag → Set
     ct-bd  = CB.CBd
     ct-bd* = CB*.CBd
@@ -341,7 +372,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       (λ { (e , x , un , nl) → inj₁ (e , ct-conn→ x , un , nl) })
       (λ { ((e , x) , pl) → inj₁ ((e , ct-conn→ x) , pl) })
       (CP.Pair.corr N (ct-src-bcorr N) (ct-body-bcorr N)
-        (λ {k} → ct-φβ-src {N} {k}) (λ {k} {e} → ct-φc-body {N} {k} {e}) (λ {k} {e} → ct-φc-echo {N} {k} {e}) (λ ())
+        (λ {k} {e} → ct-φc-body {N} {k} {e}) (λ {k} {e} → ct-φc-echo {N} {k} {e}) (λ ())
         (λ {k} → ct-late-body {N} {k}) (λ {k} → ct-late-echo {N} {k})
         (λ {k} {e} {l} → ct-put-split {N} {k} {e} {l}) (λ {k} → ct-img {N} {k}) (λ {k} {e} {l} → ct-put-row {N} {k} {e} {l})
         (λ {b} {g} {y} {e} → ct-gap-src {N} {b} {g} {y} {e}) (λ {b} {g} {y} {e} → ct-gap-src* {N} {b} {g} {y} {e})

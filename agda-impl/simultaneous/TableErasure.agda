@@ -464,6 +464,23 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- it; a row settled on both sides is settled between the two cuts; and
   -- an instant's leading row is clear where a row of its image's instant is.
   --
+  -- DEAD ROUTE: `root-back` from one cut's pair.  `clear←` at the
+  --   shallower cut needs the row to be that cut's, which is the
+  --   conclusion.  Through a plain boundary at or before the row and its
+  --   partner: `Btw` at a cut orders only that cut's rows, and a partner
+  --   past every image the cut has satisfies it whatever the deeper rows
+  --   are, so nothing puts the partner before the image of a row the
+  --   shallower plain cut lacks.  What it needs is a pair across cuts: a
+  --   deeper cut's row clear of a shallower cut's plain boundaries where
+  --   its image is clear of the elaborated ones.
+  -- DEAD ROUTE: `root-lead` from one cut's pair.  An elaborated boundary
+  --   at or before the leading row's image has its plain partner at or
+  --   before the row, but `Btw` orders only images of own rows, and `m`,
+  --   a pin or mark with no preimage, is ordered against no partner.
+  --   Suspected false at a cut hanging inside a subscribe burst: a pin
+  --   before the hang is clear, and the image of the instant's leading row
+  --   past it is not.  Then the leading-row arm of `Erase.place` is the
+  --   misplaced call, choosing its cut by `m` rather than by the leader.
   -- RECOVERY: git show b96dfae:agda-impl/simultaneous/HorizonCorr.agda restores `RealEnv`, `ReaderReal` and `ConnReal`, a boundary real or borne by the environment, discharged at the connect owning its hot, for `root-real`.
   postulate
     root-real  : Cuts.Real cP R.Bd

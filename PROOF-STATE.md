@@ -34,13 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE ROOT'S CROSSINGS
 
-A row exists only if no hang came first. `At` reads stable, causal,
-lead and placements off `HorizonCorr.Root` from the closed program's
-boundaries and their pair. Riskiest, untried: a row settled on both
-sides is settled between two cuts (`root-back`); an instant's leading
-row is clear where its image's instant is (`root-lead`). The map read
-alike by agreeing cuts stays two-cut. Settled by bodies over
-`Root`, or two cuts agreeing on one side only.
+A row exists only if no hang came first. One cut's pair orders only
+that cut's rows, so neither crossing follows from it. `root-lead` is
+suspected false at a hang inside a subscribe burst, which moves the
+fault to `Erase.place`'s leading-row arm; `root-back` needs a pair
+across cuts, a deeper row clear where its image is. Settled by a
+leading row whose image a cut hangs before while a pin of its instant
+is clear, or a cross-cut pair in `Rel`.
 
 Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
 `root-φ-agree`, `root-late-agree`, `root-put-up`, `root-back-put`.
@@ -61,14 +61,15 @@ Members: `mg-bd`, `mg-bd*`, `mg-bounded`, `mg-bounded*`, `mg-bcorr`,
 
 The connect's bounded is `Horizon.ConnB`'s and its pair `HorizonConn.ConnPair`'s,
 each table read as `Connecting.ConnT` of its parts, the elaborated over
-the annotated source. Riskiest: the body's pair must cover the source's
-rows as its environment (`ct-body-bcorr`), which `Rel.bcorr` does not
-carry. Then the annotated source's pair and the cross-part leaves.
-Settled by bodies, or a body boundary cut unlike its image by a source row.
+the annotated source. The body's pair cuts its source alike through
+`Rest.bcorr-env`. Riskiest: a pinned or late source row is placed at its
+image (`ct-src-img`), which the body's placements need; then the
+annotated source's pair and the cross-part leaves. Settled by bodies,
+or a late source row placed off its image.
 
-Members: `ct-body-bcorr`, `ct-src-bcorr`, `ct-conn→`, `ct-conn←`,
+Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-conn→`, `ct-conn←`,
 `ct-conn*→`, `ct-conn*←`, `ct-src-after`, `ct-src-held`, `ct-ann-bd*`,
-`ct-ann-bounded*`, `ct-ann-after*`, `ct-ann-held*`, `ct-φβ-src`,
+`ct-ann-bounded*`, `ct-ann-after*`, `ct-ann-held*`,
 `ct-φc-body`, `ct-φc-echo`, `ct-late-body`, `ct-late-echo`,
 `ct-put-split`, `ct-img`, `ct-put-row`, `ct-gap-src`, `ct-gap-src*`,
 `ct-held-src`, `ct-held-src*`, `ct-held-body`, `ct-held-body*`,
@@ -83,7 +84,7 @@ the elaborated reader's boundaries and their pair. Settled by bodies,
 or a reader row the rejoined hot lacks.
 
 Members: `rd-rejoin→`, `rd-rejoin←`, `rd-apart`, `rd-bd*`,
-`rd-bounded*`, `rd-bcorr`.
+`rd-bounded*`, `rd-bcorr-env`.
 
 #### THE LAYERS' HANGS
 
@@ -184,9 +185,10 @@ Members: `rd-corr`, `rd-linked`, `rd-cuts`, `rd-self`, `rd-self-at`, `rd-seen`.
 
 The connect's record is written: body rows along the body's map, source
 rows one label down at their annotated image. Untried: its field leaves,
-an old hot cutting the new alike (`conn-old-cut`). Settled by bodies.
+an old hot's reader cutting the new alike, rows and partners
+(`conn-old-cut`, `conn-old-bcorr`). Settled by bodies.
 
-Members: `conn-old-cut`, `conn-order`, `ct-corr`, `ct-in-bk`, `ct-after-φ`.
+Members: `conn-old-cut`, `conn-old-bcorr`, `conn-order`, `ct-corr`, `ct-in-bk`, `ct-after-φ`.
 
 #### THE ORDER FACTS
 

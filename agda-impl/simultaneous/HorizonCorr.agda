@@ -136,6 +136,49 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
       to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × TagTo g g*
       from : ∀ {b* g*} → Bd* b* g* → Σ Pos λ b → Σ Tag λ g → Bd b g × Between b b* × PutBefore b b* × TagFrom g g*
 
+  -- A correspondence whose pairs, held ones too, cut more alike (`X`):
+  -- rows read along maps of their own, as an environment's are.
+  data TagToX (X : Pos → Pos → Set) : Tag → Tag → Set where
+    plain-free : ∀ {g*} → TagToX X free g*
+    both-held  : ∀ {q q*} → Between q q* → X q q* → TagToX X (held q) (held q*)
+
+  data TagFromX (X : Pos → Pos → Set) : Tag → Tag → Set where
+    elab-free : ∀ {g} → TagFromX X g free
+    both-held : ∀ {q q*} → Between q q* → X q q* → TagFromX X (held q) (held q*)
+
+  record BCorrX (X : Pos → Pos → Set) : Set where
+    field
+      to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × X b b* × TagToX X g g*
+      from : ∀ {b* g*} → Bd* b* g* → Σ Pos λ b → Σ Tag λ g → Bd b g × Between b b* × PutBefore b b* × X b b* × TagFromX X g g*
+
+  -- What is cut alike carries to what that implies.
+  weakenX : ∀ {X X′ : Pos → Pos → Set} → (∀ {z z*} → X z z* → X′ z z*) → BCorrX X → BCorrX X′
+  weakenX {X} {X′} w C = record
+    { to   = λ bd → let (b* , g* , bd* , btw , x , tg) = BCorrX.to C bd in b* , g* , bd* , btw , w x , tagTo tg
+    ; from = λ bd* → let (b , g , bd , btw , pb , x , tg) = BCorrX.from C bd* in b , g , bd , btw , pb , w x , tagFrom tg }
+    where
+      tagTo : ∀ {g g*} → TagToX X g g* → TagToX X′ g g*
+      tagTo plain-free         = plain-free
+      tagTo (both-held btw x)  = both-held btw (w x)
+
+      tagFrom : ∀ {g g*} → TagFromX X g g* → TagFromX X′ g g*
+      tagFrom elab-free        = elab-free
+      tagFrom (both-held btw x) = both-held btw (w x)
+
+  -- Forgetting what more is cut alike.
+  forget : ∀ {X} → BCorrX X → BCorr
+  forget {X} C = record
+    { to   = λ bd → let (b* , g* , bd* , btw , _ , tg) = BCorrX.to C bd in b* , g* , bd* , btw , tagTo tg
+    ; from = λ bd* → let (b , g , bd , btw , pb , _ , tg) = BCorrX.from C bd* in b , g , bd , btw , pb , tagFrom tg }
+    where
+      tagTo : ∀ {g g*} → TagToX X g g* → TagTo g g*
+      tagTo plain-free        = plain-free
+      tagTo (both-held btw _) = both-held btw
+
+      tagFrom : ∀ {g g*} → TagFromX X g g* → TagFrom g g*
+      tagFrom elab-free         = elab-free
+      tagFrom (both-held btw _) = both-held btw
+
   Clear Clear* : Pos → Set
   Clear k  = ∀ {b g} → Bd b g → k ≺ b
   Clear* l = ∀ {b g} → Bd* b g → l ≺ b

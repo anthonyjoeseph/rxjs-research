@@ -19,9 +19,9 @@
 -- sides together, since the body's ends are each other's images and the
 -- body's rows cut the pair alike (`ConnPair.al→`, `ConnPair.al←`).
 --
--- WHAT THE PARTS OWE, as parameters: their correspondences; the body's
--- rows cut each source boundary pair alike (`body-src`), the one fact
--- about two parts at once; the burst holds partners together (`home→`,
+-- WHAT THE PARTS OWE, as parameters: their correspondences, the body's
+-- partners cutting its source alike along the source's map (`SrcCut`);
+-- the body's rows cut each source boundary pair alike (`body-src`); the burst holds partners together (`home→`,
 -- `home←`); the body's ends correspond; rows lie past the connect, and
 -- the environment cuts the two connects alike (`env-p`); and the gaps
 -- every former's boundaries keep from its rows.
@@ -33,7 +33,7 @@ open import Data.List using ([]; [_])
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; inside; ix; _⊕_)
@@ -78,12 +78,10 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
   SrcPut : Pos → Pos → Set
   SrcPut = OwnPut (σ N) Pσ ∪² EnvPut
 
-  -- The body's environment: its source, as its hot, and the connect's.
-  BodyRow : Pos → Set
-  BodyRow = Own (β N) Lβ ∪ SrcRow
-
-  BodyPut : Pos → Pos → Set
-  BodyPut = OwnPut (β N) Pβ ∪² SrcPut
+  -- The body's environment: its source, as its hot, and the connect's,
+  -- each read along the source's map.
+  SrcCut : Pos → Pos → Set
+  SrcCut z z* = Btw SrcRow φσ z z* × PB SrcPut z z*
 
   ConnRow : Pos → Set
   ConnRow = Own (P.Cc N) Lc ∪ Env
@@ -92,7 +90,7 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
   ConnPut = OwnPut (P.Cc N) Pc ∪² EnvPut
 
   module IS = Inter SrcRow φσ SrcPut (Bdσ N) (Bdσ* N)
-  module IB = Inter BodyRow φβ BodyPut (Bdβ N) (Bdβ* N)
+  module IB = Inter (Own (β N) Lβ) φβ (OwnPut (β N) Pβ) (Bdβ N) (Bdβ* N)
   module IC = Inter ConnRow φc ConnPut (P.CBd N) (E.CBd N)
 
   r r* : Pos
@@ -100,10 +98,9 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
   r* = p* ⊕ [ ix 1 ]
 
   module Pair
-    (Cσ : IS.BCorr) (Cβ : IB.BCorr)
-    -- one map: the body reads its hot rows as the source does, the connect
-    -- its body's rows and environment as they do, an echo under its row's
-    (φβ-src : ∀ {k} → SrcRow k → φβ k ≡ φσ k)
+    (Cσ : IS.BCorr) (Cβ : IB.BCorrX SrcCut)
+    -- one map: the connect reads its body's rows and environment as they
+    -- do, an echo under its row's
     (φc-body : ∀ {k e} → β N k e → φc k ≡ φβ k)
     (φc-echo : ∀ {k e} → σ N k e → φc (k ⊕ [ ix 0 ]) ≡ φσ k ⊕ [ ix 0 ])
     (φc-env : ∀ {k} → Env k → φc k ≡ φσ k)
@@ -137,7 +134,7 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     (env-p : Btw Env φc p p*)
     where
     open Inter.BCorr Cσ renaming (to to toσ; from to fromσ)
-    open Inter.BCorr Cβ renaming (to to toβ; from to fromβ)
+    open Inter.BCorrX Cβ renaming (to to toβ; from to fromβ)
 
     gapc : ∀ {b g y e} → P.CBd N b g → P.Cc N y e → ¬ y ⊑ b
     gapc cb y = proj₂ (P.gap-c cb y)
@@ -158,8 +155,8 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
         (first-child {j} {φσ j} {z} {z*} (bs (inj₁ (e , x , un , λ l → nl (late-echo l)))) (ng y)
           (subst (λ w → ¬ w ⊑ z*) (φc-echo x) (ng* (proj₂ (img (_ , y , un′ , nl))))))
 
-    liftβ : ∀ {z z*} → IB.Between z z* → (∀ {y e} → P.Cc N y e → ¬ y ⊑ z) → (∀ {y e} → E.Cc N y e → ¬ y ⊑ z*) → IC.Between z z*
-    liftβ {z} {z*} btw = lift (λ x → btw (inj₁ x)) (λ {k} x → retarget {k} {z} {z*} (sym (φβ-src x)) (btw (inj₂ x)))
+    liftβ : ∀ {z z*} → IB.Between z z* → SrcCut z z* → (∀ {y e} → P.Cc N y e → ¬ y ⊑ z) → (∀ {y e} → E.Cc N y e → ¬ y ⊑ z*) → IC.Between z z*
+    liftβ btw (bs , _) = lift btw bs
 
     liftσ : ∀ {z z*} → Mark (Bdσ N) z → Mark (Bdσ* N) z* → IS.Between z z*
           → (∀ {y e} → P.Cc N y e → ¬ y ⊑ z) → (∀ {y e} → E.Cc N y e → ¬ y ⊑ z*) → IC.Between z z*
@@ -197,13 +194,13 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     ...     | inj₁ lt   = lt
     ...     | inj₂ refl = ⊥-elim (ng (Connecting.body x) (⊑-refl z))
 
-    tagβ→ : ∀ {b b* g g*} → Bdβ N b g → Bdβ* N b* g* → IB.TagTo g g* → IC.TagTo g g*
-    tagβ→ _  _   IB.plain-free      = IC.plain-free
-    tagβ→ bd bd* (IB.both-held btw) = IC.both-held (liftβ btw (held-body bd) (held-body* bd*))
+    tagβ→ : ∀ {b b* g g*} → Bdβ N b g → Bdβ* N b* g* → IB.TagToX SrcCut g g* → IC.TagTo g g*
+    tagβ→ _  _   IB.plain-free         = IC.plain-free
+    tagβ→ bd bd* (IB.both-held btw sc) = IC.both-held (liftβ btw sc (held-body bd) (held-body* bd*))
 
-    tagβ← : ∀ {b b* g g*} → Bdβ N b g → Bdβ* N b* g* → IB.TagFrom g g* → IC.TagFrom g g*
-    tagβ← _  _   IB.elab-free       = IC.elab-free
-    tagβ← bd bd* (IB.both-held btw) = IC.both-held (liftβ btw (held-body bd) (held-body* bd*))
+    tagβ← : ∀ {b b* g g*} → Bdβ N b g → Bdβ* N b* g* → IB.TagFromX SrcCut g g* → IC.TagFrom g g*
+    tagβ← _  _   IB.elab-free          = IC.elab-free
+    tagβ← bd bd* (IB.both-held btw sc) = IC.both-held (liftβ btw sc (held-body bd) (held-body* bd*))
 
     nin→ : ∀ {b b* g g*} → Bdσ N b g → Bdσ* N b* g* → IS.Between b b* → T (not (inside r b)) → T (not (inside r* b*))
     nin→ bd bd* btw nin = not-T (λ i → T-not nin (home← bd bd* btw i))
@@ -213,7 +210,7 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
 
     to : ∀ {b g} → P.CBd N b g → Σ Pos λ b* → Σ Tag λ g* → E.CBd N b* g* × IC.Between b b* × IC.TagTo g g*
     to (P.bodyB bd) with toβ bd
-    ... | b* , g* , bd* , btw , tt = b* , g* , E.bodyB bd* , liftβ btw (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*)) , tagβ→ bd bd* tt
+    ... | b* , g* , bd* , btw , sc , tt = b* , g* , E.bodyB bd* , liftβ btw sc (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*)) , tagβ→ bd bd* tt
     to (P.burstB bd ins) with toσ bd
     ... | b* , g* , bd* , btw , _ =
       b* , held p* , E.burstB bd* (home→ bd bd* btw ins) , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*) , IC.both-held at-p
@@ -233,9 +230,9 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
 
     from : ∀ {b* g*} → E.CBd N b* g* → Σ Pos λ b → Σ Tag λ g → P.CBd N b g × IC.Between b b* × IC.PutBefore b b* × IC.TagFrom g g*
     from (E.bodyB bd*) with fromβ bd*
-    ... | b , g , bd , btw , pb , tf =
-      b , g , P.bodyB bd , liftβ btw (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*))
-      , putC (λ x → pb (inj₁ x)) (λ x → pb (inj₂ x)) (gapc* (E.bodyB bd*)) , tagβ← bd bd* tf
+    ... | b , g , bd , btw , pb , (bs , spb) , tf =
+      b , g , P.bodyB bd , liftβ btw (bs , spb) (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*))
+      , putC pb spb (gapc* (E.bodyB bd*)) , tagβ← bd bd* tf
     from (E.burstB bd* ins*) with fromσ bd*
     ... | b , g , bd , btw , pb , _ =
       b , held p , P.burstB bd (home← bd bd* btw ins*) , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*)
