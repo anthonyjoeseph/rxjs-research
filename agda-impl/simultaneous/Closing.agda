@@ -489,11 +489,10 @@ meet {A} o {rs} {y} {e} mx sy@((xy , _) , fy) vi ay with pass o mx sy
     found : (cursor nothing (rs ++ ext) ≡ nothing ⊎ Σ Pos λ c → cursor nothing (rs ++ ext) ≡ just c)
           → Σ _ λ ext′ → Met (elaborated o) (rs ++ ext′) × (y , e) ∈ ext′
     found (inj₁ eq) = ⊥-elim (cv xy vi (≼-refl {y}) (subst (λ c → After c y) (sym eq) tt))
-    found (inj₂ (c , eq)) with cursor-in nothing (rs ++ ext) eq
-    ... | inj₁ ()
-    ... | inj₂ (_ , cm) with ∈-++⁻ rs (run-has (at-func (elaborate (plain o))) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)
-    ...   | inj₁ m = ⊥-elim (not-past mx m ay)
-    ...   | inj₂ m = ext , mx′ , m
+    found (inj₂ (c , eq)) = [ (λ ()) , (λ { (_ , cm) →
+        [ (λ m → ⊥-elim (not-past mx m ay)) , (λ m → ext , mx′ , m) ]′
+          (∈-++⁻ rs (run-has (at-func (elaborate (plain o))) mx′ xy vi tt (λ cy → cv xy vi (≼-refl {y}) (subst (λ m → After m y) (sym eq) cy)) cm)) }) ]′
+      (cursor-in nothing (rs ++ ext) eq)
 
 -- Rows past one with finitely many before it, finitely many, leave
 -- finitely many before any row.
@@ -781,12 +780,14 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
     in shut o mx′ rk ext refl z bm yin (trans (cong (_∙ []) iy) (sym rb))
 
   gone : ∀ {y a j} → X y (out (instEmit (value a) j)) → q ≺ y → instantOf y ≡ instantOf q → ⊥
-  gone {y} xy qy iy with T? (y <ᵖ k)
-  ... | yes yk = none xy qy yk
-  ... | no ky with ≼-split {k} {y} ky
-  ...   | inj₁ ky′ = beyond how xy ky′ iy
-  ...   | inj₂ refl with at-func (elaborate (plain o)) xk xy
-  ...     | ()
+  gone {y} {a} {j} xy qy iy = cmp (T? (y <ᵖ k))
+    where
+      cmp : Dec (T (y <ᵖ k)) → ⊥
+      cmp (yes yk) = none xy qy yk
+      cmp (no ky) = [ (λ ky′ → beyond how xy ky′ iy) , (λ { refl → mk≢ (at-func (elaborate (plain o)) xk xy) }) ]′ (≼-split {k} {y} ky)
+        where
+          mk≢ : out (instEmit (mark mk) nk) ≡ out (instEmit (value a) j) → ⊥
+          mk≢ ()
 
   left : Left valuesOf X q
   left {a = instEmit (mark _) _}  _  _  _  = refl
@@ -809,13 +810,16 @@ module Released {A : Set} (o : SObs [] A) {rs q} (mx : Met (elaborated o) rs) (R
     where
       by : How o q rk k → Exits X q
       by (apart ne) = inj₁ (k , _ , seen xk tt , past , inj₁ ne)
-      by (done xc) with done-end o xc
-      ... | c , xe , kc = inj₁ (c , end , seen xe tt , ≺-trans {q} {k} {c} past kc , inj₂ refl)
-      by (sub xs fq) with sub-rest o xs
-      ... | ks , h = exits-bounded o (proj₂ xq) (bounded {ks} λ xy ky iy → h xy ky (trans iy fq))
-      by (emptied z bm rb) with Held.rest (held o) mrk z bm
-      ... | ks , h = exits-bounded o (proj₂ xq)
-                       (bounded {ks} λ {y} xy ky iy → h xy (subst (λ c → After c y) (sym ck) ky) (trans (cong (_∙ []) iy) (sym rb)))
+      by (done xc) =
+        let c , xe , kc = done-end o xc
+        in inj₁ (c , end , seen xe tt , ≺-trans {q} {k} {c} past kc , inj₂ refl)
+      by (sub xs fq) =
+        let ks , h = sub-rest o xs
+        in exits-bounded o (proj₂ xq) (bounded {ks} λ xy ky iy → h xy ky (trans iy fq))
+      by (emptied z bm rb) =
+        let ks , h = Held.rest (held o) mrk z bm
+        in exits-bounded o (proj₂ xq)
+             (bounded {ks} λ {y} xy ky iy → h xy (subst (λ c → After c y) (sym ck) ky) (trans (cong (_∙ []) iy) (sym rb)))
 
 -- THE RUN IS CLOSED WHERE NOTHING IS HELD: past every release, no value
 -- of the instant released, and the run leaves it.
@@ -906,10 +910,10 @@ batches o = early , late
 
     -- Names to ranks: the batches carry the ranks of the values they release.
     bs-rel : ∀ {rs} → Met (ranked B) rs → Pointwise.Pointwise Lab (stamped (values (unrank rs))) (stampedᴮ rs)
-    bs-rel mb = Pointwise.map (λ ce → batch-rank o (proj₁ ce) , proj₂ ce) (carried-rel mb)
+    bs-rel mb = Pointwise.map (λ ce → batch-rank o (proj₁ ce) , proj₂ ce) (carried-rel {t = B} mb)
 
     groups : ∀ ov {rx} → Met (ranked X) rx → Pointwise.Pointwise Lab (byName ov (unrank rx)) (grouped ov (stampedᴮ rx))
-    groups ov mx = closed-rel ov (group-rel (name-rank o) (rank-name o) (carried-rel mx))
+    groups ov mx = closed-rel ov (group-rel (name-rank o) (rank-name o) (carried-rel {t = X} mx))
 
     opaque
       early₀ : ∀ {rs} → Met B rs → Σ _ λ rx → Met X rx
