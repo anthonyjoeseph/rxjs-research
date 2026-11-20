@@ -49,17 +49,16 @@ open import simultaneous.Listing using (UncutEnv; listC)
 open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; module ConnBd; module TakeBd; bounded-≃)
-open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-out; src-held)
+open import simultaneous.TreeBounded using (conn-tr→; conn-tr←; tree-bounded; src-out; src-held)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv
-  using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub; shownᵇ;
-  Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps;
-  Aligned; aligned-⊕; Rest; Out; out; SameBd; sameBd; same-bd; HotR; EnvR; envR; EnvEq; maps; lw; lw*; hot; hot-coh; EnvCut;
-  Full; Coh; Admits; DenOf; dbd; admits-step; admits-wk; unended; tab-func;
+  using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub;
+  shownᵇ; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps; Aligned;
+  aligned-⊕; Rest; Out; out; SameBd; sameBd; same-bd; HotR; EnvR; envR; EnvEq; maps; lw; lw*;
+  hot; hot-coh; EnvCut; Full; Coh; Admits; DenOf; dbd; admits-step; admits-wk; tab-func;
   tab-flat)
-open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
 open import simultaneous.TableTake using (take-tab; take-bd; take-bd*; take-cong)
 open import simultaneous.TableScan using (scan-tab)

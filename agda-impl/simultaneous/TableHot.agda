@@ -110,18 +110,9 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
 
   opaque
     unfolding hD hD*
-    hD-eq : hD ≡ listHot n s uρ (lw env) p a
-    hD-eq = refl
-
-    hD*-eq : hD* ≡ listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
-    hD*-eq = refl
-
-    -- Each hot hangs at its source's tree's boundaries.
+    -- The hot hangs at its source's tree's boundaries.
     hD-bd : hbd hD ≡ bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ])
     hD-bd = refl
-
-    hD*-bd : hbd hD* ≡ bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ])
-    hD*-bd = refl
 
     -- The scope's boundaries: the source's tree's, then the old.
     D′-bd : (λ {X} → dbd D′ {X}) ≡ (λ {X} → (bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ]) ∷ᵇ dbd (lw env)) {X})
