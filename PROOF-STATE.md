@@ -333,7 +333,7 @@ The rewrite: the plain cold's cuts, renamed onto the elaborated
 cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
-Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`, `walk-apart`,
+Members: `walk-under`, `walk-end`, `walk-before`, `walk-apart`,
 `walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-alone`,
 `φ-mono`, `φ-inst`, `φ-home`, `φ-after`, `φ-back`.
 
