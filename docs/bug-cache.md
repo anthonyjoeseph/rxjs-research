@@ -18,7 +18,7 @@ QuickCheck sweep samples. A row says only which program to run.
 
 **The runner matches its verdicts in a helper, never with a `with`.** A `with` on
 the verdict makes the typechecker normalise a whole run and exhausts any heap;
-see [agda-traps.md](agda-traps.md).
+see the Agda traps in [CLAUDE.md](../CLAUDE.md).
 
 ## The verdict is text, and the target demands it
 

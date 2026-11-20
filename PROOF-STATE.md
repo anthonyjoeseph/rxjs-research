@@ -34,14 +34,12 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
-Each part's pair and clearance hold at its tree's boundaries
-(`Out.bd-pin`); the merge's elaborated outer hangs at the source's
-(`mg-each-bd→`), its rows the source's images relocated under the
-share, the end at the later of its own and the trigger's. Open: the end
-relocated past a boundary; a late row put past one; the lanes likewise
-under `laneˢ`. Settled by bodies.
+A late row put past a tree boundary (`mg-o-pb`); then the lanes under
+`laneˢ`, whose `Rel.Bd` is not yet pinned to the lane tree's `bd`.
+Untried. Settled by bodies over the parts' fields, or a late row whose
+placement crosses a boundary its image does not.
 
-Members: `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
+Members: `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
 `mg-outer-lead`, `mg-lane-lead`.
 
@@ -52,7 +50,7 @@ cut the other parts' marks alike, a merge row's map is its outer's (`φo`) or it
 image row is a row's. Untried. Settled by bodies over the listing, or
 a lane row ordered against an outer mark unlike its image.
 
-Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-skip`, `mg-val←`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
+Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-src`, `mg-val←`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
 `mg-img`, `mg-outer-lane`, `mg-outer-lane-put`,
 `mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
 
@@ -114,7 +112,7 @@ Each core's pair with the plain flatMap's: the merge's is
 over `cc-bd`, `sw-bd`, `ex-bd`, opaque; a bounded merge hangs only where
 its outer or a lane does. Settled by bodies.
 
-Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`, `share-bd→`, `share-bd←`.
 
 #### THE CONNECT'S HANGS
 

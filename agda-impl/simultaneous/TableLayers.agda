@@ -320,7 +320,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     sr-bd* = bd n (elab ρι (flatMap op f s)) ρ* uρ* (dbd (lw* env)) p*
 
     sr-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) sr-bd*
-    sr-bounded* = tree-bounded n (elab ρι (flatMap op f s)) ρ* uρ* (lw* env) p* ad*
+    sr-bounded* = tree-bounded n (elab _ (flatMap op f s)) ρ* uρ* (lw* env) p* ad*
 
     postulate
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
@@ -342,26 +342,26 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     sr-after {N} = after-ok (3 + N) n (flatMap op f s) {ρ N} p
 
     sr-got* : ∀ N → Got (Q′ N)
-    sr-got* N = got-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} (uρ* N) p*
+    sr-got* N = got-ok (3 + N) n (elab _ (flatMap op f s)) {ρ* N} (uρ* N) p*
 
     sr-pin-in* : ∀ {N l r} → TR (Q′ N) l (pin r) → T (inside r l)
-    sr-pin-in* {N} = pin-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
+    sr-pin-in* {N} = pin-ok (3 + N) n (elab _ (flatMap op f s)) {ρ* N} p*
 
     -- The closer's images lie past the share, two labels up.
     sr-after-φ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → p* ≼ φ′ N k
     sr-after-φ {N} {k} x u nl = ≼-trans {p*} {c₃} {φ′ N k} (≼-ˡ p* (ix 0 ∷ ix 0 ∷ [])) (Rel.after-φ R (pd-keep {op} {N} x u) u (nl-pd x u nl))
 
     sr-after* : ∀ {N l e} → TR (Q′ N) l e → p* ≼ l
-    sr-after* {N} = after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
+    sr-after* {N} = after-ok (3 + N) n (elab _ (flatMap op f s)) {ρ* N} p*
 
     sr-pin-after* : ∀ {N l r} → TR (Q′ N) l (pin r) → p* ≼ r
-    sr-pin-after* {N} = pin-after-ok (3 + N) n (elab ρι (flatMap op f s)) {ρ* N} p*
+    sr-pin-after* {N} = pin-after-ok (3 + N) n (elab _ (flatMap op f s)) {ρ* N} p*
 
     rel′ : Rel P′ Q′ p p*
     rel′ = record
       { φ = φ′ ; Put = Put′ ; Late = Late′ ; corr = sr-corr ; bk = bk′ ; in-bk = sr-in-bk ; pb-few = sr-pb-few
-      ; func = tab-func n (flatMap op f s) uρ (lw env) ad ; func* = tab-func n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
-      ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
+      ; func = tab-func n (flatMap op f s) uρ (lw env) ad ; func* = tab-func n (elab _ (flatMap op f s)) uρ* (lw* env) ad*
+      ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab _ (flatMap op f s)) uρ* (lw* env) ad*
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after*
       ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = sr-across ; skip-off* = sr-put-off* }
@@ -394,7 +394,7 @@ module FlatRel {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs T
   module G = Layers n f s ρ uρ ρι ρ* uρ* env p p* ad ad*
 
   path : List Label
-  path = ix 1 ∷ ix 0 ∷ sub (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ∷ ix 1 ∷ []
+  path = ix 1 ∷ last ∷ sub (p* ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []
 
   Os : F.Src
   Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.ttD env) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)

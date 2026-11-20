@@ -24,27 +24,26 @@
 module simultaneous.TreeBounded where
 
 open import Data.Bool using (T)
-open import Data.Bool.Properties using (T-≡)
 open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
-open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
+open import Data.Unit using (⊤)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap;
   connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
-open import denotation.Events using (Timeline; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; on-out; module Connecting)
+open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end; module Connecting)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; ok-in)
+open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix;
+  plain-last; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
@@ -61,7 +60,8 @@ open import simultaneous.TableCorr using (keys; in-keys)
 open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
-open import simultaneous.TableEnv using (Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
+open import simultaneous.TableRows using (part-≺)
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
 open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd; cold-bd)
@@ -221,40 +221,37 @@ mutual
   tree-bounded zero    (defer l)         ρ uρ D p a = SpinB.bounded p
   tree-bounded (suc n) (defer l)         ρ uρ D p a = later-bounded ρ uρ D n l p a
 
--- A ONE-VALUE TRIGGER'S LANE: a connect at `c` whose source is `of
--- [tt]`, its value read by a flatMap subscribed one label under the
--- body.  The lane under the value is admissible.
+-- A SHARED CHILD'S LANE: a connect at `c` whose source is `empty`, its
+-- end read by a blocker lane of a flatMap subscribed one label under
+-- the body, the child queued behind that blocker.  The child's lane,
+-- past the trigger's end, is admissible.
 admits-trig : ∀ {Γ} n {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
-            → Admits (den-cons (listHot n (of (tt ∷ [])) u D c a) D) (c ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub (c ⊕ [ ix 0 ] ⊕ [ ix 1 ]) ] ⊕ [ ix 1 ])
+            → Admits (den-cons (listHot n (empty {A = ⊤}) u D c a) D)
+                     (c ⊕ˡ (ix 1 ∷ last ∷ sub (c ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []))
 admits-trig n u D c a =
   ok-step (h ⊕ [ sub r ]) (ok-in (proj₁ ar) (join (inj₁ hh) here lt) (real-sub h rh (proj₁ (proj₁ ar)) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h [])))) ,
   past-⊕ (h ⊕ [ sub r ]) (ix 1) [] (past-⊕ h (sub r) [] (past-up r h (proj₂ ar) (≺→≼ {r} {h} lt)))
   where
-    hD = listHot n (of (tt ∷ [])) u D c a
+    hD = listHot n (empty {A = ⊤}) u D c a
     r h : Pos
-    r = c ⊕ [ ix 0 ] ⊕ [ ix 1 ]
-    h = c ⊕ [ ix 1 ] ⊕ [ ix 0 ]
+    r = c ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+    h = c ⊕ˡ (ix 1 ∷ last ∷ [])
 
     ar : Admits (den-cons hD D) r
-    ar = admits-step (den-cons hD D) (admits-body n (of (tt ∷ [])) u D c a)
+    ar = admits-ix (den-cons hD D) 1 (admits-ix (den-cons hD D) 0 (admits-step (den-cons hD D) (admits-body n (empty {A = ⊤}) u D c a)))
 
     rh : Real h
-    rh = real-snoc (c ⊕ [ ix 1 ]) plain-ix (real-snoc c plain-ix (proj₁ (proj₁ a)))
+    rh = real-snoc (c ⊕ [ ix 1 ]) plain-last (real-snoc c plain-ix (proj₁ (proj₁ a)))
 
     lt : r ≺ h
-    lt = subst₂ _≺_ (sym (⊕-assoc c [ ix 0 ] [ ix 1 ])) (sym (⊕-assoc c [ ix 1 ] [ ix 0 ]))
-           (Equivalence.from T-≡ (<ᵖ-part c (ix 1 ∷ []) (ix 0 ∷ []) refl))
+    lt = part-≺ c (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ []) refl
 
-    s₁ : Pos
-    s₁ = c ⊕ [ ix 1 ]
-
-    -- The trigger's one value, before its end.
-    row : hev hD 0 h (out tt)
-    row = (at-out , (h ∷ (s₁ ⊕ [ last ]) ∷ []) , λ { at-out _ _ → here refl ; (on-out at-end) _ _ → there (here refl) })
-        , λ { (on-out at-end , _) → ≺→≼ {h} {s₁ ⊕ [ last ]} (Equivalence.from T-≡ (<ᵖ-part s₁ [] [] refl)) }
+    -- The trigger's end.
+    row : hev hD 0 h end
+    row = (at-end , (h ∷ []) , λ { at-end _ _ → here refl }) , λ { (at-end , _) → ≼-refl {h} }
 
     hh : HotsAll (den-cons hD D) h
-    hh = 0 , inj₁ (out tt , row)
+    hh = 0 , inj₁ (end , row)
 
 -- An elaborated connect's hot ends no lane, wherever its scope's hots end none.
 listHot-u : ∀ {Γ Δ X} n {ρι : Ren Γ Δ} (s : Obs Timeline Γ X) {ρ* : ℕ → All Tb.Listed Δ} (u : ∀ N → UncutEnv (ρ* N)) (D : DenOf ρ*) c a

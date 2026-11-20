@@ -22,7 +22,7 @@ open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
-open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; Part; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -80,7 +80,7 @@ open import simultaneous.Project using (Proj; proj-outs; run-prefix)
 open import denotation.EmissionSet using (skip; pin; Few; _≼_; module TakeWhile)
 open import denotation.Read using (After; cursor)
 open import Data.Nat.Properties using (0≢1+n)
-open import Data.Bool using (T)
+open import Data.Bool using (Bool; T)
 open import denotation.Position using (isLt; cmpPath)
 open import denotation.Simultaneity using (reflⁱ)
 open import denotation.EmissionSet using (_≺_)
@@ -280,8 +280,8 @@ ev-none (just n) s env P (TakeWhile.fail _ _ _ () , _)
 module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (s : Obs Timeline Γ A) (env : DenEnv Δ) (p : Pos) where
 
-  g : A → Obs Timeline (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
-  g a = elab (λ i → there (there (there (there (ρ i))))) (f a)
+  g : A → Part → Bool → Obs Timeline (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
+  g a k c = laneSrc (λ i → there (there (there (there (ρ i))))) (f a) k c
 
   tk : Obs Timeline (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes)
   tk = trackers Γ 0 (λ i → there (there (there (there (ρ i)))))
@@ -289,9 +289,9 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   real : Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   real = flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))
 
-  -- The outer, a lane of the trigger.
+  -- The outer, queued past the trigger's lane.
   trig : Obs Timeline (⊤ ∷ Δ) (IE A)
-  trig = flatMap (mergeᶠ nothing) (λ _ → elab (λ i → there (ρ i)) s) (connected (here refl))
+  trig = flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ []))
 
   c p₀ p₀₀ : Pos
   c   = p ⊕ [ ix 0 ]
@@ -299,7 +299,7 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   p₀₀ = p₀ ⊕ [ ix 0 ]
 
   σ₀ : EmissionSet ⊤
-  σ₀ = Proper (enter (ev m (of (tt ∷ [])) env) (p ⊕ [ ix 1 ]))
+  σ₀ = Proper (enter (ev m empty env) (p ⊕ [ ix 1 ]))
 
   env₀ : DenEnv (⊤ ∷ Δ)
   env₀ = hot σ₀ ∷ env
@@ -717,16 +717,17 @@ held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok
     (CombSrc.scan-rest m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where
     open FlatHots m ρ op f s env p using (src; env′; P)
-    L₀ = src-lawful {s = ev m (of (tt ∷ [])) env} {F = λ h → ev m (of (tt ∷ [])) (h ∷ env)} (inv-ev m (of (tt ∷ [])) env gd) (λ L → inv-ev m (of (tt ∷ [])) (hot _ ∷ env) (good-cons L gd)) p ok
+    L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
 
--- A TRIGGERED LANE HOLDS as its child does: the child is subscribed once,
--- at the trigger's one row, inside the share's own burst, which the
--- share's subscription exempts.
+-- A SHARED OUTER HOLDS as the outer does: the trigger's lane holds
+-- nothing, and the outer is subscribed once, as the trigger ends, inside
+-- the share's own burst, which the share's subscription exempts.
 postulate
-  held-trigger : ∀ m {Δ A} (x : Obs Timeline (⊤ ∷ Δ) (IE A)) (env : DenEnv Δ) cs p → GoodEnv env → Ok (Hots env) p → Early p
-               → let σ₀ = Proper (enter (ev m (of (tt ∷ [])) env) (p ⊕ [ ix 1 ])) in
-                 HeldD (Hots (hot σ₀ ∷ env)) (ev m x (hot σ₀ ∷ env)) cs
-               → Held (enter (ev m (flatMap (mergeᶠ nothing) (λ _ → x) (connected (here refl))) (hot σ₀ ∷ env)) ((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))
+  held-trigger : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs p
+               → GoodEnv env → Ok (Hots env) p → Early p
+               → let σ₀ = Proper (enter (ev m empty env) (p ⊕ [ ix 1 ])) in
+                 HeldD (Hots (hot σ₀ ∷ env)) (ev m (elab (λ i → there (ρ i)) s) (hot σ₀ ∷ env)) cs
+               → Held (enter (ev m (flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ []))) (hot σ₀ ∷ env)) ((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))
                       (((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ∷ p ∷ cs)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
@@ -734,12 +735,12 @@ held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
 held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
   let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀) in
-  conn-ev m (of (tt ∷ [])) _ env cs g p ok ep λ L₀ ok₀ ep₀ →
+  conn-ev m empty _ env cs g p ok ep λ L₀ ok₀ ep₀ →
     conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ λ L₁ ok₁ ep₁ →
       conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ λ L₂ ok₂ ep₂ →
         conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok ep
-            (held-trigger m (elab (λ i → there (ρ i)) s) env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
+            (held-trigger m ρ s env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body

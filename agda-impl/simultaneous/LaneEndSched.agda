@@ -12,50 +12,48 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; _+_; s≤s; z≤n)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 
-open import Tree using (Obs; mergeᶠ; of; flatMap; takeWhile; scan; connect; connected)
-open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_; _<ᵖ_)
+open import Tree using (Obs; mergeᶠ; empty; of; flatMap; scan; connect; connected)
+open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; shown; ended;
-  at-out; at-end; on-out; _≺_; _≼_; module Op; module Bounded; module Scan; module TakeWhile;
-  module Values)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; ended; at-out;
+  at-end; on-out; _≺_; _≼_; module Op; module Bounded; module Scan; module Values;
+  module Joining)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-ext)
-open import denotation.Laws.Worlds using (notT)
+open import denotation.Laws.Worlds using (notT; InvAt)
 open import denotation.Laws.Cut using (capprox; inv-capprox; ix-asc)
-open import denotation.Laws.BoundedInv using (module BoundedI)
+open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
 open import denotation.Laws.Nth using (module Nths)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf)
 open import quickcheck.Tabled.Exact using (EnvRel; rejoin-exact; proper-exact)
 open import quickcheck.Tabled.Exact.Base using (sound)
-open import simultaneous.SObs using (lone; Part; lanePart; burstPart; isLane; module Elaborate)
+open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; raw-exact; in-raw; Raw; Own; UncutEnv)
 open import simultaneous.TableKit using (TR)
-open import simultaneous.TableEnv using (_⊕ˡ_; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at)
+open import simultaneous.TableEnv using (_⊕ˡ_; up; up-⊕; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at; admits-step)
 open import simultaneous.TreeBounded using (listHot; admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
-open import simultaneous.DenRows using (conn-out; merge-out; hot-out; scan-out; bounded-out; of-mem)
+open import simultaneous.DenRows using (conn-out; merge-out; hot-out; scan-out; bounded-out; of-mem; each-one)
 open import simultaneous.ElabUndone using (Undone; Sends; sd-[]; sd-rep)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
   laneDone; burstEnd; outerDone; subscribed; completed)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; laneˢ; shareˢ; counted; framed; piece; laneStep; undone; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; blockˢ; laneSrc; elab; counted; framed; piece; laneStep; undone; marked)
 
 ------------------------------------------------------------------------
 -- Where `laneˢ` puts things, subscribed at `st`
 
--- Its trigger's lane, the elaborated lane under it, and the trigger's
--- end rejoined by the share.
-laneXt trigXs : Pos → List Label
-laneXt st = ix 1 ∷ ix 0 ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ []
-trigXs st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ []
+-- The elaborated lane, queued behind the blocker.
+laneXt : Pos → List Label
+laneXt st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []
 
 -- The lane part's connect, the elaborated lane, the share's reader.
 laneL laneX readerR : Pos → Pos
@@ -66,21 +64,6 @@ readerR st = laneL st ⊕ˡ (ix 0 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
 -- Where `counted` sends what its scan reads at `r`.
 emitAt : Pos → Pos
 emitAt r = r ⊕ˡ (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
-
--- The later of two positions.
-pick : Bool → Pos → Pos → Pos
-pick true  e t = t
-pick false e t = e
-
-later : Pos → Pos → Pos
-later e t = pick (e <ᵖ t) e t
-
-later-cases : ∀ e t → (later e t ≡ e × t ≼ e) ⊎ (later e t ≡ t × e ≺ t)
-later-cases e t = go (e <ᵖ t) refl
-  where
-    go : ∀ b → (e <ᵖ t) ≡ b → (pick b e t ≡ e × t ≼ e) ⊎ (pick b e t ≡ t × e ≺ t)
-    go true  eq = inj₂ (refl , subst T (sym eq) tt)
-    go false eq = inj₁ (refl , λ h → subst T eq h)
 
 ≺-ˡ : ∀ x l ls → x ≺ (x ⊕ˡ (l ∷ ls))
 ≺-ˡ x l ls = subst (x ≺_) (sym (⊕ˡ-⊕ x (l ∷ ls))) (≺-ext x ls)
@@ -172,23 +155,214 @@ of-one p x at-out      = refl , refl
 of-one p x (on-out ())
 
 ------------------------------------------------------------------------
--- The lane
+-- A share at `c`: an `empty` trigger, read by a concat whose first lane,
+-- the blocker, ends on the trigger's end, and whose second, the child,
+-- is queued behind it
 
-module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B)) {ρ : ℕ → All Tb.Listed Θ} (u : ∀ N → UncutEnv (ρ N))
-              (D : DenOf ρ) (st : Pos) (ad : Admits D st) (N : ℕ) (ux : ∀ h → Undone (capprox (3 + N) n x (h ∷ den D N))) where
+module Share {Θ : List Set} {B : Set} n (F : Bool → Obs Timeline (⊤ ∷ Θ) B) (fb : F true ≡ blockˢ)
+             {ρ : ℕ → All Tb.Listed Θ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) (c : Pos) (ac : Admits D c) (N : ℕ) where
 
   K : ℕ
   K = 3 + N
 
-  -- The two parts' children.
-  G : Part → Obs Timeline (⊤ ∷ Θ) (IE B)
-  G k = flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))
+  Sh : Obs Timeline (⊤ ∷ Θ) B
+  Sh = flatMap (mergeᶠ (just 1)) F (of (true ∷ false ∷ []))
+
+  L₁ S bq T′ Xp : Pos
+  L₁ = c ⊕ [ ix 1 ]
+  S = (c ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+  bq = (S ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+  T′ = c ⊕ˡ (ix 1 ∷ last ∷ sub bq ∷ [])
+  Xp = T′ ⊕ [ ix 1 ]
+
+  ρ₀ : DenEnv Θ
+  ρ₀ = den D N
+
+  h₁ = listHot n (empty {A = ⊤}) u D c ac
+  D₁ = den-cons h₁ D
+
+  a₁ : Admits D₁ (c ⊕ [ ix 0 ])
+  a₁ = admits-body n (empty {A = ⊤}) u D c ac
+
+  trig : ℕ → Tb.Listed ⊤
+  trig N′ = hotOf (proj₁ (listC-ok (3 + N′) n (empty {A = ⊤}) (u N′) L₁))
+
+  ℓ₁ : ℕ → All Tb.Listed (⊤ ∷ Θ)
+  ℓ₁ N′ = trig N′ ∷ ρ N′
+
+  u₁ : ∀ N′ → UncutEnv (ℓ₁ N′)
+  u₁ N′ = proj₂ (proj₂ (listC-ok (3 + N′) n (empty {A = ⊤}) (u N′) L₁)) , u N′
+
+  ρ₁ = den D₁ N
+
+  σ₁ : EmissionSet ⊤
+  σ₁ = enter (capprox K n (empty {A = ⊤}) ρ₀) L₁
+
+  σ₂ : EmissionSet B
+  σ₂ = enter (capprox K n Sh ρ₁) S
+
+  -- The trigger: its end only.
+  σ₁-end : σ₁ (L₁ ⊕ [ last ]) end
+  σ₁-end = raw-in K n (empty {A = ⊤}) tt (den-ex D N) (u N) L₁ at-end
+
+  σ₁-end⁻ : ∀ {c′} → σ₁ c′ end → c′ ≡ L₁ ⊕ [ last ]
+  σ₁-end⁻ (at-end , _) = refl
+
+  H₁-end : Proper σ₁ (L₁ ⊕ [ last ]) end
+  H₁-end = σ₁-end , λ c′ → subst (λ c″ → (L₁ ⊕ [ last ]) ≼ c″) (sym (σ₁-end⁻ c′)) (≼-refl {L₁ ⊕ [ last ]})
+
+  -- The blocker reads the trigger's end, and nothing else.
+  bq-L₁ : bq ≺ (L₁ ⊕ [ last ])
+  bq-L₁ = part-≺ c (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ []) refl
+
+  r₁-end : enter (ES.hot (Proper σ₁)) bq T′ end
+  r₁-end = hot-in n (empty {A = ⊤}) u D c N bq (ended H₁-end bq-L₁)
+
+  r₁-no : ∀ {k y} → enter (ES.hot (Proper σ₁)) bq k (out y) → ⊥
+  r₁-no r with hot-out r
+  ... | _ , ((() , _) , _) , _
+
+  -- The concat's two values.
+  Os : EmissionSet Bool
+  Os = enter (Op.of (true ∷ false ∷ [])) S
+
+  module Bs = Bounded 1 (λ b → capprox K n (F b) ρ₁) Os
+  open Nths Os using () renaming (nth-inj to nth-injS; nth-val to nth-valS) public
+
+  aS : Admits D₁ S
+  aS = admits-step D₁ a₁
+
+  okS = admits-at D₁ aS N
+  module BS = BoundedI okS 1 (λ b → capprox K n (F b) ρ₁) (λ b → inv-capprox K n (F b) ρ₁ (den-ok D₁ N))
+    (inv-capprox K n (of (true ∷ false ∷ [])) ρ₁ (den-ok D₁ N) S okS)
+
+  os₀ : Os (S ⊕ [ ix 0 ]) (out true)
+  os₀ = raw-in K n (of (true ∷ false ∷ [])) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) S at-out
+
+  os₁ : Os (S ⊕ [ ix 1 ]) (out false)
+  os₁ = raw-in K n (of (true ∷ false ∷ [])) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) S (on-out at-out)
+
+  os-end : Os (S ⊕ [ last ]) end
+  os-end = raw-in K n (of (true ∷ false ∷ [])) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) S (on-out (on-out at-end))
+
+  S01 : (S ⊕ [ ix 0 ]) ≺ (S ⊕ [ ix 1 ])
+  S01 = ix-asc S (s≤s z≤n)
+
+  os-min : ∀ {k b} → Os k (out b) → (S ⊕ [ ix 0 ]) ≼ k
+  os-min (at-out , _)                 = ≼-refl {S ⊕ [ ix 0 ]}
+  os-min (on-out at-out , _)          = ≺→≼ {S ⊕ [ ix 0 ]} {S ⊕ [ ix 1 ]} S01
+  os-min (on-out (on-out ()) , _)
+
+  os-nx : Values.Next Os (S ⊕ [ ix 0 ]) (S ⊕ [ ix 1 ])
+  os-nx (at-out , _)        lt = ⊥-elim (≺-irrefl {S ⊕ [ ix 0 ]} lt)
+  os-nx (on-out at-out , _) _  = ≼-refl {S ⊕ [ ix 1 ]}
+  os-nx (on-out (on-out ()) , _) _
+
+  nS₀ : Values.Nth Os 0 (S ⊕ [ ix 0 ]) true
+  nS₀ = Values.first os₀ os-min
+
+  nS₁ : Values.Nth Os 1 (S ⊕ [ ix 1 ]) false
+  nS₁ = Values.next nS₀ os₁ S01 os-nx
+
+  -- The blocker, subscribed at `bq`, ends at `T′`, there only.
+  abq : Admits D₁ bq
+  abq = admits-ix D₁ 1 (admits-ix D₁ 0 aS)
+
+  Iblk : InvAt _ bq (enter (capprox K n (F true) ρ₁) bq)
+  Iblk = inv-capprox K n (F true) ρ₁ (den-ok D₁ N) bq (admits-at D₁ abq N)
+
+  blk-end : enter (capprox K n (F true) ρ₁) bq T′ end
+  blk-end = subst (λ o′ → enter (capprox K n o′ ρ₁) bq T′ end) (sym fb)
+    (raw-in K n (blockˢ {X = B}) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) bq
+      (Joining.oend r₁-end ((T′ , r₁-end , ≼-refl {T′}) , λ hq _ _ _ → ⊥-elim (r₁-no hq))))
+
+  bq-T : bq ≺ T′
+  bq-T = part-≺ c (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ sub bq ∷ []) refl
+
+  sbS₀ : Bs.Sub 0 (S ⊕ [ ix 0 ]) bq true
+  sbS₀ = nS₀ , Bs.room (s≤s z≤n)
+
+  blk-ends : Bs.Ends 0 [] T′
+  blk-ends = S ⊕ [ ix 0 ] , true , bq , nS₀ , Bs.room (s≤s z≤n) , (blk-end , bq-T)
+
+  blk-uniq : ∀ {c′} → Bs.Ends 0 [] c′ → c′ ≡ T′
+  blk-uniq (_ , _ , _ , nq , sq , af) with BS.sub-fun (nq , sq) sbS₀
+  ... | refl , refl , refl = end-uniq Iblk (proj₁ af) blk-end
+
+  S1-T : (S ⊕ [ ix 1 ]) ≺ T′
+  S1-T = part-≺ c (ix 1 ∷ ix 1 ∷ []) (last ∷ sub bq ∷ []) refl
+
+  nKS : ¬ Bs.Kth (_≺ T′) (Bs.Sched 1) 0
+  nKS (inj₁ (c′ , ec , lt)) = ≺-irrefl {T′} (subst (_≺ T′) (blk-uniq ec) lt)
+  nKS (inj₂ ())
+
+  -- The child, queued where the blocker ends.
+  sbX : Bs.Sub 1 (S ⊕ [ ix 1 ]) Xp false
+  sbX = nS₁ , Bs.queued (s≤s z≤n) S1-T (inj₁ (T′ , blk-ends , refl)) (inj₁ (T′ , blk-ends , ≼-refl {T′})) nKS
+
+  T-X : T′ ≺ Xp
+  T-X = ≺-ext T′ []
+
+  Sl-T : (S ⊕ [ last ]) ≺ T′
+  Sl-T = part-≺ c (ix 1 ∷ last ∷ []) (last ∷ sub bq ∷ []) refl
+
+  S0-T : (S ⊕ [ ix 0 ]) ≺ T′
+  S0-T = part-≺ c (ix 1 ∷ ix 0 ∷ []) (last ∷ sub bq ∷ []) refl
+
+  -- The child's values are the share's.
+  share-out : ∀ {k y} → enter (capprox K n (F false) ρ₁) Xp k (out y) → Xp ≺ k → σ₂ k (out y)
+  share-out r lt = raw-in K n Sh tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) S (Joining.lane os₁ (1 , false , nS₁) (1 , Xp , sbX , (r , lt)) (λ ()) tt)
+
+  -- The share ends where the child does.
+  module ShareEnd {e : Pos} (xe : enter (capprox K n (F false) ρ₁) Xp e end) (lx : Xp ≺ e) where
+
+    T-e : T′ ≺ e
+    T-e = ≺-trans {T′} {Xp} {e} T-X lx
+
+    snoc-inj : ∀ {y} → e ⊕ [ ix 1 ] ≡ y ⊕ [ ix 1 ] → e ≡ y
+    snoc-inj {y} eq = trans (sym (up-⊕ e (ix 1))) (trans (cong up eq) (up-⊕ y (ix 1)))
+
+    not-at : ∀ {y} → e ≡ y → y ≺ e → ⊥
+    not-at refl lt = ≺-irrefl {e} lt
+
+    hand-at : ∀ {i q a} → Os q (out a) → Bs.Sub i q (e ⊕ [ ix 1 ]) a → ⊥
+    hand-at (at-out , _) sb with nth-injS (proj₁ sb) nS₀
+    ... | refl = not-at (snoc-inj (proj₂ (proj₂ (BS.sub-fun sb sbS₀)))) (≺-trans {S ⊕ [ ix 0 ]} {T′} {e} S0-T T-e)
+    hand-at (on-out at-out , _) sb with nth-injS (proj₁ sb) nS₁
+    ... | refl = not-at (snoc-inj (proj₂ (proj₂ (BS.sub-fun sb sbX)))) T-e
+    hand-at (on-out (on-out ()) , _) _
+
+    hand-no : ¬ Bs.Queued e
+    hand-no (_ , _ , _ , sb) = hand-at (nth-valS (proj₁ sb)) sb
+
+    share-end : σ₂ e end
+    share-end = raw-in K n Sh tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) S
+      (Joining.lend os₁ (1 , false , nS₁) (1 , Xp , sbX , (xe , lx)) (λ ()) hand-no
+        ((S ⊕ [ last ] , os-end , ≺→≼ {S ⊕ [ last ]} {e} (≺-trans {S ⊕ [ last ]} {T′} {e} Sl-T T-e)) ,
+         λ { (at-out , _) _ _ _ → T′ , (0 , bq , sbS₀ , (blk-end , bq-T)) , ≺→≼ {T′} {e} T-e
+           ; (on-out at-out , _) _ _ _ → e , (1 , Xp , sbX , (xe , lx)) , ≼-refl {e}
+           ; (on-out (on-out ()) , _) _ _ _ }))
+
+------------------------------------------------------------------------
+-- The lane
+
+module Ending {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ ∷ Θ) (o : Obs Timeline Γ′ B)
+              {ρ : ℕ → All Tb.Listed Θ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) (st : Pos) (ad : Admits D st) (N : ℕ)
+              (ux : ∀ h → Undone (capprox (3 + N) n (elab ρ′ o) (h ∷ den D N))) where
+
+  K : ℕ
+  K = 3 + N
+
+  -- The two parts' children: the blocker, then the elaborated lane in
+  -- the lane part only.
+  x : Part → Bool → Obs Timeline (⊤ ∷ Θ) (IE B)
+  x k c = laneSrc ρ′ o k c
 
   Sh : Part → Obs Timeline (⊤ ∷ Θ) (IE B)
-  Sh k = flatMap (mergeᶠ nothing) (λ _ → G k) (connected (here refl))
+  Sh k = flatMap (mergeᶠ (just 1)) (x k) (of (true ∷ false ∷ []))
 
   M : Obs Timeline Θ (IE B)
-  M = flatMap (mergeᶠ nothing) (λ k → shareˢ (G k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
+  M = flatMap (mergeᶠ nothing) (λ k → shareˢ (x k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
   inner : Routes × (List (IE B) × List (IE B)) → Obs Timeline (IE B ∷ ⊤ ∷ Θ) (IE B)
   inner y = flatMap (mergeᶠ nothing) (λ c → of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (of (true ∷ false ∷ []))
@@ -202,12 +376,23 @@ module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B))
   ρ₀ : DenEnv Θ
   ρ₀ = den D N
 
+  -- The blocker sends nothing.
+  blk-u : ∀ {Γ} (ρ : DenEnv (⊤ ∷ Γ)) → Undone (capprox K n (blockˢ {X = IE B}) ρ)
+  blk-u ρ p r with each-one (λ _ → []) (capprox K n (connected (here refl)) ρ) p r
+  ... | _ , _ , _ , ()
+
+  -- No child of a part ends a lane.
+  ux′ : ∀ k c h → Undone (capprox K n (x k c) (h ∷ ρ₀))
+  ux′ k         true  h = blk-u (h ∷ ρ₀)
+  ux′ lanePart  false h = ux h
+  ux′ burstPart false h p (() , _)
+
   ----------------------------------------------------------------------
   -- Every lane, wherever subscribed: what ends the take
 
   module Peel (k : Part) (P : Pos) where
     σ₁P : EmissionSet ⊤
-    σ₁P = enter (Op.of (tt ∷ [])) (P ⊕ [ ix 1 ])
+    σ₁P = enter Op.empty (P ⊕ [ ix 1 ])
 
     ρ₁P : DenEnv (⊤ ∷ Θ)
     ρ₁P = ES.hot (Proper σ₁P) ∷ ρ₀
@@ -235,24 +420,22 @@ module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B))
     pick-lane v _ s₀ a₀ fa refl (on-out (on-out ()) , _) _ _
 
     -- What the lane ends the take with is what its scan read.
-    peel : ∀ {q a} → enter (capprox K n (shareˢ (G k) (counted (framed k))) ρ₀) P q (out a) → T (not (undone a))
+    peel : ∀ {q a} → enter (capprox K n (shareˢ (x k) (counted (framed k))) ρ₀) P q (out a) → T (not (undone a))
          → Σ Pos λ v → Σ (IE B) λ a₀ → q ≡ emitAt v × FrP v (out a₀) × T (not (undone a₀))
     peel r nu =
-      let r₁ = conn-out (capprox K n (of (tt ∷ [])) ρ₀) (λ h → capprox K n (connect (Sh k) (counted (framed k))) (h ∷ ρ₀)) P r
+      let r₁ = conn-out (capprox K n empty ρ₀) (λ h → capprox K n (connect (Sh k) (counted (framed k))) (h ∷ ρ₀)) P r
           r₂ = conn-out (capprox K n (Sh k) ρ₁P) (λ h → capprox K n (counted (framed k)) (h ∷ ρ₁P)) (P ⊕ [ ix 0 ]) r₁
           (v , y , sv , il , _) = merge-out (λ y → capprox K n (inner y) ρ₂P) (Op.scan laneStep z₀ (capprox K n (framed k) ρ₂P)) BP r₂
           (w , c , ow , (ll , _) , _) = merge-out (λ c → Op.of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (Op.of (true ∷ false ∷ [])) (v ⊕ [ ix 1 ]) il
           (s₀ , a₀ , fa , eq) = scan-out laneStep z₀ (capprox K n (framed k) ρ₂P) BP sv
       in pick-lane v y s₀ a₀ fa eq ow ll nu
 
-    -- The second part reads the share, whose rows are the elaborated
-    -- lane's.
+    -- The second part reads the share, whose rows are its children's.
     h₂-u : ∀ {s v a} → enter (ES.hot (Proper σ₂P)) s v (out a) → T (undone a)
     h₂-u r =
       let (_ , (σq , _) , _ , _) = hot-out r
-          (q₁ , _ , _ , lg , _) = merge-out (λ _ → capprox K n (G k) ρ₁P) (ES.hot (Proper σ₁P)) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) σq
-          (_ , _ , _ , lx , _) = merge-out (λ _ → capprox K n x ρ₁P) (capprox K n (takeWhile false isLane (of (k ∷ []))) ρ₁P) (q₁ ⊕ [ ix 1 ]) lg
-      in ux (ES.hot (Proper σ₁P)) _ lx
+          (_ , c , _ , _ , _ , _ , (l , _)) = bounded-out 1 (λ c → capprox K n (x k c) ρ₁P) (Op.of (true ∷ false ∷ [])) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) σq
+      in ux′ k c (ES.hot (Proper σ₁P)) _ l
 
     module Bp = Bounded 1 (λ j → capprox K n (piece k j) ρ₂P) (enter (Op.of (0 ∷ 1 ∷ 2 ∷ [])) BP)
 
@@ -293,37 +476,16 @@ module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B))
   ----------------------------------------------------------------------
   -- The lane part, at `L`
 
-  L L₁ B₀ S Bc R : Pos
+  L B₀ Bc R : Pos
   L = laneL st
-  L₁ = L ⊕ [ ix 1 ]
   B₀ = L ⊕ [ ix 0 ]
-  S = B₀ ⊕ [ ix 1 ]
   Bc = B₀ ⊕ [ ix 0 ]
   R = readerR st
 
-  qt sp T′ : Pos
-  qt = (L₁ ⊕ [ ix 0 ]) ⊕ [ sub S ]
-  sp = qt ⊕ [ ix 1 ]
-  T′ = laneL st ⊕ˡ trigXs st
-
-  -- The hots and their admissible subscriptions.
   aL : Admits D L
   aL = admits-ix D 1 (admits-ix D 0 ad)
 
-  h₁ = listHot n (of (tt ∷ [])) u D L aL
-  D₁ = den-cons h₁ D
-
-  a₁ : Admits D₁ B₀
-  a₁ = admits-body n (of (tt ∷ [])) u D L aL
-
-  trig : ℕ → Tb.Listed ⊤
-  trig N′ = hotOf (proj₁ (listC-ok (3 + N′) n (of (tt ∷ [])) (u N′) L₁))
-
-  ℓ₁ : ℕ → All Tb.Listed (⊤ ∷ Θ)
-  ℓ₁ N′ = trig N′ ∷ ρ N′
-
-  u₁ : ∀ N′ → UncutEnv (ℓ₁ N′)
-  u₁ N′ = proj₂ (proj₂ (listC-ok (3 + N′) n (of (tt ∷ [])) (u N′) L₁)) , u N′
+  open Share n (x lanePart) refl u D L aL N public hiding (K; ρ₀; Sh)
 
   h₂ = listHot n (Sh lanePart) {ℓ₁} u₁ D₁ B₀ a₁
   D₂ = den-cons h₂ D₁
@@ -337,89 +499,14 @@ module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B))
   u₂ : ∀ N′ → UncutEnv (ℓ₂ N′)
   u₂ N′ = proj₂ (proj₂ (listC-ok (3 + N′) n (Sh lanePart) {ℓ₁ N′} (u₁ N′) S)) , u₁ N′
 
-  ρ₁ = den D₁ N
   ρ₂ = den D₂ N
 
-  σ₁ : EmissionSet ⊤
-  σ₁ = enter (capprox K n (of (tt ∷ [])) ρ₀) L₁
-
-  σ₂ : EmissionSet (IE B)
-  σ₂ = enter (capprox K n (Sh lanePart) ρ₁) S
-
-  -- The trigger: one value, then its end.
-  σ₁-val : σ₁ (L₁ ⊕ [ ix 0 ]) (out tt)
-  σ₁-val = raw-in K n (of (tt ∷ [])) tt (den-ex D N) (u N) L₁ at-out
-
-  σ₁-end : σ₁ (L₁ ⊕ [ last ]) end
-  σ₁-end = raw-in K n (of (tt ∷ [])) tt (den-ex D N) (u N) L₁ (on-out at-end)
-
-  σ₁-end⁻ : ∀ {c} → σ₁ c end → c ≡ L₁ ⊕ [ last ]
-  σ₁-end⁻ (on-out at-end , _) = refl
-
-  σ₁-out⁻ : ∀ {k y} → σ₁ k (out y) → k ≡ L₁ ⊕ [ ix 0 ]
-  σ₁-out⁻ (at-out , _)    = refl
-  σ₁-out⁻ (on-out () , _)
-
-  L₁0-last : (L₁ ⊕ [ ix 0 ]) ≺ (L₁ ⊕ [ last ])
-  L₁0-last = part-≺ L₁ [] [] refl
-
-  H₁-val : Proper σ₁ (L₁ ⊕ [ ix 0 ]) (out tt)
-  H₁-val = σ₁-val , λ c → subst (λ c′ → (L₁ ⊕ [ ix 0 ]) ≼ c′) (sym (σ₁-end⁻ c)) (≺→≼ {L₁ ⊕ [ ix 0 ]} {L₁ ⊕ [ last ]} L₁0-last)
-
-  H₁-end : Proper σ₁ (L₁ ⊕ [ last ]) end
-  H₁-end = σ₁-end , λ c → subst (λ c′ → (L₁ ⊕ [ last ]) ≼ c′) (sym (σ₁-end⁻ c)) (≼-refl {L₁ ⊕ [ last ]})
-
-  -- The share reads it: one value, then the trigger's end.
-  r₁-val : enter (ES.hot (Proper σ₁)) S qt (out tt)
-  r₁-val = hot-in n (of (tt ∷ [])) u D L N S (shown H₁-val tt (part-≺ L (ix 1 ∷ []) (ix 0 ∷ []) refl))
-
-  r₁-end : enter (ES.hot (Proper σ₁)) S T′ end
-  r₁-end = hot-in n (of (tt ∷ [])) u D L N S (ended H₁-end (part-≺ L (ix 1 ∷ []) (last ∷ []) refl))
-
-  r₁-out⁻ : ∀ {k y} → enter (ES.hot (Proper σ₁)) S k (out y) → k ≡ qt
-  r₁-out⁻ r with hot-out r
-  ... | _ , (σq , _) , _ , refl = cong (λ q′ → q′ ⊕ [ sub S ]) (σ₁-out⁻ σq)
-
-  -- The gate passes the lane part's one value, then ends.
-  TW : Obs Timeline (⊤ ∷ Θ) Part
-  TW = takeWhile false isLane (of (lanePart ∷ []))
-
-  tw : EmissionSet Part
-  tw = enter (capprox K n TW ρ₁) sp
-
-  og-val : enter (Op.of (lanePart ∷ [])) sp (sp ⊕ [ ix 0 ]) (out lanePart)
-  og-val = raw-in K n (of (lanePart ∷ [])) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) sp at-out
-
-  og-end : enter (Op.of (lanePart ∷ [])) sp (sp ⊕ [ last ]) end
-  og-end = raw-in K n (of (lanePart ∷ [])) tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) sp (on-out at-end)
-
-  tg-nf : ∀ {k} → ¬ TakeWhile.Failed false isLane (enter (Op.of (lanePart ∷ [])) sp) k
-  tg-nf (_ , _ , (at-out , _) , () , _)
-  tg-nf (_ , _ , (on-out () , _) , _ , _)
-
-  tg-val : tw (sp ⊕ [ ix 0 ]) (out lanePart)
-  tg-val = raw-in K n TW tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) sp (TakeWhile.pass og-val tt tg-nf)
-
-  tg-end : tw (sp ⊕ [ last ]) end
-  tg-end = raw-in K n TW tt {ℓ₁ N} (den-ex D₁ N) (u₁ N) sp (TakeWhile.tend og-end tg-nf)
-
-  tg-out⁻ : ∀ {k y} → tw k (out y) → k ≡ sp ⊕ [ ix 0 ]
-  tg-out⁻ (TakeWhile.pass (at-out , _) _ _ , _)    = refl
-  tg-out⁻ (TakeWhile.pass (on-out () , _) _ _ , _)
-  tg-out⁻ (TakeWhile.fail _ _ _ () , _)
-
-  Gd : Den (IE B)
-  Gd = capprox K n (G lanePart) ρ₁
-
   -- Orders.
-  sl-T : (sp ⊕ [ last ]) ≺ T′
-  sl-T = part-≺ L₁ (sub S ∷ ix 1 ∷ last ∷ []) (sub S ∷ []) refl
-
   R-T : R ≺ T′
-  R-T = part-≺ L (ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (last ∷ sub S ∷ []) refl
+  R-T = part-≺ L (ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (last ∷ sub bq ∷ []) refl
 
   L-T : L ≺ T′
-  L-T = ≺-ˡ L (ix 1) (last ∷ sub S ∷ [])
+  L-T = ≺-ˡ L (ix 1) (last ∷ sub bq ∷ [])
 
   c₀ : Pos
   c₀ = ((Bc ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ [ last ]
@@ -428,10 +515,10 @@ module Ending {Θ : List Set} {B : Set} n (x : Obs Timeline (⊤ ∷ Θ) (IE B))
   c₀-B1 = part-≺ Bc (ix 1 ∷ last ∷ []) [] refl
 
   c₀-T : c₀ ≺ T′
-  c₀-T = part-≺ L (ix 0 ∷ ix 0 ∷ ix 1 ∷ last ∷ []) (last ∷ sub S ∷ []) refl
+  c₀-T = part-≺ L (ix 0 ∷ ix 0 ∷ ix 1 ∷ last ∷ []) (last ∷ sub bq ∷ []) refl
 
   B2-T : (Bc ⊕ [ ix 2 ]) ≺ T′
-  B2-T = part-≺ L (ix 0 ∷ ix 2 ∷ []) (last ∷ sub S ∷ []) refl
+  B2-T = part-≺ L (ix 0 ∷ ix 2 ∷ []) (last ∷ sub bq ∷ []) refl
 
   -- The framed parts and their schedule.
   Fj : ℕ → Den (IE B)

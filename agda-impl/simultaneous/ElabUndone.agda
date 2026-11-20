@@ -25,12 +25,12 @@ open import denotation.Position using (root; _≟ᵖ_; _⊕_; ix)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; Den; hot; Proper; DenEnv; enter; module Op; module DeferT)
 open import denotation.Laws.Cut using (capprox)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
-  laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
+  burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; ext; Tag; val; cdone; tick; flat; Flat; isZero; module Elaborate)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; map-out′; scan-out; take-row; of-mem; each-one; module Cat)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; annotate; undone; joins;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; srcLane; laneSrc; annotate; undone; joins;
   joinStep; annStep; render; phase; passes; mapIE; scanIE; combined; react; onMark; cut; unpark; arrive; ended; burstOver;
   left; begun; stopped; overed; share; setAt; concatˢ; marked; closer; laneˢ; each; trackers; Out; Input; going; fed)
 
@@ -275,6 +275,16 @@ ann-u N n s env us p {y = y} rw | x , sx , eq | st , a , ca , eq′ | refl | inj
 ... | _ , (σx , _) , _ , _ with map-out′ just (capprox N n s env) (p ⊕ (ix 1 ∷ [])) σx
 ...   | _ , sy , refl = us _ sy
 
+-- A connect's elaboration ends no lane where its source's and body's end none.
+conn-u : ∀ N n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) (env : DenEnv Δ) → EnvU ρ env
+       → Undone (capprox N n (elab ρ s) env) → (∀ e → EnvU (ext ρ) e → Undone (capprox N n (elab (ext ρ) b) e))
+       → Undone (capprox N n (elab ρ (connect s b)) env)
+conn-u N n ρ s b env eu us ub =
+  conn≡ N n (elab ρ (connect s b)) (annotate (elab ρ s)) (elab (ext ρ) b) env refl λ q →
+    ub (hot (Proper (enter (capprox N n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
+      let (_ , (x , _) , _) = hot-out {t = Proper (enter (capprox N n (annotate (elab ρ s)) env) q)} r
+      in ann-u N n (elab ρ s) env us q x) eu)
+
 ------------------------------------------------------------------------
 -- The elaboration
 
@@ -294,16 +304,10 @@ elab-undone N n ρ (scan f z s) env eu p r with map-out′ proj₂ (Op.scan (sca
 ...   | st , x , dx , refl = scanIE-u f st x (elab-undone N n ρ s env eu p dx)
 elab-undone N n ρ (takeWhile i keep s) env eu p r =
   let (_ , sx) = take-row i (passes keep) (capprox N n (elab ρ s) env) p r in elab-undone N n ρ s env eu p sx
-elab-undone N n {Γ} ρ (flatMap op f s) env eu =
-  conn⁴ N n (elab ρ (flatMap op f s)) (of (tt ∷ [])) (flatMap (mergeᶠ nothing) (λ _ → elab (λ i → there (ρ i)) s) (connected (here refl)))
-    closer (flatMap op (λ a → laneˢ (elab (λ i → there (there (there (there (ρ i))))) (f a))) (each valuesOf (connected (there (here refl)))))
-    (combined op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))) env refl
-    λ e → comb-u N n op (trackers Γ 0 (λ i → there (there (there (there (ρ i)))))) e
+elab-undone N n ρ (flatMap op f s) env eu =
+  conn⁴ N n (elab _ (flatMap op f s)) _ _ _ _ _ env refl λ e → comb-u N n op _ e
 elab-undone N n ρ (connect s b) env eu =
-  conn≡ N n (elab ρ (connect s b)) (annotate (elab ρ s)) (elab (ext ρ) b) env refl λ q →
-    elab-undone N n (ext ρ) b (hot (Proper (enter (capprox N n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
-      let (_ , (x , _) , _) = hot-out {t = Proper (enter (capprox N n (annotate (elab ρ s)) env) q)} r
-      in ann-u N n (elab ρ s) env (elab-undone N n ρ s env eu) q x) eu)
+  conn-u N n ρ s b env eu (elab-undone N n ρ s env eu) (λ e eu′ → elab-undone N n (ext ρ) b e eu′)
 elab-undone N n ρ (connected i) env eu p r
   with merge-out (λ x → Op.flatMap (mergeᶠ nothing) (λ b → Op.of (if b then proj₁ (proj₂ x) else proj₂ (proj₂ x))) (Op.of (true ∷ false ∷ [])))
          (Op.scan joinStep (true , ([] , [])) (lookup env (ρ (∈-map⁺ AIE i)))) p r

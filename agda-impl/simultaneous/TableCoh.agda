@@ -33,7 +33,7 @@ open import simultaneous.Listing using (UncutEnv)
 open import simultaneous.TableCorr using (Same; module Same; same; Rel)
 open import simultaneous.TableKit using (TR)
 open import simultaneous.TableEnv using (Ren; Tab; up; _⊕ˡ_; Aligned; Linked; EnvR; maps; lw; lw*; Admits; Out; HotD; den-cons)
-open import simultaneous.LaneEndSched using (laneX; laneL; trigXs; readerR; emitAt; later)
+open import simultaneous.LaneEndSched using (laneX; readerR; emitAt)
 open import simultaneous.TableFlat using (module Flat; module Vals; module TabRows; if-≡)
 open import simultaneous.TableJoin using (module Joiners; module Runs)
 
@@ -112,7 +112,7 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     out-x x y = cong₂ (λ u v → emitAt (u ⊕ [ sub (readerR v) ])) (LaneX.φ≡ x y) (LaneX.stE≡ x)
 
     end-x : ∀ {N} {R : P.LaneRec N} {R′ : P′.LaneRec N} → LaneX R R′ → ∀ y → P.LaneRec.endImage R y ≡ P′.LaneRec.endImage R′ y
-    end-x x y = cong₂ (λ u v → emitAt (later u (laneL v ⊕ˡ trigXs v) ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
+    end-x x y = cong₂ (λ u v → emitAt (u ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
                       (LaneX.φ≡ x y) (LaneX.stE≡ x)
 
     -- A lane at alike subscriptions maps alike and is late alike in the
@@ -186,8 +186,7 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       rowφ-x {N} {y} nothing (just x) = cong (_⊕ [ ix 0 ]) (end-x x (up y))
       rowφ-x {N} {y} nothing nothing =
         if-≡ {b = isMarker N y} {b′ = isMarker N y} refl (λ _ → cong (λ u → (u ⊕ˡ (sub X.c₁ ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ ix 0 ]) (Same.φ≡ (os≡ N (up y))))
-                  (λ _ → if-≡ {b = endAt (S N) y} {b′ = endAt (S N) y} refl (λ _ → cong (λ u → later u P.ttEnd ⊕ [ sub X.c₁ ]) (Same.φ≡ (os≡ N y)))
-                                   (λ _ → cong (_⊕ [ sub X.c₁ ]) (Same.φ≡ (os≡ N y))))
+                  (λ _ → cong (_⊕ [ sub X.c₁ ]) (Same.φ≡ (os≡ N y)))
 
       -- The holder late alike, or a source row late alike in the source.
       late-x : ∀ {N y m m′} → PickX m m′ → ¬ P.Tabs.lateAt op lanes N y m → ¬ P′.Tabs.lateAt op lanes′ N y m′
