@@ -20,7 +20,7 @@ open import Data.List using (List; []; _∷_; [_]; length; drop; take)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; [])
 open import Data.Maybe using (Maybe; just)
-open import Data.Nat using (ℕ; _+_; _∸_)
+open import Data.Nat using (ℕ; _+_; _∸_; _≤_)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -43,7 +43,7 @@ open import simultaneous.Listing using (walkN; listC; UncutEnv)
 open import simultaneous.ColdRows using (Kind; kv; ks; ke; kind; module At)
 open import simultaneous.ColdList using (module Cold)
 open import simultaneous.ColdOrder using (walk-past; walk-nopin)
-open import simultaneous.Horizon using (Tag)
+open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableCorr using (Corr; Rel; Stable; LeadClear; across-of)
 open import simultaneous.TableKit using (TR; M; Got)
@@ -145,8 +145,17 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     -- THE COLD'S HANGS: each side's are its tree's, the same plain rows
     -- before each.
     cold-bcorr    : ∀ N → Inter.BCorr (Own (TR (P N)) (λ _ → ⊥)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (cold-bd (fixed m) p N) (cold-bd* N)
-    cold-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ (λ _ _ → ⊥) (cold-bd (fixed m) p) cold-bd*
+    -- A row whose image lies before a shallower cut's elaborated hangs is
+    -- that cut's, on the same image.
+    cold-pull   : ∀ {N N′ k e} → N ≤ N′ → TR (P N′) k e → Unpinned e
+                → Cuts.Clear (λ N → TR (Q N)) cold-bd* N (φ′ N′ k) → TR (P N) k e × φ′ N k ≡ φ′ N′ k
     cold-lead   : LeadClear (λ N → TR (P N)) (λ N → TR (Q N)) φ′ (λ _ _ → ⊥) (cold-bd (fixed m) p) cold-bd*
+
+  -- The cold puts nothing.
+  cold-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ (λ _ _ → ⊥) (cold-bd (fixed m) p) cold-bd*
+  cold-stable = record
+    { pull = λ le x un _ cl → let (x₀ , eq) = cold-pull le x un cl in x₀ , (λ ()) , eq
+    ; put-pull = λ _ _ () }
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′

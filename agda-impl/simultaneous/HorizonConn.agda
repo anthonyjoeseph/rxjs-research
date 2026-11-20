@@ -41,7 +41,7 @@ open import denotation.EmissionSet using (Ev; end; EmissionSet; _≺_; _≼_; mo
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-absurd; ≺→≼; ≼-or-≻; ≼-split)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts; module ConnB; not-T; T-not)
-open import simultaneous.HorizonCorr using (Btw; PB; Own; OwnPut; _∪_; _∪²_; module Inter; first-child; ix0-first)
+open import simultaneous.HorizonCorr using (Btw; PB; PA; Own; OwnPut; _∪_; _∪²_; module Inter; first-child; ix0-first)
 
 -- A boundary, or the connect a held one waits on.
 Mark : (Pos → Tag → Set) → Pos → Set
@@ -87,7 +87,7 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
   -- The body's environment: its source, as its hot, and the connect's,
   -- each read along the source's map.
   SrcCut : Pos → Pos → Set
-  SrcCut z z* = Btw SrcRow φσ z z* × PB SrcPut z z*
+  SrcCut z z* = Btw SrcRow φσ z z* × PB SrcPut z z* × PA SrcPut z z*
 
   ConnRow : Pos → Set
   ConnRow = Own (P.Cc N) Lc ∪ Env
@@ -128,6 +128,7 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     -- the body's rows cut each source mark pair alike
     (body-src : ∀ {z z*} → Mark (Bdσ N) z → Mark (Bdσ* N) z* → IS.Between z z* → Btw (Own (β N) Lβ) φβ z z*)
     (body-src-put : ∀ {z z*} → Mark (Bdσ N) z → Mark (Bdσ* N) z* → IS.PutBefore z z* → PB (OwnPut (β N) Pβ) z z*)
+    (body-src-put← : ∀ {z z*} → Mark (Bdσ N) z → Mark (Bdσ* N) z* → IS.PutAfter z z* → PA (OwnPut (β N) Pβ) z z*)
     -- the burst holds partners together
     (home→ : ∀ {b b* g g*} → Bdσ N b g → Bdσ* N b* g* → IS.Between b b* → T (inside r b) → T (inside r* b*))
     (home← : ∀ {b b* g g*} → Bdσ N b g → Bdσ* N b* g* → IS.Between b b* → T (inside r* b*) → T (inside r b))
@@ -176,6 +177,13 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     ... | inj₂ (j , e′ , l₀ , x , refl , pl′ , refl) =
       ix0-first (pbs (inj₁ ((e′ , x) , pl′)) (≺-trans {j} {j ⊕ [ ix 0 ]} {z} (≺-ext j []) kz)) (ng* (proj₂ (put-row y pl)))
 
+    putC← : ∀ {z z*} → PA (OwnPut (β N) Pβ) z z* → PA SrcPut z z* → (∀ {y e} → P.Cc N y e → ¬ y ⊑ z) → PA ConnPut z z*
+    putC← pab pas ng (inj₂ x) lz = pas (inj₂ x) lz
+    putC← {z} {z*} pab pas ng (inj₁ ((e , y) , pl)) lz with put-split y pl
+    ... | inj₁ (e′ , x , pl′) = pab ((e′ , x) , pl′) lz
+    ... | inj₂ (j , e′ , l₀ , x , refl , pl′ , refl) =
+      ix0-first (pas (inj₁ ((e′ , x) , pl′)) (≺-trans {l₀} {l₀ ⊕ [ ix 0 ]} {z*} (≺-ext l₀ []) lz)) (ng y)
+
     -- The connect's own position, against its rows and the environment.
     at-p : Btw ConnRow φc p p*
     at-p (inj₂ en) = env-p en
@@ -214,30 +222,36 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     nin← : ∀ {b b* g g*} → Bdσ N b g → Bdσ* N b* g* → IS.Between b b* → T (not (inside r* b*)) → T (not (inside r b))
     nin← bd bd* btw nin* = not-T (λ i → T-not nin* (home→ bd bd* btw i))
 
-    to : ∀ {b g} → P.CBd N b g → Σ Pos λ b* → Σ Tag λ g* → E.CBd N b* g* × IC.Between b b* × IC.TagTo g g*
+    to : ∀ {b g} → P.CBd N b g → Σ Pos λ b* → Σ Tag λ g* → E.CBd N b* g* × IC.Between b b* × IC.PutAfter b b* × IC.TagTo g g*
     to (P.bodyB bd) with toβ bd
-    ... | b* , g* , bd* , btw , sc , tt = b* , g* , E.bodyB bd* , liftβ btw sc (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*)) , tagβ→ bd bd* tt
+    ... | b* , g* , bd* , btw , pa , (bs , spb , spa) , tt =
+      b* , g* , E.bodyB bd* , liftβ btw (bs , spb , spa) (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*))
+      , putC← pa spa (gapc (P.bodyB bd)) , tagβ→ bd bd* tt
     to (P.burstB bd ins) with toσ bd
-    ... | b* , g* , bd* , btw , _ =
-      b* , held p* , E.burstB bd* (home→ bd bd* btw ins) , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*) , IC.both-held at-p
+    ... | b* , g* , bd* , btw , pa , _ =
+      b* , held p* , E.burstB bd* (home→ bd bd* btw ins) , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*)
+      , putC← (body-src-put← (mark bd) (mark bd*) pa) pa (gap-src bd) , IC.both-held at-p
     to (P.echoB bd nin al) with toσ bd
-    ... | b* , free , bd* , btw , _ =
+    ... | b* , free , bd* , btw , pa , _ =
       b* , free , E.echoB bd* (nin→ bd bd* btw nin) (al→ (body-src (mark bd) (mark bd*) btw) (gap-src* bd*) al)
-      , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*) , IC.plain-free
-    ... | b* , held q* , bd* , btw , _ =
+      , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*)
+      , putC← (body-src-put← (mark bd) (mark bd*) pa) pa (gap-src bd) , IC.plain-free
+    ... | b* , held q* , bd* , btw , pa , _ =
       b* , held q* , E.keptB bd* (nin→ bd bd* btw nin)
         (E.alive-down {N} {b*} {q*} (≺→≼ {q*} {b*} (E.BS.held-in {N} {b*} {q*} bd*)) (al→ (body-src (mark bd) (mark bd*) btw) (gap-src* bd*) al))
-      , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*) , IC.plain-free
+      , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*)
+      , putC← (body-src-put← (mark bd) (mark bd*) pa) pa (gap-src bd) , IC.plain-free
     to (P.keptB bd nin alq) with toσ bd
-    ... | b* , _ , bd* , btw , IS.both-held btwq =
+    ... | b* , _ , bd* , btw , pa , IS.both-held btwq =
       b* , _ , E.keptB bd* (nin→ bd bd* btw nin) (al→ (body-src (mark-q bd) (mark-q bd*) btwq) (held-src* bd*) alq)
       , liftσ (mark bd) (mark bd*) btw (gap-src bd) (gap-src* bd*)
+      , putC← (body-src-put← (mark bd) (mark bd*) pa) pa (gap-src bd)
       , IC.both-held (liftσ (mark-q bd) (mark-q bd*) btwq (held-src bd) (held-src* bd*))
 
     from : ∀ {b* g*} → E.CBd N b* g* → Σ Pos λ b → Σ Tag λ g → P.CBd N b g × IC.Between b b* × IC.PutBefore b b* × IC.TagFrom g g*
     from (E.bodyB bd*) with fromβ bd*
-    ... | b , g , bd , btw , pb , (bs , spb) , tf =
-      b , g , P.bodyB bd , liftβ btw (bs , spb) (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*))
+    ... | b , g , bd , btw , pb , (bs , spb , spa) , tf =
+      b , g , P.bodyB bd , liftβ btw (bs , spb , spa) (gapc (P.bodyB bd)) (gapc* (E.bodyB bd*))
       , putC pb spb (gapc* (E.bodyB bd*)) , tagβ← bd bd* tf
     from (E.burstB bd* ins*) with fromσ bd*
     ... | b , g , bd , btw , pb , _ =

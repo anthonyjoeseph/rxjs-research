@@ -54,7 +54,7 @@ open import simultaneous.TreeBounded using (tree-bounded; tree-placed; src-out; 
 open import simultaneous.CutParts using (conn-tr→; conn-tr←)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
-open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
+open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB; PA)
 open import simultaneous.TableEnv
   using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub;
   shownᵇ; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps; Aligned;
@@ -378,6 +378,8 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
                   → Btw (Own (βc N) (Rel.Late Rb N)) (Rel.φ Rb N) z z*
       ct-body-src-put : ∀ {N z z*} → Mark (Rel.Bd RS N) z → Mark (ct-ann-bd* N) z* → CP.IS.PutBefore N z z*
                       → PB (OwnPut (βc N) (Rel.Put Rb N)) z z*
+      ct-body-src-put← : ∀ {N z z*} → Mark (Rel.Bd RS N) z → Mark (ct-ann-bd* N) z* → CP.IS.PutAfter N z z*
+                       → PA (OwnPut (βc N) (Rel.Put Rb N)) z z*
       ct-home→ : ∀ {N b b* g g*} → Rel.Bd RS N b g → ct-ann-bd* N b* g* → CP.IS.Between N b b*
                → T (inside (p ⊕ [ ix 1 ]) b) → T (inside (p* ⊕ [ ix 1 ]) b*)
       ct-home← : ∀ {N b b* g g*} → Rel.Bd RS N b g → ct-ann-bd* N b* g* → CP.IS.Between N b b*
@@ -398,7 +400,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ct-src-img : ∀ {N k e} → σc N k e → (Unpinned e × ¬ Rel.Late RS N k) ⊎ π (srcMap Rs N) k (φσ N k)
 
     src-cut : ∀ {N z z*} → EnvCut (Ψ′ Rs) ρ′ N z z* → CP.SrcCut N z z*
-    src-cut {N} {z} {z*} ((bs , pbs) , _) = btw , pb
+    src-cut {N} {z} {z*} ((bs , pbs , pas) , _) = btw , pb , pa
       where
         btw : Btw (CP.SrcRow N) (φσ N) z z*
         btw (inj₁ (e , x , un , nl)) = bs (e , ct-src-hot x , un , nl)
@@ -410,6 +412,13 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
         ... | inj₁ (un , nl) = proj₁ (bs (e , ct-src-hot x , un , nl)) kz
         ... | inj₂ pl        = pbs ((e , ct-src-hot x) , pl) kz
         pb (inj₂ ()) _
+
+        pa : PA (CP.SrcPut N) z z*
+        pa (inj₁ ((e , x) , inj₂ pl)) lz = pas ((e , ct-src-hot x) , pl) lz
+        pa (inj₁ ((e , x) , inj₁ refl)) lz with ct-src-img x
+        ... | inj₁ (un , nl) = proj₂ (bs (e , ct-src-hot x , un , nl)) lz
+        ... | inj₂ pl        = pas ((e , ct-src-hot x) , pl) lz
+        pa (inj₂ ()) _
 
     ct-body-bcorr : ∀ N → CP.IB.BCorrX N (CP.SrcCut N)
     ct-body-bcorr N = Inter.weakenX _ _ _ _ _ (λ {z} {z*} → src-cut {N} {z} {z*}) (Rest.bcorr-env (Out.rest Ob) N)
@@ -446,7 +455,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
         (λ {b} {g} {y} {e} → ct-gap-src {N} {b} {g} {y} {e}) (λ {b} {g} {y} {e} → ct-gap-src* {N} {b} {g} {y} {e})
         (λ {b} {q} {y} {e} → ct-held-src {N} {b} {q} {y} {e}) (λ {b} {q} {y} {e} → ct-held-src* {N} {b} {q} {y} {e})
         (λ {b} {q} {y} {e} → ct-held-body {N} {b} {q} {y} {e}) (λ {b} {q} {y} {e} → ct-held-body* {N} {b} {q} {y} {e})
-        (λ {z} {z*} → ct-body-src {N} {z} {z*}) (λ {z} {z*} → ct-body-src-put {N} {z} {z*})
+        (λ {z} {z*} → ct-body-src {N} {z} {z*}) (λ {z} {z*} → ct-body-src-put {N} {z} {z*}) (λ {z} {z*} → ct-body-src-put← {N} {z} {z*})
         (λ {b} {b*} {g} {g*} → ct-home→ {N} {b} {b*} {g} {g*}) (λ {b} {b*} {g} {g*} → ct-home← {N} {b} {b*} {g} {g*})
         (λ {c} → ct-end→ {N} {c}) (λ {c*} → ct-end← {N} {c*})
         (λ {k} {e} → ct-rows-after {N} {k} {e}) (λ {k} {e} → ct-rows-after* {N} {k} {e}) (λ ()))

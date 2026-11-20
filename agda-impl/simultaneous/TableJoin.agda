@@ -54,7 +54,7 @@ open import simultaneous.TableKit using (TR; Got) renaming (M to Matches)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.InstEmit using (valuesOf)
 open import Function using (_⇔_)
-open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; module Sub)
+open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; PA; module Sub)
 open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
   Admits; tab-func; admits-row; dbd; SameBd; same-bd; Out; wk; _⊕ˡ_)
 open JoinBd using (outerB; laneB; laneH)
@@ -243,6 +243,9 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-o-pb  : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → PB (OwnPut (oM N) (Rel.Put (Out.rel Os) N)) z z* → JP.IO.PutBefore N z z*
+        mg-o-pa  : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
+                 → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
+                 → PA (OwnPut (oM N) (Rel.Put (Out.rel Os) N)) z z* → JP.IO.PutAfter N z z*
         -- the lane's pair at the tree's boundaries
         mg-lane-bcorr  : ∀ N {q a a*} → oM N q (out a) → oM* N (φo N q) (out a*) → JP.IL.BCorr N q a (φo N q) a*
         -- every value of the elaborated outer is a value's image
@@ -257,16 +260,22 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- each part's rows cut the other parts' marks alike
         mg-outer-lane : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.Between N z z* → JP.Lanes N z z*
         mg-outer-lane-put : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.PutBefore N z z* → JP.LanesP N z z*
+        mg-outer-lane-put← : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.PutAfter N z z* → JP.LanesA N z z*
         mg-lane-outer : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
                       → JP.IL.Between N q a (φo N q) a* z z* → Btw (Own (oM N) (Late′ N)) (φo N) z z*
         mg-lane-outer-put : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
                           → JP.IL.PutBefore N q a (φo N q) a* z z* → PB (OwnPut (oM N) (Put′ N)) z z*
+        mg-lane-outer-put← : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
+                           → JP.IL.PutAfter N q a (φo N q) a* z z* → PA (OwnPut (oM N) (Put′ N)) z z*
         mg-lane-lane : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
                      → JP.IL.Between N q a (φo N q) a* z z*
                      → ∀ {q′ a′} → oM N q′ (out a′) → ¬ q′ ≡ q → Btw (Own (MergeJ.Lane oM LM N q′ a′) (Late′ N)) (φ′ N) z z*
         mg-lane-lane-put : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
                          → JP.IL.PutBefore N q a (φo N q) a* z z*
                          → ∀ {q′ a′} → oM N q′ (out a′) → ¬ q′ ≡ q → PB (OwnPut (MergeJ.Lane oM LM N q′ a′) (Put′ N)) z z*
+        mg-lane-lane-put← : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (φo N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (φo N q) a*) z*
+                          → JP.IL.PutAfter N q a (φo N q) a* z z*
+                          → ∀ {q′ a′} → oM N q′ (out a′) → ¬ q′ ≡ q → PA (OwnPut (MergeJ.Lane oM LM N q′ a′) (Put′ N)) z z*
 
       -- A value's image is its value's row in the elaborated outer.
       φo-val : ∀ N {q a} → oM N q (out a) → φo N q ≡ val* N q
@@ -351,11 +360,11 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           tagFrom _ _ Inter.elab-free        = Inter.elab-free
           tagFrom x y (Inter.both-held btw)  = Inter.both-held (mg-o-btw N (mark-q x) (mark-q y) btw)
 
-          to′ : ∀ {b g} → BdoM N b g → Σ Pos λ b* → Σ Tag λ g* → BdoM* N b* g* × JP.IO.Between N b b* × JP.IO.TagTo N g g*
+          to′ : ∀ {b g} → BdoM N b g → Σ Pos λ b* → Σ Tag λ g* → BdoM* N b* g* × JP.IO.Between N b b* × JP.IO.PutAfter N b b* × JP.IO.TagTo N g g*
           to′ x =
-            let (b* , g* , y , btw , tg) = C.to (SameBd.from (Out.bd-pin Os) x)
+            let (b* , g* , y , btw , pa , tg) = C.to (SameBd.from (Out.bd-pin Os) x)
                 y′ = SameBd.to (Out.bd-pin* Os) y
-            in b* , g* , mg-each-bd← N y′ , mg-o-btw N (mark x) (mark y′) btw , tagTo x y′ tg
+            in b* , g* , mg-each-bd← N y′ , mg-o-btw N (mark x) (mark y′) btw , mg-o-pa N (mark x) (mark y′) btw pa , tagTo x y′ tg
 
           from′ : ∀ {b* g*} → BdoM* N b* g* → Σ Pos λ b → Σ Tag λ g → BdoM N b g × JP.IO.Between N b b* × JP.IO.PutBefore N b b* × JP.IO.TagFrom N g g*
           from′ y =
@@ -410,7 +419,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (f a) ρ uρ (lw env) (q ⊕ [ ix 1 ]) (admits-row n s uρ (lw env) ad x)) b₀)
           (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) ρ*c uρ*c Dc (q ⊕ [ ix 1 ]) (admits-row n eachS uρ*c Dc ad₁ x)) b₀)
           (λ _ _ _ ()) (λ _ _ _ ()) (λ ()) (λ ())
-          (mg-outer-lane N) (mg-outer-lane-put N) (mg-lane-outer N) (mg-lane-outer-put N) (mg-lane-lane N) (mg-lane-lane-put N))
+          (mg-outer-lane N) (mg-outer-lane-put N) (mg-outer-lane-put← N) (mg-lane-outer N) (mg-lane-outer-put N) (mg-lane-outer-put← N)
+          (mg-lane-lane N) (mg-lane-lane-put N) (mg-lane-lane-put← N))
         where
           row : ∀ {k} → Own (TR (P′ N)) (Late′ N) k → JP.JRow N k
           row (e , x , un , nl) = inj₁ (e , merge-tr→ n f s uρ p (pd-sub {mergeᶠ nothing} {N} x) , un , nl)

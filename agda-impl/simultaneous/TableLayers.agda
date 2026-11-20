@@ -35,7 +35,7 @@ open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr; A
 open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB)
+open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB; PA)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; linked-r*;
   Aligned; aligned-r*; Rest; Out; out; same-bd; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
 open import simultaneous.TreeBounded using (admits-trig; tree-bounded)
@@ -147,6 +147,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-moved    : ∀ N {k b g} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b g → (Rel.φ R N k ≺ b → φ′ N k ≺ b) × (φ′ N k ≺ b → Rel.φ R N k ≺ b)
       cb-moved-q  : ∀ N {k b q} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b (held q) → (Rel.φ R N k ≺ q → φ′ N k ≺ q) × (φ′ N k ≺ q → Rel.φ R N k ≺ q)
       cb-putw     : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PB (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PB (OwnPut (TR (P′ N)) (Put′ N)) b b*
+      cb-putw←    : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PA (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PA (OwnPut (TR (P′ N)) (Put′ N)) b b*
       cb-stable : Stable (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
       cb-lead   : LeadClear (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Late′ (Rel.Bd R) cb-bd*
 
@@ -163,7 +164,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     cb-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cb-bd* N)
     cb-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
       (Rel.Bd R N) (Rel.Bd* R N) (cb-bd* N) (Rel.bcorr R N)
-      (cb-keeps N) (cb-only N) (λ {k} {b} {g} → cb-moved N {k} {b} {g}) (λ {k} {b} {q} → cb-moved-q N {k} {b} {q}) (cb-putw N)
+      (cb-keeps N) (cb-only N) (λ {k} {b} {g} → cb-moved N {k} {b} {g}) (λ {k} {b} {q} → cb-moved-q N {k} {b} {q}) (cb-putw N) (cb-putw← N)
 
     cb-got* : ∀ N → Got (Q′ N)
     cb-got* N = got-ok (3 + N) n (inner op) {ρ*c N} (uρ*c N) c₂
@@ -237,7 +238,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     cz-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cz-bd* N)
     cz-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
       (Rel.Bd R N) (Rel.Bd* R N) (cz-bd* N) (Rel.bcorr R N)
-      (cz-keeps N) (cz-only N) (λ _ _ → (λ x → x) , (λ x → x)) (λ _ _ → (λ x → x) , (λ x → x)) (λ _ pb → pb)
+      (cz-keeps N) (cz-only N) (λ _ _ → (λ x → x) , (λ x → x)) (λ _ _ → (λ x → x) , (λ x → x)) (λ _ pb → pb) (λ _ pa → pa)
 
     cz-got* : ∀ N → Got (Q′ N)
     cz-got* N = got-ok (3 + N) n (body op) {ρ*h N} (uρ*h N) c₃

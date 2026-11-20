@@ -67,7 +67,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableCorr using (Rel; Same)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts)
-open import simultaneous.HorizonCorr using (module Inter; Btw; PB; Own; OwnPut)
+open import simultaneous.HorizonCorr using (module Inter; Btw; PB; PA; Own; OwnPut)
 open import simultaneous.HorizonTree using (BdEnv; _∷ᵇ_; bd)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -511,7 +511,8 @@ EnvCut : ∀ {Γ} → Maps Γ → (ℕ → All Tb.Listed Γ) → ℕ → Pos →
 EnvCut {[]}    Ψ ρ N z z* = ⊤
 EnvCut {_ ∷ Γ} Ψ ρ N z z* =
   (Btw (Own (Rows (All.head (ρ N))) (late (Ψ (here refl) N))) (ψ (Ψ (here refl) N)) z z*
-   × PB (OwnPut (Rows (All.head (ρ N))) (π (Ψ (here refl) N))) z z*)
+   × PB (OwnPut (Rows (All.head (ρ N))) (π (Ψ (here refl) N))) z z*
+   × PA (OwnPut (Rows (All.head (ρ N))) (π (Ψ (here refl) N))) z z*)
   × EnvCut {Γ} (λ i → Ψ (there i)) (λ N′ → All.tail (ρ N′)) N z z*
 
 -- Every row not late linked to its image; every shown row cutting every
