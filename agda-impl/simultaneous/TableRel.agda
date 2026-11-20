@@ -158,13 +158,13 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     -- (the source's `cuts`); seen from the other side, the old rows cut
     -- the source's alike, each creator chain compared at its own levels.
     conn-old-cut : (Rs : Src) → ∀ {X} (j : X ∈ Γ) n′ q q* (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) (lk : Linked q q*)
-                 → let R = Out.rel (hot env j uρ uρ* n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk) in
+                 → let R = Out.rel (hot env j uρ uρ* n′ q q* (admits-wk hD ad) (admits-wk hD* ad*) (λ i → al (there i)) lk) in
                    ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → T (shownᵇ e)
                  → ∀ N′ → Alike (Ψ′ Rs (here refl) N′) (Rows (hotOf (σ N′))) k (Rel.φ R N k)
 
     -- An old hot's reader's partners cut the new hot alike, with the old.
     conn-old-bcorr : (Rs : Src) → ∀ {X} (j : X ∈ Γ) n′ q q* (ad : Admits D′ q) (ad* : Admits D*′ q*) (al : Aligned (Ψ′ Rs) ρ′ q q*) (lk : Linked q q*)
-                   → let R = Out.rel (hot env j uρ uρ* n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk) in
+                   → let R = Out.rel (hot env j uρ uρ* n′ q q* (admits-wk hD ad) (admits-wk hD* ad*) (λ i → al (there i)) lk) in
                      ∀ N → Inter.BCorrX (Own (TR (Tab n′ (connected j) ρ q N)) (Rel.Late R N)) (Rel.φ R N)
                                         (OwnPut (TR (Tab n′ (connected j) ρ q N)) (Rel.Put R N)) (Rel.Bd R N) (Rel.Bd* R N) (EnvCut (Ψ′ Rs) ρ′ N)
 
@@ -180,7 +180,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ; bcorr-env = conn-old-bcorr Rs j n′ q q* ad ad* al lk
     }) (Out.bd-pin O) (Out.bd-pin* O)
     where
-      O = hot env j uρ uρ* n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD* (lw* env) ad*) (λ i → al (there i)) lk
+      O = hot env j uρ uρ* n′ q q* (admits-wk hD ad) (admits-wk hD* ad*) (λ i → al (there i)) lk
 
       cuts′ : ∀ N {k e} → TR (Tab n′ (connected j) ρ q N) k e → T (shownᵇ e)
             → Aligned (Ψ′ Rs) ρ′ k (Rel.φ (Out.rel O) N k)
@@ -198,7 +198,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
                → Same (Out.rel (hots i u u* n′ q q* ad ad* al lk)) (Out.rel (hots i u u* n′ q q* ad′ ad*′ al′ lk′)) N y
       hots-coh (here refl) = conn-hot-coh n s ρ uρ ρι ρ* uρ* env env p p* a a a* a* Rs Rs (λ _ _ → same refl (λ nl → nl))
       hots-coh (there j) _ _ n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
-        let x = hot-coh env j uρ uρ* n′ q q* (admits-wk hD (lw env) ad) (admits-wk hD (lw env) ad′) (admits-wk hD* (lw* env) ad*) (admits-wk hD* (lw* env) ad*′)
+        let x = hot-coh env j uρ uρ* n′ q q* (admits-wk hD ad) (admits-wk hD ad′) (admits-wk hD* ad*) (admits-wk hD* ad*′)
                   (λ i → al (there i)) (λ i → al′ (there i)) lk lk′ N y
         in same (φ≡ x) (nl→ x)
 
@@ -561,8 +561,8 @@ conn-coh n s b Fs Fb cs cb ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ a
     ee′ : EnvEq (X.C.env′ X.Rs) (X′.C.env′ X′.Rs)
     ee′ (here refl) = conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Rs X′.Rs sφ
     ee′ (there j) _ _ n′ q q* ad ad′ ad* ad*′ al₁ al₁′ lk₁ lk₁′ N′ y′ =
-      let x = ee j uρ uρ* n′ q q* (admits-wk X.CE.hD (lw E) ad) (admits-wk X′.CE.hD (lw E′) ad′)
-                 (admits-wk X.CE.hD* (lw* E) ad*) (admits-wk X′.CE.hD* (lw* E′) ad*′) (λ i → al₁ (there i)) (λ i → al₁′ (there i)) lk₁ lk₁′ N′ y′
+      let x = ee j uρ uρ* n′ q q* (admits-wk X.CE.hD ad) (admits-wk X′.CE.hD ad′)
+                 (admits-wk X.CE.hD* ad*) (admits-wk X′.CE.hD* ad*′) (λ i → al₁ (there i)) (λ i → al₁′ (there i)) lk₁ lk₁′ N′ y′
       in same (φ≡ x) (nl→ x)
 
     bφ : ∀ N y → Same (Out.rel X.Ob) (Out.rel X′.Ob) N y

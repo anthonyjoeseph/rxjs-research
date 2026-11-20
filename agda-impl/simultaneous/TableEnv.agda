@@ -32,21 +32,21 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix; last)
+open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix)
 open import denotation.Events using (Timeline; fresh; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; Ev; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≺→≼; ≼-trans; ≼-or-≻; ≼-false)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-absurd; ≼-or-≻; ≼-false)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; ⊑-refl; ⊑-trans; ⊑-snoc⁺; ⊑-snoc; Ok; InvAt; GoodEnv; Hots; Lawful; ok-step; W;
-  W⁼; step; timer; join; here; inW; real-snoc; plain-ix; shrink; ok-in)
+  W⁼; step; timer; join; here; inW; real-snoc; plain-ix; shrink; ok-in; _∪ʰ_)
 open import denotation.Laws.Count using (child)
 open import denotation.Laws.Cut using (inv-capprox; inv-sub)
 open import denotation.Laws using (good-cons)
@@ -290,8 +290,10 @@ linked-r* L (l ∷ ls) = linked-r* (linked-r L l) ls
 -- Each cut's hots listed exactly off a lawful environment, so a table's
 -- func and flat are its denotation's, read at an admissible subscription.
 --
--- Each hot's connect subscribes its body first (`lo`): a reader of the
--- hot is one of the body's, subscribed at or past it.
+-- Each hot's connect subscribes its body at `dlo` over hot rows `dH`:
+-- the scope's, and the hot's own.  The scope's later hots' rows lie in
+-- that world (`dnest`), and no position of it leads the hot's
+-- boundaries (`dlead`).
 --
 -- DEAD ROUTE: func and flat over an arbitrary aligned environment.  A hot
 --   row the alignment exempts may sit in the subscription's world, and the
@@ -302,13 +304,12 @@ record DenOf {Γ} (ρ : ℕ → All Tb.Listed Γ) : Set₁ where
     den    : ℕ → DenEnv Γ
     den-ex : ∀ N → EnvRel (ρ N) (den N)
     den-ok : ∀ N → GoodEnv (den N)
-    lo     : List Pos
-    -- Each hot hangs at its own boundaries, none led by the late end of
-    -- a reader admissibly subscribed.
+    dlo    : ∀ {X : Set} → X ∈ Γ → Pos
+    dH     : ∀ {X : Set} → X ∈ Γ → Pos → Set
     dbd      : BdEnv Γ
     dbounded : ∀ {X : Set} (i : X ∈ Γ) → Cuts.Bounded (λ N → Rows (lookup (ρ N) i)) (dbd i)
-    dapart   : ∀ {X : Set} (i : X ∈ Γ) {p} → Ok (λ h → Σ ℕ λ N → Hots (den N) h) p → All (_≼ p) lo
-             → ∀ {N b g} → dbd i N b g → ¬ (p ⊕ [ last ]) ⊑ b
+    dnest    : ∀ {X : Set} (i : X ∈ Γ) {h} → (Σ ℕ λ N → Hots (den N) h) → dH i h ⊎ W (dH i) (dlo i) h
+    dlead    : ∀ {X : Set} (i : X ∈ Γ) {N b g w} → dbd i N b g → W⁼ (dH i) (dlo i) w → ¬ w ⊑ b
 open DenOf public
 
 -- More hot rows, the world no smaller.
@@ -323,6 +324,18 @@ mutual
   w-mono⁼ f here    = here
   w-mono⁼ f (inW w) = inW (w-mono f w)
 
+-- A world reached from one whose hot rows lie in another's lies in it.
+mutual
+  transfer : ∀ {H H′ : Pos → Set} {f x w} → (∀ {h} → H h → H′ h ⊎ W H′ f h) → W⁼ H′ f x → W H x w → W H′ f w
+  transfer t fx (step w l)           = step (transfer⁼ t fx w) l
+  transfer t fx (timer i w lt pl)    = timer i (transfer⁼ t fx w) lt pl
+  transfer t fx (join (inj₁ h) w eh) = join (t h) (transfer⁼ t fx w) eh
+  transfer t fx (join (inj₂ v) w eh) = join (inj₂ (transfer t fx v)) (transfer⁼ t fx w) eh
+
+  transfer⁼ : ∀ {H H′ : Pos → Set} {f x w} → (∀ {h} → H h → H′ h ⊎ W H′ f h) → W⁼ H′ f x → W⁼ H x w → W⁼ H′ f w
+  transfer⁼ t fx here    = fx
+  transfer⁼ t fx (inW w) = inW (transfer t fx w)
+
 -- Fewer hot rows, still admissible.
 ok-mono : ∀ {H H′ : Pos → Set} {p} → (∀ {h} → H h → H′ h) → Ok H′ p → Ok H p
 ok-mono f (r , dj) = r , λ hh w i → dj (f hh) (w-mono f w) i
@@ -333,33 +346,58 @@ HotsAll D h = Σ ℕ λ N → Hots (den D N) h
 
 -- No hots: nothing listed, nothing to keep.
 none : DenOf {[]} (λ _ → All.[])
-none = denOf (λ _ → All.[]) (λ _ → Ex.[]) (λ _ ()) [] (λ ()) (λ ()) (λ ())
+none = denOf (λ _ → All.[]) (λ _ → Ex.[]) (λ _ ()) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()) (λ ())
 
--- At or past each of them.
-Past : List Pos → Pos → Set
-Past fs p = All (_≼ p) fs
+-- One fact per scope entry, by recursion: a product indexed over `Set`
+-- would not be small.
+Each : ∀ {Γ : List Set} → (∀ {X : Set} → X ∈ Γ → Set) → Set
+Each {[]}    P = ⊤
+Each {_ ∷ Γ} P = P (here refl) × Each {Γ} (λ i → P (there i))
 
-past-up : ∀ {fs} p p′ → Past fs p → p ≼ p′ → Past fs p′
-past-up p p′ fp pp′ = All.map (λ {f} fp₁ → ≼-trans {f} {p} {p′} fp₁ pp′) fp
+each-at : ∀ {Γ : List Set} {P : ∀ {X : Set} → X ∈ Γ → Set} → Each P → ∀ {X : Set} (i : X ∈ Γ) → P i
+each-at {_ ∷ Γ} (x , _)  (here refl) = x
+each-at {_ ∷ Γ} (_ , xs) (there i)   = each-at xs i
 
-past-⊕ : ∀ {fs} p l ls → Past fs p → Past fs (p ⊕ (l ∷ ls))
-past-⊕ p l ls fp = past-up p (p ⊕ (l ∷ ls)) fp (≺→≼ {p} {p ⊕ (l ∷ ls)} (≺-ext p {l} ls))
+each : ∀ {Γ : List Set} {P : ∀ {X : Set} → X ∈ Γ → Set} → (∀ {X : Set} (i : X ∈ Γ) → P i) → Each P
+each {[]}    f = tt
+each {_ ∷ Γ} f = f (here refl) , each (λ i → f (there i))
+
+-- In the world of each hot's body.
+Inside : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} → DenOf ρ → Pos → Set
+Inside D p = Each (λ i → W⁼ (dH D i) (dlo D i) p)
+
+-- Its family named, for a scope whose `Each` has already unfolded.
+inside-by : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → (∀ {X : Set} (i : X ∈ Γ) → W⁼ (dH D i) (dlo D i) p) → Inside D p
+inside-by D f = each f
+
+inside-at : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Inside D p → ∀ {X : Set} (i : X ∈ Γ) → W⁼ (dH D i) (dlo D i) p
+inside-at D f i = each-at f i
 
 -- ADMISSIBLE: reachable, and no cut's hot row in its world.  Every cut's
 -- at once, because a lane subscribed under a row of one cut is read at
 -- every cut, where that row's world may join other cuts' rows.  And in
--- each hot's scope: at or past its connect's body.
+-- each hot's scope: in its connect's body's world.
 Admits : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} → DenOf ρ → Pos → Set
-Admits D p = Ok (HotsAll D) p × Past (lo D) p
+Admits D p = Ok (HotsAll D) p × Inside D p
+
+-- A hot's boundary is led by no position of a world reached from its
+-- body's, nor of an admissible reader's.
+scope-lead : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {X : Set} (i : X ∈ Γ) {N b g} → dbd D i N b g
+           → ∀ {H : Pos → Set} {x w} → (∀ {h} → H h → dH D i h ⊎ W (dH D i) (dlo D i) h) → W⁼ (dH D i) (dlo D i) x → W⁼ H x w → ¬ w ⊑ b
+scope-lead D i bd t fx v = dlead D i bd (transfer⁼ t fx v)
+
+reader-lead : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Admits D p → ∀ {X : Set} (i : X ∈ Γ) {N b g} → dbd D i N b g
+            → ∀ {M w} → W⁼ (Hots (den D M)) p w → ¬ w ⊑ b
+reader-lead D a i bd {M} v = scope-lead D i bd (λ hh → dnest D i (M , hh)) (each-at (proj₂ a) i) v
 
 admits-at : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Admits D p → ∀ N → Ok (Hots (den D N)) p
 admits-at D a N = ok-mono (λ hh → N , hh) (proj₁ a)
 
 admits-step : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → Admits D p → Admits D (p ⊕ [ ix 1 ])
-admits-step D {p} (o , fp) = ok-step p o , past-⊕ p (ix 1) [] fp
+admits-step D {p} (o , fp) = ok-step p o , each (λ i → inW (step (each-at fp i) plain-ix))
 
 admits-ix : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} i → Admits D p → Admits D (p ⊕ [ ix i ])
-admits-ix D {p} i ((r , dj) , fp) = (real-snoc p plain-ix r , λ hh w ins → dj hh (shrink w) ins) , past-⊕ p (ix i) [] fp
+admits-ix D {p} i ((r , dj) , fp) = (real-snoc p plain-ix r , λ hh w ins → dj hh (shrink w) ins) , each (λ j → inW (step (each-at fp j) plain-ix))
 
 -- A table listed at an admissible subscription keeps the invariant.
 tab-inv : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} {ρD : DenEnv Γ} → EnvRel ρL ρD → GoodEnv ρD → UncutEnv ρL
@@ -385,41 +423,59 @@ admits-row : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ
            → ∀ {q} → Admits D q → ∀ {N k e} → TR (Tab n o ρ q N) k e → Admits D (k ⊕ [ ix 1 ])
 admits-row n o u D {q} a {N} {k} x =
   ok-step k (ok-in (proj₁ a) (w-mono (λ hh → N , hh) (InvAt.world I x)) (InvAt.real I x)) ,
-  past-⊕ k (ix 1) [] (past-up q k (proj₂ a) (after-ok (3 + N) n o q x))
+  each (λ i → inW (step (inW (transfer (λ hh → dnest D i (N , hh)) (each-at (proj₂ a) i) (InvAt.world I x))) plain-ix))
   where I = tab-at n o u D a N
 
--- A hot listed exactly off a lawful emission set, hanging at its own
--- boundaries, none led by the late end of a reader its rows admit.
-record HotD {X : Set} (t : ℕ → Tb.Listed X) : Set₁ where
+-- A hot of the scope `D`, listed exactly off a lawful emission set: its
+-- source subscribed at `hat ⊕ [ ix 1 ]`, its rows in that world, its
+-- boundaries led by no position of its body's world.
+record HotD {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {X : Set} (t : ℕ → Tb.Listed X) : Set₁ where
   constructor hotD
   field
     hev  : ℕ → EmissionSet X
     hex  : ∀ N p → Exactly (rejoin p (t N)) (enter (ES.hot (hev N)) p)
     hlaw : ∀ N → Lawful (hev N)
-    hlo  : Pos
+    hat  : Pos
+    hadm : Admits D hat
+    hin  : ∀ N {h e} → hev N h e → W (HotsAll D) (hat ⊕ [ ix 1 ]) h
     hbd      : ℕ → Pos → Tag → Set
     hbounded : Cuts.Bounded (λ N → Rows (t N)) hbd
-    hapart   : ∀ {p} → Ok (λ k → Σ ℕ λ N → Σ (Ev X) (hev N k)) p → hlo ≼ p
-             → ∀ {N b g} → hbd N b g → ¬ (p ⊕ [ last ]) ⊑ b
+    hlead    : ∀ {N b g w} → hbd N b g → W⁼ (HotsAll D ∪ʰ (λ h e → Σ ℕ λ N → hev N h e)) (hat ⊕ [ ix 0 ]) w → ¬ w ⊑ b
 open HotD public
 
-den-cons : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} → HotD t → DenOf ρ → DenOf (λ N → t N ∷ ρ N)
-den-cons {t = t} {ρ = ρ} h D =
-  denOf (λ N → ES.hot (hev h N) ∷ den D N) (λ N → hex h N ∷ den-ex D N) (λ N → good-cons (hlaw h N) (den-ok D N)) (hlo h ∷ lo D)
-    (hbd h ∷ᵇ dbd D) db da
+den-cons : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} {D : DenOf ρ} → HotD D t → DenOf (λ N → t N ∷ ρ N)
+den-cons {Γ} {X} {t = t} {ρ = ρ} {D} h =
+  denOf (λ N → ES.hot (hev h N) ∷ den D N) (λ N → hex h N ∷ den-ex D N) (λ N → good-cons (hlaw h N) (den-ok D N))
+    lo′ H′ (hbd h ∷ᵇ dbd D) db dn dl
   where
+    σ∞ : EmissionSet X
+    σ∞ k e = Σ ℕ λ N → hev h N k e
+
+    lo′ : ∀ {Y : Set} → Y ∈ X ∷ Γ → Pos
+    lo′ (here refl) = hat h ⊕ [ ix 0 ]
+    lo′ (there i)   = dlo D i
+
+    H′ : ∀ {Y : Set} → Y ∈ X ∷ Γ → Pos → Set
+    H′ (here refl) = HotsAll D ∪ʰ σ∞
+    H′ (there i)   = dH D i
+
     db : ∀ {Y : Set} (i : Y ∈ _ ∷ _) → Cuts.Bounded (λ N → Rows (lookup (t N ∷ ρ N) i)) ((hbd h ∷ᵇ dbd D) i)
     db (here refl) = hbounded h
     db (there i)   = dbounded D i
 
-    da : ∀ {Y : Set} (i : Y ∈ _ ∷ _) {p} → Ok (λ k → Σ ℕ λ N → Hots (ES.hot (hev h N) ∷ den D N) k) p → All (_≼ p) (hlo h ∷ lo D)
-       → ∀ {N b g} → (hbd h ∷ᵇ dbd D) i N b g → ¬ (p ⊕ [ last ]) ⊑ b
-    da (here refl) o (lp ∷ _)  {N} {b} {g} = hapart h (ok-mono (λ { (M , e) → M , inj₁ e }) o) lp {N} {b} {g}
-    da (there i)   o (_ ∷ fp)  {N} {b} {g} = dapart D i (ok-mono (λ { (M , hh) → M , inj₂ hh }) o) fp {N} {b} {g}
+    dn : ∀ {Y : Set} (i : Y ∈ X ∷ Γ) {k} → (Σ ℕ λ N → Hots (ES.hot (hev h N) ∷ den D N) k) → H′ i k ⊎ W (H′ i) (lo′ i) k
+    dn (here refl) (N , inj₁ (e , x)) = inj₁ (inj₁ (e , N , x))
+    dn (here refl) (N , inj₂ hh)      = inj₁ (inj₂ (N , hh))
+    dn (there i)   (N , inj₁ (e , x)) = inj₂ (transfer (dnest D i) (inW (step (each-at (proj₂ (hadm h)) i) plain-ix)) (hin h N x))
+    dn (there i)   (N , inj₂ hh)      = dnest D i (N , hh)
+
+    dl : ∀ {Y : Set} (i : Y ∈ X ∷ Γ) {N b g w} → (hbd h ∷ᵇ dbd D) i N b g → W⁼ (H′ i) (lo′ i) w → ¬ w ⊑ b
+    dl (here refl) = hlead h
+    dl (there i)   = dlead D i
 
 -- One hot more, a world no smaller.
-admits-wk : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} (h : HotD t) (D : DenOf ρ) {p} → Admits (den-cons h D) p → Admits D p
-admits-wk h D (o , _ ∷ fp) = ok-mono (λ { (N , hh) → N , inj₂ hh }) o , fp
+admits-wk : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} {D : DenOf ρ} (h : HotD D t) {p} → Admits (den-cons h) p → Admits D p
+admits-wk h (o , fp) = ok-mono (λ { (N , hh) → N , inj₂ hh }) o , proj₂ fp
 
 ------------------------------------------------------------------------
 -- The hots in scope
@@ -554,16 +610,16 @@ Coh {Γ} n o F = ∀ (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ)
 
 -- An elaborated binder no plain subterm reads changes no reader.
 env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
-       → HotD t → EnvR ρ ρι ρ* → EnvR ρ (wk ρι) (λ N → t N ∷ ρ* N)
-env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i uρ uρ* n p p* a a* al lk →
-  let O = hot env i uρ (λ N → proj₂ (uρ* N)) n p p* a (admits-wk h (lw* env) a*) al lk in out (Out.rel O) (Out.rest O) (Out.bd-pin O) (Out.bd-pin* O))
+       → (env : EnvR ρ ρι ρ*) → HotD (lw* env) t → EnvR ρ (wk ρι) (λ N → t N ∷ ρ* N)
+env-wk env h = envR (maps env) (lw env) (den-cons h) (λ i uρ uρ* n p p* a a* al lk →
+  let O = hot env i uρ (λ N → proj₂ (uρ* N)) n p p* a (admits-wk h a*) al lk in out (Out.rel O) (Out.rest O) (Out.bd-pin O) (Out.bd-pin* O))
   (λ i uρ uρ* n p p* a a′ a* a*′ al al′ lk lk′ →
-     hot-coh env i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
+     hot-coh env i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h a*) (admits-wk h a*′) al al′ lk lk′)
   (λ N i → unended env N i)
 
 -- Two environments whose hots map alike, weakened by two records of one
 -- hot: their hots map alike.
 env-wk-eq : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
-          → (h h′ : HotD t) {E E′ : EnvR ρ ρι ρ*} → EnvEq E E′ → EnvEq (env-wk h E) (env-wk h′ E′)
-env-wk-eq h h′ {E} {E′} ee i uρ uρ* n p p* a a′ a* a*′ al al′ lk lk′ =
-  ee i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h (lw* E) a*) (admits-wk h′ (lw* E′) a*′) al al′ lk lk′
+          → {E E′ : EnvR ρ ρι ρ*} (h : HotD (lw* E) t) (h′ : HotD (lw* E′) t) → EnvEq E E′ → EnvEq (env-wk E h) (env-wk E′ h′)
+env-wk-eq {E = E} {E′} h h′ ee i uρ uρ* n p p* a a′ a* a*′ al al′ lk lk′ =
+  ee i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h a*) (admits-wk h′ a*′) al al′ lk lk′
