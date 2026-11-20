@@ -28,11 +28,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; root; ix; _≟ᵖ_; _⊕_)
+open import denotation.Position using (Pos; ix; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet; Den; _≺_; _≼_; out; end; ⟦_⟧; enter; LaneOf; module Bounded; module Values; module Exhaust)
 open import denotation.Laws.Modulus using (≺-ext; ≺-irrefl; ≼-or-≻; ≺-trans; ≼-trans; ≼-antisym)
-open import denotation.Laws.Join using (module Join)
+open import denotation.Laws.JoinInv using (cur-le)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import denotation.Laws.Worlds using (InvAt; ok-step; ok-in; world-after; ⊑-inside; ⊕-assoc; ⊕-identityʳ)
@@ -545,7 +545,7 @@ module _ {R : Set} (Rt : EmissionSet R) where
       -- next before it, and its lane is the one still running
       no-run : ¬ XCur p p
       no-run (cur₀ _ least) = least xv x≺p
-      no-run (drop cu′ _ _ _ lt′ _) = Join.ExhaustJ.cur-le root cu′ lt′
+      no-run (drop cu′ _ _ _ lt′ _) = cur-le cu′ lt′
       no-run (run cu′ oq′ lc cp _ lt′ n′) with next-fun (proj₂ (cur-val cu′)) xv lt′ x≺p n′ nxt
       ... | refl with cur-fun cu′ cu
       ...   | refl with InvAt.func io oq′ oq

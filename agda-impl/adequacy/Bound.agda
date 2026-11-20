@@ -489,7 +489,7 @@ join-past sc op f s {q} ad ok x = go op x
   go : ∀ op {k e} → JoinF op F (pendRows (full sc) s q) k e → q ≺ k
   go (mergeᶠ nothing)  x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) x
   go switchᶠ           x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (λ _ → ⊤) (Switch.Cut F (pendRows (full sc) s q))
-                             (λ {q′} {k} {y} → switch-cut-up F (pendRows (full sc) s q) {q′} {k} {y})
+                             (λ {q′} {k} {y} → switch-cut-up (pendRows (full sc) s q) {q′} {k} {y})
                              (λ {q′} {a} {k} {r} → SwitchI.uncut ok F fi Io {q′} {a} {k} {r}) x
   go exhaustᶠ          x = JoinerPast.run-past ok F fi {pendRows (full sc) s q} Io (Exhaust.Run F (pendRows (full sc) s q)) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) x
   go (mergeᶠ (just m)) x = world-after (BoundedI.world-v ok m F fi Io (BoundedI.vw ok m F fi Io x)) (BoundedI.real-v ok m F fi Io (BoundedI.vw ok m F fi Io x))

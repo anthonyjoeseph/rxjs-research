@@ -77,18 +77,6 @@ by bodies over the tree, or a placement that moves between agreeing cuts.
 Members: `root-real`, `root-real*`, `root-off`, `root-off*`,
 `root-φ-agree`, `root-late-agree`, `root-put-up`, `root-put-down`.
 
-#### THE PLACEMENT
-
-A tree's own boundaries lie in its world, under no world of a plain
-child of its rows; its scope's are its hots', led by no admissible
-world position (`Placed.Placing`). The merge's gap, the source's
-window, a defer's marker and the connect's cross gaps are bodies over it,
-and so is a scope's lead: an admissible reader lies in each hot's body
-world. Untried. Settled by a body by induction over the tree, or a
-boundary outside every world the cut reads.
-
-Members: `tree-placed`.
-
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
 `Horizon.ConnB` keeps a source boundary before the connect as an echo,
@@ -100,28 +88,13 @@ subscription.
 
 Members: `ct-src-out`, `ct-src-held`.
 
-#### THE TREE'S HANGS
-
-A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
-bounds its cuts by one induction; the cold, scan, defer and connect
-cases are bodies. Open: the joins' boundaries and their bound (outer's,
-and each running lane's before the lane's cut), and a hot's ends before
-a settled pin (`hot-pin-ends`, not derivable from `Cuts.Bounded` alone).
-The plain side of a one-child former, a reader
-and a connect still passes its child's `Rel.Bd` through unpinned.
-Settled by bodies, or a lane hang the join does not keep.
-
-Members: `cc-bd`, `sw-bd`, `ex-bd`, `hot-pin-ends`,
-`cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`.
-
 #### THE JOINS' HANGS
 
 Each core's pair with the plain flatMap's: the merge's is
 `JoinPair`'s over its parts' and cross-part leaves; the others copy it,
-over `cc-bd`, `sw-bd`, `ex-bd`, opaque; a bounded merge hangs only where
-its outer or a lane does. Settled by bodies.
+over `cc-bd`, `sw-bd`, `ex-bd`. Settled by bodies.
 
-Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`, `share-bd→`, `share-bd←`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `share-bd→`, `share-bd←`.
 
 #### THE CONNECT'S HANGS
 

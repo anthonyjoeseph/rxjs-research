@@ -174,6 +174,19 @@ module Cuts {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → 
       fwd     : ∀ {N k} → Clear N k → Settled N k
       fwd-pin : ∀ {N q k} → Clear N q → HeldClear N q k → PinSettled N q k
 
+  -- SETTLES: bounded, but for pins.  A hot's reader shows a pin as a
+  -- skip, so asks no more of the hot.
+  record Settles : Set where
+    field
+      gap     : ∀ {N b g y e} → Bd N b g → c N y e → ¬ y ⊑ b
+      held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b
+      held-under : ∀ {N b q} → Bd N b (held q) → q ⊑ b
+      fwd     : ∀ {N k} → Clear N k → Settled N k
+
+  settles : Bounded → Settles
+  settles B = record { gap = B.gap ; held-in = B.held-in ; held-under = B.held-under ; fwd = B.fwd }
+    where module B = Bounded B
+
 -- A cut that never moves hangs nowhere.
 const-bounded : ∀ {A} (t : EmissionSet A) → Cuts.Bounded (λ _ → t) (λ _ _ _ → ⊥)
 const-bounded t = record
@@ -687,7 +700,7 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
 -- tag: the hot's pins are skips to it, but a held hang sits in a call
 -- the reader cannot interrupt.  The hot's boundaries lie in its own
 -- world, led by no reader's late end.
-module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Pos → Tag → Set) (Bh : Cuts.Bounded h Bdh)
+module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Pos → Tag → Set) (Bh : Cuts.Settles h Bdh)
   (apart-s : ∀ {N b g} → Bdh N b g → ¬ (s ⊕ [ last ]) ⊑ b)
   where
 
@@ -702,7 +715,7 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
 
   module H  = Cuts h Bdh
   module SJ = Cuts J JBd
-  module BH = H.Bounded Bh
+  module BH = H.Settles Bh
 
   -- A hot row leads no boundary.
   gap-j : ∀ {N b g y e} → JBd N b g → J N y e → ¬ y ⊑ b

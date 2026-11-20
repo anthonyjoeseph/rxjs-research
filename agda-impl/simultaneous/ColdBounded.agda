@@ -29,7 +29,8 @@ open import denotation.Laws.ColdInv using (depth; cold-inv; cold-reach; cold-asc
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (sound; complete)
 open import simultaneous.Listing using (walkN-exact)
-open import simultaneous.Horizon using (module Cuts)
+open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.Placed using (module Placing)
 open import simultaneous.HorizonTree using (Cut; cold-bd)
 
 ------------------------------------------------------------------------
@@ -64,6 +65,11 @@ private
 ------------------------------------------------------------------------
 -- A cold's cuts
 
+-- A row of the cut at `N` is a row of the stream, shallower than `3 + N`.
+cold-row : ∀ {Γ A} n (c : Timeline A) (ρ : ℕ → All Tb.Listed Γ) p {N y e}
+         → Cut n (cold c) ρ p N y e → Σ (InE (start p (timelineAt c p)) y e) λ x → depth x < 3 + N
+cold-row n c ρ p {N} (_ , refl , mem) = sound (walkN-exact (3 + N) (start p (timelineAt c p))) mem
+
 cold-bounded : ∀ {Γ A} n (c : Timeline A) (ρ : ℕ → All Tb.Listed Γ) p {H} → Ok H p → Cuts.Bounded (Cut n (cold c) ρ p) (cold-bd c p)
 cold-bounded {A = A} n c ρ p ok = record
   { gap = gap ; held-in = λ { (() , _) } ; held-under = λ { (() , _) }
@@ -77,7 +83,7 @@ cold-bounded {A = A} n c ρ p ok = record
     rp = proj₁ ok
 
     row : ∀ {N y e} → Cut n (cold c) ρ p N y e → Σ (InE ev y e) λ x → depth x < 3 + N
-    row {N} (_ , refl , mem) = sound (walkN-exact (3 + N) ev) mem
+    row = cold-row n c ρ p
 
     cut : ∀ {N y e} (x : InE ev y e) → depth x < 3 + N → Cut n (cold c) ρ p N y e
     cut {N} x lt = _ , refl , complete (walkN-exact (3 + N) ev) (x , lt)
@@ -117,3 +123,18 @@ cold-bounded {A = A} n c ρ p ok = record
 
     fwd-pin : ∀ {N q k} → Clear N q → HeldClear N q k → PinSettled N q k
     fwd-pin {N} {q} {k} _ _ {N′} _ {y} _ = (λ r → nopin {N} r) , (λ r → nopin {N′} r)
+
+-- A COLD'S BOUNDARY IS PLACED: it is a row of its stream, so it lies in
+-- the stream's world, and no plain child of an earlier row leads it.
+cold-placed : ∀ {Γ A} n (c : Timeline A) (ρ : ℕ → All Tb.Listed Γ) p {H : ℕ → Pos → Set} {Env : ℕ → Pos → Tag → Set}
+            → (∀ N → Ok (H N) p) → Placing.Placed H Env p (Cut n (cold c) ρ p) (cold-bd c p)
+cold-placed n c ρ p ok {N} (refl , e₀ , xb , _) = inj₁ (record
+  { world  = InvAt.world I (entered xb)
+  ; real   = InvAt.real I (entered xb)
+  ; under  = λ r pl v le → InvAt.under I (entered (proj₁ (cold-row n c ρ p r))) (entered xb) pl v le
+  ; holder = λ () })
+  where
+    I = cold-inv c p (ok N)
+
+    entered : ∀ {y e} → InE (start p (timelineAt c p)) y e → enter (Op.cold c) p y e
+    entered x = x , cold-reach p (timelineAt c p) (proj₁ (ok N)) x

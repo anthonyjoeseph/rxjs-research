@@ -307,7 +307,7 @@ record DenOf {Γ} (ρ : ℕ → All Tb.Listed Γ) : Set₁ where
     dlo    : ∀ {X : Set} → X ∈ Γ → Pos
     dH     : ∀ {X : Set} → X ∈ Γ → Pos → Set
     dbd      : BdEnv Γ
-    dbounded : ∀ {X : Set} (i : X ∈ Γ) → Cuts.Bounded (λ N → Rows (lookup (ρ N) i)) (dbd i)
+    dsettles : ∀ {X : Set} (i : X ∈ Γ) → Cuts.Settles (λ N → Rows (lookup (ρ N) i)) (dbd i)
     dnest    : ∀ {X : Set} (i : X ∈ Γ) {h} → (Σ ℕ λ N → Hots (den N) h) → dH i h ⊎ W (dH i) (dlo i) h
     dlead    : ∀ {X : Set} (i : X ∈ Γ) {N b g w} → dbd i N b g → W⁼ (dH i) (dlo i) w → ¬ w ⊑ b
 open DenOf public
@@ -439,7 +439,7 @@ record HotD {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {X : Set} (t : �
     hadm : Admits D hat
     hin  : ∀ N {h e} → hev N h e → W (HotsAll D) (hat ⊕ [ ix 1 ]) h
     hbd      : ℕ → Pos → Tag → Set
-    hbounded : Cuts.Bounded (λ N → Rows (t N)) hbd
+    hsettles : Cuts.Settles (λ N → Rows (t N)) hbd
     hlead    : ∀ {N b g w} → hbd N b g → W⁼ (HotsAll D ∪ʰ (λ h e → Σ ℕ λ N → hev N h e)) (hat ⊕ [ ix 0 ]) w → ¬ w ⊑ b
 open HotD public
 
@@ -459,9 +459,9 @@ den-cons {Γ} {X} {t = t} {ρ = ρ} {D} h =
     H′ (here refl) = HotsAll D ∪ʰ σ∞
     H′ (there i)   = dH D i
 
-    db : ∀ {Y : Set} (i : Y ∈ _ ∷ _) → Cuts.Bounded (λ N → Rows (lookup (t N ∷ ρ N) i)) ((hbd h ∷ᵇ dbd D) i)
-    db (here refl) = hbounded h
-    db (there i)   = dbounded D i
+    db : ∀ {Y : Set} (i : Y ∈ _ ∷ _) → Cuts.Settles (λ N → Rows (lookup (t N ∷ ρ N) i)) ((hbd h ∷ᵇ dbd D) i)
+    db (here refl) = hsettles h
+    db (there i)   = dsettles D i
 
     dn : ∀ {Y : Set} (i : Y ∈ X ∷ Γ) {k} → (Σ ℕ λ N → Hots (ES.hot (hev h N) ∷ den D N) k) → H′ i k ⊎ W (H′ i) (lo′ i) k
     dn (here refl) (N , inj₁ (e , x)) = inj₁ (inj₁ (e , N , x))

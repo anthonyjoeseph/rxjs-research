@@ -148,7 +148,7 @@ switch-truth : ∀ {A B H} {f f′ : A → Den B} {s s′ : Den A}
 switch-truth {A} {B} {H} {f} {f′} {s} {s′} Is Is′ If If′ sk-o sk-f R Rf p ok =
   Joiners.P.placed {A} {B} {H} {f} {f′} {s} {s′} Is Is′ If If′ R Rf p ok (λ _ _ _ → ⊤) (λ g u → Switch.Cut g u)
     (k-shows (λ n → SJ.Flat.sk-switch {A} {B} {H} {n} s f Is If p ok (sk-o n p ok) (λ a q okq → sk-f n a q okq)))
-    (λ {q} {k} {y} → switch-cut-up f (enter s p) {q} {k} {y}) (λ {q} {k} {y} → switch-cut-up f′ (enter s′ p) {q} {k} {y})
+    (λ {q} {k} {y} → switch-cut-up (enter s p) {q} {k} {y}) (λ {q} {k} {y} → switch-cut-up (enter s′ p) {q} {k} {y})
     (λ {q} {z} {w} → switch-cut-in f (enter s p) {q} {z} {w})
     (λ Q → LJ.Join.SwitchJ.agree {A} {B} Q) (λ _ _ _ _ _ _ → tt) (λ _ _ _ _ _ _ → tt)
     (λ Q ao → LJ.Join.SwitchJ.cut-to {A} {B} Q {f} {f′} {enter s p} {enter s′ p} ao)

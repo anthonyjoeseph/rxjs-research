@@ -26,8 +26,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Position using (Pos; ix; _⊕_; inside; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; EmissionSet; _≺_; _≼_; Work; Den; enter; After; Truncate;
-  module Joiner; module Switch; module Exhaust)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
+  module Joiner; module Switch; module Exhaust; Superseded; module ExhaustOn)
+open import denotation.Laws.Modulus using (AgreeTo; upto; ≺-irrefl; ≺→≼; ≼-refl; ≼-antisym; ≼-or-≻; ≺-≼-≺; ≼-≺-≺)
 open import denotation.Laws.Worlds using (Plain; plain-ix; W; W⁼; step; here; inW; Real; Ok; InvAt; InvD; _⊑_; real-snoc; ok-in; nest-in; nest⁼; apart-w; leads; w-up; not-up; conv; ⊑-refl; ⊑-snoc; ⊑-snoc⁺; ⊑-inside; inside-⊑; flat-under; ext≢; PinBy; ⊕-identityʳ; ⊕-injˡ; ⊕-injʳ)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 
@@ -359,8 +359,24 @@ module JoinerI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H 
   inv = inv-v (λ x → vw (proj₁ x)) en
 
 -- A switch's cut only grows.
-switch-cut-up : ∀ {A B : Set} (f : A → Den B) (o : EmissionSet A) {q k y} → Switch.Cut f o q k → k ≼ y → Switch.Cut f o q y
-switch-cut-up f o {k = k} {y} (q′ , a′ , x , qq′ , q′k) ky = q′ , a′ , x , qq′ , ≺-≼-≺ {q′} {k} {y} q′k ky
+switch-cut-up : ∀ {A : Set} (o : EmissionSet A) {q k y} → Superseded o q k → k ≼ y → Superseded o q y
+switch-cut-up o {k = k} {y} (q′ , a′ , x , qq′ , q′k) ky = q′ , a′ , x , qq′ , ≺-≼-≺ {q′} {k} {y} q′k ky
+
+-- And is cut before `y` by a value two outers agreeing past `y` both hold.
+switch-cut-to : ∀ {A : Set} {o o′ : EmissionSet A} {k q y} → AgreeTo k o o′ → y ≼ k → Superseded o q y → Superseded o′ q y
+switch-cut-to {k = k} {y = y} ag yk (q′ , a′ , x , qq′ , q′y) =
+  q′ , a′ , proj₁ (upto ag (≺→≼ {q′} {k} (≺-≼-≺ {q′} {y} {k} q′y yk))) x , qq′ , q′y
+
+-- An exhaust's last lane run lies at or before its cursor, and ran.
+cur-le : ∀ {A B : Set} {L : Pos → A → EmissionSet B} {o : EmissionSet A} {q₁ q} → ExhaustOn.Cur L o q₁ q → q ≼ q₁
+cur-le {q₁ = q₁} (ExhaustOn.cur₀ _ _)         = ≼-refl {q₁}
+cur-le {q₁ = q₂} (ExhaustOn.run _ _ _ _ _ _ _) = ≼-refl {q₂}
+cur-le (ExhaustOn.drop {q₁} {q} {q₂ = q₂} cu _ _ _ lt _) = ≺→≼ {q} {q₂} (≼-≺-≺ {q} {q₁} {q₂} (cur-le cu) lt)
+
+cur-run : ∀ {A B : Set} {L : Pos → A → EmissionSet B} {o : EmissionSet A} {q₁ q} → ExhaustOn.Cur L o q₁ q → ExhaustOn.Run L o q
+cur-run (ExhaustOn.cur₀ x mn)              = ExhaustOn.cur₀ x mn
+cur-run (ExhaustOn.run cu x l c x₂ lt nx)  = ExhaustOn.run cu x l c x₂ lt nx
+cur-run (ExhaustOn.drop cu _ _ _ _ _)      = cur-run cu
 
 module MergeI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
   open JoinerI ok f fi Io (λ _ → ⊤) (λ _ _ → ⊥) (λ ()) (λ _ _ _ ()) public using (inv)
@@ -376,7 +392,7 @@ module SwitchI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H 
   uncut {q} {k = k} {r} xq w⁼ ins (q′ , a′ , xq′ , qq′ , q′k) nc =
     U xq xq′ plain-ix w⁼ (conv {r} {r} {q′} {k} (⊑-refl r) (λ lt → nc (q′ , a′ , xq′ , qq′ , lt)) q′k (inside-⊑ r k ins))
 
-  open JoinerI ok f fi Io (λ _ → ⊤) Cut (λ {q} {k} {y} → switch-cut-up f O {q} {k} {y}) (λ {q} {a} {k} {r} → uncut {q} {a} {k} {r}) public using (inv)
+  open JoinerI ok f fi Io (λ _ → ⊤) Cut (λ {q} {k} {y} → switch-cut-up O {q} {k} {y}) (λ {q} {a} {k} {r} → uncut {q} {a} {k} {r}) public using (inv)
 
 module ExhaustI {A B H p} (ok : Ok H p) (f : A → Den B) (fi : ∀ a → InvD H (f a)) {O : EmissionSet A} (Io : InvAt H p O) where
   open Exhaust f O using (Run)
