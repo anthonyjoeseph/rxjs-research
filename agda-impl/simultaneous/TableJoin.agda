@@ -305,12 +305,15 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       mg-across : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd (mergeᶠ nothing)) (jbd* (mergeᶠ nothing))
       mg-across = record
-        { back-clear = λ le x un nl cl* → mg-clear (mg-outer-back le x un nl (λ b₀ → cl* (outerB b₀)))
-                                                   (λ x₀ x₀* → mg-lane-back le x un nl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
-        ; put-clear  = λ le x pl cl* → mg-clear (mg-outer-put le x pl (λ b₀ → cl* (outerB b₀)))
-                                                (λ x₀ x₀* → mg-lane-put le x pl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
-        ; lead-clear = λ x un nl ld m ie cl* → mg-clear (mg-outer-lead x un nl ld m ie (λ b₀ → cl* (outerB b₀)))
-                                                        (λ x₀ x₀* → mg-lane-lead x un nl ld m ie x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀))) }
+        { back-clear = λ {N} {N′} {k} {e} le x un nl cl* → mg-clear {N} {k}
+            (mg-outer-back {N} {N′} {k} {e} le x un nl (λ b₀ → cl* (outerB b₀)))
+            (λ {q} {a} {a*} x₀ x₀* → mg-lane-back {N} {N′} {k} {e} {q} {a} {a*} le x un nl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
+        ; put-clear  = λ {N} {N′} {k} {e} {l} le x pl cl* → mg-clear {N} {k}
+            (mg-outer-put {N} {N′} {k} {e} {l} le x pl (λ b₀ → cl* (outerB b₀)))
+            (λ {q} {a} {a*} x₀ x₀* → mg-lane-put {N} {N′} {k} {e} {l} {q} {a} {a*} le x pl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
+        ; lead-clear = λ {N} {k} {e} {m} {e*} x un nl ld mq ie cl* → mg-clear {N} {k}
+            (mg-outer-lead {N} {k} {e} {m} {e*} x un nl ld mq ie (λ b₀ → cl* (outerB b₀)))
+            (λ {q} {a} {a*} x₀ x₀* → mg-lane-lead {N} {k} {e} {m} {e*} {q} {a} {a*} x un nl ld mq ie x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀))) }
 
       mg-got : ∀ N → Got (P′ N)
       mg-got N = pd-got (mergeᶠ nothing) N
