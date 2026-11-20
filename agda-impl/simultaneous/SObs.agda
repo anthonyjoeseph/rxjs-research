@@ -220,12 +220,20 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   each₂ : ∀ {Γ X Y} → (X → List Y) → (X → List Y) → E Γ X → E Γ Y
   each₂ f g s = flatMap (mergeᶠ nothing) (λ x → flatMap (mergeᶠ nothing) (λ b → of (if b then f x else g x)) (of (true ∷ false ∷ []))) s
 
-  -- A child shared by a body, subscribed as the lane of a trigger fired
-  -- past the body's subscribe: within the connect's burst, never as its
-  -- source, so a cut below stops it.
-  shareˢ : ∀ {Γ X Y} → E (⊤ ∷ Γ) X → E (X ∷ ⊤ ∷ Γ) Y → E Γ Y
-  shareˢ s b = connect (of (tt ∷ [])) (connect (flatMap (mergeᶠ nothing) (λ _ → s) (connected (here refl))) b)
+  -- A child shared by a body: the second lane of a concat whose first
+  -- holds until the trigger ends, past the body's subscribe.  Within the
+  -- connect's burst, never as its source, so a cut below stops it; queued
+  -- past the concat's own outer, so the share ends as the child does, not
+  -- once the child's subscribe returns.  The two lanes are `k true`, a
+  -- `blockˢ`, and `k false`, the child, chosen by a definition of the
+  -- mutual block of `elab` when the child is elaborated.
+  shareˢ : ∀ {Γ X Y} → (Bool → E (⊤ ∷ Γ) X) → E (X ∷ ⊤ ∷ Γ) Y → E Γ Y
+  shareˢ k b = connect empty (connect (flatMap (mergeᶠ (just 1)) k (of (true ∷ false ∷ []))) b)
   {-# INLINE shareˢ #-}
+
+  -- The trigger's lane: nothing, until the trigger ends.
+  blockˢ : ∀ {Γ X} → E (⊤ ∷ Γ) X
+  blockˢ = each (λ _ → []) (connected (here refl))
 
   ------------------------------------------------------------------------
   -- Routes
@@ -383,9 +391,9 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- rxjs subscribes the next queued lane inside that run, so a lane ended
   -- in its burst never waits on it.  Its burst's end, past a lane already
   -- done, would change nothing (`burstOver`).
-  laneˢ : ∀ {Θ B} → E (⊤ ∷ Θ) (IE B) → E Θ (IE B)
+  laneˢ : ∀ {Θ B} → (Part → Bool → E (⊤ ∷ Θ) (IE B)) → E Θ (IE B)
   laneˢ x = takeWhile true undone (flatMap (mergeᶠ nothing)
-    (λ k → shareˢ (flatMap (mergeᶠ nothing) (λ _ → x) (takeWhile false isLane (of (k ∷ [])))) (counted (framed k)))
+    (λ k → shareˢ (x k) (counted (framed k)))
     (of (lanePart ∷ burstPart ∷ [])))
   {-# INLINE laneˢ #-}
 
@@ -546,8 +554,8 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
   -- then by `closer`: the order the nested connects subscribe them in.
-  flatMapˢ : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes) → (A → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
-           → E (⊤ ∷ Δ) (IE A) → E Δ (IE B)
+  flatMapˢ : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (ℕ × Routes) → (A → Part → Bool → E (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B))
+           → (Bool → E (⊤ ∷ Δ) (IE A)) → E Δ (IE B)
   flatMapˢ op tk g s =
     shareˢ s (connect closer
       (connect (flatMap op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl))))) (combined op tk)))
@@ -561,12 +569,13 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   -- `defer` only under constructors, and sees through `INLINE`, nested
   -- too.  An opaque definition around any recursive call sinks the whole
   -- mutual block, and so does a pattern-matching lambda whose arm holds
-  -- the child: Agda lifts it out as a definition of its own.
+  -- the child: Agda lifts it out as a definition of its own.  A
+  -- definition of the mutual block itself may match on data and return
+  -- the child (`srcLane`, `laneSrc`): its calls are seen.
   --
   -- The rule binds only the path down to a child.  Data may pass through
   -- anything, so an operator's logic stays opaque once it reads its child
-  -- as a `connect`'s source through `connected`, and a choice between
-  -- parts gates each with a `takeWhile` on a one-value `of`.  A child
+  -- as a `connect`'s source through `connected`.  A child
   -- moved under a new binder is elaborated under a renaming, since
   -- `rename` is opaque.
   --
@@ -583,10 +592,21 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     elab ρ (takeWhile i p s) = takeWhileˢ i p (elab ρ s)
     elab {Γ} ρ (flatMap op f s) =
       flatMapˢ op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))
-        (λ a → elab (λ i → there (there (there (there (ρ i))))) (f a)) (elab (λ i → there (ρ i)) s)
+        (λ a k c → laneSrc (λ i → there (there (there (there (ρ i))))) (f a) k c) (λ c → srcLane ρ s c)
     elab ρ (connect s b)     = connect (annotate (elab ρ s)) (elab (ext ρ) b)
     elab ρ (connected i)     = reader (connected (ρ (∈-map⁺ AIE i)))
     elab ρ (defer l)         = defer (elabˡ ρ l)
+
+    -- A flatMap's outer, shared.
+    srcLane : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Obs C Γ A → Bool → E (⊤ ∷ Δ) (IE A)
+    srcLane ρ s true  = blockˢ
+    srcLane ρ s false = elab (λ i → there (ρ i)) s
+
+    -- A lane's part, shared: the lane, or nothing past its burst.
+    laneSrc : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ ⊤ ∷ Δ) → Obs C Γ A → Part → Bool → E (⊤ ∷ Δ) (IE A)
+    laneSrc ρ o _         true  = blockˢ
+    laneSrc ρ o lanePart  false = elab ρ o
+    laneSrc ρ o burstPart false = empty
 
     elabˡ : ∀ {Γ Δ A} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → Later C Γ A → Later C Δ (IE A)
     elabˡ ρ l .Later.force = elab ρ (Later.force l)
