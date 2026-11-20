@@ -34,14 +34,13 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
-Each part's pair and clearance hold at its tree's boundaries
-(`Out.bd-pin`); the merge's elaborated outer hangs at the source's
-(`mg-each-bd→`), its rows the source's images relocated under the
-share, the end at the later of its own and the trigger's. Open: the end
-relocated past a boundary, suspect false where the source hangs past its
-own end (a connect's burst after its body's end), the elaborated end
-past that burst; a late row put past one; the lanes likewise under
-`laneˢ`. Settled by bodies, or `mg-o-end` refuted and the pair restated.
+The merge's end, relocated to the later of its source's and the
+trigger's, suspect false where the source hangs past its own end (a
+connect's burst after its body's end): the plain end lies before that
+burst's boundary, the elaborated end past every partner, so the merge's
+pair itself fails there. Settle by restating: the elaborated merge
+ending at its source's end, or ends cut alike only at a deeper cut.
+Then a late row put past a boundary; the lanes under `laneˢ`.
 
 Members: `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
