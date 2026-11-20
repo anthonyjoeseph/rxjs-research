@@ -235,7 +235,7 @@ mutual
   listHot {X = X} n o {ρ} u D c a =
     hotD hv hx hl c a hin (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
       (hot-rows-bounded n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
-      lead
+      src-lead
     where
       hv : ℕ → EmissionSet _
       hv = listEv n o D c
@@ -255,8 +255,8 @@ mutual
 
       -- A source boundary of its own lies in the source's world, which no
       -- body position leads; a scope's, in its hot's body's world.
-      lead : ∀ {N b g w} → bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]) N b g → W⁼ (HotsAll D ∪ʰ σ∞) (c ⊕ [ ix 0 ]) w → ¬ w ⊑ b
-      lead {N} bi v =
+      src-lead : ∀ {N b g w} → bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]) N b g → W⁼ (HotsAll D ∪ʰ σ∞) (c ⊕ [ ix 0 ]) w → ¬ w ⊑ b
+      src-lead {N} bi v =
         [ (λ own → Cn.Apart.body-leads σ∞ c (proj₁ a) (λ { (M , x) → hin M x }) v (inW (w-mono (λ hh → N , hh) (Placing.Own.world own))))
         , env-elim (dbd D) (λ i bj → scope-lead D i bj (into i) (inW (step (each-at (proj₂ a) i) plain-ix)) v) ]′
         (tree-placed ρ u D n o (c ⊕ [ ix 1 ]) (admits-step D a) bi)
