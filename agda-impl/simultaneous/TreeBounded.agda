@@ -37,7 +37,8 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap;
+  connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; on-out; module Connecting)

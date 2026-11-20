@@ -32,16 +32,40 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### THE PARTS AT THE TREE'S BOUNDARIES
+
+A join's pair and clearance are bodies over its parts' at the tree's
+boundaries (`bd`), but a part's `Rel.Bd` is not pinned to its tree's
+`bd`: plain one-child formers pass their child's through, a reader
+takes its hot's. So the parts' `bcorr` and `across` cannot feed the
+join. Settled by an `Out` field pinning `Rel.Bd` to `bd` (then these are
+the parts' fields), or a part whose `Rel.Bd` must differ from its tree's.
+
+Members: `mg-outer-bcorr`, `mg-lane-bcorr`, `mg-outer-back`, `mg-lane-back`,
+`mg-outer-put`, `mg-lane-put`, `mg-outer-lead`, `mg-lane-lead`.
+
+#### THE MERGE'S CROSS-PART FACTS
+
+`JoinPair` asks the merge what no part knows alone: each part's rows
+cut the other parts' marks alike, a held pin has no merge row under it,
+a merge row's map is its outer's (`val*`) or its lane's, and every
+image row is a row's. Untried. Settled by bodies over the listing, or
+a lane row ordered against an outer mark unlike its image.
+
+Members: `mg-val←`, `mg-φ-outer`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
+`mg-img`, `mg-held`, `mg-held*`, `mg-outer-lane`, `mg-outer-lane-put`,
+`mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
+
 #### THE HANGS ACROSS CUTS
 
 Each `Rel` owes `TableCorr.Across`: a row is clear at a shallower cut
 where its image, its placement or a leading pin of its instant is. One
 way only: a hang past a cut's first may sit in a lane no deeper cut
-runs. Riskiest: the joins', over `join-bd`, which is opaque, and
-`mg-bcorr` and kin, still postulates. Settled by the merge's body, or a
-deeper lane row clear where its image is while its shallower lane hangs.
+runs. The merge's is a body over its parts'; the other joins copy it.
+Settled by bodies, or a deeper lane row clear where its image is while
+its shallower lane hangs.
 
-Members: `mg-across`, `cc-across`, `sw-across`, `ex-across`,
+Members: `cc-across`, `sw-across`, `ex-across`,
 `cold-across`, `defer-across`, `rd-across`, `cb-across`, `sr-across`,
 `ct-across`, `cz-lead-clear`.
 
@@ -57,14 +81,14 @@ Members: `root-real`, `root-real*`, `root-φ-agree`, `root-late-agree`,
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
-`Horizon.ConnB` asks every connect's source for boundaries past its
-subscription. Suspected false where the source is a hot's reader: its
-boundaries are its hot's, which may precede the reader. `src-apart`
-reads only the hot's own rows and the body's subscription. Settled by
-a proof over the tree, or by that reader and `ConnB` restated to take
-the hot's boundaries as they stand.
+`Horizon.ConnB` keeps a source boundary before the connect as an echo,
+so it asks only that none lies inside the connect's own window
+(`src-out`) and that a burst's held pin is past the subscription. A hot
+reader's boundaries are its hot's, before or past. Untried. Settled by
+a proof over the tree, or a source boundary between the connect and its
+source's subscription.
 
-Members: `src-after`, `src-held`, `src-apart`, `ct-src-after`, `ct-src-held`.
+Members: `src-out`, `src-held`, `src-apart`, `ct-src-out`, `ct-src-held`.
 
 #### THE TREE'S HANGS
 
@@ -72,23 +96,24 @@ A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
 bounds its cuts by one induction; every `Rel`'s elaborated side and the
 plain leaves, joins and connects read both. Untried: the join's
 boundaries and their bound (outer's, and each running lane's before the
-lane's cut), the cold's, the scan's fold, the unrolled defer, a
+lane's cut) for the bounded merge, switch and exhaust, the merge's
+table read as `MergeJ.Jc`, the cold's, the scan's fold, the unrolled defer, a
 connect's table read as `Connecting.ConnT`. The plain side of a
 one-child former, a reader and a connect still passes its child's
 `Rel.Bd` through unpinned. Settled by bodies, or a lane hang the join
 does not keep.
 
-Members: `cold-bd`, `join-bd`, `cold-bounded`, `scan-bounded`,
-`hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `join-bounded`,
-`later-bounded`, `pd-bounded`.
+Members: `cold-bd`, `cc-bd`, `sw-bd`, `ex-bd`, `cold-bounded`, `scan-bounded`,
+`hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `merge-tr→`, `merge-tr←`, `gap-m`,
+`cc-bounded`, `sw-bounded`, `ex-bounded`, `later-bounded`, `pd-bounded`.
 
 #### THE JOINS' HANGS
 
-Untried: each core's pair with the plain flatMap's, over its parts'
-pairs (a pair over cross-part leaves is recoverable, see the merge's
-leaves). Settled by bodies.
+Each core's pair with the plain flatMap's: the merge's is
+`JoinPair`'s over its parts' and cross-part leaves; the others copy it,
+over `cc-bd`, `sw-bd`, `ex-bd`. Settled by bodies.
 
-Members: `mg-bcorr`, `cc-bcorr`, `sw-bcorr`, `ex-bcorr`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`.
 
 #### THE CONNECT'S HANGS
 
@@ -184,7 +209,8 @@ source's end at the later of its own and the trigger's. Visible images
 probed; skip images and puts untried.
 Settled by bodies.
 
-Members: `mg-corr`, `mg-in-bk`, `mg-after-φ`.
+Members: `mg-row→`, `mg-late-put`, `mg-pin→`, `mg-put-before`, `mg-pin-before`,
+`mg-shown←`, `mg-place`, `mg-mono`, `mg-inst`, `mg-home`, `mg-in-bk`, `mg-after-φ`.
 
 #### THE CLOSER AND THE SHARE
 

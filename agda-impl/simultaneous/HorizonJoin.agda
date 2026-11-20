@@ -12,15 +12,15 @@
 -- on a connect past the lane's subscription, so past the value.
 module simultaneous.HorizonJoin where
 
-open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Empty using (⊥)
 open import Data.List using ([]; [_])
-open import Data.Nat using (ℕ; _≤_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Nat using (ℕ)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; ix; _⊕_)
-open import denotation.EmissionSet using (Ev; out; end; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
+open import denotation.EmissionSet using (out; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-ext; ≺→≼; ≺-≼-≺; ≼-refl; ≼-trans)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)

@@ -22,23 +22,39 @@ open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.Maybe using (just; nothing; maybe)
 import Data.Maybe as M
-open import Data.Nat using (ℕ; _+_)
-open import Data.Product using (_×_; _,_)
+open import Data.Nat using (ℕ; _+_; _≤_)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
+open import Data.Sum using (_⊎_; inj₁)
+open import Data.Empty using (⊥)
+open import Data.Unit using (⊤; tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; pin; _≼_)
+open import denotation.EmissionSet using (Unpinned; pin; _≼_; _≺_; Ev; out; skip; EmissionSet; Ended)
+open import simultaneous.Readings using (instantOf)
+open import denotation.Laws.Worlds using (_⊑_)
+open import simultaneous.Horizon using (Tag; free; held; module Cuts)
+open import simultaneous.HorizonTree using (Cut; bd)
+open import simultaneous.HorizonJoin using (module MergeJ; module JoinBd)
+open import simultaneous.HorizonJoinPair using (module JoinPair)
+open import simultaneous.HorizonConn using (Mark)
+open import simultaneous.TreeBounded using (tree-bounded; merge-tr→; merge-tr←)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Corr; Across)
-open import simultaneous.TableKit using (TR; Got)
-open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
+open import simultaneous.TableKit using (TR; Got) renaming (M to Matches)
+open import simultaneous.Attribution using (One; Shown; Live)
+open import simultaneous.InstEmit using (valuesOf)
+open import Function using (_⇔_)
+open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; module Sub)
 open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
-  Admits)
+  Admits; tab-func; admits-row; dbd)
+open JoinBd using (outerB; laneB; laneH)
 
 
 open import Relation.Nullary using (¬_)
@@ -105,18 +121,196 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       open Tabs (mergeᶠ nothing) (λ N → L.map (valRec N) (valsAt N))
 
+      -- WHAT THE MERGE'S CORRESPONDENCE OWES, field by field.
+      MImaged : ℕ → Pos → Ev B → Set
+      MImaged N k e = Σ (Ev (IE B)) λ e′ → TR (Q′ N) (φ′ N k) e′ × Matches e e′
+
+      MHomed : ℕ → Pos → Set
+      MHomed N k = instantOf k ≡ instantOf p
+                 ⊎ Σ Pos λ k₀ → Σ (Ev B) λ e₀ → TR (P′ N) k₀ e₀ × Unpinned e₀ × ¬ Late′ N k₀ × MImaged N k₀ e₀ × k₀ ≺ k × instantOf k₀ ≡ instantOf k
+
+      MPutAt : ℕ → Pos → Set
+      MPutAt N k = (Σ Pos λ l → Σ (Ev (IE B)) λ e′ → TR (Q′ N) l e′ × Put′ N k l) × MHomed N k
+
+      MLeads : ℕ → Pos → Set
+      MLeads N k = ∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
+
+      MPinAt : ℕ → Pos → Pos → Set
+      MPinAt N k r = (Σ Pos λ l → Σ Pos λ p′ → TR (Q′ N) l (pin p′) × Put′ N k l
+                       × (∀ {k₀ a} → TR (P′ N) k₀ (out a) → φ′ N k₀ ≺ p′ → k₀ ≺ r)) × MHomed N k
+
       postulate
-        mg-corr        : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (Late′ N) (TR (P′ N)) (TR (Q′ N))
+        mg-row→       : ∀ N {k e} → TR (P′ N) k e → Unpinned e → (MImaged N k e × ¬ Late′ N k) ⊎ (e ≡ skip × MPutAt N k)
+        mg-late-put   : ∀ N {k e} → Late′ N k → TR (P′ N) k e → e ≡ skip × MPutAt N k
+        mg-pin→       : ∀ N {k r} → TR (P′ N) k (pin r) → Live (TR (P′ N)) k → MPinAt N k r
+        mg-put-before : ∀ N {k l k′ e′} → TR (P′ N) k skip → Put′ N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ Late′ N k′ → k ≺ k′ → l ≼ φ′ N k′
+        mg-pin-before : ∀ N {k r l k′ e′} → TR (P′ N) k (pin r) → Put′ N k l → TR (P′ N) k′ e′ → Unpinned e′ → ¬ Late′ N k′ → k ≺ k′ → l ≼ φ′ N k′
+        mg-shown←     : ∀ N {l e′} → TR (Q′ N) l e′ → Shown (One valuesOf) e′
+                      → Σ Pos λ k → Σ (Ev B) λ e → l ≡ φ′ N k × TR (P′ N) k e × Unpinned e × ¬ Late′ N k × Matches e e′
+        mg-place      : ∀ N {m e′} → TR (Q′ N) m e′ → Live (TR (Q′ N)) m
+                      → instantOf m ≡ instantOf c₁
+                      ⊎ Σ Pos λ k → Σ (Ev B) λ e → TR (P′ N) k e × Unpinned e × ¬ Late′ N k × MImaged N k e × (φ′ N k ≼ m ⊎ MLeads N k) × instantOf (φ′ N k) ≡ instantOf m
+        mg-mono       : ∀ N {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ N k → ¬ Late′ N k′ → k ≺ k′ → φ′ N k ≺ φ′ N k′
+        mg-inst       : ∀ N {k k′ e e′} → TR (P′ N) k e → TR (P′ N) k′ e′ → Unpinned e → Unpinned e′ → ¬ Late′ N k → ¬ Late′ N k′
+                      → (instantOf (φ′ N k) ≡ instantOf (φ′ N k′) ⇔ instantOf k ≡ instantOf k′)
+        mg-home       : ∀ N {k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → (instantOf (φ′ N k) ≡ instantOf c₁ ⇔ instantOf k ≡ instantOf p)
+
+      mg-corr : ∀ N → Corr p c₁ (φ′ N) (Put′ N) (Late′ N) (TR (P′ N)) (TR (Q′ N))
+      mg-corr N = record
+        { row→ = mg-row→ N ; late-put = mg-late-put N ; pin→ = mg-pin→ N ; put-before = mg-put-before N ; pin-before = mg-pin-before N
+        ; shown← = mg-shown← N ; place = mg-place N ; mono = mg-mono N ; inst = mg-inst N ; home = mg-home N }
+
+      postulate
         mg-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → k ∈ bk′ N (φ′ N k)
         mg-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → c₁ ≼ φ′ N k
 
       -- THE MERGE'S HANGS: its outer's boundaries, and each running
-      -- lane's before the lane's cut; each partnered with its image's.
-      --
-      -- RECOVERY: git show 252f560:agda-impl/simultaneous/HorizonJoin.agda restores `JoinPair`, a join's pair over its parts' pairs; git show 252f560:agda-impl/simultaneous/TableJoin.agda restores `tr-den` and `den-tr`, a table read as its cut program.
+      -- lane's; each partnered with its image's.  The merge is the join of
+      -- its parts on both sides (`merge-tr→`), its boundaries the tree's,
+      -- so its pair is `JoinPair`'s over the parts' pairs at the tree's
+      -- boundaries, restricted to the rows the listing shows.
+      oM oM* : ℕ → EmissionSet A
+      oM  = Cut n s ρ p
+      oM* = Cut n eachS ρ*c c₁
+
+      LM : A → Pos → ℕ → EmissionSet B
+      LM a q = Cut n (f a) ρ q
+
+      LM* : A → Pos → ℕ → EmissionSet (IE B)
+      LM* a q = Cut n (laneˢ (elab ρι⁴ (f a))) ρ*c q
+
+      BdoM BdoM* : ℕ → Pos → Tag → Set
+      BdoM  N = bd n s ρ uρ (dbd (lw env)) p N
+      BdoM* N = bd n eachS ρ*c uρ*c (dbd Dc) c₁ N
+
+      BdLM BdLM* : ℕ → Pos → A → Pos → Tag → Set
+      BdLM  N q a = bd n (f a) ρ uρ (dbd (lw env)) (q ⊕ [ ix 1 ]) N
+      BdLM* N q a = bd n (laneˢ (elab ρι⁴ (f a))) ρ*c uρ*c (dbd Dc) (q ⊕ [ ix 1 ]) N
+
+      module JP (N : ℕ) = JoinPair (MergeJ.Lane oM LM N) (oM N) (Ended (oM N)) (λ _ → ⊤) (λ _ _ → ⊥)
+        (MergeJ.Lane oM* LM* N) (oM* N) (Ended (oM* N)) (λ _ → ⊤) (λ _ _ → ⊥)
+        (BdoM N) (BdLM N) (BdoM* N) (BdLM* N) (λ _ → ⊥) (λ _ _ → ⊥)
+        (val* N) (φ′ N) (λ _ _ → φ′ N) (Late′ N) (Late′ N) (λ _ _ → Late′ N) (Put′ N) (Put′ N) (λ _ _ → Put′ N)
+
       postulate
-        mg-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ nothing) N) (jbd* (mergeᶠ nothing) N)
-        mg-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd (mergeᶠ nothing)) (jbd* (mergeᶠ nothing))
+        -- the parts' pairs at the tree's boundaries
+        mg-outer-bcorr : ∀ N → JP.IO.BCorr N
+        mg-lane-bcorr  : ∀ N {q a a*} → oM N q (out a) → oM* N (val* N q) (out a*) → JP.IL.BCorr N q a (val* N q) a*
+        -- every value of the elaborated outer is a value's image
+        mg-val←  : ∀ N {q* a*} → oM* N q* (out a*) → Σ Pos λ q → Σ A λ a → oM N q (out a) × q* ≡ val* N q
+        -- the merge reads its outer's rows where the outer's image is, a
+        -- value's marker under its image
+        mg-φ-outer : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → φ′ N k ≡ val* N k
+        mg-φ-val : ∀ N {q a} → oM N q (out a) → φ′ N (q ⊕ [ ix 0 ]) ≡ val* N q ⊕ [ ix 0 ]
+        mg-nl-out : ∀ N {q a} → oM N q (out a) → ¬ Late′ N q
+        mg-put-split : ∀ N {k e l} → JP.J.JoinT N k e → Put′ N k l
+                     → (Σ (Ev A) λ e′ → oM N k e′ × Put′ N k l)
+                     ⊎ (Σ Pos λ q → Σ A λ a → Σ (Ev B) λ e′ → oM N q (out a) × MergeJ.Lane oM LM N q a k e′ × Put′ N k l)
+        mg-img : ∀ N {k} → Own (JP.J.JoinT N) (Late′ N) k → Σ (Ev (IE B)) (JP.J*.JoinT N (φ′ N k))
+        -- no merge row extends a held boundary's pin
+        mg-held  : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
+        mg-held* : ∀ {N b r y e} → jbd* (mergeᶠ nothing) N b (held r) → JP.J*.JoinT N y e → ¬ y ⊑ r
+        -- each part's rows cut the other parts' marks alike
+        mg-outer-lane : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.Between N z z* → JP.Lanes N z z*
+        mg-outer-lane-put : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.PutBefore N z z* → JP.LanesP N z z*
+        mg-lane-outer : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (val* N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (val* N q) a*) z*
+                      → JP.IL.Between N q a (val* N q) a* z z* → Btw (Own (oM N) (Late′ N)) (val* N) z z*
+        mg-lane-outer-put : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (val* N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (val* N q) a*) z*
+                          → JP.IL.PutBefore N q a (val* N q) a* z z* → PB (OwnPut (oM N) (Put′ N)) z z*
+        mg-lane-lane : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (val* N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (val* N q) a*) z*
+                     → JP.IL.Between N q a (val* N q) a* z z*
+                     → ∀ {q′ a′} → oM N q′ (out a′) → ¬ q′ ≡ q → Btw (Own (MergeJ.Lane oM LM N q′ a′) (Late′ N)) (φ′ N) z z*
+        mg-lane-lane-put : ∀ N {q a a* z z*} → oM N q (out a) → oM* N (val* N q) (out a*) → Mark (BdLM N q a) z → Mark (BdLM* N (val* N q) a*) z*
+                         → JP.IL.PutBefore N q a (val* N q) a* z z*
+                         → ∀ {q′ a′} → oM N q′ (out a′) → ¬ q′ ≡ q → PB (OwnPut (MergeJ.Lane oM LM N q′ a′) (Put′ N)) z z*
+
+      -- A value's image is its value's row in the elaborated outer.
+      mg-val→ : ∀ N {q a} → oM N q (out a) → Σ A λ a* → oM* N (val* N q) (out a*)
+      mg-val→ N {a = a} x = a , each-row x
+
+      -- A value's row carries one value.
+      mg-o-func : ∀ N {q a a′} → oM N q (out a) → oM N q (out a′) → a ≡ a′
+      mg-o-func N x x′ with tab-func n s uρ (lw env) ad x x′
+      ... | refl = refl
+
+      -- A boundary of a running lane is the merge's.
+      mg-laneB : ∀ {N q a b g} → oM N q (out a) → BdLM N q a b g → jbd (mergeᶠ nothing) N b g
+      mg-laneB {g = free}   x b₀ = laneB x tt b₀ (λ ())
+      mg-laneB {g = held r} x b₀ = laneH x tt b₀ (λ ())
+
+      mg-laneB* : ∀ {N q a b g} → oM* N q (out a) → BdLM* N q a b g → jbd* (mergeᶠ nothing) N b g
+      mg-laneB* {g = free}   x b₀ = laneB x tt b₀ (λ ())
+      mg-laneB* {g = held r} x b₀ = laneH x tt b₀ (λ ())
+
+      -- No merge row lies over the merge's boundaries.
+      mg-gap : ∀ {N b g y e} → jbd (mergeᶠ nothing) N b g → JP.J.JoinT N y e → ¬ y ⊑ b
+      mg-gap {N} b₀ y = proj₂ (Cuts.Bounded.gap (jtree (mergeᶠ nothing)) b₀ (merge-tr← n f s uρ p {N} y))
+
+      mg-gap* : ∀ {N b g y e} → jbd* (mergeᶠ nothing) N b g → JP.J*.JoinT N y e → ¬ y ⊑ b
+      mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (elab ρι⁴ (f a))) eachS {ρ*c} uρ*c c₁ {N} y))
+
+      mg-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ nothing) N) (jbd* (mergeᶠ nothing) N)
+      mg-bcorr N = Sub.restrict {Row = Own (TR (P′ N)) (Late′ N)} {Row′ = JP.JRow N} {φ = φ′ N} {Puts = OwnPut (TR (P′ N)) (Put′ N)} {Puts′ = JP.JPut N}
+                     {Bd = jbd (mergeᶠ nothing) N} {Bd* = jbd* (mergeᶠ nothing) N} row put
+        (JP.Pair.corr N (mg-outer-bcorr N) (mg-val→ N) (mg-val← N) (λ _ _ → tt) (λ _ _ → tt) (mg-o-func N) (mg-lane-bcorr N)
+          (mg-φ-outer N) (mg-φ-val N) (λ _ _ → refl) (λ ()) (λ ()) (mg-nl-out N) (λ l → l) (λ _ _ l → l)
+          (mg-put-split N) (mg-img N)
+          (λ b₀ → mg-gap (outerB b₀)) (λ b₀ → mg-gap* (outerB b₀)) (λ b₀ → mg-held (outerB b₀)) (λ b₀ → mg-held* (outerB b₀))
+          (λ x b₀ → mg-gap (mg-laneB x b₀)) (λ x b₀ → mg-gap* (mg-laneB* x b₀))
+          (λ x b₀ → mg-held (laneH x tt b₀ (λ ()))) (λ x b₀ → mg-held* (laneH x tt b₀ (λ ())))
+          (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (f a) ρ uρ (lw env) (q ⊕ [ ix 1 ]) (admits-row n s uρ (lw env) ad x)) b₀)
+          (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (laneˢ (elab ρι⁴ (f a))) ρ*c uρ*c Dc (q ⊕ [ ix 1 ]) (admits-row n eachS uρ*c Dc ad₁ x)) b₀)
+          (λ _ _ _ ()) (λ _ _ _ ()) (λ ()) (λ ())
+          (mg-outer-lane N) (mg-outer-lane-put N) (mg-lane-outer N) (mg-lane-outer-put N) (mg-lane-lane N) (mg-lane-lane-put N))
+        where
+          row : ∀ {k} → Own (TR (P′ N)) (Late′ N) k → JP.JRow N k
+          row (e , x , un , nl) = inj₁ (e , merge-tr→ n f s uρ p (pd-sub {mergeᶠ nothing} {N} x) , un , nl)
+
+          put : ∀ {k l} → OwnPut (TR (P′ N)) (Put′ N) k l → JP.JPut N k l
+          put ((e , x) , pl) = inj₁ ((e , merge-tr→ n f s uρ p (pd-sub {mergeᶠ nothing} {N} x)) , pl)
+
+      -- THE MERGE CLEARS ACROSS CUTS AS ITS PARTS DO: a boundary of the
+      -- merge is its outer's or a running lane's, and the image's clearance
+      -- restricts to the image's outer and to the image value's lane.
+      ClearO ClearO* : ℕ → Pos → Set
+      ClearO  N k = ∀ {b g} → BdoM N b g → k ≺ b
+      ClearO* N k = ∀ {b g} → BdoM* N b g → k ≺ b
+
+      ClearL : ℕ → Pos → A → Pos → Set
+      ClearL N q a k = ∀ {b g} → BdLM N q a b g → k ≺ b
+
+      ClearL* : ℕ → Pos → A → Pos → Set
+      ClearL* N q a k = ∀ {b g} → BdLM* N q a b g → k ≺ b
+
+      postulate
+        mg-outer-back : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ Late′ N′ k → ClearO* N (φ′ N′ k) → ClearO N k
+        mg-lane-back  : ∀ {N N′ k e q a a*} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ Late′ N′ k
+                      → oM N q (out a) → oM* N (val* N q) (out a*) → ClearL* N (val* N q) a* (φ′ N′ k) → ClearL N q a k
+        mg-outer-put  : ∀ {N N′ k e l} → N ≤ N′ → TR (P′ N′) k e → Put′ N′ k l → ClearO* N l → ClearO N k
+        mg-lane-put   : ∀ {N N′ k e l q a a*} → N ≤ N′ → TR (P′ N′) k e → Put′ N′ k l
+                      → oM N q (out a) → oM* N (val* N q) (out a*) → ClearL* N (val* N q) a* l → ClearL N q a k
+        mg-outer-lead : ∀ {N k e m e*} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k
+                      → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → ClearO* N m → ClearO N k
+        mg-lane-lead  : ∀ {N k e m e* q a a*} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k
+                      → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+                      → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k)
+                      → oM N q (out a) → oM* N (val* N q) (out a*) → ClearL* N (val* N q) a* m → ClearL N q a k
+
+      mg-clear : ∀ {N k} → ClearO N k → (∀ {q a a*} → oM N q (out a) → oM* N (val* N q) (out a*) → ClearL N q a k)
+               → Cuts.Clear (λ M → TR (P′ M)) (jbd (mergeᶠ nothing)) N k
+      mg-clear     co cl (outerB b₀)      = co b₀
+      mg-clear {N} co cl (laneB x _ b₀ _) = cl x (proj₂ (mg-val→ N x)) b₀
+      mg-clear {N} co cl (laneH x _ b₀ _) = cl x (proj₂ (mg-val→ N x)) b₀
+
+      mg-across : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd (mergeᶠ nothing)) (jbd* (mergeᶠ nothing))
+      mg-across = record
+        { back-clear = λ le x un nl cl* → mg-clear (mg-outer-back le x un nl (λ b₀ → cl* (outerB b₀)))
+                                                   (λ x₀ x₀* → mg-lane-back le x un nl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
+        ; put-clear  = λ le x pl cl* → mg-clear (mg-outer-put le x pl (λ b₀ → cl* (outerB b₀)))
+                                                (λ x₀ x₀* → mg-lane-put le x pl x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀)))
+        ; lead-clear = λ x un nl ld m ie cl* → mg-clear (mg-outer-lead x un nl ld m ie (λ b₀ → cl* (outerB b₀)))
+                                                        (λ x₀ x₀* → mg-lane-lead x un nl ld m ie x₀ x₀* (λ b₀ → cl* (mg-laneB* x₀* b₀))) }
 
       mg-got : ∀ N → Got (P′ N)
       mg-got N = pd-got (mergeᶠ nothing) N
