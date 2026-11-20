@@ -233,7 +233,7 @@ mutual
                → ∀ p → Admits D p → Cuts.Bounded (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
 
   listHot {X = X} n o {ρ} u D c a =
-    hotD hv hx hl c a hin (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
+    hotD hv hx hl c a src-in (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
       (hot-rows-bounded n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
       src-lead
     where
@@ -241,8 +241,8 @@ mutual
       hv = listEv n o D c
 
       -- The source's rows at every cut, each in the source's world.
-      hin : ∀ N {h e} → hv N h e → W (HotsAll D) (c ⊕ [ ix 1 ]) h
-      hin N x = w-mono (λ hh → N , hh)
+      src-in : ∀ N {h e} → hv N h e → W (HotsAll D) (c ⊕ [ ix 1 ]) h
+      src-in N x = w-mono (λ hh → N , hh)
         (InvAt.world (inv-capprox (3 + N) n o (den D N) (den-ok D N) (c ⊕ [ ix 1 ]) (ok-step c (admits-at D a N))) (proj₁ x))
 
       σ∞ : EmissionSet X
@@ -251,13 +251,13 @@ mutual
       -- The body's world, read from a scope hot's body's.
       into : ∀ {Y : Set} (i : Y ∈ _) {h} → (HotsAll D ∪ʰ σ∞) h → dH D i h ⊎ W (dH D i) (dlo D i) h
       into i (inj₂ hh)          = dnest D i hh
-      into i (inj₁ (_ , M , x)) = inj₂ (transfer (dnest D i) (inW (step (each-at (proj₂ a) i) plain-ix)) (hin M x))
+      into i (inj₁ (_ , M , x)) = inj₂ (transfer (dnest D i) (inW (step (each-at (proj₂ a) i) plain-ix)) (src-in M x))
 
       -- A source boundary of its own lies in the source's world, which no
       -- body position leads; a scope's, in its hot's body's world.
       src-lead : ∀ {N b g w} → bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]) N b g → W⁼ (HotsAll D ∪ʰ σ∞) (c ⊕ [ ix 0 ]) w → ¬ w ⊑ b
       src-lead {N} bi v =
-        [ (λ own → Cn.Apart.body-leads σ∞ c (proj₁ a) (λ { (M , x) → hin M x }) v (inW (w-mono (λ hh → N , hh) (Placing.Own.world own))))
+        [ (λ own → Cn.Apart.body-leads σ∞ c (proj₁ a) (λ { (M , x) → src-in M x }) v (inW (w-mono (λ hh → N , hh) (Placing.Own.world own))))
         , env-elim (dbd D) (λ i bj → scope-lead D i bj (into i) (inW (step (each-at (proj₂ a) i) plain-ix)) v) ]′
         (tree-placed ρ u D n o (c ⊕ [ ix 1 ]) (admits-step D a) bi)
 
