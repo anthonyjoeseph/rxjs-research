@@ -19,7 +19,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 
-open import Tree using (Obs; mergeᶠ; empty; of; flatMap; scan; connect)
+open import Tree using (Obs; mergeᶠ; empty; of; flatMap; scan; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; shown; ended;
@@ -38,7 +38,7 @@ open import quickcheck.Tabled.Exact.Base using (sound)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; raw-exact; in-raw; Raw; Own; UncutEnv)
 open import simultaneous.TableKit using (TR)
-open import simultaneous.TableEnv using (_⊕ˡ_; up; up-⊕; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at)
+open import simultaneous.TableEnv using (_⊕ˡ_; up; up-⊕; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at; admits-step)
 open import simultaneous.TreeBounded using (listHot; admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; scan-out; bounded-out; of-mem; each-one)
@@ -380,7 +380,7 @@ module Ending {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.m
 
   -- The blocker sends nothing.
   blk-u : ∀ {Γ} (ρ : DenEnv (⊤ ∷ Γ)) → Undone (capprox K n (blockˢ {X = IE B}) ρ)
-  blk-u ρ p r with each-one (λ _ → []) _ p r
+  blk-u ρ p r with each-one (λ _ → []) (capprox K n (connected (here refl)) ρ) p r
   ... | _ , _ , _ , ()
 
   -- No child of a part ends a lane.

@@ -530,8 +530,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     trigD st a = listHot n (empty {A = ⊤}) uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))
 
     laneAdm : ∀ st (a : Admits Dc st) → Admits (den-cons (trigD st a) Dc) (laneX st)
-    laneAdm st a = admits-ix D′ 1 (admits-ix D′ 0 (admits-trig n uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))))
-      where D′ = den-cons (trigD st a) Dc
+    laneAdm st a = admits-trig n uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))
 
     -- A lane's hots, opaque: the record's field type naming `trigD`
     -- exhausts the heap.
