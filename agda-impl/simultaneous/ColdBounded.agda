@@ -13,7 +13,7 @@ open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using (All)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; s≤s; _≤?_)
 open import Data.Nat.Properties using (<-≤-trans; +-monoʳ-≤; ≰⇒>; m≤n⇒m<n∨m≡n; suc-injective)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (yes; no)
@@ -29,7 +29,7 @@ open import denotation.Laws.ColdInv using (depth; cold-inv; cold-reach; cold-asc
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (sound; complete)
 open import simultaneous.Listing using (walkN-exact)
-open import simultaneous.Horizon using (free; module Cuts)
+open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonTree using (Cut; cold-bd)
 
 ------------------------------------------------------------------------

@@ -39,7 +39,7 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty
   connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix;
@@ -63,8 +63,9 @@ open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
 open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
-open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
-open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd)
+open import simultaneous.Horizon using (held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
+  bounded-≃)
+open import simultaneous.HorizonTree using (Cut; bodyρ; bodyU; bd)
 open import simultaneous.ColdBounded using (cold-bounded)
 open import simultaneous.HotRows using (hot-rows-bounded)
 open import simultaneous.HorizonJoin using (module MergeB)

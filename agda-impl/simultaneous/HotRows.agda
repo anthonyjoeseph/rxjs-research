@@ -10,11 +10,11 @@
 -- before it moves is a fact about the source (`hot-pin-ends`).
 --
 -- DEAD ROUTE: deriving `hot-pin-ends` from `Cuts.Bounded` alone.  Two
--- cuts, the shallower holding a pin of `q` at `y` and a boundary `b`
--- with `q ≺ b`, the deeper the same pin and an end at `c₀` with
--- `b ≼ c₀ ≺ y`, are bounded by `b`: `Clear N q` holds, and no row before
--- `b` moves.  The end moved, so the hot of the shallower cut keeps the
--- pin and the deeper drops it.
+--   cuts, the shallower holding a pin of `q` at `y` and a boundary `b`
+--   with `q ≺ b`, the deeper the same pin and an end at `c₀` with
+--   `b ≼ c₀ ≺ y`, are bounded by `b`: `Clear N q` holds, and no row before
+--   `b` moves.  The end moved, so the hot of the shallower cut keeps the
+--   pin and the deeper drops it.
 module simultaneous.HotRows where
 
 open import Data.List using ([_])

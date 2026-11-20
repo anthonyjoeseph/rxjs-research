@@ -31,7 +31,7 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
-open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr; Across; module Across)
+open import simultaneous.TableCorr using (Same; same; φ≡; nl→; Rel; Corr; Across; Stable; LeadClear; across-of; module Across)
 open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.Readings using (instantOf)
@@ -147,7 +147,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-moved    : ∀ N {k b g} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b g → (Rel.φ R N k ≺ b → φ′ N k ≺ b) × (φ′ N k ≺ b → Rel.φ R N k ≺ b)
       cb-moved-q  : ∀ N {k b q} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b (held q) → (Rel.φ R N k ≺ q → φ′ N k ≺ q) × (φ′ N k ≺ q → Rel.φ R N k ≺ q)
       cb-putw     : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PB (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PB (OwnPut (TR (P′ N)) (Put′ N)) b b*
-      cb-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
+      cb-stable : Stable (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
+      cb-lead   : LeadClear (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Late′ (Rel.Bd R) cb-bd*
 
     -- A put skip is no end: re-emitted, its image lies under the lanes'
     -- flatMap's, over no boundary of the flatMap's, which the scan's are.
@@ -182,7 +183,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; func = Rel.func R ; func* = tab-func n (inner op) uρ*c Dc ad₂ ; flat = Rel.flat R ; flat* = tab-flat n (inner op) uρ*c Dc ad₂
       ; pin-in = Rel.pin-in R ; pin-in* = cb-pin-in* ; got = Rel.got R ; got* = cb-got*
       ; after = Rel.after R ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr ; across = cb-across ; skip-off* = cb-put-off* }
+      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr ; across = across-of (λ N → cb-bcorr N) (cb-stable) (λ {N} → cb-lead {N}) ; skip-off* = cb-put-off* }
 
   ----------------------------------------------------------------------
   -- THE CLOSER: the combined run is the closer's connect's body, its rows
@@ -324,7 +325,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     postulate
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
-      sr-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) sr-bd*
+      sr-stable : Stable (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) sr-bd*
+      sr-lead   : LeadClear (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Late′ (Rel.Bd R) sr-bd*
       -- every row not late imaged at a row of the elaborated flatMap
       sr-img      : ∀ N {k} → Own (TR (P′ N)) (Late′ N) k → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N k))
 
@@ -364,7 +366,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab _ (flatMap op f s)) uρ* (lw* env) ad*
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = sr-across ; skip-off* = sr-put-off* }
+      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = across-of (λ N → sr-bcorr N) (sr-stable) (λ {N} → sr-lead {N}) ; skip-off* = sr-put-off* }
 
   -- The layers pass the core's boundaries through: the flatMap's own.
   flat-hangs : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*)

@@ -47,7 +47,7 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; plainˡ; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv; listC; listC-ok)
-open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; module Rel; Stable; LeadClear; across-of; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; module ConnBd; module TakeBd; bounded-≃)
 open import simultaneous.TreeBounded using (tree-bounded; src-out; src-held)
@@ -418,7 +418,8 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     postulate
       -- THE CONNECT'S HANGS ACROSS CUTS: its body's and its source's, as
       -- at one cut.
-      ct-across : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+      ct-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+      ct-lead   : LeadClear (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Late′ ct-bd ct-bd*
 
     -- A put skip is imaged as any row is, at a row of the elaborated
     -- connect, so over no boundary.
@@ -482,7 +483,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; got = ct-got ; got* = ct-got*
       ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after*
-      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = ct-across ; skip-off* = ct-put-off* }
+      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = across-of (λ N → ct-bcorr N) (ct-stable) (λ {N} → ct-lead {N}) ; skip-off* = ct-put-off* }
 
   conn-tab : (Rs : Src) → Out n b ρ′ uρ′ (ext ρι) ρ*′ uρ*′ (Ψ′ Rs) D′ D*′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
   conn-tab = ConnTab.rel′
