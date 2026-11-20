@@ -208,6 +208,10 @@ module Vals {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p 
       first []       = nothing
       first (v ∷ vs) = if does (ValAt.q v ≟ᵖ q) then just v else first vs
 
+  -- A value of the source at a row.
+  isVal : ℕ → Pos → Bool
+  isVal N y = anyᵇ (λ v → does (ValAt.q v ≟ᵖ y)) (valsAt N)
+
   -- A value's marker at a row.
   isMarker : ℕ → Pos → Bool
   isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
