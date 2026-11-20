@@ -209,6 +209,18 @@ opaque
 Opaque names compare by argument, so two spellings of one program meet cheaply; a
 consumer that only passes the value on never notices.
 
+#### Re-spelling an implicit-Π argument
+
+```agda
+f : … elab ρ (flatMap op f s) …           -- ρ : ∀ {X} → X ∈ Γ → X ∈ Δ
+f = conn⁴ … (elab ρ (flatMap op f s)) …   -- ρ arrives eta-expanded: no syntactic match,
+                                         -- conversion unfolds the elaboration and denotation
+```
+```agda
+f = conn⁴ … (elab _ (flatMap op f s)) …   -- or leave it to refl; ρ comes from the goal
+```
+Unification copies the goal's spelling; nothing unfolds. `opaque` and `NOT_PROJECTION_LIKE` don't help.
+
 #### A big closed numeral meets a variable
 
 ```agda
