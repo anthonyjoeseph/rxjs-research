@@ -66,7 +66,7 @@ open import denotation.Laws.Cut using (capprox)
 open import simultaneous.TableFlat using (module Flat; module Vals)
 open import simultaneous.TableRows using (rejoin-one)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; laneSrc; closer; combined; trackers)
 
 -- Apart from a position, a row and its descendants order alike against
 -- it.
@@ -193,7 +193,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       LM a q = Cut n (f a) ρ q
 
       LM* : A → Pos → ℕ → EmissionSet (IE B)
-      LM* a q = Cut n (laneˢ (elab ρι⁴ (f a))) ρ*c q
+      LM* a q = Cut n (laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) ρ*c q
 
       BdoM BdoM* : ℕ → Pos → Tag → Set
       BdoM  N = bd n s ρ uρ (dbd (lw env)) p N
@@ -201,7 +201,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       BdLM BdLM* : ℕ → Pos → A → Pos → Tag → Set
       BdLM  N q a = bd n (f a) ρ uρ (dbd (lw env)) (q ⊕ [ ix 1 ]) N
-      BdLM* N q a = bd n (laneˢ (elab ρι⁴ (f a))) ρ*c uρ*c (dbd Dc) (q ⊕ [ ix 1 ]) N
+      BdLM* N q a = bd n (laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) ρ*c uρ*c (dbd Dc) (q ⊕ [ ix 1 ]) N
 
       -- THE OUTER'S MAP: a value at its elaborated value, `each`'s row
       -- under the shared hot's; any other row where the merge puts it.
@@ -212,21 +212,20 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       BdS* : ℕ → Pos → Tag → Set
       BdS* N = bd n (elab (wk ρι) s) ρ*s uρ*s (dbd Ds) sp* N
 
-      -- `each` hangs as its shared hot does, whose one lane is the
-      -- trigger's, subscribed at the source's elaborated subscription.
-      trig-only : ∀ N {q a} → TR (listC (3 + N) n (connected (here refl)) (ρ*s N) shp) q (out a) → q ≡ p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub shp ]
-      trig-only N (_ , refl , m) = rejoin-one shp (p* ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (p* ⊕ [ ix 1 ] ⊕ [ last ]) {a = tt} {s = false} m
+      -- THE SHARE HANGS WHERE ITS CHILD DOES, at the child's queued
+      -- subscription: the concat's outer and blocker hang nowhere.
+      postulate
+        share-bd→ : ∀ N {b g} → bd n shared ρ*s uρ*s (dbd Ds) shp N b g → BdS* N b g
+        share-bd← : ∀ N {b g} → BdS* N b g → bd n shared ρ*s uρ*s (dbd Ds) shp N b g
 
+      -- `each` hangs as its shared hot does.
       mg-each-bd→ : ∀ N {b g} → BdoM* N b g → BdS* N b g
-      mg-each-bd→ N (outerB (outerB ()))
-      mg-each-bd→ N {b} (outerB (laneB x _ y _))     = subst (λ q → bd n s* ρ*s uρ*s (dbd Ds) (q ⊕ [ ix 1 ]) N b free) (trig-only N x) y
-      mg-each-bd→ N {b} (outerB (laneH {r = r} x _ y _)) = subst (λ q → bd n s* ρ*s uρ*s (dbd Ds) (q ⊕ [ ix 1 ]) N b (held r)) (trig-only N x) y
+      mg-each-bd→ N (outerB x)      = share-bd→ N x
       mg-each-bd→ N (laneB _ _ () _)
       mg-each-bd→ N (laneH _ _ () _)
 
       mg-each-bd← : ∀ N {b g} → BdS* N b g → BdoM* N b g
-      mg-each-bd← N {g = free}   y = outerB (laneB (Tb.rejoin shp (tt-tab N) , refl , trig-row N) tt y (λ ()))
-      mg-each-bd← N {g = held r} y = outerB (laneH (Tb.rejoin shp (tt-tab N) , refl , trig-row N) tt y (λ ()))
+      mg-each-bd← N y = outerB (share-bd← N y)
 
       module JP (N : ℕ) = JoinPair (MergeJ.Lane oM LM N) (oM N) (Ended (oM N)) (λ _ → ⊤) (λ _ _ → ⊥)
         (MergeJ.Lane oM* LM* N) (oM* N) (Ended (oM* N)) (λ _ → ⊤) (λ _ _ → ⊥)
@@ -391,7 +390,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       mg-gap {N} b₀ y = proj₂ (Cuts.Bounded.gap (jtree (mergeᶠ nothing)) b₀ (merge-tr← n f s uρ p {N} y))
 
       mg-gap* : ∀ {N b g y e} → jbd* (mergeᶠ nothing) N b g → JP.J*.JoinT N y e → ¬ y ⊑ b
-      mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (elab ρι⁴ (f a))) eachS {ρ*c} uρ*c c₁ {N} y))
+      mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) eachS {ρ*c} uρ*c c₁ {N} y))
 
       -- No merge row lies over a connect a boundary waits on: the
       -- boundary lies under it, and no row over the boundary.
@@ -416,7 +415,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
           (λ x b₀ → mg-gap (mg-laneB x b₀)) (λ x b₀ → mg-gap* (mg-laneB* x b₀))
           (λ x b₀ → mg-held (laneH x tt b₀ (λ ()))) (λ x b₀ → mg-held* (laneH x tt b₀ (λ ())))
           (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (f a) ρ uρ (lw env) (q ⊕ [ ix 1 ]) (admits-row n s uρ (lw env) ad x)) b₀)
-          (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (laneˢ (elab ρι⁴ (f a))) ρ*c uρ*c Dc (q ⊕ [ ix 1 ]) (admits-row n eachS uρ*c Dc ad₁ x)) b₀)
+          (λ {q} {a} x b₀ → Cuts.Bounded.held-in (tree-bounded n (laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) ρ*c uρ*c Dc (q ⊕ [ ix 1 ]) (admits-row n eachS uρ*c Dc ad₁ x)) b₀)
           (λ _ _ _ ()) (λ _ _ _ ()) (λ ()) (λ ())
           (mg-outer-lane N) (mg-outer-lane-put N) (mg-lane-outer N) (mg-lane-outer-put N) (mg-lane-lane N) (mg-lane-lane-put N))
         where

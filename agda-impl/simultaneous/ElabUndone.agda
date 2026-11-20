@@ -16,7 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
 open import Relation.Nullary using (does)
 
@@ -30,7 +30,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; sto
 open import simultaneous.SObs using (lone; ext; Tag; val; cdone; tick; flat; Flat; isZero; module Elaborate)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; map-out′; scan-out; take-row; of-mem; each-one; module Cat)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; annotate; undone; joins;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; srcLane; laneSrc; annotate; undone; joins;
   joinStep; annStep; render; phase; passes; mapIE; scanIE; combined; react; onMark; cut; unpark; arrive; ended; burstOver;
   left; begun; stopped; overed; share; setAt; concatˢ; marked; closer; laneˢ; each; trackers; Out; Input; going; fed)
 
@@ -295,8 +295,8 @@ elab-undone N n ρ (scan f z s) env eu p r with map-out′ proj₂ (Op.scan (sca
 elab-undone N n ρ (takeWhile i keep s) env eu p r =
   let (_ , sx) = take-row i (passes keep) (capprox N n (elab ρ s) env) p r in elab-undone N n ρ s env eu p sx
 elab-undone N n {Γ} ρ (flatMap op f s) env eu =
-  conn⁴ N n (elab ρ (flatMap op f s)) (of (tt ∷ [])) (flatMap (mergeᶠ nothing) (λ _ → elab (λ i → there (ρ i)) s) (connected (here refl)))
-    closer (flatMap op (λ a → laneˢ (elab (λ i → there (there (there (there (ρ i))))) (f a))) (each valuesOf (connected (there (here refl)))))
+  conn⁴ N n (elab ρ (flatMap op f s)) (empty {A = ⊤}) (flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ [])))
+    closer (flatMap op (λ a → laneˢ (λ k c → laneSrc (λ i → there (there (there (there (ρ i))))) (f a) k c)) (each valuesOf (connected (there (here refl)))))
     (combined op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))) env refl
     λ e → comb-u N n op (trackers Γ 0 (λ i → there (there (there (there (ρ i)))))) e
 elab-undone N n ρ (connect s b) env eu =
