@@ -56,16 +56,16 @@ Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-src`, `mg-val←`, `mg
 
 #### THE HANGS ACROSS CUTS
 
-Each `Rel` owes `TableCorr.Across`: a row is clear at a shallower cut
-where its image, its placement or a leading pin of its instant is. One
-way only: a hang past a cut's first may sit in a lane no deeper cut
-runs. The merge's is a body over its parts'; the other joins copy it.
-Settled by bodies, or a deeper lane row clear where its image is while
-its shallower lane hangs.
+Each `Rel` owes `TableCorr.Across`; `TableCorr.across-of` builds it from
+one cut's `bcorr` and `TableCorr.Stable`: an own row whose image lies
+before a shallower cut's elaborated hangs is in that cut, on the same
+image; a placed row is clear where its placement is. Untried. Settled by bodies, or a deeper row before the
+elaborated hangs whose shallower image moved. Leading rows stay per former.
 
-Members: `cc-across`, `sw-across`, `ex-across`,
-`cold-across`, `defer-across`, `rd-across`, `cb-across`, `sr-across`,
-`ct-across`, `cz-lead-clear`.
+Members: `cc-stable`, `sw-stable`, `ex-stable`, `cold-stable`, `defer-stable`,
+`rd-stable`, `cb-stable`, `sr-stable`, `ct-stable`, `cc-lead`, `sw-lead`,
+`ex-lead`, `cold-lead`, `defer-lead`, `rd-lead`, `cb-lead`, `sr-lead`,
+`ct-lead`, `cz-lead-clear`.
 
 #### THE ROOT'S LEAVES
 
@@ -91,19 +91,17 @@ Members: `src-out`, `src-held`, `src-apart`, `ct-src-out`, `ct-src-held`.
 #### THE TREE'S HANGS
 
 A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
-bounds its cuts by one induction; every `Rel`'s elaborated side and the
-plain leaves, joins and connects read both. Untried: the join's
-boundaries and their bound (outer's, and each running lane's before the
-lane's cut) for the bounded merge, switch and exhaust, the merge's
-table read as `MergeJ.Jc`, the cold's, the scan's fold, the unrolled defer, a
-connect's table read as `Connecting.ConnT`. The plain side of a
-one-child former, a reader and a connect still passes its child's
-`Rel.Bd` through unpinned. Settled by bodies, or a lane hang the join
-does not keep.
+bounds its cuts by one induction; the cold, scan, defer and connect
+cases are bodies. Open: the joins' boundaries and their bound (outer's,
+and each running lane's before the lane's cut), a merge boundary off its
+lanes' rows (`gap-m`), a hot's ends before a settled pin (`hot-pin-ends`,
+not derivable from `Cuts.Bounded` alone), and a deferred child's
+boundaries off its guard. The plain side of a one-child former, a reader
+and a connect still passes its child's `Rel.Bd` through unpinned.
+Settled by bodies, or a lane hang the join does not keep.
 
-Members: `cold-bd`, `cc-bd`, `sw-bd`, `ex-bd`, `cold-bounded`, `scan-bounded`,
-`hot-rows-bounded`, `conn-tr→`, `conn-tr←`, `merge-tr→`, `merge-tr←`, `gap-m`,
-`cc-bounded`, `sw-bounded`, `ex-bounded`, `later-bounded`, `pd-bounded`.
+Members: `cc-bd`, `sw-bd`, `ex-bd`, `gap-m`, `hot-pin-ends`, `defer-apart`,
+`cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`.
 
 #### THE JOINS' HANGS
 

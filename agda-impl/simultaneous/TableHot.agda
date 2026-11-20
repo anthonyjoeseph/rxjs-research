@@ -45,7 +45,7 @@ open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
-open import simultaneous.TableCorr using (Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; Stable; LeadClear; across-of; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounded-≃; module ConnBd)
 open import simultaneous.HorizonJoin using (module JoinBd)
@@ -407,7 +407,8 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
     rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
     rd-bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
                                       (EnvCut (Ψ′ Rs) ρ′ N)
-    rd-across    : Across (λ N → TR (P N)) (λ N → TR (Q N)) φᵣ Putᵣ Lateᵣ (Rel.Bd R₀) rd-bd*
+    rd-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φᵣ Putᵣ Lateᵣ (Rel.Bd R₀) rd-bd*
+    rd-lead   : LeadClear (λ N → TR (P N)) (λ N → TR (Q N)) φᵣ Lateᵣ (Rel.Bd R₀) rd-bd*
 
   -- The elaborated reader hangs where its hot does, the hot where the
   -- annotation's source does, which is the elaborated source.
@@ -463,7 +464,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
     ; func = Gen.rd-func ad ad* ; func* = Gen.rd-func* ad ad* ; flat = Gen.rd-flat ad ad* ; flat* = Gen.rd-flat* ad ad*
     ; pin-in = rd-pin-in ; pin-in* = rd-pin-in* ; got = rd-got ; got* = rd-got*
     ; after = rd-after ; after* = rd-after* ; after-φ = rd-after-φ al ; pin-after* = rd-pin-after*
-    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ad* ; bcorr = rd-bcorr ; across = rd-across ; skip-off* = rd-put-off* ad }
+    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ad* ; bcorr = rd-bcorr ; across = across-of (λ N → rd-bcorr N) (rd-stable) (λ {N} → rd-lead {N}) ; skip-off* = rd-put-off* ad }
 
   -- THE READER'S ORDER FACTS: each row linked to its image; each shown
   -- row cutting every hot alike with it, and the reader's own rows of

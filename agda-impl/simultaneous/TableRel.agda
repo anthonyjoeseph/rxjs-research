@@ -41,16 +41,17 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _�
 open import denotation.Events using (Timeline; From; fresh)
 open import denotation.EmissionSet using (Ev; end; skip; EmissionSet; Unpinned; pin; _≺_; _≼_; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-≼-≺)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-refl; Ok)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; plainˡ; lone; ext; module Elaborate)
-open import simultaneous.Listing using (UncutEnv; listC)
-open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.Listing using (UncutEnv; listC; listC-ok)
+open import simultaneous.TableCorr using (Rel; module Rel; Stable; LeadClear; across-of; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; module ConnBd; module TakeBd; bounded-≃)
-open import simultaneous.TreeBounded using (conn-tr→; conn-tr←; tree-bounded; src-out; src-held)
+open import simultaneous.TreeBounded using (tree-bounded; src-out; src-held)
+open import simultaneous.CutParts using (conn-tr→; conn-tr←)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
@@ -82,8 +83,8 @@ postulate
   -- subscription's instant or at steps of timers it created there, each
   -- imaged at the alike step of the elaborated subscription; so each row
   -- inherits its subscription's link and its cuts of the hots in scope.
-  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (D* : DenOf ρ*) (Ψ : Maps Γ) p p* (a* : Admits D* p*)
-            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* D* p p* a*)
+  cold-order : ∀ {Γ A} (m : From A 0) n {Δ} {ρ : ℕ → All Tb.Listed Γ} (ρ* : ℕ → All Tb.Listed Δ) uρ* (D* : DenOf ρ*) (Ψ : Maps Γ) p p* (a* : Admits D* p*) {H} (ok : Ok H p)
+            → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (cold-tab m n ρ* uρ* D* p p* a* ok)
   of-order   : ∀ {Γ A} (xs : List A) v vals (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
             → Aligned Ψ ρ p p* → Linked p p* → Rest Ψ ρ (of-tab xs v vals p p*)
   spin-order : ∀ {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) p p*
@@ -95,8 +96,8 @@ postulate
   -- through the inversion of the former's rows.
   map-order  : ∀ {Γ A B} (f : A → B) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
             → Rest Ψ ρ R → Rest Ψ ρ (map-tab f R)
-  scan-order : ∀ {Γ A B} (f : B → A → B) z {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
-            → Rest Ψ ρ R → Rest Ψ ρ (scan-tab f z R)
+  scan-order : ∀ {Γ A B} (f : B → A → B) z {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*) uP uQ
+            → Rest Ψ ρ R → Rest Ψ ρ (scan-tab f z R uP uQ)
   take-order : ∀ {Γ A} i (q : A → Bool) {Ψ : Maps Γ} {ρ : ℕ → All Tb.Listed Γ} {P Q s s*} (R : Rel P Q s s*)
             → Rest Ψ ρ R → Rest Ψ ρ (take-tab i q R)
 
@@ -417,7 +418,8 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     postulate
       -- THE CONNECT'S HANGS ACROSS CUTS: its body's and its source's, as
       -- at one cut.
-      ct-across : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+      ct-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+      ct-lead   : LeadClear (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Late′ ct-bd ct-bd*
 
     -- A put skip is imaged as any row is, at a row of the elaborated
     -- connect, so over no boundary.
@@ -481,7 +483,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; got = ct-got ; got* = ct-got*
       ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after*
-      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = ct-across ; skip-off* = ct-put-off* }
+      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = across-of (λ N → ct-bcorr N) (ct-stable) (λ {N} → ct-lead {N}) ; skip-off* = ct-put-off* }
 
   conn-tab : (Rs : Src) → Out n b ρ′ uρ′ (ext ρι) ρ*′ uρ*′ (Ψ′ Rs) D′ D*′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
   conn-tab = ConnTab.rel′
@@ -570,7 +572,10 @@ map-coh n f s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′
 
 scan-rel : ∀ {Γ A B} n (f : B → A → B) (z : B) (s : Obs Timeline Γ A) → Full n s → Full n (scan f z s)
 scan-rel n f z s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (scan-tab f z (Out.rel O)) (scan-order f z (Out.rel O) (Out.rest O)) (Out.bd-pin O) (Out.bd-pin* O)
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (scan-tab f z (Out.rel O) uP uQ) (scan-order f z (Out.rel O) uP uQ (Out.rest O)) (Out.bd-pin O) (Out.bd-pin* O)
+  where
+    uP = λ N → listC-ok (3 + N) n s (uρ N) p
+    uQ = λ N → listC-ok (3 + N) n (elab ρι s) (uρ* N) p*
 
 scan-coh : ∀ {Γ A B} n (f : B → A → B) (z : B) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (scan f z s) (scan-rel n f z s Fs)
 scan-coh n f z s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ N y =
@@ -618,7 +623,7 @@ rel : ∀ {Γ A} n (o : SObs Γ A) → Full n (plain o)
 -- `connect`'s are their children's.
 rel-coh : ∀ {Γ A} n (o : SObs Γ A) → Coh n (plain o) (rel n o)
 
-rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* a a* al lk = out (cold-tab m n ρ* uρ* (lw* env) p p* a*) (cold-order m n ρ* uρ* (lw* env) (maps env) p p* a* al lk) same-bd same-bd
+rel n (cold (fixedˢ m)) ρ uρ ρι ρ* uρ* env p p* a a* al lk = out (cold-tab m n ρ* uρ* (lw* env) p p* a* (proj₁ a)) (cold-order m n ρ* uρ* (lw* env) (maps env) p p* a* (proj₁ a) al lk) same-bd same-bd
 rel n empty             ρ uρ ρι ρ* uρ* env p p* a a* al lk =
   out (of-tab [] (λ x → instEmit (value x) root) (λ _ → refl) p p*) (of-order [] _ _ (maps env) ρ p p* al lk) same-bd same-bd
 rel n (of xs)           ρ uρ ρι ρ* uρ* env p p* a a* al lk =
