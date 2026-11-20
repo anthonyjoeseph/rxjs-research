@@ -105,6 +105,9 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
     hD* : HotD (λ N → hotOf (σ* N))
     hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
 
+  D′ = den-cons hD (lw env)
+  D*′ = den-cons hD* (lw* env)
+
   opaque
     unfolding hD hD*
     hD-eq : hD ≡ listHot n s uρ (lw env) p a
@@ -121,10 +124,10 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
     hD*-bd = refl
 
     -- The scope's boundaries: the source's tree's, then the old.
-    D′-bd : dbd D′ ≡ (bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ]) ∷ᵇ dbd (lw env))
+    D′-bd : (λ {X} → dbd D′ {X}) ≡ (λ {X} → (bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ]) ∷ᵇ dbd (lw env)) {X})
     D′-bd = refl
 
-    D*′-bd : dbd D*′ ≡ (bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ]) ∷ᵇ dbd (lw* env))
+    D*′-bd : (λ {X} → dbd D*′ {X}) ≡ (λ {X} → (bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ]) ∷ᵇ dbd (lw* env)) {X})
     D*′-bd = refl
 
     -- The body admissible where the connect is.
@@ -137,8 +140,6 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
     -- No elaborated hot in scope ends a lane.
     unended′ : ∀ N → EnvU (ext ρι) (den D*′ N)
     unended′ N = env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
-  D′ = den-cons hD (lw env)
-  D*′ = den-cons hD* (lw* env)
 
   -- The source's hot maps each row to its annotated image, each late
   -- placement to its annotated one; its late rows are the source's.
