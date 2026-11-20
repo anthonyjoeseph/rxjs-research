@@ -717,7 +717,7 @@ held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok
     (CombSrc.scan-rest m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where
     open FlatHots m ρ op f s env p using (src; env′; P)
-    L₀ = src-lawful {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+    L₀ = src-lawful {s = ev m (empty {A = ⊤}) env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
 
 -- A SHARED OUTER HOLDS as the outer does: the trigger's lane holds
 -- nothing, and the outer is subscribed once, as the trigger ends, inside
