@@ -49,13 +49,12 @@ Members: `mg-skip-off*`, `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
 #### THE MERGE'S CROSS-PART FACTS
 
 `JoinPair` asks the merge what no part knows alone: each part's rows
-cut the other parts' marks alike, a held pin has no merge row under it,
-a merge row's map is its outer's (`φo`) or its lane's, and every
+cut the other parts' marks alike, a merge row's map is its outer's (`φo`) or its lane's, and every
 image row is a row's. Untried. Settled by bodies over the listing, or
 a lane row ordered against an outer mark unlike its image.
 
 Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-skip`, `mg-val←`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
-`mg-img`, `mg-held`, `mg-held*`, `mg-outer-lane`, `mg-outer-lane-put`,
+`mg-img`, `mg-outer-lane`, `mg-outer-lane-put`,
 `mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
 
 #### THE HANGS ACROSS CUTS

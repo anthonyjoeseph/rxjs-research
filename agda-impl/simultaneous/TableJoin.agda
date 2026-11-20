@@ -263,9 +263,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                      → (Σ (Ev A) λ e′ → oM N k e′ × Put′ N k l)
                      ⊎ (Σ Pos λ q → Σ A λ a → Σ (Ev B) λ e′ → oM N q (out a) × MergeJ.Lane oM LM N q a k e′ × Put′ N k l)
         mg-img : ∀ N {k} → Own (JP.J.JoinT N) (Late′ N) k → Σ (Ev (IE B)) (JP.J*.JoinT N (φ′ N k))
-        -- no merge row extends a held boundary's pin
-        mg-held  : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
-        mg-held* : ∀ {N b r y e} → jbd* (mergeᶠ nothing) N b (held r) → JP.J*.JoinT N y e → ¬ y ⊑ r
         -- each part's rows cut the other parts' marks alike
         mg-outer-lane : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.Between N z z* → JP.Lanes N z z*
         mg-outer-lane-put : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.PutBefore N z z* → JP.LanesP N z z*
@@ -379,6 +376,14 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       mg-gap* : ∀ {N b g y e} → jbd* (mergeᶠ nothing) N b g → JP.J*.JoinT N y e → ¬ y ⊑ b
       mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (elab ρι⁴ (f a))) eachS {ρ*c} uρ*c c₁ {N} y))
+
+      -- No merge row lies over a connect a boundary waits on: the
+      -- boundary lies under it, and no row over the boundary.
+      mg-held : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
+      mg-held {N} b₀ y yr = mg-gap b₀ y (⊑-trans yr (Cuts.Bounded.held-under (jtree (mergeᶠ nothing)) b₀))
+
+      mg-held* : ∀ {N b r y e} → jbd* (mergeᶠ nothing) N b (held r) → JP.J*.JoinT N y e → ¬ y ⊑ r
+      mg-held* {N} b₀ y yr = mg-gap* b₀ y (⊑-trans yr (Cuts.Bounded.held-under (jbounded* (mergeᶠ nothing)) b₀))
 
       mg-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ nothing) N) (jbd* (mergeᶠ nothing) N)
       mg-bcorr N = Sub.restrict {Row = Own (TR (P′ N)) (Late′ N)} {Row′ = JP.JRow N} {φ = φ′ N} {Puts = OwnPut (TR (P′ N)) (Put′ N)} {Puts′ = JP.JPut N}
