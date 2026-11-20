@@ -584,7 +584,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   flat-core exhaustᶠ          = λ Os Ls Lc al lk → Joins.ExhaustTab.rel′ Os Ls Lc al lk
 
   -- Every joiner's core hangs as its tree does.
-  flat-core-pin : ∀ op Os Ls Lc al lk → SameBd (Rel.Bd (flat-core op Os Ls Lc al lk)) (jbd op)
+  flat-core-pin : ∀ op Os Ls Lc (al : Aligned (maps env) ρ p p*) lk → SameBd (Rel.Bd (flat-core op Os Ls Lc al lk)) (jbd op)
   flat-core-pin (mergeᶠ nothing)  _ _ _ _ _ = same-bd
   flat-core-pin (mergeᶠ (just k)) _ _ _ _ _ = same-bd
   flat-core-pin switchᶠ           _ _ _ _ _ = same-bd
