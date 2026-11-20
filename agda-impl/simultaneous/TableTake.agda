@@ -40,7 +40,7 @@ open import simultaneous.TableCorr using (Corr; Rel; module Rel; Across; module 
 open import simultaneous.TableKit using (TR; got-bind)
 open import simultaneous.TakeKit using (Run; Lab; lab; module Take)
 open import simultaneous.TakeCut using (module TakeCut; inst-⊕)
-open import simultaneous.Horizon using (module Cuts; module TakeB; bounded-≃; past-child)
+open import simultaneous.Horizon using (module Cuts; module TakeB; module TakeBd; bounded-≃; past-child)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; passes)
@@ -372,6 +372,17 @@ opaque
   take-tab : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} → Rel P Q s s*
            → Rel (λ N → bind (P N) λ l → just (takeRows i q l)) (λ N → bind (Q N) λ l → just (takeRows i (passes q) l)) s s*
   take-tab i q R = TakeTab.rel′ i q R
+
+-- A take's boundaries: its child's, kept by its rows.
+opaque
+  unfolding take-tab
+  take-bd : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} (R : Rel P Q s s*)
+          → Rel.Bd (take-tab i q R) ≡ TakeBd.Bd′ i q (λ N → TR (P N)) (Rel.Bd R)
+  take-bd i q R = refl
+
+  take-bd* : ∀ {A} (i : Bool) (q : A → Bool) {P Q s s*} (R : Rel P Q s s*)
+           → Rel.Bd* (take-tab i q R) ≡ TakeBd.Bd′ i (passes q) (λ N → TR (Q N)) (Rel.Bd* R)
+  take-bd* i q R = refl
 
 -- Children mapping alike, taken alike.
 opaque

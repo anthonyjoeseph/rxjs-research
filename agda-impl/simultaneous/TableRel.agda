@@ -61,7 +61,7 @@ open import simultaneous.TableEnv
   tab-flat)
 open import simultaneous.ElabUndone using (env-ext)
 open import simultaneous.TableMap using (map-tab)
-open import simultaneous.TableTake using (take-tab; take-cong)
+open import simultaneous.TableTake using (take-tab; take-bd; take-bd*; take-cong)
 open import simultaneous.TableScan using (scan-tab)
 open import simultaneous.TableDefer using (defer-tab; defer-cong)
 open import simultaneous.TableSpin using (spin-tab)
@@ -111,9 +111,9 @@ postulate
 -- Boundaries moved along their parts' pins
 
 -- A take keeps a boundary by its rows alone, whichever names it.
-keep-map : ∀ {A i q} {c : ℕ → EmissionSet A} {Bd Bd′ : ℕ → Pos → Tag → Set}
-         → SameBd Bd Bd′ → SameBd (TakeBd.Bd′ i q c Bd) (TakeBd.Bd′ i q c Bd′)
-keep-map sb = sameBd (λ { (x , k) → SameBd.to sb x , k }) (λ { (x , k) → SameBd.from sb x , k })
+keep-map : ∀ {A i q} {c : ℕ → EmissionSet A} {Bd Bd′ Bd₀ : ℕ → Pos → Tag → Set}
+         → Bd₀ ≡ TakeBd.Bd′ i q c Bd → SameBd Bd Bd′ → SameBd Bd₀ (TakeBd.Bd′ i q c Bd′)
+keep-map refl sb = sameBd (λ { (x , k) → SameBd.to sb x , k }) (λ { (x , k) → SameBd.from sb x , k })
 
 -- A connect's boundaries are its parts', each kept by the rows alone.
 cbd-map : ∀ {A B p} {σ : ℕ → EmissionSet A} {β : ℕ → EmissionSet B} {Bdσ Bdσ′ Bdβ Bdβ′ : ℕ → Pos → Tag → Set}
@@ -573,7 +573,7 @@ scan-coh n f z s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al
 
 take-rel : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) → Full n s → Full n (takeWhile i q s)
 take-rel n i q s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (take-tab i q (Out.rel O)) (take-order i q (Out.rel O) (Out.rest O)) (keep-map (Out.bd-pin O)) (keep-map (Out.bd-pin* O))
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (take-tab i q (Out.rel O)) (take-order i q (Out.rel O) (Out.rest O)) (keep-map (take-bd i q (Out.rel O)) (Out.bd-pin O)) (keep-map (take-bd* i q (Out.rel O)) (Out.bd-pin* O))
 
 take-coh : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (takeWhile i q s) (take-rel n i q s Fs)
 take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
