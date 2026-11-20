@@ -275,6 +275,17 @@ ann-u N n s env us p {y = y} rw | x , sx , eq | st , a , ca , eq′ | refl | inj
 ... | _ , (σx , _) , _ , _ with map-out′ just (capprox N n s env) (p ⊕ (ix 1 ∷ [])) σx
 ...   | _ , sy , refl = us _ sy
 
+-- A connect's elaboration, given its source's and body's: the
+-- recursion stays out of the clause, which is checked fast.
+conn-u : ∀ N n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) (env : DenEnv Δ) → EnvU ρ env
+       → Undone (capprox N n (elab ρ s) env) → (∀ e → EnvU (ext ρ) e → Undone (capprox N n (elab (ext ρ) b) e))
+       → Undone (capprox N n (elab ρ (connect s b)) env)
+conn-u N n ρ s b env eu us ub =
+  conn≡ N n (elab ρ (connect s b)) (annotate (elab ρ s)) (elab (ext ρ) b) env refl λ q →
+    ub (hot (Proper (enter (capprox N n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
+      let (_ , (x , _) , _) = hot-out {t = Proper (enter (capprox N n (annotate (elab ρ s)) env) q)} r
+      in ann-u N n (elab ρ s) env us q x) eu)
+
 ------------------------------------------------------------------------
 -- The elaboration
 
@@ -300,10 +311,7 @@ elab-undone N n {Γ} ρ (flatMap op f s) env eu =
     (combined op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))) env refl
     λ e → comb-u N n op (trackers Γ 0 (λ i → there (there (there (there (ρ i)))))) e
 elab-undone N n ρ (connect s b) env eu =
-  conn≡ N n (elab ρ (connect s b)) (annotate (elab ρ s)) (elab (ext ρ) b) env refl λ q →
-    elab-undone N n (ext ρ) b (hot (Proper (enter (capprox N n (annotate (elab ρ s)) env) q)) ∷ᴬ env) (env-ext (λ z r →
-      let (_ , (x , _) , _) = hot-out {t = Proper (enter (capprox N n (annotate (elab ρ s)) env) q)} r
-      in ann-u N n (elab ρ s) env (elab-undone N n ρ s env eu) q x) eu)
+  conn-u N n ρ s b env eu (elab-undone N n ρ s env eu) (λ e eu′ → elab-undone N n (ext ρ) b e eu′)
 elab-undone N n ρ (connected i) env eu p r
   with merge-out (λ x → Op.flatMap (mergeᶠ nothing) (λ b → Op.of (if b then proj₁ (proj₂ x) else proj₂ (proj₂ x))) (Op.of (true ∷ false ∷ [])))
          (Op.scan joinStep (true , ([] , [])) (lookup env (ρ (∈-map⁺ AIE i)))) p r

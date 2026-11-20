@@ -20,7 +20,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; Dec; yes; no)
 
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap; scan; connect)
-open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_; _<ᵖ_)
+open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; shown; ended;
   at-out; at-end; on-out; _≺_; _≼_; module Op; module Bounded; module Scan; module TakeWhile;
@@ -66,21 +66,6 @@ readerR st = laneL st ⊕ˡ (ix 0 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])
 -- Where `counted` sends what its scan reads at `r`.
 emitAt : Pos → Pos
 emitAt r = r ⊕ˡ (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ [])
-
--- The later of two positions.
-pick : Bool → Pos → Pos → Pos
-pick true  e t = t
-pick false e t = e
-
-later : Pos → Pos → Pos
-later e t = pick (e <ᵖ t) e t
-
-later-cases : ∀ e t → (later e t ≡ e × t ≼ e) ⊎ (later e t ≡ t × e ≺ t)
-later-cases e t = go (e <ᵖ t) refl
-  where
-    go : ∀ b → (e <ᵖ t) ≡ b → (pick b e t ≡ e × t ≼ e) ⊎ (pick b e t ≡ t × e ≺ t)
-    go true  eq = inj₂ (refl , subst T (sym eq) tt)
-    go false eq = inj₁ (refl , λ h → subst T eq h)
 
 ≺-ˡ : ∀ x l ls → x ≺ (x ⊕ˡ (l ∷ ls))
 ≺-ˡ x l ls = subst (x ≺_) (sym (⊕ˡ-⊕ x (l ∷ ls))) (≺-ext x ls)
