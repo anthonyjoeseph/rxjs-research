@@ -20,7 +20,6 @@ module simultaneous.TableHot where
 
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_; _∧_)
@@ -34,14 +33,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym;
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_; _⊣_)
-open import quickcheck.Tabled.Exact.Base using (when⁻; if⁻; cm⁻; offT; ends⁻; Exact)
+open import quickcheck.Tabled using (hotOf; ends; rows; anyᵇ)
+open import quickcheck.Tabled.Exact.Base using (ends⁻; Exact)
 open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
@@ -56,7 +55,7 @@ open import simultaneous.TableEnv
 open import simultaneous.TreeBounded using (listHot; tree-bounded)
 open import simultaneous.HorizonTree using (bd)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
-open import simultaneous.TableRows using (toT)
+open import simultaneous.TableRows using (proper⊆; unpin; RjRow; rejoin-inv)
 open import simultaneous.LaneEndSched using (emitAt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -66,14 +65,6 @@ open TabRows using (endAt; endsOf; endAt-I)
 -- reader that the annotation's concat subscribes first.
 reader* : Pos → Pos
 reader* p* = p* ⊕ˡ (ix 1 ∷ ix 0 ∷ ix 0 ∷ ix 1 ∷ [])
-
--- A hot's proper rows are among its rows.
-proper⊆ : ∀ {X} es (rs : List (Row X)) {r} → r ∈ properAt es rs → r ∈ rs
-proper⊆ es []             ()
-proper⊆ es ((q , e) ∷ rs) m with ∈-++⁻ _ m
-... | inj₂ h = there (proper⊆ es rs h)
-... | inj₁ h with when⁻ {b = allᵇ (q ≼ᵇ_) es} {x = (q , e)} h
-...   | (_ , refl) = here refl
 
 -- THE CONNECT'S SCOPE: the source subscribed under the connect's second
 -- label, its two hots listed off it, and the maps a body reads them by.
@@ -160,11 +151,6 @@ ends-tr : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {c} → c ∈ endsOf m → TR 
 ends-tr nothing   ()
 ends-tr (just Lx) c∈ = Lx , refl , ends⁻ {rs = rows Lx} c∈
 
--- A pin read as a skip.
-unpin : ∀ {X : Set} → Ev X → Ev X
-unpin (pin _) = skip
-unpin e       = e
-
 -- Shown once unpinned: shown before.
 shown-unpin : ∀ {X : Set} (e : Ev X) → T (shownᵇ (unpin e)) → T (shownᵇ e)
 shown-unpin (out _) t = t
@@ -181,27 +167,6 @@ shown-unpin (pin _) ()
 private
   false≢true : ¬ (false ≡ true)
   false≢true ()
-
--- A REJOINED ROW: a hot row past the subscription one label down, a pin
--- as a skip; or the end, at the subscription's last, of a hot ended at
--- or before it.
-RjRow : ∀ {X : Set} → Pos → Tb.Listed X → Pos → Ev X → Set
-RjRow {X} q L k e = (Σ Pos λ h → Σ (Ev X) λ e₀ → (h , e₀) ∈ rows L × q ≺ h × k ≡ h ⊕ [ sub q ] × e ≡ unpin e₀)
-                  ⊎ (Σ Pos λ h → (h , end) ∈ rows L × ¬ (q ≺ h) × k ≡ q ⊕ [ last ] × e ≡ end)
-
-rejoin-inv : ∀ {X : Set} q (L : Tb.Listed X) {k e} → (k , e) ∈ rows (Tb.rejoin q L) → RjRow q L k e
-rejoin-inv q (rs ⊣ _) m with cm⁻ {f = Tb.rejoinRow q} {xs = rs} m
-... | ((h , out a) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , out a)} w
-...   | (b , refl) = inj₁ (h , out a , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , skip) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , skip , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , pin r) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , pin r , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , end) , hm , w) with if⁻ {b = q <ᵖ h} w
-...   | inj₁ (b , here refl) = inj₁ (h , end , hm , toT b , refl , refl)
-...   | inj₁ (_ , there ())
-...   | inj₂ (b , here refl) = inj₂ (h , hm , offT b , refl , refl)
-...   | inj₂ (_ , there ())
 
 -- A rejoined row read through a reader's image: its end on the
 -- elaborated reader's end or a default, any other row on its hot row's.

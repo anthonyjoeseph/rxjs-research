@@ -35,15 +35,14 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
 Each part's pair and clearance hold at its tree's boundaries
-(`Out.bd-pin`). The merge's elaborated outer is `each` over the shared
-hot: its boundaries the source's at the share's subscription
+(`Out.bd-pin`); the merge's elaborated outer hangs at the source's
 (`mg-each-bd→`), its rows the source's images relocated under the
 share, the end at the later of its own and the trigger's. Open: an
 image over an elaborated boundary, or the end relocated past one; the
 lanes likewise under `laneˢ`. Settled by bodies, or a relocated image
 ordered against a boundary unlike its image.
 
-Members: `mg-each-bd→`, `mg-each-bd←`, `mg-o-btw`, `mg-o-pb`, `mg-lane-bcorr`,
+Members: `mg-o-btw`, `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
 `mg-outer-lead`, `mg-lane-lead`.
 

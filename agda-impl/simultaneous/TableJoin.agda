@@ -30,8 +30,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; inside; _⊕_)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; connected)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Unpinned; pin; _≼_; _≺_; Ev; out; skip; EmissionSet; Ended)
 open import simultaneous.Readings using (instantOf)
@@ -39,6 +39,7 @@ open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.HorizonTree using (Cut; bd)
 open import simultaneous.HorizonJoin using (module MergeJ; module JoinBd)
+open JoinBd using (outerB; laneB; laneH)
 open import simultaneous.HorizonJoinPair using (module JoinPair)
 open import simultaneous.HorizonConn using (Mark; mark; mark-q)
 open import simultaneous.TreeBounded using (tree-bounded; merge-tr→; merge-tr←)
@@ -62,6 +63,7 @@ open import denotation.EmissionSet using (DenEnv; Den)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Cut using (capprox)
 open import simultaneous.TableFlat using (module Flat; module Vals)
+open import simultaneous.TableRows using (rejoin-one)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
 
@@ -196,6 +198,22 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       BdS* : ℕ → Pos → Tag → Set
       BdS* N = bd n (elab (wk ρι) s) ρ*s uρ*s (dbd Ds) sp* N
 
+      -- `each` hangs as its shared hot does, whose one lane is the
+      -- trigger's, subscribed at the source's elaborated subscription.
+      trig-only : ∀ N {q a} → TR (listC (3 + N) n (connected (here refl)) (ρ*s N) shp) q (out a) → q ≡ p* ⊕ [ ix 1 ] ⊕ [ ix 0 ] ⊕ [ sub shp ]
+      trig-only N (_ , refl , m) = rejoin-one shp (p* ⊕ [ ix 1 ] ⊕ [ ix 0 ]) (p* ⊕ [ ix 1 ] ⊕ [ last ]) {a = tt} {s = false} m
+
+      mg-each-bd→ : ∀ N {b g} → BdoM* N b g → BdS* N b g
+      mg-each-bd→ N (outerB (outerB ()))
+      mg-each-bd→ N {b} (outerB (laneB x _ y _))     = subst (λ q → bd n s* ρ*s uρ*s (dbd Ds) (q ⊕ [ ix 1 ]) N b free) (trig-only N x) y
+      mg-each-bd→ N {b} (outerB (laneH {r = r} x _ y _)) = subst (λ q → bd n s* ρ*s uρ*s (dbd Ds) (q ⊕ [ ix 1 ]) N b (held r)) (trig-only N x) y
+      mg-each-bd→ N (laneB _ _ () _)
+      mg-each-bd→ N (laneH _ _ () _)
+
+      mg-each-bd← : ∀ N {b g} → BdS* N b g → BdoM* N b g
+      mg-each-bd← N {g = free}   y = outerB (laneB (Tb.rejoin shp (tt-tab N) , refl , trig-row N) tt y (λ ()))
+      mg-each-bd← N {g = held r} y = outerB (laneH (Tb.rejoin shp (tt-tab N) , refl , trig-row N) tt y (λ ()))
+
       module JP (N : ℕ) = JoinPair (MergeJ.Lane oM LM N) (oM N) (Ended (oM N)) (λ _ → ⊤) (λ _ _ → ⊥)
         (MergeJ.Lane oM* LM* N) (oM* N) (Ended (oM* N)) (λ _ → ⊤) (λ _ _ → ⊥)
         (BdoM N) (BdLM N) (BdoM* N) (BdLM* N) (λ _ → ⊥) (λ _ _ → ⊥)
@@ -205,9 +223,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- a value lies where the source has one, and only there
         mg-is-val  : ∀ N {q a} → oM N q (out a) → isVal N q ≡ true
         mg-not-val : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → isVal N k ≡ false
-        -- `each` hangs as the source does at the share's subscription
-        mg-each-bd→ : ∀ N {b g} → BdoM* N b g → BdS* N b g
-        mg-each-bd← : ∀ N {b g} → BdS* N b g → BdoM* N b g
         -- the merge's outer rows cut a pair of the source's boundaries
         -- alike where the source's rows do
         mg-o-btw : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*

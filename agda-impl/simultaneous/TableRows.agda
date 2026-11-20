@@ -5,24 +5,26 @@
 module simultaneous.TableRows where
 
 open import Data.Bool using (true; T)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Relation.Nullary using (¬_)
 open import Data.List using (List; []; _∷_; [_]; length)
 open import Data.Nat using (suc)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-map⁺)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-map⁺; ∈-++⁻)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; ix; sub; _<ˡ_; _⊕_)
+open import denotation.Position using (Pos; ix; sub; last; _<ˡ_; _<ᵖ_; _⊕_)
 open import denotation.Events using (<ᵖ-part; ofᴱ)
-open import denotation.EmissionSet using (out; end; _≺_; _≼_)
+open import denotation.EmissionSet using (Ev; out; end; skip; pin; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
-open import quickcheck.Tabled using (Row; Listed; rows; bind; lanes; mergeRows; proper; rejoin; pastRows)
-open import quickcheck.Tabled.Exact.Base using (cm⁺; when⁺; all⁺; T-not; ends⁻; mapM⁺; fromT; pastRows⁺)
+open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; bind; lanes; mergeRows; proper; properAt; ends; allᵇ; _≼ᵇ_; rejoin; rejoinRow; pastRows)
+open import quickcheck.Tabled.Exact.Base using (cm⁺; cm⁻; when⁺; when⁻; if⁻; offT; all⁺; T-not; ends⁻; mapM⁺; fromT; pastRows⁺)
 open import simultaneous.Listing using (walkN)
 open import simultaneous.TableEnv using (_⊕ˡ_)
 
@@ -67,3 +69,50 @@ rejoin-in p l m pk = cm⁺ m (when⁺ (fromT pk))
 -- An `of` of one value lists it past its subscription.
 of-past : ∀ {X : Set} s (xs : List X) {a} → xs ≡ a ∷ [] → (s ⊕ [ ix 0 ] , out a) ∈ pastRows s (walkN (suc (length xs)) (ofᴱ s 0 xs))
 of-past s .(_ ∷ []) refl = pastRows⁺ {s = s} (walkN 2 (ofᴱ s 0 (_ ∷ []))) (here refl) (≺-ext s {ix 0} [])
+
+-- A hot's proper rows are among its rows.
+proper⊆ : ∀ {X} es (rs : List (Row X)) {r} → r ∈ properAt es rs → r ∈ rs
+proper⊆ es []             ()
+proper⊆ es ((q , e) ∷ rs) m with ∈-++⁻ _ m
+... | inj₂ h = there (proper⊆ es rs h)
+... | inj₁ h with when⁻ {b = allᵇ (q ≼ᵇ_) es} {x = (q , e)} h
+...   | (_ , refl) = here refl
+
+-- A pin read as a skip.
+unpin : ∀ {X : Set} → Ev X → Ev X
+unpin (pin _) = skip
+unpin e       = e
+
+-- A REJOINED ROW: a hot row past the subscription one label down, a pin
+-- as a skip; or the end, at the subscription's last, of a hot ended at
+-- or before it.
+RjRow : ∀ {X : Set} → Pos → Listed X → Pos → Ev X → Set
+RjRow {X} q L k e = (Σ Pos λ h → Σ (Ev X) λ e₀ → (h , e₀) ∈ rows L × q ≺ h × k ≡ h ⊕ [ sub q ] × e ≡ unpin e₀)
+                  ⊎ (Σ Pos λ h → (h , end) ∈ rows L × ¬ (q ≺ h) × k ≡ q ⊕ [ last ] × e ≡ end)
+
+rejoin-inv : ∀ {X : Set} q (L : Listed X) {k e} → (k , e) ∈ rows (rejoin q L) → RjRow q L k e
+rejoin-inv q (rs ⊣ _) m with cm⁻ {f = rejoinRow q} {xs = rs} m
+... | ((h , out a) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , out a)} w
+...   | (b , refl) = inj₁ (h , out a , hm , toT b , refl , refl)
+rejoin-inv q (rs ⊣ _) m | ((h , skip) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
+...   | (b , refl) = inj₁ (h , skip , hm , toT b , refl , refl)
+rejoin-inv q (rs ⊣ _) m | ((h , pin r) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
+...   | (b , refl) = inj₁ (h , pin r , hm , toT b , refl , refl)
+rejoin-inv q (rs ⊣ _) m | ((h , end) , hm , w) with if⁻ {b = q <ᵖ h} w
+...   | inj₁ (b , here refl) = inj₁ (h , end , hm , toT b , refl , refl)
+...   | inj₁ (_ , there ())
+...   | inj₂ (b , here refl) = inj₂ (h , hm , offT b , refl , refl)
+...   | inj₂ (_ , there ())
+
+-- A value a rejoin shows of a hot listed off one value: that value's row,
+-- under the rejoin.
+rejoin-one : ∀ {A} p h c {a : A} {s k b} → (k , out b) ∈ rows (rejoin p (proper ((h , out a) ∷ (c , end) ∷ []) ⊣ s)) → k ≡ h ⊕ [ sub p ]
+rejoin-one p h c {a} {s} {k} {b} m with rejoin-inv p (proper ((h , out a) ∷ (c , end) ∷ []) ⊣ s) m
+... | inj₁ (_ , _ , hm , _ , kk , eu) = one (proper⊆ (ends rs) rs hm) kk eu
+  where
+    rs = (h , out a) ∷ (c , end) ∷ []
+    one : ∀ {h′ e₀} → (h′ , e₀) ∈ ((h , out a) ∷ (c , end) ∷ []) → k ≡ h′ ⊕ [ sub p ] → out b ≡ unpin e₀ → k ≡ h ⊕ [ sub p ]
+    one (here refl)         kk _  = kk
+    one (there (here refl)) _  ()
+    one (there (there ()))
+... | inj₂ (_ , _ , _ , _ , ())
