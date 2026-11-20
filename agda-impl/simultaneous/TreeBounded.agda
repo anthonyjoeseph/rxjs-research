@@ -65,7 +65,8 @@ open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; he
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
 open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd; cold-bd)
-open import simultaneous.HorizonJoin using (module MergeJ; module MergeB)
+open import simultaneous.HorizonJoin using (module MergeB)
+open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
 
@@ -91,18 +92,6 @@ postulate
   -- A HOT'S ROWS are its source's proper rows, cut where the source is.
   hot-rows-bounded : ∀ {Γ A} n (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {Bd : ℕ → Pos → Tag → Set}
                    → Cuts.Bounded (Cut n s ρ (p ⊕ [ ix 1 ])) Bd → Cuts.Bounded (λ N → Rows (hotOf (srcL n s uρ p N))) Bd
-
-  -- A CONNECT'S TABLE is the connect of its parts'.
-  conn-tr→ : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
-           → Cut n (connect s b) ρ p N y e → Connecting.ConnT p (Cut n s ρ (p ⊕ [ ix 1 ]) N) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]) N) y e
-  conn-tr← : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
-           → Connecting.ConnT p (Cut n s ρ (p ⊕ [ ix 1 ]) N) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]) N) y e → Cut n (connect s b) ρ p N y e
-
-  -- A MERGE'S TABLE is the merge of its parts'.
-  merge-tr→ : ∀ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
-            → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e
-  merge-tr← : ∀ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
-            → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e
 
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
