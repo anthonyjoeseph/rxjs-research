@@ -62,17 +62,21 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
   (σ-out : ∀ {N b g} → Bdσ N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b)
   (σ-held : ∀ {N b q} → Bdσ N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q)
   (β-after : ∀ {N c} → β N c end → p ≺ c)
+  (gap-sb : ∀ {N b g y e} → Bdσ N b g → β N y e → ¬ y ⊑ b)
+  (gap-bs : ∀ {N b g k e} → Bdβ N b g → σ N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b)
   (σ* : ℕ → EmissionSet X) (β* : ℕ → EmissionSet Y) (Bdσ* Bdβ* : ℕ → Pos → Tag → Set)
   (Bσ* : Cuts.Bounded σ* Bdσ*) (Bβ* : Cuts.Bounded β* Bdβ*)
   (σ-out* : ∀ {N b g} → Bdσ* N b g → b ≺ p* ⊎ (p* ⊕ [ ix 1 ]) ≺ b)
   (σ-held* : ∀ {N b q} → Bdσ* N b (held q) → T (inside (p* ⊕ [ ix 1 ]) b) → (p* ⊕ [ ix 1 ]) ≼ q)
   (β-after* : ∀ {N c} → β* N c end → p* ≺ c)
+  (gap-sb* : ∀ {N b g y e} → Bdσ* N b g → β* N y e → ¬ y ⊑ b)
+  (gap-bs* : ∀ {N b g k e} → Bdβ* N b g → σ* N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b)
   -- the environment, and each part's map, late rows and placements
   (Env : Pos → Set) (EnvPut : Pos → Pos → Set)
   (φσ φβ φc : Pos → Pos) (Lσ Lβ Lc : Pos → Set) (Pσ Pβ Pc : Pos → Pos → Set)
   where
-  module P = ConnB p σ β Bdσ Bdβ Bσ Bβ σ-out σ-held β-after
-  module E = ConnB p* σ* β* Bdσ* Bdβ* Bσ* Bβ* σ-out* σ-held* β-after*
+  module P = ConnB p σ β Bdσ Bdβ Bσ Bβ σ-out σ-held β-after gap-sb gap-bs
+  module E = ConnB p* σ* β* Bdσ* Bdβ* Bσ* Bβ* σ-out* σ-held* β-after* gap-sb* gap-bs*
 
   SrcRow : Pos → Set
   SrcRow = Own (σ N) Lσ ∪ Env

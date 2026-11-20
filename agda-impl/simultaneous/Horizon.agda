@@ -484,6 +484,10 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   (σ-out : ∀ {N b g} → Bdσ N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b)
   (σ-held : ∀ {N b q} → Bdσ N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q)
   (β-after : ∀ {N c} → β N c end → p ≺ c)
+  -- A source boundary is led by no row of the body; a body boundary by
+  -- no row the connect makes of its source.
+  (gap-sb : ∀ {N b g y e} → Bdσ N b g → β N y e → ¬ y ⊑ b)
+  (gap-bs : ∀ {N b g k e} → Bdβ N b g → σ N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b)
   where
 
   open ConnBd p σ β Bdσ Bdβ public
@@ -655,12 +659,6 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
 
   fwd-pin : ∀ {N q k} → SC.Clear N q → SC.HeldClear N q k → SC.PinSettled N q k
   fwd-pin {N} {q} {k} cq hq {N′} le {y} yk = PinStep.pin-to le {q} {k} {y} cq hq yk , PinStep.pin-from le {q} {k} {y} cq hq yk
-
-  postulate
-    -- A SOURCE BOUNDARY is led by no row of the body.
-    gap-sb : ∀ {N b g y e} → Bdσ N b g → β N y e → ¬ y ⊑ b
-    -- A BODY BOUNDARY is led by no row the connect makes of its source.
-    gap-bs : ∀ {N b g k e} → Bdβ N b g → σ N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b
 
   -- A source boundary: the source's rows lead it nowhere, so neither do
   -- their marks under it.

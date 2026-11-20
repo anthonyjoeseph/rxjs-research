@@ -326,6 +326,11 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     postulate
       ct-src-out  : ∀ {N b g} → Rel.Bd RS N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
       ct-src-held : ∀ {N b q} → Rel.Bd RS N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
+      -- The source's boundaries and the body's rows, and back, both sides.
+      ct-gap-sb  : ∀ {N b g y e} → Rel.Bd RS N b g → βc N y e → ¬ y ⊑ b
+      ct-gap-bs  : ∀ {N b g k e} → Rel.Bd Rb N b g → σc N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b
+      ct-gap-sb* : ∀ {N b g y e} → ct-ann-bd* N b g → βc* N y e → ¬ y ⊑ b
+      ct-gap-bs* : ∀ {N b g k e} → Rel.Bd* Rb N b g → σc* N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b
 
     -- The body's rows lie past the connect.
     ct-body-after : ∀ {N c} → βc N c end → p ≺ c
@@ -336,12 +341,16 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
 
     module CB  = ConnB p σc βc (Rel.Bd RS) (Rel.Bd Rb) (Rel.bounded RS) (Rel.bounded Rb)
       (λ {N} {b} {g} → ct-src-out {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q}) (λ {N} {c} → ct-body-after {N} {c})
+      (λ {N} {b} {g} {y} {e} → ct-gap-sb {N} {b} {g} {y} {e}) (λ {N} {b} {g} {k} {e} → ct-gap-bs {N} {b} {g} {k} {e})
     module CB* = ConnB p* σc* βc* ct-ann-bd* (Rel.Bd* Rb) ct-ann-bounded* (Rel.bounded* Rb)
       (λ {N} {b} {g} → ct-ann-out* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q}) (λ {N} {c} → ct-body-after* {N} {c})
+      (λ {N} {b} {g} {y} {e} → ct-gap-sb* {N} {b} {g} {y} {e}) (λ {N} {b} {g} {k} {e} → ct-gap-bs* {N} {b} {g} {k} {e})
     module CP (N : ℕ) = ConnPair N p p* σc βc (Rel.Bd RS) (Rel.Bd Rb) (Rel.bounded RS) (Rel.bounded Rb)
       (λ {N} {b} {g} → ct-src-out {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q}) (λ {N} {c} → ct-body-after {N} {c})
+      (λ {N} {b} {g} {y} {e} → ct-gap-sb {N} {b} {g} {y} {e}) (λ {N} {b} {g} {k} {e} → ct-gap-bs {N} {b} {g} {k} {e})
       σc* βc* ct-ann-bd* (Rel.Bd* Rb) ct-ann-bounded* (Rel.bounded* Rb)
       (λ {N} {b} {g} → ct-ann-out* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q}) (λ {N} {c} → ct-body-after* {N} {c})
+      (λ {N} {b} {g} {y} {e} → ct-gap-sb* {N} {b} {g} {y} {e}) (λ {N} {b} {g} {k} {e} → ct-gap-bs* {N} {b} {g} {k} {e})
       (λ _ → ⊥) (λ _ _ → ⊥) (φσ N) (Rel.φ Rb N) (φ′ N) (Rel.Late RS N) (Rel.Late Rb N) (Late′ N) (Pσ N) (Rel.Put Rb N) (Put′ N)
 
     -- WHAT THE PARTS OWE THE PAIR: the source's pair against the annotated

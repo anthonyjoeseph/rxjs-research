@@ -77,6 +77,19 @@ by bodies over the tree, or a placement that moves between agreeing cuts.
 Members: `root-real`, `root-real*`, `root-off`, `root-off*`,
 `root-φ-agree`, `root-late-agree`, `root-put-up`, `root-put-down`.
 
+#### THE PLACEMENT
+
+A tree's own boundaries lie in its world, under no world of a plain
+child of its rows; its scope's are its hots', led by no admissible
+world position (`Placed.Placing`). The merge's gap, the source's
+window, a defer's marker and the connect's cross gaps are bodies over it.
+`env-lead` is false while `Admits` places a reader by order alone: a
+spin source's boundary is itself admissible. Open: `Admits` placing a
+reader in the world of every body it reads in, while a reader that drops
+a hot (`admits-wk`) keeps the hot's rows in its worlds.
+
+Members: `tree-placed`, `env-lead`.
+
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
 `Horizon.ConnB` keeps a source boundary before the connect as an echo,
@@ -88,17 +101,6 @@ tree, or a source boundary between the connect and its source's
 subscription.
 
 Members: `src-apart`, `ct-src-out`, `ct-src-held`.
-
-#### THE PLACEMENT
-
-A tree's own boundaries lie in its world, under no world of a plain
-child of its rows; its scope's are its hots', led by no admissible
-world position (`Placed.Placing`). The merge's gap and the source's
-window and a defer's marker are bodies over it.
-Untried. Settled by an induction beside `tree-bounded`, or a reader's
-boundary a body position leads.
-
-Members: `tree-placed`, `env-lead`.
 
 #### THE TREE'S HANGS
 
@@ -132,12 +134,11 @@ image (`ct-src-img`), which the body's placements need; then the
 annotated source's pair and the cross-part leaves. Settled by bodies,
 or a late source row placed off its image.
 
-Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`,
-`ct-φc-body`, `ct-φc-echo`, `ct-late-body`, `ct-late-echo`,
-`ct-put-split`, `ct-img`, `ct-put-row`, `ct-gap-src`, `ct-gap-src*`,
-`ct-held-src`, `ct-held-src*`, `ct-held-body`, `ct-held-body*`,
-`ct-body-src`, `ct-body-src-put`, `ct-home→`, `ct-home←`, `ct-end→`,
-`ct-end←`, `ct-rows-after`, `ct-rows-after*`, `gap-sb`, `gap-bs`.
+Members: `ct-src-img`, `ct-src-hot`, `ct-src-bcorr`, `ct-φc-body`,
+`ct-φc-echo`, `ct-late-body`, `ct-late-echo`, `ct-put-split`, `ct-img`,
+`ct-put-row`, `ct-gap-sb`, `ct-gap-bs`, `ct-gap-sb*`, `ct-gap-bs*`, `ct-gap-src`, `ct-gap-src*`, `ct-held-src`, `ct-held-src*`,
+`ct-held-body`, `ct-held-body*`, `ct-body-src`, `ct-body-src-put`, `ct-home→`,
+`ct-home←`, `ct-end→`, `ct-end←`, `ct-rows-after`, `ct-rows-after*`.
 
 #### THE HOT READER'S HANGS
 

@@ -30,7 +30,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -44,7 +44,8 @@ open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_;
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
 open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub; plain-ix;
-  plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑; ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ)
+  plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑; ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ;
+  narrow⁼; shrink; shrink⁼)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
@@ -62,12 +63,13 @@ open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
-open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
-open import simultaneous.Horizon using (Tag; held; past-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
+open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
 open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
 open import simultaneous.Placed using (module Placing)
+open import simultaneous.ListTR using (tr-at)
 open import simultaneous.ColdBounded using (cold-bounded)
 open import simultaneous.HotRows using (hot-rows-bounded)
 open import simultaneous.HorizonJoin using (module MergeB)
@@ -163,6 +165,59 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   ...   | inj₂ eq with ⊕-injʳ p p eq
   ...     | ()
 
+-- A cut's row is a row of its reading.
+cut-enter : ∀ {Γ A} n (o : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) q N
+          → ∀ {k e} → Cut n o ρ q N k e → enter (capprox (3 + N) n o (den D N)) q k e
+cut-enter n o uρ D q N x with listC-ok (3 + N) n o (uρ N) q
+... | L , eq , uL = sound (listC-exact (3 + N) n o (den-ex D N) q eq uL) (tr-at eq x)
+
+-- A CONNECT'S GAPS, over the hot `hD` listing its source's rows.  A
+-- source boundary of its own lies in the source's world, which no body
+-- position leads; a scope's, under no position of the connect's.
+conn-gap-sb : ∀ {Γ A B} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (a : Admits D p)
+            {t : ℕ → Tb.Listed A} (hD : HotD t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD D) (p ⊕ [ ix 0 ]))
+            (σrow : ∀ N {h e} → hev hD N h e → enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]) h e)
+            → ∀ {N b′ g y e} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b′ g → Cut n b (λ M → t M ∷ ρ M) (p ⊕ [ ix 0 ]) N y e → ¬ y ⊑ b′
+conn-gap-sb ρ uρ D n s b p a {t} hD u′ a′ σrow {N} {b′} {g} {y} bd′ x le =
+  [ (λ own → Cn.Apart.body-leads (hev hD N) p (admits-at D a N) σw (inW yw) (inW (Placing.Own.world own)) le)
+  , (λ env → env-lead ρ uρ D a env (inW (narrow⁼ (λ z → shrink (σw z)) (inW yw))) le) ]′
+  (tree-placed ρ uρ D n s (p ⊕ [ ix 1 ]) (admits-step D a) bd′)
+  where
+    σw : ∀ {h e} → hev hD N h e → W (Hots (den D N)) (p ⊕ [ ix 1 ]) h
+    σw z = InvAt.world (inv-capprox (3 + N) n s (den D N) (den-ok D N) (p ⊕ [ ix 1 ]) (ok-step p (admits-at D a N))) (σrow N z)
+
+    yw : W (Hots (den (den-cons hD D) N)) (p ⊕ [ ix 0 ]) y
+    yw = InvAt.world (tab-at n b u′ (den-cons hD D) a′ N) x
+
+-- A body boundary of its own is led by a source position only through a
+-- joined source row, which would lie under another's plain child; the
+-- body's scope's are its source's, or the connect's scope's.
+conn-gap-bs : ∀ {Γ A B} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (a : Admits D p)
+            {t : ℕ → Tb.Listed A} (hD : HotD t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD D) (p ⊕ [ ix 0 ]))
+            (σrow : ∀ N {h e} → hev hD N h e → enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]) h e)
+            (sgap : ∀ {N b′ g k e} → hbd hD N b′ g → Cut n s ρ (p ⊕ [ ix 1 ]) N k e → ¬ k ⊑ b′)
+            → ∀ {N b′ g k e} → bd n b (λ M → t M ∷ ρ M) u′ (dbd (den-cons hD D)) (p ⊕ [ ix 0 ]) N b′ g → Cut n s ρ (p ⊕ [ ix 1 ]) N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b′
+conn-gap-bs ρ uρ D n s b p a {t} hD u′ a′ σrow sgap {N} {b′} {g} {k} {e} bd′ x le =
+  [ (λ own → through (Cn.Apart.source-leads (hev hD N) p (admits-at D a N) σw (inW (step (inW kw) plain-ix)) (inW (Placing.Own.world own)) le))
+  , [ (λ sb → under-child (ix 0) (sgap sb x) le)
+    , (λ env → env-lead ρ uρ D a env (inW (shrink⁼ (inW (step (inW kw) plain-ix)))) le) ]′ ]′
+  (tree-placed (λ M → t M ∷ ρ M) u′ (den-cons hD D) n b (p ⊕ [ ix 0 ]) a′ bd′)
+  where
+    I : InvAt (Hots (den D N)) (p ⊕ [ ix 1 ]) (enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]))
+    I = inv-capprox (3 + N) n s (den D N) (den-ok D N) (p ⊕ [ ix 1 ]) (ok-step p (admits-at D a N))
+
+    σw : ∀ {h e} → hev hD N h e → W (Hots (den D N)) (p ⊕ [ ix 1 ]) h
+    σw z = InvAt.world I (σrow N z)
+
+    kx : enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]) k e
+    kx = cut-enter n s uρ D (p ⊕ [ ix 1 ]) N x
+
+    kw : W (Hots (den D N)) (p ⊕ [ ix 1 ]) k
+    kw = InvAt.world I kx
+
+    through : ∀ {z} → Cn.Apart.Through (hev hD N) p (admits-at D a N) σw (k ⊕ [ ix 0 ]) z → ⊥
+    through (_ , _ , (_ , σh) , kh , _) = InvAt.under I kx (σrow N σh) plain-ix here kh
+
 ------------------------------------------------------------------------
 -- Every tree, and the hot a connect lists
 
@@ -249,7 +304,10 @@ mutual
         (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (den-cons (listHot n s uρ D p a) D) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
         (λ {N} {b′} {g} → src-out ρ uρ D n s p a {N} {b′} {g})
         (λ {N} {b′} {q} → src-held ρ uρ D n s p a {N} {b′} {q})
-        (λ {N} {c} x → ≺-≼-≺ {p} {p ⊕ [ ix 0 ]} {c} (≺-ext p []) (after-ok (3 + N) n b (p ⊕ [ ix 0 ]) x)))
+        (λ {N} {c} x → ≺-≼-≺ {p} {p ⊕ [ ix 0 ]} {c} (≺-ext p []) (after-ok (3 + N) n b (p ⊕ [ ix 0 ]) x))
+        (λ {N} {b′} {g} {y} {e} → conn-gap-sb ρ uρ D n s b p a (listHot n s uρ D p a) (bodyU n s uρ p) (admits-body n s uρ D p a) (λ N → proj₁) {N} {b′} {g} {y} {e})
+        (λ {N} {b′} {g} {k} {e} → conn-gap-bs ρ uρ D n s b p a (listHot n s uρ D p a) (bodyU n s uρ p) (admits-body n s uρ D p a) (λ N → proj₁)
+           (λ {M} {b″} {g′} {k′} {e′} → Cuts.Bounded.gap (tree-bounded n s ρ uρ D (p ⊕ [ ix 1 ]) (admits-step D a)) {M} {b″} {g′} {k′} {e′}) {N} {b′} {g} {k} {e}))
   tree-bounded n       (connected i)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
               (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })
