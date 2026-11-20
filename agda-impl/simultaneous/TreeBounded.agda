@@ -126,6 +126,12 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   postulate
     -- A SOURCE'S BOUNDARIES are led by no late end of a reader its hot's
     -- rows admit, subscribed at or past the connect's body.
+    --
+    -- DEAD ROUTE: deriving it from `tree-placed` and `env-lead`.  The
+    --   reader is placed only by order, so `Worlds.lead` leaves a reader
+    --   inside the source's world, or under a scope boundary, whose own
+    --   world holds no source row while a boundary lies under its late
+    --   end; neither the premises nor the placement exclude it.
     src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
               → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (q ⊕ [ last ]) ⊑ b
 
