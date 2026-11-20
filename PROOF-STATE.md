@@ -84,11 +84,10 @@ child of its rows; its scope's are its hots', led by no admissible
 world position (`Placed.Placing`). The merge's gap, the source's
 window, a defer's marker and the connect's cross gaps are bodies over it,
 and so is a scope's lead. `tree-placed` is a body over the tree; left
-are the merge, whose lanes' boundaries move under the outer's rows, and
-the connect, whose body reads its source as a hot. Untried. Settled by bodies, or a boundary outside every
+is the connect, whose body reads its source as a hot. Untried. Settled by bodies, or a boundary outside every
 world the cut reads.
 
-Members: `placed-merge`, `placed-connect`.
+Members: `placed-connect`.
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 

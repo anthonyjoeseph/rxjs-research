@@ -15,17 +15,17 @@ module simultaneous.HorizonJoin where
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; yes; no)
 
-open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_)
-open import denotation.EmissionSet using (out; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
+open import denotation.Position using (Pos; Label; ix; _⊕_; _≟ᵖ_)
+open import denotation.EmissionSet using (Ev; out; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-ext; ≺→≼; ≺-≼-≺; ≼-refl; ≼-trans)
 open import denotation.Laws.Worlds using (_⊑_; InvAt; Disj; W; W⁼; step; inW; here; plain-ix; lead; l-root; l-in; l-hot; leads;
-  ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-refl; ⊑-inside; w-up; not-up; apart-w; nest-in; ⊕-injʳ; ⊕-injˡ; ⊕-identityʳ)
+  ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-refl; ⊑-inside; w-up; not-up; apart-w; nest-in; nest; nest⁼; Plain; ⊕-injʳ; ⊕-injˡ; ⊕-identityʳ)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts; under-child)
 open import simultaneous.Placed using (module Placing)
 
@@ -55,6 +55,121 @@ module MergeJ {A B : Set} (o : ℕ → EmissionSet A) (L : A → Pos → ℕ →
   Jc : ℕ → EmissionSet B
   Jc N = J.JoinT N
 
+-- WHERE THE MERGE'S BOUNDARIES LIE, from where its outer's and its
+-- lanes' do.
+module MergeP {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag → Set)
+  (L : A → Pos → ℕ → EmissionSet B) (BdL : A → Pos → ℕ → Pos → Tag → Set)
+  (o-func : ∀ {N y e e′} → o N y e → o N y e′ → e ≡ e′)
+  (H : ℕ → Pos → Set) (Env : ℕ → Pos → Tag → Set) (p : Pos)
+  (io : ∀ N → InvAt (H N) p (o N)) (dj : ∀ N → Disj (H N) p)
+  (lw : ∀ {N q a y e} → o N q (out a) → L a (q ⊕ [ ix 1 ]) N y e → W (H N) (q ⊕ [ ix 1 ]) y)
+  (po : Placing.Placed H Env p o Bdo)
+  (pl : ∀ {N q a} → o N q (out a) → Placing.Placed H Env (q ⊕ [ ix 1 ]) (L a (q ⊕ [ ix 1 ])) (BdL a (q ⊕ [ ix 1 ])))
+  where
+
+  open MergeJ o L using (Jc)
+  open JoinBd using (outerB; laneB; laneH)
+
+  MBd : ℕ → Pos → Tag → Set
+  MBd N = JoinBd.JBd (o N) (λ _ → ⊤) (λ _ _ → ⊥) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
+
+  -- A lane's subscription lies in the merge's world.
+  ow : ∀ {N q a} → o N q (out a) → W (H N) p (q ⊕ [ ix 1 ])
+  ow {N} x = step (inW (InvAt.world (io N) x)) plain-ix
+
+  -- A merge row stands on an outer row: as a valueless one, a value's
+  -- marker, or a row of the value's lane.
+  data Stand (N : ℕ) (y : Pos) : Set where
+    on   : ∀ {q e} → o N q e → (∀ {a} → ¬ e ≡ out a) → y ≡ q → Stand N y
+    mark : ∀ {q a} → o N q (out a) → y ≡ q ⊕ [ ix 0 ] → Stand N y
+    inln : ∀ {q a e} → o N q (out a) → L a (q ⊕ [ ix 1 ]) N y e → Stand N y
+
+  stand : ∀ {N y e} → Jc N y e → Stand N y
+  stand (Joining.val x)             = mark x refl
+  stand (Joining.step x)            = on x (λ ()) refl
+  stand (Joining.opin x)            = on x (λ ()) refl
+  stand (Joining.oend x _)          = on x (λ ()) refl
+  stand (Joining.opass x _)         = on x (λ ()) refl
+  stand (Joining.lane x _ l _ _)    = inln x (proj₁ l)
+  stand (Joining.lend x _ l _ _ _)  = inln x (proj₁ l)
+  stand (Joining.lpass x _ l _ _ _) = inln x (proj₁ l)
+  stand (Joining.hand _ _ _ _ ())
+  stand (Joining.left x _ l _ _)    = inln x (proj₁ l)
+  stand (Joining.run () _)
+  stand (Joining.rend () _ _)
+  stand (Joining.rpass () _ _)
+  stand (Joining.rhand () _)
+
+  -- So a plain child's world of a merge row lies in a plain child's world
+  -- of an outer row.
+  up-to : ∀ {N y l w} → Stand N y → Plain l → W⁼ (H N) (y ⊕ [ l ]) w
+        → Σ Pos λ q → Σ (Ev A) (o N q) × Σ Label λ l′ → Plain l′ × W⁼ (H N) (q ⊕ [ l′ ]) w
+  up-to (on x _ refl)   pl v = _ , (_ , x) , _ , pl , v
+  up-to (mark x refl)   pl v = _ , (_ , x) , ix 0 , plain-ix , nest⁼ (inW (step here pl)) v
+  up-to {N} (inln x l)  pl v = _ , (_ , x) , ix 1 , plain-ix , nest⁼ (inW (step (inW (lw x l)) pl)) v
+
+  -- What a plain child of an outer row reaches leads no position of
+  -- another child's world, unless it is that child: the two worlds are
+  -- apart, and neither row lies in the other's children's.
+  off-lane : ∀ {N q₀ a₀ y e l w b} → o N q₀ (out a₀) → o N y e → Plain l → W⁼ (H N) (y ⊕ [ l ]) w
+           → ¬ (y ⊕ [ l ] ≡ q₀ ⊕ [ ix 1 ]) → W⁼ (H N) (q₀ ⊕ [ ix 1 ]) b → ¬ w ⊑ b
+  off-lane {N} {q₀} x₀ x pl v ne wb le with lead wb le
+  ... | l-in u     = apart-w pl plain-ix ne (λ z → InvAt.under (io N) x₀ x plain-ix z (⊑-refl _))
+                       (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl _)) v (inW u)
+  ... | l-hot hh r = dj N hh (nest-in (step (inW (InvAt.world (io N) x)) pl) v) (⊑-inside r)
+  ... | l-root r with ⊑-snoc q₀ r
+  ...   | inj₁ wq   = InvAt.under (io N) x x₀ pl v wq
+  ...   | inj₂ refl = [ ne , (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl q₀)) ]′ (w-up plain-ix v)
+
+  -- A lane's own boundary, as the merge's.
+  lane-own : ∀ {N q₀ a₀ b g} (x₀ : o N q₀ (out a₀)) → Placing.Own H Env (q₀ ⊕ [ ix 1 ]) (L a₀ (q₀ ⊕ [ ix 1 ])) N b g
+           → Placing.Own H Env p Jc N b g
+  lane-own {N} {q₀} {a₀} {b} x₀ own = record
+    { world  = nest (inW (ow x₀)) (OL.Own.world own)
+    ; real   = OL.Own.real own
+    ; holder = λ eq → nest⁼ (inW (ow x₀)) (proj₁ (OL.Own.holder own eq)) , proj₂ (OL.Own.holder own eq)
+    ; under  = under }
+    where
+      module OL = Placing H Env (q₀ ⊕ [ ix 1 ]) (L a₀ (q₀ ⊕ [ ix 1 ]))
+
+      wb : W⁼ (H N) (q₀ ⊕ [ ix 1 ]) b
+      wb = inW (OL.Own.world own)
+
+      at : ∀ {y l w} → Stand N y → Plain l → W⁼ (H N) (y ⊕ [ l ]) w → ¬ w ⊑ b
+      at {l = l} (on {q} x nv refl) pl v = off-lane x₀ x pl v ne wb
+        where
+          ne : ¬ (q ⊕ [ l ] ≡ q₀ ⊕ [ ix 1 ])
+          ne eq with ⊕-injˡ q q₀ eq
+          ... | refl = nv (InvAt.func (io N) x x₀)
+      at (mark {q} x refl) pl v =
+        off-lane x₀ x plain-ix (nest⁼ (inW (step here pl)) v) (λ eq → ix01 (⊕-injʳ q q₀ eq)) wb
+        where
+          ix01 : ¬ ix 0 ≡ ix 1
+          ix01 ()
+      at (inln {q} x l) pl v with q ≟ᵖ q₀
+      ... | no ne = off-lane x₀ x plain-ix (nest⁼ (inW (step (inW (lw x l)) pl)) v) (λ eq → ne (⊕-injˡ q q₀ eq)) wb
+      ... | yes refl with o-func x x₀
+      ...   | refl = OL.Own.under own l pl v
+
+      under : ∀ {y e l w} → Jc N y e → Plain l → W⁼ (H N) (y ⊕ [ l ]) w → ¬ w ⊑ b
+      under j = at (stand j)
+
+  -- THE MERGE'S BOUNDARIES ARE PLACED: the outer's own by the outer, every
+  -- merge row standing on an outer row; a lane's own in its value's
+  -- child's world, under its own lane's rows by the lane and under every
+  -- other row by `off-lane`.
+  placed : Placing.Placed H Env p Jc MBd
+  placed {N} (outerB bd) = [ (λ own → inj₁ (outer own)) , inj₂ ]′ (po bd)
+    where
+      module O = Placing H Env p o
+
+      outer : ∀ {b g} → O.Own N b g → Placing.Own H Env p Jc N b g
+      outer own = record
+        { world = O.Own.world own ; real = O.Own.real own ; holder = O.Own.holder own
+        ; under = λ j pl v le → let (_ , (_ , x) , _ , pl′ , v′) = up-to (stand j) pl v in O.Own.under own x pl′ v′ le }
+  placed {N} (laneB x₀ _ bd _) = [ (λ own → inj₁ (lane-own x₀ own)) , inj₂ ]′ (pl x₀ bd)
+  placed {N} (laneH x₀ _ bd _) = [ (λ own → inj₁ (lane-own x₀ own)) , inj₂ ]′ (pl x₀ bd)
+
 module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag → Set) (Bo : Cuts.Bounded o Bdo)
   (L : A → Pos → ℕ → EmissionSet B) (BdL : A → Pos → ℕ → Pos → Tag → Set)
   (BL : ∀ {N q a} → o N q (out a) → Cuts.Bounded (L a (q ⊕ [ ix 1 ])) (BdL a (q ⊕ [ ix 1 ])))
@@ -71,8 +186,7 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
 
   open MergeJ o L public
 
-  MBd : ℕ → Pos → Tag → Set
-  MBd N = JoinBd.JBd (o N) (λ _ → ⊤) (λ _ _ → ⊥) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
+  open MergeP o Bdo L BdL o-func H Env p io dj lw po pl using (MBd; ow)
 
   open JoinBd using (outerB; laneB; laneH)
 
@@ -226,10 +340,6 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
   row-lead : ∀ {N y e q e′} → o N y e → o N q e′ → y ⊑ q → y ≡ q
   row-lead {y = y} _ _ ([] , eq) = sym (trans eq (⊕-identityʳ y))
   row-lead {N} oy oq (_ ∷ _ , refl) = ⊥-elim (InvAt.flat (io N) oy oq)
-
-  -- A lane's subscription lies in the merge's world.
-  ow : ∀ {N q a} → o N q (out a) → W (H N) p (q ⊕ [ ix 1 ])
-  ow {N} x = step (inW (InvAt.world (io N) x)) plain-ix
 
   -- AN OUTER BOUNDARY is led by no lane's row: the outer's own lies
   -- under no world of its rows' children, its scope's under no world

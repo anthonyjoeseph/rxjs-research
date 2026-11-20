@@ -75,7 +75,7 @@ open import simultaneous.Placed using (module Placing)
 open import simultaneous.ListTR using (tr-at)
 open import simultaneous.ColdBounded using (cold-bounded; cold-placed)
 open import simultaneous.HotRows using (hot-rows-bounded)
-open import simultaneous.HorizonJoin using (module MergeB)
+open import simultaneous.HorizonJoin using (module MergeB; module MergeP)
 open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
@@ -154,11 +154,6 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   PlacedAt n o p = Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
 
   postulate
-    -- A MERGE'S: its outer's, and each lane's, subscribed under a row of
-    -- the outer, in that row's world.
-    placed-merge : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-                 → PlacedAt n (flatMap (mergeᶠ nothing) f s) p
-
     -- THE OTHER JOINS'.
     placed-cc : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
               → PlacedAt n (flatMap (mergeᶠ (just k)) f s) p
@@ -245,7 +240,14 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
       (tree-placed n s p a)
   tree-placed n       (takeWhile i q s) p a =
     placed-sub {Bd′ = bd n (takeWhile i q s) ρ uρ (dbd D) p} (λ {N} x → take-stands i q (tr-take→ i q (listC (3 + N) n s (ρ N) p) x)) (λ { (b , _) → b }) (tree-placed n s p a)
-  tree-placed n (flatMap (mergeᶠ nothing) f s)  p a = placed-merge n f s p a
+  tree-placed n (flatMap (mergeᶠ nothing) f s)  p a =
+    placed-sub (λ {N} x → _ , (_ , merge-tr→ n f s uρ p x) , inj₁ refl) (λ b → b)
+      (MergeP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (tree-placed n s p a)
+        (λ {N} {q} {v} x → tree-placed n (f v) (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x)))
   tree-placed n (flatMap (mergeᶠ (just k)) f s) p a = placed-cc n k f s p a
   tree-placed n (flatMap switchᶠ f s)           p a = placed-sw n f s p a
   tree-placed n (flatMap exhaustᶠ f s)          p a = placed-ex n f s p a
