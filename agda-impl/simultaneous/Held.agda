@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -86,6 +86,13 @@ open import denotation.Simultaneity using (reflⁱ)
 open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt; Carried)
 open import simultaneous.HeldComb using (ShutRun)
+open import denotation.Position using (Path)
+open import denotation.EmissionSet using (InE; at-out; at-end; on-out)
+open import denotation.Events using (ofᴱ)
+open import denotation.Laws.Worlds.Leaves using (of-idx)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
+open import simultaneous.Relations using (values)
+open import simultaneous.HeldComb using (RunHeld)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -121,9 +128,69 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 -- EACH ELABORATED FORMER HOLDS when its children do, under the meaning
 -- and under every approximant alike.
 
+-- A STREAM OF ITS SUBSCRIBE BURST ALONE HOLDS: every row it shows lies
+-- below its subscription, in its instant, and none is a mark.
+module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : Early p)
+             (below : ∀ {y e} → t y e → Visible e → Σ Path λ zs → y ≡ p ⊕ zs)
+             (no-mark : ∀ {y m n} → t y (out (instEmit (mark m) n)) → ⊥) where
+
+  in-burst : ∀ {y e} → t y e → Visible e → Ex (p ∷ cs) y
+  in-burst x v with below x v
+  ... | zs , refl = here (⊑-inside {p} {p ⊕ zs} (zs , refl) , rootOf-ext p zs)
+
+  quiet-fold : ∀ c (rs : List (Pos × Ev (IE A))) → (∀ {y m n} → (y , out (instEmit (mark m) n)) ∈ rs → ⊥)
+             → L.foldl count c (values rs) ≡ c
+  quiet-fold c []                                    h = refl
+  quiet-fold c ((y , out (instEmit (value a) n)) ∷ rs) h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , out (instEmit (mark m) n)) ∷ rs)  h = ⊥-elim (h (here refl))
+  quiet-fold c ((y , end) ∷ rs)                      h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , skip) ∷ rs)                     h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , pin _) ∷ rs)                    h = quiet-fold c rs (λ i → h (there i))
+
+  runs : ∀ {rs} → Met t rs → RunHeld (p ∷ cs) rs
+  runs {rs} mt = record
+    { covered = λ r₁ r₂ eq _ ne → let (x , v) = run-row r₁ (subst (Met t) eq mt) in ⊥-elim (ne (in-burst x v))
+    ; exact   = λ r₁ r₂ eq → ⊥-elim (no-mark (proj₁ (run-row r₁ (subst (Met t) eq mt))))
+    ; shut    = λ r₁ r₂ eq _ bq _ _ → ⊥-elim (no-mark (proj₁ (run-row∈ mt (subst (_ ∈_) (sym eq) (∈-++⁺ˡ bq))))) }
+
+  held : Held t (p ∷ cs)
+  held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x))
+    (λ mt _ _ _ _ → inj₁ (cong proj₂ (quiet-fold r₀ _ (λ i → no-mark (proj₁ (run-row∈ mt i))))))
+    (λ mt _ bq → ⊥-elim (no-mark (proj₁ (run-row∈ mt bq))))
+    runs
+    where
+      early : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
+      early x with below x tt
+      ... | zs , refl = early-inst zs ep
+      ends : ∀ {y} → t y end → Early y
+      ends x with below x tt
+      ... | zs , refl = early-inst zs ep
+
+-- The rows of `of` and of `empty`.
+of-below : ∀ {X} p i (ys : List X) {y e} → InE (ofᴱ p i ys) y e → Σ Path λ zs → y ≡ p ⊕ zs
+of-below p i ys x with of-idx p i ys x
+... | inj₁ (j , _ , eq) = [ ix j ] , eq
+... | inj₂ eq           = [ last ] , eq
+
+of-vals : ∀ {X} p i (ys : List X) {y v} → InE (ofᴱ p i ys) y (out v) → v ∈ ys
+of-vals p i (_ ∷ ys) at-out     = here refl
+of-vals p i (_ ∷ ys) (on-out r) = there (of-vals p (suc i) ys r)
+
+of-mark : ∀ {X} p (xs : List X) {y m n} → InE (ofᴱ p 0 (L.map (λ x → instEmit (value x) root) xs)) y (out (instEmit (mark m) n)) → ⊥
+of-mark p xs r with ∈-map⁻ (λ x → instEmit (value x) root) (of-vals p 0 _ r)
+... | _ , _ , ()
+
+held-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
+held-empty nothing  ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
+held-empty (just n) ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
+
+held-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
+held-of nothing  ρ xs = ih λ env cs g eh p ok ep →
+  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
+held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
+  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
+
 postulate
-  held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
-  held-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
   held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
