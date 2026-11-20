@@ -12,18 +12,22 @@
 -- on a connect past the lane's subscription, so past the value.
 module simultaneous.HorizonJoin where
 
-open import Data.Empty using (⊥)
-open import Data.List using ([]; [_])
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Nullary using (¬_; yes; no)
 
-open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_)
 open import denotation.EmissionSet using (out; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-ext; ≺→≼; ≺-≼-≺; ≼-refl; ≼-trans)
-open import denotation.Laws.Worlds using (_⊑_)
-open import simultaneous.Horizon using (Tag; free; held; module Cuts)
+open import denotation.Laws.Worlds using (_⊑_; InvAt; Disj; W; W⁼; step; inW; here; plain-ix; lead; l-root; l-in; l-hot; leads;
+  ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-refl; ⊑-inside; w-up; not-up; apart-w; nest-in; ⊕-injʳ; ⊕-injˡ; ⊕-identityʳ)
+open import simultaneous.Horizon using (Tag; free; held; module Cuts; under-child)
+open import simultaneous.Placed using (module Placing)
 
 ------------------------------------------------------------------------
 -- A join's boundaries
@@ -55,6 +59,14 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
   (L : A → Pos → ℕ → EmissionSet B) (BdL : A → Pos → ℕ → Pos → Tag → Set)
   (BL : ∀ {N q a} → o N q (out a) → Cuts.Bounded (L a (q ⊕ [ ix 1 ])) (BdL a (q ⊕ [ ix 1 ])))
   (pin-after : ∀ {N M q a y r} → o N q (out a) → L a (q ⊕ [ ix 1 ]) M y (pin r) → (q ⊕ [ ix 1 ]) ≼ r)
+  (o-func : ∀ {N y e e′} → o N y e → o N y e′ → e ≡ e′)
+  -- each cut under hot rows `H`, its scope's boundaries `Env`
+  (H : ℕ → Pos → Set) (Env : ℕ → Pos → Tag → Set) (p : Pos)
+  (io : ∀ N → InvAt (H N) p (o N)) (dj : ∀ N → Disj (H N) p)
+  (lw : ∀ {N q a y e} → o N q (out a) → L a (q ⊕ [ ix 1 ]) N y e → W (H N) (q ⊕ [ ix 1 ]) y)
+  (po : Placing.Placed H Env p o Bdo)
+  (pl : ∀ {N q a} → o N q (out a) → Placing.Placed H Env (q ⊕ [ ix 1 ]) (L a (q ⊕ [ ix 1 ])) (BdL a (q ⊕ [ ix 1 ])))
+  (el : ∀ {N b g} → Env N b g → ∀ {w} → W⁼ (H N) p w → ¬ w ⊑ b)
   where
 
   open MergeJ o L public
@@ -210,9 +222,111 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
         where x = proj₂ (upto ago (qr x′ (proj₁ l))) x′
       from (Joining.run () _)
 
-  postulate
-    -- No merge row leads a boundary of the merge.
-    gap-m : ∀ {N b g y e} → MBd N b g → Jc N y e → ¬ y ⊑ b
+  -- An outer row leads another only as itself.
+  row-lead : ∀ {N y e q e′} → o N y e → o N q e′ → y ⊑ q → y ≡ q
+  row-lead {y = y} _ _ ([] , eq) = sym (trans eq (⊕-identityʳ y))
+  row-lead {N} oy oq (_ ∷ _ , refl) = ⊥-elim (InvAt.flat (io N) oy oq)
+
+  -- A lane's subscription lies in the merge's world.
+  ow : ∀ {N q a} → o N q (out a) → W (H N) p (q ⊕ [ ix 1 ])
+  ow {N} x = step (inW (InvAt.world (io N) x)) plain-ix
+
+  -- AN OUTER BOUNDARY is led by no lane's row: the outer's own lies
+  -- under no world of its rows' children, its scope's under no world
+  -- position.
+  gap-ol : ∀ {N b g q a y e} → Bdo N b g → o N q (out a) → L a (q ⊕ [ ix 1 ]) N y e → ¬ y ⊑ b
+  gap-ol bd x l with po bd
+  ... | inj₁ own = Placing.Own.under own x plain-ix (inW (lw x l))
+  ... | inj₂ env = el env (inW (nest-in (ow x) (inW (lw x l))))
+
+  -- A LANE'S BOUNDARY is led by no valueless outer row: the lane's own
+  -- lies in the lane's world, which no other outer row leads.
+  gap-lo : ∀ {N q a b g y e} → o N q (out a) → BdL a (q ⊕ [ ix 1 ]) N b g → o N y e → (∀ {a′} → ¬ e ≡ out a′) → ¬ y ⊑ b
+  gap-lo {N} x bd oy ne le with pl x bd
+  ... | inj₂ env = el env (inW (InvAt.world (io N) oy)) le
+  ... | inj₁ own with lead (inW (Placing.Own.world own)) le
+  ...   | l-hot hh r = dj N hh (InvAt.world (io N) oy) (⊑-inside r)
+  ...   | l-in v     = InvAt.under (io N) x oy plain-ix (inW v) (⊑-refl _)
+  gap-lo {N} {q} x bd oy ne le | inj₁ own | l-root r with ⊑-snoc q r
+  ...   | inj₂ refl = InvAt.flat (io N) x oy
+  ...   | inj₁ yq with row-lead oy x yq
+  ...     | refl = ne (InvAt.func (io N) oy x)
+
+  -- Nor any value's marker.
+  gap-lv : ∀ {N q a b g y a′} → o N q (out a) → BdL a (q ⊕ [ ix 1 ]) N b g → o N y (out a′) → ¬ (y ⊕ [ ix 0 ]) ⊑ b
+  gap-lv {N} x bd oy le with pl x bd
+  ... | inj₂ env = el env (inW (step (inW (InvAt.world (io N) oy)) plain-ix)) le
+  ... | inj₁ own with lead (inW (Placing.Own.world own)) le
+  ...   | l-hot hh r = dj N hh (step (inW (InvAt.world (io N) oy)) plain-ix) (⊑-inside r)
+  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-in v with w-up plain-ix (inW v)
+  ...   | inj₂ v′ = InvAt.under (io N) x oy plain-ix v′ (⊑-refl y)
+  ...   | inj₁ eq with ⊕-injʳ q y eq
+  ...     | ()
+  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-root r with ⊑-snoc q r
+  ...   | inj₂ eq with ⊕-injʳ y q eq
+  ...     | ()
+  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-root r | inj₁ r′ with row-lead oy x (⊑-trans (⊑-snoc⁺ y) r′)
+  ...     | refl = not-up {H = H N} (InvAt.real (io N) x) here r′
+
+  -- Nor another lane's row: two values' lanes are apart.
+  gap-ll : ∀ {N q a q′ a′ b g y e} → o N q (out a) → o N q′ (out a′) → ¬ q ≡ q′
+         → BdL a (q ⊕ [ ix 1 ]) N b g → L a′ (q′ ⊕ [ ix 1 ]) N y e → ¬ y ⊑ b
+  gap-ll {N} {q} {q′ = q′} {y = y} x x′ ne bd l le with pl x bd
+  ... | inj₂ env = el env (inW (nest-in (ow x′) (inW (lw x′ l)))) le
+  ... | inj₁ own = leads dj′ (lw x′ l) nin nup (inW (Placing.Own.world own)) le
+    where
+      dj′ : Disj (H N) (q′ ⊕ [ ix 1 ])
+      dj′ hh w ins = dj N hh (nest-in (ow x′) (inW w)) ins
+
+      n₁ : W⁼ (H N) (q′ ⊕ [ ix 1 ]) q → ⊥
+      n₁ v = InvAt.under (io N) x′ x plain-ix v (⊑-refl q)
+
+      n₂ : W⁼ (H N) (q ⊕ [ ix 1 ]) q′ → ⊥
+      n₂ v = InvAt.under (io N) x x′ plain-ix v (⊑-refl q′)
+
+      nin : W⁼ (H N) (q ⊕ [ ix 1 ]) y → ⊥
+      nin v = apart-w plain-ix plain-ix (λ eq → ne (⊕-injˡ q q′ eq)) n₁ n₂ v (inW (lw x′ l))
+
+      nup : y ⊑ (q ⊕ [ ix 1 ]) → ⊥
+      nup r with ⊑-snoc q r
+      ... | inj₁ yq = InvAt.under (io N) x′ x plain-ix (inW (lw x′ l)) yq
+      ... | inj₂ eq with w-up plain-ix (subst (W⁼ (H N) (q′ ⊕ [ ix 1 ])) eq (inW (lw x′ l)))
+      ...   | inj₁ eq′ = ne (sym (⊕-injˡ q′ q eq′))
+      ...   | inj₂ v   = n₁ v
+
+  -- A merge row is a valueless outer row, a value's marker, or a lane's
+  -- row: what leads none of them leads no merge row.  A value's own row
+  -- is not one: it leads its lane.
+  gap-row : ∀ {N b} → (∀ {y e} → o N y e → (∀ {a} → ¬ e ≡ out a) → ¬ y ⊑ b) → (∀ {y a} → o N y (out a) → ¬ (y ⊕ [ ix 0 ]) ⊑ b)
+          → (∀ {q a y e} → o N q (out a) → L a (q ⊕ [ ix 1 ]) N y e → ¬ y ⊑ b)
+          → ∀ {y e} → Jc N y e → ¬ y ⊑ b
+  gap-row O V Ln (Joining.val x)             = V x
+  gap-row O V Ln (Joining.step x)            = O x (λ ())
+  gap-row O V Ln (Joining.opin x)            = O x (λ ())
+  gap-row O V Ln (Joining.oend x _)          = O x (λ ())
+  gap-row O V Ln (Joining.opass x _)         = O x (λ ())
+  gap-row O V Ln (Joining.lane x _ l _ _)    = Ln x (proj₁ l)
+  gap-row O V Ln (Joining.lend x _ l _ _ _)  = Ln x (proj₁ l)
+  gap-row O V Ln (Joining.lpass x _ l _ _ _) = Ln x (proj₁ l)
+  gap-row O V Ln (Joining.hand _ _ _ _ ())
+  gap-row O V Ln (Joining.left x _ l _ _)    = Ln x (proj₁ l)
+  gap-row O V Ln (Joining.run () _)
+  gap-row O V Ln (Joining.rend () _ _)
+  gap-row O V Ln (Joining.rpass () _ _)
+  gap-row O V Ln (Joining.rhand () _)
+
+  -- A lane's boundary and a lane's row: one lane's by its own gap.
+  lanes : ∀ {N q a b g} → o N q (out a) → BdL a (q ⊕ [ ix 1 ]) N b g
+        → ∀ {q′ a′ y e} → o N q′ (out a′) → L a′ (q′ ⊕ [ ix 1 ]) N y e → ¬ y ⊑ b
+  lanes {N} {q} x bd {q′} x′ l with q ≟ᵖ q′
+  ... | no ne = gap-ll x x′ ne bd l
+  ... | yes refl with o-func x x′
+  ...   | refl = BLn.gap x bd l
+
+  gap-m : ∀ {N b g y e} → MBd N b g → Jc N y e → ¬ y ⊑ b
+  gap-m (outerB bd) j       = gap-row (λ x _ → BO.gap bd x) (λ x → under-child (ix 0) (BO.gap bd x)) (gap-ol bd) j
+  gap-m (laneB x _ bd _) j  = gap-row (gap-lo x bd) (gap-lv x bd) (lanes x bd) j
+  gap-m (laneH x _ bd _) j  = gap-row (gap-lo x bd) (gap-lv x bd) (lanes x bd) j
 
   bounded : SM.Bounded
   bounded = record { gap = gap-m ; held-in = λ {N} {b} {r} → held-in {N} {b} {r} ; held-under = λ {N} {b} {r} → held-under {N} {b} {r} ; fwd = fwd ; fwd-pin = λ {N} {r} {k} → fwd-pin {N} {r} {k} }

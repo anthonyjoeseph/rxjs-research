@@ -657,7 +657,27 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   fwd-pin {N} {q} {k} cq hq {N′} le {y} yk = PinStep.pin-to le {q} {k} {y} cq hq yk , PinStep.pin-from le {q} {k} {y} cq hq yk
 
   postulate
-    gap-c  : ∀ {N b g y e} → CBd N b g → Cc N y e → ¬ y ⊑ b
+    -- A SOURCE BOUNDARY is led by no row of the body.
+    gap-sb : ∀ {N b g y e} → Bdσ N b g → β N y e → ¬ y ⊑ b
+    -- A BODY BOUNDARY is led by no row the connect makes of its source.
+    gap-bs : ∀ {N b g k e} → Bdβ N b g → σ N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b
+
+  -- A source boundary: the source's rows lead it nowhere, so neither do
+  -- their marks under it.
+  gap-σ : ∀ {N b g y e} → Bdσ N b g → Cc N y e → ¬ y ⊑ b
+  gap-σ bd (Connecting.body x)       = gap-sb bd x
+  gap-σ bd (Connecting.burst x _)    = under-child (ix 0) (BS.gap bd x)
+  gap-σ bd (Connecting.echo x _ _ _) = under-child (ix 0) (BS.gap bd x)
+  gap-σ bd (Connecting.kept x _ _ _) = under-child (ix 0) (BS.gap bd x)
+
+  gap-c : ∀ {N b g y e} → CBd N b g → Cc N y e → ¬ y ⊑ b
+  gap-c (bodyB bd) (Connecting.body x)       = BB.gap bd x
+  gap-c (bodyB bd) (Connecting.burst x _)    = gap-bs bd x
+  gap-c (bodyB bd) (Connecting.echo x _ _ _) = gap-bs bd x
+  gap-c (bodyB bd) (Connecting.kept x _ _ _) = gap-bs bd x
+  gap-c (burstB bd _)  y = gap-σ bd y
+  gap-c (echoB bd _ _) y = gap-σ bd y
+  gap-c (keptB bd _ _) y = gap-σ bd y
 
   bounded : SC.Bounded
   bounded = record { gap = gap-c ; held-in = held-in ; held-under = held-under ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
