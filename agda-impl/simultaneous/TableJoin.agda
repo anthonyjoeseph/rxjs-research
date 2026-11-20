@@ -238,28 +238,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-not-val : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → isVal N k ≡ false
         -- an outer row late for the source is late for the merge
         mg-late-src : ∀ N {k e} → oM N k e → Rel.Late (Out.rel Os) N k → Late′ N k
-        -- an outer skip read through the shared hot
-        mg-φ-skip : ∀ N {k} → oM N k skip → φ′ N k ≡ srcφ N k
-        -- the source's end, relocated past the trigger's, cuts a pair of
-        -- the source's boundaries alike where the source's rows do.
-        -- Suspect where the source hangs past its own end: a connect whose
-        -- body ends as it subscribes keeps its source's burst as pins past
-        -- its end, held, the plain merge ending before them, while the
-        -- trigger's end, and so the elaborated merge's, lies past them all.
-        --
-        -- DEAD ROUTE: no boundary past a non-late end, as a `Cuts.Bounded`
-        --   field: a connect's burst boundary (`ConnBd`) lies past its end
-        --   whenever its body ends at its subscribe.
-        -- DEAD ROUTE: the elaborated flatMap's readers stopped at a
-        --   completion mark its shared source sends at its end.  Appended by
-        --   `concatˢ`, the child sits under `if`, which the productivity
-        --   check of `elab` cannot see through; appended under a connect, the
-        --   child is a connect's source again, the hazard `shareˢ` exists to
-        --   avoid; gated by a one-row flatMap, the mark follows the child's
-        --   whole burst, the gate's row ending only as its emit returns.
-        mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
-                 → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
-                 → oM N k end → ¬ Late′ N k → (k ≺ z → φ′ N k ≺ z*) × (φ′ N k ≺ z* → k ≺ z)
+        -- an outer skip or end read through the shared hot
+        mg-φ-src : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → Unpinned e → φ′ N k ≡ srcφ N k
         mg-o-pb  : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → PB (OwnPut (oM N) (Rel.Put (Out.rel Os) N)) z z* → JP.IO.PutBefore N z z*
@@ -314,10 +294,23 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       val-img : ∀ N {k a} → oM N k (out a) → Σ (Ev (IE A)) (Cut n s* ρ*s sp* N (Rel.φ (Out.rel Os) N k))
       val-img N x = [ (λ { ((e′ , y , _) , _) → e′ , y }) , (λ { (() , _) }) ]′ (Corr.row→ (Rel.corr (Out.rel Os) N) x tt)
 
+      -- THE SOURCE'S END, read through the shared hot, which ends where the
+      -- source does: below the image of an end, which lies over no mark.
+      mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
+               → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
+               → oM N k end → ¬ Late′ N k → (k ≺ z → φ′ N k ≺ z*) × (φ′ N k ≺ z* → k ≺ z)
+      mg-o-end N {z} {z*} {k} mz (b , g , bd , eq) btw x nl =
+        retarget {k} {z} {z*} {srcφ N k} {φ′ N k} (mg-φ-src N x (λ ()) tt)
+          (chain {k} {z} {RO.φ N k} {srcφ N k} {z*} (btw (end , x , tt , nlo))
+            (past-ext {RO.φ N k} {z*} (sub c₁) [] (off*-mark (Out.rel Os) (end , x , tt , nlo) (b , g , SameBd.from (Out.bd-pin* Os) bd , eq))))
+        where
+          module RO = Rel (Out.rel Os)
+          nlo = λ l → nl (mg-late-src N x l)
+
       -- THE MERGE'S OUTER ROWS cut a pair of the source's boundaries alike
       -- where the source's rows do: a value at its elaborated value, a
       -- skip through the shared hot, each a descendant of the source's
-      -- image, which lies over no mark; the end relocated.
+      -- image, which lies over no mark.
       mg-o-btw : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
                → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z* → JP.IO.Between N z z*
       mg-o-btw N mz mz* btw (inj₂ ())
@@ -328,7 +321,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
             (past-ext {RO.φ N k} {z*} (sub c₁) (ix 1 ∷ ix 0 ∷ []) (src-off* N mz* (proj₂ (val-img N x)))))
         where module RO = Rel (Out.rel Os)
       mg-o-btw N {z} {z*} mz mz* btw {k} (inj₁ (skip , x , _ , nl)) =
-        retarget {k} {z} {z*} {srcφ N k} {φo N k} (trans (sym (mg-φ-outer N x (λ ()))) (mg-φ-skip N x))
+        retarget {k} {z} {z*} {srcφ N k} {φo N k} (trans (sym (mg-φ-outer N x (λ ()))) (mg-φ-src N x (λ ()) tt))
           (chain {k} {z} {RO.φ N k} {srcφ N k} {z*} (btw (skip , x , tt , nlo))
             (past-ext {RO.φ N k} {z*} (sub c₁) [] (mg-skip-off* N mz* x nlo)))
         where
