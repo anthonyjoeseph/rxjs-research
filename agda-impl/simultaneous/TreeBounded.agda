@@ -64,9 +64,11 @@ open import simultaneous.TableRows using (part-≺)
 open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
-open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd; cold-bd)
+open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd)
+open import simultaneous.ColdBounded using (cold-bounded)
+open import simultaneous.HotRows using (hot-rows-bounded)
 open import simultaneous.HorizonJoin using (module MergeB)
-open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←)
+open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
 
@@ -83,15 +85,6 @@ listEv n o D c N = Proper (enter (capprox (3 + N) n o (den D N)) (c ⊕ [ ix 1 ]
 
 ------------------------------------------------------------------------
 -- The leaves owed
-
-postulate
-  -- A COLD'S CUTS: the listing stops short of the timeline only at its
-  -- boundaries.
-  cold-bounded : ∀ {Γ A} n (c : Timeline A) (ρ : ℕ → All Tb.Listed Γ) p → Cuts.Bounded (Cut n (cold c) ρ p) (cold-bd c p)
-
-  -- A HOT'S ROWS are its source's proper rows, cut where the source is.
-  hot-rows-bounded : ∀ {Γ A} n (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {Bd : ℕ → Pos → Tag → Set}
-                   → Cuts.Bounded (Cut n s ρ (p ⊕ [ ix 1 ])) Bd → Cuts.Bounded (λ N → Rows (hotOf (srcL n s uρ p N))) Bd
 
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
@@ -114,10 +107,10 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     ex-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
                → Cuts.Bounded (Cut n (flatMap exhaustᶠ f s) ρ p) (bd n (flatMap exhaustᶠ f s) ρ uρ (dbd D) p)
 
-    -- A DEFER'S CUTS: its marker under its first label, apart from every
+    -- A DEFER'S MARKER, under its first label, lies apart from every
     -- boundary of its body, subscribed one label down.
-    later-bounded : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
-                  → Cuts.Bounded (Cut (suc n) (defer l) ρ p) (bd (suc n) (defer l) ρ uρ (dbd D) p)
+    defer-apart : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
+                → ∀ {N b g} → bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (p ⊕ [ ix 0 ]) × ¬ (p ⊕ [ ix 0 ]) ⊑ b
 
 ------------------------------------------------------------------------
 -- Every tree, and the hot a connect lists
@@ -169,11 +162,11 @@ mutual
       into (N , inj₁ (e , x)) = inj₁ (e , N , x)
       into (N , inj₂ hh)      = inj₂ (N , hh)
 
-  tree-bounded n       (cold c)          ρ uρ D p a = cold-bounded n c ρ p
+  tree-bounded n       (cold c)          ρ uρ D p a = cold-bounded n c ρ p (proj₁ a)
   tree-bounded n       empty             ρ uρ D p a = const-bounded _
   tree-bounded n       (of xs)           ρ uρ D p a = const-bounded _
   tree-bounded n       (map f s)         ρ uρ D p a = map-bounded f (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ D p a)
-  tree-bounded n       (scan f z s)      ρ uρ D p a = scan-bounded f z (λ N → listC (3 + N) n s (ρ N) p) (tree-bounded n s ρ uρ D p a)
+  tree-bounded n       (scan f z s)      ρ uρ D p a = scan-bounded f z (λ N → listC (3 + N) n s (ρ N) p) (λ N → listC-ok (3 + N) n s (uρ N) p) (tree-bounded n s ρ uρ D p a)
   tree-bounded n       (takeWhile i q s) ρ uρ D p a =
     bounded-≃ (λ {N} → tr-take← i q (listC (3 + N) n s (ρ N) p)) (λ {N} → tr-take→ i q (listC (3 + N) n s (ρ N) p))
       (TakeB.bounded′ i q (Cut n s ρ p) (bd n s ρ uρ (dbd D) p)
@@ -208,7 +201,11 @@ mutual
       ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
       ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
   tree-bounded zero    (defer l)         ρ uρ D p a = SpinB.bounded p
-  tree-bounded (suc n) (defer l)         ρ uρ D p a = later-bounded ρ uρ D n l p a
+  tree-bounded (suc n) (defer l)         ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → defer-tr← n l uρ p {N} {y} {e}) (λ {N} {y} {e} → defer-tr→ n l uρ p {N} {y} {e})
+      (MarkB.bounded (p ⊕ [ ix 0 ]) (Cut n (Later.force l) ρ (p ⊕ [ ix 1 ])) (bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]))
+        (tree-bounded n (Later.force l) ρ uρ D (p ⊕ [ ix 1 ]) (admits-step D a))
+        (λ {N} {b} {g} → defer-apart ρ uρ D n l p a {N} {b} {g}))
 
 -- A SHARED CHILD'S LANE: a connect at `c` whose source is `empty`, its
 -- end read by a blocker lane of a flatMap subscribed one label under

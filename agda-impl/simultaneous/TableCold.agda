@@ -32,6 +32,7 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; last; 
 open import denotation.Events using (Timeline; From; fixed; fresh; start)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼)
+open import denotation.Laws.Worlds using (Ok)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (Row; _⊣_)
 open import simultaneous.InstEmit using (valuesOf)
@@ -49,7 +50,8 @@ open import simultaneous.TableKit using (TR; M; Got)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.TableEnv using (got-ok; DenOf; dbd; Admits)
 open import simultaneous.HorizonTree using (bd; cold-bd)
-open import simultaneous.TreeBounded using (cold-bounded; tree-bounded)
+open import simultaneous.TreeBounded using (tree-bounded)
+open import simultaneous.ColdBounded using (cold-bounded)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ)
 
@@ -250,8 +252,8 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
           inst : instantOf (im (ψ k) e) ≡ instantOf l
           inst rewrite as = trans (σ-inst (kind e) (ψ k)) ieq
 
-  rel′ : Rel P Q p p*
-  rel′ = record
+  rel′ : ∀ {H} → Ok H p → Rel P Q p p*
+  rel′ ok = record
     { φ = φ′ ; Put = Put′ ; Late = λ _ _ → ⊥ ; corr = corr′
     ; bk = λ _ → bk′
     ; in-bk = λ { (_ , refl , x) _ _ → φ-back x }
@@ -268,8 +270,8 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; after* = cold-after*
     ; after-φ = λ { (_ , refl , x) _ _ → φ-after x }
     ; pin-after* = λ y → ⊥-elim (cold-pin* y)
-    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = tree-bounded n (coldˢ (fixed m)) ρ* uρ* D* p* a* ; bcorr = cold-bcorr ; across = cold-across ; skip-off* = λ _ _ () }
+    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ok ; bounded* = tree-bounded n (coldˢ (fixed m)) ρ* uρ* D* p* a* ; bcorr = cold-bcorr ; across = cold-across ; skip-off* = λ _ _ () }
 
-cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (D* : DenOf ρ*) p p* (a* : Admits D* p*)
+cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (D* : DenOf ρ*) p p* (a* : Admits D* p*) {H} → Ok H p
          → Rel (ColdTab.P m n ρ* uρ* D* p p* a*) (ColdTab.Q m n ρ* uρ* D* p p* a*) p p*
 cold-tab m n ρ* uρ* D* p p* a* = ColdTab.rel′ m n ρ* uρ* D* p p* a*

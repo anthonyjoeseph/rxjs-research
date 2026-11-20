@@ -42,7 +42,12 @@ open import simultaneous.TableCorr using (Corr; Rel; module Rel; module Across; 
 open import simultaneous.TableKit using (TR; M; ev; ends; m-back; m-val; m-ee; got-bind)
 open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; func-map; flat-map; pin-in-map; tr-pin←; map-bounded)
 open import simultaneous.TableTake using (ex-just)
-open import simultaneous.Horizon using (Tag; module Cuts)
+open import simultaneous.Horizon using (Tag; module Cuts; bounded-≃)
+open import simultaneous.Listing using (Uncut)
+open import simultaneous.ListTR using (self-exact)
+open import quickcheck.Tabled.Exact.Scan using (scan-exact)
+open import quickcheck.Tabled.Exact.Base using (sound; complete)
+open import denotation.Laws using (scan-ag)
 open import simultaneous.HorizonCorr using (module Sub)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; scanIE; marked)
@@ -55,12 +60,42 @@ open Scan using (Acc; acc₀; acc; ScanT; sval; sstep; spin; send)
 Scanned : ∀ {X B : Set} → (B → X → B) → B → Maybe (Tb.Listed X) → Maybe (Tb.Listed B)
 Scanned f z m = bind m λ l → just (scanRows f z l)
 
-postulate
-  -- A SCAN KEEPS ITS CHILD'S HANGS: a scan neither adds nor removes a
-  -- position, and folds each value from the rows before it, so the
-  -- child's boundaries bound the scanned cuts.
-  scan-bounded : ∀ {X Y : Set} (f : Y → X → Y) (z : Y) (P : ℕ → Maybe (Tb.Listed X)) {Bd : ℕ → Pos → Tag → Set}
-               → Cuts.Bounded (λ N → TR (P N)) Bd → Cuts.Bounded (λ N → TR (Scanned f z (P N))) Bd
+-- A table there, uncut.
+Whole : ∀ {X : Set} → Maybe (Tb.Listed X) → Set
+Whole {X} m = Σ (Tb.Listed X) λ L → m ≡ just L × Uncut L
+
+-- An uncut table's scan holds its rows' scan.
+scan-of : ∀ {X Y : Set} (f : Y → X → Y) (z : Y) {m : Maybe (Tb.Listed X)} → Whole m → ∀ {y e}
+        → (TR (Scanned f z m) y e → ScanT f z (TR m) y e) × (ScanT f z (TR m) y e → TR (Scanned f z m) y e)
+scan-of f z (L , refl , u) = (λ { (_ , refl , r) → sound ex r }) , (λ sc → _ , refl , complete ex sc)
+  where ex = scan-exact f z L (self-exact refl) u
+
+-- A scan row stands on a row of its child, at its own position.
+scan-src : ∀ {X Y : Set} {f : Y → X → Y} {z : Y} {t : EmissionSet X} {y e} → ScanT f z t y e → Σ (Ev X) (t y)
+scan-src (sval (acc₀ x _))   = _ , x
+scan-src (sval (acc _ x _ _)) = _ , x
+scan-src (sstep x)           = _ , x
+scan-src (spin x)            = _ , x
+scan-src (send x)            = _ , x
+
+-- A SCAN KEEPS ITS CHILD'S HANGS: a scan neither adds nor removes a
+-- position, and folds each value from the rows before it (`scan-ag`), so
+-- the child's boundaries bound the scanned cuts.  Uncut: a fold runs in
+-- list order, so two tables holding one set of rows in two orders scan
+-- apart.
+scan-bounded : ∀ {X Y : Set} (f : Y → X → Y) (z : Y) (P : ℕ → Maybe (Tb.Listed X)) → (∀ N → Whole (P N)) → {Bd : ℕ → Pos → Tag → Set}
+             → Cuts.Bounded (λ N → TR (P N)) Bd → Cuts.Bounded (λ N → TR (Scanned f z (P N))) Bd
+scan-bounded {X} f z P uP {Bd} B = bounded-≃ (λ {N} → proj₂ (scan-of f z (uP N))) (λ {N} → proj₁ (scan-of f z (uP N))) SB
+  where
+    module B = Cuts.Bounded B
+
+    SB : Cuts.Bounded (λ N → ScanT f z (TR (P N))) Bd
+    SB = record
+      { gap = λ bd sc → B.gap bd (proj₂ (scan-src sc)) ; held-in = B.held-in ; held-under = B.held-under
+      ; fwd = λ {N} {k} cl le → scan-ag f z (B.fwd {N} {k} cl le)
+      ; fwd-pin = λ {N} {q} {k} cl hc {N′} le {y} yk →
+          (λ { (spin x) → spin (proj₁ (B.fwd-pin {N} {q} {k} cl hc le yk) x) })
+        , (λ { (spin x) → spin (proj₂ (B.fwd-pin {N} {q} {k} cl hc le yk) x) }) }
 
 -- The latest position before `w` among `ks` where a decidable `V` holds.
 latest? : ∀ (V : Pos → Set) → (∀ k → Dec (V k)) → ∀ w ks → Latest V w ks
@@ -183,7 +218,8 @@ private
 -- The record, scanned
 
 module ScanTab {A B : Set} (f : B → A → B) (z : B)
-  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} (R : Rel P Q s s*) where
+  {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos} (R : Rel P Q s s*)
+  (uP : ∀ N → Whole (P N)) (uQ : ∀ N → Whole (Q N)) where
 
   module R = Rel R
 
@@ -207,10 +243,10 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
   ... | e₁ , y₁ , eq = e₁ , tr-scan→ (scanIE f) z* (Q N) y₁ , eq
 
   sc-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
-  sc-bounded  = scan-bounded f z P R.bounded
+  sc-bounded  = scan-bounded f z P uP R.bounded
 
   sc-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
-  sc-bounded* = map-bounded proj₂ S* (scan-bounded (scanIE f) z* Q R.bounded*)
+  sc-bounded* = map-bounded proj₂ S* (scan-bounded (scanIE f) z* Q uQ R.bounded*)
 
   -- One cut.
   module At (N : ℕ) where
@@ -533,7 +569,7 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
       pin-sc : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → (∀ {l r} → t l (pin r) → T (inside r l)) → T (inside r l)
       pin-sc (spin x) pi = pi x
 
-scan-tab : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s*
+scan-tab : ∀ {A B} (f : B → A → B) (z : B) {P Q s s*} → Rel P Q s s* → (∀ N → Whole (P N)) → (∀ N → Whole (Q N))
          → Rel (λ N → bind (P N) λ l → just (scanRows f z l))
                (λ N → bind (bind (Q N) λ l → just (scanRows (scanIE f) (z , marked begin) l)) λ l → just (Tb.mapRows proj₂ l)) s s*
-scan-tab f z R = ScanTab.rel′ f z R
+scan-tab f z R uP uQ = ScanTab.rel′ f z R uP uQ

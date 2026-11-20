@@ -21,19 +21,20 @@ open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Maybe using (just; nothing)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; ix; _⊕_)
-open import denotation.Events using (Timeline)
-open import denotation.EmissionSet using (EmissionSet)
+open import denotation.Events using (Timeline; timelineAt; start)
+open import denotation.EmissionSet using (EmissionSet; Ev; InE)
+open import denotation.Laws.ColdInv using (depth)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableKit using (TR)
-open import simultaneous.Horizon using (Tag; module SpinB; module TakeBd; module ConnBd)
+open import simultaneous.Horizon using (Tag; free; module SpinB; module TakeBd; module ConnBd)
 open import simultaneous.HorizonJoin using (module JoinBd)
 
 ------------------------------------------------------------------------
@@ -75,14 +76,16 @@ JoinBdT = ∀ {A B : Set} → Pos
         → ℕ → Pos → Tag → Set
 
 postulate
-  -- A COLD'S BOUNDARIES: where its listing stopped short of its timeline.
-  cold-bd : ∀ {A} → Timeline A → Pos → ℕ → Pos → Tag → Set
-
   -- THE OTHER JOINS' BOUNDARIES: the outer's, and each running lane's
   -- before the lane's cut, by each policy's running and cutting.
   cc-bd : ℕ → JoinBdT
   sw-bd : JoinBdT
   ex-bd : JoinBdT
+
+-- A COLD'S BOUNDARY at `N`: the row its listing at `N` stops short of,
+-- the stream's next.
+cold-bd : ∀ {A} → Timeline A → Pos → ℕ → Pos → Tag → Set
+cold-bd {A} c p N b g = g ≡ free × Σ (Ev A) λ e → Σ (InE (start p (timelineAt c p)) b e) λ x → depth x ≡ 3 + N
 
 -- A MERGE'S BOUNDARIES: its outer's, and every value's lane's, subscribed
 -- under the value's row.
