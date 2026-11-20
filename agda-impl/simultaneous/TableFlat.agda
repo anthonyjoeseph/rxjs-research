@@ -160,7 +160,7 @@ unpin-pin ks (just Lx) {k} (_ , refl , x) k∈ =
 unpin-pin ks nothing (_ , () , _)
 
 unpin-pin← : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k r} → TR m k (pin r) → ¬ k ∈ ks → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k (pin r)
-unpin-pin← ks (just Lx) (_ , refl , x) nk = unpinAt ks Lx , refl , filt-keep (keepRow ks) (rows Lx) x (keep-out ks nk)
+unpin-pin← {X} ks (just Lx) {k} {r} (_ , refl , x) nk = unpinAt ks Lx , refl , filt-keep (keepRow ks) (rows Lx) x (keep-out {X} ks {k} {r} nk)
 
 in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
 in-if true  Q t e = t refl
