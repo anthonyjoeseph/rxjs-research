@@ -37,12 +37,11 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 A skip put rather than imaged lies over no elaborated boundary
 (`Rel.skip-off*`); an imaged one's image is a row, which does not. Open:
 that a bounded merge hangs only where its outer or a lane does, its
-boundaries opaque; and every other former that puts, where every row is
-a put at its own image. Settled by bodies, or a put skip's image over a
-boundary.
+boundaries opaque; and the share's, whose elaborated flatMap hangs also
+where its source does, outside the body. Settled by bodies, or a put
+skip's image over a boundary.
 
-Members: `cc-bd-src`, `ct-put-off*`, `sr-put-off*`,
-`mg-put-off*`, `cc-put-off*`, `sw-put-off*`, `ex-put-off*`.
+Members: `cc-bd-src`, `sr-put-off*`.
 
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
@@ -193,7 +192,7 @@ The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-in-bk`, `sw-after-φ`.
+Members: `sw-corr`, `sw-in-bk`, `sw-after-φ`, `sw-img`.
 
 #### THE EXHAUST
 
@@ -202,7 +201,7 @@ exhaust runs. Untried: the elaborated exhaust runs the same lanes,
 though its lanes end at their end images. Settled by bodies, or a value
 run on one side only.
 
-Members: `ex-corr`, `ex-in-bk`, `ex-after-φ`.
+Members: `ex-corr`, `ex-in-bk`, `ex-after-φ`, `ex-img`.
 
 #### THE BOUNDED MERGE
 
@@ -211,7 +210,7 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-in-bk`, `cc-after-φ`.
+Members: `cc-corr`, `cc-in-bk`, `cc-after-φ`, `cc-img`.
 
 #### THE PLAIN MERGE
 

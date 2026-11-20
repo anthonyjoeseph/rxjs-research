@@ -179,9 +179,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         mg-in-bk       : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → k ∈ bk′ N (φ′ N k)
         mg-after-φ     : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → c₁ ≼ φ′ N k
-        -- a skip the merge puts lies over no boundary of the elaborated
-        -- merge
-        mg-put-off*    : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ nothing) N b g → ¬ φ′ N y ⊑ b
 
       -- THE MERGE'S HANGS: its outer's boundaries, and each running
       -- lane's; each partnered with its image's.  The merge is the join of
@@ -383,6 +380,11 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- No merge row lies over a connect a boundary waits on: the
       -- boundary lies under it, and no row over the boundary.
+      -- A put skip is imaged as any row is, at a row of the elaborated
+      -- merge, so over no boundary.
+      mg-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ nothing) N b g → ¬ φ′ N y ⊑ b
+      mg-put-off* {N} x nl _ b₀ = mg-gap* b₀ (proj₂ (mg-img N (skip , merge-tr→ n f s uρ p (pd-sub {mergeᶠ nothing} {N} x) , tt , nl)))
+
       mg-held : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
       mg-held {N} b₀ y yr = mg-gap b₀ y (⊑-trans yr (Cuts.Bounded.held-under (jtree (mergeᶠ nothing)) b₀))
 
@@ -523,7 +525,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         cc-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ (just k)) N) (jbd* (mergeᶠ (just k)) N)
         cc-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd (mergeᶠ (just k))) (jbd* (mergeᶠ (just k)))
-        cc-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ (just k)) N b g → ¬ φ′ N y ⊑ b
+        -- every row not late imaged at a row of the elaborated join
+        cc-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      cc-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ (just k)) N b g → ¬ φ′ N y ⊑ b
+      cc-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ (just k))) b₀ (proj₂ (cc-img _ (skip , x , tt , nl))))
 
       cc-got : ∀ N → Got (P′ N)
       cc-got N = pd-got (mergeᶠ (just k)) N
@@ -575,7 +582,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         sw-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd switchᶠ N) (jbd* switchᶠ N)
         sw-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd switchᶠ) (jbd* switchᶠ)
-        sw-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* switchᶠ N b g → ¬ φ′ N y ⊑ b
+        -- every row not late imaged at a row of the elaborated join
+        sw-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      sw-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* switchᶠ N b g → ¬ φ′ N y ⊑ b
+      sw-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* switchᶠ) b₀ (proj₂ (sw-img _ (skip , x , tt , nl))))
 
       sw-got : ∀ N → Got (P′ N)
       sw-got N = pd-got (switchᶠ) N
@@ -629,7 +641,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         ex-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd exhaustᶠ N) (jbd* exhaustᶠ N)
         ex-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd exhaustᶠ) (jbd* exhaustᶠ)
-        ex-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* exhaustᶠ N b g → ¬ φ′ N y ⊑ b
+        -- every row not late imaged at a row of the elaborated join
+        ex-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      ex-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* exhaustᶠ N b g → ¬ φ′ N y ⊑ b
+      ex-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* exhaustᶠ) b₀ (proj₂ (ex-img _ (skip , x , tt , nl))))
 
       ex-got : ∀ N → Got (P′ N)
       ex-got N = pd-got (exhaustᶠ) N

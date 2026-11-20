@@ -31,6 +31,7 @@ open import Data.Empty using (⊥)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst)
 open import Relation.Nullary using (¬_; does)
@@ -417,9 +418,11 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       -- THE CONNECT'S HANGS ACROSS CUTS: its body's and its source's, as
       -- at one cut.
       ct-across : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
-      -- a skip the connect puts lies over no boundary of the elaborated
-      -- connect
-      ct-put-off* : ∀ {N k l b g} → TR (P N) k skip → ¬ Late′ N k → Put′ N k l → ct-bd* N b g → ¬ φ′ N k ⊑ b
+
+    -- A put skip is imaged as any row is, at a row of the elaborated
+    -- connect, so over no boundary.
+    ct-put-off* : ∀ {N k l b g} → TR (P N) k skip → ¬ Late′ N k → Put′ N k l → ct-bd* N b g → ¬ φ′ N k ⊑ b
+    ct-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap CB*.bounded b₀ (proj₂ (ct-img (skip , ct-conn→ x , tt , nl))))
 
     ct-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Late′ N)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (ct-bd N) (ct-bd* N)
     ct-bcorr N = Sub.restrict
