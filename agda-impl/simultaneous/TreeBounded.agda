@@ -17,30 +17,33 @@
 -- the two are one recursion, the hot's on the same tree, the theorem's
 -- on a smaller.
 --
--- A source's boundaries past its subscription (`src-after`, `src-held`)
--- are owed of every tree, a hot's reader among them, whose boundaries
--- are its hot's and may precede it.
+-- A source's boundaries lie before its connect or past its subscription
+-- (`src-out`), never under the connect short of the source.  Not all
+-- past it: a reader in a lane under a late row of its hot keeps every
+-- boundary of the hot, a running lane's tick before that row among them.
 module simultaneous.TreeBounded where
 
+open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap;
+  connect; connected; defer)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; on-out; module Connecting)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
@@ -59,9 +62,10 @@ open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableEnv using (Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
-  Admits; admits-at; admits-step; den-cons; tab-func; tab-flat; pin-ok)
+  Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded; bounded-≃)
 open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU; bd; cold-bd)
+open import simultaneous.HorizonJoin using (module MergeJ; module MergeB)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
 
@@ -94,22 +98,32 @@ postulate
   conn-tr← : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
            → Connecting.ConnT p (Cut n s ρ (p ⊕ [ ix 1 ]) N) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]) N) y e → Cut n (connect s b) ρ p N y e
 
+  -- A MERGE'S TABLE is the merge of its parts'.
+  merge-tr→ : ∀ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
+            → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e
+  merge-tr← : ∀ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N y e}
+            → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e
+
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
-    -- A SOURCE'S BOUNDARIES lie past its subscription, and so do the
-    -- connects its held ones wait on.
-    src-after : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → (p ⊕ [ ix 1 ]) ≺ b
-    src-held  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
+    -- A SOURCE'S BOUNDARIES lie before its connect or past its
+    -- subscription, and a held one in its burst waits on a connect there.
+    src-out  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
+    src-held : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
 
     -- A SOURCE'S BOUNDARIES lie apart from the late end of any reader its
     -- hot's rows admit, subscribed at or past the connect's body.
     src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
               → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
 
-    -- A JOIN'S CUTS: its outer's boundaries, and each running lane's
-    -- before the lane's cut.
-    join-bounded : ∀ {A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-                 → Cuts.Bounded (Cut n (flatMap op f s) ρ p) (bd n (flatMap op f s) ρ uρ (dbd D) p)
+    -- THE OTHER JOINS' CUTS: the outer's boundaries, and each running
+    -- lane's before the lane's cut.
+    cc-bounded : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+               → Cuts.Bounded (Cut n (flatMap (mergeᶠ (just k)) f s) ρ p) (bd n (flatMap (mergeᶠ (just k)) f s) ρ uρ (dbd D) p)
+    sw-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+               → Cuts.Bounded (Cut n (flatMap switchᶠ f s) ρ p) (bd n (flatMap switchᶠ f s) ρ uρ (dbd D) p)
+    ex-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+               → Cuts.Bounded (Cut n (flatMap exhaustᶠ f s) ρ p) (bd n (flatMap exhaustᶠ f s) ρ uρ (dbd D) p)
 
     -- A DEFER'S CUTS: its marker under its first label, apart from every
     -- boundary of its body, subscribed one label down.
@@ -178,7 +192,15 @@ mutual
         (λ N → failed? i q (listC (3 + N) n s (ρ N) p))
         (λ N w → keys (listC (3 + N) n s (ρ N) p) , λ x _ → in-keys x)
         (tree-bounded n s ρ uρ D p a))
-  tree-bounded n       (flatMap op f s)  ρ uρ D p a = join-bounded ρ uρ D n op f s p a
+  tree-bounded n (flatMap (mergeᶠ nothing) f s) ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → merge-tr← n f s uρ p {N} {y} {e}) (λ {N} {y} {e} → merge-tr→ n f s uρ p {N} {y} {e})
+      (MergeB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+        (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
+        (λ {N} {q} {v} x → tree-bounded n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x))
+        (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l))
+  tree-bounded n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = cc-bounded ρ uρ D n k f s p a
+  tree-bounded n (flatMap switchᶠ f s)           ρ uρ D p a = sw-bounded ρ uρ D n f s p a
+  tree-bounded n (flatMap exhaustᶠ f s)          ρ uρ D p a = ex-bounded ρ uρ D n f s p a
   tree-bounded n       (connect s b)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} → conn-tr← n s b uρ p {N} {y} {e}) (λ {N} {y} {e} → conn-tr→ n s b uρ p {N} {y} {e})
       (ConnB.bounded p (Cut n s ρ (p ⊕ [ ix 1 ])) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]))
@@ -186,8 +208,9 @@ mutual
         (bd n b (bodyρ n s uρ p) (bodyU n s uρ p) (dbd (den-cons (listHot n s uρ D p a) D)) (p ⊕ [ ix 0 ]))
         (tree-bounded n s ρ uρ D (p ⊕ [ ix 1 ]) (admits-step D a))
         (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (den-cons (listHot n s uρ D p a) D) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
-        (λ {N} {b′} {g} → src-after ρ uρ D n s p a {N} {b′} {g})
-        (λ {N} {b′} {q} → src-held ρ uρ D n s p a {N} {b′} {q}))
+        (λ {N} {b′} {g} → src-out ρ uρ D n s p a {N} {b′} {g})
+        (λ {N} {b′} {q} → src-held ρ uρ D n s p a {N} {b′} {q})
+        (λ {N} {c} x → ≺-≼-≺ {p} {p ⊕ [ ix 0 ]} {c} (≺-ext p []) (after-ok (3 + N) n b (p ⊕ [ ix 0 ]) x)))
   tree-bounded n       (connected i)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
               (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })

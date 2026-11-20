@@ -20,10 +20,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Maybe using (just; nothing)
 open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Tree using (Obs; FlatOp; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (EmissionSet)
@@ -32,6 +34,7 @@ open import quickcheck.Tabled using (hotOf)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv)
 open import simultaneous.TableKit using (TR)
 open import simultaneous.Horizon using (Tag; module SpinB; module TakeBd; module ConnBd)
+open import simultaneous.HorizonJoin using (module JoinBd)
 
 ------------------------------------------------------------------------
 -- A program's cuts
@@ -63,16 +66,34 @@ _∷ᵇ_ : ∀ {Γ} {A : Set} → (ℕ → Pos → Tag → Set) → BdEnv Γ →
 (B ∷ᵇ β) (here refl) = B
 (B ∷ᵇ β) (there i)   = β i
 
+-- A join's boundaries, from its outer's cuts and boundaries and each
+-- lane's, by the lane's value and subscription.
+JoinBdT : Set₁
+JoinBdT = ∀ {A B : Set} → Pos
+        → (ℕ → EmissionSet A) → (ℕ → Pos → Tag → Set)
+        → (A → Pos → ℕ → EmissionSet B) → (A → Pos → ℕ → Pos → Tag → Set)
+        → ℕ → Pos → Tag → Set
+
 postulate
   -- A COLD'S BOUNDARIES: where its listing stopped short of its timeline.
   cold-bd : ∀ {A} → Timeline A → Pos → ℕ → Pos → Tag → Set
 
-  -- A JOIN'S BOUNDARIES: its outer's, and each running lane's before the
-  -- lane's cut.
-  join-bd : ∀ {A B : Set} → FlatOp → Pos
-          → (ℕ → EmissionSet A) → (ℕ → Pos → Tag → Set)
-          → (A → Pos → ℕ → EmissionSet B) → (A → Pos → ℕ → Pos → Tag → Set)
-          → ℕ → Pos → Tag → Set
+  -- THE OTHER JOINS' BOUNDARIES: the outer's, and each running lane's
+  -- before the lane's cut, by each policy's running and cutting.
+  cc-bd : ℕ → JoinBdT
+  sw-bd : JoinBdT
+  ex-bd : JoinBdT
+
+-- A MERGE'S BOUNDARIES: its outer's, and every value's lane's, subscribed
+-- under the value's row.
+merge-bd : JoinBdT
+merge-bd p o Bdo L BdL N = JoinBd.JBd (o N) (λ _ → ⊤) (λ _ _ → ⊥) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
+
+join-bd : FlatOp → JoinBdT
+join-bd (mergeᶠ nothing)  = merge-bd
+join-bd (mergeᶠ (just k)) = cc-bd k
+join-bd switchᶠ           = sw-bd
+join-bd exhaustᶠ          = ex-bd
 
 -- A TREE'S BOUNDARIES, subscribed at `p` in a scope of hots.
 bd : ∀ {Γ A} → ℕ → (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ N)) → BdEnv Γ → Pos → ℕ → Pos → Tag → Set

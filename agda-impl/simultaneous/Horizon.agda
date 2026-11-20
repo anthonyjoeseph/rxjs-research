@@ -470,8 +470,7 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
 ------------------------------------------------------------------------
 -- A connect's cuts
 
--- The source's boundaries lie in its world, past its subscription, and so
--- do the connects its held ones wait on.
+-- A connect keeps a boundary as it keeps its hang's rows.
 module ConnBd {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set) where
 
   r : Pos
@@ -494,8 +493,9 @@ module ConnBd {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → E
 
 module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → EmissionSet B) (Bdσ Bdβ : ℕ → Pos → Tag → Set)
   (Bσ : Cuts.Bounded σ Bdσ) (Bβ : Cuts.Bounded β Bdβ)
-  (σ-after : ∀ {N b g} → Bdσ N b g → (p ⊕ [ ix 1 ]) ≺ b)
-  (σ-held : ∀ {N b q} → Bdσ N b (held q) → (p ⊕ [ ix 1 ]) ≼ q)
+  (σ-out : ∀ {N b g} → Bdσ N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b)
+  (σ-held : ∀ {N b q} → Bdσ N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q)
+  (β-after : ∀ {N c} → β N c end → p ≺ c)
   where
 
   open ConnBd p σ β Bdσ Bdβ public
@@ -525,6 +525,18 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   ... | inj₁ cw = al (proj₁ (upto ag {c} {end} cw) x)
   ... | inj₂ wc = ≼-≺-≺ {z} {w} {c} zw wc
 
+  not-burst : ∀ {b} → b ≺ p → T (not (inside r b))
+  not-burst {b} bp = not-T (λ ins → ≺-absurd {b} {p} bp (≺-≼-≺ {p} {r} {b} (≺-ext p []) (⊑-≼ (inside-⊑ r b ins))))
+
+  alive-early : ∀ {N z} → z ≺ p → Al N z
+  alive-early {N} {z} zp x = ≺-trans {z} {p} zp (β-after x)
+
+  -- A source boundary before the connect is the connect's: the body,
+  -- subscribed past it, is alive there.
+  early : ∀ {N b g} → Bdσ N b g → b ≺ p → Σ Tag (CBd N b)
+  early {N} {b} {free}   bd bp = free , echoB bd (not-burst bp) (alive-early {N} {b} bp)
+  early {N} {b} {held q} bd bp = held q , keptB bd (not-burst bp) (alive-early {N} {q} (≺-trans {q} {b} {p} (BS.held-in {N} {b} {q} bd) bp))
+
   -- Where the body is alive, the source is clear wherever the connect is.
   src-clear : ∀ {N z} → (∀ {b g} → CBd N b g → z ≺ b) → Al N z → Sσ.Clear N z
   src-clear {N} {z} H al {b} {g} bd with ≼-or-≻ b z
@@ -539,13 +551,16 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
       ... | yes ins  = held p , burstB bd′ ins
       ... | no nins  = held q , keptB bd′ (not-T nins) (alive-down {N} {z} {q} (≺→≼ {q} {z} (≺-≼-≺ {q} {b} {z} (BS.held-in {N} {b} {q} bd′) bz)) al)
 
-  -- In the burst, the source is clear wherever no burst boundary is.
-  src-burst : ∀ {N z} → (∀ {b g} → Bdσ N b g → T (inside r b) → z ≺ b) → T (inside r z) → Sσ.Clear N z
-  src-burst {N} {z} H insz {b} {g} bd with ≼-or-≻ b z
+  -- In the burst, the source is clear wherever no burst boundary is and
+  -- no boundary before the connect.
+  src-burst : ∀ {N z} → (∀ {b g} → Bdσ N b g → T (inside r b) → z ≺ b) → (∀ {b g} → Bdσ N b g → b ≺ p → z ≺ b) → T (inside r z) → Sσ.Clear N z
+  src-burst {N} {z} H E insz {b} {g} bd with ≼-or-≻ b z
   ... | inj₂ zb = zb
   ... | inj₁ bz with T? (inside r b)
   ...   | yes ins = ⊥-elim (bz (H {b} {g} bd ins))
-  ...   | no nins = past-sub (inside-⊑ r z insz) (≺→≼ {r} {b} (σ-after {N} {b} {g} bd)) (λ h → nins (⊑-inside h))
+  ...   | no nins with σ-out {N} {b} {g} bd
+  ...     | inj₁ bp = ⊥-elim (bz (E {b} {g} bd bp))
+  ...     | inj₂ rb = past-sub (inside-⊑ r z insz) (≺→≼ {r} {b} rb) (λ h → nins (⊑-inside h))
 
   -- CLEAR, SO SETTLED: the body by its own; each source row shown by the
   -- source clear there, or its pins clear.
@@ -559,7 +574,8 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
       below {z} zk {b} bd = ≺-trans {z} {k} {b} zk (cl bd)
 
       burst-ag : ∀ {k₀} → k₀ ≺ k → T (inside r k₀) → AgreeTo k₀ (σ N) (σ N′)
-      burst-ag {k₀} k0k ins = BS.fwd {N} {k₀} (src-burst {N} {k₀} (λ {b} bd ins′ → ≺-trans {k₀} {k} {b} k0k (cl (burstB bd ins′))) ins) le
+      burst-ag {k₀} k0k ins = BS.fwd {N} {k₀} (src-burst {N} {k₀} (λ {b} bd ins′ → ≺-trans {k₀} {k} {b} k0k (cl (burstB bd ins′)))
+        (λ {b} {g} bd bp → ≺-trans {k₀} {k} {b} k0k (cl (proj₂ (early {N} {b} {g} bd bp)))) ins) le
 
       held-all : ∀ {q} → Al N q → Sσ.HeldClear N q k
       held-all al {b} bd with T? (inside r b)
@@ -608,13 +624,14 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   ... | yes insb = ⊥-elim (T-not nins (⊑-inside (⊑-trans rq (inside-⊑ q k₀ ins))))
     where
       rq : r ⊑ q
-      rq = sub-between (inside-⊑ r b insb) (σ-held {N} {b} {q} bd) (≺→≼ {q} {b} (BS.held-in {N} {b} {q} bd))
+      rq = sub-between (inside-⊑ r b insb) (σ-held {N} {b} {q} bd insb) (≺→≼ {q} {b} (BS.held-in {N} {b} {q} bd))
 
   -- PINS OF `q` SETTLE: the body's by its own, the burst's by the source
   -- clear there, a kept one by the source's pins of `q`.
   module PinStep {N N′ : ℕ} (le : N ≤ N′) where
-    burst-ag : ∀ {k k₀} → SC.HeldClear N p k → (k₀ ⊕ [ ix 0 ]) ≼ k → T (inside r k₀) → AgreeTo k₀ (σ N) (σ N′)
-    burst-ag {k} {k₀} hq yk ins = BS.fwd {N} {k₀} (src-burst {N} {k₀} (λ {b} bd ins′ → ≺-trans {k₀} {k} {b} k0k (hq (burstB bd ins′))) ins) le
+    burst-ag : ∀ {k k₀} → SC.Clear N p → SC.HeldClear N p k → (k₀ ⊕ [ ix 0 ]) ≼ k → T (inside r k₀) → AgreeTo k₀ (σ N) (σ N′)
+    burst-ag {k} {k₀} cp hq yk ins = BS.fwd {N} {k₀} (src-burst {N} {k₀} (λ {b} bd ins′ → ≺-trans {k₀} {k} {b} k0k (hq (burstB bd ins′)))
+      (λ {b} {g} bd bp → ⊥-elim (≺-absurd {b} {p} bp (cp (proj₂ (early {N} {b} {g} bd bp))))) ins) le
       where
         k0k : k₀ ≺ k
         k0k = ≺-≼-≺ {k₀} {k₀ ⊕ [ ix 0 ]} {k} (≺-ext k₀ []) yk
@@ -630,14 +647,14 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
 
     pin-to : ∀ {q k y} → SC.Clear N q → SC.HeldClear N q k → y ≼ k → Cc N y (pin q) → Cc N′ y (pin q)
     pin-to {q} {k} cq hq yk (Connecting.body x) = Connecting.body (proj₁ (body-ag {q} {k} cq hq yk) x)
-    pin-to {k = k} cq hq yk (Connecting.burst {k₀} x ins) = Connecting.burst (proj₁ (upto (burst-ag {k} {k₀} hq yk ins) (≼-refl {k₀})) x) ins
+    pin-to {k = k} cq hq yk (Connecting.burst {k₀} x ins) = Connecting.burst (proj₁ (upto (burst-ag {k} {k₀} cq hq yk ins) (≼-refl {k₀})) x) ins
     pin-to {q} {k} cq hq yk (Connecting.kept {k₀} x al nins ins) =
       Connecting.kept (proj₁ (kept-ag {q} {k} {k₀} cq hq al nins ins {k₀} (≺→≼ {k₀} {k} (≺-≼-≺ {k₀} {k₀ ⊕ [ ix 0 ]} {k} (≺-ext k₀ []) yk))) x)
         (alive→ {N} {N′} {q} {q} (agβq {q} cq) (≼-refl {q}) al) nins ins
 
     pin-from : ∀ {q k y} → SC.Clear N q → SC.HeldClear N q k → y ≼ k → Cc N′ y (pin q) → Cc N y (pin q)
     pin-from {q} {k} cq hq yk (Connecting.body x) = Connecting.body (proj₂ (body-ag {q} {k} cq hq yk) x)
-    pin-from {k = k} cq hq yk (Connecting.burst {k₀} x ins) = Connecting.burst (proj₂ (upto (burst-ag {k} {k₀} hq yk ins) (≼-refl {k₀})) x) ins
+    pin-from {k = k} cq hq yk (Connecting.burst {k₀} x ins) = Connecting.burst (proj₂ (upto (burst-ag {k} {k₀} cq hq yk ins) (≼-refl {k₀})) x) ins
     pin-from {q} {k} cq hq yk (Connecting.kept {k₀} x al′ nins ins) =
       Connecting.kept (proj₂ (kept-ag {q} {k} {k₀} cq hq al nins ins {k₀} (≺→≼ {k₀} {k} (≺-≼-≺ {k₀} {k₀ ⊕ [ ix 0 ]} {k} (≺-ext k₀ []) yk))) x) al nins ins
       where

@@ -39,6 +39,7 @@ open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatM
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _⊕_)
 open import denotation.Events using (Timeline; From; fresh)
 open import denotation.EmissionSet using (Ev; end; EmissionSet; Unpinned; pin; _≺_; _≼_; module Connecting)
+open import denotation.Laws.Modulus using (≺-ext; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import denotation.Laws.Count using (under-guard)
 import quickcheck.Tabled as Tb
@@ -48,7 +49,7 @@ open import simultaneous.Listing using (UncutEnv; listC)
 open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; bounded-≃)
-open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-after; src-held)
+open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-out; src-held)
 open import simultaneous.HorizonTree using (bd)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
@@ -283,10 +284,10 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ct-ann-bounded* : Cuts.Bounded σc* ct-ann-bd*
     ct-ann-bounded* = tree-bounded n (annotate (elab ρι s)) ρ* uρ* (lw* env) (p* ⊕ [ ix 1 ]) (admits-step (lw* env) a*)
 
-    ct-ann-after* : ∀ {N b g} → ct-ann-bd* N b g → (p* ⊕ [ ix 1 ]) ≺ b
-    ct-ann-after* {N} {b} {g} = src-after ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {g}
+    ct-ann-out* : ∀ {N b g} → ct-ann-bd* N b g → b ≺ p* ⊎ (p* ⊕ [ ix 1 ]) ≺ b
+    ct-ann-out* {N} {b} {g} = src-out ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {g}
 
-    ct-ann-held* : ∀ {N b q} → ct-ann-bd* N b (held q) → (p* ⊕ [ ix 1 ]) ≼ q
+    ct-ann-held* : ∀ {N b q} → ct-ann-bd* N b (held q) → T (inside (p* ⊕ [ ix 1 ]) b) → (p* ⊕ [ ix 1 ]) ≼ q
     ct-ann-held* {N} {b} {q} = src-held ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {q}
 
     ct-conn→  : ∀ {N y e} → TR (P N) y e → Connecting.ConnT p (σc N) (βc N) y e
@@ -302,17 +303,24 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ct-conn*← {N} {y} {e} = conn-tr← n (annotate (elab ρι s)) (elab (ext ρι) b) uρ* p* {N} {y} {e}
 
     postulate
-      ct-src-after : ∀ {N b g} → Rel.Bd RS N b g → (p ⊕ [ ix 1 ]) ≺ b
-      ct-src-held  : ∀ {N b q} → Rel.Bd RS N b (held q) → (p ⊕ [ ix 1 ]) ≼ q
+      ct-src-out  : ∀ {N b g} → Rel.Bd RS N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
+      ct-src-held : ∀ {N b q} → Rel.Bd RS N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
+
+    -- The body's rows lie past the connect.
+    ct-body-after : ∀ {N c} → βc N c end → p ≺ c
+    ct-body-after {N} {c} x = ≺-≼-≺ {p} {p ⊕ [ ix 0 ]} {c} (≺-ext p []) (Rel.after Rb x)
+
+    ct-body-after* : ∀ {N c} → βc* N c end → p* ≺ c
+    ct-body-after* {N} {c} x = ≺-≼-≺ {p*} {p* ⊕ [ ix 0 ]} {c} (≺-ext p* []) (Rel.after* Rb x)
 
     module CB  = ConnB p σc βc (Rel.Bd RS) (Rel.Bd Rb) (Rel.bounded RS) (Rel.bounded Rb)
-      (λ {N} {b} {g} → ct-src-after {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q})
+      (λ {N} {b} {g} → ct-src-out {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q}) (λ {N} {c} → ct-body-after {N} {c})
     module CB* = ConnB p* σc* βc* ct-ann-bd* (Rel.Bd* Rb) ct-ann-bounded* (Rel.bounded* Rb)
-      (λ {N} {b} {g} → ct-ann-after* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q})
+      (λ {N} {b} {g} → ct-ann-out* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q}) (λ {N} {c} → ct-body-after* {N} {c})
     module CP (N : ℕ) = ConnPair N p p* σc βc (Rel.Bd RS) (Rel.Bd Rb) (Rel.bounded RS) (Rel.bounded Rb)
-      (λ {N} {b} {g} → ct-src-after {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q})
+      (λ {N} {b} {g} → ct-src-out {N} {b} {g}) (λ {N} {b} {q} → ct-src-held {N} {b} {q}) (λ {N} {c} → ct-body-after {N} {c})
       σc* βc* ct-ann-bd* (Rel.Bd* Rb) ct-ann-bounded* (Rel.bounded* Rb)
-      (λ {N} {b} {g} → ct-ann-after* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q})
+      (λ {N} {b} {g} → ct-ann-out* {N} {b} {g}) (λ {N} {b} {q} → ct-ann-held* {N} {b} {q}) (λ {N} {c} → ct-body-after* {N} {c})
       (λ _ → ⊥) (λ _ _ → ⊥) (φσ N) (Rel.φ Rb N) (φ′ N) (Rel.Late RS N) (Rel.Late Rb N) (Late′ N) (Pσ N) (Rel.Put Rb N) (Put′ N)
 
     -- WHAT THE PARTS OWE THE PAIR: the source's pair against the annotated
