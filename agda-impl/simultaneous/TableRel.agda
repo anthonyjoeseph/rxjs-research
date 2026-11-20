@@ -50,7 +50,7 @@ open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; �
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; module ConnBd; module TakeBd; bounded-≃)
 open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-out; src-held)
-open import simultaneous.HorizonTree using (bd)
+open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv
@@ -513,9 +513,9 @@ module ConnRel {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B
          (linked-r (linked-l lk (ix 0)) (ix 0))
 
 conn-rel : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Full n s → Full n b → Full n (connect s b)
-conn-rel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  out (C.conn-tab Rs Ob) (C.conn-order Rs Ob al lk) (cbd-map (Out.bd-pin Rs) (subst (λ β → SameBd (Rel.Bd (Out.rel Ob)) (bd n b CE.ρ′ CE.uρ′ β (p ⊕ [ ix 0 ]))) CE.D′-bd (Out.bd-pin Ob)))
-      (cbd-map same-bd (subst (λ β → SameBd (Rel.Bd* (Out.rel Ob)) (bd n (elab (ext ρι) b) CE.ρ*′ CE.uρ*′ β (p* ⊕ [ ix 0 ]))) CE.D*′-bd (Out.bd-pin* Ob)))
+conn-rel {Γ} {A} n s b Fs Fb ρ uρ {Δ} ρι ρ* uρ* env p p* a a* al lk =
+  out (C.conn-tab Rs Ob) (C.conn-order Rs Ob al lk) (cbd-map (Out.bd-pin Rs) (subst (λ (β : BdEnv (A ∷ Γ)) → SameBd (Rel.Bd (Out.rel Ob)) (bd n b CE.ρ′ CE.uρ′ β (p ⊕ [ ix 0 ]))) CE.D′-bd (Out.bd-pin Ob)))
+      (cbd-map same-bd (subst (λ (β : BdEnv (AIE A ∷ Δ)) → SameBd (Rel.Bd* (Out.rel Ob)) (bd n (elab (ext ρι) b) CE.ρ*′ CE.uρ*′ β (p* ⊕ [ ix 0 ]))) CE.D*′-bd (Out.bd-pin* Ob)))
   where open ConnRel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk
 
 -- Rows late alike on each branch of a test are late alike under it.
