@@ -303,12 +303,12 @@ record DenOf {Γ} (ρ : ℕ → All Tb.Listed Γ) : Set₁ where
     den-ex : ∀ N → EnvRel (ρ N) (den N)
     den-ok : ∀ N → GoodEnv (den N)
     lo     : List Pos
-    -- Each hot hangs at its own boundaries, each apart from the late end
-    -- of any reader admissibly subscribed.
+    -- Each hot hangs at its own boundaries, none led by the late end of
+    -- a reader admissibly subscribed.
     dbd      : BdEnv Γ
     dbounded : ∀ {X : Set} (i : X ∈ Γ) → Cuts.Bounded (λ N → Rows (lookup (ρ N) i)) (dbd i)
     dapart   : ∀ {X : Set} (i : X ∈ Γ) {p} → Ok (λ h → Σ ℕ λ N → Hots (den N) h) p → All (_≼ p) lo
-             → ∀ {N b g} → dbd i N b g → ¬ b ⊑ (p ⊕ [ last ]) × ¬ (p ⊕ [ last ]) ⊑ b
+             → ∀ {N b g} → dbd i N b g → ¬ (p ⊕ [ last ]) ⊑ b
 open DenOf public
 
 -- More hot rows, the world no smaller.
@@ -389,7 +389,7 @@ admits-row n o u D {q} a {N} {k} x =
   where I = tab-at n o u D a N
 
 -- A hot listed exactly off a lawful emission set, hanging at its own
--- boundaries, each apart from the late end of any reader its rows admit.
+-- boundaries, none led by the late end of a reader its rows admit.
 record HotD {X : Set} (t : ℕ → Tb.Listed X) : Set₁ where
   constructor hotD
   field
@@ -400,7 +400,7 @@ record HotD {X : Set} (t : ℕ → Tb.Listed X) : Set₁ where
     hbd      : ℕ → Pos → Tag → Set
     hbounded : Cuts.Bounded (λ N → Rows (t N)) hbd
     hapart   : ∀ {p} → Ok (λ k → Σ ℕ λ N → Σ (Ev X) (hev N k)) p → hlo ≼ p
-             → ∀ {N b g} → hbd N b g → ¬ b ⊑ (p ⊕ [ last ]) × ¬ (p ⊕ [ last ]) ⊑ b
+             → ∀ {N b g} → hbd N b g → ¬ (p ⊕ [ last ]) ⊑ b
 open HotD public
 
 den-cons : ∀ {Γ X} {t : ℕ → Tb.Listed X} {ρ : ℕ → All Tb.Listed Γ} → HotD t → DenOf ρ → DenOf (λ N → t N ∷ ρ N)
@@ -413,7 +413,7 @@ den-cons {t = t} {ρ = ρ} h D =
     db (there i)   = dbounded D i
 
     da : ∀ {Y : Set} (i : Y ∈ _ ∷ _) {p} → Ok (λ k → Σ ℕ λ N → Hots (ES.hot (hev h N) ∷ den D N) k) p → All (_≼ p) (hlo h ∷ lo D)
-       → ∀ {N b g} → (hbd h ∷ᵇ dbd D) i N b g → ¬ b ⊑ (p ⊕ [ last ]) × ¬ (p ⊕ [ last ]) ⊑ b
+       → ∀ {N b g} → (hbd h ∷ᵇ dbd D) i N b g → ¬ (p ⊕ [ last ]) ⊑ b
     da (here refl) o (lp ∷ _)  {N} {b} {g} = hapart h (ok-mono (λ { (M , e) → M , inj₁ e }) o) lp {N} {b} {g}
     da (there i)   o (_ ∷ fp)  {N} {b} {g} = dapart D i (ok-mono (λ { (M , hh) → M , inj₂ hh }) o) fp {N} {b} {g}
 

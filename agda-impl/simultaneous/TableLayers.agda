@@ -332,7 +332,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- A put skip is imaged as any row is, so over no boundary.
     sr-put-off* : ∀ {N k l b g} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → sr-bd* N b g → ¬ φ′ N k ⊑ b
-    sr-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap sr-bounded* b₀ (proj₂ (sr-img _ (skip , x , tt , nl))))
+    sr-put-off* x nl _ b₀ = Cuts.Bounded.gap sr-bounded* b₀ (proj₂ (sr-img _ (skip , x , tt , nl)))
 
     sr-got : ∀ N → Got (P′ N)
     sr-got N = got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p

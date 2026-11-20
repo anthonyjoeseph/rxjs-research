@@ -50,7 +50,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable.Core using (T?)
 
@@ -87,14 +87,9 @@ sub-between {b} {y} {q} by bq qy with T? (inside b q)
 past-child : ∀ {o b} l → o ≺ b → ¬ o ⊑ b → (o ⊕ [ l ]) ≺ b
 past-child {o} {b} l lt nsub = Equivalence.from T-≡ (<ᵖ-apart o b [ l ] (Equivalence.to T-≡ lt) (λ ys eq → nsub (ys , eq)))
 
--- Apart from a position: apart from its children.
-under-child : ∀ {b q} l → ¬ b ⊑ q × ¬ q ⊑ b → ¬ b ⊑ (q ⊕ [ l ]) × ¬ (q ⊕ [ l ]) ⊑ b
-under-child {b} {q} l (nbq , nqb) = up , λ h → nqb (⊑-trans (⊑-snoc⁺ q) h)
-  where
-    up : ¬ b ⊑ (q ⊕ [ l ])
-    up h with ⊑-snoc q h
-    ... | inj₁ h′ = nbq h′
-    ... | inj₂ eq = nqb (subst (q ⊑_) (sym eq) (⊑-snoc⁺ q))
+-- Leading no position: nor do its children.
+under-child : ∀ {b q} l → ¬ q ⊑ b → ¬ (q ⊕ [ l ]) ⊑ b
+under-child {b} {q} l nqb h = nqb (⊑-trans (⊑-snoc⁺ q) h)
 
 not-T : ∀ {x} → ¬ T x → T (not x)
 not-T {false} _ = tt
@@ -171,15 +166,13 @@ module Cuts {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → 
 
   record Bounded : Set where
     field
-      gap     : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b
+      -- a row leads no boundary
+      gap     : ∀ {N b g y e} → Bd N b g → c N y e → ¬ y ⊑ b
       held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b
       -- a held boundary lies under the connect holding it
       held-under : ∀ {N b q} → Bd N b (held q) → q ⊑ b
       fwd     : ∀ {N k} → Clear N k → Settled N k
       fwd-pin : ∀ {N q k} → Clear N q → HeldClear N q k → PinSettled N q k
-
-    off-row : ∀ {N k e} → c N k e → Off N k
-    off-row x bd = proj₁ (gap bd x)
 
 -- A cut that never moves hangs nowhere.
 const-bounded : ∀ {A} (t : EmissionSet A) → Cuts.Bounded (λ _ → t) (λ _ _ _ → ⊥)
@@ -204,8 +197,9 @@ bounded-≃ {c = c} {c′} to from B = record
 module Settle {A : Set}
   (c : ℕ → EmissionSet A) (d : ℕ → EmissionSet (IE A)) (Bd Bd* : ℕ → Pos → Tag → Set)
   (B : Cuts.Bounded c Bd) (B* : Cuts.Bounded d Bd*)
-  -- the closed programs' boundaries are real
+  -- the closed programs' boundaries are real, and over no row
   (R : Cuts.Real c Bd) (R* : Cuts.Real d Bd*)
+  (off : ∀ {N k e} → c N k e → Cuts.Off c Bd N k) (off* : ∀ {N k e} → d N k e → Cuts.Off d Bd* N k)
   (φ : ℕ → Pos → Pos) (Put : ℕ → Pos → Pos → Set) (Late : ℕ → Pos → Set)
   -- clearness corresponds at one cut
   (clear→ : ∀ {N k e} → c N k e → Unpinned e → ¬ Late N k → Cuts.Clear c Bd N k → Cuts.Clear d Bd* N (φ N k))
@@ -218,14 +212,14 @@ module Settle {A : Set}
   module EB = E.Bounded B*
 
   settle→ : ∀ {N k e} → c N k e → Unpinned e → ¬ Late N k → P.Settled N k → E.Settled N (φ N k)
-  settle→ x un nl st = EB.fwd (clear→ x un nl (P.clear R (PB.off-row x) st))
+  settle→ x un nl st = EB.fwd (clear→ x un nl (P.clear R (off x) st))
 
   settle← : ∀ {N k e e′} → c N k e → Unpinned e → ¬ Late N k → d N (φ N k) e′ → E.Settled N (φ N k) → P.Settled N k
-  settle← x un nl y st = PB.fwd (clear← x un nl (E.clear R* (EB.off-row y) st))
+  settle← x un nl y st = PB.fwd (clear← x un nl (E.clear R* (off* y) st))
 
   -- A late skip or a pin, on its placement.
   settle-put : ∀ {N k e l} → c N k e → Put N k l → P.Settled N k → E.Settled N l
-  settle-put x pl st = EB.fwd (clear-put x pl (P.clear R (PB.off-row x) st))
+  settle-put x pl st = EB.fwd (clear-put x pl (P.clear R (off x) st))
 
 ------------------------------------------------------------------------
 -- A spin
@@ -247,15 +241,10 @@ module SpinB {X : Set} (p : Pos) where
     tick-ne : ∀ {N i} → i < 3 + N → ¬ (p ⊕ [ ix (3 + N) ]) ≡ p ⊕ [ ix i ]
     tick-ne lt eq = <-irrefl (sym (ix-inj (step-inj p eq))) lt
 
-  gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b
+  gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ y ⊑ b
   gap {N} (refl , refl) x with sp→ x
-  ... | i , lt , refl , refl = up , down
+  ... | i , lt , refl , refl = down
     where
-      up : ¬ (p ⊕ [ ix (3 + N) ]) ⊑ (p ⊕ [ ix i ])
-      up h with ⊑-snoc p h
-      ... | inj₁ h′ = no-up h′
-      ... | inj₂ eq = tick-ne lt eq
-
       down : ¬ (p ⊕ [ ix i ]) ⊑ (p ⊕ [ ix (3 + N) ])
       down h with ⊑-snoc p h
       ... | inj₁ h′ = no-up h′
@@ -311,7 +300,6 @@ module TakeBd {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionS
   Bd′ N b g = Bd N b g × Keep N b g
 
 module TakeClear {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set)
-  (gap : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b)
   (held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b) where
 
   open TakeBd incl keep c Bd public
@@ -353,7 +341,7 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
 
   open Take incl keep
   module CB = Cuts.Bounded B
-  open TakeClear incl keep c Bd CB.gap CB.held-in public
+  open TakeClear incl keep c Bd CB.held-in public
 
   Tk : ℕ → EmissionSet A
   Tk N = TakeWhile.TakeT incl keep (c N)
@@ -376,18 +364,10 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
     only-left {f = f} xf nk nF ly (W.stop xo nko nFo) with One.first-uniq R xf nk nF xo nko nFo
     ... | refl = ⊥-elim (≼-last {f} (inj₂ refl) ly)
 
-  gap′ : ∀ {N b g y e} → Bd′ N b g → Tk N y e → ¬ b ⊑ y × ¬ y ⊑ b
+  gap′ : ∀ {N b g y e} → Bd′ N b g → Tk N y e → ¬ y ⊑ b
   gap′ {N} {b} (bd , _) tk with One.from (run N) tk
   ... | One.self x _ = CB.gap bd x
-  ... | One.new {o} x _ _ (l , refl , _) = up , down
-    where
-      up : ¬ b ⊑ (o ⊕ [ l ])
-      up h with ⊑-snoc o h
-      ... | inj₁ h′ = proj₁ (CB.gap bd x) h′
-      ... | inj₂ eq = proj₂ (CB.gap bd x) (subst (o ⊑_) (sym eq) (⊑-snoc⁺ o))
-
-      down : ¬ (o ⊕ [ l ]) ⊑ b
-      down h = proj₂ (CB.gap bd x) (⊑-trans (⊑-snoc⁺ o) h)
+  ... | One.new {o} x _ _ (l , refl , _) = under-child l (CB.gap bd x)
 
   held-in′ : ∀ {N b q} → Bd′ N b (held q) → q ≺ b
   held-in′ (bd , _) = CB.held-in bd
@@ -677,7 +657,7 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   fwd-pin {N} {q} {k} cq hq {N′} le {y} yk = PinStep.pin-to le {q} {k} {y} cq hq yk , PinStep.pin-from le {q} {k} {y} cq hq yk
 
   postulate
-    gap-c  : ∀ {N b g y e} → CBd N b g → Cc N y e → ¬ b ⊑ y × ¬ y ⊑ b
+    gap-c  : ∀ {N b g y e} → CBd N b g → Cc N y e → ¬ y ⊑ b
 
   bounded : SC.Bounded
   bounded = record { gap = gap-c ; held-in = held-in ; held-under = held-under ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
@@ -688,9 +668,9 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
 -- A reader subscribed at `s` keeps every boundary of the hot with its
 -- tag: the hot's pins are skips to it, but a held hang sits in a call
 -- the reader cannot interrupt.  The hot's boundaries lie in its own
--- world, apart from the reader's late end.
+-- world, led by no reader's late end.
 module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Pos → Tag → Set) (Bh : Cuts.Bounded h Bdh)
-  (apart-s : ∀ {N b g} → Bdh N b g → ¬ b ⊑ (s ⊕ [ last ]) × ¬ (s ⊕ [ last ]) ⊑ b)
+  (apart-s : ∀ {N b g} → Bdh N b g → ¬ (s ⊕ [ last ]) ⊑ b)
   where
 
   J : ℕ → EmissionSet A
@@ -699,15 +679,15 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
   JBd : ℕ → Pos → Tag → Set
   JBd = Bdh
 
-  under : ∀ {b q} → ¬ b ⊑ q × ¬ q ⊑ b → ¬ b ⊑ (q ⊕ [ sub s ]) × ¬ (q ⊕ [ sub s ]) ⊑ b
+  under : ∀ {b q} → ¬ q ⊑ b → ¬ (q ⊕ [ sub s ]) ⊑ b
   under = under-child (sub s)
 
   module H  = Cuts h Bdh
   module SJ = Cuts J JBd
   module BH = H.Bounded Bh
 
-  -- A hot row is under no boundary, nor a boundary under it.
-  gap-j : ∀ {N b g y e} → JBd N b g → J N y e → ¬ b ⊑ y × ¬ y ⊑ b
+  -- A hot row leads no boundary.
+  gap-j : ∀ {N b g y e} → JBd N b g → J N y e → ¬ y ⊑ b
   gap-j bd (shown x _ _) = under (BH.gap bd x)
   gap-j bd (heard x _)   = under (BH.gap bd x)
   gap-j bd (ended x _)   = under (BH.gap bd x)

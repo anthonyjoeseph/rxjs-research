@@ -424,7 +424,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     -- A put skip is imaged as any row is, at a row of the elaborated
     -- connect, so over no boundary.
     ct-put-off* : ∀ {N k l b g} → TR (P N) k skip → ¬ Late′ N k → Put′ N k l → ct-bd* N b g → ¬ φ′ N k ⊑ b
-    ct-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap CB*.bounded b₀ (proj₂ (ct-img (skip , ct-conn→ x , tt , nl))))
+    ct-put-off* x nl _ b₀ = Cuts.Bounded.gap CB*.bounded b₀ (proj₂ (ct-img (skip , ct-conn→ x , tt , nl)))
 
     ct-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Late′ N)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (ct-bd N) (ct-bd* N)
     ct-bcorr N = Sub.restrict

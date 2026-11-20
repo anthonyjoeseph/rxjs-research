@@ -139,10 +139,10 @@ module ConnPair {A B X Y : Set} (N : ℕ) (p p* : Pos)
     open Inter.BCorrX Cβ renaming (to to toβ; from to fromβ)
 
     gapc : ∀ {b g y e} → P.CBd N b g → P.Cc N y e → ¬ y ⊑ b
-    gapc cb y = proj₂ (P.gap-c cb y)
+    gapc cb y = P.gap-c cb y
 
     gapc* : ∀ {b g y e} → E.CBd N b g → E.Cc N y e → ¬ y ⊑ b
-    gapc* cb y = proj₂ (E.gap-c cb y)
+    gapc* cb y = E.gap-c cb y
 
     -- A CONNECT ROW ORDERS AS ITS PART'S ROW.
     lift : ∀ {z z*} → Btw (Own (β N) Lβ) φβ z z* → Btw SrcRow φσ z z*

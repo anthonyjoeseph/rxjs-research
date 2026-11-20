@@ -300,7 +300,7 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   -- A failing value clear at `N`: so are the rows the take puts under it.
   made-clear : ∀ {N N′ o l a} → N ≤ N′ → TR (P N′) o (out a) → CP.Clear N o → CP.Clear N (o ⊕ [ l ])
   made-clear {N} {N′} {o} {l} le xo clo {b} bd =
-    past-child l (clo bd) (proj₂ (Cuts.Bounded.gap R.bounded bd (proj₂ (upto (Cuts.Bounded.fwd R.bounded {N} {o} clo le) (≼-refl {o})) xo)))
+    past-child l (clo bd) (Cuts.Bounded.gap R.bounded bd (proj₂ (upto (Cuts.Bounded.fwd R.bounded {N} {o} clo le) (≼-refl {o})) xo))
 
   back-clear′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ K.Late′ N′ k → TB*.Clear′ N (φ′ N′ k) → TB.Clear′ N k
   back-clear′ {N} {N′} {k} {e} le x un nl cl* with K.O.kind N′ (from x) un

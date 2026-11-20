@@ -211,9 +211,9 @@ private
   mk-from q (L , refl) (inj₁ (refl , refl)) = _ , refl , here refl
   mk-from q (L , refl) (inj₂ (_ , refl , x)) = _ , refl , there x
 
--- A marker apart from every boundary moves nothing.
+-- A marker leading no boundary moves nothing.
 module MarkB {A : Set} (q : Pos) (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → Set) (B : Cuts.Bounded c Bd)
-  (apart : ∀ {N b g} → Bd N b g → ¬ b ⊑ q × ¬ q ⊑ b) where
+  (apart : ∀ {N b g} → Bd N b g → ¬ q ⊑ b) where
 
   private
     module B = Cuts.Bounded B

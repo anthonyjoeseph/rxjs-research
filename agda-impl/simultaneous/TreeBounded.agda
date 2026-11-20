@@ -94,10 +94,10 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     src-out  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
     src-held : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
 
-    -- A SOURCE'S BOUNDARIES lie apart from the late end of any reader its
-    -- hot's rows admit, subscribed at or past the connect's body.
+    -- A SOURCE'S BOUNDARIES are led by no late end of a reader its hot's
+    -- rows admit, subscribed at or past the connect's body.
     src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
-              → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
+              → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (q ⊕ [ last ]) ⊑ b
 
     -- THE OTHER JOINS' CUTS: the outer's boundaries, and each running
     -- lane's before the lane's cut.
@@ -108,10 +108,10 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     ex-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
                → Cuts.Bounded (Cut n (flatMap exhaustᶠ f s) ρ p) (bd n (flatMap exhaustᶠ f s) ρ uρ (dbd D) p)
 
-    -- A DEFER'S MARKER, under its first label, lies apart from every
-    -- boundary of its body, subscribed one label down.
+    -- A DEFER'S MARKER, under its first label, leads no boundary of its
+    -- body, subscribed one label down.
     defer-apart : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
-                → ∀ {N b g} → bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ b ⊑ (p ⊕ [ ix 0 ]) × ¬ (p ⊕ [ ix 0 ]) ⊑ b
+                → ∀ {N b g} → bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (p ⊕ [ ix 0 ]) ⊑ b
 
 ------------------------------------------------------------------------
 -- Every tree, and the hot a connect lists
