@@ -23,7 +23,8 @@ open import denotation.Events using (<ᵖ-part; ofᴱ)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-ext)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
-open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; bind; lanes; mergeRows; proper; properAt; ends; allᵇ; _≼ᵇ_; rejoin; rejoinRow; pastRows)
+open import quickcheck.Tabled using (Row; Listed; _⊣_; rows; bind; lanes; mergeRows; proper; properAt; allᵇ; _≼ᵇ_; rejoin;
+  rejoinRow; pastRows)
 open import quickcheck.Tabled.Exact.Base using (cm⁺; cm⁻; when⁺; when⁻; if⁻; offT; all⁺; T-not; ends⁻; mapM⁺; fromT; pastRows⁺)
 open import simultaneous.Listing using (walkN)
 open import simultaneous.TableEnv using (_⊕ˡ_)
@@ -103,16 +104,3 @@ rejoin-inv q (rs ⊣ _) m | ((h , end) , hm , w) with if⁻ {b = q <ᵖ h} w
 ...   | inj₁ (_ , there ())
 ...   | inj₂ (b , here refl) = inj₂ (h , hm , offT b , refl , refl)
 ...   | inj₂ (_ , there ())
-
--- A value a rejoin shows of a hot listed off one value: that value's row,
--- under the rejoin.
-rejoin-one : ∀ {A} p h c {a : A} {s k b} → (k , out b) ∈ rows (rejoin p (proper ((h , out a) ∷ (c , end) ∷ []) ⊣ s)) → k ≡ h ⊕ [ sub p ]
-rejoin-one p h c {a} {s} {k} {b} m with rejoin-inv p (proper ((h , out a) ∷ (c , end) ∷ []) ⊣ s) m
-... | inj₁ (_ , _ , hm , _ , kk , eu) = one (proper⊆ (ends rs) rs hm) kk eu
-  where
-    rs = (h , out a) ∷ (c , end) ∷ []
-    one : ∀ {h′ e₀} → (h′ , e₀) ∈ ((h , out a) ∷ (c , end) ∷ []) → k ≡ h′ ⊕ [ sub p ] → out b ≡ unpin e₀ → k ≡ h ⊕ [ sub p ]
-    one (here refl)         kk _  = kk
-    one (there (here refl)) _  ()
-    one (there (there ()))
-... | inj₂ (_ , _ , _ , _ , ())

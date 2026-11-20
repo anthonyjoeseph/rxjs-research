@@ -42,12 +42,12 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; pastRows⁺; complete)
+open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; complete)
 open import Relation.Nullary.Decidable using (dec-true)
 open import Data.Maybe.Properties using (just-injective)
 open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
 open import denotation.Laws.Worlds using (InvAt; PinBy; world-after)
-open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; bind; lanes; past; rejoin)
+open import quickcheck.Tabled using (hotOf; Row; rows; ends; anyᵇ; values; afterL; bind; lanes; rejoin)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; UncutEnv)
 open import simultaneous.InstEmit using (valuesOf)
@@ -56,12 +56,10 @@ open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.TreeBounded using (tree-bounded; listHot; admits-body; admits-trig)
-open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
-  linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*; unended; den; den-ex; dbd; env-wk; Holds; Admits; admits-step;
-  admits-ix; admits-row; den-cons; HotD; DenOf; tab-func;
-  tab-flat; tab-at)
+  linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*;
+  unended; den; den-ex; dbd; env-wk; Holds; Admits; admits-step; admits-ix; admits-row;
+  den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
 
 open import simultaneous.ElabUndone using (elab-undone)
 open import simultaneous.LaneEndSched using (laneXt; laneL; laneX; readerR; emitAt; tr-in; module Share)

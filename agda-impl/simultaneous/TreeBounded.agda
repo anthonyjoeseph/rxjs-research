@@ -24,27 +24,26 @@
 module simultaneous.TreeBounded where
 
 open import Data.Bool using (T)
-open import Data.Bool.Properties using (T-≡)
 open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst₂)
+open import Data.Unit using (⊤)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap;
   connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
-open import denotation.Events using (Timeline; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; out; enter; Proper; module Op; at-out; at-end; end; on-out; module Connecting)
+open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end; module Connecting)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
-open import denotation.Laws.Worlds using (_⊑_; ⊕-assoc; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix; plain-last; ok-in)
+open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix;
+  plain-last; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn

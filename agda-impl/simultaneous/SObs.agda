@@ -89,7 +89,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_; z≤n)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (⊤)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym)
 open import Relation.Nullary using (does)
@@ -176,10 +176,6 @@ private
   isTick : ∀ {A} → Tag A → Bool
   isTick tick = true
   isTick _    = false
-
-isLane : Part → Bool
-isLane lanePart  = true
-isLane burstPart = false
 
 -- A renaming under one more binder.
 ext : ∀ {X : Set} {Γ Δ : List Set} → (∀ {Y} → Y ∈ Γ → Y ∈ Δ) → ∀ {Y} → Y ∈ X ∷ Γ → Y ∈ X ∷ Δ

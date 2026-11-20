@@ -30,8 +30,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (does)
 
-open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; connected)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; inside; _⊕_)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Unpinned; pin; _≼_; _≺_; Ev; out; skip; end; EmissionSet; Ended)
 open import simultaneous.Readings using (instantOf)
@@ -64,7 +64,6 @@ open import denotation.EmissionSet using (DenEnv; Den)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Cut using (capprox)
 open import simultaneous.TableFlat using (module Flat; module Vals)
-open import simultaneous.TableRows using (rejoin-one)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; laneSrc; closer; combined; trackers)
 

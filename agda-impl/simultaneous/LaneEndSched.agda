@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; _+_; s≤s; z≤n)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; Dec; yes; no)
@@ -22,9 +22,9 @@ open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap; scan; connect; connected)
 open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; shown; ended;
-  at-out; at-end; on-out; _≺_; _≼_; module Op; module Bounded; module Scan; module TakeWhile;
-  module Values; module Joining)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Den; DenEnv; enter; Proper; Rejoin; ended; at-out;
+  at-end; on-out; _≺_; _≼_; module Op; module Bounded; module Scan; module Values;
+  module Joining)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≺-ext)
 open import denotation.Laws.Worlds using (notT; InvAt)
@@ -51,11 +51,9 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ------------------------------------------------------------------------
 -- Where `laneˢ` puts things, subscribed at `st`
 
--- The trigger's end as the blocker reads it, which ends the blocker;
--- the elaborated lane, queued behind it.
-laneXt trigXs : Pos → List Label
+-- The elaborated lane, queued behind the blocker.
+laneXt : Pos → List Label
 laneXt st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []
-trigXs st = ix 1 ∷ last ∷ sub (st ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ []
 
 -- The lane part's connect, the elaborated lane, the share's reader.
 laneL laneX readerR : Pos → Pos

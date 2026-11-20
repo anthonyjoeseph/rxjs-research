@@ -16,7 +16,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
 open import Relation.Nullary using (does)
 
@@ -25,8 +25,8 @@ open import denotation.Position using (root; _≟ᵖ_; _⊕_; ix)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; Den; hot; Proper; DenEnv; enter; module Op; module DeferT)
 open import denotation.Laws.Cut using (capprox)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
-  laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
+  burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; ext; Tag; val; cdone; tick; flat; Flat; isZero; module Elaborate)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; map-out′; scan-out; take-row; of-mem; each-one; module Cat)
 
