@@ -38,8 +38,10 @@ Each part's pair and clearance hold at its tree's boundaries
 (`Out.bd-pin`); the merge's elaborated outer hangs at the source's
 (`mg-each-bd→`), its rows the source's images relocated under the
 share, the end at the later of its own and the trigger's. Open: the end
-relocated past a boundary; a late row put past one; the lanes likewise
-under `laneˢ`. Settled by bodies.
+relocated past a boundary, suspect false where the source hangs past its
+own end (a connect's burst after its body's end), the elaborated end
+past that burst; a late row put past one; the lanes likewise under
+`laneˢ`. Settled by bodies, or `mg-o-end` refuted and the pair restated.
 
 Members: `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,

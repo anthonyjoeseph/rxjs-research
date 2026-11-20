@@ -242,7 +242,15 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- an outer skip read through the shared hot
         mg-φ-skip : ∀ N {k} → oM N k skip → φ′ N k ≡ srcφ N k
         -- the source's end, relocated past the trigger's, cuts a pair of
-        -- the source's boundaries alike where the source's rows do
+        -- the source's boundaries alike where the source's rows do.
+        -- Suspect where the source hangs past its own end: a connect whose
+        -- body ends as it subscribes keeps its source's burst as pins past
+        -- its end, held, the plain merge ending before them, while the
+        -- trigger's end, and so the elaborated merge's, lies past them all.
+        --
+        -- DEAD ROUTE: no boundary past a non-late end, as a `Cuts.Bounded`
+        --   field: a connect's burst boundary (`ConnBd`) lies past its end
+        --   whenever its body ends at its subscribe.
         mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → oM N k end → ¬ Late′ N k → (k ≺ z → φ′ N k ≺ z*) × (φ′ N k ≺ z* → k ≺ z)
