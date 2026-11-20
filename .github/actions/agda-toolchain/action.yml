@@ -53,7 +53,7 @@ runs:
     # after; install-agda.sh skips a download whose version is already on
     # PATH.  Keyed on the script, which pins the version.
     - name: Cache Agda binary
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cabal/bin/agda
         key: agda-bin-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
