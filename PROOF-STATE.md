@@ -34,25 +34,27 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
-A join's pair and clearance are bodies over its parts' at the tree's
-boundaries (`bd`), but a part's `Rel.Bd` is not pinned to its tree's
-`bd`: plain one-child formers pass their child's through, a reader
-takes its hot's. So the parts' `bcorr` and `across` cannot feed the
-join. Settled by an `Out` field pinning `Rel.Bd` to `bd` (then these are
-the parts' fields), or a part whose `Rel.Bd` must differ from its tree's.
+Each part's pair and clearance hold at its tree's boundaries
+(`Out.bd-pin`); the merge's elaborated outer hangs at the source's
+(`mg-each-bd→`), its rows the source's images relocated under the
+share, the end at the later of its own and the trigger's. Open: a
+put skip's image, or an image, over a held connect; the end relocated
+past a boundary; a late row put past one; the lanes likewise under
+`laneˢ`. Settled by bodies, or an image under a held connect.
 
-Members: `mg-outer-bcorr`, `mg-lane-bcorr`, `mg-outer-back`, `mg-lane-back`,
-`mg-outer-put`, `mg-lane-put`, `mg-outer-lead`, `mg-lane-lead`.
+Members: `mg-skip-off*`, `mg-src-held*`, `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
+`mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
+`mg-outer-lead`, `mg-lane-lead`.
 
 #### THE MERGE'S CROSS-PART FACTS
 
 `JoinPair` asks the merge what no part knows alone: each part's rows
 cut the other parts' marks alike, a held pin has no merge row under it,
-a merge row's map is its outer's (`val*`) or its lane's, and every
+a merge row's map is its outer's (`φo`) or its lane's, and every
 image row is a row's. Untried. Settled by bodies over the listing, or
 a lane row ordered against an outer mark unlike its image.
 
-Members: `mg-val←`, `mg-φ-outer`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
+Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-skip`, `mg-val←`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
 `mg-img`, `mg-held`, `mg-held*`, `mg-outer-lane`, `mg-outer-lane-put`,
 `mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
 

@@ -20,7 +20,6 @@ module simultaneous.TableHot where
 
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_; _∧_)
@@ -34,14 +33,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym;
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _<ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled using (hotOf; Row; properAt; ends; rows; allᵇ; anyᵇ; _≼ᵇ_; _⊣_)
-open import quickcheck.Tabled.Exact.Base using (when⁻; if⁻; cm⁻; offT; ends⁻; Exact)
+open import quickcheck.Tabled using (hotOf; ends; rows; anyᵇ)
+open import quickcheck.Tabled.Exact.Base using (ends⁻; Exact)
 open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
@@ -51,12 +50,13 @@ open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounde
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
-  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
+  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
-open import simultaneous.TreeBounded using (listHot; tree-bounded)
-open import simultaneous.HorizonTree using (bd)
+open import simultaneous.TreeBounded using (listHot; tree-bounded; admits-body; listHot-u)
+open import simultaneous.HorizonTree using (bd; _∷ᵇ_)
+open import simultaneous.ElabUndone using (env-ext; EnvU)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
-open import simultaneous.TableRows using (toT)
+open import simultaneous.TableRows using (proper⊆; unpin; RjRow; rejoin-inv)
 open import simultaneous.LaneEndSched using (emitAt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
@@ -66,14 +66,6 @@ open TabRows using (endAt; endsOf; endAt-I)
 -- reader that the annotation's concat subscribes first.
 reader* : Pos → Pos
 reader* p* = p* ⊕ˡ (ix 1 ∷ ix 0 ∷ ix 0 ∷ ix 1 ∷ [])
-
--- A hot's proper rows are among its rows.
-proper⊆ : ∀ {X} es (rs : List (Row X)) {r} → r ∈ properAt es rs → r ∈ rs
-proper⊆ es []             ()
-proper⊆ es ((q , e) ∷ rs) m with ∈-++⁻ _ m
-... | inj₂ h = there (proper⊆ es rs h)
-... | inj₁ h with when⁻ {b = allᵇ (q ≼ᵇ_) es} {x = (q , e)} h
-...   | (_ , refl) = here refl
 
 -- THE CONNECT'S SCOPE: the source subscribed under the connect's second
 -- label, its two hots listed off it, and the maps a body reads them by.
@@ -102,13 +94,43 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
   uρ*′ N = proj₂ (proj₂ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))) , uρ* N
 
   Src : Set₁
-  Src = Out n s ρ ρι ρ* (maps env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
+  Src = Out n s ρ uρ ρι ρ* uρ* (maps env) (lw env) (lw* env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
 
-  -- The two hots, each listed off its lawful source.
-  hD = listHot n s uρ (lw env) p a
-  hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+  -- The two hots, each listed off its lawful source, opaque: a type
+  -- naming them unfolded exhausts the heap.
+  opaque
+    hD : HotD (λ N → hotOf (σ N))
+    hD = listHot n s uρ (lw env) p a
+
+    hD* : HotD (λ N → hotOf (σ* N))
+    hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+
   D′ = den-cons hD (lw env)
   D*′ = den-cons hD* (lw* env)
+
+  opaque
+    unfolding hD hD*
+    -- The hot hangs at its source's tree's boundaries.
+    hD-bd : hbd hD ≡ bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ])
+    hD-bd = refl
+
+    -- The scope's boundaries: the source's tree's, then the old.
+    D′-bd : (λ {X} → dbd D′ {X}) ≡ (λ {X} → (bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ]) ∷ᵇ dbd (lw env)) {X})
+    D′-bd = refl
+
+    D*′-bd : (λ {X} → dbd D*′ {X}) ≡ (λ {X} → (bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ]) ∷ᵇ dbd (lw* env)) {X})
+    D*′-bd = refl
+
+    -- The body admissible where the connect is.
+    body-ad : Admits D′ (p ⊕ [ ix 0 ])
+    body-ad = admits-body n s uρ (lw env) p a
+
+    body-ad* : Admits D*′ (p* ⊕ [ ix 0 ])
+    body-ad* = admits-body n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+
+    -- No elaborated hot in scope ends a lane.
+    unended′ : ∀ N → EnvU (ext ρι) (den D*′ N)
+    unended′ N = env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
 
   -- The source's hot maps each row to its annotated image, each late
   -- placement to its annotated one; its late rows are the source's.
@@ -127,9 +149,12 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
 
   -- A source hot row is a hot row of its cut, which no admissible
   -- subscription's world holds.
-  hot-row : ∀ N {h e} → Rows (hotOf (σ N)) h e → HotsAll D′ h
-  hot-row N {h} {e} m = N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
-    where ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ])
+  opaque
+   unfolding hD
+   hot-row : ∀ N {h e} → Rows (hotOf (σ N)) h e → HotsAll D′ h
+   hot-row N {h} {e} m =
+     let ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]) in
+     N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
 
   -- The new hot, read by a body subscribed in this scope.
   HotS : Src → Set₁
@@ -160,11 +185,6 @@ ends-tr : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {c} → c ∈ endsOf m → TR 
 ends-tr nothing   ()
 ends-tr (just Lx) c∈ = Lx , refl , ends⁻ {rs = rows Lx} c∈
 
--- A pin read as a skip.
-unpin : ∀ {X : Set} → Ev X → Ev X
-unpin (pin _) = skip
-unpin e       = e
-
 -- Shown once unpinned: shown before.
 shown-unpin : ∀ {X : Set} (e : Ev X) → T (shownᵇ (unpin e)) → T (shownᵇ e)
 shown-unpin (out _) t = t
@@ -181,27 +201,6 @@ shown-unpin (pin _) ()
 private
   false≢true : ¬ (false ≡ true)
   false≢true ()
-
--- A REJOINED ROW: a hot row past the subscription one label down, a pin
--- as a skip; or the end, at the subscription's last, of a hot ended at
--- or before it.
-RjRow : ∀ {X : Set} → Pos → Tb.Listed X → Pos → Ev X → Set
-RjRow {X} q L k e = (Σ Pos λ h → Σ (Ev X) λ e₀ → (h , e₀) ∈ rows L × q ≺ h × k ≡ h ⊕ [ sub q ] × e ≡ unpin e₀)
-                  ⊎ (Σ Pos λ h → (h , end) ∈ rows L × ¬ (q ≺ h) × k ≡ q ⊕ [ last ] × e ≡ end)
-
-rejoin-inv : ∀ {X : Set} q (L : Tb.Listed X) {k e} → (k , e) ∈ rows (Tb.rejoin q L) → RjRow q L k e
-rejoin-inv q (rs ⊣ _) m with cm⁻ {f = Tb.rejoinRow q} {xs = rs} m
-... | ((h , out a) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , out a)} w
-...   | (b , refl) = inj₁ (h , out a , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , skip) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , skip , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , pin r) , hm , w) with when⁻ {b = q <ᵖ h} {x = (h ⊕ [ sub q ] , skip)} w
-...   | (b , refl) = inj₁ (h , pin r , hm , toT b , refl , refl)
-rejoin-inv q (rs ⊣ _) m | ((h , end) , hm , w) with if⁻ {b = q <ᵖ h} w
-...   | inj₁ (b , here refl) = inj₁ (h , end , hm , toT b , refl , refl)
-...   | inj₁ (_ , there ())
-...   | inj₂ (b , here refl) = inj₂ (h , hm , offT b , refl , refl)
-...   | inj₂ (_ , there ())
 
 -- A rejoined row read through a reader's image: its end on the
 -- elaborated reader's end or a default, any other row on its hot row's.
@@ -440,9 +439,10 @@ opaque
   conn-hot : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
                (env : EnvR ρ ρι ρ*) p p* (a : Admits (lw env) p) (a* : Admits (lw* env) p*)
            → (Rs : ConnEnv.Src n s ρ uρ ρι ρ* uρ* env p p* a a*) → ConnEnv.HotS n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
-  conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs n′ q q* ad ad* al lk =
-    rel′ ad ad* al ⊢ rest′ ad ad* al lk
+  conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs _ _ n′ q q* ad ad* al lk =
+    out (rel′ ad ad* al) (rest′ ad ad* al lk) (subst (SameBd (Rel.Bd R₀)) (sym hD-bd) (Out.bd-pin Rs)) same-bd
     where open ReaderTab n s ρ uρ ρι ρ* uρ* env p p* a a* Rs n′ q q*
+          open ConnEnv n s ρ uρ ρι ρ* uρ* env p p* a a* using (hD-bd)
 
 -- THE HOT'S MAP IS ITS SOURCE'S: two scopes whose sources map alike and
 -- are late alike give their hots one map and late rows, however the
@@ -455,10 +455,10 @@ module ConnTwo {Γ A} n (s : Obs Timeline Γ A)
 
   HotCoh : Set₁
   HotCoh = (Rs : C.Src) (Rs′ : C′.Src) → (∀ N y → Same (Out.rel Rs) (Out.rel Rs′) N y)
-         → ∀ n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
+         → ∀ u u* n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
              (al : Aligned (C.Ψ′ Rs) C.ρ′ q q*) (al′ : Aligned (C′.Ψ′ Rs′) C′.ρ′ q q*) (lk lk′ : Linked q q*) N y
-         → Same (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs n′ q q* ad ad* al lk))
-                (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ n′ q q* ad′ ad*′ al′ lk′)) N y
+         → Same (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs u u* n′ q q* ad ad* al lk))
+                (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ u u* n′ q q* ad′ ad*′ al′ lk′)) N y
 
 -- Two scopes whose sources map alike and are late alike: a reader's
 -- image is its source row's, carried alike, and it is late where its
@@ -467,7 +467,7 @@ opaque
   unfolding conn-hot
   conn-hot-coh : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
                    (E E′ : EnvR ρ ρι ρ*) p p* a a′ a* a*′ → ConnTwo.HotCoh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′
-  conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ Rs Rs′ hs n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
+  conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ Rs Rs′ hs _ _ n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
     same (if-≡ {b = endAt (X.P N) y} refl (λ _ → refl) (λ _ → cong (X.imgAt N) (φ≡ (hs N (up y)))))
          (λ { nl (ne , inj₁ pn)  → nl (ne , inj₁ pn)
             ; nl (ne , inj₂ lt′) → nl→ (hs N (up y)) (λ lt → nl (ne , inj₂ lt)) lt′ })

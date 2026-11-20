@@ -54,12 +54,12 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.TableCorr using (Same; Rel; Corr; keys; in-keys; nl-ev)
 open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Horizon using (Tag; module Cuts)
-open import simultaneous.HorizonTree using (bd)
+open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.TreeBounded using (tree-bounded; listHot; admits-body; admits-trig)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
   linked-r*; linked-later; inst-⊕ˡ; squeeze; ⊑-⊕ˡ; Aligned; aligned-⊕; aligned-past;
-  aligned-r*; Rest; Out; EnvR; maps; lw; lw*; unended; den; dbd; env-wk; Holds; Admits; admits-step;
+  aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*; unended; den; dbd; env-wk; Holds; Admits; admits-step;
   admits-ix; admits-row; den-cons; HotD; DenOf; tab-func;
   tab-flat; tab-at)
 
@@ -208,6 +208,10 @@ module Vals {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p 
       first []       = nothing
       first (v ∷ vs) = if does (ValAt.q v ≟ᵖ q) then just v else first vs
 
+  -- A value of the source at a row.
+  isVal : ℕ → Pos → Bool
+  isVal N y = anyᵇ (λ v → does (ValAt.q v ≟ᵖ y)) (valsAt N)
+
   -- A value's marker at a row.
   isMarker : ℕ → Pos → Bool
   isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
@@ -319,14 +323,14 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   -- The source, at the share's subscription.
   Src : Set₁
-  Src = Out n s ρ (wk ρι) ρ*s (maps env) p sp*
+  Src = Out n s ρ uρ (wk ρι) ρ*s uρ*s (maps env) (lw env) Ds p sp*
 
   -- Each lane, wherever subscribed alike, whatever the four binders hold.
   Lanes : Set₁
   Lanes = ∀ a (t₁ : ℕ → Tb.Listed ⊤) (t₂ : ℕ → Tb.Listed (IE B)) (t₃ : ℕ → Tb.Listed (IE A)) (t₄ : ℕ → Tb.Listed ⊤)
-        → (∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
+        → (u : ∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
         → (h₁ : HotD t₁) (h₂ : HotD t₂) (h₃ : HotD t₃) (h₄ : HotD t₄)
-        → Holds n (f a) ρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+        → Holds n (f a) ρ uρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
 
   -- Two records of one lane, its trigger's hot recorded twice: they map
   -- alike and are late alike (`simultaneous.TableEnv.Coh`).
@@ -527,6 +531,26 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     laneAdm st a = admits-ix D′ 1 (admits-ix D′ 0 (admits-trig n uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))))
       where D′ = den-cons (trigD st a) Dc
 
+    -- A lane's hots, opaque: the record's field type naming `trigD`
+    -- exhausts the heap.
+    opaque
+      laneDen : ∀ st → Admits Dc st → DenOf (λ N′ → trig st N′ ∷ ρ*c N′)
+      laneDen st a = den-cons (trigD st a) Dc
+
+    opaque
+      unfolding laneDen
+      laneDen-pin : ∀ st (a : Admits Dc st) {Bx : ℕ → Pos → Tag → Set} (F : BdEnv (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) → ℕ → Pos → Tag → Set)
+                  → SameBd Bx (F (dbd (den-cons (trigD st a) Dc))) → SameBd Bx (F (dbd (laneDen st a)))
+      laneDen-pin st a F x = x
+
+    -- A lane's record, its hots named opaquely.
+    to-lane : ∀ {a′ st stE} (adm* : Admits Dc stE)
+            → Out n (f a′) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (den-cons (trigD stE adm*) Dc) st (laneX stE)
+            → Out n (f a′) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (laneDen stE adm*) st (laneX stE)
+    to-lane {a′} {st} {stE} adm* O =
+      out (Out.rel O) (Out.rest O) (Out.bd-pin O)
+        (laneDen-pin stE adm* (λ β → bd n (elab ρι⁴ (f a′)) (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) β (laneX stE)) (Out.bd-pin* O))
+
     -- A lane related at a cut: its value, its two subscriptions, its
     -- record.
     record LaneRec (N : ℕ) : Set₁ where
@@ -538,7 +562,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         alL : Aligned (maps env) ρ st (laneL stE)
         adm : Admits (lw env) st
         adm* : Admits Dc stE
-        lane : Out n (f a) ρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (maps env) st (laneX stE)
+        lane : Out n (f a) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (laneDen stE adm*) st (laneX stE)
 
       -- The lane's plain tables.
       tab : Maybe (Tb.Listed B)
@@ -610,10 +634,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- A value's lane, subscribed under its row: the source's facts at the
     -- row align the lane's pair.
     valRec : ∀ N → ValAt N → LaneRec N
-    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL ad₀ ad₀* (
+    valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL ad₀ ad₀* (to-lane ad₀* (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (q ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
-         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt nlx) (ix 1)) (sub c₁)) ys))
+         (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt nlx) (ix 1)) (sub c₁)) ys)))
       where
         nlx = nl-ev (Rel.corr (Out.rel Os) N) x (λ ())
         st = st* N q
@@ -630,10 +654,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- lane's facts at its end align the pair, the elaborated lane queued
     -- under the end's image.
     queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
-    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL ad₀ ad₀* (
+    queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL ad₀ ad₀* (to-lane ad₀* (
       Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (c ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
-         (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys))
+         (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys)))
       where
         r  = readerR (LaneRec.stE R)
         st = LaneRec.endImage R c ⊕ [ ix 1 ]
