@@ -40,6 +40,7 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [agda-build.md](agda-build.md) | the `AGDA` variable, `-W error`, the GHC backend's own failures |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
+| [cone.md](cone.md) | `make cone` — the postulates one definition rests on, with the chain to each |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, rulings, traps |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
 | [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
