@@ -26,7 +26,7 @@ open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; s
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; pin; skip; _≺_; _≼_)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-trans)
-open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext; ≺-trans; ≼-≺-≺)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -147,9 +147,16 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-moved    : ∀ N {k b g} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b g → (Rel.φ R N k ≺ b → φ′ N k ≺ b) × (φ′ N k ≺ b → Rel.φ R N k ≺ b)
       cb-moved-q  : ∀ N {k b q} → Own (TR (P′ N)) (Late′ N) k → Rel.Bd* R N b (held q) → (Rel.φ R N k ≺ q → φ′ N k ≺ q) × (φ′ N k ≺ q → Rel.φ R N k ≺ q)
       cb-putw     : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PB (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PB (OwnPut (TR (P′ N)) (Put′ N)) b b*
-      cb-putw←    : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PA (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PA (OwnPut (TR (P′ N)) (Put′ N)) b b*
       cb-stable : Stable (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
       cb-lead   : LeadClear (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Late′ (Rel.Bd R) cb-bd*
+
+    -- A placement before a boundary lies past the lanes' flatMap's,
+    -- which it re-emits or marks: that lies before the boundary too.
+    cb-putw← : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PA (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PA (OwnPut (TR (P′ N)) (Put′ N)) b b*
+    cb-putw← N {b* = b*} _ pa (x , l′ , pt , inj₁ refl) lz =
+      pa (x , pt) (≼-≺-≺ {l′} {reEmit l′} {b*} (≼-ˡ l′ (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ [])) lz)
+    cb-putw← N {b* = b*} _ pa (x , l′ , pt , inj₂ refl) lz =
+      pa (x , pt) (≺-trans {l′} {l′ ⊕ [ ix 0 ]} {b*} (≺-ext l′ []) lz)
 
     -- A put skip is no end: re-emitted, its image lies under the lanes'
     -- flatMap's, over no boundary of the flatMap's, which the scan's are.

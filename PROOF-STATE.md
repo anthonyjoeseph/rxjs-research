@@ -59,12 +59,14 @@ Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-src`, `mg-val←`, `mg
 `Inter.BCorr.to` orders placements both ways: a late row whose
 placement lies before an elaborated hang lies before its plain partner
 (`Inter.PutAfter`), as `from` orders them forward. With it a row clear
-where its placement is (`Across.put-clear`) is derived. Untried: no
-former's placements were ever ordered back. Settled by bodies, or a put
-row past a plain hang whose placement lies before the partner.
+where its placement is (`Across.put-clear`) is derived. Riskiest: the
+merge places a late or pinned outer row at its own image, which the
+source's `Corr` does not constrain (`mg-o-pa`, and `mg-o-pb` forward).
+Then the cross-part mirrors. Settled by bodies, or a put row past a
+plain hang whose placement lies before the partner.
 
 Members: `mg-o-pa`, `mg-outer-lane-put←`, `mg-lane-outer-put←`,
-`mg-lane-lane-put←`, `ct-body-src-put←`, `cb-putw←`.
+`mg-lane-lane-put←`, `ct-body-src-put←`.
 
 #### THE HANGS ACROSS CUTS
 
