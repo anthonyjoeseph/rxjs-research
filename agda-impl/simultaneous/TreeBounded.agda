@@ -26,12 +26,13 @@ module simultaneous.TreeBounded where
 open import Data.Bool using (T)
 open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
+open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
@@ -42,7 +43,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
-open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; join; here; real-snoc; real-sub; plain-ix;
+open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub; plain-ix;
   plain-last; ok-in)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
@@ -61,11 +62,12 @@ open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
-open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
-open import simultaneous.Horizon using (held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
+open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
-open import simultaneous.HorizonTree using (Cut; bodyρ; bodyU; bd)
+open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
+open import simultaneous.Placed using (module Placing)
 open import simultaneous.ColdBounded using (cold-bounded)
 open import simultaneous.HotRows using (hot-rows-bounded)
 open import simultaneous.HorizonJoin using (module MergeB)
@@ -87,8 +89,21 @@ listEv n o D c N = Proper (enter (capprox (3 + N) n o (den D N)) (c ⊕ [ ix 1 ]
 ------------------------------------------------------------------------
 -- The leaves owed
 
+-- A boundary of one of the scope's hots.
+EnvB : ∀ {Γ} → BdEnv Γ → ℕ → Pos → Tag → Set
+EnvB {[]}    β N b g = ⊥
+EnvB {_ ∷ Γ} β N b g = β (here refl) N b g ⊎ EnvB {Γ} (λ {X} i → β {X} (there i)) N b g
+
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
+    -- EVERY TREE'S BOUNDARIES ARE PLACED: its own in its world, its
+    -- scope's named by the scope.
+    tree-placed : ∀ {A} n (o : Obs Timeline Γ A) p → Admits D p
+                → Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
+
+    -- A SCOPE'S BOUNDARY is led by no position of an admissible world.
+    env-lead : ∀ {p} → Admits D p → ∀ {N b g} → EnvB (dbd D) N b g → ∀ {w} → W⁼ (Hots (den D N)) p w → ¬ w ⊑ b
+
     -- A SOURCE'S BOUNDARIES lie before its connect or past its
     -- subscription, and a held one in its burst waits on a connect there.
     src-out  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
@@ -180,7 +195,13 @@ mutual
       (MergeB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
         (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
         (λ {N} {q} {v} x → tree-bounded n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x))
-        (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l))
+        (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (λ {N} {b} {g} → tree-placed ρ uρ D n s p a {N} {b} {g})
+        (λ {N} {q} {v} x {M} {b} {g} → tree-placed ρ uρ D n (f v) (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x) {M} {b} {g})
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w}))
   tree-bounded n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = cc-bounded ρ uρ D n k f s p a
   tree-bounded n (flatMap switchᶠ f s)           ρ uρ D p a = sw-bounded ρ uρ D n f s p a
   tree-bounded n (flatMap exhaustᶠ f s)          ρ uρ D p a = ex-bounded ρ uρ D n f s p a
