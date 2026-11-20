@@ -32,17 +32,6 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### PUT SKIPS OFF THE BOUNDARIES
-
-A skip put rather than imaged lies over no elaborated boundary
-(`Rel.skip-off*`); an imaged one's image is a row, which does not. Open:
-that a bounded merge hangs only where its outer or a lane does, its
-boundaries opaque; and the share's, whose elaborated flatMap hangs also
-where its source does, outside the body. Settled by bodies, or a put
-skip's image over a boundary.
-
-Members: `cc-bd-src`, `sr-put-off*`.
-
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
 Each part's pair and clearance hold at its tree's boundaries
@@ -122,9 +111,10 @@ Members: `cold-bd`, `cc-bd`, `sw-bd`, `ex-bd`, `cold-bounded`, `scan-bounded`,
 
 Each core's pair with the plain flatMap's: the merge's is
 `JoinPair`'s over its parts' and cross-part leaves; the others copy it,
-over `cc-bd`, `sw-bd`, `ex-bd`. Settled by bodies.
+over `cc-bd`, `sw-bd`, `ex-bd`, opaque; a bounded merge hangs only where
+its outer or a lane does. Settled by bodies.
 
-Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`.
 
 #### THE CONNECT'S HANGS
 
@@ -230,7 +220,7 @@ are and its source's only as pins and skips; the share puts the
 source's pins where its connect shows them, the layers inside relating
 the plain flatMap without them. Untried: the fields. Settled by bodies.
 
-Members: `cz-corr`, `sr-corr`.
+Members: `cz-corr`, `sr-corr`, `sr-img`.
 
 #### THE CONNECT'S HOT
 

@@ -15,6 +15,7 @@ open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_)
+open import Data.Unit using (tt)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -324,9 +325,12 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     postulate
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
       sr-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) sr-bd*
-      -- a skip the share puts lies over no boundary of the elaborated
-      -- flatMap
-      sr-put-off* : ∀ {N k l b g} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → sr-bd* N b g → ¬ φ′ N k ⊑ b
+      -- every row not late imaged at a row of the elaborated flatMap
+      sr-img      : ∀ N {k} → Own (TR (P′ N)) (Late′ N) k → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N k))
+
+    -- A put skip is imaged as any row is, so over no boundary.
+    sr-put-off* : ∀ {N k l b g} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → sr-bd* N b g → ¬ φ′ N k ⊑ b
+    sr-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap sr-bounded* b₀ (proj₂ (sr-img _ (skip , x , tt , nl))))
 
     sr-got : ∀ N → Got (P′ N)
     sr-got N = got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p
