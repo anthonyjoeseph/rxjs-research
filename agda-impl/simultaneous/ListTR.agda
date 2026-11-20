@@ -26,17 +26,19 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (_⇔_; mk⇔; Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
-open import Tree using (Obs; mergeᶠ; flatMap; cold; of; map; scan)
+open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; cold; of; map; scan)
 open import denotation.Position using (Pos; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; From; fixed; start)
 open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Den; coldAt; enter; After; Reach; Truncate; MapT; _≺_; _≼_;
-  module Merge; module Bounded; module Values; module Scan)
+  module Merge; module Switch; module Exhaust; module Bounded; module Values; module Scan)
 open import denotation.Laws.Modulus using (≼-refl; ≺→≼; ≼-trans; ≼-or-≻)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; afterL; values)
 open import quickcheck.Tabled.Exact using (map-exact; merge-exact; truncate-exact)
 open import quickcheck.Tabled.Exact.Scan using (scan-exact)
 open import quickcheck.Tabled.Exact.Bounded using (bounded-exact)
+open import quickcheck.Tabled.Exact.Switch using (switch-exact)
+open import quickcheck.Tabled.Exact.Exhaust using (exhaust-exact)
 open import quickcheck.Tabled.Exact.Base using (Exact; Exactly; sound; complete; bind⁻; lanes-from; lanes-to; afterL-exact;
   values⁺; values⁻; cnt; cnt-lt)
 open import simultaneous.Listing using (walkN; listC; listC-ok; UncutEnv)
@@ -129,6 +131,32 @@ merge-tr K n f s {ρ} uρ p with listC-ok K n (flatMap (mergeᶠ nothing) f s) u
   where
     ex : Exact L (Merge.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)))
     ex = merge-exact (laneD K n f ρ) o ls (self-exact eo)
+      (lanes-from {ln = afterL (λ a → listC K n (f a) ρ)} {D = λ a → After (laneD K n f ρ a)}
+        (afterL-exact {ln = λ a → listC K n (f a) ρ} {D = λ a → enter (laneD K n f ρ a)} (λ el → truncate-exact (self-exact el))) els)
+      (lanes-to {ln = afterL (λ a → listC K n (f a) ρ)} els) u
+
+sw-tr : ∀ {Γ} {X Y : Set} K n (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) {ρ : All Tb.Listed Γ} → UncutEnv ρ → ∀ p {k e}
+  → TR (listC K n (flatMap switchᶠ f s) ρ p) k e ⇔ Switch.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)) k e
+sw-tr K n f s {ρ} uρ p with listC-ok K n (flatMap switchᶠ f s) uρ p
+... | L , eq , u with bind⁻ {m = listC K n s ρ p} eq
+... | o , eo , e₁ with bind⁻ {m = Tb.lanes (afterL (λ a → listC K n (f a) ρ)) (values (rows o))} e₁
+... | ls , els , refl = mk⇔ (λ x → sound ex (tr-at eq x)) (λ x → at-tr eq (complete ex x))
+  where
+    ex : Exact L (Switch.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)))
+    ex = switch-exact (laneD K n f ρ) o ls (self-exact eo)
+      (lanes-from {ln = afterL (λ a → listC K n (f a) ρ)} {D = λ a → After (laneD K n f ρ a)}
+        (afterL-exact {ln = λ a → listC K n (f a) ρ} {D = λ a → enter (laneD K n f ρ a)} (λ el → truncate-exact (self-exact el))) els)
+      (lanes-to {ln = afterL (λ a → listC K n (f a) ρ)} els) u
+
+ex-tr : ∀ {Γ} {X Y : Set} K n (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ X) {ρ : All Tb.Listed Γ} → UncutEnv ρ → ∀ p {k e}
+  → TR (listC K n (flatMap exhaustᶠ f s) ρ p) k e ⇔ Exhaust.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)) k e
+ex-tr K n f s {ρ} uρ p with listC-ok K n (flatMap exhaustᶠ f s) uρ p
+... | L , eq , u with bind⁻ {m = listC K n s ρ p} eq
+... | o , eo , e₁ with bind⁻ {m = Tb.lanes (afterL (λ a → listC K n (f a) ρ)) (values (rows o))} e₁
+... | ls , els , refl = mk⇔ (λ x → sound ex (tr-at eq x)) (λ x → at-tr eq (complete ex x))
+  where
+    ex : Exact L (Exhaust.JoinT (laneD K n f ρ) (TR (listC K n s ρ p)))
+    ex = exhaust-exact (laneD K n f ρ) o ls (self-exact eo)
       (lanes-from {ln = afterL (λ a → listC K n (f a) ρ)} {D = λ a → After (laneD K n f ρ a)}
         (afterL-exact {ln = λ a → listC K n (f a) ρ} {D = λ a → enter (laneD K n f ρ a)} (λ el → truncate-exact (self-exact el))) els)
       (lanes-to {ln = afterL (λ a → listC K n (f a) ρ)} els) u

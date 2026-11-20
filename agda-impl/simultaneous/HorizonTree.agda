@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Events using (Timeline; timelineAt; start)
-open import denotation.EmissionSet using (EmissionSet; Ev; InE)
+open import denotation.EmissionSet using (EmissionSet; Ev; InE; At; Superseded; module ExhaustOn)
 open import denotation.Laws.ColdInv using (depth)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf)
@@ -76,11 +76,9 @@ JoinBdT = ∀ {A B : Set} → Pos
         → ℕ → Pos → Tag → Set
 
 postulate
-  -- THE OTHER JOINS' BOUNDARIES: the outer's, and each running lane's
-  -- before the lane's cut, by each policy's running and cutting.
+  -- THE CONCURRENCY-BOUNDED MERGE'S BOUNDARIES: the outer's, and each
+  -- running lane's, by its queue.
   cc-bd : ℕ → JoinBdT
-  sw-bd : JoinBdT
-  ex-bd : JoinBdT
 
 -- A COLD'S BOUNDARY at `N`: the row its listing at `N` stops short of,
 -- the stream's next.
@@ -91,6 +89,14 @@ cold-bd {A} c p N b g = g ≡ free × Σ (Ev A) λ e → Σ (InE (start p (timel
 -- under the value's row.
 merge-bd : JoinBdT
 merge-bd p o Bdo L BdL N = JoinBd.JBd (o N) (λ _ → ⊤) (λ _ _ → ⊥) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
+
+-- A SWITCH'S: its outer's, and every lane's before the next value.
+sw-bd : JoinBdT
+sw-bd p o Bdo L BdL N = JoinBd.JBd (o N) (λ _ → ⊤) (Superseded (o N)) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
+
+-- AN EXHAUST'S: its outer's, and every running lane's.
+ex-bd : JoinBdT
+ex-bd p o Bdo L BdL N = JoinBd.JBd (o N) (ExhaustOn.Run (At (λ a s → L a s N)) (o N)) (λ _ _ → ⊥) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
 
 join-bd : FlatOp → JoinBdT
 join-bd (mergeᶠ nothing)  = merge-bd

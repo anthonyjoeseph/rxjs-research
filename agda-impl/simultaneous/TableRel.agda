@@ -50,7 +50,7 @@ open import simultaneous.Listing using (UncutEnv; listC; listC-ok)
 open import simultaneous.TableCorr using (Rel; module Rel; Stable; LeadClear; across-of; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; module ConnBd; module TakeBd; bounded-≃)
-open import simultaneous.TreeBounded using (tree-bounded; src-out; src-held)
+open import simultaneous.TreeBounded using (tree-bounded; tree-placed; src-out; src-held)
 open import simultaneous.CutParts using (conn-tr→; conn-tr←)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
@@ -306,10 +306,10 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ct-ann-bounded* = tree-bounded n (annotate (elab ρι s)) ρ* uρ* (lw* env) (p* ⊕ [ ix 1 ]) (admits-step (lw* env) a*)
 
     ct-ann-out* : ∀ {N b g} → ct-ann-bd* N b g → b ≺ p* ⊎ (p* ⊕ [ ix 1 ]) ≺ b
-    ct-ann-out* {N} {b} {g} = src-out ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {g}
+    ct-ann-out* {N} {b} {g} = src-out ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* (tree-placed n (annotate (elab ρι s)) ρ* uρ* (lw* env) (p* ⊕ [ ix 1 ]) (admits-step (lw* env) a*)) {N} {b} {g}
 
     ct-ann-held* : ∀ {N b q} → ct-ann-bd* N b (held q) → T (inside (p* ⊕ [ ix 1 ]) b) → (p* ⊕ [ ix 1 ]) ≼ q
-    ct-ann-held* {N} {b} {q} = src-held ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* {N} {b} {q}
+    ct-ann-held* {N} {b} {q} = src-held ρ* uρ* (lw* env) n (annotate (elab ρι s)) p* a* (tree-placed n (annotate (elab ρι s)) ρ* uρ* (lw* env) (p* ⊕ [ ix 1 ]) (admits-step (lw* env) a*)) {N} {b} {q}
 
     ct-conn→  : ∀ {N y e} → TR (P N) y e → Connecting.ConnT p (σc N) (βc N) y e
     ct-conn→ {N} {y} {e} = conn-tr→ n s b uρ p {N} {y} {e}

@@ -39,7 +39,7 @@ open import denotation.Laws.Modulus
 open import denotation.Laws.Count
   using (Cnt; DCnt; AgC; agc; ag-cnt; _≈ᶜ⟨_∣_⟩_; ≈ᶜ-sym; cnt-up; cnt-down; cnt-at; dcnt-pin; dcnt-pin-up; pinned-after; trunc-ag; Img; em; seen; seen-under)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; world-after; ok-in; ok-step; ⊑-≼; inside-⊑; ⊕-injˡ)
-open import denotation.Laws.JoinInv using (switch-cut-up)
+open import denotation.Laws.JoinInv using (switch-cut-up; switch-cut-to; cur-le; cur-run)
 open import denotation.Laws.Nth using (module Nths)
 
 -- A condition on every value: read at or before `Q`, free past it.
@@ -211,25 +211,15 @@ module Join {A B : Set} (Q : Pos) where
     open JoinerJ (λ _ _ _ → ⊤) ES.Switch.Cut public
 
     cut-to : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → ∀ q k → k ≼ Q → ES.Switch.Cut f o q k → ES.Switch.Cut f′ o′ q k
-    cut-to ao q k kQ (q′ , a′ , x , qq′ , q′k) = q′ , a′ , fwd ao q′ (below q′ k q′k kQ) x , qq′ , q′k
+    cut-to ao q k kQ = switch-cut-to {q = q} {y = k} ao kQ
 
     open Policy (λ _ _ _ _ _ → tt) (λ {f} {f′} {o} {o′} → cut-to {f} {f′} {o} {o′})
-                (λ {f} {o} {q} {k} {y} → switch-cut-up f o {q} {k} {y}) public
+                (λ {f} {o} {q} {k} {y} → switch-cut-up o {q} {k} {y}) public
 
   module ExhaustJ where
-    open ES.Exhaust using (Cur; cur₀; run; drop; Run)
+    open ES.Exhaust using (Cur; Run)
+    open ES.ExhaustOn using (cur₀; run; drop)
     open JoinerJ Run (λ _ _ _ _ → ⊥) public
-
-    cur-le : ∀ {f : A → Den B} {o : EmissionSet A} {q₁ q} → Cur f o q₁ q → q ≼ q₁
-    cur-le {q₁ = q₁} (cur₀ _ _)            = ≼-refl {q₁}
-    cur-le {q₁ = q₂} (run _ _ _ _ _ _ _)    = ≼-refl {q₂}
-    cur-le (drop {q₁} {q} {q₂ = q₂} cu _ _ _ lt _) = ≺→≼ {q} {q₂} (≼-≺-≺ {q} {q₁} {q₂} (cur-le cu) lt)
-
-    -- The last lane run ran.
-    cur-run : ∀ {f : A → Den B} {o : EmissionSet A} {q₁ q} → Cur f o q₁ q → Cur f o q q
-    cur-run (cur₀ x mn)            = cur₀ x mn
-    cur-run (run cu x l c x₂ lt nx) = run cu x l c x₂ lt nx
-    cur-run (drop cu _ _ _ _ _)    = cur-run cu
 
     -- From the other side, by the lanes run before.
     cur-from : ∀ {f f′ : A → Den B} {o o′ : EmissionSet A} → AgreeTo Q o o′ → Lanes o f f′ → ∀ q₁ q → q₁ ≼ Q → Cur f′ o′ q₁ q → Cur f o q₁ q
@@ -589,7 +579,7 @@ private
 
     module KM = KJ (λ _ _ _ → ⊤) (λ _ _ _ _ → ⊥) (λ ()) (λ ()) (λ Q → Join.MergeJ.agree {A} {B} Q)
                    (λ _ _ _ _ _ _ → tt) (λ _ _ _ _ _ _ → tt) (λ _ _ _ _ _ ()) (λ _ _ _ _ _ ())
-    module KS = KJ (λ _ _ _ → ⊤) ES.Switch.Cut (λ {q} {k} {y} → switch-cut-up f o {q} {k} {y}) (λ {q} {k} {y} → switch-cut-up f′ o′ {q} {k} {y})
+    module KS = KJ (λ _ _ _ → ⊤) ES.Switch.Cut (λ {q} {k} {y} → switch-cut-up o {q} {k} {y}) (λ {q} {k} {y} → switch-cut-up o′ {q} {k} {y})
                    (λ Q → Join.SwitchJ.agree {A} {B} Q) (λ _ _ _ _ _ _ → tt) (λ _ _ _ _ _ _ → tt)
                    (λ Q ao → Join.SwitchJ.cut-to {A} {B} Q {f} {f′} {o} {o′} ao) (λ Q ao → Join.SwitchJ.cut-to {A} {B} Q {f′} {f} {o′} {o} (AgreeTo-sym ao))
     module KE = KJ ES.Exhaust.Run (λ _ _ _ _ → ⊥) (λ ()) (λ ()) (λ Q → Join.ExhaustJ.agree {A} {B} Q)

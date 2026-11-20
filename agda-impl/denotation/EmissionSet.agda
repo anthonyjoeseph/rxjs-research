@@ -332,31 +332,37 @@ module Bounded {A B : Set} (n : ℕ) (f : A → Den B) (o : EmissionSet A) where
 
   open Joining Lane o (λ _ _ → Empty) (Ended o) Indexed (λ _ _ → Empty) Queued public
 
+-- A value after `q` arrived before `k`.
+Superseded : ∀ {A : Set} → EmissionSet A → Pos → Pos → Set
+Superseded {A} o q k = Σ Pos λ q′ → Σ A λ a′ → o q′ (out a′) × q ≺ q′ × q′ ≺ k
+
 -- SWITCH: a value's lane runs until the next value arrives.
 module Switch {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
-  -- A value after `q` arrived before `k`.
   Cut : Pos → Pos → Set
-  Cut q k = Σ Pos λ q′ → Σ A λ a′ → o q′ (out a′) × q ≺ q′ × q′ ≺ k
+  Cut = Superseded o
 
   open Joiner f o (λ _ → ⊤) Cut public
 
 -- EXHAUST: a value's lane runs only if the last lane run has ended by the
 -- time it arrives; otherwise the value is dropped.
-module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
+module ExhaustOn {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet A) where
   open Values o using (Next)
 
   -- At the value at `q′`, the last lane run is the value at `q`'s.
   data Cur : Pos → Pos → Set where
     cur₀ : ∀ {q a} → o q (out a) → (∀ {k b} → o k (out b) → q ≼ k) → Cur q q
-    run  : ∀ {q₁ q a c q₂ a₂} → Cur q₁ q → o q (out a) → LaneOf f q a c end → c ≺ q₂
+    run  : ∀ {q₁ q a c q₂ a₂} → Cur q₁ q → o q (out a) → Lane q a c end → c ≺ q₂
          → o q₂ (out a₂) → q₁ ≺ q₂ → Next q₁ q₂ → Cur q₂ q₂
-    drop : ∀ {q₁ q a q₂ a₂} → Cur q₁ q → o q (out a) → (∀ {c} → LaneOf f q a c end → q₂ ≼ c)
+    drop : ∀ {q₁ q a q₂ a₂} → Cur q₁ q → o q (out a) → (∀ {c} → Lane q a c end → q₂ ≼ c)
          → o q₂ (out a₂) → q₁ ≺ q₂ → Next q₁ q₂ → Cur q₂ q
 
   -- The value at `q` runs its lane.
   Run : Pos → Set
   Run q = Cur q q
+
+module Exhaust {A B : Set} (f : A → Den B) (o : EmissionSet A) where
+  open ExhaustOn (LaneOf f) o public
 
   open Joiner f o Run (λ _ _ → Empty) public
 

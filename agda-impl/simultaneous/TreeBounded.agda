@@ -32,7 +32,7 @@ open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
@@ -41,9 +41,10 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty
   connect; connected; defer)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; module TakeWhile; Rejoin; _≺_; _≼_; enter; Proper; module Op; module Connecting; at-end; end)
+open import denotation.EmissionSet using (EmissionSet; Ev; module TakeWhile; Rejoin; _≺_; _≼_; enter; Proper; module Op; module Connecting; at-end; end; At; Superseded; module ExhaustOn)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split; AgreeTo-sym)
+open import denotation.Laws.JoinInv using (switch-cut-up; switch-cut-to)
 open import denotation.Laws.Worlds using (_⊑_; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub;
   plain-ix; plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑;
   ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ; narrow; narrow⁼; shrink; shrink⁼; Plain; nest⁼;
@@ -75,8 +76,9 @@ open import simultaneous.Placed using (module Placing)
 open import simultaneous.ListTR using (tr-at)
 open import simultaneous.ColdBounded using (cold-bounded; cold-placed)
 open import simultaneous.HotRows using (hot-rows-settle)
-open import simultaneous.HorizonJoin using (module MergeB; module MergeP)
-open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
+open import simultaneous.HorizonJoin using (module JoinB; module JoinP)
+open import simultaneous.CutParts using (merge-tr→; merge-tr←; sw-tr→; sw-tr←; ex-tr→; ex-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
+open import simultaneous.JoinPolicy using (module ExhaustRuns)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
 
@@ -154,13 +156,9 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   PlacedAt n o p = Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
 
   postulate
-    -- THE OTHER JOINS'.
+    -- THE CONCURRENCY-BOUNDED MERGE'S.
     placed-cc : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
               → PlacedAt n (flatMap (mergeᶠ (just k)) f s) p
-    placed-sw : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-              → PlacedAt n (flatMap switchᶠ f s) p
-    placed-ex : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-              → PlacedAt n (flatMap exhaustᶠ f s) p
 
   -- A SPIN'S NEXT TICK lies one label under its subscription, and a plain
   -- child of an earlier tick reaches nothing that leads it: not the
@@ -246,14 +244,10 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   ... | inj₂ env = ⊥-elim (env-lead a env (inW (step here plain-ix)) (inside-⊑ (p ⊕ [ ix 1 ]) b ins))
 
   postulate
-    -- THE OTHER JOINS' CUTS: the outer's boundaries, and each running
-    -- lane's before the lane's cut.
+    -- THE CONCURRENCY-BOUNDED MERGE'S CUTS: the outer's boundaries, and
+    -- each running lane's.
     cc-bounded : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
                → Cuts.Bounded (Cut n (flatMap (mergeᶠ (just k)) f s) ρ p) (bd n (flatMap (mergeᶠ (just k)) f s) ρ uρ (dbd D) p)
-    sw-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-               → Cuts.Bounded (Cut n (flatMap switchᶠ f s) ρ p) (bd n (flatMap switchᶠ f s) ρ uρ (dbd D) p)
-    ex-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-               → Cuts.Bounded (Cut n (flatMap exhaustᶠ f s) ρ p) (bd n (flatMap exhaustᶠ f s) ρ uρ (dbd D) p)
 
   -- A DEFER'S MARKER, under its first label, leads no boundary of its
   -- body, subscribed one label down: the body's own lie in its world,
@@ -513,15 +507,29 @@ mutual
     placed-sub {Bd′ = bd n (takeWhile i q s) ρ uρ (dbd D) p} (λ {N} x → take-stands i q (tr-take→ i q (listC (3 + N) n s (ρ N) p) x)) (λ { (b , _) → b }) (tree-placed n s ρ uρ D p a)
   tree-placed n (flatMap (mergeᶠ nothing) f s)  ρ uρ D p a =
     placed-sub (λ {N} x → _ , (_ , merge-tr→ n f s uρ p x) , inj₁ refl) (λ b → b)
-      (MergeP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
+      (JoinP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (λ _ _ → ⊤) (λ _ _ _ → ⊥)
         (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
         (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
         (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
         (tree-placed n s ρ uρ D p a)
         (λ {N} {q} {v} x → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x)))
   tree-placed n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = placed-cc ρ uρ D n k f s p a
-  tree-placed n (flatMap switchᶠ f s)           ρ uρ D p a = placed-sw ρ uρ D n f s p a
-  tree-placed n (flatMap exhaustᶠ f s)          ρ uρ D p a = placed-ex ρ uρ D n f s p a
+  tree-placed n (flatMap switchᶠ f s)           ρ uρ D p a =
+    placed-sub (λ {N} x → _ , (_ , sw-tr→ n f s uρ p x) , inj₁ refl) (λ b → b)
+      (JoinP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (λ _ _ → ⊤) (λ N → Superseded (Cut n s ρ p N))
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (tree-placed n s ρ uρ D p a)
+        (λ {N} {q} {v} x → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x)))
+  tree-placed n (flatMap exhaustᶠ f s)           ρ uρ D p a =
+    placed-sub (λ {N} x → _ , (_ , ex-tr→ n f s uρ p x) , inj₁ refl) (λ b → b)
+      (JoinP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (λ N → ExhaustOn.Run (At (λ v q → Cut n (f v) ρ q N)) (Cut n s ρ p N)) (λ _ _ _ → ⊥)
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (tree-placed n s ρ uρ D p a)
+        (λ {N} {q} {v} x → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x)))
   tree-placed n       (connect s b)     ρ uρ D p a =
     placed-sub (λ {N} x → _ , (_ , conn-tr→ n s b uρ p x) , inj₁ refl) (λ b → b)
       (conn-placed ρ uρ D n s b p a (listHot n s uρ D p a) (bodyU n s uρ p) (admits-body n s uρ D p a) (λ N → proj₁)
@@ -545,19 +553,53 @@ mutual
         (tree-bounded n s ρ uρ D p a))
   tree-bounded n (flatMap (mergeᶠ nothing) f s) ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} → merge-tr← n f s uρ p {N} {y} {e}) (λ {N} {y} {e} → merge-tr→ n f s uρ p {N} {y} {e})
-      (MergeB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+      (JoinB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
         (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
         (λ {N} {q} {v} x → tree-bounded n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x))
         (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {q} {v} x l → pin-ok (3 + N) n (f v) {ρ N} (q ⊕ [ ix 1 ]) l)
         (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
         (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
         (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
         (λ {N} {b} {g} → tree-placed n s ρ uρ D p a {N} {b} {g})
         (λ {N} {q} {v} x {M} {b} {g} → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x) {M} {b} {g})
-        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w}))
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w})
+        (λ _ _ → ⊤) (λ _ _ _ → ⊥) (λ ()) (λ _ _ ()) (λ _ _ ()) (λ _ _ _ _ → tt) (λ _ _ _ _ → tt))
   tree-bounded n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = cc-bounded ρ uρ D n k f s p a
-  tree-bounded n (flatMap switchᶠ f s)           ρ uρ D p a = sw-bounded ρ uρ D n f s p a
-  tree-bounded n (flatMap exhaustᶠ f s)          ρ uρ D p a = ex-bounded ρ uρ D n f s p a
+  tree-bounded n (flatMap switchᶠ f s) ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → sw-tr← n f s uρ p {N} {y} {e}) (λ {N} {y} {e} → sw-tr→ n f s uρ p {N} {y} {e})
+      (JoinB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+        (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
+        (λ {N} {q} {v} x → tree-bounded n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x))
+        (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {q} {v} x l → pin-ok (3 + N) n (f v) {ρ N} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (λ {N} {b} {g} → tree-placed n s ρ uρ D p a {N} {b} {g})
+        (λ {N} {q} {v} x {M} {b} {g} → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x) {M} {b} {g})
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w})
+        (λ _ _ → ⊤) (λ N → Superseded (Cut n s ρ p N))
+        (λ {N} {q} {k} {y} → switch-cut-up (Cut n s ρ p N) {q} {k} {y})
+        (λ {N} {N′} {k} {q} {y} ag yk → switch-cut-to {o = Cut n s ρ p N} {Cut n s ρ p N′} {k} {q} {y} ag yk)
+        (λ {N} {N′} {k} {q} {y} ag yk → switch-cut-to {o = Cut n s ρ p N′} {Cut n s ρ p N} {k} {q} {y} (AgreeTo-sym ag) yk)
+        (λ _ _ _ _ → tt) (λ _ _ _ _ → tt))
+  tree-bounded n (flatMap exhaustᶠ f s) ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → ex-tr← n f s uρ p {N} {y} {e}) (λ {N} {y} {e} → ex-tr→ n f s uρ p {N} {y} {e})
+      (JoinB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+        (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q)
+        (λ {N} {q} {v} x → tree-bounded n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x))
+        (λ {N} {M} {q} {v} x l → pin-after-ok (3 + M) n (f v) {ρ M} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {q} {v} x l → pin-ok (3 + N) n (f v) {ρ N} (q ⊕ [ ix 1 ]) l)
+        (λ {N} {y} {e} {e′} → tab-func n s uρ D a {N} {y} {e} {e′})
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → tab-at n s uρ D a N) (λ N → proj₂ (admits-at D a N))
+        (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
+        (λ {N} {b} {g} → tree-placed n s ρ uρ D p a {N} {b} {g})
+        (λ {N} {q} {v} x {M} {b} {g} → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x) {M} {b} {g})
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w})
+        (λ N → ExhaustOn.Run (At (λ v q → Cut n (f v) ρ q N)) (Cut n s ρ p N)) (λ _ _ _ → ⊥) (λ ()) (λ _ _ ()) (λ _ _ ())
+        (λ {N} {N′} {k} {q} → ExhaustRuns.runs→ (Cut n s ρ p) (λ v q′ → Cut n (f v) ρ q′) {N} {N′} {k} {q})
+        (λ {N} {N′} {k} {q} → ExhaustRuns.runs← (Cut n s ρ p) (λ v q′ → Cut n (f v) ρ q′) {N} {N′} {k} {q}))
   tree-bounded n       (connect s b)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} → conn-tr← n s b uρ p {N} {y} {e}) (λ {N} {y} {e} → conn-tr→ n s b uρ p {N} {y} {e})
       (ConnB.bounded p (Cut n s ρ (p ⊕ [ ix 1 ])) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]))

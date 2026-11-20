@@ -91,17 +91,15 @@ Members: `ct-src-out`, `ct-src-held`.
 #### THE TREE'S HANGS
 
 A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
-bounds its cuts by one induction; the cold, scan, defer and connect
-cases are bodies, and every placement (`TreeBounded.tree-placed`) but the
-joins'. Open: the joins' boundaries, their bound (outer's, and each
-running lane's before the lane's cut) and placement.
+bounds its cuts by one induction; every case and placement is a body but
+the concurrency-bounded merge's. Open: its boundaries, bound and
+placement, a queued lane starting at another's end (`HorizonJoin.JoinB`
+needs which lanes run decided before the row).
 The plain side of a one-child former, a reader
 and a connect still passes its child's `Rel.Bd` through unpinned.
-Settled by bodies, or a lane hang the join does not keep.
+Settled by bodies, or a queued hang the merge does not keep.
 
-Members: `cc-bd`, `sw-bd`, `ex-bd`,
-`cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`, `placed-cc`,
-`placed-sw`, `placed-ex`.
+Members: `cc-bd`, `cc-bounded`, `pd-bounded`, `placed-cc`.
 
 #### THE JOINS' HANGS
 

@@ -2,7 +2,7 @@
 
 -- A COMPOUND'S CUT IS ITS OPERATOR OVER ITS PARTS' CUTS.  A merge's cut
 -- is the join of its outer's cut and its lanes' (`merge-tr→`,
--- `merge-tr←`), a connect's the connect of its source's and its body's
+-- `merge-tr←`, and the switch's and exhaust's likewise), a connect's the connect of its source's and its body's
 -- (`conn-tr→`, `conn-tr←`), a defer's its marker and its body's
 -- (`defer-tr→`, `defer-tr←`).  Each is the listing's exactness read
 -- against the parts' own tables as denotations (`simultaneous.ListTR`):
@@ -23,10 +23,10 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; Later; mergeᶠ; flatMap; connect; defer)
+open import Tree using (Obs; Later; mergeᶠ; switchᶠ; exhaustᶠ; flatMap; connect; defer)
 open import denotation.Position using (Pos; ix; _⊕_)
 open import denotation.Events using (Timeline)
-open import denotation.EmissionSet using (EmissionSet; skip; Den; coldAt; Truncate; Ended; LaneOf; module Joining; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; skip; Den; coldAt; Truncate; Ended; LaneOf; At; Superseded; module Joining; module Connecting; module ExhaustOn)
 import denotation.EmissionSet as ES
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; bind; rows; short; _⊣_)
@@ -37,9 +37,9 @@ open import quickcheck.Tabled.Exact using (conn-exact; truncate-exact)
 open import quickcheck.Tabled.Exact.Base using (Exactly; sound; complete; bind⁻)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv; Uncut)
 open import simultaneous.TableKit using (TR)
-open import simultaneous.ListTR using (self-exact; ent; laneD; merge-tr)
+open import simultaneous.ListTR using (self-exact; ent; laneD; merge-tr; sw-tr; ex-tr)
 open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU)
-open import simultaneous.HorizonJoin using (module MergeJ)
+open import simultaneous.HorizonJoin using (module MergeJ; module JoinJ)
 
 ------------------------------------------------------------------------
 -- Tables
@@ -57,21 +57,30 @@ private
 ------------------------------------------------------------------------
 -- Joins and connects over parts holding the same rows
 
+-- An exhaust's cursor over two lane families holding the same rows.
+cur-cong : ∀ {A B : Set} {L L′ : Pos → A → EmissionSet B} (o : EmissionSet A)
+         → (∀ {q a k e} → L q a k e → L′ q a k e) → (∀ {q a k e} → L′ q a k e → L q a k e)
+         → ∀ {q₁ q} → ExhaustOn.Cur L o q₁ q → ExhaustOn.Cur L′ o q₁ q
+cur-cong o l→ l← (ExhaustOn.cur₀ x m)            = ExhaustOn.cur₀ x m
+cur-cong o l→ l← (ExhaustOn.run c x l cq x₂ qq nx)   = ExhaustOn.run (cur-cong o l→ l← c) x (l→ l) cq x₂ qq nx
+cur-cong o l→ l← (ExhaustOn.drop c x nd x₂ qq nx)    = ExhaustOn.drop (cur-cong o l→ l← c) x (λ l → nd (l← l)) x₂ qq nx
+
 module JoinCong {A B : Set} {L L′ : Pos → A → EmissionSet B} {o o′ : EmissionSet A} {Over Over′ : Pos → Set}
-  (Bg : EmissionSet B) (Runs : Pos → Set) (Cut′ : Pos → Pos → Set) (Hand : Pos → Set)
+  (Bg : EmissionSet B) (Runs Runs′ : Pos → Set) (Cut′ : Pos → Pos → Set) (Hand : Pos → Set)
   (l→ : ∀ {q a k e} → L q a k e → L′ q a k e) (l← : ∀ {q a k e} → L′ q a k e → L q a k e)
   (o→ : ∀ {k e} → o k e → o′ k e) (o← : ∀ {k e} → o′ k e → o k e)
-  (ov→ : ∀ {c} → Over c → Over′ c) (ov← : ∀ {c} → Over′ c → Over c) where
+  (ov→ : ∀ {c} → Over c → Over′ c) (ov← : ∀ {c} → Over′ c → Over c)
+  (r→ : ∀ {q} → Runs q → Runs′ q) (r← : ∀ {q} → Runs′ q → Runs q) where
 
   private
-    module J  = Joining L  o  Bg Over  Runs Cut′ Hand
-    module J′ = Joining L′ o′ Bg Over′ Runs Cut′ Hand
+    module J  = Joining L  o  Bg Over  Runs  Cut′ Hand
+    module J′ = Joining L′ o′ Bg Over′ Runs′ Cut′ Hand
 
   done→ : ∀ {c} → J.Done c → J′.Done c
-  done→ {c} (ov , ls) = ov→ ov , λ {q} {a} x r qc nc → ended-map {t = L q a} {t′ = L′ q a} (λ {k} {e} → l→ {q} {a} {k} {e}) {c} (ls {q} {a} (o← x) r qc nc)
+  done→ {c} (ov , ls) = ov→ ov , λ {q} {a} x r qc nc → ended-map {t = L q a} {t′ = L′ q a} (λ {k} {e} → l→ {q} {a} {k} {e}) {c} (ls {q} {a} (o← x) (r← r) qc nc)
 
   done← : ∀ {c} → J′.Done c → J.Done c
-  done← {c} (ov , ls) = ov← ov , λ {q} {a} x r qc nc → ended-map {t = L′ q a} {t′ = L q a} (λ {k} {e} → l← {q} {a} {k} {e}) {c} (ls {q} {a} (o→ x) r qc nc)
+  done← {c} (ov , ls) = ov← ov , λ {q} {a} x r qc nc → ended-map {t = L′ q a} {t′ = L q a} (λ {k} {e} → l← {q} {a} {k} {e}) {c} (ls {q} {a} (o→ x) (r→ r) qc nc)
 
   to : ∀ {k e} → J.JoinT k e → J′.JoinT k e
   to (Joining.val x)                = Joining.val (o→ x)
@@ -79,11 +88,11 @@ module JoinCong {A B : Set} {L L′ : Pos → A → EmissionSet B} {o o′ : Emi
   to (Joining.opin x)               = Joining.opin (o→ x)
   to (Joining.oend x d)             = Joining.oend (o→ x) (done→ d)
   to (Joining.opass x nd)           = Joining.opass (o→ x) (λ d → nd (done← d))
-  to (Joining.lane x r l nc w)      = Joining.lane (o→ x) r (l→ l) nc w
-  to (Joining.lend x r l nc nh d)   = Joining.lend (o→ x) r (l→ l) nc nh (done→ d)
-  to (Joining.lpass x r l nc nh nd) = Joining.lpass (o→ x) r (l→ l) nc nh (λ d → nd (done← d))
-  to (Joining.hand x r l nc h)      = Joining.hand (o→ x) r (l→ l) nc h
-  to (Joining.left x r l nc ins)    = Joining.left (o→ x) r (l→ l) nc ins
+  to (Joining.lane x r l nc w)      = Joining.lane (o→ x) (r→ r) (l→ l) nc w
+  to (Joining.lend x r l nc nh d)   = Joining.lend (o→ x) (r→ r) (l→ l) nc nh (done→ d)
+  to (Joining.lpass x r l nc nh nd) = Joining.lpass (o→ x) (r→ r) (l→ l) nc nh (λ d → nd (done← d))
+  to (Joining.hand x r l nc h)      = Joining.hand (o→ x) (r→ r) (l→ l) nc h
+  to (Joining.left x r l nc ins)    = Joining.left (o→ x) (r→ r) (l→ l) nc ins
   to (Joining.run b w)              = Joining.run b w
   to (Joining.rend b nh d)          = Joining.rend b nh (done→ d)
   to (Joining.rpass b nh nd)        = Joining.rpass b nh (λ d → nd (done← d))
@@ -95,11 +104,11 @@ module JoinCong {A B : Set} {L L′ : Pos → A → EmissionSet B} {o o′ : Emi
   from (Joining.opin x)               = Joining.opin (o← x)
   from (Joining.oend x d)             = Joining.oend (o← x) (done← d)
   from (Joining.opass x nd)           = Joining.opass (o← x) (λ d → nd (done→ d))
-  from (Joining.lane x r l nc w)      = Joining.lane (o← x) r (l← l) nc w
-  from (Joining.lend x r l nc nh d)   = Joining.lend (o← x) r (l← l) nc nh (done← d)
-  from (Joining.lpass x r l nc nh nd) = Joining.lpass (o← x) r (l← l) nc nh (λ d → nd (done→ d))
-  from (Joining.hand x r l nc h)      = Joining.hand (o← x) r (l← l) nc h
-  from (Joining.left x r l nc ins)    = Joining.left (o← x) r (l← l) nc ins
+  from (Joining.lane x r l nc w)      = Joining.lane (o← x) (r← r) (l← l) nc w
+  from (Joining.lend x r l nc nh d)   = Joining.lend (o← x) (r← r) (l← l) nc nh (done← d)
+  from (Joining.lpass x r l nc nh nd) = Joining.lpass (o← x) (r← r) (l← l) nc nh (λ d → nd (done→ d))
+  from (Joining.hand x r l nc h)      = Joining.hand (o← x) (r← r) (l← l) nc h
+  from (Joining.left x r l nc ins)    = Joining.left (o← x) (r← r) (l← l) nc ins
   from (Joining.run b w)              = Joining.run b w
   from (Joining.rend b nh d)          = Joining.rend b nh (done← d)
   from (Joining.rpass b nh nd)        = Joining.rpass b nh (λ d → nd (done→ d))
@@ -126,16 +135,57 @@ module ConnCong {A B : Set} (p : Pos) {σ σ′ : EmissionSet A} {β β′ : Emi
   from (Connecting.kept x al n i) = Connecting.kept (s← x) (λ y → al (b→ y)) n i
 
 ------------------------------------------------------------------------
--- A merge's cut
+-- A join's cut
 
 module _ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : ℕ → All Tb.Listed Γ} (uρ : ∀ N → UncutEnv (ρ N)) p {N : ℕ} where
   private
+    Lt Lc : Pos → A → EmissionSet B
+    Lt = LaneOf (laneD (3 + N) n f (ρ N))
+    Lc = JoinJ.Lane (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) (λ _ _ → ⊤) (λ _ _ _ → ⊥) N
+
     -- A lane read off its listing, truncated, holds that listing's rows.
-    module Cg = JoinCong {L = LaneOf (laneD (3 + N) n f (ρ N))} {L′ = MergeJ.Lane (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N}
+    lt→ : ∀ {q a k e} → Lt q a k e → Lc q a k e
+    lt→ l = proj₁ (proj₁ l) , proj₂ l
+
+    lt← : ∀ {q a k e} → Lc q a k e → Lt q a k e
+    lt← {q} {a} l = ent (3 + N) n (f a) (uρ N) (q ⊕ [ ix 1 ]) (proj₁ l) , proj₂ l
+
+    module Cg = JoinCong {L = Lt} {L′ = Lc}
       {o = Cut n s ρ p N} {o′ = Cut n s ρ p N} {Over = Ended (Cut n s ρ p N)} {Over′ = Ended (Cut n s ρ p N)}
-      (λ _ _ → ⊥) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥)
-      (λ l → proj₁ (proj₁ l) , proj₂ l) (λ {q} {a} l → ent (3 + N) n (f a) (uρ N) (q ⊕ [ ix 1 ]) (proj₁ l) , proj₂ l)
+      (λ _ _ → ⊥) (λ _ → ⊤) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) lt→ lt←
+      (λ x → x) (λ x → x) (λ x → x) (λ x → x) (λ x → x) (λ x → x)
+
+    module Cs = JoinCong {L = Lt} {L′ = Lc}
+      {o = Cut n s ρ p N} {o′ = Cut n s ρ p N} {Over = Ended (Cut n s ρ p N)} {Over′ = Ended (Cut n s ρ p N)}
+      (λ _ _ → ⊥) (λ _ → ⊤) (λ _ → ⊤) (Superseded (Cut n s ρ p N)) (λ _ → ⊥) lt→ lt←
+      (λ x → x) (λ x → x) (λ x → x) (λ x → x) (λ x → x) (λ x → x)
+
+    module Ce = JoinCong {L = Lt} {L′ = Lc}
+      {o = Cut n s ρ p N} {o′ = Cut n s ρ p N} {Over = Ended (Cut n s ρ p N)} {Over′ = Ended (Cut n s ρ p N)}
+      (λ _ _ → ⊥) (ExhaustOn.Run Lt (Cut n s ρ p N)) (ExhaustOn.Run Lc (Cut n s ρ p N)) (λ _ _ → ⊥) (λ _ → ⊥) lt→ lt←
       (λ x → x) (λ x → x) (λ x → x) (λ x → x)
+      (cur-cong (Cut n s ρ p N) (λ {q} {a} {k} {e} → lt→ {q} {a} {k} {e}) (λ {q} {a} {k} {e} → lt← {q} {a} {k} {e}))
+      (cur-cong (Cut n s ρ p N) (λ {q} {a} {k} {e} → lt← {q} {a} {k} {e}) (λ {q} {a} {k} {e} → lt→ {q} {a} {k} {e}))
+
+  -- The switch: every lane runs, each cut where the next value arrives.
+  SwJ : ℕ → EmissionSet B
+  SwJ = JoinJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) (λ _ _ → ⊤) (λ N′ → Superseded (Cut n s ρ p N′))
+
+  -- The exhaust: a lane runs when the last run has ended.
+  ExJ : ℕ → EmissionSet B
+  ExJ = JoinJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) (λ N′ → ExhaustOn.Run (At (λ a q → Cut n (f a) ρ q N′)) (Cut n s ρ p N′)) (λ _ _ _ → ⊥)
+
+  sw-tr→ : ∀ {y e} → Cut n (flatMap switchᶠ f s) ρ p N y e → SwJ N y e
+  sw-tr→ x = Cs.to (Equivalence.to (sw-tr (3 + N) n f s (uρ N) p) x)
+
+  sw-tr← : ∀ {y e} → SwJ N y e → Cut n (flatMap switchᶠ f s) ρ p N y e
+  sw-tr← j = Equivalence.from (sw-tr (3 + N) n f s (uρ N) p) (Cs.from j)
+
+  ex-tr→ : ∀ {y e} → Cut n (flatMap exhaustᶠ f s) ρ p N y e → ExJ N y e
+  ex-tr→ x = Ce.to (Equivalence.to (ex-tr (3 + N) n f s (uρ N) p) x)
+
+  ex-tr← : ∀ {y e} → ExJ N y e → Cut n (flatMap exhaustᶠ f s) ρ p N y e
+  ex-tr← j = Equivalence.from (ex-tr (3 + N) n f s (uρ N) p) (Ce.from j)
 
   merge-tr→ : ∀ {y e} → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e
   merge-tr→ x = Cg.to (Equivalence.to (merge-tr (3 + N) n f s (uρ N) p) x)
