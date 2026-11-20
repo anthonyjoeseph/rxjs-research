@@ -35,7 +35,7 @@ open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; _⊢_; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
+  Aligned; aligned-r*; Rest; Out; out; same-bd; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
 open import simultaneous.TreeBounded using (admits-trig; tree-bounded)
 open import simultaneous.HorizonTree using (bd)
 
@@ -395,7 +395,8 @@ module FlatRel {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs T
 
 flat-rel : ∀ {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
          → Full n s → (Ff : ∀ a → Full n (f a)) → (∀ a → Coh n (f a) (Ff a)) → Full n (flatMap op f s)
-flat-rel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk = G.flat-tab op Os Ls Lc al lk ⊢ G.flatmap-order op Os Ls Lc al lk
+flat-rel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk =
+  out (G.flat-tab op Os Ls Lc al lk) (G.flatmap-order op Os Ls Lc al lk) (Joiners.flat-core-pin n f s ρ uρ ρι ρ* uρ* env p p* ad ad* op Os Ls Lc al lk) same-bd
   where open FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* env p p* ad ad* al lk
 
 -- THE LANES' MAP IS THE SUBSCRIPTIONS': two environments whose hots map

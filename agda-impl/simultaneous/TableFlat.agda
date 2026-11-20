@@ -319,14 +319,14 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   -- The source, at the share's subscription.
   Src : Set₁
-  Src = Out n s ρ (wk ρι) ρ*s (maps env) p sp*
+  Src = Out n s ρ uρ (wk ρι) ρ*s uρ*s (maps env) (lw env) Ds p sp*
 
   -- Each lane, wherever subscribed alike, whatever the four binders hold.
   Lanes : Set₁
   Lanes = ∀ a (t₁ : ℕ → Tb.Listed ⊤) (t₂ : ℕ → Tb.Listed (IE B)) (t₃ : ℕ → Tb.Listed (IE A)) (t₄ : ℕ → Tb.Listed ⊤)
-        → (∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
+        → (u : ∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
         → (h₁ : HotD t₁) (h₂ : HotD t₂) (h₃ : HotD t₃) (h₄ : HotD t₄)
-        → Holds n (f a) ρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+        → Holds n (f a) ρ uρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
 
   -- Two records of one lane, its trigger's hot recorded twice: they map
   -- alike and are late alike (`simultaneous.TableEnv.Coh`).
@@ -538,7 +538,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         alL : Aligned (maps env) ρ st (laneL stE)
         adm : Admits (lw env) st
         adm* : Admits Dc stE
-        lane : Out n (f a) ρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (maps env) st (laneX stE)
+        lane : Out n (f a) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (den-cons (trigD stE adm*) Dc) st (laneX stE)
 
       -- The lane's plain tables.
       tab : Maybe (Tb.Listed B)

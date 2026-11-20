@@ -51,7 +51,7 @@ open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounde
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
-  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; _⊢_; HotR; EnvR; maps; lw; lw*;
+  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; same-bd; HotR; EnvR; maps; lw; lw*;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
 open import simultaneous.TreeBounded using (listHot; tree-bounded)
 open import simultaneous.HorizonTree using (bd)
@@ -102,7 +102,7 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
   uρ*′ N = proj₂ (proj₂ (listC-ok (3 + N) n (annotate (elab ρι s)) (uρ* N) (p* ⊕ [ ix 1 ]))) , uρ* N
 
   Src : Set₁
-  Src = Out n s ρ ρι ρ* (maps env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
+  Src = Out n s ρ uρ ρι ρ* uρ* (maps env) (lw env) (lw* env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
 
   -- The two hots, each listed off its lawful source.
   hD = listHot n s uρ (lw env) p a
@@ -440,8 +440,8 @@ opaque
   conn-hot : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
                (env : EnvR ρ ρι ρ*) p p* (a : Admits (lw env) p) (a* : Admits (lw* env) p*)
            → (Rs : ConnEnv.Src n s ρ uρ ρι ρ* uρ* env p p* a a*) → ConnEnv.HotS n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
-  conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs n′ q q* ad ad* al lk =
-    rel′ ad ad* al ⊢ rest′ ad ad* al lk
+  conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs _ _ n′ q q* ad ad* al lk =
+    out (rel′ ad ad* al) (rest′ ad ad* al lk) (Out.bd-pin Rs) same-bd
     where open ReaderTab n s ρ uρ ρι ρ* uρ* env p p* a a* Rs n′ q q*
 
 -- THE HOT'S MAP IS ITS SOURCE'S: two scopes whose sources map alike and
@@ -455,10 +455,10 @@ module ConnTwo {Γ A} n (s : Obs Timeline Γ A)
 
   HotCoh : Set₁
   HotCoh = (Rs : C.Src) (Rs′ : C′.Src) → (∀ N y → Same (Out.rel Rs) (Out.rel Rs′) N y)
-         → ∀ n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
+         → ∀ u u* n′ q q* (ad : Admits C.D′ q) (ad′ : Admits C′.D′ q) (ad* : Admits C.D*′ q*) (ad*′ : Admits C′.D*′ q*)
              (al : Aligned (C.Ψ′ Rs) C.ρ′ q q*) (al′ : Aligned (C′.Ψ′ Rs′) C′.ρ′ q q*) (lk lk′ : Linked q q*) N y
-         → Same (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs n′ q q* ad ad* al lk))
-                (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ n′ q q* ad′ ad*′ al′ lk′)) N y
+         → Same (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E p p* a a* Rs u u* n′ q q* ad ad* al lk))
+                (Out.rel (conn-hot n s ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ Rs′ u u* n′ q q* ad′ ad*′ al′ lk′)) N y
 
 -- Two scopes whose sources map alike and are late alike: a reader's
 -- image is its source row's, carried alike, and it is late where its
@@ -467,7 +467,7 @@ opaque
   unfolding conn-hot
   conn-hot-coh : ∀ {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) uρ*
                    (E E′ : EnvR ρ ρι ρ*) p p* a a′ a* a*′ → ConnTwo.HotCoh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′
-  conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ Rs Rs′ hs n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
+  conn-hot-coh n s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ Rs Rs′ hs _ _ n′ q q* ad ad′ ad* ad*′ al al′ lk lk′ N y =
     same (if-≡ {b = endAt (X.P N) y} refl (λ _ → refl) (λ _ → cong (X.imgAt N) (φ≡ (hs N (up y)))))
          (λ { nl (ne , inj₁ pn)  → nl (ne , inj₁ pn)
             ; nl (ne , inj₂ lt′) → nl→ (hs N (up y)) (λ lt → nl (ne , inj₂ lt)) lt′ })

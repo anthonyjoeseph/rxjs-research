@@ -53,7 +53,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import Function using (_⇔_)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; module Sub)
 open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
-  Admits; tab-func; admits-row; dbd)
+  Admits; tab-func; admits-row; dbd; SameBd; same-bd)
 open JoinBd using (outerB; laneB; laneH)
 
 
@@ -522,3 +522,10 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   flat-core (mergeᶠ (just k)) = λ Os Ls Lc al lk → Joins.ConcatTab.rel′ Os Ls Lc k al lk
   flat-core switchᶠ           = λ Os Ls Lc al lk → Joins.SwitchTab.rel′ Os Ls Lc al lk
   flat-core exhaustᶠ          = λ Os Ls Lc al lk → Joins.ExhaustTab.rel′ Os Ls Lc al lk
+
+  -- Every joiner's core hangs as its tree does.
+  flat-core-pin : ∀ op Os Ls Lc al lk → SameBd (Rel.Bd (flat-core op Os Ls Lc al lk)) (jbd op)
+  flat-core-pin (mergeᶠ nothing)  _ _ _ _ _ = same-bd
+  flat-core-pin (mergeᶠ (just k)) _ _ _ _ _ = same-bd
+  flat-core-pin switchᶠ           _ _ _ _ _ = same-bd
+  flat-core-pin exhaustᶠ          _ _ _ _ _ = same-bd

@@ -69,7 +69,7 @@ open import simultaneous.TableCorr using (Rel; Same)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Btw; PB; Own; OwnPut)
-open import simultaneous.HorizonTree using (BdEnv; _∷ᵇ_)
+open import simultaneous.HorizonTree using (BdEnv; _∷ᵇ_; bd)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
 
@@ -540,17 +540,32 @@ record Rest {Γ A} (Ψ : Maps Γ) (ρ : ℕ → All Tb.Listed Γ) {P : ℕ → M
     bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Rel.Late R N)) (Rel.φ R N) (OwnPut (TR (P N)) (Rel.Put R N)) (Rel.Bd R N) (Rel.Bd* R N)
                                    (EnvCut Ψ ρ N)
 
-record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ)
-           (Ψ : Maps Γ) (p p* : Pos) : Set₁ where
-  constructor _⊢_
+-- Two families holding the same boundaries.
+record SameBd (Bd Bd′ : ℕ → Pos → Tag → Set) : Set where
+  constructor sameBd
+  field
+    to   : ∀ {N b g} → Bd N b g → Bd′ N b g
+    from : ∀ {N b g} → Bd′ N b g → Bd N b g
+open SameBd public
+
+same-bd : ∀ {Bd : ℕ → Pos → Tag → Set} → SameBd Bd Bd
+same-bd = sameBd (λ x → x) (λ x → x)
+
+-- A SUBTERM'S RECORD, its boundaries its tree's on both sides (`bd-pin`,
+-- `bd-pin*`): a join's pair is its parts' pairs at the tree's boundaries.
+record Out {Γ Δ A} (n : ℕ) (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (ρι : Ren Γ Δ)
+           (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (Ψ : Maps Γ) (D : DenOf ρ) (D* : DenOf ρ*) (p p* : Pos) : Set₁ where
+  constructor out
   field
     rel  : Rel (Tab n o ρ p) (Tab* n ρι o ρ* p*) p p*
     rest : Rest Ψ ρ rel
+    bd-pin  : SameBd (Rel.Bd rel) (bd n o ρ uρ (dbd D) p)
+    bd-pin* : SameBd (Rel.Bd* rel) (bd n (elab ρι o) ρ* uρ* (dbd D*) p*)
 
 -- A hot in scope: its two readers' record wherever they are subscribed
 -- alike.
 HotR : ∀ {Γ Δ X} → X ∈ Γ → (ρ : ℕ → All Tb.Listed Γ) → Ren Γ Δ → (ρ* : ℕ → All Tb.Listed Δ) → Maps Γ → DenOf ρ → DenOf ρ* → Set₁
-HotR i ρ ρι ρ* Ψ D D* = ∀ n p p* → Admits D p → Admits D* p* → Aligned Ψ ρ p p* → Linked p p* → Out n (connected i) ρ ρι ρ* Ψ p p*
+HotR i ρ ρι ρ* Ψ D D* = ∀ uρ uρ* n p p* → Admits D p → Admits D* p* → Aligned Ψ ρ p p* → Linked p p* → Out n (connected i) ρ uρ ρι ρ* uρ* Ψ D D* p p*
 
 record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) : Set₁ where
   constructor envR
@@ -560,27 +575,29 @@ record EnvR {Γ Δ} (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : �
     lw*  : DenOf ρ*
     hot  : ∀ {X} (i : X ∈ Γ) → HotR i ρ ρι ρ* maps lw lw*
     -- A hot's map is its readers' subscriptions', never their admissions'.
-    hot-coh : ∀ {X} (i : X ∈ Γ) n p p* (a a′ : Admits lw p) (a* a*′ : Admits lw* p*) (al al′ : Aligned maps ρ p p*) (lk lk′ : Linked p p*) N y
-            → Same (Out.rel (hot i n p p* a a* al lk)) (Out.rel (hot i n p p* a′ a*′ al′ lk′)) N y
+    hot-coh : ∀ {X} (i : X ∈ Γ) uρ uρ* n p p* (a a′ : Admits lw p) (a* a*′ : Admits lw* p*) (al al′ : Aligned maps ρ p p*) (lk lk′ : Linked p p*) N y
+            → Same (Out.rel (hot i uρ uρ* n p p* a a* al lk)) (Out.rel (hot i uρ uρ* n p p* a′ a*′ al′ lk′)) N y
     -- No elaborated hot a program reads ends a lane.
     unended : ∀ N → EnvU ρι (den lw* N)
 open EnvR public
 
 -- Wherever the two are subscribed alike, each admissibly.
-Holds : ∀ {Γ Δ A} → ℕ → Obs Timeline Γ A → (ρ : ℕ → All Tb.Listed Γ) (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) → EnvR ρ ρι ρ* → Set₁
-Holds n o ρ ρι ρ* env = ∀ p p* → Admits (lw env) p → Admits (lw* env) p* → Aligned (maps env) ρ p p* → Linked p p* → Out n o ρ ρι ρ* (maps env) p p*
+Holds : ∀ {Γ Δ A} → ℕ → Obs Timeline Γ A → (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ N)) → (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ)
+      → (∀ N → UncutEnv (ρ* N)) → EnvR ρ ρι ρ* → Set₁
+Holds n o ρ uρ ρι ρ* uρ* env = ∀ p p* → Admits (lw env) p → Admits (lw* env) p* → Aligned (maps env) ρ p p* → Linked p p*
+                             → Out n o ρ uρ ρι ρ* uρ* (maps env) (lw env) (lw* env) p p*
 
 -- In every environment of uncut tables whose hots are related.
 Full : ∀ {Γ A} → ℕ → Obs Timeline Γ A → Set₁
-Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) → (∀ N → UncutEnv (ρ N))
-             → ∀ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) → (∀ N → UncutEnv (ρ* N)) → (env : EnvR ρ ρι ρ*) → Holds n o ρ ρι ρ* env
+Full {Γ} n o = ∀ (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N))
+             → ∀ {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) → (env : EnvR ρ ρι ρ*) → Holds n o ρ uρ ρι ρ* uρ* env
 
 -- Two environments whose hots map alike, however their readers are
 -- admitted.
 EnvEq : ∀ {Γ Δ} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} → EnvR ρ ρι ρ* → EnvR ρ ρι ρ* → Set₁
-EnvEq {Γ} {ρ = ρ} E E′ = ∀ {X} (i : X ∈ Γ) n p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
+EnvEq {Γ} {ρ = ρ} E E′ = ∀ {X} (i : X ∈ Γ) uρ uρ* n p p* (a : Admits (lw E) p) (a′ : Admits (lw E′) p) (a* : Admits (lw* E) p*) (a*′ : Admits (lw* E′) p*)
                  (al : Aligned (maps E) ρ p p*) (al′ : Aligned (maps E′) ρ p p*) (lk lk′ : Linked p p*) N y
-               → Same (Out.rel (hot E i n p p* a a* al lk)) (Out.rel (hot E′ i n p p* a′ a*′ al′ lk′)) N y
+               → Same (Out.rel (hot E i uρ uρ* n p p* a a* al lk)) (Out.rel (hot E′ i uρ uρ* n p p* a′ a*′ al′ lk′)) N y
 
 -- THE MAP IS THE SUBSCRIPTIONS': a record's map and its late rows are
 -- had from its subscriptions and its environment's maps, never from how
@@ -596,14 +613,15 @@ Coh {Γ} n o F = ∀ (ρ : ℕ → All Tb.Listed Γ) uρ {Δ} (ρι : Ren Γ Δ)
 -- An elaborated binder no plain subterm reads changes no reader.
 env-wk : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
        → HotD t → EnvR ρ ρι ρ* → EnvR ρ (wk ρι) (λ N → t N ∷ ρ* N)
-env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i n p p* a a* al lk →
-  let O = hot env i n p p* a (admits-wk h (lw* env) a*) al lk in Out.rel O ⊢ Out.rest O)
-  (λ i n p p* a a′ a* a*′ al al′ lk lk′ → hot-coh env i n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
+env-wk h env = envR (maps env) (lw env) (den-cons h (lw* env)) (λ i uρ uρ* n p p* a a* al lk →
+  let O = hot env i uρ (λ N → proj₂ (uρ* N)) n p p* a (admits-wk h (lw* env) a*) al lk in out (Out.rel O) (Out.rest O) (Out.bd-pin O) (Out.bd-pin* O))
+  (λ i uρ uρ* n p p* a a′ a* a*′ al al′ lk lk′ →
+     hot-coh env i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h (lw* env) a*) (admits-wk h (lw* env) a*′) al al′ lk lk′)
   (λ N i → unended env N i)
 
 -- Two environments whose hots map alike, weakened by two records of one
 -- hot: their hots map alike.
 env-wk-eq : ∀ {Γ Δ X} {ρ : ℕ → All Tb.Listed Γ} {ρι : Ren Γ Δ} {ρ* : ℕ → All Tb.Listed Δ} {t : ℕ → Tb.Listed X}
           → (h h′ : HotD t) {E E′ : EnvR ρ ρι ρ*} → EnvEq E E′ → EnvEq (env-wk h E) (env-wk h′ E′)
-env-wk-eq h h′ {E} {E′} ee i n p p* a a′ a* a*′ al al′ lk lk′ =
-  ee i n p p* a a′ (admits-wk h (lw* E) a*) (admits-wk h′ (lw* E′) a*′) al al′ lk lk′
+env-wk-eq h h′ {E} {E′} ee i uρ uρ* n p p* a a′ a* a*′ al al′ lk lk′ =
+  ee i uρ (λ N → proj₂ (uρ* N)) n p p* a a′ (admits-wk h (lw* E) a*) (admits-wk h′ (lw* E′) a*′) al al′ lk lk′
