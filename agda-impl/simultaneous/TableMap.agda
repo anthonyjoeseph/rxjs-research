@@ -68,6 +68,7 @@ map-bounded : ∀ {X Y : Set} (f : X → Y) (P : ℕ → Maybe (Tb.Listed X)) {B
 map-bounded {X} {Y} f P {Bd} B = record
   { gap     = λ {N} bd′ x → B.gap bd′ (proj₁ (proj₂ (tr-map→ f (P N) x)))
   ; held-in = λ {N} {b} {q} → B.held-in {N} {b} {q}
+  ; held-under = λ {N} {b} {q} → B.held-under {N} {b} {q}
   ; fwd     = λ {N} {k} cl {N′} le →
       ⟨ (λ {y} yk → (λ x → mv N N′ (λ {e₀} → proj₁ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)
                   , (λ x → mv N′ N (λ {e₀} → proj₂ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)) ⟩

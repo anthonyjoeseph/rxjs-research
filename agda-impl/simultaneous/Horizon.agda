@@ -173,6 +173,8 @@ module Cuts {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → 
     field
       gap     : ∀ {N b g y e} → Bd N b g → c N y e → ¬ b ⊑ y × ¬ y ⊑ b
       held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b
+      -- a held boundary lies under the connect holding it
+      held-under : ∀ {N b q} → Bd N b (held q) → q ⊑ b
       fwd     : ∀ {N k} → Clear N k → Settled N k
       fwd-pin : ∀ {N q k} → Clear N q → HeldClear N q k → PinSettled N q k
 
@@ -182,7 +184,7 @@ module Cuts {A : Set} (c : ℕ → EmissionSet A) (Bd : ℕ → Pos → Tag → 
 -- A cut that never moves hangs nowhere.
 const-bounded : ∀ {A} (t : EmissionSet A) → Cuts.Bounded (λ _ → t) (λ _ _ _ → ⊥)
 const-bounded t = record
-  { gap = λ () ; held-in = λ ()
+  { gap = λ () ; held-in = λ () ; held-under = λ ()
   ; fwd = λ _ _ → ⟨ (λ _ → (λ x → x) , (λ x → x)) ⟩
   ; fwd-pin = λ _ _ _ _ → (λ x → x) , (λ x → x) }
 
@@ -191,7 +193,7 @@ bounded-≃ : ∀ {A} {c c′ : ℕ → EmissionSet A} {Bd : ℕ → Pos → Tag
           → (∀ {N k e} → c N k e → c′ N k e) → (∀ {N k e} → c′ N k e → c N k e)
           → Cuts.Bounded c Bd → Cuts.Bounded c′ Bd
 bounded-≃ {c = c} {c′} to from B = record
-  { gap = λ bd x → B.gap bd (from x) ; held-in = B.held-in
+  { gap = λ bd x → B.gap bd (from x) ; held-in = B.held-in ; held-under = B.held-under
   ; fwd = λ {N} {k} cl le → ag-≃ to from to from (B.fwd {N} {k} cl le)
   ; fwd-pin = λ {N} {q} {k} cl hc le yk → let (f , g) = B.fwd-pin {N} {q} {k} cl hc le yk in (λ x → to (f (from x))) , (λ x → to (g (from x))) }
   where module B = Cuts.Bounded B
@@ -262,6 +264,9 @@ module SpinB {X : Set} (p : Pos) where
   held-in : ∀ {N b q} → Bd N b (held q) → q ≺ b
   held-in (() , _)
 
+  held-under : ∀ {N b q} → Bd N b (held q) → q ⊑ b
+  held-under (() , _)
+
   real : Real
   real {N} (refl , refl) = p ⊕ [ ix (3 + N) ] , inj₂ (⊑-refl _) , skip , inj₂ (sp← (n<1+n (3 + N)) , nope)
     where
@@ -285,7 +290,7 @@ module SpinB {X : Set} (p : Pos) where
       ... | _ , _ , _ , ()
 
   bounded : Bounded
-  bounded = record { gap = gap ; held-in = held-in ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
+  bounded = record { gap = gap ; held-in = held-in ; held-under = held-under ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
 
 ------------------------------------------------------------------------
 -- A takeWhile's clearness at a row, its source's at the row read
@@ -387,6 +392,9 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
   held-in′ : ∀ {N b q} → Bd′ N b (held q) → q ≺ b
   held-in′ (bd , _) = CB.held-in bd
 
+  held-under′ : ∀ {N b q} → Bd′ N b (held q) → q ⊑ b
+  held-under′ (bd , _) = CB.held-under bd
+
   -- CLEAR, SO SETTLED: the source settles up to `k`, or up to the first
   -- failing value; past its completion each cut holds only pins of
   -- connects before it, which the source holds alike.
@@ -465,7 +473,7 @@ module TakeB {A : Set} (incl : Bool) (keep : A → Bool) (c : ℕ → EmissionSe
       xf′ = proj₁ (upto (CB.fwd {N} {f} (clear-first {N} {q} {f} cq nFf fq) le) (≼-refl {f})) xf
 
   bounded′ : T.Bounded
-  bounded′ = record { gap = gap′ ; held-in = held-in′ ; fwd = fwd′ ; fwd-pin = λ {N} {q} {k} → fwd-pin′ {N} {q} {k} }
+  bounded′ = record { gap = gap′ ; held-in = held-in′ ; held-under = held-under′ ; fwd = fwd′ ; fwd-pin = λ {N} {q} {k} → fwd-pin′ {N} {q} {k} }
 
 ------------------------------------------------------------------------
 -- A connect's cuts
@@ -510,6 +518,11 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
   held-in {N} {b} (bodyB bd)       = BB.held-in {N} {b} bd
   held-in {N} {b} (burstB _ ins)   = ≺-≼-≺ {p} {r} {b} (≺-ext p []) (⊑-≼ (inside-⊑ r b ins))
   held-in {N} {b} (keptB bd _ _)   = BS.held-in {N} {b} bd
+
+  held-under : ∀ {N b q} → CBd N b (held q) → q ⊑ b
+  held-under {N} {b} (bodyB bd)       = BB.held-under {N} {b} bd
+  held-under {N} {b} (burstB _ ins)   = ⊑-trans {p} {r} {b} ([ ix 1 ] , refl) (inside-⊑ r b ins)
+  held-under {N} {b} (keptB bd _ _)   = BS.held-under {N} {b} bd
 
   alive-down : ∀ {N z w} → w ≼ z → Al N z → Al N w
   alive-down {z = z} {w = w} wz al {c} x = ≼-≺-≺ {w} {z} {c} wz (al x)
@@ -667,7 +680,7 @@ module ConnB {A B : Set} (p : Pos) (σ : ℕ → EmissionSet A) (β : ℕ → Em
     gap-c  : ∀ {N b g y e} → CBd N b g → Cc N y e → ¬ b ⊑ y × ¬ y ⊑ b
 
   bounded : SC.Bounded
-  bounded = record { gap = gap-c ; held-in = held-in ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
+  bounded = record { gap = gap-c ; held-in = held-in ; held-under = held-under ; fwd = fwd ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
 
 ------------------------------------------------------------------------
 -- A lane reading a hot
@@ -702,6 +715,9 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
 
   held-in-j : ∀ {N b q} → JBd N b (held q) → q ≺ b
   held-in-j {N} {b} {q} = BH.held-in {N} {b} {q}
+
+  held-under-j : ∀ {N b q} → JBd N b (held q) → q ⊑ b
+  held-under-j {N} {b} {q} = BH.held-under {N} {b} {q}
 
   -- CLEAR, SO SETTLED: a row shown at `q ⊕ [ sub s ]` reads the hot up to
   -- `q`, and a late end up to `s`; every hot boundary lies past both.
@@ -742,4 +758,4 @@ module RejoinB {A : Set} (s : Pos) (h : ℕ → EmissionSet A) (Bdh : ℕ → Po
       none (shown _ () _)
 
   bounded-j : SJ.Bounded
-  bounded-j = record { gap = gap-j ; held-in = λ {N} {b} {q} → held-in-j {N} {b} {q} ; fwd = fwd-j ; fwd-pin = λ {N} {q} {k} → fwd-pin-j {N} {q} {k} }
+  bounded-j = record { gap = gap-j ; held-in = λ {N} {b} {q} → held-in-j {N} {b} {q} ; held-under = λ {N} {b} {q} → held-under-j {N} {b} {q} ; fwd = fwd-j ; fwd-pin = λ {N} {q} {k} → fwd-pin-j {N} {q} {k} }

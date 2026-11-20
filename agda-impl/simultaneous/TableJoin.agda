@@ -244,9 +244,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- the source's own skip lies over no mark of its elaborated
         -- boundaries
         mg-skip-off* : ∀ N {z* k} → Mark (BdS* N) z* → oM N k skip → ¬ Rel.Late (Out.rel Os) N k → ¬ Rel.φ (Out.rel Os) N k ⊑ z*
-        -- no image of the source lies over a connect an elaborated
-        -- boundary waits on
-        mg-src-held* : ∀ N {b r y e} → BdS* N b (held r) → Cut n s* ρ*s sp* N y e → ¬ y ⊑ r
         -- the source's end, relocated past the trigger's, cuts a pair of
         -- the source's boundaries alike where the source's rows do
         mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
@@ -296,9 +293,11 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- An image of the source's values lies over no mark of its
       -- elaborated boundaries.
+      module TBs = Cuts.Bounded (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*))
+
       src-off* : ∀ N {z* y e} → Mark (BdS* N) z* → Cut n s* ρ*s sp* N y e → ¬ y ⊑ z*
-      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (Cuts.Bounded.gap (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*)) bd y)
-      src-off* N (_ , _ , bd , inj₂ refl) y = mg-src-held* N bd y
+      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (TBs.gap bd y)
+      src-off* N (_ , _ , bd , inj₂ refl) y yr = proj₂ (TBs.gap bd y) (⊑-trans yr (TBs.held-under bd))
 
       val-img : ∀ N {k a} → oM N k (out a) → Σ (Ev (IE A)) (Cut n s* ρ*s sp* N (Rel.φ (Out.rel Os) N k))
       val-img N x = [ (λ { ((e′ , y , _) , _) → e′ , y }) , (λ { (() , _) }) ]′ (Corr.row→ (Rel.corr (Out.rel Os) N) x tt)
