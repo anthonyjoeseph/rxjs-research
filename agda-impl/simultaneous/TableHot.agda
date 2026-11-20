@@ -160,8 +160,9 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
   opaque
    unfolding hD
    hot-row : ∀ N {h e} → Rows (hotOf (σ N)) h e → HotsAll D′ h
-   hot-row N {h} {e} m = N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
-     where ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ])
+   hot-row N {h} {e} m =
+     let ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ]) in
+     N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
 
   -- The new hot, read by a body subscribed in this scope.
   HotS : Src → Set₁
