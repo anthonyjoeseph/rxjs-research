@@ -42,6 +42,5 @@ Beside the gate, in its own CI job: `bug-cache` — [bug-cache.md](bug-cache.md)
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, rulings, traps |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard |
-| [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
 | [split.md](split.md) | `make split` — cut a long module into parts and retarget its consumers |
 | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out |
