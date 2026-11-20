@@ -80,19 +80,21 @@ Members: `root-real`, `root-real*`, `root-off`, `root-off*`,
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
 `Horizon.ConnB` keeps a source boundary before the connect as an echo,
-so it asks only that none lies inside the connect's own window
-(`src-out`) and that a burst's held pin is past the subscription. A hot
-reader's boundaries are its hot's, before or past. Untried. Settled by
-a proof over the tree, or a source boundary between the connect and its
-source's subscription.
+so it asks only that none lies inside the connect's own window and that
+a burst's held pin is past the subscription; the plain side's are bodies
+over the placement. Left: the elaborated side's, and a hot's boundaries
+led by no late end of a reader. Untried. Settled by a proof over the
+tree, or a source boundary between the connect and its source's
+subscription.
 
-Members: `src-out`, `src-held`, `src-apart`, `ct-src-out`, `ct-src-held`.
+Members: `src-apart`, `ct-src-out`, `ct-src-held`.
 
 #### THE PLACEMENT
 
 A tree's own boundaries lie in its world, under no world of a plain
 child of its rows; its scope's are its hots', led by no admissible
-world position (`Placed.Placing`). The merge's gap is a body over it.
+world position (`Placed.Placing`). The merge's gap and the source's
+window and a defer's marker are bodies over it.
 Untried. Settled by an induction beside `tree-bounded`, or a reader's
 boundary a body position leads.
 
@@ -103,13 +105,13 @@ Members: `tree-placed`, `env-lead`.
 A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
 bounds its cuts by one induction; the cold, scan, defer and connect
 cases are bodies. Open: the joins' boundaries and their bound (outer's,
-and each running lane's before the lane's cut), a hot's ends before a settled pin (`hot-pin-ends`,
-not derivable from `Cuts.Bounded` alone), and a deferred child's
-boundaries off its guard. The plain side of a one-child former, a reader
+and each running lane's before the lane's cut), and a hot's ends before
+a settled pin (`hot-pin-ends`, not derivable from `Cuts.Bounded` alone).
+The plain side of a one-child former, a reader
 and a connect still passes its child's `Rel.Bd` through unpinned.
 Settled by bodies, or a lane hang the join does not keep.
 
-Members: `cc-bd`, `sw-bd`, `ex-bd`, `hot-pin-ends`, `defer-apart`,
+Members: `cc-bd`, `sw-bd`, `ex-bd`, `hot-pin-ends`,
 `cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`.
 
 #### THE JOINS' HANGS

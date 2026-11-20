@@ -32,7 +32,7 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
@@ -42,9 +42,9 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; las
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
 open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub; plain-ix;
-  plain-last; ok-in)
+  plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑; ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
@@ -64,7 +64,7 @@ open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
 open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
-open import simultaneous.Horizon using (Tag; held; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
+open import simultaneous.Horizon using (Tag; held; past-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
 open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
 open import simultaneous.Placed using (module Placing)
@@ -104,11 +104,26 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     -- A SCOPE'S BOUNDARY is led by no position of an admissible world.
     env-lead : ∀ {p} → Admits D p → ∀ {N b g} → EnvB (dbd D) N b g → ∀ {w} → W⁼ (Hots (den D N)) p w → ¬ w ⊑ b
 
-    -- A SOURCE'S BOUNDARIES lie before its connect or past its
-    -- subscription, and a held one in its burst waits on a connect there.
-    src-out  : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
-    src-held : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
+  -- A SOURCE'S BOUNDARIES lie before its connect or past its
+  -- subscription: its own in its world, its scope's led by neither the
+  -- connect nor the subscription.
+  src-out : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → b ≺ p ⊎ (p ⊕ [ ix 1 ]) ≺ b
+  src-out n s p a {N} {b} bd with tree-placed n s (p ⊕ [ ix 1 ]) (admits-step D a) bd
+  ... | inj₁ own = inj₂ (world-after (Placing.Own.world own) (Placing.Own.real own))
+  ... | inj₂ env with ≼-or-≻ b p
+  ...   | inj₂ pb = inj₂ (past-child (ix 1) pb (env-lead a env here))
+  ...   | inj₁ bp with ≼-split {b} {p} bp
+  ...     | inj₁ lt   = inj₁ lt
+  ...     | inj₂ refl = ⊥-elim (env-lead a env here (⊑-refl b))
 
+  -- A held one in its burst waits on a connect there: its own's in the
+  -- source's world, and no scope boundary lies under the subscription.
+  src-held : ∀ {A} n (s : Obs Timeline Γ A) p → Admits D p → ∀ {N b q} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b (held q) → T (inside (p ⊕ [ ix 1 ]) b) → (p ⊕ [ ix 1 ]) ≼ q
+  src-held n s p a {N} {b} {q} bd ins with tree-placed n s (p ⊕ [ ix 1 ]) (admits-step D a) bd
+  ... | inj₁ own = world-after⁼ (proj₁ (Placing.Own.holder own refl)) (proj₂ (Placing.Own.holder own refl))
+  ... | inj₂ env = ⊥-elim (env-lead a env (inW (step here plain-ix)) (inside-⊑ (p ⊕ [ ix 1 ]) b ins))
+
+  postulate
     -- A SOURCE'S BOUNDARIES are led by no late end of a reader its hot's
     -- rows admit, subscribed at or past the connect's body.
     src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
@@ -123,10 +138,24 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     ex-bounded : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
                → Cuts.Bounded (Cut n (flatMap exhaustᶠ f s) ρ p) (bd n (flatMap exhaustᶠ f s) ρ uρ (dbd D) p)
 
-    -- A DEFER'S MARKER, under its first label, leads no boundary of its
-    -- body, subscribed one label down.
-    defer-apart : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
-                → ∀ {N b g} → bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (p ⊕ [ ix 0 ]) ⊑ b
+  -- A DEFER'S MARKER, under its first label, leads no boundary of its
+  -- body, subscribed one label down: the body's own lie in its world,
+  -- which the marker's sibling does not lead, and its scope's under no
+  -- position of the defer's.
+  defer-apart : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p
+              → ∀ {N b g} → bd n (Later.force l) ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (p ⊕ [ ix 0 ]) ⊑ b
+  defer-apart n l p a {N} bd le with tree-placed n (Later.force l) (p ⊕ [ ix 1 ]) (admits-step D a) bd
+  ... | inj₂ env = env-lead a env (inW (step here plain-ix)) le
+  ... | inj₁ own with lead (inW (Placing.Own.world own)) le
+  ...   | l-hot hh r = proj₂ (admits-at D a N) hh (step here plain-ix) (⊑-inside r)
+  ...   | l-in v with w-up plain-ix (inW v)
+  ...     | inj₂ v′ = not-up (proj₁ (proj₁ a)) v′ (⊑-refl p)
+  ...     | inj₁ eq with ⊕-injʳ p p eq
+  ...       | ()
+  defer-apart n l p a {N} bd le | inj₁ own | l-root r with ⊑-snoc p r
+  ...   | inj₁ r′ = not-up {H = Hots (den D N)} (proj₁ (proj₁ a)) here r′
+  ...   | inj₂ eq with ⊕-injʳ p p eq
+  ...     | ()
 
 ------------------------------------------------------------------------
 -- Every tree, and the hot a connect lists
