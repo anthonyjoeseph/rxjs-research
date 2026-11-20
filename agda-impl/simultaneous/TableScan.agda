@@ -30,6 +30,7 @@ open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; Emi
 open import denotation.Laws.Fold using (Latest)
 open import denotation.Laws.Modulus using (few-ind; ≺-irrefl; ≺-absurd; ≼-refl; ≺→≼; ≼-trans; ≼-antisym; ≼-or-≻; ≼-split; ≼-≺-≺)
 open import denotation.Laws.Worlds.Leaves using (module AccF)
+open import denotation.Laws.Worlds using (_⊑_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; scanRows)
 open import quickcheck.Tabled.Exact.Scan using (module ScanX)
@@ -519,8 +520,13 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
       ; put-clear = λ {N} {N′} le x pl cl* → Across.put-clear R.across le (proj₂ (row-of f z (tr-scan→ f z (P N′) x))) pl cl*
       ; lead-clear = λ {N} x un nl ld y ie cl* → let (_ , x₀ , u₀) = At.back-row N x un in
           Across.lead-clear R.across x₀ u₀ nl (λ x′ un′ ie′ → let (_ , x″ , u″) = At.fwd-row N x′ un′ in ld x″ u″ ie′)
-            (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) ie cl* } }
+            (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) ie cl* }
+    ; skip-off* = skip-off*′ }
     where
+      skip-off*′ : ∀ {N k l b t} → TR (P′ N) k skip → ¬ R.Late N k → R.Put N k l → R.Bd* N b t → ¬ R.φ N k ⊑ b
+      skip-off*′ {N} x with tr-scan→ f z (P N) x
+      ... | sstep xs = R.skip-off* xs
+
       sc-pin : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → t l (pin r)
       sc-pin (spin x) = x
 

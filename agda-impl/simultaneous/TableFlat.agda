@@ -42,7 +42,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; bind⁻; values⁺; pastRows⁺)
+open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; pastRows⁺)
 open import Relation.Nullary.Decidable using (dec-true)
 open import Data.Maybe.Properties using (just-injective)
 open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
@@ -152,6 +152,17 @@ module TabRows where
   endAt-I : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → TR m y end → endAt m y ≡ true
   endAt-I nothing (_ , () , _)
   endAt-I (just Lx) {y} (_ , refl , m) = any⁺ {p = λ k → does (k ≟ᵖ y)} (ends⁺ m) (dec-true (y ≟ᵖ y) refl)
+
+  -- An end listed among a table's ends is a row.
+  ends-tr : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {c} → c ∈ endsOf m → TR m c end
+  ends-tr nothing   ()
+  ends-tr (just Lx) c∈ = Lx , refl , ends⁻ {rs = rows Lx} c∈
+
+  endAt-E : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {y} → endAt m y ≡ true → TR m y end
+  endAt-E m h = ends-tr m (any-≟ h)
+
+  skip≢end : ∀ {X : Set} → ¬ (skip {X} ≡ end)
+  skip≢end ()
 
   rowAt : ∀ {X : Set} → Maybe (Tb.Listed X) → Pos → Bool
   rowAt nothing   y = false

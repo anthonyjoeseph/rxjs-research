@@ -268,7 +268,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
     ; after* = cold-after*
     ; after-φ = λ { (_ , refl , x) _ _ → φ-after x }
     ; pin-after* = λ y → ⊥-elim (cold-pin* y)
-    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = tree-bounded n (coldˢ (fixed m)) ρ* uρ* D* p* a* ; bcorr = cold-bcorr ; across = cold-across }
+    ; Bd = cold-bd (fixed m) p ; Bd* = cold-bd* ; bounded = cold-bounded {Γ = []} n (fixed m) (λ _ → []) p ; bounded* = tree-bounded n (coldˢ (fixed m)) ρ* uρ* D* p* a* ; bcorr = cold-bcorr ; across = cold-across ; skip-off* = λ _ _ () }
 
 cold-tab : ∀ {A} (m : From A 0) n {Δ} (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (D* : DenOf ρ*) p p* (a* : Admits D* p*)
          → Rel (ColdTab.P m n ρ* uρ* D* p p* a*) (ColdTab.Q m n ρ* uρ* D* p p* a*) p p*

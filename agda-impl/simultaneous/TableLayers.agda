@@ -6,7 +6,7 @@
 -- lanes' records.
 module simultaneous.TableLayers where
 
-open import Data.Bool using (T; if_then_else_)
+open import Data.Bool using (T; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -15,6 +15,7 @@ open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_)
+open import Data.Unit using (tt)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -23,7 +24,8 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; Unpinned; pin; _≺_; _≼_)
+open import denotation.EmissionSet using (Ev; Unpinned; pin; skip; _≺_; _≼_)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans)
 open import denotation.Laws.Modulus using (≼-trans; ≺→≼; ≺-ext)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; rows; ends)
@@ -34,7 +36,7 @@ open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB)
-open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; Linked; linked-r*;
+open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; linked-r*;
   Aligned; aligned-r*; Rest; Out; out; same-bd; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
 open import simultaneous.TreeBounded using (admits-trig; tree-bounded)
 open import simultaneous.HorizonTree using (bd)
@@ -147,6 +149,16 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       cb-putw     : ∀ N {b b* g*} → Rel.Bd* R N b* g* → PB (OwnPut (TR (P′ N)) (Rel.Put R N)) b b* → PB (OwnPut (TR (P′ N)) (Put′ N)) b b*
       cb-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) cb-bd*
 
+    -- A put skip is no end: re-emitted, its image lies under the lanes'
+    -- flatMap's, over no boundary of the flatMap's, which the scan's are.
+    cb-put-off* : ∀ {N k l b g} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → cb-bd* N b g → ¬ φ′ N k ⊑ b
+    cb-put-off* {N} {k} {b = b} x nl (_ , pl , _) bd = go (endAt (P′ N) k) refl
+      where
+        go : ∀ c → endAt (P′ N) k ≡ c → ¬ (if c then aEnd N ⊕ˡ (ix 1 ∷ ix 0 ∷ last ∷ []) else reEmit (Rel.φ R N k)) ⊑ b
+        go true  eq _ = skip≢end (Rel.func R x (endAt-E (P′ N) eq))
+        go false _  h = Rel.skip-off* R x nl pl (proj₁ (proj₂ (cb-only N bd)))
+                          (⊑-trans (⊑-⊕ˡ (Rel.φ R N k) (sub (rB 1) ∷ ix 1 ∷ ix 0 ∷ [])) h)
+
     cb-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (cb-bd* N)
     cb-bcorr N = Wrap.corr (Own (TR (P′ N)) (Late′ N)) (Rel.φ R N) (φ′ N) (OwnPut (TR (P′ N)) (Rel.Put R N)) (OwnPut (TR (P′ N)) (Put′ N))
       (Rel.Bd R N) (Rel.Bd* R N) (cb-bd* N) (Rel.bcorr R N)
@@ -170,7 +182,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; func = Rel.func R ; func* = tab-func n (inner op) uρ*c Dc ad₂ ; flat = Rel.flat R ; flat* = tab-flat n (inner op) uρ*c Dc ad₂
       ; pin-in = Rel.pin-in R ; pin-in* = cb-pin-in* ; got = Rel.got R ; got* = cb-got*
       ; after = Rel.after R ; after* = cb-after* ; after-φ = cb-after-φ ; pin-after* = cb-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr ; across = cb-across }
+      ; Bd = Rel.Bd R ; Bd* = cb-bd* ; bounded = Rel.bounded R ; bounded* = cb-bounded* ; bcorr = cb-bcorr ; across = cb-across ; skip-off* = cb-put-off* }
 
   ----------------------------------------------------------------------
   -- THE CLOSER: the combined run is the closer's connect's body, its rows
@@ -252,7 +264,8 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; across = record
         { back-clear = λ {N} {N′} {k} {e} le x un nl cl* → Across.back-clear (Rel.across R) {N} {N′} {k} {e} le x un nl (cz-clear {N} {φ′ N′ k} cl*)
         ; put-clear = λ {N} {N′} {k} {e} {l} le x pl cl* → Across.put-clear (Rel.across R) {N} {N′} {k} {e} {l} le x pl (cz-clear {N} {l} cl*)
-        ; lead-clear = λ {N} {k} {e} {m} {e*} → cz-lead-clear {N} {k} {e} {m} {e*} } }
+        ; lead-clear = λ {N} {k} {e} {m} {e*} → cz-lead-clear {N} {k} {e} {m} {e*} }
+      ; skip-off* = λ {N} x nl pl bd → Rel.skip-off* R x nl pl (proj₁ (proj₂ (cz-only N bd))) }
 
   ----------------------------------------------------------------------
   -- THE SHARE: the body is the share's two connects' body, its rows shown
@@ -312,6 +325,12 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     postulate
       sr-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (Rel.Bd R N) (sr-bd* N)
       sr-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (Rel.Bd R) sr-bd*
+      -- every row not late imaged at a row of the elaborated flatMap
+      sr-img      : ∀ N {k} → Own (TR (P′ N)) (Late′ N) k → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N k))
+
+    -- A put skip is imaged as any row is, so over no boundary.
+    sr-put-off* : ∀ {N k l b g} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → sr-bd* N b g → ¬ φ′ N k ⊑ b
+    sr-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap sr-bounded* b₀ (proj₂ (sr-img _ (skip , x , tt , nl))))
 
     sr-got : ∀ N → Got (P′ N)
     sr-got N = got-ok (3 + N) n (flatMap op f s) {ρ N} (uρ N) p
@@ -345,7 +364,7 @@ module Layers {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       ; flat = tab-flat n (flatMap op f s) uρ (lw env) ad ; flat* = tab-flat n (elab ρι (flatMap op f s)) uρ* (lw* env) ad*
       ; pin-in = sr-pin-in ; pin-in* = sr-pin-in* ; got = sr-got ; got* = sr-got*
       ; after = sr-after ; after* = sr-after* ; after-φ = sr-after-φ ; pin-after* = sr-pin-after*
-      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = sr-across }
+      ; Bd = Rel.Bd R ; Bd* = sr-bd* ; bounded = sr-bounded ; bounded* = sr-bounded* ; bcorr = sr-bcorr ; across = sr-across ; skip-off* = sr-put-off* }
 
   -- The layers pass the core's boundaries through: the flatMap's own.
   flat-hangs : ∀ op (Os : Src) (Ls : Lanes) (Lc : LanesCoh Ls) (al : Aligned (maps env) ρ p p*) (lk : Linked p p*)

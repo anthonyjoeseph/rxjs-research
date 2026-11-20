@@ -11,7 +11,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _≤_)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Empty using (⊥)
 open import Function using (_⇔_)
@@ -30,6 +30,8 @@ open import simultaneous.Attribution using (One; Shown; Live)
 
 open import simultaneous.Horizon using (Tag; module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
+open import simultaneous.HorizonConn using (Mark)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans)
 open import simultaneous.TableKit using (Got; TR; M)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -177,6 +179,8 @@ record Across {A : Set} (P : ℕ → EmissionSet A) (Q : ℕ → EmissionSet (IE
 -- two sides hang alike, at one cut and across cuts (`across`).
 --
 -- LATE ROWS (`Late`) have no image: the order facts are over the rest.
+-- A skip put rather than imaged still lies over no elaborated boundary
+-- (`skip-off*`), as an image, a row, does not.
 record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Listed (IE A))) (s s* : Pos) : Set₁ where
   field
     φ           : ℕ → Pos → Pos
@@ -192,6 +196,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     bounded*    : Cuts.Bounded (λ N → TR (Q N)) Bd*
     bcorr       : ∀ N → Inter.BCorr (Own (TR (P N)) (Late N)) (φ N) (OwnPut (TR (P N)) (Put N)) (Bd N) (Bd* N)
     across      : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ Put Late Bd Bd*
+    skip-off*   : ∀ {N k l b g} → TR (P N) k skip → ¬ Late N k → Put N k l → Bd* N b g → ¬ φ N k ⊑ b
     func        : ∀ {N y e e′} → TR (P N) y e → TR (P N) y e′ → e ≡ e′
     func*       : ∀ {N y e e′} → TR (Q N) y e → TR (Q N) y e′ → e ≡ e′
     flat        : ∀ {N y e l ys e′} → TR (P N) y e → TR (P N) (y ⊕ (l ∷ ys)) e′ → ⊥
@@ -204,6 +209,18 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
     after*      : ∀ {N l e} → TR (Q N) l e → s* ≼ l
     after-φ     : ∀ {N k e} → TR (P N) k e → Unpinned e → ¬ Late N k → s* ≼ φ N k
     pin-after*  : ∀ {N l r} → TR (Q N) l (pin r) → s* ≼ r
+
+-- NO OWN ROW'S IMAGE LIES OVER AN ELABORATED BOUNDARY: an imaged row's
+-- image is a row; a put one's by `skip-off*`.
+off* : ∀ {A P Q s s*} (R : Rel {A} P Q s s*) {N k b g} → Own (TR (P N)) (Rel.Late R N) k → Rel.Bd* R N b g → ¬ Rel.φ R N k ⊑ b
+off* R {N} (e , x , un , nl) bd with Corr.row→ (Rel.corr R N) x un
+... | inj₁ ((_ , y , _) , _)        = proj₂ (Cuts.Bounded.gap (Rel.bounded* R) bd y)
+... | inj₂ (refl , ((_ , _ , _ , pl) , _)) = Rel.skip-off* R x nl pl bd
+
+-- Nor over a connect a boundary waits on, which lies under it.
+off*-mark : ∀ {A P Q s s*} (R : Rel {A} P Q s s*) {N k z*} → Own (TR (P N)) (Rel.Late R N) k → Mark (Rel.Bd* R N) z* → ¬ Rel.φ R N k ⊑ z*
+off*-mark R o (_ , _ , bd , inj₁ refl) = off* R o bd
+off*-mark R o (_ , _ , bd , inj₂ refl) h = off* R o bd (⊑-trans h (Cuts.Bounded.held-under (Rel.bounded* R) bd))
 
 -- Two records of one stream alike at a row: one image, and the row late
 -- in the second only where it is late in the first.

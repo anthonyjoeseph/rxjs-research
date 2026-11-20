@@ -37,25 +37,23 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 Each part's pair and clearance hold at its tree's boundaries
 (`Out.bd-pin`); the merge's elaborated outer hangs at the source's
 (`mg-each-bd→`), its rows the source's images relocated under the
-share, the end at the later of its own and the trigger's. Open: a
-put skip's image, or an image, over a held connect; the end relocated
-past a boundary; a late row put past one; the lanes likewise under
-`laneˢ`. Settled by bodies, or an image under a held connect.
+share, the end at the later of its own and the trigger's. Open: the end
+relocated past a boundary; a late row put past one; the lanes likewise
+under `laneˢ`. Settled by bodies.
 
-Members: `mg-skip-off*`, `mg-src-held*`, `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
+Members: `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
 `mg-outer-lead`, `mg-lane-lead`.
 
 #### THE MERGE'S CROSS-PART FACTS
 
 `JoinPair` asks the merge what no part knows alone: each part's rows
-cut the other parts' marks alike, a held pin has no merge row under it,
-a merge row's map is its outer's (`φo`) or its lane's, and every
+cut the other parts' marks alike, a merge row's map is its outer's (`φo`) or its lane's, and every
 image row is a row's. Untried. Settled by bodies over the listing, or
 a lane row ordered against an outer mark unlike its image.
 
 Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-skip`, `mg-val←`, `mg-φ-val`, `mg-nl-out`, `mg-put-split`,
-`mg-img`, `mg-held`, `mg-held*`, `mg-outer-lane`, `mg-outer-lane-put`,
+`mg-img`, `mg-outer-lane`, `mg-outer-lane-put`,
 `mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
 
 #### THE HANGS ACROSS CUTS
@@ -113,9 +111,10 @@ Members: `cold-bd`, `cc-bd`, `sw-bd`, `ex-bd`, `cold-bounded`, `scan-bounded`,
 
 Each core's pair with the plain flatMap's: the merge's is
 `JoinPair`'s over its parts' and cross-part leaves; the others copy it,
-over `cc-bd`, `sw-bd`, `ex-bd`. Settled by bodies.
+over `cc-bd`, `sw-bd`, `ex-bd`, opaque; a bounded merge hangs only where
+its outer or a lane does. Settled by bodies.
 
-Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`.
 
 #### THE CONNECT'S HANGS
 
@@ -183,7 +182,7 @@ The switch's record is the merge's map over every value's lane. Untried:
 a cut lane's rows unshown alike, its pins kept alike, its end shown at
 the same `done`. Settled by bodies, or a lane cut at one side's row only.
 
-Members: `sw-corr`, `sw-in-bk`, `sw-after-φ`.
+Members: `sw-corr`, `sw-in-bk`, `sw-after-φ`, `sw-img`.
 
 #### THE EXHAUST
 
@@ -192,7 +191,7 @@ exhaust runs. Untried: the elaborated exhaust runs the same lanes,
 though its lanes end at their end images. Settled by bodies, or a value
 run on one side only.
 
-Members: `ex-corr`, `ex-in-bk`, `ex-after-φ`.
+Members: `ex-corr`, `ex-in-bk`, `ex-after-φ`, `ex-img`.
 
 #### THE BOUNDED MERGE
 
@@ -201,7 +200,7 @@ a queued lane's record had from the lane it waited on, at its end, and
 subscribed under that end's image (probed). Untried:
 its fields, the queue's state a run's. Settled by bodies.
 
-Members: `cc-corr`, `cc-in-bk`, `cc-after-φ`.
+Members: `cc-corr`, `cc-in-bk`, `cc-after-φ`, `cc-img`.
 
 #### THE PLAIN MERGE
 
@@ -221,7 +220,7 @@ are and its source's only as pins and skips; the share puts the
 source's pins where its connect shows them, the layers inside relating
 the plain flatMap without them. Untried: the fields. Settled by bodies.
 
-Members: `cz-corr`, `sr-corr`.
+Members: `cz-corr`, `sr-corr`, `sr-img`.
 
 #### THE CONNECT'S HOT
 

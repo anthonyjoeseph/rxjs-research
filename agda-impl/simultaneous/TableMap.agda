@@ -68,6 +68,7 @@ map-bounded : ∀ {X Y : Set} (f : X → Y) (P : ℕ → Maybe (Tb.Listed X)) {B
 map-bounded {X} {Y} f P {Bd} B = record
   { gap     = λ {N} bd′ x → B.gap bd′ (proj₁ (proj₂ (tr-map→ f (P N) x)))
   ; held-in = λ {N} {b} {q} → B.held-in {N} {b} {q}
+  ; held-under = λ {N} {b} {q} → B.held-under {N} {b} {q}
   ; fwd     = λ {N} {k} cl {N′} le →
       ⟨ (λ {y} yk → (λ x → mv N N′ (λ {e₀} → proj₁ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)
                   , (λ x → mv N′ N (λ {e₀} → proj₂ (upto (B.fwd {N} {k} cl le) {y} {e₀} yk)) x)) ⟩
@@ -277,7 +278,8 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
       ; put-clear = λ {N} {N′} le x pl cl* → Across.put-clear R.across le (proj₁ (proj₂ (tr-map→ f (P N′) x))) pl cl*
       ; lead-clear = λ {N} x un nl ld y ie cl* → let (_ , x₀ , u₀) = back-row N x un in
           Across.lead-clear R.across x₀ u₀ nl (λ {_} {e′} x′ un′ ie′ → ld (tr-map← f (P N) x′) (un← f e′ un′) ie′)
-            (proj₁ (proj₂ (tr-map→ g (Q N) y))) ie cl* } }
+            (proj₁ (proj₂ (tr-map→ g (Q N) y))) ie cl* }
+    ; skip-off* = λ {N} x → R.skip-off* (tr-skip← f (P N) x) }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))

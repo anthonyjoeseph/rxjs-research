@@ -78,6 +78,10 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
   held-in {N} {b} (outerB bd)          = BO.held-in {N} {b} bd
   held-in {N} {b} (laneH {r = r} x _ bd _) = BLn.held-in x {N} {b} {r} bd
 
+  held-under : ∀ {N b r} → MBd N b (held r) → r ⊑ b
+  held-under {N} {b} (outerB bd)          = BO.held-under {N} {b} bd
+  held-under {N} {b} (laneH {r = r} x _ bd _) = BLn.held-under x {N} {b} {r} bd
+
   -- Below a value's row, the value is the same in every cut agreeing there.
   below : ∀ {q k} → (q ⊕ [ ix 1 ]) ≺ k → q ≼ k
   below {q} {k} lt = ≺→≼ {q} {k} (≺-≼-≺ {q} {q ⊕ [ ix 1 ]} {k} (≺-ext q []) (≺→≼ {q ⊕ [ ix 1 ]} {k} lt))
@@ -211,4 +215,4 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
     gap-m : ∀ {N b g y e} → MBd N b g → Jc N y e → ¬ b ⊑ y × ¬ y ⊑ b
 
   bounded : SM.Bounded
-  bounded = record { gap = gap-m ; held-in = λ {N} {b} {r} → held-in {N} {b} {r} ; fwd = fwd ; fwd-pin = λ {N} {r} {k} → fwd-pin {N} {r} {k} }
+  bounded = record { gap = gap-m ; held-in = λ {N} {b} {r} → held-in {N} {b} {r} ; held-under = λ {N} {b} {r} → held-under {N} {b} {r} ; fwd = fwd ; fwd-pin = λ {N} {r} {k} → fwd-pin {N} {r} {k} }

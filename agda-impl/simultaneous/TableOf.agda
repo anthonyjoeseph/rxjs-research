@@ -185,6 +185,7 @@ module OfTab {A : Set} (xs : List A) (v : A → IE A) (vals : ∀ x → valuesOf
     ; bounded = const-bounded (TR (just (W p 0 xs ⊣ false))) ; bounded* = const-bounded (TR (just (W p* 0 (map v xs) ⊣ false)))
     ; bcorr = λ _ → none-corr
     ; across = record { back-clear = λ _ _ _ _ _ () ; put-clear = λ _ _ () ; lead-clear = λ _ _ _ _ _ _ _ () }
+    ; skip-off* = λ _ _ ()
     ; func = λ { (_ , refl , m) (_ , refl , m′) → func-W p 0 xs m m′ }
     ; func* = λ { (_ , refl , m) (_ , refl , m′) → func-W p* 0 (map v xs) m m′ }
     ; flat = λ { (_ , refl , m) (_ , refl , m′) → flat-W p 0 xs m m′ }

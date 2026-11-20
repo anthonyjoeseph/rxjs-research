@@ -48,7 +48,7 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Listing using (listC; UncutEnv)
-open import simultaneous.TableCorr using (Rel; Corr; Across)
+open import simultaneous.TableCorr using (Rel; Corr; Across; off*-mark)
 open import simultaneous.TableKit using (TR; Got) renaming (M to Matches)
 open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.InstEmit using (valuesOf)
@@ -241,12 +241,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-late-src : ∀ N {k e} → oM N k e → Rel.Late (Out.rel Os) N k → Late′ N k
         -- an outer skip read through the shared hot
         mg-φ-skip : ∀ N {k} → oM N k skip → φ′ N k ≡ srcφ N k
-        -- the source's own skip lies over no mark of its elaborated
-        -- boundaries
-        mg-skip-off* : ∀ N {z* k} → Mark (BdS* N) z* → oM N k skip → ¬ Rel.Late (Out.rel Os) N k → ¬ Rel.φ (Out.rel Os) N k ⊑ z*
-        -- no image of the source lies over a connect an elaborated
-        -- boundary waits on
-        mg-src-held* : ∀ N {b r y e} → BdS* N b (held r) → Cut n s* ρ*s sp* N y e → ¬ y ⊑ r
         -- the source's end, relocated past the trigger's, cuts a pair of
         -- the source's boundaries alike where the source's rows do
         mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
@@ -266,9 +260,6 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
                      → (Σ (Ev A) λ e′ → oM N k e′ × Put′ N k l)
                      ⊎ (Σ Pos λ q → Σ A λ a → Σ (Ev B) λ e′ → oM N q (out a) × MergeJ.Lane oM LM N q a k e′ × Put′ N k l)
         mg-img : ∀ N {k} → Own (JP.J.JoinT N) (Late′ N) k → Σ (Ev (IE B)) (JP.J*.JoinT N (φ′ N k))
-        -- no merge row extends a held boundary's pin
-        mg-held  : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
-        mg-held* : ∀ {N b r y e} → jbd* (mergeᶠ nothing) N b (held r) → JP.J*.JoinT N y e → ¬ y ⊑ r
         -- each part's rows cut the other parts' marks alike
         mg-outer-lane : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.Between N z z* → JP.Lanes N z z*
         mg-outer-lane-put : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdoM* N) z* → JP.IO.PutBefore N z z* → JP.LanesP N z z*
@@ -296,9 +287,15 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- An image of the source's values lies over no mark of its
       -- elaborated boundaries.
+      module TBs = Cuts.Bounded (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*))
+
       src-off* : ∀ N {z* y e} → Mark (BdS* N) z* → Cut n s* ρ*s sp* N y e → ¬ y ⊑ z*
-      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (Cuts.Bounded.gap (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*)) bd y)
-      src-off* N (_ , _ , bd , inj₂ refl) y = mg-src-held* N bd y
+      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (TBs.gap bd y)
+      src-off* N (_ , _ , bd , inj₂ refl) y yr = proj₂ (TBs.gap bd y) (⊑-trans yr (TBs.held-under bd))
+
+      -- Nor does a skip of the source's.
+      mg-skip-off* : ∀ N {z* k} → Mark (BdS* N) z* → oM N k skip → ¬ Rel.Late (Out.rel Os) N k → ¬ Rel.φ (Out.rel Os) N k ⊑ z*
+      mg-skip-off* N (b , g , bd , eq) x nlo = off*-mark (Out.rel Os) (skip , x , tt , nlo) (b , g , SameBd.from (Out.bd-pin* Os) bd , eq)
 
       val-img : ∀ N {k a} → oM N k (out a) → Σ (Ev (IE A)) (Cut n s* ρ*s sp* N (Rel.φ (Out.rel Os) N k))
       val-img N x = [ (λ { ((e′ , y , _) , _) → e′ , y }) , (λ { (() , _) }) ]′ (Corr.row→ (Rel.corr (Out.rel Os) N) x tt)
@@ -380,6 +377,19 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       mg-gap* : ∀ {N b g y e} → jbd* (mergeᶠ nothing) N b g → JP.J*.JoinT N y e → ¬ y ⊑ b
       mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (elab ρι⁴ (f a))) eachS {ρ*c} uρ*c c₁ {N} y))
+
+      -- No merge row lies over a connect a boundary waits on: the
+      -- boundary lies under it, and no row over the boundary.
+      -- A put skip is imaged as any row is, at a row of the elaborated
+      -- merge, so over no boundary.
+      mg-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ nothing) N b g → ¬ φ′ N y ⊑ b
+      mg-put-off* {N} x nl _ b₀ = mg-gap* b₀ (proj₂ (mg-img N (skip , merge-tr→ n f s uρ p (pd-sub {mergeᶠ nothing} {N} x) , tt , nl)))
+
+      mg-held : ∀ {N b r y e} → jbd (mergeᶠ nothing) N b (held r) → JP.J.JoinT N y e → ¬ y ⊑ r
+      mg-held {N} b₀ y yr = mg-gap b₀ y (⊑-trans yr (Cuts.Bounded.held-under (jtree (mergeᶠ nothing)) b₀))
+
+      mg-held* : ∀ {N b r y e} → jbd* (mergeᶠ nothing) N b (held r) → JP.J*.JoinT N y e → ¬ y ⊑ r
+      mg-held* {N} b₀ y yr = mg-gap* b₀ y (⊑-trans yr (Cuts.Bounded.held-under (jbounded* (mergeᶠ nothing)) b₀))
 
       mg-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ nothing) N) (jbd* (mergeᶠ nothing) N)
       mg-bcorr N = Sub.restrict {Row = Own (TR (P′ N)) (Late′ N)} {Row′ = JP.JRow N} {φ = φ′ N} {Puts = OwnPut (TR (P′ N)) (Put′ N)} {Puts′ = JP.JPut N}
@@ -474,7 +484,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {(mergeᶠ nothing)} ; func* = core-func {(mergeᶠ nothing)} ; flat = pd-flat {(mergeᶠ nothing)} ; flat* = core-flat {(mergeᶠ nothing)}
         ; pin-in = mg-pin-in ; pin-in* = mg-pin-in* ; got = mg-got ; got* = mg-got*
         ; after = mg-after ; after* = mg-after* ; after-φ = mg-after-φ ; pin-after* = mg-pin-after*
-        ; Bd = jbd (mergeᶠ nothing) ; Bd* = jbd* (mergeᶠ nothing) ; bounded = jbounded (mergeᶠ nothing) ; bounded* = jbounded* (mergeᶠ nothing) ; bcorr = mg-bcorr ; across = mg-across }
+        ; Bd = jbd (mergeᶠ nothing) ; Bd* = jbd* (mergeᶠ nothing) ; bounded = jbounded (mergeᶠ nothing) ; bounded* = jbounded* (mergeᶠ nothing) ; bcorr = mg-bcorr ; across = mg-across ; skip-off* = mg-put-off* }
 
     ----------------------------------------------------------------------
     -- THE BOUNDED MERGE: a value's lane subscribed under its row when
@@ -515,6 +525,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         cc-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd (mergeᶠ (just k)) N) (jbd* (mergeᶠ (just k)) N)
         cc-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd (mergeᶠ (just k))) (jbd* (mergeᶠ (just k)))
+        -- every row not late imaged at a row of the elaborated join
+        cc-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      cc-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ (just k)) N b g → ¬ φ′ N y ⊑ b
+      cc-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ (just k))) b₀ (proj₂ (cc-img _ (skip , x , tt , nl))))
 
       cc-got : ∀ N → Got (P′ N)
       cc-got N = pd-got (mergeᶠ (just k)) N
@@ -543,7 +559,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {(mergeᶠ (just k))} ; func* = core-func {(mergeᶠ (just k))} ; flat = pd-flat {(mergeᶠ (just k))} ; flat* = core-flat {(mergeᶠ (just k))}
         ; pin-in = cc-pin-in ; pin-in* = cc-pin-in* ; got = cc-got ; got* = cc-got*
         ; after = cc-after ; after* = cc-after* ; after-φ = cc-after-φ ; pin-after* = cc-pin-after*
-        ; Bd = jbd (mergeᶠ (just k)) ; Bd* = jbd* (mergeᶠ (just k)) ; bounded = jbounded (mergeᶠ (just k)) ; bounded* = jbounded* (mergeᶠ (just k)) ; bcorr = cc-bcorr ; across = cc-across }
+        ; Bd = jbd (mergeᶠ (just k)) ; Bd* = jbd* (mergeᶠ (just k)) ; bounded = jbounded (mergeᶠ (just k)) ; bounded* = jbounded* (mergeᶠ (just k)) ; bcorr = cc-bcorr ; across = cc-across ; skip-off* = cc-put-off* }
 
     ----------------------------------------------------------------------
     -- THE SWITCH: every value's lane subscribed under its row, its rows
@@ -566,6 +582,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         sw-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd switchᶠ N) (jbd* switchᶠ N)
         sw-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd switchᶠ) (jbd* switchᶠ)
+        -- every row not late imaged at a row of the elaborated join
+        sw-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      sw-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* switchᶠ N b g → ¬ φ′ N y ⊑ b
+      sw-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* switchᶠ) b₀ (proj₂ (sw-img _ (skip , x , tt , nl))))
 
       sw-got : ∀ N → Got (P′ N)
       sw-got N = pd-got (switchᶠ) N
@@ -594,7 +616,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {switchᶠ} ; func* = core-func {switchᶠ} ; flat = pd-flat {switchᶠ} ; flat* = core-flat {switchᶠ}
         ; pin-in = sw-pin-in ; pin-in* = sw-pin-in* ; got = sw-got ; got* = sw-got*
         ; after = sw-after ; after* = sw-after* ; after-φ = sw-after-φ ; pin-after* = sw-pin-after*
-        ; Bd = jbd switchᶠ ; Bd* = jbd* switchᶠ ; bounded = jbounded switchᶠ ; bounded* = jbounded* switchᶠ ; bcorr = sw-bcorr ; across = sw-across }
+        ; Bd = jbd switchᶠ ; Bd* = jbd* switchᶠ ; bounded = jbounded switchᶠ ; bounded* = jbounded* switchᶠ ; bcorr = sw-bcorr ; across = sw-across ; skip-off* = sw-put-off* }
 
     ----------------------------------------------------------------------
     -- THE EXHAUST: the lanes the plain exhaust runs, each subscribed under
@@ -619,6 +641,12 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       postulate
         ex-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (jbd exhaustᶠ N) (jbd* exhaustᶠ N)
         ex-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ (jbd exhaustᶠ) (jbd* exhaustᶠ)
+        -- every row not late imaged at a row of the elaborated join
+        ex-img : ∀ N {y} → Own (TR (P′ N)) (Late′ N) y → Σ (Ev (IE B)) (TR (Q′ N) (φ′ N y))
+
+      -- A put skip is imaged as any row is, so over no boundary.
+      ex-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* exhaustᶠ N b g → ¬ φ′ N y ⊑ b
+      ex-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* exhaustᶠ) b₀ (proj₂ (ex-img _ (skip , x , tt , nl))))
 
       ex-got : ∀ N → Got (P′ N)
       ex-got N = pd-got (exhaustᶠ) N
@@ -647,7 +675,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ; func = pd-func {exhaustᶠ} ; func* = core-func {exhaustᶠ} ; flat = pd-flat {exhaustᶠ} ; flat* = core-flat {exhaustᶠ}
         ; pin-in = ex-pin-in ; pin-in* = ex-pin-in* ; got = ex-got ; got* = ex-got*
         ; after = ex-after ; after* = ex-after* ; after-φ = ex-after-φ ; pin-after* = ex-pin-after*
-        ; Bd = jbd exhaustᶠ ; Bd* = jbd* exhaustᶠ ; bounded = jbounded exhaustᶠ ; bounded* = jbounded* exhaustᶠ ; bcorr = ex-bcorr ; across = ex-across }
+        ; Bd = jbd exhaustᶠ ; Bd* = jbd* exhaustᶠ ; bounded = jbounded exhaustᶠ ; bounded* = jbounded* exhaustᶠ ; bcorr = ex-bcorr ; across = ex-across ; skip-off* = ex-put-off* }
 
   flat-core : ∀ op → Core op
   flat-core (mergeᶠ nothing)  = λ Os Ls Lc al lk → Joins.MergeTab.rel′ Os Ls Lc al lk
