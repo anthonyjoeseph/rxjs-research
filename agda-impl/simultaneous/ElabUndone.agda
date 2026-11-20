@@ -275,8 +275,7 @@ ann-u N n s env us p {y = y} rw | x , sx , eq | st , a , ca , eq′ | refl | inj
 ... | _ , (σx , _) , _ , _ with map-out′ just (capprox N n s env) (p ⊕ (ix 1 ∷ [])) σx
 ...   | _ , sy , refl = us _ sy
 
--- A connect's elaboration, given its source's and body's: the
--- recursion stays out of the clause, which is checked fast.
+-- A connect's elaboration ends no lane where its source's and body's end none.
 conn-u : ∀ N n {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) (env : DenEnv Δ) → EnvU ρ env
        → Undone (capprox N n (elab ρ s) env) → (∀ e → EnvU (ext ρ) e → Undone (capprox N n (elab (ext ρ) b) e))
        → Undone (capprox N n (elab ρ (connect s b)) env)
@@ -305,11 +304,8 @@ elab-undone N n ρ (scan f z s) env eu p r with map-out′ proj₂ (Op.scan (sca
 ...   | st , x , dx , refl = scanIE-u f st x (elab-undone N n ρ s env eu p dx)
 elab-undone N n ρ (takeWhile i keep s) env eu p r =
   let (_ , sx) = take-row i (passes keep) (capprox N n (elab ρ s) env) p r in elab-undone N n ρ s env eu p sx
-elab-undone N n {Γ} ρ (flatMap op f s) env eu =
-  conn⁴ N n (elab ρ (flatMap op f s)) (empty {A = ⊤}) (flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ [])))
-    closer (flatMap op (λ a → laneˢ (λ k c → laneSrc (λ i → there (there (there (there (ρ i))))) (f a) k c)) (each valuesOf (connected (there (here refl)))))
-    (combined op (trackers Γ 0 (λ i → there (there (there (there (ρ i))))))) env refl
-    λ e → comb-u N n op (trackers Γ 0 (λ i → there (there (there (there (ρ i)))))) e
+elab-undone N n ρ (flatMap op f s) env eu =
+  conn⁴ N n (elab _ (flatMap op f s)) _ _ _ _ _ env refl λ e → comb-u N n op _ e
 elab-undone N n ρ (connect s b) env eu =
   conn-u N n ρ s b env eu (elab-undone N n ρ s env eu) (λ e eu′ → elab-undone N n (ext ρ) b e eu′)
 elab-undone N n ρ (connected i) env eu p r
