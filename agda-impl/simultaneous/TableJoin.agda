@@ -24,25 +24,26 @@ open import Data.Maybe using (just; nothing; maybe)
 import Data.Maybe as M
 open import Data.Nat using (ℕ; _+_; _≤_)
 open import Data.Product using (Σ; _×_; _,_; proj₂)
-open import Data.Sum using (_⊎_; inj₁)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Empty using (⊥)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 open import Relation.Nullary using (does)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Unpinned; pin; _≼_; _≺_; Ev; out; skip; EmissionSet; Ended)
+open import denotation.EmissionSet using (Unpinned; pin; _≼_; _≺_; Ev; out; skip; end; EmissionSet; Ended)
 open import simultaneous.Readings using (instantOf)
-open import denotation.Laws.Worlds using (_⊑_)
-open import simultaneous.Horizon using (Tag; free; held; module Cuts)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-snoc⁺)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
+open import simultaneous.Horizon using (Tag; free; held; module Cuts; past-child)
 open import simultaneous.HorizonTree using (Cut; bd)
 open import simultaneous.HorizonJoin using (module MergeJ; module JoinBd)
 open JoinBd using (outerB; laneB; laneH)
 open import simultaneous.HorizonJoinPair using (module JoinPair)
-open import simultaneous.HorizonConn using (Mark; mark; mark-q)
-open import simultaneous.TreeBounded using (tree-bounded; merge-tr→; merge-tr←)
+open import simultaneous.HorizonConn using (Mark; mark; mark-q; retarget)
+open import simultaneous.TreeBounded using (tree-bounded; admits-trig; merge-tr→; merge-tr←)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; anyᵇ; values; afterL; lanes; module BoundedL; module ExhaustL; module Order)
 open import simultaneous.SObs using (lone; module Elaborate)
@@ -54,7 +55,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import Function using (_⇔_)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; module Sub)
 open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
-  Admits; tab-func; admits-row; dbd; SameBd; same-bd; Out; wk)
+  Admits; tab-func; admits-row; dbd; SameBd; same-bd; Out; wk; _⊕ˡ_)
 open JoinBd using (outerB; laneB; laneH)
 
 
@@ -66,6 +67,19 @@ open import simultaneous.TableFlat using (module Flat; module Vals)
 open import simultaneous.TableRows using (rejoin-one)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; closer; combined; trackers)
+
+-- Apart from a position, a row and its descendants order alike against
+-- it.
+past-ext : ∀ {o b} l ls → ¬ o ⊑ b → (o ≺ b → (o ⊕ˡ (l ∷ ls)) ≺ b) × ((o ⊕ˡ (l ∷ ls)) ≺ b → o ≺ b)
+past-ext {o} {b} l []         no = (λ lt → past-child l lt no) , λ lt → ≺-trans {o} {o ⊕ [ l ]} {b} (≺-ext o []) lt
+past-ext {o} {b} l (l′ ∷ ls) no =
+  let (fw , bw) = past-ext {o ⊕ [ l ]} {b} l′ ls (λ h → no (⊑-trans (⊑-snoc⁺ o) h))
+  in (λ lt → fw (past-child l lt no)) , (λ lt → ≺-trans {o} {o ⊕ [ l ]} {b} (≺-ext o []) (bw lt))
+
+-- Two orderings chained.
+chain : ∀ {k z w w′ z*} → (k ≺ z → w ≺ z*) × (w ≺ z* → k ≺ z) → (w ≺ z* → w′ ≺ z*) × (w′ ≺ z* → w ≺ z*)
+      → (k ≺ z → w′ ≺ z*) × (w′ ≺ z* → k ≺ z)
+chain (f , g) (f′ , g′) = (λ lt → f′ (f lt)) , (λ lt → g (g′ lt))
 
 -- What the plain joiners run, the same in every environment.
 module Runs {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p : Pos) where
@@ -223,10 +237,21 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- a value lies where the source has one, and only there
         mg-is-val  : ∀ N {q a} → oM N q (out a) → isVal N q ≡ true
         mg-not-val : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → isVal N k ≡ false
-        -- the merge's outer rows cut a pair of the source's boundaries
-        -- alike where the source's rows do
-        mg-o-btw : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
-                 → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z* → JP.IO.Between N z z*
+        -- an outer row late for the source is late for the merge
+        mg-late-src : ∀ N {k e} → oM N k e → Rel.Late (Out.rel Os) N k → Late′ N k
+        -- an outer skip read through the shared hot
+        mg-φ-skip : ∀ N {k} → oM N k skip → φ′ N k ≡ srcφ N k
+        -- the source's own skip lies over no mark of its elaborated
+        -- boundaries
+        mg-skip-off* : ∀ N {z* k} → Mark (BdS* N) z* → oM N k skip → ¬ Rel.Late (Out.rel Os) N k → ¬ Rel.φ (Out.rel Os) N k ⊑ z*
+        -- no image of the source lies over a connect an elaborated
+        -- boundary waits on
+        mg-src-held* : ∀ N {b r y e} → BdS* N b (held r) → Cut n s* ρ*s sp* N y e → ¬ y ⊑ r
+        -- the source's end, relocated past the trigger's, cuts a pair of
+        -- the source's boundaries alike where the source's rows do
+        mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
+                 → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
+                 → oM N k end → ¬ Late′ N k → (k ≺ z → φ′ N k ≺ z*) × (φ′ N k ≺ z* → k ≺ z)
         mg-o-pb  : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → PB (OwnPut (oM N) (Rel.Put (Out.rel Os) N)) z z* → JP.IO.PutBefore N z z*
@@ -268,6 +293,38 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- The merge reads its outer's other rows where the outer's map does.
       mg-φ-outer : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → φ′ N k ≡ φo N k
       mg-φ-outer N {k} x nv = cong (λ c → if c then val* N k else φ′ N k) (sym (mg-not-val N x nv))
+
+      -- An image of the source's values lies over no mark of its
+      -- elaborated boundaries.
+      src-off* : ∀ N {z* y e} → Mark (BdS* N) z* → Cut n s* ρ*s sp* N y e → ¬ y ⊑ z*
+      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (Cuts.Bounded.gap (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*)) bd y)
+      src-off* N (_ , _ , bd , inj₂ refl) y = mg-src-held* N bd y
+
+      val-img : ∀ N {k a} → oM N k (out a) → Σ (Ev (IE A)) (Cut n s* ρ*s sp* N (Rel.φ (Out.rel Os) N k))
+      val-img N x = [ (λ { ((e′ , y , _) , _) → e′ , y }) , (λ { (() , _) }) ]′ (Corr.row→ (Rel.corr (Out.rel Os) N) x tt)
+
+      -- THE MERGE'S OUTER ROWS cut a pair of the source's boundaries alike
+      -- where the source's rows do: a value at its elaborated value, a
+      -- skip through the shared hot, each a descendant of the source's
+      -- image, which lies over no mark; the end relocated.
+      mg-o-btw : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
+               → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z* → JP.IO.Between N z z*
+      mg-o-btw N mz mz* btw (inj₂ ())
+      mg-o-btw N mz mz* btw (inj₁ (pin _ , _ , () , _))
+      mg-o-btw N {z} {z*} mz mz* btw {k} (inj₁ (out a , x , _ , nl)) =
+        retarget {k} {z} {z*} {val* N k} {φo N k} (φo-val N x)
+          (chain {k} {z} {RO.φ N k} {val* N k} {z*} (btw (out a , x , tt , λ l → nl (mg-late-src N x l)))
+            (past-ext {RO.φ N k} {z*} (sub c₁) (ix 1 ∷ ix 0 ∷ []) (src-off* N mz* (proj₂ (val-img N x)))))
+        where module RO = Rel (Out.rel Os)
+      mg-o-btw N {z} {z*} mz mz* btw {k} (inj₁ (skip , x , _ , nl)) =
+        retarget {k} {z} {z*} {srcφ N k} {φo N k} (trans (sym (mg-φ-outer N x (λ ()))) (mg-φ-skip N x))
+          (chain {k} {z} {RO.φ N k} {srcφ N k} {z*} (btw (skip , x , tt , nlo))
+            (past-ext {RO.φ N k} {z*} (sub c₁) [] (mg-skip-off* N mz* x nlo)))
+        where
+          module RO = Rel (Out.rel Os)
+          nlo = λ l → nl (mg-late-src N x l)
+      mg-o-btw N {z} {z*} mz mz* btw {k} (inj₁ (end , x , _ , nl)) =
+        retarget {k} {z} {z*} {φ′ N k} {φo N k} (sym (mg-φ-outer N x (λ ()))) (mg-o-end N mz mz* btw x nl)
 
       -- THE OUTER'S PAIR: the source's, at the tree's boundaries on both
       -- sides, the elaborated one's through `each`.
