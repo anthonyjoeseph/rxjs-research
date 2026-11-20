@@ -165,17 +165,18 @@ record Across {A : Set} (P : ℕ → EmissionSet A) (Q : ℕ → EmissionSet (IE
 
 -- A ROW IS CUT-INDEPENDENT BEFORE THE ELABORATED HANGS: a deeper cut's own
 -- row whose image lies before a shallower cut's elaborated hangs is a row
--- of the shallower cut, as own and on the same image (`pull`).  No plain
--- hang is mentioned: with one cut's correspondence, it gives
--- `Across.back-clear` (`across-of`).  A placement is ordered against a
--- correspondence's hangs one way only (`Inter.PutBefore`), so a row clear
--- where its placement is stays a field (`put-clear`).
+-- of the shallower cut, as own and on the same image (`pull`); a late
+-- row whose placement lies before them is one of the shallower cut,
+-- placed there too (`put-pull`).  No plain hang is mentioned: with one
+-- cut's correspondence, ordering rows and placements both ways
+-- (`Inter.clear←`, `Inter.clear-put←`), it gives `Across.back-clear`
+-- and `Across.put-clear` (`across-of`).
 record Stable {A : Set} (P : ℕ → EmissionSet A) (Q : ℕ → EmissionSet (IE A)) (φ : ℕ → Pos → Pos)
   (Put : ℕ → Pos → Pos → Set) (Late : ℕ → Pos → Set) (Bd Bd* : ℕ → Pos → Tag → Set) : Set where
   field
     pull     : ∀ {N N′ k e} → N ≤ N′ → P N′ k e → Unpinned e → ¬ Late N′ k
              → Cuts.Clear Q Bd* N (φ N′ k) → P N k e × ¬ Late N k × φ N k ≡ φ N′ k
-    put-clear : ∀ {N N′ k e l} → N ≤ N′ → P N′ k e → Put N′ k l → Cuts.Clear Q Bd* N l → Cuts.Clear P Bd N k
+    put-pull : ∀ {N N′ k e l} → N ≤ N′ → P N′ k e → Put N′ k l → Cuts.Clear Q Bd* N l → Σ (Ev A) (P N k) × Put N k l
 
 -- At one cut, a leading row clear where its instant's elaborated rows are.
 LeadClear : ∀ {A} → (ℕ → EmissionSet A) → (ℕ → EmissionSet (IE A)) → (ℕ → Pos → Pos) → (ℕ → Pos → Set) → (Bd Bd* : ℕ → Pos → Tag → Set) → Set
@@ -191,7 +192,7 @@ across-of : ∀ {A} {P : ℕ → EmissionSet A} {Q : ℕ → EmissionSet (IE A)}
           → LeadClear P Q φ Late Bd Bd*
           → Across P Q φ Put Late Bd Bd*
 across-of {P = P} {Q} {φ} {Put} {Late} {Bd} {Bd*} C S lead = record
-  { back-clear = back ; put-clear = Stable.put-clear S ; lead-clear = lead }
+  { back-clear = back ; put-clear = put ; lead-clear = lead }
   where
     module I (N : ℕ) = Inter (Own (P N) (Late N)) (φ N) (OwnPut (P N) (Put N)) (Bd N) (Bd* N)
 
@@ -199,6 +200,9 @@ across-of {P = P} {Q} {φ} {Put} {Late} {Bd} {Bd*} C S lead = record
     back {N} {N′} {k} {e} le x un nl cl* =
       let (x₀ , nl₀ , eq) = Stable.pull S {N} {N′} {k} {e} le x un nl cl*
       in I.clear← N (C N) {k} (e , x₀ , un , nl₀) (λ {b} {g} bd* → subst (_≺ b) (sym eq) (cl* bd*))
+
+    put : ∀ {N N′ k e l} → N ≤ N′ → P N′ k e → Put N′ k l → Cuts.Clear Q Bd* N l → Cuts.Clear P Bd N k
+    put {N} {N′} {k} {e} {l} le x pl cl* = I.clear-put← N (C N) {k} {l} (Stable.put-pull S {N} {N′} {k} {e} {l} le x pl cl*) cl*
 
 -- A SUBTERM'S CUTS CORRESPOND, each along its own map and late
 -- placement, read off the two families of tables: each position is

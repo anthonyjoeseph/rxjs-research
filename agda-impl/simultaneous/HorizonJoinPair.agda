@@ -29,7 +29,7 @@ open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_)
 open import denotation.EmissionSet using (Ev; out; end; skip; EmissionSet; _≺_; module Joining)
 open import denotation.Laws.Worlds using (_⊑_)
 open import simultaneous.Horizon using (Tag; free; held)
-open import simultaneous.HorizonCorr using (Btw; PB; Own; OwnPut; _∪_; _∪²_; module Inter; first-child)
+open import simultaneous.HorizonCorr using (Btw; PB; PA; Own; OwnPut; _∪_; _∪²_; module Inter; first-child)
 open import simultaneous.HorizonConn using (Mark; mark; mark-q; retarget)
 open import simultaneous.HorizonJoin using (module JoinBd)
 
@@ -84,6 +84,9 @@ module JoinPair {A B X Y : Set}
   LanesP : Pos → Pos → Set
   LanesP z z* = ∀ {q a} → o q (out a) → PB (OwnPut (Lane q a) (PL q a)) z z*
 
+  LanesA : Pos → Pos → Set
+  LanesA z z* = ∀ {q a} → o q (out a) → PA (OwnPut (Lane q a) (PL q a)) z z*
+
   module Pair
     (Co : IO.BCorr)
     -- a value's image is a value, running alike, and their lanes correspond
@@ -124,14 +127,19 @@ module JoinPair {A B X Y : Set}
     -- each part's rows cut the other parts' marks alike
     (outer-lane : ∀ {z z*} → Mark Bdo z → Mark Bdo* z* → IO.Between z z* → Lanes z z*)
     (outer-lane-put : ∀ {z z*} → Mark Bdo z → Mark Bdo* z* → IO.PutBefore z z* → LanesP z z*)
+    (outer-lane-put← : ∀ {z z*} → Mark Bdo z → Mark Bdo* z* → IO.PutAfter z z* → LanesA z z*)
     (lane-outer : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
                 → IL.Between q a (φo q) a* z z* → Btw (Own o Lo) φo z z*)
     (lane-outer-put : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
                     → IL.PutBefore q a (φo q) a* z z* → PB (OwnPut o Po) z z*)
+    (lane-outer-put← : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
+                     → IL.PutAfter q a (φo q) a* z z* → PA (OwnPut o Po) z z*)
     (lane-lane : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
                → IL.Between q a (φo q) a* z z* → ∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → Btw (Own (Lane q′ a′) (Ll q′ a′)) (φL q′ a′) z z*)
     (lane-lane-put : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
                    → IL.PutBefore q a (φo q) a* z z* → ∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → PB (OwnPut (Lane q′ a′) (PL q′ a′)) z z*)
+    (lane-lane-put← : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
+                    → IL.PutAfter q a (φo q) a* z z* → ∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → PA (OwnPut (Lane q′ a′) (PL q′ a′)) z z*)
     where
     open Inter.BCorr Co renaming (to to toO; from to fromO)
 
@@ -170,6 +178,12 @@ module JoinPair {A B X Y : Set}
     ... | inj₁ (e′ , x , p′) = po (inj₁ ((e′ , x) , p′)) kz
     ... | inj₂ (q , a , e′ , x , y′ , p′) = pl x ((e′ , y′) , p′) kz
 
+    putJ← : ∀ {z z*} → IO.PutAfter z z* → LanesA z z* → IJ.PutAfter z z*
+    putJ← po pl (inj₂ x) lz = po (inj₂ x) lz
+    putJ← po pl (inj₁ ((e , y) , p)) lz with put-split y p
+    ... | inj₁ (e′ , x , p′) = po (inj₁ ((e′ , x) , p′)) lz
+    ... | inj₂ (q , a , e′ , x , y′ , p′) = pl x ((e′ , y′) , p′) lz
+
     -- At a lane's mark: its own rows, and every other lane's.
     lanes-at : ∀ {q a z z*} → o q (out a) → Btw (Own (Lane q a) (Ll q a)) (φL q a) z z*
              → (∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → Btw (Own (Lane q′ a′) (Ll q′ a′)) (φL q′ a′) z z*) → Lanes z z*
@@ -181,6 +195,13 @@ module JoinPair {A B X Y : Set}
     lanes-at-put : ∀ {q a z z*} → o q (out a) → PB (OwnPut (Lane q a) (PL q a)) z z*
                  → (∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → PB (OwnPut (Lane q′ a′) (PL q′ a′)) z z*) → LanesP z z*
     lanes-at-put {q} x own other {q′} x′ with q′ ≟ᵖ q
+    ... | no ne = other x′ ne
+    ... | yes refl with o-func x′ x
+    ...   | refl = own
+
+    lanes-at-put← : ∀ {q a z z*} → o q (out a) → PA (OwnPut (Lane q a) (PL q a)) z z*
+                  → (∀ {q′ a′} → o q′ (out a′) → ¬ q′ ≡ q → PA (OwnPut (Lane q′ a′) (PL q′ a′)) z z*) → LanesA z z*
+    lanes-at-put← {q} x own other {q′} x′ with q′ ≟ᵖ q
     ... | no ne = other x′ ne
     ... | yes refl with o-func x′ x
     ...   | refl = own
@@ -205,6 +226,12 @@ module JoinPair {A B X Y : Set}
       putJ (λ { (inj₁ p) → lane-outer-put x x* m m* pb p ; (inj₂ p) → pb (inj₂ p) })
            (lanes-at-put x (λ p → pb (inj₁ p)) (lane-lane-put x x* m m* pb))
 
+    putL← : ∀ {q a a* z z*} → o q (out a) → o* (φo q) (out a*) → Mark (BdL q a) z → Mark (BdL* (φo q) a*) z*
+          → IL.PutAfter q a (φo q) a* z z* → IJ.PutAfter z z*
+    putL← x x* m m* pa =
+      putJ← (λ { (inj₁ p) → lane-outer-put← x x* m m* pa p ; (inj₂ p) → pa (inj₂ p) })
+            (lanes-at-put← x (λ p → pa (inj₁ p)) (lane-lane-put← x x* m m* pa))
+
     tagO→ : ∀ {b b* g g*} → Bdo b g → Bdo* b* g* → IO.TagTo g g* → IJ.TagTo g g*
     tagO→ _  _   IO.plain-free      = IJ.plain-free
     tagO→ bd bd* (IO.both-held btw) = IJ.both-held (liftO (mark-q bd) (mark-q bd*) btw (held-o bd) (held-o* bd*))
@@ -213,22 +240,24 @@ module JoinPair {A B X Y : Set}
     tagO← _  _   IO.elab-free       = IJ.elab-free
     tagO← bd bd* (IO.both-held btw) = IJ.both-held (liftO (mark-q bd) (mark-q bd*) btw (held-o bd) (held-o* bd*))
 
-    to : ∀ {b g} → JBd b g → Σ Pos λ b* → Σ Tag λ g* → JBd* b* g* × IJ.Between b b* × IJ.TagTo g g*
+    to : ∀ {b g} → JBd b g → Σ Pos λ b* → Σ Tag λ g* → JBd* b* g* × IJ.Between b b* × IJ.PutAfter b b* × IJ.TagTo g g*
     to (outerB bd) with toO bd
-    ... | b* , g* , bd* , btw , tt = b* , g* , outerB bd* , liftO (mark bd) (mark bd*) btw (gap-o bd) (gap-o* bd*) , tagO→ bd bd* tt
+    ... | b* , g* , bd* , btw , pa , tt =
+      b* , g* , outerB bd* , liftO (mark bd) (mark bd*) btw (gap-o bd) (gap-o* bd*)
+      , putJ← pa (outer-lane-put← (mark bd) (mark bd*) pa) , tagO→ bd bd* tt
     to (laneB {q} {a} {b} x rn bd nc) with val→ x
     ... | a* , x* with Inter.BCorr.to (CL x x*) bd
-    ...   | b* , free , bd* , btw , _ =
-      b* , free , laneB x* (runs→ x rn) bd* (cut→ x jb nc) , jb , IJ.plain-free
+    ...   | b* , free , bd* , btw , pa , _ =
+      b* , free , laneB x* (runs→ x rn) bd* (cut→ x jb nc) , jb , putL← x x* (mark bd) (mark bd*) pa , IJ.plain-free
       where jb = liftL x x* (mark bd) (mark bd*) btw (gap-l x bd) (gap-l* x* bd*)
-    ...   | b* , held r* , bd* , btw , _ =
-      b* , held r* , laneH x* (runs→ x rn) bd* (λ c → cut→ x jb nc (cut-up* c (held-in-l* x* bd*))) , jb , IJ.plain-free
+    ...   | b* , held r* , bd* , btw , pa , _ =
+      b* , held r* , laneH x* (runs→ x rn) bd* (λ c → cut→ x jb nc (cut-up* c (held-in-l* x* bd*))) , jb , putL← x x* (mark bd) (mark bd*) pa , IJ.plain-free
       where jb = liftL x x* (mark bd) (mark bd*) btw (gap-l x bd) (gap-l* x* bd*)
     to (laneH {q} {a} {b} {r} x rn bd nc) with val→ x
     ... | a* , x* with Inter.BCorr.to (CL x x*) bd
-    ...   | b* , _ , bd* , btw , IL.both-held {q* = r*} btwr =
+    ...   | b* , _ , bd* , btw , pa , IL.both-held {q* = r*} btwr =
       b* , held r* , laneH x* (runs→ x rn) bd* (cut→ x jr nc)
-      , liftL x x* (mark bd) (mark bd*) btw (gap-l x bd) (gap-l* x* bd*) , IJ.both-held jr
+      , liftL x x* (mark bd) (mark bd*) btw (gap-l x bd) (gap-l* x* bd*) , putL← x x* (mark bd) (mark bd*) pa , IJ.both-held jr
       where jr = liftL x x* (mark-q bd) (mark-q bd*) btwr (held-l x bd) (held-l* x* bd*)
 
     from : ∀ {b* g*} → JBd* b* g* → Σ Pos λ b → Σ Tag λ g → JBd b g × IJ.Between b b* × IJ.PutBefore b b* × IJ.TagFrom g g*

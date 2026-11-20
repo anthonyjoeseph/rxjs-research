@@ -54,18 +54,31 @@ Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-src`, `mg-val←`, `mg
 `mg-img`, `mg-outer-lane`, `mg-outer-lane-put`,
 `mg-lane-outer`, `mg-lane-outer-put`, `mg-lane-lane`, `mg-lane-lane-put`.
 
+#### THE PLACEMENTS ORDERED BACK
+
+`Inter.BCorr.to` orders placements both ways: a late row whose
+placement lies before an elaborated hang lies before its plain partner
+(`Inter.PutAfter`), as `from` orders them forward. With it a row clear
+where its placement is (`Across.put-clear`) is derived. Untried: no
+former's placements were ever ordered back. Settled by bodies, or a put
+row past a plain hang whose placement lies before the partner.
+
+Members: `mg-o-pa`, `mg-outer-lane-put←`, `mg-lane-outer-put←`,
+`mg-lane-lane-put←`, `ct-body-src-put←`, `cb-putw←`.
+
 #### THE HANGS ACROSS CUTS
 
 Each `Rel` owes `TableCorr.Across`; `TableCorr.across-of` builds it from
 one cut's `bcorr` and `TableCorr.Stable`: an own row whose image lies
 before a shallower cut's elaborated hangs is in that cut, on the same
-image; a placed row is clear where its placement is. Untried. Settled by bodies, or a deeper row before the
-elaborated hangs whose shallower image moved. Leading rows stay per former.
+image; a late row whose placement does is in that cut, placed there.
+Untried. Settled by bodies, or a deeper row before the elaborated hangs
+whose shallower image or placement moved. Leading rows stay per former.
 
-Members: `cc-stable`, `sw-stable`, `ex-stable`, `cold-stable`, `defer-stable`,
-`rd-stable`, `cb-stable`, `sr-stable`, `ct-stable`, `cc-lead`, `sw-lead`,
-`ex-lead`, `cold-lead`, `defer-lead`, `rd-lead`, `cb-lead`, `sr-lead`,
-`ct-lead`, `cz-lead-clear`.
+Members: `cc-stable`, `sw-stable`, `ex-stable`, `cold-pull`, `defer-stable`, `rd-stable`,
+`cb-stable`, `sr-stable`, `ct-stable`, `cc-lead`, `sw-lead`, `ex-lead`,
+`cold-lead`, `defer-lead`, `rd-lead`, `cb-lead`, `sr-lead`, `ct-lead`,
+`cz-lead-clear`.
 
 #### THE ROOT'S LEAVES
 

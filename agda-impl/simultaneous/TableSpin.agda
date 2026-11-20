@@ -111,7 +111,7 @@ module SpinTab {A : Set} (p p* : Pos) where
     ; pb-few = λ _ _ → [] , λ ()
     ; Bd = SpinB.Bd {A} p ; Bd* = SpinB.Bd {IE A} p* ; bounded = SpinB.bounded p ; bounded* = SpinB.bounded p*
     ; bcorr = λ N → Sub.restrict inj₁ (λ { (_ , ()) })
-        (SpinPair.corr p p* N (φ′ N) (λ _ → ⊥) (λ _ _ → ⊥) rows* (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
+        (SpinPair.corr p p* N (φ′ N) (λ _ → ⊥) (λ _ _ → ⊥) rows* (λ ()) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
     ; across = record { back-clear = λ _ x _ _ cl* → back-clear′ x cl* ; put-clear = λ _ _ () ; lead-clear = λ x _ _ _ _ _ _ → at-cut x }
     ; skip-off* = λ _ _ ()
     ; func = λ x x′ → trans (proj₂ (proj₂ (proj₂ (sp→ x)))) (sym (proj₂ (proj₂ (proj₂ (sp→ x′)))))

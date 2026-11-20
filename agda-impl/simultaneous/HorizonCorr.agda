@@ -63,6 +63,10 @@ Btw R φ z z* = ∀ {k} → R k → (k ≺ z → φ k ≺ z*) × (φ k ≺ z* �
 PB : (Pos → Pos → Set) → Pos → Pos → Set
 PB P z z* = ∀ {k l} → P k l → k ≺ z → l ≺ z*
 
+-- A late row whose placement is before `z*` lies before `z`.
+PA : (Pos → Pos → Set) → Pos → Pos → Set
+PA P z z* = ∀ {k l} → P k l → l ≺ z* → k ≺ z
+
 -- A term's own rows: unpinned and not late.
 Own : ∀ {A} → EmissionSet A → (Pos → Set) → Pos → Set
 Own {A} L Late k = Σ (Ev A) λ e → L k e × Unpinned e × ¬ Late k
@@ -80,6 +84,10 @@ _∪²_ : (Pos → Pos → Set) → (Pos → Pos → Set) → Pos → Pos → Se
 pb-∪ : ∀ {P P′ z z*} → PB P z z* → PB P′ z z* → PB (P ∪² P′) z z*
 pb-∪ b b′ (inj₁ x) = b x
 pb-∪ b b′ (inj₂ x) = b′ x
+
+pa-∪ : ∀ {P P′ z z*} → PA P z z* → PA P′ z z* → PA (P ∪² P′) z z*
+pa-∪ a a′ (inj₁ x) = a x
+pa-∪ a a′ (inj₂ x) = a′ x
 
 -- Past a position: past its first child, unless over that.
 ix0-first : ∀ {j z} → j ≺ z → ¬ (j ⊕ [ ix 0 ]) ⊑ z → (j ⊕ [ ix 0 ]) ≺ z
@@ -118,8 +126,9 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
   Between : Pos → Pos → Set
   Between = Btw Row φ
 
-  PutBefore : Pos → Pos → Set
+  PutBefore PutAfter : Pos → Pos → Set
   PutBefore = PB Puts
+  PutAfter  = PA Puts
 
   -- A plain held boundary has a held partner.
   data TagTo : Tag → Tag → Set where
@@ -133,7 +142,7 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
 
   record BCorr : Set where
     field
-      to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × TagTo g g*
+      to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × PutAfter b b* × TagTo g g*
       from : ∀ {b* g*} → Bd* b* g* → Σ Pos λ b → Σ Tag λ g → Bd b g × Between b b* × PutBefore b b* × TagFrom g g*
 
   -- A correspondence whose pairs, held ones too, cut more alike (`X`):
@@ -148,13 +157,13 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
 
   record BCorrX (X : Pos → Pos → Set) : Set where
     field
-      to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × X b b* × TagToX X g g*
+      to   : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bd* b* g* × Between b b* × PutAfter b b* × X b b* × TagToX X g g*
       from : ∀ {b* g*} → Bd* b* g* → Σ Pos λ b → Σ Tag λ g → Bd b g × Between b b* × PutBefore b b* × X b b* × TagFromX X g g*
 
   -- What is cut alike carries to what that implies.
   weakenX : ∀ {X X′ : Pos → Pos → Set} → (∀ {z z*} → X z z* → X′ z z*) → BCorrX X → BCorrX X′
   weakenX {X} {X′} w C = record
-    { to   = λ bd → let (b* , g* , bd* , btw , x , tg) = BCorrX.to C bd in b* , g* , bd* , btw , w x , tagTo tg
+    { to   = λ bd → let (b* , g* , bd* , btw , pa , x , tg) = BCorrX.to C bd in b* , g* , bd* , btw , pa , w x , tagTo tg
     ; from = λ bd* → let (b , g , bd , btw , pb , x , tg) = BCorrX.from C bd* in b , g , bd , btw , pb , w x , tagFrom tg }
     where
       tagTo : ∀ {g g*} → TagToX X g g* → TagToX X′ g g*
@@ -168,7 +177,7 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
   -- Forgetting what more is cut alike.
   forget : ∀ {X} → BCorrX X → BCorr
   forget {X} C = record
-    { to   = λ bd → let (b* , g* , bd* , btw , _ , tg) = BCorrX.to C bd in b* , g* , bd* , btw , tagTo tg
+    { to   = λ bd → let (b* , g* , bd* , btw , pa , _ , tg) = BCorrX.to C bd in b* , g* , bd* , btw , pa , tagTo tg
     ; from = λ bd* → let (b , g , bd , btw , pb , _ , tg) = BCorrX.from C bd* in b , g , bd , btw , pb , tagFrom tg }
     where
       tagTo : ∀ {g g*} → TagToX X g g* → TagTo g g*
@@ -198,6 +207,10 @@ module Inter (Row : Pos → Set) (φ : Pos → Pos) (Puts : Pos → Pos → Set)
     clear-put x cl bd* with from bd*
     ... | _ , _ , bd , _ , pb , _ = pb x (cl bd)
 
+    clear-put← : ∀ {k l} → Puts k l → Clear* l → Clear k
+    clear-put← x cl* bd with to bd
+    ... | _ , _ , bd* , _ , pa , _ = pa x (cl* bd*)
+
 -- No boundary on either side corresponds trivially.
 none-corr : ∀ {Row φ Puts} → Inter.BCorr Row φ Puts (λ _ _ → ⊥) (λ _ _ → ⊥)
 none-corr = record { to = λ () ; from = λ () }
@@ -218,7 +231,7 @@ module Sub {Row Row′ : Pos → Set} {φ : Pos → Pos} {Puts Puts′ : Pos →
 
   restrict : I′.BCorr → I.BCorr
   restrict C = record
-    { to   = λ bd → let (b* , g* , bd* , btw , tg) = I′.BCorr.to C bd in b* , g* , bd* , (λ x → btw (r x)) , tagTo tg
+    { to   = λ bd → let (b* , g* , bd* , btw , pa , tg) = I′.BCorr.to C bd in b* , g* , bd* , (λ x → btw (r x)) , (λ x → pa (pt x)) , tagTo tg
     ; from = λ bd* → let (b , g , bd , btw , pb , tg) = I′.BCorr.from C bd* in b , g , bd , (λ x → btw (r x)) , (λ x → pb (pt x)) , tagFrom tg }
 
 ------------------------------------------------------------------------
@@ -250,6 +263,7 @@ module SpinPair {X Y : Set} (p p* : Pos) (N : ℕ) (φ : Pos → Pos)
   (rows* : ∀ {k e} → SpinB.c {X} p N k e → Σ (Ev Y) (SpinB.c {Y} p* N (φ k)))
   (env-at : Btw Env φ p p*) (env-off : ∀ {k} → Env k → ¬ p ⊑ k) (env-off* : ∀ {k} → Env k → ¬ p* ⊑ φ k)
   (put-at : PB EnvPut p p*) (put-off : ∀ {k l} → EnvPut k l → ¬ p ⊑ k)
+  (put-at← : PA EnvPut p p*) (put-off* : ∀ {k l} → EnvPut k l → ¬ p* ⊑ l)
   where
   module P = SpinB {X} p
   module E = SpinB {Y} p*
@@ -275,9 +289,14 @@ module SpinPair {X Y : Set} (p p* : Pos) (N : ℕ) (φ : Pos → Pos)
   put-before {k} {l} (inj₂ x) lt =
     ≺-trans {l} {p*} {b*} (put-at x (proj₂ (off-child {p} {k} (ix (3 + N)) (put-off x)) lt)) (≺-ext p* [])
 
+  put-after : I.PutAfter b b*
+  put-after (inj₁ ())
+  put-after {k} {l} (inj₂ x) lt =
+    ≺-trans {k} {p} {b} (put-at← x (proj₂ (off-child {p*} {l} (ix (3 + N)) (put-off* x)) lt)) (≺-ext p [])
+
   corr : I.BCorr
   corr = record
-    { to   = λ { {g = .free} (refl , refl) → b* , free , (refl , refl) , between , I.plain-free }
+    { to   = λ { {g = .free} (refl , refl) → b* , free , (refl , refl) , between , put-after , I.plain-free }
     ; from = λ { {g* = .free} (refl , refl) → b , free , (refl , refl) , between , put-before , I.elab-free } }
 
 ------------------------------------------------------------------------
@@ -403,9 +422,11 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
     { to = λ { {g = g} (bd , kp) → case-to g bd kp }
     ; from = λ { {g* = g*} (bd* , kp*) → case-from g* bd* kp* } }
     where
-      case-to : ∀ {b} g → Bd b g → Keep b g → Σ Pos λ b* → Σ Tag λ g* → Bd*′ b* g* × I′.Between b b* × I′.TagTo g g*
+      case-to : ∀ {b} g → Bd b g → Keep b g → Σ Pos λ b* → Σ Tag λ g* → Bd*′ b* g* × I′.Between b b* × I′.PutAfter b b* × I′.TagTo g g*
       case-to g bd kp with to bd
-      ... | b* , g* , bd* , btw , tt = b* , g* , (bd* , keep→ bd* btw tt kp) , between′ (tagged Bd g bd) (tagged Bd* g* bd*) btw , tag→ bd bd* tt
+      ... | b* , g* , bd* , btw , pa , tt =
+        b* , g* , (bd* , keep→ bd* btw tt kp) , between′ (tagged Bd g bd) (tagged Bd* g* bd*) btw
+        , pa-∪ {OwnPut Tk Put′} {EnvPut} (λ {k} {l} → λ { (_ , (x , pl)) lz → pa {k} {l} (inj₁ (x , pl)) lz }) (λ {k} {l} x lz → pa {k} {l} (inj₂ x) lz) , tag→ bd bd* tt
 
       case-from : ∀ {b*} g* → Bd* b* g* → Keep* b* g* → Σ Pos λ b → Σ Tag λ g → Bd′ b g × I′.Between b b* × I′.PutBefore b b* × I′.TagFrom g g*
       case-from g* bd* kp* with from bd*
@@ -427,6 +448,7 @@ module Wrap (Row : Pos → Set) (φ φw : Pos → Pos) (Puts Putsw : Pos → Pos
   (moved : ∀ {k b g} → Row k → Bd* b g → (φ k ≺ b → φw k ≺ b) × (φw k ≺ b → φ k ≺ b))
   (moved-q : ∀ {k b q} → Row k → Bd* b (held q) → (φ k ≺ q → φw k ≺ q) × (φw k ≺ q → φ k ≺ q))
   (putw : ∀ {b b* g*} → Bd* b* g* → PB Puts b b* → PB Putsw b b*)
+  (putw← : ∀ {b b* g*} → Bd* b* g* → PA Puts b b* → PA Putsw b b*)
   where
   module I  = Inter Row φ Puts Bd Bd*
   module Iw = Inter Row φw Putsw Bd Bdw
@@ -450,9 +472,9 @@ module Wrap (Row : Pos → Set) (φ φw : Pos → Pos) (Puts Putsw : Pos → Pos
     { to = λ bd → case-to bd
     ; from = λ bdw → case-from bdw }
     where
-      case-to : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bdw b* g* × Iw.Between b b* × Iw.TagTo g g*
+      case-to : ∀ {b g} → Bd b g → Σ Pos λ b* → Σ Tag λ g* → Bdw b* g* × Iw.Between b b* × Iw.PutAfter b b* × Iw.TagTo g g*
       case-to bd with to bd
-      ... | b* , g* , bd* , btw , tt = b* , g* , keeps bd bd* btw , between-at (λ r → moved r bd*) btw , tag→ bd* tt
+      ... | b* , g* , bd* , btw , pa , tt = b* , g* , keeps bd bd* btw , between-at (λ r → moved r bd*) btw , putw← bd* pa , tag→ bd* tt
 
       case-from : ∀ {b* g′} → Bdw b* g′ → Σ Pos λ b → Σ Tag λ g → Bd b g × Iw.Between b b* × Iw.PutBefore b b* × Iw.TagFrom g g′
       case-from bdw with only bdw
