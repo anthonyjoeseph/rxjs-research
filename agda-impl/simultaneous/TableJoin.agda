@@ -251,6 +251,13 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         -- DEAD ROUTE: no boundary past a non-late end, as a `Cuts.Bounded`
         --   field: a connect's burst boundary (`ConnBd`) lies past its end
         --   whenever its body ends at its subscribe.
+        -- DEAD ROUTE: the elaborated flatMap's readers stopped at a
+        --   completion mark its shared source sends at its end.  Appended by
+        --   `concatˢ`, the child sits under `if`, which the productivity
+        --   check of `elab` cannot see through; appended under a connect, the
+        --   child is a connect's source again, the hazard `shareˢ` exists to
+        --   avoid; gated by a one-row flatMap, the mark follows the child's
+        --   whole burst, the gate's row ending only as its emit returns.
         mg-o-end : ∀ N {z z* k} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → oM N k end → ¬ Late′ N k → (k ≺ z → φ′ N k ≺ z*) × (φ′ N k ≺ z* → k ≺ z)
