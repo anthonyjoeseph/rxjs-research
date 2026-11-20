@@ -40,12 +40,12 @@ open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty
   connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
+open import denotation.EmissionSet using (EmissionSet; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
 import denotation.EmissionSet as ES
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺→≼; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
-open import denotation.Laws.Worlds using (_⊑_; Ok; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub; plain-ix;
-  plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑; ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ;
-  narrow⁼; shrink; shrink⁼)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
+open import denotation.Laws.Worlds using (_⊑_; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub;
+  plain-ix; plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑;
+  ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ; narrow⁼; shrink; shrink⁼)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
@@ -63,7 +63,7 @@ open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
-open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; dapart; HotsAll; w-mono; ok-mono; Past; past-up; past-⊕;
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; HotsAll; w-mono; ok-mono; transfer; scope-lead; reader-lead; each; each-at; dnest; dH; dlo;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
@@ -96,6 +96,12 @@ EnvB : ∀ {Γ} → BdEnv Γ → ℕ → Pos → Tag → Set
 EnvB {[]}    β N b g = ⊥
 EnvB {_ ∷ Γ} β N b g = β (here refl) N b g ⊎ EnvB {Γ} (λ {X} i → β {X} (there i)) N b g
 
+-- Which hot's.
+env-elim : ∀ {Γ} (β : BdEnv Γ) {N b g} {P : Set} → (∀ {X : Set} (i : X ∈ Γ) → β i N b g → P) → EnvB β N b g → P
+env-elim {[]}    β k ()
+env-elim {_ ∷ Γ} β k (inj₁ x) = k (here refl) x
+env-elim {_ ∷ Γ} β k (inj₂ y) = env-elim (λ {X} i → β {X} (there i)) (λ i → k (there i)) y
+
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
   postulate
     -- EVERY TREE'S BOUNDARIES ARE PLACED: its own in its world, its
@@ -103,8 +109,10 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
     tree-placed : ∀ {A} n (o : Obs Timeline Γ A) p → Admits D p
                 → Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
 
-    -- A SCOPE'S BOUNDARY is led by no position of an admissible world.
-    env-lead : ∀ {p} → Admits D p → ∀ {N b g} → EnvB (dbd D) N b g → ∀ {w} → W⁼ (Hots (den D N)) p w → ¬ w ⊑ b
+  -- A SCOPE'S BOUNDARY is led by no position of an admissible world: its
+  -- hot's body's world holds it.
+  env-lead : ∀ {p} → Admits D p → ∀ {N b g} → EnvB (dbd D) N b g → ∀ {w} → W⁼ (Hots (den D N)) p w → ¬ w ⊑ b
+  env-lead a {N} env v = env-elim (dbd D) (λ i bi → reader-lead D a i bi {N} v) env
 
   -- A SOURCE'S BOUNDARIES lie before its connect or past its
   -- subscription: its own in its world, its scope's led by neither the
@@ -126,17 +134,6 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   ... | inj₂ env = ⊥-elim (env-lead a env (inW (step here plain-ix)) (inside-⊑ (p ⊕ [ ix 1 ]) b ins))
 
   postulate
-    -- A SOURCE'S BOUNDARIES are led by no late end of a reader its hot's
-    -- rows admit, subscribed at or past the connect's body.
-    --
-    -- DEAD ROUTE: deriving it from `tree-placed` and `env-lead`.  The
-    --   reader is placed only by order, so `Worlds.lead` leaves a reader
-    --   inside the source's world, or under a scope boundary, whose own
-    --   world holds no source row while a boundary lies under its late
-    --   end; neither the premises nor the placement exclude it.
-    src-apart : ∀ {A} n (s : Obs Timeline Γ A) p {q} → Ok (λ k → Σ ℕ λ N → Σ (Ev A) (listEv n s D p N k)) q → (p ⊕ [ ix 0 ]) ≼ q
-              → ∀ {N b g} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b g → ¬ (q ⊕ [ last ]) ⊑ b
-
     -- THE OTHER JOINS' CUTS: the outer's boundaries, and each running
     -- lane's before the lane's cut.
     cc-bounded : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
@@ -175,7 +172,7 @@ cut-enter n o uρ D q N x with listC-ok (3 + N) n o (uρ N) q
 -- source boundary of its own lies in the source's world, which no body
 -- position leads; a scope's, under no position of the connect's.
 conn-gap-sb : ∀ {Γ A B} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (a : Admits D p)
-            {t : ℕ → Tb.Listed A} (hD : HotD t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD D) (p ⊕ [ ix 0 ]))
+            {t : ℕ → Tb.Listed A} (hD : HotD D t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD) (p ⊕ [ ix 0 ]))
             (σrow : ∀ N {h e} → hev hD N h e → enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]) h e)
             → ∀ {N b′ g y e} → bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]) N b′ g → Cut n b (λ M → t M ∷ ρ M) (p ⊕ [ ix 0 ]) N y e → ¬ y ⊑ b′
 conn-gap-sb ρ uρ D n s b p a {t} hD u′ a′ σrow {N} {b′} {g} {y} bd′ x le =
@@ -186,22 +183,22 @@ conn-gap-sb ρ uρ D n s b p a {t} hD u′ a′ σrow {N} {b′} {g} {y} bd′ x
     σw : ∀ {h e} → hev hD N h e → W (Hots (den D N)) (p ⊕ [ ix 1 ]) h
     σw z = InvAt.world (inv-capprox (3 + N) n s (den D N) (den-ok D N) (p ⊕ [ ix 1 ]) (ok-step p (admits-at D a N))) (σrow N z)
 
-    yw : W (Hots (den (den-cons hD D) N)) (p ⊕ [ ix 0 ]) y
-    yw = InvAt.world (tab-at n b u′ (den-cons hD D) a′ N) x
+    yw : W (Hots (den (den-cons hD) N)) (p ⊕ [ ix 0 ]) y
+    yw = InvAt.world (tab-at n b u′ (den-cons hD) a′ N) x
 
 -- A body boundary of its own is led by a source position only through a
 -- joined source row, which would lie under another's plain child; the
 -- body's scope's are its source's, or the connect's scope's.
 conn-gap-bs : ∀ {Γ A B} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p (a : Admits D p)
-            {t : ℕ → Tb.Listed A} (hD : HotD t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD D) (p ⊕ [ ix 0 ]))
+            {t : ℕ → Tb.Listed A} (hD : HotD D t) (u′ : ∀ N → UncutEnv (t N ∷ ρ N)) (a′ : Admits (den-cons hD) (p ⊕ [ ix 0 ]))
             (σrow : ∀ N {h e} → hev hD N h e → enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]) h e)
             (sgap : ∀ {N b′ g k e} → hbd hD N b′ g → Cut n s ρ (p ⊕ [ ix 1 ]) N k e → ¬ k ⊑ b′)
-            → ∀ {N b′ g k e} → bd n b (λ M → t M ∷ ρ M) u′ (dbd (den-cons hD D)) (p ⊕ [ ix 0 ]) N b′ g → Cut n s ρ (p ⊕ [ ix 1 ]) N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b′
+            → ∀ {N b′ g k e} → bd n b (λ M → t M ∷ ρ M) u′ (dbd (den-cons hD)) (p ⊕ [ ix 0 ]) N b′ g → Cut n s ρ (p ⊕ [ ix 1 ]) N k e → ¬ (k ⊕ [ ix 0 ]) ⊑ b′
 conn-gap-bs ρ uρ D n s b p a {t} hD u′ a′ σrow sgap {N} {b′} {g} {k} {e} bd′ x le =
   [ (λ own → through (Cn.Apart.source-leads (hev hD N) p (admits-at D a N) σw (inW (step (inW kw) plain-ix)) (inW (Placing.Own.world own)) le))
   , [ (λ sb → under-child (ix 0) (sgap sb x) le)
     , (λ env → env-lead ρ uρ D a env (inW (shrink⁼ (inW (step (inW kw) plain-ix)))) le) ]′ ]′
-  (tree-placed (λ M → t M ∷ ρ M) u′ (den-cons hD D) n b (p ⊕ [ ix 0 ]) a′ bd′)
+  (tree-placed (λ M → t M ∷ ρ M) u′ (den-cons hD) n b (p ⊕ [ ix 0 ]) a′ bd′)
   where
     I : InvAt (Hots (den D N)) (p ⊕ [ ix 1 ]) (enter (capprox (3 + N) n s (den D N)) (p ⊕ [ ix 1 ]))
     I = inv-capprox (3 + N) n s (den D N) (den-ok D N) (p ⊕ [ ix 1 ]) (ok-step p (admits-at D a N))
@@ -221,30 +218,47 @@ conn-gap-bs ρ uρ D n s b p a {t} hD u′ a′ σrow sgap {N} {b′} {g} {k} {e
 ------------------------------------------------------------------------
 -- Every tree, and the hot a connect lists
 
--- A connect's body is past every connect it lies in.
-past-body : ∀ {fs} c → Past fs c → Past ((c ⊕ [ ix 0 ]) ∷ fs) (c ⊕ [ ix 0 ])
-past-body c fp = ≼-refl {c ⊕ [ ix 0 ]} ∷ past-⊕ c (ix 0) [] fp
-
 mutual
   -- A CONNECT'S HOT: its source listed under the connect's second label.
   listHot : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c → Admits D c
-          → HotD (λ N → hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))
+          → HotD D (λ N → hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))
 
   -- Its body admissible where the connect is.
   admits-body : ∀ {Γ X} n (o : Obs Timeline Γ X) {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
-              → Admits (den-cons (listHot n o u D c a) D) (c ⊕ [ ix 0 ])
+              → Admits (den-cons (listHot n o u D c a)) (c ⊕ [ ix 0 ])
 
   -- EVERY TREE'S CUTS ARE BOUNDED BY ITS BOUNDARIES.
   tree-bounded : ∀ {Γ A} n (o : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ)
                → ∀ p → Admits D p → Cuts.Bounded (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
 
   listHot {X = X} n o {ρ} u D c a =
-    hotD hv hx hl (c ⊕ [ ix 0 ]) (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
+    hotD hv hx hl c a hin (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
       (hot-rows-bounded n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
-      (λ {q} ok lp {N} {b} {g} → src-apart ρ u D n o c {q} ok lp {N} {b} {g})
+      lead
     where
       hv : ℕ → EmissionSet _
       hv = listEv n o D c
+
+      -- The source's rows at every cut, each in the source's world.
+      hin : ∀ N {h e} → hv N h e → W (HotsAll D) (c ⊕ [ ix 1 ]) h
+      hin N x = w-mono (λ hh → N , hh)
+        (InvAt.world (inv-capprox (3 + N) n o (den D N) (den-ok D N) (c ⊕ [ ix 1 ]) (ok-step c (admits-at D a N))) (proj₁ x))
+
+      σ∞ : EmissionSet X
+      σ∞ h e = Σ ℕ λ N → hv N h e
+
+      -- The body's world, read from a scope hot's body's.
+      into : ∀ {Y : Set} (i : Y ∈ _) {h} → (HotsAll D ∪ʰ σ∞) h → dH D i h ⊎ W (dH D i) (dlo D i) h
+      into i (inj₂ hh)          = dnest D i hh
+      into i (inj₁ (_ , M , x)) = inj₂ (transfer (dnest D i) (inW (step (each-at (proj₂ a) i) plain-ix)) (hin M x))
+
+      -- A source boundary of its own lies in the source's world, which no
+      -- body position leads; a scope's, in its hot's body's world.
+      lead : ∀ {N b g w} → bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]) N b g → W⁼ (HotsAll D ∪ʰ σ∞) (c ⊕ [ ix 0 ]) w → ¬ w ⊑ b
+      lead {N} bi v =
+        [ (λ own → Cn.Apart.body-leads σ∞ c (proj₁ a) (λ { (M , x) → hin M x }) v (inW (w-mono (λ hh → N , hh) (Placing.Own.world own))))
+        , env-elim (dbd D) (λ i bj → scope-lead D i bj (into i) (inW (step (each-at (proj₂ a) i) plain-ix)) v) ]′
+        (tree-placed ρ u D n o (c ⊕ [ ix 1 ]) (admits-step D a) bi)
 
       hx : ∀ N p → Exactly (rejoin p (hotOf (proj₁ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ]))))) (enter (ES.hot (hv N)) p)
       hx N p = truncate-exact (rejoin-exact (proper-exact (listC-exact (3 + N) n o (den-ex D N) (c ⊕ [ ix 1 ]) (proj₁ (proj₂ (listC-ok (3 + N) n o (u N) (c ⊕ [ ix 1 ])))))) p)
@@ -252,19 +266,18 @@ mutual
       hl : ∀ N → Lawful (hv N)
       hl N = Cn.lawful {s = capprox (3 + N) n o (den D N)} {F = λ _ → Op.empty {X}} (inv-capprox (3 + N) n o (den D N) (den-ok D N)) (λ _ → empty-inv) c (admits-at D a N)
 
-  admits-body {X = X} n o u D c a = ok-mono into (Cn.Apart.ok₀ σ∞ c (proj₁ a) σw) , past-body c (proj₂ a)
+  admits-body {X = X} n o u D c a =
+    ok-mono into (Cn.Apart.ok₀ σ∞ c (proj₁ a) σw) , here , each (λ i → inW (step (each-at (proj₂ a) i) plain-ix))
     where
       hD = listHot n o u D c a
 
-      -- The source's rows at every cut, each in the source's world.
       σ∞ : EmissionSet X
       σ∞ h e = Σ ℕ λ N → hev hD N h e
 
       σw : ∀ {h e} → σ∞ h e → W (HotsAll D) (c ⊕ [ ix 1 ]) h
-      σw (N , x) = w-mono (λ hh → N , hh)
-        (InvAt.world (inv-capprox (3 + N) n o (den D N) (den-ok D N) (c ⊕ [ ix 1 ]) (ok-step c (admits-at D a N))) (proj₁ x))
+      σw (N , x) = hin hD N x
 
-      into : ∀ {h} → HotsAll (den-cons hD D) h → (HotsAll D ∪ʰ σ∞) h
+      into : ∀ {h} → HotsAll (den-cons hD) h → (HotsAll D ∪ʰ σ∞) h
       into (N , inj₁ (e , x)) = inj₁ (e , N , x)
       into (N , inj₂ hh)      = inj₂ (N , hh)
 
@@ -299,9 +312,9 @@ mutual
     bounded-≃ (λ {N} {y} {e} → conn-tr← n s b uρ p {N} {y} {e}) (λ {N} {y} {e} → conn-tr→ n s b uρ p {N} {y} {e})
       (ConnB.bounded p (Cut n s ρ (p ⊕ [ ix 1 ])) (Cut n b (bodyρ n s uρ p) (p ⊕ [ ix 0 ]))
         (bd n s ρ uρ (dbd D) (p ⊕ [ ix 1 ]))
-        (bd n b (bodyρ n s uρ p) (bodyU n s uρ p) (dbd (den-cons (listHot n s uρ D p a) D)) (p ⊕ [ ix 0 ]))
+        (bd n b (bodyρ n s uρ p) (bodyU n s uρ p) (dbd (den-cons (listHot n s uρ D p a))) (p ⊕ [ ix 0 ]))
         (tree-bounded n s ρ uρ D (p ⊕ [ ix 1 ]) (admits-step D a))
-        (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (den-cons (listHot n s uρ D p a) D) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
+        (tree-bounded n b (bodyρ n s uρ p) (bodyU n s uρ p) (den-cons (listHot n s uρ D p a)) (p ⊕ [ ix 0 ]) (admits-body n s uρ D p a))
         (λ {N} {b′} {g} → src-out ρ uρ D n s p a {N} {b′} {g})
         (λ {N} {b′} {q} → src-held ρ uρ D n s p a {N} {b′} {q})
         (λ {N} {c} x → ≺-≼-≺ {p} {p ⊕ [ ix 0 ]} {c} (≺-ext p []) (after-ok (3 + N) n b (p ⊕ [ ix 0 ]) x))
@@ -311,7 +324,7 @@ mutual
   tree-bounded n       (connected i)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
               (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })
-      (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (dbd D i) (dbounded D i) (λ {N} {b} {g} → dapart D i (proj₁ a) (proj₂ a) {N} {b} {g}))
+      (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (dbd D i) (dbounded D i) (λ {N} {b} {g} bi → reader-lead D a i bi {N} (inW (step here plain-last))))
     where
       ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
       ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
@@ -327,19 +340,19 @@ mutual
 -- the body, the child queued behind that blocker.  The child's lane,
 -- past the trigger's end, is admissible.
 admits-trig : ∀ {Γ} n {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) c (a : Admits D c)
-            → Admits (den-cons (listHot n (empty {A = ⊤}) u D c a) D)
+            → Admits (den-cons (listHot n (empty {A = ⊤}) u D c a))
                      (c ⊕ˡ (ix 1 ∷ last ∷ sub (c ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []))
 admits-trig n u D c a =
   ok-step (h ⊕ [ sub r ]) (ok-in (proj₁ ar) (join (inj₁ hh) here lt) (real-sub h rh (proj₁ (proj₁ ar)) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h [])))) ,
-  past-⊕ (h ⊕ [ sub r ]) (ix 1) [] (past-⊕ h (sub r) [] (past-up r h (proj₂ ar) (≺→≼ {r} {h} lt)))
+  each (λ i → inW (step (inW (join (dnest (den-cons hD) i hh) (each-at (proj₂ ar) i) lt)) plain-ix))
   where
     hD = listHot n (empty {A = ⊤}) u D c a
     r h : Pos
     r = c ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
     h = c ⊕ˡ (ix 1 ∷ last ∷ [])
 
-    ar : Admits (den-cons hD D) r
-    ar = admits-ix (den-cons hD D) 1 (admits-ix (den-cons hD D) 0 (admits-step (den-cons hD D) (admits-body n (empty {A = ⊤}) u D c a)))
+    ar : Admits (den-cons hD) r
+    ar = admits-ix (den-cons hD) 1 (admits-ix (den-cons hD) 0 (admits-step (den-cons hD) (admits-body n (empty {A = ⊤}) u D c a)))
 
     rh : Real h
     rh = real-snoc (c ⊕ [ ix 1 ]) plain-last (real-snoc c plain-ix (proj₁ (proj₁ a)))
@@ -351,7 +364,7 @@ admits-trig n u D c a =
     row : hev hD 0 h end
     row = (at-end , (h ∷ []) , λ { at-end _ _ → here refl }) , λ { (at-end , _) → ≼-refl {h} }
 
-    hh : HotsAll (den-cons hD D) h
+    hh : HotsAll (den-cons hD) h
     hh = 0 , inj₁ (end , row)
 
 -- An elaborated connect's hot ends no lane, wherever its scope's hots end none.

@@ -83,12 +83,13 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   -- Two environments' lanes, mapping alike however their hots are
   -- recorded and their subscriptions admitted.
   LanesX : X.Lanes → X′.Lanes → Set₁
-  LanesX Ls Ls′ = ∀ b t₁ t₂ t₃ t₄ u (h₁ h₁′ : HotD t₁) (h₂ h₂′ : HotD t₂) (h₃ h₃′ : HotD t₃) (h₄ h₄′ : HotD t₄) q q*
+  LanesX Ls Ls′ = ∀ b t₁ t₂ t₃ t₄ u (h₄ : HotD (lw* E) t₄) (h₄′ : HotD (lw* E′) t₄) (h₃ : HotD (den-cons h₄) t₃) (h₃′ : HotD (den-cons h₄′) t₃)
+                    (h₂ : HotD (den-cons h₃) t₂) (h₂′ : HotD (den-cons h₃′) t₂) (h₁ : HotD (den-cons h₂) t₁) (h₁′ : HotD (den-cons h₂′) t₁) q q*
                     (ad : Admits (lw E) q) (ad′ : Admits (lw E′) q)
-                    (ad* : Admits (den-cons h₁ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* E))))) q*)
-                    (ad*′ : Admits (den-cons h₁′ (den-cons h₂′ (den-cons h₃′ (den-cons h₄′ (lw* E′))))) q*)
+                    (ad* : Admits (den-cons h₁) q*)
+                    (ad*′ : Admits (den-cons h₁′) q*)
                     (al : Aligned (maps E) ρ q q*) (al′ : Aligned (maps E′) ρ q q*) (lk lk′ : Linked q q*) N y
-                → Same (Out.rel (Ls b t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) (Out.rel (Ls′ b t₁ t₂ t₃ t₄ u h₁′ h₂′ h₃′ h₄′ q q* ad′ ad*′ al′ lk′)) N y
+                → Same (Out.rel (Ls b t₁ t₂ t₃ t₄ u h₄ h₃ h₂ h₁ q q* ad ad* al lk)) (Out.rel (Ls′ b t₁ t₂ t₃ t₄ u h₄′ h₃′ h₂′ h₁′ q q* ad′ ad*′ al′ lk′)) N y
 
   module _ (Os : X.Src) (Os′ : X′.Src) (Ls : X.Lanes) (Ls′ : X′.Lanes) (Lc : X.LanesCoh Ls) (Lc′ : X′.LanesCoh Ls′)
            (os≡ : ∀ N y → Same (Out.rel Os) (Out.rel Os′) N y) (ls≡ : LanesX Ls Ls′) where
@@ -121,12 +122,12 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
            → (ad : Admits (lw E) q) (ad′ : Admits (lw E′) q)
            → (al : Aligned (maps E) ρ q (laneX st)) (al′ : Aligned (maps E′) ρ q (laneX st′))
            → (lk : Linked q (laneX st)) (lk′ : Linked q (laneX st′)) → ∀ N y
-           → Same (Out.rel (Ls b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) (P.trigD st ad*) X.clD X.shD X.ttD
+           → Same (Out.rel (Ls b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) X.ttD X.shD X.clD (P.trigD st ad*)
                                 q (laneX st) ad (P.laneAdm st ad*) al lk))
-                  (Out.rel (Ls′ b (P′.trig st′) X′.cl-tab X′.sh-tab X′.tt-tab (P′.utrig st′) (P′.trigD st′ ad*′) X′.clD X′.shD X′.ttD
+                  (Out.rel (Ls′ b (P′.trig st′) X′.cl-tab X′.sh-tab X′.tt-tab (P′.utrig st′) X′.ttD X′.shD X′.clD (P′.trigD st′ ad*′)
                                 q (laneX st′) ad′ (P′.laneAdm st′ ad*′) al′ lk′)) N y
     lane-x {b} {q} {st} refl ad* ad*′ ad ad′ al al′ lk lk′ =
-      ls≡ b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) (P.trigD st ad*) (P′.trigD st ad*′) X.clD X′.clD X.shD X′.shD X.ttD X′.ttD
+      ls≡ b (P.trig st) X.cl-tab X.sh-tab X.tt-tab (P.utrig st) X.ttD X′.ttD X.shD X′.shD X.clD X′.clD (P.trigD st ad*) (P′.trigD st ad*′)
           q (laneX st) ad ad′ (P.laneAdm st ad*) (P′.laneAdm st ad*′) al al′ lk lk′
 
     -- A value's two lanes.

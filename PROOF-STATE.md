@@ -82,25 +82,23 @@ Members: `root-real`, `root-real*`, `root-off`, `root-off*`,
 A tree's own boundaries lie in its world, under no world of a plain
 child of its rows; its scope's are its hots', led by no admissible
 world position (`Placed.Placing`). The merge's gap, the source's
-window, a defer's marker and the connect's cross gaps are bodies over it.
-`env-lead` is false while `Admits` places a reader by order alone: a
-spin source's boundary is itself admissible. Open: `Admits` placing a
-reader in the world of every body it reads in, while a reader that drops
-a hot (`admits-wk`) keeps the hot's rows in its worlds.
+window, a defer's marker and the connect's cross gaps are bodies over it,
+and so is a scope's lead: an admissible reader lies in each hot's body
+world. Untried. Settled by a body by induction over the tree, or a
+boundary outside every world the cut reads.
 
-Members: `tree-placed`, `env-lead`.
+Members: `tree-placed`.
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
 `Horizon.ConnB` keeps a source boundary before the connect as an echo,
 so it asks only that none lies inside the connect's own window and that
 a burst's held pin is past the subscription; the plain side's are bodies
-over the placement. Left: the elaborated side's, and a hot's boundaries
-led by no late end of a reader. Untried. Settled by a proof over the
+over the placement. Left: the elaborated side's. Untried. Settled by a proof over the
 tree, or a source boundary between the connect and its source's
 subscription.
 
-Members: `src-apart`, `ct-src-out`, `ct-src-held`.
+Members: `ct-src-out`, `ct-src-held`.
 
 #### THE TREE'S HANGS
 

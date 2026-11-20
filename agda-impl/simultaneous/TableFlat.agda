@@ -294,29 +294,29 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
 
   -- Each hot listed off its lawful source, each body admissible.
-  ttD : HotD tt-tab
+  ttD : HotD (lw* env) tt-tab
   ttD = listHot n (empty {A = ⊤}) uρ* (lw* env) p* ad*
 
   Ds : DenOf ρ*s
-  Ds = den-cons ttD (lw* env)
+  Ds = den-cons ttD
 
   ad₄ : Admits Ds (p* ⊕ [ ix 0 ])
   ad₄ = admits-body n (empty {A = ⊤}) uρ* (lw* env) p* ad*
 
-  shD : HotD sh-tab
+  shD : HotD Ds sh-tab
   shD = listHot n shared uρ*s Ds (p* ⊕ [ ix 0 ]) ad₄
 
   Dh : DenOf ρ*h
-  Dh = den-cons shD Ds
+  Dh = den-cons shD
 
   ad₃ : Admits Dh c₃
   ad₃ = admits-body n shared uρ*s Ds (p* ⊕ [ ix 0 ]) ad₄
 
-  clD : HotD cl-tab
+  clD : HotD Dh cl-tab
   clD = listHot n closer uρ*h Dh c₃ ad₃
 
   Dc : DenOf ρ*c
-  Dc = den-cons clD Dh
+  Dc = den-cons clD
 
   ad₂ : Admits Dc c₂
   ad₂ = admits-body n closer uρ*h Dh c₃ ad₃
@@ -338,17 +338,17 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   Lanes : Set₁
   Lanes = ∀ a (t₁ : ℕ → Tb.Listed ⊤) (t₂ : ℕ → Tb.Listed (IE B)) (t₃ : ℕ → Tb.Listed (IE A)) (t₄ : ℕ → Tb.Listed ⊤)
         → (u : ∀ N → UncutEnv (t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N))
-        → (h₁ : HotD t₁) (h₂ : HotD t₂) (h₃ : HotD t₃) (h₄ : HotD t₄)
-        → Holds n (f a) ρ uρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+        → (h₄ : HotD (lw* env) t₄) (h₃ : HotD (den-cons h₄) t₃) (h₂ : HotD (den-cons h₃) t₂) (h₁ : HotD (den-cons h₂) t₁)
+        → Holds n (f a) ρ uρ ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk (env-wk (env-wk (env-wk env h₄) h₃) h₂) h₁)
 
   -- Two records of one lane, its trigger's hot recorded twice: they map
   -- alike and are late alike (`simultaneous.TableEnv.Coh`).
   LanesCoh : Lanes → Set₁
-  LanesCoh Ls = ∀ a t₁ t₂ t₃ t₄ u (h₁ h₁′ : HotD t₁) h₂ h₃ h₄ q q* (ad ad′ : Admits (lw env) q)
-                  (ad* : Admits (den-cons h₁ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* env))))) q*)
-                  (ad*′ : Admits (den-cons h₁′ (den-cons h₂ (den-cons h₃ (den-cons h₄ (lw* env))))) q*)
+  LanesCoh Ls = ∀ a t₁ t₂ t₃ t₄ u h₄ h₃ h₂ (h₁ h₁′ : HotD (den-cons h₂) t₁) q q* (ad ad′ : Admits (lw env) q)
+                  (ad* : Admits (den-cons h₁) q*)
+                  (ad*′ : Admits (den-cons h₁′) q*)
                   (al al′ : Aligned (maps env) ρ q q*) (lk lk′ : Linked q q*) N y
-              → Same (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ q q* ad ad* al lk)) (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₁′ h₂ h₃ h₄ q q* ad′ ad*′ al′ lk′)) N y
+              → Same (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₄ h₃ h₂ h₁ q q* ad ad* al lk)) (Out.rel (Ls a t₁ t₂ t₃ t₄ u h₄ h₃ h₂ h₁′ q q* ad′ ad*′ al′ lk′)) N y
 
   -- The plain flatMap's tables.
   P : FlatOp → ℕ → _
@@ -524,27 +524,27 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
     -- A lane's trigger, listed off its lawful source, and the lane's
     -- elaborated subscription admissible under it.
-    trigD : ∀ st → Admits Dc st → HotD (trig st)
+    trigD : ∀ st → Admits Dc st → HotD Dc (trig st)
     trigD st a = listHot n (empty {A = ⊤}) uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))
 
-    laneAdm : ∀ st (a : Admits Dc st) → Admits (den-cons (trigD st a) Dc) (laneX st)
+    laneAdm : ∀ st (a : Admits Dc st) → Admits (den-cons (trigD st a)) (laneX st)
     laneAdm st a = admits-trig n uρ*c Dc (laneL st) (admits-ix Dc 1 (admits-ix Dc 0 a))
 
     -- A lane's hots, opaque: the record's field type naming `trigD`
     -- exhausts the heap.
     opaque
       laneDen : ∀ st → Admits Dc st → DenOf (λ N′ → trig st N′ ∷ ρ*c N′)
-      laneDen st a = den-cons (trigD st a) Dc
+      laneDen st a = den-cons (trigD st a)
 
     opaque
       unfolding laneDen
       laneDen-pin : ∀ st (a : Admits Dc st) {Bx : ℕ → Pos → Tag → Set} (F : BdEnv (⊤ ∷ IE B ∷ IE A ∷ ⊤ ∷ Δ) → ℕ → Pos → Tag → Set)
-                  → SameBd Bx (F (dbd (den-cons (trigD st a) Dc))) → SameBd Bx (F (dbd (laneDen st a)))
+                  → SameBd Bx (F (dbd (den-cons (trigD st a)))) → SameBd Bx (F (dbd (laneDen st a)))
       laneDen-pin st a F x = x
 
     -- A lane's record, its hots named opaquely.
     to-lane : ∀ {a′ st stE} (adm* : Admits Dc stE)
-            → Out n (f a′) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (den-cons (trigD stE adm*) Dc) st (laneX stE)
+            → Out n (f a′) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (den-cons (trigD stE adm*)) st (laneX stE)
             → Out n (f a′) ρ uρ ρι⁴ (λ N′ → trig stE N′ ∷ ρ*c N′) (utrig stE) (maps env) (lw env) (laneDen stE adm*) st (laneX stE)
     to-lane {a′} {st} {stE} adm* O =
       out (Out.rel O) (Out.rest O) (Out.bd-pin O)
@@ -598,7 +598,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- row align the lane's pair.
     valRec : ∀ N → ValAt N → LaneRec N
     valRec N (valAt q a x) = laneRec a (q ⊕ [ ix 1 ]) st alL ad₀ ad₀* (to-lane ad₀* (
-      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (q ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
+      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) ttD shD clD (trigD st ad₀*) (q ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (Rest.linked (Out.rest Os) N x tt nlx) (ix 1)) (sub c₁)) ys)))
       where
@@ -618,7 +618,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     -- under the end's image.
     queuedRec : ∀ N (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → A → LaneRec N
     queuedRec N R {c} cx a = laneRec a (c ⊕ [ ix 1 ]) st alL ad₀ ad₀* (to-lane ad₀* (
-      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) (trigD st ad₀*) clD shD ttD (c ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
+      Ls a (trig st) cl-tab sh-tab tt-tab (utrig st) ttD shD clD (trigD st ad₀*) (c ⊕ [ ix 1 ]) (laneX st) ad₀ (laneAdm st ad₀*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} alL (laneXt st))
          (linked-r* (linked-r (linked-l (end-linked R cx) (ix 1)) (sub r)) ys)))
       where

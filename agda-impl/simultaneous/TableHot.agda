@@ -130,14 +130,14 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
   -- The two hots, each listed off its lawful source, opaque: a type
   -- naming them unfolded exhausts the heap.
   opaque
-    hD : HotD (λ N → hotOf (σ N))
+    hD : HotD (lw env) (λ N → hotOf (σ N))
     hD = listHot n s uρ (lw env) p a
 
-    hD* : HotD (λ N → hotOf (σ* N))
+    hD* : HotD (lw* env) (λ N → hotOf (σ* N))
     hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
 
-  D′ = den-cons hD (lw env)
-  D*′ = den-cons hD* (lw* env)
+  D′ = den-cons hD
+  D*′ = den-cons hD*
 
   opaque
     unfolding hD hD*

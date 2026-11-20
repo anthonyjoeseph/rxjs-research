@@ -399,16 +399,16 @@ module FlatRel {Γ A B} n (op : FlatOp) (f : A → Obs Timeline Γ B) (s : Obs T
   path = ix 1 ∷ last ∷ sub (p* ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []
 
   Os : F.Src
-  Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk F.ttD env) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)
+  Os = Fs ρ uρ (wk ρι) F.ρ*s F.uρ*s (env-wk env F.ttD) p F.sp* ad (admits-trig n uρ* (lw* env) p* ad*)
          (aligned-r* {Ψ = maps env} {ρ = ρ} al path) (linked-r* lk path)
 
   Ls : F.Lanes
-  Ls a t₁ t₂ t₃ t₄ u h₁ h₂ h₃ h₄ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ (env-wk h₂ (env-wk h₃ (env-wk h₄ env))))
+  Ls a t₁ t₂ t₃ t₄ u h₄ h₃ h₂ h₁ = Ff a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk (env-wk (env-wk (env-wk env h₄) h₃) h₂) h₁)
 
   Lc : F.LanesCoh Ls
-  Lc a t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₃ h₄ =
-    Ffc a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E₄) (env-wk h₁′ E₄) (env-wk-eq h₁ h₁′ {E₄} {E₄} (hot-coh E₄))
-    where E₄ = env-wk h₂ (env-wk h₃ (env-wk h₄ env))
+  Lc a t₁ t₂ t₃ t₄ u h₄ h₃ h₂ h₁ h₁′ =
+    Ffc a ρ uρ F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk E₄ h₁) (env-wk E₄ h₁′) (env-wk-eq {E = E₄} {E′ = E₄} h₁ h₁′ (hot-coh E₄))
+    where E₄ = env-wk (env-wk (env-wk env h₄) h₃) h₂
 
   -- The lanes' flatMap's record.
   Rc : Rel (F.Pd op) (λ N → listC (3 + N) n (F.core op) (F.ρ*c N) F.c₁) p F.c₁
@@ -435,20 +435,20 @@ core-coh n op f s Fs Ff Ffc cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*�
     module X  = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E  p p* a  a*  al  lk
     module X′ = FlatRel n op f s Fs Ff Ffc ρ uρ ρι ρ* uρ* E′ p p* a′ a*′ al′ lk′
     os≡ : ∀ N y → Same (Out.rel X.Os) (Out.rel X′.Os) N y
-    os≡ = cs ρ uρ (wk ρι) X.F.ρ*s X.F.uρ*s (env-wk X.F.ttD E) (env-wk X′.F.ttD E′) (env-wk-eq X.F.ttD X′.F.ttD {E} {E′} ee) p X.F.sp* a a′
+    os≡ = cs ρ uρ (wk ρι) X.F.ρ*s X.F.uρ*s (env-wk E X.F.ttD) (env-wk E′ X′.F.ttD) (env-wk-eq {E = E} {E′ = E′} X.F.ttD X′.F.ttD ee) p X.F.sp* a a′
              (admits-trig n uρ* (lw* E) p* a*) (admits-trig n uρ* (lw* E′) p* a*′)
              (aligned-r* {Ψ = maps E} {ρ = ρ} al X.path) (aligned-r* {Ψ = maps E′} {ρ = ρ} al′ X.path) (linked-r* lk X.path) (linked-r* lk′ X.path)
     ls≡ : Two.LanesX n f s ρ uρ ρι ρ* uρ* E E′ p p* a a′ a* a*′ X.Ls X′.Ls
-    ls≡ b t₁ t₂ t₃ t₄ u h₁ h₁′ h₂ h₂′ h₃ h₃′ h₄ h₄′ =
-      Ffc b ρ uρ X.F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk h₁ E₂) (env-wk h₁′ E₂′)
-          (env-wk-eq h₁ h₁′ {E₂} {E₂′} (env-wk-eq h₂ h₂′ {E₃} {E₃′} (env-wk-eq h₃ h₃′ {E₄} {E₄′} (env-wk-eq h₄ h₄′ {E} {E′} ee))))
+    ls≡ b t₁ t₂ t₃ t₄ u h₄ h₄′ h₃ h₃′ h₂ h₂′ h₁ h₁′ =
+      Ffc b ρ uρ X.F.ρι⁴ (λ N → t₁ N ∷ t₂ N ∷ t₃ N ∷ t₄ N ∷ ρ* N) u (env-wk E₂ h₁) (env-wk E₂′ h₁′)
+          (env-wk-eq {E = E₂} {E′ = E₂′} h₁ h₁′ (env-wk-eq {E = E₃} {E′ = E₃′} h₂ h₂′ (env-wk-eq {E = E₄} {E′ = E₄′} h₃ h₃′ (env-wk-eq {E = E} {E′ = E′} h₄ h₄′ ee))))
       where
-        E₄  = env-wk h₄ E
-        E₄′ = env-wk h₄′ E′
-        E₃  = env-wk h₃ E₄
-        E₃′ = env-wk h₃′ E₄′
-        E₂  = env-wk h₂ E₃
-        E₂′ = env-wk h₂′ E₃′
+        E₄  = env-wk E h₄
+        E₄′ = env-wk E′ h₄′
+        E₃  = env-wk E₄ h₃
+        E₃′ = env-wk E₄′ h₃′
+        E₂  = env-wk E₃ h₂
+        E₂′ = env-wk E₃′ h₂′
 
 -- A flatMap's map is its lanes' flatMap's, re-emitted by the combined
 -- scan: coherent where the lanes' flatMap is.

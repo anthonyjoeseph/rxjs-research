@@ -179,7 +179,7 @@ module Share {Θ : List Set} {B : Set} n (F : Bool → Obs Timeline (⊤ ∷ Θ)
   ρ₀ = den D N
 
   h₁ = listHot n (empty {A = ⊤}) u D c ac
-  D₁ = den-cons h₁ D
+  D₁ = den-cons h₁
 
   a₁ : Admits D₁ (c ⊕ [ ix 0 ])
   a₁ = admits-body n (empty {A = ⊤}) u D c ac
@@ -488,7 +488,7 @@ module Ending {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.m
   open Share n (x lanePart) refl u D L aL N public hiding (K; ρ₀; Sh)
 
   h₂ = listHot n (Sh lanePart) {ℓ₁} u₁ D₁ B₀ a₁
-  D₂ = den-cons h₂ D₁
+  D₂ = den-cons h₂
 
   a₂ : Admits D₂ Bc
   a₂ = admits-body n (Sh lanePart) {ℓ₁} u₁ D₁ B₀ a₁
