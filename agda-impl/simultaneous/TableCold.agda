@@ -155,7 +155,7 @@ module ColdTab {A : Set} (m : From A 0) (n : ℕ) {Δ : List Set} (ρ* : ℕ →
   cold-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ (λ _ _ → ⊥) (cold-bd (fixed m) p) cold-bd*
   cold-stable = record
     { pull = λ le x un _ cl → let (x₀ , eq) = cold-pull le x un cl in x₀ , (λ ()) , eq
-    ; put-pull = λ _ _ () _ }
+    ; put-pull = λ _ _ () }
 
   -- The elaborated table is the rows written out.
   rows→ : ∀ {N l e′} → TR (Q N) l e′ → CRow (I N) l e′
