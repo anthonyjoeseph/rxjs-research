@@ -32,7 +32,7 @@ open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subst)
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
@@ -187,7 +187,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       cuts′ N x sh (there i)   N′ = Rest.cuts (Out.rest O) N x sh i N′
 
   env′ : Src → EnvR ρ′ (ext ρι) ρ*′
-  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh λ N → env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
+  env′ Rs = envR (Ψ′ Rs) D′ D*′ hots hots-coh unended′
     where
       hots : ∀ {X} (i : X ∈ A ∷ Γ) → HotR i ρ′ (ext ρι) ρ*′ (Ψ′ Rs) D′ D*′
       hots (here refl) = conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
@@ -509,12 +509,13 @@ module ConnRel {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B
 
   Ob : Out n b CE.ρ′ CE.uρ′ (ext ρι) CE.ρ*′ CE.uρ*′ (CE.Ψ′ Rs) CE.D′ CE.D*′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
   Ob = Fb CE.ρ′ CE.uρ′ (ext ρι) CE.ρ*′ CE.uρ*′ (C.env′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ])
-         (admits-body n s uρ (lw env) p a) (admits-body n (annotate (elab ρι s)) uρ* (lw* env) p* a*) (C.al′ Rs al lk)
+         CE.body-ad CE.body-ad* (C.al′ Rs al lk)
          (linked-r (linked-l lk (ix 0)) (ix 0))
 
 conn-rel : ∀ {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) → Full n s → Full n b → Full n (connect s b)
 conn-rel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  out (C.conn-tab Rs Ob) (C.conn-order Rs Ob al lk) (cbd-map (Out.bd-pin Rs) (Out.bd-pin Ob)) (cbd-map same-bd (Out.bd-pin* Ob))
+  out (C.conn-tab Rs Ob) (C.conn-order Rs Ob al lk) (cbd-map (Out.bd-pin Rs) (subst (λ β → SameBd (Rel.Bd (Out.rel Ob)) (bd n b CE.ρ′ CE.uρ′ β (p ⊕ [ ix 0 ]))) CE.D′-bd (Out.bd-pin Ob)))
+      (cbd-map same-bd (subst (λ β → SameBd (Rel.Bd* (Out.rel Ob)) (bd n (elab (ext ρι) b) CE.ρ*′ CE.uρ*′ β (p* ⊕ [ ix 0 ]))) CE.D*′-bd (Out.bd-pin* Ob)))
   where open ConnRel n s b Fs Fb ρ uρ ρι ρ* uρ* env p p* a a* al lk
 
 -- Rows late alike on each branch of a test are late alike under it.

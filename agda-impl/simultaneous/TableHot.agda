@@ -50,10 +50,11 @@ open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounde
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
-  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; same-bd; HotR; EnvR; maps; lw; lw*;
+  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
-open import simultaneous.TreeBounded using (listHot; tree-bounded)
-open import simultaneous.HorizonTree using (bd)
+open import simultaneous.TreeBounded using (listHot; tree-bounded; admits-body; listHot-u)
+open import simultaneous.HorizonTree using (bd; _∷ᵇ_)
+open import simultaneous.ElabUndone using (env-ext; EnvU)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
 open import simultaneous.TableRows using (proper⊆; unpin; RjRow; rejoin-inv)
 open import simultaneous.LaneEndSched using (emitAt)
@@ -95,9 +96,47 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
   Src : Set₁
   Src = Out n s ρ uρ ρι ρ* uρ* (maps env) (lw env) (lw* env) (p ⊕ [ ix 1 ]) (p* ⊕ [ ix 1 ] ⊕ [ ix 1 ])
 
-  -- The two hots, each listed off its lawful source.
-  hD = listHot n s uρ (lw env) p a
-  hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+  -- The two hots, each listed off its lawful source, opaque: a type
+  -- naming them unfolded exhausts the heap.
+  opaque
+    hD : HotD (λ N → hotOf (σ N))
+    hD = listHot n s uρ (lw env) p a
+
+    hD* : HotD (λ N → hotOf (σ* N))
+    hD* = listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+
+  opaque
+    unfolding hD hD*
+    hD-eq : hD ≡ listHot n s uρ (lw env) p a
+    hD-eq = refl
+
+    hD*-eq : hD* ≡ listHot n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+    hD*-eq = refl
+
+    -- Each hot hangs at its source's tree's boundaries.
+    hD-bd : hbd hD ≡ bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ])
+    hD-bd = refl
+
+    hD*-bd : hbd hD* ≡ bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ])
+    hD*-bd = refl
+
+    -- The scope's boundaries: the source's tree's, then the old.
+    D′-bd : dbd D′ ≡ (bd n s ρ uρ (dbd (lw env)) (p ⊕ [ ix 1 ]) ∷ᵇ dbd (lw env))
+    D′-bd = refl
+
+    D*′-bd : dbd D*′ ≡ (bd n (annotate (elab ρι s)) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ]) ∷ᵇ dbd (lw* env))
+    D*′-bd = refl
+
+    -- The body admissible where the connect is.
+    body-ad : Admits D′ (p ⊕ [ ix 0 ])
+    body-ad = admits-body n s uρ (lw env) p a
+
+    body-ad* : Admits D*′ (p* ⊕ [ ix 0 ])
+    body-ad* = admits-body n (annotate (elab ρι s)) uρ* (lw* env) p* a*
+
+    -- No elaborated hot in scope ends a lane.
+    unended′ : ∀ N → EnvU (ext ρι) (den D*′ N)
+    unended′ N = env-ext (listHot-u n s uρ* (lw* env) p* a* (unended env) N) (unended env N)
   D′ = den-cons hD (lw env)
   D*′ = den-cons hD* (lw* env)
 
@@ -118,9 +157,11 @@ module ConnEnv {Γ A} n (s : Obs Timeline Γ A)
 
   -- A source hot row is a hot row of its cut, which no admissible
   -- subscription's world holds.
-  hot-row : ∀ N {h e} → Rows (hotOf (σ N)) h e → HotsAll D′ h
-  hot-row N {h} {e} m = N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
-    where ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ])
+  opaque
+   unfolding hD
+   hot-row : ∀ N {h e} → Rows (hotOf (σ N)) h e → HotsAll D′ h
+   hot-row N {h} {e} m = N , inj₁ (e , Exact.sound (proper-exact (listC-exact (3 + N) n s (den-ex (lw env) N) (p ⊕ [ ix 1 ]) (proj₁ (proj₂ ok))) (proj₂ (proj₂ ok))) m)
+     where ok = listC-ok (3 + N) n s (uρ N) (p ⊕ [ ix 1 ])
 
   -- The new hot, read by a body subscribed in this scope.
   HotS : Src → Set₁
@@ -406,8 +447,9 @@ opaque
                (env : EnvR ρ ρι ρ*) p p* (a : Admits (lw env) p) (a* : Admits (lw* env) p*)
            → (Rs : ConnEnv.Src n s ρ uρ ρι ρ* uρ* env p p* a a*) → ConnEnv.HotS n s ρ uρ ρι ρ* uρ* env p p* a a* Rs
   conn-hot n s ρ uρ ρι ρ* uρ* env p p* a a* Rs _ _ n′ q q* ad ad* al lk =
-    out (rel′ ad ad* al) (rest′ ad ad* al lk) (Out.bd-pin Rs) same-bd
+    out (rel′ ad ad* al) (rest′ ad ad* al lk) (subst (SameBd (Rel.Bd R₀)) (sym hD-bd) (Out.bd-pin Rs)) same-bd
     where open ReaderTab n s ρ uρ ρι ρ* uρ* env p p* a a* Rs n′ q q*
+          open ConnEnv n s ρ uρ ρι ρ* uρ* env p p* a a* using (hD-bd)
 
 -- THE HOT'S MAP IS ITS SOURCE'S: two scopes whose sources map alike and
 -- are late alike give their hots one map and late rows, however the
