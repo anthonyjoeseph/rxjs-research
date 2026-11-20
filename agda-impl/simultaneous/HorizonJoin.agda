@@ -211,8 +211,8 @@ module MergeB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag
       from (Joining.run () _)
 
   postulate
-    -- No merge row lies over a boundary of the merge, nor under one.
-    gap-m : ∀ {N b g y e} → MBd N b g → Jc N y e → ¬ b ⊑ y × ¬ y ⊑ b
+    -- No merge row leads a boundary of the merge.
+    gap-m : ∀ {N b g y e} → MBd N b g → Jc N y e → ¬ y ⊑ b
 
   bounded : SM.Bounded
   bounded = record { gap = gap-m ; held-in = λ {N} {b} {r} → held-in {N} {b} {r} ; held-under = λ {N} {b} {r} → held-under {N} {b} {r} ; fwd = fwd ; fwd-pin = λ {N} {r} {k} → fwd-pin {N} {r} {k} }

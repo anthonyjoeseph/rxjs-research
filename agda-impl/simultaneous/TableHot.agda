@@ -399,12 +399,12 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
 
   -- THE READER'S HANGS: the reader's table is its hot's rejoined at the
   -- subscription, so the source's boundaries bound it (`RejoinB`), none
-  -- at the reader's late end; the elaborated reader's are its tree's.  Each partner pair cuts every
+  -- led by the reader's late end; the elaborated reader's are its tree's.  Each partner pair cuts every
   -- hot in scope alike, the read hot as the source's own pair cuts it.
   postulate
     rd-rejoin→  : ∀ {N y e} → TR (P N) y e → Rejoin q (TR (S N)) y e
     rd-rejoin←  : ∀ {N y e} → Rejoin q (TR (S N)) y e → TR (P N) y e
-    rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ b ⊑ (q ⊕ [ last ]) × ¬ (q ⊕ [ last ]) ⊑ b
+    rd-apart    : ∀ {N b g} → Rel.Bd R₀ N b g → ¬ (q ⊕ [ last ]) ⊑ b
     rd-bcorr-env : ∀ N → Inter.BCorrX (Own (TR (P N)) (Lateᵣ N)) (φᵣ N) (OwnPut (TR (P N)) (Putᵣ N)) (Rel.Bd R₀ N) (rd-bd* N)
                                       (EnvCut (Ψ′ Rs) ρ′ N)
     rd-stable : Stable (λ N → TR (P N)) (λ N → TR (Q N)) φᵣ Putᵣ Lateᵣ (Rel.Bd R₀) rd-bd*

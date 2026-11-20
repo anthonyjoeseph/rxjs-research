@@ -226,13 +226,15 @@ module Sub {Row Row′ : Pos → Set} {φ : Pos → Pos} {Puts Puts′ : Pos →
 
 module Root {A : Set}
   (c : ℕ → EmissionSet A) (d : ℕ → EmissionSet (IE A)) (Bd Bd* : ℕ → Pos → Tag → Set)
-  (B : Cuts.Bounded c Bd) (B* : Cuts.Bounded d Bd*) (R : Cuts.Real c Bd) (R* : Cuts.Real d Bd*)
+  (B : Cuts.Bounded c Bd) (B* : Cuts.Bounded d Bd*)
+  (off : ∀ {N k e} → c N k e → Cuts.Off c Bd N k) (off* : ∀ {N k e} → d N k e → Cuts.Off d Bd* N k)
+  (R : Cuts.Real c Bd) (R* : Cuts.Real d Bd*)
   (φ : ℕ → Pos → Pos) (Put : ℕ → Pos → Pos → Set) (Late : ℕ → Pos → Set)
   (C : ∀ N → Inter.BCorr (Own (c N) (Late N)) (φ N) (OwnPut (c N) (Put N)) (Bd N) (Bd* N))
   where
   module I (N : ℕ) = Inter (Own (c N) (Late N)) (φ N) (OwnPut (c N) (Put N)) (Bd N) (Bd* N)
 
-  open Settle c d Bd Bd* B B* R R* φ Put Late
+  open Settle c d Bd Bd* B B* R R* off off* φ Put Late
     (λ {N} x un nl → I.clear→ N (C N) (_ , x , un , nl))
     (λ {N} x un nl → I.clear← N (C N) (_ , x , un , nl))
     (λ {N} x pl → I.clear-put N (C N) ((_ , x) , pl))
@@ -286,8 +288,8 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
   (Env : Pos → Set) (EnvPut : Pos → Pos → Set)
   (Bd Bd* : Pos → Tag → Set)
   (R : Run c)
-  (gap  : ∀ {b g y e} → Bd b g → c y e → ¬ b ⊑ y × ¬ y ⊑ b)
-  (gap* : ∀ {b g y e} → Bd* b g → d y e → ¬ b ⊑ y × ¬ y ⊑ b)
+  (gap  : ∀ {b g y e} → Bd b g → c y e → ¬ y ⊑ b)
+  (gap* : ∀ {b g y e} → Bd* b g → d y e → ¬ y ⊑ b)
   (held-in  : ∀ {b q} → Bd b (held q) → q ≺ b)
   (held-in* : ∀ {b q} → Bd* b (held q) → q ≺ b)
   -- no row lies over a connect a boundary waits on
@@ -369,7 +371,7 @@ module TakePair {A X : Set} (incl : Bool) (keep : A → Bool) (keep* : X → Boo
 
   between′ : ∀ {b b*} → Bd b free ⊎ Σ Pos (λ q → Bd b (held q)) → Bd* b* free ⊎ Σ Pos (λ q → Bd* b* (held q))
            → I.Between b b* → I′.Between b b*
-  between′ bdp bde = between-at (λ x → either Bd bdp (λ bd → proj₂ (gap bd x))) (λ y → either Bd* bde (λ bd* → proj₂ (gap* bd* y)))
+  between′ bdp bde = between-at (λ x → either Bd bdp (λ bd → gap bd x)) (λ y → either Bd* bde (λ bd* → gap* bd* y))
 
   tagged : ∀ (B : Pos → Tag → Set) {b} g → B b g → B b free ⊎ Σ Pos (λ q → B b (held q))
   tagged _ free     bd = inj₁ bd

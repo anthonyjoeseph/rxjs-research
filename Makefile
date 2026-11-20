@@ -1,7 +1,7 @@
 .PHONY: all help agda gate gate-cheap bug-cache spec-check spec-check-selftest oracle oracle-build bg bg-check bg-wait \
         wiring wiring-gate wiring-selftest unsafe-check dup-check dup-selftest \
         imports-check imports-fix imports-selftest comments-check comments-selftest \
-        roadmap-check roadmap-selftest find find-prose postulates notify split \
+        roadmap-check roadmap-selftest find find-prose postulates cone notify split \
         ts-check ts-lint ts-format-check ts-gate
 
 # UTF-8 locale for em-dashes and special characters in Agda output
@@ -44,6 +44,7 @@ help:
 	@echo "  spec-check-selftest  every statement's sabotage is caught (CI only)"
 	@echo "  oracle        the three Agda engines against real rxjs (typescript/ drives it)"
 	@echo "  postulates    every postulate in $(SRC) by name — the work ledger"
+	@echo "  cone          the postulates one definition rests on:  make cone NAME=tree-bounded"
 	@echo "  find          search the declared TYPE of every statement:  make find Q='⊑ lub'"
 	@echo "  find-prose    search comment blocks and docs for a finding:  make find-prose Q='dead route'"
 	@echo "  wiring        the wiring report (wiring-gate: the same, exiting 1)"
@@ -575,6 +576,13 @@ find-prose:
 # these, in exactly one tier.
 postulates:
 	@scripts/check-wiring.py --postulates
+
+# THE LEDGER UNDER ONE NAME: every postulate a definition reaches, each with
+# one chain of names down to it.  `postulates` is the whole ledger; this is
+# what one proof still owes.  Over-approximates, never under.  docs/cone.md
+#   make cone NAME=tree-bounded      make cone NAME=bounded FILE=simultaneous/Horizon.agda
+cone:
+	@scripts/cone.py "$(NAME)" --paths $(if $(FILE),--file $(FILE))
 
 # THE LEDGER'S SHAPE, PUSHED TO A PHONE.  A gate is the one moment the tree is
 # known-good and a commit is next, so the gate targets call this on the way out

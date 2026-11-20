@@ -23,7 +23,7 @@ open import denotation.Position using (Pos)
 open import denotation.Events using (Timeline; timelineAt; start; Events)
 open import denotation.EmissionSet using (Ev; pin; _≺_; _≼_; InE; at-out; at-skip; at-end; on-out; on-skip; enter; module Op)
 open import denotation.Laws.Modulus using (⟨_⟩; ≺-irrefl; ≺→≼; ≼-refl; ≺-≼-≺)
-open import denotation.Laws.Worlds using (Ok; InvAt; ⊑-≼; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Ok; InvAt; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Laws.ColdInv using (depth; cold-inv; cold-reach; cold-asc)
 import quickcheck.Tabled as Tb
@@ -86,7 +86,7 @@ cold-bounded {A = A} n c ρ p ok = record
     entered x = x , cold-reach p (timelineAt c p) rp x
 
     gap : ∀ {N b g y e} → cold-bd c p N b g → Cut n (cold c) ρ p N y e → _
-    gap {N} {b} {g} {y} {e} (refl , e₀ , xb , db) r = (λ h → ⊑-≼ h yb) , below
+    gap {N} {b} {g} {y} {e} (refl , e₀ , xb , db) r = below
       where
         x = proj₁ (row r)
 

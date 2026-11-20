@@ -70,12 +70,12 @@ Members: `cc-stable`, `sw-stable`, `ex-stable`, `cold-stable`, `defer-stable`,
 #### THE ROOT'S LEAVES
 
 The crossings are the `Rel`'s. Left: a closed program's boundaries are
-real, and the map and placements are read alike by cuts agreeing up to
-them. Untried. Settled by bodies over the tree, or a placement that
-moves between agreeing cuts.
+real and over none of its rows (false of an open one), and the map and
+placements are read alike by cuts agreeing up to them. Untried. Settled
+by bodies over the tree, or a placement that moves between agreeing cuts.
 
-Members: `root-real`, `root-real*`, `root-φ-agree`, `root-late-agree`,
-`root-put-up`, `root-put-down`.
+Members: `root-real`, `root-real*`, `root-off`, `root-off*`,
+`root-φ-agree`, `root-late-agree`, `root-put-up`, `root-put-down`.
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
@@ -333,7 +333,7 @@ The rewrite: the plain cold's cuts, renamed onto the elaborated
 cold's, keep order, instants and kinds. Untried; each is about one
 walk of one timeline. Settled by bodies.
 
-Members: `walk-past`, `walk-under`, `walk-end`, `walk-before`, `walk-apart`,
+Members: `walk-under`, `walk-end`, `walk-before`, `walk-apart`,
 `walk-ren→`, `walk-ren←`, `walk-kind`, `walk-func`, `walk-flat`, `walk-alone`,
 `φ-mono`, `φ-inst`, `φ-home`, `φ-after`, `φ-back`.
 

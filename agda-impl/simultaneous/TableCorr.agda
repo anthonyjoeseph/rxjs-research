@@ -11,7 +11,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.Bool using (T)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _≤_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_])
 open import Data.Empty using (⊥)
 open import Function using (_⇔_)
@@ -251,7 +251,7 @@ record Rel {A : Set} (P : ℕ → Maybe (Tb.Listed A)) (Q : ℕ → Maybe (Tb.Li
 -- image is a row; a put one's by `skip-off*`.
 off* : ∀ {A P Q s s*} (R : Rel {A} P Q s s*) {N k b g} → Own (TR (P N)) (Rel.Late R N) k → Rel.Bd* R N b g → ¬ Rel.φ R N k ⊑ b
 off* R {N} (e , x , un , nl) bd with Corr.row→ (Rel.corr R N) x un
-... | inj₁ ((_ , y , _) , _)        = proj₂ (Cuts.Bounded.gap (Rel.bounded* R) bd y)
+... | inj₁ ((_ , y , _) , _)        = Cuts.Bounded.gap (Rel.bounded* R) bd y
 ... | inj₂ (refl , ((_ , _ , _ , pl) , _)) = Rel.skip-off* R x nl pl bd
 
 -- Nor over a connect a boundary waits on, which lies under it.

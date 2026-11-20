@@ -284,8 +284,8 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       module TBs = Cuts.Bounded (tree-bounded n s* ρ*s uρ*s Ds sp* (admits-trig n uρ* (lw* env) p* ad*))
 
       src-off* : ∀ N {z* y e} → Mark (BdS* N) z* → Cut n s* ρ*s sp* N y e → ¬ y ⊑ z*
-      src-off* N (_ , _ , bd , inj₁ refl) y = proj₂ (TBs.gap bd y)
-      src-off* N (_ , _ , bd , inj₂ refl) y yr = proj₂ (TBs.gap bd y) (⊑-trans yr (TBs.held-under bd))
+      src-off* N (_ , _ , bd , inj₁ refl) y = TBs.gap bd y
+      src-off* N (_ , _ , bd , inj₂ refl) y yr = TBs.gap bd y (⊑-trans yr (TBs.held-under bd))
 
       -- Nor does a skip of the source's.
       mg-skip-off* : ∀ N {z* k} → Mark (BdS* N) z* → oM N k skip → ¬ Rel.Late (Out.rel Os) N k → ¬ Rel.φ (Out.rel Os) N k ⊑ z*
@@ -380,10 +380,10 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- No merge row lies over the merge's boundaries.
       mg-gap : ∀ {N b g y e} → jbd (mergeᶠ nothing) N b g → JP.J.JoinT N y e → ¬ y ⊑ b
-      mg-gap {N} b₀ y = proj₂ (Cuts.Bounded.gap (jtree (mergeᶠ nothing)) b₀ (merge-tr← n f s uρ p {N} y))
+      mg-gap {N} b₀ y = Cuts.Bounded.gap (jtree (mergeᶠ nothing)) b₀ (merge-tr← n f s uρ p {N} y)
 
       mg-gap* : ∀ {N b g y e} → jbd* (mergeᶠ nothing) N b g → JP.J*.JoinT N y e → ¬ y ⊑ b
-      mg-gap* {N} b₀ y = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) eachS {ρ*c} uρ*c c₁ {N} y))
+      mg-gap* {N} b₀ y = Cuts.Bounded.gap (jbounded* (mergeᶠ nothing)) b₀ (merge-tr← n (λ a → laneˢ (λ k′ c′ → laneSrc ρι⁴ (f a) k′ c′)) eachS {ρ*c} uρ*c c₁ {N} y)
 
       -- No merge row lies over a connect a boundary waits on: the
       -- boundary lies under it, and no row over the boundary.
@@ -538,7 +538,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- A put skip is imaged as any row is, so over no boundary.
       cc-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* (mergeᶠ (just k)) N b g → ¬ φ′ N y ⊑ b
-      cc-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* (mergeᶠ (just k))) b₀ (proj₂ (cc-img _ (skip , x , tt , nl))))
+      cc-put-off* x nl _ b₀ = Cuts.Bounded.gap (jbounded* (mergeᶠ (just k))) b₀ (proj₂ (cc-img _ (skip , x , tt , nl)))
 
       cc-got : ∀ N → Got (P′ N)
       cc-got N = pd-got (mergeᶠ (just k)) N
@@ -596,7 +596,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- A put skip is imaged as any row is, so over no boundary.
       sw-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* switchᶠ N b g → ¬ φ′ N y ⊑ b
-      sw-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* switchᶠ) b₀ (proj₂ (sw-img _ (skip , x , tt , nl))))
+      sw-put-off* x nl _ b₀ = Cuts.Bounded.gap (jbounded* switchᶠ) b₀ (proj₂ (sw-img _ (skip , x , tt , nl)))
 
       sw-got : ∀ N → Got (P′ N)
       sw-got N = pd-got (switchᶠ) N
@@ -656,7 +656,7 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
       -- A put skip is imaged as any row is, so over no boundary.
       ex-put-off* : ∀ {N y l b g} → TR (P′ N) y skip → ¬ Late′ N y → Put′ N y l → jbd* exhaustᶠ N b g → ¬ φ′ N y ⊑ b
-      ex-put-off* x nl _ b₀ = proj₂ (Cuts.Bounded.gap (jbounded* exhaustᶠ) b₀ (proj₂ (ex-img _ (skip , x , tt , nl))))
+      ex-put-off* x nl _ b₀ = Cuts.Bounded.gap (jbounded* exhaustᶠ) b₀ (proj₂ (ex-img _ (skip , x , tt , nl)))
 
       ex-got : ∀ N → Got (P′ N)
       ex-got N = pd-got (exhaustᶠ) N

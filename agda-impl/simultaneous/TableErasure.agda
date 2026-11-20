@@ -456,19 +456,27 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
 
   module HQ = Cuts cQ R.Bd*
 
-  -- THE ROOT'S LEAVES: a closed program's boundaries are real; the map is
-  -- causal, read alike by cuts agreeing up to a row; and a placement is
-  -- read alike by cuts agreeing up to it, each way.
+  -- THE ROOT'S LEAVES: a closed program's boundaries are real, and lie
+  -- over none of its rows; the map is causal, read alike by cuts agreeing
+  -- up to a row; and a placement is read alike by cuts agreeing up to it,
+  -- each way.
+  --
+  -- Over no row only at the root: an open program's row may lie under a
+  -- boundary.  A lane subscribed under a row of one cut is read at every
+  -- cut, and at a shallower one a hot it reads may hang at a position the
+  -- lane's subscription lies under, so every row of the lane does too.
   -- RECOVERY: git show b96dfae:agda-impl/simultaneous/HorizonCorr.agda restores `RealEnv`, `ReaderReal` and `ConnReal`, a boundary real or borne by the environment, discharged at the connect owning its hot, for `root-real`.
   postulate
     root-real  : Cuts.Real cP R.Bd
     root-real* : Cuts.Real cQ R.Bd*
+    root-off  : ∀ {N k e} → cP N k e → Cuts.Off cP R.Bd N k
+    root-off* : ∀ {N k e} → cQ N k e → Cuts.Off cQ R.Bd* N k
     root-φ-agree   : ∀ {N N′ k e} → Rows (CP.L₃ N) k e → Unpinned e → ¬ Late N k → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → φ N k ≡ φ N′ k
     root-late-agree : ∀ {N N′ k e} → Rows (CP.L₃ N) k e → Unpinned e → ¬ Late N k → AgreeTo k (CP.c₃ N) (CP.c₃ N′) → ¬ Late N′ k
     root-put-up    : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (CP.c₃ N′) (CP.c₃ N) → Put N k l → Put N′ k l
     root-put-down  : ∀ {N N′ k l} → N ≤ N′ → AgreeTo k (CP.c₃ N′) (CP.c₃ N) → AgreeTo l (CQ.c₃ N′) (CQ.c₃ N) → Put N′ k l → Put N k l
 
-  module RT = Root cP cQ R.Bd R.Bd* R.bounded R.bounded* root-real root-real* R.φ R.Put R.Late R.bcorr
+  module RT = Root cP cQ R.Bd R.Bd* R.bounded R.bounded* (λ {N} {k} {e} → root-off {N} {k} {e}) (λ {N} {k} {e} → root-off* {N} {k} {e}) root-real root-real* R.φ R.Put R.Late R.bcorr
 
   bk : ℕ → Pos → List Pos
   bk = R.bk
@@ -518,7 +526,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
     CQ.cuts→run (Cuts.Bounded.fwd R.bounded*
       (RT.I.clear→ N (R.bcorr N) (_ , CP.→tr {N} r , un , nl)
         (Across.lead-clear R.across (CP.→tr {N} r) un nl (λ x → ld (CP.tr→ {N} x)) (CQ.→tr {N} rm) ie
-          (HQ.clear root-real* (Cuts.Bounded.off-row R.bounded* (CQ.→tr {N} rm)) (CQ.run→cuts ag*)))))
+          (HQ.clear root-real* (root-off* (CQ.→tr {N} rm)) (CQ.run→cuts ag*)))))
 
   -- An agreed table row's image: the elaborated run agrees with the cut
   -- up to it.
@@ -555,7 +563,7 @@ module At (n : ℕ) {A : Set} (o : SObs [] A) where
   -- cut, no hang lies over it.
   image-clear : ∀ {N l e′} → u l e′ → Settled u CQ.c₃ N l → HQ.Clear N l
   image-clear {N} {l} {e′} y st* =
-    HQ.clear root-real* (Cuts.Bounded.off-row R.bounded* (CQ.c→ {N} (proj₁ (upto (st* ≤-refl′) {l} {e′} (≼-refl {l})) y))) (CQ.run→cuts st*)
+    HQ.clear root-real* (root-off* (CQ.c→ {N} (proj₁ (upto (st* ≤-refl′) {l} {e′} (≼-refl {l})) y))) (CQ.run→cuts st*)
 
   -- SETTLED ON BOTH SIDES, SETTLED BETWEEN THE CUTS: a deeper cut's row
   -- whose image is clear at the shallower cut is clear there itself.
