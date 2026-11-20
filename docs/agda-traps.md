@@ -1,276 +1,211 @@
-# Agda language and stdlib traps — each diagnosed the expensive way
+# Agda language and stdlib traps
 
-Traps **inside the language**, as opposed to the build- and tooling-level ones in
-[agda-build.md](agda-build.md). Every one below cost real time at least once, and they
-share a shape worth naming: **Agda reports these against the WRONG thing**, so the
-error message actively misdirects. Read the entry before reasoning from the error.
+Traps **inside the language**; build and tooling traps live in
+[agda-build.md](agda-build.md). Each cost real time at least once, and most share a shape:
+**Agda reports them against the WRONG thing.** Read the entry before reasoning from the error.
 
-- **A SHORT LOWERCASE BINDER MAY COLLIDE WITH AN IN-SCOPE CONSTRUCTOR, AND THE ERROR
-  NAMES THE WRONG TYPE.** Agda then reads your intended *variable* as a *pattern*. The
-  stdlib instance is `acc`, `Induction.WellFounded`'s constructor, whose shadowing
-  yields the useless "cannot split on non-datatype". The costly ones are REPO-LOCAL — a
-  two-letter constructor of one of this development's own small relations — and there
-  the message reports the type you were matching on rather than the clash, e.g. "hs is
-  not a constructor of the datatype `_≤_`". **When an error says "X is not a constructor
-  of T" for something you meant as a variable, grep for `X :` before touching the
-  proof.** Cost one 40-minute gate.
+## Trap style guide
 
-- **AND A BINDER MAY COLLIDE WITH A MIXFIX NAME PART, WHERE THE ERROR NAMES NOTHING AT
-  ALL.** The bullet above has a culprit in the message; this one does not. A mixfix
-  operator puts each of its name parts into scope as a reserved token, so an ordinary
-  English word imported as part of one cannot be a variable — and a clause binding it
-  fails with `NoParseForLHS` plus "Operators used in the grammar: None", which reads as
-  a broken left-hand side rather than as one word being unavailable. Worked instance:
-  `as` is a name part of an emit constructor this repo imports widely, so `(consᵗ a as)`
-  parses in modules that do not import it and fails in modules that do — the same clause
-  text, green in one file and red in its neighbour, which is what makes it look like
-  anything but a name clash. **When a left-hand side will not parse and every constructor
-  in it is in scope, suspect the BINDERS, not the pattern**; a one-letter rename decides
-  it in one dev run.
+- bad agda code example, in markdown
+- good agda code example
+- sentence fragment explaining the advantage to the 'good' version
 
-- **A `with` ON A TERM THAT RUNS THE EVALUATOR MAKES THE TYPECHECKER RUN IT, AND THE
-  FAILURE IS AN OUT-OF-MEMORY WITH NO ERROR AT ALL.** Abstracting a `with` head normalises
-  it, and a head like `agrees c` — a whole `evaluate↓` over a variable case — unfolds the
-  evaluator symbolically once nothing on the path is a postulate. Nothing names the
-  clause: the module's `Checking` line is the last output, the heap climbs, and the
-  process is killed from outside. Worked instance: the bug cache's runner, where a `with`
-  on `wellFormed c` alone checked at once and one on `agrees c` alone filled a 6 GB heap;
-  the same verdicts matched in a helper function checked in seconds. **Match the result
-  in a helper, or use the non-dependent eliminator**, as `CLI.Main` already does with
-  `maybe′` for the same reason. To find the clause, check under a heap cap
-  (`agda +RTS -M4G -RTS`) so it fails fast instead of swapping, and bisect by definition.
+The bad/good examples should be as brief as possible, under 7 lines if possible.
+Expressiveness is much better than formal correctness — make heavy use of pseudocode
+conventions.
 
-- **A SLOW CHECK IS CHARGED TO THE DEFINITION THAT TRIGGERS THE UNFOLDING, NOT THE ONE
-  THAT IS LARGE.** Profile per definition (`make bg T=check F=… AGDA_PROFILE="--profile=definitions"`)
-  before rewriting anything; a clause split out into its own lemma gets its own line. Four
-  shapes, each measured at tens of seconds to minutes:
-  - A `with` that only destructures a Σ, or splits a ⊎ without refining the goal, pays for
-    its whole context (module parameters over the elaborated program). **Read a Σ with a
-    pattern `let`, split a ⊎ with `[_,_]′`, and match a `Dec`, an indexed constructor or a
-    `refl` in a small helper's clauses.**
-  - A definition whose body is a `let` unfolds into its consumers' `with`. **When the
-    consumers need only its type, make it `opaque`.**
-  - A large record value — a table built by a `record { … }` with many fields — is unfolded
-    whenever a conversion meets it under an application. **Make the value `opaque` and give
-    its own lemmas `unfolding` it**; a consumer that only passes it on never notices.
-  - An application whose result type is a transparent row of a large program — `enter
-    (capprox …) p q e` — has that type reduced to whnf for implicit insertion, which runs
-    the denotation. **Wrap the row in an `opaque` type and prove its step lemmas once, over
-    a variable program, inside an `unfolding` block.** Opaque names compare by argument, so
-    two spellings of the same program meet cheaply.
+Read thru all examples before adding a new one — make sure you're not adding anything
+redundant. Always better to augment an existing example, or, best of all, leave everything
+as-is.
 
-- **A `with` INSIDE A CYCLE LOSES A MATCHED ACCESSIBILITY'S ORDER, AND THE ERROR NAMES
-  EVERY MEMBER OF THE LOOP.** A clause matching `(acc rs)` hands its with-functions the
-  FIELD `rs`, so a call in the with body re-applying `acc rs` reads as unrelated to the
-  clause's argument rather than equal to it. The accessibility then drops out of every
-  loop that passes through that call, and an unrelated decrease elsewhere on the loop is
-  what the error ends up blamed on. Decide the Boolean or the Σ OUTSIDE the cycle — a
-  `let` for a Σ, an eliminator taking the equation for a Boolean — so the clause has no
-  with-function at all.
+---
 
-- **AND THE OPPOSITE HOLDS FOR A COPATTERN'S SUCCESSOR: a `with` branch keeps the guard,
-  and a lambda does not.** A coinductive successor at the head of a clause or of a `with`
-  branch, under a constructor, is guarded by the `fold` copattern it answers. The same
-  successor under a lambda handed to an eliminator (`[_,_]′`) is an ARGUMENT of that
-  eliminator, and the guard is gone. So the two traps pull opposite ways: eliminate a
-  decision without `with` where an accessibility is matched, and keep the `with` where a
-  guarded successor is built.
+## Names
 
-- **Bisect a termination failure on a SUBSET of the block, not on the whole.** Stubbing
-  every member except a chosen few as postulates leaves the termination checker only the
-  loops among those few, far faster than checking the whole block. A loop that survives
-  on five members is the real culprit; cutting one call edge at a time, by routing it to
-  a postulated copy of its callee, names the edge.
+### A binder collides with something in scope
 
-- **The termination checker rejects `where`-bound abbreviations of the recursion
-  pattern.** Inline it — write `suc (suc j)`, not a bound alias.
+```agda
+f (acc hs) = …        -- "hs is not a constructor of _≤_"  (hs is a constructor somewhere)
+g (consᵗ a as) = …    -- NoParseForLHS, "Operators used: None"  (`as` is a mixfix name part)
+```
+```agda
+f (acc hs′) = …       -- after `grep 'hs :'`
+g (consᵗ a xs) = …
+```
+Your variable stays a variable. "X is not a constructor of T" → grep `X :`; an LHS that
+won't parse with every constructor in scope → suspect the binders, rename one letter.
 
-- **As-patterns break the termination checker** in nested-`Acc` `where`-helpers. Keep
-  the plain `go` shape. The mechanism, and it decides the shape of every
-  lexicographic well-foundedness proof here: an as-pattern handed back to a recursive
-  call is REBUILT rather than passed on, so `aU@(acc fU)` is not the argument that was
-  matched and nothing is structurally smaller. A flat helper taking all the
-  accessibility witnesses at once therefore cannot work — its off-component arms have to
-  return the outer witnesses unchanged — and the error names EVERY recursive call, which
-  reads as a bad measure rather than as a pattern problem. **Nest instead: one
-  `where`-bound level per component, each binding its own witness in an enclosing
-  pattern**, so every inner recursion descends on its own argument alone.
+### A `variable` block generalises in declaration order
 
-- **Implicits sitting under `_+_` are not inferred from `≤-refl`.** Agda refuses to
-  invert `_+_` (it hits inversion depth 50) and reports the failure as an *unsolved
-  constraint* rather than as an inference failure. Pass the implicit explicitly.
+```agda
+variable n : ℕ ; Γ : Ctx n
+lemma : P Γ → Q n      -- "Γ.n != n", or an out-of-scope variable in a well-formed type
+```
+```agda
+lemma : ∀ {n} {Γ : Ctx n} → P Γ → Q n
+```
+One name per number, binders in the order you wrote — use `variable` only for
+single-binder signatures.
 
-- **`suc m ≤ᵇ n` unfolds to `m <ᵇ n`.** State Bool-false helpers over `<ᵇ` or they will
-  not reduce. The same asymmetry bites in reverse when a conjunct needs a cons DROPPED
-  from a `length`: a Bool-level widening lemma's bound is recoverable only *after*
-  `suc … ≤ᵇ suc …` reduces, and Agda will not run that reduction backwards to solve for
-  it. Go through the `≤` side instead — `≤ᵇ⇒≤`, `≤-trans`, `≤⇒≤ᵇ`.
+### Inside `abstract`, every `where` binding needs a signature
 
-- **`∧-true`'s Bool arguments must be EXPLICIT, not `_`,** wherever the statement
-  reduces its own conjunction away — otherwise the metas are unsolvable, because there
-  is nothing left in the goal to recover them from. Same family as the eta-expansion
-  mandate for lemmas passed to postulates.
+```agda
+abstract
+  S-lemma = … step … where step = …    -- MissingTypeSignatureForOpaque + a desugared dump
+```
+```agda
+abstract
+  S-lemma = … step … where step : T ; step = …
+```
+Agda never infers an abstract type; the dump is Agda's own rendering, not mangled source.
 
-- **`+-monoˡ-≤` with `s≤s z≤n`** needs the implicit pinned (`z≤n {k}`), else it leaves
-  unsolved metas.
+## Unsolved metas — an implicit nothing in the term determines
 
-- **`Data.Nat.Solver` works, but suc-headed sums must be written `3 + V`, not `V + 3`.**
+```agda
+… ∧-true _ _ …             -- the goal reduced its own ∧ away
+… +-monoˡ-≤ (s≤s z≤n) …     -- z≤n's implicit; and implicits under _+_ (≤-refl won't invert _+_)
+f = all (λ v → P v) vs       -- P's implicit {e}: a fresh meta per element
+… hopDᵉ (inputᶜ i) …        -- inputᶜ's Γ appears only in its RESULT type
+… T (p k x) … root …        -- T forgets k; root : Path Γ lo t t leaves lo free
+… scan-st (evalTm s) …      -- existential index: no error, Agda normalises the conclusion looking for it
+```
+```agda
+… ∧-true b c …
+… +-monoˡ-≤ (s≤s (z≤n {k})) …
+f {e = e} = all (λ v → P {e = e} v) vs
+… hopDᵉ (inputᶜ {Γ = Γ} i) …
+… f {lo = 1} … root …       -- census every application with one grep; pin them together
+… scan-st {A = A} (evalTm s) …
+```
+The meta closes over a variable instead of asking the unifier. When a meta is blamed on an
+application whose arguments look determined, look for an argument whose type variable
+appears in its result only. A meta with no error and only a growing heap is the
+existential-index case: 18 s pinned against 14 GB unpinned.
 
-- **`rewrite *-identityʳ` twice for `suc sz * 1`** — it unfolds to `suc (sz * 1)`, so
-  the inner product needs its own rewrite.
+## Cost — the checker runs what it unfolds
 
-- **A `with` scrutinee can be named without adding a pattern position**: `with X in eq`
-  binds the equation and adds no `with` nesting level. Where the proof and the lookup
-  can share ONE `with`, prefer that — refining the lookup then refines the proof's type
-  and the equation is not needed at all.
+A slow check is charged to the definition that TRIGGERS the unfolding, not the large one.
+Cap the heap (`agda +RTS -M4G -RTS`) so it fails fast, and profile
+(`make bg T=check F=… AGDA_PROFILE="--profile=definitions"`) before rewriting anything.
 
-- **A CONTEXT-INDEXED CONSTRUCTOR ALIAS IN A `where` TYPE LEAVES `Γ` UNSOLVABLE, AND
-  THE META IS REPORTED AT ITS CONSUMER.** `inputᶜ : ∀ {n} {Γ : Ctx n} (i : Fin n) →
-  Exp Γ … (lookup Γ i)` mentions `Γ` only in its RESULT, so `hopDᵉ V (slotHop V sl)
-  (inputᶜ i)` cannot solve it: `Fin n` does not carry `Γ`, and `slotHop`'s result type
-  (`Fin n → ℕ`) has already forgotten it. In the enclosing STATEMENT the same term is
-  fine, because a telescope variable of type `Closed Γ …` pins it — so the trap only
-  appears when a `where` binding re-spells the statement's own term. Agda blames the
-  outer application (`hopDᵉ`, `syncSizeᵉ`), never the alias, and the clause head that
-  would supply `Γ` typically binds `{n = n}` and stops. Bind `{Γ = Γ}` in the clause
-  head and write `inputᶜ {Γ = Γ} i`. The general form: **when an unsolved meta is
-  reported at a function whose own arguments look fully determined, look for an argument
-  whose type variable appears in ITS result only.**
+### A `with` normalises its head and pays for its context
 
-- **INSIDE `abstract`, EVERY `where` BINDING NEEDS AN EXPLICIT TYPE SIGNATURE, AND THE
-  ERROR IS A WARNING WITH NO POSITION YOU CAN USE.** A sealed lemma whose proof is
-  staged through `where`-bound steps fails with
-  `MissingTypeSignatureForOpaque: Missing type signature for abstract definition S` —
-  because Agda never infers the type of an abstract definition, and a `where` binding
-  under an `abstract` block is one. The message then prints the whole clause back
-  desugared, as `mutual / abstract / syntax S ... / postulate S : _`, which reads like a
-  tool generating broken code and is in fact Agda's own rendering. The fix is one
-  signature per binding, and the desugared dump is NOT evidence that anything mangled
-  your source. Since the build runs `-W error`, the warning is a build failure.
+```agda
+f c with agrees c                 -- runs evaluate↓ symbolically: OOM, no error
+g x with lemma x                  -- only destructures a Σ / splits a ⊎: pays for the whole context
+... | (r , d) = …
+```
+```agda
+f c = helper (agrees c)           -- or a non-dependent eliminator: maybe′, [_,_]′
+g x = let (r , d) = lemma x in …  -- refl / Dec / indexed constructor: match in a small helper
+```
+Nothing gets abstracted over the context, so nothing gets normalised.
 
-- **A CLOSED NUMERAL LARGE ENOUGH TO EXCEED WORD ARITHMETIC IS FINE UNTIL IT MEETS A
-  FREE VARIABLE, AND THEN THE CHECKER PEELS IT ONE SUCCESSOR AT A TIME.** `_+_` and
-  `_*_` on `ℕ` are GMP-backed only when BOTH operands close; with one operand stuck on a
-  bound variable, Agda falls back on the defining clauses, and `suc n * m = m + n * m`
-  turns a forty-five digit factor into a forty-five digit recursion. It surfaces three
-  ways, all of which read as "Agda hung on a two-line lemma": an implicit left for the
-  unifier to solve against `1 + U` where `U` is such a numeral, which inverts a builtin
-  addition; two DIFFERENT SPELLINGS of the same product compared under a stuck sum, which
-  defeats the syntactic-equality short circuit and reduces instead; and `with` on a `Σ`
-  whose type carries such a product, which reduces the abstracted type.
-  Three repairs, and all of them are about keeping the numeral away from the variable
-  rather than about making it smaller — shrinking it does not help, since the peel is
-  linear in the value: supply the implicits explicitly; state the step that introduces
-  the free variable **over variables**, in its own lemma, and apply it at the
-  obligation's own spellings so every comparison is syntactic; and take a `Σ` apart with
-  `proj₁`/`proj₂` rather than `with`.
+### A transparent definition unfolds into its consumers
 
-- **AN IMPLICIT USED INSIDE AN `all`-PREDICATE LAMBDA IS SOLVED PER ELEMENT, AND THE
-  ERROR LANDS ON THE LAMBDA.** A clause whose body is `all (λ v → P v) vs`, where `P`
-  takes an implicit the clause's own signature fixes (the program `e`, a context, a
-  slot type), leaves that implicit to the unifier at every application of the lambda —
-  and `all` over a list determines nothing about it, so each element is a fresh meta
-  and the report is `Unsolved metas` (or a yellow highlight) at the lambda, which reads
-  as the predicate being wrong. Nothing is wrong with the predicate. Bind the implicit
-  on the clause's left-hand side — `f {e = e} … = all (λ v → P {e = e} v) vs` — so the
-  lambda closes over a variable instead of asking for one; the same repair as the
-  eta-expansion rule for passing lemmas into an assembly, arriving inside a body.
+```agda
+tbl = record { …many fields… }             -- unfolded at every conversion that meets it
+row : enter (capprox N n o env) p q e      -- whnf'd for implicit insertion: runs the denotation
+d = let … in …                             -- unfolds into every consumer's `with`
+```
+```agda
+opaque
+  tbl = record { … }                       -- own lemmas `unfolding tbl`
+  Row o p q e = enter (capprox N n o env) p q e  -- step lemmas once, over a variable program
+```
+Opaque names compare by argument, so two spellings of one program meet cheaply; a
+consumer that only passes the value on never notices.
 
-- **A THRESHOLD WRITTEN ON THE LEFT OF ITS OFFSET IS A SUC-TOWER; ON THE RIGHT IT IS
-  NEUTRAL.** An induction over "every `S` at or above `k`" is normally indexed by the
-  offset, and the two spellings of the subject look interchangeable: `k + j` (or the
-  nested `suc (suc … j)` a helper like `from14` builds) against `j + k`. They are not.
-  `_+_` matches on its LEFT argument, so `k + j` reduces to a tower of `k` successors
-  over the variable, while `j + k` is STUCK — no clause applies to a free `j`, and every
-  power of it is stuck too. Then `_*_`, which also matches on its left, expands a
-  suc-tower subject into `k + 1` copies of its right argument at EVERY nesting, so a
-  degree-`d` subject costs `(k+1)^d` nodes: fifteen successors at degree three is tens of
-  thousands and survives, thirty-one at degree five is millions and does not. The
-  induction step is the same proof either way — one `suc` peel — and the premise `k ≤ S`
-  is spent with `subst` over `m∸n+n≡m` at `S ∸ k` rather than a `k`-deep wall of `s≤s`.
+### A big closed numeral meets a variable
 
+```agda
+U = 10^44 ; … 1 + U … (with j free)      -- falls off GMP, peels U one suc at a time
+```
+```agda
+step : ∀ a b → … a … b …                 -- state over variables, apply at the obligation's spellings
+… step U j …                              -- pass implicits explicitly; proj₁/proj₂, not `with`
+```
+Keeps the numeral away from the variable; shrinking it doesn't help, the peel is linear.
 
-- **A CONSTRUCTOR WHOSE TYPE INDEX IS EXISTENTIAL LEAVES A META NOTHING IN THE TERM CAN
-  SOLVE, AND AGDA GOES LOOKING FOR IT IN THE CONCLUSION'S NORMAL FORM.** This tree's
-  node-state family is indexed only in its CONSTRUCTORS — the state carries the payload
-  type, the record does not — so a cell built as `scan-st (evalTm (strmᵗ emptyᵉ))` and
-  installed in a store hands the checker an implicit that the result type has already
-  forgotten. Nothing downstream determines it either, so the unifier falls back on the
-  only remaining constraint, which in a probe is the tie's own conclusion: it normalises
-  the whole evaluator run to look for a type. There is no error, no yellow and no name —
-  just an allocation curve, which is why this reads as the STATEMENT being unevaluable
-  rather than as one missing annotation. **The repair is one annotation at the
-  constructor's argument**, and it makes the row MORE faithful rather than less: the
-  call site being modelled installs the seed cell from the same term the statement takes
-  as its seed, so pinning the index makes cell and seed agree by construction instead of
-  by unification. Measured across four probes at one fixture: eighteen to twenty seconds
-  each with the index pinned, against fourteen gigabytes and no verdict without it. The
-  cost is never the run it appears to be about — the same rows were read for a session
-  as evidence that a fold could not be instantiated, and the fold was innocent.
+## Arithmetic
 
-- **A `with` ON A STORE LOOKUP REWRITES A CARRIED PREMISE ABOUT THAT CELL, AND EVERY
-  CALLEE STILL STATES IT AT THE LOOKUP.** A clause that carries a hypothesis
-  `P (lookupNode nid (nodes st)) ≡ true` and then matches the cell with
-  `with lookupNode nid (nodes st)` gets that hypothesis abstracted along with the
-  scrutinee: in each arm its type is `P` applied to the arm's PATTERN, already reduced
-  through `P`'s own clauses — a `foldr _∧_ true (map …)` where the source said
-  `parkStrat? k (lookupNode …)`. Every callee below was elaborated against the STUCK
-  lookup term, which the abstraction does not touch, so handing the hypothesis on gives
-  `UnequalTerms` between two spellings of one fact, reported at the ARGUMENT and reading
-  as a wrong premise. The repair is `with … in eqN`, then
-  `subst (λ z → P z ≡ true) (sym eqN) h` at each call site — and note the direction:
-  `sym` when the premise is in pattern form and the callee wants the lookup, bare `eqN`
-  when a hypothesis arrived in lookup form and the GOAL is in pattern form, which is the
-  same trap seen from the other end. `in` names the proof and adds no pattern position,
-  so the arms themselves need no change; the whole cost of this is finding it, four
-  sites at a time.
+### `_+_`, `_*_` and `≤ᵇ` match on the LEFT
 
-- **AN INDEX THAT REACHES THE GOAL ONLY THROUGH `T` IS UNSOLVABLE, AND A CONSTRUCTOR
-  THAT LEAVES THAT INDEX FREE IS WHERE IT BITES.** `T : Bool → Set` is not injective —
-  it computes to `⊤` or `⊥` and forgets which boolean produced it — so a statement whose
-  conclusion is `T (p k x)` determines nothing about `k`. That alone is survivable while
-  some OTHER argument mentions the index. The trap is a constructor that mentions it
-  vacuously: a path family indexed by a floor whose root constructor reads
-  `root : ∀ {lo t} → Path Γ lo t t` puts no constraint on `lo` at all, so a row whose
-  only floor-carrying argument is `root` leaves the index a meta with nothing anywhere to
-  pin it. Agda reports `Unsolved metas` at the APPLICATION, which reads as the statement
-  being ill-formed or the harness being wrong; both are fine. **The repair is one
-  explicit pin at the application site** — `f {lo = 1} …`, at whatever value the harness
-  actually ran — and the value is read off the run's own entry point rather than guessed.
-  Two properties make this worth a doc: it fires per row, so a probe file goes from
-  seventeen metas to none on one pass; and it is textually decidable, so **census every
-  application of the floor-carrying statement in one `grep` and pin them together**
-  rather than paying a build per reveal. Measured at thirty-four pins across six probe
-  files, found in two passes after the first was driven one error at a time.
+```agda
+∀ j → P (k + j)         -- k-deep suc-tower; under _*_ a degree-d subject costs (k+1)^d
+solve … (V + 3) …
+rewrite *-identityʳ     -- suc sz * 1 = suc (sz * 1): the inner product is untouched
+bad : T (not (suc m ≤ᵇ n))  -- won't reduce as written
+```
+```agda
+∀ j → P (j + k)         -- stuck, neutral; spend k ≤ S with subst over m∸n+n≡m
+solve … (3 + V) …
+rewrite *-identityʳ | *-identityʳ
+ok : T (not (m <ᵇ n))   -- what it unfolds to; drop a cons via ≤ᵇ⇒≤ / ≤-trans / ≤⇒≤ᵇ
+```
+Spell terms the way the left-matching clauses actually leave them.
 
-- **A `variable` BLOCK GENERALISES THE TELESCOPE IN DECLARATION ORDER, AND A REUSED NAME
-  BECOMES A PROJECTION OUT OF SOMETHING ELSE.** Two failures with one cause. Generalised
-  binders are inserted in the order the block declares them, not the order the statement
-  mentions them, so a signature depending on two of them can be generated with the
-  dependency backwards and reports an out-of-scope variable in a type you can see is
-  well-formed. And a block generalising both a size and a context over that size lets
-  Agda reconstruct the size as a FIELD of the generalised context, so a statement that
-  separately mentions the bare size fails with `Γ.n != n of type ℕ` — two names for one
-  number, neither of which you wrote. **Write the telescope explicitly whenever a
-  statement mentions more than one generalised name**; the block is a convenience for
-  single-binder signatures and stops paying past that.
+## `with` and carried premises
 
-- **A PATTERN `let` RUNS ITS RIGHT-HAND SIDE ONCE PER COMPONENT, AND NOTHING REPORTS IT
-  EXCEPT THE CLOCK.** Agda substitutes a `let`: `let (r , d) = E in b` elaborates to `b`
-  with `proj₁ E` and `proj₁ (proj₂ E)` in place of `r` and `d`, and the compiled code
-  evaluates E once per use. Where E is the evaluator's own recursive call the factor
-  compounds at every level of nesting, which read as the oracle's cases stalling. **In
-  the runtime modules bind a pattern with `E |>′ λ (r , d) → b`** (`Function.Base`): E is
-  an argument, so it is evaluated once, and `|>′` unfolds, so the two forms are
-  definitionally equal and a proof sees no difference. One cost: the body is now checked
-  before the result type is known, so an implicit lambda the expected type used to
-  insert must be written out (`λ {lo′} {s′} κ₂ → …`). **Except in a `fold` copattern
-  clause whose body builds the coinductive successor**: there the lambda strips the guard
-  (the entry above), so bind with `with E … | (r , d) = b` instead — the with-function
-  takes E as one argument, and a record pattern still unfolds. **Unless that clause also
-  matches `(acc rs)` and re-applies `acc rs` in the successor**: the with-function is
-  handed the field `rs`, not the `acc` it came from, so the call reads as unrelated to
-  the clause's pattern and termination fails. There, call a helper in the same mutual
-  block from the clause head — passing E and the whole `(acc rs)` — and build the
-  successor in the helper under the `ans` constructor. A plain `let x = E` is
-  substituted too, and costs the same whenever `x` is used more than once.
+```agda
+f h with lookupNode nid (nodes st)    -- h : P (lookupNode …): rewritten to P <pattern>, reduced
+... | c = callee h                    -- UnequalTerms at the argument
+```
+```agda
+f h with lookupNode nid (nodes st) in eq
+... | c = callee (subst (λ z → P z ≡ true) (sym eq) h)  -- bare eq the other way round
+```
+`in` names the scrutinee without a pattern position. Better still, let the proof and the
+lookup share ONE `with`, so refining one refines the other and no equation is needed.
+
+## Termination
+
+### Bisect on a subset of the block
+
+```agda
+mutual a … ; b … ; c … ; d … ; e …     -- one error naming every member
+```
+```agda
+mutual a … ; b …  ;  postulate c d e   -- then route one call edge at a time to a postulated copy
+```
+Only the loops among the survivors are left to check, and that is much faster.
+
+### A `with`, an alias or an as-pattern rebuilds what was matched
+
+```agda
+f (acc rs) with b … | _ = f (acc rs)   -- with-function gets the FIELD rs: unrelated, not equal
+g (suc (suc j)) = … g j′ where j′ = j  -- where-bound alias of the pattern
+h aU@(acc fU) … = h aU …               -- as-pattern handed back is rebuilt
+```
+```agda
+f (acc rs) = f′ (decide b) (acc rs)    -- decide outside the cycle: let for Σ, eliminator for Bool
+g (suc (suc j)) = … g j …              -- inline it
+h (acc fU) … = go … where go = …       -- one nested where-level per lexicographic component
+```
+The recursive call receives the argument that was matched, so it is visibly smaller. The
+error names every call, and reads as a bad measure rather than a pattern problem.
+
+### A lambda strips a copattern's guard; a `with` keeps it
+
+```agda
+fold … = [ (λ x → succ x) , … ]′ d     -- successor is an ARGUMENT of [_,_]′: unguarded
+```
+```agda
+fold … with d
+... | inj₁ x = succ x                   -- head of a with-branch, under a constructor: guarded
+```
+The successor sits under the copattern it answers. This pulls opposite to the previous
+entry: drop `with` where an `acc` is matched, keep it where a guarded successor is built.
+
+## Runtime — a pattern `let` runs its right-hand side per component
+
+```agda
+let (r , d) = eval … in b      -- b[proj₁ E, proj₁ (proj₂ E)]: E evaluated per use, compounding
+let x = E in … x … x …          -- same
+```
+```agda
+E |>′ λ (r , d) → b            -- runtime modules; definitionally equal; write implicit lambdas out
+fold … with E … | (r , d) = b   -- in a fold copattern building the successor (keeps the guard)
+fold (acc rs) … = helper E (acc rs)  -- …and if it also re-applies acc rs: helper in the mutual block
+```
+E is passed as one argument, so it is evaluated once. Nothing reports this but the clock.
