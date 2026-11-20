@@ -32,17 +32,28 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
+#### PUT SKIPS OFF THE BOUNDARIES
+
+A skip put rather than imaged lies over no elaborated boundary
+(`Rel.skip-off*`); an imaged one's image is a row, which does not. Open:
+that a bounded merge hangs only where its outer or a lane does, its
+boundaries opaque; and every other former that puts, where every row is
+a put at its own image. Settled by bodies, or a put skip's image over a
+boundary.
+
+Members: `cc-bd-src`, `ct-put-off*`, `sr-put-off*`,
+`mg-put-off*`, `cc-put-off*`, `sw-put-off*`, `ex-put-off*`.
+
 #### THE PARTS AT THE TREE'S BOUNDARIES
 
 Each part's pair and clearance hold at its tree's boundaries
 (`Out.bd-pin`); the merge's elaborated outer hangs at the source's
 (`mg-each-bd→`), its rows the source's images relocated under the
-share, the end at the later of its own and the trigger's. Open: a
-put skip's image over a mark; the end relocated
-past a boundary; a late row put past one; the lanes likewise under
-`laneˢ`. Settled by bodies, or a skip image under a mark.
+share, the end at the later of its own and the trigger's. Open: the end
+relocated past a boundary; a late row put past one; the lanes likewise
+under `laneˢ`. Settled by bodies.
 
-Members: `mg-skip-off*`, `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
+Members: `mg-o-end`, `mg-o-pb`, `mg-lane-bcorr`,
 `mg-outer-back`, `mg-lane-back`, `mg-outer-put`, `mg-lane-put`,
 `mg-outer-lead`, `mg-lane-lead`.
 

@@ -23,6 +23,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_; _∧_)
+open import Function using (case_of_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -35,32 +36,62 @@ open import Relation.Nullary using (¬_; does)
 open import Tree using (Obs; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin)
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin; shown; heard)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-snoc⁺; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; ends; rows; anyᵇ)
-open import quickcheck.Tabled.Exact.Base using (ends⁻; Exact)
+open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (proper-exact)
 open import simultaneous.SObs using (lone; ext; module Elaborate)
 open import simultaneous.Listing using (listC-ok; listC-exact; UncutEnv)
 open import simultaneous.TableCorr using (Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
-open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounded-≃)
+open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounded-≃; module ConnBd)
+open import simultaneous.HorizonJoin using (module JoinBd)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
 open import simultaneous.TreeBounded using (listHot; tree-bounded; admits-body; listHot-u)
-open import simultaneous.HorizonTree using (bd; _∷ᵇ_)
+open import simultaneous.HorizonTree using (bd; _∷ᵇ_; BdEnv; cc-bd)
 open import simultaneous.ElabUndone using (env-ext; EnvU)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
 open import simultaneous.TableRows using (proper⊆; unpin; RjRow; rejoin-inv)
 open import simultaneous.LaneEndSched using (emitAt)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
-open TabRows using (endAt; endsOf; endAt-I)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; reader)
+open TabRows using (endAt; endsOf; endAt-I; ends-tr; endAt-E; skip≢end)
+open JoinBd using (outerB; laneB; laneH)
+open ConnBd using (bodyB; burstB; echoB; keptB)
+
+-- A bounded merge hangs where its outer or one of its lanes does.
+postulate
+  cc-bd-src : ∀ k {A B : Set} p (o : ℕ → EmissionSet A) Bdo (L : A → Pos → ℕ → EmissionSet B) BdL {N b g}
+            → cc-bd k p o Bdo L BdL N b g → (Σ Tag λ g₀ → Bdo N b g₀) ⊎ (Σ A λ a → Σ Pos λ r → Σ Tag λ g₀ → BdL a r N b g₀)
+
+-- A reader hangs where its hot does: its lanes are lists.
+reader-bd : ∀ n {Γ A} (i : AIE A ∈ Γ) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) p {N b g}
+          → bd n (reader (connected i)) ρ uρ β p N b g → β i N b g
+reader-bd n i ρ uρ β p (outerB x)                       = x
+reader-bd n i ρ uρ β p (laneB _ _ (outerB ()) _)
+reader-bd n i ρ uρ β p (laneB _ _ (laneB _ _ () _) _)
+reader-bd n i ρ uρ β p (laneH _ _ (outerB ()) _)
+reader-bd n i ρ uρ β p (laneH _ _ (laneH _ _ () _) _)
+
+-- An annotation hangs where its source does: its body reads the
+-- source's hot, then a list.
+annotate-bd : ∀ n {Γ A} (s : Obs Timeline Γ (IE A)) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) p {N b g}
+            → bd n (annotate s) ρ uρ β p N b g → Σ Tag λ g₀ → bd n s ρ uρ β (p ⊕ [ ix 1 ]) N b g₀
+annotate-bd n s ρ uρ β p (bodyB x) = case cc-bd-src 1 _ _ _ _ _ x of λ
+  { (inj₁ (_ , ()))
+  ; (inj₂ (true , _ , y)) → y
+  ; (inj₂ (false , _ , _ , ()))
+  }
+annotate-bd n s ρ uρ β p (burstB x _)  = _ , x
+annotate-bd n s ρ uρ β p (echoB x _ _) = _ , x
+annotate-bd n s ρ uρ β p (keptB x _ _) = _ , x
 
 -- The annotated hot rows: the elaborated source's own, rejoined under the
 -- reader that the annotation's concat subscribes first.
@@ -179,11 +210,6 @@ headOr d (c ∷ _) = c
 cut-lvl : ∀ {b q q* y y*} → Cut b q q* y y* → Lvl b q q* y y*
 cut-lvl (at-frame v _ _)  = v
 cut-lvl (at-step v _ _ _) = v
-
--- An end listed among a table's ends is a row.
-ends-tr : ∀ {X : Set} (m : Maybe (Tb.Listed X)) {c} → c ∈ endsOf m → TR m c end
-ends-tr nothing   ()
-ends-tr (just Lx) c∈ = Lx , refl , ends⁻ {rs = rows Lx} c∈
 
 -- Shown once unpinned: shown before.
 shown-unpin : ∀ {X : Set} (e : Ev X) → T (shownᵇ (unpin e)) → T (shownᵇ e)
@@ -383,6 +409,44 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
                                       (EnvCut (Ψ′ Rs) ρ′ N)
     rd-across    : Across (λ N → TR (P N)) (λ N → TR (Q N)) φᵣ Putᵣ Lateᵣ (Rel.Bd R₀) rd-bd*
 
+  -- The elaborated reader hangs where its hot does, the hot where the
+  -- annotation's source does, which is the elaborated source.
+  rd-bd*-src : ∀ {N b g} → rd-bd* N b g → Σ Tag λ g₀ → Rel.Bd* R₀ N b g₀
+  rd-bd*-src {N} {b} {g} x = proj₁ z , SameBd.from (Out.bd-pin* Rs) (proj₂ z)
+    where
+      z = annotate-bd n (elab ρι s) ρ* uρ* (dbd (lw* env)) (p* ⊕ [ ix 1 ])
+            (subst (λ (B : BdEnv (AIE A ∷ Δ)) → B (here refl) N b g) D*′-bd (reader-bd n′ (here refl) ρ*′ uρ*′ (dbd D*′) q* x))
+
+  -- An elaborated source row's place lies under the row.
+  img-ext : ∀ N l → l ⊑ imgAt N l
+  img-ext N l = go (outAt (S* N) l)
+    where
+      und : l ⊑ under l
+      und = ⊑-trans {l} {l ⊕ [ sub (reader* p*) ]} {under l} (⊑-snoc⁺ l) (⊑-snoc⁺ (l ⊕ [ sub (reader* p*) ]))
+
+      go : ∀ c → l ⊑ (if c then emitAt (under l) else under l)
+      go true  = ⊑-trans {l} {under l} {emitAt (under l)} und (⊑-⊕ˡ (under l) (ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ []))
+      go false = und
+
+  -- A skip the reader puts is no end and no pin's, so a skip its source
+  -- shows: its image lies under the source's, over no boundary of the
+  -- elaborated source, where the elaborated reader's are.
+  rd-put-off* : Admits D′ q → ∀ {N k l b g} → TR (P N) k skip → ¬ Lateᵣ N k → Putᵣ N k l → rd-bd* N b g → ¬ φᵣ N k ⊑ b
+  rd-put-off* ad {N} {k} {b = b} x nl pt bd = go (endAt (P N) k) refl
+    where
+      -- the source's row: a skip it shows, a pin's being late
+      from : ∀ {y} → (∀ {r} → ¬ TR (S N) (up y) (pin r)) → Rejoin q (TR (S N)) y skip → TR (S N) (up y) skip
+      from np (shown {q = q₀} y′ _ _) = subst (λ z → TR (S N) z skip) (sym (up-⊕ q₀ (sub q))) y′
+      from np (heard {q = q₀} y′ _)   = ⊥-elim (np (subst (λ z → TR (S N) z (pin _)) (sym (up-⊕ q₀ (sub q))) y′))
+
+      src : endAt (P N) k ≡ false → TR (S N) (up k) skip
+      src eq = from (λ py → nl (eq , inj₁ (_ , py))) (rd-rejoin→ x)
+
+      go : ∀ c → endAt (P N) k ≡ c → ¬ (if c then headOr (q* ⊕ [ last ]) (endsOf (Q N)) else imgAt N (Rel.φ R₀ N (up k))) ⊑ b
+      go true  eq _ = skip≢end (tab-func n′ (connected (here refl)) uρ′ D′ ad x (endAt-E (P N) eq))
+      go false eq h = Rel.skip-off* R₀ (src eq) (λ lt → nl (eq , inj₂ lt)) (proj₁ (proj₂ (proj₂ pt))) (proj₂ (rd-bd*-src bd))
+                        (⊑-trans {Rel.φ R₀ N (up k)} {imgAt N (Rel.φ R₀ N (up k))} {b} (img-ext N (Rel.φ R₀ N (up k))) h)
+
   rd-bounded* : Admits D*′ q* → Cuts.Bounded (λ N → TR (Q N)) rd-bd*
   rd-bounded* ad* = tree-bounded n′ (elab (ext ρι) (connected (here refl))) ρ*′ uρ*′ D*′ q* ad*
 
@@ -399,7 +463,7 @@ module ReaderTab {Γ A} n (s : Obs Timeline Γ A)
     ; func = Gen.rd-func ad ad* ; func* = Gen.rd-func* ad ad* ; flat = Gen.rd-flat ad ad* ; flat* = Gen.rd-flat* ad ad*
     ; pin-in = rd-pin-in ; pin-in* = rd-pin-in* ; got = rd-got ; got* = rd-got*
     ; after = rd-after ; after* = rd-after* ; after-φ = rd-after-φ al ; pin-after* = rd-pin-after*
-    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ad* ; bcorr = rd-bcorr ; across = rd-across }
+    ; Bd = Rel.Bd R₀ ; Bd* = rd-bd* ; bounded = rd-bounded ; bounded* = rd-bounded* ad* ; bcorr = rd-bcorr ; across = rd-across ; skip-off* = rd-put-off* ad }
 
   -- THE READER'S ORDER FACTS: each row linked to its image; each shown
   -- row cutting every hot alike with it, and the reader's own rows of

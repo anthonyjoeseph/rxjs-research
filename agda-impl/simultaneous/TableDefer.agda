@@ -26,7 +26,7 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; inside; ix
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (Ev; out; skip; pin; Unpinned; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≺-≼-≺; ≼-trans; ≺-ext; ticks)
-open import denotation.Laws.Worlds using (⊕-assoc)
+open import denotation.Laws.Worlds using (⊕-assoc; _⊑_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; short; bind; _⊣_)
 open import simultaneous.InstEmit using (valuesOf)
@@ -328,6 +328,12 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     defer-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (R.Bd N) (R.Bd* N)
     defer-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ R.Bd R.Bd*
 
+  -- The guard is put nowhere; a child's skip lies where the child's does.
+  skip-off*′ : ∀ {N k l b t} → TR (P′ N) k skip → ¬ Late′ N k → Put′ N k l → R.Bd* N b t → ¬ φ′ N k ⊑ b
+  skip-off*′ {N} {k} x nl (ok , pl) bd with tr-g→ g (P N) x
+  ... | inj₁ (refl , _) = ⊥-elim (ok (ticks p 0))
+  ... | inj₂ x₀ = subst (λ z → ¬ z ⊑ _) (sym (φ-c {N} {k} (ab N x₀))) (R.skip-off* x₀ (nl-c x₀ nl) pl bd)
+
   rel′ : Rel P′ Q′ p p*
   rel′ = record
     { φ = φ′ ; Put = Put′ ; Late = Late′ ; corr = corr′
@@ -346,7 +352,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     ; after* = after*′
     ; after-φ = after-φ′
     ; pin-after* = pin-after*′
-    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = defer-bounded ; bounded* = defer-bounded* ; bcorr = defer-bcorr ; across = defer-across }
+    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = defer-bounded ; bounded* = defer-bounded* ; bcorr = defer-bcorr ; across = defer-across ; skip-off* = skip-off*′ }
     where
       in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → k ∈ (g ∷ R.bk N (φ′ N k))
       in-bk′ {N} {k} x un nl with tr-g→ g (P N) x

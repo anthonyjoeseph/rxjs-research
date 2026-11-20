@@ -278,7 +278,8 @@ module EvTab {A B : Set} (f : A → B) (g : IE A → IE B)
       ; put-clear = λ {N} {N′} le x pl cl* → Across.put-clear R.across le (proj₁ (proj₂ (tr-map→ f (P N′) x))) pl cl*
       ; lead-clear = λ {N} x un nl ld y ie cl* → let (_ , x₀ , u₀) = back-row N x un in
           Across.lead-clear R.across x₀ u₀ nl (λ {_} {e′} x′ un′ ie′ → ld (tr-map← f (P N) x′) (un← f e′ un′) ie′)
-            (proj₁ (proj₂ (tr-map→ g (Q N) y))) ie cl* } }
+            (proj₁ (proj₂ (tr-map→ g (Q N) y))) ie cl* }
+    ; skip-off* = λ {N} x → R.skip-off* (tr-skip← f (P N) x) }
 
 ev-tab : ∀ {A B : Set} (f : A → B) (g : IE A → IE B)
        → (∀ {e e′} → M e e′ → M (ev f e) (ev g e′))

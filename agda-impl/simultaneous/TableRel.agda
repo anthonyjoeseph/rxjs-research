@@ -38,7 +38,7 @@ open import Relation.Nullary using (¬_; does)
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; inside; _⊕_)
 open import denotation.Events using (Timeline; From; fresh)
-open import denotation.EmissionSet using (Ev; end; EmissionSet; Unpinned; pin; _≺_; _≼_; module Connecting)
+open import denotation.EmissionSet using (Ev; end; skip; EmissionSet; Unpinned; pin; _≺_; _≼_; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-≼-≺)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
 open import denotation.Laws.Count using (under-guard)
@@ -417,6 +417,9 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       -- THE CONNECT'S HANGS ACROSS CUTS: its body's and its source's, as
       -- at one cut.
       ct-across : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+      -- a skip the connect puts lies over no boundary of the elaborated
+      -- connect
+      ct-put-off* : ∀ {N k l b g} → TR (P N) k skip → ¬ Late′ N k → Put′ N k l → ct-bd* N b g → ¬ φ′ N k ⊑ b
 
     ct-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Late′ N)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (ct-bd N) (ct-bd* N)
     ct-bcorr N = Sub.restrict
@@ -475,7 +478,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; got = ct-got ; got* = ct-got*
       ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after*
-      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = ct-across }
+      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = ct-across ; skip-off* = ct-put-off* }
 
   conn-tab : (Rs : Src) → Out n b ρ′ uρ′ (ext ρι) ρ*′ uρ*′ (Ψ′ Rs) D′ D*′ (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
   conn-tab = ConnTab.rel′

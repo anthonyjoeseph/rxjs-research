@@ -29,7 +29,7 @@ open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; l
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; module TakeWhile)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; upto)
-open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ)
+open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ; _⊑_)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; takeRows)
 open import quickcheck.Tabled.Exact.Base using (Exact)
@@ -349,6 +349,15 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
     ; put-clear  = λ {N} {N′} {k} {e} {l} → put-clear′ {N} {N′} {k} {e} {l}
     ; lead-clear = λ {N} {k} {e} {m} {e*} → lead-clear′ {N} {k} {e} {m} {e*} }
 
+  -- A take's put skip is a kept one, put where the child put it or under
+  -- the failing value there; it lies where the child's does, and a kept
+  -- boundary is the child's.
+  skip-off*′ : ∀ {N k l b t} → TR (P′ N) k skip → ¬ K.Late′ N k → K.Put′ N k l → TB*.Bd′ N b t → ¬ φ′ N k ⊑ b
+  skip-off*′ {N} {k} x nl (_ , _ , pl) (bd , _) with K.O.kind N (from x) tt | pl
+  ... | K.O.kept xk _ _ | inj₁ (pk , _)     = subst (λ z → ¬ z ⊑ _) (sym (old N xk)) (R.skip-off* xk (K.nl-kept N xk nl) pk bd)
+  ... | K.O.kept xk _ _ | inj₂ (_ , pk , _) = subst (λ z → ¬ z ⊑ _) (sym (old N xk)) (R.skip-off* xk (K.nl-kept N xk nl) pk bd)
+  ... | K.O.made _ _ _ (_ , _ , ()) | _
+
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = φ′ ; Put = K.Put′ ; Late = K.Late′ ; corr = corr ; bk = λ N → under-bk (R.bk N) ; in-bk = in-bk
@@ -364,7 +373,7 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
     ; got* = λ N → got-bind (takeRows i (passes q)) (R.got* N)
     ; after = λ {N} {k} x → let (y , _ , x₀ , le) = take-row i q (from x) in ≼-trans {s} {y} {k} (R.after x₀) le
     ; after* = λ {N} {l} y → let (w , _ , y₀ , le) = take-row i (passes q) (from* y) in ≼-trans {s*} {w} {l} (R.after* y₀) le
-    ; after-φ = after-φ ; pin-after* = pin-after* }
+    ; after-φ = after-φ ; pin-after* = pin-after* ; skip-off* = skip-off*′ }
 
 -- Kept folded: a consumer needs only its type, and unfolding the record
 -- in a conversion costs the whole table.
