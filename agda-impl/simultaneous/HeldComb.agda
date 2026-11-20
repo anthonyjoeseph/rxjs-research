@@ -251,14 +251,37 @@ exact-past : ∀ {B} op rx → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , o
            → proj₂ (from r₀ (outRows {B} op init rx)) ≡ tot (proj₁ (past op init rx))
 exact-past op rx nc = exact-from op init r₀ rx nc inv₀ refl
 
+-- Rows owing what they should, then more from the count they leave.
+locals-++ : ∀ {B cs c} (r₁ : List (Pos × Ev (IE B))) {r₂} → Locals cs c r₁ → Locals cs (from c r₁) r₂ → Locals cs c (r₁ ++ r₂)
+locals-++ []                 _        l₂ = l₂
+locals-++ ((_ , out _) ∷ r₁) (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , end) ∷ r₁)   (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , skip) ∷ r₁)  (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , pin _) ∷ r₁) (l , ls) l₂ = l , locals-++ r₁ ls l₂
+
+-- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
+-- from the count the outputs before them leave, and the end.
+walk : ∀ {B} op cs (o : Out B) c rx
+     → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
+        → Locals cs (from c (outRows op o rx₁)) (lay q 0 (proj₂ (react op (past op o rx₁) x))))
+     → (∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local {B} cs (from c (outRows op o rx₁)) q end)
+     → Locals cs c (outRows op o rx)
+walk op cs o c []                 st fn = _
+walk op cs o c ((q , out x) ∷ rx) st fn =
+  locals-++ (lay q 0 (proj₂ (react op o x))) (st [] rx refl)
+    (walk op cs (react op o x) (from c (lay q 0 (proj₂ (react op o x)))) rx
+      (λ rx₁ {q′} {x′} rx₂ eq → subst (λ c′ → Locals cs c′ (lay q′ 0 (proj₂ (react op (past op (react op o x) rx₁) x′))))
+                        (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx₁))
+                        (st ((q , out x) ∷ rx₁) rx₂ (cong ((q , out x) ∷_) eq)))
+      (λ rx₁ {q′} rx₂ eq → subst (λ c′ → Local cs c′ q′ end) (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx₁))
+                        (fn ((q , out x) ∷ rx₁) rx₂ (cong ((q , out x) ∷_) eq))))
+walk op cs o c ((q , end) ∷ rx)   st fn = fn [] rx refl , _
+walk op cs o c ((q , skip) ∷ rx)  st fn =
+  walk op cs o c rx (λ rx₁ rx₂ eq → st ((q , skip) ∷ rx₁) rx₂ (cong ((q , skip) ∷_) eq)) (λ rx₁ rx₂ eq → fn ((q , skip) ∷ rx₁) rx₂ (cong ((q , skip) ∷_) eq))
+walk op cs o c ((q , pin r) ∷ rx) st fn =
+  walk op cs o c rx (λ rx₁ rx₂ eq → st ((q , pin r) ∷ rx₁) rx₂ (cong ((q , pin r) ∷_) eq)) (λ rx₁ rx₂ eq → fn ((q , pin r) ∷ rx₁) rx₂ (cong ((q , pin r) ∷_) eq))
+
 postulate
-  -- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
-  -- from the count the outputs before them leave, and the end.
-  walk : ∀ {B} op cs (o : Out B) c rx
-       → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
-          → Locals cs (from c (outRows op o rx₁)) (lay q 0 (proj₂ (react op (past op o rx₁) x))))
-       → (∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local {B} cs (from c (outRows op o rx₁)) q end)
-       → Locals cs c (outRows op o rx)
   -- ONE STEP'S OUTPUTS OWE WHAT THEY SHOULD when the routes open at its
   -- row are of the row's instant, a begin it reads is named for it, and
   -- a value or a live over it reads finds a route.
