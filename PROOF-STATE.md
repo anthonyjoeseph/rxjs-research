@@ -94,13 +94,12 @@ A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
 bounds its cuts by one induction; the cold, scan, defer and connect
 cases are bodies, and every placement (`TreeBounded.tree-placed`) but the
 joins'. Open: the joins' boundaries, their bound (outer's, and each
-running lane's before the lane's cut) and placement, and a hot's ends before
-a settled pin (`hot-pin-ends`, not derivable from `Cuts.Bounded` alone).
+running lane's before the lane's cut) and placement.
 The plain side of a one-child former, a reader
 and a connect still passes its child's `Rel.Bd` through unpinned.
 Settled by bodies, or a lane hang the join does not keep.
 
-Members: `cc-bd`, `sw-bd`, `ex-bd`, `hot-pin-ends`,
+Members: `cc-bd`, `sw-bd`, `ex-bd`,
 `cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`, `placed-cc`,
 `placed-sw`, `placed-ex`.
 

@@ -65,7 +65,7 @@ open import simultaneous.TableMap using (map-bounded; tr-map→)
 open import simultaneous.TableScan using (scan-bounded; scan-of; scan-src)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
-open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; HotsAll; w-mono; w-mono⁼; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside-by; inside-at; dnest; dH; dlo;
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dsettles; HotsAll; w-mono; w-mono⁼; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside-by; inside-at; dnest; dH; dlo;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.SpinKit using (sp→)
 open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module ConnBd; module RejoinB; const-bounded;
@@ -74,7 +74,7 @@ open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
 open import simultaneous.Placed using (module Placing)
 open import simultaneous.ListTR using (tr-at)
 open import simultaneous.ColdBounded using (cold-bounded; cold-placed)
-open import simultaneous.HotRows using (hot-rows-bounded)
+open import simultaneous.HotRows using (hot-rows-settle)
 open import simultaneous.HorizonJoin using (module MergeB; module MergeP)
 open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
 
@@ -452,7 +452,7 @@ mutual
 
   listHot {X = X} n o {ρ} u D c a =
     hotD hv hx hl c a src-in (bd n o ρ u (dbd D) (c ⊕ [ ix 1 ]))
-      (hot-rows-bounded n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
+      (hot-rows-settle n o u c (tree-bounded n o ρ u D (c ⊕ [ ix 1 ]) (admits-step D a)))
       src-lead
     where
       hv : ℕ → EmissionSet _
@@ -576,7 +576,7 @@ mutual
   tree-bounded n       (connected i)     ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} x → rejoin p (lookup (ρ N) i) , refl , complete (ex N) x)
               (λ {N} {y} {e} → λ { (_ , refl , m) → sound (ex N) m })
-      (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (dbd D i) (dbounded D i) (λ {N} {b} {g} bi → reader-lead D a i bi {N} (inW (step here plain-last))))
+      (RejoinB.bounded-j p (λ N → Rows (lookup (ρ N) i)) (dbd D i) (dsettles D i) (λ {N} {b} {g} bi → reader-lead D a i bi {N} (inW (step here plain-last))))
     where
       ex : ∀ N → Exact (rejoin p (lookup (ρ N) i)) (Rejoin p (Rows (lookup (ρ N) i)))
       ex N = rj (lookup (ρ N) i) p (listC-ok (3 + N) n (connected i) (uρ N) p)
