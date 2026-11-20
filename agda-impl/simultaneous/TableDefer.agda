@@ -33,7 +33,7 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; Across; Same; same; φ≡; nl→)
 open import simultaneous.TableKit using (TR; M; Got; got-bind; m-ss)
 open import simultaneous.Horizon using (module Cuts)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
@@ -326,6 +326,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     defer-bounded  : Cuts.Bounded (λ N → TR (P′ N)) R.Bd
     defer-bounded* : Cuts.Bounded (λ N → TR (Q′ N)) R.Bd*
     defer-bcorr    : ∀ N → Inter.BCorr (Own (TR (P′ N)) (Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (Put′ N)) (R.Bd N) (R.Bd* N)
+    defer-across   : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ Put′ Late′ R.Bd R.Bd*
 
   rel′ : Rel P′ Q′ p p*
   rel′ = record
@@ -345,7 +346,7 @@ module DeferTab {A : Set} (p p* : Pos) {P : ℕ → Maybe (Tb.Listed A)} {Q : �
     ; after* = after*′
     ; after-φ = after-φ′
     ; pin-after* = pin-after*′
-    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = defer-bounded ; bounded* = defer-bounded* ; bcorr = defer-bcorr }
+    ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = defer-bounded ; bounded* = defer-bounded* ; bcorr = defer-bcorr ; across = defer-across }
     where
       in-bk′ : ∀ {N k e} → TR (P′ N) k e → Unpinned e → ¬ Late′ N k → k ∈ (g ∷ R.bk N (φ′ N k))
       in-bk′ {N} {k} x un nl with tr-g→ g (P N) x

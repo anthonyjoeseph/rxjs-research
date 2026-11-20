@@ -16,7 +16,8 @@ open import Data.List.Membership.Propositional using (_∈_; find; lose)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (any?)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _≤_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -27,19 +28,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; _≺_; _≼_; module TakeWhile)
-open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans; ≺-irrefl; ≺-≼-≺; ≼-≺-≺; ≼-or-≻; upto)
 open import denotation.Laws.Worlds using (⊕-injˡ; ⊕-injʳ)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (rows; bind; takeRows)
 open import quickcheck.Tabled.Exact.Base using (Exact)
 open import quickcheck.Tabled.Exact using (module TakeX)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Readings using (parent; parent-snoc)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; Same; same; φ≡; nl→; corr-≃; keys; in-keys)
+open import simultaneous.Readings using (parent; parent-snoc; instantOf)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; Across; module Across; Same; same; φ≡; nl→; corr-≃; keys; in-keys)
 open import simultaneous.TableKit using (TR; got-bind)
 open import simultaneous.TakeKit using (Run; Lab; lab; module Take)
-open import simultaneous.TakeCut using (module TakeCut)
-open import simultaneous.Horizon using (module TakeB; bounded-≃)
+open import simultaneous.TakeCut using (module TakeCut; inst-⊕)
+open import simultaneous.Horizon using (module Cuts; module TakeB; bounded-≃; past-child)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; passes)
@@ -167,6 +168,18 @@ module _ {X : Set} (i : Bool) (keep : X → Bool) where
 ------------------------------------------------------------------------
 -- The record
 
+-- A take's row no failure precedes is its source's.
+module Src {X : Set} (incl : Bool) (keep : X → Bool) (t : EmissionSet X) where
+  open TakeWhile incl keep t
+
+  src : ∀ {k e} → TakeT k e → ¬ Failed k → t k e
+  src (pass x _ _)             _  = x
+  src (fail {q} {a} x nk _ _)  nF = ⊥-elim (nF (q , a , x , nk , ≺-ext q []))
+  src (stop {q} {a} x nk _)    nF = ⊥-elim (nF (q , a , x , nk , ≺-ext q []))
+  src (step x _)               _  = x
+  src (tend x _)               _  = x
+  src (left x _ _)             _  = x
+
 module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.Listed A)} {Q : ℕ → Maybe (Tb.Listed (IE A))} {s s* : Pos}
   (R : Rel P Q s s*) where
 
@@ -247,11 +260,100 @@ module TakeTab {A : Set} (i : Bool) (q : A → Bool) {P : ℕ → Maybe (Tb.List
   postulate
     take-bcorr : ∀ N → Inter.BCorr (Own (TR (P′ N)) (K.Late′ N)) (φ′ N) (OwnPut (TR (P′ N)) (K.Put′ N)) (TB.Bd′ N) (TB*.Bd′ N)
 
+  ----------------------------------------------------------------------
+  -- The hangs across cuts: the child's, wherever the take's image is
+  -- clear of the boundaries it keeps.
+
+  module CP = Cuts (λ N → TR (P N)) R.Bd
+  module CQ = Cuts (λ N → TR (Q N)) R.Bd*
+
+  only : ∀ {N k} → CP.Clear N k → TB.Clear′ N k
+  only cl (bd , _) = cl bd
+
+  up : ∀ {N y l} → TB*.Clear′ N (y ⊕ [ l ]) → TB*.Clear′ N y
+  up {y = y} {l} cl {b} bd = ≺-trans {y} {y ⊕ [ l ]} {b} (≺-ext y []) (cl bd)
+
+  -- An elaborated failure before a position clear of the kept
+  -- boundaries at `N`: the first such failure is clear of them all, so
+  -- settled, so a failure at every deeper cut, whose plain value is clear
+  -- at `N` too; and every row no failure precedes there lies before it.
+  fl-clear : ∀ {N N′ z k} → N ≤ N′ → TB*.Clear′ N z → TB*.Fl N z → ¬ K.W.Failed N′ k → CP.Clear N k
+  fl-clear {N} {N′} {z} {k} le cl (q₀ , a , yq , nk , qz) nF with K.fst* N yq nk
+  ... | f , b , yf , nkf , nFf , fq = go
+    where
+      cf : CQ.Clear N f
+      cf = TB*.clear-first {N} {z} {f} cl nFf (≼-≺-≺ {f} {q₀} {z} fq qz)
+
+      go : CP.Clear N k
+      go {c} bd with K.shown-fail N′ (proj₁ (upto (Cuts.Bounded.fwd R.bounded* {N} {f} cf le) (≼-refl {f})) yf) nkf
+      ... | k₀ , a₀ , eq , x₀ , nk₀ , _ with ≼-or-≻ k k₀
+      ...   | inj₂ k₀k = ⊥-elim (nF (k₀ , a₀ , x₀ , nk₀ , k₀k))
+      ...   | inj₁ kk₀ = ≼-≺-≺ {k} {k₀} {c} kk₀
+          (Across.back-clear R.across {N} {N′} {k₀} {out a₀} le x₀ tt (K.nl-out N′ x₀) (λ {c′} bd* → subst (_≺ c′) eq (cf bd*)) bd)
+
+  -- Clear of the elaborated take's boundaries, so of the child's.
+  lift : ∀ {N N′ z k} → N ≤ N′ → TB*.Clear′ N z → (¬ TB*.Fl N z → CQ.Clear N z → CP.Clear N k) → ¬ K.W.Failed N′ k → CP.Clear N k
+  lift {N} {N′} {z} {k} le cl go nF with failed? i (passes q) (Q N) z
+  ... | no nFz = go nFz (TB*.clear-kept {N} {z} nFz cl)
+  ... | yes F  = fl-clear {N} {N′} {z} {k} le cl F nF
+
+  -- A failing value clear at `N`: so are the rows the take puts under it.
+  made-clear : ∀ {N N′ o l a} → N ≤ N′ → TR (P N′) o (out a) → CP.Clear N o → CP.Clear N (o ⊕ [ l ])
+  made-clear {N} {N′} {o} {l} le xo clo {b} bd =
+    past-child l (clo bd) (proj₂ (Cuts.Bounded.gap R.bounded bd (proj₂ (upto (Cuts.Bounded.fwd R.bounded {N} {o} clo le) (≼-refl {o})) xo)))
+
+  back-clear′ : ∀ {N N′ k e} → N ≤ N′ → TR (P′ N′) k e → Unpinned e → ¬ K.Late′ N′ k → TB*.Clear′ N (φ′ N′ k) → TB.Clear′ N k
+  back-clear′ {N} {N′} {k} {e} le x un nl cl* with K.O.kind N′ (from x) un
+  ... | K.O.kept xk nFk _ =
+    only {N} {k} (lift {N} {N′} {R.φ N′ k} {k} le (λ {b} bd → subst (_≺ b) (old N′ xk) (cl* bd)) (λ _ → Across.back-clear R.across {N} {N′} {k} {e} le xk un (K.nl-kept N′ xk nl)) nFk)
+  ... | K.O.made {o} xo nk nFo (l , refl , m) =
+    only {N} {o ⊕ [ l ]} (made-clear {N} {N′} {o} {l} le xo (lift {N} {N′} {R.φ N′ o} {o} le (λ {b} bd → ≺-trans {R.φ N′ o} {R.φ N′ o ⊕ [ l ]} {b} (≺-ext (R.φ N′ o) []) (subst (_≺ b) (new N′ xo nk (Tp.made-lab m)) (cl* bd)))
+      (λ _ → Across.back-clear R.across {N} {N′} {o} le xo tt (K.nl-out N′ xo)) nFo))
+
+  put-clear′ : ∀ {N N′ k e l} → N ≤ N′ → TR (P′ N′) k e → K.Put′ N′ k l → TB*.Clear′ N l → TB.Clear′ N k
+  put-clear′ {N} {N′} {k} {e} {l} le x (_ , nFk , inj₁ (pl , _)) cl* =
+    only {N} {k} (lift {N} {N′} {l} {k} le cl* (λ _ → Across.put-clear R.across {N} {N′} {k} {e} {l} le (Src.src i q (TR (P N′)) (from x) nFk) pl) nFk)
+  put-clear′ {N} {N′} {k} {e} le x (_ , nFk , inj₂ (y , pl , _ , refl)) cl* =
+    only {N} {k} (lift {N} {N′} {y} {k} le (up {N} {y} cl*) (λ _ → Across.put-clear R.across {N} {N′} {k} {e} {y} le (Src.src i q (TR (P N′)) (from x) nFk) pl) nFk)
+
+  -- A row no failure precedes leads its instant in the child as in the take.
+  leads-kept : ∀ {N k} → ¬ K.W.Failed N k → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+             → ∀ {k′ e′} → TR (P N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′
+  leads-kept {N} {k} nFk ld {k′} x′ un′ ie with ≼-or-≻ k k′
+  ... | inj₁ le = le
+  ... | inj₂ lt = ⊥-elim (≺-irrefl {k′} (≺-≼-≺ {k′} {k} {k′} lt
+        (ld (to (K.O.keep-row N x′ (λ F → nFk (K.O.failed-≼ N (≺→≼ {k′} {k} lt) F)) (K.O.nofail< N nFk lt))) un′ ie)))
+
+  -- The first failing value leads its instant if a row under it does.
+  leads-made : ∀ {N o l} → ¬ K.W.Failed N o → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf (o ⊕ [ l ]) → (o ⊕ [ l ]) ≼ k′)
+             → ∀ {k′ e′} → TR (P N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf o → o ≼ k′
+  leads-made {N} {o} {l} nFo ld {k′} x′ un′ ie with ≼-or-≻ o k′
+  ... | inj₁ le = le
+  ... | inj₂ lt = ⊥-elim (≺-irrefl {k′} (≺-trans {k′} {o} {k′} lt (≺-≼-≺ {o} {o ⊕ [ l ]} {k′} (≺-ext o [])
+        (ld (to (K.O.keep-row N x′ (λ F → nFo (K.O.failed-≼ N (≺→≼ {k′} {o} lt) F)) (K.O.nofail< N nFo lt))) un′ (trans ie (sym (inst-⊕ o [ l ])))))))
+
+  lead-clear′ : ∀ {N k e m e*} → TR (P′ N) k e → Unpinned e → ¬ K.Late′ N k
+              → (∀ {k′ e′} → TR (P′ N) k′ e′ → Unpinned e′ → instantOf k′ ≡ instantOf k → k ≼ k′)
+              → TR (Q′ N) m e* → instantOf m ≡ instantOf (φ′ N k) → TB*.Clear′ N m → TB.Clear′ N k
+  lead-clear′ {N} {k} {e} {m} {e*} x un nl ld y ie cl* with K.O.kind N (from x) un
+  ... | K.O.kept xk nFk _ =
+    only {N} {k} (lift {N} {N} {m} {k} ≤-refl cl* (λ nFm → Across.lead-clear R.across {N} {k} {e} {m} {e*} xk un (K.nl-kept N xk nl) (leads-kept {N} {k} nFk (λ {k′} {e′} → ld {k′} {e′}))
+      (Src.src i (passes q) (TR (Q N)) (from* y) nFm) (trans ie (cong instantOf (old N xk)))) nFk)
+  ... | K.O.made {o} xo nk nFo (l , refl , md) =
+    only {N} {o ⊕ [ l ]} (made-clear {N} {N} {o} {l} ≤-refl xo (lift {N} {N} {m} {o} ≤-refl cl* (λ nFm → Across.lead-clear R.across {N} {o} {_} {m} {e*} xo tt (K.nl-out N xo) (leads-made {N} {o} {l} nFo (λ {k′} {e′} → ld {k′} {e′}))
+      (Src.src i (passes q) (TR (Q N)) (from* y) nFm) (trans ie (trans (cong instantOf (new N xo nk (Tp.made-lab md))) (inst-⊕ (R.φ N o) [ l ])))) nFo))
+
+  take-across : Across (λ N → TR (P′ N)) (λ N → TR (Q′ N)) φ′ K.Put′ K.Late′ TB.Bd′ TB*.Bd′
+  take-across = record
+    { back-clear = λ {N} {N′} {k} {e} → back-clear′ {N} {N′} {k} {e}
+    ; put-clear  = λ {N} {N′} {k} {e} {l} → put-clear′ {N} {N′} {k} {e} {l}
+    ; lead-clear = λ {N} {k} {e} {m} {e*} → lead-clear′ {N} {k} {e} {m} {e*} }
+
   rel′ : Rel P′ Q′ s s*
   rel′ = record
     { φ = φ′ ; Put = K.Put′ ; Late = K.Late′ ; corr = corr ; bk = λ N → under-bk (R.bk N) ; in-bk = in-bk
     ; pb-few = λ N l → (proj₁ (R.pb-few N l) ++ proj₁ (R.pb-few N (parent l))) , pb-in N l
-    ; Bd = TB.Bd′ ; Bd* = TB*.Bd′ ; bounded = bounded-≃ to from TB.bounded′ ; bounded* = bounded-≃ to* from* TB*.bounded′ ; bcorr = take-bcorr
+    ; Bd = TB.Bd′ ; Bd* = TB*.Bd′ ; bounded = bounded-≃ to from TB.bounded′ ; bounded* = bounded-≃ to* from* TB*.bounded′ ; bcorr = take-bcorr ; across = take-across
     ; func = λ {N} x x′ → Run.func (K.O.run-T N) (from x) (from x′)
     ; func* = λ {N} y y′ → Run.func (K.O*.run-T N) (from* y) (from* y′)
     ; flat = λ {N} x x′ → Run.flat (K.O.run-T N) (from x) (from x′)

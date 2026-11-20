@@ -37,7 +37,7 @@ open import simultaneous.InstEmit using (valuesOf; instEmit; value; mark)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Attribution using (One; Shown; Live)
-open import simultaneous.TableCorr using (Corr; Rel; module Rel; keys; in-keys)
+open import simultaneous.TableCorr using (Corr; Rel; module Rel; module Across; keys; in-keys)
 open import simultaneous.TableKit using (TR; M; ev; ends; m-back; m-val; m-ee; got-bind)
 open import simultaneous.TableMap using (Mapped; tr-map→; tr-map←; func-map; flat-map; pin-in-map; tr-pin←; map-bounded)
 open import simultaneous.TableTake using (ex-just)
@@ -513,7 +513,13 @@ module ScanTab {A B : Set} (f : B → A → B) (z : B)
     ; pin-after* = λ {N} y → R.pin-after* (sc-pin (tr-scan→ (scanIE f) z* (Q N) (tr-pin← proj₂ (S* N) y)))
     ; Bd = R.Bd ; Bd* = R.Bd* ; bounded = sc-bounded ; bounded* = sc-bounded*
     ; bcorr = λ N → Sub.restrict (λ { (_ , x , un , nl) → let (e₀ , x₀ , u₀) = At.back-row N x un in e₀ , x₀ , u₀ , nl })
-        (λ { ((_ , x) , pl) → row-of f z (tr-scan→ f z (P N) x) , pl }) (R.bcorr N) }
+        (λ { ((_ , x) , pl) → row-of f z (tr-scan→ f z (P N) x) , pl }) (R.bcorr N)
+    ; across = record
+      { back-clear = λ {N} {N′} le x un nl cl* → let (_ , x₀ , u₀) = At.back-row N′ x un in Across.back-clear R.across le x₀ u₀ nl cl*
+      ; put-clear = λ {N} {N′} le x pl cl* → Across.put-clear R.across le (proj₂ (row-of f z (tr-scan→ f z (P N′) x))) pl cl*
+      ; lead-clear = λ {N} x un nl ld y ie cl* → let (_ , x₀ , u₀) = At.back-row N x un in
+          Across.lead-clear R.across x₀ u₀ nl (λ x′ un′ ie′ → let (_ , x″ , u″) = At.fwd-row N x′ un′ in ld x″ u″ ie′)
+            (proj₂ (At.row-of* N (proj₁ (proj₂ (q′→ {N} y))))) ie cl* } }
     where
       sc-pin : ∀ {X C : Set} {g : C → X → C} {c : C} {t : EmissionSet X} {l r} → ScanT g c t l (pin r) → t l (pin r)
       sc-pin (spin x) = x

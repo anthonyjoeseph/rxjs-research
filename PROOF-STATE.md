@@ -32,18 +32,28 @@ Rules: CLAUDE.md, "PROOF-STATE.md — the risk ledger" and "Two phases".
 
 ### Ledger
 
-#### THE ROOT'S CROSSINGS
+#### THE HANGS ACROSS CUTS
 
-A row exists only if no hang came first. One cut's pair orders only
-that cut's rows, so neither crossing follows from it. `root-lead` is
-suspected false at a hang inside a subscribe burst, which moves the
-fault to `Erase.place`'s leading-row arm; `root-back` needs a pair
-across cuts, a deeper row clear where its image is. Settled by a
-leading row whose image a cut hangs before while a pin of its instant
-is clear, or a cross-cut pair in `Rel`.
+Each `Rel` owes `TableCorr.Across`: a row is clear at a shallower cut
+where its image, its placement or a leading pin of its instant is. One
+way only: a hang past a cut's first may sit in a lane no deeper cut
+runs. Riskiest: the joins', over `join-bd`, which is opaque, and
+`mg-bcorr` and kin, still postulates. Settled by the merge's body, or a
+deeper lane row clear where its image is while its shallower lane hangs.
 
-Members: `root-back`, `root-lead`, `root-real`, `root-real*`,
-`root-φ-agree`, `root-late-agree`, `root-put-up`, `root-back-put`.
+Members: `mg-across`, `cc-across`, `sw-across`, `ex-across`,
+`cold-across`, `defer-across`, `rd-across`, `cb-across`, `sr-across`,
+`ct-across`, `cz-lead-clear`.
+
+#### THE ROOT'S LEAVES
+
+The crossings are the `Rel`'s. Left: a closed program's boundaries are
+real, and the map and placements are read alike by cuts agreeing up to
+them. Untried. Settled by bodies over the tree, or a placement that
+moves between agreeing cuts.
+
+Members: `root-real`, `root-real*`, `root-φ-agree`, `root-late-agree`,
+`root-put-up`, `root-put-down`.
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 

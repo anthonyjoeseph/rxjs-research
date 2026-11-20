@@ -36,7 +36,7 @@ open import simultaneous.TableCorr using (Corr; Rel)
 open import simultaneous.TableKit using (TR; M; m-ss)
 open import simultaneous.TakeCut using (inst-⊕)
 
-open import simultaneous.Horizon using (module SpinB)
+open import simultaneous.Horizon using (module SpinB; module Cuts)
 open import simultaneous.HorizonCorr using (module SpinPair; module Sub)
 open import simultaneous.SpinKit using (S; sp→; sp←; lastL; lastL-⊕; spin-flat)
 
@@ -112,6 +112,7 @@ module SpinTab {A : Set} (p p* : Pos) where
     ; Bd = SpinB.Bd {A} p ; Bd* = SpinB.Bd {IE A} p* ; bounded = SpinB.bounded p ; bounded* = SpinB.bounded p*
     ; bcorr = λ N → Sub.restrict inj₁ (λ { (_ , ()) })
         (SpinPair.corr p p* N (φ′ N) (λ _ → ⊥) (λ _ _ → ⊥) rows* (λ ()) (λ ()) (λ ()) (λ ()) (λ ()))
+    ; across = record { back-clear = λ _ x _ _ cl* → back-clear′ x cl* ; put-clear = λ _ _ () ; lead-clear = λ x _ _ _ _ _ _ → at-cut x }
     ; func = λ x x′ → trans (proj₂ (proj₂ (proj₂ (sp→ x)))) (sym (proj₂ (proj₂ (proj₂ (sp→ x′)))))
     ; func* = λ y y′ → trans (proj₂ (proj₂ (proj₂ (sp→ y)))) (sym (proj₂ (proj₂ (proj₂ (sp→ y′)))))
     ; flat = spin-flat
@@ -128,6 +129,18 @@ module SpinTab {A : Set} (p p* : Pos) where
       pin-no : ∀ {X : Set} {M q k r} → TR {X} (S M q) k (pin r) → ⊥
       pin-no x with sp→ x
       ... | _ , _ , _ , ()
+
+      -- Every tick a cut lists lies before its hang.
+      at-cut : ∀ {N k e} → TR (P N) k e → Cuts.Clear (λ N → TR (P N)) (SpinB.Bd {A} p) N k
+      at-cut x (refl , refl) with sp→ x
+      ... | _ , lt , refl , _ = ix-asc p lt
+
+      -- A deeper tick whose image lies before a cut's elaborated hang lies
+      -- before its plain one: the same index.
+      back-clear′ : ∀ {N N′ k e} → TR (P N′) k e → Cuts.Clear (λ N → TR (Q N)) (SpinB.Bd {IE A} p*) N (φ′ N′ k)
+                  → Cuts.Clear (λ N → TR (P N)) (SpinB.Bd {A} p) N k
+      back-clear′ {N} {N′} x cl* (refl , refl) with sp→ x
+      ... | i , _ , refl , _ = ix-asc p (ix-back p* (subst (_≺ (p* ⊕ [ ix (3 + N) ])) (φ-ix {N′} i) (cl* (refl , refl))))
 
       rows* : ∀ {N k e} → SpinB.c {A} p N k e → Σ (Ev (IE A)) (SpinB.c {IE A} p* N (φ′ N k))
       rows* {N} x with sp→ x

@@ -45,7 +45,7 @@ import quickcheck.Tabled as Tb
 open import quickcheck.Tabled using (hotOf; anyᵇ)
 open import simultaneous.SObs using (SObs; fixedˢ; plain; plainˡ; lone; ext; module Elaborate)
 open import simultaneous.Listing using (UncutEnv; listC)
-open import simultaneous.TableCorr using (Rel; module Rel; Same; same; φ≡; nl→; Corr; keys; in-keys)
+open import simultaneous.TableCorr using (Rel; module Rel; Across; Same; same; φ≡; nl→; Corr; keys; in-keys)
 open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; held; module Cuts; module ConnB; bounded-≃)
 open import simultaneous.TreeBounded using (admits-body; listHot-u; conn-tr→; conn-tr←; tree-bounded; src-after; src-held)
@@ -386,6 +386,11 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
     ct-bounded* : Cuts.Bounded (λ N → TR (Q N)) ct-bd*
     ct-bounded* = bounded-≃ (λ {N} {y} {e} → ct-conn*← {N} {y} {e}) (λ {N} {y} {e} → ct-conn*→ {N} {y} {e}) CB*.bounded
 
+    postulate
+      -- THE CONNECT'S HANGS ACROSS CUTS: its body's and its source's, as
+      -- at one cut.
+      ct-across : Across (λ N → TR (P N)) (λ N → TR (Q N)) φ′ Put′ Late′ ct-bd ct-bd*
+
     ct-bcorr : ∀ N → Inter.BCorr (Own (TR (P N)) (Late′ N)) (φ′ N) (OwnPut (TR (P N)) (Put′ N)) (ct-bd N) (ct-bd* N)
     ct-bcorr N = Sub.restrict
       (λ { (e , x , un , nl) → inj₁ (e , ct-conn→ x , un , nl) })
@@ -443,7 +448,7 @@ module Conn {Γ A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
       ; func = ct-func ; func* = ct-func* ; flat = ct-flat ; flat* = ct-flat*
       ; pin-in = ct-pin-in ; pin-in* = ct-pin-in* ; got = ct-got ; got* = ct-got*
       ; after = ct-after ; after* = ct-after* ; after-φ = ct-after-φ ; pin-after* = ct-pin-after*
-      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr }
+      ; Bd = ct-bd ; Bd* = ct-bd* ; bounded = ct-bounded ; bounded* = ct-bounded* ; bcorr = ct-bcorr ; across = ct-across }
 
   conn-tab : (Rs : Src) → Out n b ρ′ (ext ρι) ρ*′ (Ψ′ Rs) (p ⊕ [ ix 0 ]) (p* ⊕ [ ix 0 ]) → Rel P Q p p*
   conn-tab = ConnTab.rel′
