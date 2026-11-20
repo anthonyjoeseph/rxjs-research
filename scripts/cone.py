@@ -147,6 +147,20 @@ def main():
                                         edges[(o, rel)].add((n, g))
                     idx = text.find(term, idx + 1)
 
+    # A `with` continuation (`... | pat = body`) is registered per site as its
+    # own node, so it continues the clause above it: hang it under the
+    # nearest owner above it that is not itself a continuation.
+    for (o, rel) in list(edges):
+        if not o.startswith("...#"):
+            continue
+        ln = int(o.rsplit(":", 1)[1]) - 1
+        p = cw.owner_of(by_file, rel, ln)
+        while p is not None and p.startswith("...#"):
+            ln = int(p.rsplit(":", 1)[1]) - 1
+            p = cw.owner_of(by_file, rel, ln)
+        if p is not None:
+            edges[(p, rel)].add((o, rel))
+
     roots = [(args.name, f) for f in sorted(def_files.get(args.name, ()))
              if args.file is None or f == args.file]
     if not roots:
