@@ -367,8 +367,8 @@ Inside : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} → DenOf ρ → Pos → Set
 Inside D p = Each (λ i → W⁼ (dH D i) (dlo D i) p)
 
 -- Its family named, for a scope whose `Each` has already unfolded.
-inside : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → (∀ {X : Set} (i : X ∈ Γ) → W⁼ (dH D i) (dlo D i) p) → Inside D p
-inside D f = each f
+inside-at : ∀ {Γ} {ρ : ℕ → All Tb.Listed Γ} (D : DenOf ρ) {p} → (∀ {X : Set} (i : X ∈ Γ) → W⁼ (dH D i) (dlo D i) p) → Inside D p
+inside-at D f = each f
 
 -- ADMISSIBLE: reachable, and no cut's hot row in its world.  Every cut's
 -- at once, because a lane subscribed under a row of one cut is read at

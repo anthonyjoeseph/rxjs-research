@@ -64,7 +64,7 @@ open import simultaneous.TableMap using (map-bounded)
 open import simultaneous.TableScan using (scan-bounded)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
-open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; HotsAll; w-mono; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside; dnest; dH; dlo;
+open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; HotsAll; w-mono; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside-at; dnest; dH; dlo;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
@@ -345,7 +345,7 @@ admits-trig : ∀ {Γ} n {ρ : ℕ → All Tb.Listed Γ} (u : ∀ N → UncutEnv
                      (c ⊕ˡ (ix 1 ∷ last ∷ sub (c ⊕ˡ (ix 0 ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])) ∷ ix 1 ∷ []))
 admits-trig n u D c a =
   ok-step (h ⊕ [ sub r ]) (ok-in (proj₁ ar) (join (inj₁ hh) here lt) (real-sub h rh (proj₁ (proj₁ ar)) (≺-trans {r} {h} {h ⊕ [ sub r ]} lt (≺-ext h [])))) ,
-  inside (den-cons hD) (λ i → inW (step (inW (join (dnest (den-cons hD) i hh) (each-at (proj₂ ar) i) lt)) plain-ix))
+  inside-at (den-cons hD) (λ i → inW (step (inW (join (dnest (den-cons hD) i hh) (each-at (proj₂ ar) i) lt)) plain-ix))
   where
     hD = listHot n (empty {A = ⊤}) u D c a
     r h : Pos
