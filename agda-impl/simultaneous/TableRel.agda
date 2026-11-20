@@ -72,7 +72,7 @@ open import simultaneous.TableFlat using (if-≡)
 open import simultaneous.TableHot using (reader*; module ConnEnv; conn-hot; conn-hot-coh)
 open import simultaneous.InstEmit using (instEmit; value)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; annotate; passes)
 
 ------------------------------------------------------------------------
 -- The order facts each one-to-one former keeps
@@ -573,7 +573,8 @@ scan-coh n f z s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al
 
 take-rel : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) → Full n s → Full n (takeWhile i q s)
 take-rel n i q s Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk =
-  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (take-tab i q (Out.rel O)) (take-order i q (Out.rel O) (Out.rest O)) (keep-map (take-bd i q (Out.rel O)) (Out.bd-pin O)) (keep-map (take-bd* i q (Out.rel O)) (Out.bd-pin* O))
+  let O = Fs ρ uρ ρι ρ* uρ* env p p* a a* al lk in out (take-tab i q (Out.rel O)) (take-order i q (Out.rel O) (Out.rest O)) (keep-map {i = i} {q = q} {c = λ N → TR (Tab n s ρ p N)} {Bd = Rel.Bd (Out.rel O)} (take-bd i q (Out.rel O)) (Out.bd-pin O))
+      (keep-map {i = i} {q = passes q} {c = λ N → TR (Tab* n ρι s ρ* p* N)} {Bd = Rel.Bd* (Out.rel O)} (take-bd* i q (Out.rel O)) (Out.bd-pin* O))
 
 take-coh : ∀ {Γ A} n i (q : A → Bool) (s : Obs Timeline Γ A) (Fs : Full n s) → Coh n s Fs → Coh n (takeWhile i q s) (take-rel n i q s Fs)
 take-coh n i q s Fs cs ρ uρ ρι ρ* uρ* E E′ ee p p* a a′ a* a*′ al al′ lk lk′ =
