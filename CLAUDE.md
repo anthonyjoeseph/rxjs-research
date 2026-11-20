@@ -251,6 +251,16 @@ f h with lookupNode nid (nodes st) in eq
 `in` names the scrutinee without a pattern position. Better still, let the proof and the
 lookup share ONE `with`, so refining one refines the other and no equation is needed.
 
+```agda
+g x with …                         -- goal mentions `h y`, h y = if b then u else v
+... | _ rewrite h-eq = …           -- "did not apply": the goal already shows the if
+... | _ = lemma _ _                -- implicits won't infer from the unfolded if
+```
+```agda
+... | _ = trans (lemma {y = y}) …  -- trans with the equation; implicits explicit
+```
+Works on the unfolded goal Agda actually holds, not the folded one you wrote.
+
 ### Termination
 
 #### Bisect on a subset of the block
