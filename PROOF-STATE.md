@@ -83,11 +83,12 @@ A tree's own boundaries lie in its world, under no world of a plain
 child of its rows; its scope's are its hots', led by no admissible
 world position (`Placed.Placing`). The merge's gap, the source's
 window, a defer's marker and the connect's cross gaps are bodies over it,
-and so is a scope's lead: an admissible reader lies in each hot's body
-world. Untried. Settled by a body by induction over the tree, or a
-boundary outside every world the cut reads.
+and so is a scope's lead. `tree-placed` is a body over the tree; left
+are the merge, whose lanes' boundaries move under the outer's rows, and
+the connect, whose body reads its source as a hot. Untried. Settled by bodies, or a boundary outside every
+world the cut reads.
 
-Members: `tree-placed`.
+Members: `placed-merge`, `placed-connect`.
 
 #### THE SOURCE PAST ITS SUBSCRIPTION
 
@@ -112,7 +113,8 @@ and a connect still passes its child's `Rel.Bd` through unpinned.
 Settled by bodies, or a lane hang the join does not keep.
 
 Members: `cc-bd`, `sw-bd`, `ex-bd`, `hot-pin-ends`,
-`cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`.
+`cc-bounded`, `sw-bounded`, `ex-bounded`, `pd-bounded`, `placed-cc`,
+`placed-sw`, `placed-ex`.
 
 #### THE JOINS' HANGS
 

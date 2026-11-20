@@ -23,7 +23,7 @@
 -- boundary of the hot, a running lane's tick before that row among them.
 module simultaneous.TreeBounded where
 
-open import Data.Bool using (T)
+open import Data.Bool using (Bool; T)
 open import Data.List using ([]; _∷_; [_])
 open import Data.List.Relation.Unary.All using (All; _∷_; lookup)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -39,14 +39,15 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; switchᶠ; exhaustᶠ; Later; cold; empty; of; map; scan; takeWhile; flatMap;
   connect; connected; defer)
-open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
+open import denotation.EmissionSet using (EmissionSet; Ev; module TakeWhile; Rejoin; _≺_; _≼_; enter; Proper; module Op; at-end; end)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-refl; ≺-≼-≺; ≼-or-≻; ≼-split)
 open import denotation.Laws.Worlds using (_⊑_; InvAt; Lawful; Real; _∪ʰ_; ok-step; W; W⁼; Hots; join; here; real-snoc; real-sub;
   plain-ix; plain-last; ok-in; world-after; world-after⁼; inW; step; ⊑-refl; inside-⊑;
-  ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ; narrow⁼; shrink; shrink⁼)
+  ⊑-inside; ⊑-snoc; lead; l-root; l-in; l-hot; w-up; not-up; ⊕-injʳ; narrow⁼; shrink; shrink⁼; Plain; nest⁼;
+  anc-lead; anc-view; world-anc⁼; world-anc; anc-trans; Anc; self; up; apart; Lead; parent-fun; step-parent; ⊕-injˡ; ext≢)
 open import denotation.Laws.Worlds.Leaves using (empty-inv)
 open import denotation.Laws.Cut using (capprox; inv-capprox)
 import denotation.Laws.Connect as Cn
@@ -60,18 +61,19 @@ open import simultaneous.DenRows using (hot-out)
 open import simultaneous.Listing using (listC; listC-ok; listC-exact; UncutEnv; Uncut)
 open import simultaneous.TableKit using (Rows)
 open import simultaneous.TableCorr using (keys; in-keys)
-open import simultaneous.TableMap using (map-bounded)
-open import simultaneous.TableScan using (scan-bounded)
+open import simultaneous.TableMap using (map-bounded; tr-map→)
+open import simultaneous.TableScan using (scan-bounded; scan-of; scan-src)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
 open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dbounded; HotsAll; w-mono; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside-by; inside-at; dnest; dH; dlo;
   Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
+open import simultaneous.SpinKit using (sp→)
 open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module RejoinB; const-bounded;
   bounded-≃)
 open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
 open import simultaneous.Placed using (module Placing)
 open import simultaneous.ListTR using (tr-at)
-open import simultaneous.ColdBounded using (cold-bounded)
+open import simultaneous.ColdBounded using (cold-bounded; cold-placed)
 open import simultaneous.HotRows using (hot-rows-bounded)
 open import simultaneous.HorizonJoin using (module MergeB)
 open import simultaneous.CutParts using (merge-tr→; merge-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
@@ -103,12 +105,154 @@ env-elim {[]}    β k ()
 env-elim {_ ∷ Γ} β k (inj₁ x) = k (here refl) x
 env-elim {_ ∷ Γ} β k (inj₂ y) = env-elim (λ {X} i → β {X} (there i)) (λ i → k (there i)) y
 
+-- One of them.
+env-in : ∀ {Γ} (β : BdEnv Γ) {X : Set} (i : X ∈ Γ) {N b g} → β i N b g → EnvB β N b g
+env-in {_ ∷ Γ} β (here refl) x = inj₁ x
+env-in {_ ∷ Γ} β (there i)   x = inj₂ (env-in (λ {X} j → β {X} (there j)) i x)
+
+------------------------------------------------------------------------
+-- Placement carried from a child
+
+-- A row standing on a row of another cut: at it, or one plain label
+-- under it.
+StandsOn : ∀ {A} → EmissionSet A → Pos → Set
+StandsOn {A} c x = Σ Pos λ y → Σ (Ev A) (c y) × (x ≡ y ⊎ Σ Label λ l → Plain l × x ≡ y ⊕ [ l ])
+
+-- A cut whose rows stand on another's keeps the other's placement of
+-- fewer boundaries: a plain child of its row lies in the world of one of
+-- the other's.
+placed-sub : ∀ {A B : Set} {H : ℕ → Pos → Set} {Env : ℕ → Pos → Tag → Set} {p} {c : ℕ → EmissionSet A} {c′ : ℕ → EmissionSet B}
+             {Bd Bd′ : ℕ → Pos → Tag → Set}
+           → (∀ {N x e} → c′ N x e → StandsOn (c N) x) → (∀ {N b g} → Bd′ N b g → Bd N b g)
+           → Placing.Placed H Env p c Bd → Placing.Placed H Env p c′ Bd′
+placed-sub {A} {B} {H} {Env} {p} {c} {c′} {Bd} {Bd′} st sb P bd′ = [ (λ own → inj₁ (keep own)) , inj₂ ]′ (P (sb bd′))
+  where
+    module O = Placing H Env p c
+    module O′ = Placing H Env p c′
+
+    under′ : ∀ {N b g} → O.Own N b g → ∀ {x l w} → StandsOn (c N) x → Plain l → W⁼ (H N) (x ⊕ [ l ]) w → ¬ w ⊑ b
+    under′ own (y , (_ , cy) , inj₁ refl)            pl v = O.Own.under own cy pl v
+    under′ own (y , (_ , cy) , inj₂ (l′ , pl′ , refl)) pl v = O.Own.under own cy pl′ (nest⁼ (inW (step here pl)) v)
+
+    keep : ∀ {N b g} → O.Own N b g → O′.Own N b g
+    keep own = record { world = O.Own.world own ; real = O.Own.real own ; holder = O.Own.holder own
+                      ; under = λ x pl v → under′ own (st x) pl v }
+
+-- A take's rows stand on its child's: at a passing value, a step, an end
+-- or a pin, and one label under the failing value.
+take-stands : ∀ {X : Set} i (keep : X → Bool) {t : EmissionSet X} {k e} → TakeWhile.TakeT i keep t k e → StandsOn t k
+take-stands i keep (TakeWhile.pass x _ _)   = _ , (_ , x) , inj₁ refl
+take-stands i keep (TakeWhile.fail x _ _ _) = _ , (_ , x) , inj₂ (ix 0 , plain-ix , refl)
+take-stands i keep (TakeWhile.stop x _ _)   = _ , (_ , x) , inj₂ (last , plain-last , refl)
+take-stands i keep (TakeWhile.step x _)     = _ , (_ , x) , inj₁ refl
+take-stands i keep (TakeWhile.tend x _)     = _ , (_ , x) , inj₁ refl
+take-stands i keep (TakeWhile.left x _ _)   = _ , (_ , x) , inj₁ refl
+
 module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (D : DenOf ρ) where
+  -- A tree subscribed at `p`'s placement.
+  PlacedAt : ∀ {A} n (o : Obs Timeline Γ A) p → Set
+  PlacedAt n o p = Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
+
   postulate
-    -- EVERY TREE'S BOUNDARIES ARE PLACED: its own in its world, its
-    -- scope's named by the scope.
-    tree-placed : ∀ {A} n (o : Obs Timeline Γ A) p → Admits D p
-                → Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
+    -- A MERGE'S: its outer's, and each lane's, subscribed under a row of
+    -- the outer, in that row's world.
+    placed-merge : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+                 → PlacedAt n (flatMap (mergeᶠ nothing) f s) p
+
+    -- THE OTHER JOINS'.
+    placed-cc : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+              → PlacedAt n (flatMap (mergeᶠ (just k)) f s) p
+    placed-sw : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+              → PlacedAt n (flatMap switchᶠ f s) p
+    placed-ex : ∀ {A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
+              → PlacedAt n (flatMap exhaustᶠ f s) p
+
+    -- A CONNECT'S: its source's, and its body's, the source's hot among
+    -- the body's scope.
+    placed-connect : ∀ {A B} n (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B) p → Admits D p
+                   → PlacedAt n (connect s b) p
+
+  -- A SPIN'S NEXT TICK lies one label under its subscription, and a plain
+  -- child of an earlier tick reaches nothing that leads it: not the
+  -- subscription, which precedes the tick, nor the next tick, whose only
+  -- parent is the subscription.
+  placed-spin : ∀ {A} (l : Later Timeline Γ A) p → Admits D p → PlacedAt zero (defer l) p
+  placed-spin l p a {N} (refl , refl) = inj₁ (record
+    { world = step here plain-ix ; real = real-snoc p plain-ix rp ; under = under ; holder = λ () })
+    where
+      rp = proj₁ (proj₁ a)
+
+      under : ∀ {x e k w} → Cut zero (defer l) ρ p N x e → Plain k → W⁼ (Hots (den D N)) (x ⊕ [ k ]) w → ¬ w ⊑ (p ⊕ [ ix (3 + N) ])
+      under x pl v le with sp→ x
+      ... | i , _ , refl , refl with ⊑-snoc p le
+      ...   | inj₁ wp   = anc-lead (world-anc⁼ v) wp rp (≺-trans {p} {p ⊕ [ ix i ]} (≺-ext p []) (≺-ext (p ⊕ [ ix i ]) []))
+      ...   | inj₂ refl with anc-view (world-anc⁼ v)
+      ...     | inj₁ eq = ext≢ p [] (⊕-injˡ (p ⊕ [ ix i ]) p eq)
+      ...     | inj₂ (b , ab , pb) with parent-fun pb (step-parent p plain-ix)
+      ...       | refl = anc-lead ab (⊑-refl p) rp (≺-trans {p} {p ⊕ [ ix i ]} (≺-ext p []) (≺-ext (p ⊕ [ ix i ]) []))
+
+  -- A DEFER'S are its body's, one label down: the body's world lies in
+  -- the defer's, and its marker's plain children reach nothing leading a
+  -- position of the body's world, apart from it under the subscription.
+  placed-defer : ∀ {A} n (l : Later Timeline Γ A) p → Admits D p → PlacedAt n (Later.force l) (p ⊕ [ ix 1 ])
+               → PlacedAt (suc n) (defer l) p
+  placed-defer n l p a P {N} bi = [ (λ own → inj₁ (keep own)) , inj₂ ]′ (P bi)
+    where
+      H : Pos → Set
+      H = Hots (den D N)
+
+      module O  = Placing (λ M → Hots (den D M)) (EnvB (dbd D)) (p ⊕ [ ix 1 ]) (Cut n (Later.force l) ρ (p ⊕ [ ix 1 ]))
+      module O′ = Placing (λ M → Hots (den D M)) (EnvB (dbd D)) p (Cut (suc n) (defer l) ρ p)
+
+      rp : Real p
+      rp = proj₁ (proj₁ a)
+
+      from0 : ∀ {k w} → Plain k → W⁼ H ((p ⊕ [ ix 0 ]) ⊕ [ k ]) w → Anc (p ⊕ [ ix 0 ]) w
+      from0 pl v = anc-trans (up self (step-parent (p ⊕ [ ix 0 ]) pl)) (world-anc⁼ v)
+
+      root-case : ∀ {k w} → Plain k → W⁼ H ((p ⊕ [ ix 0 ]) ⊕ [ k ]) w → w ⊑ (p ⊕ [ ix 1 ]) → ⊥
+      root-case pl v r with ⊑-snoc p r
+      ... | inj₁ wp   = anc-lead (world-anc⁼ v) wp rp (≺-trans {p} {p ⊕ [ ix 0 ]} (≺-ext p []) (≺-ext (p ⊕ [ ix 0 ]) []))
+      ... | inj₂ refl = apart rp (from0 pl v) self
+
+      lead-case : ∀ {k w} → Plain k → W⁼ H ((p ⊕ [ ix 0 ]) ⊕ [ k ]) w → Lead H (p ⊕ [ ix 1 ]) w → ⊥
+      lead-case pl v (l-root r)  = root-case pl v r
+      lead-case pl v (l-in u)    = apart rp (from0 pl v) (world-anc u)
+      lead-case pl v (l-hot hh r) = proj₂ (admits-at D a N) hh (shrink⁼ (nest⁼ (inW (step here pl)) v)) (⊑-inside r)
+
+      keep : ∀ {b g} → O.Own N b g → O′.Own N b g
+      keep {b} own = record
+        { world = shrink (O.Own.world own) ; real = O.Own.real own
+        ; under = under
+        ; holder = λ eq → inW (shrink⁼ (proj₁ (O.Own.holder own eq))) , proj₂ (O.Own.holder own eq) }
+        where
+          under : ∀ {x e k w} → Cut (suc n) (defer l) ρ p N x e → Plain k → W⁼ H (x ⊕ [ k ]) w → ¬ w ⊑ b
+          under x pl v le with defer-tr→ n l uρ p x
+          ... | inj₁ (refl , refl) = lead-case pl v (lead (inW (O.Own.world own)) le)
+          ... | inj₂ cx            = O.Own.under own cx pl v le
+
+  -- EVERY TREE'S BOUNDARIES ARE PLACED: its own in its world, its scope's
+  -- named by the scope.
+  tree-placed : ∀ {A} n (o : Obs Timeline Γ A) p → Admits D p → PlacedAt n o p
+  tree-placed n       (cold c)          p a = cold-placed n c ρ p (admits-at D a)
+  tree-placed n       empty             p a = λ ()
+  tree-placed n       (of xs)           p a = λ ()
+  tree-placed n       (map f s)         p a =
+    placed-sub (λ {N} x → let (e₀ , x₀ , _) = tr-map→ f (listC (3 + N) n s (ρ N) p) x in _ , (e₀ , x₀) , inj₁ refl) (λ b → b)
+      (tree-placed n s p a)
+  tree-placed n       (scan f z s)      p a =
+    placed-sub (λ {N} x → _ , scan-src (proj₁ (scan-of f z (listC-ok (3 + N) n s (uρ N) p)) x) , inj₁ refl) (λ b → b)
+      (tree-placed n s p a)
+  tree-placed n       (takeWhile i q s) p a =
+    placed-sub {Bd′ = bd n (takeWhile i q s) ρ uρ (dbd D) p} (λ {N} x → take-stands i q (tr-take→ i q (listC (3 + N) n s (ρ N) p) x)) (λ { (b , _) → b }) (tree-placed n s p a)
+  tree-placed n (flatMap (mergeᶠ nothing) f s)  p a = placed-merge n f s p a
+  tree-placed n (flatMap (mergeᶠ (just k)) f s) p a = placed-cc n k f s p a
+  tree-placed n (flatMap switchᶠ f s)           p a = placed-sw n f s p a
+  tree-placed n (flatMap exhaustᶠ f s)          p a = placed-ex n f s p a
+  tree-placed n       (connect s b)     p a = placed-connect n s b p a
+  tree-placed n       (connected i)     p a = λ bi → inj₂ (env-in (dbd D) i bi)
+  tree-placed zero    (defer l)         p a = placed-spin l p a
+  tree-placed (suc n) (defer l)         p a = placed-defer n l p a (tree-placed n (Later.force l) (p ⊕ [ ix 1 ]) (admits-step D a))
 
   -- A SCOPE'S BOUNDARY is led by no position of an admissible world: its
   -- hot's body's world holds it.
