@@ -67,17 +67,18 @@ open import simultaneous.TableScan using (scan-bounded; scan-of; scan-src)
 open import simultaneous.TableTake using (tr-take→; tr-take←; failed?)
 open import simultaneous.TableRows using (part-≺)
 open import simultaneous.TableEnv using (_⊕ˡ_; admits-ix; Ren; HotD; hotD; hev; hin; hbd; DenOf; den; den-ex; tab-at; den-ok; dbd; dsettles; HotsAll; w-mono; w-mono⁼; ok-mono; transfer; scope-lead; reader-lead; each; each-at; inside-by; inside-at; dnest; dH; dlo;
-  Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; pin-ok; after-ok; pin-after-ok)
+  Admits; admits-at; admits-step; admits-row; den-cons; tab-func; tab-flat; tab-inv; pin-ok; after-ok; pin-after-ok)
 open import simultaneous.SpinKit using (sp→)
 open import simultaneous.Horizon using (Tag; held; past-child; under-child; module Cuts; module SpinB; module TakeB; module ConnB; module ConnBd; module RejoinB; const-bounded;
   bounded-≃)
 open import simultaneous.HorizonTree using (Cut; BdEnv; bodyρ; bodyU; bd)
 open import simultaneous.Placed using (module Placing)
-open import simultaneous.ListTR using (tr-at)
+open import simultaneous.ListTR using (tr-at; ent)
+open import simultaneous.HorizonCc using (module CcB)
 open import simultaneous.ColdBounded using (cold-bounded; cold-placed)
 open import simultaneous.HotRows using (hot-rows-settle)
 open import simultaneous.HorizonJoin using (module JoinB; module JoinP)
-open import simultaneous.CutParts using (merge-tr→; merge-tr←; sw-tr→; sw-tr←; ex-tr→; ex-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
+open import simultaneous.CutParts using (merge-tr→; merge-tr←; cc-tr→; cc-tr←; sw-tr→; sw-tr←; ex-tr→; ex-tr←; conn-tr→; conn-tr←; defer-tr→; defer-tr←; module MarkB)
 open import simultaneous.JoinPolicy using (module ExhaustRuns)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (elab; annotate)
@@ -154,11 +155,6 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   -- A tree subscribed at `p`'s placement.
   PlacedAt : ∀ {A} n (o : Obs Timeline Γ A) p → Set
   PlacedAt n o p = Placing.Placed (λ N → Hots (den D N)) (EnvB (dbd D)) p (Cut n o ρ p) (bd n o ρ uρ (dbd D) p)
-
-  postulate
-    -- THE CONCURRENCY-BOUNDED MERGE'S.
-    placed-cc : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-              → PlacedAt n (flatMap (mergeᶠ (just k)) f s) p
 
   -- A SPIN'S NEXT TICK lies one label under its subscription, and a plain
   -- child of an earlier tick reaches nothing that leads it: not the
@@ -242,12 +238,6 @@ module _ {Γ} (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) 
   src-held n s p a P {N} {b} {q} bd ins with P bd
   ... | inj₁ own = world-after⁼ (proj₁ (Placing.Own.holder own refl)) (proj₂ (Placing.Own.holder own refl))
   ... | inj₂ env = ⊥-elim (env-lead a env (inW (step here plain-ix)) (inside-⊑ (p ⊕ [ ix 1 ]) b ins))
-
-  postulate
-    -- THE CONCURRENCY-BOUNDED MERGE'S CUTS: the outer's boundaries, and
-    -- each running lane's.
-    cc-bounded : ∀ {A B} n k (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) p → Admits D p
-               → Cuts.Bounded (Cut n (flatMap (mergeᶠ (just k)) f s) ρ p) (bd n (flatMap (mergeᶠ (just k)) f s) ρ uρ (dbd D) p)
 
   -- A DEFER'S MARKER, under its first label, leads no boundary of its
   -- body, subscribed one label down: the body's own lie in its world,
@@ -513,7 +503,20 @@ mutual
         (λ {N} {q} {v} {y} {e} x l → InvAt.world (tab-at n (f v) uρ D (admits-row n s uρ D a x) N) l)
         (tree-placed n s ρ uρ D p a)
         (λ {N} {q} {v} x → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x)))
-  tree-placed n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = placed-cc ρ uρ D n k f s p a
+  tree-placed n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a =
+    placed-sub (λ {N} x → _ , (_ , cc-tr→ n f s uρ p k x) , inj₁ refl) (λ b → b)
+      (CcB.placed k (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+        (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (Admits D)
+        (λ {v} {q} ad → tree-bounded n (f v) ρ uρ D q ad)
+        (λ {N} {v} {q} x → proj₂ (ent (3 + N) n (f v) (uρ N) q x))
+        (λ {N} {v} {q} l → pin-after-ok (3 + N) n (f v) {ρ N} q l)
+        (λ {N} {v} {q} l → pin-ok (3 + N) n (f v) {ρ N} q l)
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → admits-at D a N) (λ N → tab-at n s uρ D a N)
+        (λ N v q oks → tab-inv (3 + N) n (f v) (den-ex D N) (den-ok D N) (uρ N) q oks)
+        (λ {N} x → admits-row n s uρ D a x) (λ {N} {v} {q} ad x → admits-row n (f v) uρ D ad x)
+        (λ {N} {b} {g} → tree-placed n s ρ uρ D p a {N} {b} {g})
+        (λ {v} {q} ad {M} {b} {g} → tree-placed n (f v) ρ uρ D q ad {M} {b} {g})
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w}))
   tree-placed n (flatMap switchᶠ f s)           ρ uρ D p a =
     placed-sub (λ {N} x → _ , (_ , sw-tr→ n f s uρ p x) , inj₁ refl) (λ b → b)
       (JoinP.placed (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (λ _ _ → ⊤) (λ N → Superseded (Cut n s ρ p N))
@@ -565,7 +568,20 @@ mutual
         (λ {N} {q} {v} x {M} {b} {g} → tree-placed n (f v) ρ uρ D (q ⊕ [ ix 1 ]) (admits-row n s uρ D a x) {M} {b} {g})
         (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w})
         (λ _ _ → ⊤) (λ _ _ _ → ⊥) (λ ()) (λ _ _ ()) (λ _ _ ()) (λ _ _ _ _ → tt) (λ _ _ _ _ → tt))
-  tree-bounded n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a = cc-bounded ρ uρ D n k f s p a
+  tree-bounded n (flatMap (mergeᶠ (just k)) f s) ρ uρ D p a =
+    bounded-≃ (λ {N} {y} {e} → cc-tr← n f s uρ p {N} k {y} {e}) (λ {N} {y} {e} → cc-tr→ n f s uρ p {N} k {y} {e})
+      (CcB.bounded k (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)
+        (λ v q → Cut n (f v) ρ q) (λ v q → bd n (f v) ρ uρ (dbd D) q) (Admits D)
+        (λ {v} {q} ad → tree-bounded n (f v) ρ uρ D q ad)
+        (λ {N} {v} {q} x → proj₂ (ent (3 + N) n (f v) (uρ N) q x))
+        (λ {N} {v} {q} l → pin-after-ok (3 + N) n (f v) {ρ N} q l)
+        (λ {N} {v} {q} l → pin-ok (3 + N) n (f v) {ρ N} q l)
+        (λ N → Hots (den D N)) (EnvB (dbd D)) p (λ N → admits-at D a N) (λ N → tab-at n s uρ D a N)
+        (λ N v q oks → tab-inv (3 + N) n (f v) (den-ex D N) (den-ok D N) (uρ N) q oks)
+        (λ {N} x → admits-row n s uρ D a x) (λ {N} {v} {q} ad x → admits-row n (f v) uρ D ad x)
+        (λ {N} {b} {g} → tree-placed n s ρ uρ D p a {N} {b} {g})
+        (λ {v} {q} ad {M} {b} {g} → tree-placed n (f v) ρ uρ D q ad {M} {b} {g})
+        (λ {N} {b} {g} env {w} → env-lead ρ uρ D a {N} {b} {g} env {w}))
   tree-bounded n (flatMap switchᶠ f s) ρ uρ D p a =
     bounded-≃ (λ {N} {y} {e} → sw-tr← n f s uρ p {N} {y} {e}) (λ {N} {y} {e} → sw-tr→ n f s uρ p {N} {y} {e})
       (JoinB.bounded (Cut n s ρ p) (bd n s ρ uρ (dbd D) p) (tree-bounded n s ρ uρ D p a)

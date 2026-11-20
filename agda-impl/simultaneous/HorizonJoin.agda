@@ -27,7 +27,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 
 open import denotation.Position using (Pos; Label; ix; _⊕_; _≟ᵖ_; inside)
-open import denotation.EmissionSet using (Ev; out; pin; EmissionSet; _≺_; _≼_; At; Ended; module Joining)
+open import denotation.EmissionSet using (Ev; out; pin; EmissionSet; _≺_; _≼_; At; Ended; Den; coldAt; module Joining; module Bounded)
 open import denotation.Laws.Modulus using (AgreeTo; ⟨_⟩; upto; ≺-ext; ≺→≼; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≼-trans; ≼-or-≻)
 open import denotation.Laws.Worlds using (_⊑_; InvAt; Disj; W; W⁼; step; inW; here; plain-ix; lead; l-root; l-in; l-hot; leads;
   ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊑-refl; ⊑-inside; ⊑-≼; inside-⊑; w-up; not-up; apart-w; nest-in; nest; nest⁼; Plain; ⊕-injʳ; ⊕-injˡ; ⊕-identityʳ)
@@ -44,6 +44,75 @@ module JoinBd {A : Set} (o : EmissionSet A) (Runs : Pos → Set) (Cut : Pos → 
     outerB : ∀ {b g} → Bdo b g → JBd b g
     laneB  : ∀ {q a b} → o q (out a) → Runs q → BdL q a b free → ¬ Cut q b → JBd b free
     laneH  : ∀ {q a b r} → o q (out a) → Runs q → BdL q a b (held r) → ¬ Cut q r → JBd b (held r)
+
+-- A BOUNDED MERGE'S: its lanes', each where the schedule subscribes it.
+module CcJ {A B : Set} (m : ℕ) (o : ℕ → EmissionSet A) (L : A → Pos → ℕ → EmissionSet B) where
+
+  -- The lanes at `N`, each read off its cut wherever it is subscribed.
+  fD : ℕ → A → Den B
+  fD N a = coldAt (λ s → L a s N)
+
+  module BN (N : ℕ) = Bounded m (fD N) (o N)
+
+  Jc : ℕ → EmissionSet B
+  Jc N = BN.JoinT N
+
+  -- The value at `q`'s lane's boundaries, at its subscription.
+  LBd : (A → Pos → ℕ → Pos → Tag → Set) → ℕ → Pos → A → Pos → Tag → Set
+  LBd BdL N q a b g = Σ ℕ λ i → Σ Pos λ s → BN.Sub N i q s a × BdL a s N b g
+
+------------------------------------------------------------------------
+-- An outer's rows, against a value's second child's world
+
+module JoinRows {A : Set} (o : ℕ → EmissionSet A) (H : ℕ → Pos → Set) (p : Pos)
+  (io : ∀ N → InvAt (H N) p (o N)) (dj : ∀ N → Disj (H N) p) where
+
+  -- A lane's subscription lies in the join's world.
+  ow : ∀ {N q a} → o N q (out a) → W (H N) p (q ⊕ [ ix 1 ])
+  ow {N} x = step (inW (InvAt.world (io N) x)) plain-ix
+
+  -- What a plain child of an outer row reaches leads no position of
+  -- another child's world, unless it is that child: the two worlds are
+  -- apart, and neither row lies in the other's children's.
+  off-lane : ∀ {N q₀ a₀ y e l w b} → o N q₀ (out a₀) → o N y e → Plain l → W⁼ (H N) (y ⊕ [ l ]) w
+           → ¬ (y ⊕ [ l ] ≡ q₀ ⊕ [ ix 1 ]) → W⁼ (H N) (q₀ ⊕ [ ix 1 ]) b → ¬ w ⊑ b
+  off-lane {N} {q₀} x₀ x pl v ne wb le with lead wb le
+  ... | l-in u     = apart-w pl plain-ix ne (λ z → InvAt.under (io N) x₀ x plain-ix z (⊑-refl _))
+                       (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl _)) v (inW u)
+  ... | l-hot hh r = dj N hh (nest-in (step (inW (InvAt.world (io N) x)) pl) v) (⊑-inside r)
+  ... | l-root r with ⊑-snoc q₀ r
+  ...   | inj₁ wq   = InvAt.under (io N) x x₀ pl v wq
+  ...   | inj₂ refl = [ ne , (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl q₀)) ]′ (w-up plain-ix v)
+
+  -- An outer row leads another only as itself.
+  row-lead : ∀ {N y e q e′} → o N y e → o N q e′ → y ⊑ q → y ≡ q
+  row-lead {y = y} _ _ ([] , eq) = sym (trans eq (⊕-identityʳ y))
+  row-lead {N} oy oq (_ ∷ _ , refl) = ⊥-elim (InvAt.flat (io N) oy oq)
+
+  -- A valueless outer row leads nothing in a value's second child's
+  -- world: no other outer row leads that world.
+  root-lo : ∀ {N q a b y e} → o N q (out a) → W (H N) (q ⊕ [ ix 1 ]) b → o N y e → (∀ {a′} → ¬ e ≡ out a′) → ¬ y ⊑ b
+  root-lo {N} x wb oy ne le with lead (inW wb) le
+  ... | l-hot hh r = dj N hh (InvAt.world (io N) oy) (⊑-inside r)
+  ... | l-in v     = InvAt.under (io N) x oy plain-ix (inW v) (⊑-refl _)
+  root-lo {N} {q} x wb oy ne le | l-root r with ⊑-snoc q r
+  ...   | inj₂ refl = InvAt.flat (io N) x oy
+  ...   | inj₁ yq with row-lead oy x yq
+  ...     | refl = ne (InvAt.func (io N) oy x)
+
+  -- Nor does any value's marker.
+  root-lv : ∀ {N q a b y a′} → o N q (out a) → W (H N) (q ⊕ [ ix 1 ]) b → o N y (out a′) → ¬ (y ⊕ [ ix 0 ]) ⊑ b
+  root-lv {N} x wb oy le with lead (inW wb) le
+  ... | l-hot hh r = dj N hh (step (inW (InvAt.world (io N) oy)) plain-ix) (⊑-inside r)
+  root-lv {N} {q} {y = y} x wb oy le | l-in v with w-up plain-ix (inW v)
+  ...   | inj₂ v′ = InvAt.under (io N) x oy plain-ix v′ (⊑-refl y)
+  ...   | inj₁ eq with ⊕-injʳ q y eq
+  ...     | ()
+  root-lv {N} {q} {y = y} x wb oy le | l-root r with ⊑-snoc q r
+  ...   | inj₂ eq with ⊕-injʳ y q eq
+  ...     | ()
+  root-lv {N} {q} {y = y} x wb oy le | l-root r | inj₁ r′ with row-lead oy x (⊑-trans (⊑-snoc⁺ y) r′)
+  ...     | refl = not-up {H = H N} (InvAt.real (io N) x) here r′
 
 ------------------------------------------------------------------------
 -- A join's cuts
@@ -85,13 +154,10 @@ module JoinP {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag 
 
   open JoinJ o L Runs Cut using (Jc)
   open JoinBd using (outerB; laneB; laneH)
+  open JoinRows o H p io dj using (ow; off-lane)
 
   MBd : ℕ → Pos → Tag → Set
   MBd N = JoinBd.JBd (o N) (Runs N) (Cut N) (Bdo N) (λ q a → BdL a (q ⊕ [ ix 1 ]) N)
-
-  -- A lane's subscription lies in the join's world.
-  ow : ∀ {N q a} → o N q (out a) → W (H N) p (q ⊕ [ ix 1 ])
-  ow {N} x = step (inW (InvAt.world (io N) x)) plain-ix
 
   -- A join row stands on an outer row: as a valueless one, a value's
   -- marker, or a row of the value's lane.
@@ -123,19 +189,6 @@ module JoinP {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag 
   up-to (on x _ refl)   pl v = _ , (_ , x) , _ , pl , v
   up-to (mark x refl)   pl v = _ , (_ , x) , ix 0 , plain-ix , nest⁼ (inW (step here pl)) v
   up-to {N} (inln x l)  pl v = _ , (_ , x) , ix 1 , plain-ix , nest⁼ (inW (step (inW (lw x l)) pl)) v
-
-  -- What a plain child of an outer row reaches leads no position of
-  -- another child's world, unless it is that child: the two worlds are
-  -- apart, and neither row lies in the other's children's.
-  off-lane : ∀ {N q₀ a₀ y e l w b} → o N q₀ (out a₀) → o N y e → Plain l → W⁼ (H N) (y ⊕ [ l ]) w
-           → ¬ (y ⊕ [ l ] ≡ q₀ ⊕ [ ix 1 ]) → W⁼ (H N) (q₀ ⊕ [ ix 1 ]) b → ¬ w ⊑ b
-  off-lane {N} {q₀} x₀ x pl v ne wb le with lead wb le
-  ... | l-in u     = apart-w pl plain-ix ne (λ z → InvAt.under (io N) x₀ x plain-ix z (⊑-refl _))
-                       (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl _)) v (inW u)
-  ... | l-hot hh r = dj N hh (nest-in (step (inW (InvAt.world (io N) x)) pl) v) (⊑-inside r)
-  ... | l-root r with ⊑-snoc q₀ r
-  ...   | inj₁ wq   = InvAt.under (io N) x x₀ pl v wq
-  ...   | inj₂ refl = [ ne , (λ z → InvAt.under (io N) x x₀ pl z (⊑-refl q₀)) ]′ (w-up plain-ix v)
 
   -- A lane's own boundary, as the join's.
   lane-own : ∀ {N q₀ a₀ b g} (x₀ : o N q₀ (out a₀)) → Placing.Own H Env (q₀ ⊕ [ ix 1 ]) (L a₀ (q₀ ⊕ [ ix 1 ])) N b g
@@ -210,7 +263,8 @@ module JoinB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag 
 
   open JoinJ o L Runs Cut public
 
-  open JoinP o Bdo L BdL Runs Cut o-func H Env p io dj lw po pl using (MBd; ow)
+  open JoinP o Bdo L BdL Runs Cut o-func H Env p io dj lw po pl using (MBd)
+  open JoinRows o H p io dj using (ow; root-lo; root-lv)
 
   open JoinBd using (outerB; laneB; laneH)
 
@@ -433,11 +487,6 @@ module JoinB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag 
       from (Joining.left x rn l nc ins) = left← x rn l nc ins
       from (Joining.run () _)
 
-  -- An outer row leads another only as itself.
-  row-lead : ∀ {N y e q e′} → o N y e → o N q e′ → y ⊑ q → y ≡ q
-  row-lead {y = y} _ _ ([] , eq) = sym (trans eq (⊕-identityʳ y))
-  row-lead {N} oy oq (_ ∷ _ , refl) = ⊥-elim (InvAt.flat (io N) oy oq)
-
   -- AN OUTER BOUNDARY is led by no lane's row: the outer's own lies
   -- under no world of its rows' children, its scope's under no world
   -- position.
@@ -451,29 +500,13 @@ module JoinB {A B : Set} (o : ℕ → EmissionSet A) (Bdo : ℕ → Pos → Tag 
   gap-lo : ∀ {N q a b g y e} → o N q (out a) → BdL a (q ⊕ [ ix 1 ]) N b g → o N y e → (∀ {a′} → ¬ e ≡ out a′) → ¬ y ⊑ b
   gap-lo {N} x bd oy ne le with pl x bd
   ... | inj₂ env = el env (inW (InvAt.world (io N) oy)) le
-  ... | inj₁ own with lead (inW (Placing.Own.world own)) le
-  ...   | l-hot hh r = dj N hh (InvAt.world (io N) oy) (⊑-inside r)
-  ...   | l-in v     = InvAt.under (io N) x oy plain-ix (inW v) (⊑-refl _)
-  gap-lo {N} {q} x bd oy ne le | inj₁ own | l-root r with ⊑-snoc q r
-  ...   | inj₂ refl = InvAt.flat (io N) x oy
-  ...   | inj₁ yq with row-lead oy x yq
-  ...     | refl = ne (InvAt.func (io N) oy x)
+  ... | inj₁ own = root-lo x (Placing.Own.world own) oy ne le
 
   -- Nor any value's marker.
   gap-lv : ∀ {N q a b g y a′} → o N q (out a) → BdL a (q ⊕ [ ix 1 ]) N b g → o N y (out a′) → ¬ (y ⊕ [ ix 0 ]) ⊑ b
   gap-lv {N} x bd oy le with pl x bd
   ... | inj₂ env = el env (inW (step (inW (InvAt.world (io N) oy)) plain-ix)) le
-  ... | inj₁ own with lead (inW (Placing.Own.world own)) le
-  ...   | l-hot hh r = dj N hh (step (inW (InvAt.world (io N) oy)) plain-ix) (⊑-inside r)
-  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-in v with w-up plain-ix (inW v)
-  ...   | inj₂ v′ = InvAt.under (io N) x oy plain-ix v′ (⊑-refl y)
-  ...   | inj₁ eq with ⊕-injʳ q y eq
-  ...     | ()
-  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-root r with ⊑-snoc q r
-  ...   | inj₂ eq with ⊕-injʳ y q eq
-  ...     | ()
-  gap-lv {N} {q} {y = y} x bd oy le | inj₁ own | l-root r | inj₁ r′ with row-lead oy x (⊑-trans (⊑-snoc⁺ y) r′)
-  ...     | refl = not-up {H = H N} (InvAt.real (io N) x) here r′
+  ... | inj₁ own = root-lv x (Placing.Own.world own) oy le
 
   -- Nor another lane's row: two values' lanes are apart.
   gap-ll : ∀ {N q a q′ a′ b g y e} → o N q (out a) → o N q′ (out a′) → ¬ q ≡ q′

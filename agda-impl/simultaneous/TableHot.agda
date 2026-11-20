@@ -23,7 +23,6 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (All; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Bool using (Bool; true; false; T; if_then_else_; _∧_)
-open import Function using (case_of_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Unit using (tt)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -36,7 +35,7 @@ open import Relation.Nullary using (¬_; does)
 open import Tree using (Obs; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; inside; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin; shown; heard)
+open import denotation.EmissionSet using (Ev; out; skip; end; Unpinned; pin; _≺_; _≼_; Rejoin; shown; heard)
 open import denotation.Laws.Modulus using (≺→≼; ≺-ext; ≺-≼-≺; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-snoc⁺; ⊑-≼; ⊑-inside; ⊑-snoc; ⊕-assoc; step; here; plain-last)
 import quickcheck.Tabled as Tb
@@ -55,7 +54,7 @@ open import simultaneous.TableEnv
   up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
 open import simultaneous.TreeBounded using (listHot; tree-bounded; admits-body; listHot-u)
-open import simultaneous.HorizonTree using (bd; _∷ᵇ_; BdEnv; cc-bd)
+open import simultaneous.HorizonTree using (bd; _∷ᵇ_; BdEnv)
 open import simultaneous.ElabUndone using (env-ext; EnvU)
 open import simultaneous.TableFlat using (if-≡; in-if; module TabRows)
 open import simultaneous.TableRows using (proper⊆; unpin; RjRow; rejoin-inv)
@@ -65,11 +64,6 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 open TabRows using (endAt; endsOf; endAt-I; ends-tr; endAt-E; skip≢end)
 open JoinBd using (outerB; laneB; laneH)
 open ConnBd using (bodyB; burstB; echoB; keptB)
-
--- A bounded merge hangs where its outer or one of its lanes does.
-postulate
-  cc-bd-src : ∀ k {A B : Set} p (o : ℕ → EmissionSet A) Bdo (L : A → Pos → ℕ → EmissionSet B) BdL {N b g}
-            → cc-bd k p o Bdo L BdL N b g → (Σ Tag λ g₀ → Bdo N b g₀) ⊎ (Σ A λ a → Σ Pos λ r → Σ Tag λ g₀ → BdL a r N b g₀)
 
 -- A reader hangs where its hot does: its lanes are lists.
 reader-bd : ∀ n {Γ A} (i : AIE A ∈ Γ) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) p {N b g}
@@ -84,11 +78,11 @@ reader-bd n i ρ uρ β p (laneH _ _ (laneH _ _ () _) _)
 -- source's hot, then a list.
 annotate-bd : ∀ n {Γ A} (s : Obs Timeline Γ (IE A)) (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) (β : BdEnv Γ) p {N b g}
             → bd n (annotate s) ρ uρ β p N b g → Σ Tag λ g₀ → bd n s ρ uρ β (p ⊕ [ ix 1 ]) N b g₀
-annotate-bd n s ρ uρ β p (bodyB x) = case cc-bd-src 1 _ _ _ _ _ x of λ
-  { (inj₁ (_ , ()))
-  ; (inj₂ (true , _ , y)) → y
-  ; (inj₂ (false , _ , _ , ()))
-  }
+annotate-bd n s ρ uρ β p (bodyB (outerB ()))
+annotate-bd n s ρ uρ β p (bodyB (laneB {a = true} _ _ (_ , _ , _ , y) _))      = _ , y
+annotate-bd n s ρ uρ β p (bodyB (laneB {a = false} _ _ (_ , _ , _ , ()) _))
+annotate-bd n s ρ uρ β p (bodyB (laneH {a = true} _ _ (_ , _ , _ , y) _))      = _ , y
+annotate-bd n s ρ uρ β p (bodyB (laneH {a = false} _ _ (_ , _ , _ , ()) _))
 annotate-bd n s ρ uρ β p (burstB x _)  = _ , x
 annotate-bd n s ρ uρ β p (echoB x _ _) = _ , x
 annotate-bd n s ρ uρ β p (keptB x _ _) = _ , x

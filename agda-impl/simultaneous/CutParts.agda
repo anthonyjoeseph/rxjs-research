@@ -37,9 +37,9 @@ open import quickcheck.Tabled.Exact using (conn-exact; truncate-exact)
 open import quickcheck.Tabled.Exact.Base using (Exactly; sound; complete; bind⁻)
 open import simultaneous.Listing using (listC; listC-ok; UncutEnv; Uncut)
 open import simultaneous.TableKit using (TR)
-open import simultaneous.ListTR using (self-exact; ent; laneD; merge-tr; sw-tr; ex-tr)
+open import simultaneous.ListTR using (self-exact; ent; laneD; merge-tr; sw-tr; ex-tr; bounded-tr)
 open import simultaneous.HorizonTree using (Cut; srcL; bodyρ; bodyU)
-open import simultaneous.HorizonJoin using (module MergeJ; module JoinJ)
+open import simultaneous.HorizonJoin using (module MergeJ; module JoinJ; module CcJ)
 
 ------------------------------------------------------------------------
 -- Tables
@@ -192,6 +192,13 @@ module _ {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) {ρ : 
 
   merge-tr← : ∀ {y e} → MergeJ.Jc (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e → Cut n (flatMap (mergeᶠ nothing) f s) ρ p N y e
   merge-tr← j = Equivalence.from (merge-tr (3 + N) n f s (uρ N) p) (Cg.from j)
+
+  -- The bounded merge: each lane read off its listing, as is.
+  cc-tr→ : ∀ k {y e} → Cut n (flatMap (mergeᶠ (just k)) f s) ρ p N y e → CcJ.Jc k (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e
+  cc-tr→ k x = Equivalence.to (bounded-tr (3 + N) n k f s (uρ N) p) x
+
+  cc-tr← : ∀ k {y e} → CcJ.Jc k (Cut n s ρ p) (λ a q → Cut n (f a) ρ q) N y e → Cut n (flatMap (mergeᶠ (just k)) f s) ρ p N y e
+  cc-tr← k j = Equivalence.from (bounded-tr (3 + N) n k f s (uρ N) p) j
 
 ------------------------------------------------------------------------
 -- A connect's cut

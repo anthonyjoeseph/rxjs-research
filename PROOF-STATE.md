@@ -88,27 +88,13 @@ subscription.
 
 Members: `ct-src-out`, `ct-src-held`.
 
-#### THE TREE'S HANGS
-
-A tree's boundaries are `HorizonTree.bd`, and `TreeBounded.tree-bounded`
-bounds its cuts by one induction; every case and placement is a body but
-the concurrency-bounded merge's. Open: its boundaries, bound and
-placement, a queued lane starting at another's end (`HorizonJoin.JoinB`
-needs which lanes run decided before the row).
-The plain side of a one-child former, a reader
-and a connect still passes its child's `Rel.Bd` through unpinned.
-Settled by bodies, or a queued hang the merge does not keep.
-
-Members: `cc-bd`, `cc-bounded`, `pd-bounded`, `placed-cc`.
-
 #### THE JOINS' HANGS
 
 Each core's pair with the plain flatMap's: the merge's is
 `JoinPair`'s over its parts' and cross-part leaves; the others copy it,
-over `cc-bd`, `sw-bd`, `ex-bd`, opaque; a bounded merge hangs only where
-its outer or a lane does. Settled by bodies.
+over `cc-bd`, `sw-bd`, `ex-bd`. Settled by bodies.
 
-Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `cc-bd-src`, `share-bd→`, `share-bd←`.
+Members: `cc-bcorr`, `sw-bcorr`, `ex-bcorr`, `share-bd→`, `share-bd←`.
 
 #### THE CONNECT'S HANGS
 

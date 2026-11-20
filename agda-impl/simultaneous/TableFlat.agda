@@ -20,7 +20,7 @@
 module simultaneous.TableFlat where
 
 open import Data.Bool using (Bool; true; false; T; if_then_else_; not)
-open import Data.Empty using (⊥)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -36,11 +36,11 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_; does; yes; no)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; empty; of; flatMap; connect; connected)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; flatMap; connect; connected)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _<ᵖ_; ix; sub; last; inside; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_)
-open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
+open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_; module Joining)
+open import denotation.Laws.Modulus using (⟨_⟩; upto; ≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
 open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; complete)
 open import Relation.Nullary.Decidable using (dec-true)
@@ -54,7 +54,9 @@ open import simultaneous.InstEmit using (valuesOf)
 open import simultaneous.TableCorr using (Same; Rel; Corr; keys; in-keys; nl-ev)
 open import simultaneous.TableKit using (TR; Got; got-bind)
 open import simultaneous.Horizon using (Tag; module Cuts)
-open import simultaneous.HorizonTree using (bd; BdEnv)
+open import simultaneous.HorizonTree using (bd; BdEnv; Cut)
+open import simultaneous.HorizonJoin using (module JoinBd)
+open import simultaneous.CutParts using (merge-tr←; cc-tr←; sw-tr←; ex-tr←)
 open import simultaneous.TreeBounded using (tree-bounded; listHot; admits-body; admits-trig)
 open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
   linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*;
@@ -111,6 +113,21 @@ filt-keep g (r ∷ rs) (there m) gx with g r
 pinKeys : ∀ {X : Set} → List (Row X) → List Pos
 pinKeys = L.concatMap λ { (k , pin _) → [ k ] ; _ → [] }
 
+-- A position among the pins' is a pin's, and a pin's is among them.
+pk→ : ∀ {X : Set} (rs : List (Row X)) {y} → y ∈ pinKeys rs → Σ Pos λ r → (y , pin r) ∈ rs
+pk→ ((k , out _) ∷ rs) m = proj₁ (pk→ rs m) , there (proj₂ (pk→ rs m))
+pk→ ((k , skip) ∷ rs)  m = proj₁ (pk→ rs m) , there (proj₂ (pk→ rs m))
+pk→ ((k , end) ∷ rs)   m = proj₁ (pk→ rs m) , there (proj₂ (pk→ rs m))
+pk→ ((k , pin r) ∷ rs) (here refl) = r , here refl
+pk→ ((k , pin r) ∷ rs) (there m)   = proj₁ (pk→ rs m) , there (proj₂ (pk→ rs m))
+
+pk← : ∀ {X : Set} (rs : List (Row X)) {y r} → (y , pin r) ∈ rs → y ∈ pinKeys rs
+pk← ((k , pin r) ∷ rs) (here refl) = here refl
+pk← ((k , pin _) ∷ rs) (there m)   = there (pk← rs m)
+pk← ((k , out _) ∷ rs) (there m)   = pk← rs m
+pk← ((k , skip) ∷ rs)  (there m)   = pk← rs m
+pk← ((k , end) ∷ rs)   (there m)   = pk← rs m
+
 -- A table without its pins at some positions.
 unpinAt : ∀ {X : Set} → List Pos → Tb.Listed X → Tb.Listed X
 unpinAt ks Lx = L.filterᵇ (keepRow ks) (rows Lx) Tb.⊣ Tb.short Lx
@@ -121,6 +138,29 @@ unpin-sub ks nothing   (_ , () , _)
 
 unpin-keep : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k e} → TR m k e → Unpinned e → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k e
 unpin-keep ks (just Lx) (_ , refl , r) u = unpinAt ks Lx , refl , filt-keep (keepRow ks) (rows Lx) r (keep-un ks u)
+
+filt-true : ∀ {X : Set} (g : X → Bool) (rs : List X) {x} → x ∈ L.filterᵇ g rs → g x ≡ true
+filt-true g (r ∷ rs) m with g r in gr | m
+... | true  | here refl = gr
+... | true  | there m′  = filt-true g rs m′
+... | false | m′        = filt-true g rs m′
+
+not-any : ∀ {b} → b ≡ true → not b ≡ true → ⊥
+not-any refl ()
+
+keep-out : ∀ {X : Set} ks {k r} → ¬ k ∈ ks → keepRow {X} ks (k , pin r) ≡ true
+keep-out ks {k} nk with anyᵇ (λ k′ → does (k′ ≟ᵖ k)) ks in a
+... | true  = ⊥-elim (nk (any-≟ a))
+... | false = refl
+
+-- A pin the unpinned table keeps is at no position named; one at none is kept.
+unpin-pin : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k r} → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k (pin r) → ¬ k ∈ ks
+unpin-pin ks (just Lx) {k} (_ , refl , x) k∈ =
+  not-any (any⁺ {p = λ k′ → does (k′ ≟ᵖ k)} k∈ (dec-true (k ≟ᵖ k) refl)) (filt-true (keepRow ks) (rows Lx) x)
+unpin-pin ks nothing (_ , () , _)
+
+unpin-pin← : ∀ {X : Set} ks (m : Maybe (Tb.Listed X)) {k r} → TR m k (pin r) → ¬ k ∈ ks → TR (Tb.bind m λ Lx → just (unpinAt ks Lx)) k (pin r)
+unpin-pin← ks (just Lx) (_ , refl , x) nk = unpinAt ks Lx , refl , filt-keep (keepRow ks) (rows Lx) x (keep-out ks nk)
 
 in-if : ∀ (b : Bool) {X : Set} (Q : X → Set) {x y} → (b ≡ true → Q x) → (b ≡ false → Q y) → Q (if b then x else y)
 in-if true  Q t e = t refl
@@ -363,11 +403,6 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   Pd : FlatOp → ℕ → Maybe (Tb.Listed B)
   Pd op N = Tb.bind (P op N) λ Lp → just (unpinAt (srcPins N) Lp)
 
-  postulate
-    -- THE UNPINNED FLATMAP HANGS WHERE THE FLATMAP DOES: a source's pin
-    -- shown as a skip stays at its position.
-    pd-bounded : ∀ {op} {Bd : ℕ → Pos → Tag → Set} → Cuts.Bounded (λ N → TR (P op N)) Bd → Cuts.Bounded (λ N → TR (Pd op N)) Bd
-
   -- THE FLATMAP'S HANGS are its tree's, and the unpinned flatMap's with them.
   jbd : FlatOp → ℕ → Pos → Tag → Set
   jbd op = bd n (flatMap op f s) ρ uρ (dbd (lw env)) p
@@ -375,8 +410,12 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   jtree : ∀ op → Cuts.Bounded (λ N → TR (P op N)) (jbd op)
   jtree op = tree-bounded n (flatMap op f s) ρ uρ (lw env) p ad
 
-  jbounded : ∀ op → Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
-  jbounded op = pd-bounded {op} (jtree op)
+  -- The source's boundaries are the flatMap's.
+  src-jbd : ∀ op {N b g} → bd n s ρ uρ (dbd (lw env)) p N b g → jbd op N b g
+  src-jbd (mergeᶠ nothing)  x = JoinBd.outerB x
+  src-jbd (mergeᶠ (just k)) x = JoinBd.outerB x
+  src-jbd switchᶠ           x = JoinBd.outerB x
+  src-jbd exhaustᶠ          x = JoinBd.outerB x
 
   -- THE LANES' FLATMAP'S HANGS are its tree's, in the closer's scope.
   jbd* : FlatOp → ℕ → Pos → Tag → Set
@@ -407,6 +446,83 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
 
   pd-flat : ∀ {op N y e l ys e′} → TR (Pd op N) y e → TR (Pd op N) (y ⊕ (l ∷ ys)) e′ → ⊥
   pd-flat {op} {N} x x′ = tab-flat n (flatMap op f s) uρ (lw env) ad (pd-sub {op} {N} x) (pd-sub {op} {N} x′)
+
+  -- THE SOURCE'S PINS, each shown by the flatMap at its position.
+  src-pk→ : ∀ {N y} → y ∈ srcPins N → Σ Pos λ r → Cut n s ρ p N y (pin r)
+  src-pk→ {N} m with Tab n s ρ p N
+  src-pk→ {N} m  | just Lo = proj₁ (pk→ (rows Lo) m) , Lo , refl , proj₂ (pk→ (rows Lo) m)
+  src-pk→ {N} () | nothing
+
+  src-pk← : ∀ {N y r} → Cut n s ρ p N y (pin r) → y ∈ srcPins N
+  src-pk← {N} {y} (Lo , eq , x) = subst (λ m → y ∈ M.maybe (λ Lo′ → pinKeys (rows Lo′)) [] m) (sym eq) (pk← (rows Lo) x)
+
+  src-show : ∀ op {N y r} → Cut n s ρ p N y (pin r) → TR (P op N) y (pin r)
+  src-show (mergeᶠ nothing)  x = merge-tr← n f s uρ p (Joining.opin x)
+  src-show (mergeᶠ (just k)) x = cc-tr← n f s uρ p k (Joining.opin x)
+  src-show switchᶠ           x = sw-tr← n f s uρ p (Joining.opin x)
+  src-show exhaustᶠ          x = ex-tr← n f s uρ p (Joining.opin x)
+
+  -- THE UNPINNED FLATMAP HANGS WHERE THE FLATMAP DOES: a row moves with
+  -- the flatMap's, and a pin is unpinned in both cuts or neither, the
+  -- source's pins settled under the source's boundaries, which are the
+  -- flatMap's.
+  module PdB (op : FlatOp) where
+    private
+      module B  = Cuts.Bounded (jtree op)
+      module SB = Cuts.Bounded (tree-bounded n s ρ uρ (lw env) p ad)
+      module PC = Cuts (λ N → TR (Pd op N)) (jbd op)
+      module SC = Cuts (Cut n s ρ p) (bd n s ρ uρ (dbd (lw env)) p)
+
+    move : ∀ {N₁ N₂ y e} → (TR (P op N₁) y e → TR (P op N₂) y e)
+         → (∀ {r} → Cut n s ρ p N₂ y (pin r) → Cut n s ρ p N₁ y (pin r))
+         → TR (Pd op N₁) y e → TR (Pd op N₂) y e
+    move {N₁} {N₂} {e = pin r} to back x =
+      unpin-pin← (srcPins N₂) (P op N₂) (to (pd-sub {op} {N₁} x))
+        (λ m → unpin-pin (srcPins N₁) (P op N₁) x (src-pk← (back (proj₂ (src-pk→ m)))))
+    move {N₁} {N₂} {e = out _} to back x = pd-keep {op} {N₂} (to (pd-sub {op} {N₁} x)) tt
+    move {N₁} {N₂} {e = skip}  to back x = pd-keep {op} {N₂} (to (pd-sub {op} {N₁} x)) tt
+    move {N₁} {N₂} {e = end}   to back x = pd-keep {op} {N₂} (to (pd-sub {op} {N₁} x)) tt
+
+    -- A pin's: the flatMap holds it in the second cut, so a source's pin
+    -- there is it.
+    movep : ∀ {N₁ N₂ y q} → (TR (P op N₁) y (pin q) → TR (P op N₂) y (pin q))
+          → (Cut n s ρ p N₂ y (pin q) → Cut n s ρ p N₁ y (pin q))
+          → TR (Pd op N₁) y (pin q) → TR (Pd op N₂) y (pin q)
+    movep {N₁} {N₂} {y} {q} to back x = move to back′ x
+      where
+        x₂ : TR (P op N₂) y (pin q)
+        x₂ = to (pd-sub {op} {N₁} x)
+
+        back′ : ∀ {r} → Cut n s ρ p N₂ y (pin r) → Cut n s ρ p N₁ y (pin r)
+        back′ z with tab-func n (flatMap op f s) uρ (lw env) ad (src-show op z) x₂
+        ... | refl = back z
+
+    fwd : ∀ {N k} → PC.Clear N k → PC.Settled N k
+    fwd {N} {k} cl {N′} le = ⟨ (λ {y} {e} yk →
+        move (proj₁ (upto (B.fwd {N} {k} cl le) {y} {e} yk)) (λ {r} → proj₂ (upto (SB.fwd {N} {k} scl le) {y} {pin r} yk))
+      , move (proj₂ (upto (B.fwd {N} {k} cl le) {y} {e} yk)) (λ {r} → proj₁ (upto (SB.fwd {N} {k} scl le) {y} {pin r} yk))) ⟩
+      where
+        scl : SC.Clear N k
+        scl b = cl (src-jbd op b)
+
+    fwd-pin : ∀ {N q k} → PC.Clear N q → PC.HeldClear N q k → PC.PinSettled N q k
+    fwd-pin {N} {q} {k} cl hc {N′} le {y} yk =
+        movep (proj₁ (B.fwd-pin {N} {q} {k} cl hc le yk)) (proj₂ (SB.fwd-pin {N} {q} {k} scl shc le yk))
+      , movep (proj₂ (B.fwd-pin {N} {q} {k} cl hc le yk)) (proj₁ (SB.fwd-pin {N} {q} {k} scl shc le yk))
+      where
+        scl : SC.Clear N q
+        scl b = cl (src-jbd op b)
+
+        shc : SC.HeldClear N q k
+        shc b = hc (src-jbd op b)
+
+    bounded : Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
+    bounded = record
+      { gap = λ b x → B.gap b (pd-sub {op} x) ; held-in = B.held-in ; held-under = B.held-under
+      ; fwd = fwd ; fwd-pin = fwd-pin }
+
+  jbounded : ∀ op → Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
+  jbounded op = PdB.bounded op
 
   core-func : ∀ {op N y e e′} → TR (listC (3 + N) n (core op) (ρ*c N) c₁) y e → TR (listC (3 + N) n (core op) (ρ*c N) c₁) y e′ → e ≡ e′
   core-func {op} = tab-func n (core op) uρ*c Dc ad₁
