@@ -519,7 +519,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     bounded : Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
     bounded = record
       { gap = λ b x → B.gap b (pd-sub {op} x) ; held-in = B.held-in ; held-under = B.held-under
-      ; fwd = fwd ; fwd-pin = fwd-pin }
+      ; fwd = λ {N} {k} → fwd {N} {k} ; fwd-pin = λ {N} {q} {k} → fwd-pin {N} {q} {k} }
 
   jbounded : ∀ op → Cuts.Bounded (λ N → TR (Pd op N)) (jbd op)
   jbounded op = PdB.bounded op
