@@ -345,9 +345,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   -- WHERE THE SOURCE'S NEXT ROW IS NOT A LANE'S, no lane value lies before
   -- it past the lanes' cursor, as the source would have met it first.
-  lane-gap : ∀ {cM cσ q e rx₂} → LS.Inv cM cσ → Run LS.M′ cM ((q , e) ∷ rx₂) → laneTag e ≡ nothing
+  lane-gap : ∀ {cM cσ q a rx₂} → LS.Inv cM cσ → Run LS.M′ cM ((q , out a) ∷ rx₂) → laneTag (out a) ≡ nothing
            → Few σ₃ q × After cσ q × (∀ {y x} → σ₃ y (out x) → After cσ y → q ≼ y)
-  lane-gap {cM} {cσ} {q} {e} iv ((((mq , _) , ks , h) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
+  lane-gap {cM} {cσ} {q} {a} iv ((((mq , _) , ks , h) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
     where
       J = Spots.J P
       few : Few σ₃ q
@@ -373,7 +373,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
           ... | inj₁ lt = lst m′ tt (LS.Inv.i1 iv ry ay m′) lt
           ... | inj₂ eq = lane-not (src-func mq (subst (λ z → LS.M′ z (out (Ln x))) eq m′)) nl
             where
-              lane-not : e ≡ out (Ln x) → laneTag e ≡ nothing → ⊥
+              lane-not : out a ≡ out (Ln x) → laneTag (out a) ≡ nothing → ⊥
               lane-not refl ()
 
   -- Where the source's next row is not a lane's, the lanes' end before it
@@ -385,8 +385,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | false = inj₁ λ ()
 
   -- Where it is a lane's, the lanes' row it shows.
-  next-at : ∀ rx₁ {q e rx₂} → LS.Lanes nothing nothing rx₁
-          → Run LS.M′ (cursor nothing rx₁) ((q , e) ∷ rx₂) → LS.LView e → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
+  next-at : ∀ rx₁ {q a rx₂} → LS.Lanes nothing nothing rx₁
+          → Run LS.M′ (cursor nothing rx₁) ((q , out a) ∷ rx₂) → LS.LView (out a) → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
   next-at rx₁ (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (LS.isLane x) with LS.next-lane iv (proj₁ (proj₁ sn)) lst
   ... | y , refl , _ , seen , af , least =
     rs , pr , mr , y , cong nm (sym (rootOf-ext y [ sub (Spots.J P) ])) , proj₂ seen , af ,
@@ -394,9 +394,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   next-at rx₁ {q} (rs , pr , mr , iv) rn (LS.notLane nl) with lane-gap iv rn nl
   ... | fw , af , outl = rs , pr , mr , q , refl , fw , af , outl , end-gap {c = cursor nothing rs} outl
 
-  lane-next : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
-  lane-next rx₁ {q} {e} {rx₂} mt = next-at rx₁ (lane-run (run-prefix rx₁ mt))
-    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , e) ∷ rx₂)) (src-op tk env′ m) mt)) (LS.lview e)
+  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
+  lane-next rx₁ {q} {a} {rx₂} mt = next-at rx₁ (lane-run (run-prefix rx₁ mt))
+    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (LS.lview (out a))
 
   -- The lanes' counter is none, or of the name the lanes last began,
   -- with a route of it open.
@@ -416,9 +416,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ h   = h
   ... | inj₂ all = ⊥-elim (0≢1+n (trans (sym (lane-end-shut mr noend ry ay all)) open≡))
 
-  lanes-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+  lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  lanes-current rx₁ mt v with lane-next rx₁ mt
+  lanes-current rx₁ mt with lane-next rx₁ mt
   ... | rs , pr , mr , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
   ...   | inj₂ (at≡ , k , open≡) with lane-idle mr (proj-outs lane-vals pr) fw af (idle-least open≡ mr (proj-outs lane-vals pr) outl endl)
@@ -455,15 +455,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₂ x) _ = inj₂ x
   sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₁ _) (inj₂ x) = inj₂ x
 
-  flat-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+  flat-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                → tot (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  flat-current rx₁ mt v = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
-    (outer-current rx₁ mt v) (lanes-current rx₁ mt v) (held-current rx₁ mt v) (parked-current rx₁ mt v)
+  flat-current rx₁ mt = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
+    (outer-current rx₁ mt tt) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
     where st = proj₁ (past op init rx₁)
 
-  start-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+  start-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
-  start-current rx₁ mt v with flat-current rx₁ mt v
+  start-current rx₁ mt with flat-current rx₁ mt
   ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
   ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
@@ -508,7 +508,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       step : ∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
            → Locals cs′ (from r₀ (outRows op init rx₁)) (lay q 0 (proj₂ (react op (past op init rx₁) x)))
       step rx₁ {q} {x} rx₂ refl =
-        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt tt)
+        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt)
           (λ { refl → named (proj₁ (run-row rx₁ mt)) })
           (λ { refl ne → value-open rx₁ mt o-value ne })
           (λ { refl sp ne → over-open rx₁ mt sp ne })
