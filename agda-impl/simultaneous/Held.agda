@@ -115,7 +115,10 @@ open import denotation.Read using (After; cursor; Run)
 import denotation.Read as Run
 open import Data.Nat.Properties using (0≢1+n)
 import Data.Nat as ℕ
-open import Relation.Nullary using (yes; no)
+import Data.Nat.Properties as ℕP
+import denotation.EmissionSet as ES
+open import denotation.Laws.Truthful using (reached)
+open import simultaneous.HeldLim using (module LimHeld)
 open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt)
 open import simultaneous.HeldComb using (ShutRun)
@@ -488,7 +491,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lanes-of (past-lanes op init r₀ rx rs (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (lanes₀ {B} r₀))
 
   -- With a route open, the lanes' next visible row lies past `w`.
-  idle-least : ∀ {rs w} → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥)
+  idle-least : ∀ {rs : List (Pos × Ev (IE B))} {w} → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥)
              → (∀ {y x} → σ₃ y (out x) → After (cursor nothing rs) y → w ≼ y)
              → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → w ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k))
              → ∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → w ≼ y
@@ -497,14 +500,25 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ h   = h
   ... | inj₂ all = ⊥-elim (shut ry ay all)
 
+  -- Where the lanes still count a route, no lane end is next.
+  lane-shut : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
+            → ∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥
+  lane-shut rx₁ mt pr nz ry ay all = nz (lane-end-shut rx₁ mt pr ry ay all)
+
+  -- Where the lanes still count a route, their next row is of its instant.
+  lanes-idle : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → Met σ₃ rs → (ln : LaneNext rs q)
+             → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf (proj₁ ln)
+  lanes-idle rx₁ {rs = rs} mt pr mr (w , nw , fw , af , outl , endl) nz =
+    lane-idle mr (proj-outs lane-vals pr) fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)
+
   lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
   lanes-current rx₁ mt with lane-next rx₁ mt
   ... | rs , pr , mr , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
   ...   | inj₂ (at≡ , k , open≡) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
-  ...     | yes z = inj₁ z
-  ...     | no nz with lane-idle mr (proj-outs lane-vals pr) fw af (idle-least (λ ry ay all → nz (lane-end-shut rx₁ mt pr ry ay all)) outl endl)
+  ...     | Nl.yes z = inj₁ z
+  ...     | Nl.no nz with lanes-idle rx₁ mt pr mr (w , nw , fw , af , outl , endl) nz
   ...       | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
   ...       | inj₂ cw   = inj₂ (trans at≡ (trans cw nw))
 
@@ -755,11 +769,26 @@ held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
             (held-trigger m ρ s env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
--- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
--- under a `defer`'s guard; the meaning is the approximants' limit.
+-- A DEFER'S LIMIT KEEPS ITS INSTANTS FINITE: past a zero count, finitely
+-- many rows of the instant last begun.  Each approximant's rest bounds only
+-- its own rows, and the limit's rows of an instant are those of every
+-- approximant together, which no one approximant's list bounds.
 postulate
-  held-lim  : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-            → (∀ n → IH (just n) ρ (defer l)) → IH nothing ρ (defer l)
+  lim-rest : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
+           → (∀ n → IH (just n) ρ (defer l))
+           → ∀ env cs → GoodEnv env → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Early p
+           → Rest (enter (⟦ elab ρ (defer l) ⟧ env) p)
+
+-- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
+-- under a `defer`'s guard; the meaning is the approximants' limit, held
+-- wherever the approximants agree with it.
+held-lim : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
+         → (∀ n → IH (just n) ρ (defer l)) → IH nothing ρ (defer l)
+held-lim ρ l hs = ih λ env cs g eh p ok ep →
+  LimHeld.held (enter (⟦ elab ρ (defer l) ⟧ env) p) (λ n → enter (approx n (elab ρ (defer l)) env) p) (p ∷ cs)
+    (λ { (ES.from N h , _) → N , h N ℕP.≤-refl })
+    (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
+    (λ n → IH.holds (hs n) env cs g eh p ok ep) (lim-rest ρ l hs env cs g eh p ok ep)
 
 held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
 held-⊥ ρ l = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (spin _ , _) () }) λ { (() , _) }
