@@ -83,8 +83,11 @@ open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.OuterSplit using (count-open; module OuterSplit)
 open import simultaneous.ProperIdle using (proper-idle)
 open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
+open import simultaneous.RealView using (module View; real-from; real-ends)
+open import denotation.EmissionSet using (Den; Truncate)
+open import simultaneous.InstEmit using (valuesOf)
 
-open import Tree using (Obs; FlatOp; empty; of; map; flatMap)
+open import Tree using (Obs; FlatOp; empty; of; map; flatMap; connected)
 
 
 -- A row between two of one instant is of it.
@@ -655,18 +658,63 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (CS.dshow sh-σ₂) (r₁ , λ sc → ≺→≼ {z₁} {_} (aft sc)) zq
             λ (z , e″ , m′ , _ , z≼q , pr) → case (pr refl) z≼q m′
 
+  -- THE REAL FLATMAP, READ THROUGH ITS POLICY: its outer is the hot
+  -- outer's values, each lane a value's elaborated lane.
+  fL : A → Den (IE B)
+  fL a = ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀)
+
+  RO : EmissionSet A
+  RO = enter (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])
+
+  module RV = View fL RO
+
+  R-from : ∀ {k e} → Truncate (RV.Join op) k e → R k e
+  R-from = real-from m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ])
+
   postulate
-    -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
-    -- LANES HAVE ENDED BY ITS INSTANT: the scan counts every lane rxjs
-    -- started and has not ended, and every outer value a bounded merge
-    -- holds, and every outer value lies before the mark.  Asked only where
-    -- the real flatMap has few rows before a later instant's row.
-    --
-    -- REFUTED: 9e244736 `lanes-ended` unrestricted, by a switch whose cut lane loops: the lane never ends, the switch's count drops it at the cut, and the scan meets the closer's `outerDone` with no lane running or queued
-    lanes-ended : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-                → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-                → ∀ {q} → Few R q → instantOf z ≺ⁱ instantOf q
-                → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
+    -- THE REAL FLATMAP'S OUTER ENDS AFTER ITS VALUES, IN THE HOT OUTER'S
+    -- END'S INSTANT: the hot outer's values each end their own lane at once.
+    ro-before : ∀ {q a c} → RO q (out a) → RO c end → q ≺ c
+    ro-end    : ∀ {y} → σ₁ y end → Σ Pos λ c → RO c end × instantOf c ≡ instantOf y
+
+    -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, EVERY
+    -- LANE THE REAL FLATMAP RUNS AND NEVER CUTS HAS ENDED BY ITS INSTANT:
+    -- the scan counts every lane rxjs started and has not ended, and every
+    -- outer value a bounded merge holds, and every outer value lies before
+    -- the mark.
+    lanes-by : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+             → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+             → RV.LanesBy op (instantOf z)
+
+  -- The real flatMap's outer has ended by the closer's `outerDone`.
+  outer-by : ∀ {z n} → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → RV.OuterBy (instantOf z)
+  outer-by mz with close-sent mz
+  ... | _ , w′ , σd , refl with CD.done-under (proj₁ σd)
+  ...   | y₁ , e₁ , (ws , refl) with ro-end e₁
+  ...     | c′ , rc , ic = c′ , rc , λ h → irrⁱ (subst (instantOf ((y₁ ⊕ ws) ⊕ [ sub w′ ]) ≺ⁱ_) (trans ic i₁) h)
+    where
+      i₁ : instantOf y₁ ≡ instantOf ((y₁ ⊕ ws) ⊕ [ sub w′ ])
+      i₁ = trans (sym (inst-⊕ y₁ ws)) (sym (inst-⊕ (y₁ ⊕ ws) [ sub w′ ]))
+
+  -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
+  -- LANES HAVE ENDED BY ITS INSTANT: its outer has, and every lane run and
+  -- never cut.  Asked only where the real flatMap has few rows before a
+  -- later instant's row.
+  --
+  -- REFUTED: 9e244736 `lanes-ended` unrestricted, by a switch whose cut lane loops: the lane never ends, the switch's count drops it at the cut, and the scan meets the closer's `outerDone` with no lane running or queued
+  lanes-ended : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+              → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+              → ∀ {q} → Few R q → instantOf z ≺ⁱ instantOf q
+              → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
+  lanes-ended r₁ mt a0 q0 Fq zq ¬g =
+    real-ends op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+      (shows-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
+      (λ a s′ oks → shows-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s′ oks)
+      ro-before (proj₁ Fq , λ x lt → proj₂ Fq (R-from x) lt) zq
+      (outer-by (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (lanes-by r₁ mt a0 q0)
+      λ (y , ry , iy) → ¬g (y , (R-from ry , λ {c′} rc → subst (y ≼_) (end-uniq I₃ (R-from ry) rc) (≼-refl {y})) , iy)
 
 
   -- NO VISIBLE ROW OF THE SOURCE LIES IN AN INSTANT PAST ONE OF ITS
