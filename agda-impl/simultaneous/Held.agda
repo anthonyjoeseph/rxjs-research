@@ -18,10 +18,10 @@ open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
-  defer)
+  defer; mergeᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline)
-open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx)
+open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; module Op)
 open import simultaneous.SObs using (SObs; plain; ext)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
@@ -49,6 +49,13 @@ open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import simultaneous.FlatPark using (past-park)
 open import simultaneous.LaneSplit using (SrcOf; Ln; module LaneSplit; module Spots)
+import denotation.Laws.ShowsJoin as SJ
+open import denotation.Laws.ShowsOps using (sk-of; module Take)
+open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-down; sk-trunc)
+open import denotation.Laws.Worlds.Leaves using (of-inv)
+open import denotation.Laws.Worlds using (Shows; Hots)
+open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺)
+open import simultaneous.CombSent using (fed-op; Fed)
 open import simultaneous.FlatLanes using (laneTag; lane-vals; end-last; past-lanes; lanes-of; lanes₀)
 open import denotation.Up using (up; up-⊕)
 open import denotation.Laws.Shows using (∈-stable)
@@ -56,7 +63,7 @@ open import denotation.Laws.Modulus using (≺-ext)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import denotation.Position using (_<ᵖ_)
 open import denotation.Laws.Modulus using (≼-split)
-open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; module Quiet; conn-ev; empty-few; ev-none; held-cold; held-connect; held-connected; held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
+open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH; module Quiet; conn-ev; empty-few; ev-none; held-cold; held-connect; held-connected; held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.SObs using (SObs; plain; lone; ext; module Elaborate)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
@@ -325,16 +332,42 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                 × (∀ {y} → σ₃ y end → After (cursor nothing rs) y
                    → w ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k))
 
+  -- Each level the source's reader of the lanes passes through shows its hangs.
+  private
+    S₂ s₃ : Pos
+    S₂ = Spots.S₂ P
+    s₃ = Spots.s₃ P
+
+    module FM2 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ b → ev m (fed tk b) env′) (of-inv _)
+      (λ b → inv-ev m (fed tk b) env′ g₃) P ok₃ (sk-of _ P) (λ b s oks → shows-k (shows-ev m (fed tk b) env′ g₃ s oks))
+    module FB3 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ c → ev m (Cat-of tk env′ c) env′) (of-inv _)
+      (λ c → inv-ev m (Cat-of tk env′ c) env′ g₃) S₂ (FM2.val-ok 0 LS.o₁) (sk-of _ S₂)
+      (λ c s oks → shows-k (shows-ev m (Cat-of tk env′ c) env′ g₃ s oks))
+    module FM4 (n : ℕ) = SJ.Flat {n = n} (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) (λ b → ev m (Tag tk env′ b) env′) (of-inv _)
+      (λ b → inv-ev m (Tag tk env′ b) env′ g₃) s₃ (FB3.val-ok 0 LS.o₂) (sk-of _ s₃)
+      (λ b s oks → shows-k (shows-ev m (Tag tk env′ b) env′ g₃ s oks))
+
+    I-fed : InvAt (Hots env′) P (enter (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P)
+    I-fed = subst (λ d → InvAt (Hots env′) P (enter d P)) (fed-op tk env′ m) (inv-ev m (Fed tk env′) env′ g₃ P ok₃)
+
+    sh-σ₃ : Shows σ₃
+    sh-σ₃ = k-shows λ n → sk-down (λ x ¬e → ¬e (_ , proj₁ x)) dn
+      (shows-k (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)))
+      where
+        dn : ∀ {q e k e′} → σ₃ q e → enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) k e′ → k ≺ q → ¬ ¬ Σ _ (σ₃ k)
+        dn {q} {k = k} (_ , pr) x kq ¬s = ¬s (_ , x , λ {c} xc → ≺→≼ {k} {c} (≺-≼-≺ {k} {q} {c} kq (pr xc)))
+
+  -- A LANE ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
+  lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub (Spots.J P) ]) ≼ q
+             → ¬ ¬ Σ Pos λ z → Σ (Ev (Maybe (Input B))) λ e″ → LS.M′ z e″ × Step (y ⊕ [ sub (Spots.J P) ]) z × z ≼ q
+               × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub (Spots.J P) ] × e″ ≡ out (Ln x))
+  lane-shown ry mq = LS.Shown.shown′ sh-σ₃ (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
+    (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq ry
+
   postulate
     -- NO SOURCE ROW LIES UNDER A LANE'S ROW before where the source's
     -- reader shows it.
     lane-under : ∀ {y e q e′} → σ₃ y e → LS.M′ q e′ → y ≺ q → (y ⊕ [ sub (Spots.J P) ]) ≼ q
-    -- A LANE ROW BEFORE A SOURCE ROW IS SHOWN: the source has few rows
-    -- before its own, so few at each level its reader passes through.
-    -- RECOVERY: git show fb4140bd restores `simultaneous.Race`, a joiner's Few from its lanes'.
-    lane-shown : ∀ {y e q e′} → σ₃ y e → LS.M′ q e′ → (y ⊕ [ sub (Spots.J P) ]) ≼ q
-               → ¬ ¬ Σ (Ev (Maybe (Input B))) λ e″ → LS.M′ (y ⊕ [ sub (Spots.J P) ]) e″ × (∀ {x} → e ≡ out x → e″ ≡ out (Ln x))
-
     -- THE LANES END WITH NO ROUTE OPEN: a run of theirs followed by their
     -- end, no value between, counts none.
     lane-end-shut : ∀ {rs y} → Met σ₃ rs → (∀ {c} → (c , end) ∈ rs → ⊥) → σ₃ y end → After (cursor nothing rs) y
@@ -350,26 +383,33 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   lane-gap {cM} {cσ} {q} {a} iv ((((mq , _) , ks , h) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
     where
       J = Spots.J P
+      ks′ : List Pos
+      ks′ = up q ∷ up (up q) ∷ L.map up ks ++ L.map (λ x → up (up x)) ks
       few : Few σ₃ q
-      few = up q ∷ L.map up ks , pick
+      few = ks′ , pick
         where
-          pick : ∀ {k e′} → σ₃ k e′ → k ≺ q → k ∈ up q ∷ L.map up ks
-          pick {k} rk kq = ∈-stable λ ¬i → lane-shown rk mq (lane-under rk mq kq) λ { (_ , m′ , _) → ¬i (at m′) }
+          pick : ∀ {k e′} → σ₃ k e′ → k ≺ q → k ∈ ks′
+          pick {k} rk kq = ∈-stable λ ¬i → lane-shown rk mq (lane-under rk mq kq) λ { (z , _ , m′ , st , zq , _) → ¬i (at st (≼-split {z} {q} zq) m′) }
             where
-              at : ∀ {e″} → LS.M′ (k ⊕ [ sub J ]) e″ → k ∈ up q ∷ L.map up ks
-              at {e″} m′ with ≼-split {k ⊕ [ sub J ]} {q} (lane-under rk mq kq)
-              ... | inj₁ lt = there (subst (_∈ L.map up ks) (up-⊕ k (sub J)) (∈-map⁺ up (h m′ lt)))
-              ... | inj₂ eq = here (trans (sym (up-⊕ k (sub J))) (cong up eq))
+              Y = k ⊕ [ sub J ]
+              uu : up (up (Y ⊕ [ ix 0 ])) ≡ k
+              uu = trans (cong up (up-⊕ Y (ix 0))) (up-⊕ k (sub J))
+              at : ∀ {z e″} → Step Y z → z ≺ q ⊎ z ≡ q → LS.M′ z e″ → k ∈ ks′
+              at (inj₁ refl) (inj₁ lt) m′ = there (there (∈-++⁺ˡ (subst (_∈ L.map up ks) (up-⊕ k (sub J)) (∈-map⁺ up (h m′ lt)))))
+              at (inj₂ refl) (inj₁ lt) m′ =
+                there (there (∈-++⁺ʳ (L.map up ks) (subst (_∈ L.map (λ x → up (up x)) ks) uu (∈-map⁺ (λ x → up (up x)) (h m′ lt)))))
+              at (inj₁ refl) (inj₂ eq) _  = here (trans (sym (up-⊕ k (sub J))) (cong up eq))
+              at (inj₂ refl) (inj₂ eq) _  = there (here (trans (sym uu) (cong (λ x → up (up x)) eq)))
       af : ∀ cσ → LS.Inv cM cσ → After cM q → After cσ q
       af nothing  _   _ = tt
       af (just y) iv′ a = ≺-trans {y} {y ⊕ [ sub J ]} {q} (≺-ext y []) (proj₂ (LS.Inv.i2 iv′ refl) a)
       least : ∀ {y x} → σ₃ y (out x) → After cσ y → q ≼ y
-      least {y} {x} ry ay yq = lane-shown ry mq J≼ λ { (_ , m′ , ev) → go (ev refl) m′ }
+      least {y} {x} ry ay yq = lane-shown ry mq J≼ λ { (_ , _ , m′ , _ , _ , ev) → go (ev refl) m′ }
         where
           J≼ : (y ⊕ [ sub J ]) ≼ q
           J≼ = lane-under ry mq yq
-          go : ∀ {e″} → e″ ≡ out (Ln x) → LS.M′ (y ⊕ [ sub J ]) e″ → ⊥
-          go refl m′ with ≼-split {y ⊕ [ sub J ]} {q} J≼
+          go : ∀ {z e″} → z ≡ y ⊕ [ sub J ] × e″ ≡ out (Ln x) → LS.M′ z e″ → ⊥
+          go (refl , refl) m′ with ≼-split {y ⊕ [ sub J ]} {q} J≼
           ... | inj₁ lt = lst m′ tt (LS.Inv.i1 iv ry ay m′) lt
           ... | inj₂ eq = lane-not (src-func mq (subst (λ z → LS.M′ z (out (Ln x))) eq m′)) nl
             where

@@ -10,7 +10,7 @@ module denotation.Laws.Lift where
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T-≡)
 import Data.List as L
-open import Data.List using (_∷_; _++_; [_])
+open import Data.List using (_∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -20,7 +20,7 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Position using (Pos; ix; _⊕_)
+open import denotation.Position using (Pos; ix)
 open import denotation.Events using (<ᵖ-step)
 open import denotation.EmissionSet using (Ev; EmissionSet; Few; Truncate; _≺_; _≼_)
 open import denotation.Laws.Modulus using (≺-≼-≺; ≺→≼; ≼-split)

@@ -37,14 +37,17 @@ open import denotation.EmissionSet using (Ev; out; skip; pin; end; EmissionSet; 
   module Bounded; module Values)
 open import denotation.Read using (Run; Least; After; Visible; cursor)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-split; reach-few; ≺→≼; ≼-≺-≺; ≺-≼-≺; ≼-refl)
-open import denotation.Laws.Worlds using (Lawful; ⊕-assoc; Shows; inside-⊑; ⊑-≼)
+open import denotation.Laws.Worlds using (Lawful; ⊕-assoc; Shows; inside-⊑; ⊑-≼; hot-shows)
 open import denotation.Laws.Worlds.Leaves using (of-in; of-rows; of-reach)
-open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-trunc)
+open import denotation.Laws.Shows using (Step; k-shows; shows-k)
 open import denotation.Laws.ShowsOps using (sk-mapT)
 open import denotation.Laws.Lift using (few-lift; few-below; step-≼)
 open import denotation.Laws.Count using (em)
 import denotation.Laws.Join as LJ
-open import denotation.Laws.Rejoined using (lower; row-few)
+open import denotation.Laws.Rejoined using (lower; row-few; row-reach)
+open import denotation.Up using (up; up-⊕)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+import Data.List as L
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB; laneB; closeB)
 open import simultaneous.Project using (Proj; keep; drop)
 open import simultaneous.FlatLanes using (laneTag)
@@ -447,12 +450,12 @@ module LaneSplit {B : Set} (σ : EmissionSet (IE B)) (Lσ : Lawful σ) (P : Pos)
   -- few rows before its value: so each level has few there, top down, and
   -- a lanes' row lifts bottom up, the concat handing a lane's end on one
   -- step down.  A hand-off that would pass the value is the value itself.
-  module Shown (shR : Shows (Rejoin J σ)) (shM4 : Shows M4.JoinT) (shB3 : Shows B3.JoinT) (shM2 : Shows M2.JoinT)
+  module Shown (shσ : Shows σ) (shM4 : Shows M4.JoinT) (shB3 : Shows B3.JoinT) (shM2 : Shows M2.JoinT)
                (shTW : Shows TW.TakeT) (pinF : ∀ {k r} → Fed′ k (pin r) → T (inside r k)) {q a} (mq : M′ q (out a)) where
     open RawMonad (¬¬-Monad {lzero}) using (_>>=_; pure)
 
     shU1 : Shows (MapT Ln T0)
-    shU1 = k-shows λ n → sk-mapT Ln (sk-trunc (shows-k {n = n} shR))
+    shU1 = k-shows λ n → sk-mapT Ln (shows-k {n = n} (hot-shows σ J))
 
     nfq : ¬ TW.Failed q
     nfq = nf-of mq
@@ -545,12 +548,22 @@ module LaneSplit {B : Set} (σ : EmissionSet (IE B)) (Lσ : Lawful σ) (P : Pos)
       handed-on (same-K s k) mv u3 Yq >>= λ (z′ , e″ , t5 , st , zq , pr) →
       pure (z′ , e″ , t5 , st , zq , λ {_} eq → pr (same-out s eq))
 
+    -- The lanes' row, as their reader shows it: the lanes' rows before it
+    -- are few, each shown at or before it.
+    t0-of : ∀ {y e e₀} → σ y e → Rejoin J σ (y ⊕ [ sub J ]) e₀ → (y ⊕ [ sub J ]) ≼ q → ¬ ¬ T0 (y ⊕ [ sub J ]) e₀
+    t0-of {y} ry r0 Yq = shσ {v = y} (L.map up (proj₁ f0) , pick) >>= λ fy → pure (r0 , row-reach Lσ ry fy (pastJ ry))
+      where
+        pick : ∀ {k e} → σ k e → Few σ k → k ≺ y → k ∈ L.map up (proj₁ f0)
+        pick {k} rk fk ky with rj rk
+        ... | _ , rk′ , _ = subst (_∈ L.map up (proj₁ f0)) (up-⊕ k (sub J))
+          (∈-map⁺ up (proj₂ f0 (rk′ , row-reach Lσ rk fk (pastJ rk)) (≺-≼-≺ {k ⊕ [ sub J ]} {y ⊕ [ sub J ]} {q} (mono rk ry ky) Yq)))
+
     -- A LANES' ROW AT OR BEFORE THE SOURCE'S VALUE, as the source shows it.
     shown′ : ∀ {y e} → σ y e → (y ⊕ [ sub J ]) ≼ q
            → ¬ ¬ Σ Pos λ z → Σ _ λ e″ → M′ z e″ × Step (y ⊕ [ sub J ]) z × z ≼ q × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub J ] × e″ ≡ out (Ln x))
     shown′ ry Yq with rj ry
     ... | _ , r0 , _ , mp , k1 , o1 =
-      few-lift shR f0 r0 Yq >>= λ t0 →
+      t0-of ry r0 Yq >>= λ t0 →
       few-lift shU1 f1 (mp t0) Yq >>= λ t1 →
       lifted k1 t1 Yq >>= λ (z , e″ , t5 , st , zq , pr) →
       pure (z , e″ , t5 , st , zq , λ {_} eq → pr (o1 eq))
