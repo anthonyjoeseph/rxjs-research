@@ -85,7 +85,7 @@ module MapRun {A B : Set} (g : A → B) (d : Den A) (p : Pos) where
 
 same-mapIE : ∀ {A B : Set} {f : A → B} (x : IE A) → Same (mapIE f x) x
 same-mapIE (instEmit (value _) _) = same-value
-same-mapIE (instEmit (mark _) _)  = same-mark
+same-mapIE (instEmit (mark _) _)  = same-mark (λ _ → refl)
 
 -- The rows met of a map of marks relabel its source's.
 rows-mapIE : ∀ {A B : Set} {f : A → B} {t : EmissionSet (IE A)} {c sc} → Run t c sc → Rows≈ (mapRows (mapIE f) sc) sc

@@ -318,7 +318,7 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
 
 same-refl : ∀ {A} (x : IE A) → Same x x
 same-refl (instEmit (value _) _) = same-value
-same-refl (instEmit (mark _) _)  = same-mark
+same-refl (instEmit (mark _) _)  = same-mark (λ _ → refl)
 
 rows-refl : ∀ {A} {c} {t : EmissionSet (IE A)} {rs} → Run t c rs → Rows≈ rs rs
 rows-refl []                                = []

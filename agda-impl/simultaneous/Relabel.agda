@@ -2,8 +2,8 @@
 
 -- A STREAM THAT RELABELS ITS SOURCE HOLDS WHAT ITS SOURCE HOLDS.  When
 -- every run met of `t′` is a run met of `t`, row for row at the same
--- positions, each mark kept and each value still a value of the same
--- name, the count reads the same marks in the same order: a route held
+-- positions, each mark kept, a begin under its own name, and each value
+-- still a value, the count reads the same marks in the same order: a route held
 -- under one is held under the other, a begin stays a begin, and a dead
 -- instant's values are the same rows.
 module simultaneous.Relabel where
@@ -16,7 +16,7 @@ open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_)
 open import Data.Bool using (true; false)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst; trans)
 open import Relation.Nullary using (¬_; does)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.Maybe using (Maybe)
@@ -39,10 +39,10 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ------------------------------------------------------------------------
 -- Same marks
 
--- `x′` is `x` with at most its value changed.
+-- `x′` is `x` with at most its value, or a name no count reads, changed.
 data Same {A B : Set} : IE B → IE A → Set where
-  same-mark  : ∀ {m n} → Same (instEmit (mark m) n) (instEmit (mark m) n)
-  same-value : ∀ {a b n} → Same (instEmit (value b) n) (instEmit (value a) n)
+  same-mark  : ∀ {m n n′} → (m ≡ begin → n′ ≡ n) → Same (instEmit (mark m) n′) (instEmit (mark m) n)
+  same-value : ∀ {a b n n′} → Same (instEmit (value b) n′) (instEmit (value a) n)
 
 data EvSame {A B : Set} : Ev (IE B) → Ev (IE A) → Set where
   ev-out : ∀ {x′ x} → Same x′ x → EvSame (out x′) (out x)
@@ -57,20 +57,21 @@ data Rows≈ {A B : Set} : List (Pos × Ev (IE B)) → List (Pos × Ev (IE A)) �
 
 count-same : ∀ {A B : Set} r {x′ : IE B} {x : IE A} → Same x′ x → count r x′ ≡ count r x
 count-same r                        (same-value)                   = refl
-count-same (m , k) {instEmit (mark begin) n} same-mark with does (n ≟ᵖ m)
-... | true  = refl
-... | false = refl
-count-same r {instEmit (mark stop) _}       same-mark = refl
-count-same r {instEmit (mark over) _}       same-mark = refl
-count-same r {instEmit (mark outerOpen) _}  same-mark = refl
-count-same r {instEmit (mark outerClose) _} same-mark = refl
-count-same r {instEmit (mark laneStart) _}  same-mark = refl
-count-same r {instEmit (mark carry) _}      same-mark = refl
-count-same r {instEmit (mark laneDone) _}   same-mark = refl
-count-same r {instEmit (mark burstEnd) _}   same-mark = refl
-count-same r {instEmit (mark outerDone) _}  same-mark = refl
-count-same r {instEmit (mark subscribed) _} same-mark = refl
-count-same r {instEmit (mark completed) _}  same-mark = refl
+count-same (m , k) {instEmit (mark begin) n} (same-mark e) with e refl
+... | refl with does (n ≟ᵖ m)
+...   | true  = refl
+...   | false = refl
+count-same r {instEmit (mark stop) _}       (same-mark _) = refl
+count-same r {instEmit (mark over) _}       (same-mark _) = refl
+count-same r {instEmit (mark outerOpen) _}  (same-mark _) = refl
+count-same r {instEmit (mark outerClose) _} (same-mark _) = refl
+count-same r {instEmit (mark laneStart) _}  (same-mark _) = refl
+count-same r {instEmit (mark carry) _}      (same-mark _) = refl
+count-same r {instEmit (mark laneDone) _}   (same-mark _) = refl
+count-same r {instEmit (mark burstEnd) _}   (same-mark _) = refl
+count-same r {instEmit (mark outerDone) _}  (same-mark _) = refl
+count-same r {instEmit (mark subscribed) _} (same-mark _) = refl
+count-same r {instEmit (mark completed) _}  (same-mark _) = refl
 
 fold-same : ∀ {A B : Set} r {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs
           → L.foldl count r (values rs′) ≡ L.foldl count r (values rs)
@@ -113,8 +114,8 @@ end≈ (_ ∷ eq)     (there m)   = there (end≈ eq m)
 
 carried-same : ∀ {A B : Set} {e′ : Ev (IE B)} {e : Ev (IE A)} → EvSame e′ e → Carried e′ → Carried e
 carried-same (ev-out same-value) c-value = c-value
-carried-same (ev-out same-mark)  c-stop  = c-stop
-carried-same (ev-out same-mark)  c-over  = c-over
+carried-same (ev-out (same-mark _)) c-stop = c-stop
+carried-same (ev-out (same-mark _)) c-over = c-over
 carried-same ev-end              c-end   = c-end
 
 ------------------------------------------------------------------------
@@ -128,8 +129,8 @@ rest-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
           → Rest t → Rest t′
 rest-same every back R m z bq with back m
 ... | rs , run , eq with mem≈ eq bq
-...   | _ , bq′ , same-mark with R run (subst (λ r → proj₂ r ≡ 0) (cnt-same eq) z)
-                                      (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ rs) (cong proj₁ (cnt-same eq)) bq′)
+...   | _ , bq′ , same-mark e with R run (subst (λ r → proj₂ r ≡ 0) (cnt-same eq) z)
+                                      (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ rs) (trans (sym (e refl)) (cong proj₁ (cnt-same eq))) bq′)
 ...     | ks , h = ks , λ ty ay iq → h (proj₂ (every ty)) (subst (λ c → After c _) (cursor≈ eq _) ay) iq
 
 held-same : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)} {cs}
@@ -149,11 +150,11 @@ held-same {t = t} {t′} {cs} row end-row back fwd rest H = record
 
     late : ∀ {y n} → t′ y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     late x with row x
-    ... | _ , y , same-mark = Held.late H y
+    ... | _ , y , same-mark _ = Held.late H y
 
     named : ∀ {y n} → t′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y
     named x with row x
-    ... | _ , y , same-mark = Held.named H y
+    ... | _ , y , same-mark e = trans (e refl) (Held.named H y)
 
     covered : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′ → Carried e′ → ¬ Ex cs y
             → Σ ℕ λ k → cnt r₁′ ≡ (nameOf y , suc k)
@@ -168,7 +169,7 @@ held-same {t = t} {t′} {cs} row end-row back fwd rest H = record
     exact m r₁′ r₂′ e with back m
     ... | rs , run , eq with split≈ eq r₁′ _ e
     ...   | r₁ , r₂ , refl , e₁ , e₂ with head≈ e₂
-    ...     | _ , r₂₀ , refl , ev-out same-mark =
+    ...     | _ , r₂₀ , refl , ev-out (same-mark _) =
       subst (λ r → Σ _ λ k → proj₂ r ≡ _) (sym (cnt-same e₁)) (Held.exact H run r₁ r₂₀ refl)
 
     idle : Idle t′
@@ -183,12 +184,12 @@ held-same {t = t} {t′} {cs} row end-row back fwd rest H = record
 
     routing : ∀ {y m n} → t′ y (out (instEmit (mark m) n)) → Routing m
     routing x with row x
-    ... | _ , y , same-mark = Held.routing H y
+    ... | _ , y , same-mark _ = Held.routing H y
 
     shut : Shut t′
     shut m r₁′ r₂′ e z bq vy iq with back m
     ... | rs , run , eq with split≈ eq r₁′ r₂′ e
     ...   | r₁ , r₂ , refl , e₁ , e₂ with mem≈ e₁ bq | mem≈ e₂ vy
-    ...     | _ , bq′ , same-mark | _ , vy′ , same-value =
+    ...     | _ , bq′ , same-mark e | _ , vy′ , same-value =
       Held.shut H run r₁ r₂ refl (subst (λ r → proj₂ r ≡ 0) (cnt-same e₁) z)
-        (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ r₁) (cong proj₁ (cnt-same e₁)) bq′) vy′ iq
+        (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ r₁) (trans (sym (e refl)) (cong proj₁ (cnt-same e₁))) bq′) vy′ iq

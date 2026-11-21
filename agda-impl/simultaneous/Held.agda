@@ -13,7 +13,7 @@ open import Data.List.Properties using (++-assoc)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
-open import Data.List.Relation.Unary.All using (lookup; _∷_)
+open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -28,7 +28,8 @@ open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
-open import simultaneous.HeldScan using (held-scan-den)
+open import simultaneous.Relabel using (same-mark; same-value)
+open import simultaneous.HeldScan using (held-scan-den; held-scan-at; Relabels)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
@@ -51,7 +52,7 @@ open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
-  Input; react; going; fed; opening; anyHolds; branch)
+  Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
@@ -898,10 +899,34 @@ held-⟦⟧ ρ (defer l)         = held-lim ρ l λ n → held-approx n ρ (defe
 ------------------------------------------------------------------------
 -- The top
 
--- THE BATCHER'S SOURCE HOLDS: the elaborated program, restamped, beside
--- the subscribe and completion marks, exempt for the subscribe burst.
+-- The restamp renames only what no count reads: a begin keeps its own.
+same-restamp : ∀ {A} → Relabels (restamp {A})
+same-restamp st (instEmit (value _) _)        = same-value
+same-restamp st (instEmit (mark begin) _)      = same-mark (λ _ → refl)
+same-restamp st (instEmit (mark stop) _)       = same-mark λ ()
+same-restamp st (instEmit (mark over) _)       = same-mark λ ()
+same-restamp st (instEmit (mark outerOpen) _)  = same-mark λ ()
+same-restamp st (instEmit (mark outerClose) _) = same-mark λ ()
+same-restamp st (instEmit (mark laneStart) _)  = same-mark λ ()
+same-restamp st (instEmit (mark carry) _)      = same-mark λ ()
+same-restamp st (instEmit (mark laneDone) _)   = same-mark λ ()
+same-restamp st (instEmit (mark burstEnd) _)   = same-mark λ ()
+same-restamp st (instEmit (mark outerDone) _)  = same-mark λ ()
+same-restamp st (instEmit (mark subscribed) _) = same-mark λ ()
+same-restamp st (instEmit (mark completed) _)  = same-mark λ ()
+
+-- THE WRAPPED PROGRAM HOLDS: the program beside the subscribe and
+-- completion marks, cut after the completion, exempt for the subscribe
+-- burst.
 postulate
-  held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
+  held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
+
+-- THE BATCHER'S SOURCE HOLDS: the wrapped program, restamped.
+held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
+held-top o hy = held-scan-at restamp same-restamp (root , marked begin) (⟦ wrapped s ⟧ []ᵉ) root
+  (held-wrapped s (IH.holds hy []ᵉ [] (λ ()) (λ ())))
+  where
+    s = elab (λ i → i) (plain o)
 
 held : ∀ {A} (o : SObs [] A) → Held (elaborated o) (root ∷ [])
 held o = held-top o (held-⟦⟧ (λ i → i) (plain o))
