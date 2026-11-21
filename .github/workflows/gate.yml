@@ -82,13 +82,10 @@ jobs:
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
-      # Heap capped below the runner's 16 GB: a blow-up fails in the log as
-      # "Heap exhausted" instead of OOM-killing the runner, which leaves the
-      # step unfinished and no log at all.  A healthy full check peaks under 8 GB.
+      # Agda's heap cap lives in the Makefile's AGDA, so a session hits the
+      # same ceiling CI does.
       - name: make gate
         run: make gate
-        env:
-          AGDA_BIN: agda +RTS -M12G -RTS
 
   bug-cache:
     runs-on: ubuntu-latest
