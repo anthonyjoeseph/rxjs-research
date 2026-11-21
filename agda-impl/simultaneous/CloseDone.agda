@@ -206,12 +206,13 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
                                 (of-end-row _ 0 (marked {B} outerDone ∷ []))
   ...     | ()
 
-  -- EVERY OUTER VALUE LIES BEFORE THE CLOSER'S `outerDone`, whoever
-  -- reads either: the outer's end lies past the value, and over the mark.
-  before-done : ∀ {r a c n} → t r (out a) → enter (ev m (closer {Δ} {A} {B}) ρ) s c (out (instEmit (mark outerDone) n))
-              → ∀ w w′ → (r ⊕ [ sub w ]) ≺ (c ⊕ [ sub w′ ])
-  before-done {r} {a} {c} x xc w w′ with done-under xc
-  ... | y , ry , yc = past-sub {r} {r ⊕ [ sub w ]} {c ⊕ [ sub w′ ]} ([ sub w ] , refl) (≺→≼ {r} {c ⊕ [ sub w′ ]} r≺k) nk
+  -- EVERY OUTER VALUE, AND ANYTHING UNDER A `sub` READING OF IT, LIES
+  -- BEFORE THE CLOSER'S `outerDone`, whoever reads either: the outer's end
+  -- lies past the value, and over the mark.
+  below-done : ∀ {r a c n} → t r (out a) → enter (ev m (closer {Δ} {A} {B}) ρ) s c (out (instEmit (mark outerDone) n))
+             → ∀ w zs w′ → (r ⊕ (sub w ∷ zs)) ≺ (c ⊕ [ sub w′ ])
+  below-done {r} {a} {c} x xc w zs w′ with done-under xc
+  ... | y , ry , yc = past-sub {r} {r ⊕ (sub w ∷ zs)} {c ⊕ [ sub w′ ]} (sub w ∷ zs , refl) (≺→≼ {r} {c ⊕ [ sub w′ ]} r≺k) nk
     where
       yk : y ⊑ (c ⊕ [ sub w′ ])
       yk = ⊑-trans {y} {c} {c ⊕ [ sub w′ ]} yc ([ sub w′ ] , refl)
@@ -230,6 +231,10 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
       ... | inj₁ ([] , eq)       = ≺-irrefl {r} (subst (r ≺_) (trans eq (⊕-identityʳ r)) r≺y)
       ... | inj₁ (l ∷ ls , eq)   = Lawful.flat L x (subst (λ k → t k end) eq ry)
       ... | inj₂ yr              = ⊑-≼ {y} {r} yr r≺y
+
+  before-done : ∀ {r a c n} → t r (out a) → enter (ev m (closer {Δ} {A} {B}) ρ) s c (out (instEmit (mark outerDone) n))
+              → ∀ w w′ → (r ⊕ [ sub w ]) ≺ (c ⊕ [ sub w′ ])
+  before-done x xc w w′ = below-done x xc w [] w′
 
   ------------------------------------------------------------------------
   -- The first part's end, one `sub` under the outer's
