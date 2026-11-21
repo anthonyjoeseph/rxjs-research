@@ -43,7 +43,7 @@ import simultaneous.LaneStart as LaneStart
 open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≼-≺-≺; ≼-or-≻; ≺-absurd)
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import Data.Bool.Properties using (T-≡)
-open import Function using (Equivalence)
+open import Function using (Equivalence; _|>′_)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
@@ -186,6 +186,12 @@ never-cut : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k} → ¬ View
 never-cut switchᶠ    f o nc (q′ , a′ , x , lt , _) = nc (q′ , a′ , x , lt)
 never-cut (mergeᶠ _) f o nc ()
 never-cut exhaustᶠ   f o nc ()
+
+lane-of : ∀ {A B} (f : A → Den B) (o : EmissionSet A) op → (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a y e} → LaneOf f q a y e → View.Lane f o op q a y e
+lane-of f o (mergeᶠ nothing)  nb l = l
+lane-of f o (mergeᶠ (just k)) nb l = ⊥-elim (nb k refl)
+lane-of f o switchᶠ           nb l = l
+lane-of f o exhaustᶠ          nb l = l
 
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -532,10 +538,12 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
         (λ _ _ _ _ _ _ → open-one) (start-live r₁ mt) q0 (_ , xo , rn) oi
         (λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc) κ
 
-  postulate
-    -- AN IMMEDIATE LANE SHOWS ITS `laneStart`, under its value.
-    lane-shows-start : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a} → RO q (out a)
-                     → ¬ ¬ Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × q ⊑ y₀
+  -- AN IMMEDIATE LANE SHOWS ITS `laneStart`, under its value.
+  lane-shows-start : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a} → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × q ⊑ y₀
+  lane-shows-start nb {q} {a} =
+    let (r , u) = LaneStart.lane-start-row _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m (q ⊕ [ ix 1 ])
+    in _ , _ , lane-of fL RO op nb (r , LaneStart.under-ext (q ⊕ [ ix 1 ]) u)
+     , LaneStart.under-trans (LaneStart.under-⊕ (LaneStart.under-⊕ (LaneStart.under-refl q) (ix 1)) (ix 0)) u
 
   private
     few-reach : ∀ {X : Set} {t : EmissionSet X} {k e} → Few t k → ES.Reach t k e
@@ -567,7 +575,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
             → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
   start-met nb r₁ mt {v} Fv zv {q} {a} xo rn nc with ro-row xo
   ... | r , _ , σr , refl with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
-  ...   | c , w′ , σk , refl = λ κ → lane-shows-start nb xo λ (y₀ , n₀ , l , ys , qy) →
+  ...   | c , w′ , σk , refl = λ κ → lane-shows-start nb {q} {a} |>′ λ (y₀ , n₀ , l , ys , qy) →
     join-shows op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
