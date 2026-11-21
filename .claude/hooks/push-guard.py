@@ -14,7 +14,10 @@ def git(*a):
     return subprocess.run(["git", *a], capture_output=True, text=True).stdout.strip()
 
 cmd = json.load(sys.stdin).get("tool_input", {}).get("command", "")
-if not re.search(r"\bgit\b[^;&|\n]*\bpush\b", cmd) or "GATE_CANCEL_OK=1" in cmd:
+# `git` at a command position (start, or after ; & | newline, past any
+# VAR=value prefixes), so a command merely mentioning "git push" passes.
+PUSH = r"(?:^|[;&|\n])\s*(?:\w+=\S*\s+)*git\b(?:\s+-\S+(?:\s+\S+)?)*\s+push\b"
+if not re.search(PUSH, cmd) or "GATE_CANCEL_OK=1" in cmd:
     sys.exit(0)
 
 m = re.search(r"github\.com[/:]([^/]+/[^/.]+)", git("remote", "get-url", "origin"))
