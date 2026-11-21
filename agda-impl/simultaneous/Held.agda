@@ -58,6 +58,7 @@ open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; 
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
 open import simultaneous.HeldComb using (exact-past; inv-at)
+open import simultaneous.FlatPark using (past-park)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
 open import Relation.Nullary.Decidable using (decidable-stable)
@@ -656,12 +657,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ...       | inj₂ nm≡  = inj₂ (trans at≡ nm≡)
 
   postulate
-    -- ROUTES PARK ONLY ON A CONNECT HOLDING ONE: a cut parks while a
-    -- connect in scope holds a route of the instant, a tracker's row that
-    -- leaves none holding stops them, and a new instant starts none.
-    parked-live  : ∀ {rx} → Met M rx
-                 → Flat.parked (proj₁ (past op init rx)) ≡ 0
-                 ⊎ anyHolds (Flat.at (proj₁ (past op init rx))) (Flat.live (proj₁ (past op init rx))) ≡ true
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
     -- scan's rows.  Owed: the run split onto that connect's tracker, and
     -- the binder's own `idle` (`Bound.held`) read through `annotate`.
@@ -671,7 +666,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   parked-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                  → Flat.parked (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  parked-current rx₁ mt v with parked-live (run-prefix rx₁ mt)
+  parked-current rx₁ mt v with past-park op init rx₁ (inj₁ refl)
   ... | inj₁ z = inj₁ z
   ... | inj₂ h = inj₂ (live-current rx₁ mt v h)
 
