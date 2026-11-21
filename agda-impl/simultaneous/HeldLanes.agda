@@ -46,7 +46,7 @@ open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; undone; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
@@ -77,6 +77,15 @@ open import simultaneous.LaneCount using (module Count; kCut)
 open import simultaneous.ScanCount using (rowKind; markAct)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++)
 open import simultaneous.HeldSrc using (module CombSrc; open-mark)
+open import simultaneous.LaneCount using (kStart; kDone)
+open import simultaneous.ScanCount using (markQue; past-queue; row-start; que-cut)
+open import simultaneous.CombSent using (starts-after)
+open import simultaneous.Project using (run-prefix)
+open import simultaneous.ScanPast using (run-catch)
+open import Data.List.Relation.Unary.Any using (Any)
+open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁺ʳ to any-++ʳ)
+open import Data.List.Membership.Propositional using (find)
+open import Tree using (mergeᶠ; exhaustᶠ)
 
 -- A LANE'S TAKE ENDS BESIDE ITS FAILING VALUE: the take's `ix 0` row of a
 -- failing value at `w` has the take's end at `w`'s `last`.
@@ -155,6 +164,20 @@ open-cut completed  ()
 open-routing : Routing outerOpen → ⊥
 open-routing ()
 
+-- A LANE'S ROWS LIE PAST ITS VALUE.
+lane-past : ∀ {X Y : Set} op (f : X → Den Y) (o : EmissionSet X) {q a y e} → View.Lane f o op q a y e → q ≺ y
+lane-past (mergeᶠ nothing)  f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
+lane-past (mergeᶠ (just n)) f o {q} {y = y} (_ , s′ , (_ , st) , _ , sy) = ≺-trans {q} {s′} {y} (starts-after st) sy
+lane-past switchᶠ           f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
+lane-past exhaustᶠ          f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
+
+-- Whether a flatMap is a bounded merge.
+bounded? : ∀ o → (Σ ℕ λ k → o ≡ mergeᶠ (just k)) ⊎ (∀ k → o ≡ mergeᶠ (just k) → ⊥)
+bounded? (mergeᶠ (just k)) = inj₁ (k , refl)
+bounded? (mergeᶠ nothing)  = inj₂ λ _ ()
+bounded? switchᶠ           = inj₂ λ _ ()
+bounded? exhaustᶠ          = inj₂ λ _ ()
+
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
@@ -226,17 +249,6 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   act r = Flat.active (proj₁ (past op init r))
 
   module AC = Count _≟ᵖ_ (rowKind markAct op) Own (LaneMark laneStart) (LaneMark laneDone) act
-
-  postulate
-    -- A LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S `outerDone`, with
-    -- no lane queued there.
-    --
-    -- RECOVERY: git show ea69c2b2:agda-impl/simultaneous/ScanCount.agda restores `past-queue`, the bounded merge's queue counter row by row
-    lane-started : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-                 → Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
-                 → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
-
-
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
@@ -410,3 +422,116 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     where
       q₀ : Pos
       q₀ = p₀₀ ⊕ [ ix 1 ]
+
+  -- The source reads the outer before the real flatMap does.
+  J≺q₀ : OS.J ≺ (p₀₀ ⊕ [ ix 1 ])
+  J≺q₀ = subst (_≺ (p₀₀ ⊕ [ ix 1 ])) (sym (proj₂ OS.J-under)) (P≺q₀ (proj₁ OS.J-under))
+
+  J≺ro : ∀ c → (c ⊕ [ sub OS.J ]) ≺ ro-at c
+  J≺ro c = Equivalence.from T-≡ (<ᵖ-part c {sub OS.J} {sub (p₀₀ ⊕ [ ix 1 ])} [] (ix 1 ∷ ix 0 ∷ []) (Equivalence.to T-≡ J≺q₀))
+
+  split-met : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → Met M (xs ++ x ∷ (ys ++ (z , e) ∷ r₂))
+  split-met r₁ {z} {e} {r₂} mt xs x ys refl = subst (Met M) (++-assoc xs (x ∷ ys) ((z , e) ∷ r₂)) mt
+
+  in-r₁ : ∀ (r₁ : List Row) xs x ys → r₁ ≡ xs ++ x ∷ ys → x ∈ r₁
+  in-r₁ r₁ xs x ys refl = ∈-++⁺ʳ xs (here refl)
+
+  -- THE ROWS THAT QUEUE A LANE: an outer value's `outerOpen`, where the
+  -- source shows the outer's row, owned by the real flatMap's value of it.
+  OpenMark : Pos → Row → Set
+  OpenMark q x = Σ A λ a → Σ Pos λ r → Σ Pos λ n → σ₁ r (out (instEmit (value a) n)) × q ≡ ro-at r
+    × x ≡ (r ⊕ [ sub OS.J ] , out (just (inj₁ (outerB , instEmit (mark outerOpen) n))))
+
+  que : List Row → ℕ
+  que r = Flat.queue (proj₁ (past op init r))
+
+  module QC = Count _≟ᵖ_ (rowKind markQue op) Own OpenMark (LaneMark laneStart) que
+
+  private
+    shown-at : ∀ {z′ e″ k e} → M z′ e″ → z′ ≡ k × e″ ≡ e → M k e
+    shown-at mo (refl , refl) = mo
+
+    open-caught : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {r a n} → σ₁ r (out (instEmit (value a) n)) → (r ⊕ [ sub OS.J ]) ≺ z
+                → M (r ⊕ [ sub OS.J ]) (out (OS.g (instEmit (value a) n))) → Any (OpenMark (ro-at r)) r₁
+    open-caught r₁ mt {r} {a} {n} σr jz mo with run-catch r₁ mt mo tt tt jz
+    ... | a₁ , b₁ , e₁ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ a₁ (here refl))))) mo
+    ...   | refl = any-++ʳ a₁ (here (a , r , n , σr , refl , refl))
+
+  -- AN OUTER VALUE BEFORE A ROW THE SCAN MEETS HAS ITS `outerOpen` MET
+  -- BEFORE IT.
+  met-open : ∀ r₁ {z v r₂} → Met M (r₁ ++ (z , out v) ∷ r₂) → ∀ {r a n} → σ₁ r (out (instEmit (value a) n))
+           → (r ⊕ [ sub OS.J ]) ≺ z → ¬ ¬ Any (OpenMark (ro-at r)) r₁
+  met-open r₁ {z} mt {r} σr jz κ =
+    outer-shown σr (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {r ⊕ [ sub OS.J ]} {z} jz)
+      λ (_ , _ , mo , _ , _ , pn) → κ (open-caught r₁ mt σr jz (shown-at (toM mo) (pn refl)))
+
+  -- EACH VALUE OF THE REAL FLATMAP'S OUTER HAS ITS `outerOpen` MET BEFORE
+  -- THE CLOSER'S `outerDone`.
+  open-met : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+           → ∀ {q a} → RO q (out a) → ¬ ¬ Any (OpenMark q) r₁
+  open-met r₁ mt xo with ro-row xo
+  ... | r , _ , σr , refl with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
+  ...   | _ , w′ , σk , refl = met-open r₁ mt σr (CD.before-done σr (proj₁ σk) OS.J w′)
+
+  -- EACH `outerOpen` QUEUES ONE LANE.
+  open-one : ∀ {x q q′} → OpenMark q x → OpenMark q′ x → q ≡ q′
+  open-one (_ , r , _ , _ , refl , refl) (_ , r′ , _ , _ , refl , e) with ⊕-injˡ r r′ (cong proj₁ e)
+  ... | refl = refl
+
+  postulate
+    -- A LANE STARTS ONCE: read in one subscription (`lane-at₂`), its
+    -- `laneStart` is the frame's first piece's mark, and the content below
+    -- routes no lane mark.
+    start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+               → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
+
+  -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
+  start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q
+  start-first r₁ mt xs x ys eq (a , y , n , xo , refl , l) di with find di
+  ... | _ , i , (a′ , y′ , n′ , xo′ , refl , l′) with ro-func xo xo′
+  ...   | refl with start-once xo l l′
+  ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} (met-before xs (split-met r₁ mt xs _ ys eq) i)
+
+  -- EACH `laneStart` THE SCAN MEETS STARTS A LANE IT MET QUEUED, NEVER MET
+  -- START, AND NEVER EMPTIED.
+  start-live : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markQue op x ≡ kDone
+             → ¬ ¬ Σ Pos λ q → LaneMark laneStart q x × QC.Live [] xs q
+  start-live r₁ mt xs x ys eq kx κ with row-start op x kx
+  ... | k , b , n , refl with lane-mark (run-prefix r₁ mt) {k = k} {b = b} {mk = laneStart} {n = n} (in-r₁ r₁ xs _ ys eq) (inj₁ refl)
+  ...   | y , refl , refl , σs with σ₃-lane σs
+  ...     | q , a , xo , rn , l , _ with ro-row xo
+  ...       | r , _ , σr , refl =
+    met-open xs (split-met r₁ mt xs _ ys eq) σr
+      (≺-trans {r ⊕ [ sub OS.J ]} {ro-at r} {y ⊕ [ sub LS.J ]} (J≺ro r) (≺-trans {ro-at r} {y} {y ⊕ [ sub LS.J ]} (lane-past op fL RO l) (≺-ext y [])))
+      λ oi → κ (ro-at r , (a , y , n , xo , refl , l) , (a , xo , rn) , oi , start-first r₁ mt xs _ ys eq (a , y , n , xo , refl , l)
+                , λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc)
+
+  -- WITH NO LANE QUEUED AT THE CLOSER'S `outerDone`, EACH LANE OF A
+  -- BOUNDED MERGE HAS STARTED: its value's `outerOpen` was met before the
+  -- mark, and the queue rises at each and falls at each lane's start.
+  queued-started : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+                 → que r₁ ≡ 0 → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ ¬ AC.StartIn [] r₁ q
+  queued-started bd r₁ mt q0 xo rn κ =
+    open-met r₁ mt xo λ oi →
+      QC.drained r₁ (λ xs y ys eq → past-queue op init xs y (no-end r₁ mt xs eq))
+        (λ { (_ , _ , _ , _ , _ , refl) → subst (λ o → markQue o outerOpen ≡ kStart) (sym bd) refl })
+        (λ { (_ , _ , _ , _ , refl , _) → refl })
+        (λ _ _ _ _ _ _ → open-one) (start-live r₁ mt) q0 (_ , xo , rn) oi
+        (λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc) κ
+
+  postulate
+    -- AN IMMEDIATE LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S
+    -- `outerDone`: unqueued, its `laneStart` lies in its value's
+    -- subscription.
+    start-met : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+              → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
+              → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
+
+  -- A LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S `outerDone`, with
+  -- no lane queued there.
+  lane-started : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+               → Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
+               → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
+  lane-started r₁ mt q0 Fv zv xo rn nc with bounded? op
+  ... | inj₁ (_ , bd) = queued-started bd r₁ mt q0 xo rn
+  ... | inj₂ nb       = start-met nb r₁ mt Fv zv xo rn nc
