@@ -114,6 +114,8 @@ open import denotation.EmissionSet using (Few; _≼_)
 open import denotation.Read using (After; cursor; Run)
 import denotation.Read as Run
 open import Data.Nat.Properties using (0≢1+n)
+import Data.Nat as ℕ
+open import Relation.Nullary using (yes; no)
 open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt)
 open import simultaneous.HeldComb using (ShutRun)
@@ -404,10 +406,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       ...   | inj₁ (l ∷ ws , refl) = Lawful.flat L₃ ry ry′
 
   postulate
-    -- THE LANES END WITH NO ROUTE OPEN: a run of theirs followed by their
-    -- end, no value between, counts none.
-    lane-end-shut : ∀ {rs y} → Met σ₃ rs → (∀ {c} → (c , end) ∈ rs → ⊥) → σ₃ y end → After (cursor nothing rs) y
-                  → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → proj₂ (cnt rs) ≡ 0
+    -- THE LANES END WITH THE SCAN HOLDING NONE OF THEIR ROUTES: where the
+    -- lanes' next row past what the source met is their end, every lane has
+    -- sent its `laneDone`, its routes stopped, ended or handed on.
+    --
+    -- REFUTED: cf901010 lane-end-shut over the lanes' own count, by a lane whose inner completes asynchronously: its completion's begin is carried, never stopped
+    lane-end-shut : ∀ rx₁ {q a rx₂ rs y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → σ₃ y end → After (cursor nothing rs) y
+                  → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
 
     -- The lanes keep no route past its instant.
     lane-idle   : Idle σ₃
@@ -483,23 +488,25 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lanes-of (past-lanes op init r₀ rx rs (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (lanes₀ {B} r₀))
 
   -- With a route open, the lanes' next visible row lies past `w`.
-  idle-least : ∀ {rs w k} → proj₂ (cnt rs) ≡ suc k → Met σ₃ rs → (∀ {c} → (c , end) ∈ rs → ⊥)
+  idle-least : ∀ {rs w} → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥)
              → (∀ {y x} → σ₃ y (out x) → After (cursor nothing rs) y → w ≼ y)
              → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → w ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k))
              → ∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → w ≼ y
-  idle-least _     _  _     outl _    {e′ = out _} ry _ ay = outl ry ay
-  idle-least open≡ mr noend _    endl {e′ = end}   ry _ ay with endl ry ay
+  idle-least _    outl _    {e′ = out _} ry _ ay = outl ry ay
+  idle-least shut _    endl {e′ = end}   ry _ ay with endl ry ay
   ... | inj₁ h   = h
-  ... | inj₂ all = ⊥-elim (0≢1+n (trans (sym (lane-end-shut mr noend ry ay all)) open≡))
+  ... | inj₂ all = ⊥-elim (shut ry ay all)
 
   lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
   lanes-current rx₁ mt with lane-next rx₁ mt
   ... | rs , pr , mr , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
-  ...   | inj₂ (at≡ , k , open≡) with lane-idle mr (proj-outs lane-vals pr) fw af (idle-least open≡ mr (proj-outs lane-vals pr) outl endl)
-  ...     | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
-  ...     | inj₂ cw   = inj₂ (trans at≡ (trans cw nw))
+  ...   | inj₂ (at≡ , k , open≡) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
+  ...     | yes z = inj₁ z
+  ...     | no nz with lane-idle mr (proj-outs lane-vals pr) fw af (idle-least (λ ry ay all → nz (lane-end-shut rx₁ mt pr ry ay all)) outl endl)
+  ...       | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
+  ...       | inj₂ cw   = inj₂ (trans at≡ (trans cw nw))
 
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
