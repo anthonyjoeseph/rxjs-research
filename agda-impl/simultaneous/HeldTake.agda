@@ -48,6 +48,7 @@ open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-value; Routing; r-completed; Idle; Rest; cnt; nameOf; nm;
   Valued; opos)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
+open import simultaneous.HeldTo using (Unfailed; HeldTo; held-to)
 open import simultaneous.Layers using (cursor-snoc; after-≺)
 open import simultaneous.TakeKit using (apart; ix<last; module Take) renaming (Run to Shape)
 
@@ -239,41 +240,6 @@ under-of {f} {w} fw wl with ≼-split {w} {f ⊕ [ last ]} wl
 data Inert {X : Set} : IE X → Set where
   i-value : ∀ {v j} → Inert (instEmit (value v) j)
   i-done  : ∀ {j} → Inert (instEmit (mark completed) j)
-
--- No row failing `keep` has its first effect before `w`.
-Unfailed : ∀ {X : Set} → (IE X → Bool) → EmissionSet (IE X) → Pos → Set
-Unfailed keep t w = ∀ {f a} → t f (out a) → T (not (keep a)) → (f ⊕ [ ix 0 ]) ≺ w → ⊥
-
--- IDLE UP TO THE FIRST FAILURE: idle at every position no failing row's
--- first effect precedes.  All a take reads of its source's idleness.
-IdleTo : ∀ {X : Set} → (IE X → Bool) → EmissionSet (IE X) → Set
-IdleTo keep t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Unfailed keep t w → Few t w → After (cursor nothing rs) w
-              → (∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
-              → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
-
--- HELD UP TO THE FIRST FAILURE: held, idle only up to the first row
--- failing `keep`.  What a take needs of its source.
-record HeldTo {X : Set} (keep : IE X → Bool) (t : EmissionSet (IE X)) (cs : List Pos) : Set where
-  field
-    named   : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
-    covered : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
-            → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
-    exact   : ∀ {rs} → Met t rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
-            → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
-    routing : ∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m
-    shut    : Shut t
-    early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
-    ends    : ∀ {y} → t y end → Early y
-    done    : ∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y
-    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
-    idle    : IdleTo keep t
-    rest    : Rest t
-
-held-to : ∀ {X : Set} {keep : IE X → Bool} {t cs} → Held t cs → HeldTo keep t cs
-held-to h = record
-  { named = H.named ; covered = H.covered ; exact = H.exact ; routing = H.routing ; shut = H.shut
-  ; early = H.early ; ends = H.ends ; done = H.done ; late = H.late ; idle = λ m ne _ → H.idle m ne ; rest = H.rest }
-  where module H = Held h
 
 -- A TAKE HOLDS WHAT ITS SOURCE HOLDS when it fails only at inert rows
 -- whose instant its source holds a route of, early ones.

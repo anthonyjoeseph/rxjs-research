@@ -646,6 +646,13 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
       ... | inj₁ m        = ∈-++⁺ˡ m
       ... | inj₂ (_ , u′) = ∈-++⁺ʳ base (h u′ ay ry)
 
+  -- The concat ends only past its mark's first effect.
+  closes : ∀ {c} → C c end → Σ Pos λ f → C f (out mk₀) × (f ⊕ [ ix 0 ]) ≺ c
+  closes y with end-row y
+  ... | src _ ne = ⊥-elim (ne refl)
+  ... | fin {c₀} yc = mpos c₀ , lift (mk yc) ,
+          subst (_≺ fpos c₀) (sym (⊕-assoc (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [ ix 0 ])) (≺-part (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [] refl)
+
   held : ∀ {cs} → Held R cs → Held C cs
   held H = held-same (λ r → _ , row r , same-refl _) end-row (λ m → _ , back m , rows-refl (back m))
              (λ _ y _ no → no (_ , lift y , λ v → v)) rest (Holds.held H)
