@@ -51,9 +51,11 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (eac
 at : ∀ {A} → Obs Timeline [] A → EmissionSet A
 at s = enter (⟦ s ⟧ []) root
 
--- A closed program's rows are lawful.
-inv-at : ∀ {A} (s : Obs Timeline [] A) → InvAt (Hots []) root (at s)
-inv-at s = inv-⟦⟧ s [] (λ ()) root (tt , λ ())
+-- A closed program's rows are lawful.  Opaque: a consumer's `with` on a
+-- layer would otherwise unfold the invariant over the whole program.
+opaque
+  inv-at : ∀ {A} (s : Obs Timeline [] A) → InvAt (Hots []) root (at s)
+  inv-at s = inv-⟦⟧ s [] (λ ()) root (tt , λ ())
 
 -- A closed program has one row at a position.
 at-func : ∀ {A} (s : Obs Timeline [] A) {y e e′} → at s y e → at s y e′ → e ≡ e′
