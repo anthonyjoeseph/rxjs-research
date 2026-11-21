@@ -14,7 +14,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import denotation.Position using (Pos; Path; sub; _⊕_; _∙_; fired; _▸_)
 open import denotation.EmissionSet using (_≼_)
-open import denotation.Laws.Worlds using (W; W⁼; here; inW; step; timer; join; Real; _⊑_; ⊑-snoc; ⊕-assoc; real-init; real-last; world-after⁼)
+open import denotation.Laws.Worlds using (W; here; inW; step; timer; join; Real; _⊑_; ⊑-snoc; ⊕-assoc; real-init; real-last;
+  world-after⁼)
 open import denotation.Laws.Modulus using (≼-trans)
 
 -- What leads a minted position is it.
