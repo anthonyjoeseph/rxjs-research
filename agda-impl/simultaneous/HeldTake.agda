@@ -240,17 +240,52 @@ data Inert {X : Set} : IE X → Set where
   i-value : ∀ {v j} → Inert (instEmit (value v) j)
   i-done  : ∀ {j} → Inert (instEmit (mark completed) j)
 
+-- No row failing `keep` has its first effect before `w`.
+Unfailed : ∀ {X : Set} → (IE X → Bool) → EmissionSet (IE X) → Pos → Set
+Unfailed keep t w = ∀ {f a} → t f (out a) → T (not (keep a)) → (f ⊕ [ ix 0 ]) ≺ w → ⊥
+
+-- IDLE UP TO THE FIRST FAILURE: idle at every position no failing row's
+-- first effect precedes.  All a take reads of its source's idleness.
+IdleTo : ∀ {X : Set} → (IE X → Bool) → EmissionSet (IE X) → Set
+IdleTo keep t = ∀ {rs} → Met t rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Unfailed keep t w → Few t w → After (cursor nothing rs) w
+              → (∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+              → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
+
+-- HELD UP TO THE FIRST FAILURE: held, idle only up to the first row
+-- failing `keep`.  What a take needs of its source.
+record HeldTo {X : Set} (keep : IE X → Bool) (t : EmissionSet (IE X)) (cs : List Pos) : Set where
+  field
+    named   : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
+    covered : ∀ {rs} → Met t rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
+            → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+    exact   : ∀ {rs} → Met t rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
+            → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
+    routing : ∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m
+    shut    : Shut t
+    early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
+    ends    : ∀ {y} → t y end → Early y
+    done    : ∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y
+    late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
+    idle    : IdleTo keep t
+    rest    : Rest t
+
+held-to : ∀ {X : Set} {keep : IE X → Bool} {t cs} → Held t cs → HeldTo keep t cs
+held-to h = record
+  { named = H.named ; covered = H.covered ; exact = H.exact ; routing = H.routing ; shut = H.shut
+  ; early = H.early ; ends = H.ends ; done = H.done ; late = H.late ; idle = λ m ne _ → H.idle m ne ; rest = H.rest }
+  where module H = Held h
+
 -- A TAKE HOLDS WHAT ITS SOURCE HOLDS when it fails only at inert rows
 -- whose instant its source holds a route of, early ones.
 module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H : Pos → Set} (cs : List Pos)
-             (p : Pos) (iv : InvAt H p (enter d p)) (h : Held (enter d p) cs)
+             (p : Pos) (iv : InvAt H p (enter d p)) (h : HeldTo keep (enter d p) cs)
              (fails : ∀ {x} → T (not (keep x)) → Inert x)
              (fcov : ∀ {rs} → Met (enter d p) rs → ∀ r₁ {y x} r₂ → rs ≡ r₁ ++ (y , out x) ∷ r₂ → T (not (keep x)) → ¬ Ex cs y
                    → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k))
              (fearly : ∀ {y x} → enter d p y (out x) → T (not (keep x)) → Early y) where
 
   open TakeBack {H = H} incl keep d p iv
-  module HS = Held h
+  module HS = HeldTo h
 
   Row : Set
   Row = Pos × Ev (IE X)
@@ -410,6 +445,16 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
   ----------------------------------------------------------------------
   -- Idle
 
+  unf : ∀ {w} → ¬ Failed w → Unfailed keep S w
+  unf {w} nF {f} {a} x nk fw = nF (f , a , x , nk , ≺-trans {f} {f ⊕ [ ix 0 ]} {w} (≺-ext f {ix 0} []) fw)
+
+  unf₀ : ∀ {f a} → S f (out a) → ¬ Failed f → Unfailed keep S (f ⊕ [ ix 0 ])
+  unf₀ {f} fx nF {g} {b} x nk gf with below-or-under g f (ix 0) (≺-trans {g} {g ⊕ [ ix 0 ]} {f ⊕ [ ix 0 ]} (≺-ext g {ix 0} []) gf)
+  ... | inj₂ (l′ , ls , refl) = InvAt.flat iv fx x
+  ... | inj₁ gf′ with ≼-split {g} {f} gf′
+  ...   | inj₁ lt   = nF (g , b , x , nk , lt)
+  ...   | inj₂ refl = ≺-irrefl {g ⊕ [ ix 0 ]} gf
+
   Goal : List Row → Pos → Set
   Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
 
@@ -417,12 +462,12 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
              → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
   idle-clean {rs} m cu ne {w} fw aw lw =
     decidable-stable ((proj₂ (cnt rs) ≟ⁿ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng → em λ
-      { (inj₂ nF) → ng (HS.idle m ne (proj₁ fw , λ x kw → proj₂ fw (below nF x kw) kw) aw (λ x v ay yw → lw (below nF x yw) v ay yw))
+      { (inj₂ nF) → ng (HS.idle m ne (unf nF) (proj₁ fw , λ x kw → proj₂ fw (below nF x kw) kw) aw (λ x v ay yw → lw (below nF x yw) v ay yw))
       ; (inj₁ (f₀ , a₀ , x₀ , nk₀ , f₀w)) → min-fail x₀ nk₀ λ (f , b , xf , nkf , nFf , ff₀) →
           let fw′ = ≼-≺-≺ {f} {f₀} {w} ff₀ f₀w
               stp = lw (up (stop xf nkf nFf)) tt (after-≺ (cursor nothing rs) (cur-before cu xf nkf) (≺-ext f []))
           in ng (⊎-map (λ z → z) (λ e → trans e (sym (under-of {f} {w} fw′ stp)))
-                  (HS.idle m ne (few-S tt xf) (cur-before cu xf nkf) λ {y} x v ay yf → lw (below nFf x yf) v ay (≺-trans {y} {f} {w} yf fw′))) }
+                  (HS.idle m ne (unf nFf) (few-S tt xf) (cur-before cu xf nkf) λ {y} x v ay yf → lw (below nFf x yf) v ay (≺-trans {y} {f} {w} yf fw′))) }
 
   idle-v : ∀ {rs₀ f a} → Inert a → Met S (rs₀ ++ [ (f , out a) ]) → S f (out a)
          → T (not (keep a)) → ¬ Failed f
@@ -432,7 +477,7 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
          → Goal (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) w
   idle-v {rs₀} {f} {a} va run fx nk nF ne {w} aw lw =
     ⊎-map (λ z → trans (cong proj₂ E) z) (λ e → trans (cong proj₁ E) (trans e (trans (name-ext f [ ix 0 ]) (sym nmw))))
-      (HS.idle run ne′ few0 aft0 least0)
+      (HS.idle run ne′ (unf₀ fx nF) few0 aft0 least0)
     where
       E : cnt (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) ≡ cnt (rs₀ ++ [ (f , out a) ])
       E = trans (cnt-snoc va rs₀ (inj₂ refl)) (sym (cnt-snoc va rs₀ (inj₂ refl)))
@@ -547,7 +592,7 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
 
 held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H} cs → HeldD H d cs → InvD H d → HeldD H (Op.takeWhile incl (passes kp) d) cs
 held-take-den {X} incl kp d cs h inv p ok ep =
-  Holds.holds incl (passes kp) d (p ∷ cs) p (inv p ok) H fails (λ m r₁ r₂ eq nk nx → Held.covered H m r₁ r₂ eq (carried nk) nx) fearly
+  Holds.holds incl (passes kp) d (p ∷ cs) p (inv p ok) (held-to H) fails (λ m r₁ r₂ eq nk nx → Held.covered H m r₁ r₂ eq (carried nk) nx) fearly
   where
     H = h p ok ep
 

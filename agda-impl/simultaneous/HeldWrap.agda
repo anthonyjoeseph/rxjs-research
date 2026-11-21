@@ -33,7 +33,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; ove
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
-open import simultaneous.HeldTake using (module Holds; Inert; i-done)
+open import simultaneous.HeldTake using (module Holds; Inert; i-done; HeldTo)
 open import simultaneous.HeldConnect using (held-conn; held-ex)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.HeldHot using (module HotRead)
@@ -52,7 +52,7 @@ beside : ∀ {A} → Obs Timeline [] (IE A) → Den (IE A)
 beside s = ⟦ merge (completing s) (cold (lone (marked subscribed))) ⟧ []ᵉ
 
 -- A TAKE CUT AFTER THE COMPLETION holds what its source holds.
-held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → Held (enter d p) cs
+held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → HeldTo unfinished (enter d p) cs
            → Held (enter (Op.takeWhile true unfinished d) p) cs
 held-until {X} d p cs iv h = Holds.holds true unfinished d cs p iv h fails fcov fearly
   where
@@ -74,11 +74,11 @@ held-until {X} d p cs iv h = Holds.holds true unfinished d cs p iv h fails fcov 
     fcov : ∀ {rs} → Met (enter d p) rs → ∀ r₁ {y x} r₂ → rs ≡ r₁ ++ (y , out x) ∷ r₂ → T (not (unfinished x)) → ¬ Ex cs y
          → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
     fcov m r₁ r₂ eq nk nx with fails nk
-    ... | i-done = Held.covered h m r₁ r₂ eq c-done nx
+    ... | i-done = HeldTo.covered h m r₁ r₂ eq c-done nx
 
     fearly : ∀ {y x} → enter d p y (out x) → T (not (unfinished x)) → Early y
     fearly x nk with fails nk
-    ... | i-done = Held.done h x
+    ... | i-done = HeldTo.done h x
 
 -- What completes a source read hot: its rows, then the completion mark.
 closing : ∀ {A} → Den (IE A) → Den (IE A)
@@ -150,10 +150,16 @@ held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-closing
     sh = k-shows λ n → sk-⟦⟧ n s []ᵉ (λ ()) (p ⊕ [ ix 1 ]) (ok-step p ok)
 
 postulate
-  -- BESIDE THE SUBSCRIBE MARK, the completed program holds as it did.
+  -- BESIDE THE SUBSCRIBE MARK, the completed program holds as it did, up
+  -- to its completion.  Past it the merge never ends, its end turned a
+  -- skip, so idleness past the completion is not claimed.
+  --
+  -- DEAD ROUTE: unrestricted `Held` of the merge is false.  A program
+  --   ending in a later instant holds a route of that instant at its end
+  --   (`covered`), and the merge, never ending, idles past it later.
   held-merged : ∀ {A} (s : Obs Timeline [] (IE A))
               → Held (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ [])
-              → Held (enter (beside s) root) (root ∷ [])
+              → HeldTo unfinished (enter (beside s) root) (root ∷ [])
 
 held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
 held-wrapped s hs =
