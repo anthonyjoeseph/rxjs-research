@@ -420,10 +420,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     I-fed = subst (λ d → InvAt (Hots env′) P (enter d P)) (fed-op tk env′ m) (inv-ev m (Fed tk env′) env′ g₃ P ok₃)
 
     sh-σ₃ : Shows σ₃
-    sh-σ₃ = proper-shows (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
+    sh-σ₃ = proper-shows {t = enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])} (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
 
     sh-σ₁ : Shows σ₁
-    sh-σ₁ = proper-shows (shows-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′))
+    sh-σ₁ = proper-shows {t = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (shows-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′))
 
   -- A LANE ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
   lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub LS.J ]) ≼ q
@@ -580,10 +580,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     module LN = LS.Next lane-shown lane-under
     module ON = OS.Next outer-shown outer-under
 
-  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
-            → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub LS.J ]) × LN.NextAt (cursor nothing rs) w
-  lane-next rx₁ {q} {a} {rx₂} mt = LN.next-at (lane-run (run-prefix rx₁ mt))
-    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview laneB (out a))
+  opaque
+    lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+              → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub LS.J ]) × LN.NextAt (cursor nothing rs) w
+    lane-next rx₁ {q} {a} {rx₂} mt = LN.next-at {rx₁} {q} {a} {rx₂} (lane-run (run-prefix rx₁ mt))
+      (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview laneB (out a))
 
   -- The lanes' counter is none, or of the name the lanes last began,
   -- with a route of it open.
@@ -607,14 +608,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ...   | inj₂ (at≡ , _) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
   ...     | Nl.yes z = inj₁ z
   ...     | Nl.no nz =
-    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (LN.idle-least (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) (named-at LS.J wq)))
+    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (LN.idle-least {cursor nothing rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) (named-at LS.J wq)))
 
   -- The outer's next row past what the source met.
-  outer-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
-             → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Met σ₁ rs
-               × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub OS.J ]) × ON.NextAt (cursor nothing rs) w
-  outer-next rx₁ {q} {a} {rx₂} mt = ON.next-at (OS.run′ (subst (λ d → Run (enter d P) nothing rx₁) (src-op tk env′ m) (run-prefix rx₁ mt)))
-    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview outerB (out a))
+  opaque
+    outer-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+               → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Met σ₁ rs
+                 × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub OS.J ]) × ON.NextAt (cursor nothing rs) w
+    outer-next rx₁ {q} {a} {rx₂} mt = ON.next-at {rx₁} {q} {a} {rx₂} (OS.run′ (subst (λ d → Run (enter d P) nothing rx₁) (src-op tk env′ m) (run-prefix rx₁ mt)))
+      (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview outerB (out a))
 
   -- The outer's counter is none, or of the name the outer last began,
   -- with a route of it open.
@@ -627,7 +629,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   -- The outer's proper rows are idle where the outer is.
   outer-idle : Idle σ₁
-  outer-idle = proper-idle (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁) (Held.idle H₁)
+  outer-idle = proper-idle {S = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁) (Held.idle H₁)
 
   postulate
     -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
