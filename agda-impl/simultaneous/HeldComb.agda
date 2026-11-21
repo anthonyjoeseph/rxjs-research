@@ -27,12 +27,13 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; DenEnv; ⟦_⟧; approx)
-open import denotation.Laws.Worlds using (_⊑_)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-refl)
+open import simultaneous.HeldIn using (Upto; ++-split)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
 open import simultaneous.SObs using (Flat; flat; lone; module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++)
-open import Data.List.Properties using (foldl-++; ++-assoc)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ)
+open import Data.List.Properties using (foldl-++; ++-assoc; ++-identityʳ; ∷-injective)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
@@ -176,6 +177,36 @@ laid-in op o ((q , skip) ∷ rx) i with laid-in op o rx i
 laid-in op o ((q , pin r) ∷ rx) i with laid-in op o rx i
 ... | laid rx₁ rx₂ refl vi = laid ((q , pin r) ∷ rx₁) rx₂ refl vi
 ... | ended rx₁ rx₂ refl   = ended ((q , pin r) ∷ rx₁) rx₂ refl
+
+-- THE SHORTEST RUN LAYING OUT A ROW: what a run lays out up to a row,
+-- the run up to the source row that row lies under lays out too.
+trim : ∀ {B} op (o : Out B) rx rs₀ {y e} ext → rs₀ ++ (y , e) ∷ ext ≡ outRows op o rx
+     → Σ _ λ rx₀ → Σ Pos λ q → Σ _ λ eq → Σ _ λ rx₂ → rx ≡ rx₀ ++ (q , eq) ∷ rx₂ × q ⊑ y
+       × Σ _ λ ext′ → rs₀ ++ (y , e) ∷ ext′ ≡ outRows op o (rx₀ ++ (q , eq) ∷ [])
+trim op o []               []          _   ()
+trim op o []               (_ ∷ _)     _   ()
+trim op o ((q , end) ∷ rx) []          ext refl = [] , q , end , rx , refl , ⊑-refl q , [] , refl
+trim op o ((q , end) ∷ rx) (_ ∷ [])    _   ()
+trim op o ((q , end) ∷ rx) (_ ∷ _ ∷ _) _   ()
+trim op o ((q , skip) ∷ rx) rs₀ ext eq with trim op o rx rs₀ ext eq
+... | rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′ = (q , skip) ∷ rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′
+trim op o ((q , pin r) ∷ rx) rs₀ ext eq with trim op o rx rs₀ ext eq
+... | rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′ = (q , pin r) ∷ rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′
+trim op o ((q , out x) ∷ rx) rs₀ {y} {e} ext eq
+  with ++-split rs₀ ((y , e) ∷ ext) (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx) eq
+... | inj₁ ([] , e₁ , e₂) with trim op (react op o x) rx [] ext e₂
+...   | rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′ =
+  (q , out x) ∷ rx₀ , q′ , e′ , rx₂ , refl , u , ext′ ,
+  trans (cong (_++ (y , e) ∷ ext′) (trans (sym (++-identityʳ rs₀)) (sym e₁))) (cong (lay q 0 (proj₂ (react op o x)) ++_) eq′)
+trim op o ((q , out x) ∷ rx) rs₀ {y} {e} ext eq | inj₁ ((y′ , e′) ∷ m′ , e₁ , e₂) with ∷-injective e₂
+... | refl , _ with lay-in q 0 (proj₂ (react op o x)) (subst ((y , e) ∈_) (sym e₁) (∈-++⁺ʳ rs₀ (here refl)))
+...   | j′ , v , refl , _ , _ =
+  [] , q , out x , rx , refl , (ix 1 ∷ ix j′ ∷ [] , refl) , m′ ++ [] ,
+  trans (sym (++-assoc rs₀ ((y , e) ∷ m′) [])) (cong (_++ []) (sym e₁))
+trim op o ((q , out x) ∷ rx) rs₀ {y} {e} ext eq | inj₂ (m , e₁ , e₂) with trim op (react op o x) rx m ext (sym e₂)
+... | rx₀ , q′ , e′ , rx₂ , refl , u , ext′ , eq′ =
+  (q , out x) ∷ rx₀ , q′ , e′ , rx₂ , refl , u , ext′ ,
+  trans (cong (_++ (y , e) ∷ ext′) e₁) (trans (++-assoc (lay q 0 (proj₂ (react op o x))) m _) (cong (lay q 0 (proj₂ (react op o x)) ++_) eq′))
 
 -- What one row owes, given the count before it.
 record Local {B : Set} (cs : List Pos) (c : Routes) (y : Pos) (e : Ev (IE B)) : Set where
@@ -451,12 +482,12 @@ step-local op cs (s , _) (m , K) q (just (inj₂ (i , r))) iv cur bn vo oo dn rt
 ------------------------------------------------------------------------
 -- What the source promises
 
-record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : List Pos) : Set where
+record CombIn {B : Set} (D : Pos → Set) (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : List Pos) : Set where
   field
     named  : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
     early  : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
     ends   : ∀ {q} → M q end → Early q
     late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
     done   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
-    runs   : ∀ {rx} → Met M rx → RunHeld cs (outRows op init rx)
+    runs   : ∀ {rx} → Met M rx → Upto D rx → RunHeld cs (outRows op init rx)
 

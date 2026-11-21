@@ -22,6 +22,7 @@ open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
+open import simultaneous.HeldIn using (IdleIn; Upto)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
   _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
@@ -280,8 +281,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     comb-shut     : ∀ {rx} → Met M rx → ShutRun (outRows op init rx)
     -- IDLE BETWEEN ROWS: where a reader of the scan waits on nothing before
     -- a position few rows precede, the routes it counts are of that
-    -- position's instant, or none.
-    scan-idle     : Idle scanned
+    -- position's instant, or none, wherever the real flatMap has few rows
+    -- before.
+    --
+    -- REFUTED: 9e244736 `scan-idle` unrestricted, by a switch whose cut lane loops: the real flatMap never gets past the loop, while the scan reads on in the clairvoyant hot outer to the closer's `outerDone`, which keeps the outer completion's route as the counts empty, and waits in a later instant still holding it
+    scan-idle     : IdleIn (Few R) scanned
     -- PAST A ZERO COUNT THE SCAN FINISHES THE INSTANT: once its count holds
     -- no route of the instant last begun, finitely many rows of it follow,
     -- outer, branches and trackers together.
@@ -655,9 +659,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
     -- LANES HAVE ENDED BY ITS INSTANT: the scan counts every lane rxjs
     -- started and has not ended, and every outer value a bounded merge
-    -- holds, and every outer value lies before the mark.
+    -- holds, and every outer value lies before the mark.  Asked only where
+    -- the real flatMap has few rows before a later instant's row.
+    --
+    -- REFUTED: 9e244736 `lanes-ended` unrestricted, by a switch whose cut lane loops: the lane never ends, the switch's count drops it at the cut, and the scan meets the closer's `outerDone` with no lane running or queued
     lanes-ended : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
                 → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+                → ∀ {q} → Few R q → instantOf z ≺ⁱ instantOf q
                 → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
 
 
@@ -726,12 +734,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- lanes by it.
   idle-ends : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
             → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-            → ∀ {q a} → M q (out a) → z ≺ q → instantOf z ≡ instantOf q
-  idle-ends r₁ {z} mt a0 q0 {q} mq zq with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
+            → ∀ {q a} → M q (out a) → Few R q → z ≺ q → instantOf z ≡ instantOf q
+  idle-ends r₁ {z} mt a0 q0 {q} mq Fq zq with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
   ... | y₂′ , w′ , σd , refl with CD.done-under (proj₁ σd) | closer-ends σd
   ...   | y₁ , e₁ , (ws , refl) | y₂ , e₂ , i₂ =
     decidable-stable (instantOf Z ≟ⁱ instantOf q) λ ne →
-      lanes-ended r₁ mt a0 q0 λ (y₃ , e₃ , i₃) →
+      lanes-ended r₁ mt a0 q0 Fq (lt ne) λ (y₃ , e₃ , i₃) →
         src-ends e₁ e₂ e₃ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl)))) mq (lt ne)
           (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₁ h)) (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₂′ h)) i₃
     where
@@ -760,8 +768,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
   -- lane running or queued, and no outer row follows to count another.
   done-met : ∀ rx₁ {q a rx₂ z n} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
-           → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
-  done-met rx₁ {q} {a} {rx₂} {z} {n} mt mz zq nz with run-catch rx₁ mt mz tt tt zq
+           → Few R q → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
+  done-met rx₁ {q} {a} {rx₂} {z} {n} mt mz Fq zq nz with run-catch rx₁ mt mz tt tt zq
   ... | r₁ , r₂ , e″ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ r₁ (here refl))))) mz
   ...   | refl = go (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) refl
     where
@@ -803,7 +811,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
       go : ∀ b → (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) ≡ b → instantOf z ≡ instantOf q
       go true h with both-zero (Flat.active s₀) (Flat.queue s₀) h
-      ... | a0 , q0 = idle-ends r₁ mt′ a0 q0 (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) zq
+      ... | a0 , q0 = idle-ends r₁ mt′ a0 q0 (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) Fq zq
       go false h = ⊥-elim (nz (trans (cong (λ o → Flat.outer (proj₁ o)) split≡) (ℕP.n≤0⇒n≡0 (Within.le Wo))))
         where
           oz : Flat.outer (proj₁ (react op (past op init r₁) xz)) ≡ 0
@@ -815,19 +823,19 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
   -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: the source meets that row
   -- no later than the closer's `outerDone`, or past it.
-  outer-end-at : ∀ rx₁ {q a rx₂ y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → σ₁ y end → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
+  outer-end-at : ∀ rx₁ {q a rx₂ y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q → σ₁ y end → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
                → nameOf y ≡ nameOf q
-  outer-end-at rx₁ {q} {a} {rx₂} {y} mt ry yq nz = decidable-stable (nameOf y ≟ᵖ nameOf q) λ ne →
+  outer-end-at rx₁ {q} {a} {rx₂} {y} mt Fq ry yq nz = decidable-stable (nameOf y ≟ᵖ nameOf q) λ ne →
     close-done ry (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) yq λ where
       (z , zy , inj₁ qz)            → ne (cong (λ i → nm (i ∙ [])) (between-inst {y} {q} {z} yq qz zy))
-      (z , zy , inj₂ (n , mz , zq)) → ne (cong (λ i → nm (i ∙ [])) (trans (sym zy) (done-met rx₁ mt mz zq nz)))
+      (z , zy , inj₂ (n , mz , zq)) → ne (cong (λ i → nm (i ∙ [])) (trans (sym zy) (done-met rx₁ mt mz Fq zq nz)))
 
   -- THE SCAN'S OUTER COUNTER IS OF THE SOURCE'S NEXT ROW'S INSTANT, OR
   -- NONE: it is of the instant the outer last began, which the outer,
   -- idle, keeps up to its next row, or up to its end.
-  outer-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+  outer-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
                 → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  outer-current rx₁ {q} mt with outer-next rx₁ mt
+  outer-current rx₁ {q} mt Fq with outer-next rx₁ mt
   ... | rs , pr , mr , w , wq , fw , af , outl , _ with outer-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
   ...   | inj₂ (at≡ , k , ck) with Flat.outer (proj₁ (past op init rx₁)) ℕ.≟ 0
@@ -854,7 +862,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       idle-y : Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → proj₁ (cnt rs) ≡ nameOf q
       idle-y (y , ry , ay , yw) =
         trans (at-idle (proj₁ fw , λ {k} rk ky → proj₂ fw rk (≺-trans {k} {y} {w} ky yw)) ay ly)
-              (outer-end-at rx₁ {y = y} mt ry (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
+              (outer-end-at rx₁ {y = y} mt Fq ry (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
         where
           ly : ∀ {y′ e} → σ₁ y′ e → Visible e → After Cr y′ → y ≼ y′
           ly {y′} {out _} ry′ _ ay′ = ≺→≼ {y} {y′} (≺-≼-≺ {y} {w} {y′} yw (outl ry′ ay′))
@@ -892,15 +900,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₂ x) _ = inj₂ x
   sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₁ _) (inj₂ x) = inj₂ x
 
-  flat-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+  flat-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
                → tot (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  flat-current rx₁ mt = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
-    (outer-current rx₁ mt) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
+  flat-current rx₁ mt Fq = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
+    (outer-current rx₁ mt Fq) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
     where st = proj₁ (past op init rx₁)
 
-  start-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+  start-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
                 → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
-  start-current rx₁ mt with flat-current rx₁ mt
+  start-current rx₁ mt Fq with flat-current rx₁ mt Fq
   ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
   ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
@@ -939,13 +947,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | lane {w = w} y = early-inst [ sub w ] (Fit.fine lane-fit y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
-  comb-runs : ∀ {rx} → Met M rx → RunHeld cs′ (outRows op init rx)
-  comb-runs {rx} mt = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
+  comb-runs : ∀ {rx} → Met M rx → Upto (Few R) rx → RunHeld cs′ (outRows op init rx)
+  comb-runs {rx} mt up = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
     where
       step : ∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
            → Locals cs′ (from r₀ (outRows op init rx₁)) (lay q 0 (proj₂ (react op (past op init rx₁) x)))
       step rx₁ {q} {x} rx₂ refl =
-        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt)
+        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt (up (∈-++⁺ʳ rx₁ (here refl))))
           (λ { refl → named (proj₁ (run-row rx₁ mt)) })
           (λ { refl ne → value-open rx₁ mt o-value ne })
           (λ { refl sp ne → over-open rx₁ mt sp ne })
@@ -955,5 +963,5 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
       fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
 
-  comb : CombIn op M cs′
+  comb : CombIn (Few R) op M cs′
   comb = record { named = named ; early = early ; ends = ends ; late = late ; done = mdone ; runs = comb-runs }

@@ -35,11 +35,12 @@ open import adequacy.Up using (conn-reach)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin)
 open import simultaneous.Readings using (rootOf; parent; parent-snoc)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Rest; Sync; Ex; Early; Before; Valued; opos; cnt)
-open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
+open import simultaneous.Routed using (Held; Idle; Rest; Sync; Ex; Early; Before; Valued; opos; cnt)
+open import simultaneous.HeldIn using (HeldIn; Upto; RestIn)
+open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next; <ᵖ-split; <ᵖ-step)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
-open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; held-same)
+open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end)
 
 open import simultaneous.SObs using (lone; module Elaborate)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -133,17 +134,20 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   alive′ : ∀ {q e} → β q e → Visible e → ∀ k → k ≺ q → Alive k
   alive′ x v k kq ce = ≺-≼-≺ {k} kq (before-end x v ce)
 
-  -- Before a visible body row, every source row shows.
-  shows : ∀ {q e} → β q e → Visible e → ∀ {y e′} → σ y e′ → (y ⊕ [ ix 0 ]) ≺ q → Σ (Ev B) (ConnT (y ⊕ [ ix 0 ]))
-  shows {q} x v {y} {e′} sy lt with inside r y in ins
+  -- A source row the body outlives shows one step down.
+  show-at : ∀ {y e′} → σ y e′ → Alive y → Σ (Ev B) (ConnT (y ⊕ [ ix 0 ]))
+  show-at {y} {e′} sy al with inside r y in ins
   ... | true  = _ , burst sy (subst T (sym ins) tt)
   ... | false with e′
-  ...   | out _ = _ , echo sy (alive′ x v y (≺-trans {y} (≺-ext y []) lt)) tt (subst T (sym (cong not ins)) tt)
-  ...   | skip  = _ , echo sy (alive′ x v y (≺-trans {y} (≺-ext y []) lt)) tt (subst T (sym (cong not ins)) tt)
-  ...   | end   = _ , echo sy (alive′ x v y (≺-trans {y} (≺-ext y []) lt)) tt (subst T (sym (cong not ins)) tt)
-  ...   | pin p′ = _ , kept sy (λ ce → ≼-≺-≺ {p′} {y} (⊑-≼ (inside-⊑ p′ y (proj₂ (InvAt.pinned Iσ sy))))
-                                         (alive′ x v y (≺-trans {y} (≺-ext y []) lt) ce))
+  ...   | out _ = _ , echo sy al tt (subst T (sym (cong not ins)) tt)
+  ...   | skip  = _ , echo sy al tt (subst T (sym (cong not ins)) tt)
+  ...   | end   = _ , echo sy al tt (subst T (sym (cong not ins)) tt)
+  ...   | pin p′ = _ , kept sy (λ ce → ≼-≺-≺ {p′} {y} (⊑-≼ (inside-⊑ p′ y (proj₂ (InvAt.pinned Iσ sy)))) (al ce))
                        (subst T (sym (cong not ins)) tt) (proj₂ (InvAt.pinned Iσ sy))
+
+  -- Before a visible body row, every source row shows.
+  shows : ∀ {q e} → β q e → Visible e → ∀ {y e′} → σ y e′ → (y ⊕ [ ix 0 ]) ≺ q → Σ (Ev B) (ConnT (y ⊕ [ ix 0 ]))
+  shows x v {y} sy lt = show-at sy (alive′ x v y (≺-trans {y} (≺-ext y []) lt))
 
   -- A body row before a visible connect row is the connect's.
   lift : ∀ {q e} → C q e → Visible e → ∀ {k e′} → β k e′ → k ≺ q → C k e′
@@ -306,6 +310,27 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
   conn-seen {w} Fw {k} x kw = ks , λ {k′} y lt _ → all-in y (≺-trans {k′} {k} {w} lt kw)
     where open Seen Fw
 
+  -- WHILE THE BODY RUNS, A CONNECT'S FEW ROWS ARE ITS SOURCE'S FEW: each
+  -- source row before the position shows one step down, at it or before it.
+  conn-few : ∀ {w} → Few C w → (∀ {c} → β c end → w ≼ c) → Few σ w
+  conn-few {w} Fw al = L.map parent ks ++ [ parent w ] , at
+    where
+      open Seen Fw
+
+      at : ∀ {k e} → σ k e → k ≺ w → k ∈ L.map parent ks ++ [ parent w ]
+      at {k} y kw with <ᵖ-split (k ⊕ [ ix 0 ]) w (<ᵖ-step k w (Equivalence.to T-≡ kw))
+      ... | inj₁ lt = ∈-++⁺ˡ (subst (_∈ L.map parent ks) (parent-snoc k (ix 0))
+                        (∈-map⁺ parent (all-in (proj₂ (show-at y λ ce → ≺-≼-≺ {k} kw (al ce))) (Equivalence.from T-≡ lt))))
+      ... | inj₂ eq = ∈-++⁺ʳ (L.map parent ks) (here (trans (sym (parent-snoc k (ix 0))) (cong parent eq)))
+
+  -- Every row a reader of the connect meets has few source rows before it.
+  run-few : ∀ {c rs} → Run C c rs → Upto (Few σ) rs
+  run-few (((((body y , _) , _) , Fq) , vi , _) ∷ _) (here refl) = conn-few Fq (λ ce → before-end y vi ce)
+  run-few (((((burst _ _ , _) , _) , _) , () , _) ∷ _) (here refl)
+  run-few (((((echo _ _ _ _ , _) , _) , _) , () , _) ∷ _) (here refl)
+  run-few (((((kept _ _ _ _ , _) , _) , _) , () , _) ∷ _) (here refl)
+  run-few (_ ∷ run) (there m) = run-few run m
+
   -- Every run met of the connect is met of its body.
   back : ∀ {c rs} → Run C c rs → Run β c rs
   back [] = []
@@ -336,13 +361,13 @@ rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 -- the body parks a route it cuts while a connect in scope holds one of
 -- the instant, so an elaborated body empties only once its source has
 -- let go of the instant.
-Tracks : ∀ {A B} → EmissionSet A → EmissionSet (IE B) → Set
-Tracks σ β = ∀ {rs} → Met β rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+Tracks : ∀ {A B} → (Pos → Set) → EmissionSet A → EmissionSet (IE B) → Set
+Tracks D σ β = ∀ {rs} → Met β rs → Upto D rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
            → Σ (List Pos) λ ks → ∀ {k e} → σ k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
 
 -- A source of finitely many rows tracks every body.
-tracks-fin : ∀ {A B} {σ : EmissionSet A} {β : EmissionSet (IE B)} → Σ (List Pos) (λ ks → ∀ {k e} → σ k e → k ∈ ks) → Tracks σ β
-tracks-fin (ks , h) _ _ _ = ks , λ y _ _ → h y
+tracks-fin : ∀ {A B} {D : Pos → Set} {σ : EmissionSet A} {β : EmissionSet (IE B)} → Σ (List Pos) (λ ks → ∀ {k e} → σ k e → k ∈ ks) → Tracks D σ β
+tracks-fin (ks , h) _ _ _ _ = ks , λ y _ _ → h y
 
 -- A row one step under `k`, past the cursor: `k` is past it, or is it.
 pre : ∀ cur {k} → After cur (k ⊕ [ ix 0 ]) → After cur k ⊎ cur ≡ just k
@@ -363,17 +388,18 @@ pre (just c) {k} lt with k <ᵖ c in e
 --   end there, every echo silent.
 conn-rest : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
             (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p)
-          → Shows (enter s (p ⊕ [ ix 1 ])) → Rest (Connect.β s F p) → Tracks (Connect.σ s F p) (Connect.β s F p)
+          → Shows (enter s (p ⊕ [ ix 1 ])) → RestIn (Few (Connect.σ s F p)) (Connect.β s F p)
+          → Tracks (Few (Connect.σ s F p)) (Connect.σ s F p) (Connect.β s F p)
           → Rest (enter (Op.connect s F) p)
 conn-rest s F Is IF p ok sh rb tr {rs} m z {q} bq = kb ++ L.map (_⊕ [ ix 0 ]) (cur ++ kt) , at
   where
     open ConnRun s F Is IF p ok sh
 
     kb : List Pos
-    kb = proj₁ (rb (back m) z bq)
+    kb = proj₁ (rb (back m) (run-few m) z bq)
 
     kt : List Pos
-    kt = proj₁ (tr (back m) z bq)
+    kt = proj₁ (tr (back m) (run-few m) z bq)
 
     cur : List Pos
     cur = maybe′ [_] [] (cursor nothing rs)
@@ -386,22 +412,47 @@ conn-rest s F Is IF p ok sh rb tr {rs} m z {q} bq = kb ++ L.map (_⊕ [ ix 0 ]) 
         r′ = trans (sym (rootOf-ext k [ ix 0 ])) r
 
         at-src : After (cursor nothing rs) k ⊎ cursor nothing rs ≡ just k → k ∈ cur ++ kt
-        at-src (inj₁ a′) = ∈-++⁺ʳ cur (proj₂ (tr (back m) z bq) y a′ r′)
+        at-src (inj₁ a′) = ∈-++⁺ʳ cur (proj₂ (tr (back m) (run-few m) z bq) y a′ r′)
         at-src (inj₂ e)  = ∈-++⁺ˡ (subst (λ c → k ∈ maybe′ [_] [] c) (sym e) (here refl))
 
     at : ∀ {y e} → C y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ kb ++ L.map (_⊕ [ ix 0 ]) (cur ++ kt)
-    at (Connecting.body y , _)         a r = ∈-++⁺ˡ (proj₂ (rb (back m) z bq) y a r)
+    at (Connecting.body y , _)         a r = ∈-++⁺ˡ (proj₂ (rb (back m) (run-few m) z bq) y a r)
     at (Connecting.burst y _ , _)      a r = ∈-++⁺ʳ kb (src y a r)
     at (Connecting.echo y _ _ _ , _)   a r = ∈-++⁺ʳ kb (src y a r)
     at (Connecting.kept y _ _ _ , _)   a r = ∈-++⁺ʳ kb (src y a r)
 
+-- The row a reader of the connect has last met, if any.
+last-row : ∀ {X : Set} c (rs : List (Pos × Ev X)) → cursor c rs ≡ c ⊎ Σ Pos λ y → Σ (Ev X) λ e → cursor c rs ≡ just y × (y , e) ∈ rs
+last-row c []             = inj₁ refl
+last-row c ((q , e) ∷ rs) with last-row (just q) rs
+... | inj₁ eq               = inj₂ (q , e , eq , here refl)
+... | inj₂ (y , e′ , eq , m) = inj₂ (y , e′ , eq , there m)
+
+seen-row : ∀ {X : Set} {t : EmissionSet X} {c rs y e} → Run t c rs → (y , e) ∈ rs → denotation.EmissionSet.Seen t y e × Visible e
+seen-row ((sn , vi , _) ∷ _) (here refl) = sn , vi
+seen-row (_ ∷ run) (there m)            = seen-row run m
+
+-- A CONNECT HOLDS WHAT ITS BODY HOLDS WHERE ITS SOURCE HAS FEW ROWS: a
+-- reader of the connect meets nothing else, and waits only where its
+-- body still runs.
 held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
             (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) cs
           → Shows (enter s (p ⊕ [ ix 1 ]))
-          → Held (enter (F (hot (Proper (enter s (p ⊕ [ ix 1 ]))))) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
-          → Tracks (Connect.σ s F p) (Connect.β s F p)
+          → HeldIn (Few (Connect.σ s F p)) (Connect.β s F p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
+          → Tracks (Few (Connect.σ s F p)) (Connect.σ s F p) (Connect.β s F p)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok cs sh h tr = held-same row end-row back′ fwd (λ rb → conn-rest s F Is IF p ok sh rb tr) (held-ex ex h)
+held-conn s F Is IF p ok cs sh h tr = record
+  { named   = λ x → HeldIn.named h (row x)
+  ; covered = λ m r₁ r₂ e c nx → HeldIn.covered h (back m) (run-few m) r₁ r₂ e c (λ x → nx (ex x))
+  ; exact   = λ m → HeldIn.exact h (back m) (run-few m)
+  ; routing = λ x → HeldIn.routing h (row x)
+  ; shut    = λ m → HeldIn.shut h (back m) (run-few m)
+  ; early   = λ x → HeldIn.early h (row x)
+  ; ends    = λ x → HeldIn.ends h (end-row x)
+  ; done    = λ x → HeldIn.done h (row x)
+  ; late    = λ x → HeldIn.late h (row x)
+  ; idle    = idle
+  ; rest    = conn-rest s F Is IF p ok sh (HeldIn.rest h) tr }
   where
     open ConnRun s F Is IF p ok sh
 
@@ -409,14 +460,38 @@ held-conn s F Is IF p ok cs sh h tr = held-same row end-row back′ fwd (λ rb �
     ex {y} (here sy) = here (sync-body {p} {y} sy)
     ex (there x) = x
 
-    row : ∀ {y x′} → C y (out x′) → Σ _ λ x → Connect.β s F p y (out x) × Same x′ x
-    row (Connecting.body y , _) = _ , y , same-refl _
+    row : ∀ {y x} → C y (out x) → Connect.β s F p y (out x)
+    row (Connecting.body y , _) = y
 
     end-row : ∀ {y} → C y end → Connect.β s F p y end
     end-row (Connecting.body y , _) = y
 
-    back′ : ∀ {rs′} → Met C rs′ → Σ _ λ rs → Met (Connect.β s F p) rs × Rows≈ rs′ rs
-    back′ m = _ , back m , rows-refl m
+    -- No body end lies before a wait past a run that met none.
+    alive : ∀ {rs} → Met C rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few C w
+          → (∀ {y e} → C y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+          → ∀ {c} → Connect.β s F p c end → w ≼ c
+    alive {rs} m ne {w} Fw later {c} ce cw = at (last-row nothing rs)
+      where
+        cc : C c end
+        cc = Connecting.body ce , conn-seen Fw (Connecting.body ce) cw
 
-    fwd : ∀ {w} → Few C w → ∀ {k e} → Connect.β s F p k e → k ≺ w → ¬ ¬ Σ _ λ e′ → C k e′ × (Visible e → Visible e′)
-    fwd F x kw no = no (_ , (Connecting.body x , conn-seen F (Connecting.body x) kw) , λ v → v)
+        met : ∀ {y e} → C y e → Visible e → (y , e) ∈ rs → y ≡ c → ⊥
+        met (Connecting.body b , _) _ ym refl = ne (subst (λ e → (_ , e) ∈ rs) (InvAt.func Iβ b ce) ym)
+        met (Connecting.burst _ _ , _) () _ _
+        met (Connecting.echo _ _ _ _ , _) () _ _
+        met (Connecting.kept _ _ _ _ , _) () _ _
+
+        at : cursor nothing rs ≡ nothing ⊎ Σ Pos (λ y → Σ _ λ e → cursor nothing rs ≡ just y × (y , e) ∈ rs) → ⊥
+        at (inj₁ eq) = later cc tt (subst (λ c′ → After c′ c) (sym eq) tt) cw
+        at (inj₂ (y , e , eq , ym)) with seen-row m ym
+        ... | ((cy , pr) , _) , vi with c <ᵖ y in d
+        ...   | true  = pr cc (subst T (sym d) tt)
+        ...   | false with <ᵖ-split y c d
+        ...     | inj₁ yc   = later cc tt (subst (λ c′ → After c′ c) (sym eq) (subst T (sym yc) tt)) cw
+        ...     | inj₂ refl = met cy vi ym refl
+
+    idle : Idle C
+    idle m ne {w} Fw aw later =
+      HeldIn.idle h (back m) (run-few m) ne (conn-few Fw (alive m ne Fw later))
+        (proj₁ Fw , λ tk kw → proj₂ Fw (Connecting.body tk , conn-seen Fw (Connecting.body tk) kw) kw) aw
+        (λ ty vy ay yw → later (Connecting.body ty , conn-seen Fw (Connecting.body ty) yw) vy ay yw)
