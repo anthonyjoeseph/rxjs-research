@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Tree using (mergeᶠ)
 open import denotation.Position using (Pos; sub; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (out; EmissionSet; Den; hot; enter; Few; _≺_; _≼_; module Op)
+open import denotation.EmissionSet using (out; end; ended; EmissionSet; Den; hot; enter; Few; _≺_; _≼_; module Op)
 open import denotation.Laws.Worlds using (Lawful; Shows; hot-shows)
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB)
 open import simultaneous.FlatLanes using (Tg)
@@ -83,3 +83,9 @@ module OuterSplit {A B : Set} (σ : EmissionSet (IE A)) (Lσ : Lawful σ) (P : P
   ...     | f0 , lift₀ =
     t0-of shσ f0 ry r0 Yq >>= λ t0 → lift₀ t0 Yq >>= λ t0′ → lift′ t0′ Yq >>= λ t1 →
     pure (mev Ou (mev (opening {A} {B}) e₀) , t1 , top k0 , λ {_} eq → cong (λ z → mev Ou (mev (opening {A} {B}) z)) (o0 eq))
+
+  -- The outer's end as its reader shows it.
+  dend : Shows σ → ∀ {q} → Few T1 q → ∀ {y} → σ y end → (y ⊕ [ sub J ]) ≼ q → ¬ ¬ T1 (y ⊕ [ sub J ]) end
+  dend shσ f1 ry Yq with map-lift Ou (Op.map (opening {A} {B}) (hot σ)) (map-shows (opening {A} {B}) (hot σ) (hot-shows σ J)) f1
+  ... | f0′ , lift′ with map-lift (opening {A} {B}) (hot σ) (hot-shows σ J) f0′
+  ...   | f0 , lift₀ = t0-of shσ f0 ry (ended ry (pastJ ry)) Yq >>= λ t0 → lift₀ t0 Yq >>= λ t0′ → lift′ t0′ Yq
