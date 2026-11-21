@@ -71,6 +71,11 @@ module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
   Cut switchᶠ q = Σ Pos λ q′ → Σ A λ a′ → o q′ (out a′) × q ≺ q′
   Cut _       _ = ⊥
 
+  -- A later value has cut the value at `q`'s lane by `k`.
+  CutAt : FlatOp → Pos → Pos → Set
+  CutAt switchᶠ = Superseded o
+  CutAt _       = λ _ _ → ⊥
+
   -- The joiner itself.
   Join : FlatOp → EmissionSet B
   Join (mergeᶠ nothing)  = Merge.JoinT f o
@@ -97,6 +102,40 @@ real-from (just _) (mergeᶠ nothing)  F s E p x = x
 real-from (just _) (mergeᶠ (just _)) F s E p x = x
 real-from (just _) switchᶠ           F s E p x = x
 real-from (just _) exhaustᶠ          F s E p x = x
+
+-- and an elaborated flatMap's row is its policy's joiner's.
+real-to : ∀ m op {Γ A B} (F : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (E : DenEnv Γ) p {k e}
+        → enter (ev m (flatMap op F s) E) p k e → Truncate (View.Join (λ a → ev m (F a) E) (enter (ev m s E) p) op) k e
+real-to nothing  (mergeᶠ nothing)  F s E p x = x
+real-to nothing  (mergeᶠ (just _)) F s E p x = x
+real-to nothing  switchᶠ           F s E p x = x
+real-to nothing  exhaustᶠ          F s E p x = x
+real-to (just _) (mergeᶠ nothing)  F s E p x = x
+real-to (just _) (mergeᶠ (just _)) F s E p x = x
+real-to (just _) switchᶠ           F s E p x = x
+real-to (just _) exhaustᶠ          F s E p x = x
+
+-- A JOINER'S VALUE IS A LANE'S, run and not yet cut there.
+join-out : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {k b} → View.Join f o op k (out b)
+         → Σ Pos λ q → Σ A λ a → o q (out a) × View.Runs f o op q × View.Lane f o op q a k (out b) × ¬ View.CutAt f o op q k
+join-out (mergeᶠ nothing)  f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
+join-out (mergeᶠ nothing)  f o (Joining.run () _)
+join-out (mergeᶠ (just n)) f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
+join-out (mergeᶠ (just n)) f o (Joining.run () _)
+join-out switchᶠ           f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
+join-out switchᶠ           f o (Joining.run () _)
+join-out exhaustᶠ          f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
+join-out exhaustᶠ          f o (Joining.run () _)
+
+-- Two rows of one lane are its value's own rows at one subscription.
+lane-at₂ : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) p (ok : Ok H p)
+         → ∀ {q a k e k′ e′} → enter d p q (out a) → View.Lane f (enter d p) op q a k e → View.Lane f (enter d p) op q a k′ e′
+         → Σ Pos λ s → Ok H s × enter (f a) s k e × enter (f a) s k′ e′
+lane-at₂ (mergeᶠ nothing)  d f Id If p ok {q} x (r , _) (r′ , _) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , r′
+lane-at₂ switchᶠ           d f Id If p ok {q} x (r , _) (r′ , _) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , r′
+lane-at₂ exhaustᶠ          d f Id If p ok {q} x (r , _) (r′ , _) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , r′
+lane-at₂ (mergeᶠ (just n)) d f Id If p ok x (i , s , sb , r , _) (i′ , s′ , sb′ , r′ , _) with BoundedI.sub-same ok n f If (Id p ok) sb sb′
+... | refl = s , BoundedI.okS ok n f If (Id p ok) sb , r , r′
 
 -- A LANE'S ROW IS ITS VALUE'S OWN ROW PAST A SUBSCRIPTION THE INVARIANT
 -- HOLDS AT, and any row of that subscription past it is the lane's.

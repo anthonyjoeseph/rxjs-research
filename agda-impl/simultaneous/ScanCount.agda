@@ -8,7 +8,7 @@ open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat using (suc; _∸_; _⊓_; _+_)
 open import Relation.Nullary using (does)
@@ -21,7 +21,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
 open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
   laneDone; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.SObs using (Flat; isZero; outerB; laneB; closeB; lone; module Elaborate)
+open import simultaneous.SObs using (Flat; isZero; Branch; outerB; laneB; closeB; lone; module Elaborate)
 open import simultaneous.HeldComb using (past)
 open import simultaneous.LaneCount using (Kind; kStart; kDone; kCut; kOther; stepK)
 
@@ -41,6 +41,50 @@ evKind k op _                                              = kOther
 
 rowKind : ∀ {B} → (FlatOp → Mark → Kind) → FlatOp → Pos × Ev (Maybe (Input B)) → Kind
 rowKind k op (_ , e) = evKind k op e
+
+-- A ROW THAT LOWERS THE COUNTER IS A `laneDone`.
+row-done : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markAct op x ≡ kDone
+         → Σ Pos λ k → Σ Branch λ b → Σ _ λ n → x ≡ (k , out (just (inj₁ (b , instEmit (mark laneDone) n))))
+row-done op (k , out (just (inj₁ (b , instEmit (mark m) n)))) eq with mark-done op m eq
+  where mark-done : ∀ op m → markAct op m ≡ kDone → m ≡ laneDone
+        mark-done _ laneDone _ = refl
+        mark-done _ begin () ; mark-done _ over () ; mark-done _ stop () ; mark-done _ outerClose ()
+        mark-done _ laneStart () ; mark-done _ carry () ; mark-done _ burstEnd () ; mark-done _ outerDone ()
+        mark-done _ subscribed () ; mark-done _ completed ()
+        mark-done switchᶠ outerOpen () ; mark-done (mergeᶠ _) outerOpen () ; mark-done exhaustᶠ outerOpen ()
+... | refl = k , b , n , refl
+row-done op (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+row-done op (_ , out (just (inj₂ _))) ()
+row-done op (_ , out nothing) ()
+row-done op (_ , end)   ()
+row-done op (_ , skip)  ()
+row-done op (_ , pin _) ()
+
+-- ONLY A SWITCH'S ARRIVAL EMPTIES THE COUNTER.
+row-cut : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markAct op x ≡ kCut → op ≡ switchᶠ
+row-cut switchᶠ    _                                                  _  = refl
+row-cut (mergeᶠ _) (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut m eq
+  where mark-cut : ∀ {k} m → markAct (mergeᶠ k) m ≡ kCut → mergeᶠ k ≡ switchᶠ
+        mark-cut begin () ; mark-cut over () ; mark-cut stop () ; mark-cut outerOpen () ; mark-cut outerClose ()
+        mark-cut laneStart () ; mark-cut carry () ; mark-cut laneDone () ; mark-cut burstEnd () ; mark-cut outerDone ()
+        mark-cut subscribed () ; mark-cut completed ()
+row-cut exhaustᶠ   (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut m eq
+  where mark-cut : ∀ m → markAct exhaustᶠ m ≡ kCut → exhaustᶠ ≡ switchᶠ
+        mark-cut begin () ; mark-cut over () ; mark-cut stop () ; mark-cut outerOpen () ; mark-cut outerClose ()
+        mark-cut laneStart () ; mark-cut carry () ; mark-cut laneDone () ; mark-cut burstEnd () ; mark-cut outerDone ()
+        mark-cut subscribed () ; mark-cut completed ()
+row-cut (mergeᶠ _) (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+row-cut (mergeᶠ _) (_ , out (just (inj₂ _))) ()
+row-cut (mergeᶠ _) (_ , out nothing) ()
+row-cut (mergeᶠ _) (_ , end)   ()
+row-cut (mergeᶠ _) (_ , skip)  ()
+row-cut (mergeᶠ _) (_ , pin _) ()
+row-cut exhaustᶠ   (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+row-cut exhaustᶠ   (_ , out (just (inj₂ _))) ()
+row-cut exhaustᶠ   (_ , out nothing) ()
+row-cut exhaustᶠ   (_ , end)   ()
+row-cut exhaustᶠ   (_ , skip)  ()
+row-cut exhaustᶠ   (_ , pin _) ()
 
 private
   cut-act : ∀ {B} k n s → Flat.active (proj₁ (cut {B} k n s)) ≡ Flat.active s × Flat.queue (proj₁ (cut {B} k n s)) ≡ Flat.queue s
