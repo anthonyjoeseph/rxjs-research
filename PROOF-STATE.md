@@ -268,11 +268,12 @@ instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch; read on the scan's lanes
-counter, not the lanes' own count, which a carried route outlives. Then a reader's joins, the
+counter, not the lanes' own count, which a carried route outlives; the outer's
+counter past an outer end. Then a reader's joins, the
 defer limit's rest (no one approximant bounds it), and the cold's rows'
 order. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lane-end-shut`, `lane-idle`, `held-current`,
+Members: `outer-end-at`, `lane-end-shut`, `lane-idle`, `held-current`,
 `live-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
 `scan-idle`, `held-connected`, `lim-rest`, `cold-rows`, `cold-covered`,
 `cold-shut`, `cold-idle`.

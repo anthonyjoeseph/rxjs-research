@@ -118,6 +118,15 @@ import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
 open import denotation.Laws.Truthful using (reached)
+open import denotation.EmissionSet using (EmissionSet; Proper)
+open import denotation.Laws.Modulus using (≺-absurd; ≼-refl)
+open import denotation.Laws.Worlds using (W; ⊑-≼; pinby-silent)
+open import denotation.Position using (Path)
+open import denotation.Laws.HotBelow using (under-hot)
+open import simultaneous.OuterSplit using (count-open; module OuterSplit)
+open import simultaneous.ProperIdle using (proper-idle)
+open import simultaneous.FlatLanes using (co; bproj-end)
+open import simultaneous.CombSent using (tag-outer)
 open import simultaneous.HeldLim using (module LimHeld)
 open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt)
@@ -150,6 +159,23 @@ open-value : ∀ {A B} {x : IE A} {a n} → opening {B = B} x ≡ instEmit (valu
 open-value {x = instEmit (value _) _} ()
 open-value {x = instEmit (mark _) _}  ()
 
+-- A stream's proper rows show their hangs as it does.
+proper-shows : ∀ {A} {t : EmissionSet A} → Shows t → Shows (Proper t)
+proper-shows {t = t} sh = k-shows λ n → sk-down (λ x ¬e → ¬e (_ , proj₁ x)) dn (shows-k sh)
+  where
+    dn : ∀ {q e k e′} → Proper t q e → t k e′ → k ≺ q → ¬ ¬ Σ _ (Proper t k)
+    dn {q} {k = k} (_ , pr) x kq ¬s = ¬s (_ , x , λ {c} xc → ≺→≼ {k} {c} (≺-≼-≺ {k} {q} {c} kq (pr xc)))
+
+-- A branch's next row is of the source's next row's instant,
+named-at : ∀ J {w q} → (w ≡ q ⊎ q ≡ w ⊕ [ sub J ]) → nameOf w ≡ nameOf q
+named-at J     (inj₁ refl) = refl
+named-at J {w} (inj₂ refl) = cong nm (sym (rootOf-ext w [ sub J ]))
+
+-- and no later than it.
+next-≼ : ∀ J {w q} → (w ≡ q ⊎ q ≡ w ⊕ [ sub J ]) → w ≼ q
+next-≼ J {w} (inj₁ refl) = ≼-refl {w}
+next-≼ J {w} (inj₂ refl) = ≺→≼ {w} {w ⊕ [ sub J ]} (≺-ext w [])
+
 -- What a branch's row opens past the scan unchanged: a value, or a completion.
 data Opens {A : Set} : IE A → Set where
   o-value : ∀ {a n} → Opens (instEmit (value a) n)
@@ -173,10 +199,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
 
+  L₀ : Lawful σ₀
+  L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+
   g₂ : GoodEnv (hot σ₂ ∷ hot σ₁ ∷ env₀)
   g₂ = good-cons L₂ (good-cons L₁ (good-cons L₀ gd))
-    where
-      L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
 
   g₃ : GoodEnv env′
   g₃ = good-cons L₃ g₂
@@ -294,11 +321,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- over read, and the end find one open unless exempt; and a dead
   -- instant stays dead.
   postulate
-    -- THE SCAN'S COUNTERS ARE OF THE ROW'S INSTANT, OR NONE, counter by
-    -- counter: the outer's routes, the lanes', those an ended lane hands
-    -- a queued lane's burst, and those parked on a connect in scope.
-    outer-current  : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                   → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+    -- THE SCAN'S COUNTERS ARE OF THE ROW'S INSTANT, OR NONE: those an ended
+    -- lane hands a queued lane's burst.
     held-current   : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                    → Flat.held (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     value-open    : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
@@ -318,12 +342,48 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- outer, branches and trackers together.
     scan-rest     : Rest scanned
 
-  -- The lanes' hot lies wholly past the source's subscription.
+  -- THE READINGS UNDER THE SCAN'S SOURCE: the outer at its subscription,
+  -- the closer over it, the lanes over both.
+  ok₀′ : Ok (Hots env₀) c
+  ok₀′ = body-ok {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+
+  I₁ : InvAt (Hots env₀) (c ⊕ [ ix 1 ]) (enter (ev m trig env₀) (c ⊕ [ ix 1 ]))
+  I₁ = inv-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′)
+
+  I₂ : InvAt (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]))
+  I₂ = inv-ev m (closer {B = B}) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ gd)) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁)
+
+  I₃ : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]))
+  I₃ = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+
+  -- Where they subscribe: the source first, then the lanes, the closer,
+  -- the outer.
+  P≺q₀ : ∀ zs → (P ⊕ zs) ≺ (p₀₀ ⊕ [ ix 1 ])
+  P≺q₀ zs = subst (_≺ (p₀₀ ⊕ [ ix 1 ])) (sym (⊕-assoc p₀₀ [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p₀₀ {ix 0} {ix 1} zs [] refl))
+
+  q₀≺s₂ : (p₀₀ ⊕ [ ix 1 ]) ≺ (p₀ ⊕ [ ix 1 ])
+  q₀≺s₂ = subst (_≺ (p₀ ⊕ [ ix 1 ])) (sym (⊕-assoc p₀ [ ix 0 ] [ ix 1 ])) (Equivalence.from T-≡ (<ᵖ-part p₀ {ix 0} {ix 1} [ ix 1 ] [] refl))
+
+  s₂≺c₁ : (p₀ ⊕ [ ix 1 ]) ≺ (c ⊕ [ ix 1 ])
+  s₂≺c₁ = subst (_≺ (c ⊕ [ ix 1 ])) (sym (⊕-assoc c [ ix 0 ] [ ix 1 ])) (Equivalence.from T-≡ (<ᵖ-part c {ix 0} {ix 1} [ ix 1 ] [] refl))
+
+  σ₁-after : ∀ {y e} → σ₁ y e → (c ⊕ [ ix 1 ]) ≺ y
+  σ₁-after (r , _) = world-after (InvAt.world I₁ r) (InvAt.real I₁ r)
+
+  -- The lanes' hot lies wholly past the source's subscription,
   lanes-past : ∀ zs {k e} → σ₃ k e → (P ⊕ zs) ≺ k
-  lanes-past zs {k} (r , _) = ≺-trans {P ⊕ zs} {p₀₀ ⊕ [ ix 1 ]} {k}
-    (subst (_≺ (p₀₀ ⊕ [ ix 1 ])) (sym (⊕-assoc p₀₀ [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p₀₀ zs [] refl)))
-    (world-after (InvAt.world I r) (InvAt.real I r))
-    where I = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+  lanes-past zs {k} (r , _) = ≺-trans {P ⊕ zs} {p₀₀ ⊕ [ ix 1 ]} {k} (P≺q₀ zs) (world-after (InvAt.world I₃ r) (InvAt.real I₃ r))
+
+  -- and so does the outer's.
+  outer-past : ∀ zs {k e} → σ₁ k e → (P ⊕ zs) ≺ k
+  outer-past zs {k} r = ≺-trans {P ⊕ zs} {c ⊕ [ ix 1 ]} {k}
+    (subst (_≺ (c ⊕ [ ix 1 ])) (sym (trans (⊕-assoc p₀₀ [ ix 0 ] zs) (trans (⊕-assoc p₀ [ ix 0 ] (ix 0 ∷ zs)) (⊕-assoc c [ ix 0 ] (ix 0 ∷ ix 0 ∷ zs)))))
+      (Equivalence.from T-≡ (<ᵖ-part c {ix 0} {ix 1} (ix 0 ∷ ix 0 ∷ zs) [] refl)))
+    (σ₁-after r)
+
+  -- A row of the source's reading is one the scan's source meets.
+  toM : ∀ {q′ e′} → SrcOf (λ b → ev m (fed tk b) env′) P q′ e′ → M q′ e′
+  toM {q′} {e′} = subst (λ d → enter d P q′ e′) (sym (src-op tk env′ m))
 
   src-func : ∀ {y e e′} → SrcOf (λ b → ev m (fed tk b) env′) P y e → SrcOf (λ b → ev m (fed tk b) env′) P y e′ → e ≡ e′
   src-func {y} {e} {e′} a b = InvAt.func (inv-ev m src env′ g₃ P ok₃)
@@ -333,18 +393,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     module LS = LaneSplit σ₃ L₃ P (λ b → ev m (fed tk b) env′) (λ c → ev m (Cat-of tk env′ c) env′) (λ b → ev m (Tag tk env′ b) env′)
       (own-op tk env′ m) (cat-op tk env′ m) (tag-op tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
       src-func lanes-past
+    module OS = OuterSplit σ₁ L₁ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
+      (own-op tk env′ m) (cat-op tk env′ m) (tag-outer tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
+      src-func outer-past
 
   -- The lanes' rows a run of the source met are a run of the lanes.
   lane-run : ∀ {rx} → Met M rx → LS.Runs nothing nothing rx
   lane-run {rx} mt = LS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
-
-  -- A position of the source's next row's instant that the lanes' next
-  -- value lies no earlier than, nor their end unless no value follows it.
-  LaneNext : List (Pos × Ev (IE B)) → Pos → Set
-  LaneNext rs q = Σ Pos λ w → nameOf w ≡ nameOf q × Few σ₃ w × After (cursor nothing rs) w
-                × (∀ {y x} → σ₃ y (out x) → After (cursor nothing rs) y → w ≼ y)
-                × (∀ {y} → σ₃ y end → After (cursor nothing rs) y
-                   → w ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k))
 
   -- Each level the source's reader of the lanes passes through shows its hangs.
   private
@@ -365,11 +420,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     I-fed = subst (λ d → InvAt (Hots env′) P (enter d P)) (fed-op tk env′ m) (inv-ev m (Fed tk env′) env′ g₃ P ok₃)
 
     sh-σ₃ : Shows σ₃
-    sh-σ₃ = k-shows λ n → sk-down (λ x ¬e → ¬e (_ , proj₁ x)) dn
-      (shows-k (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)))
-      where
-        dn : ∀ {q e k e′} → σ₃ q e → enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) k e′ → k ≺ q → ¬ ¬ Σ _ (σ₃ k)
-        dn {q} {k = k} (_ , pr) x kq ¬s = ¬s (_ , x , λ {c} xc → ≺→≼ {k} {c} (≺-≼-≺ {k} {q} {c} kq (pr xc)))
+    sh-σ₃ = proper-shows (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
+
+    sh-σ₁ : Shows σ₁
+    sh-σ₁ = proper-shows (shows-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′))
 
   -- A LANE ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
   lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub LS.J ]) ≼ q
@@ -385,15 +439,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   lane-under {y} {e} {q} {a} ry mq yq qJ = go a mq yq qJ
     where
       J = LS.J
-      I = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
       ⊑q : ∀ {q′} → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → y ⊑ q′
       ⊑q {q′} lt lt′ = <ᵖ-between y q′ [ sub J ] (Equivalence.to T-≡ lt) (Equivalence.to T-≡ lt′)
       apart : ∀ {q′ c w} → Hots (hot σ₂ ∷ hot σ₁ ∷ env₀) c → q′ ≡ c ⊕ [ sub w ] → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → ⊥
       apart {c = c} hc refl lt lt′ with ⊑-snoc c (⊑q lt lt′)
-      ... | inj₁ yc = proj₂ (ok-step p₀₀ ok₂) hc (InvAt.world I (proj₁ ry)) (⊑-inside yc)
+      ... | inj₁ yc = proj₂ (ok-step p₀₀ ok₂) hc (InvAt.world I₃ (proj₁ ry)) (⊑-inside yc)
       ... | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
-      toM : ∀ {q′ e′} → LS.M′ q′ e′ → M q′ e′
-      toM {q′} {e′} = subst (λ d → enter d P q′ e′) (sym (src-op tk env′ m))
       go : ∀ {q′} a′ → LS.M′ q′ (out a′) → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → ⊥
       go nothing r _ _ = ev-none m _ env′ P (toM r)
       go (just (inj₂ x)) r lt lt′ with track-sent (toM r)
@@ -426,66 +477,112 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
               → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
               → proj₁ (cnt rs) ≡ nameOf w
 
-  -- WHERE THE SOURCE'S NEXT ROW IS NOT A LANE'S, no lane value lies before
-  -- it past the lanes' cursor, as the source would have met it first.
-  lane-gap : ∀ {cM cσ q a rx₂} → LS.Inv cM cσ → Run LS.M′ cM ((q , out a) ∷ rx₂) → laneTag (out a) ≡ nothing
-           → Few σ₃ q × After cσ q × (∀ {y x} → σ₃ y (out x) → After cσ y → q ≼ y)
-  lane-gap {cM} {cσ} {q} {a} iv ((((mq , _) , ks , h) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
+  -- NO SOURCE VALUE LIES UNDER AN OUTER ROW before where the source's
+  -- reader joins it: the outer's value lies one `sub J` below its own row;
+  -- the closer and the lanes reach inside an outer row only by joining it
+  -- past their own subscriptions, so past `J`; a tracker, never.
+  outer-under : ∀ {y e q a} → σ₁ y e → OS.M′ q (out a) → y ≺ q → (y ⊕ [ sub OS.J ]) ≼ q
+  outer-under {y} {e} {q} {a} ry mq yq qJ = go a mq yq qJ
     where
-      J = LS.J
-      ks′ : List Pos
-      ks′ = up q ∷ up (up q) ∷ L.map up ks ++ L.map (λ x → up (up x)) ks
-      few : Few σ₃ q
-      few = ks′ , pick
-        where
-          pick : ∀ {k e′} → σ₃ k e′ → k ≺ q → k ∈ ks′
-          pick {k} rk kq = ∈-stable λ ¬i → lane-shown rk mq (lane-under rk mq kq) λ { (z , _ , m′ , st , zq , _) → ¬i (at st (≼-split {z} {q} zq) m′) }
-            where
-              Y = k ⊕ [ sub J ]
-              uu : up (up (Y ⊕ [ ix 0 ])) ≡ k
-              uu = trans (cong up (up-⊕ Y (ix 0))) (up-⊕ k (sub J))
-              at : ∀ {z e″} → Step Y z → z ≺ q ⊎ z ≡ q → LS.M′ z e″ → k ∈ ks′
-              at (inj₁ refl) (inj₁ lt) m′ = there (there (∈-++⁺ˡ (subst (_∈ L.map up ks) (up-⊕ k (sub J)) (∈-map⁺ up (h m′ lt)))))
-              at (inj₂ refl) (inj₁ lt) m′ =
-                there (there (∈-++⁺ʳ (L.map up ks) (subst (_∈ L.map (λ x → up (up x)) ks) uu (∈-map⁺ (λ x → up (up x)) (h m′ lt)))))
-              at (inj₁ refl) (inj₂ eq) _  = here (trans (sym (up-⊕ k (sub J))) (cong up eq))
-              at (inj₂ refl) (inj₂ eq) _  = there (here (trans (sym uu) (cong (λ x → up (up x)) eq)))
-      af : ∀ cσ → LS.Inv cM cσ → After cM q → After cσ q
-      af nothing  _   _ = tt
-      af (just y) iv′ a = ≺-trans {y} {y ⊕ [ sub J ]} {q} (≺-ext y []) (proj₂ (LS.Inv.i2 iv′ refl) a)
-      least : ∀ {y x} → σ₃ y (out x) → After cσ y → q ≼ y
-      least {y} {x} ry ay yq = lane-shown ry mq J≼ λ { (_ , _ , m′ , _ , _ , ev) → go (ev refl) m′ }
-        where
-          J≼ : (y ⊕ [ sub J ]) ≼ q
-          J≼ = lane-under ry mq yq
-          go : ∀ {z e″} → z ≡ y ⊕ [ sub J ] × e″ ≡ out (Ln x) → LS.M′ z e″ → ⊥
-          go (refl , refl) m′ with ≼-split {y ⊕ [ sub J ]} {q} J≼
-          ... | inj₁ lt = lst m′ tt (LS.Inv.i1 iv ry ay m′) lt
-          ... | inj₂ eq = lane-not (src-func mq (subst (λ z → LS.M′ z (out (Ln x))) eq m′)) nl
-            where
-              lane-not : out a ≡ out (Ln x) → laneTag (out a) ≡ nothing → ⊥
-              lane-not refl ()
+      J q₀ Y : Pos
+      J  = OS.J
+      q₀ = p₀₀ ⊕ [ ix 1 ]
+      Y  = y ⊕ [ sub J ]
 
-  -- Where the source's next row is not a lane's, the lanes' end before it
-  -- has no value after it.
-  end-gap : ∀ {c q} → (∀ {y x} → σ₃ y (out x) → After c y → q ≼ y)
-          → ∀ {y} → σ₃ y end → After c y → q ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After c k → y ≼ k)
-  end-gap {c} {q} outl {y} _ _ with y <ᵖ q in yq
-  ... | true  = inj₂ λ {k} rk ak ky → outl rk ak (≺-trans {k} {y} {q} ky (Equivalence.from T-≡ yq))
-  ... | false = inj₁ λ ()
+      U : Pos → Set
+      U z = Σ Pos λ e′ → Σ Path λ zs → z ≡ y ⊕ (sub e′ ∷ zs) × q₀ ≼ e′
 
-  -- Where it is a lane's, the lanes' row it shows.
-  next-at : ∀ rx₁ {q a rx₂} → LS.Runs nothing nothing rx₁
-          → Run LS.M′ (cursor nothing rx₁) ((q , out a) ∷ rx₂) → BView laneB (out a) → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × LaneNext rs q
-  next-at rx₁ (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (isB x) with LS.next iv (proj₁ (proj₁ sn)) lst
-  ... | y , _ , refl , refl , seen , af , least =
-    rs , pr , mr , y , cong nm (sym (rootOf-ext y [ sub LS.J ])) , proj₂ seen , af ,
-    (λ ry ay → least ry tt ay) , (λ ry ay → inj₁ (least ry tt ay))
-  next-at rx₁ {q} (rs , pr , mr , iv) rn (notB nl) with lane-gap iv rn nl
-  ... | fw , af , outl = rs , pr , mr , q , refl , fw , af , outl , end-gap {c = cursor nothing rs} outl
+      ⊑q : ∀ {q′} → y ≺ q′ → q′ ≺ Y → y ⊑ q′
+      ⊑q {q′} lt lt′ = <ᵖ-between y q′ [ sub J ] (Equivalence.to T-≡ lt) (Equivalence.to T-≡ lt′)
 
-  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × LaneNext rs q
-  lane-next rx₁ {q} {a} {rx₂} mt = next-at rx₁ (lane-run (run-prefix rx₁ mt))
+      lead : ∀ {c′ w} → y ≺ (c′ ⊕ [ sub w ]) → (c′ ⊕ [ sub w ]) ≺ Y → y ⊑ c′
+      lead {c′} {w} lt lt′ with ⊑-snoc c′ (⊑q {c′ ⊕ [ sub w ]} lt lt′)
+      ... | inj₁ yc = yc
+      ... | inj₂ eq = ⊥-elim (≺-irrefl {y} (subst (y ≺_) (sym eq) lt))
+
+      env-apart : ∀ {h} → Hots env₀ h → y ⊑ h → ⊥
+      env-apart hc yh = proj₂ (ok-step c ok₀′) hc (InvAt.world I₁ (proj₁ ry)) (⊑-inside yh)
+
+      σ₁-lead : ∀ {h e′} → σ₁ h e′ → y ⊑ h → h ≡ y
+      σ₁-lead rh ([] , eq)      = trans eq (⊕-identityʳ y)
+      σ₁-lead rh (_ ∷ _ , refl) = ⊥-elim (Lawful.flat L₁ ry rh)
+
+      self : y ⊑ y
+      self = [] , sym (⊕-identityʳ y)
+
+      dj₂ : ∀ {w} → W (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) w → w ≡ y → ⊥
+      dj₂ ww refl = proj₂ (ok-step p₀ ok₁) (inj₁ (_ , ry)) ww (⊑-inside self)
+
+      dj₃ : ∀ {w} → W (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) q₀ w → w ≡ y → ⊥
+      dj₃ ww refl = proj₂ (ok-step p₀₀ ok₂) (inj₂ (inj₁ (_ , ry))) ww (⊑-inside self)
+
+      sy₂ : y ⊑ (p₀ ⊕ [ ix 1 ]) → ⊥
+      sy₂ ys = ⊑-≼ {y} {p₀ ⊕ [ ix 1 ]} ys (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {y} s₂≺c₁ (σ₁-after ry))
+
+      sy₃ : y ⊑ q₀ → ⊥
+      sy₃ ys = ⊑-≼ {y} {q₀} ys (≺-trans {q₀} {p₀ ⊕ [ ix 1 ]} {y} q₀≺s₂ (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {y} s₂≺c₁ (σ₁-after ry)))
+
+      hy₂ : ∀ {h} → Hots (hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ U h
+      hy₂ (inj₁ (_ , rh)) yh = inj₁ (σ₁-lead rh yh)
+      hy₂ (inj₂ hc)       yh = ⊥-elim (env-apart hc yh)
+
+      -- The closer's rows under `y`,
+      in-σ₂ : ∀ {h e′} → σ₂ h e′ → y ⊑ h → U h
+      in-σ₂ (r , _) = under-hot {H = Hots (hot σ₁ ∷ env₀)} {s = p₀ ⊕ [ ix 1 ]} {q = q₀} {y = y} (≺→≼ {q₀} {p₀ ⊕ [ ix 1 ]} q₀≺s₂) hy₂ dj₂ sy₂
+                        (InvAt.world I₂ r) (InvAt.real I₂ r)
+
+      hy₃ : ∀ {h} → Hots (hot σ₂ ∷ hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ U h
+      hy₃ (inj₁ (_ , r₂))        yh = inj₂ (in-σ₂ r₂ yh)
+      hy₃ (inj₂ (inj₁ (_ , rh))) yh = inj₁ (σ₁-lead rh yh)
+      hy₃ (inj₂ (inj₂ hc))       yh = ⊥-elim (env-apart hc yh)
+
+      -- and the lanes'.
+      in-σ₃ : ∀ {h e′} → σ₃ h e′ → y ⊑ h → U h
+      in-σ₃ (r , _) = under-hot {H = Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)} {s = q₀} {q = q₀} {y = y} (≼-refl {q₀}) hy₃ dj₃ sy₃
+                        (InvAt.world I₃ r) (InvAt.real I₃ r)
+
+      J≺q₀ : J ≺ q₀
+      J≺q₀ = subst (_≺ q₀) (sym (proj₂ OS.J-under)) (P≺q₀ (proj₁ OS.J-under))
+
+      past-Y : ∀ {c′ w} → U c′ → Y ≺ (c′ ⊕ [ sub w ])
+      past-Y {w = w} (e′ , zs , refl , qe) =
+        subst (Y ≺_) (sym (⊕-assoc y (sub e′ ∷ zs) [ sub w ]))
+          (Equivalence.from T-≡ (<ᵖ-part y {sub J} {sub e′} [] (zs ++ [ sub w ]) (Equivalence.to T-≡ (≺-≼-≺ {J} {q₀} {e′} J≺q₀ qe))))
+
+      sent : ∀ {q′ c′ w} → q′ ≡ c′ ⊕ [ sub w ] → (y ⊑ c′ → U c′) → y ≺ q′ → q′ ≺ Y → ⊥
+      sent {c′ = c′} {w} refl un lt lt′ = ≺-absurd {c′ ⊕ [ sub w ]} {Y} lt′ (past-Y {c′} {w} (un (lead {c′} {w} lt lt′)))
+
+      apart : ∀ {q′ c′ w} → Hots env₀ c′ → q′ ≡ c′ ⊕ [ sub w ] → y ≺ q′ → q′ ≺ Y → ⊥
+      apart {c′ = c′} {w} hc refl lt lt′ = env-apart hc (lead {c′} {w} lt lt′)
+
+      go : ∀ {q′} a′ → OS.M′ q′ (out a′) → y ≺ q′ → q′ ≺ Y → ⊥
+      go nothing r _ _ = ev-none m _ env′ P (toM r)
+      go (just (inj₂ x)) r lt lt′ with track-sent (toM r)
+      ... | _ , _ , hc , eq = apart (inj₂ hc) eq lt lt′
+      go (just (inj₁ (laneB , x))) r lt lt′ with lane-sent (toM r)
+      ... | _ , _ , σc , eq = sent eq (in-σ₃ σc) lt lt′
+      go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
+      ... | _ , _ , σc , eq = sent eq (in-σ₂ σc) lt lt′
+      go (just (inj₁ (outerB , x))) r lt lt′ with OS.split r
+      ... | _ , refl , y′ , refl , ry′ , _ with ⊑-snoc y′ (⊑q lt lt′)
+      ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
+      ...   | inj₁ ([] , refl) = ≺-irrefl {(y ⊕ []) ⊕ [ sub J ]} (subst (λ z → ((y ⊕ []) ⊕ [ sub J ]) ≺ (z ⊕ [ sub J ])) (sym (⊕-identityʳ y)) lt′)
+      ...   | inj₁ (l ∷ ws , refl) = Lawful.flat L₁ ry ry′
+
+  -- AN OUTER ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
+  outer-shown : ∀ {y e q a} → σ₁ y e → OS.M′ q (out a) → (y ⊕ [ sub OS.J ]) ≼ q
+              → ¬ ¬ Σ Pos λ z → Σ (Ev (Maybe (Input B))) λ e″ → OS.M′ z e″ × Step (y ⊕ [ sub OS.J ]) z × z ≼ q
+                × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub OS.J ] × e″ ≡ out (OS.g x))
+  outer-shown ry mq = OS.Rows.Shown.shown′ OS.dpast (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
+    (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq (OS.dshow sh-σ₁) ry
+
+  private
+    module LN = LS.Next lane-shown lane-under
+    module ON = OS.Next outer-shown outer-under
+
+  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+            → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub LS.J ]) × LN.NextAt (cursor nothing rs) w
+  lane-next rx₁ {q} {a} {rx₂} mt = LN.next-at (lane-run (run-prefix rx₁ mt))
     (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview laneB (out a))
 
   -- The lanes' counter is none, or of the name the lanes last began,
@@ -497,16 +594,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     within-of (past-within {B} {B} cl (λ x → x) (λ _ _ → refl) LS.J op init r₀ rx rs
       (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (within₀ {B} laneB r₀))
 
-  -- With a route open, the lanes' next visible row lies past `w`.
-  idle-least : ∀ {rs : List (Pos × Ev (IE B))} {w} → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥)
-             → (∀ {y x} → σ₃ y (out x) → After (cursor nothing rs) y → w ≼ y)
-             → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → w ≼ y ⊎ (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k))
-             → ∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → w ≼ y
-  idle-least _    outl _    {e′ = out _} ry _ ay = outl ry ay
-  idle-least shut _    endl {e′ = end}   ry _ ay with endl ry ay
-  ... | inj₁ h   = h
-  ... | inj₂ all = ⊥-elim (shut ry ay all)
-
   -- Where the lanes still count a route, no lane end is next.
   lane-shut : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
             → ∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥
@@ -515,12 +602,82 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
   lanes-current rx₁ mt with lane-next rx₁ mt
-  ... | rs , pr , _ , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
+  ... | rs , pr , _ , w , wq , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
   ...   | inj₂ (at≡ , _) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
   ...     | Nl.yes z = inj₁ z
   ...     | Nl.no nz =
-    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) nw))
+    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (LN.idle-least (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) (named-at LS.J wq)))
+
+  -- The outer's next row past what the source met.
+  outer-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+             → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Met σ₁ rs
+               × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub OS.J ]) × ON.NextAt (cursor nothing rs) w
+  outer-next rx₁ {q} {a} {rx₂} mt = ON.next-at (OS.run′ (subst (λ d → Run (enter d P) nothing rx₁) (src-op tk env′ m) (run-prefix rx₁ mt)))
+    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview outerB (out a))
+
+  -- The outer's counter is none, or of the name the outer last began,
+  -- with a route of it open.
+  outer-count : ∀ {rx rs} → Met M rx → BProj outerB (opening {A} {B}) OS.J rx rs
+              → Flat.outer (proj₁ (past op init rx)) ≡ 0
+              ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
+  outer-count {rx} {rs} mt pr =
+    within-of (past-within {A} {B} co (opening {A} {B}) count-open OS.J op init r₀ rx rs
+      (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (within₀ {B} outerB r₀))
+
+  -- The outer's proper rows are idle where the outer is.
+  outer-idle : Idle σ₁
+  outer-idle = proper-idle (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁) (Held.idle H₁)
+
+  postulate
+    -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
+    -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: past the outer's cursor,
+    -- its end lies in the instant the source meets next.
+    outer-end-at : ∀ rx₁ {q a rx₂ rs y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → BProj outerB (opening {A} {B}) OS.J rx₁ rs
+                 → σ₁ y end → After (cursor nothing rs) y → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
+                 → nameOf y ≡ nameOf q
+
+  -- THE SCAN'S OUTER COUNTER IS OF THE SOURCE'S NEXT ROW'S INSTANT, OR
+  -- NONE: it is of the instant the outer last began, which the outer,
+  -- idle, keeps up to its next row, or up to its end.
+  outer-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
+                → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+  outer-current rx₁ {q} mt with outer-next rx₁ mt
+  ... | rs , pr , mr , w , wq , fw , af , outl , _ with outer-count (run-prefix rx₁ mt) pr
+  ...   | inj₁ z = inj₁ z
+  ...   | inj₂ (at≡ , k , ck) with Flat.outer (proj₁ (past op init rx₁)) ℕ.≟ 0
+  ...     | Nl.yes z = inj₁ z
+  ...     | Nl.no nz = inj₂ (trans at≡ (decidable-stable (proj₁ (cnt rs) ≟ᵖ nameOf q) λ ¬g → ¬g (idle-w λ e → ¬g (idle-y e))))
+    where
+      Cr : Maybe Pos
+      Cr = cursor nothing rs
+
+      at-idle : ∀ {v} → Few σ₁ v → After Cr v → (∀ {y e} → σ₁ y e → Visible e → After Cr y → v ≼ y) → proj₁ (cnt rs) ≡ nameOf v
+      at-idle fv av lv with outer-idle mr (λ i → bproj-end pr i) fv av lv
+      ... | inj₁ z = ⊥-elim (ℕP.0≢1+n (trans (sym z) ck))
+      ... | inj₂ n = n
+
+      -- No outer end before `w`: the outer is idle at `w`.
+      idle-w : (Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → ⊥) → proj₁ (cnt rs) ≡ nameOf q
+      idle-w ne = trans (at-idle fw af lw) (named-at OS.J wq)
+        where
+          lw : ∀ {y e} → σ₁ y e → Visible e → After Cr y → w ≼ y
+          lw {e = out _} ry _ ay    = outl ry ay
+          lw {e = end}   ry _ ay yw = ne (_ , ry , ay , yw)
+          lw {e = skip}  _  () _
+          lw {e = pin _} _  () _
+
+      -- An outer end before it: the outer is idle at that end.
+      idle-y : Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → proj₁ (cnt rs) ≡ nameOf q
+      idle-y (y , ry , ay , yw) =
+        trans (at-idle (proj₁ fw , λ {k} rk ky → proj₂ fw rk (≺-trans {k} {y} {w} ky yw)) ay ly)
+              (outer-end-at rx₁ mt pr ry ay (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
+        where
+          ly : ∀ {y′ e} → σ₁ y′ e → Visible e → After Cr y′ → y ≼ y′
+          ly {y′} {out _} ry′ _ ay′ = ≺→≼ {y} {y′} (≺-≼-≺ {y} {w} {y′} yw (outl ry′ ay′))
+          ly {e = end}    ry′ _ _   = Lawful.proper L₁ ry′ ry
+          ly {e = skip}   _   () _
+          ly {e = pin _}  _   () _
 
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
@@ -555,7 +712,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   flat-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                → tot (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
   flat-current rx₁ mt = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
-    (outer-current rx₁ mt tt) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
+    (outer-current rx₁ mt) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
     where st = proj₁ (past op init rx₁)
 
   start-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)

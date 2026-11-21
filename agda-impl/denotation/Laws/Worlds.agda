@@ -225,17 +225,17 @@ private
   back-real acc (ix i ∷ x)   b           = back-real (acc ⊕ [ ix i ]) x b
   back-real acc (last ∷ x)   b           = back-real (acc ⊕ [ last ]) x b
 
-  -- What a reachable position's last `sub` names is reachable.
-  real-last : ∀ x {e} → Real (x ⊕ [ sub e ]) → Real e
-  real-last (frame ∙ p)       r           = back-real root p r
-  real-last (cascade t e l ∙ p) (_ , _ , b) = back-real (fired t e ▸ l) p b
-
   back-snoc : ∀ acc x {l} → Plain l → Back acc x → Back acc (x ++ [ l ])
   back-snoc acc []           plain-ix   b            = tt
   back-snoc acc []           plain-last b            = tt
   back-snoc acc (sub e ∷ x)  pl         (r , lt , b) = r , lt , back-snoc (acc ⊕ [ sub e ]) x pl b
   back-snoc acc (ix j ∷ x)   pl         b            = back-snoc (acc ⊕ [ ix j ]) x pl b
   back-snoc acc (last ∷ x)   pl         b            = back-snoc (acc ⊕ [ last ]) x pl b
+
+-- What a reachable position's last `sub` names is reachable.
+real-last : ∀ x {e} → Real (x ⊕ [ sub e ]) → Real e
+real-last (frame ∙ p)       r           = back-real root p r
+real-last (cascade t e l ∙ p) (_ , _ , b) = back-real (fired t e ▸ l) p b
 
 -- A reachable position's prefix is reachable.
 real-init : ∀ x ys → Real (x ⊕ ys) → Real x

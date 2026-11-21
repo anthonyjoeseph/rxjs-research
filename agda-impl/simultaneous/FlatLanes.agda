@@ -15,6 +15,8 @@ open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m∸n≤m; n≤0⇒n≡0; ∸-monoˡ-≤)
@@ -71,6 +73,13 @@ data BProj {A B : Set} (b : Branch) (h : IE A → IE B) (J : Pos)
   []   : BProj b h J [] []
   keep : ∀ {y x rx rs} → BProj b h J rx rs → BProj b h J ((y ⊕ [ sub J ] , out (Tg b (h x))) ∷ rx) ((y , out x) ∷ rs)
   drop : ∀ {q e rx rs} → brTag b e ≡ nothing → BProj b h J rx rs → BProj b h J ((q , e) ∷ rx) rs
+
+-- A projection keeps only the branch's values.
+bproj-end : ∀ {A B b} {h : IE A → IE B} {J rx rs c} → BProj b h J rx rs → (c , end) ∈ rs → ⊥
+bproj-end []          ()
+bproj-end (keep pr)   (here ())
+bproj-end (keep pr)   (there i) = bproj-end pr i
+bproj-end (drop _ pr) i         = bproj-end pr i
 
 -- Nothing is met past the end.
 end-last : ∀ {A H p} {t : EmissionSet A} → InvAt H p t → ∀ r₁ {q r₂} → Met t (r₁ ++ (q , end) ∷ r₂) → r₂ ≡ []

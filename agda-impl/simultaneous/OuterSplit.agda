@@ -12,7 +12,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using ([]; _∷_; [_])
 open import Effect.Monad using (RawMonad)
 open import Level using () renaming (zero to lzero)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; does)
 open import Relation.Nullary.Negation using (¬¬-Monad)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
@@ -25,11 +25,30 @@ open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB)
 open import simultaneous.FlatLanes using (Tg)
 open import simultaneous.BranchSplit using (SrcOf; OwnOf; K; kout; kskip; kend; mev; module BranchSplit)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Input; opening)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Input; opening; count)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed)
 
 -- The outer's row, as the source tags it.
 Ou : ∀ {B} → IE B → Maybe (Input B)
 Ou x = Tg outerB x
+
+-- An outer row counts as its opening does: a value opens no route.
+count-open : ∀ {A B} c (x : IE A) → count c (opening {A} {B} x) ≡ count c x
+count-open c        (instEmit (value _) _)        = refl
+count-open (cm , _) (instEmit (mark begin) n)     with does (n ≟ᵖ cm)
+... | true  = refl
+... | false = refl
+count-open c        (instEmit (mark over) _)       = refl
+count-open c        (instEmit (mark stop) _)       = refl
+count-open c        (instEmit (mark outerOpen) _)  = refl
+count-open c        (instEmit (mark outerClose) _) = refl
+count-open c        (instEmit (mark laneStart) _)  = refl
+count-open c        (instEmit (mark carry) _)      = refl
+count-open c        (instEmit (mark laneDone) _)   = refl
+count-open c        (instEmit (mark burstEnd) _)   = refl
+count-open c        (instEmit (mark outerDone) _)  = refl
+count-open c        (instEmit (mark subscribed) _) = refl
+count-open c        (instEmit (mark completed) _)  = refl
 
 module OuterSplit {A B : Set} (σ : EmissionSet (IE A)) (Lσ : Lawful σ) (P : Pos)
                   (F C : Bool → Den (Maybe (Input B))) (G : Branch → Den (Maybe (Input B)))

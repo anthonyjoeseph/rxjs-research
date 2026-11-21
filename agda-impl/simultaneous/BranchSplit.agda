@@ -27,7 +27,8 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; cong; trans)
+open import Data.Sum using (_⊎_)
 
 open import Tree using (mergeᶠ)
 open import denotation.Position using (Pos; Path; ix; sub; root; _≟ᵖ_; _⊕_; inside)
@@ -46,7 +47,9 @@ open import denotation.Laws.Count using (em)
 import denotation.Laws.Join as LJ
 open import denotation.Laws.Rejoined using (lower; row-few; row-reach)
 open import denotation.Up using (up; up-⊕)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import denotation.Laws.Shows using (∈-stable)
+open import denotation.Position using (_<ᵖ_)
 import Data.List as L
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB; laneB; closeB)
 open import simultaneous.FlatLanes using (Tg; brTag; tagged; BProj; keep; drop)
@@ -644,3 +647,85 @@ module BranchSplit {A B : Set} (σ : EmissionSet (IE A)) (Lσ : Lawful σ) (P : 
           dshow f1 ry Yq >>= λ (e₁ , t1 , k1 , o1) →
           lifted k1 t1 Yq >>= λ (z , e″ , t5 , st , zq , pr) →
           pure (z , e″ , t5 , st , zq , λ {_} eq → pr (o1 eq))
+
+    ------------------------------------------------------------------------
+    -- The branch's next row, past a run met
+
+    -- Where the source's reader of the branch shows each branch row before
+    -- one of its values, and no source value lies under a branch row before
+    -- the reader joins it.
+    module Next (shown : ∀ {y e q a} → σ y e → M′ q (out a) → (y ⊕ [ sub J ]) ≼ q
+                         → ¬ ¬ Σ Pos λ z → Σ (Ev (Maybe (Input B))) λ e″ → M′ z e″ × Step (y ⊕ [ sub J ]) z × z ≼ q
+                           × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub J ] × e″ ≡ out (g x)))
+                (under : ∀ {y e q a} → σ y e → M′ q (out a) → y ≺ q → (y ⊕ [ sub J ]) ≼ q) where
+
+      -- WHERE THE SOURCE'S NEXT ROW IS NOT THE BRANCH'S, no branch value
+      -- lies before it past the branch's cursor, as the source would have
+      -- met it first.
+      gap : ∀ {cM cσ q a rx₂} → Inv cM cσ → Run M′ cM ((q , out a) ∷ rx₂) → brTag b (out a) ≡ nothing
+          → Few σ q × After cσ q × (∀ {y x} → σ y (out x) → After cσ y → q ≼ y)
+      gap {cM} {cσ} {q} {a} iv ((((mq , _) , ks , hk) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
+        where
+          ks′ : List Pos
+          ks′ = up q ∷ up (up q) ∷ L.map up ks ++ L.map (λ x → up (up x)) ks
+          few : Few σ q
+          few = ks′ , pick
+            where
+              pick : ∀ {k e′} → σ k e′ → k ≺ q → k ∈ ks′
+              pick {k} rk kq = ∈-stable λ ¬i → shown rk mq (under rk mq kq) λ { (z , _ , m′ , st , zq , _) → ¬i (at st (≼-split {z} {q} zq) m′) }
+                where
+                  Y = k ⊕ [ sub J ]
+                  uu : up (up (Y ⊕ [ ix 0 ])) ≡ k
+                  uu = trans (cong up (up-⊕ Y (ix 0))) (up-⊕ k (sub J))
+                  at : ∀ {z e″} → Step Y z → z ≺ q ⊎ z ≡ q → M′ z e″ → k ∈ ks′
+                  at (inj₁ refl) (inj₁ lt) m′ = there (there (∈-++⁺ˡ (subst (_∈ L.map up ks) (up-⊕ k (sub J)) (∈-map⁺ up (hk m′ lt)))))
+                  at (inj₂ refl) (inj₁ lt) m′ =
+                    there (there (∈-++⁺ʳ (L.map up ks) (subst (_∈ L.map (λ x → up (up x)) ks) uu (∈-map⁺ (λ x → up (up x)) (hk m′ lt)))))
+                  at (inj₁ refl) (inj₂ eq) _  = here (trans (sym (up-⊕ k (sub J))) (cong up eq))
+                  at (inj₂ refl) (inj₂ eq) _  = there (here (trans (sym uu) (cong (λ x → up (up x)) eq)))
+          af : ∀ cσ → Inv cM cσ → After cM q → After cσ q
+          af nothing  _   _ = tt
+          af (just y) iv′ a = ≺-trans {y} {y ⊕ [ sub J ]} {q} (≺-ext y []) (proj₂ (Inv.i2 iv′ refl) a)
+          least : ∀ {y x} → σ y (out x) → After cσ y → q ≼ y
+          least {y} {x} ry ay yq = shown ry mq J≼ λ { (_ , _ , m′ , _ , _ , ev) → met (ev refl) m′ }
+            where
+              J≼ : (y ⊕ [ sub J ]) ≼ q
+              J≼ = under ry mq yq
+              met : ∀ {z e″} → z ≡ y ⊕ [ sub J ] × e″ ≡ out (g x) → M′ z e″ → ⊥
+              met (refl , refl) m′ with ≼-split {y ⊕ [ sub J ]} {q} J≼
+              ... | inj₁ lt = lst m′ tt (Inv.i1 iv ry ay m′) lt
+              ... | inj₂ eq = tagged b (subst (λ z → brTag b z ≡ nothing) (funcM mq (subst (λ z → M′ z (out (g x))) eq m′)) nl)
+
+      -- Where the source's next row is not the branch's, the branch's end
+      -- before it has no value after it.
+      end-gap : ∀ {c q} → (∀ {y x} → σ y (out x) → After c y → q ≼ y)
+              → ∀ {y} → σ y end → After c y → q ≼ y ⊎ (∀ {k x} → σ k (out x) → After c k → y ≼ k)
+      end-gap {c} {q} outl {y} _ _ with y <ᵖ q in yq
+      ... | true  = inj₂ λ {k} rk ak ky → outl rk ak (≺-trans {k} {y} {q} ky (Equivalence.from T-≡ yq))
+      ... | false = inj₁ λ ()
+
+      -- A position the branch's next value lies no earlier than, nor its
+      -- end unless no value follows it.
+      NextAt : Maybe Pos → Pos → Set
+      NextAt c w = Few σ w × After c w × (∀ {y x} → σ y (out x) → After c y → w ≼ y)
+                 × (∀ {y} → σ y end → After c y → w ≼ y ⊎ (∀ {k x} → σ k (out x) → After c k → y ≼ k))
+
+      -- THE BRANCH'S NEXT ROW, past the run met before the source's next
+      -- row: at that row, or the branch's row it shows.
+      next-at : ∀ {rx₁ q a rx₂} → Runs nothing nothing rx₁ → Run M′ (cursor nothing rx₁) ((q , out a) ∷ rx₂) → BView b (out a)
+              → Σ _ λ rs → BProj b h J rx₁ rs × Run σ nothing rs × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub J ]) × NextAt (cursor nothing rs) w
+      next-at (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (isB x) with next iv (proj₁ (proj₁ sn)) lst
+      ... | y , _ , refl , refl , seen , af , least =
+        rs , pr , mr , y , inj₂ refl , proj₂ seen , af , (λ ry ay → least ry tt ay) , (λ ry ay → inj₁ (least ry tt ay))
+      next-at {q = q} (rs , pr , mr , iv) rn (notB nl) with gap iv rn nl
+      ... | fw , af , outl = rs , pr , mr , q , inj₁ refl , fw , af , outl , end-gap {c = cursor nothing rs} outl
+
+      -- With no end next, the branch's next visible row lies past `w`.
+      idle-least : ∀ {c w} → (∀ {y} → σ y end → After c y → (∀ {k x} → σ k (out x) → After c k → y ≼ k) → ⊥)
+                 → (∀ {y x} → σ y (out x) → After c y → w ≼ y)
+                 → (∀ {y} → σ y end → After c y → w ≼ y ⊎ (∀ {k x} → σ k (out x) → After c k → y ≼ k))
+                 → ∀ {y e′} → σ y e′ → Visible e′ → After c y → w ≼ y
+      idle-least _    outl _    {e′ = out _} ry _ ay = outl ry ay
+      idle-least shut _    endl {e′ = end}   ry _ ay with endl ry ay
+      ... | inj₁ h′  = h′
+      ... | inj₂ all = ⊥-elim (shut ry ay all)
