@@ -106,24 +106,6 @@ after-ok N n o q (_ , eq , m) = listC-past N n o q eq m
 pin-after-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {l r} → TR (listC N n o ρL q) l (pin r) → q ≼ r
 pin-after-ok N n o q (_ , eq , m) = listC-pinpast N n o q eq m
 
-private
-  dropLast : List Label → List Label
-  dropLast []           = []
-  dropLast (_ ∷ [])     = []
-  dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
-
-  dropLast-++ : ∀ ys l → dropLast (ys L.++ [ l ]) ≡ ys
-  dropLast-++ []           l = refl
-  dropLast-++ (y ∷ [])     l = refl
-  dropLast-++ (y ∷ z ∷ zs) l = cong (y ∷_) (dropLast-++ (z ∷ zs) l)
-
--- One label up.
-up : Pos → Pos
-up (i ∙ ys) = i ∙ dropLast ys
-
-up-⊕ : ∀ q l → up (q ⊕ [ l ]) ≡ q
-up-⊕ (i ∙ ys) l = cong (i ∙_) (dropLast-++ ys l)
-
 -- A path walked one label at a time, as the listing walks it.
 infixl 5 _⊕ˡ_
 _⊕ˡ_ : Pos → List Label → Pos

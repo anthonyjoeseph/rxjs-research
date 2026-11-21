@@ -36,7 +36,7 @@ open import simultaneous.HeldDefer using (held-defer)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
 open import simultaneous.HeldTrigger using (held-trigger)
 open import simultaneous.CombRun using (comb-run)
-open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
+open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
 open import simultaneous.DenRows using (map-out′; hot-out)
@@ -59,6 +59,7 @@ open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; 
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
 open import simultaneous.HeldComb using (exact-past; inv-at)
 open import simultaneous.FlatPark using (past-park)
+open import simultaneous.LaneSplit using (SrcOf; module LaneSplit; module Spots)
 open import simultaneous.FlatLanes using (laneTag; lane-vals; end-last; past-lanes; lanes-of; lanes₀)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
@@ -77,13 +78,17 @@ open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import simultaneous.Routed using (nameOf; nm; Valued; opos)
-open import simultaneous.Layers using () renaming (run-row to run-row∈)
+open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
-open import denotation.Laws.Worlds using (ok-step; _⊑_)
+open import denotation.Laws.Worlds using (ok-step; _⊑_; InvAt; world-after)
+open import denotation.Laws.Modulus using (≺-trans)
+open import denotation.Events using (<ᵖ-part)
+open import Data.Bool.Properties using (T-≡)
+open import Function using (Equivalence)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -92,7 +97,8 @@ open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
 open import simultaneous.Project using (Proj; proj-outs; run-prefix)
 open import denotation.EmissionSet using (skip; pin; Few; _≼_; module TakeWhile)
-open import denotation.Read using (After; cursor)
+open import denotation.Read using (After; cursor; Run)
+import denotation.Read as Run
 open import Data.Nat.Properties using (0≢1+n)
 open import Data.Bool using (Bool; T)
 open import denotation.Position using (isLt; cmpPath)
@@ -477,10 +483,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
 
-  g₃ : GoodEnv env′
-  g₃ = good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))
+  g₂ : GoodEnv (hot σ₂ ∷ hot σ₁ ∷ env₀)
+  g₂ = good-cons L₂ (good-cons L₁ (good-cons L₀ gd))
     where
       L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+
+  g₃ : GoodEnv env′
+  g₃ = good-cons L₃ g₂
 
   -- Where a branch's reader ends: past its source's end.
   data BEnd : Pos → Set where
@@ -559,10 +568,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                (λ a L q okq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
                                    (good-cons L g₂) eh q okq eq))
                (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
-    where
-      L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
-      g₂ : GoodEnv (hot σ₂ ∷ hot σ₁ ∷ env₀)
-      g₂ = good-cons L₂ (good-cons L₁ (good-cons L₀ gd))
 
   lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
   lane-named = Fit.fine lane-fit
@@ -618,16 +623,53 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- outer, branches and trackers together.
     scan-rest     : Rest scanned
 
+  -- The lanes' hot lies wholly past the source's subscription.
+  lanes-past : ∀ zs {k e} → σ₃ k e → (P ⊕ zs) ≺ k
+  lanes-past zs {k} (r , _) = ≺-trans {P ⊕ zs} {p₀₀ ⊕ [ ix 1 ]} {k}
+    (subst (_≺ (p₀₀ ⊕ [ ix 1 ])) (sym (⊕-assoc p₀₀ [ ix 0 ] zs)) (Equivalence.from T-≡ (<ᵖ-part p₀₀ zs [] refl)))
+    (world-after (InvAt.world I r) (InvAt.real I r))
+    where I = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+
+  src-func : ∀ {y e e′} → SrcOf (λ b → ev m (fed tk b) env′) P y e → SrcOf (λ b → ev m (fed tk b) env′) P y e′ → e ≡ e′
+  src-func {y} {e} {e′} a b = InvAt.func (inv-ev m src env′ g₃ P ok₃)
+    (subst (λ d → enter d P y e) (sym (src-op tk env′ m)) a) (subst (λ d → enter d P y e′) (sym (src-op tk env′ m)) b)
+
+  private
+    module LS = LaneSplit σ₃ L₃ P (λ b → ev m (fed tk b) env′) (λ c → ev m (Cat-of tk env′ c) env′) (λ b → ev m (Tag tk env′ b) env′)
+      (own-op tk env′ m) (cat-op tk env′ m) (tag-op tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
+      src-func lanes-past
+
+  -- The lanes' rows a run of the source met are a run of the lanes.
+  lane-run : ∀ {rx} → Met M rx → LS.Lanes nothing nothing rx
+  lane-run {rx} mt = LS.lane-run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+
+  -- A position of the source's next row's instant that the lanes' next
+  -- row lies no earlier than.
+  LaneNext : List (Pos × Ev (IE B)) → Pos → Set
+  LaneNext rs q = Σ Pos λ w → nameOf w ≡ nameOf q × Few σ₃ w × After (cursor nothing rs) w
+                × (∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → w ≼ y)
+
   postulate
-    -- The lanes' rows a run of the source met are a run of the lanes.
-    lane-run    : ∀ {rx} → Met M rx → Σ _ λ rs → Proj laneTag rx rs × Met σ₃ rs
-    -- What the lanes tell of past those rows lies no earlier than the
-    -- source's next row: no source row lies under a lane's row.
-    lane-next   : ∀ rx₁ {q e rx₂ rs} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → Proj laneTag rx₁ rs
+    -- WHERE THE SOURCE'S NEXT ROW IS NOT A LANE'S, the lanes tell nothing
+    -- before it: no source row lies under a lane's row, nor past a lane's
+    -- row the source never shows.
+    lane-gap    : ∀ rx₁ {q e rx₂ rs} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → laneTag e ≡ nothing → Proj laneTag rx₁ rs
                 → Few σ₃ q × After (cursor nothing rs) q
                 × (∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → q ≼ y)
     -- The lanes keep no route past its instant.
     lane-idle   : Idle σ₃
+
+  -- Where it is a lane's, the lanes' row it shows.
+  next-at : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → LS.Lanes nothing nothing rx₁
+          → Run LS.M′ (cursor nothing rx₁) ((q , e) ∷ rx₂) → LS.LView e → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
+  next-at rx₁ mt v (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (LS.isLane x) with LS.next-lane iv (proj₁ (proj₁ sn)) lst
+  ... | y , refl , _ , seen , af , least = rs , pr , mr , y , cong nm (sym (rootOf-ext y [ sub (Spots.J P) ])) , proj₂ seen , af , least
+  next-at rx₁ {q} mt v (rs , pr , mr , _) _ (LS.notLane nl) with lane-gap rx₁ mt v nl pr
+  ... | fw , af , least = rs , pr , mr , q , refl , fw , af , least
+
+  lane-next : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
+  lane-next rx₁ {q} {e} {rx₂} mt v = next-at rx₁ mt v (lane-run (run-prefix rx₁ mt))
+    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , e) ∷ rx₂)) (src-op tk env′ m) mt)) (LS.lview e)
 
   -- The lanes' counter is none, or of the name the lanes last began,
   -- with a route of it open.
@@ -639,13 +681,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   lanes-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  lanes-current rx₁ mt v with lane-run (run-prefix rx₁ mt)
-  ... | rs , pr , mr with lanes-count (run-prefix rx₁ mt) pr
+  lanes-current rx₁ mt v with lane-next rx₁ mt v
+  ... | rs , pr , mr , w , nw , fw , af , least with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
-  ...   | inj₂ (at≡ , k , open≡) with lane-next rx₁ mt v pr
-  ...     | fw , af , least with lane-idle mr (proj-outs lane-vals pr) fw af least
-  ...       | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
-  ...       | inj₂ nm≡  = inj₂ (trans at≡ nm≡)
+  ...   | inj₂ (at≡ , k , open≡) with lane-idle mr (proj-outs lane-vals pr) fw af least
+  ...     | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
+  ...     | inj₂ cw   = inj₂ (trans at≡ (trans cw nw))
 
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the

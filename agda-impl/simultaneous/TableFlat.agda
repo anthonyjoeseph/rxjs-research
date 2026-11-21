@@ -58,10 +58,8 @@ open import simultaneous.HorizonTree using (bd; BdEnv; Cut)
 open import simultaneous.HorizonJoin using (module JoinBd)
 open import simultaneous.CutParts using (merge-tr←; cc-tr←; sw-tr←; ex-tr←)
 open import simultaneous.TreeBounded using (tree-bounded; listHot; admits-body; admits-trig)
-open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; up; up-⊕; _⊕ˡ_; Linked; linked-l; linked-r;
-  linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*;
-  unended; den; den-ex; dbd; env-wk; Holds; Admits; admits-step; admits-ix; admits-row;
-  den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
+open import denotation.Up using (up; up-⊕)
+open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; Tab; _⊕ˡ_; Linked; linked-l; linked-r; linked-r*; Aligned; aligned-⊕; aligned-r*; Rest; Out; out; SameBd; EnvR; maps; lw; lw*; unended; den; den-ex; dbd; env-wk; Holds; Admits; admits-step; admits-ix; admits-row; den-cons; HotD; DenOf; tab-func; tab-flat; tab-at)
 
 open import simultaneous.ElabUndone using (elab-undone)
 open import simultaneous.LaneEndSched using (laneXt; laneL; laneX; readerR; emitAt; tr-in; module Share)

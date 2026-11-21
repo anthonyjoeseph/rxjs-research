@@ -55,8 +55,8 @@ open import simultaneous.Attribution using (One; Shown; Live)
 open import simultaneous.InstEmit using (valuesOf)
 open import Function using (_⇔_)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut; Btw; PB; PA; module Sub)
-open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Aligned; EnvR; maps; lw; lw*; den;
-  Admits; tab-func; admits-row; dbd; SameBd; same-bd; Out; wk; _⊕ˡ_)
+open import denotation.Up using (up)
+open import simultaneous.TableEnv using (Ren; got-ok; pin-ok; after-ok; pin-after-ok; Linked; Aligned; EnvR; maps; lw; lw*; den; Admits; tab-func; admits-row; dbd; SameBd; same-bd; Out; wk; _⊕ˡ_)
 open JoinBd using (outerB; laneB; laneH)
 
 
