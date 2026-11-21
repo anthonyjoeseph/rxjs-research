@@ -272,7 +272,7 @@ scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
 split is owed). Then a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
 their shape. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`, `lanes-count`,
+Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
 `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `held-connected`, `held-lim`,
 `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`.

@@ -59,6 +59,7 @@ open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; 
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
 open import simultaneous.HeldComb using (exact-past; inv-at)
 open import simultaneous.FlatPark using (past-park)
+open import simultaneous.FlatLanes using (laneTag; lane-vals; end-last; past-lanes; lanes-of; lanes₀)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed)
 open import Relation.Nullary.Decidable using (decidable-stable)
@@ -476,6 +477,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
 
+  g₃ : GoodEnv env′
+  g₃ = good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))
+    where
+      L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+
   -- Where a branch's reader ends: past its source's end.
   data BEnd : Pos → Set where
     b-outer : ∀ {c w} → σ₁ c end → BEnd (c ⊕ [ sub w ])
@@ -612,22 +618,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- outer, branches and trackers together.
     scan-rest     : Rest scanned
 
-  -- THE LANES' BRANCH OF THE SCAN'S SOURCE: a lane's row, where the lanes
-  -- show it.
-  laneTag : Ev (Maybe (Input B)) → Maybe (Ev (IE B))
-  laneTag (out (just (inj₁ (laneB , x)))) = just (out x)
-  laneTag _                              = nothing
-
-  lane-vals : ∀ {e e′} → laneTag e ≡ just e′ → Σ (IE B) λ x → e′ ≡ out x
-  lane-vals {out (just (inj₁ (laneB , x)))}  refl = x , refl
-  lane-vals {out (just (inj₁ (outerB , _)))} ()
-  lane-vals {out (just (inj₁ (closeB , _)))} ()
-  lane-vals {out (just (inj₂ _))}            ()
-  lane-vals {out nothing}                    ()
-  lane-vals {skip}                           ()
-  lane-vals {pin _}                          ()
-  lane-vals {end}                            ()
-
   postulate
     -- The lanes' rows a run of the source met are a run of the lanes.
     lane-run    : ∀ {rx} → Met M rx → Σ _ λ rs → Proj laneTag rx rs × Met σ₃ rs
@@ -638,13 +628,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                 × (∀ {y e′} → σ₃ y e′ → Visible e′ → After (cursor nothing rs) y → q ≼ y)
     -- The lanes keep no route past its instant.
     lane-idle   : Idle σ₃
-    -- THE LANES' COUNTER IS THE LANES' COUNT: none, or of the name the
-    -- lanes last began, with a route of it open.  A begin past the
-    -- instant's over counts there and not here, and a lane's end hands
-    -- its routes on, so the counter is at most the count.
-    lanes-count : ∀ {rx rs} → Met M rx → Proj laneTag rx rs
-                → Flat.lanes (proj₁ (past op init rx)) ≡ 0
-                ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
+
+  -- The lanes' counter is none, or of the name the lanes last began,
+  -- with a route of it open.
+  lanes-count : ∀ {rx rs} → Met M rx → Proj laneTag rx rs
+              → Flat.lanes (proj₁ (past op init rx)) ≡ 0
+              ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
+  lanes-count {rx} {rs} mt pr =
+    lanes-of (past-lanes op init r₀ rx rs (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (lanes₀ {B} r₀))
 
   lanes-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
