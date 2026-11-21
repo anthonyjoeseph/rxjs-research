@@ -331,6 +331,12 @@ rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 -- A CONNECT FINISHES ITS INSTANTS WHERE ITS BODY DOES: the source rows
 -- it re-keys under its own position, pins of its burst and echoes while
 -- its body is alive, add finitely many past a zero count.
+--
+-- DEAD ROUTE: from `Rest` of the body alone.  Nothing bounds the source's
+--   rows of an instant: a source looping synchronously in an instant the
+--   body has stopped reading, its count zero but still alive, echoes
+--   without end there, every echo silent.  The body's rows are the
+--   connect's only visible ones.
 postulate
   conn-rest : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
               (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p)
