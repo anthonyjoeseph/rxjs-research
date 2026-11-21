@@ -226,6 +226,12 @@ module Two (P : Pos) where
 
 -- A CONCAT OF A LANE SHOWING ONLY ITS END AT `cb`, THEN A LANE: every
 -- row a reader meets is the second lane's, subscribed at `cb ⊕ [ ix 1 ]`.
+-- A bounded merge's first lane starts at its value.
+start-0 : ∀ {A B : Set} {n f} {o : EmissionSet A} {q s} → Bounded.Starts {A} {B} (suc n) f o 0 q [] s → s ≡ q ⊕ [ ix 1 ]
+start-0 (Bounded.room _) = refl
+start-0 (Bounded.freed () _)
+start-0 (Bounded.queued () _ _ _ _)
+
 module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) cb)
            (sb≺cb : ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ≺ cb) (q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb) (e₁≺cb : (P ⊕ [ last ]) ≺ cb)
            (after  : ∀ {y e} → enter (G false) (cb ⊕ [ ix 1 ]) y e → (cb ⊕ [ ix 1 ]) ≺ y)
@@ -248,11 +254,7 @@ module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true
   cbs₁ : cb ≺ s₁
   cbs₁ = ≺-ext cb []
 
-  -- The first lane starts at its value; the second where the first ends.
-  start-0 : ∀ {q s} → Bd.Starts 0 q [] s → s ≡ q ⊕ [ ix 1 ]
-  start-0 (Bd.room _) = refl
-  start-0 (Bd.freed () _)
-  start-0 (Bd.queued () _ _ _ _)
+  -- The second lane starts where the first ends.
 
   ends-0 : ∀ {c} → Bd.Ends 0 [] c → c ≡ cb
   ends-0 (_ , _ , _ , N , St , (x , _)) with nth-0 N | start-0 St

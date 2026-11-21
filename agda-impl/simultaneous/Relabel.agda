@@ -85,17 +85,6 @@ cnt-same = fold-same r₀
 ------------------------------------------------------------------------
 -- Rows
 
-split≈ : ∀ {A B : Set} {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs
-       → ∀ r₁′ r₂′ → rs′ ≡ r₁′ ++ r₂′
-       → Σ _ λ r₁ → Σ _ λ r₂ → rs ≡ r₁ ++ r₂ × Rows≈ r₁′ r₁ × Rows≈ r₂′ r₂
-split≈ eq         []        r₂′ refl = [] , _ , refl , [] , eq
-split≈ (s ∷ eq)   (_ ∷ r₁′) r₂′ refl with split≈ eq r₁′ r₂′ refl
-... | r₁ , r₂ , refl , e₁ , e₂ = _ ∷ r₁ , r₂ , refl , s ∷ e₁ , e₂
-
-head≈ : ∀ {A B : Set} {y e′ r₂′} {r₂ : List (Pos × Ev (IE A))} → Rows≈ {B = B} ((y , e′) ∷ r₂′) r₂
-      → Σ _ λ e → Σ _ λ r₂₀ → r₂ ≡ (y , e) ∷ r₂₀ × EvSame e′ e
-head≈ (s ∷ eq) = _ , _ , refl , s
-
 mem≈ : ∀ {A B : Set} {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs
      → ∀ {q x′} → (q , out x′) ∈ rs′ → Σ (IE A) λ x → (q , out x) ∈ rs × Same x′ x
 mem≈ (ev-out s ∷ _) (here refl) = _ , here refl , s

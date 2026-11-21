@@ -33,17 +33,17 @@ open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; _∙_; Path; Label; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-down; <ᵖ-apart)
-open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Few; Reach; Proper; Rejoin; shown; heard; ended; late; hot;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Few; Reach; Proper; Rejoin; shown; heard; ended; late; hot; Bare; Unpinned;
   enter; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split; ≼-antisym; ≺-ext)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊕-identityʳ; Shows)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split; ≼-antisym; ≺-ext; entered-few)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊕-identityʳ; ⊕-injˡ; Shows; full)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; begin)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Readings using (rootOf; parent; parent-snoc)
-open import simultaneous.Routed using (Held; Idle; Rest; Ex; cnt; nameOf; nm; opos)
-open import simultaneous.Relabel using (Same; same-mark; EvSame; ev-out; ev-end; RowsAt; []ᵃ; _∷ᵃ_; cntAt; memAt; endAt; held-move)
+open import simultaneous.Routed using (Held; Idle; Rest; cnt; nameOf; nm; opos)
+open import simultaneous.Relabel using (same-mark; EvSame; ev-out; ev-end; RowsAt; []ᵃ; _∷ᵃ_; cntAt; memAt; endAt; held-move)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst; same-refl)
 open import simultaneous.HeldTake using (ex-ext)
 open import simultaneous.Layers using (to≺; from≺; snoc-view; cursor-snoc; run-row)
@@ -153,6 +153,75 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
   ev-same {end}   _ = ev-end
   ev-same {skip}  ()
   ev-same {pin _} ()
+
+  ----------------------------------------------------------------------
+  -- The reading's own shape
+
+  rj-σ : ∀ {y e} → Rejoin sb σ y e → Σ Pos λ k → y ≡ shift k × Σ _ (σ k)
+  rj-σ (shown x _ _) = _ , refl , _ , x
+  rj-σ (heard x _)   = _ , refl , _ , x
+  rj-σ (ended x _)   = _ , refl , _ , x
+  rj-σ (late x c≼)   = ⊥-elim (c≼ (after (proj₁ x)))
+
+  -- Every row of the reading lies at or before its end.
+  rd-proper : ∀ {q e c} → Rd q e → Rd c end → q ≼ c
+  rd-proper (x , _) (y , _) with rj-σ x | src-vis y tt
+  ... | k , refl , _ , σk | k′ , refl , σk′ = λ lt → proj₂ σk (proj₁ σk′) (reflect (proj₁ σk′) (proj₁ σk) lt)
+
+  bare-pin : ∀ {e : Ev (IE A)} {r} → Bare e → e ≡ pin r → ⊥
+  bare-pin {pin _} () _
+  bare-pin {out _} _ ()
+  bare-pin {skip}  _ ()
+  bare-pin {end}   _ ()
+
+  bare-end : ∀ {e : Ev (IE A)} → Bare e → e ≡ end → ⊥
+  bare-end {end}   () _
+  bare-end {out _} _ ()
+  bare-end {skip}  _ ()
+  bare-end {pin _} _ ()
+
+  -- One row to a position.
+  rd-func : ∀ {q e e′} → Rd q e → Rd q e′ → e ≡ e′
+  rd-func (x , _) (x′ , _) = go x x′ refl
+    where
+      go : ∀ {y y′ e e′} → Rejoin sb σ y e → Rejoin sb σ y′ e′ → y ≡ y′ → e ≡ e′
+      go (late x c≼) _ _ = ⊥-elim (c≼ (after (proj₁ x)))
+      go _ (late x c≼) _ = ⊥-elim (c≼ (after (proj₁ x)))
+      go (shown x b _) (shown x′ _ _) eq with ⊕-injˡ _ _ eq
+      ... | refl = func (proj₁ x) (proj₁ x′)
+      go (shown x b _) (heard x′ _) eq with ⊕-injˡ _ _ eq
+      ... | refl = ⊥-elim (bare-pin b (func (proj₁ x) (proj₁ x′)))
+      go (shown x b _) (ended x′ _) eq with ⊕-injˡ _ _ eq
+      ... | refl = ⊥-elim (bare-end b (func (proj₁ x) (proj₁ x′)))
+      go (heard x _) (shown x′ b _) eq with ⊕-injˡ _ _ eq
+      ... | refl = ⊥-elim (bare-pin b (func (proj₁ x′) (proj₁ x)))
+      go (heard x _) (heard x′ _) _ = refl
+      go (heard x _) (ended x′ _) eq with ⊕-injˡ _ _ eq
+      ... | refl with func (proj₁ x) (proj₁ x′)
+      ...   | ()
+      go (ended x _) (shown x′ b _) eq with ⊕-injˡ _ _ eq
+      ... | refl = ⊥-elim (bare-end b (func (proj₁ x′) (proj₁ x)))
+      go (ended x _) (heard x′ _) eq with ⊕-injˡ _ _ eq
+      ... | refl with func (proj₁ x′) (proj₁ x)
+      ...   | ()
+      go (ended x _) (ended x′ _) _ = refl
+
+  rd-nopin : ∀ {k r} → Rd k (pin r) → ⊥
+  rd-nopin {r = r} (shown _ b _ , _) = bare-pin {pin r} b refl
+
+  rd-few : ∀ {q e} → Rd q e → Few Rd q
+  rd-few {e = e} x = entered-few (hot σ) sb (full (un e x)) x
+    where
+      un : ∀ {q} e → Rd q e → Unpinned e
+      un (out _) _ = tt
+      un skip    _ = tt
+      un end     _ = tt
+      un (pin _) x = ⊥-elim (rd-nopin x)
+
+  -- The reading's rows lie past whatever the source's do.
+  rd-past : ∀ {v} → (∀ {y e} → S y e → v ≺ y) → ∀ {k e} → Rd k e → v ≺ k
+  rd-past {v} vs (x , _) with src x
+  ... | k , refl , _ , sk = ≺-trans {v} {k} {shift k} (vs sk) (≺-ext k {sub sb} [])
 
   ----------------------------------------------------------------------
   -- Runs

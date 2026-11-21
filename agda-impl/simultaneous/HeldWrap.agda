@@ -6,32 +6,40 @@
 -- carries its end's route down to the cut, where the take ends.
 module simultaneous.HeldWrap where
 
-open import Data.Bool using (true; T; not)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.Bool using (Bool; true; T; not; if_then_else_)
+open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵉ; _∷_ to _∷ᵉ_)
 open import Data.Nat using (ℕ; suc)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_)
 open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; cold; merge; of; connected)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Relation.Binary.PropositionalEquality using (refl)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
+open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; out; Den; hot; enter; ⟦_⟧; module Op; module Connect; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; out; skip; pin; end; Den; hot; enter; Proper; Few; _≺_; _≼_; ⟦_⟧; module Op;
+  module Connect)
+open import denotation.Read using (Visible)
+open import denotation.Laws.Modulus using (≺-trans; entered-few)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.Shows using (k-shows)
 open import denotation.Laws.ShowsEv using (sk-⟦⟧)
-open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; Shows; _∪ʰ_; ok-step)
+open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; Shows; _∪ʰ_; ok-step; world-after; full; ⊕-assoc)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
 open import simultaneous.HeldTake using (module Holds; Inert; i-done)
-open import simultaneous.HeldConnect using (held-conn; module ConnRun; sync-body)
+open import simultaneous.HeldConnect using (held-conn; held-ex)
+open import simultaneous.HeldDefer using (sync-up)
+open import simultaneous.HeldHot using (module HotRead)
+open import simultaneous.HeldClose using (module CatClose; of-row₁; of-val₁; of-end₁)
+open import simultaneous.HeldTrigger using (≺-part)
+open import simultaneous.CombSent using (assoc³)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; marked; unfinished; completing; wrapped; concatˢ)
 
@@ -76,12 +84,55 @@ held-until {X} d p cs iv h = Holds.holds true unfinished d cs p iv h fails fcov 
 closing : ∀ {A} → Den (IE A) → Den (IE A)
 closing h = ⟦ concatˢ (connected (here refl)) (of (marked completed ∷ [])) ⟧ (h ∷ᵉ []ᵉ)
 
-postulate
-  -- READ HOT FROM BEFORE ITS FIRST ROW, A SOURCE COMPLETED BY A MARK holds
-  -- what the source holds, and its mark lies where its end did.
-  held-closing : ∀ {A} (D : Den (IE A)) {H} p cs → InvD H D → Ok H p → Shows (enter D (p ⊕ [ ix 1 ]))
-               → Held (enter D (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
-               → Held (Connect.β D closing p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
+-- READ HOT FROM BEFORE ITS FIRST ROW, A SOURCE COMPLETED BY A MARK holds
+-- what the source holds, and its mark lies where its end did: the reading
+-- holds as the source does (`HotRead`), and the concat shows the reading
+-- closed by the mark (`CatClose`).
+held-closing : ∀ {A} (D : Den (IE A)) {H} p cs → InvD H D → Ok H p → Shows (enter D (p ⊕ [ ix 1 ]))
+             → Held (enter D (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
+             → Held (Connect.β D closing p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
+held-closing {A} D p cs I ok sh h =
+  CatClose.held G P _ HR.rd-proper HR.rd-func HR.rd-few (HR.rd-past {e₁} λ y → ≺-trans {e₁} {r} {_} e₁≺r (aft y)) HR.rd-nopin
+    (of-row₁ _) (of-val₁ _) (of-end₁ _) (HR.held-hot (held-ex ex h))
+  where
+    P r sb e₁ : Pos
+    P  = p ⊕ [ ix 0 ]
+    r  = p ⊕ [ ix 1 ]
+    sb = (P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+    e₁ = P ⊕ [ last ]
+
+    S : EmissionSet (IE A)
+    S = enter D r
+
+    G : Bool → Den (IE A)
+    G b = ⟦ if b then connected (here refl) else of (marked completed ∷ []) ⟧ (hot (Proper S) ∷ᵉ []ᵉ)
+
+    IS = I r (ok-step p ok)
+
+    aft : ∀ {y e} → S y e → r ≺ y
+    aft y = world-after (InvAt.world IS y) (InvAt.real IS y)
+
+    sb≺r : sb ≺ r
+    sb≺r = subst (_≺ r) (sym (assoc³ p (ix 0) (ix 0) (ix 1))) (≺-part p (ix 0 ∷ ix 1 ∷ []) [] refl)
+
+    e₁≺r : e₁ ≺ r
+    e₁≺r = subst (_≺ r) (sym (⊕-assoc p [ ix 0 ] [ last ])) (≺-part p [ last ] [] refl)
+
+    few-vis : ∀ {y e} → S y e → Visible e → Few S y
+    few-vis {q} {out x} y _ = entered-few D r (λ {k} {e′} → full {IE A} {q} {out x} tt {k} {e′}) y
+    few-vis {q} {end}   y _ = entered-few D r (λ {k} {e′} → full {IE A} {q} {end} tt {k} {e′}) y
+    few-vis {e = skip}  _ ()
+    few-vis {e = pin _} _ ()
+
+    proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c
+    proper-vis sc sy v cy with InvAt.quiet IS sc sy cy
+    ... | _ , refl , _ = v
+
+    module HR = HotRead S sb (InvAt.flat IS) (InvAt.func IS) (λ {y} y′ → ≺-trans {sb} {r} {y} sb≺r (aft y′)) few-vis proper-vis sh
+
+    ex : ∀ {y} → Ex (r ∷ cs) y → Ex (P ∷ p ∷ cs) y
+    ex {y} (here sy) = there (here (sync-up {p} {y} [ ix 1 ] sy))
+    ex (there x)     = there (there x)
 
 -- A PROGRAM COMPLETED BY A MARK holds what it holds, and its mark lies
 -- where its end did.
