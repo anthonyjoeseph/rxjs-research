@@ -273,7 +273,7 @@ counter past the closer's `outerDone`. Then a reader's joins, the
 defer limit's rest (no one approximant bounds it), and the cold's rows'
 order. Settled when each former's leaf is a body.
 
-Members: `close-done`, `done-met`, `lane-end-shut`, `lane-idle`, `held-current`,
+Members: `done-met`, `lane-end-shut`, `lane-idle`, `held-current`,
 `live-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
 `scan-idle`, `held-connected`, `lim-rest`, `cold-rows`, `cold-covered`,
 `cold-shut`, `cold-idle`.

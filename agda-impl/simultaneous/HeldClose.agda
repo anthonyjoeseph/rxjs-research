@@ -44,6 +44,7 @@ open import simultaneous.HeldTake using (++-split′; ex-ext; name-ext; under-of
 open import simultaneous.HeldComb using (from-++)
 open import simultaneous.HeldHot using (em)
 open import simultaneous.HeldTrigger using (≺-part; start-0; module Two)
+open import simultaneous.CombSent using (of-two)
 open import simultaneous.Relabel using (held-same)
 open import simultaneous.Layers using (after-≺; run-tail; cursor-snoc)
 open import simultaneous.Project using (run-prefix)
@@ -541,7 +542,7 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
   done {c} yc = (e₁ , oe , ≺→≼ {e₁} {fpos c} (≺-trans {e₁} {c} {fpos c} (r-late yc) (c≺f c))) , lanes
     where
       lanes : ∀ {q a} → O q (out a) → Bd.Indexed q → q ≺ fpos c → (⊥ → ⊥) → Ended (Bd.Lane q a) (fpos c)
-      lanes x _ _ _ with o-out x
+      lanes x _ _ _ with of-two P x
       ... | inj₁ (refl , refl) = c , lane₀ yc , ≺→≼ {c} {fpos c} (c≺f c)
       ... | inj₂ (refl , refl) = fpos c , lane₁ yc (of-end _) , ≼-refl {fpos c}
 
@@ -550,7 +551,7 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
 
   -- EVERY ROW OF THE CONCAT is the outer's, or one of the closed stream's.
   classify : ∀ {k e′} → Bd.JoinT k e′ → k ∈ base ⊎ Σ (Ev (IE A)) λ e₀ → U k e₀
-  classify (Bd.val x) with o-out x
+  classify (Bd.val x) with of-two P x
   ... | inj₁ (refl , _) = inj₁ (here refl)
   ... | inj₂ (refl , _) = inj₁ (there (here refl))
   classify (Bd.step x)  = ⊥-elim (o-skip x)

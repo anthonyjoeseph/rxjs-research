@@ -23,10 +23,10 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (mergeᶠ)
-open import denotation.Position using (Pos; Instant; ix; sub; last; root; _≟ᵖ_; _⊕_; _∙_)
+open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; pin; end; EmissionSet; Den; DenEnv; hot; enter; After; Reach;
-  Rejoin; shown; heard; ended; late; at-out; on-out; module Op; module Merge; module Bounded; module Values; _≺_; _≼_; Few)
+open import denotation.EmissionSet using (out; end; EmissionSet; Den; DenEnv; hot; enter; shown; ended; late; at-out; on-out;
+  module Op; module Merge; module Bounded; module Values; _≺_; _≼_; Few)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-irrefl; ≺-absurd; ≼-refl; ≼-split; ≺→≼; ≺-≼-≺; ≼-or-≻)
 open import denotation.Laws.Worlds using (Lawful; ⊕-assoc; _⊑_)
 open import denotation.Laws.Count using (⊑?)
@@ -36,15 +36,13 @@ open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Truth using () renaming (past to ix≺last)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.CombSent using (Clo; assoc³; module EachEnd)
+open import simultaneous.CombSent using (Clo; assoc³; of-two; module EachEnd)
 open import simultaneous.Readings using (instantOf)
+open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.InstEmit using (instEmit; value; mark; outerDone)
 open import simultaneous.Horizon using (past-sub)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; closer; closing; marked)
-
-inst-⊕ : ∀ p zs → instantOf (p ⊕ zs) ≡ instantOf p
-inst-⊕ (_ ∙ _) _ = refl
 
 module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv Δ) (L : Lawful t) (s : Pos)
                  (past : ∀ zs {k e} → t k e → (s ⊕ zs) ≺ k) where
@@ -110,9 +108,7 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
   q₀≺q₁ = ix-asc s (s≤s z≤n)
 
   o-rows : ∀ {k b} → O k (out b) → (k ≡ q₀ × b ≡ true) ⊎ (k ≡ q₁ × b ≡ false)
-  o-rows (at-out , _)                = inj₁ (refl , refl)
-  o-rows (on-out at-out , _)         = inj₂ (refl , refl)
-  o-rows (on-out (on-out ()) , _)
+  o-rows = of-two s
 
   nth₀ : Values.Nth O 0 q₀ true
   nth₀ = Values.first o₀ least

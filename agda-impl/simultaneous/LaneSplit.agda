@@ -1,8 +1,8 @@
 {-# OPTIONS --guardedness #-}
 
--- THE LANES' ROWS THE SCAN'S SOURCE MEETS ARE A RUN OF THE LANES
--- (`simultaneous.BranchSplit`): the lanes are read by their hot, tagged,
--- their values unchanged.
+-- THE ROWS OF A HOT BRANCH THE SCAN'S SOURCE MEETS ARE A RUN OF IT
+-- (`simultaneous.BranchSplit`): the lanes, and the closer, are each read
+-- by their hot, tagged, their values unchanged.
 module simultaneous.LaneSplit where
 
 open import Data.Product using (Σ; _×_; _,_)
@@ -40,33 +40,33 @@ lane-proj FL.[]          = Proj.[]
 lane-proj (keep pr)      = Proj.keep refl refl (lane-proj pr)
 lane-proj (drop nl pr)   = Proj.drop nl (lane-proj pr)
 
-module LaneSplit {B : Set} (σ : EmissionSet (IE B)) (Lσ : Lawful σ) (P : Pos)
+module HotSplit {B : Set} (b : Branch) (σ : EmissionSet (IE B)) (Lσ : Lawful σ) (P : Pos)
                  (F C : Bool → Den (Maybe (Input B))) (G : Branch → Den (Maybe (Input B)))
                  (eqF : F false ≡ Op.flatMap (mergeᶠ (just 1)) C (Op.of (true ∷ false ∷ [])))
                  (eqC : C true ≡ Op.flatMap (mergeᶠ nothing) G (Op.of OwnOf))
-                 (eqG : G laneB ≡ Op.map Ln (hot σ))
-                 (noF : ∀ {s k x} → enter (F true) s k (out (Ln x)) → ⊥)
-                 (noC : ∀ {s k x} → enter (C false) s k (out (Ln x)) → ⊥)
-                 (noG : ∀ {b s k x} → enter (G b) s k (out (Ln x)) → b ≡ laneB)
+                 (eqG : G b ≡ Op.map (Tg b) (hot σ))
+                 (noF : ∀ {s k x} → enter (F true) s k (out (Tg b x)) → ⊥)
+                 (noC : ∀ {s k x} → enter (C false) s k (out (Tg b x)) → ⊥)
+                 (noG : ∀ {b′ s k x} → enter (G b′) s k (out (Tg b x)) → b′ ≡ b)
                  (funcM : ∀ {y e e′} → SrcOf F P y e → SrcOf F P y e′ → e ≡ e′)
                  (past : ∀ zs {k e} → σ k e → (P ⊕ zs) ≺ k) where
   open RawMonad (¬¬-Monad {lzero}) using (_>>=_; pure)
-  open BranchSplit σ Lσ P laneB (λ x → x) F C G (Op.map Ln (hot σ)) eqF eqC eqG noF noC noG funcM past public
+  open BranchSplit σ Lσ P b (λ x → x) F C G (Op.map (Tg b) (hot σ)) eqF eqC eqG noF noC noG funcM past public
 
-  open Up (s-map Ln {d = hot σ} s-hot) public
+  open Up (s-map (Tg b) {d = hot σ} s-hot) public
 
   dpast : ∀ {k e} → T1 k e → J ≺ k
-  dpast = map-past Ln {d = hot σ} hot-past
+  dpast = map-past (Tg b) {d = hot σ} hot-past
 
   private
-    top : ∀ {e₀} → K0 e₀ → K laneB (mev Ln e₀)
+    top : ∀ {e₀} → K0 e₀ → K b (mev (Tg b) e₀)
     top (k0out x) = kout x
     top k0skip    = kskip
     top k0end     = kend
 
   -- A lanes' row as their reader shows it, tagged.
   dshow : Shows σ → ∀ {q} → Few T1 q → ∀ {y e} → σ y e → (y ⊕ [ sub J ]) ≼ q
-        → ¬ ¬ Σ _ λ e₁ → T1 (y ⊕ [ sub J ]) e₁ × K laneB e₁ × (∀ {x} → e ≡ out x → e₁ ≡ out (g x))
+        → ¬ ¬ Σ _ λ e₁ → T1 (y ⊕ [ sub J ]) e₁ × K b e₁ × (∀ {x} → e ≡ out x → e₁ ≡ out (g x))
   dshow shσ f1 ry Yq with rj ry
-  ... | e₀ , r0 , k0 , o0 with map-lift Ln (hot σ) (hot-shows σ J) f1
-  ...   | f0 , lift = t0-of shσ f0 ry r0 Yq >>= λ t0 → lift t0 Yq >>= λ t1 → pure (mev Ln e₀ , t1 , top k0 , λ {_} eq → cong (mev Ln) (o0 eq))
+  ... | e₀ , r0 , k0 , o0 with map-lift (Tg b) (hot σ) (hot-shows σ J) f1
+  ...   | f0 , lift = t0-of shσ f0 ry r0 Yq >>= λ t0 → lift t0 Yq >>= λ t1 → pure (mev (Tg b) e₀ , t1 , top k0 , λ {_} eq → cong (mev (Tg b)) (o0 eq))
