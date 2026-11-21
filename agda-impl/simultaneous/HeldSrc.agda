@@ -67,7 +67,8 @@ import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
+open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
 open import denotation.Laws.BoundedInv using (end-uniq)
@@ -341,6 +342,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   tag-close nothing  = refl
   tag-close (just _) = refl
 
+  cat-nothing : ∀ m′ → ev m′ (Cat-of tk env′ false) env′ ≡ Op.of (nothing ∷ [])
+  cat-nothing nothing  = refl
+  cat-nothing (just _) = refl
+
   -- A row of the source's reading is one the scan's source meets.
   toM : ∀ {q′ e′} → SrcOf (λ b → ev m (fed tk b) env′) P q′ e′ → M q′ e′
   toM {q′} {e′} = subst (λ d → enter d P q′ e′) (sym (src-op tk env′ m))
@@ -356,6 +361,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     module OS = OuterSplit σ₁ L₁ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
       (own-op tk env′ m) (cat-op tk env′ m) (tag-outer tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
       src-func outer-past
+    module OE = OwnEnds (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′) P
+      (own-op tk env′ m) (cat-op tk env′ m) (cat-nothing m)
     module CS = HotSplit closeB σ₂ L₂ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
       (own-op tk env′ m) (cat-op tk env′ m) (tag-close m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
       src-func closer-past
@@ -653,12 +660,58 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                 → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
                 → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
 
-    -- NO VISIBLE ROW OF THE SOURCE LIES IN AN INSTANT PAST ONE OF ITS
-    -- ROWS AND EVERY BRANCH'S END: its own branches' merge ends at the last
-    -- of their ends as its readers see them, and the item telling it, at
-    -- once, fails the take.
-    src-ends : ∀ {y₁ y₂ y₃ z e q a} → σ₁ y₁ end → σ₂ y₂ end → σ₃ y₃ end → M z e → M q (out a) → instantOf z ≺ⁱ instantOf q
-             → ¬ (instantOf z ≺ⁱ instantOf y₁) → ¬ (instantOf z ≺ⁱ instantOf y₂) → ¬ (instantOf z ≺ⁱ instantOf y₃) → ⊥
+
+  -- NO VISIBLE ROW OF THE SOURCE LIES IN AN INSTANT PAST ONE OF ITS
+  -- ROWS AND EVERY BRANCH'S END: its own branches' merge ends at the last
+  -- of their ends as its readers see them, and the item telling it, at
+  -- once, fails the take (`simultaneous.OwnEnds`).
+  src-ends : ∀ {y₁ y₂ y₃ z e q a} → σ₁ y₁ end → σ₂ y₂ end → σ₃ y₃ end → M z e → M q (out a) → instantOf z ≺ⁱ instantOf q
+           → ¬ (instantOf z ≺ⁱ instantOf y₁) → ¬ (instantOf z ≺ⁱ instantOf y₂) → ¬ (instantOf z ≺ⁱ instantOf y₃) → ⊥
+  src-ends {y₁} {y₂} {y₃} {z} {e} {q} {a} r₁ r₂ r₃ _ mq zq n₁ n₂ n₃ =
+    OS.dend sh-σ₁ SO.f1 r₁ (Yq {y₁} OS.J n₁) λ t₁ →
+    CS.dend sh-σ₂ SC.f1 r₂ (Yq {y₂} CS.J n₂) λ t₂ →
+    LS.dend sh-σ₃ SL.f1 r₃ (Yq {y₃} LS.J n₃) λ t₃ →
+    fin (OE.merge-end (OS.Rows.m4-lane OS.dpast t₁ , pst (λ zs → outer-past zs r₁) OS.J)
+                      (LS.Rows.m4-lane LS.dpast t₃ , pst (λ zs → lanes-past zs r₃) LS.J)
+                      (CS.Rows.m4-lane CS.dpast t₂ , pst (λ zs → closer-past zs r₂) CS.J))
+    where
+      shM4 : Shows OE.M4.JoinT
+      shM4 = k-shows λ n → FM4.sk-merge n
+      shB3 : Shows OE.B3.JoinT
+      shB3 = k-shows λ n → FB3.Bnd.sk-bounded n 1
+      shM2 : Shows OE.M2.JoinT
+      shM2 = k-shows λ n → FM2.sk-merge n
+      shTW : Shows OE.TW.TakeT
+      shTW = k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))
+
+      module SL = LS.Rows.Shown LS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (LS.dshow sh-σ₃)
+      module SO = OS.Rows.Shown OS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (OS.dshow sh-σ₁)
+      module SC = CS.Rows.Shown CS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (CS.dshow sh-σ₂)
+
+      I-own : InvAt (Hots env′) s₃ OE.Own′
+      I-own = subst (λ d → InvAt (Hots env′) s₃ (enter d s₃)) (cat-op tk env′ m) (inv-ev m (Cat-of tk env′ true) env′ g₃ s₃ (FB3.val-ok 0 LS.o₂))
+
+      module FL′ = OE.Fails shM4 shB3 shM2 (end-uniq I-own) SL.f2 SL.f3 SL.f4 SL.nfq
+
+      iq : ∀ {y} → ¬ (instantOf z ≺ⁱ instantOf y) → instantOf y ≺ⁱ instantOf q
+      iq {y} n with triⁱ (instantOf y) (instantOf z)
+      ... | inj₁ yz        = transⁱ yz zq
+      ... | inj₂ (inj₁ eq) = subst (_≺ⁱ instantOf q) (sym eq) zq
+      ... | inj₂ (inj₂ zy) = ⊥-elim (n zy)
+
+      iJ : ∀ {y} J → ¬ (instantOf z ≺ⁱ instantOf y) → instantOf (y ⊕ [ sub J ]) ≺ⁱ instantOf q
+      iJ {y} J n = subst (_≺ⁱ instantOf q) (sym (inst-⊕ y [ sub J ])) (iq {y} n)
+
+      Yq : ∀ {y} J → ¬ (instantOf z ≺ⁱ instantOf y) → (y ⊕ [ sub J ]) ≼ q
+      Yq {y} J n = ≺→≼ {y ⊕ [ sub J ]} {q} (instant-≺ (y ⊕ [ sub J ]) q (iJ {y} J n))
+
+      pst : ∀ {y} → (∀ zs → (P ⊕ zs) ≺ y) → ∀ J → OE.Past (y ⊕ [ sub J ])
+      pst {y} yp J zs = ≺-trans {P ⊕ zs} {y} {y ⊕ [ sub J ]} (yp zs) (≺-ext y [])
+
+      fin : (Σ Pos λ c′ → OE.M4.JoinT c′ end × (c′ ≡ y₁ ⊕ [ sub OS.J ] ⊎ c′ ≡ y₃ ⊕ [ sub LS.J ] ⊎ c′ ≡ y₂ ⊕ [ sub CS.J ])) → ⊥
+      fin (_ , x , inj₁ refl)        = FL′.own-fails x (pst (λ zs → outer-past zs r₁) OS.J) (iJ {y₁} OS.J n₁)
+      fin (_ , x , inj₂ (inj₁ refl)) = FL′.own-fails x (pst (λ zs → lanes-past zs r₃) LS.J) (iJ {y₃} LS.J n₃)
+      fin (_ , x , inj₂ (inj₂ refl)) = FL′.own-fails x (pst (λ zs → closer-past zs r₂) CS.J) (iJ {y₂} CS.J n₂)
 
   -- THE CLOSER ENDS IN ITS `outerDone`'s INSTANT: the mark is its last
   -- part's only item (`CloseDone.FirstEnd.closer-end`).

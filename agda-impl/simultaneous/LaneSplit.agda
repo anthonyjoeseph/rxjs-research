@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 open import Tree using (mergeᶠ)
 open import denotation.Position using (Pos; sub; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; EmissionSet; Den; hot; enter; Few; _≺_; _≼_; module Op)
+open import denotation.EmissionSet using (Ev; out; end; ended; EmissionSet; Den; hot; enter; Few; _≺_; _≼_; module Op)
 open import denotation.Laws.Worlds using (Lawful; Shows; hot-shows)
 open import simultaneous.SObs using (lone; module Elaborate; Branch; laneB)
 open import simultaneous.Project using (Proj)
@@ -70,3 +70,8 @@ module HotSplit {B : Set} (b : Branch) (σ : EmissionSet (IE B)) (Lσ : Lawful �
   dshow shσ f1 ry Yq with rj ry
   ... | e₀ , r0 , k0 , o0 with map-lift (Tg b) (hot σ) (hot-shows σ J) f1
   ...   | f0 , lift = t0-of shσ f0 ry r0 Yq >>= λ t0 → lift t0 Yq >>= λ t1 → pure (mev (Tg b) e₀ , t1 , top k0 , λ {_} eq → cong (mev (Tg b)) (o0 eq))
+
+  -- A lanes' end as their reader shows it.
+  dend : Shows σ → ∀ {q} → Few T1 q → ∀ {y} → σ y end → (y ⊕ [ sub J ]) ≼ q → ¬ ¬ T1 (y ⊕ [ sub J ]) end
+  dend shσ f1 ry Yq with map-lift (Tg b) (hot σ) (hot-shows σ J) f1
+  ... | f0 , lift = t0-of shσ f0 ry (ended ry (pastJ ry)) Yq >>= λ t0 → lift t0 Yq
