@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 
 open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected;
   defer; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade; Path)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_; frame; cascade; Path)
 open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; skip; pin; _≺_; spin)
 open import simultaneous.SObs using (SObs; plain; ext; lone; module Elaborate; Flat; outerB; laneB; closeB)
@@ -70,7 +70,8 @@ open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
-open import simultaneous.Readings using (rootOf)
+open import simultaneous.Readings using (rootOf; instantOf)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import denotation.Read using (Visible; After; cursor; Run)
 open import Function using (Equivalence)
 open import Data.Bool using (true; false)
@@ -87,6 +88,12 @@ open import simultaneous.HeldLim using (module LimHeld)
 
 open import Tree using (Obs; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected)
 
+
+-- A row between two of one instant is of it.
+between-inst : ∀ {y q z} → y ≺ q → q ≼ z → instantOf z ≡ instantOf y → instantOf y ≡ instantOf q
+between-inst {y} {q} {z} yq qz zy with instantOf y ≟ⁱ instantOf q
+... | Nl.yes e = e
+... | Nl.no ne = ⊥-elim (qz (instant-≺ z q (subst (_≺ⁱ instantOf q) (sym zy) (≺-instant y q yq ne))))
 
 -- An opened outer row is a mark it was, unless it opens.
 open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
@@ -570,12 +577,29 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   outer-idle = proper-idle {S = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁) (Held.idle H₁)
 
   postulate
-    -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
-    -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: past the outer's cursor,
-    -- its end lies in the instant the source meets next.
-    outer-end-at : ∀ rx₁ {q a rx₂ rs y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → BProj outerB (opening {A} {B}) OS.J rx₁ rs
-                 → σ₁ y end → After (cursor nothing rs) y → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
-                 → nameOf y ≡ nameOf q
+    -- THE CLOSER TELLS THE OUTER'S END IN ITS INSTANT: the closer's first
+    -- part ends one `sub` under the outer's end and its `outerDone` follows
+    -- at once; the source shows it wherever it shows a later row, as it
+    -- ends only once the closer has.
+    close-done : ∀ {y q a} → σ₁ y end → M q (out a) → y ≺ q
+               → ¬ ¬ Σ Pos λ z → instantOf z ≡ instantOf y
+                 × (q ≼ z ⊎ Σ Pos λ n → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) × z ≺ q)
+    -- PAST THE CLOSER'S `outerDone`, A COUNTED OUTER ROUTE KEEPS THE SOURCE
+    -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
+    -- lane running or queued, and every outer row lies before it, so the
+    -- branches, and the source with them, end in that instant.
+    done-met : ∀ rx₁ {q a rx₂ z n} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
+             → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
+
+  -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
+  -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: the source meets that row
+  -- no later than the closer's `outerDone`, or past it.
+  outer-end-at : ∀ rx₁ {q a rx₂ y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → σ₁ y end → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
+               → nameOf y ≡ nameOf q
+  outer-end-at rx₁ {q} {a} {rx₂} {y} mt ry yq nz = decidable-stable (nameOf y ≟ᵖ nameOf q) λ ne →
+    close-done ry (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) yq λ where
+      (z , zy , inj₁ qz)            → ne (cong (λ i → nm (i ∙ [])) (between-inst {y} {q} {z} yq qz zy))
+      (z , zy , inj₂ (n , mz , zq)) → ne (cong (λ i → nm (i ∙ [])) (trans (sym zy) (done-met rx₁ mt mz zq nz)))
 
   -- THE SCAN'S OUTER COUNTER IS OF THE SOURCE'S NEXT ROW'S INSTANT, OR
   -- NONE: it is of the instant the outer last began, which the outer,
@@ -609,7 +633,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       idle-y : Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → proj₁ (cnt rs) ≡ nameOf q
       idle-y (y , ry , ay , yw) =
         trans (at-idle (proj₁ fw , λ {k} rk ky → proj₂ fw rk (≺-trans {k} {y} {w} ky yw)) ay ly)
-              (outer-end-at rx₁ mt pr ry ay (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
+              (outer-end-at rx₁ {y = y} mt ry (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
         where
           ly : ∀ {y′ e} → σ₁ y′ e → Visible e → After Cr y′ → y ≼ y′
           ly {y′} {out _} ry′ _ ay′ = ≺→≼ {y} {y′} (≺-≼-≺ {y} {w} {y′} yw (outl ry′ ay′))
