@@ -31,6 +31,7 @@ open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
+open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
 open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
@@ -75,7 +76,7 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
-open import denotation.Laws.Worlds using (ok-step; _⊑_; ⊑-trans)
+open import denotation.Laws.Worlds using (ok-step; _⊑_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -407,16 +408,6 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   M : EmissionSet (Maybe (Input B))
   M = enter (ev m src env′) P
 
--- Either reading is lawful.
-inv-ev : ∀ m {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → InvD (Hots ρ) (ev m o ρ)
-inv-ev nothing  o ρ g = inv-⟦⟧ o ρ g
-inv-ev (just n) o ρ g = inv-approx n o ρ g
-
--- Past its over, a step is as late.
-late-ext : ∀ {q} zs → Valued (rootOf q) × opos (rootOf q) ⊑ q
-         → Valued (rootOf (q ⊕ zs)) × opos (rootOf (q ⊕ zs)) ⊑ (q ⊕ zs)
-late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (rootOf-ext q zs)) (v , ⊑-trans o (zs , refl))
-
 -- An opened outer row is a mark it was, unless it opens.
 open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
 open-mark {x = instEmit (value _) _} refl no = ⊥-elim (no refl)
@@ -514,14 +505,30 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ (_ , refl)     = under
   ... | inj₂ (_ , _ , b , refl) = done b
 
-  postulate
-    -- The lanes' rows: begins named for their instants, values before
-    -- their over, overs at it.
-    lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
-    lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
-    lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
-    -- A lane's end lies before its step's over.
-    lane-ends   : ∀ {q} → σ₃ q end → Early q
+  -- The lanes' rows, each as it claims, over the programs they share.
+  lane-fit : Fit σ₃
+  lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+               (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r))
+               (λ a L q okq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) eh q okq eq))
+               (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
+    where
+      L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
+      g₂ : GoodEnv (hot σ₂ ∷ hot σ₁ ∷ env₀)
+      g₂ = good-cons L₂ (good-cons L₁ (good-cons L₀ gd))
+
+  lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
+  lane-named = Fit.fine lane-fit
+
+  lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
+  lane-early = Fit.fine lane-fit
+
+  lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
+  lane-late = Fit.fine lane-fit
+
+  -- A lane's end lies before its step's over.
+  lane-ends   : ∀ {q} → σ₃ q end → Early q
+  lane-ends = Fit.ends lane-fit
 
   -- The closer ends where it is subscribed or where the outer ends.
   close-ends : ∀ {q} → σ₂ q end → Early q
