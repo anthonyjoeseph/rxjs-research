@@ -1,15 +1,14 @@
--- THE SCAN'S LANE COUNTERS, ROW BY ROW: `active` rises at a lane's
+-- THE SCAN'S LANE COUNTER, ROW BY ROW: `active` rises at a lane's
 -- `laneStart`, falls at its `laneDone` and empties at a switch's
--- arrival; a bounded merge's `queue` rises at an arrival and falls at a
--- `laneStart`.  No other row moves either (`past-active`, `past-queue`).
+-- arrival.  No other row moves it (`past-active`).
 module simultaneous.ScanCount where
 
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat using (suc; _∸_; _⊓_; _+_)
 open import Relation.Nullary using (does)
@@ -22,7 +21,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
 open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
   laneDone; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.SObs using (Flat; isZero; Branch; outerB; laneB; closeB; lone; module Elaborate)
+open import simultaneous.SObs using (Flat; isZero; outerB; laneB; closeB; lone; module Elaborate)
 open import simultaneous.HeldComb using (past)
 open import simultaneous.LaneCount using (Kind; kStart; kDone; kCut; kOther; stepK)
 
@@ -35,12 +34,6 @@ markAct _       laneStart = kStart
 markAct _       laneDone  = kDone
 markAct switchᶠ outerOpen = kCut
 markAct _       _         = kOther
-
--- and `queue`.
-markQue : FlatOp → Mark → Kind
-markQue _                 laneStart = kDone
-markQue (mergeᶠ (just _)) outerOpen = kStart
-markQue _                 _         = kOther
 
 evKind : ∀ {B} → (FlatOp → Mark → Kind) → FlatOp → Ev (Maybe (Input B)) → Kind
 evKind k op (out (just (inj₁ (_ , instEmit (mark m) _)))) = k op m
@@ -121,27 +114,6 @@ react-active op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj�
 react-active op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₁ (left-act n (record s { finished = true }))
 react-active op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
 react-active op (s , _) (just (inj₁ (b , instEmit (mark completed) n))) = refl
-
-react-queue : ∀ {B} op (o : Out B) x → Flat.queue (proj₁ (react op o x)) ≡ stepK (evKind markQue op (out x)) (Flat.queue (proj₁ o))
-react-queue op (s , _) nothing = refl
-react-queue op (s , _) (just (inj₂ (i , r))) = proj₂ (unpark-act root (record s { live = setAt i r (Flat.live s) }))
-react-queue op (s , _) (just (inj₁ (b , instEmit (value _) _))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark begin) n))) = proj₂ (begun-act b n s)
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark over) n))) = proj₂ (overed-act n s)
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark stop) n))) = proj₂ (stopped-act b n s (if Flat.spent s then 0 else share b s))
-react-queue (mergeᶠ (just _)) (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
-react-queue (mergeᶠ nothing)  (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
-react-queue switchᶠ           (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = proj₂ (cut-act (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }))
-react-queue exhaustᶠ          (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerClose) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneStart) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark carry) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneDone) n))) = proj₂ (ended-act (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }))
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj₂ (burst-act (isZero (Flat.held s) ∨ Flat.dead s) n s)
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₂ (left-act n (record s { finished = true }))
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark completed) n))) = refl
-
 -- The scan past one more row, before any end.
 pstep : ∀ {B} → FlatOp → Out B → Pos × Ev (Maybe (Input B)) → Out B
 pstep op o (_ , out x) = react op o x
@@ -164,10 +136,3 @@ past-active op o xs (q , out x) ne rewrite past-snoc op o xs (q , out x) ne = re
 past-active op o xs (q , end) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , end) ne)
 past-active op o xs (q , skip) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , skip) ne)
 past-active op o xs (q , pin _) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , pin _) ne)
-
-past-queue : ∀ {B} op (o : Out B) xs y → (∀ {c} → (c , end) ∈ xs → ⊥)
-           → Flat.queue (proj₁ (past op o (xs ++ [ y ]))) ≡ stepK (rowKind markQue op y) (Flat.queue (proj₁ (past op o xs)))
-past-queue op o xs (q , out x) ne rewrite past-snoc op o xs (q , out x) ne = react-queue op (past op o xs) x
-past-queue op o xs (q , end) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , end) ne)
-past-queue op o xs (q , skip) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , skip) ne)
-past-queue op o xs (q , pin _) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , pin _) ne)

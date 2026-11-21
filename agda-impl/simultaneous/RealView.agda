@@ -17,7 +17,10 @@ open import Data.List using (List)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (DenEnv; enter)
-open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ)
+open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ; ok-step; ok-in; ⊑-refl)
+import denotation.Laws.JoinInv as JoinInv
+open import Data.Nat.Properties using (<-cmp)
+open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import denotation.Laws.Shows using (k-shows; shows-k)
 import denotation.Laws.ShowsJoin as SJ
 open import simultaneous.HeldComb using (ev)
@@ -41,7 +44,7 @@ open import denotation.Up using (up; up-⊕)
 open import simultaneous.Instants using (triⁱ; transⁱ; instant-≺)
 open import simultaneous.TakeCut using (inst-⊕)
 open import denotation.Position using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Den; out; end; LaneOf; _≺_; Few; Truncate; module Merge; module Bounded;
+open import denotation.EmissionSet using (EmissionSet; Den; out; end; After; LaneOf; _≺_; Few; Truncate; module Merge; module Bounded;
   module Switch; module Exhaust)
 open import denotation.Laws.Worlds using (Shows)
 open import simultaneous.Readings using (instantOf)
@@ -94,6 +97,40 @@ real-from (just _) (mergeᶠ nothing)  F s E p x = x
 real-from (just _) (mergeᶠ (just _)) F s E p x = x
 real-from (just _) switchᶠ           F s E p x = x
 real-from (just _) exhaustᶠ          F s E p x = x
+
+-- A LANE'S ROW IS ITS VALUE'S OWN ROW PAST A SUBSCRIPTION THE INVARIANT
+-- HOLDS AT, and any row of that subscription past it is the lane's.
+lane-at : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) p (ok : Ok H p)
+        → ∀ {q a k e} → enter d p q (out a) → View.Lane f (enter d p) op q a k e
+        → Σ Pos λ s → Ok H s × enter (f a) s k e × s ≺ k × (∀ {c e′} → enter (f a) s c e′ → s ≺ c → View.Lane f (enter d p) op q a c e′)
+lane-at (mergeᶠ nothing)  d f Id If p ok {q} x (r , sk) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , sk , _,_
+lane-at (mergeᶠ (just n)) d f Id If p ok x (i , s , sb , r , sk) = s , okS sb , r , sk , λ r′ sc → i , s , sb , r′ , sc
+  where open BoundedI ok n f If (Id p ok) using (okS)
+lane-at switchᶠ           d f Id If p ok {q} x (r , sk) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , sk , _,_
+lane-at exhaustᶠ          d f Id If p ok {q} x (r , sk) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , sk , _,_
+
+private
+  out-end : ∀ {B : Set} {b : B} → _≡_ {A = Ev B} (out b) end → ⊥
+  out-end ()
+
+-- TWO LANES WITH A VALUE AT ONE POSITION ARE ONE OUTER VALUE'S.
+lane-one : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) p (ok : Ok H p)
+         → ∀ {q q′ a a′ y b b′} → enter d p q (out a) → enter d p q′ (out a′)
+         → View.Lane f (enter d p) op q a y (out b) → View.Lane f (enter d p) op q′ a′ y (out b′) → q ≡ q′
+lane-one (mergeᶠ nothing)  d f Id If p ok x x′ l l′ = JoinInv.Join.one-lane ok f If (Id p ok) x x′ l l′
+lane-one switchᶠ           d f Id If p ok x x′ l l′ = JoinInv.Join.one-lane ok f If (Id p ok) x x′ l l′
+lane-one exhaustᶠ          d f Id If p ok x x′ l l′ = JoinInv.Join.one-lane ok f If (Id p ok) x x′ l l′
+lane-one (mergeᶠ (just n)) d f Id If p ok {y = y} x x′ (i , s , sb , l) (i′ , s′ , sb′ , l′) with <-cmp i i′
+... | tri< lt _ _ = ⊥-elim (BI.x-lead sb sb′ (BI.rel lt sb sb′) (row sb l) (row sb′ l′) (⊑-refl y))
+  where module BI = BoundedI ok n f If (Id p ok)
+        row : ∀ {i q s a b} → Bounded.Sub n f (enter d p) i q s a → After (f a) s y (out b) → BI.Lr a s y
+        row sb l = BI.lr-row l (λ l″ _ → out-end (InvAt.func (BI.LI sb) (proj₁ l) (proj₁ l″)))
+... | tri≈ _ refl _ = proj₁ (BI.sub-fun sb sb′)
+  where module BI = BoundedI ok n f If (Id p ok)
+... | tri> _ _ gt = ⊥-elim (BI.x-lead sb′ sb (BI.rel gt sb′ sb) (row sb′ l′) (row sb l) (⊑-refl y))
+  where module BI = BoundedI ok n f If (Id p ok)
+        row : ∀ {i q s a b} → Bounded.Sub n f (enter d p) i q s a → After (f a) s y (out b) → BI.Lr a s y
+        row sb l = BI.lr-row l (λ l″ _ → out-end (InvAt.func (BI.LI sb) (proj₁ l) (proj₁ l″)))
 
 -- Each policy's joiner shows its hangs where its outer and lanes do.
 join-shows : ∀ {A B H} op (d : Den A) (f : A → Den B) → InvD H d → (∀ a → InvD H (f a)) → ∀ p → Ok H p

@@ -12,91 +12,92 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; _+_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
-open import Tree using (Obs; FlatOp; empty; of; map; flatMap; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_; Path)
-open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; skip; pin;
-  _≺_)
+open import Tree using (Obs; FlatOp; of; map; flatMap; mergeᶠ)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_)
+open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (hot; enter; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; skip; pin; _≺_)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB; isZero)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
-open import simultaneous.HeldIn using (IdleIn; Upto)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
-  _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
-open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
+open import simultaneous.Routed using (Held; Early; nameOf; nm; Valued; opos; cnt)
+open import simultaneous.HeldIn using (Upto)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; ok-step; _⊑_; InvAt; ⊕-injˡ)
+open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
-open import simultaneous.DenRows using (map-out′; hot-out)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
-open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone; Mark; laneStart; laneDone)
+open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerDone; Mark; laneStart; laneDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
-open import simultaneous.BranchSplit using (SrcOf; bview)
-open import simultaneous.LaneSplit using (Ln; lane-proj; module HotSplit)
 open import simultaneous.TakeCut using (inst-⊕)
-open import simultaneous.CloseDone using (module CloseDone)
-open import simultaneous.CombSent using (Clo)
-open import simultaneous.FlatLanes using (Tg)
 import denotation.Laws.ShowsJoin as SJ
-open import denotation.Laws.ShowsOps using (sk-of; module Take)
-open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-down; sk-trunc)
-open import denotation.Laws.Worlds.Leaves using (of-inv)
-open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≺-irrefl; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-split; entered-few)
-open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at; tag-outer)
-open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none)
-open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co; bproj-end; Within; within;
-  brTag)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ; ∈-++⁺ˡ)
+open import denotation.Laws.ShowsOps using (module Take)
+open import denotation.Laws.Shows using (k-shows; sk-trunc)
+open import denotation.Laws.Modulus using (T-not; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
+open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH)
+open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; undone; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
-open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals; locals-runs;
-  local-end; run-row; walk; inv-past; step-local)
+open import simultaneous.HeldComb using (ev; CombIn; RunHeld; outRows; init; from; past; lay; Local; Locals; locals-runs; local-end;
+  run-row; walk; inv-past; step-local)
 open import simultaneous.FlatSim using (NoCB; tot)
-open import simultaneous.HeldComb using (exact-past; inv-at; ShutRun; RunHeld; ev; run-row)
+open import simultaneous.HeldComb using (exact-past; inv-at; RunHeld; ev; run-row)
 open import Relation.Nullary.Decidable using (decidable-stable)
-open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
-open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
-open import Function using (Equivalence)
 open import denotation.Laws.BoundedInv using (end-uniq)
-open import Data.Bool using (true; false; _∧_)
-open import simultaneous.Project using (Proj; run-prefix)
+open import Data.Bool using (Bool; T; not; true; false; _∧_)
+open import simultaneous.Project using (run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
-open import denotation.Laws.HotBelow using (under-hot)
-open import simultaneous.OuterSplit using (count-open; module OuterSplit)
-open import simultaneous.ProperIdle using (proper-idle)
+open import simultaneous.OuterSplit using (count-open)
 open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
-open import simultaneous.RealView using (module View; real-from; real-ends)
+open import simultaneous.RealView using (module View; real-from; real-ends; lane-at; lane-one)
+open import simultaneous.HeldTake using (module TakeBack)
+open import simultaneous.TakeKit using (ix<last)
 open import denotation.EmissionSet using (Den; Truncate)
 open import simultaneous.InstEmit using (valuesOf)
 
-open import Tree using (Obs; FlatOp; empty; of; map; flatMap; connected)
+open import Tree using (Obs; FlatOp; of; map; flatMap; connected; takeWhile)
 
 
 open import simultaneous.LaneCount using (module Count; kDone)
 open import simultaneous.ScanCount using (rowKind; markAct; past-active)
 open import Data.List.Membership.Propositional using (find)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++)
-open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; proper-shows; named-at; next-≼; Opens; o-value; o-done)
+open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; named-at; next-≼; o-value; o-done)
+
+-- A LANE'S TAKE ENDS BESIDE ITS FAILING VALUE: the take's `ix 0` row of a
+-- failing value at `w` has the take's end at `w`'s `last`.
+module _ {X : Set} {H : Pos → Set} (keep : X → Bool) (d : Den X) (s : Pos) (iv : InvAt H s (enter d s)) where
+  private module TB = TakeBack true keep d s iv
+
+  take-fail : ∀ {k a} → enter (Op.takeWhile true keep d) s k (out a) → T (not (keep a))
+            → Σ Pos λ w → k ≡ w ⊕ [ ix 0 ] × enter (Op.takeWhile true keep d) s (w ⊕ [ last ]) end
+  take-fail (TB.pass _ kp _ , _)     nk = ⊥-elim (T-not kp nk)
+  take-fail (TB.fail x nk′ nf _ , _) _  = _ , refl , TB.up (TB.stop x nk′ nf)
+
+lane-take : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) → GoodEnv ρ → ∀ s → Ok (Hots ρ) s
+          → ∀ {k a} → enter (ev m (takeWhile true keep o) ρ) s k (out a) → T (not (keep a))
+          → Σ Pos λ w → k ≡ w ⊕ [ ix 0 ] × enter (ev m (takeWhile true keep o) ρ) s (w ⊕ [ last ]) end
+lane-take nothing  keep o ρ g s ok = take-fail keep (ev nothing o ρ) s (inv-ev nothing o ρ g s ok)
+lane-take (just n) keep o ρ g s ok = take-fail keep (ev (just n) o ρ) s (inv-ev (just n) o ρ g s ok)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -152,9 +153,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   module AC = Count _≟ᵖ_ (rowKind markAct op) Own (LaneMark laneStart) (LaneMark laneDone) act
 
   postulate
-    -- EACH `laneStart` IS ONE LANE'S: no two values' lanes start at one row.
-    start-one : ∀ {x q q′} → Own q → Own q′ → LaneMark laneStart q x → LaneMark laneStart q′ x → q ≡ q′
-
     -- EACH `laneDone` THE SCAN MEETS ENDS A LANE IT MET START, AND NEVER MET
     -- END OR CUT.
     done-live : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markAct op x ≡ kDone
@@ -162,6 +160,8 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
     -- A LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S `outerDone`, with
     -- no lane queued there.
+    --
+    -- RECOVERY: git show ea69c2b2:agda-impl/simultaneous/ScanCount.agda restores `past-queue`, the bounded merge's queue counter row by row
     lane-started : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
                  → Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
                  → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
@@ -169,9 +169,22 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     -- NO LANE NEVER CUT MEETS A CUT IN THE SCAN.
     cut-never : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q a} → RO q (out a) → ¬ RV.Cut op q → ¬ AC.CutIn [] r₁ q
 
-    -- A LANE ENDS IN ITS `laneDone`'s INSTANT.
-    done-ends : ∀ {q a y n} → RV.Lane op q a y (out (instEmit (mark laneDone) n))
-              → Σ Pos λ c → RV.Lane op q a c end × instantOf c ≡ instantOf y
+
+  -- EACH `laneStart` IS ONE LANE'S: no two values' lanes start at one row.
+  start-one : ∀ {x q q′} → LaneMark laneStart q x → LaneMark laneStart q′ x → q ≡ q′
+  start-one (_ , y , _ , xo , refl , l) (_ , y′ , _ , xo′ , e , l′) with ⊕-injˡ y y′ (cong proj₁ e)
+  ... | refl = lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
+
+  -- A LANE ENDS IN ITS `laneDone`'s INSTANT.
+  done-ends : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n))
+            → Σ Pos λ c → RV.Lane op q a c end × instantOf c ≡ instantOf y
+  done-ends x l with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) x l
+  ... | s , oks , r , sk , back with lane-take m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks r tt
+  ...   | w , refl , e = w ⊕ [ last ] , back e (≺-trans {s} {w ⊕ [ ix 0 ]} {w ⊕ [ last ]} sk (ix<last w)) , trans (inst-⊕ w [ last ]) (sym (inst-⊕ w [ ix 0 ]))
 
   private
     I-RO : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) RO
@@ -212,11 +225,11 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     lane-started r₁ mt q0 Fv zv x rn nc λ si →
       AC.drained r₁ (λ xs y ys eq → past-active op init xs y (no-end r₁ mt xs eq))
         (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , refl , _) → refl })
-        (λ _ _ _ _ → start-one) (done-live r₁ mt) a0 (a , x , rn) si (cut-never r₁ mt x nc) done-by
+        (λ _ _ _ _ _ _ → start-one) (done-live r₁ mt) a0 (a , x , rn) si (cut-never r₁ mt x nc) done-by
     where
       done-by : AC.DoneIn r₁ r₁ q → ⊥
       done-by di with find di
-      ... | _ , i , (a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends l
+      ... | _ , i , (a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
       ...   | refl | c , lc , ic = ¬g (c , lc , λ zc → ≺-absurd {y ⊕ [ sub LS.J ]} {z} (met-before r₁ mt i)
               (instant-≺ z (y ⊕ [ sub LS.J ]) (subst (instantOf z ≺ⁱ_) (trans ic (sym (inst-⊕ y [ sub LS.J ]))) zc)))
 

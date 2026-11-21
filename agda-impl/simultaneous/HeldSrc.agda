@@ -5,27 +5,25 @@
 module simultaneous.HeldSrc where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (Obs; FlatOp; empty; of; map; flatMap; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_; Path)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; Path)
 open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; skip; pin;
-  _≺_)
-open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB; isZero)
+open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; _≺_)
+open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
-open import simultaneous.HeldIn using (IdleIn; Upto)
+open import simultaneous.HeldIn using (IdleIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
   _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
-open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
+open import simultaneous.LaneLocal using (inv-ev; Fit; proper-fit; held-fit; module LaneReal)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import simultaneous.DenRows using (map-out′; hot-out)
@@ -33,11 +31,10 @@ open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (there)
 open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
-open import simultaneous.FlatPark using (past-park)
 open import simultaneous.BranchSplit using (SrcOf; bview)
 open import simultaneous.LaneSplit using (Ln; lane-proj; module HotSplit)
 open import simultaneous.TakeCut using (inst-⊕)
@@ -51,29 +48,24 @@ open import denotation.Laws.Worlds.Leaves using (of-inv)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≺-irrefl; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-split; entered-few)
 open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at; tag-outer)
 open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none)
-open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co; bproj-end; Within; within;
-  brTag)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ; ∈-++⁺ˡ)
+open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
-open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals; locals-runs;
-  local-end; run-row; walk; inv-past; step-local)
-open import simultaneous.FlatSim using (NoCB; tot)
-open import simultaneous.HeldComb using (exact-past; inv-at; ShutRun; RunHeld; ev; run-row)
-open import Relation.Nullary.Decidable using (decidable-stable)
+open import simultaneous.HeldComb using (ev; ShutRun; outRows; init; from; past)
+open import simultaneous.HeldComb using (ShutRun; ev)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
-open import denotation.Laws.BoundedInv using (end-uniq)
-open import Data.Bool using (true; false; _∧_)
+open import Data.Bool using (true; false)
 open import simultaneous.Project using (Proj; run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
@@ -82,12 +74,8 @@ import denotation.EmissionSet as ES
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.OuterSplit using (count-open; module OuterSplit)
 open import simultaneous.ProperIdle using (proper-idle)
-open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
-open import simultaneous.RealView using (module View; real-from; real-ends)
-open import denotation.EmissionSet using (Den; Truncate)
-open import simultaneous.InstEmit using (valuesOf)
 
-open import Tree using (Obs; FlatOp; empty; of; map; flatMap; connected)
+open import Tree using (Obs; FlatOp; empty; of; map; flatMap)
 
 
 -- A row between two of one instant is of it.
