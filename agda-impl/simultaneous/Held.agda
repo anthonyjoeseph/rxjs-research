@@ -22,7 +22,7 @@ open import Tree using (Obs; Later; FlatOp; cold; empty; of; map; scan; takeWhil
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_; Path)
 open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; skip; pin; _≺_; spin)
-open import simultaneous.SObs using (SObs; plain; lone; module Elaborate; Flat; outerB; laneB; closeB)
+open import simultaneous.SObs using (SObs; plain; lone; module Elaborate; Flat; outerB; laneB; closeB; isZero)
 open import simultaneous.Relations using (elaborated; Met)
 open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
@@ -59,10 +59,11 @@ open import denotation.Laws.Worlds.Leaves using (of-inv)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≺-irrefl; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-split; entered-few)
 open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at; tag-outer)
 open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; module Quiet; conn-ev; empty-few; ev-none; held-cold; held-connect; held-connected; held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
-open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co; bproj-end)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ)
+open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co; bproj-end; Within; within;
+  brTag)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ; ∈-++⁺ˡ)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
-  Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
+  Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals; locals-runs;
   local-end; run-row; walk; inv-past; step-local)
 open import simultaneous.FlatSim using (NoCB; tot)
@@ -72,12 +73,12 @@ open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
-open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
+open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
-open import denotation.Read using (Visible; After; cursor; Run)
+open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
-open import Data.Bool using (true; false)
+open import Data.Bool using (true; false; _∧_)
 open import simultaneous.Project using (Proj; run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
@@ -89,6 +90,7 @@ open import simultaneous.OuterSplit using (count-open; module OuterSplit)
 open import simultaneous.ProperIdle using (proper-idle)
 open import simultaneous.HeldLim using (module LimHeld)
 open import simultaneous.HeldScanned using (comb-held)
+open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
 
 open import Tree using (Obs; FlatOp; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected)
 
@@ -156,6 +158,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   g₃ : GoodEnv env′
   g₃ = good-cons L₃ g₂
+
+  I-M : InvAt (Hots env′) P M
+  I-M = inv-ev m src env′ g₃ P ok₃
 
   -- Where a branch's reader ends: past its source's end.
   data BEnd : Pos → Set where
@@ -650,12 +655,78 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             λ (z , e″ , m′ , _ , z≼q , pr) → case (pr refl) z≼q m′
 
   postulate
-    -- PAST THE CLOSER'S `outerDone`, A COUNTED OUTER ROUTE KEEPS THE SOURCE
-    -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
-    -- lane running or queued, and every outer row lies before it, so the
-    -- branches, and the source with them, end in that instant.
-    done-met : ∀ rx₁ {q a rx₂ z n} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
-             → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
+    -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
+    -- SOURCE ENDS IN ITS INSTANT: the scan counts every lane rxjs started
+    -- and has not ended, and every outer value a bounded merge holds, so
+    -- the lanes have ended, the closer ends past its mark, and the
+    -- source's last item follows them.
+    idle-ends : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+              → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+              → Σ Pos λ c → M c end × instantOf c ≡ instantOf z
+
+  -- EVERY OUTER ROW THE SOURCE MEETS LIES BEFORE THE CLOSER'S `outerDone`.
+  outer-before-done : ∀ {k v z n} → M k (out (just (inj₁ (outerB , v)))) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
+                    → k ≺ z
+  outer-before-done mk mz with outer-sent mk | close-sent mz
+  ... | y₁ , w , _ , σy , _ , refl | y₂ , w′ , σy′ , refl = CD.before-done σy (proj₁ σy′) w w′
+
+  -- PAST THE CLOSER'S `outerDone`, A COUNTED OUTER ROUTE KEEPS THE SOURCE
+  -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
+  -- lane running or queued, and no outer row follows to count another.
+  done-met : ∀ rx₁ {q a rx₂ z n} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
+           → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
+  done-met rx₁ {q} {a} {rx₂} {z} {n} mt mz zq nz with run-catch rx₁ mt mz tt tt zq
+  ... | r₁ , r₂ , e″ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ r₁ (here refl))))) mz
+  ...   | refl = go (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) refl
+    where
+      xz : Maybe (Input B)
+      xz = just (inj₁ (closeB , instEmit (mark outerDone) n))
+      s₀ = proj₁ (past op init r₁)
+      rest = (q , out a) ∷ rx₂
+
+      mt′ : Met M (r₁ ++ (z , out xz) ∷ (r₂ ++ rest))
+      mt′ = subst (Met M) (++-assoc r₁ ((z , out xz) ∷ r₂) rest) mt
+
+      mx : Met M (r₁ ++ (z , out xz) ∷ r₂)
+      mx = run-prefix (r₁ ++ (z , out xz) ∷ r₂) mt
+
+      zk : ∀ {k e} → (k , e) ∈ r₂ → z ≺ k
+      zk i with run-tail r₁ mt′
+      ... | _ ∷ᴿ rn = run-after rn (∈-++⁺ˡ i)
+
+      rk : ∀ {k e} → (k , e) ∈ r₂ → M k e
+      rk i = proj₁ (run-row∈ mt′ (∈-++⁺ʳ r₁ (there (∈-++⁺ˡ i))))
+
+      -- No outer row follows the mark.
+      nt : ∀ {k e} → (k , e) ∈ r₂ → brTag {B} outerB e ≡ nothing
+      nt {k} {out (just (inj₁ (outerB , v)))} i = ⊥-elim (≺-absurd {z} {k} (zk i) (outer-before-done (rk i) mz))
+      nt {k} {out (just (inj₁ (laneB , v)))}  i = refl
+      nt {k} {out (just (inj₁ (closeB , v)))} i = refl
+      nt {k} {out (just (inj₂ _))}            i = refl
+      nt {k} {out nothing}                    i = refl
+      nt {k} {end}                            i = refl
+      nt {k} {skip}                           i = refl
+      nt {k} {pin _}                          i = refl
+
+      tl₂ : ∀ a₁ {c} a₂ → r₂ ≡ a₁ ++ (c , end) ∷ a₂ → a₂ ≡ []
+      tl₂ a₁ {c} a₂ eq = end-last I-M (r₁ ++ (z , out xz) ∷ a₁)
+        (subst (Met M) (trans (cong (λ w → r₁ ++ (z , out xz) ∷ w) eq) (sym (++-assoc r₁ ((z , out xz) ∷ a₁) ((c , end) ∷ a₂)))) mx)
+
+      split≡ : past op init (r₁ ++ (z , out xz) ∷ r₂) ≡ past op (react op (past op init r₁) xz) r₂
+      split≡ = past-split op init r₁ (λ a₁ a₂ eq → end-last I-M a₁ (subst (Met M) eq mx))
+
+      go : ∀ b → (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) ≡ b → instantOf z ≡ instantOf q
+      go true h with both-zero (Flat.active s₀) (Flat.queue s₀) h
+      ... | a0 , q0 with idle-ends r₁ mt′ a0 q0
+      ...   | c , rc , cz = between-inst {z} {q} {c} zq
+                (λ cq → loud tt (pinby-silent (InvAt.quiet I-M rc (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) cq))) cz
+      go false h = ⊥-elim (nz (trans (cong (λ o → Flat.outer (proj₁ o)) split≡) (ℕP.n≤0⇒n≡0 (Within.le Wo))))
+        where
+          oz : Flat.outer (proj₁ (react op (past op init r₁) xz)) ≡ 0
+          oz = left-cut n (record s₀ { finished = true }) h
+          Wo : Within outerB (proj₁ (past op (react op (past op init r₁) xz) r₂)) (root , 0)
+          Wo = past-within {A} {B} co (opening {A} {B}) count-open OS.J op (react op (past op init r₁) xz) (root , 0) r₂ [] tl₂
+                (all-drop r₂ nt) (within (λ _ → oz) (subst (ℕ._≤ 0) (sym oz) ℕ.z≤n) (inj₁ oz))
 
   -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
   -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: the source meets that row
