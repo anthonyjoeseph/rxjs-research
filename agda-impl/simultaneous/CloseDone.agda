@@ -19,7 +19,7 @@ open import Data.Nat using (ℕ; suc; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Nullary using (¬_)
+open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (mergeᶠ)
@@ -27,9 +27,10 @@ open import denotation.Position using (Pos; Instant; ix; sub; last; root; _≟�
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; skip; pin; end; EmissionSet; Den; DenEnv; hot; enter; After; Reach;
   Rejoin; shown; heard; ended; late; at-out; on-out; module Op; module Merge; module Bounded; module Values; _≺_; _≼_; Few)
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-irrefl; ≺-absurd; ≼-refl; ≼-split; ≺→≼; ≺-≼-≺)
-open import denotation.Laws.Worlds using (Lawful; ⊕-assoc)
-open import denotation.Laws.Worlds.Leaves using (of-in; of-reach; of-end; of-end-row)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-irrefl; ≺-absurd; ≼-refl; ≼-split; ≺→≼; ≺-≼-≺; ≼-or-≻)
+open import denotation.Laws.Worlds using (Lawful; ⊕-assoc; _⊑_)
+open import denotation.Laws.Count using (⊑?)
+open import denotation.Laws.Worlds.Leaves using (of-in; of-reach; of-end; of-end-row; of-rows)
 open import denotation.Laws.Rejoined using (row-reach)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Truth using () renaming (past to ix≺last)
@@ -38,6 +39,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.CombSent using (Clo; assoc³; module EachEnd)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.InstEmit using (instEmit; value; mark; outerDone)
+open import simultaneous.Horizon using (past-sub)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; closer; closing; marked)
 
@@ -153,7 +155,8 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
   ------------------------------------------------------------------------
   -- The first part's end, one `sub` under the outer's
 
-  module FirstEnd {y} (ry : t y end) (fy : Few t y) where
+  module FirstEnd {y} (ry : t y end) (fy : Few t y)
+                  (flat₀ : ∀ {k e l ys e′} → enter D₀ s₁ k e → enter D₀ s₁ (k ⊕ (l ∷ ys)) e′ → ⊥) where
 
     c₁ : Pos
     c₁ = y ⊕ [ sub s₁ ]
@@ -310,3 +313,82 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
     ...     | refl = done-past d (≺-trans {q₁} {c₂} {_} q₁≺c₂ lt)
     raw-end-after (Bd.run () _)
     raw-end-after (Bd.rend () _ _)
+
+    ----------------------------------------------------------------------
+    -- Finitely many rows before it
+
+    R : List Pos
+    R = (q₀ ⊕ [ ix 0 ]) ∷ (q₁ ⊕ [ ix 0 ]) ∷ (s ⊕ [ last ]) ∷ (c₁ ⊕ []) ∷ (c₁ ⊕ [ ix 0 ]) ∷ ((c₂ ⊕ [ last ]) ⊕ [ ix 0 ])
+      ∷ of-rows c₂ 0 (marked {B} outerDone ∷ []) ++ below
+
+    in-below : ∀ {k} → k ∈ below → k ∈ R
+    in-below i = there (there (there (there (there (there (∈-++⁺ʳ (of-rows c₂ 0 (marked {B} outerDone ∷ [])) i))))))
+
+    c₁⊑z₀ : c₁ ⊑ z₀
+    c₁⊑z₀ = ix 1 ∷ ix 0 ∷ [] , ⊕-assoc c₁ [ ix 1 ] [ ix 0 ]
+
+    -- The first part's rows before it: before its end, or its end.
+    lane₀-row : ∀ {k e} → enter D₀ s₁ k e → k ≺ z₀ → k ∈ R
+    lane₀-row {k} x kz with ≼-or-≻ c₁ k
+    ... | inj₂ kc = in-below (few₀ (proj₁ x) kc)
+    ... | inj₁ ck with ⊑? c₁ k
+    ...   | no nk = ⊥-elim (≺-absurd {k} {z₀} kz (past-sub {c₁} {z₀} {k} c₁⊑z₀ ck nk))
+    ...   | yes ([] , refl) = there (there (there (here refl)))
+    ...   | yes (l ∷ ys , refl) = ⊥-elim (flat₀ end₀ x)
+
+    lane-end : ∀ {q a c} → Bd.Lane q a c end → c ≡ c₁ ⊎ c ≡ c₂ ⊕ [ last ]
+    lane-end (i , s′ , (nth , st) , en , lt) with o-rows (nth-row nth)
+    ... | inj₁ (refl , refl) with nth-q₀ nth
+    ...   | refl = inj₁ (ends₀-only (q₀ , true , s′ , nth , st , en , lt))
+    lane-end (i , s′ , (nth , st) , en , lt) | inj₂ (refl , refl) with nth-q₁ nth
+    ...   | refl with st₁-only st
+    ...     | refl = inj₂ (of-end c₂ 0 (marked {B} outerDone ∷ []) (proj₁ (subst (λ d → enter d c₂ _ end) second-op en)))
+
+    lane-row : ∀ {q a k e} → Bd.Lane q a k e → k ≺ z₀ → k ∈ R
+    lane-row {k = k} {e} (i , s′ , (nth , st) , en , lt) kz with o-rows (nth-row nth)
+    ... | inj₁ (refl , refl) with nth-q₀ nth
+    ...   | refl with st
+    ...     | Bd.room _ = lane₀-row (subst (λ d → enter d s₁ k e) first-op en) kz
+    ...     | Bd.freed () _
+    ...     | Bd.queued () _ _ _ _
+    lane-row {k = k} {e} (i , s′ , (nth , st) , en , lt) kz | inj₂ (refl , refl) with nth-q₁ nth
+    ...   | refl with st₁-only st
+    ...     | refl = there (there (there (there (there (there (∈-++⁺ˡ (of-in c₂ 0 (marked {B} outerDone ∷ [])
+                       (proj₁ (subst (λ d → enter d c₂ k e) second-op en)))))))))
+
+    hand-row : ∀ {q a c} → Bd.Lane q a c end → (c ⊕ [ ix 0 ]) ∈ R
+    hand-row l with lane-end l
+    ... | inj₁ refl = there (there (there (there (here refl))))
+    ... | inj₂ refl = there (there (there (there (there (here refl)))))
+
+    o-end : ∀ {c} → O c end → c ∈ R
+    o-end (r , _) with of-end s 0 (true ∷ false ∷ []) r
+    ... | refl = there (there (here refl))
+
+    o-val : ∀ {q a} → O q (out a) → (q ⊕ [ ix 0 ]) ∈ R
+    o-val r with o-rows r
+    ... | inj₁ (refl , _) = here refl
+    ... | inj₂ (refl , _) = there (here refl)
+
+    raw-reach : ∀ {k e} → Bd.JoinT k e → k ≺ z₀ → k ∈ R
+    raw-reach (Bd.val r) _                = o-val r
+    raw-reach (Bd.step (on-out (on-out ()) , _)) _
+    raw-reach (Bd.opin (on-out (on-out ()) , _)) _
+    raw-reach (Bd.oend r _) _             = o-end r
+    raw-reach (Bd.opass r _) _            = o-end r
+    raw-reach (Bd.lane _ _ l _ _) kz      = lane-row l kz
+    raw-reach (Bd.lend _ _ l _ _ _) kz    = lane-row l kz
+    raw-reach (Bd.lpass _ _ l _ _ _) kz   = lane-row l kz
+    raw-reach (Bd.hand _ _ l _ _) _       = hand-row l
+    raw-reach (Bd.left _ _ l _ _) kz      = lane-row l kz
+    raw-reach (Bd.run () _)
+    raw-reach (Bd.rend () _ _)
+    raw-reach (Bd.rpass () _ _)
+    raw-reach (Bd.rhand () _)
+
+    -- THE CLOSER'S `outerDone`, at or before each of its ends.
+    closer-row : Σ Pos λ z₁ → instantOf z₁ ≡ instantOf y × enter (ev m (closer {Δ} {A} {B}) ρ) s z₁ (out (marked {B} outerDone))
+                 × (∀ {c} → enter (ev m (closer {Δ} {A} {B}) ρ) s c end → z₁ ≺ c)
+    closer-row = z₀ , raw-inst ,
+      subst (λ d → enter d s z₀ (out (marked {B} outerDone))) (sym closer-op) (raw , R , λ x lt _ → raw-reach x lt) ,
+      λ {c} x → raw-end-after (proj₁ (subst (λ d → enter d s c end) closer-op x))
