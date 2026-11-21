@@ -85,6 +85,7 @@ held-ex wd H = record
   ; shut    = Held.shut H
   ; early   = Held.early H
   ; ends    = Held.ends H
+  ; done    = Held.done H
   ; late    = Held.late H
   ; idle    = Held.idle H
   ; rest    = Held.rest H }

@@ -30,7 +30,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; ove
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; Idle; Rest; Carried; c-value; c-stop; c-over; c-end; cnt; Ex; nameOf; nm; Routing; Early; Valued; opos)
+open import simultaneous.Routed using (Held; Idle; Rest; Carried; c-value; c-stop; c-over; c-done; c-end; cnt; Ex; nameOf; nm; Routing; Early; Valued; opos)
 open import simultaneous.Readings using (rootOf)
 open import denotation.Laws.Worlds using (_⊑_)
 
@@ -116,6 +116,7 @@ carried-same : ∀ {A B : Set} {e′ : Ev (IE B)} {e : Ev (IE A)} → EvSame e�
 carried-same (ev-out same-value) c-value = c-value
 carried-same (ev-out (same-mark _)) c-stop = c-stop
 carried-same (ev-out (same-mark _)) c-over = c-over
+carried-same (ev-out (same-mark _)) c-done = c-done
 carried-same ev-end              c-end   = c-end
 
 ------------------------------------------------------------------------
@@ -196,7 +197,7 @@ held-move : ∀ {A B : Set} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
           → Held t cs → Held t′ cs′
 held-move {A} {t = t} {t′} {cs} {cs′} R rt exR eaR laR row end-row back idle rest H = record
   { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
-  ; early = early ; ends = ends ; late = late ; idle = idle (Held.idle H) ; rest = rest (Held.rest H) }
+  ; early = early ; ends = ends ; done = done ; late = late ; idle = idle (Held.idle H) ; rest = rest (Held.rest H) }
   where
     nm-R : ∀ {y′ y} → R y′ y → nameOf y′ ≡ nameOf y
     nm-R r = cong nm (rt r)
@@ -208,6 +209,10 @@ held-move {A} {t = t} {t′} {cs} {cs′} R rt exR eaR laR row end-row back idle
     ends : ∀ {y} → t′ y end → Early y
     ends x with end-row x
     ... | _ , r , y = eaR r (Held.ends H y)
+
+    done : ∀ {y n} → t′ y (out (instEmit (mark completed) n)) → Early y
+    done x with row x
+    ... | _ , _ , r , y , same-mark _ = eaR r (Held.done H y)
 
     late : ∀ {y n} → t′ y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     late x with row x

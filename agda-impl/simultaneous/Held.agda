@@ -166,7 +166,7 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
     ; shut    = λ r₁ r₂ eq _ bq _ _ → ⊥-elim (no-mark (proj₁ (run-row∈ mt (subst (_ ∈_) (sym eq) (∈-++⁺ˡ bq))))) }
 
   held : Held t (p ∷ cs)
-  held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x))
+  held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x))
     (λ mt _ _ _ _ → inj₁ (cong proj₂ (quiet-fold r₀ _ (λ i → no-mark (proj₁ (run-row∈ mt i))))))
     (λ mt _ bq → ⊥-elim (no-mark (proj₁ (run-row∈ mt bq))))
     runs
@@ -278,10 +278,14 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
   no-stop x with row x tt
   ... | ()
 
+  done : ∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y
+  done x with row x tt
+  ... | ()
+
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
 held-cold m ρ c = ih λ env cs g eh p ok ep →
   let open ColdHeld p (enter (ev m (elab ρ (cold c)) env) p) (cold-rows m c env p) in
-  held-runs named routing (early ep) (ends ep) late (cold-idle m c env p) (cold-rest m c env p) λ mt → record
+  held-runs named routing (early ep) (ends ep) done late (cold-idle m c env p) (cold-rest m c env p) λ mt → record
     { covered = λ r₁ r₂ eq cr ne → cold-covered m c env p mt r₁ r₂ eq cr λ { (here s) → ne (here s) ; (there ()) }
     ; exact   = λ r₁ r₂ eq → ⊥-elim (no-stop (proj₁ (run-row r₁ (subst (Met _) eq mt))))
     ; shut    = cold-shut m c env p mt }
@@ -422,6 +426,11 @@ open-value : ∀ {A B} {x : IE A} {a n} → opening {B = B} x ≡ instEmit (valu
 open-value {x = instEmit (value _) _} ()
 open-value {x = instEmit (mark _) _}  ()
 
+-- What a branch's row opens past the scan unchanged: a value, or a completion.
+data Opens {A : Set} : IE A → Set where
+  o-value : ∀ {a n} → Opens (instEmit (value a) n)
+  o-done  : ∀ {n} → Opens (instEmit (mark completed) n)
+
 -- WHAT THE SCAN'S SOURCE MEETS, read past the three connects: a
 -- tracker's report, a branch's row re-keyed where the branch's reader
 -- subscribed it, or the end, under the scan's own subscription.
@@ -559,7 +568,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                    → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     held-current   : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                    → Flat.held (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-    value-open    : ∀ rx₁ {q b a n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (value a) n)))) ∷ rx₂) → ¬ Ex cs′ q
+    value-open    : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
                   → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
     over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
                   → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
@@ -697,6 +706,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
+  mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
+  mdone x with m-rows x tt
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
+  ... | lane {w = w} y = early-inst [ sub w ] (Fit.fine lane-fit y)
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
   comb-runs : ∀ {rx} → Met M rx → RunHeld cs′ (outRows op init rx)
   comb-runs {rx} mt = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
     where
@@ -705,15 +720,16 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       step rx₁ {q} {x} rx₂ refl =
         step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt tt)
           (λ { refl → named (proj₁ (run-row rx₁ mt)) })
-          (λ { refl ne → value-open rx₁ mt ne })
+          (λ { refl ne → value-open rx₁ mt o-value ne })
           (λ { refl sp ne → over-open rx₁ mt sp ne })
+          (λ { refl ne → value-open rx₁ mt o-done ne })
           (λ j → rootOf-ext q (ix 1 ∷ ix j ∷ []))
 
       fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
       fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
 
   comb : CombIn op M cs′
-  comb = record { named = named ; early = early ; ends = ends ; late = late ; runs = comb-runs }
+  comb = record { named = named ; early = early ; ends = ends ; late = late ; done = mdone ; runs = comb-runs }
 
 ------------------------------------------------------------------------
 -- The scanned stream
@@ -801,6 +817,11 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
   ... | routed _ refl = late-ext (ix 1 ∷ ix j ∷ []) (CombIn.late ci mq)
     where mq = proj₁ (run-row rx₁ mx)
 
+  done-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark completed) n)) → Early y
+  done-laid mx (laid rx₁ {x = x} rx₂ {j = j} refl vi) with react-sent op (past op init rx₁) x vi
+  ... | routed _ refl = early-inst (ix 1 ∷ ix j ∷ []) (CombIn.done ci mq)
+    where mq = proj₁ (run-row rx₁ mx)
+
   named : ∀ {y n} → S y (out (instEmit (mark begin) n)) → n ≡ nameOf y
   named x = decidable-stable (_ ≟ᵖ _) λ ng → met-laid x tt λ (_ , mx , l) → ng (named-laid mx l)
 
@@ -816,6 +837,9 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
   late : ∀ {y n} → S y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
   late x = late-stable λ ng → met-laid x tt λ (_ , mx , l) → ng (late-laid mx l)
 
+  done : ∀ {y n} → S y (out (instEmit (mark completed) n)) → Early y
+  done x = early-stable λ ng → met-laid x tt λ (_ , mx , l) → ng (done-laid mx l)
+
   runs : ∀ {rs} → Met S rs → RunHeld cs rs
   runs mt = runheld-stable λ k → comb-run m op s ρ P g ok mt λ (rx , mx , ext , eq) →
     k (runs-prefix ext (subst (RunHeld cs) (sym eq) (CombIn.runs ci mx)))
@@ -824,7 +848,7 @@ comb-held : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv
           → CombIn op (enter (ev m s ρ) P) cs → Idle (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
           → Rest (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
           → Held (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) cs
-comb-held m op s ρ P cs g ok ci id re = held-runs named routing early ends late id re runs
+comb-held m op s ρ P cs g ok ci id re = held-runs named routing early ends done late id re runs
   where open Scanned m op s ρ P cs g ok ci
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s

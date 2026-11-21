@@ -24,24 +24,16 @@ open import denotation.EmissionSet using (EmissionSet; out; Den; hot; enter; ⟦
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.Shows using (k-shows)
 open import denotation.Laws.ShowsEv using (sk-⟦⟧)
-open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; _∪ʰ_; ok-step)
+open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; Shows; _∪ʰ_; ok-step)
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf)
+open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
 open import simultaneous.HeldTake using (module Holds; Inert; i-done)
 open import simultaneous.HeldConnect using (held-conn; module ConnRun; sync-body)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; marked; unfinished; completing; wrapped; concatˢ)
-
--- WHERE A STREAM COMPLETES, A ROUTE OF ITS INSTANT IS HELD: its
--- completion mark is counted for as an end is, and lies early.
-record Closes {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
-  field
-    covered : ∀ {rs} → Met t rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark completed) n)) ∷ r₂ → ¬ Ex cs y
-            → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
-    early   : ∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y
 
 -- Where the merge subscribes the completed program.
 sb₀ : Pos
@@ -52,9 +44,9 @@ beside : ∀ {A} → Obs Timeline [] (IE A) → Den (IE A)
 beside s = ⟦ merge (completing s) (cold (lone (marked subscribed))) ⟧ []ᵉ
 
 -- A TAKE CUT AFTER THE COMPLETION holds what its source holds.
-held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → Held (enter d p) cs → Closes (enter d p) cs
+held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → Held (enter d p) cs
            → Held (enter (Op.takeWhile true unfinished d) p) cs
-held-until {X} d p cs iv h c = Holds.holds true unfinished d cs p iv h fails fcov fearly
+held-until {X} d p cs iv h = Holds.holds true unfinished d cs p iv h fails fcov fearly
   where
     fails : ∀ {x : IE X} → T (not (unfinished x)) → Inert x
     fails {instEmit (mark completed) _}  _ = i-done
@@ -74,11 +66,11 @@ held-until {X} d p cs iv h c = Holds.holds true unfinished d cs p iv h fails fco
     fcov : ∀ {rs} → Met (enter d p) rs → ∀ r₁ {y x} r₂ → rs ≡ r₁ ++ (y , out x) ∷ r₂ → T (not (unfinished x)) → ¬ Ex cs y
          → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
     fcov m r₁ r₂ eq nk nx with fails nk
-    ... | i-done = Closes.covered c m r₁ r₂ eq nx
+    ... | i-done = Held.covered h m r₁ r₂ eq c-done nx
 
     fearly : ∀ {y x} → enter d p y (out x) → T (not (unfinished x)) → Early y
     fearly x nk with fails nk
-    ... | i-done = Closes.early c x
+    ... | i-done = Held.done h x
 
 -- What completes a source read hot: its rows, then the completion mark.
 closing : ∀ {A} → Den (IE A) → Den (IE A)
@@ -87,15 +79,16 @@ closing h = ⟦ concatˢ (connected (here refl)) (of (marked completed ∷ [])) 
 postulate
   -- READ HOT FROM BEFORE ITS FIRST ROW, A SOURCE COMPLETED BY A MARK holds
   -- what the source holds, and its mark lies where its end did.
-  held-closing : ∀ {A} (D : Den (IE A)) {H} p cs → InvD H D → Ok H p → Held (enter D (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
-               → Held (Connect.β D closing p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs) × Closes (Connect.β D closing p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
+  held-closing : ∀ {A} (D : Den (IE A)) {H} p cs → InvD H D → Ok H p → Shows (enter D (p ⊕ [ ix 1 ]))
+               → Held (enter D (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
+               → Held (Connect.β D closing p) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
 
 -- A PROGRAM COMPLETED BY A MARK holds what it holds, and its mark lies
 -- where its end did.
 held-completing : ∀ {A} (s : Obs Timeline [] (IE A)) p cs → Ok (Hots []ᵉ) p
                 → Held (enter (⟦ s ⟧ []ᵉ) (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
-                → Held (enter (⟦ completing s ⟧ []ᵉ) p) (p ∷ cs) × Closes (enter (⟦ completing s ⟧ []ᵉ) p) (p ∷ cs)
-held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (proj₁ B) , record { covered = covered ; early = early }
+                → Held (enter (⟦ completing s ⟧ []ᵉ) p) (p ∷ cs)
+held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-closing D p cs Is ok sh h)
   where
     D = ⟦ s ⟧ []ᵉ
     Is = inv-⟦⟧ s []ᵉ (λ ())
@@ -104,28 +97,14 @@ held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (proj₁ B) ,
     IF L = inv-⟦⟧ (concatˢ (connected (here refl)) (of (marked completed ∷ []))) (hot _ ∷ᵉ []ᵉ) (good-cons L (λ ()))
 
     sh = k-shows λ n → sk-⟦⟧ n s []ᵉ (λ ()) (p ⊕ [ ix 1 ]) (ok-step p ok)
-    B = held-closing D p cs Is ok h
-
-    open ConnRun D closing Is IF p ok sh using (C; back)
-
-    covered : ∀ {rs} → Met C rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark completed) n)) ∷ r₂ → ¬ Ex (p ∷ cs) y
-            → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
-    covered m r₁ r₂ eq nx = Closes.covered (proj₂ B) (back m) r₁ r₂ eq λ
-      { (here sy) → nx (here (sync-body {p} sy)) ; (there x) → nx x }
-
-    early : ∀ {y n} → C y (out (instEmit (mark completed) n)) → Early y
-    early (Connecting.body y , _) = Closes.early (proj₂ B) y
 
 postulate
   -- BESIDE THE SUBSCRIBE MARK, the completed program holds as it did.
   held-merged : ∀ {A} (s : Obs Timeline [] (IE A))
-              → Held (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ []) → Closes (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ [])
-              → Held (enter (beside s) root) (root ∷ []) × Closes (enter (beside s) root) (root ∷ [])
+              → Held (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ [])
+              → Held (enter (beside s) root) (root ∷ [])
 
 held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
 held-wrapped s hs =
   held-until (beside s) root (root ∷ []) (inv-⟦⟧ (merge (completing s) (cold (lone (marked subscribed)))) []ᵉ (λ ()) root (tt , λ ()))
-    (proj₁ M) (proj₂ M)
-  where
-    C = held-completing s sb₀ [] (tt , λ ()) (hs (sb₀ ⊕ [ ix 1 ]) (tt , λ ()) λ ())
-    M = held-merged s (proj₁ C) (proj₂ C)
+    (held-merged s (held-completing s sb₀ [] (tt , λ ()) (hs (sb₀ ⊕ [ ix 1 ]) (tt , λ ()) λ ())))

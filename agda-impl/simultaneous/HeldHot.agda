@@ -10,10 +10,10 @@
 -- waits on every row before it, where the pin waited on its own connect's
 -- burst alone, so the reading drops a heard pin with infinitely many rows
 -- before it, and a position past one may have few rows before it in the
--- reading but not in the source.  Where no row of the source is reached
--- from below infinitely often, the rows before such a position are each
--- dropped by the reading only when they are before it in the source too:
--- induction on the source's rows lists them.
+-- reading but not in the source.  But a row of the source with few rows
+-- before it is read, so the rows of the source with few rows before such
+-- a position are listed, and a source whose hangs show (`Shows`) has few
+-- rows before it.
 module simultaneous.HeldHot where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -27,7 +27,6 @@ open import Data.Nat using (_≟_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
@@ -38,7 +37,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; 
   enter; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split; ≼-antisym; ≺-ext)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊕-identityʳ; Shows)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; begin)
 open import simultaneous.Relations using (Met)
@@ -50,14 +49,6 @@ open import simultaneous.HeldTake using (ex-ext)
 open import simultaneous.Layers using (to≺; from≺; snoc-view; cursor-snoc; run-row)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
-
--- A row of `t` before `k`.
-Below : ∀ {X : Set} → EmissionSet X → Pos → Pos → Set
-Below t j k = Σ _ (t j) × j ≺ k
-
--- FOUNDED: no row is reached from below infinitely often.
-Founded : ∀ {X : Set} → EmissionSet X → Set
-Founded t = ∀ {k e} → t k e → Acc (Below t) k
 
 -- The positions a position lies under, itself included.
 heads : Path → List Path
@@ -84,7 +75,7 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
                (after : ∀ {y e} → S y e → sb ≺ y)
                (few-vis : ∀ {y e} → S y e → Visible e → Few S y)
                (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c)
-               (founded : Founded S) where
+               (shows : Shows S) where
 
   σ : EmissionSet (IE A)
   σ = Proper S
@@ -248,20 +239,19 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
     proper-below : ∀ {k e} → S k e → k ≺ w → ∀ {c} → S c end → k ≼ c
     proper-below {k} sk kw {c} sc ck = wend sc (≺-trans {shift c} {k} {w} (past [ sub sb ] sc sk ck) kw)
 
-    go : ∀ {k e} → S k e → Acc (Below S) k → k ≺ w → k ∈ ls
-    go {k} sk (acc rs) kw = decidable-stable (any? (k ≟ᵖ_) ls) λ nin → em {Σ Path λ ys → w ≡ k ⊕ ys} λ
+    -- A row with few rows before it is read, so it is listed.
+    listed : ∀ {k e} → S k e → Few S k → k ≺ w → k ∈ ls
+    listed {k} sk fk kw = decidable-stable (any? (k ≟ᵖ_) ls) λ nin → em {Σ Path λ ys → w ≡ k ⊕ ys} λ
       { (inj₁ (ys , eq)) → nin (∈-++⁺ʳ (L.map parent (proj₁ F)) (prefix-in k ys eq))
       ; (inj₂ np) → nin (∈-++⁺ˡ (subst (_∈ L.map parent (proj₁ F)) (parent-snoc k (sub sb))
-                          (∈-map⁺ parent (proj₂ F (proj₂ r , reach-from ls cov sk {proj₁ r}) (moved np))))) }
+                          (∈-map⁺ parent (proj₂ F (proj₂ r , reach-from (proj₁ fk) (proj₂ fk) sk {proj₁ r}) (moved np))))) }
       where
         r = rj (sk , proper-below sk kw)
-        cov : ∀ {j e} → S j e → j ≺ k → j ∈ ls
-        cov {j} sj jk = go sj (rs ((_ , sj) , jk)) (≺-trans {j} {k} {w} jk kw)
         moved : ¬ Σ Path (λ ys → w ≡ k ⊕ ys) → shift k ≺ w
         moved np = to≺ (shift k) w (<ᵖ-apart k w [ sub sb ] (from≺ k w kw) λ ys eq → np (ys , eq))
 
-    few : Few S w
-    few = ls , λ sk kw → go sk (founded sk) kw
+    few : ¬ ¬ Few S w
+    few = shows (ls , listed)
 
   Goal : List (Pos × Ev (IE A)) → Pos → Set
   Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
@@ -291,7 +281,7 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
     goal {c} refl lc aw lw =
       decidable-stable ((proj₂ (cnt rs) ≟ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng → em {Under c} λ
         { (inj₁ (y , e , sy , vy , ay , l , zs , eq)) → ng (under y sy vy ay l zs eq)
-        ; (inj₂ nu) → ng (clear nu) }
+        ; (inj₂ nu) → FewBack.few F (wend lc lw) λ fw → ng (clear nu fw) }
       where
         cu = last-cur lc
 
@@ -305,8 +295,8 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
         ... | inj₂ nq = inj₂ (trans nq (cong nm (sym (rootOf-ext y (l ∷ zs)))))
 
         -- Under no row met after the cursor: the source's own route.
-        clear : ¬ Under c → Goal rs w
-        clear nu = I run ne (FewBack.few F (wend lc lw)) (aft-in cu aw) not-past
+        clear : ¬ Under c → Few S w → Goal rs w
+        clear nu fw = I run ne fw (aft-in cu aw) not-past
           where
             not-past : ∀ {y e} → S y e → Visible e → After c y → w ≼ y
             not-past {y} sy vy ay yw = em {Σ Path λ ys → w ≡ y ⊕ ys} λ

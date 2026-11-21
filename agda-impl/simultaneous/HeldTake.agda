@@ -340,6 +340,11 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
   ... | kept x _ _ = HS.ends x
   ... | made xf nk _ (_ , refl , atl) = early-inst [ last ] (fearly xf nk)
 
+  done : ∀ {y n} → Tk y (out (instEmit (mark completed) n)) → Early y
+  done (tk , _) with kind tk tt
+  ... | kept x _ _                       = HS.done x
+  ... | made xf nk _ (_ , refl , at0 _) = early-inst [ ix 0 ] (fearly xf nk)
+
   ----------------------------------------------------------------------
   -- Run by run
 
@@ -538,7 +543,7 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
   holds : Held Tk cs
   holds = record
     { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
-    ; early = early ; ends = ends ; late = late ; idle = idle ; rest = rest }
+    ; early = early ; ends = ends ; done = done ; late = late ; idle = idle ; rest = rest }
 
 held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H} cs → HeldD H d cs → InvD H d → HeldD H (Op.takeWhile incl (passes kp) d) cs
 held-take-den {X} incl kp d cs h inv p ok ep =

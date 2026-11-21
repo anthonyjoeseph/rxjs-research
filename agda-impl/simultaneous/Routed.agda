@@ -96,11 +96,12 @@ Ex cs y = Any (λ c → Sync c y) cs
 cnt : ∀ {A} → List (Pos × Ev (IE A)) → Routes
 cnt rs = L.foldl count r₀ (values rs)
 
--- A row a route carries: anything but a begin, and the end.
+-- A row a route carries: a value, a stop, an over, a completion, and the end.
 data Carried {A : Set} : Ev (IE A) → Set where
   c-value : ∀ {a n} → Carried (out (instEmit (value a) n))
   c-stop  : ∀ {n} → Carried (out (instEmit (mark stop) n))
   c-over  : ∀ {n} → Carried (out (instEmit (mark over) n))
+  c-done  : ∀ {n} → Carried (out (instEmit (mark completed) n))
   c-end   : Carried end
 
 -- A mark read above a flatMap: never one a flatMap's scan consumes.
@@ -141,6 +142,7 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     shut    : Shut t
     early   : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
     ends    : ∀ {y} → t y end → Early y
+    done    : ∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y
     late    : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
     idle    : Idle t
     rest    : Rest t
