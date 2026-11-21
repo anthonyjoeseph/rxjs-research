@@ -89,7 +89,7 @@ open import simultaneous.SObs using (Flat)
 open import simultaneous.Routed using (Ex)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; [_,_]′)
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
 open import simultaneous.InstEmit using (instEmit; value; mark; over; outerOpen; outerClose; outerDone)
@@ -653,9 +653,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       Cr = cursor nothing rs
 
       at-idle : ∀ {v} → Few σ₁ v → After Cr v → (∀ {y e} → σ₁ y e → Visible e → After Cr y → v ≼ y) → proj₁ (cnt rs) ≡ nameOf v
-      at-idle fv av lv with outer-idle mr (λ i → bproj-end pr i) fv av lv
-      ... | inj₁ z = ⊥-elim (ℕP.0≢1+n (trans (sym z) ck))
-      ... | inj₂ n = n
+      at-idle fv av lv = [ (λ z → ⊥-elim (ℕP.0≢1+n (trans (sym z) ck))) , (λ n → n) ]′ (outer-idle mr (λ i → bproj-end pr i) fv av lv)
 
       -- No outer end before `w`: the outer is idle at `w`.
       idle-w : (Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → ⊥) → proj₁ (cnt rs) ≡ nameOf q
