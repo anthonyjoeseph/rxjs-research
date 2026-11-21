@@ -14,7 +14,8 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Relation.Nullary.Decidable using (decidable-stable)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Maybe using (nothing; just; maybe′)
 open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -25,15 +26,16 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; hot; enter; Proper; _≺_; _≼_; module Op;
   module Connect; module Connecting; Few; Reach; Dep; PDep; Unpinned)
 open import Relation.Nullary using (¬_)
-open import denotation.Read using (Run; []; _∷_; Visible)
-open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach)
+open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
+open import denotation.Laws.Modulus using (≺-absurd; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-ext; entered-few; entered-reach; ≼-split)
+open import denotation.Laws.Truth.Connect.Cuts using (step≼)
 open import denotation.Laws.Worlds using (Shows; full; Ok; InvD; InvAt; Lawful; _∪ʰ_; ok-step; _⊑_; inside-⊑; ⊑-snoc⁺; ⊑-trans; ⊑-inside; world-after; world-after⁼; in-world; ⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import adequacy.Up using (conn-reach)
-open import simultaneous.InstEmit using (instEmit; value; mark)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin)
 open import simultaneous.Readings using (rootOf; parent; parent-snoc)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Rest; Sync; Ex; Early; Before; Valued; opos)
+open import simultaneous.Routed using (Held; Rest; Sync; Ex; Early; Before; Valued; opos; cnt)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
@@ -85,6 +87,7 @@ held-ex wd H = record
   ; shut    = Held.shut H
   ; early   = Held.early H
   ; ends    = Held.ends H
+  ; done    = Held.done H
   ; late    = Held.late H
   ; idle    = Held.idle H
   ; rest    = Held.rest H }
@@ -318,7 +321,7 @@ module ConnRun {A B : Set} {H : Pos → Set} (s : Den A) (F : Den A → Den B)
 
 same-refl : ∀ {A} (x : IE A) → Same x x
 same-refl (instEmit (value _) _) = same-value
-same-refl (instEmit (mark _) _)  = same-mark
+same-refl (instEmit (mark _) _)  = same-mark (λ _ → refl)
 
 rows-refl : ∀ {A} {c} {t : EmissionSet (IE A)} {rs} → Run t c rs → Rows≈ rs rs
 rows-refl []                                = []
@@ -327,20 +330,78 @@ rows-refl (_∷_ {e = end}   (_ , _ , _) run) = ev-end ∷ rows-refl run
 rows-refl (_∷_ {e = skip}  (_ , () , _) _)
 rows-refl (_∷_ {e = pin _} (_ , () , _) _)
 
+-- WHERE A BODY'S COUNT IS EMPTY, ITS SOURCE FINISHES THE INSTANT: past a
+-- run of the body met with no route of the instant it last began,
+-- finitely many rows of the source lie in that instant.  A flatMap of
+-- the body parks a route it cuts while a connect in scope holds one of
+-- the instant, so an elaborated body empties only once its source has
+-- let go of the instant.
+Tracks : ∀ {A B} → EmissionSet A → EmissionSet (IE B) → Set
+Tracks σ β = ∀ {rs} → Met β rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+           → Σ (List Pos) λ ks → ∀ {k e} → σ k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
+
+-- A source of finitely many rows tracks every body.
+tracks-fin : ∀ {A B} {σ : EmissionSet A} {β : EmissionSet (IE B)} → Σ (List Pos) (λ ks → ∀ {k e} → σ k e → k ∈ ks) → Tracks σ β
+tracks-fin (ks , h) _ _ _ = ks , λ y _ _ → h y
+
+-- A row one step under `k`, past the cursor: `k` is past it, or is it.
+pre : ∀ cur {k} → After cur (k ⊕ [ ix 0 ]) → After cur k ⊎ cur ≡ just k
+pre nothing  _ = inj₁ tt
+pre (just c) {k} lt with k <ᵖ c in e
+... | true  = ⊥-elim (step≼ {k} {c} (subst T (sym e) tt) lt)
+... | false with ≼-split {c} {k} (λ kc → subst T e kc)
+...   | inj₁ ck   = inj₁ ck
+...   | inj₂ refl = inj₂ refl
+
 -- A CONNECT FINISHES ITS INSTANTS WHERE ITS BODY DOES: the source rows
 -- it re-keys under its own position, pins of its burst and echoes while
--- its body is alive, add finitely many past a zero count.
-postulate
-  conn-rest : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
-              (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p)
-            → Shows (enter s (p ⊕ [ ix 1 ])) → Rest (Connect.β s F p) → Rest (enter (Op.connect s F) p)
+-- its body is alive, are the source's, one step down.
+--
+-- DEAD ROUTE: from `Rest` of the body alone.  Nothing bounds the source's
+--   rows of an instant: a body that stops reading an instant, its count
+--   zero, while the source loops synchronously in it, echoes without
+--   end there, every echo silent.
+conn-rest : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
+            (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p)
+          → Shows (enter s (p ⊕ [ ix 1 ])) → Rest (Connect.β s F p) → Tracks (Connect.σ s F p) (Connect.β s F p)
+          → Rest (enter (Op.connect s F) p)
+conn-rest s F Is IF p ok sh rb tr {rs} m z {q} bq = kb ++ L.map (_⊕ [ ix 0 ]) (cur ++ kt) , at
+  where
+    open ConnRun s F Is IF p ok sh
+
+    kb : List Pos
+    kb = proj₁ (rb (back m) z bq)
+
+    kt : List Pos
+    kt = proj₁ (tr (back m) z bq)
+
+    cur : List Pos
+    cur = maybe′ [_] [] (cursor nothing rs)
+
+    src : ∀ {k e} → Connect.σ s F p k e → After (cursor nothing rs) (k ⊕ [ ix 0 ]) → rootOf (k ⊕ [ ix 0 ]) ≡ rootOf q
+        → (k ⊕ [ ix 0 ]) ∈ L.map (_⊕ [ ix 0 ]) (cur ++ kt)
+    src {k} y a r = ∈-map⁺ (_⊕ [ ix 0 ]) (at-src (pre (cursor nothing rs) a))
+      where
+        r′ : rootOf k ≡ rootOf q
+        r′ = trans (sym (rootOf-ext k [ ix 0 ])) r
+
+        at-src : After (cursor nothing rs) k ⊎ cursor nothing rs ≡ just k → k ∈ cur ++ kt
+        at-src (inj₁ a′) = ∈-++⁺ʳ cur (proj₂ (tr (back m) z bq) y a′ r′)
+        at-src (inj₂ e)  = ∈-++⁺ˡ (subst (λ c → k ∈ maybe′ [_] [] c) (sym e) (here refl))
+
+    at : ∀ {y e} → C y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ kb ++ L.map (_⊕ [ ix 0 ]) (cur ++ kt)
+    at (Connecting.body y , _)         a r = ∈-++⁺ˡ (proj₂ (rb (back m) z bq) y a r)
+    at (Connecting.burst y _ , _)      a r = ∈-++⁺ʳ kb (src y a r)
+    at (Connecting.echo y _ _ _ , _)   a r = ∈-++⁺ʳ kb (src y a r)
+    at (Connecting.kept y _ _ _ , _)   a r = ∈-++⁺ʳ kb (src y a r)
 
 held-conn : ∀ {A B} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B))
             (Is : InvD H s) (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) cs
           → Shows (enter s (p ⊕ [ ix 1 ]))
           → Held (enter (F (hot (Proper (enter s (p ⊕ [ ix 1 ]))))) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs)
+          → Tracks (Connect.σ s F p) (Connect.β s F p)
           → Held (enter (Op.connect s F) p) (p ∷ cs)
-held-conn s F Is IF p ok cs sh h = held-same row end-row back′ fwd (conn-rest s F Is IF p ok sh) (held-ex ex h)
+held-conn s F Is IF p ok cs sh h tr = held-same row end-row back′ fwd (λ rb → conn-rest s F Is IF p ok sh rb tr) (held-ex ex h)
   where
     open ConnRun s F Is IF p ok sh
 

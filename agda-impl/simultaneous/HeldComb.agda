@@ -36,7 +36,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
-open import simultaneous.Routed using (Carried; c-end; c-value; c-stop; c-over; nm)
+open import simultaneous.Routed using (Carried; c-end; c-value; c-stop; c-over; c-done; nm)
 open import Data.Nat using (_≤_; s≤s; z≤n; _⊓_; zero; _+_; _∸_)
 open import Data.Nat.Properties using (≤-trans; ≤-reflexive; m≤m+n; m≤n+m; m⊓n≤n; +-monoˡ-≤)
 open import Data.Bool using (true; if_then_else_; _∧_; _∨_)
@@ -114,12 +114,13 @@ held-runs : ∀ {A} {t : EmissionSet (IE A)} {cs}
           → (∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m)
           → (∀ {y a n} → t y (out (instEmit (value a) n)) → Early y)
           → (∀ {y} → t y end → Early y)
+          → (∀ {y n} → t y (out (instEmit (mark completed) n)) → Early y)
           → (∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y)
           → Idle t
           → Rest t
           → (∀ {rs} → Met t rs → RunHeld cs rs)
           → Held t cs
-held-runs nm rt ea en lt id re rh = record
+held-runs nm rt ea en dn lt id re rh = record
   { named = nm
   ; covered = λ m → RunHeld.covered (rh m)
   ; exact = λ m → RunHeld.exact (rh m)
@@ -127,6 +128,7 @@ held-runs nm rt ea en lt id re rh = record
   ; shut = λ m r₁ r₂ e z bq vy iq → RunHeld.shut (rh m) r₁ r₂ e z bq vy iq
   ; early = ea
   ; ends = en
+  ; done = dn
   ; late = lt
   ; idle = id
   ; rest = re
@@ -357,9 +359,14 @@ private
   module Step {B : Set} (cs : List Pos) (m : Pos) (K : ℕ) (q : Pos)
               (rt : ∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q) (cur : K ≡ 0 ⊎ m ≡ nameOf q) where
 
-    quiet : ∀ {mk n} → (mk ≡ stop → ⊥) → (mk ≡ over → ⊥) → Locals cs (m , K) (lay {B} q 0 (instEmit (mark mk) n ∷ []))
-    quiet ns no = record { carried = λ { c-stop → ⊥-elim (ns refl) ; c-over → ⊥-elim (no refl) }
-                         ; stops = λ { refl → ⊥-elim (ns refl) } } , _
+    quiet : ∀ {mk n} → (mk ≡ stop → ⊥) → (mk ≡ over → ⊥) → (mk ≡ completed → ⊥) → Locals cs (m , K) (lay {B} q 0 (instEmit (mark mk) n ∷ []))
+    quiet ns no nd = record { carried = λ { c-stop → ⊥-elim (ns refl) ; c-over → ⊥-elim (no refl) ; c-done → ⊥-elim (nd refl) }
+                            ; stops = λ { refl → ⊥-elim (ns refl) } } , _
+
+    -- A completion read is passed on, finding a route where the read did.
+    done-l : ∀ n → (¬ Ex cs q → Σ ℕ λ k → K ≡ suc k) → Locals cs (m , K) (lay {B} q 0 (instEmit (mark completed) n ∷ []))
+    done-l n vo = record { carried = λ { c-done ne → let k , e = vo (λ x → ne (ex-lay cs q 0 rt x)) in k , open-at {m = m} {K = K} {q = q} 0 rt cur e }
+                         ; stops = λ () } , _
 
     stopped-l : ∀ b n s k → k ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (stopped {B} b n s k)))
     stopped-l b n s zero    _        = _
@@ -396,7 +403,7 @@ private
     begun-l : ∀ b n s → Locals cs (m , K) (lay q 0 (proj₂ (begun {B} b n s)))
     begun-l b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
     ... | true  = _
-    ... | false = quiet (λ ()) (λ ())
+    ... | false = quiet (λ ()) (λ ()) (λ ())
 
     overed-l : ∀ n s → (Flat.spent s ≡ false → ¬ Ex cs q → Σ ℕ λ k → K ≡ suc k) → Locals cs (m , K) (lay q 0 (proj₂ (overed {B} n s)))
     overed-l n s oo with Flat.spent s
@@ -405,19 +412,20 @@ private
                          ; stops = λ () } , _
 
     mark-l : ∀ op b mk n s → Inv (m , K) s → (Flat.spent s ≡ false → mk ≡ over → ¬ Ex cs q → Σ ℕ λ k → K ≡ suc k)
+           → (mk ≡ completed → ¬ Ex cs q → Σ ℕ λ k → K ≡ suc k)
            → Locals cs (m , K) (lay q 0 (proj₂ (onMark {B} op b s mk n)))
-    mark-l op b begin      n s iv oo = begun-l b n s
-    mark-l op b stop       n s iv oo = stopped-l b n s _ (stop≤ b s iv)
-    mark-l op b over       n s iv oo = overed-l n s (λ sp → oo sp refl)
-    mark-l op b carry      n s iv oo = _
-    mark-l op b outerOpen  n s iv oo = arrive-l op n s (≤-trans (lanes≤ s) (inv-tot iv))
-    mark-l op b outerClose n s iv oo = _
-    mark-l op b laneStart  n s iv oo = _
-    mark-l op b laneDone   n s iv oo = ended-l (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }) (≤-trans (ended≤ s) (inv-tot iv))
-    mark-l op b burstEnd   n s iv oo = burst-l (isZero (Flat.held s) ∨ Flat.dead s) n s (≤-trans (held≤ s) (inv-tot iv))
-    mark-l op b outerDone  n s iv oo = left-l n (record s { finished = true }) (≤-trans (outer≤ s) (inv-tot iv))
-    mark-l op b subscribed n s iv oo = quiet (λ ()) (λ ())
-    mark-l op b completed  n s iv oo = quiet (λ ()) (λ ())
+    mark-l op b begin      n s iv oo dn = begun-l b n s
+    mark-l op b stop       n s iv oo dn = stopped-l b n s _ (stop≤ b s iv)
+    mark-l op b over       n s iv oo dn = overed-l n s (λ sp → oo sp refl)
+    mark-l op b carry      n s iv oo dn = _
+    mark-l op b outerOpen  n s iv oo dn = arrive-l op n s (≤-trans (lanes≤ s) (inv-tot iv))
+    mark-l op b outerClose n s iv oo dn = _
+    mark-l op b laneStart  n s iv oo dn = _
+    mark-l op b laneDone   n s iv oo dn = ended-l (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }) (≤-trans (ended≤ s) (inv-tot iv))
+    mark-l op b burstEnd   n s iv oo dn = burst-l (isZero (Flat.held s) ∨ Flat.dead s) n s (≤-trans (held≤ s) (inv-tot iv))
+    mark-l op b outerDone  n s iv oo dn = left-l n (record s { finished = true }) (≤-trans (outer≤ s) (inv-tot iv))
+    mark-l op b subscribed n s iv oo dn = quiet (λ ()) (λ ()) (λ ())
+    mark-l op b completed  n s iv oo dn = done-l n (dn refl)
 
 -- ONE STEP'S OUTPUTS OWE WHAT THEY SHOULD when the routes open at its
 -- row are of the row's instant, a begin it reads is named for it, and
@@ -428,15 +436,16 @@ step-local : ∀ {B} op cs (o : Out B) c q x → Inv c (proj₁ o)
            → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
            → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
               → Σ ℕ λ k → proj₂ c ≡ suc k)
+           → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark completed) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
            → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
            → Locals cs c (lay q 0 (proj₂ (react op o x)))
-step-local op cs (s , _) (m , K) q nothing iv cur bn vo oo rt = _
-step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (value v) n))) iv cur bn vo oo rt =
+step-local op cs (s , _) (m , K) q nothing iv cur bn vo oo dn rt = _
+step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (value v) n))) iv cur bn vo oo dn rt =
   record { carried = λ { c-value ne → let k , e = vo refl (λ x → ne (ex-lay cs q 0 rt x)) in k , open-at {m = m} {K = K} {q = q} 0 rt cur e }
          ; stops = λ () } , _
-step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (mark mk) n))) iv cur bn vo oo rt =
-  Step.mark-l cs m K q rt cur op b mk n s iv λ { sp refl → oo refl sp }
-step-local op cs (s , _) (m , K) q (just (inj₂ (i , r))) iv cur bn vo oo rt =
+step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (mark mk) n))) iv cur bn vo oo dn rt =
+  Step.mark-l cs m K q rt cur op b mk n s iv (λ { sp refl → oo refl sp }) λ { refl → dn refl }
+step-local op cs (s , _) (m , K) q (just (inj₂ (i , r))) iv cur bn vo oo dn rt =
   Step.unpark-l cs m K q rt cur root (record s { live = setAt i r (Flat.live s) }) (≤-trans (parked≤ s) (inv-tot iv))
 
 ------------------------------------------------------------------------
@@ -448,5 +457,6 @@ record CombIn {B : Set} (op : FlatOp) (M : EmissionSet (Maybe (Input B))) (cs : 
     early  : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
     ends   : ∀ {q} → M q end → Early q
     late   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
+    done   : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
     runs   : ∀ {rx} → Met M rx → RunHeld cs (outRows op init rx)
 

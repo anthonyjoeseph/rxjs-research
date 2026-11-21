@@ -252,10 +252,14 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 Untried: past a zero count only finitely many rows of the instant last
 begun remain. A cold needs no run: one step makes finitely many rows.
-Connect and the combinator scan can loop synchronously, so theirs need
-the count: a route is held while its instant can still make a row.
+The combinator scan loops synchronously, so its rest needs the count.
+A connect's echoes are its source's rows: where its body empties, its
+source must be done with the instant (`Tracks`), true of an elaborated
+body because each flatMap parks what it cuts while a connect in scope
+holds a route. Settled by bodies, or a body emptied under a looping source.
 
-Members: `cold-step-few`, `scan-rest`, `conn-rest`.
+Members: `cold-step-few`, `scan-rest`, `connect-tracks`, `tracks-trig`,
+`tracks-closer`, `tracks-real`.
 
 #### THE HELD STREAMS
 
@@ -265,16 +269,13 @@ bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, true on every row probed, hand-offs and parks
 included: each is the `idle` of what holds the routes, read on the
 scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
-split is owed). Then where the scan's source ends (`m-ends`), the lanes'
-own rows, a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
+split is owed). Then a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
 their shape. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`, `lanes-count`,
-`held-current`, `parked-live`, `live-current`, `value-open`, `over-open`,
-`end-open`, `comb-shut`, `m-ends`, `lane-ends`, `close-ends`, `lane-named`,
-`lane-early`, `lane-late`, `scan-idle`, `comb-run`, `held-connected`,
-`held-lim`, `held-top`, `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`,
-`held-trigger`.
+Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
+`held-current`, `live-current`, `value-open`, `over-open`,
+`end-open`, `comb-shut`, `scan-idle`, `held-connected`, `held-lim`,
+`cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`.
 
 #### THE BATCH RANK
 
