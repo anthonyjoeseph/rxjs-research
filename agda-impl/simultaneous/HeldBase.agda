@@ -51,7 +51,7 @@ open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.InstEmit using (instEmit; value; mark; over)
-open import simultaneous.Routed using (nameOf; nm; Valued; opos)
+open import simultaneous.Routed using (nameOf; Valued; opos)
 open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.ColdFew using (cold-step-few; of-below)
@@ -81,6 +81,7 @@ open import denotation.Events using (ofᴱ)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import simultaneous.Relations using (values)
 open import simultaneous.HeldComb using (RunHeld)
+open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -181,31 +182,10 @@ held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
 postulate
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
--- THE COLD'S ROWS, subscribed at `p`: its synchronous values and end lie
--- in the subscribe burst, named `root`.  Each async step at `I` renders
--- under its lane at `I ∙ [ ix 1 ]`: a value step's `of` sends begin,
--- value and over beneath `nm I ⊕ [ ix 0 ]`, the over at `opos I`.  A
--- completion is an instant of its own, even straight after a value: its
--- begin lies where a value step's does, under the name one queued lane
--- further down, and the cold's end carries that route
--- (`simultaneous.Routed.Carried`) from where the step's lane completes.
-data ColdRow {A : Set} (p : Pos) : Pos → Ev (IE A) → Set where
-  now-value  : ∀ zs {a} → ColdRow p (p ⊕ zs) (out (instEmit (value a) root))
-  now-end    : ∀ zs → ColdRow p (p ⊕ zs) end
-  step-begin : ∀ {t e l} → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
-                                     (out (instEmit (mark begin) (nm (cascade t e l ∙ []))))
-  step-value : ∀ {t e i a} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
-                                       (out (instEmit (value a) (nm (cascade t e (ix i) ∙ []))))
-  step-over  : ∀ {t e i} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
-                                     (out (instEmit (mark over) (nm (cascade t e (ix i) ∙ []))))
-  step-end   : ∀ {t e} → ColdRow p (cascade t e last ∙ (ix 1 ∷ last ∷ [])) end
-
 -- A step's route opens at its begin and nothing comes between: what the
 -- cold's runs ask needs the order of its rows, which `ColdRow` does not
 -- carry.
 postulate
-  cold-rows    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {y e}
-               → enter (ev m (coldˢ c) env) p y e → Visible e → ColdRow p y e
   cold-covered : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs
                → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex [ p ] y
                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)

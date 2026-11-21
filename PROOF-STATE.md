@@ -273,7 +273,7 @@ order. Settled when each former's leaf is a body.
 
 Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `value-open`, `over-open`, `end-open`, `comb-shut`, `scan-idle`,
-`held-connected`, `lim-rest`, `cold-rows`, `cold-covered`, `cold-shut`,
+`held-connected`, `lim-rest`, `cold-covered`, `cold-shut`,
 `cold-idle`.
 
 #### THE BATCH RANK

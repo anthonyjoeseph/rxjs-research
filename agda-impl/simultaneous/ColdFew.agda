@@ -18,8 +18,8 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; z≤n)
-open import Data.Nat.Properties using (<-irrefl; m<n⇒m<1+n; ≤-reflexive)
+open import Data.Nat using (ℕ; zero; suc; _<_; _+_; s≤s; z≤n)
+open import Data.Nat.Properties using (<-irrefl; m<n⇒m<1+n; ≤-reflexive; <-trans; ≤-trans; +-monoʳ-≤; +-monoʳ-<; n<1+n; m<m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -30,7 +30,7 @@ open import Tree using (mergeᶠ; cold; of; map)
 open import denotation.Position using (Pos; Instant; Label; Path; ix; last; root; frame; cascade; _∙_; _⊕_; _≟ᵖ_; instant; path; nested; fired)
   renaming (tick to tickᵖ)
 open import denotation.Events using (Timeline; fresh; From; done; quiet; at; Frame; emit; stall; close; Frame∞; From∞; frames; burst; start; timelineAt; ofᴱ; <ᵖ-part; ix-<)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; Ev; out; end; InE; at-out; at-skip; at-end; on-out; on-skip;
+open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; Ev; out; skip; end; InE; at-out; at-skip; at-end; on-out; on-skip;
   _≺_; _≼_; Truncate; map-out; map-skip; map-pin; map-end; module Op; module Joining;
   module Values; module Bounded; module Merge; module Scan)
 open import denotation.Laws.Modulus using (≺-trans; ≼-refl; ≺→≼; ≺-irrefl)
@@ -44,6 +44,7 @@ open import simultaneous.InstEmit using (instEmit; mark; value; begin; over)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.CombSent using (assoc³)
 open import denotation.Laws.Truth using (instant-⊑)
+open import simultaneous.Instants using (past-tick)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render; phase; concatˢ)
 
@@ -58,25 +59,43 @@ mutual
   depthⁱ frame           = 0
   depthⁱ (cascade _ e _) = suc (depth e)
 
--- An instant whose timer was made under `s`, or in such an instant.
+-- An instant whose timer was made under `s`, or in such an instant, and
+-- fires at a later tick.
 data Fresh (s : Pos) : Instant → Set where
-  fresh₀ : ∀ {t e l} → s ⊑ e → Fresh s (cascade t e l)
-  fresh₁ : ∀ {t e l} → Fresh s (instant e) → Fresh s (cascade t e l)
+  fresh₀ : ∀ {t e l} → s ⊑ e → tickᵖ e < t → Fresh s (cascade t e l)
+  fresh₁ : ∀ {t e l} → Fresh s (instant e) → tickᵖ e < t → Fresh s (cascade t e l)
 
 ⊑-depth : ∀ {x y} → x ⊑ y → depth y ≡ depth x
 ⊑-depth {_ ∙ _} (_ , refl) = refl
 
 fresh-deep : ∀ {s I} → Fresh s I → depth s < depthⁱ I
-fresh-deep (fresh₀ u)             = s≤s (≤-reflexive (sym (⊑-depth u)))
-fresh-deep (fresh₁ {e = _ ∙ _} f) = m<n⇒m<1+n (fresh-deep f)
+fresh-deep (fresh₀ u _)             = s≤s (≤-reflexive (sym (⊑-depth u)))
+fresh-deep (fresh₁ {e = _ ∙ _} f _) = m<n⇒m<1+n (fresh-deep f)
 
 -- No instant is fired under a position of its own.
 fresh-self : ∀ {s} → Fresh s (instant s) → ⊥
 fresh-self {_ ∙ _} f = <-irrefl refl (fresh-deep f)
 
 fresh-⊑ : ∀ {s s′ I} → s ⊑ s′ → Fresh s′ I → Fresh s I
-fresh-⊑ u (fresh₀ v) = fresh₀ (⊑-trans u v)
-fresh-⊑ u (fresh₁ f) = fresh₁ (fresh-⊑ u f)
+fresh-⊑ u (fresh₀ v h) = fresh₀ (⊑-trans u v) h
+fresh-⊑ u (fresh₁ f h) = fresh₁ (fresh-⊑ u f) h
+
+tick-⊑ : ∀ {x y} → x ⊑ y → tickᵖ y ≡ tickᵖ x
+tick-⊑ {frame ∙ _}         (_ , refl) = refl
+tick-⊑ {cascade _ _ _ ∙ _} (_ , refl) = refl
+
+tickⁱ : Instant → ℕ
+tickⁱ frame           = 0
+tickⁱ (cascade t _ _) = t
+
+-- A fresh instant fires past its subscription's tick, so after every row
+-- under it.
+fresh-tick : ∀ {s I} → Fresh s I → tickᵖ s < tickⁱ I
+fresh-tick (fresh₀ u h)                       = subst (_< _) (tick-⊑ u) h
+fresh-tick (fresh₁ {e = cascade _ _ _ ∙ _} f h) = <-trans (fresh-tick f) h
+
+fresh-past : ∀ {s x y} → s ⊑ x → Fresh s (instant y) → x ≺ y
+fresh-past {s} {x} {cascade t e l ∙ q} u f = past-tick x (subst (_< t) (sym (tick-⊑ u)) (fresh-tick f))
 
 ⊑₂ : ∀ s a b → s ⊑ ((s ⊕ [ a ]) ⊕ [ b ])
 ⊑₂ s a b = a ∷ b ∷ [] , ⊕-assoc s [ a ] [ b ]
@@ -100,49 +119,70 @@ pl-ext : ∀ {Zs s y} w → Place Zs s y → Place (L.map (_++ w) Zs) s (y ⊕ w
 pl-ext {y = _ ∙ _} w (inj₁ u)       = inj₁ (⊑-trans u (w , refl))
 pl-ext {y = _ ∙ _} w (inj₂ (m , f)) = inj₂ (∈-map⁺ (_++ w) m , f)
 
--- A timer made at a placed row fires a fresh instant.
-fire : ∀ {Zs s e t l} → Place Zs s e → Fresh s (cascade t e l)
-fire (inj₁ u)       = fresh₀ u
-fire (inj₂ (_ , f)) = fresh₁ f
-
 ------------------------------------------------------------------------
 -- The leaves
 
 One : List Path
 One = [] ∷ []
 
--- A cold leaf's later frames each fire their own instants, one row apiece.
-mutual
-  frames-pl : ∀ {A t} s τ e (m : From A t) {y ev} → Place One s e → InE (frames τ e m) y ev → Place One s y
-  frames-pl s τ e done       pe at-end = pe
-  frames-pl s τ e quiet      pe ()
-  frames-pl s τ e (at _ _ b) pe x      = burst-pl s τ e 0 b (fire pe) x
+-- A cold leaf's rows: under its subscription, or one apiece in an instant
+-- its timers fire, a value or skip at an indexed label, the end at the
+-- last.
+data Fired {A : Set} (s : Pos) : Pos → Ev A → Set where
+  f-out  : ∀ {T e i a} → Fresh s (cascade T e (ix i)) → Fired s (cascade T e (ix i) ∙ []) (out a)
+  f-skip : ∀ {T e i} → Fresh s (cascade T e (ix i)) → Fired s (cascade T e (ix i) ∙ []) skip
+  f-end  : ∀ {T e} → Fresh s (cascade T e last) → Fired s (cascade T e last ∙ []) end
 
-  burst-pl : ∀ {A t T} s τ e i (b : Frame A t) {y ev} → (∀ {l} → Fresh s (cascade T e l)) → InE (burst τ (fired T e) i b) y ev → Place One s y
-  burst-pl s τ e i (emit _ k) fr at-out      = inj₂ (here refl , fr)
-  burst-pl s τ e i (emit _ k) fr (on-out x)  = burst-pl s τ e (suc i) k fr x
-  burst-pl s τ e i (stall k)  fr at-skip     = inj₂ (here refl , fr)
-  burst-pl s τ e i (stall k)  fr (on-skip x) = burst-pl s τ e (suc i) (Frame∞.force k) fr x
-  burst-pl s τ e i (close k)  fr at-skip     = inj₂ (here refl , fr)
-  burst-pl {T = T} s τ e i (close k) fr (on-skip x) = frames-pl s τ (cascade T e last ∙ []) (From∞.force k) (inj₂ (here refl , fr)) x
+Leaf : ∀ {A} → Pos → Pos → Ev A → Set
+Leaf s y e = s ⊑ y ⊎ Fired s y e
+
+leaf-pl : ∀ {A s y} {e : Ev A} → Leaf s y e → Place One s y
+leaf-pl (inj₁ u)          = inj₁ u
+leaf-pl (inj₂ (f-out f))  = inj₂ (here refl , f)
+leaf-pl (inj₂ (f-skip f)) = inj₂ (here refl , f)
+leaf-pl (inj₂ (f-end f))  = inj₂ (here refl , f)
+
+-- A timer made where the leaf ends fires a fresh instant.
+lf-fire : ∀ {A s e t l} → Leaf {A} s e end → tickᵖ e < t → Fresh s (cascade t e l)
+lf-fire (inj₁ u)         h = fresh₀ u h
+lf-fire (inj₂ (f-end f)) h = fresh₁ f h
+
+last-tick : ∀ s → tickᵖ (s ⊕ [ last ]) < tickᵖ s + 1
+last-tick s = subst (_< tickᵖ s + 1) (sym (tick-⊑ {s} ([ last ] , refl))) (m<m+n (tickᵖ s) (s≤s z≤n))
+
+-- Each later frame fires its own instant.
+mutual
+  frames-lf : ∀ {A t} s τ e (m : From A t) {y ev} → Leaf {A} s e end → tickᵖ e < τ + t → InE (frames τ e m) y ev → Leaf s y ev
+  frames-lf s τ e done         pe h at-end = pe
+  frames-lf s τ e quiet        pe h ()
+  frames-lf s τ e (at t′ le b) pe h x      = burst-lf s τ e 0 b (lf-fire pe (≤-trans h (+-monoʳ-≤ τ le))) x
+
+  burst-lf : ∀ {A t} s τ e i (b : Frame A t) {y ev} → (∀ {l} → Fresh s (cascade (τ + t) e l)) → InE (burst τ (fired (τ + t) e) i b) y ev → Leaf s y ev
+  burst-lf s τ e i (emit _ k) fr at-out      = inj₂ (f-out fr)
+  burst-lf s τ e i (emit _ k) fr (on-out x)  = burst-lf s τ e (suc i) k fr x
+  burst-lf s τ e i (stall k)  fr at-skip     = inj₂ (f-skip fr)
+  burst-lf s τ e i (stall k)  fr (on-skip x) = burst-lf s τ e (suc i) (Frame∞.force k) fr x
+  burst-lf s τ e i (close k)  fr at-skip     = inj₂ (f-skip fr)
+  burst-lf {t = t} s τ e i (close k) fr (on-skip x) =
+    frames-lf s τ (cascade (τ + t) e last ∙ []) (From∞.force k) (inj₂ (f-end fr)) (+-monoʳ-< τ (n<1+n t)) x
 
 -- Its subscribe frame lies under the subscription.
-nested-pl : ∀ {A t} s τ i (b : Frame A t) {y ev} → InE (burst τ (nested s) i b) y ev → Place One s y
-nested-pl s τ i (emit _ k) at-out      = inj₁ (_ , refl)
-nested-pl s τ i (emit _ k) (on-out x)  = nested-pl s τ (suc i) k x
-nested-pl s τ i (stall k)  at-skip     = inj₁ (_ , refl)
-nested-pl s τ i (stall k)  (on-skip x) = nested-pl s τ (suc i) (Frame∞.force k) x
-nested-pl s τ i (close k)  at-skip     = inj₁ (_ , refl)
-nested-pl s τ i (close k)  (on-skip x) = frames-pl s τ (s ⊕ [ last ]) (From∞.force k) (inj₁ (_ , refl)) x
+nested-lf : ∀ {A} s i (b : Frame A 0) {y ev} → InE (burst (tickᵖ s) (nested s) i b) y ev → Leaf s y ev
+nested-lf s i (emit _ k) at-out      = inj₁ (_ , refl)
+nested-lf s i (emit _ k) (on-out x)  = nested-lf s (suc i) k x
+nested-lf s i (stall k)  at-skip     = inj₁ (_ , refl)
+nested-lf s i (stall k)  (on-skip x) = nested-lf s (suc i) (Frame∞.force k) x
+nested-lf s i (close k)  at-skip     = inj₁ (_ , refl)
+nested-lf s i (close k)  (on-skip x) = frames-lf s (tickᵖ s) (s ⊕ [ last ]) (From∞.force k) (inj₁ (_ , refl)) (last-tick s) x
 
-start-pl : ∀ {A} s (m : From A 0) {y ev} → InE (start s m) y ev → Place One s y
-start-pl s done              x = frames-pl {t = 0} s 0 (s ⊕ [ last ]) done (inj₁ (_ , refl)) x
-start-pl s quiet             x = frames-pl {t = 0} s 0 (s ⊕ [ last ]) quiet (inj₁ (_ , refl)) x
-start-pl s (at zero _ b)     x = nested-pl s (tickᵖ s) 0 b x
-start-pl s (at (suc t) le b) x = frames-pl s (tickᵖ s) (s ⊕ [ last ]) (at (suc t) le b) (inj₁ (_ , refl)) x
+start-lf : ∀ {A} s (m : From A 0) {y ev} → InE (start s m) y ev → Leaf s y ev
+start-lf s done              at-end = inj₁ (_ , refl)
+start-lf s quiet             ()
+start-lf s (at zero _ b)     x      = nested-lf s 0 b x
+start-lf s (at (suc t) le b) x      = frames-lf {t = 1} s (tickᵖ s) (s ⊕ [ last ]) (at (suc t) (s≤s z≤n) b) (inj₁ (_ , refl)) (last-tick s) x
 
 cold-pl : ∀ {A} (c : Timeline A) s {y ev} → InE (start s (timelineAt c s)) y ev → Place One s y
-cold-pl c s = start-pl s (timelineAt c s)
+cold-pl c s x = leaf-pl (start-lf s (timelineAt c s) x)
 
 -- The rows of `of`.
 of-below : ∀ {X} p i (ys : List X) {y e} → InE (ofᴱ p i ys) y e → p ⊑ y

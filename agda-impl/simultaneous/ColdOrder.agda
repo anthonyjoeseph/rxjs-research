@@ -11,29 +11,28 @@
 module simultaneous.ColdOrder where
 
 open import Data.Bool using (true; false)
-open import Data.Unit using (tt)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.List.Properties using (∷ʳ-injectiveˡ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _<ᵇ_; _+_; s≤s; z≤n)
-open import Data.Nat.Properties using (<⇒<ᵇ; m<m+n; ≤-trans)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _+_; s≤s; z≤n)
+open import Data.Nat.Properties using (m<m+n; ≤-trans)
 open import Data.Product using (Σ; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 
-open import denotation.Position using (Pos; Label; _∙_; _≟ⁱ_; _<ˡ_; ix; last; _⊕_; instant; tick; frame; cascade; nested; fired)
+open import denotation.Position using (Pos; Label; _∙_; _≟ⁱ_; _<ˡ_; ix; last; _⊕_; instant; tick; nested; fired)
 open import denotation.Events using (<ᵖ-part; Events; From; Frame; start; frames; burst; done; quiet; at; emit; stall; close; Frame∞; From∞)
 import denotation.Events as Ev
 open import denotation.EmissionSet using (Ev; out; skip; end; pin; Work; _≺_; InE; at-out; at-skip; at-end; on-out; on-skip)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-ext)
 open import denotation.Laws.Worlds using (⊕-assoc; ∙-inj)
 open import quickcheck.Tabled using (Row)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; past-tick)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Listing using (walkN; walkN-exact)
 open import quickcheck.Tabled.Exact.Base using (sound)
@@ -42,13 +41,6 @@ open import simultaneous.ColdRows using (module At)
 
 ------------------------------------------------------------------------
 -- A cold's walk
-
--- A row of a later tick lies past the subscription.
-past-tick : ∀ s {u e l ys} → tick s < u → s ≺ (cascade u e l ∙ ys)
-past-tick (frame ∙ _)         _  = tt
-past-tick (cascade t d a ∙ q) {u} lt with t <ᵇ u | <⇒<ᵇ lt
-... | true  | _  = tt
-... | false | ()
 
 -- EVERY ROW OF A COLD LIES PAST ITS SUBSCRIPTION: the subscribe burst
 -- under it, every later frame at a later tick.

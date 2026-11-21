@@ -14,16 +14,19 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 import Data.List.Relation.Unary.All as All
 open import Data.List.Relation.Unary.AllPairs using (AllPairs; []; _∷_)
-open import Data.Nat using (suc; _≤_; z≤n; s≤s)
+open import Data.Nat using (suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (m≤n⇒m≤1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
 open import Relation.Nullary using (¬_)
+open import Data.Bool.Properties using (T-≡)
+open import Function using (Equivalence)
 
-open import denotation.Position using (Instant; frame; cascade; Cmp; lt; eq; gt; isLt; lexi; cmpInstant; cmpPath; _<ⁱ_; _∙_; instant)
+open import denotation.Position using (Instant; frame; cascade; Cmp; lt; eq; gt; isLt; lexi; cmpInstant; cmpPath; _<ⁱ_; _∙_;
+  instant; tick)
 open import denotation.EmissionSet using (_≺_)
-open import denotation.Simultaneity using (eqⁱ; reflⁱ; ltⁱ; gtⁱ)
+open import denotation.Simultaneity using (eqⁱ; reflⁱ; ltⁱ; gtⁱ; earlier-tick)
 
 -- Instants in order.
 record _≺ⁱ_ (i j : Instant) : Set where
@@ -167,3 +170,7 @@ sorted-⊂ {xs} {ys} sx sy sub wy wx =
 -- A row of an earlier instant is before.
 instant-≺ : ∀ k q → instant k ≺ⁱ instant q → k ≺ q
 instant-≺ (a ∙ p) (b ∙ r) h = subst (λ x → T (isLt (lexi x (cmpPath p r)))) (sym (≺ⁱ→lt h)) tt
+
+-- A row of a later tick lies past the position.
+past-tick : ∀ s {u e l ys} → tick s < u → s ≺ (cascade u e l ∙ ys)
+past-tick s {u} {e} {l} {ys} h = Equivalence.from T-≡ (earlier-tick s e l ys h)
