@@ -959,8 +959,11 @@ held-top o hy = held-scan-at restamp same-restamp (root , marked begin) (⟦ wra
   where
     s = elab (λ i → i) (plain o)
 
-held : ∀ {A} (o : SObs [] A) → Held (elaborated o) (root ∷ [])
-held o = held-top o (held-⟦⟧ (λ i → i) (plain o))
+-- Opaque: a consumer projects its fields, and a `with` on one would
+-- otherwise unfold the whole induction.
+opaque
+  held : ∀ {A} (o : SObs [] A) → Held (elaborated o) (root ∷ [])
+  held o = held-top o (held-⟦⟧ (λ i → i) (plain o))
 
 -- The elaborated program's instants stay dead.
 shut : ∀ {A : Set} (o : SObs [] A) → Shut (elaborated o)
