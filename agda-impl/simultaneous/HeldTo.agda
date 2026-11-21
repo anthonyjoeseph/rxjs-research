@@ -2,10 +2,10 @@
 
 -- HELD UP TO THE FIRST FAILURE.  A take reads its source's idleness only
 -- up to the first row it fails at, so what it needs of its source is
--- `Held` with `idle` claimed only there.  Failing nothing, it is `Held`.
+-- `Held` with `idle` claimed only there.
 module simultaneous.HeldTo where
 
-open import Data.Bool using (Bool; T; not; true)
+open import Data.Bool using (Bool; T; not)
 open import Data.Empty using (⊥)
 open import Data.List using (List; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
@@ -64,10 +64,3 @@ held-to h = record
   { named = H.named ; covered = H.covered ; exact = H.exact ; routing = H.routing ; shut = H.shut
   ; early = H.early ; ends = H.ends ; done = H.done ; late = H.late ; idle = λ m ne _ → H.idle m ne ; rest = H.rest }
   where module H = Held h
-
--- Failing nothing, held up to it is held.
-held-from : ∀ {X : Set} {t : EmissionSet (IE X)} {cs} → HeldTo (λ _ → true) t cs → Held t cs
-held-from h = record
-  { named = H.named ; covered = H.covered ; exact = H.exact ; routing = H.routing ; shut = H.shut
-  ; early = H.early ; ends = H.ends ; done = H.done ; late = H.late ; idle = λ m ne → H.idle m ne (λ _ ()) ; rest = H.rest }
-  where module H = HeldTo h

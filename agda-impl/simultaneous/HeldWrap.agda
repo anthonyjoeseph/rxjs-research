@@ -35,6 +35,7 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
 open import simultaneous.HeldTake using (module Holds; Inert; i-done)
 open import simultaneous.HeldTo using (HeldTo)
+open import simultaneous.HeldBeside using (sb₀; beside; module Beside)
 open import simultaneous.HeldConnect using (held-conn; held-ex; module ConnRun)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.HeldHot using (module HotRead)
@@ -43,14 +44,6 @@ open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.CombSent using (assoc³)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; marked; unfinished; completing; wrapped; concatˢ)
-
--- Where the merge subscribes the completed program.
-sb₀ : Pos
-sb₀ = (root ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
-
--- The completed program beside the subscribe mark.
-beside : ∀ {A} → Obs Timeline [] (IE A) → Den (IE A)
-beside s = ⟦ merge (completing s) (cold (lone (marked subscribed))) ⟧ []ᵉ
 
 -- A TAKE CUT AFTER THE COMPLETION holds what its source holds.
 held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → HeldTo unfinished (enter d p) cs
@@ -176,17 +169,17 @@ completing-closed s p ok {w} {c} Fw (Connecting.body y , _) cw =
     open Closing D p Is ok sh using (module CC)
     module CR = ConnRun D closing Is IF p ok sh
 
-postulate
-  -- BESIDE THE SUBSCRIBE MARK, the completed program holds as it did, up
-  -- to its completion.  Past it the merge never ends, its end turned a
-  -- skip, so idleness past the completion is not claimed.
-  --
-  -- DEAD ROUTE: unrestricted `Held` of the merge is false.  A program
-  --   ending in a later instant holds a route of that instant at its end
-  --   (`covered`), and the merge, never ending, idles past it later.
-  held-merged : ∀ {A} (s : Obs Timeline [] (IE A))
-              → Held (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ [])
-              → HeldTo unfinished (enter (beside s) root) (root ∷ [])
+-- BESIDE THE SUBSCRIBE MARK, the completed program holds as it did, up
+-- to its completion.  Past it the merge never ends, its end turned a
+-- skip, so idleness past the completion is not claimed.
+--
+-- DEAD ROUTE: unrestricted `Held` of the merge is false.  A program
+--   ending in a later instant holds a route of that instant at its end
+--   (`covered`), and the merge, never ending, idles past it later.
+held-merged : ∀ {A} (s : Obs Timeline [] (IE A))
+            → Held (enter (⟦ completing s ⟧ []ᵉ) sb₀) (sb₀ ∷ [])
+            → HeldTo unfinished (enter (beside s) root) (root ∷ [])
+held-merged s = Beside.held s (λ {w} {c} → completing-closed s sb₀ (tt , λ ()) {w} {c})
 
 held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
 held-wrapped s hs =
