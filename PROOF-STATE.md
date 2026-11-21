@@ -266,16 +266,16 @@ Members: `cold-step-few`, `scan-rest`, `connect-tracks`, `tracks-trig`,
 Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
-flatMap's scan counters, true on every row probed, hand-offs and parks
-included: each is the `idle` of what holds the routes, read on the
-scan's run split onto that branch (owed where the next row is not a
-lane's, and for a tracker). Then a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
-their shape. Settled when each former's leaf is a body.
+flatMap's scan counters, each the `idle` of what holds the routes, read
+on the scan's run split onto that branch; the lanes' counter is zero
+where their end is next (`lane-end-shut`). Then a reader's joins, the
+defer limit's rest (no one approximant bounds it), and the cold's rows'
+order. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lane-under`, `lane-end-shut`, `lane-idle`,
-`held-current`, `live-current`, `value-open`, `over-open`,
-`end-open`, `comb-shut`, `scan-idle`, `held-connected`, `held-lim`,
-`cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`.
+Members: `outer-current`, `lane-end-shut`, `lane-idle`, `held-current`,
+`live-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
+`scan-idle`, `held-connected`, `lim-rest`, `cold-rows`, `cold-covered`,
+`cold-shut`, `cold-idle`.
 
 #### THE BATCH RANK
 
