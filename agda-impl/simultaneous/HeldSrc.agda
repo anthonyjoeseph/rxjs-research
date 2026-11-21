@@ -443,6 +443,40 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
               → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
               → proj₁ (cnt rs) ≡ nameOf w
 
+  -- THE HOT ROWS UNDER AN OUTER ROW: itself, or the closer's, under one of
+  -- its `sub`s naming a position at or past any `Q` at or before the
+  -- closer's subscription; the environment's, never.
+  module OuterRow {y e} (ry : σ₁ y e) where
+    Below : Pos → Pos → Set
+    Below Q z = Σ Pos λ e′ → Σ Path λ zs → z ≡ y ⊕ (sub e′ ∷ zs) × Q ≼ e′
+
+    env-apart : ∀ {h} → Hots env₀ h → y ⊑ h → ⊥
+    env-apart hc yh = proj₂ (ok-step c ok₀′) hc (InvAt.world I₁ (proj₁ ry)) (⊑-inside yh)
+
+    σ₁-lead : ∀ {h e′} → σ₁ h e′ → y ⊑ h → h ≡ y
+    σ₁-lead rh ([] , eq)      = trans eq (⊕-identityʳ y)
+    σ₁-lead rh (_ ∷ _ , refl) = ⊥-elim (Lawful.flat L₁ ry rh)
+
+    private
+      hy₂ : ∀ {Q h} → Hots (hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ Below Q h
+      hy₂ (inj₁ (_ , rh)) yh = inj₁ (σ₁-lead rh yh)
+      hy₂ (inj₂ hc)       yh = ⊥-elim (env-apart hc yh)
+
+      dj₂ : ∀ {w} → W (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) w → w ≡ y → ⊥
+      dj₂ ww refl = proj₂ (ok-step p₀ ok₁) (inj₁ (_ , ry)) ww (⊑-inside ([] , sym (⊕-identityʳ y)))
+
+      sy₂ : y ⊑ (p₀ ⊕ [ ix 1 ]) → ⊥
+      sy₂ ys = ⊑-≼ {y} {p₀ ⊕ [ ix 1 ]} ys (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {y} s₂≺c₁ (σ₁-after ry))
+
+    in-σ₂ : ∀ Q → Q ≼ (p₀ ⊕ [ ix 1 ]) → ∀ {h e′} → σ₂ h e′ → y ⊑ h → Below Q h
+    in-σ₂ Q qs (r , _) = under-hot {H = Hots (hot σ₁ ∷ env₀)} {s = p₀ ⊕ [ ix 1 ]} {q = Q} {y = y} qs (λ {h} → hy₂ {Q} {h}) dj₂ sy₂
+                           (InvAt.world I₂ r) (InvAt.real I₂ r)
+
+    hots-under : ∀ Q → Q ≼ (p₀ ⊕ [ ix 1 ]) → ∀ {h} → Hots (hot σ₂ ∷ hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ Below Q h
+    hots-under Q qs (inj₁ (_ , r₂))        yh = inj₂ (in-σ₂ Q qs r₂ yh)
+    hots-under Q qs (inj₂ (inj₁ (_ , rh))) yh = inj₁ (σ₁-lead rh yh)
+    hots-under Q qs (inj₂ (inj₂ hc))       yh = ⊥-elim (env-apart hc yh)
+
   -- NO SOURCE VALUE LIES UNDER AN OUTER ROW before where the source's
   -- reader joins it: the outer's value lies one `sub J` below its own row;
   -- the closer and the lanes reach inside an outer row only by joining it
@@ -455,8 +489,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       q₀ = p₀₀ ⊕ [ ix 1 ]
       Y  = y ⊕ [ sub J ]
 
+      open OuterRow ry
+
       U : Pos → Set
-      U z = Σ Pos λ e′ → Σ Path λ zs → z ≡ y ⊕ (sub e′ ∷ zs) × q₀ ≼ e′
+      U = Below q₀
 
       ⊑q : ∀ {q′} → y ≺ q′ → q′ ≺ Y → y ⊑ q′
       ⊑q {q′} lt lt′ = <ᵖ-between y q′ [ sub J ] (Equivalence.to T-≡ lt) (Equivalence.to T-≡ lt′)
@@ -466,41 +502,17 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       ... | inj₁ yc = yc
       ... | inj₂ eq = ⊥-elim (≺-irrefl {y} (subst (y ≺_) (sym eq) lt))
 
-      env-apart : ∀ {h} → Hots env₀ h → y ⊑ h → ⊥
-      env-apart hc yh = proj₂ (ok-step c ok₀′) hc (InvAt.world I₁ (proj₁ ry)) (⊑-inside yh)
-
-      σ₁-lead : ∀ {h e′} → σ₁ h e′ → y ⊑ h → h ≡ y
-      σ₁-lead rh ([] , eq)      = trans eq (⊕-identityʳ y)
-      σ₁-lead rh (_ ∷ _ , refl) = ⊥-elim (Lawful.flat L₁ ry rh)
-
-      self : y ⊑ y
-      self = [] , sym (⊕-identityʳ y)
-
-      dj₂ : ∀ {w} → W (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) w → w ≡ y → ⊥
-      dj₂ ww refl = proj₂ (ok-step p₀ ok₁) (inj₁ (_ , ry)) ww (⊑-inside self)
-
       dj₃ : ∀ {w} → W (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) q₀ w → w ≡ y → ⊥
-      dj₃ ww refl = proj₂ (ok-step p₀₀ ok₂) (inj₂ (inj₁ (_ , ry))) ww (⊑-inside self)
-
-      sy₂ : y ⊑ (p₀ ⊕ [ ix 1 ]) → ⊥
-      sy₂ ys = ⊑-≼ {y} {p₀ ⊕ [ ix 1 ]} ys (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {y} s₂≺c₁ (σ₁-after ry))
+      dj₃ ww refl = proj₂ (ok-step p₀₀ ok₂) (inj₂ (inj₁ (_ , ry))) ww (⊑-inside ([] , sym (⊕-identityʳ y)))
 
       sy₃ : y ⊑ q₀ → ⊥
       sy₃ ys = ⊑-≼ {y} {q₀} ys (≺-trans {q₀} {p₀ ⊕ [ ix 1 ]} {y} q₀≺s₂ (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {y} s₂≺c₁ (σ₁-after ry)))
 
-      hy₂ : ∀ {h} → Hots (hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ U h
-      hy₂ (inj₁ (_ , rh)) yh = inj₁ (σ₁-lead rh yh)
-      hy₂ (inj₂ hc)       yh = ⊥-elim (env-apart hc yh)
-
-      -- The closer's rows under `y`,
-      in-σ₂ : ∀ {h e′} → σ₂ h e′ → y ⊑ h → U h
-      in-σ₂ (r , _) = under-hot {H = Hots (hot σ₁ ∷ env₀)} {s = p₀ ⊕ [ ix 1 ]} {q = q₀} {y = y} (≺→≼ {q₀} {p₀ ⊕ [ ix 1 ]} q₀≺s₂) hy₂ dj₂ sy₂
-                        (InvAt.world I₂ r) (InvAt.real I₂ r)
+      q₀≼s₂ : q₀ ≼ (p₀ ⊕ [ ix 1 ])
+      q₀≼s₂ = ≺→≼ {q₀} {p₀ ⊕ [ ix 1 ]} q₀≺s₂
 
       hy₃ : ∀ {h} → Hots (hot σ₂ ∷ hot σ₁ ∷ env₀) h → y ⊑ h → h ≡ y ⊎ U h
-      hy₃ (inj₁ (_ , r₂))        yh = inj₂ (in-σ₂ r₂ yh)
-      hy₃ (inj₂ (inj₁ (_ , rh))) yh = inj₁ (σ₁-lead rh yh)
-      hy₃ (inj₂ (inj₂ hc))       yh = ⊥-elim (env-apart hc yh)
+      hy₃ = hots-under q₀ q₀≼s₂
 
       -- and the lanes'.
       in-σ₃ : ∀ {h e′} → σ₃ h e′ → y ⊑ h → U h
@@ -528,7 +540,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       go (just (inj₁ (laneB , x))) r lt lt′ with lane-sent (toM r)
       ... | _ , _ , σc , eq = sent eq (in-σ₃ σc) lt lt′
       go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
-      ... | _ , _ , σc , eq = sent eq (in-σ₂ σc) lt lt′
+      ... | _ , _ , σc , eq = sent eq (in-σ₂ q₀ q₀≼s₂ σc) lt lt′
       go (just (inj₁ (outerB , x))) r lt lt′ with OS.split r
       ... | _ , refl , y′ , refl , ry′ , _ with ⊑-snoc y′ (⊑q lt lt′)
       ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)

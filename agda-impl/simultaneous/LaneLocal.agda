@@ -59,7 +59,7 @@ late-ext : ∀ {q} zs → Valued (rootOf q) × opos (rootOf q) ⊑ q
 late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (rootOf-ext q zs)) (v , ⊑-trans o (zs , refl))
 
 ------------------------------------------------------------------------
--- A row's own claim
+-- A row's own claim: an `outerOpen`, never, as no lane opens an outer.
 
 Fine : ∀ {A} → IE A → Pos → Set
 Fine (instEmit (value _) _)          y = Early y
@@ -72,7 +72,7 @@ Fine (instEmit (mark burstEnd) _)    y = Early y
 Fine (instEmit (mark stop) _)        y = ⊤
 Fine (instEmit (mark subscribed) _)  y = ⊤
 Fine (instEmit (mark completed) _)   y = Early y
-Fine (instEmit (mark outerOpen) _)   y = ⊤
+Fine (instEmit (mark outerOpen) _)   y = ⊥
 Fine (instEmit (mark outerClose) _)  y = ⊤
 Fine (instEmit (mark outerDone) _)   y = ⊤
 
@@ -88,7 +88,7 @@ fine-ext (instEmit (mark burstEnd) _)   zs f = early-inst zs f
 fine-ext (instEmit (mark stop) _)       zs f = tt
 fine-ext (instEmit (mark subscribed) _) zs f = tt
 fine-ext (instEmit (mark completed) _)  zs f = early-inst zs f
-fine-ext (instEmit (mark outerOpen) _)  zs f = tt
+fine-ext (instEmit (mark outerOpen) _)  zs f = f
 fine-ext (instEmit (mark outerClose) _) zs f = tt
 fine-ext (instEmit (mark outerDone) _)  zs f = tt
 
@@ -130,7 +130,7 @@ held-fit {t = t} H = fit fine (Held.ends H)
     fine {x = instEmit (mark stop) _}       r = tt
     fine {x = instEmit (mark subscribed) _} r = tt
     fine {x = instEmit (mark completed) _}  r = Held.done H r
-    fine {x = instEmit (mark outerOpen) _}  r = tt
+    fine {x = instEmit (mark outerOpen) _}  r with () ← Held.routing H r
     fine {x = instEmit (mark outerClose) _} r = tt
     fine {x = instEmit (mark outerDone) _}  r = tt
 
