@@ -50,7 +50,7 @@ open import simultaneous.NextRow using (next)
 open import simultaneous.Project using (run-prefix)
 import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
-open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix)
+open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix; prefix-ext)
 open import simultaneous.Relations using (Met; values; values-++; ranked; Left; Exits; Over; lastValue; carried; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
 open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name; enter-few; visible-unpinned)
 open import simultaneous.Erasure using (module Reaching)
@@ -371,12 +371,6 @@ Covers t rs y = ∀ {k e} → t k e → Visible e → k ≼ y → After (cursor 
 -- No visible row is left past the run.
 Dry : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Set
 Dry t rs = ∀ {k e} → t k e → Visible e → After (cursor nothing rs) k → ⊥
-
--- One list a prefix of another: the other, extended.
-prefix-ext : ∀ {X : Set} {xs ys : List X} → Prefix _≡_ xs ys → Σ (List X) λ zs → ys ≡ xs ++ zs
-prefix-ext {ys = ys} Prefix.[] = ys , refl
-prefix-ext (refl Prefix.∷ p) with prefix-ext p
-... | zs , refl = zs , refl
 
 prefix-in : ∀ {X : Set} {xs ys : List X} {x} → Prefix _≡_ xs ys → x ∈ xs → x ∈ ys
 prefix-in (refl Prefix.∷ _) (here refl) = here refl

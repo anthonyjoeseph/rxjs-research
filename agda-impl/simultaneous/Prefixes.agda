@@ -6,6 +6,7 @@ open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Product using (Σ; _,_)
 
 open import simultaneous.Readings using (closed)
 
@@ -26,6 +27,12 @@ prefix-trans (refl ∷ p) (refl ∷ q) = refl ∷ prefix-trans p q
 prefix-++ : ∀ {X : Set} (zs : List X) {xs ys : List X} → Prefix _≡_ xs ys → Prefix _≡_ (zs ++ xs) (zs ++ ys)
 prefix-++ []       p = p
 prefix-++ (z ∷ zs) p = refl ∷ prefix-++ zs p
+
+-- One list a prefix of another: the other, extended.
+prefix-ext : ∀ {X : Set} {xs ys : List X} → Prefix _≡_ xs ys → Σ (List X) λ zs → ys ≡ xs ++ zs
+prefix-ext {ys = ys} [] = ys , refl
+prefix-ext (refl ∷ p) with prefix-ext p
+... | zs , refl = zs , refl
 
 -- Holding the last group back keeps a prefix.
 closed-prefix : ∀ {X : Set} ov (xs : List X) → Prefix _≡_ (closed ov xs) xs

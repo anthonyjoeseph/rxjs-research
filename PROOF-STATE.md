@@ -270,7 +270,7 @@ their shape. Settled when each former's leaf is a body.
 
 Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`, `lanes-count`,
 `held-current`, `parked-live`, `live-current`, `value-open`, `over-open`,
-`end-open`, `comb-shut`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
+`end-open`, `comb-shut`, `scan-idle`, `held-connected`, `held-lim`,
 `held-top`, `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`.
 
 #### THE BATCH RANK

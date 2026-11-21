@@ -33,6 +33,7 @@ open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
 open import simultaneous.HeldTrigger using (held-trigger)
+open import simultaneous.CombRun using (comb-run)
 open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
@@ -66,6 +67,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.SObs using (Flat)
 open import simultaneous.Routed using (Ex)
 open import Relation.Nullary using (¬_)
+import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_)
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.SObs using (outerB; laneB; closeB)
@@ -714,12 +716,21 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 ------------------------------------------------------------------------
 -- The scanned stream
 
--- WHAT THE SCANNED STREAM MEETS IS LAID OUT FROM WHAT ITS SOURCE MEETS: a
--- run met of it is a prefix of what a run met of the source lays out.
-postulate
-  comb-run : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P → GoodEnv ρ → Ok (Hots ρ) P
-           → ∀ {rs} → Met (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) rs
-           → Σ _ λ rx → Met (enter (ev m s ρ) P) rx × Σ _ λ ext → rs ++ ext ≡ outRows op init rx
+-- A run's facts, each decidable from the run, hold if not refuted.
+runheld-stable : ∀ {A cs} {rs : List (Pos × Ev (IE A))} → ¬ ¬ RunHeld cs rs → RunHeld cs rs
+runheld-stable h = record
+  { covered = λ r₁ r₂ eq c ne → routes-stable (cnt r₁) _ λ k → h λ R → k (RunHeld.covered R r₁ r₂ eq c ne)
+  ; exact   = λ r₁ r₂ eq → suc-stable _ λ k → h λ R → k (RunHeld.exact R r₁ r₂ eq)
+  ; shut    = λ r₁ r₂ eq z bq vy iq → h λ R → RunHeld.shut R r₁ r₂ eq z bq vy iq }
+  where
+    suc-stable : ∀ n → ¬ ¬ (Σ ℕ λ k → n ≡ suc k) → Σ ℕ λ k → n ≡ suc k
+    suc-stable zero    h′ = ⊥-elim (h′ λ { (_ , ()) })
+    suc-stable (suc k) _  = k , refl
+    routes-stable : ∀ (r : Pos × ℕ) y → ¬ ¬ (Σ ℕ λ k → r ≡ (y , suc k)) → Σ ℕ λ k → r ≡ (y , suc k)
+    routes-stable (x , zero)  y h′ = ⊥-elim (h′ λ { (_ , ()) })
+    routes-stable (x , suc k) y h′ with x ≟ᵖ y
+    ... | Nl.yes refl = k , refl
+    ... | Nl.no ne    = ⊥-elim (h′ λ { (_ , refl) → ne refl })
 
 -- What a row shows, it shows whether or not a run is found to meet it.
 early-stable : ∀ {y} → ¬ ¬ Early y → Early y
@@ -762,7 +773,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 
   -- A row shown is laid out by a run met of the source, classically.
   met-laid : ∀ {y e} → S y e → Visible e → ¬ ¬ Σ _ λ rx → Met M rx × Laid op init rx y e
-  met-laid {y} {e} x vi k = reach x vi λ (rs , mt) → let (rx , mx , ext , eq) = comb-run m op s ρ P g ok mt in
+  met-laid {y} {e} x vi k = reach x vi λ (rs , mt) → comb-run m op s ρ P g ok mt λ (rx , mx , ext , eq) →
     k (rx , mx , laid-in op init rx (subst ((y , e) ∈_) eq (∈-++⁺ˡ (∈-++⁺ʳ rs (here refl)))))
 
   named-laid : ∀ {rx y n} → Met M rx → Laid op init rx y (out (instEmit (mark begin) n)) → n ≡ nameOf y
@@ -804,8 +815,8 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
   late x = late-stable λ ng → met-laid x tt λ (_ , mx , l) → ng (late-laid mx l)
 
   runs : ∀ {rs} → Met S rs → RunHeld cs rs
-  runs mt with comb-run m op s ρ P g ok mt
-  ... | rx , mx , ext , eq = runs-prefix ext (subst (RunHeld cs) (sym eq) (CombIn.runs ci mx))
+  runs mt = runheld-stable λ k → comb-run m op s ρ P g ok mt λ (rx , mx , ext , eq) →
+    k (runs-prefix ext (subst (RunHeld cs) (sym eq) (CombIn.runs ci mx)))
 
 comb-held : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P cs → GoodEnv ρ → Ok (Hots ρ) P
           → CombIn op (enter (ev m s ρ) P) cs → Idle (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
