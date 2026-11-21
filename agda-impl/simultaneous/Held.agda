@@ -55,7 +55,11 @@ open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-down; sk-tru
 open import denotation.Laws.Worlds.Leaves using (of-inv)
 open import denotation.Laws.Worlds using (Shows; Hots)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺)
-open import simultaneous.CombSent using (fed-op; Fed)
+open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at)
+open import simultaneous.HeldBase using (Bound)
+open import denotation.Laws.Worlds using (⊑-snoc; ⊕-identityʳ)
+open import denotation.Events using (<ᵖ-between)
+open import denotation.Laws.Modulus using (≺-irrefl)
 open import simultaneous.FlatLanes using (laneTag; lane-vals; end-last; past-lanes; lanes-of; lanes₀)
 open import denotation.Up using (up; up-⊕)
 open import denotation.Laws.Shows using (∈-stable)
@@ -204,6 +208,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   close-sent r with sent-branch tk env′ m P r
   ... | w , l with hot-out l
   ...   | c′ , σc , _ , refl = c′ , w , σc , refl
+
+  track-sent : ∀ {q x} → M q (out (just (inj₂ x))) → Σ Pos λ c → Σ Pos λ w → Hots env c × q ≡ c ⊕ [ sub w ]
+  track-sent r with sent-track tk env′ m P r
+  ... | _ , l = trackers-out m Γ 0 (λ i → there (there (there (there (ρ i))))) env′ (Hots env)
+    (λ j → _ , Bound.is (eh j) , λ {_} {_} t → hots-at env (ρ (∈-map⁺ AIE j)) (Bound.is (eh j)) t) l
 
   -- The source ends under its own subscription, or past a branch's end.
   MEnd : Pos → Set
@@ -364,10 +373,37 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   lane-shown ry mq = LS.Shown.shown′ sh-σ₃ (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
     (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq ry
 
+  -- NO SOURCE VALUE LIES UNDER A LANE'S ROW before where the source's
+  -- reader joins it: a lane's value lies one `sub J` below its own row,
+  -- and the rest one `sub` below a hot no lane row lies over.
+  lane-under : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → y ≺ q → (y ⊕ [ sub (Spots.J P) ]) ≼ q
+  lane-under {y} {e} {q} {a} ry mq yq qJ = go a mq yq qJ
+    where
+      J = Spots.J P
+      I = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+      ⊑q : ∀ {q′} → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → y ⊑ q′
+      ⊑q {q′} lt lt′ = <ᵖ-between y q′ [ sub J ] (Equivalence.to T-≡ lt) (Equivalence.to T-≡ lt′)
+      apart : ∀ {q′ c w} → Hots (hot σ₂ ∷ hot σ₁ ∷ env₀) c → q′ ≡ c ⊕ [ sub w ] → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → ⊥
+      apart {c = c} hc refl lt lt′ with ⊑-snoc c (⊑q lt lt′)
+      ... | inj₁ yc = proj₂ (ok-step p₀₀ ok₂) hc (InvAt.world I (proj₁ ry)) (⊑-inside yc)
+      ... | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
+      toM : ∀ {q′ e′} → LS.M′ q′ e′ → M q′ e′
+      toM {q′} {e′} = subst (λ d → enter d P q′ e′) (sym (src-op tk env′ m))
+      go : ∀ {q′} a′ → LS.M′ q′ (out a′) → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → ⊥
+      go nothing r _ _ = ev-none m _ env′ P (toM r)
+      go (just (inj₂ x)) r lt lt′ with track-sent (toM r)
+      ... | _ , _ , hc , eq = apart (inj₂ (inj₂ (inj₂ hc))) eq lt lt′
+      go (just (inj₁ (outerB , x))) r lt lt′ with outer-sent (toM r)
+      ... | _ , _ , _ , σc , _ , eq = apart (inj₂ (inj₁ (_ , σc))) eq lt lt′
+      go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
+      ... | _ , _ , σc , eq = apart (inj₁ (_ , σc)) eq lt lt′
+      go (just (inj₁ (laneB , x))) r lt lt′ with LS.split r
+      ... | y′ , refl , ry′ , _ , _ with ⊑-snoc y′ (⊑q lt lt′)
+      ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
+      ...   | inj₁ ([] , refl) = ≺-irrefl {(y ⊕ []) ⊕ [ sub J ]} (subst (λ z → ((y ⊕ []) ⊕ [ sub J ]) ≺ (z ⊕ [ sub J ])) (sym (⊕-identityʳ y)) lt′)
+      ...   | inj₁ (l ∷ ws , refl) = Lawful.flat L₃ ry ry′
+
   postulate
-    -- NO SOURCE ROW LIES UNDER A LANE'S ROW before where the source's
-    -- reader shows it.
-    lane-under : ∀ {y e q e′} → σ₃ y e → LS.M′ q e′ → y ≺ q → (y ⊕ [ sub (Spots.J P) ]) ≼ q
     -- THE LANES END WITH NO ROUTE OPEN: a run of theirs followed by their
     -- end, no value between, counts none.
     lane-end-shut : ∀ {rs y} → Met σ₃ rs → (∀ {c} → (c , end) ∈ rs → ⊥) → σ₃ y end → After (cursor nothing rs) y

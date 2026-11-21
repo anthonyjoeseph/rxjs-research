@@ -8,6 +8,9 @@ module simultaneous.CombSent where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; [_]; _++_)
+import Data.List as L
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; s≤s; z≤n)
@@ -23,21 +26,21 @@ open import Tree using (mergeᶠ; takeWhile; flatMap; of; map; connected)
 open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Den; EmissionSet; enter; DenEnv; ⟦_⟧; approx; out; end; Reach; InE; at-out; on-out;
-  Ended; After; LaneOf; _≺_; _≼_; map-end; hot; Rejoin; shown; ended; late; module Op; module TakeWhile; module Merge; module Bounded; module Values)
+  Ended; After; LaneOf; _≺_; _≼_; map-end; hot; coldAt; Rejoin; shown; ended; late; module Op; module TakeWhile; module Merge; module Bounded; module Values)
 open import denotation.Events using (ofᴱ; <ᵖ-part; <ᵖ-apart)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-≼-≺; ≼-refl; ≺→≼; ≺-ext; ≼-split)
 open import denotation.Laws.Cut using (ix-asc)
-open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ; Lawful)
+open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ; Lawful; Hots)
 open import denotation.Laws.Worlds.Leaves using (of-reach; of-end; of-idx)
 open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB; laneB; closeB)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.DenRows using (merge-out; bounded-out; map-out′; of-mem; each-one; nth-row; module Cat)
+open import simultaneous.DenRows using (merge-out; bounded-out; map-out′; hot-out; of-mem; each-one; nth-row; module Cat)
 open import simultaneous.InstEmit using (instEmit; value; mark; outerClose; outerDone)
-open import Data.List.Relation.Unary.All using (lookup)
+open import Data.List.Relation.Unary.All using (lookup; _∷_)
 import Data.List.Relation.Unary.All as All
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked; each)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked; each; AIE; trackers) renaming (past to routes-past)
 
 -- A takeWhile that never includes its failure keeps a value where it was.
 take-at : ∀ {X} (keep : X → Bool) (d : Den X) p {k y} → enter (Op.takeWhile false keep d) p k (out y) → enter d p k (out y)
@@ -93,6 +96,29 @@ module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env 
   ... | _ , b′ , _ , l″ , _ with map-out′ (λ e → just (inj₁ (b′ , e))) (approx n (branch b′) env) _ l″
   ...   | _ , l‴ , refl = _ , branch-ev (just n) b′ l‴
 
+  -- A tracker's row the source sends is the trackers', at the same row.
+  sent-track : ∀ m P {q x} → enter (ev m Src env) P q (out (just (inj₂ x))) → Σ Pos λ s → enter (ev m tk env) s q (out x)
+  sent-track nothing P r with merge-out (λ a → ⟦ fed tk a ⟧ env) (Op.of (true ∷ false ∷ [])) P (take-at going (⟦ Fed ⟧ env) P r)
+  ... | _ , true , _ , l , _ with map-out′ _ (⟦ tk ⟧ env) _ l
+  ...   | _ , l′ , refl = _ , l′
+  sent-track nothing P r | _ , false , _ , l , _ with Cat.cat-out (λ c → ⟦ Cat-of c ⟧ env) _ l
+  ... | inj₂ (_ , l′) with of-mem _ 0 (nothing ∷ []) (proj₁ l′)
+  ...   | here ()
+  ...   | there ()
+  sent-track nothing P r | _ , false , _ , l , _ | inj₁ l′ with merge-out (λ b → ⟦ Tag b ⟧ env) (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) _ l′
+  ... | _ , b′ , _ , l″ , _ with map-out′ (λ e → just (inj₁ (b′ , e))) (⟦ branch b′ ⟧ env) _ l″
+  ...   | _ , _ , ()
+  sent-track (just n) P r with merge-out (λ a → approx n (fed tk a) env) (Op.of (true ∷ false ∷ [])) P (take-at going (approx n Fed env) P r)
+  ... | _ , true , _ , l , _ with map-out′ _ (approx n tk env) _ l
+  ...   | _ , l′ , refl = _ , l′
+  sent-track (just n) P r | _ , false , _ , l , _ with Cat.cat-out (λ c → approx n (Cat-of c) env) _ l
+  ... | inj₂ (_ , l′) with of-mem _ 0 (nothing ∷ []) (proj₁ l′)
+  ...   | here ()
+  ...   | there ()
+  sent-track (just n) P r | _ , false , _ , l , _ | inj₁ l′ with merge-out (λ b → approx n (Tag b) env) (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) _ l′
+  ... | _ , b′ , _ , l″ , _ with map-out′ (λ e → just (inj₁ (b′ , e))) (approx n (branch b′) env) _ l″
+  ...   | _ , _ , ()
+
   -- THE SOURCE AS OPERATORS, level by level, under every approximant as
   -- under the meaning: nothing under it is deferred.
   src-op : ∀ m → ev m Src env ≡ Op.takeWhile false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env) (Op.of (true ∷ false ∷ [])))
@@ -135,6 +161,38 @@ module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env 
   ... | _ , _ , refl = refl
   tag-branch (just n) b r with map-out′ (λ e → just (inj₁ (b , e))) (approx n (branch b) env) _ r
   ... | _ , _ , refl = refl
+
+-- A hot an environment holds has its rows among the environment's hots.
+hots-at : ∀ {Γ A} (ρ : DenEnv Γ) (k : A ∈ Γ) {t : EmissionSet A} → lookup ρ k ≡ hot t → ∀ {c e} → t c e → Hots ρ c
+hots-at (hot _ ∷ ρ)    (here refl) refl tc = inj₁ (_ , tc)
+hots-at (coldAt _ ∷ ρ) (here refl) ()   _
+hots-at (hot _ ∷ ρ)    (there k)   eq   tc = inj₂ (hots-at ρ k eq tc)
+hots-at (coldAt _ ∷ ρ) (there k)   eq   tc = hots-at ρ k eq tc
+
+-- A TRACKER'S ROW LIES ONE `sub` BELOW A ROW OF THE HOT IT READS.
+trackers-out : ∀ m {Δ} Γ i (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (env : DenEnv Δ) (H : Pos → Set)
+             → (∀ {X} (j : X ∈ Γ) → Σ (EmissionSet (AIE X)) λ t → lookup env (ρ (∈-map⁺ AIE j)) ≡ hot t × (∀ {c e} → t c e → H c))
+             → ∀ {s q x} → enter (ev m (trackers Γ i ρ) env) s q (out x) → Σ Pos λ c → Σ Pos λ w → H c × q ≡ c ⊕ [ sub w ]
+trackers-out nothing  []      i ρ env H hs (() , _)
+trackers-out (just n) []      i ρ env H hs (() , _)
+trackers-out nothing  (X ∷ Γ) i ρ env H hs {s} r
+  with merge-out (λ b → ⟦ if b then map (λ a → i , routes-past a) (connected (ρ (here refl))) else trackers Γ (suc i) (λ j → ρ (there j)) ⟧ env)
+                 (Op.of (true ∷ false ∷ [])) s r
+... | _ , true , _ , l , _ with map-out′ (λ a → i , routes-past a) (lookup env (ρ (here refl))) _ l
+...   | _ , l′ , _ with hs (here refl)
+...     | _ , eq , ht with hot-out (subst (λ d → enter d _ _ _) eq l′)
+...       | c , tc , _ , refl = c , _ , ht tc , refl
+trackers-out nothing  (X ∷ Γ) i ρ env H hs {s} r | _ , false , _ , l , _ =
+  trackers-out nothing Γ (suc i) (λ j → ρ (there j)) env H (λ j → hs (there j)) l
+trackers-out (just n) (X ∷ Γ) i ρ env H hs {s} r
+  with merge-out (λ b → approx n (if b then map (λ a → i , routes-past a) (connected (ρ (here refl))) else trackers Γ (suc i) (λ j → ρ (there j))) env)
+                 (Op.of (true ∷ false ∷ [])) s r
+... | _ , true , _ , l , _ with map-out′ (λ a → i , routes-past a) (lookup env (ρ (here refl))) _ l
+...   | _ , l′ , _ with hs (here refl)
+...     | _ , eq , ht with hot-out (subst (λ d → enter d _ _ _) eq l′)
+...       | c , tc , _ , refl = c , _ , ht tc , refl
+trackers-out (just n) (X ∷ Γ) i ρ env H hs {s} r | _ , false , _ , l , _ =
+  trackers-out (just n) Γ (suc i) (λ j → ρ (there j)) env H (λ j → hs (there j)) l
 
 -- What the closer sends: a bracket's close, then the outer's end.
 data Closing {B : Set} : IE B → Set where
