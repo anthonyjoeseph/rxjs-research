@@ -280,11 +280,12 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 #### THE REAL FLATMAP'S LANE COUNT
 
 The scan's `active` counts the real flatMap's live lanes (`LaneCount`).
-Open: a switch's `outerOpen` past a lane's start is a later value's,
-before every row of that lane in the scan; a lane run and never cut started
-before the closer's `outerDone` (the bounded merge needs `queue` too).
+Open: inside an outer row the source's reading precedes the real
+flatMap's value with no lane row between; the lanes show no `outerOpen`;
+the real flatMap's outer holds each outer value; a lane run and never cut
+started before the closer's `outerDone` (the bounded merge needs `queue`).
 
-Members: `switch-cut`, `lane-started`.
+Members: `lane-in-outer`, `σ₃-open`, `ro-of`, `lane-started`.
 
 #### THE REAL FLATMAP'S OUTER
 
