@@ -42,9 +42,6 @@ open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
 import simultaneous.LaneStart as LaneStart
 open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-≺-≺)
-open import denotation.Events using (<ᵖ-part)
-open import Data.Bool.Properties using (T-≡)
-open import Function using (Equivalence)
 open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
@@ -123,13 +120,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   cut-row mt {_ , skip} i ()
   cut-row mt {_ , pin _} i ()
 
-  -- The source reads the outer before the real flatMap does.
-  J≺q₀ : OS.J ≺ (p₀₀ ⊕ [ ix 1 ])
-  J≺q₀ = subst (_≺ (p₀₀ ⊕ [ ix 1 ])) (sym (proj₂ OS.J-under)) (P≺q₀ (proj₁ OS.J-under))
-
-  J≺ro : ∀ c → (c ⊕ [ sub OS.J ]) ≺ ro-at c
-  J≺ro c = Equivalence.from T-≡ (<ᵖ-part c {sub OS.J} {sub (p₀₀ ⊕ [ ix 1 ])} [] (ix 1 ∷ ix 0 ∷ []) (Equivalence.to T-≡ J≺q₀))
-
   -- A SWITCH'S ARRIVAL THE SCAN MEETS PAST A LANE'S START IS A LATER
   -- VALUE'S, before every lane row the scan meets next.
   switch-cut : op ≡ switchᶠ → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q} → AC.CutIn [] r₁ q
@@ -170,13 +160,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       ...   | inj₁ xy = ⊥-elim (lane-in-outer op≡ σc σy xy le)
       ...   | inj₂ yx = ⊥-elim (≺-irrefl {c ⊕ [ sub OS.J ]} (≺-≼-≺ {c ⊕ [ sub OS.J ]} {y ⊕ [ sub LS.J ]} {c ⊕ [ sub OS.J ]} xc≺z
                           (lane-under σy (subst (λ d → enter d P (c ⊕ [ sub OS.J ]) (out v)) (src-op tk env′ m) mc) yx)))
-
-  private
-    split-met : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → Met M (xs ++ x ∷ (ys ++ (z , e) ∷ r₂))
-    split-met r₁ {z} {e} {r₂} mt xs x ys refl = subst (Met M) (++-assoc xs (x ∷ ys) ((z , e) ∷ r₂)) mt
-
-    in-r₁ : ∀ (r₁ : List Row) xs x ys → r₁ ≡ xs ++ x ∷ ys → x ∈ r₁
-    in-r₁ r₁ xs x ys refl = ∈-++⁺ʳ xs (here refl)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → ¬ AC.DoneIn [] xs q

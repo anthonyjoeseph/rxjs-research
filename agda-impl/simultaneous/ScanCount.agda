@@ -1,6 +1,7 @@
--- THE SCAN'S LANE COUNTER, ROW BY ROW: `active` rises at a lane's
+-- THE SCAN'S LANE COUNTERS, ROW BY ROW: `active` rises at a lane's
 -- `laneStart`, falls at its `laneDone` and empties at a switch's
--- arrival.  No other row moves it (`past-active`).
+-- arrival; a bounded merge's `queue` rises at an arrival and falls at a
+-- `laneStart`.  No other row moves either (`past-active`, `past-queue`).
 module simultaneous.ScanCount where
 
 open import Data.Empty using (⊥; ⊥-elim)
@@ -8,7 +9,7 @@ open import Data.List using ([]; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat using (suc; _∸_; _⊓_; _+_)
 open import Relation.Nullary using (does)
@@ -34,6 +35,12 @@ markAct _       laneStart = kStart
 markAct _       laneDone  = kDone
 markAct switchᶠ outerOpen = kCut
 markAct _       _         = kOther
+
+-- and `queue`.
+markQue : FlatOp → Mark → Kind
+markQue _                 laneStart = kDone
+markQue (mergeᶠ (just _)) outerOpen = kStart
+markQue _                 _         = kOther
 
 evKind : ∀ {B} → (FlatOp → Mark → Kind) → FlatOp → Ev (Maybe (Input B)) → Kind
 evKind k op (out (just (inj₁ (_ , instEmit (mark m) _)))) = k op m
@@ -158,6 +165,26 @@ react-active op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj�
 react-active op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₁ (left-act n (record s { finished = true }))
 react-active op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
 react-active op (s , _) (just (inj₁ (b , instEmit (mark completed) n))) = refl
+react-queue : ∀ {B} op (o : Out B) x → Flat.queue (proj₁ (react op o x)) ≡ stepK (evKind markQue op (out x)) (Flat.queue (proj₁ o))
+react-queue op (s , _) nothing = refl
+react-queue op (s , _) (just (inj₂ (i , r))) = proj₂ (unpark-act root (record s { live = setAt i r (Flat.live s) }))
+react-queue op (s , _) (just (inj₁ (b , instEmit (value _) _))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark begin) n))) = proj₂ (begun-act b n s)
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark over) n))) = proj₂ (overed-act n s)
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark stop) n))) = proj₂ (stopped-act b n s (if Flat.spent s then 0 else share b s))
+react-queue (mergeᶠ (just _)) (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
+react-queue (mergeᶠ nothing)  (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
+react-queue switchᶠ           (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = proj₂ (cut-act (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }))
+react-queue exhaustᶠ          (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerClose) n))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneStart) n))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark carry) n))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneDone) n))) = proj₂ (ended-act (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }))
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj₂ (burst-act (isZero (Flat.held s) ∨ Flat.dead s) n s)
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₂ (left-act n (record s { finished = true }))
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark completed) n))) = refl
+
 -- The scan past one more row, before any end.
 pstep : ∀ {B} → FlatOp → Out B → Pos × Ev (Maybe (Input B)) → Out B
 pstep op o (_ , out x) = react op o x
@@ -180,3 +207,45 @@ past-active op o xs (q , out x) ne rewrite past-snoc op o xs (q , out x) ne = re
 past-active op o xs (q , end) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , end) ne)
 past-active op o xs (q , skip) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , skip) ne)
 past-active op o xs (q , pin _) ne = cong (λ o′ → Flat.active (proj₁ o′)) (past-snoc op o xs (q , pin _) ne)
+
+past-queue : ∀ {B} op (o : Out B) xs y → (∀ {c} → (c , end) ∈ xs → ⊥)
+           → Flat.queue (proj₁ (past op o (xs ++ [ y ]))) ≡ stepK (rowKind markQue op y) (Flat.queue (proj₁ (past op o xs)))
+past-queue op o xs (q , out x) ne rewrite past-snoc op o xs (q , out x) ne = react-queue op (past op o xs) x
+past-queue op o xs (q , end) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , end) ne)
+past-queue op o xs (q , skip) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , skip) ne)
+past-queue op o xs (q , pin _) ne = cong (λ o′ → Flat.queue (proj₁ o′)) (past-snoc op o xs (q , pin _) ne)
+
+-- A ROW THAT LOWERS THE QUEUE IS A `laneStart`,
+row-start : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markQue op x ≡ kDone
+          → Σ Pos λ k → Σ Branch λ b → Σ _ λ n → x ≡ (k , out (just (inj₁ (b , instEmit (mark laneStart) n))))
+row-start op (k , out (just (inj₁ (b , instEmit (mark m) n)))) eq with mark-start op m eq
+  where mark-start : ∀ op m → markQue op m ≡ kDone → m ≡ laneStart
+        mark-start _ laneStart _ = refl
+        mark-start _ begin () ; mark-start _ over () ; mark-start _ stop () ; mark-start _ outerClose ()
+        mark-start _ carry () ; mark-start _ laneDone () ; mark-start _ burstEnd () ; mark-start _ outerDone ()
+        mark-start _ subscribed () ; mark-start _ completed ()
+        mark-start (mergeᶠ (just _)) outerOpen () ; mark-start (mergeᶠ nothing) outerOpen ()
+        mark-start switchᶠ outerOpen () ; mark-start exhaustᶠ outerOpen ()
+... | refl = k , b , n , refl
+row-start op (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+row-start op (_ , out (just (inj₂ _))) ()
+row-start op (_ , out nothing) ()
+row-start op (_ , end)   ()
+row-start op (_ , skip)  ()
+row-start op (_ , pin _) ()
+
+-- and no row empties it.
+que-cut : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markQue op x ≡ kCut → ⊥
+que-cut op (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut op m eq
+  where mark-cut : ∀ op m → markQue op m ≡ kCut → ⊥
+        mark-cut _ begin () ; mark-cut _ over () ; mark-cut _ stop () ; mark-cut _ outerClose ()
+        mark-cut _ laneStart () ; mark-cut _ carry () ; mark-cut _ laneDone () ; mark-cut _ burstEnd () ; mark-cut _ outerDone ()
+        mark-cut _ subscribed () ; mark-cut _ completed ()
+        mark-cut (mergeᶠ (just _)) outerOpen () ; mark-cut (mergeᶠ nothing) outerOpen ()
+        mark-cut switchᶠ outerOpen () ; mark-cut exhaustᶠ outerOpen ()
+que-cut op (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+que-cut op (_ , out (just (inj₂ _))) ()
+que-cut op (_ , out nothing) ()
+que-cut op (_ , end)   ()
+que-cut op (_ , skip)  ()
+que-cut op (_ , pin _) ()
