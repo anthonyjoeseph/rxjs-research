@@ -93,6 +93,45 @@ module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env 
   ... | _ , b′ , _ , l″ , _ with map-out′ (λ e → just (inj₁ (b′ , e))) (approx n (branch b′) env) _ l″
   ...   | _ , l‴ , refl = _ , branch-ev (just n) b′ l‴
 
+  -- THE SOURCE AS OPERATORS, level by level, under every approximant as
+  -- under the meaning: nothing under it is deferred.
+  src-op : ∀ m → ev m Src env ≡ Op.takeWhile false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env) (Op.of (true ∷ false ∷ [])))
+  src-op nothing  = refl
+  src-op (just n) = refl
+
+  own-op : ∀ m → ev m (fed tk false) env ≡ Op.flatMap (mergeᶠ (just 1)) (λ c → ev m (Cat-of c) env) (Op.of (true ∷ false ∷ []))
+  own-op nothing  = refl
+  own-op (just n) = refl
+
+  cat-op : ∀ m → ev m (Cat-of true) env ≡ Op.flatMap (mergeᶠ nothing) (λ b → ev m (Tag b) env) (Op.of (outerB ∷ laneB ∷ closeB ∷ []))
+  cat-op nothing  = refl
+  cat-op (just n) = refl
+
+  tag-op : ∀ m → ev m (Tag laneB) env ≡ Op.map (λ e → just (inj₁ (laneB , e))) (lookup env (here refl))
+  tag-op nothing  = refl
+  tag-op (just n) = refl
+
+  -- The trackers send no branch's row.
+  no-track : ∀ m {s k x} → enter (ev m (fed tk true) env) s k (out (just (inj₁ x))) → ⊥
+  no-track nothing  r with map-out′ _ (⟦ tk ⟧ env) _ r
+  ... | _ , _ , ()
+  no-track (just n) r with map-out′ _ (approx n tk env) _ r
+  ... | _ , _ , ()
+
+  -- The closing item is `nothing`.
+  no-close : ∀ m {s k y} → enter (ev m (Cat-of false) env) s k (out (just y)) → ⊥
+  no-close nothing  {s} r with of-mem s 0 (nothing ∷ []) (proj₁ r)
+  ... | there ()
+  no-close (just n) {s} r with of-mem s 0 (nothing ∷ []) (proj₁ r)
+  ... | there ()
+
+  -- A branch's tagged row names that branch.
+  tag-branch : ∀ m b {s k b′ x} → enter (ev m (Tag b) env) s k (out (just (inj₁ (b′ , x)))) → b ≡ b′
+  tag-branch nothing  b r with map-out′ (λ e → just (inj₁ (b , e))) (⟦ branch b ⟧ env) _ r
+  ... | _ , _ , refl = refl
+  tag-branch (just n) b r with map-out′ (λ e → just (inj₁ (b , e))) (approx n (branch b) env) _ r
+  ... | _ , _ , refl = refl
+
 -- What the closer sends: a bracket's close, then the outer's end.
 data Closing {B : Set} : IE B → Set where
   c-close : ∀ {n} → Closing (instEmit (mark outerClose) n)

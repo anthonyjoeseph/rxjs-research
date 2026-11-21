@@ -36,11 +36,11 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix)
 open import denotation.Events using (Timeline; fresh; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; Ev; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter)
 import denotation.EmissionSet as ES
@@ -105,24 +105,6 @@ after-ok N n o q (_ , eq , m) = listC-past N n o q eq m
 -- A pin listed in any environment names a connect past its subscription.
 pin-after-ok : ∀ {Γ X} N n (o : Obs Timeline Γ X) {ρL : All Tb.Listed Γ} q {l r} → TR (listC N n o ρL q) l (pin r) → q ≼ r
 pin-after-ok N n o q (_ , eq , m) = listC-pinpast N n o q eq m
-
-private
-  dropLast : List Label → List Label
-  dropLast []           = []
-  dropLast (_ ∷ [])     = []
-  dropLast (y ∷ z ∷ zs) = y ∷ dropLast (z ∷ zs)
-
-  dropLast-++ : ∀ ys l → dropLast (ys L.++ [ l ]) ≡ ys
-  dropLast-++ []           l = refl
-  dropLast-++ (y ∷ [])     l = refl
-  dropLast-++ (y ∷ z ∷ zs) l = cong (y ∷_) (dropLast-++ (z ∷ zs) l)
-
--- One label up.
-up : Pos → Pos
-up (i ∙ ys) = i ∙ dropLast ys
-
-up-⊕ : ∀ q l → up (q ⊕ [ l ]) ≡ q
-up-⊕ (i ∙ ys) l = cong (i ∙_) (dropLast-++ ys l)
 
 -- A path walked one label at a time, as the listing walks it.
 infixl 5 _⊕ˡ_

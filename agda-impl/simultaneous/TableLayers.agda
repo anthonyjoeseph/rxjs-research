@@ -36,8 +36,8 @@ open import simultaneous.TableKit using (TR; Got)
 open import simultaneous.Horizon using (Tag; free; held; module Cuts)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.HorizonCorr using (module Inter; module Wrap; Own; OwnPut; Btw; PB; PA)
-open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; linked-r*;
-  Aligned; aligned-r*; Rest; Out; out; same-bd; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
+open import denotation.Up using (up; up-⊕)
+open import simultaneous.TableEnv using (Ren; wk; got-ok; pin-ok; after-ok; pin-after-ok; Tab; Tab*; _⊕ˡ_; ⊑-⊕ˡ; Linked; linked-r*; Aligned; aligned-r*; Rest; Out; out; same-bd; EnvR; maps; lw; lw*; hot-coh; env-wk; env-wk-eq; EnvEq; Full; Coh; Admits; dbd; tab-func; tab-flat)
 open import simultaneous.TreeBounded using (admits-trig; tree-bounded)
 open import simultaneous.HorizonTree using (bd)
 

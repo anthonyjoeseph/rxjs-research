@@ -16,11 +16,9 @@ open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 open import Data.Nat using (suc)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup) renaming (_∷_ to _∷ᴬ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.AllPairs using () renaming ([] to []ᴾ)
-import Data.List as L
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
@@ -28,12 +26,12 @@ open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Tree using (connected)
-open import denotation.Position using (Pos; ix; sub; last; _<ᵖ_; _⊕_)
-open import denotation.Events using (<ᵖ-split; <ᵖ-down; <ᵖ-part; ofᴱ)
+open import denotation.Position using (Pos; ix; last; _⊕_)
+open import denotation.Events using (<ᵖ-part; ofᴱ)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; Ev; out; skip; end; pin; Bare; Unpinned; Dep; Few; Reach; enter; ⟦_⟧; Den; hot;
   coldAt; Proper; Rejoin; shown; heard; ended; late; _≺_; _≼_; Truncate; InE; at-end; at-out; on-out)
 open import denotation.Read using (Visible)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-absurd; ≺→≼; ≼-trans; ≺-ext; entered-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺→≼; ≼-trans; ≺-ext; entered-few)
 open import denotation.Laws.Worlds using (Lawful; InvAt; Ok; Hots; ok-step)
 open import denotation.Laws using (inv-⟦⟧)
 open import operation.PureObservable using (module Machine)
@@ -52,6 +50,7 @@ open import adequacy.Walk using (due-≈)
 open import adequacy.Bound using (owes?; owes-≼; good-full)
 open import adequacy.Ended using (endUp)
 open import adequacy.SubOne using (dep-un)
+open import denotation.Laws.Rejoined using (row-reach)
 
 ------------------------------------------------------------------------
 -- A hot's ends: each still owed, or past all a cursor has reached.
@@ -116,29 +115,10 @@ bare-un : ∀ {A} {e : Ev A} → Bare e → Unpinned e
 bare-un {e = out _} _ = tt
 bare-un {e = skip}  _ = tt
 
--- Two rows of a lawful hot, a label down in order: in order.
-lower : ∀ {A} {t : EmissionSet A} → Lawful t → ∀ {q k e e′ s} → t q e → t k e′ → (k ⊕ [ s ]) ≺ (q ⊕ [ s ]) → k ≺ q
-lower {t = t} L {q} {k} {e} {e′} {s} x y lt with q <ᵖ k in qk
-... | true  = ⊥-elim (≺-absurd {k ⊕ [ s ]} {q ⊕ [ s ]} lt
-                (Equivalence.from T-≡ (<ᵖ-down q k s s qk (λ l ls eq → Lawful.flat L x (subst (λ z → t z e′) eq y)))))
-... | false with <ᵖ-split k q qk
-...   | inj₁ kq   = Equivalence.from T-≡ kq
-...   | inj₂ refl = ⊥-elim (≺-irrefl {k ⊕ [ s ]} lt)
-
--- A row rejoined from the hot's row at `q`: the hot's rows before `q`.
-row-reach : ∀ {A} {t : EmissionSet A} {j} → Bind t → ∀ {q e₀} → t q e₀ → Few t q → j ≺ q → ∀ {e} → Reach (Rejoin j t) (q ⊕ [ sub j ]) e
-row-reach {t = t} {j} B {q} x (ks , h) jq {e} = L.map (_⊕ [ sub j ]) ks , pick
-  where
-    pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (q ⊕ [ sub j ]) → Dep (q ⊕ [ sub j ]) e k e′ → k ∈ L.map (_⊕ [ sub j ]) ks
-    pick (shown y _ _)   l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
-    pick (heard y _)     l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
-    pick (ended y _)     l _ = ∈-map⁺ (_⊕ [ sub j ]) (h y (lower (law B) x y l))
-    pick (late {c} y cj) _ _ = ⊥-elim (≼-trans {q} {c} {j} (Lawful.proper (law B) y x) cj jq)
-
 rejoin-reach : ∀ {A} {t : EmissionSet A} {j} → Bind t → ∀ {q e} → Rejoin j t q e → Visible e → Reach (Rejoin j t) q e
-rejoin-reach B (shown x b jq) _ = row-reach B x (few B x (bare-un b)) jq
+rejoin-reach B (shown x b jq) _ = row-reach (law B) x (few B x (bare-un b)) jq
 rejoin-reach B (heard _ _) ()
-rejoin-reach B (ended x jc) _   = row-reach B x (few B x tt) jc {end}
+rejoin-reach B (ended x jc) _   = row-reach (law B) x (few B x tt) jc {end}
 rejoin-reach {t = t} {j} B (late {c} x cj) _ = [] , pick
   where
     pick : ∀ {k e′} → Rejoin j t k e′ → k ≺ (j ⊕ [ last ]) → Dep (j ⊕ [ last ]) end k e′ → k ∈ []
