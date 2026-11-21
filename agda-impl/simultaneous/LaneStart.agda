@@ -18,12 +18,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _<_; s≤s; z≤n)
+open import Data.Nat using (ℕ; suc; _<_; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap)
@@ -41,7 +41,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.DenRows using (conn-out; merge-out; scan-out; bounded-out; hot-out; each-one; of-mem)
 open import simultaneous.LaneEndSched using (ls-one; ls-true; of-one)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
 
@@ -74,6 +74,10 @@ under-≺ p {i} {j} lt (ys , refl) = subst (_≺ (p ⊕ [ ix j ])) (sym (⊕-ass
 z₀ : ∀ {B} → Routes × (List (IE B) × List (IE B))
 z₀ = (root , 0) , ([] , [])
 
+-- A lane's lane part, subscribed under its first value.
+laneAt : Pos → Pos
+laneAt s = (s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+
 module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ → Den ⊤ → Den (IE B) → Den (IE B))
   -- The lane part's first piece shows its mark at its first child,
   (pc0    : ∀ h h′ s → enter (PC lanePart 0 h h′) s (s ⊕ [ ix 0 ]) (out (marked laneStart)))
@@ -84,7 +88,10 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   -- The burst part's third piece shows nothing,
   (pc2    : ∀ h h′ s {y a} → enter (PC burstPart 2 h h′) s y (out a) → ⊥)
   -- nor does its share.
-  (sh-b   : ∀ h p {y a} → enter (SH burstPart h) p y (out a) → ⊥) where
+  (sh-b   : ∀ h p {y a} → enter (SH burstPart h) p y (out a) → ⊥)
+  -- The burst part's first piece shows no `laneStart`, nor the lane part's third.
+  (pc0-b  : ∀ h h′ s {y n} → enter (PC burstPart 0 h h′) s y (out (instEmit (mark laneStart) n)) → ⊥)
+  (pc2-l  : ∀ h h′ s {y n} → enter (PC lanePart 2 h h′) s y (out (instEmit (mark laneStart) n)) → ⊥) where
 
   ls : IE B
   ls = marked laneStart
@@ -233,6 +240,24 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         go burstPart refl {s = s} (on-out (on-out at-out) , _) _ l _ = ⊥-elim (pc2 h h′ s l)
         go _ _ (on-out (on-out (on-out ())) , _) _ _ _
 
+    -- What shows `laneStart` in the frame is the lane part's first piece's
+    -- mark, when the share shows none.
+    fr-start : ∀ {y n} → enter (Fr k h h′) P y (out (instEmit (mark laneStart) n)) → (∀ {p y n} → enter h′ p y (out (instEmit (mark laneStart) n)) → ⊥)
+             → k ≡ lanePart × y ≡ V₀
+    fr-start r hn with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
+    ... | q , j , i , s , oq , sb , (l , _) = go k refl oq sb l
+      where
+        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y n} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out (instEmit (mark laneStart) n)) → k ≡ lanePart × y ≡ V₀
+        go lanePart refl (at-out , _) (nth , st) l with nth-zero nth
+        ... | refl with starts-0 st
+        ...   | refl with pc0-at k h h′ S₀ l
+        ...     | refl , _ = refl , refl
+        go burstPart refl {s = s} (at-out , _) _ l = ⊥-elim (pc0-b h h′ s l)
+        go _ _ {s = s} (on-out at-out , _) _ l = ⊥-elim (hn (pc1 k h h′ s l))
+        go lanePart refl {s = s} (on-out (on-out at-out) , _) _ l = ⊥-elim (pc2-l h h′ s l)
+        go burstPart refl {s = s} (on-out (on-out at-out) , _) _ l = ⊥-elim (pc2 h h′ s l)
+        go _ _ (on-out (on-out (on-out ())) , _) _ _
+
   ----------------------------------------------------------------------
   -- The scan's split
 
@@ -244,6 +269,26 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   pick _ st a₀ refl (on-out at-out) l nu with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
   ... | refl , refl = refl
   pick _ _ _ refl (on-out (on-out ())) _ _
+
+  -- The split's first list holds no `laneStart`: carries, if anything.
+  rep-no : ∀ k {n} → instEmit (mark laneStart) n ∈ L.replicate k (marked {B} carry) → ⊥
+  rep-no (suc k) (here ())
+  rep-no (suc k) (there i) = rep-no k i
+
+  ls-no : ∀ (st : Routes × (List (IE B) × List (IE B))) e {n} → instEmit (mark laneStart) n ∈ proj₁ (proj₂ (laneStep st e)) → ⊥
+  ls-no st (instEmit (value _) _)      ()
+  ls-no st (instEmit (mark begin) _)      ()
+  ls-no st (instEmit (mark over) _)       ()
+  ls-no st (instEmit (mark stop) _)       ()
+  ls-no st (instEmit (mark outerOpen) _)  ()
+  ls-no st (instEmit (mark outerClose) _) ()
+  ls-no st (instEmit (mark laneStart) _)  ()
+  ls-no st (instEmit (mark carry) _)      ()
+  ls-no st (instEmit (mark laneDone) _) i = rep-no (proj₂ (proj₁ st)) i
+  ls-no st (instEmit (mark burstEnd) _)   ()
+  ls-no st (instEmit (mark outerDone) _)  ()
+  ls-no st (instEmit (mark subscribed) _) ()
+  ls-no st (instEmit (mark completed) _)  ()
 
   -- The split of the first piece's mark, at `U`, shows it at its second
   -- lane's first child: one of few rows.
@@ -294,6 +339,17 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
             (λ ()) tt
         , ks , λ x _ _ → all-in x
 
+  -- What the split shows as `laneStart` is the scan's read, at its second
+  -- lane's first child.
+  pick-at : ∀ (y : Routes × (List (IE B) × List (IE B))) st a₀ → y ≡ laneStep st a₀ → ∀ {U w c q n}
+          → InE (ofᴱ U 0 (true ∷ false ∷ [])) w (out c)
+          → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out (instEmit (mark laneStart) n))
+          → a₀ ≡ instEmit (mark laneStart) n × q ≡ Split.E₀ U
+  pick-at _ st a₀ refl at-out l = ⊥-elim (ls-no st a₀ (of-mem _ 0 _ l))
+  pick-at _ st a₀ refl (on-out at-out) l with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
+  ... | refl , refl = refl , refl
+  pick-at _ _ _ refl (on-out (on-out ())) _
+
   ----------------------------------------------------------------------
   -- Down, then up
 
@@ -308,6 +364,43 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   ...     | st , a₀ , fa , eq with pick yst st a₀ eq (proj₁ ow) (proj₁ ll) tt
   ...       | refl with Frame.fr-done k (H₁ P) (H₂ P k) (Bp P) fa (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
   ...         | refl , vlt = refl , v₂ , yst , _ , scr , fa , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
+
+  -- What a part's connect shows as `laneStart` is the lane part's split of
+  -- its frame's first mark, when its share shows none.
+  down-start : ∀ k P {y n} → enter (Sv k) P y (out (instEmit (mark laneStart) n)) → (∀ {p y n} → enter (H₂ P k) p y (out (instEmit (mark laneStart) n)) → ⊥)
+             → k ≡ lanePart × y ≡ Split.E₀ (Frame.V₀ k (H₁ P) (H₂ P k) (Bp P) ⊕ [ ix 1 ])
+  down-start k P svr hn =
+    let (v₂ , yst , scr , inr , _) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
+        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
+        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
+        (ea , ey) = pick-at yst st a₀ eq (proj₁ ow) (proj₁ ll)
+        (ek , ev₂) = Frame.fr-start k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) ea fa) hn
+    in ek , trans ey (cong (λ v → Split.E₀ (v ⊕ [ ix 1 ])) ev₂)
+
+  h₂-no : ∀ P k → (∀ {y n} → enter (SH k (H₁ P)) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
+        → ∀ {p y n} → enter (H₂ P k) p y (out (instEmit (mark laneStart) n)) → ⊥
+  h₂-no P k hn r = hn (proj₁ (proj₁ (proj₂ (hot-out r))))
+
+  -- Where a lane shows its `laneStart`.
+  startAt : Pos → Pos
+  startAt s = Split.E₀ (Frame.V₀ lanePart (H₁ (laneAt s)) (H₂ (laneAt s) lanePart) (Bp (laneAt s)) ⊕ [ ix 1 ])
+
+  bl : burstPart ≡ lanePart → ⊥
+  bl ()
+
+  -- A LANE SHOWS `laneStart` AT ONE PLACE, when its lane part's share shows
+  -- none.
+  start-at : ∀ s → (∀ {y n} → enter (SH lanePart (H₁ (laneAt s))) ((laneAt s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
+           → ∀ {y n} → enter LaneD s y (out (instEmit (mark laneStart) n)) → y ≡ startAt s
+  start-at s hn (TakeWhile.pass r _ _ , _) = part (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
+    where
+      part : ∀ {y n} → (Σ Pos λ kq → Σ Part λ k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
+               × enter (Sv k) (kq ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) × (kq ⊕ [ ix 1 ]) ≺ y) → y ≡ startAt s
+      part (_ , _ , (at-out , _) , svr , _) = proj₂ (down-start lanePart (laneAt s) svr (h₂-no (laneAt s) lanePart hn))
+      part (_ , _ , (on-out at-out , _) , svr , _) = ⊥-elim (bl (proj₁ (down-start burstPart _ svr (h₂-no _ burstPart (sh-b _ _)))))
+      part (_ , _ , (on-out (on-out ()) , _) , _ , _)
+  start-at s hn (TakeWhile.fail _ () _ _ , _)
+
 
   -- The lane part's split of its first mark, a row of its connect's body.
   module Up (P : Pos) where
@@ -439,8 +532,20 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
       emp (just _) (() , _)
   ... | _ , _ , _ , _ , (on-out (on-out ()) , _) , _ , _
 
+  pc0-b : ∀ m (h : Den ⊤) (h′ : Den (IE B)) s {y n} → enter (ev m (piece {B = B} burstPart 0) (h′ ∷ h ∷ ρ)) s y (out (instEmit (mark laneStart) n)) → ⊥
+  pc0-b nothing  h h′ s (r , _) with of-one s _ r
+  ... | _ , ()
+  pc0-b (just _) h h′ s (r , _) with of-one s _ r
+  ... | _ , ()
+
+  pc2-l : ∀ m (h : Den ⊤) (h′ : Den (IE B)) s {y n} → enter (ev m (piece {B = B} lanePart 2) (h′ ∷ h ∷ ρ)) s y (out (instEmit (mark laneStart) n)) → ⊥
+  pc2-l nothing  h h′ s (r , _) with of-one s _ r
+  ... | _ , ()
+  pc2-l (just _) h h′ s (r , _) with of-one s _ r
+  ... | _ , ()
+
   module C (m : Maybe ℕ) = Core (λ k (h : Den ⊤) → ev m (Sh k) (h ∷ ρ)) (λ k j (h : Den ⊤) (h′ : Den (IE B)) → ev m (piece k j) (h′ ∷ h ∷ ρ))
-    (pc0 m) (pc0-at m) (pc1 m) (pc2 m) (sh-b m)
+    (pc0 m) (pc0-at m) (pc1 m) (pc2 m) (sh-b m) (pc0-b m) (pc2-l m)
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
@@ -448,3 +553,10 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
               → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
   lane-starts nothing  s r = C.core nothing s r
   lane-starts (just n) s r = C.core (just n) s r
+
+  -- A LANE SHOWS `laneStart` AT ONE PLACE, when its lane part's share shows
+  -- none.
+  lane-start-at : ∀ m s → (∀ {y n} → enter (ev m (Sh lanePart) (hot (Proper (enter (ev m empty ρ) (laneAt s ⊕ [ ix 1 ]))) ∷ ρ)) ((laneAt s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
+                → ∀ {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark laneStart) n)) → y ≡ C.startAt m s
+  lane-start-at nothing  s hn r = C.start-at nothing s hn r
+  lane-start-at (just n) s hn r = C.start-at (just n) s hn r

@@ -281,10 +281,9 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 
 The scan's `active` and `queue` count the real flatMap's lanes
 (`LaneCount`). Open: an immediate lane's `laneStart` reaches the source
-before the closer's `outerDone` (truncation through the lane's layers),
-and a lane starts once.
+before the closer's `outerDone` (truncation through the lane's layers).
 
-Members: `start-met`, `start-once`.
+Members: `start-met`.
 
 #### THE BATCH RANK
 

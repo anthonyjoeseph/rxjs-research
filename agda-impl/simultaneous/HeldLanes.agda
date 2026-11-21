@@ -86,6 +86,9 @@ open import Data.List.Relation.Unary.Any using (Any)
 open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁺ʳ to any-++ʳ)
 open import Data.List.Membership.Propositional using (find)
 open import Tree using (mergeᶠ; exhaustᶠ)
+open import simultaneous.LaneOnce using (module LaneOnce)
+open import denotation.Laws using (good-cons)
+open import simultaneous.HeldConnect using (early-inst)
 
 -- A LANE'S TAKE ENDS BESIDE ITS FAILING VALUE: the take's `ix 0` row of a
 -- failing value at `w` has the take's end at `w`'s `last`.
@@ -478,12 +481,16 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   open-one (_ , r , _ , _ , refl , refl) (_ , r′ , _ , _ , refl , e) with ⊕-injˡ r r′ (cong proj₁ e)
   ... | refl = refl
 
-  postulate
-    -- A LANE STARTS ONCE: read in one subscription (`lane-at₂`), its
-    -- `laneStart` is the frame's first piece's mark, and the content below
-    -- routes no lane mark.
-    start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
-               → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
+  private
+    module LO = LaneOnce m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) cs
+                  (λ a L q okq eq → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                      (good-cons L g₂) eh q okq eq)
+
+  -- A LANE STARTS ONCE.
+  start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+             → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
+  start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q
