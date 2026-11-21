@@ -75,7 +75,7 @@ import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; triⁱ)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
 open import Data.Bool using (true; false; _∧_)
@@ -656,13 +656,51 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   postulate
     -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
-    -- SOURCE ENDS IN ITS INSTANT: the scan counts every lane rxjs started
-    -- and has not ended, and every outer value a bounded merge holds, so
-    -- the lanes have ended, the closer ends past its mark, and the
-    -- source's last item follows them.
-    idle-ends : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-              → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-              → Σ Pos λ c → M c end × instantOf c ≡ instantOf z
+    -- LANES HAVE ENDED BY ITS INSTANT: the scan counts every lane rxjs
+    -- started and has not ended, and every outer value a bounded merge
+    -- holds, and every outer value lies before the mark.
+    lanes-ended : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+                → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+                → Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
+
+    -- THE CLOSER ENDS IN ITS `outerDone`'s INSTANT: the mark is its last
+    -- part's only item.
+    closer-ends : ∀ {k n} → σ₂ k (out (instEmit (mark outerDone) n)) → Σ Pos λ y → σ₂ y end × instantOf y ≡ instantOf k
+
+    -- THE SOURCE ENDS IN ITS LAST BRANCH'S END'S INSTANT: its own
+    -- branches' merge ends at the last of their ends, and the item that
+    -- tells it, which ends the take, follows at once.
+    src-ends : ∀ {y₁ y₂ y₃} → σ₁ y₁ end → σ₂ y₂ end → σ₃ y₃ end
+             → Σ Pos λ c → M c end × ¬ (instantOf c ≺ⁱ instantOf y₁) × ¬ (instantOf c ≺ⁱ instantOf y₂) × ¬ (instantOf c ≺ⁱ instantOf y₃)
+               × (instantOf c ≡ instantOf y₁ ⊎ instantOf c ≡ instantOf y₂ ⊎ instantOf c ≡ instantOf y₃)
+
+  -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
+  -- SOURCE ENDS IN ITS INSTANT: the outer has ended under the mark, the
+  -- closer ends in its instant, and the lanes by it.
+  idle-ends : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+            → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+            → Σ Pos λ c → M c end × instantOf c ≡ instantOf z
+  idle-ends r₁ {z} mt a0 q0 with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
+  ... | y₂′ , w′ , σd , refl with CD.done-under (proj₁ σd) | closer-ends σd | lanes-ended r₁ mt a0 q0
+  ...   | y₁ , e₁ , (ws , refl) | y₂ , e₂ , i₂ | y₃ , e₃ , i₃ with src-ends e₁ e₂ e₃
+  ...     | c , mc , _ , ¬c₂ , _ , which = c , mc , pick which
+    where
+      iz : instantOf (y₂′ ⊕ [ sub w′ ]) ≡ instantOf y₂′
+      iz = inst-⊕ y₂′ [ sub w′ ]
+
+      i₁ : instantOf y₁ ≡ instantOf (y₂′ ⊕ [ sub w′ ])
+      i₁ = trans (sym (inst-⊕ y₁ ws)) (sym iz)
+
+      i₂′ : instantOf y₂ ≡ instantOf (y₂′ ⊕ [ sub w′ ])
+      i₂′ = trans i₂ (sym iz)
+
+      pick : instantOf c ≡ instantOf y₁ ⊎ instantOf c ≡ instantOf y₂ ⊎ instantOf c ≡ instantOf y₃ → instantOf c ≡ instantOf (y₂′ ⊕ [ sub w′ ])
+      pick (inj₁ e) = trans e i₁
+      pick (inj₂ (inj₁ e)) = trans e i₂′
+      pick (inj₂ (inj₂ e)) with triⁱ (instantOf c) (instantOf (y₂′ ⊕ [ sub w′ ]))
+      ... | inj₁ lt = ⊥-elim (¬c₂ (subst (instantOf c ≺ⁱ_) (sym i₂′) lt))
+      ... | inj₂ (inj₁ e′) = e′
+      ... | inj₂ (inj₂ gt) = ⊥-elim (i₃ (subst (instantOf (y₂′ ⊕ [ sub w′ ]) ≺ⁱ_) e gt))
 
   -- EVERY OUTER ROW THE SOURCE MEETS LIES BEFORE THE CLOSER'S `outerDone`.
   outer-before-done : ∀ {k v z n} → M k (out (just (inj₁ (outerB , v)))) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
