@@ -63,13 +63,13 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 data ColdRow {A : Set} (p : Pos) : Pos → Ev (IE A) → Set where
   now-value  : ∀ zs {a} → ColdRow p (p ⊕ zs) (out (instEmit (value a) root))
   now-end    : ∀ zs → ColdRow p (p ⊕ zs) end
-  step-begin : ∀ {t e l} → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
+  step-begin : ∀ {t e l} → Fresh p (cascade t e l) → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
                                      (out (instEmit (mark begin) (nm (cascade t e l ∙ []))))
-  step-value : ∀ {t e i a} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
+  step-value : ∀ {t e i a} → Fresh p (cascade t e (ix i)) → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
                                        (out (instEmit (value a) (nm (cascade t e (ix i) ∙ []))))
-  step-over  : ∀ {t e i} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
+  step-over  : ∀ {t e i} → Fresh p (cascade t e (ix i)) → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
                                      (out (instEmit (mark over) (nm (cascade t e (ix i) ∙ []))))
-  step-end   : ∀ {t e} → ColdRow p (cascade t e last ∙ (ix 1 ∷ last ∷ [])) end
+  step-end   : ∀ {t e} → Fresh p (cascade t e last) → ColdRow p (cascade t e last ∙ (ix 1 ∷ last ∷ [])) end
 
 ------------------------------------------------------------------------
 -- A cold leaf's stream: one end, after every other row
@@ -447,12 +447,12 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     now-e (zs , refl) = now-end zs
 
     lo-v : ∀ {q₀ a k v} → ValAt q₀ a → VRow a (q₀ ⊕ [ ix 1 ]) k v → ColdRow p k (out v)
-    lo-v (_ , _ , _ , refl , _ , _) v-begin = step-begin
-    lo-v (_ , _ , _ , refl , _ , _) v-value = step-value
-    lo-v (_ , _ , _ , refl , _ , _) v-over  = step-over
+    lo-v (_ , _ , _ , refl , _ , f) v-begin = step-begin f
+    lo-v (_ , _ , _ , refl , _ , f) v-value = step-value f
+    lo-v (_ , _ , _ , refl , _ , f) v-over  = step-over f
 
     lo-c : ∀ {q₀} → CdAt q₀ → ColdRow {A} p ((q₀ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (instEmit (mark begin) (q₀ ⊕ [ ix 1 ])))
-    lo-c (_ , _ , f-end _ , refl) = step-begin
+    lo-c (_ , _ , f-end f , refl) = step-begin (fresh-⊑ pS f)
 
     lo : ∀ x₀ {q₀ k v} → Acc p q₀ x₀ → ROut x₀ (q₀ ⊕ [ ix 1 ]) k v → ColdRow p k (out v)
     lo (false , val a) {q₀} ac (refl , refl) =
@@ -499,21 +499,22 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     early-r : ∀ {q₀ w} → (p ⊕ [ ix 0 ]) ⊑ q₀ → p ⊑ ((q₀ ⊕ [ ix 1 ]) ⊕ w)
     early-r {q₀} {w} u = ⊑-trans (⊑-trans ([ ix 0 ] , refl) u) ((ix 1 ∷ w) , ⊕-assoc q₀ [ ix 1 ] w)
 
-    le-x : ∀ x₀ {q₀ w} → Acc p q₀ x₀ → Merge.Done R (Sc p) ((q₀ ⊕ [ ix 1 ]) ⊕ w) → ColdRow {A} p ((q₀ ⊕ [ ix 1 ]) ⊕ w) end
-    le-x (false , val a) {q₀} {w} ac dn = now-e (early-r {q₀} {w} (read-early ac (λ ()) tt))
-    le-x (false , cdone) {q₀} {w} ac dn = now-e (early-r {q₀} {w} (read-early ac (λ ()) tt))
-    le-x (false , tick)  {q₀} {w} ac dn = now-e (tick-r {q₀} {false} {w} ac)
-    le-x (true , tick)   {q₀} {w} ac dn = now-e (tick-r {q₀} {true} {w} ac)
-    le-x (true , val a)  ac dn = ⊥-elim (val-end (val-row ac) (over-end dn))
-    le-x (true , cdone)  ac dn = ⊥-elim (cd-end (cd-row ac) (over-end dn))
+    le-u : ∀ x₀ {q₀ w} → Acc p q₀ x₀ → Merge.Done R (Sc p) ((q₀ ⊕ [ ix 1 ]) ⊕ w) → p ⊑ ((q₀ ⊕ [ ix 1 ]) ⊕ w)
+    le-u (false , val a) {q₀} {w} ac dn = early-r {q₀} {w} (read-early ac (λ ()) tt)
+    le-u (false , cdone) {q₀} {w} ac dn = early-r {q₀} {w} (read-early ac (λ ()) tt)
+    le-u (false , tick)  {q₀} {w} ac dn = tick-r {q₀} {false} {w} ac
+    le-u (true , tick)   {q₀} {w} ac dn = tick-r {q₀} {true} {w} ac
+    le-u (true , val a)  ac dn = ⊥-elim (val-end (val-row ac) (over-end dn))
+    le-u (true , cdone)  ac dn = ⊥-elim (cd-end (cd-row ac) (over-end dn))
 
-    lane-end : ∀ {q₀ x₀ c} → Acc p q₀ x₀ → enter (R x₀) (q₀ ⊕ [ ix 1 ]) c end → Merge.Done R (Sc p) c → ColdRow {A} p c end
+    -- A render's end ends the whole only under the subscription.
+    lane-end : ∀ {q₀ x₀ c} → Acc p q₀ x₀ → enter (R x₀) (q₀ ⊕ [ ix 1 ]) c end → Merge.Done R (Sc p) c → p ⊑ c
     lane-end {q₀} {x₀} ac l dn with r-in x₀ (q₀ ⊕ [ ix 1 ]) l
-    ... | w , _ , refl = le-x x₀ {q₀} {w} ac dn
+    ... | w , _ , refl = le-u x₀ {q₀} {w} ac dn
 
     top-end : ∀ {c} → MgEnd c → ColdRow {A} p c end
     top-end (inj₁ u)                        = now-e u
-    top-end (inj₂ (_ , _ , f-end _ , refl)) = step-end
+    top-end (inj₂ (_ , _ , f-end f , refl)) = step-end (fresh-⊑ pS f)
 
     -- EACH ROW SHOWN.
     top-row : ∀ {y e} → Merge.JoinT R (Sc p) y e → Visible e → ColdRow p y e
@@ -522,7 +523,7 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     top-row (Joining.lane {e = pin _} _ _ _ _ _) ()
     top-row (Joining.lane {e = end} _ _ _ _ ())  _
     top-row (Joining.oend (Scan.send x , _) _) _ = top-end (mg-end (proj₁ x))
-    top-row (Joining.lend (Scan.sval ac , _) _ (l , _) _ _ dn) _ = lane-end ac l dn
+    top-row (Joining.lend (Scan.sval ac , _) _ (l , _) _ _ dn) _ = now-e (lane-end ac l dn)
     top-row (Joining.val _)              ()
     top-row (Joining.step _)             ()
     top-row (Joining.opin _)             ()

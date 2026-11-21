@@ -206,26 +206,26 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
 
   named : ∀ {y n} → t y (out (instEmit (mark begin) n)) → n ≡ nameOf y
   named x with row x tt
-  ... | step-begin = refl
+  ... | step-begin _ = refl
 
   routing : ∀ {y m n} → t y (out (instEmit (mark m) n)) → Routing m
   routing x with row x tt
-  ... | step-begin = r-begin
-  ... | step-over  = r-over
+  ... | step-begin _ = r-begin
+  ... | step-over _  = r-over
 
   early : Early p → ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
   early ep x with row x tt
   ... | now-value zs = early-inst zs ep
-  ... | step-value {t} {e} {i} = λ _ → same-≺ (cascade t e (ix i)) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []) tt , λ { (_ , ()) }
+  ... | step-value {t} {e} {i} _ = λ _ → same-≺ (cascade t e (ix i)) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []) tt , λ { (_ , ()) }
 
   ends : Early p → ∀ {y} → t y end → Early y
   ends ep x with row x tt
   ... | now-end zs = early-inst zs ep
-  ... | step-end   = λ ()
+  ... | step-end _   = λ ()
 
   late : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
   late x with row x tt
-  ... | step-over = valued , [] , refl
+  ... | step-over _ = valued , [] , refl
 
   no-stop : ∀ {y n} → t y (out (instEmit (mark stop) n)) → ⊥
   no-stop x with row x tt
