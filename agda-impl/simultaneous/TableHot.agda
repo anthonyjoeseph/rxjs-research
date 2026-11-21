@@ -49,9 +49,10 @@ open import simultaneous.TableKit using (Rows; TR; Got)
 open import simultaneous.Horizon using (Tag; module Cuts; module RejoinB; bounded-≃; module ConnBd)
 open import simultaneous.HorizonJoin using (module JoinBd)
 open import simultaneous.HorizonCorr using (module Inter; Own; OwnPut)
+open import denotation.Up using (up; up-⊕)
 open import simultaneous.TableEnv
   using (Ren; HotMap; hotMap; π; relMap; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok;
-  up; up-⊕; _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
+  _⊕ˡ_; ⊑-⊕ˡ; Linked; Cut; at-frame; at-step; Lvl; cut; Alike; Aligned; Off; shownᵇ; Maps; Rest; Out; out; SameBd; same-bd; HotD; hbd; HotR; EnvR; maps; lw; lw*; unended; den;
   Admits; HotsAll; den-ex; den-cons; dbd; tab-func; tab-flat; EnvCut)
 open import simultaneous.TreeBounded using (listHot; tree-bounded; admits-body; listHot-u)
 open import simultaneous.HorizonTree using (bd; _∷ᵇ_; BdEnv)

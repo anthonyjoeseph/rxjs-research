@@ -55,8 +55,9 @@ open import simultaneous.CutParts using (conn-tr→; conn-tr←)
 open import simultaneous.HorizonTree using (bd; BdEnv)
 open import simultaneous.HorizonConn using (Mark; module ConnPair)
 open import simultaneous.HorizonCorr using (module Inter; module Sub; Own; OwnPut; Btw; PB; PA)
+open import denotation.Up using (up)
 open import simultaneous.TableEnv
-  using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; up; Linked; Cut; cut-sub;
+  using (Ren; ψ; π; Tab; Tab*; got-ok; pin-ok; after-ok; pin-after-ok; Linked; Cut; cut-sub;
   shownᵇ; Alike; alike; cut; cut-put; alike-l; alike-r; linked-l; linked-r; Maps; Aligned;
   aligned-⊕; Rest; Out; out; SameBd; sameBd; same-bd; HotR; EnvR; envR; EnvEq; maps; lw; lw*;
   hot; hot-coh; EnvCut; Full; Coh; Admits; DenOf; dbd; admits-step; admits-wk; tab-func;

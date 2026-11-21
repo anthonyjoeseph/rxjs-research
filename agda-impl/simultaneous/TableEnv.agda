@@ -36,11 +36,11 @@ open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (_⇔_; Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; connected)
-open import denotation.Position using (Pos; Label; _∙_; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; _⊕_; frame; cascade; inside; ix)
 open import denotation.Events using (Timeline; fresh; <ᵖ-split)
 open import denotation.EmissionSet using (EmissionSet; Ev; Unpinned; _≺_; _≼_; pin; out; DenEnv; enter)
 import denotation.EmissionSet as ES
