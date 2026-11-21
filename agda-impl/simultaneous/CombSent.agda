@@ -40,7 +40,7 @@ open import simultaneous.InstEmit using (instEmit; value; mark; outerClose; oute
 open import Data.List.Relation.Unary.All using (lookup; _∷_)
 import Data.List.Relation.Unary.All as All
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked; each; AIE; trackers) renaming (past to routes-past)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked; each; AIE; trackers; opening) renaming (past to routes-past)
 
 -- A takeWhile that never includes its failure keeps a value where it was.
 take-at : ∀ {X} (keep : X → Bool) (d : Den X) p {k y} → enter (Op.takeWhile false keep d) p k (out y) → enter d p k (out y)
@@ -140,6 +140,10 @@ module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env 
   tag-op : ∀ m → ev m (Tag laneB) env ≡ Op.map (λ e → just (inj₁ (laneB , e))) (lookup env (here refl))
   tag-op nothing  = refl
   tag-op (just n) = refl
+
+  tag-outer : ∀ m → ev m (Tag outerB) env ≡ Op.map (λ e → just (inj₁ (outerB , e))) (Op.map opening (lookup env (there (there (here refl)))))
+  tag-outer nothing  = refl
+  tag-outer (just n) = refl
 
   -- The trackers send no branch's row.
   no-track : ∀ m {s k x} → enter (ev m (fed tk true) env) s k (out (just (inj₁ x))) → ⊥

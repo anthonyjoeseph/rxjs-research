@@ -48,7 +48,8 @@ open import simultaneous.InstEmit using (begin)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 open import simultaneous.FlatPark using (past-park)
-open import simultaneous.LaneSplit using (SrcOf; Ln; module LaneSplit; module Spots)
+open import simultaneous.BranchSplit using (SrcOf; BView; isB; notB; bview)
+open import simultaneous.LaneSplit using (Ln; lane-proj; module LaneSplit)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (sk-of; module Take)
 open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-down; sk-trunc)
@@ -60,7 +61,7 @@ open import simultaneous.HeldBase using (Bound)
 open import denotation.Laws.Worlds using (⊑-snoc; ⊕-identityʳ)
 open import denotation.Events using (<ᵖ-between)
 open import denotation.Laws.Modulus using (≺-irrefl)
-open import simultaneous.FlatLanes using (laneTag; end-last; past-lanes; lanes-of; lanes₀)
+open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl)
 open import denotation.Up using (up; up-⊕)
 open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws.Modulus using (≺-ext)
@@ -334,8 +335,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       src-func lanes-past
 
   -- The lanes' rows a run of the source met are a run of the lanes.
-  lane-run : ∀ {rx} → Met M rx → LS.Lanes nothing nothing rx
-  lane-run {rx} mt = LS.lane-run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+  lane-run : ∀ {rx} → Met M rx → LS.Runs nothing nothing rx
+  lane-run {rx} mt = LS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
 
   -- A position of the source's next row's instant that the lanes' next
   -- value lies no earlier than, nor their end unless no value follows it.
@@ -348,8 +349,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- Each level the source's reader of the lanes passes through shows its hangs.
   private
     S₂ s₃ : Pos
-    S₂ = Spots.S₂ P
-    s₃ = Spots.s₃ P
+    S₂ = LS.S₂
+    s₃ = LS.s₃
 
     module FM2 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ b → ev m (fed tk b) env′) (of-inv _)
       (λ b → inv-ev m (fed tk b) env′ g₃) P ok₃ (sk-of _ P) (λ b s oks → shows-k (shows-ev m (fed tk b) env′ g₃ s oks))
@@ -371,19 +372,19 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
         dn {q} {k = k} (_ , pr) x kq ¬s = ¬s (_ , x , λ {c} xc → ≺→≼ {k} {c} (≺-≼-≺ {k} {q} {c} kq (pr xc)))
 
   -- A LANE ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
-  lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub (Spots.J P) ]) ≼ q
-             → ¬ ¬ Σ Pos λ z → Σ (Ev (Maybe (Input B))) λ e″ → LS.M′ z e″ × Step (y ⊕ [ sub (Spots.J P) ]) z × z ≼ q
-               × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub (Spots.J P) ] × e″ ≡ out (Ln x))
-  lane-shown ry mq = LS.Shown.shown′ sh-σ₃ (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
-    (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq ry
+  lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub LS.J ]) ≼ q
+             → ¬ ¬ Σ Pos λ z → Σ (Ev (Maybe (Input B))) λ e″ → LS.M′ z e″ × Step (y ⊕ [ sub LS.J ]) z × z ≼ q
+               × (∀ {x} → e ≡ out x → z ≡ y ⊕ [ sub LS.J ] × e″ ≡ out (Ln x))
+  lane-shown ry mq = LS.Rows.Shown.shown′ LS.dpast (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
+    (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq (LS.dshow sh-σ₃) ry
 
   -- NO SOURCE VALUE LIES UNDER A LANE'S ROW before where the source's
   -- reader joins it: a lane's value lies one `sub J` below its own row,
   -- and the rest one `sub` below a hot no lane row lies over.
-  lane-under : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → y ≺ q → (y ⊕ [ sub (Spots.J P) ]) ≼ q
+  lane-under : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → y ≺ q → (y ⊕ [ sub LS.J ]) ≼ q
   lane-under {y} {e} {q} {a} ry mq yq qJ = go a mq yq qJ
     where
-      J = Spots.J P
+      J = LS.J
       I = inv-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
       ⊑q : ∀ {q′} → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → y ⊑ q′
       ⊑q {q′} lt lt′ = <ᵖ-between y q′ [ sub J ] (Equivalence.to T-≡ lt) (Equivalence.to T-≡ lt′)
@@ -402,7 +403,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
       ... | _ , _ , σc , eq = apart (inj₁ (_ , σc)) eq lt lt′
       go (just (inj₁ (laneB , x))) r lt lt′ with LS.split r
-      ... | y′ , refl , ry′ , _ , _ with ⊑-snoc y′ (⊑q lt lt′)
+      ... | _ , refl , y′ , refl , ry′ , _ with ⊑-snoc y′ (⊑q lt lt′)
       ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
       ...   | inj₁ ([] , refl) = ≺-irrefl {(y ⊕ []) ⊕ [ sub J ]} (subst (λ z → ((y ⊕ []) ⊕ [ sub J ]) ≺ (z ⊕ [ sub J ])) (sym (⊕-identityʳ y)) lt′)
       ...   | inj₁ (l ∷ ws , refl) = Lawful.flat L₃ ry ry′
@@ -431,7 +432,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
            → Few σ₃ q × After cσ q × (∀ {y x} → σ₃ y (out x) → After cσ y → q ≼ y)
   lane-gap {cM} {cσ} {q} {a} iv ((((mq , _) , ks , h) , _ , aft , lst) Run.∷ _) nl = few , af cσ iv aft , least
     where
-      J = Spots.J P
+      J = LS.J
       ks′ : List Pos
       ks′ = up q ∷ up (up q) ∷ L.map up ks ++ L.map (λ x → up (up x)) ks
       few : Few σ₃ q
@@ -474,26 +475,27 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | false = inj₁ λ ()
 
   -- Where it is a lane's, the lanes' row it shows.
-  next-at : ∀ rx₁ {q a rx₂} → LS.Lanes nothing nothing rx₁
-          → Run LS.M′ (cursor nothing rx₁) ((q , out a) ∷ rx₂) → LS.LView (out a) → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
-  next-at rx₁ (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (LS.isLane x) with LS.next-lane iv (proj₁ (proj₁ sn)) lst
-  ... | y , refl , _ , seen , af , least =
-    rs , pr , mr , y , cong nm (sym (rootOf-ext y [ sub (Spots.J P) ])) , proj₂ seen , af ,
+  next-at : ∀ rx₁ {q a rx₂} → LS.Runs nothing nothing rx₁
+          → Run LS.M′ (cursor nothing rx₁) ((q , out a) ∷ rx₂) → BView laneB (out a) → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × LaneNext rs q
+  next-at rx₁ (rs , pr , mr , iv) ((sn , _ , lst) Run.∷ _) (isB x) with LS.next iv (proj₁ (proj₁ sn)) lst
+  ... | y , _ , refl , refl , seen , af , least =
+    rs , pr , mr , y , cong nm (sym (rootOf-ext y [ sub LS.J ])) , proj₂ seen , af ,
     (λ ry ay → least ry tt ay) , (λ ry ay → inj₁ (least ry tt ay))
-  next-at rx₁ {q} (rs , pr , mr , iv) rn (LS.notLane nl) with lane-gap iv rn nl
+  next-at rx₁ {q} (rs , pr , mr , iv) rn (notB nl) with lane-gap iv rn nl
   ... | fw , af , outl = rs , pr , mr , q , refl , fw , af , outl , end-gap {c = cursor nothing rs} outl
 
-  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Σ _ λ rs → Proj laneTag rx₁ rs × Met σ₃ rs × LaneNext rs q
+  lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × LaneNext rs q
   lane-next rx₁ {q} {a} {rx₂} mt = next-at rx₁ (lane-run (run-prefix rx₁ mt))
-    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (LS.lview (out a))
+    (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview laneB (out a))
 
   -- The lanes' counter is none, or of the name the lanes last began,
   -- with a route of it open.
-  lanes-count : ∀ {rx rs} → Met M rx → Proj laneTag rx rs
+  lanes-count : ∀ {rx rs} → Met M rx → BProj laneB (λ x → x) LS.J rx rs
               → Flat.lanes (proj₁ (past op init rx)) ≡ 0
               ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
   lanes-count {rx} {rs} mt pr =
-    lanes-of (past-lanes op init r₀ rx rs (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (lanes₀ {B} r₀))
+    within-of (past-within {B} {B} cl (λ x → x) (λ _ _ → refl) LS.J op init r₀ rx rs
+      (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (within₀ {B} laneB r₀))
 
   -- With a route open, the lanes' next visible row lies past `w`.
   idle-least : ∀ {rs : List (Pos × Ev (IE B))} {w} → (∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥)
@@ -506,9 +508,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₂ all = ⊥-elim (shut ry ay all)
 
   -- Where the lanes still count a route, no lane end is next.
-  lane-shut : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
+  lane-shut : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
             → ∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥
-  lane-shut rx₁ mt pr nz ry ay all = nz (lane-end-shut rx₁ mt pr ry ay all)
+  lane-shut rx₁ mt pr nz ry ay all = nz (lane-end-shut rx₁ mt (lane-proj pr) ry ay all)
 
   lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
@@ -518,7 +520,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ...   | inj₂ (at≡ , _) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
   ...     | Nl.yes z = inj₁ z
   ...     | Nl.no nz =
-    inj₂ (trans at≡ (trans (lane-idle rx₁ mt pr nz fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) nw))
+    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) nw))
 
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
