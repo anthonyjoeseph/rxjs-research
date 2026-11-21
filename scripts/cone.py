@@ -65,7 +65,9 @@ def imports_of(visible):
             for item in um.group(1).split(";"):
                 item = item.strip()
                 if item.startswith("module "):
-                    item = item[len("module "):].strip()
+                    # an `open` of the module reaches every name it holds
+                    names = None
+                    break
                 if item:
                     names.add(item)
             out.append((mod, names))
