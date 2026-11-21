@@ -48,6 +48,7 @@ open import simultaneous.HeldTo using (HeldTo; IdleTo)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.HeldClose using (end?)
 open import simultaneous.HeldTrigger using (module Two)
+open import simultaneous.CombSent using (of-two)
 open import simultaneous.Layers using (module LoneLayer; after-≺; run-row)
 open import simultaneous.Project using (run-prefix)
 
@@ -69,7 +70,7 @@ module Beside {A : Set} (s : Obs Timeline [] (IE A))
   mkS = marked subscribed
 
   open LoneLayer (completing s) mkS using (F; undone; lone-endless)
-  open Two root using (q₀; q₁; e₁; O; o-out; o-end; o-skip; o-pin; o₀)
+  open Two root using (q₀; q₁; e₁; O; o-end; o-skip; o-pin; o₀)
   open Merge F O
 
   C R : EmissionSet (IE A)
@@ -124,7 +125,7 @@ module Beside {A : Set} (s : Obs Timeline [] (IE A))
     sk    : k ≡ m₂ → Row k skip
 
   classify : ∀ {k e} → JoinT k e → Row k e
-  classify (val x) with o-out x
+  classify (val x) with of-two root x
   ... | inj₁ (refl , _) = outer (here refl)
   ... | inj₂ (refl , _) = outer (there (here refl))
   classify (step x)   = ⊥-elim (o-skip x)
@@ -132,17 +133,17 @@ module Beside {A : Set} (s : Obs Timeline [] (IE A))
   classify (oend _ d) = ⊥-elim (undone d)
   classify (opass x _) with o-end x
   ... | refl = outer (there (there (here refl)))
-  classify (lane x _ L _ w) with o-out x
+  classify (lane x _ L _ w) with of-two root x
   ... | inj₁ (refl , refl) = src (proj₁ L) λ { refl → w }
   ... | inj₂ (refl , refl) with lone-row (proj₁ L)
   ...   | inj₁ (refl , refl) = mk refl
   ...   | inj₂ (refl , refl) = sk refl
   classify (lend _ _ _ _ _ d) = ⊥-elim (undone d)
-  classify (lpass x _ L _ _ _) with o-out x
+  classify (lpass x _ L _ _ _) with of-two root x
   ... | inj₁ (refl , refl) = fin (proj₁ L)
   ... | inj₂ (refl , refl) = ⊥-elim (lone-endless (proj₁ L))
   classify (hand _ _ _ _ ())
-  classify (left x _ L _ _) with o-out x
+  classify (left x _ L _ _) with of-two root x
   ... | inj₁ (refl , refl) = src (proj₁ L) λ ()
   ... | inj₂ (refl , refl) with lone-row (proj₁ L)
   ...   | inj₁ (_ , ())

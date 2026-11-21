@@ -41,7 +41,7 @@ open import simultaneous.Relabel using (held-same)
 open import simultaneous.HeldConnect using (early-inst; held-ex; same-refl; rows-refl)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.CombSent using (assoc³)
+open import simultaneous.CombSent using (assoc³; of-two)
 open import simultaneous.LaneLocal using (inv-ev)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; srcLane)
@@ -167,11 +167,7 @@ module Two (P : Pos) where
   q₀e₁ : q₀ ≺ e₁
   q₀e₁ = ≺-part P [] [] refl
 
-  -- The outer's rows: two values and the end.
-  o-out : ∀ {q a} → O q (out a) → (q ≡ q₀ × a ≡ true) ⊎ (q ≡ q₁ × a ≡ false)
-  o-out (at-out , _)        = inj₁ (refl , refl)
-  o-out (on-out at-out , _) = inj₂ (refl , refl)
-  o-out (on-out (on-out ()) , _)
+  -- The outer's end.
 
   o-end : ∀ {c} → O c end → c ≡ e₁
   o-end (on-out (on-out at-end) , _) = refl
@@ -195,7 +191,7 @@ module Two (P : Pos) where
   nth₀ = first o₀ least
     where
       least : ∀ {k b} → O k (out b) → q₀ ≼ k
-      least x with o-out x
+      least x with of-two P x
       ... | inj₁ (refl , _) = ≼-refl {q₀}
       ... | inj₂ (refl , _) = ≺⇒≼ {q₀} {q₁} q₀q₁
 
@@ -203,23 +199,23 @@ module Two (P : Pos) where
   nth₁ = next nth₀ o₁ q₀q₁ nx
     where
       nx : Next q₀ q₁
-      nx x lt with o-out x
+      nx x lt with of-two P x
       ... | inj₁ (refl , _) = ⊥-elim (≺-irrefl {q₀} lt)
       ... | inj₂ (refl , _) = ≼-refl {q₁}
 
   nth-0 : ∀ {q a} → Nth 0 q a → q ≡ q₀ × a ≡ true
-  nth-0 (first x least) with o-out x
+  nth-0 (first x least) with of-two P x
   ... | inj₁ e = e
   ... | inj₂ (refl , _) = ⊥-elim (least o₀ q₀q₁)
 
   nth-1 : ∀ {q a} → Nth 1 q a → q ≡ q₁ × a ≡ false
-  nth-1 (next N x lt _) with nth-0 N | o-out x
+  nth-1 (next N x lt _) with nth-0 N | of-two P x
   ... | refl , _ | inj₁ (refl , _) = ⊥-elim (≺-irrefl {q₀} lt)
   ... | refl , _ | inj₂ e = e
 
   nth-2 : ∀ {i q a} → Nth (suc (suc i)) q a → ⊥
   nth-2 {suc i} (next N _ _ _) = nth-2 N
-  nth-2 {zero} (next N x lt _) with nth-1 N | o-out x
+  nth-2 {zero} (next N x lt _) with nth-1 N | of-two P x
   ... | refl , _ | inj₁ (refl , _) = ≺-absurd {q₀} {q₁} q₀q₁ lt
   ... | refl , _ | inj₂ (refl , _) = ≺-irrefl {q₁} lt
 
@@ -303,7 +299,7 @@ module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true
   done {c} y = (e₁ , oe , ≺⇒≼ {e₁} {c} (≺-trans {e₁} {s₁} {c} (≺-trans {e₁} {cb} {s₁} e₁≺cb cbs₁) (after y))) , lanes
     where
       lanes : ∀ {q a} → O q (out a) → Bd.Indexed q → q ≺ c → (⊥ → ⊥) → Ended (Bd.Lane q a) c
-      lanes x _ _ _ with o-out x
+      lanes x _ _ _ with of-two P x
       ... | inj₁ (refl , refl) = cb , (0 , sb , (nth₀ , Bd.room (s≤s z≤n)) , (bk-has , sb≺cb)) , ≺⇒≼ {cb} {c} (≺-trans {cb} {s₁} {c} cbs₁ (after y))
       ... | inj₂ (refl , refl) = c , lane₁ y , ≼-refl {c}
 
@@ -315,7 +311,7 @@ module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true
 
   -- EVERY ROW OF THE CONCAT is one of finitely many, or the second lane's.
   classify : ∀ {k e′} → Bd.JoinT k e′ → k ∈ base ⊎ Σ (Ev (IE A)) λ e₀ → In k e₀ × (∀ {q e} → Dep q e k e′ → Dep q e k e₀)
-  classify (Bd.val x) with o-out x
+  classify (Bd.val x) with of-two P x
   ... | inj₁ (refl , _) = inj₁ (here refl)
   ... | inj₂ (refl , _) = inj₁ (there (here refl))
   classify (Bd.step x)  = ⊥-elim (o-skip x)

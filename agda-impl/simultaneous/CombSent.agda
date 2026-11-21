@@ -17,7 +17,7 @@ open import Data.Nat using (ℕ; zero; suc; s≤s; z≤n)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 open import Data.Empty using (⊥; ⊥-elim)
@@ -236,6 +236,12 @@ of-at : ∀ {X} p i (xs : List X) {y e} → InE (ofᴱ p i xs) y e → Σ Label 
 of-at p i xs x with of-idx p i xs x
 ... | inj₁ (j , _ , eq) = ix j , eq
 ... | inj₂ eq           = last , eq
+
+-- The two-valued `of`'s values.
+of-two : ∀ P {q a} → enter (Op.of (true ∷ false ∷ [])) P q (out a) → (q ≡ P ⊕ [ ix 0 ] × a ≡ true) ⊎ (q ≡ P ⊕ [ ix 1 ] × a ≡ false)
+of-two P (at-out , _)        = inj₁ (refl , refl)
+of-two P (on-out at-out , _) = inj₂ (refl , refl)
+of-two P (on-out (on-out ()) , _)
 
 -- Below its end, a row waits on no more than the end does.
 reach-below : ∀ {X} {t : EmissionSet X} {c k a} → Reach t c end → k ≺ c → Reach t k (out a)
