@@ -45,6 +45,7 @@ open import simultaneous.Relabel using (memAt; cntAt; same-mark)
 open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
 open import simultaneous.HeldTake using (module Holds; Inert; i-done)
 open import simultaneous.HeldTo using (HeldTo)
+open import simultaneous.HeldIn using (held-in)
 open import simultaneous.HeldBeside using (sb₀; beside; module Beside)
 open import simultaneous.HeldConnect using (held-conn; held-ex; module ConnRun; Tracks; rootOf-ext)
 open import simultaneous.HeldDefer using (sync-up)
@@ -184,8 +185,8 @@ module Closing {A : Set} (D : Den (IE A)) {H : Pos → Set} (p : Pos) (I : InvD 
       past CL.t-fin  lt = ≺-trans {cb} {CL.fpos cb} {k} (CL.c≺f cb) lt
 
   -- WHERE THE CLOSED READING EMPTIES, THE SOURCE FINISHES THE INSTANT.
-  tracks : ∀ {cs} → Held S cs → Tracks S CC.C
-  tracks H m z bq = go (CL.shape₀ (CC.back m)) z bq
+  tracks : ∀ {cs} {W : Pos → Set} → Held S cs → Tracks W S CC.C
+  tracks H m _ z bq = go (CL.shape₀ (CC.back m)) z bq
     where
       go : ∀ {rs} → CL.Shape nothing rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
          → Σ (List Pos) λ ks → ∀ {k e} → S k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
@@ -214,7 +215,7 @@ held-closing D p cs I ok sh h = CC.held (HR.held-hot (held-ex ex h))
 held-completing : ∀ {A} (s : Obs Timeline [] (IE A)) p cs → Ok (Hots []ᵉ) p
                 → Held (enter (⟦ s ⟧ []ᵉ) (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
                 → Held (enter (⟦ completing s ⟧ []ᵉ) p) (p ∷ cs)
-held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-closing D p cs Is ok sh h) (Closing.tracks D p Is ok sh h)
+held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-in (held-closing D p cs Is ok sh h)) (Closing.tracks D p Is ok sh h)
   where
     D = ⟦ s ⟧ []ᵉ
     Is = inv-⟦⟧ s []ᵉ (λ ())

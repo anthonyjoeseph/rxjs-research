@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
 open import denotation.Position using (root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; spin)
+open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; spin; Few)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
@@ -59,6 +59,8 @@ open import denotation.Laws.Truthful using (reached)
 open import simultaneous.HeldLim using (module LimHeld)
 open import simultaneous.HeldScanned using (comb-held)
 open import simultaneous.HeldSrc using (module CombSrc)
+open import simultaneous.HeldIn using (HeldIn; held-in)
+open import denotation.Laws.Shows using (few-down)
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
             (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs
@@ -68,9 +70,9 @@ held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ)
             Held (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) ((c ⊕ [ ix 1 ]) ∷ p ∷ cs)
           → Lawful σ₁ → Lawful σ₂ → Lawful σ₃ → Ok (Hots (hot σ₁ ∷ env₀)) p₀ → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) p₀₀
           → Ok (Hots env′) P → Early P
-          → Held scanned (P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs)
+          → HeldIn (Few R) scanned (P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs)
 held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
-  comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))) ok₃
+  comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))) ok₃ (λ kw F → few-down F kw)
     (CombSrc.comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
     (CombSrc.scan-idle m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
     (CombSrc.scan-rest m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
@@ -83,13 +85,13 @@ held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
 held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
   let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real) in
-  conn-ev m empty _ env cs g p ok ep (tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ →
-    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ tracks-trig λ L₁ ok₁ ep₁ →
-      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ tracks-closer λ L₂ ok₂ ep₂ →
+  conn-ev m empty _ env cs g p ok ep (tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
+    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ tracks-trig λ L₁ ok₁ ep₁ → held-in (
+      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ tracks-closer λ L₂ ok₂ ep₂ → held-in (
         conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ tracks-real λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok ep
             (held-trigger m ρ s env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
-            L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+            L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)))
 
 -- A DEFER'S LIMIT KEEPS ITS INSTANTS FINITE: past a zero count, finitely
 -- many rows of the instant last begun.  Each approximant's rest bounds only

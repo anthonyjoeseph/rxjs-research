@@ -49,6 +49,7 @@ open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-
   Valued; opos)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
 open import simultaneous.HeldTo using (Unfailed; HeldTo; held-to)
+open import simultaneous.HeldIn using (++-split)
 open import simultaneous.Layers using (cursor-snoc; after-≺)
 open import simultaneous.TakeKit using (apart; ix<last; module Take) renaming (Run to Shape)
 
@@ -56,16 +57,6 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 
 ------------------------------------------------------------------------
 -- Lists
-
--- Two ways to cut one list.
-++-split : ∀ {B : Set} (xs ys r₁ r₂ : List B) → xs ++ ys ≡ r₁ ++ r₂
-         → (Σ (List B) λ m → r₁ ≡ xs ++ m × ys ≡ m ++ r₂) ⊎ (Σ (List B) λ m → xs ≡ r₁ ++ m × r₂ ≡ m ++ ys)
-++-split []       ys r₁       r₂ eq = inj₁ (r₁ , refl , eq)
-++-split (x ∷ xs) ys []       r₂ eq = inj₂ (x ∷ xs , refl , sym eq)
-++-split (x ∷ xs) ys (z ∷ r₁) r₂ eq with ∷-injective eq
-... | refl , eq′ with ++-split xs ys r₁ r₂ eq′
-...   | inj₁ (m , e₁ , e₂) = inj₁ (m , cong (x ∷_) e₁ , e₂)
-...   | inj₂ (m , e₁ , e₂) = inj₂ (m , cong (x ∷_) e₁ , e₂)
 
 -- The same, about a row: it falls in the second part, or in the first.
 ++-split′ : ∀ {B : Set} (xs ys r₁ : List B) z r₂ → xs ++ ys ≡ r₁ ++ z ∷ r₂
