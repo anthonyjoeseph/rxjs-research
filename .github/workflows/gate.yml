@@ -75,7 +75,7 @@ jobs:
       # invalidates by content, so a stale interface is rechecked, never
       # trusted.  The `agda-interfaces-` prefix is what cache-prune.yml trims.
       - name: Cache Agda interfaces
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agda-impl/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
@@ -100,7 +100,7 @@ jobs:
       # GHC objects for the stdlib's modules dominate the compile; they move
       # only with the toolchain.
       - name: Cache compiled MAlonzo objects
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agda-impl/_cli/MAlonzo
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
@@ -126,7 +126,7 @@ jobs:
 
       - name: Already green for these inputs?
         id: green
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: spec-green
           key: spec-green-${{ steps.inputs.outputs.hash }}
@@ -142,7 +142,7 @@ jobs:
 
       - name: Cache compiled MAlonzo objects
         if: steps.green.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agda-impl/_cli/MAlonzo
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
@@ -161,7 +161,7 @@ jobs:
 
       - name: Save the green marker
         if: steps.green.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: spec-green
           key: spec-green-${{ steps.inputs.outputs.hash }}
@@ -197,7 +197,7 @@ jobs:
         uses: ./.github/actions/agda-toolchain
 
       - name: Cache compiled MAlonzo objects
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: agda-impl/_cli/MAlonzo
           key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
