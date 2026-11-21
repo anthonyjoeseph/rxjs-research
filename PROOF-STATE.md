@@ -280,20 +280,10 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 #### THE REAL FLATMAP'S LANE COUNT
 
 The scan's `active` counts the real flatMap's live lanes (`LaneCount`).
-Open: inside an outer row the source's reading precedes the real
-flatMap's value with no lane row between; the lanes show no `outerOpen`;
-the real flatMap's outer holds each outer value; a lane run and never cut
-started before the closer's `outerDone` (the bounded merge needs `queue`).
+Open: a lane run and never cut started before the closer's `outerDone`
+(the bounded merge needs `queue`).
 
-Members: `lane-in-outer`, `σ₃-open`, `ro-of`, `lane-started`.
-
-#### THE REAL FLATMAP'S OUTER
-
-Untried, mechanical: the real flatMap reads the hot outer's values each
-in a lane of its own, so its outer's values precede its end, which lies
-in the hot outer's end's instant.
-
-Members: `ro-before`, `ro-end`.
+Members: `lane-started`.
 
 #### THE BATCH RANK
 
