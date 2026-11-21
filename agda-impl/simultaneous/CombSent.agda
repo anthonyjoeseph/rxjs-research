@@ -99,6 +99,10 @@ module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env 
   src-op nothing  = refl
   src-op (just n) = refl
 
+  fed-op : ∀ m → ev m Fed env ≡ Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env) (Op.of (true ∷ false ∷ []))
+  fed-op nothing  = refl
+  fed-op (just n) = refl
+
   own-op : ∀ m → ev m (fed tk false) env ≡ Op.flatMap (mergeᶠ (just 1)) (λ c → ev m (Cat-of c) env) (Op.of (true ∷ false ∷ []))
   own-op nothing  = refl
   own-op (just n) = refl

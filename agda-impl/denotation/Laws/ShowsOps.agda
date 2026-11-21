@@ -61,20 +61,23 @@ sk-⊥ p = sk-unpinned Op.⊥ p λ { (spin _ , _) → tt }
 ------------------------------------------------------------------------
 -- One input, its positions kept
 
-sk-map : ∀ {A B n} (f : A → B) (d : Den A) p → ShowsK n (enter d p) → ShowsK n (enter (Op.map f d) p)
-sk-map f d p sk = sk-trunc (sk-same to back sk)
+sk-mapT : ∀ {A B n} (f : A → B) {t : EmissionSet A} → ShowsK n t → ShowsK n (MapT f t)
+sk-mapT f {t} sk = sk-same to back sk
   where
-    to : MapT f (enter d p) ⊆ᵖ enter d p
+    to : MapT f t ⊆ᵖ t
     to (map-out x)  ¬t = ¬t (_ , x)
     to (map-skip x) ¬t = ¬t (_ , x)
     to (map-pin x)  ¬t = ¬t (_ , x)
     to (map-end x)  ¬t = ¬t (_ , x)
 
-    back : enter d p ⊆ᵖ MapT f (enter d p)
+    back : t ⊆ᵖ MapT f t
     back {e = out _} x ¬m = ¬m (_ , map-out x)
     back {e = skip}  x ¬m = ¬m (_ , map-skip x)
     back {e = end}   x ¬m = ¬m (_ , map-end x)
     back {e = pin _} x ¬m = ¬m (_ , map-pin x)
+
+sk-map : ∀ {A B n} (f : A → B) (d : Den A) p → ShowsK n (enter d p) → ShowsK n (enter (Op.map f d) p)
+sk-map f d p sk = sk-trunc (sk-mapT f sk)
 
 sk-scan : ∀ {A B n} (f : B → A → B) (z : B) (d : Den A) p → ShowsK n (enter d p) → ShowsK n (enter (Op.scan f z d) p)
 sk-scan f z d p sk = sk-trunc (sk-closed to back sk)
