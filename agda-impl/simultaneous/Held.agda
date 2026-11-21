@@ -118,7 +118,7 @@ import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
 open import denotation.Laws.Truthful using (reached)
-open import denotation.EmissionSet using (EmissionSet; Proper)
+open import denotation.EmissionSet using (EmissionSet; Proper; skip; pin)
 open import denotation.Laws.Modulus using (≺-absurd; ≼-refl)
 open import denotation.Laws.Worlds using (W; ⊑-≼; pinby-silent)
 open import denotation.Position using (Path)
