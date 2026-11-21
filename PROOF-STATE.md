@@ -267,8 +267,8 @@ Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch; the lanes' counter is zero
-where their end is next (`lane-end-shut`). Then a reader's joins, the
+on the scan's run split onto that branch; read on the scan's lanes
+counter, not the lanes' own count, which a carried route outlives. Then a reader's joins, the
 defer limit's rest (no one approximant bounds it), and the cold's rows'
 order. Settled when each former's leaf is a body.
 

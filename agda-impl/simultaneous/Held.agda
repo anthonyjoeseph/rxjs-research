@@ -60,7 +60,7 @@ open import simultaneous.HeldBase using (Bound)
 open import denotation.Laws.Worlds using (⊑-snoc; ⊕-identityʳ)
 open import denotation.Events using (<ᵖ-between)
 open import denotation.Laws.Modulus using (≺-irrefl)
-open import simultaneous.FlatLanes using (laneTag; lane-vals; end-last; past-lanes; lanes-of; lanes₀)
+open import simultaneous.FlatLanes using (laneTag; end-last; past-lanes; lanes-of; lanes₀)
 open import denotation.Up using (up; up-⊕)
 open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws.Modulus using (≺-ext)
@@ -109,11 +109,10 @@ open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (trans; sym; cong; subst)
 open import Data.Bool using (true; false)
-open import simultaneous.Project using (Proj; proj-outs; run-prefix)
+open import simultaneous.Project using (Proj; run-prefix)
 open import denotation.EmissionSet using (Few; _≼_)
 open import denotation.Read using (After; cursor; Run)
 import denotation.Read as Run
-open import Data.Nat.Properties using (0≢1+n)
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
@@ -417,8 +416,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane-end-shut : ∀ rx₁ {q a rx₂ rs y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → σ₃ y end → After (cursor nothing rs) y
                   → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
 
-    -- The lanes keep no route past its instant.
-    lane-idle   : Idle σ₃
+    -- WHILE THE SCAN STILL COUNTS A LANE ROUTE, THE LANES' NEXT ROW IS OF
+    -- THEIR INSTANT: the instant the lanes' own count names, past a run of
+    -- them, is that of any position before every lane row still to come.
+    --
+    -- REFUTED: 1e9665c7 lane-idle as the lanes' own `Idle`, by a merge whose first lane completes asynchronously while a second is pending: the completion's begin is carried, so the lanes' count keeps its instant as the second lane begins another
+    lane-idle : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
+              → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+              → proj₁ (cnt rs) ≡ nameOf w
 
   -- WHERE THE SOURCE'S NEXT ROW IS NOT A LANE'S, no lane value lies before
   -- it past the lanes' cursor, as the source would have met it first.
@@ -505,22 +510,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             → ∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥
   lane-shut rx₁ mt pr nz ry ay all = nz (lane-end-shut rx₁ mt pr ry ay all)
 
-  -- Where the lanes still count a route, their next row is of its instant.
-  lanes-idle : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → Met σ₃ rs → (ln : LaneNext rs q)
-             → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf (proj₁ ln)
-  lanes-idle rx₁ {rs = rs} mt pr mr (w , nw , fw , af , outl , endl) nz =
-    lane-idle mr (proj-outs lane-vals pr) fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)
-
   lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
                 → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
   lanes-current rx₁ mt with lane-next rx₁ mt
-  ... | rs , pr , mr , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
+  ... | rs , pr , _ , w , nw , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
   ...   | inj₁ z = inj₁ z
-  ...   | inj₂ (at≡ , k , open≡) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
+  ...   | inj₂ (at≡ , _) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
   ...     | Nl.yes z = inj₁ z
-  ...     | Nl.no nz with lanes-idle rx₁ mt pr mr (w , nw , fw , af , outl , endl) nz
-  ...       | inj₁ none = ⊥-elim (0≢1+n (trans (sym none) open≡))
-  ...       | inj₂ cw   = inj₂ (trans at≡ (trans cw nw))
+  ...     | Nl.no nz =
+    inj₂ (trans at≡ (trans (lane-idle rx₁ mt pr nz fw af (idle-least {rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) nw))
 
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the

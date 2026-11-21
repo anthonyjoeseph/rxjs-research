@@ -46,16 +46,6 @@ laneTag : ∀ {B} → Ev (Maybe (Input B)) → Maybe (Ev (IE B))
 laneTag (out (just (inj₁ (laneB , x)))) = just (out x)
 laneTag _                              = nothing
 
-lane-vals : ∀ {B} {e : Ev (Maybe (Input B))} {e′} → laneTag e ≡ just e′ → Σ (IE B) λ x → e′ ≡ out x
-lane-vals {e = out (just (inj₁ (laneB , x)))}  refl = x , refl
-lane-vals {e = out (just (inj₁ (outerB , _)))} ()
-lane-vals {e = out (just (inj₁ (closeB , _)))} ()
-lane-vals {e = out (just (inj₂ _))}            ()
-lane-vals {e = out nothing}                    ()
-lane-vals {e = skip}                           ()
-lane-vals {e = pin _}                          ()
-lane-vals {e = end}                            ()
-
 -- Nothing is met past the end.
 end-last : ∀ {A H p} {t : EmissionSet A} → InvAt H p t → ∀ r₁ {q r₂} → Met t (r₁ ++ (q , end) ∷ r₂) → r₂ ≡ []
 end-last {t = t} I r₁ {q} mt = go r₁ mt
