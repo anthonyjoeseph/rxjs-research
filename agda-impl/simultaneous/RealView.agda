@@ -17,7 +17,7 @@ open import Data.List using (List)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; flatMap)
 open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (DenEnv; enter)
-open import denotation.Laws.Worlds using (InvD; Ok)
+open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ)
 open import denotation.Laws.Shows using (k-shows; shows-k)
 import denotation.Laws.ShowsJoin as SJ
 open import simultaneous.HeldComb using (ev)
@@ -29,10 +29,10 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import denotation.Position using (ix; _⊕_)
 open import denotation.EmissionSet using (Ev; Ended; Superseded; _≼_; module Joining; module Values)
-open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≼-or-≻; ≺→≼; ≺-trans; ≺-ext; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≼-or-≻; ≺→≼; ≺-trans; ≺-ext; ≺-≼-≺; ≺-absurd)
 open import denotation.Laws.Count using (em)
 open import denotation.Laws.Shows using (∈-stable)
 open import denotation.Laws.Lift using (few-lift)
@@ -81,7 +81,7 @@ module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
   -- and so has every lane run and never cut.
   LanesBy : FlatOp → _ → Set
-  LanesBy op I = ∀ {q a} → o q (out a) → Runs op q → ¬ Cut op q → Σ Pos λ c → Lane op q a c end × ¬ (I ≺ⁱ instantOf c)
+  LanesBy op I = ∀ {q a} → o q (out a) → Runs op q → ¬ Cut op q → ¬ ¬ Σ Pos λ c → Lane op q a c end × ¬ (I ≺ⁱ instantOf c)
 
 -- An elaborated flatMap's policy's joiner, read past finitely many rows, is a row of it.
 real-from : ∀ m op {Γ A B} (F : A → Obs Timeline Γ B) (s : Obs Timeline Γ A) (E : DenEnv Γ) p {k e}
@@ -130,6 +130,31 @@ nn-max P L inL {c₀} p₀ ¬g = go L λ where
     go : ∀ L′ → ¬ Res L′ → ⊥
     go []       k = k (inj₂ λ _ ())
     go (x ∷ L′) k = go L′ λ r → k (no (λ px → k (yes px r)) r)
+
+-- What holds of each of finitely many values, at one value per position,
+-- holds of all of them.
+nn-all : ∀ {A : Set} (R P : Pos → A → Set) (ks : List Pos)
+       → (∀ {q a} → R q a → (q ⊕ [ ix 0 ]) ∈ ks) → (∀ {q a a′} → R q a → R q a′ → a ≡ a′)
+       → (∀ {q a} → R q a → ¬ ¬ P q a) → ¬ ¬ (∀ {q a} → R q a → P q a)
+nn-all {A} R P ks mem func each ¬all = go ks λ g → ¬all λ r → g r (mem r)
+  where
+    Gs : List Pos → Set
+    Gs ks′ = ∀ {q a} → R q a → (q ⊕ [ ix 0 ]) ∈ ks′ → P q a
+
+    go : ∀ ks′ → ¬ Gs ks′ → ⊥
+    go []         κ = κ λ _ ()
+    go (k₀ ∷ ks′) κ = go ks′ λ g → em {P = Σ Pos λ q → Σ A λ a → k₀ ≡ q ⊕ [ ix 0 ] × R q a}
+      (λ (q₀ , a₀ , eq , r₀) ¬G → each r₀ λ p₀ → ¬G λ where
+        {q} r (here e) → yes r r₀ p₀ (⊕-injˡ q q₀ (trans e eq))
+        r (there i)    → g r i)
+      (λ no ¬G → ¬G λ where
+        {q} {a} r (here e) → ⊥-elim (no (q , a , sym e , r))
+        r (there i)        → g r i)
+      κ
+      where
+        yes : ∀ {q a q₀ a₀} → R q a → R q₀ a₀ → P q₀ a₀ → q ≡ q₀ → P q a
+        yes r r₀ p₀ refl with func r r₀
+        ... | refl = p₀
 
 -- A JOINER HAS ENDED BY AN INSTANT BEFORE ONE WHERE IT HAS FEW ROWS, once
 -- its outer and every lane run and never cut have: at the last of those
@@ -200,11 +225,45 @@ module Ends {A B : Set} (Lane : Pos → A → EmissionSet B) (o : EmissionSet A)
           (inj₂ (_ , j)) → few-lift sh (ks , h) j (≺→≼ {c ⊕ [ ix 0 ]} {v} (bv (c ⊕ [ ix 0 ]) (i₀ c (proj₂ cc)))) λ t →
             ¬i (∈-++⁺ʳ ks (subst (_∈ L.map up ks) (up-⊕ c (ix 0)) (∈-map⁺ up (h t (bv (c ⊕ [ ix 0 ]) (i₀ c (proj₂ cc)))))))
 
+  -- The same, each lane known to end by `I` only up to double negation:
+  -- the values before the outer's end are finitely many rows of it.
+  ends¬ : ∀ {I c₀} → o c₀ end → ¬ (I ≺ⁱ instantOf c₀)
+        → (∀ {q a} → Rel q a → ¬ ¬ Σ Pos λ c → Lane q a c end × ¬ (I ≺ⁱ instantOf c))
+        → (∀ {q c} → CutV q → c₀ ≼ c → Cut q c)
+        → (∀ {c} → Hand c → Σ Pos λ q → Σ A λ a → Rel q a × (∀ {c′} → Lane q a c′ end → c ≺ c′))
+        → (∀ {q a a′} → o q (out a) → o q (out a′) → a ≡ a′) → (∀ {q a} → o q (out a) → q ≺ c₀)
+        → Shows JoinT → ∀ {v} → Few (Truncate JoinT) v → I ≺ⁱ instantOf v
+        → ¬ ¬ Σ Pos λ y → Truncate JoinT y end × ¬ (I ≺ⁱ instantOf y)
+  ends¬ {I} {c₀} oc ic₀ ln cl hp func be sh {v} (ks , h) iv ¬g =
+    nn-all Rel (λ q a → Σ Pos λ c → Lane q a c end × ¬ (I ≺ⁱ instantOf c)) ks mem
+      (λ (x , _) (x′ , _) → func x x′) ln λ lanes → ends oc ic₀ lanes cl hp sh (ks , h) iv ¬g
+    where
+      nq : ∀ {q a} → o q (out a) → ¬ (I ≺ⁱ instantOf (q ⊕ [ ix 0 ]))
+      nq {q} x Iq with triⁱ (instantOf c₀) (instantOf q)
+      ... | inj₁ cq        = ≺-absurd {q} {c₀} (be x) (instant-≺ c₀ q cq)
+      ... | inj₂ (inj₁ eq) = ic₀ (subst (I ≺ⁱ_) (trans (inst-⊕ q [ ix 0 ]) (sym eq)) Iq)
+      ... | inj₂ (inj₂ qc) = ic₀ (transⁱ (subst (I ≺ⁱ_) (inst-⊕ q [ ix 0 ]) Iq) qc)
+
+      bv : ∀ k → ¬ (I ≺ⁱ instantOf k) → k ≺ v
+      bv k nk with triⁱ (instantOf k) I
+      ... | inj₁ kI        = instant-≺ k v (transⁱ kI iv)
+      ... | inj₂ (inj₁ eq) = instant-≺ k v (subst (_≺ⁱ instantOf v) (sym eq) iv)
+      ... | inj₂ (inj₂ Ik) = ⊥-elim (nk Ik)
+
+      mem : ∀ {q a} → Rel q a → (q ⊕ [ ix 0 ]) ∈ ks
+      mem {q} (x , _) = ∈-stable λ ¬i →
+        few-lift sh (ks , h) (val x) (≺→≼ {q ⊕ [ ix 0 ]} {v} (bv (q ⊕ [ ix 0 ]) (nq x))) λ t → ¬i (h t (bv (q ⊕ [ ix 0 ]) (nq x)))
+
 
 -- The i-th value is a value.
 nth-out : ∀ {A} {o : EmissionSet A} {i q a} → Values.Nth o i q a → o q (out a)
 nth-out (Values.first x _)       = x
 nth-out (Values.next _ x _ _)    = x
+
+-- One value at a position.
+o-func : ∀ {A H} {d : Den A} → InvD H d → ∀ p → Ok H p → ∀ {q a a′} → enter d p q (out a) → enter d p q (out a′) → a ≡ a′
+o-func Id p ok x x′ with InvAt.func (Id p ok) x x′
+... | refl = refl
 
 -- EACH POLICY'S JOINER HAS ENDED BY AN INSTANT BEFORE ONE WHERE IT HAS
 -- FEW ROWS, once its outer and every lane run and never cut have.
@@ -215,11 +274,11 @@ real-ends : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : �
           → View.OuterBy f (enter d p) I → View.LanesBy f (enter d p) op I
           → ¬ ¬ Σ Pos λ y → Truncate (View.Join f (enter d p) op) y end × ¬ (I ≺ⁱ instantOf y)
 real-ends (mergeᶠ nothing) d f Id If p ok so sf be fv iv (c₀ , oc , ic) ln =
-  Ends.ends (LaneOf f) (enter d p) (λ _ _ → ⊥) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ → ⊥) (λ ())
-    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) (λ ()) (join-shows (mergeᶠ nothing) d f Id If p ok so sf) fv iv
+  Ends.ends¬ (LaneOf f) (enter d p) (λ _ _ → ⊥) (λ _ → ⊤) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ → ⊥) (λ ())
+    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) (λ ()) (o-func {d = d} Id p ok) (λ x → be x oc) (join-shows (mergeᶠ nothing) d f Id If p ok so sf) fv iv
 real-ends (mergeᶠ (just n)) d f Id If p ok so sf be fv iv (c₀ , oc , ic) ln =
-  Ends.ends (Bounded.Lane n f o) o (λ _ _ → ⊥) (Bounded.Indexed n f o) (λ _ _ → ⊥) (Bounded.Queued n f o) (λ _ → ⊥) (λ ())
-    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) hp (join-shows (mergeᶠ (just n)) d f Id If p ok so sf) fv iv
+  Ends.ends¬ (Bounded.Lane n f o) o (λ _ _ → ⊥) (Bounded.Indexed n f o) (λ _ _ → ⊥) (Bounded.Queued n f o) (λ _ → ⊥) (λ ())
+    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) hp (o-func {d = d} Id p ok) (λ x → be x oc) (join-shows (mergeᶠ (just n)) d f Id If p ok so sf) fv iv
   where
     o = enter d p
     open BoundedI ok n f If (Id p ok) using (sub-same)
@@ -228,11 +287,11 @@ real-ends (mergeᶠ (just n)) d f Id If p ok so sf be fv iv (c₀ , oc , ic) ln 
     hp {c} (i , q , a , sb) = q , a , (nth-out (proj₁ sb) , (i , a , proj₁ sb) , λ ()) ,
       λ { {c′} (_ , s′ , sb′ , (_ , lt)) → ≺-trans {c} {c ⊕ [ ix 1 ]} {c′} (≺-ext c []) (subst (_≺ c′) (sym (sub-same sb sb′)) lt) }
 real-ends switchᶠ d f Id If p ok so sf be fv iv (c₀ , oc , ic) ln =
-  Ends.ends (LaneOf f) (enter d p) (λ _ _ → ⊥) (λ _ → ⊤) (Superseded (enter d p)) (λ _ → ⊥) (View.Cut f (enter d p) switchᶠ)
+  Ends.ends¬ (LaneOf f) (enter d p) (λ _ _ → ⊥) (λ _ → ⊤) (Superseded (enter d p)) (λ _ → ⊥) (View.Cut f (enter d p) switchᶠ)
     (λ (q′ , a′ , x , lt , _) → q′ , a′ , x , lt)
     oc ic (λ (x , r , nv) → ln x r nv) (λ (q′ , a′ , x , lt) c₀c → q′ , a′ , x , lt , ≺-≼-≺ {q′} {c₀} {_} (be x oc) c₀c) (λ ())
-    (join-shows switchᶠ d f Id If p ok so sf) fv iv
+    (o-func {d = d} Id p ok) (λ x → be x oc) (join-shows switchᶠ d f Id If p ok so sf) fv iv
 real-ends exhaustᶠ d f Id If p ok so sf be fv iv (c₀ , oc , ic) ln =
-  Ends.ends (LaneOf f) (enter d p) (λ _ _ → ⊥) (Exhaust.Run f (enter d p)) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ → ⊥) (λ ())
-    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) (λ ()) (join-shows exhaustᶠ d f Id If p ok so sf) fv iv
+  Ends.ends¬ (LaneOf f) (enter d p) (λ _ _ → ⊥) (Exhaust.Run f (enter d p)) (λ _ _ → ⊥) (λ _ → ⊥) (λ _ → ⊥) (λ ())
+    oc ic (λ (x , r , nv) → ln x r nv) (λ ()) (λ ()) (o-func {d = d} Id p ok) (λ x → be x oc) (join-shows exhaustᶠ d f Id If p ok so sf) fv iv
 

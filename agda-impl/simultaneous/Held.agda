@@ -59,6 +59,7 @@ open import denotation.Laws.Truthful using (reached)
 open import simultaneous.HeldLim using (module LimHeld)
 open import simultaneous.HeldScanned using (comb-held)
 open import simultaneous.HeldSrc using (module CombSrc)
+open import simultaneous.HeldReal using (module CombReal)
 open import simultaneous.HeldIn using (HeldIn; held-in)
 open import denotation.Laws.Shows using (few-down)
 
@@ -73,7 +74,7 @@ held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ)
           → HeldIn (Few R) scanned (P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs)
 held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ =
   comb-held m op src env′ P _ (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ gd)))) ok₃ (λ kw F → few-down F kw)
-    (CombSrc.comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
+    (CombReal.comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
     (CombSrc.scan-idle m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
     (CombSrc.scan-rest m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃)
   where
