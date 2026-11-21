@@ -22,7 +22,7 @@ open import Tree using (Obs; Later; FlatOp; mergeᶠ; cold; empty; of; map; scan
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_; _∙_; frame; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx)
-open import simultaneous.SObs using (SObs; plain; lone; Part; module Elaborate)
+open import simultaneous.SObs using (SObs; plain; lone; Part; ext; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
 open import simultaneous.Routed using (Held; HeldD; Early)
@@ -40,7 +40,7 @@ open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; clo
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
 open import simultaneous.DenRows using (map-out′; hot-out)
-open import simultaneous.HeldConnect using (held-conn; early-inst)
+open import simultaneous.HeldConnect using (held-conn; early-inst; Tracks; tracks-fin)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Ok; InvD; Lawful; _∪ʰ_)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
@@ -192,6 +192,11 @@ of-mark : ∀ {X} p (xs : List X) {y m n} → InE (ofᴱ p 0 (L.map (λ x → in
 of-mark p xs r with ∈-map⁻ (λ x → instEmit (value x) root) (of-vals p 0 _ r)
 ... | _ , _ , ()
 
+-- An `empty` makes one row.
+empty-few : ∀ m {Δ} (env : DenEnv Δ) q → Σ (List Pos) λ ks → ∀ {k e} → enter (ev m (empty {A = ⊤}) env) q k e → k ∈ ks
+empty-few nothing  env q = [ q ⊕ [ last ] ] , λ { (at-end , _) → here refl }
+empty-few (just n) env q = [ q ⊕ [ last ] ] , λ { (at-end , _) → here refl }
+
 held-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
 held-empty nothing  ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
 held-empty (just n) ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
@@ -320,32 +325,42 @@ shows-ev (just k) A′ env g p ok = k-shows λ n → sk-approx n k A′ env g p 
 -- A connect shows its body, read over its source made hot.
 conn-ev : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) cs → GoodEnv env
         → ∀ p → Ok (Hots env) p → Early p
+        → Tracks (enter (ev m A′ env) (p ⊕ [ ix 1 ])) (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ]))
         → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
            → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ]) → Early (p ⊕ [ ix 0 ])
            → Held (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ])) ((p ⊕ [ ix 0 ]) ∷ p ∷ cs))
         → Held (enter (ev m (connect A′ B′) env) p) (p ∷ cs)
-conn-ev nothing A′ B′ env cs g p ok ep k =
+conn-ev nothing A′ B′ env cs g p ok ep tr k =
   held-conn (⟦ A′ ⟧ env) (λ h → ⟦ B′ ⟧ (h ∷ env)) Is IF p ok cs (shows-ev nothing A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
     (k (src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) (body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok)
-       (early-inst [ ix 0 ] ep))
+       (early-inst [ ix 0 ] ep)) tr
   where
     Is = inv-⟦⟧ A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (⟦ B′ ⟧ (hot t ∷ env))
     IF L = inv-⟦⟧ B′ (hot _ ∷ env) (good-cons L g)
-conn-ev (just n) A′ B′ env cs g p ok ep k =
+conn-ev (just n) A′ B′ env cs g p ok ep tr k =
   held-conn (approx n A′ env) (λ h → approx n B′ (h ∷ env)) Is IF p ok cs (shows-ev (just n) A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
     (k (src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
        (body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
-       (early-inst [ ix 0 ] ep))
+       (early-inst [ ix 0 ] ep)) tr
   where
     Is = inv-approx n A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
     IF L = inv-approx n B′ (hot _ ∷ env) (good-cons L g)
 
+-- AN ELABORATED BODY EMPTIES ONLY ONCE ITS SOURCE LETS GO OF THE
+-- INSTANT: each flatMap of the body watches the connect, parking a route
+-- it cuts while the connect's source holds one of the instant.
+postulate
+  connect-tracks : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
+                   (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Early p
+                 → Tracks (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))
+                          (enter (ev m (elab (ext ρ) b) (hot (Proper (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ]))
+
 held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
 held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
-  conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep λ L ok₀ ep₀ →
+  conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
     IH.holds (hb _) _ (p ∷ cs) (good-cons L g)
       (λ { (here refl) → record { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs ; held = hs env cs g eh
                                 ; under = λ i → i ; is = refl }
@@ -416,6 +431,17 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
   M : EmissionSet (Maybe (Input B))
   M = enter (ev m src env′) P
+
+  -- EACH CONNECT OF THE FLATMAP LETS ITS BODY EMPTY ONLY ONCE ITS SOURCE
+  -- IS DONE WITH THE INSTANT: the outer read through the closer and the
+  -- real flatMap, the real flatMap's rows read by the scan, which parks
+  -- what it cuts while a connect in scope holds a route.
+  postulate
+    tracks-trig   : Tracks (enter (ev m trig env₀) (c ⊕ [ ix 1 ]))
+                           (enter (ev m (connect (closer {B = B}) (connect real (combined op tk))) (hot σ₁ ∷ env₀)) p₀)
+    tracks-closer : Tracks (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]))
+                           (enter (ev m (connect real (combined op tk)) (hot σ₂ ∷ hot σ₁ ∷ env₀)) p₀₀)
+    tracks-real   : Tracks (enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])) scanned
 
 -- An opened outer row is a mark it was, unless it opens.
 open-mark : ∀ {A B} {x : IE A} {m n} → opening {B = B} x ≡ instEmit (mark m) n → (m ≡ outerOpen → ⊥) → x ≡ instEmit (mark m) n
@@ -873,11 +899,11 @@ held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
 held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
-  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀) in
-  conn-ev m empty _ env cs g p ok ep λ L₀ ok₀ ep₀ →
-    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ λ L₁ ok₁ ep₁ →
-      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ λ L₂ ok₂ ep₂ →
-        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ λ L₃ ok₃ ep₃ →
+  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real) in
+  conn-ev m empty _ env cs g p ok ep (tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ →
+    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ tracks-trig λ L₁ ok₁ ep₁ →
+      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ tracks-closer λ L₂ ok₂ ep₂ →
+        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ tracks-real λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok ep
             (held-trigger m ρ s env cs p g ok ep (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) eh))
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃

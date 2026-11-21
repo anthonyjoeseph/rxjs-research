@@ -7,22 +7,28 @@
 module simultaneous.HeldWrap where
 
 open import Data.Bool using (Bool; true; T; not; if_then_else_)
-open import Data.List using ([]; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; _++_; [_])
+import Data.List as L
+open import Data.List.Properties using (++-identityʳ; foldl-++)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁻)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵉ; _∷_ to _∷ᵉ_)
 open import Data.Nat using (ℕ; suc)
-open import Data.Product using (Σ; _×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Tree using (Obs; cold; merge; of; connected)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (refl; sym; subst; trans; cong)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; out; skip; pin; end; Den; hot; enter; Proper; Few; _≺_; _≼_; ⟦_⟧; module Op;
+open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; pin; end; Den; hot; enter; Proper; Few; _≺_; _≼_; ⟦_⟧; module Op;
   module Connect; module Connecting)
-open import denotation.Read using (Visible)
+open import denotation.Read using (Visible; After; cursor)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; entered-few)
 open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.Shows using (k-shows)
@@ -31,19 +37,23 @@ open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; Shows; 
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Relations using (Met)
+open import simultaneous.Relations using (Met; values; values-++)
+open import simultaneous.Shut using (r₀)
+open import simultaneous.Readings using (rootOf)
+open import simultaneous.Layers using (cursor-++)
+open import simultaneous.Relabel using (memAt; cntAt; same-mark)
 open import simultaneous.Routed using (Held; HeldD; Early; Ex; cnt; nameOf; c-done)
 open import simultaneous.HeldTake using (module Holds; Inert; i-done)
 open import simultaneous.HeldTo using (HeldTo)
 open import simultaneous.HeldBeside using (sb₀; beside; module Beside)
-open import simultaneous.HeldConnect using (held-conn; held-ex; module ConnRun)
+open import simultaneous.HeldConnect using (held-conn; held-ex; module ConnRun; Tracks; rootOf-ext)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.HeldHot using (module HotRead)
-open import simultaneous.HeldClose using (module CatClose; of-row₁; of-val₁; of-end₁)
+open import simultaneous.HeldClose using (module CatClose; module Close; of-row₁; of-val₁; of-end₁)
 open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.CombSent using (assoc³)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; marked; unfinished; completing; wrapped; concatˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; marked; unfinished; completing; wrapped; concatˢ; count)
 
 -- A TAKE CUT AFTER THE COMPLETION holds what its source holds.
 held-until : ∀ {X} (d : Den (IE X)) {H} p cs → InvAt H p (enter d p) → HeldTo unfinished (enter d p) cs
@@ -121,6 +131,71 @@ module Closing {A : Set} (D : Den (IE A)) {H : Pos → Set} (p : Pos) (I : InvD 
   module CC = CatClose G P root HR.rd-proper HR.rd-func HR.rd-few (HR.rd-past {e₁} λ y → ≺-trans {e₁} {r} {_} e₁≺r (aft y)) HR.rd-nopin
                 (of-row₁ _) (of-val₁ _) (of-end₁ _)
 
+  module CL = Close (enter (G true) sb) root HR.rd-proper HR.rd-func HR.rd-few
+
+  -- THE READING EMPTIES WHERE THE SOURCE DOES: a run of the reading is
+  -- the source's moved, its count the same, so past it the source's own
+  -- rest bounds the instant.
+  via : ∀ {cs} → Held S cs → ∀ {rs′} → Met HR.Rd rs′ → proj₂ (cnt rs′) ≡ 0
+      → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs′)))) ∈ rs′
+      → Σ (List Pos) λ ks → ∀ {k e} → S k e → After (cursor nothing rs′) k → rootOf k ≡ rootOf q → k ∈ ks
+  via H {rs′} m z bq with HR.back m
+  ... | rs , run , eq with memAt eq bq
+  ...   | q₀ , _ , bq′ , refl , same-mark e
+    with Held.rest H run (subst (λ r → proj₂ r ≡ 0) (cntAt eq) z)
+           (subst (λ n → (q₀ , out (instEmit (mark begin) n)) ∈ rs) (trans (sym (e refl)) (cong proj₁ (cntAt eq))) bq′)
+  ...     | ks , h = ks , λ {k} sk a r → h sk (unshift k (cursor nothing rs) (subst (λ c → After c k) (HR.cursor-at eq nothing) a))
+                                              (trans r (rootOf-ext q₀ _))
+    where
+      unshift : ∀ k c → After (HR.shiftM c) k → After c k
+      unshift k nothing  _  = tt
+      unshift k (just c) lt = ≺-trans {c} {HR.shift c} {k} (≺-ext c _) lt
+
+  -- A count past the reading's end and the mark is the reading's.
+  cnt-mark : ∀ {cb t} (r : List (Pos × Ev (IE A))) → CL.Tail cb t
+           → cnt (r ++ (CL.mpos cb , out CL.mk₀) ∷ t) ≡ cnt (r ++ [ (cb , end) ])
+  cnt-mark {cb} r tl =
+    trans (cong (L.foldl count r₀) (trans (values-++ r _) (cong (values r ++_) (cong (CL.mk₀ ∷_) (no-vals tl)))))
+      (trans (foldl-++ count r₀ (values r) [ CL.mk₀ ])
+        (sym (trans (cong (L.foldl count r₀) (trans (values-++ r [ (cb , end) ]) (++-identityʳ (values r)))) refl)))
+    where
+      no-vals : ∀ {t} → CL.Tail cb t → values t ≡ []
+      no-vals CL.t-none = refl
+      no-vals CL.t-fin  = refl
+
+  -- A begin past the reading is the reading's.
+  mem-mark : ∀ {cb t q n} (r : List (Pos × Ev (IE A))) → CL.Tail cb t
+           → (q , out (instEmit (mark begin) n)) ∈ r ++ (CL.mpos cb , out CL.mk₀) ∷ t → (q , out (instEmit (mark begin) n)) ∈ r ++ [ (cb , end) ]
+  mem-mark r tl x with ∈-++⁻ r x
+  ... | inj₁ xr = ∈-++⁺ˡ xr
+  mem-mark r CL.t-none x | inj₂ (here ())
+  mem-mark r CL.t-fin  x | inj₂ (here ())
+  mem-mark r CL.t-fin  x | inj₂ (there (here ()))
+
+  -- The cursor past the mark is past the reading's end.
+  cur-mark : ∀ {cb t} (r : List (Pos × Ev (IE A))) → CL.Tail cb t → ∀ {k}
+           → After (cursor nothing (r ++ (CL.mpos cb , out CL.mk₀) ∷ t)) k → After (cursor nothing (r ++ [ (cb , end) ])) k
+  cur-mark {cb} r tl {k} a =
+    subst (λ c → After c k) (sym (cursor-++ nothing r [ (cb , end) ]))
+      (past tl (subst (λ c → After c k) (cursor-++ nothing r _) a))
+    where
+      past : ∀ {t} → CL.Tail cb t → After (cursor (just (CL.mpos cb)) t) k → cb ≺ k
+      past CL.t-none lt = ≺-trans {cb} {CL.mpos cb} {k} (CL.c≺m cb) lt
+      past CL.t-fin  lt = ≺-trans {cb} {CL.fpos cb} {k} (CL.c≺f cb) lt
+
+  -- WHERE THE CLOSED READING EMPTIES, THE SOURCE FINISHES THE INSTANT.
+  tracks : ∀ {cs} → Held S cs → Tracks S CC.C
+  tracks H m z bq = go (CL.shape₀ (CC.back m)) z bq
+    where
+      go : ∀ {rs} → CL.Shape nothing rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+         → Σ (List Pos) λ ks → ∀ {k e} → S k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
+      go (CL.open′ run _) z bq = via H run z bq
+      go (CL.shut {cb} {r} {t} run _ tl) z {q} bq =
+        let E = cnt-mark r tl
+            ks , h = via H run (trans (cong proj₂ (sym E)) z)
+                       (mem-mark r tl (subst (λ n → (q , out (instEmit (mark begin) n)) ∈ r ++ (CL.mpos cb , out CL.mk₀) ∷ t) (cong proj₁ E) bq))
+        in ks , λ sk a r′ → h sk (cur-mark r tl a) r′
+
 -- READ HOT FROM BEFORE ITS FIRST ROW, A SOURCE COMPLETED BY A MARK holds
 -- what the source holds, and its mark lies where its end did.
 held-closing : ∀ {A} (D : Den (IE A)) {H} p cs → InvD H D → Ok H p → Shows (enter D (p ⊕ [ ix 1 ]))
@@ -139,7 +214,7 @@ held-closing D p cs I ok sh h = CC.held (HR.held-hot (held-ex ex h))
 held-completing : ∀ {A} (s : Obs Timeline [] (IE A)) p cs → Ok (Hots []ᵉ) p
                 → Held (enter (⟦ s ⟧ []ᵉ) (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs)
                 → Held (enter (⟦ completing s ⟧ []ᵉ) p) (p ∷ cs)
-held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-closing D p cs Is ok sh h)
+held-completing s p cs ok h = held-conn D closing Is IF p ok cs sh (held-closing D p cs Is ok sh h) (Closing.tracks D p Is ok sh h)
   where
     D = ⟦ s ⟧ []ᵉ
     Is = inv-⟦⟧ s []ᵉ (λ ())
