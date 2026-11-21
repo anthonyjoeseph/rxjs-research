@@ -407,11 +407,11 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
     c₁⊑z₀ = ix 1 ∷ ix 0 ∷ [] , ⊕-assoc c₁ [ ix 1 ] [ ix 0 ]
 
     -- The first part's rows before it: before its end, or its end.
-    lane₀-row : ∀ {k e} → enter D₀ s₁ k e → k ≺ z₀ → k ∈ R
-    lane₀-row {k} x kz with ≼-or-≻ c₁ k
+    lane₀-row : ∀ {w k e} → c₁ ⊑ w → enter D₀ s₁ k e → k ≺ w → k ∈ R
+    lane₀-row {w} {k} cw x kz with ≼-or-≻ c₁ k
     ... | inj₂ kc = in-below (few₀ (proj₁ x) kc)
     ... | inj₁ ck with ⊑? c₁ k
-    ...   | no nk = ⊥-elim (≺-absurd {k} {z₀} kz (past-sub {c₁} {z₀} {k} c₁⊑z₀ ck nk))
+    ...   | no nk = ⊥-elim (≺-absurd {k} {w} kz (past-sub {c₁} {w} {k} cw ck nk))
     ...   | yes ([] , refl) = there (there (there (here refl)))
     ...   | yes (l ∷ ys , refl) = ⊥-elim (flat₀ end₀ x)
 
@@ -423,14 +423,14 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
     ...   | refl with st₁-only st
     ...     | refl = inj₂ (of-end c₂ 0 (marked {B} outerDone ∷ []) (proj₁ (subst (λ d → enter d c₂ _ end) second-op en)))
 
-    lane-row : ∀ {q a k e} → Bd.Lane q a k e → k ≺ z₀ → k ∈ R
-    lane-row {k = k} {e} (i , s′ , (nth , st) , en , lt) kz with o-rows (nth-row nth)
+    lane-row : ∀ {w q a k e} → c₁ ⊑ w → Bd.Lane q a k e → k ≺ w → k ∈ R
+    lane-row {k = k} {e} cw (i , s′ , (nth , st) , en , lt) kz with o-rows (nth-row nth)
     ... | inj₁ (refl , refl) with nth-q₀ nth
     ...   | refl with st
-    ...     | Bd.room _ = lane₀-row (subst (λ d → enter d s₁ k e) first-op en) kz
+    ...     | Bd.room _ = lane₀-row cw (subst (λ d → enter d s₁ k e) first-op en) kz
     ...     | Bd.freed () _
     ...     | Bd.queued () _ _ _ _
-    lane-row {k = k} {e} (i , s′ , (nth , st) , en , lt) kz | inj₂ (refl , refl) with nth-q₁ nth
+    lane-row {k = k} {e} cw (i , s′ , (nth , st) , en , lt) kz | inj₂ (refl , refl) with nth-q₁ nth
     ...   | refl with st₁-only st
     ...     | refl = there (there (there (there (there (there (∈-++⁺ˡ (of-in c₂ 0 (marked {B} outerDone ∷ [])
                        (proj₁ (subst (λ d → enter d c₂ k e) second-op en)))))))))
@@ -449,25 +449,84 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
     ... | inj₁ (refl , _) = here refl
     ... | inj₂ (refl , _) = there (here refl)
 
-    raw-reach : ∀ {k e} → Bd.JoinT k e → k ≺ z₀ → k ∈ R
-    raw-reach (Bd.val r) _                = o-val r
-    raw-reach (Bd.step (on-out (on-out ()) , _)) _
-    raw-reach (Bd.opin (on-out (on-out ()) , _)) _
-    raw-reach (Bd.oend r _) _             = o-end r
-    raw-reach (Bd.opass r _) _            = o-end r
-    raw-reach (Bd.lane _ _ l _ _) kz      = lane-row l kz
-    raw-reach (Bd.lend _ _ l _ _ _) kz    = lane-row l kz
-    raw-reach (Bd.lpass _ _ l _ _ _) kz   = lane-row l kz
-    raw-reach (Bd.hand _ _ l _ _) _       = hand-row l
-    raw-reach (Bd.left _ _ l _ _) kz      = lane-row l kz
-    raw-reach (Bd.run () _)
-    raw-reach (Bd.rend () _ _)
-    raw-reach (Bd.rpass () _ _)
-    raw-reach (Bd.rhand () _)
+    raw-reach : ∀ {w k e} → c₁ ⊑ w → Bd.JoinT k e → k ≺ w → k ∈ R
+    raw-reach _  (Bd.val r) _                = o-val r
+    raw-reach _  (Bd.step (on-out (on-out ()) , _)) _
+    raw-reach _  (Bd.opin (on-out (on-out ()) , _)) _
+    raw-reach _  (Bd.oend r _) _             = o-end r
+    raw-reach _  (Bd.opass r _) _            = o-end r
+    raw-reach cw (Bd.lane _ _ l _ _) kz      = lane-row cw l kz
+    raw-reach cw (Bd.lend _ _ l _ _ _) kz    = lane-row cw l kz
+    raw-reach cw (Bd.lpass _ _ l _ _ _) kz   = lane-row cw l kz
+    raw-reach _  (Bd.hand _ _ l _ _) _       = hand-row l
+    raw-reach cw (Bd.left _ _ l _ _) kz      = lane-row cw l kz
+    raw-reach _  (Bd.run () _)
+    raw-reach _  (Bd.rend () _ _)
+    raw-reach _  (Bd.rpass () _ _)
+    raw-reach _  (Bd.rhand () _)
 
     -- THE CLOSER'S `outerDone`, at or before each of its ends.
     closer-row : Σ Pos λ z₁ → instantOf z₁ ≡ instantOf y × enter (ev m (closer {Δ} {A} {B}) ρ) s z₁ (out (marked {B} outerDone))
                  × (∀ {c} → enter (ev m (closer {Δ} {A} {B}) ρ) s c end → z₁ ≺ c)
     closer-row = z₀ , raw-inst ,
-      subst (λ d → enter d s z₀ (out (marked {B} outerDone))) (sym closer-op) (raw , R , λ x lt _ → raw-reach x lt) ,
+      subst (λ d → enter d s z₀ (out (marked {B} outerDone))) (sym closer-op) (raw , R , λ x lt _ → raw-reach c₁⊑z₀ x lt) ,
       λ {c} x → raw-end-after (proj₁ (subst (λ d → enter d s c end) closer-op x))
+
+    ----------------------------------------------------------------------
+    -- The closer's end: its second part's, one past its `outerDone`
+
+    E : Pos
+    E = c₂ ⊕ [ last ]
+
+    c₁⊑E : c₁ ⊑ E
+    c₁⊑E = ix 1 ∷ last ∷ [] , ⊕-assoc c₁ [ ix 1 ] [ last ]
+
+    c₁≺E : c₁ ≺ E
+    c₁≺E = ≺-trans {c₁} {c₂} {E} (≺-ext c₁ []) (≺-ext c₂ [])
+
+    s₁≺E′ : s₁ ≺ (E ⊕ [ ix 1 ])
+    s₁≺E′ = ≺-trans {s₁} {E} {E ⊕ [ ix 1 ]} (≺-trans {s₁} {c₁} {E} s₁≺c₁ c₁≺E) (≺-ext E [])
+
+    -- The first part starts nowhere but where its value asks.
+    st₀-only : ∀ {s′} → Bd.Starts 0 q₀ (Bd.Sched 0) s′ → s′ ≡ s₁
+    st₀-only (Bd.room _)         = refl
+    st₀-only (Bd.freed () _)
+    st₀-only (Bd.queued () _ _ _ _)
+
+    -- No part is handed a slot at it.
+    no-hand : ¬ Bd.Queued E
+    no-hand (i , q , a , nth , st) with o-rows (nth-row nth)
+    ... | inj₁ (refl , refl) with nth-q₀ nth
+    ...   | refl = ≺-irrefl {s₁} (subst (s₁ ≺_) (st₀-only st) s₁≺E′)
+    no-hand (i , q , a , nth , st) | inj₂ (refl , refl) with nth-q₁ nth
+    ...   | refl = ≺-irrefl {c₂} (subst (c₂ ≺_) (st₁-only st) (≺-trans {c₂} {E} {E ⊕ [ ix 1 ]} (≺-ext c₂ []) (≺-ext E [])))
+
+    -- Its outer and both parts have ended by it.
+    done-E : Bd.Done E
+    done-E = (s ⊕ [ last ] , (of-end-row s 0 (true ∷ false ∷ []) , of-reach s 0 (true ∷ false ∷ []) {s ⊕ [ last ]} {end}) ,
+              ≺→≼ {s ⊕ [ last ]} {E} (≺-trans {s ⊕ [ last ]} {y} {E} (past [ last ] ry) (≺-trans {y} {c₁} {E} (≺-ext y []) c₁≺E))) ,
+             lanes
+      where
+        lanes : ∀ {q a} → O q (out a) → Bd.Indexed q → q ≺ E → _ → Σ Pos λ c₀ → Bd.Lane q a c₀ end × c₀ ≼ E
+        lanes r _ _ _ with o-rows r
+        ... | inj₁ (refl , refl) =
+          c₁ , (0 , s₁ , (nth₀ , Bd.room (s≤s z≤n)) , subst (λ d → enter d s₁ c₁ end) (sym first-op) end₀ , s₁≺c₁) , ≺→≼ {c₁} {E} c₁≺E
+        ... | inj₂ (refl , refl) =
+          E , (1 , c₂ , (nth₁ , st₁) ,
+               subst (λ d → enter d c₂ E end) (sym second-op)
+                 (of-end-row c₂ 0 (marked {B} outerDone ∷ []) , of-reach c₂ 0 (marked {B} outerDone ∷ []) {E} {end}) ,
+               ≺-ext c₂ []) ,
+          ≼-refl {E}
+
+    -- THE CLOSER ENDS IN THE OUTER END'S INSTANT.
+    closer-end : Σ Pos λ c → enter (ev m (closer {Δ} {A} {B}) ρ) s c end × instantOf c ≡ instantOf y
+    closer-end = E ,
+      subst (λ d → enter d s E end) (sym closer-op)
+        (Bd.lend o₁ (1 , false , nth₁)
+           (1 , c₂ , (nth₁ , st₁) ,
+            subst (λ d → enter d c₂ E end) (sym second-op)
+              (of-end-row c₂ 0 (marked {B} outerDone ∷ []) , of-reach c₂ 0 (marked {B} outerDone ∷ []) {E} {end}) ,
+            ≺-ext c₂ [])
+           (λ ()) no-hand done-E ,
+         R , λ x lt _ → raw-reach c₁⊑E x lt) ,
+      trans (inst-⊕ c₂ [ last ]) (trans (inst-⊕ c₁ [ ix 1 ]) (inst-⊕ y [ sub s₁ ]))

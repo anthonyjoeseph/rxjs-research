@@ -78,6 +78,7 @@ open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; triⁱ)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
+open import denotation.Laws.BoundedInv using (end-uniq)
 open import Data.Bool using (true; false; _∧_)
 open import simultaneous.Project using (Proj; run-prefix)
 import denotation.Read as Run
@@ -663,16 +664,19 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                 → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
                 → Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
 
-    -- THE CLOSER ENDS IN ITS `outerDone`'s INSTANT: the mark is its last
-    -- part's only item.
-    closer-ends : ∀ {k n} → σ₂ k (out (instEmit (mark outerDone) n)) → Σ Pos λ y → σ₂ y end × instantOf y ≡ instantOf k
-
     -- THE SOURCE ENDS IN ITS LAST BRANCH'S END'S INSTANT: its own
     -- branches' merge ends at the last of their ends, and the item that
     -- tells it, which ends the take, follows at once.
     src-ends : ∀ {y₁ y₂ y₃} → σ₁ y₁ end → σ₂ y₂ end → σ₃ y₃ end
              → Σ Pos λ c → M c end × ¬ (instantOf c ≺ⁱ instantOf y₁) × ¬ (instantOf c ≺ⁱ instantOf y₂) × ¬ (instantOf c ≺ⁱ instantOf y₃)
                × (instantOf c ≡ instantOf y₁ ⊎ instantOf c ≡ instantOf y₂ ⊎ instantOf c ≡ instantOf y₃)
+
+  -- THE CLOSER ENDS IN ITS `outerDone`'s INSTANT: the mark is its last
+  -- part's only item (`CloseDone.FirstEnd.closer-end`).
+  closer-ends : ∀ {k n} → σ₂ k (out (instEmit (mark outerDone) n)) → Σ Pos λ y → σ₂ y end × instantOf y ≡ instantOf k
+  closer-ends σd with CD.done-under (proj₁ σd)
+  ... | y , ry , (ws , refl) with CD.FirstEnd.closer-end ry (few-σ₁ ry) (InvAt.flat I-D₀)
+  ...   | c′ , rc , ic = c′ , (rc , λ rc′ → subst (c′ ≼_) (end-uniq I₂ rc rc′) (≼-refl {c′})) , trans ic (sym (inst-⊕ y ws))
 
   -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
   -- SOURCE ENDS IN ITS INSTANT: the outer has ended under the mark, the
