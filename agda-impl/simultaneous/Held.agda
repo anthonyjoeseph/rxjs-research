@@ -31,7 +31,7 @@ open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
-open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; src-where; Where) renaming (under to w-under; past to w-past)
+open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
 open import simultaneous.DenRows using (map-out′; hot-out)
@@ -520,9 +520,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
     lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
     lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
-    -- A lane's and the closer's ends lie before their step's over.
+    -- A lane's end lies before its step's over.
     lane-ends   : ∀ {q} → σ₃ q end → Early q
-    close-ends  : ∀ {q} → σ₂ q end → Early q
+
+  -- The closer ends where it is subscribed or where the outer ends.
+  close-ends : ∀ {q} → σ₂ q end → Early q
+  close-ends (r , _) =
+    closer-good m σ₁ env₀ L₁ Early (λ e zs → early-inst zs e) (λ y → Held.ends H₁ (proj₁ y))
+      (p₀ ⊕ [ ix 1 ]) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))) r
 
   close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
   close-marks (r , _) = closer-marks m (hot σ₁ ∷ env₀) _ r

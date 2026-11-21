@@ -16,18 +16,18 @@ open import Function using (Equivalence)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 open import Data.Empty using (⊥; ⊥-elim)
 
-open import Tree using (mergeᶠ; takeWhile; flatMap; of; map)
-open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _⊕_)
+open import Tree using (mergeᶠ; takeWhile; flatMap; of; map; connected)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Den; EmissionSet; enter; DenEnv; ⟦_⟧; approx; out; end; Reach; InE; at-out; on-out;
-  Ended; After; LaneOf; _≺_; _≼_; map-end; module Op; module TakeWhile; module Merge; module Bounded; module Values)
-open import denotation.Events using (ofᴱ; <ᵖ-part)
-open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-≼-≺; ≼-refl; ≺→≼; ≺-ext)
+  Ended; After; LaneOf; _≺_; _≼_; map-end; hot; Rejoin; shown; ended; late; module Op; module TakeWhile; module Merge; module Bounded; module Values)
+open import denotation.Events using (ofᴱ; <ᵖ-part; <ᵖ-apart)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-≼-≺; ≼-refl; ≺→≼; ≺-ext; ≼-split)
 open import denotation.Laws.Cut using (ix-asc)
-open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ; Lawful)
 open import denotation.Laws.Worlds.Leaves using (of-reach; of-end; of-idx)
 open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB; laneB; closeB)
@@ -35,8 +35,9 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.DenRows using (merge-out; bounded-out; map-out′; of-mem; each-one; nth-row; module Cat)
 open import simultaneous.InstEmit using (instEmit; value; mark; outerClose; outerDone)
 open import Data.List.Relation.Unary.All using (lookup)
+import Data.List.Relation.Unary.All as All
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (E; IE; Routes; Input; going; fed; branch; closer; closing; marked; each)
 
 -- A takeWhile that never includes its failure keeps a value where it was.
 take-at : ∀ {X} (keep : X → Bool) (d : Den X) p {k y} → enter (Op.takeWhile false keep d) p k (out y) → enter d p k (out y)
@@ -185,6 +186,105 @@ where-map : ∀ {Y P} {Br Br′ : Branch → Den Y} → (∀ b {w c} → enter (
 where-map g (under zs)    = under zs
 where-map g (past zs w x) = past zs (where-map g w) (g _ x)
 
+-- THE CONCAT'S END KEEPS what its subscription and its lanes' ends keep,
+-- for a property every extension keeps: each lane's end lies where its
+-- start does, and a start where its value or the end that frees it does.
+module CatGood {X : Set} (G : Bool → Den X) (Good : Pos → Set) (ext : ∀ {c} → Good c → ∀ zs → Good (c ⊕ zs))
+               (lane-good : ∀ a {s c} → Good s → enter (G a) s c end → Good c) (s₀ : Pos) (g₀ : Good s₀) where
+  private
+    module Bd = Bounded 1 G (enter (Op.of (true ∷ false ∷ [])) s₀)
+
+  outer-good : ∀ {q a} → enter (Op.of (true ∷ false ∷ [])) s₀ q (out a) → Good q
+  outer-good (x , _) with of-at s₀ 0 _ x
+  ... | l , refl = ext g₀ [ l ]
+
+  mutual
+    lane-end : ∀ i {q a s c} → Values.Nth (enter (Op.of (true ∷ false ∷ [])) s₀) i q a → Bd.Starts i q (Bd.Sched i) s
+             → After (G a) s c end → Good c
+    lane-end i nt st (x , _) = lane-good _ (starts i st (outer-good (nth-row nt))) x
+
+    starts : ∀ i {q s} → Bd.Starts i q (Bd.Sched i) s → Good q → Good s
+    starts i (Bd.room _)           gq = ext gq [ ix 1 ]
+    starts i (Bd.freed _ _)        gq = ext gq [ ix 1 ]
+    starts i (Bd.queued _ _ k _ _) gq = ext (sched i k) [ ix 1 ]
+
+    sched : ∀ i {c} → Bd.Kth (_≡ c) (Bd.Sched i) 0 → Good c
+    sched zero ()
+    sched (suc i) (inj₁ (_ , (_ , _ , _ , nt , st , aft) , refl)) = lane-end i nt st aft
+    sched (suc i) (inj₂ k) = sched i k
+
+  cat-end : ∀ {c} → enter (Op.flatMap (mergeᶠ (just 1)) G (Op.of (true ∷ false ∷ []))) s₀ c end → Good c
+  cat-end (Bd.oend o _ , _) with of-end s₀ 0 (true ∷ false ∷ []) (proj₁ o)
+  ... | refl = ext g₀ [ last ]
+  cat-end (Bd.lane _ _ _ _ () , _)
+  cat-end (Bd.lend _ _ (i , _ , (nt , st) , aft) _ _ _ , _) = lane-end i nt st aft
+  cat-end (Bd.run () _ , _)
+  cat-end (Bd.rend () _ _ , _)
+
+assoc³ : ∀ r a b c → ((r ⊕ [ a ]) ⊕ [ b ]) ⊕ [ c ] ≡ r ⊕ (a ∷ b ∷ c ∷ [])
+assoc³ r a b c = trans (cong (_⊕ [ c ]) (⊕-assoc r [ a ] [ b ])) (⊕-assoc r (a ∷ b ∷ []) [ c ])
+
+-- AN `each` OVER A LAWFUL HOT ENDS where the hot does, or where it is
+-- subscribed: no row lies under another, so a lane of a row before the
+-- hot's end ends before it too.
+module EachEnd {X Y : Set} (g : X → List Y) (t : EmissionSet X) (L : Lawful t) (Good : Pos → Set)
+               (ext : ∀ {c} → Good c → ∀ zs → Good (c ⊕ zs)) (t-end : ∀ {c} → t c end → Good c) (s : Pos) (gs : Good s) where
+  private
+    module Mg = Merge (λ x → Op.of (g x)) (enter (hot t) s)
+
+  under-before : ∀ {r c a} → t r (out a) → t c end → ∀ zs → (r ⊕ zs) ≺ c
+  under-before {r} {c} x y zs = Equivalence.from T-≡ (<ᵖ-apart r c zs (Equivalence.to T-≡ r≺c) apart)
+    where
+      r≺c : r ≺ c
+      r≺c with ≼-split {r} {c} (Lawful.proper L y x)
+      ... | inj₁ lt = lt
+      ... | inj₂ refl with () ← Lawful.func L x y
+      apart : ∀ ys → c ≡ r ⊕ ys → ⊥
+      apart []       eq   = ≺-irrefl {r} (subst (r ≺_) (trans eq (⊕-identityʳ r)) r≺c)
+      apart (l ∷ ys) refl = Lawful.flat L x y
+
+  lane-past : ∀ {r a c₀} → t r (out a) → s ≺ r → Rejoin s t c₀ end → c₀ ≼ (((r ⊕ [ sub s ]) ⊕ [ ix 1 ]) ⊕ [ last ]) → ⊥
+  lane-past {r} x _ (ended {e} y _) c₀c =
+    c₀c (≺-trans {((r ⊕ [ sub s ]) ⊕ [ ix 1 ]) ⊕ [ last ]} {e} {e ⊕ [ sub s ]}
+          (subst (_≺ e) (sym (assoc³ r (sub s) (ix 1) last)) (under-before x y (sub s ∷ ix 1 ∷ last ∷ []))) (≺-ext e []))
+  lane-past {r} x sr (late {e} y es) _ = es (≺-≼-≺ {s} {r} {e} sr (Lawful.proper L y x))
+  lane-past x _ (shown _ () _) _
+
+  each-end : ∀ {c} → enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (g x)) (hot t)) s c end → Good c
+  each-end (Mg.oend (ended y _ , _) _ , _) = ext (t-end y) [ sub s ]
+  each-end (Mg.oend (late _ _ , _) _ , _)  = ext gs [ last ]
+  each-end (Mg.oend (shown _ () _ , _) _ , _)
+  each-end (Mg.lane _ _ _ _ () , _)
+  each-end (Mg.lend {q} {a} (shown x _ sr , _) _ (l , _) _ _ ((_ , (rj , _) , c₀c) , _) , _)
+    with of-end (q ⊕ [ ix 1 ]) 0 (g a) (proj₁ l)
+  ... | refl = ⊥-elim (lane-past x sr rj c₀c)
+  each-end (Mg.run () _ , _)
+  each-end (Mg.rend () _ _ , _)
+
+-- The closer's two lanes.
+Clo : ∀ {Δ A B} → Bool → E (IE A ∷ Δ) (IE B)
+Clo b = if b then each closing (connected (here refl)) else of (marked outerDone ∷ [])
+
+-- THE CLOSER ENDS where its subscription or the end of the hot it reads
+-- keeps, under every approximant as under the meaning.
+closer-good : ∀ m {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv Δ) → Lawful t → (Good : Pos → Set)
+            → (∀ {c} → Good c → ∀ zs → Good (c ⊕ zs)) → (∀ {c} → t c end → Good c)
+            → ∀ s → Good s → ∀ {c} → enter (ev m (closer {Δ} {A} {B}) (hot t All.∷ env)) s c end → Good c
+closer-good nothing {Δ} {A} {B} t env L Good ext t-end s gs x =
+  CatGood.cat-end (λ b → ⟦ Clo {Δ} {A} {B} b ⟧ (hot t All.∷ env)) Good ext lane s gs x
+  where
+    lane : ∀ a {s c} → Good s → enter (⟦ Clo {Δ} {A} {B} a ⟧ (hot t All.∷ env)) s c end → Good c
+    lane true  {s} gs x = EachEnd.each-end closing t L Good ext t-end s gs x
+    lane false {s} gs x with of-end s 0 (marked outerDone ∷ []) (proj₁ x)
+    ... | refl = ext gs [ last ]
+closer-good (just n) {Δ} {A} {B} t env L Good ext t-end s gs x =
+  CatGood.cat-end (λ b → approx n (Clo {Δ} {A} {B} b) (hot t All.∷ env)) Good ext lane s gs x
+  where
+    lane : ∀ a {s c} → Good s → enter (approx n (Clo {Δ} {A} {B} a) (hot t All.∷ env)) s c end → Good c
+    lane true  {s} gs x = EachEnd.each-end closing t L Good ext t-end s gs x
+    lane false {s} gs x with of-end s 0 (marked outerDone ∷ []) (proj₁ x)
+    ... | refl = ext gs [ last ]
+
 -- THE SOURCE'S PIECES, as any reading of it gives them: the trackers
 -- `Tk`, the flatMap's own branches `Br`, tagged by `T`, concatenated with
 -- the closing `nothing` by `G`, fed beside the trackers by `F`.
@@ -214,32 +314,13 @@ module SrcEnd {B : Set} (F G : Bool → Den (Maybe (Input B))) (T : Branch → D
   own-end {s} {c} ws x | (Merge.run () _ , _)
   own-end {s} {c} ws x | (Merge.rend () _ _ , _)
 
-  -- THE CONCAT AT `s₀`: each lane's end lies where its start does, and a
-  -- start where its value or the end that frees it does.
-  module CatAt (s₀ : Pos) (w₀ : W s₀) where
-    private
-      module Bd = Bounded 1 G (enter (Op.of (true ∷ false ∷ [])) s₀)
+  -- A lane of the concat ends where its start does.
+  lane-w : ∀ a {s c} → W s → enter (G a) s c end → W c
+  lane-w true  ws x = own-end ws x
+  lane-w false {s} {c} ws x with of-end s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d s c end) eG x))
+  ... | refl = where-ext ws [ last ]
 
-    outer-where : ∀ {q a} → enter (Op.of (true ∷ false ∷ [])) s₀ q (out a) → W q
-    outer-where (x , _) with of-at s₀ 0 _ x
-    ... | l , refl = where-ext w₀ [ l ]
-
-    mutual
-      lane-end : ∀ i {q a s c} → Values.Nth (enter (Op.of (true ∷ false ∷ [])) s₀) i q a → Bd.Starts i q (Bd.Sched i) s
-               → After (G a) s c end → W c
-      lane-end i {a = true} nt st (x , _) = own-end (starts i st (outer-where (nth-row nt))) x
-      lane-end i {a = false} {s} {c} nt st (x , _) with of-end s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d s c end) eG x))
-      ... | refl = where-ext (starts i st (outer-where (nth-row nt))) [ last ]
-
-      starts : ∀ i {q s} → Bd.Starts i q (Bd.Sched i) s → W q → W s
-      starts i (Bd.room _)            wq = where-ext wq [ ix 1 ]
-      starts i (Bd.freed _ _)         wq = where-ext wq [ ix 1 ]
-      starts i (Bd.queued _ _ k _ _)  wq = where-ext (sched i k) [ ix 1 ]
-
-      sched : ∀ i {c} → Bd.Kth (_≡ c) (Bd.Sched i) 0 → W c
-      sched zero ()
-      sched (suc i) (inj₁ (_ , (_ , _ , _ , nt , st , aft) , refl)) = lane-end i nt st aft
-      sched (suc i) (inj₂ k) = sched i k
+  module CatAt (s₀ : Pos) (w₀ : W s₀) = CatGood G W (λ w zs → where-ext w zs) lane-w s₀ w₀
 
   -- The closing `nothing` lies under the subscription or past a branch's end.
   nothing-at : ∀ {k} → enter D P k (out nothing) → W k
@@ -252,10 +333,10 @@ module SrcEnd {B : Set} (F G : Bool → Den (Maybe (Input B))) (T : Branch → D
   ...     | _ , _ , ()
   nothing-at r | q , false , oq , l , _ | q₂ , false , i , s , oq₂ , (nt , st) , (l′ , _)
     with of-at s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d _ _ (out nothing)) eG l′))
-  ... | l₀ , refl = where-ext (CatAt.starts (q ⊕ [ ix 1 ]) wq i st (CatAt.outer-where (q ⊕ [ ix 1 ]) wq oq₂)) [ l₀ ]
+  ... | l₀ , refl = where-ext (CatAt.starts (q ⊕ [ ix 1 ]) wq i st (CatAt.outer-good (q ⊕ [ ix 1 ]) wq oq₂)) [ l₀ ]
     where
       wq : W (q ⊕ [ ix 1 ])
-      wq = where-ext (CatAt.outer-where P where-at oq) [ ix 1 ]
+      wq = where-ext (CatAt.outer-good P where-at oq) [ ix 1 ]
 
   private
     module Mg = Merge F (enter (Op.of (true ∷ false ∷ [])) P)
