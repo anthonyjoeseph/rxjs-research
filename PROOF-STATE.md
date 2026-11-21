@@ -268,15 +268,24 @@ instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch; read on the scan's lanes
-counter, not the lanes' own count, which a carried route outlives; `active` and
-`queue` counting the real flatMap's live lanes. Then a reader's joins, the
+counter, not the lanes' own count, which a carried route outlives. Then a reader's joins, the
 defer limit's rest (no one approximant bounds it), and the cold's rows'
 order. Settled when each former's leaf is a body.
 
-Members: `lanes-by`, `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
+Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `value-open`, `over-open`, `end-open`, `comb-shut`, `scan-idle`,
 `held-connected`, `lim-rest`, `cold-rows`, `cold-covered`, `cold-shut`,
 `cold-idle`.
+
+#### THE REAL FLATMAP'S LANE COUNT
+
+The scan's `active` counts the real flatMap's live lanes (`LaneCount`).
+Open: inside an outer row the source's reading precedes the real
+flatMap's value with no lane row between; the lanes show no `outerOpen`;
+the real flatMap's outer holds each outer value; a lane run and never cut
+started before the closer's `outerDone` (the bounded merge needs `queue`).
+
+Members: `lane-in-outer`, `σ₃-open`, `ro-of`, `lane-started`.
 
 #### THE REAL FLATMAP'S OUTER
 

@@ -5,27 +5,25 @@
 module simultaneous.HeldSrc where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (Obs; FlatOp; empty; of; map; flatMap; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; _∙_; Path)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; Path)
 open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
-open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; skip; pin;
-  _≺_)
-open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB; isZero)
+open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; _≺_)
+open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
-open import simultaneous.HeldIn using (IdleIn; Upto)
+open import simultaneous.HeldIn using (IdleIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
   _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
-open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
+open import simultaneous.LaneLocal using (inv-ev; Fit; proper-fit; held-fit; module LaneReal)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import simultaneous.DenRows using (map-out′; hot-out)
@@ -33,11 +31,10 @@ open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (there)
 open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
-open import simultaneous.FlatPark using (past-park)
 open import simultaneous.BranchSplit using (SrcOf; bview)
 open import simultaneous.LaneSplit using (Ln; lane-proj; module HotSplit)
 open import simultaneous.TakeCut using (inst-⊕)
@@ -51,29 +48,24 @@ open import denotation.Laws.Worlds.Leaves using (of-inv)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≺-irrefl; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-split; entered-few)
 open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at; tag-outer)
 open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none)
-open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co; bproj-end; Within; within;
-  brTag)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ; ∈-++⁺ˡ)
+open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
-open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals; locals-runs;
-  local-end; run-row; walk; inv-past; step-local)
-open import simultaneous.FlatSim using (NoCB; tot)
-open import simultaneous.HeldComb using (exact-past; inv-at; ShutRun; RunHeld; ev; run-row)
-open import Relation.Nullary.Decidable using (decidable-stable)
+open import simultaneous.HeldComb using (ev; ShutRun; outRows; init; from; past)
+open import simultaneous.HeldComb using (ShutRun; ev)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
-open import denotation.Laws.BoundedInv using (end-uniq)
-open import Data.Bool using (true; false; _∧_)
+open import Data.Bool using (true; false)
 open import simultaneous.Project using (Proj; run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
@@ -82,12 +74,8 @@ import denotation.EmissionSet as ES
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.OuterSplit using (count-open; module OuterSplit)
 open import simultaneous.ProperIdle using (proper-idle)
-open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
-open import simultaneous.RealView using (module View; real-from; real-ends)
-open import denotation.EmissionSet using (Den; Truncate)
-open import simultaneous.InstEmit using (valuesOf)
 
-open import Tree using (Obs; FlatOp; empty; of; map; flatMap; connected)
+open import Tree using (Obs; FlatOp; empty; of; map; flatMap)
 
 
 -- A row between two of one instant is of it.
@@ -361,49 +349,47 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   src-func {y} {e} {e′} a b = InvAt.func (inv-ev m src env′ g₃ P ok₃)
     (subst (λ d → enter d P y e) (sym (src-op tk env′ m)) a) (subst (λ d → enter d P y e′) (sym (src-op tk env′ m)) b)
 
-  private
-    module LS = HotSplit laneB σ₃ L₃ P (λ b → ev m (fed tk b) env′) (λ c → ev m (Cat-of tk env′ c) env′) (λ b → ev m (Tag tk env′ b) env′)
-      (own-op tk env′ m) (cat-op tk env′ m) (tag-op tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
-      src-func lanes-past
-    module OS = OuterSplit σ₁ L₁ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
-      (own-op tk env′ m) (cat-op tk env′ m) (tag-outer tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
-      src-func outer-past
-    module OE = OwnEnds (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′) P
-      (own-op tk env′ m) (cat-op tk env′ m) (cat-nothing m)
-    module CS = HotSplit closeB σ₂ L₂ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
-      (own-op tk env′ m) (cat-op tk env′ m) (tag-close m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
-      src-func closer-past
+  module LS = HotSplit laneB σ₃ L₃ P (λ b → ev m (fed tk b) env′) (λ c → ev m (Cat-of tk env′ c) env′) (λ b → ev m (Tag tk env′ b) env′)
+    (own-op tk env′ m) (cat-op tk env′ m) (tag-op tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
+    src-func lanes-past
+  module OS = OuterSplit σ₁ L₁ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
+    (own-op tk env′ m) (cat-op tk env′ m) (tag-outer tk env′ m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
+    src-func outer-past
+  module OE = OwnEnds (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′) P
+    (own-op tk env′ m) (cat-op tk env′ m) (cat-nothing m)
+  module CS = HotSplit closeB σ₂ L₂ P (λ b → ev m (fed tk b) env′) (λ c′ → ev m (Cat-of tk env′ c′) env′) (λ b → ev m (Tag tk env′ b) env′)
+    (own-op tk env′ m) (cat-op tk env′ m) (tag-close m) (no-track tk env′ m) (no-close tk env′ m) (λ {b} → tag-branch tk env′ m b)
+    src-func closer-past
 
   -- The lanes' rows a run of the source met are a run of the lanes.
   lane-run : ∀ {rx} → Met M rx → LS.Runs nothing nothing rx
   lane-run {rx} mt = LS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
 
   -- Each level the source's reader of the lanes passes through shows its hangs.
-  private
-    S₂ s₃ : Pos
-    S₂ = LS.S₂
-    s₃ = LS.s₃
+  S₂ s₃ : Pos
+  S₂ = LS.S₂
+  s₃ = LS.s₃
 
-    module FM2 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ b → ev m (fed tk b) env′) (of-inv _)
-      (λ b → inv-ev m (fed tk b) env′ g₃) P ok₃ (sk-of _ P) (λ b s oks → shows-k (shows-ev m (fed tk b) env′ g₃ s oks))
-    module FB3 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ c → ev m (Cat-of tk env′ c) env′) (of-inv _)
-      (λ c → inv-ev m (Cat-of tk env′ c) env′ g₃) S₂ (FM2.val-ok 0 LS.o₁) (sk-of _ S₂)
-      (λ c s oks → shows-k (shows-ev m (Cat-of tk env′ c) env′ g₃ s oks))
-    module FM4 (n : ℕ) = SJ.Flat {n = n} (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) (λ b → ev m (Tag tk env′ b) env′) (of-inv _)
-      (λ b → inv-ev m (Tag tk env′ b) env′ g₃) s₃ (FB3.val-ok 0 LS.o₂) (sk-of _ s₃)
-      (λ b s oks → shows-k (shows-ev m (Tag tk env′ b) env′ g₃ s oks))
+  module FM2 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ b → ev m (fed tk b) env′) (of-inv _)
+    (λ b → inv-ev m (fed tk b) env′ g₃) P ok₃ (sk-of _ P) (λ b s oks → shows-k (shows-ev m (fed tk b) env′ g₃ s oks))
+  module FB3 (n : ℕ) = SJ.Flat {n = n} (Op.of (true ∷ false ∷ [])) (λ c → ev m (Cat-of tk env′ c) env′) (of-inv _)
+    (λ c → inv-ev m (Cat-of tk env′ c) env′ g₃) S₂ (FM2.val-ok 0 LS.o₁) (sk-of _ S₂)
+    (λ c s oks → shows-k (shows-ev m (Cat-of tk env′ c) env′ g₃ s oks))
+  module FM4 (n : ℕ) = SJ.Flat {n = n} (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) (λ b → ev m (Tag tk env′ b) env′) (of-inv _)
+    (λ b → inv-ev m (Tag tk env′ b) env′ g₃) s₃ (FB3.val-ok 0 LS.o₂) (sk-of _ s₃)
+    (λ b s oks → shows-k (shows-ev m (Tag tk env′ b) env′ g₃ s oks))
 
-    I-fed : InvAt (Hots env′) P (enter (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P)
-    I-fed = subst (λ d → InvAt (Hots env′) P (enter d P)) (fed-op tk env′ m) (inv-ev m (Fed tk env′) env′ g₃ P ok₃)
+  I-fed : InvAt (Hots env′) P (enter (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P)
+  I-fed = subst (λ d → InvAt (Hots env′) P (enter d P)) (fed-op tk env′ m) (inv-ev m (Fed tk env′) env′ g₃ P ok₃)
 
-    sh-σ₃ : Shows σ₃
-    sh-σ₃ = proper-shows {t = enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])} (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
+  sh-σ₃ : Shows σ₃
+  sh-σ₃ = proper-shows {t = enter (ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])} (shows-ev m real (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
 
-    sh-σ₂ : Shows σ₂
-    sh-σ₂ = proper-shows {t = enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])} (shows-ev m (closer {B = B}) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ gd)) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁))
+  sh-σ₂ : Shows σ₂
+  sh-σ₂ = proper-shows {t = enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])} (shows-ev m (closer {B = B}) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ gd)) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁))
 
-    sh-σ₁ : Shows σ₁
-    sh-σ₁ = proper-shows {t = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (shows-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′))
+  sh-σ₁ : Shows σ₁
+  sh-σ₁ = proper-shows {t = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (shows-ev m trig env₀ (good-cons L₀ gd) (c ⊕ [ ix 1 ]) (ok-step c ok₀′))
 
   -- A LANE ROW BEFORE A SOURCE VALUE IS SHOWN, at most a step down.
   lane-shown : ∀ {y e q a} → σ₃ y e → LS.M′ q (out a) → (y ⊕ [ sub LS.J ]) ≼ q
@@ -556,9 +542,8 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   outer-shown ry mq = OS.Rows.Shown.shown′ OS.dpast (k-shows λ n → FM4.sk-merge n) (k-shows λ n → FB3.Bnd.sk-bounded n 1) (k-shows λ n → FM2.sk-merge n)
     (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))) (λ r → proj₂ (InvAt.pinned I-fed r)) mq (OS.dshow sh-σ₁) ry
 
-  private
-    module LN = LS.Next lane-shown lane-under
-    module ON = OS.Next outer-shown outer-under
+  module LN = LS.Next lane-shown lane-under
+  module ON = OS.Next outer-shown outer-under
 
   opaque
     lane-next : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
@@ -614,23 +599,22 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- THE CLOSER TELLS THE OUTER'S END IN ITS INSTANT (`simultaneous.CloseDone`):
   -- its `outerDone` lies there, before each of its ends; the source shows
   -- it wherever it shows a later row.
-  private
-    module CD = CloseDone m {B = B} σ₁ env₀ L₁ (p₀ ⊕ [ ix 1 ]) outer-past₂
+  module CD = CloseDone m {B = B} σ₁ env₀ L₁ (p₀ ⊕ [ ix 1 ]) outer-past₂
 
-    Io₂ : InvAt (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) (enter (Op.of (true ∷ false ∷ [])) (p₀ ⊕ [ ix 1 ]))
-    Io₂ = of-inv (true ∷ false ∷ []) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁)
+  Io₂ : InvAt (Hots (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) (enter (Op.of (true ∷ false ∷ [])) (p₀ ⊕ [ ix 1 ]))
+  Io₂ = of-inv (true ∷ false ∷ []) (p₀ ⊕ [ ix 1 ]) (ok-step p₀ ok₁)
 
-    I-D₀ : InvAt (Hots (hot σ₁ ∷ env₀)) CD.s₁ (enter CD.D₀ CD.s₁)
-    I-D₀ = subst (λ d → InvAt (Hots (hot σ₁ ∷ env₀)) CD.s₁ (enter d CD.s₁)) CD.first-op
-      (inv-ev m (Clo true) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ gd)) CD.s₁
-        (ok-step CD.q₀ (ok-in (ok-step p₀ ok₁) (InvAt.world Io₂ CD.o₀) (InvAt.real Io₂ CD.o₀))))
+  I-D₀ : InvAt (Hots (hot σ₁ ∷ env₀)) CD.s₁ (enter CD.D₀ CD.s₁)
+  I-D₀ = subst (λ d → InvAt (Hots (hot σ₁ ∷ env₀)) CD.s₁ (enter d CD.s₁)) CD.first-op
+    (inv-ev m (Clo true) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ gd)) CD.s₁
+      (ok-step CD.q₀ (ok-in (ok-step p₀ ok₁) (InvAt.world Io₂ CD.o₀) (InvAt.real Io₂ CD.o₀))))
 
-    few-σ₁ : ∀ {y} → σ₁ y end → Few σ₁ y
-    few-σ₁ (r , _) with entered-few (ev m trig env₀) (c ⊕ [ ix 1 ]) {e = end} (λ {_} {_} → tt) r
-    ... | ks , h = ks , λ x lt → h (proj₁ x) lt
+  few-σ₁ : ∀ {y} → σ₁ y end → Few σ₁ y
+  few-σ₁ (r , _) with entered-few (ev m trig env₀) (c ⊕ [ ix 1 ]) {e = end} (λ {_} {_} → tt) r
+  ... | ks , h = ks , λ x lt → h (proj₁ x) lt
 
-    mq′ : ∀ {q a} → M q (out a) → CS.M′ q (out a)
-    mq′ {q} {a} = subst (λ d → enter d P q (out a)) (src-op tk env′ m)
+  mq′ : ∀ {q a} → M q (out a) → CS.M′ q (out a)
+  mq′ {q} {a} = subst (λ d → enter d P q (out a)) (src-op tk env′ m)
 
   close-done : ∀ {y q a} → σ₁ y end → M q (out a) → y ≺ q
              → ¬ ¬ Σ Pos λ z → instantOf z ≡ instantOf y
@@ -657,359 +641,3 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n)))
             (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (CS.dshow sh-σ₂) (r₁ , λ sc → ≺→≼ {z₁} {_} (aft sc)) zq
             λ (z , e″ , m′ , _ , z≼q , pr) → case (pr refl) z≼q m′
-
-  -- THE REAL FLATMAP, READ THROUGH ITS POLICY: its outer is the hot
-  -- outer's values, each lane a value's elaborated lane.
-  fL : A → Den (IE B)
-  fL a = ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀)
-
-  RO : EmissionSet A
-  RO = enter (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ])
-
-  module RV = View fL RO
-
-  R-from : ∀ {k e} → Truncate (RV.Join op) k e → R k e
-  R-from = real-from m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ])
-
-  postulate
-    -- THE REAL FLATMAP'S OUTER ENDS AFTER ITS VALUES, IN THE HOT OUTER'S
-    -- END'S INSTANT: the hot outer's values each end their own lane at once.
-    ro-before : ∀ {q a c} → RO q (out a) → RO c end → q ≺ c
-    ro-end    : ∀ {y} → σ₁ y end → Σ Pos λ c → RO c end × instantOf c ≡ instantOf y
-
-    -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, EVERY
-    -- LANE THE REAL FLATMAP RUNS AND NEVER CUTS HAS ENDED BY ITS INSTANT:
-    -- the scan counts every lane rxjs started and has not ended, and every
-    -- outer value a bounded merge holds, and every outer value lies before
-    -- the mark.
-    lanes-by : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-             → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-             → RV.LanesBy op (instantOf z)
-
-  -- The real flatMap's outer has ended by the closer's `outerDone`.
-  outer-by : ∀ {z n} → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → RV.OuterBy (instantOf z)
-  outer-by mz with close-sent mz
-  ... | _ , w′ , σd , refl with CD.done-under (proj₁ σd)
-  ...   | y₁ , e₁ , (ws , refl) with ro-end e₁
-  ...     | c′ , rc , ic = c′ , rc , λ h → irrⁱ (subst (instantOf ((y₁ ⊕ ws) ⊕ [ sub w′ ]) ≺ⁱ_) (trans ic i₁) h)
-    where
-      i₁ : instantOf y₁ ≡ instantOf ((y₁ ⊕ ws) ⊕ [ sub w′ ])
-      i₁ = trans (sym (inst-⊕ y₁ ws)) (sym (inst-⊕ (y₁ ⊕ ws) [ sub w′ ]))
-
-  -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, THE
-  -- LANES HAVE ENDED BY ITS INSTANT: its outer has, and every lane run and
-  -- never cut.  Asked only where the real flatMap has few rows before a
-  -- later instant's row.
-  --
-  -- REFUTED: 9e244736 `lanes-ended` unrestricted, by a switch whose cut lane loops: the lane never ends, the switch's count drops it at the cut, and the scan meets the closer's `outerDone` with no lane running or queued
-  lanes-ended : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-              → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-              → ∀ {q} → Few R q → instantOf z ≺ⁱ instantOf q
-              → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (instantOf z ≺ⁱ instantOf y)
-  lanes-ended r₁ mt a0 q0 Fq zq ¬g =
-    real-ends op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
-      (shows-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
-      (λ a s′ oks → shows-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s′ oks)
-      ro-before (proj₁ Fq , λ x lt → proj₂ Fq (R-from x) lt) zq
-      (outer-by (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (lanes-by r₁ mt a0 q0)
-      λ (y , ry , iy) → ¬g (y , (R-from ry , λ {c′} rc → subst (y ≼_) (end-uniq I₃ (R-from ry) rc) (≼-refl {y})) , iy)
-
-
-  -- NO VISIBLE ROW OF THE SOURCE LIES IN AN INSTANT PAST ONE OF ITS
-  -- ROWS AND EVERY BRANCH'S END: its own branches' merge ends at the last
-  -- of their ends as its readers see them, and the item telling it, at
-  -- once, fails the take (`simultaneous.OwnEnds`).
-  src-ends : ∀ {y₁ y₂ y₃ z e q a} → σ₁ y₁ end → σ₂ y₂ end → σ₃ y₃ end → M z e → M q (out a) → instantOf z ≺ⁱ instantOf q
-           → ¬ (instantOf z ≺ⁱ instantOf y₁) → ¬ (instantOf z ≺ⁱ instantOf y₂) → ¬ (instantOf z ≺ⁱ instantOf y₃) → ⊥
-  src-ends {y₁} {y₂} {y₃} {z} {e} {q} {a} r₁ r₂ r₃ _ mq zq n₁ n₂ n₃ =
-    OS.dend sh-σ₁ SO.f1 r₁ (Yq {y₁} OS.J n₁) λ t₁ →
-    CS.dend sh-σ₂ SC.f1 r₂ (Yq {y₂} CS.J n₂) λ t₂ →
-    LS.dend sh-σ₃ SL.f1 r₃ (Yq {y₃} LS.J n₃) λ t₃ →
-    fin (OE.merge-end (OS.Rows.m4-lane OS.dpast t₁ , pst (λ zs → outer-past zs r₁) OS.J)
-                      (LS.Rows.m4-lane LS.dpast t₃ , pst (λ zs → lanes-past zs r₃) LS.J)
-                      (CS.Rows.m4-lane CS.dpast t₂ , pst (λ zs → closer-past zs r₂) CS.J))
-    where
-      shM4 : Shows OE.M4.JoinT
-      shM4 = k-shows λ n → FM4.sk-merge n
-      shB3 : Shows OE.B3.JoinT
-      shB3 = k-shows λ n → FB3.Bnd.sk-bounded n 1
-      shM2 : Shows OE.M2.JoinT
-      shM2 = k-shows λ n → FM2.sk-merge n
-      shTW : Shows OE.TW.TakeT
-      shTW = k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n))
-
-      module SL = LS.Rows.Shown LS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (LS.dshow sh-σ₃)
-      module SO = OS.Rows.Shown OS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (OS.dshow sh-σ₁)
-      module SC = CS.Rows.Shown CS.dpast shM4 shB3 shM2 shTW (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (CS.dshow sh-σ₂)
-
-      I-own : InvAt (Hots env′) s₃ OE.Own′
-      I-own = subst (λ d → InvAt (Hots env′) s₃ (enter d s₃)) (cat-op tk env′ m) (inv-ev m (Cat-of tk env′ true) env′ g₃ s₃ (FB3.val-ok 0 LS.o₂))
-
-      module FL′ = OE.Fails shM4 shB3 shM2 (end-uniq I-own) SL.f2 SL.f3 SL.f4 SL.nfq
-
-      iq : ∀ {y} → ¬ (instantOf z ≺ⁱ instantOf y) → instantOf y ≺ⁱ instantOf q
-      iq {y} n with triⁱ (instantOf y) (instantOf z)
-      ... | inj₁ yz        = transⁱ yz zq
-      ... | inj₂ (inj₁ eq) = subst (_≺ⁱ instantOf q) (sym eq) zq
-      ... | inj₂ (inj₂ zy) = ⊥-elim (n zy)
-
-      iJ : ∀ {y} J → ¬ (instantOf z ≺ⁱ instantOf y) → instantOf (y ⊕ [ sub J ]) ≺ⁱ instantOf q
-      iJ {y} J n = subst (_≺ⁱ instantOf q) (sym (inst-⊕ y [ sub J ])) (iq {y} n)
-
-      Yq : ∀ {y} J → ¬ (instantOf z ≺ⁱ instantOf y) → (y ⊕ [ sub J ]) ≼ q
-      Yq {y} J n = ≺→≼ {y ⊕ [ sub J ]} {q} (instant-≺ (y ⊕ [ sub J ]) q (iJ {y} J n))
-
-      pst : ∀ {y} → (∀ zs → (P ⊕ zs) ≺ y) → ∀ J → OE.Past (y ⊕ [ sub J ])
-      pst {y} yp J zs = ≺-trans {P ⊕ zs} {y} {y ⊕ [ sub J ]} (yp zs) (≺-ext y [])
-
-      fin : (Σ Pos λ c′ → OE.M4.JoinT c′ end × (c′ ≡ y₁ ⊕ [ sub OS.J ] ⊎ c′ ≡ y₃ ⊕ [ sub LS.J ] ⊎ c′ ≡ y₂ ⊕ [ sub CS.J ])) → ⊥
-      fin (_ , x , inj₁ refl)        = FL′.own-fails x (pst (λ zs → outer-past zs r₁) OS.J) (iJ {y₁} OS.J n₁)
-      fin (_ , x , inj₂ (inj₁ refl)) = FL′.own-fails x (pst (λ zs → lanes-past zs r₃) LS.J) (iJ {y₃} LS.J n₃)
-      fin (_ , x , inj₂ (inj₂ refl)) = FL′.own-fails x (pst (λ zs → closer-past zs r₂) CS.J) (iJ {y₂} CS.J n₂)
-
-  -- THE CLOSER ENDS IN ITS `outerDone`'s INSTANT: the mark is its last
-  -- part's only item (`CloseDone.FirstEnd.closer-end`).
-  closer-ends : ∀ {k n} → σ₂ k (out (instEmit (mark outerDone) n)) → Σ Pos λ y → σ₂ y end × instantOf y ≡ instantOf k
-  closer-ends σd with CD.done-under (proj₁ σd)
-  ... | y , ry , (ws , refl) with CD.FirstEnd.closer-end ry (few-σ₁ ry) (InvAt.flat I-D₀)
-  ...   | c′ , rc , ic = c′ , (rc , λ rc′ → subst (c′ ≼_) (end-uniq I₂ rc rc′) (≼-refl {c′})) , trans ic (sym (inst-⊕ y ws))
-
-  -- WITH NO LANE RUNNING OR QUEUED AT THE CLOSER'S `outerDone`, NO
-  -- VISIBLE ROW OF THE SOURCE PAST IT LIES IN A LATER INSTANT: the outer
-  -- has ended under the mark, the closer ends in its instant, and the
-  -- lanes by it.
-  idle-ends : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-            → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
-            → ∀ {q a} → M q (out a) → Few R q → z ≺ q → instantOf z ≡ instantOf q
-  idle-ends r₁ {z} mt a0 q0 {q} mq Fq zq with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
-  ... | y₂′ , w′ , σd , refl with CD.done-under (proj₁ σd) | closer-ends σd
-  ...   | y₁ , e₁ , (ws , refl) | y₂ , e₂ , i₂ =
-    decidable-stable (instantOf Z ≟ⁱ instantOf q) λ ne →
-      lanes-ended r₁ mt a0 q0 Fq (lt ne) λ (y₃ , e₃ , i₃) →
-        src-ends e₁ e₂ e₃ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl)))) mq (lt ne)
-          (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₁ h)) (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₂′ h)) i₃
-    where
-      Z : Pos
-      Z = (y₁ ⊕ ws) ⊕ [ sub w′ ]
-
-      iz : instantOf Z ≡ instantOf (y₁ ⊕ ws)
-      iz = inst-⊕ (y₁ ⊕ ws) [ sub w′ ]
-
-      i₁ : instantOf y₁ ≡ instantOf Z
-      i₁ = trans (sym (inst-⊕ y₁ ws)) (sym iz)
-
-      i₂′ : instantOf y₂ ≡ instantOf Z
-      i₂′ = trans i₂ (sym iz)
-
-      lt : ¬ instantOf Z ≡ instantOf q → instantOf Z ≺ⁱ instantOf q
-      lt = ≺-instant Z q zq
-
-  -- EVERY OUTER ROW THE SOURCE MEETS LIES BEFORE THE CLOSER'S `outerDone`.
-  outer-before-done : ∀ {k v z n} → M k (out (just (inj₁ (outerB , v)))) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
-                    → k ≺ z
-  outer-before-done mk mz with outer-sent mk | close-sent mz
-  ... | y₁ , w , _ , σy , _ , refl | y₂ , w′ , σy′ , refl = CD.before-done σy (proj₁ σy′) w w′
-
-  -- PAST THE CLOSER'S `outerDone`, A COUNTED OUTER ROUTE KEEPS THE SOURCE
-  -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
-  -- lane running or queued, and no outer row follows to count another.
-  done-met : ∀ rx₁ {q a rx₂ z n} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
-           → Few R q → z ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0 → instantOf z ≡ instantOf q
-  done-met rx₁ {q} {a} {rx₂} {z} {n} mt mz Fq zq nz with run-catch rx₁ mt mz tt tt zq
-  ... | r₁ , r₂ , e″ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ r₁ (here refl))))) mz
-  ...   | refl = go (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) refl
-    where
-      xz : Maybe (Input B)
-      xz = just (inj₁ (closeB , instEmit (mark outerDone) n))
-      s₀ = proj₁ (past op init r₁)
-      rest = (q , out a) ∷ rx₂
-
-      mt′ : Met M (r₁ ++ (z , out xz) ∷ (r₂ ++ rest))
-      mt′ = subst (Met M) (++-assoc r₁ ((z , out xz) ∷ r₂) rest) mt
-
-      mx : Met M (r₁ ++ (z , out xz) ∷ r₂)
-      mx = run-prefix (r₁ ++ (z , out xz) ∷ r₂) mt
-
-      zk : ∀ {k e} → (k , e) ∈ r₂ → z ≺ k
-      zk i with run-tail r₁ mt′
-      ... | _ ∷ᴿ rn = run-after rn (∈-++⁺ˡ i)
-
-      rk : ∀ {k e} → (k , e) ∈ r₂ → M k e
-      rk i = proj₁ (run-row∈ mt′ (∈-++⁺ʳ r₁ (there (∈-++⁺ˡ i))))
-
-      -- No outer row follows the mark.
-      nt : ∀ {k e} → (k , e) ∈ r₂ → brTag {B} outerB e ≡ nothing
-      nt {k} {out (just (inj₁ (outerB , v)))} i = ⊥-elim (≺-absurd {z} {k} (zk i) (outer-before-done (rk i) mz))
-      nt {k} {out (just (inj₁ (laneB , v)))}  i = refl
-      nt {k} {out (just (inj₁ (closeB , v)))} i = refl
-      nt {k} {out (just (inj₂ _))}            i = refl
-      nt {k} {out nothing}                    i = refl
-      nt {k} {end}                            i = refl
-      nt {k} {skip}                           i = refl
-      nt {k} {pin _}                          i = refl
-
-      tl₂ : ∀ a₁ {c} a₂ → r₂ ≡ a₁ ++ (c , end) ∷ a₂ → a₂ ≡ []
-      tl₂ a₁ {c} a₂ eq = end-last I-M (r₁ ++ (z , out xz) ∷ a₁)
-        (subst (Met M) (trans (cong (λ w → r₁ ++ (z , out xz) ∷ w) eq) (sym (++-assoc r₁ ((z , out xz) ∷ a₁) ((c , end) ∷ a₂)))) mx)
-
-      split≡ : past op init (r₁ ++ (z , out xz) ∷ r₂) ≡ past op (react op (past op init r₁) xz) r₂
-      split≡ = past-split op init r₁ (λ a₁ a₂ eq → end-last I-M a₁ (subst (Met M) eq mx))
-
-      go : ∀ b → (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) ≡ b → instantOf z ≡ instantOf q
-      go true h with both-zero (Flat.active s₀) (Flat.queue s₀) h
-      ... | a0 , q0 = idle-ends r₁ mt′ a0 q0 (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) Fq zq
-      go false h = ⊥-elim (nz (trans (cong (λ o → Flat.outer (proj₁ o)) split≡) (ℕP.n≤0⇒n≡0 (Within.le Wo))))
-        where
-          oz : Flat.outer (proj₁ (react op (past op init r₁) xz)) ≡ 0
-          oz = left-cut n (record s₀ { finished = true }) h
-          Wo : Within outerB (proj₁ (past op (react op (past op init r₁) xz) r₂)) (root , 0)
-          Wo = past-within {A} {B} co (opening {A} {B}) count-open OS.J op (react op (past op init r₁) xz) (root , 0) r₂ [] tl₂
-                (all-drop r₂ nt) (within (λ _ → oz) (subst (ℕ._≤ 0) (sym oz) ℕ.z≤n) (inj₁ oz))
-
-  -- WHILE THE SCAN STILL COUNTS AN OUTER ROUTE, AN OUTER END BEFORE THE
-  -- SOURCE'S NEXT ROW IS OF THAT ROW'S INSTANT: the source meets that row
-  -- no later than the closer's `outerDone`, or past it.
-  outer-end-at : ∀ rx₁ {q a rx₂ y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q → σ₁ y end → y ≺ q → ¬ Flat.outer (proj₁ (past op init rx₁)) ≡ 0
-               → nameOf y ≡ nameOf q
-  outer-end-at rx₁ {q} {a} {rx₂} {y} mt Fq ry yq nz = decidable-stable (nameOf y ≟ᵖ nameOf q) λ ne →
-    close-done ry (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) yq λ where
-      (z , zy , inj₁ qz)            → ne (cong (λ i → nm (i ∙ [])) (between-inst {y} {q} {z} yq qz zy))
-      (z , zy , inj₂ (n , mz , zq)) → ne (cong (λ i → nm (i ∙ [])) (trans (sym zy) (done-met rx₁ mt mz Fq zq nz)))
-
-  -- THE SCAN'S OUTER COUNTER IS OF THE SOURCE'S NEXT ROW'S INSTANT, OR
-  -- NONE: it is of the instant the outer last began, which the outer,
-  -- idle, keeps up to its next row, or up to its end.
-  outer-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
-                → Flat.outer (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  outer-current rx₁ {q} mt Fq with outer-next rx₁ mt
-  ... | rs , pr , mr , w , wq , fw , af , outl , _ with outer-count (run-prefix rx₁ mt) pr
-  ...   | inj₁ z = inj₁ z
-  ...   | inj₂ (at≡ , k , ck) with Flat.outer (proj₁ (past op init rx₁)) ℕ.≟ 0
-  ...     | Nl.yes z = inj₁ z
-  ...     | Nl.no nz = inj₂ (trans at≡ (decidable-stable (proj₁ (cnt rs) ≟ᵖ nameOf q) λ ¬g → ¬g (idle-w λ e → ¬g (idle-y e))))
-    where
-      Cr : Maybe Pos
-      Cr = cursor nothing rs
-
-      at-idle : ∀ {v} → Few σ₁ v → After Cr v → (∀ {y e} → σ₁ y e → Visible e → After Cr y → v ≼ y) → proj₁ (cnt rs) ≡ nameOf v
-      at-idle fv av lv = [ (λ z → ⊥-elim (ℕP.0≢1+n (trans (sym z) ck))) , (λ n → n) ]′ (outer-idle mr (λ i → bproj-end pr i) fv av lv)
-
-      -- No outer end before `w`: the outer is idle at `w`.
-      idle-w : (Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → ⊥) → proj₁ (cnt rs) ≡ nameOf q
-      idle-w ne = trans (at-idle fw af lw) (named-at OS.J wq)
-        where
-          lw : ∀ {y e} → σ₁ y e → Visible e → After Cr y → w ≼ y
-          lw {e = out _} ry _ ay    = outl ry ay
-          lw {e = end}   ry _ ay yw = ne (_ , ry , ay , yw)
-          lw {e = skip}  _  () _
-          lw {e = pin _} _  () _
-
-      -- An outer end before it: the outer is idle at that end.
-      idle-y : Σ Pos (λ y → σ₁ y end × After Cr y × y ≺ w) → proj₁ (cnt rs) ≡ nameOf q
-      idle-y (y , ry , ay , yw) =
-        trans (at-idle (proj₁ fw , λ {k} rk ky → proj₂ fw rk (≺-trans {k} {y} {w} ky yw)) ay ly)
-              (outer-end-at rx₁ {y = y} mt Fq ry (≺-≼-≺ {y} {w} {q} yw (next-≼ OS.J wq)) nz)
-        where
-          ly : ∀ {y′ e} → σ₁ y′ e → Visible e → After Cr y′ → y ≼ y′
-          ly {y′} {out _} ry′ _ ay′ = ≺→≼ {y} {y′} (≺-≼-≺ {y} {w} {y′} yw (outl ry′ ay′))
-          ly {e = end}    ry′ _ _   = Lawful.proper L₁ ry′ ry
-          ly {e = skip}   _   () _
-          ly {e = pin _}  _   () _
-
-  postulate
-    -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
-    -- scan's rows.  Owed: the run split onto that connect's tracker, and
-    -- the binder's own `idle` (`Bound.held`) read through `annotate`.
-    live-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                 → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
-                 → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-
-  parked-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                 → Flat.parked (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  parked-current rx₁ mt v with past-park op init rx₁ (inj₁ refl)
-  ... | inj₁ z = inj₁ z
-  ... | inj₂ h = inj₂ (live-current rx₁ mt v h)
-
-  -- No closer's row begins a route.
-  no-cb : ∀ {q n} → MRow q (out (just (inj₁ (closeB , instEmit (mark begin) n)))) → ⊥
-  no-cb (close y) = closing-mark (close-marks y) (λ ()) (λ ())
-
-  nocb : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → ∀ r₁ {q′ x} r₂ → rx₁ ≡ r₁ ++ (q′ , out x) ∷ r₂ → NoCB x
-  nocb rx₁ {q} {e} {rx₂} mt r₁ {q′} r₂ refl refl =
-    no-cb (m-rows (proj₁ (run-row r₁ (subst (Met M) (++-assoc r₁ ((q′ , _) ∷ r₂) ((q , e) ∷ rx₂)) mt))) tt)
-
-  -- Four counters each of the instant or none: their sum is.
-  sum-current : ∀ {X : Set} (a b c d : ℕ) → (a ≡ 0 ⊎ X) → (b ≡ 0 ⊎ X) → (c ≡ 0 ⊎ X) → (d ≡ 0 ⊎ X) → a + b + c + d ≡ 0 ⊎ X
-  sum-current .0 .0 .0 .0 (inj₁ refl) (inj₁ refl) (inj₁ refl) (inj₁ refl) = inj₁ refl
-  sum-current _ _ _ _ (inj₂ x) _ _ _ = inj₂ x
-  sum-current _ _ _ _ (inj₁ _) (inj₂ x) _ _ = inj₂ x
-  sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₂ x) _ = inj₂ x
-  sum-current _ _ _ _ (inj₁ _) (inj₁ _) (inj₁ _) (inj₂ x) = inj₂ x
-
-  flat-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
-               → tot (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  flat-current rx₁ mt Fq = sum-current (Flat.outer st) (Flat.lanes st) (Flat.held st) (Flat.parked st)
-    (outer-current rx₁ mt Fq) (lanes-current rx₁ mt) (held-current rx₁ mt tt) (parked-current rx₁ mt tt)
-    where st = proj₁ (past op init rx₁)
-
-  start-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Few R q
-                → proj₂ (from r₀ (outRows op init rx₁)) ≡ 0 ⊎ proj₁ (from r₀ (outRows op init rx₁)) ≡ nameOf q
-  start-current rx₁ mt Fq with flat-current rx₁ mt Fq
-  ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
-  ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
-
-  named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
-  named x with m-rows x tt
-  ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
-    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (rootOf-ext c [ sub w ])))
-  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (rootOf-ext c [ sub w ])))
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
-
-  early : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
-  early x with m-rows x tt
-  ... | outer y eq = ⊥-elim (open-value eq)
-  ... | lane {w = w} y = early-inst [ sub w ] (lane-early y)
-  ... | close y = ⊥-elim (closing-value (close-marks y))
-
-  ends : ∀ {q} → M q end → Early q
-  ends x with m-rows x tt
-  ... | under {zs} = early-inst zs ep₃
-  ... | done {zs = zs} b = early-inst zs (bend b)
-    where
-      bend : ∀ {c} → BEnd c → Early c
-      bend (b-outer {w = w} y) = early-inst [ sub w ] (Held.ends H₁ (proj₁ y))
-      bend (b-lane {w = w} y)  = early-inst [ sub w ] (lane-ends y)
-      bend (b-close {w = w} y) = early-inst [ sub w ] (close-ends y)
-
-  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
-  late x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (Held.late H₁ (proj₁ y))
-  ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
-
-  mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
-  mdone x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
-  ... | lane {w = w} y = early-inst [ sub w ] (Fit.fine lane-fit y)
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
-
-  comb-runs : ∀ {rx} → Met M rx → Upto (Few R) rx → RunHeld cs′ (outRows op init rx)
-  comb-runs {rx} mt up = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
-    where
-      step : ∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
-           → Locals cs′ (from r₀ (outRows op init rx₁)) (lay q 0 (proj₂ (react op (past op init rx₁) x)))
-      step rx₁ {q} {x} rx₂ refl =
-        step-local op cs′ (past op init rx₁) (from r₀ (outRows op init rx₁)) q x (inv-past op rx₁) (start-current rx₁ mt (up (∈-++⁺ʳ rx₁ (here refl))))
-          (λ { refl → named (proj₁ (run-row rx₁ mt)) })
-          (λ { refl ne → value-open rx₁ mt o-value ne })
-          (λ { refl sp ne → over-open rx₁ mt sp ne })
-          (λ { refl ne → value-open rx₁ mt o-done ne })
-          (λ j → rootOf-ext q (ix 1 ∷ ix j ∷ []))
-
-      fin : ∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local cs′ (from r₀ (outRows op init rx₁)) q end
-      fin rx₁ rx₂ refl = local-end (end-open rx₁ mt)
-
-  comb : CombIn (Few R) op M cs′
-  comb = record { named = named ; early = early ; ends = ends ; late = late ; done = mdone ; runs = comb-runs }
