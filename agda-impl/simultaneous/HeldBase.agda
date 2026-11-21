@@ -54,12 +54,13 @@ open import simultaneous.InstEmit using (instEmit; value; mark; over)
 open import simultaneous.Routed using (nameOf; nm; Valued; opos)
 open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
+open import simultaneous.ColdFew using (cold-step-few; of-below)
 open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
 open import denotation.Laws.Worlds using (ok-step; _⊑_)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (sym; cong; subst)
@@ -75,9 +76,8 @@ open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt; Carried)
 open import simultaneous.HeldComb using (ShutRun)
 open import denotation.Position using (Path)
-open import denotation.EmissionSet using (InE; at-out; at-end; on-out)
+open import denotation.EmissionSet using (InE; at-end; at-out; on-out)
 open import denotation.Events using (ofᴱ)
-open import denotation.Laws.Worlds.Leaves using (of-idx)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import simultaneous.Relations using (values)
 open import simultaneous.HeldComb using (RunHeld)
@@ -155,11 +155,6 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
       ... | zs , refl = early-inst zs ep
 
 -- The rows of `of` and of `empty`.
-of-below : ∀ {X} p i (ys : List X) {y e} → InE (ofᴱ p i ys) y e → Σ Path λ zs → y ≡ p ⊕ zs
-of-below p i ys x with of-idx p i ys x
-... | inj₁ (j , _ , eq) = [ ix j ] , eq
-... | inj₂ eq           = [ last ] , eq
-
 of-vals : ∀ {X} p i (ys : List X) {y v} → InE (ofᴱ p i ys) y (out v) → v ∈ ys
 of-vals p i (_ ∷ ys) at-out     = here refl
 of-vals p i (_ ∷ ys) (on-out r) = there (of-vals p (suc i) ys r)
@@ -216,9 +211,6 @@ postulate
                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
   cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
-  -- A cold's step makes finitely many rows, past its over or not.
-  cold-step-few : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {q n} → enter (ev m (coldˢ c) env) p q (out (instEmit (mark begin) n))
-                → Σ (List Pos) λ ks → ∀ {y e} → enter (ev m (coldˢ c) env) p y e → rootOf y ≡ rootOf q → y ∈ ks
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)

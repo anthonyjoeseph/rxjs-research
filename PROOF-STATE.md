@@ -251,15 +251,14 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
-begun remain. A cold needs no run: one step makes finitely many rows.
-The combinator scan loops synchronously, so its rest needs the count.
+begun remain. The combinator scan loops synchronously, so its rest needs the count.
 A connect's echoes are its source's rows: where its body empties, its
 source must be done with the instant (`Tracks`), true of an elaborated
 body because each flatMap parks what it cuts while a connect in scope
 holds a route. Settled by bodies, or a body emptied under a looping source.
 
-Members: `cold-step-few`, `scan-rest`, `connect-tracks`, `tracks-trig`,
-`tracks-closer`, `tracks-real`.
+Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
+`tracks-real`.
 
 #### THE HELD STREAMS
 
