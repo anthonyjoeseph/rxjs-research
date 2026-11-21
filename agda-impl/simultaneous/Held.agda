@@ -29,6 +29,10 @@ open import simultaneous.Routed using (Held; HeldD; Early)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
+open import simultaneous.HeldTake using (held-take-den)
+open import simultaneous.HeldDefer using (held-defer)
+open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks)
+open import simultaneous.DenRows using (map-out′; hot-out)
 open import simultaneous.HeldConnect using (held-conn; early-inst)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Ok; InvD; Lawful; _∪ʰ_)
@@ -41,7 +45,7 @@ open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
@@ -86,6 +90,13 @@ open import denotation.Simultaneity using (reflⁱ)
 open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt; Carried)
 open import simultaneous.HeldComb using (ShutRun)
+open import denotation.Position using (Path)
+open import denotation.EmissionSet using (InE; at-out; at-end; on-out; spin)
+open import denotation.Events using (ofᴱ)
+open import denotation.Laws.Worlds.Leaves using (of-idx)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
+open import simultaneous.Relations using (values)
+open import simultaneous.HeldComb using (RunHeld)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -121,10 +132,69 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 -- EACH ELABORATED FORMER HOLDS when its children do, under the meaning
 -- and under every approximant alike.
 
+-- A STREAM OF ITS SUBSCRIBE BURST ALONE HOLDS: every row it shows lies
+-- below its subscription, in its instant, and none is a mark.
+module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : Early p)
+             (below : ∀ {y e} → t y e → Visible e → Σ Path λ zs → y ≡ p ⊕ zs)
+             (no-mark : ∀ {y m n} → t y (out (instEmit (mark m) n)) → ⊥) where
+
+  in-burst : ∀ {y e} → t y e → Visible e → Ex (p ∷ cs) y
+  in-burst x v with below x v
+  ... | zs , refl = here (⊑-inside {p} {p ⊕ zs} (zs , refl) , rootOf-ext p zs)
+
+  quiet-fold : ∀ c (rs : List (Pos × Ev (IE A))) → (∀ {y m n} → (y , out (instEmit (mark m) n)) ∈ rs → ⊥)
+             → L.foldl count c (values rs) ≡ c
+  quiet-fold c []                                    h = refl
+  quiet-fold c ((y , out (instEmit (value a) n)) ∷ rs) h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , out (instEmit (mark m) n)) ∷ rs)  h = ⊥-elim (h (here refl))
+  quiet-fold c ((y , end) ∷ rs)                      h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , skip) ∷ rs)                     h = quiet-fold c rs (λ i → h (there i))
+  quiet-fold c ((y , pin _) ∷ rs)                    h = quiet-fold c rs (λ i → h (there i))
+
+  runs : ∀ {rs} → Met t rs → RunHeld (p ∷ cs) rs
+  runs {rs} mt = record
+    { covered = λ r₁ r₂ eq _ ne → let (x , v) = run-row r₁ (subst (Met t) eq mt) in ⊥-elim (ne (in-burst x v))
+    ; exact   = λ r₁ r₂ eq → ⊥-elim (no-mark (proj₁ (run-row r₁ (subst (Met t) eq mt))))
+    ; shut    = λ r₁ r₂ eq _ bq _ _ → ⊥-elim (no-mark (proj₁ (run-row∈ mt (subst (_ ∈_) (sym eq) (∈-++⁺ˡ bq))))) }
+
+  held : Held t (p ∷ cs)
+  held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x))
+    (λ mt _ _ _ _ → inj₁ (cong proj₂ (quiet-fold r₀ _ (λ i → no-mark (proj₁ (run-row∈ mt i))))))
+    (λ mt _ bq → ⊥-elim (no-mark (proj₁ (run-row∈ mt bq))))
+    runs
+    where
+      early : ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
+      early x with below x tt
+      ... | zs , refl = early-inst zs ep
+      ends : ∀ {y} → t y end → Early y
+      ends x with below x tt
+      ... | zs , refl = early-inst zs ep
+
+-- The rows of `of` and of `empty`.
+of-below : ∀ {X} p i (ys : List X) {y e} → InE (ofᴱ p i ys) y e → Σ Path λ zs → y ≡ p ⊕ zs
+of-below p i ys x with of-idx p i ys x
+... | inj₁ (j , _ , eq) = [ ix j ] , eq
+... | inj₂ eq           = [ last ] , eq
+
+of-vals : ∀ {X} p i (ys : List X) {y v} → InE (ofᴱ p i ys) y (out v) → v ∈ ys
+of-vals p i (_ ∷ ys) at-out     = here refl
+of-vals p i (_ ∷ ys) (on-out r) = there (of-vals p (suc i) ys r)
+
+of-mark : ∀ {X} p (xs : List X) {y m n} → InE (ofᴱ p 0 (L.map (λ x → instEmit (value x) root) xs)) y (out (instEmit (mark m) n)) → ⊥
+of-mark p xs r with ∈-map⁻ (λ x → instEmit (value x) root) (of-vals p 0 _ r)
+... | _ , _ , ()
+
+held-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
+held-empty nothing  ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
+held-empty (just n) ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
+
+held-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
+held-of nothing  ρ xs = ih λ env cs g eh p ok ep →
+  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
+held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
+  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
+
 postulate
-  held-empty     : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
-  held-of        : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
-  held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
 -- THE COLD'S ROWS, subscribed at `p`: its synchronous values and end lie
@@ -211,6 +281,12 @@ held-cold m ρ c = ih λ env cs g eh p ok ep →
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
 held-map nothing  ρ f s (ih h) = ih λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
 held-map (just n) ρ f s (ih h) = ih λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh)
+
+held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
+held-takeWhile nothing  ρ i p s (ih h) = ih λ env cs g eh →
+  held-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g)
+held-takeWhile (just n) ρ i p s (ih h) = ih λ env cs g eh →
+  held-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g)
 
 held-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
 held-scan nothing  ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
@@ -348,18 +424,6 @@ open-value : ∀ {A B} {x : IE A} {a n} → opening {B = B} x ≡ instEmit (valu
 open-value {x = instEmit (value _) _} ()
 open-value {x = instEmit (mark _) _}  ()
 
--- What the closer sends: a bracket's close, then the outer's end.
-data Closing {B : Set} : IE B → Set where
-  c-close : ∀ {n} → Closing (instEmit (mark outerClose) n)
-  c-done  : ∀ {n} → Closing (instEmit (mark outerDone) n)
-
-closing-mark : ∀ {B} {m n} → Closing {B} (instEmit (mark m) n) → (m ≡ outerClose → ⊥) → (m ≡ outerDone → ⊥) → ⊥
-closing-mark c-close a _ = a refl
-closing-mark c-done  _ b = b refl
-
-closing-value : ∀ {B} {a n} → Closing {B} (instEmit (value a) n) → ⊥
-closing-value ()
-
 -- WHAT THE SCAN'S SOURCE MEETS, read past the three connects: a
 -- tracker's report, a branch's row re-keyed where the branch's reader
 -- subscribed it, or the end, under the scan's own subscription.
@@ -392,13 +456,26 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     under   : ∀ {zs} → MRow (P ⊕ zs) end
     done    : ∀ {c zs} → BEnd c → MRow (c ⊕ zs) end
 
+  -- WHAT EACH BRANCH SENT, row by row: a row of the outer, the closer or
+  -- the lanes, one `sub` below where that branch shows it.
+  outer-sent : ∀ {q y} → M q (out (just (inj₁ (outerB , y))))
+             → Σ Pos λ c → Σ Pos λ w → Σ (IE A) λ x → σ₁ c (out x) × opening x ≡ y × q ≡ c ⊕ [ sub w ]
+  outer-sent r with sent-branch tk env′ m P r
+  ... | w , l with map-out′ opening (hot σ₁) w l
+  ...   | x , l′ , refl with hot-out l′
+  ...     | c′ , σc , _ , refl = c′ , w , x , σc , refl , refl
+
+  lane-sent : ∀ {q x} → M q (out (just (inj₁ (laneB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₃ c (out x) × q ≡ c ⊕ [ sub w ]
+  lane-sent r with sent-branch tk env′ m P r
+  ... | w , l with hot-out l
+  ...   | c′ , σc , _ , refl = c′ , w , σc , refl
+
+  close-sent : ∀ {q x} → M q (out (just (inj₁ (closeB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₂ c (out x) × q ≡ c ⊕ [ sub w ]
+  close-sent r with sent-branch tk env′ m P r
+  ... | w , l with hot-out l
+  ...   | c′ , σc , _ , refl = c′ , w , σc , refl
+
   postulate
-    -- WHAT EACH BRANCH SENT, row by row: a row of the outer, the closer or
-    -- the lanes, one `sub` below where that branch shows it.
-    outer-sent : ∀ {q y} → M q (out (just (inj₁ (outerB , y))))
-               → Σ Pos λ c → Σ Pos λ w → Σ (IE A) λ x → σ₁ c (out x) × opening x ≡ y × q ≡ c ⊕ [ sub w ]
-    lane-sent  : ∀ {q x} → M q (out (just (inj₁ (laneB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₃ c (out x) × q ≡ c ⊕ [ sub w ]
-    close-sent : ∀ {q x} → M q (out (just (inj₁ (closeB , x)))) → Σ Pos λ c → Σ Pos λ w → σ₂ c (out x) × q ≡ c ⊕ [ sub w ]
     -- The source ends under its own subscription, or past a branch's end.
     m-ends     : ∀ {q} → M q end → (Σ _ λ zs → q ≡ P ⊕ zs) ⊎ (Σ Pos λ c → Σ _ λ zs → BEnd c × q ≡ c ⊕ zs)
 
@@ -422,10 +499,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
     lane-early  : ∀ {q a n} → σ₃ q (out (instEmit (value a) n)) → Early q
     lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
-    close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
     -- A lane's and the closer's ends lie before their step's over.
     lane-ends   : ∀ {q} → σ₃ q end → Early q
     close-ends  : ∀ {q} → σ₂ q end → Early q
+
+  close-marks : ∀ {q x} → σ₂ q (out x) → Closing x
+  close-marks (r , _) = closer-marks m (hot σ₁ ∷ env₀) _ r
 
   cs′ : List Pos
   cs′ = P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs
@@ -746,11 +825,16 @@ held-flatMap m ρ op f s hs hf = ih λ env cs g eh p ok ep →
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit.
 postulate
-  held-⊥    : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
-  held-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-            → IH (just n) ρ (Later.force l) → IH (just (suc n)) ρ (defer l)
   held-lim  : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
             → (∀ n → IH (just n) ρ (defer l)) → IH nothing ρ (defer l)
+
+held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
+held-⊥ ρ l = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (spin _ , _) () }) λ { (() , _) }
+
+held-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
+          → IH (just n) ρ (Later.force l) → IH (just (suc n)) ρ (defer l)
+held-next n ρ l (ih h) = ih λ env cs g eh p ok ep →
+  held-defer (approx n (elab ρ (Later.force l)) env) p cs (h env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (early-inst [ ix 1 ] ep))
 
 held-approx : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → IH (just n) ρ o
 held-approx n       ρ (cold c)          = held-cold (just n) ρ c

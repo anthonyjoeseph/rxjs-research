@@ -240,6 +240,11 @@ module Joiners {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         mg-late-src : ∀ N {k e} → oM N k e → Rel.Late (Out.rel Os) N k → Late′ N k
         -- an outer skip or end read through the shared hot
         mg-φ-src : ∀ N {k e} → oM N k e → (∀ {a} → ¬ e ≡ out a) → Unpinned e → φ′ N k ≡ srcφ N k
+        -- An outer row's placement is the source's under the shared hot,
+        -- ordered by the source's, or the row's own image: for an own row
+        -- ordered by the source's rows, for a late or pinned one by
+        -- nothing `Corr` says, since the source's map at a row it does not
+        -- image is unconstrained.
         mg-o-pb  : ∀ N {z z*} → Mark (BdoM N) z → Mark (BdS* N) z*
                  → Btw (Own (oM N) (Rel.Late (Out.rel Os) N)) (Rel.φ (Out.rel Os) N) z z*
                  → PB (OwnPut (oM N) (Rel.Put (Out.rel Os) N)) z z* → JP.IO.PutBefore N z z*

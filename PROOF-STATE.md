@@ -59,12 +59,14 @@ Members: `mg-is-val`, `mg-not-val`, `mg-late-src`, `mg-φ-src`, `mg-val←`, `mg
 `Inter.BCorr.to` orders placements both ways: a late row whose
 placement lies before an elaborated hang lies before its plain partner
 (`Inter.PutAfter`), as `from` orders them forward. With it a row clear
-where its placement is (`Across.put-clear`) is derived. Untried: no
-former's placements were ever ordered back. Settled by bodies, or a put
-row past a plain hang whose placement lies before the partner.
+where its placement is (`Across.put-clear`) is derived. Riskiest: the
+merge places a late or pinned outer row at its own image, which the
+source's `Corr` does not constrain (`mg-o-pa`, and `mg-o-pb` forward).
+Then the cross-part mirrors. Settled by bodies, or a put row past a
+plain hang whose placement lies before the partner.
 
 Members: `mg-o-pa`, `mg-outer-lane-put←`, `mg-lane-outer-put←`,
-`mg-lane-lane-put←`, `ct-body-src-put←`, `cb-putw←`.
+`mg-lane-lane-put←`, `ct-body-src-put←`.
 
 #### THE HANGS ACROSS CUTS
 
@@ -263,18 +265,15 @@ bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, true on every row probed, hand-offs and parks
 included: each is the `idle` of what holds the routes, read on the
 scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
-split is owed). Then what each branch sent, a reader's joins and the
-defer limit. The cold's runs (`cold-covered`) need its rows' order, not
+split is owed). Then where the scan's source ends (`m-ends`), the lanes'
+own rows, a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
 their shape. Settled when each former's leaf is a body.
 
-Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`,
-`lanes-count`, `held-current`, `parked-live`, `live-current`,
-`value-open`, `over-open`, `end-open`, `comb-shut`, `walk`,
-`step-local`, `outer-sent`, `lane-sent`, `close-sent`, `m-ends`,
-`lane-ends`, `close-ends`, `lane-named`, `lane-early`, `lane-late`,
-`close-marks`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
-`held-top`, `held-next`, `held-⊥`, `held-takeWhile`, `cold-rows`,
-`cold-covered`, `cold-shut`, `cold-idle`, `held-of`, `held-empty`,
+Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`, `lanes-count`,
+`held-current`, `parked-live`, `live-current`, `value-open`, `over-open`,
+`end-open`, `comb-shut`, `m-ends`, `lane-ends`, `close-ends`, `lane-named`,
+`lane-early`, `lane-late`, `scan-idle`, `comb-run`, `held-connected`,
+`held-lim`, `held-top`, `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`,
 `held-trigger`.
 
 #### THE BATCH RANK

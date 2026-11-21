@@ -36,11 +36,23 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.FlatSim using (Inv; inv₀; react-inv; react-exact; NoCB; tot; live; dead)
-open import simultaneous.Routed using (Carried; c-end)
+open import simultaneous.Routed using (Carried; c-end; c-value; c-stop; c-over; nm)
+open import Data.Nat using (_≤_; s≤s; z≤n; _⊓_; zero; _+_; _∸_)
+open import Data.Nat.Properties using (≤-trans; ≤-reflexive; m≤m+n; m≤n+m; m⊓n≤n; +-monoˡ-≤)
+open import Data.Bool using (true; if_then_else_; _∧_; _∨_)
+open import Data.Empty using (⊥-elim)
+open import Data.List.Relation.Unary.Any using () renaming (map to any-map)
+open import denotation.Laws.Worlds using (⊑-trans; ⊑-inside; inside-⊑)
+open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
+open import simultaneous.InstEmit using (carry; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.SObs using (isZero; outerB; laneB; closeB)
+open import Relation.Nullary using (does)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Routed using (Held; Carried; cnt; Ex; nameOf; Early; Valued; opos; Routing; Idle; Rest)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Out; Input; react; each)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Out; Input; react; each;
+  cut; unpark; arrive; burstOver; left; begun; overed; stopped; onMark; share; anyHolds; setAt)
+  renaming (ended to laneEnded; stops to stopsᵒ)
 
 ------------------------------------------------------------------------
 -- What the scan lays out
@@ -251,25 +263,181 @@ exact-past : ∀ {B} op rx → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , o
            → proj₂ (from r₀ (outRows {B} op init rx)) ≡ tot (proj₁ (past op init rx))
 exact-past op rx nc = exact-from op init r₀ rx nc inv₀ refl
 
-postulate
-  -- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
-  -- from the count the outputs before them leave, and the end.
-  walk : ∀ {B} op cs (o : Out B) c rx
-       → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
-          → Locals cs (from c (outRows op o rx₁)) (lay q 0 (proj₂ (react op (past op o rx₁) x))))
-       → (∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local {B} cs (from c (outRows op o rx₁)) q end)
-       → Locals cs c (outRows op o rx)
-  -- ONE STEP'S OUTPUTS OWE WHAT THEY SHOULD when the routes open at its
-  -- row are of the row's instant, a begin it reads is named for it, and
-  -- a value or a live over it reads finds a route.
-  step-local : ∀ {B} op cs (o : Out B) c q x → Inv c (proj₁ o)
-             → (proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf q)
-             → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark begin) n)) → n ≡ nameOf q)
-             → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
-             → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
-                → Σ ℕ λ k → proj₂ c ≡ suc k)
-             → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
-             → Locals cs c (lay q 0 (proj₂ (react op o x)))
+-- Rows owing what they should, then more from the count they leave.
+locals-++ : ∀ {B cs c} (r₁ : List (Pos × Ev (IE B))) {r₂} → Locals cs c r₁ → Locals cs (from c r₁) r₂ → Locals cs c (r₁ ++ r₂)
+locals-++ []                 _        l₂ = l₂
+locals-++ ((_ , out _) ∷ r₁) (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , end) ∷ r₁)   (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , skip) ∷ r₁)  (l , ls) l₂ = l , locals-++ r₁ ls l₂
+locals-++ ((_ , pin _) ∷ r₁) (l , ls) l₂ = l , locals-++ r₁ ls l₂
+
+-- WHAT THE SCAN LAYS OUT IS READ OFF ITS STEPS: each step's outputs,
+-- from the count the outputs before them leave, and the end.
+walk : ∀ {B} op cs (o : Out B) c rx
+     → (∀ rx₁ {q x} rx₂ → rx ≡ rx₁ ++ (q , out x) ∷ rx₂
+        → Locals cs (from c (outRows op o rx₁)) (lay q 0 (proj₂ (react op (past op o rx₁) x))))
+     → (∀ rx₁ {q} rx₂ → rx ≡ rx₁ ++ (q , end) ∷ rx₂ → Local {B} cs (from c (outRows op o rx₁)) q end)
+     → Locals cs c (outRows op o rx)
+walk op cs o c []                 st fn = _
+walk op cs o c ((q , out x) ∷ rx) st fn =
+  locals-++ (lay q 0 (proj₂ (react op o x))) (st [] rx refl)
+    (walk op cs (react op o x) (from c (lay q 0 (proj₂ (react op o x)))) rx
+      (λ rx₁ {q′} {x′} rx₂ eq → subst (λ c′ → Locals cs c′ (lay q′ 0 (proj₂ (react op (past op (react op o x) rx₁) x′))))
+                        (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx₁))
+                        (st ((q , out x) ∷ rx₁) rx₂ (cong ((q , out x) ∷_) eq)))
+      (λ rx₁ {q′} rx₂ eq → subst (λ c′ → Local cs c′ q′ end) (from-++ c (lay q 0 (proj₂ (react op o x))) (outRows op (react op o x) rx₁))
+                        (fn ((q , out x) ∷ rx₁) rx₂ (cong ((q , out x) ∷_) eq))))
+walk op cs o c ((q , end) ∷ rx)   st fn = fn [] rx refl , _
+walk op cs o c ((q , skip) ∷ rx)  st fn =
+  walk op cs o c rx (λ rx₁ rx₂ eq → st ((q , skip) ∷ rx₁) rx₂ (cong ((q , skip) ∷_) eq)) (λ rx₁ rx₂ eq → fn ((q , skip) ∷ rx₁) rx₂ (cong ((q , skip) ∷_) eq))
+walk op cs o c ((q , pin r) ∷ rx) st fn =
+  walk op cs o c rx (λ rx₁ rx₂ eq → st ((q , pin r) ∷ rx₁) rx₂ (cong ((q , pin r) ∷_) eq)) (λ rx₁ rx₂ eq → fn ((q , pin r) ∷ rx₁) rx₂ (cong ((q , pin r) ∷_) eq))
+
+-- WHAT ONE STEP SENDS, row by row, from the count before it: nothing, one
+-- row, or stops, each finding a route of the row's instant.
+private
+  -- What a run is exempt for at its read, it is exempt for below it.
+  ex-lay : ∀ cs q j → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q) → Ex cs q → Ex cs (q ⊕ (ix 1 ∷ ix j ∷ []))
+  ex-lay cs q j rt = any-map λ {c} (i , r) → ⊑-inside (⊑-trans (inside-⊑ c q i) ((ix 1 ∷ ix j ∷ []) , refl)) , trans (rt j) r
+
+  -- An open count, of the read's instant or none, is of the row's.
+  open-at : ∀ {m K q k} j → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q) → (K ≡ 0 ⊎ m ≡ nameOf q) → K ≡ suc k
+          → (m , K) ≡ (nameOf (q ⊕ (ix 1 ∷ ix j ∷ [])) , suc k)
+  open-at j rt (inj₁ refl) ()
+  open-at {k = k} j rt (inj₂ refl) refl = cong (λ z → z , suc k) (cong nm (sym (rt j)))
+
+  named-of : ∀ {m K q} → suc K ≡ 0 ⊎ m ≡ nameOf q → m ≡ nameOf q
+  named-of (inj₁ ())
+  named-of (inj₂ e) = e
+
+  locals-stops : ∀ {B} cs (m : Pos) K k n q j → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
+               → (K ≡ 0 ⊎ m ≡ nameOf q) → k ≤ K → Locals cs (m , K) (lay q j (stopsᵒ {B} k n))
+  locals-stops cs m K       zero    n q j rt cur le       = _
+  locals-stops cs m (suc K) (suc k) n q j rt cur (s≤s le) =
+    record { carried = λ { c-stop _ → K , open-at {m = m} {K = suc K} {q = q} j rt cur refl } ; stops = λ _ → K , refl }
+    , locals-stops cs m K k n q (suc j) rt (inj₂ (named-of {q = q} cur)) le
+
+  locals-cut : ∀ {B} cs (m : Pos) K k n s q → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
+             → (K ≡ 0 ⊎ m ≡ nameOf q) → k ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (cut {B} k n s)))
+  locals-cut cs m K k n s q rt cur le with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = _
+  ... | false | true  = _
+  ... | false | false = locals-stops cs m K k n q 0 rt cur le
+
+  -- The counters hold no more routes than are counted.
+  inv-tot : ∀ {c s} → Inv c s → tot s ≤ proj₂ c
+  inv-tot (live _ le) = le
+  inv-tot (dead _ z)  = ≤-reflexive z
+
+  outer≤ : ∀ s → Flat.outer s ≤ tot s
+  outer≤ s = ≤-trans (m≤m+n (Flat.outer s) (Flat.lanes s)) (≤-trans (m≤m+n _ (Flat.held s)) (m≤m+n _ (Flat.parked s)))
+
+  lanes≤ : ∀ s → Flat.lanes s ≤ tot s
+  lanes≤ s = ≤-trans (m≤n+m (Flat.lanes s) (Flat.outer s)) (≤-trans (m≤m+n _ (Flat.held s)) (m≤m+n _ (Flat.parked s)))
+
+  held≤ : ∀ s → Flat.held s ≤ tot s
+  held≤ s = ≤-trans (m≤n+m (Flat.held s) (Flat.outer s + Flat.lanes s)) (m≤m+n _ (Flat.parked s))
+
+  parked≤ : ∀ s → Flat.parked s ≤ tot s
+  parked≤ s = m≤n+m (Flat.parked s) _
+
+  ended≤ : ∀ s → Flat.acc s ⊓ Flat.lanes s + Flat.held s ≤ tot s
+  ended≤ s = ≤-trans (+-monoˡ-≤ (Flat.held s) (≤-trans (m⊓n≤n (Flat.acc s) (Flat.lanes s)) (m≤n+m (Flat.lanes s) (Flat.outer s))))
+                     (m≤m+n _ (Flat.parked s))
+
+  share≤ : ∀ b s → share b s ≤ tot s
+  share≤ outerB s = outer≤ s
+  share≤ laneB  s = lanes≤ s
+  share≤ closeB s = z≤n
+
+  stop≤ : ∀ b s {c} → Inv c s → (if Flat.spent s then 0 else share b s) ≤ proj₂ c
+  stop≤ b s (live sp le) rewrite sp = ≤-trans (share≤ b s) le
+  stop≤ b s (dead sp _)  rewrite sp = z≤n
+
+  module Step {B : Set} (cs : List Pos) (m : Pos) (K : ℕ) (q : Pos)
+              (rt : ∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q) (cur : K ≡ 0 ⊎ m ≡ nameOf q) where
+
+    quiet : ∀ {mk n} → (mk ≡ stop → ⊥) → (mk ≡ over → ⊥) → Locals cs (m , K) (lay {B} q 0 (instEmit (mark mk) n ∷ []))
+    quiet ns no = record { carried = λ { c-stop → ⊥-elim (ns refl) ; c-over → ⊥-elim (no refl) }
+                         ; stops = λ { refl → ⊥-elim (ns refl) } } , _
+
+    stopped-l : ∀ b n s k → k ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (stopped {B} b n s k)))
+    stopped-l b n s zero    _        = _
+    stopped-l b n s (suc _) le = locals-stops cs m K 1 n q 0 rt cur (≤-trans (s≤s z≤n) le)
+
+    ended-l : ∀ k n s → k + Flat.held s ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (laneEnded {B} k n s)))
+    ended-l k n s le with Flat.queue s
+    ... | suc _ = _
+    ... | zero with Flat.finished s | Flat.active s
+    ...   | true  | zero  = _
+    ...   | true  | suc _ = locals-cut cs m K (k + Flat.held s) n (record s { held = 0 }) q rt cur le
+    ...   | false | _     = locals-cut cs m K (k + Flat.held s) n (record s { held = 0 }) q rt cur le
+
+    burst-l : ∀ h n s → Flat.held s ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (burstOver {B} h n s)))
+    burst-l true  n s _  = _
+    burst-l false n s le = locals-cut cs m K (Flat.held s) n (record s { held = 0 }) q rt cur le
+
+    left-l : ∀ n s → Flat.outer s ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (left {B} n s)))
+    left-l n s le with isZero (Flat.active s) ∧ isZero (Flat.queue s)
+    ... | true  = _
+    ... | false = locals-cut cs m K (Flat.outer s) n (record s { outer = 0 }) q rt cur le
+
+    unpark-l : ∀ n s → Flat.parked s ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (unpark {B} n s)))
+    unpark-l n s le with anyHolds (Flat.at s) (Flat.live s)
+    ... | true  = _
+    ... | false = locals-stops cs m K (Flat.parked s) n q 0 rt cur le
+
+    arrive-l : ∀ op n s → Flat.lanes s ≤ K → Locals cs (m , K) (lay q 0 (proj₂ (arrive {B} op n s)))
+    arrive-l (mergeᶠ (just _)) n s _  = _
+    arrive-l (mergeᶠ nothing)  n s _  = _
+    arrive-l switchᶠ           n s le = locals-cut cs m K (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }) q rt cur le
+    arrive-l exhaustᶠ          n s _  = _
+
+    begun-l : ∀ b n s → Locals cs (m , K) (lay q 0 (proj₂ (begun {B} b n s)))
+    begun-l b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
+    ... | true  = _
+    ... | false = quiet (λ ()) (λ ())
+
+    overed-l : ∀ n s → (Flat.spent s ≡ false → ¬ Ex cs q → Σ ℕ λ k → K ≡ suc k) → Locals cs (m , K) (lay q 0 (proj₂ (overed {B} n s)))
+    overed-l n s oo with Flat.spent s
+    ... | true  = _
+    ... | false = record { carried = λ { c-over ne → let k , e = oo refl (λ x → ne (ex-lay cs q 0 rt x)) in k , open-at {m = m} {K = K} {q = q} 0 rt cur e }
+                         ; stops = λ () } , _
+
+    mark-l : ∀ op b mk n s → Inv (m , K) s → (Flat.spent s ≡ false → mk ≡ over → ¬ Ex cs q → Σ ℕ λ k → K ≡ suc k)
+           → Locals cs (m , K) (lay q 0 (proj₂ (onMark {B} op b s mk n)))
+    mark-l op b begin      n s iv oo = begun-l b n s
+    mark-l op b stop       n s iv oo = stopped-l b n s _ (stop≤ b s iv)
+    mark-l op b over       n s iv oo = overed-l n s (λ sp → oo sp refl)
+    mark-l op b carry      n s iv oo = _
+    mark-l op b outerOpen  n s iv oo = arrive-l op n s (≤-trans (lanes≤ s) (inv-tot iv))
+    mark-l op b outerClose n s iv oo = _
+    mark-l op b laneStart  n s iv oo = _
+    mark-l op b laneDone   n s iv oo = ended-l (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }) (≤-trans (ended≤ s) (inv-tot iv))
+    mark-l op b burstEnd   n s iv oo = burst-l (isZero (Flat.held s) ∨ Flat.dead s) n s (≤-trans (held≤ s) (inv-tot iv))
+    mark-l op b outerDone  n s iv oo = left-l n (record s { finished = true }) (≤-trans (outer≤ s) (inv-tot iv))
+    mark-l op b subscribed n s iv oo = quiet (λ ()) (λ ())
+    mark-l op b completed  n s iv oo = quiet (λ ()) (λ ())
+
+-- ONE STEP'S OUTPUTS OWE WHAT THEY SHOULD when the routes open at its
+-- row are of the row's instant, a begin it reads is named for it, and
+-- a value or a live over it reads finds a route.
+step-local : ∀ {B} op cs (o : Out B) c q x → Inv c (proj₁ o)
+           → (proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf q)
+           → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark begin) n)) → n ≡ nameOf q)
+           → (∀ {b a n} → x ≡ just (inj₁ (b , instEmit (value a) n)) → ¬ Ex cs q → Σ ℕ λ k → proj₂ c ≡ suc k)
+           → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark over) n)) → Flat.spent (proj₁ o) ≡ false → ¬ Ex cs q
+              → Σ ℕ λ k → proj₂ c ≡ suc k)
+           → (∀ j → rootOf (q ⊕ (ix 1 ∷ ix j ∷ [])) ≡ rootOf q)
+           → Locals cs c (lay q 0 (proj₂ (react op o x)))
+step-local op cs (s , _) (m , K) q nothing iv cur bn vo oo rt = _
+step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (value v) n))) iv cur bn vo oo rt =
+  record { carried = λ { c-value ne → let k , e = vo refl (λ x → ne (ex-lay cs q 0 rt x)) in k , open-at {m = m} {K = K} {q = q} 0 rt cur e }
+         ; stops = λ () } , _
+step-local op cs (s , _) (m , K) q (just (inj₁ (b , instEmit (mark mk) n))) iv cur bn vo oo rt =
+  Step.mark-l cs m K q rt cur op b mk n s iv λ { sp refl → oo refl sp }
+step-local op cs (s , _) (m , K) q (just (inj₂ (i , r))) iv cur bn vo oo rt =
+  Step.unpark-l cs m K q rt cur root (record s { live = setAt i r (Flat.live s) }) (≤-trans (parked≤ s) (inv-tot iv))
 
 ------------------------------------------------------------------------
 -- What the source promises
