@@ -127,6 +127,20 @@ join-out switchᶠ           f o (Joining.run () _)
 join-out exhaustᶠ          f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
 join-out exhaustᶠ          f o (Joining.run () _)
 
+-- and each lane's value row, run and not cut there, is one.
+join-in : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q a k b} → o q (out a) → View.Runs f o op q
+        → View.Lane f o op q a k (out b) → ¬ View.CutAt f o op q k → View.Join f o op k (out b)
+join-in (mergeᶠ nothing)  f o x r l nc = Joining.lane x r l (λ ()) _
+join-in (mergeᶠ (just n)) f o x r l nc = Joining.lane x r l (λ ()) _
+join-in switchᶠ           f o x r l nc = Joining.lane x r l nc _
+join-in exhaustᶠ          f o x r l nc = Joining.lane x r l (λ ()) _
+
+-- A CUT BY A ROW IS A CUT BY EVERY LATER ROW.
+cutat-up : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k k′} → k ≺ k′ → View.CutAt f o op q k → View.CutAt f o op q k′
+cutat-up switchᶠ f o {k = k} {k′} kk (q′ , a′ , x , lt , lt′) = q′ , a′ , x , lt , ≺-trans {q′} {k} {k′} lt′ kk
+cutat-up (mergeᶠ _) f o kk ()
+cutat-up exhaustᶠ   f o kk ()
+
 -- Two rows of one lane are its value's own rows at one subscription.
 lane-at₂ : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) p (ok : Ok H p)
          → ∀ {q a k e k′ e′} → enter d p q (out a) → View.Lane f (enter d p) op q a k e → View.Lane f (enter d p) op q a k′ e′

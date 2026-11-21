@@ -40,6 +40,8 @@ open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
+open import denotation.Laws.Count using (reach-down)
+import simultaneous.LaneStart as LaneStart
 open import denotation.Laws.Modulus using (T-not; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
 open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
@@ -68,7 +70,7 @@ import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
 open import simultaneous.OuterSplit using (count-open)
 open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
-open import simultaneous.RealView using (module View; real-from; real-to; real-ends; lane-at; lane-at₂; lane-one; join-out)
+open import simultaneous.RealView using (module View; real-from; real-to; real-ends; lane-at; lane-at₂; lane-one; join-out; join-in; cutat-up)
 open import simultaneous.HeldTake using (module TakeBack)
 open import simultaneous.TakeKit using (ix<last)
 open import denotation.EmissionSet using (Den; Truncate)
@@ -186,11 +188,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   module AC = Count _≟ᵖ_ (rowKind markAct op) Own (LaneMark laneStart) (LaneMark laneDone) act
 
   postulate
-    -- A LANE BEGINS WITH ITS `laneStart`, a row of the real flatMap at or
-    -- before each of the lane's rows there.
-    lane-begins : ∀ {q a y b} → RO q (out a) → RV.Lane op q a y (out b) → σ₃ y (out b)
-                → Σ Pos λ y₀ → Σ _ λ n → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n)) × σ₃ y₀ (out (instEmit (mark laneStart) n)) × y₀ ≼ y
-
     -- A SWITCH'S ARRIVAL THE SCAN MEETS PAST A LANE'S START IS A LATER
     -- VALUE'S, before every lane row the scan meets next.
     switch-cut : op ≡ switchᶠ → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q} → AC.CutIn [] r₁ q
@@ -205,6 +202,13 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                  → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
 
 
+
+  -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
+  -- subscription.
+  lane-starts : ∀ {a s y n} → enter (fL a) s y (out (instEmit (mark laneDone) n))
+              → Σ Pos λ y₀ → Σ _ λ n₀ → enter (fL a) s y₀ (out (instEmit (mark laneStart) n₀)) × s ≺ y₀ × y₀ ≺ y
+  lane-starts {a} {s} r =
+    let (y₀ , r₀ , lt₀ , lt) = LaneStart.lane-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r in y₀ , _ , r₀ , lt₀ , lt
 
   -- EACH `laneStart` IS ONE LANE'S: no two values' lanes start at one row.
   start-one : ∀ {x q q′} → LaneMark laneStart q x → LaneMark laneStart q′ x → q ≡ q′
@@ -250,6 +254,24 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- A ROW OF THE REAL FLATMAP'S VALUES IS A LANE'S, run and not cut there.
   σ₃-lane : ∀ {y b} → σ₃ y (out b) → Σ Pos λ q → Σ A λ a → RO q (out a) × RV.Runs op q × RV.Lane op q a y (out b) × ¬ RV.CutAt op q y
   σ₃-lane (r , _) = join-out op fL RO (proj₁ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) r))
+
+  -- A LANE'S `laneDone` IN THE REAL FLATMAP FOLLOWS ITS `laneStart` THERE.
+  lane-begins : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n)) → σ₃ y (out (instEmit (mark laneDone) n))
+              → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
+  lane-begins {q} {a} {y} {n} xo l σd with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
+  ... | s , _ , r , sk , back with lane-starts r
+  ...   | y₀ , n₀ , r₀ , sy₀ , lt with σ₃-lane σd
+  ...     | q′ , a′ , xo′ , rn , l′ , nc with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
+  ...       | refl with ro-func xo xo′
+  ...         | refl = y₀ , n₀ , back r₀ sy₀
+                     , (R-from (join-in op fL RO xo rn (back r₀ sy₀) (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
+                                , reach-down {q = y} {w = y₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
+                       , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
+                     , ≺→≼ {y₀} {y} lt
 
   -- A LANE MARK THE SCAN MEETS IS A LANE'S ROW, one `sub J` below it.
   lane-mark : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx → mk ≡ laneStart ⊎ mk ≡ laneDone
