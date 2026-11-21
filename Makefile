@@ -22,10 +22,17 @@ AGDA_SRC := $(shell find $(SRC) -name '*.agda' -not -path '*/_build/*' -not -pat
 # Agda exits 42 on a promoted warning; green means warning-free.  Agda
 # records the warning mode in an interface's validity key, so every run on
 # one cache must use the same flags.
+#
+# THE HEAP IS CAPPED, HERE AND IN CI ALIKE: under the 16 GB runner, so a
+# blow-up fails as "Heap exhausted" instead of OOM-killing the runner (the
+# step never finishes and GitHub keeps no log), and fails the same way in a
+# session.  A healthy full check peaks under 8 GB.  An RTS flag is not an
+# Agda option, so it leaves the interface cache valid.
 # ─────────────────────────────────────────────────────────────────────────
 AGDA_BIN ?= agda
 export AGDA_BIN
-AGDA := $(AGDA_BIN) -W error
+AGDA_HEAP := 12G
+AGDA := $(AGDA_BIN) +RTS -M$(AGDA_HEAP) -RTS -W error
 
 # PER-DEFINITION TIMES, opt in: `make agda AGDA_PROFILE=--profile=definitions`.
 # Agda leaves profiling options out of an interface's validity key, so this

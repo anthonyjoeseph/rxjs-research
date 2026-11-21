@@ -14,6 +14,17 @@ near the top of the tree costs that module, not the adequacy cone. It is not
 the gate: a consumer broken by the edit is found only by `make agda`. Same
 `AGDA` and cache, so it warms what `make agda` reads.
 
+## THE HEAP IS CAPPED, the same in a session as in CI
+
+`AGDA` carries `+RTS -M$(AGDA_HEAP) -RTS` (12G), below the 16 GB GitHub
+runner. Uncapped, a blow-up OOM-kills the runner itself: the gate step never
+finishes, the job is reported cancelled or failed, and GitHub keeps no log.
+Capped, it fails as `Heap exhausted` in CI and locally alike, so an OOM seen
+in CI reproduces with `make check F=<module>`. Lower it to fail fast
+(`AGDA_HEAP=4G`); never raise it to get green — a module that needs more is
+unfolding something (CLAUDE.md, "A transparent definition unfolds into its
+consumers"). A healthy full check peaks under 8 GB.
+
 ## A WARNING IS A BUILD FAILURE
 
 Every Agda invocation goes through the Makefile's `AGDA` variable, which carries
