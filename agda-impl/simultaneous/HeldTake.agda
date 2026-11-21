@@ -2,10 +2,11 @@
 
 -- A TAKEWHILE HOLDS WHAT ITS SOURCE HOLDS.  A run met of a take is a run
 -- met of its source (`back`), or one cut at the source's first failing
--- value (`Cut`): its source's run up to that value, then the one or two
--- rows the take puts under it, the value itself and the end.  Both sit
--- in the failing value's instant and carry its routes, and a failing
--- value is a value, so the count reads them as the source's one row.
+-- row (`Cut`): its source's run up to that row, then the one or two rows
+-- the take puts under it, the row itself and the end.  Both sit in the
+-- failing row's instant and carry its routes, and a failing row is a
+-- value or a completion, so the count reads them as the source's one
+-- row.
 --
 -- A position the take has nothing before but its source has: past the
 -- first failure, under it, so named for its instant.
@@ -37,14 +38,14 @@ open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; 
 open import denotation.Read using (Run; []; _∷_; Visible; After; Least; cursor)
 open import denotation.Laws.Modulus using (T-not; few-ind; reach-few; entered-reach; ≺-trans; ≺-irrefl; ≺→≼; ≼-refl; ≼-trans;
   ≼-or-≻; ≼-split; ≼-≺-≺; ≺-ext)
-open import denotation.Laws.Worlds using (Ok; InvD; InvAt; _⊑_; ⊑-trans; ⊑-inside; inside-⊑)
+open import denotation.Laws.Worlds using (InvD; InvAt; _⊑_; ⊑-trans; ⊑-inside; inside-⊑)
 open import adequacy.SubOne using (take-reach; below-or-under)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values; values-++)
 open import simultaneous.Shut using (Shut; r₀)
-open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-value; Routing; Idle; Rest; cnt; nameOf; nm;
+open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-value; Routing; r-completed; Idle; Rest; cnt; nameOf; nm;
   Valued; opos)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
 open import simultaneous.Layers using (cursor-snoc; after-≺)
@@ -233,35 +234,39 @@ under-of {f} {w} fw wl with ≼-split {w} {f ⊕ [ last ]} wl
 ------------------------------------------------------------------------
 -- Held through a take
 
-module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos → Set} (cs : List Pos)
-             (h : HeldD H d cs) (inv : InvD H d) (p : Pos) (ok : Ok H p) (ep : Early p) where
+-- What a take may fail at: a value, or a completion.  Neither is
+-- counted, and neither is a mark a reader routes by but the completion.
+data Inert {X : Set} : IE X → Set where
+  i-value : ∀ {v j} → Inert (instEmit (value v) j)
+  i-done  : ∀ {j} → Inert (instEmit (mark completed) j)
 
-  open TakeBack {H = H} incl (passes kp) d p (inv p ok)
-  module HS = Held (h p ok ep)
+-- A TAKE HOLDS WHAT ITS SOURCE HOLDS when it fails only at inert rows
+-- whose instant its source holds a route of, early ones.
+module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H : Pos → Set} (cs : List Pos)
+             (p : Pos) (iv : InvAt H p (enter d p)) (h : Held (enter d p) cs)
+             (fails : ∀ {x} → T (not (keep x)) → Inert x)
+             (fcov : ∀ {rs} → Met (enter d p) rs → ∀ r₁ {y x} r₂ → rs ≡ r₁ ++ (y , out x) ∷ r₂ → T (not (keep x)) → ¬ Ex cs y
+                   → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k))
+             (fearly : ∀ {y x} → enter d p y (out x) → T (not (keep x)) → Early y) where
+
+  open TakeBack {H = H} incl keep d p iv
+  module HS = Held h
 
   Row : Set
   Row = Pos × Ev (IE X)
-
-  IsVal : IE X → Set
-  IsVal x = Σ X λ v → Σ Pos λ j → x ≡ instEmit (value v) j
-
-  fails-val : ∀ {x} → T (not (passes kp x)) → IsVal x
-  fails-val {instEmit (value v) j} _ = v , j , refl
-  fails-val {instEmit (mark _) _}  ()
-
-  cval : ∀ {x} → IsVal x → Carried (out x)
-  cval (_ , _ , refl) = c-value
 
   -- A row the count passes over: the failing value, or the end.
   Q : IE X → Row → Set
   Q a r = proj₂ r ≡ end ⊎ proj₂ r ≡ out a
 
-  cnt-snoc : ∀ {a} → IsVal a → ∀ xs {r} → Q a r → cnt (xs ++ [ r ]) ≡ cnt xs
+  cnt-snoc : ∀ {a} → Inert a → ∀ xs {r} → Q a r → cnt (xs ++ [ r ]) ≡ cnt xs
   cnt-snoc _ xs {y , _} (inj₁ refl) = cong (L.foldl count r₀) (trans (values-++ xs [ (y , end) ]) (++-identityʳ (values xs)))
-  cnt-snoc (v , j , refl) xs {y , _} (inj₂ refl) =
-    trans (cong (L.foldl count r₀) (values-++ xs [ (y , out (instEmit (value v) j)) ])) (foldl-++ count r₀ (values xs) _)
+  cnt-snoc i-value xs {y , _} (inj₂ refl) =
+    trans (cong (L.foldl count r₀) (values-++ xs [ (y , out _) ])) (foldl-++ count r₀ (values xs) _)
+  cnt-snoc i-done xs {y , _} (inj₂ refl) =
+    trans (cong (L.foldl count r₀) (values-++ xs [ (y , out _) ])) (foldl-++ count r₀ (values xs) _)
 
-  cnt-pre : ∀ {a} → IsVal a → ∀ xs (m : List Row) → All (Q a) m → cnt (xs ++ m) ≡ cnt xs
+  cnt-pre : ∀ {a} → Inert a → ∀ xs (m : List Row) → All (Q a) m → cnt (xs ++ m) ≡ cnt xs
   cnt-pre va xs []      []       = cong cnt (++-identityʳ xs)
   cnt-pre va xs (r ∷ m) (q ∷ qs) =
     trans (cong cnt (sym (++-assoc xs [ r ] m))) (trans (cnt-pre va (xs ++ [ r ]) m qs) (cnt-snoc va xs q))
@@ -293,9 +298,13 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
   tl-row tl-e      (there ())
 
   -- A begin met of a cut run is its source's.
-  begin-in : ∀ {rs₀ tl f a q n} → IsVal a → Tl f a tl → (q , out (instEmit (mark begin) n)) ∈ rs₀ ++ tl
+  begin-in : ∀ {rs₀ tl f a q n} → Inert a → Tl f a tl → (q , out (instEmit (mark begin) n)) ∈ rs₀ ++ tl
            → (q , out (instEmit (mark begin) n)) ∈ rs₀
-  begin-in {rs₀} (_ , _ , refl) sh b with ∈-++⁻ rs₀ b
+  begin-in {rs₀} i-value sh b with ∈-++⁻ rs₀ b
+  ... | inj₁ i = i
+  ... | inj₂ i with tl-val sh i
+  ...   | _ , ()
+  begin-in {rs₀} i-done sh b with ∈-++⁻ rs₀ b
   ... | inj₁ i = i
   ... | inj₂ i with tl-val sh i
   ...   | _ , ()
@@ -306,41 +315,43 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
   named : ∀ {y n} → Tk y (out (instEmit (mark begin) n)) → n ≡ nameOf y
   named (tk , _) with kind tk tt
   ... | kept x _ _                    = HS.named x
-  ... | made _ nk _ (_ , _ , at0 _)   = ⊥-elim nk
+  ... | made _ nk _ (_ , refl , at0 _) with fails nk
+  ...   | ()
 
   routing : ∀ {y m n} → Tk y (out (instEmit (mark m) n)) → Routing m
   routing (tk , _) with kind tk tt
   ... | kept x _ _                    = HS.routing x
-  ... | made _ nk _ (_ , _ , at0 _)   = ⊥-elim nk
+  ... | made _ nk _ (_ , refl , at0 _) with fails nk
+  ...   | i-done = r-completed
 
   late : ∀ {y n} → Tk y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
   late (tk , _) with kind tk tt
   ... | kept x _ _                    = HS.late x
-  ... | made _ nk _ (_ , _ , at0 _)   = ⊥-elim nk
+  ... | made _ nk _ (_ , refl , at0 _) with fails nk
+  ...   | ()
 
   early : ∀ {y a n} → Tk y (out (instEmit (value a) n)) → Early y
   early (tk , _) with kind tk tt
   ... | kept x _ _                       = HS.early x
-  ... | made xf _ _ (_ , refl , at0 _)   = early-inst [ ix 0 ] (HS.early xf)
+  ... | made xf nk _ (_ , refl , at0 _) = early-inst [ ix 0 ] (fearly xf nk)
 
   ends : ∀ {y} → Tk y end → Early y
   ends (tk , _) with kind tk tt
   ... | kept x _ _ = HS.ends x
-  ... | made xf nk _ (_ , refl , atl) with fails-val nk
-  ...   | _ , _ , eq = early-inst [ last ] (HS.early (subst (λ z → S _ (out z)) eq xf))
+  ... | made xf nk _ (_ , refl , atl) = early-inst [ last ] (fearly xf nk)
 
   ----------------------------------------------------------------------
   -- Run by run
 
-  covered-cut : ∀ {rs} → Cut nothing rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex (p ∷ cs) y
+  covered-cut : ∀ {rs} → Cut nothing rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
               → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   covered-cut (cut {rs₀} {tl} {f} {a} refl run fx nk nF sh _) r₁ {y} {e} r₂ eq ce nx with ++-split′ rs₀ tl r₁ (y , e) r₂ eq
   ... | inj₂ (m , refl , refl) = HS.covered run r₁ (m ++ [ (f , out a) ]) (++-assoc r₁ ((y , e) ∷ m) _) ce nx
   ... | inj₁ (m , refl , teq) with tl-row sh (subst ((y , e) ∈_) (sym teq) (∈-++⁺ʳ m (here refl)))
-  ...   | l , refl with HS.covered run rs₀ [] refl (cval (fails-val nk)) (λ ex → nx (ex-ext [ l ] ex))
-  ...     | k , c = k , trans (cnt-pre (fails-val nk) rs₀ m (pre-q m (tl-q sh) teq)) (trans c (cong (λ z → z , suc k) (sym (name-ext f [ l ]))))
+  ...   | l , refl with fcov run rs₀ [] refl nk (λ ex → nx (ex-ext [ l ] ex))
+  ...     | k , c = k , trans (cnt-pre (fails nk) rs₀ m (pre-q m (tl-q sh) teq)) (trans c (cong (λ z → z , suc k) (sym (name-ext f [ l ]))))
 
-  covered : ∀ {rs} → Met Tk rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex (p ∷ cs) y
+  covered : ∀ {rs} → Met Tk rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex cs y
           → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   covered m r₁ r₂ eq ce nx with back c-none m
   ... | inj₁ (m′ , _) = HS.covered m′ r₁ r₂ eq ce nx
@@ -349,11 +360,13 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
   exact-cut : ∀ {rs} → Cut nothing rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
             → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
   exact-cut (cut {rs₀} {tl} {f} {a} refl run fx nk nF sh _) r₁ {y} {n} r₂ eq
-    with fails-val nk | ++-split′ rs₀ tl r₁ (y , out (instEmit (mark stop) n)) r₂ eq
+    with fails nk | ++-split′ rs₀ tl r₁ (y , out (instEmit (mark stop) n)) r₂ eq
   ... | _ | inj₂ (m , refl , refl) = HS.exact run r₁ (m ++ [ (f , out a) ]) (++-assoc r₁ (_ ∷ m) _)
-  ... | (_ , _ , eq) | inj₁ (m , refl , teq) with tl-val sh (subst (_ ∈_) (sym teq) (∈-++⁺ʳ m (here refl)))
-  ...   | _ , xa with trans xa eq
-  ...     | ()
+  ... | i-value | inj₁ (m , refl , teq) with tl-val sh (subst (_ ∈_) (sym teq) (∈-++⁺ʳ m (here refl)))
+  ...   | _ , ()
+  exact-cut (cut {rs₀} {tl} {f} {a} refl run fx nk nF sh _) r₁ {y} {n} r₂ eq | i-done | inj₁ (m , refl , teq)
+    with tl-val sh (subst (_ ∈_) (sym teq) (∈-++⁺ʳ m (here refl)))
+  ... | _ , ()
 
   exact : ∀ {rs} → Met Tk rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
         → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
@@ -368,11 +381,11 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
   ... | inj₁ (m , refl , teq) with tl-val sh (subst (_ ∈_) (sym teq) (∈-++⁺ʳ m yv))
   ...   | refl , refl =
     HS.shut run rs₀ [ (f , out a) ] refl (trans (cong proj₂ (sym E)) z)
-      (subst (λ n → (q , out (instEmit (mark begin) (proj₁ n))) ∈ rs₀) E (begin-in (fails-val nk) sh (pre-in bq)))
+      (subst (λ n → (q , out (instEmit (mark begin) (proj₁ n))) ∈ rs₀) E (begin-in (fails nk) sh (pre-in bq)))
       (here refl) (trans (sym (rootOf-ext f [ ix 0 ])) rt)
     where
       E : cnt (rs₀ ++ m) ≡ cnt rs₀
-      E = cnt-pre (fails-val nk) rs₀ m (pre-q m (tl-q sh) teq)
+      E = cnt-pre (fails nk) rs₀ m (pre-q m (tl-q sh) teq)
       pre-in : ∀ {x} → x ∈ rs₀ ++ m → x ∈ rs₀ ++ tl
       pre-in {x} i with ∈-++⁻ rs₀ i
       ... | inj₁ i₀ = ∈-++⁺ˡ i₀
@@ -406,8 +419,8 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
           in ng (⊎-map (λ z → z) (λ e → trans e (sym (under-of {f} {w} fw′ stp)))
                   (HS.idle m ne (few-S tt xf) (cur-before cu xf nkf) λ {y} x v ay yf → lw (below nFf x yf) v ay (≺-trans {y} {f} {w} yf fw′))) }
 
-  idle-v : ∀ {rs₀ f a} → IsVal a → Met S (rs₀ ++ [ (f , out a) ]) → S f (out a)
-         → T (not (passes kp a)) → ¬ Failed f
+  idle-v : ∀ {rs₀ f a} → Inert a → Met S (rs₀ ++ [ (f , out a) ]) → S f (out a)
+         → T (not (keep a)) → ¬ Failed f
          → (∀ {c} → (c , end) ∈ rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ] → ⊥) → ∀ {w}
          → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) w
          → (∀ {y e} → Tk y e → Visible e → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) y → w ≼ y)
@@ -437,7 +450,7 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
         where
           go : ∀ {k e′} → S k e′ → k ≺ (f ⊕ [ ix 0 ]) → k ∈ f ∷ proj₁ (few-S tt fx)
           go {k} x kf with below-or-under k f (ix 0) kf
-          ... | inj₂ (l′ , ls , refl) = ⊥-elim (InvAt.flat (inv p ok) fx x)
+          ... | inj₂ (l′ , ls , refl) = ⊥-elim (InvAt.flat iv fx x)
           ... | inj₁ kf′ with ≼-split {k} {f} kf′
           ...   | inj₁ lt   = there (proj₂ (few-S tt fx) x lt)
           ...   | inj₂ refl = here refl
@@ -452,7 +465,7 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
            → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
   idle-cut (cut {rs₀} refl run fx nk nF (tl-ve _) _) ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (there (here refl))))
   idle-cut (cut {rs₀} refl run fx nk nF tl-e _)     ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (here refl)))
-  idle-cut (cut {rs₀} refl run fx nk nF (tl-v _) _) ne aw lw = idle-v (fails-val nk) run fx nk nF ne aw lw
+  idle-cut (cut {rs₀} refl run fx nk nF (tl-v _) _) ne aw lw = idle-v (fails nk) run fx nk nF ne aw lw
 
   idle : Idle Tk
   idle m ne fw aw lw with back c-none m
@@ -488,8 +501,8 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
            → Σ (List Pos) λ ks → ∀ {y e} → Tk y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ ks
   rest-cut (cut {rs₀} {tl} {f} {a} refl run fx nk nF sh (l , ld)) z {q} bq = (f ⊕ [ ix 0 ]) ∷ (f ⊕ [ last ]) ∷ ks , go
     where
-      va : IsVal a
-      va = fails-val nk
+      va : Inert a
+      va = fails nk
 
       E : cnt (rs₀ ++ tl) ≡ cnt (rs₀ ++ [ (f , out a) ])
       E = trans (cnt-pre va rs₀ tl (tl-q sh)) (sym (cnt-snoc va rs₀ (inj₂ refl)))
@@ -522,10 +535,25 @@ module Holds {X : Set} (incl : Bool) (kp : X → Bool) (d : Den (IE X)) {H : Pos
   ... | inj₁ (m′ , cu) = rest-clean m′ cu z bq
   ... | inj₂ ct        = rest-cut ct z bq
 
-  holds : Held Tk (p ∷ cs)
+  holds : Held Tk cs
   holds = record
     { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
     ; early = early ; ends = ends ; late = late ; idle = idle ; rest = rest }
 
 held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H} cs → HeldD H d cs → InvD H d → HeldD H (Op.takeWhile incl (passes kp) d) cs
-held-take-den incl kp d cs h inv p ok ep = Holds.holds incl kp d cs h inv p ok ep
+held-take-den {X} incl kp d cs h inv p ok ep =
+  Holds.holds incl (passes kp) d (p ∷ cs) p (inv p ok) H fails (λ m r₁ r₂ eq nk nx → Held.covered H m r₁ r₂ eq (carried nk) nx) fearly
+  where
+    H = h p ok ep
+
+    fails : ∀ {x : IE X} → T (not (passes kp x)) → Inert x
+    fails {instEmit (value _) _} _ = i-value
+    fails {instEmit (mark _) _}  ()
+
+    carried : ∀ {x : IE X} → T (not (passes kp x)) → Carried (out x)
+    carried {instEmit (value _) _} _ = c-value
+    carried {instEmit (mark _) _}  ()
+
+    fearly : ∀ {y} {x : IE X} → enter d p y (out x) → T (not (passes kp x)) → Early y
+    fearly {x = instEmit (value _) _} x _ = Held.early H x
+    fearly {x = instEmit (mark _) _}  _ ()

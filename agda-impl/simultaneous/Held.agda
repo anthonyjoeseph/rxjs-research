@@ -29,6 +29,7 @@ open import simultaneous.Routed using (Held; HeldD; Early)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.Relabel using (same-mark; same-value)
+open import simultaneous.HeldWrap using (held-wrapped)
 open import simultaneous.HeldScan using (held-scan-den; held-scan-at; Relabels)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
@@ -914,12 +915,6 @@ same-restamp st (instEmit (mark burstEnd) _)   = same-mark λ ()
 same-restamp st (instEmit (mark outerDone) _)  = same-mark λ ()
 same-restamp st (instEmit (mark subscribed) _) = same-mark λ ()
 same-restamp st (instEmit (mark completed) _)  = same-mark λ ()
-
--- THE WRAPPED PROGRAM HOLDS: the program beside the subscribe and
--- completion marks, cut after the completion, exempt for the subscribe
--- burst.
-postulate
-  held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
 
 -- THE BATCHER'S SOURCE HOLDS: the wrapped program, restamped.
 held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
