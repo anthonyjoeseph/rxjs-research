@@ -23,7 +23,7 @@ open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Routing; Held; Early)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; PinBy; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.EachRow using (each-row; each-at; each-end; each-before)
 open import denotation.EmissionSet using (LaneOf)
@@ -40,11 +40,11 @@ open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.Count using (reach-down)
 import simultaneous.LaneStart as LaneStart
-open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≼-≺-≺)
+open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≼-≺-≺; ≼-or-≻; ≺-absurd)
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import Data.Bool.Properties using (T-≡)
-open import Function using (Equivalence)
-open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH)
+open import Function using (Equivalence; _|>′_)
+open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
@@ -57,14 +57,14 @@ import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (instantOf)
-open import simultaneous.Instants using (_≺ⁱ_)
+open import simultaneous.Instants using (_≺ⁱ_; triⁱ; transⁱ; instant-≺)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Data.Bool using (Bool; T; not; true)
 import denotation.Read as Run
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
-open import simultaneous.RealView using (module View; real-from; real-to; lane-at; lane-at₂; lane-one; join-out; join-in; cutat-up)
+open import simultaneous.RealView using (module View; real-from; real-to; lane-at; lane-at₂; lane-one; join-out; join-in; cutat-up; join-shows)
 open import simultaneous.HeldTake using (module TakeBack)
 open import simultaneous.TakeKit using (ix<last)
 open import denotation.EmissionSet using (Den; Truncate)
@@ -180,6 +180,18 @@ bounded? (mergeᶠ (just k)) = inj₁ (k , refl)
 bounded? (mergeᶠ nothing)  = inj₂ λ _ ()
 bounded? switchᶠ           = inj₂ λ _ ()
 bounded? exhaustᶠ          = inj₂ λ _ ()
+
+-- A LANE NEVER CUT IS CUT AT NO ROW.
+never-cut : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k} → ¬ View.Cut f o op q → ¬ View.CutAt f o op q k
+never-cut switchᶠ    f o nc (q′ , a′ , x , lt , _) = nc (q′ , a′ , x , lt)
+never-cut (mergeᶠ _) f o nc ()
+never-cut exhaustᶠ   f o nc ()
+
+lane-of : ∀ {A B} (f : A → Den B) (o : EmissionSet A) op → (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a y e} → LaneOf f q a y e → View.Lane f o op q a y e
+lane-of f o (mergeᶠ nothing)  nb l = l
+lane-of f o (mergeᶠ (just k)) nb l = ⊥-elim (nb k refl)
+lane-of f o switchᶠ           nb l = l
+lane-of f o exhaustᶠ          nb l = l
 
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -526,13 +538,68 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
         (λ _ _ _ _ _ _ → open-one) (start-live r₁ mt) q0 (_ , xo , rn) oi
         (λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc) κ
 
-  postulate
-    -- AN IMMEDIATE LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S
-    -- `outerDone`: unqueued, its `laneStart` lies in its value's
-    -- subscription.
-    start-met : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-              → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
-              → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
+  -- AN IMMEDIATE LANE SHOWS ITS `laneStart`, under its value.
+  lane-shows-start : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a} → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × q ⊑ y₀
+  lane-shows-start nb {q} {a} =
+    let (r , u) = LaneStart.lane-start-row _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m (q ⊕ [ ix 1 ])
+    in _ , _ , lane-of fL RO op nb (r , LaneStart.under-ext (q ⊕ [ ix 1 ]) u)
+     , LaneStart.under-trans (LaneStart.under-⊕ (LaneStart.under-⊕ (LaneStart.under-refl q) (ix 1)) (ix 0)) u
+
+  private
+    few-reach : ∀ {X : Set} {t : EmissionSet X} {k e} → Few t k → ES.Reach t k e
+    few-reach f = proj₁ f , λ x lt _ → proj₂ f x lt
+
+    -- A `laneStart` the source shows before a row the scan meets is met.
+    start-caught : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q a y₀ n₀} → RO q (out a)
+                 → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → (y₀ ⊕ [ sub LS.J ]) ≺ z
+                 → M (y₀ ⊕ [ sub LS.J ]) (out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) → AC.StartIn [] r₁ q
+    start-caught r₁ mt xo l jz mo with run-catch r₁ mt mo tt tt jz
+    ... | a₁ , b₁ , e₁ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ a₁ (here refl))))) mo
+    ...   | refl = any-++ʳ a₁ (here (_ , _ , _ , xo , refl , l))
+
+    shown-at′ : ∀ {z′ e″ k e} → LS.M′ z′ e″ → z′ ≡ k × e″ ≡ e → M k e
+    shown-at′ mo (refl , refl) = toM mo
+
+    -- A row before one the scan meets lies before a later instant.
+    before-inst : ∀ {k z v} → k ≺ z → instantOf z ≺ⁱ instantOf v → k ≺ v
+    before-inst {k} {z} {v} kz zv with triⁱ (instantOf k) (instantOf z)
+    ... | inj₁ lt        = instant-≺ k v (transⁱ lt zv)
+    ... | inj₂ (inj₁ eq) = instant-≺ k v (subst (_≺ⁱ instantOf v) (sym eq) zv)
+    ... | inj₂ (inj₂ gt) = ⊥-elim (≺-absurd {k} {z} kz (instant-≺ z k gt))
+
+  -- AN IMMEDIATE LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S
+  -- `outerDone`: its `laneStart` lies under its value, so before the mark,
+  -- and the real flatMap, with few rows before a later instant, shows it.
+  start-met : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+            → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
+            → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
+  start-met nb r₁ mt {v} Fv zv {q} {a} xo rn nc with ro-row xo
+  ... | r , _ , σr , refl with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
+  ...   | c , w′ , σk , refl = λ κ → lane-shows-start nb {q} {a} |>′ λ (y₀ , n₀ , l , ys , qy) →
+    join-shows op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
+      (shows-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
+      (λ a s′ oks → shows-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s′ oks)
+      (proj₁ Fv , λ x f lt → proj₂ Fv (R-from (x , few-reach f)) lt) λ fJ →
+    let q₀ = p₀₀ ⊕ [ ix 1 ]
+        x₀ = y₀ ⊕ [ sub LS.J ]
+        x₀-eq : x₀ ≡ r ⊕ (sub q₀ ∷ ix 1 ∷ ix 0 ∷ ys ++ [ sub LS.J ])
+        x₀-eq = trans (cong (_⊕ [ sub LS.J ]) (trans qy (⊕-assoc r (sub q₀ ∷ ix 1 ∷ ix 0 ∷ []) ys)))
+                      (⊕-assoc r (sub q₀ ∷ ix 1 ∷ ix 0 ∷ ys) [ sub LS.J ])
+        x₀≺z : x₀ ≺ (c ⊕ [ sub w′ ])
+        x₀≺z = subst (_≺ (c ⊕ [ sub w′ ])) (sym x₀-eq) (CD.below-done σr (proj₁ σk) q₀ (ix 1 ∷ ix 0 ∷ ys ++ [ sub LS.J ]) w′)
+        y₀≺v : y₀ ≺ v
+        y₀≺v = before-inst {y₀} {c ⊕ [ sub w′ ]} {v} (≺-trans {y₀} {x₀} {c ⊕ [ sub w′ ]} (≺-ext y₀ []) x₀≺z) zv
+        rR : R y₀ (out (instEmit (mark laneStart) n₀))
+        rR = R-from (join-in op fL RO xo rn l (never-cut op fL RO nc) , proj₁ fJ , λ {k} x lt _ → proj₂ fJ x (≺-trans {k} {y₀} {v} lt y₀≺v))
+        σs : σ₃ y₀ (out (instEmit (mark laneStart) n₀))
+        σs = rR , λ {c′} rc → [ (λ le → le) , (λ lt → ⊥-elim (pin-not (InvAt.quiet I₃ rc rR lt))) ]′ (≼-or-≻ y₀ c′)
+    in lane-shown σs (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {x₀} {c ⊕ [ sub w′ ]} x₀≺z)
+         λ (z′ , e″ , m′ , _ , _ , pr) → κ (start-caught r₁ mt xo l x₀≺z (shown-at′ m′ (pr refl)))
+    where
+      pin-not : ∀ {c′ b} → PinBy c′ (out b) → ⊥
+      pin-not (_ , () , _)
 
   -- A LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S `outerDone`, with
   -- no lane queued there.

@@ -277,14 +277,6 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `held-connected`, `lim-rest`, `cold-rows`, `cold-covered`, `cold-shut`,
 `cold-idle`.
 
-#### THE REAL FLATMAP'S LANE COUNT
-
-The scan's `active` and `queue` count the real flatMap's lanes
-(`LaneCount`). Open: an immediate lane's `laneStart` reaches the source
-before the closer's `outerDone` (truncation through the lane's layers).
-
-Members: `start-met`.
-
 #### THE BATCH RANK
 
 Untried: the batcher keeps the elaborated run's instants, an `each`
