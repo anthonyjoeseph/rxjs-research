@@ -7,22 +7,32 @@
 module simultaneous.CombSent where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using ([]; _∷_)
+open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Nat using (ℕ; zero; suc; s≤s; z≤n)
+open import Data.Bool.Properties using (T-≡)
+open import Function using (Equivalence)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Data.Empty using (⊥)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Data.Empty using (⊥; ⊥-elim)
 
 open import Tree using (mergeᶠ; takeWhile; flatMap; of; map)
-open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Position using (Pos; Label; root; _≟ᵖ_; ix; last; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Den; enter; DenEnv; ⟦_⟧; approx; out; module Op; module TakeWhile)
+open import denotation.EmissionSet using (Den; EmissionSet; enter; DenEnv; ⟦_⟧; approx; out; end; Reach; InE; at-out; on-out;
+  Ended; After; LaneOf; _≺_; _≼_; map-end; module Op; module TakeWhile; module Merge; module Bounded; module Values)
+open import denotation.Events using (ofᴱ; <ᵖ-part)
+open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-≼-≺; ≼-refl; ≺→≼; ≺-ext)
+open import denotation.Laws.Cut using (ix-asc)
+open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
+open import denotation.Laws.Worlds.Leaves using (of-reach; of-end; of-idx)
+open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.SObs using (lone; module Elaborate; Branch; outerB; laneB; closeB)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.DenRows using (merge-out; map-out′; of-mem; each-one; module Cat)
+open import simultaneous.DenRows using (merge-out; bounded-out; map-out′; of-mem; each-one; nth-row; module Cat)
 open import simultaneous.InstEmit using (instEmit; value; mark; outerClose; outerDone)
 open import Data.List.Relation.Unary.All using (lookup)
 
@@ -111,3 +121,215 @@ closer-marks (just n) env s r with Cat.cat-out _ s r
 closer-marks (just n) env s r | inj₂ (_ , l) with of-mem _ 0 (marked outerDone ∷ []) (proj₁ l)
 ... | here refl = c-done
 ... | there ()
+
+------------------------------------------------------------------------
+-- Where the source ends
+
+-- A row of an `of`, one label down.
+of-at : ∀ {X} p i (xs : List X) {y e} → InE (ofᴱ p i xs) y e → Σ Label λ l → y ≡ p ⊕ [ l ]
+of-at p i xs x with of-idx p i xs x
+... | inj₁ (j , _ , eq) = ix j , eq
+... | inj₂ eq           = last , eq
+
+-- Below its end, a row waits on no more than the end does.
+reach-below : ∀ {X} {t : EmissionSet X} {c k a} → Reach t c end → k ≺ c → Reach t k (out a)
+reach-below {c = c} {k} (ks , h) kc = ks , λ {k′} x k′k _ → h x (≺-trans {k′} {k} {c} k′k kc) tt
+
+-- A lane a bounded merge schedules starts past its value.
+starts-after : ∀ {X Y : Set} {n} {f : X → Den Y} {o : EmissionSet X} {i q ls s} → Bounded.Starts n f o i q ls s → q ≺ s
+starts-after {q = q} (Bounded.room _)               = ≺-ext q []
+starts-after {q = q} (Bounded.freed _ _)            = ≺-ext q []
+starts-after {q = q} (Bounded.queued {c} _ qc _ _ _) = ≺-trans {q} {c} {c ⊕ [ ix 1 ]} qc (≺-ext c [])
+
+-- Two values, the second one index in.
+module Two {X : Set} (x y : X) (p : Pos) where
+
+  O : EmissionSet X
+  O = enter (Op.of (x ∷ y ∷ [])) p
+
+  snd-row : O (p ⊕ [ ix 1 ]) (out y)
+  snd-row = on-out at-out , of-reach p 0 (x ∷ y ∷ []) {p ⊕ [ ix 1 ]} {out y}
+
+  snd-before : ∀ {c} → Ended O c → (p ⊕ [ ix 1 ]) ≺ c
+  snd-before {c} (c′ , (e , _) , c′c) with of-end p 0 (x ∷ y ∷ []) e
+  ... | refl = ≺-≼-≺ {p ⊕ [ ix 1 ]} {p ⊕ [ last ]} {c} (Equivalence.from T-≡ (<ᵖ-part p [] [] refl)) c′c
+
+  snd-nth : Values.Nth O 1 (p ⊕ [ ix 1 ]) y
+  snd-nth = Values.next (Values.first (at-out , of-reach p 0 (x ∷ y ∷ []) {p ⊕ [ ix 0 ]} {out x}) lo) snd-row (ix-asc p (s≤s z≤n)) nx
+    where
+      lo : ∀ {k b} → O k (out b) → (p ⊕ [ ix 0 ]) ≼ k
+      lo (at-out , _)              = ≼-refl {p ⊕ [ ix 0 ]}
+      lo (on-out at-out , _)       = ≺→≼ {p ⊕ [ ix 0 ]} {p ⊕ [ ix 1 ]} (ix-asc p (s≤s z≤n))
+      lo (on-out (on-out ()) , _)
+
+      nx : ∀ {k b} → O k (out b) → (p ⊕ [ ix 0 ]) ≺ k → (p ⊕ [ ix 1 ]) ≼ k
+      nx (at-out , _) lt          = ⊥-elim (≺-irrefl {p ⊕ [ ix 0 ]} lt)
+      nx (on-out at-out , _) _    = ≼-refl {p ⊕ [ ix 1 ]}
+      nx (on-out (on-out ()) , _) _
+
+-- WHERE A ROW OF THE SOURCE LIES: under its subscription, or past a
+-- branch's end, that branch's reader itself so placed.
+data Where {Y : Set} (P : Pos) (Br : Branch → Den Y) : Pos → Set where
+  under : ∀ zs → Where P Br (P ⊕ zs)
+  past  : ∀ {b w c} zs → Where P Br w → enter (Br b) w c end → Where P Br (c ⊕ zs)
+
+where-ext : ∀ {Y P} {Br : Branch → Den Y} {c} → Where P Br c → ∀ ys → Where P Br (c ⊕ ys)
+where-ext {P = P} {Br} (under zs) ys = subst (Where P Br) (sym (⊕-assoc P zs ys)) (under (zs ++ ys))
+where-ext {P = P} {Br} (past {c = c} zs w x) ys = subst (Where P Br) (sym (⊕-assoc c zs ys)) (past (zs ++ ys) w x)
+
+where-at : ∀ {Y P} {Br : Branch → Den Y} → Where P Br P
+where-at {P = P} {Br} = subst (Where P Br) (⊕-identityʳ P) (under [])
+
+where-map : ∀ {Y P} {Br Br′ : Branch → Den Y} → (∀ b {w c} → enter (Br b) w c end → enter (Br′ b) w c end)
+          → ∀ {c} → Where P Br c → Where P Br′ c
+where-map g (under zs)    = under zs
+where-map g (past zs w x) = past zs (where-map g w) (g _ x)
+
+-- THE SOURCE'S PIECES, as any reading of it gives them: the trackers
+-- `Tk`, the flatMap's own branches `Br`, tagged by `T`, concatenated with
+-- the closing `nothing` by `G`, fed beside the trackers by `F`.
+module SrcEnd {B : Set} (F G : Bool → Den (Maybe (Input B))) (T : Branch → Den (Maybe (Input B)))
+              (Br : Branch → Den (IE B)) (Tk : Den (ℕ × Routes)) (P : Pos)
+              (eFt : F true ≡ Op.map (λ x → just (inj₂ x)) Tk)
+              (eF : F false ≡ Op.flatMap (mergeᶠ (just 1)) G (Op.of (true ∷ false ∷ [])))
+              (eG : G false ≡ Op.of (nothing ∷ []))
+              (eT : G true ≡ Op.flatMap (mergeᶠ nothing) T (Op.of (outerB ∷ laneB ∷ closeB ∷ [])))
+              (eB : ∀ b → T b ≡ Op.map (λ e → just (inj₁ (b , e))) (Br b)) where
+
+  D : Den (Maybe (Input B))
+  D = Op.flatMap (mergeᶠ nothing) F (Op.of (true ∷ false ∷ []))
+
+  W : Pos → Set
+  W = Where P Br
+
+  -- The branches' merge ends at its outer's end, or past a branch's.
+  own-end : ∀ {s c} → W s → enter (G true) s c end → W c
+  own-end {s} {c} ws x with subst (λ d → enter d s c end) eT x
+  ... | (Merge.oend o _ , _) with of-end s 0 (outerB ∷ laneB ∷ closeB ∷ []) (proj₁ o)
+  ...   | refl = where-ext ws [ last ]
+  own-end {s} {c} ws x | (Merge.lane _ _ _ _ () , _)
+  own-end {s} {c} ws x | (Merge.lend {q} {b} o _ (l , _) _ _ _ , _) with of-at s 0 (outerB ∷ laneB ∷ closeB ∷ []) (proj₁ o)
+  ... | l₀ , refl with subst (λ d → enter d (q ⊕ [ ix 1 ]) c end) (eB b) l
+  ...   | (map-end br , _) = subst W (⊕-identityʳ c) (past [] (where-ext ws (l₀ ∷ ix 1 ∷ [])) (subst (λ w → enter (Br b) w c end) (⊕-assoc s [ l₀ ] [ ix 1 ]) br))
+  own-end {s} {c} ws x | (Merge.run () _ , _)
+  own-end {s} {c} ws x | (Merge.rend () _ _ , _)
+
+  -- THE CONCAT AT `s₀`: each lane's end lies where its start does, and a
+  -- start where its value or the end that frees it does.
+  module CatAt (s₀ : Pos) (w₀ : W s₀) where
+    private
+      module Bd = Bounded 1 G (enter (Op.of (true ∷ false ∷ [])) s₀)
+
+    outer-where : ∀ {q a} → enter (Op.of (true ∷ false ∷ [])) s₀ q (out a) → W q
+    outer-where (x , _) with of-at s₀ 0 _ x
+    ... | l , refl = where-ext w₀ [ l ]
+
+    mutual
+      lane-end : ∀ i {q a s c} → Values.Nth (enter (Op.of (true ∷ false ∷ [])) s₀) i q a → Bd.Starts i q (Bd.Sched i) s
+               → After (G a) s c end → W c
+      lane-end i {a = true} nt st (x , _) = own-end (starts i st (outer-where (nth-row nt))) x
+      lane-end i {a = false} {s} {c} nt st (x , _) with of-end s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d s c end) eG x))
+      ... | refl = where-ext (starts i st (outer-where (nth-row nt))) [ last ]
+
+      starts : ∀ i {q s} → Bd.Starts i q (Bd.Sched i) s → W q → W s
+      starts i (Bd.room _)            wq = where-ext wq [ ix 1 ]
+      starts i (Bd.freed _ _)         wq = where-ext wq [ ix 1 ]
+      starts i (Bd.queued _ _ k _ _)  wq = where-ext (sched i k) [ ix 1 ]
+
+      sched : ∀ i {c} → Bd.Kth (_≡ c) (Bd.Sched i) 0 → W c
+      sched zero ()
+      sched (suc i) (inj₁ (_ , (_ , _ , _ , nt , st , aft) , refl)) = lane-end i nt st aft
+      sched (suc i) (inj₂ k) = sched i k
+
+  -- The closing `nothing` lies under the subscription or past a branch's end.
+  nothing-at : ∀ {k} → enter D P k (out nothing) → W k
+  nothing-at r with merge-out F (Op.of (true ∷ false ∷ [])) P r
+  ... | q , true , _ , l , _ with map-out′ (λ x → just (inj₂ x)) Tk _ (subst (λ d → enter d _ _ (out nothing)) eFt l)
+  ...   | _ , _ , ()
+  nothing-at r | q , false , oq , l , _ with bounded-out 1 G (Op.of (true ∷ false ∷ [])) _ (subst (λ d → enter d _ _ (out nothing)) eF l)
+  ... | q₂ , true , i , s , oq₂ , sb , (l′ , _) with merge-out T (Op.of (outerB ∷ laneB ∷ closeB ∷ [])) s (subst (λ d → enter d _ _ (out nothing)) eT l′)
+  ...   | _ , b , _ , l″ , _ with map-out′ (λ e → just (inj₁ (b , e))) (Br b) _ (subst (λ d → enter d _ _ (out nothing)) (eB b) l″)
+  ...     | _ , _ , ()
+  nothing-at r | q , false , oq , l , _ | q₂ , false , i , s , oq₂ , (nt , st) , (l′ , _)
+    with of-at s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d _ _ (out nothing)) eG l′))
+  ... | l₀ , refl = where-ext (CatAt.starts (q ⊕ [ ix 1 ]) wq i st (CatAt.outer-where (q ⊕ [ ix 1 ]) wq oq₂)) [ l₀ ]
+    where
+      wq : W (q ⊕ [ ix 1 ])
+      wq = where-ext (CatAt.outer-where P where-at oq) [ ix 1 ]
+
+  private
+    module Mg = Merge F (enter (Op.of (true ∷ false ∷ [])) P)
+
+    sc : Pos
+    sc = (P ⊕ [ ix 1 ]) ⊕ [ ix 1 ]
+
+    module Bc = Bounded 1 G (enter (Op.of (true ∷ false ∷ [])) sc)
+
+    mg-done : ∀ {c} → Mg.JoinT c end → Mg.Done c
+    mg-done (Mg.oend _ d)         = d
+    mg-done (Mg.lane _ _ _ _ ())
+    mg-done (Mg.lend _ _ _ _ _ d) = d
+    mg-done (Mg.run () _)
+    mg-done (Mg.rend () _ _)
+
+    bc-done : ∀ {c} → Bc.JoinT c end → Bc.Done c
+    bc-done (Bc.oend _ d)         = d
+    bc-done (Bc.lane _ _ _ _ ())
+    bc-done (Bc.lend _ _ _ _ _ d) = d
+    bc-done (Bc.run () _)
+    bc-done (Bc.rend () _ _)
+
+  -- THE SOURCE'S MERGE NEVER ENDS BEFORE ITS `nothing`: its end waits on
+  -- the concat, and the concat's on the `nothing`'s lane.
+  failed : ∀ {c} → enter D P c end → TakeWhile.Failed false going (enter D P) c
+  failed {c} (x , rc) =
+    from-lane (proj₂ (mg-done x) (Two.snd-row true false P) tt (Two.snd-before true false P (proj₁ (mg-done x))) (λ ()))
+    where
+      from-lane : Ended (LaneOf F (P ⊕ [ ix 1 ]) false) c → TakeWhile.Failed false going (enter D P) c
+      from-lane (c₀ , (cr , _) , c₀c) = from-cat (subst (λ d → enter d sc c₀ end) eF cr)
+        where
+          from-cat : enter (Op.flatMap (mergeᶠ (just 1)) G (Op.of (true ∷ false ∷ []))) sc c₀ end → TakeWhile.Failed false going (enter D P) c
+          from-cat (y , ry) =
+            from-of (proj₂ (bc-done y) (Two.snd-row true false sc) (1 , false , Two.snd-nth true false sc)
+                      (Two.snd-before true false sc (proj₁ (bc-done y))) (λ ()))
+            where
+              from-of : Ended (Bc.Lane (sc ⊕ [ ix 1 ]) false) c₀ → TakeWhile.Failed false going (enter D P) c
+              from-of (c₁ , (i , s , (nt , st) , er , _) , c₁c₀) with of-end s 0 (nothing ∷ []) (proj₁ (subst (λ d → enter d s c₁ end) eG er))
+              ... | refl = s ⊕ [ ix 0 ] , nothing , (frow , reach-below {a = nothing} rc k≺c) , tt , k≺c
+                where
+                  k≺c₀ : (s ⊕ [ ix 0 ]) ≺ c₀
+                  k≺c₀ = ≺-≼-≺ {s ⊕ [ ix 0 ]} {s ⊕ [ last ]} {c₀} (ix<last s) c₁c₀
+
+                  k≺c : (s ⊕ [ ix 0 ]) ≺ c
+                  k≺c = ≺-≼-≺ {s ⊕ [ ix 0 ]} {c₀} {c} k≺c₀ c₀c
+
+                  nrow : enter (G false) s (s ⊕ [ ix 0 ]) (out nothing)
+                  nrow = subst (λ d → enter d s (s ⊕ [ ix 0 ]) (out nothing)) (sym eG) (at-out , of-reach s 0 (nothing ∷ []) {s ⊕ [ ix 0 ]} {out nothing})
+
+                  crow : enter (F false) sc (s ⊕ [ ix 0 ]) (out nothing)
+                  crow = subst (λ d → enter d sc (s ⊕ [ ix 0 ]) (out nothing)) (sym eF)
+                           (Bc.lane (nth-row nt) (i , false , nt) (i , s , (nt , st) , nrow , ≺-ext s []) (λ ()) tt , reach-below {a = nothing} ry k≺c₀)
+
+                  sc≺k : sc ≺ (s ⊕ [ ix 0 ])
+                  sc≺k = ≺-trans {sc} {sc ⊕ [ ix 1 ]} {s ⊕ [ ix 0 ]} (≺-ext sc [])
+                           (≺-trans {sc ⊕ [ ix 1 ]} {s} {s ⊕ [ ix 0 ]} (starts-after st) (≺-ext s []))
+
+                  frow : Mg.JoinT (s ⊕ [ ix 0 ]) (out nothing)
+                  frow = Mg.lane (Two.snd-row true false P) tt (crow , sc≺k) (λ ()) tt
+
+  -- The source ends past its `nothing`, never at its merge's end.
+  src-end : ∀ {c} → enter (Op.takeWhile false going D) P c end → W c
+  src-end (TakeWhile.stop {a = just _} _ () _ , _)
+  src-end (TakeWhile.stop {a = nothing} x _ _ , _) = where-ext (nothing-at x) [ last ]
+  src-end (TakeWhile.tend x nF , _)                = ⊥-elim (nF (failed x))
+
+module _ {Δ A B} (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env : DenEnv (IE B ∷ IE B ∷ IE A ∷ Δ)) where
+
+  -- Where the scan's source ends, under every approximant as under the meaning.
+  src-where : ∀ m P {c} → enter (ev m (Src tk env) env) P c end → Where P (λ b → ⟦ branch {A = A} {B} b ⟧ env) c
+  src-where nothing P x =
+    SrcEnd.src-end (λ a → ⟦ fed tk a ⟧ env) (λ a → ⟦ Cat-of tk env a ⟧ env) (λ b → ⟦ Tag tk env b ⟧ env)
+      (λ b → ⟦ branch b ⟧ env) (⟦ tk ⟧ env) P refl refl refl refl (λ _ → refl) x
+  src-where (just n) P x = where-map (λ b → branch-ev tk env (just n) b)
+    (SrcEnd.src-end (λ a → approx n (fed tk a) env) (λ a → approx n (Cat-of tk env a) env) (λ b → approx n (Tag tk env b) env)
+      (λ b → approx n (branch b) env) (approx n tk env) P refl refl refl refl (λ _ → refl) x)

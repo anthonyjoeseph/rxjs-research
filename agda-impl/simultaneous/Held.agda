@@ -31,7 +31,9 @@ open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
-open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks)
+open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; src-where; Where) renaming (under to w-under; past to w-past)
+open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
+open import denotation.Laws.Worlds using (⊕-assoc)
 open import simultaneous.DenRows using (map-out′; hot-out)
 open import simultaneous.HeldConnect using (held-conn; early-inst)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
@@ -46,7 +48,7 @@ open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
-  Input; react; going; fed; opening; anyHolds)
+  Input; react; going; fed; opening; anyHolds; branch)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; ShutRun; outRows; init; from; past; lay; Local; Locals;
   locals-runs; local-end; run-row; walk; inv-past; step-local; Laid; laid; ended; laid-in; runs-prefix; held-runs)
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted; NoCB; tot)
@@ -475,9 +477,28 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | w , l with hot-out l
   ...   | c′ , σc , _ , refl = c′ , w , σc , refl
 
-  postulate
-    -- The source ends under its own subscription, or past a branch's end.
-    m-ends     : ∀ {q} → M q end → (Σ _ λ zs → q ≡ P ⊕ zs) ⊎ (Σ Pos λ c → Σ _ λ zs → BEnd c × q ≡ c ⊕ zs)
+  -- The source ends under its own subscription, or past a branch's end.
+  MEnd : Pos → Set
+  MEnd q = (Σ _ λ zs → q ≡ P ⊕ zs) ⊎ (Σ Pos λ c → Σ _ λ zs → BEnd c × q ≡ c ⊕ zs)
+
+  mend-ext : ∀ {q} → MEnd q → ∀ ys → MEnd (q ⊕ ys)
+  mend-ext (inj₁ (zs , refl))         ys = inj₁ (zs ++ ys , ⊕-assoc P zs ys)
+  mend-ext (inj₂ (c′ , zs , b , refl)) ys = inj₂ (c′ , zs ++ ys , b , ⊕-assoc c′ zs ys)
+
+  mend : ∀ {q} → Where P (λ b → ⟦ branch {A = A} {B} b ⟧ env′) q → MEnd q
+  mend (w-under zs) = inj₁ (zs , refl)
+  mend (w-past {b = outerB} zs _ (map-end (r-ended y _ , _) , _)) = inj₂ (_ , zs , b-outer y , refl)
+  mend (w-past {b = outerB} zs _ (map-end (r-shown _ () _ , _) , _))
+  mend (w-past {b = outerB} zs w (map-end (r-late _ _ , _) , _))  = mend-ext (mend-ext (mend w) [ last ]) zs
+  mend (w-past {b = laneB} zs _ (r-ended y _ , _))                = inj₂ (_ , zs , b-lane y , refl)
+  mend (w-past {b = laneB} zs _ (r-shown _ () _ , _))
+  mend (w-past {b = laneB} zs w (r-late _ _ , _))                 = mend-ext (mend-ext (mend w) [ last ]) zs
+  mend (w-past {b = closeB} zs _ (r-ended y _ , _))               = inj₂ (_ , zs , b-close y , refl)
+  mend (w-past {b = closeB} zs _ (r-shown _ () _ , _))
+  mend (w-past {b = closeB} zs w (r-late _ _ , _))                = mend-ext (mend-ext (mend w) [ last ]) zs
+
+  m-ends : ∀ {q} → M q end → MEnd q
+  m-ends x = mend (src-where tk env′ m P x)
 
   -- Every row the scan's source meets is one of these.
   m-rows : ∀ {q e} → M q e → Visible e → MRow q e
