@@ -32,6 +32,7 @@ open import simultaneous.HeldScan using (held-scan-den)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.HeldDefer using (held-defer)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit; proper-fit; held-fit; module LaneReal)
+open import simultaneous.HeldTrigger using (held-trigger)
 open import simultaneous.CombSent using (sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import denotation.Laws.Worlds using (⊕-assoc)
@@ -830,17 +831,6 @@ held-comb m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok
   where
     open FlatHots m ρ op f s env p using (src; env′; P)
     L₀ = src-lawful {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)} (inv-ev m empty env gd) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L gd)) p ok
-
--- A SHARED OUTER HOLDS as the outer does: the trigger's lane holds
--- nothing, and the outer is subscribed once, as the trigger ends, inside
--- the share's own burst, which the share's subscription exempts.
-postulate
-  held-trigger : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs p
-               → GoodEnv env → Ok (Hots env) p → Early p
-               → let σ₀ = Proper (enter (ev m empty env) (p ⊕ [ ix 1 ])) in
-                 HeldD (Hots (hot σ₀ ∷ env)) (ev m (elab (λ i → there (ρ i)) s) (hot σ₀ ∷ env)) cs
-               → Held (enter (ev m (flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ []))) (hot σ₀ ∷ env)) ((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))
-                      (((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ∷ p ∷ cs)
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)

@@ -265,15 +265,13 @@ bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, true on every row probed, hand-offs and parks
 included: each is the `idle` of what holds the routes, read on the
 scan's run split onto that branch (`lane-run`, `lane-next`; a tracker's
-split is owed). Then the lanes' own rows, a reader's joins and the
-defer limit. The cold's runs (`cold-covered`) need its rows' order, not
+split is owed). Then a reader's joins and the defer limit. The cold's runs (`cold-covered`) need its rows' order, not
 their shape. Settled when each former's leaf is a body.
 
 Members: `outer-current`, `lane-run`, `lane-next`, `lane-idle`, `lanes-count`,
 `held-current`, `parked-live`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `comb-run`, `held-connected`, `held-lim`,
-`held-top`, `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`,
-`held-trigger`.
+`held-top`, `cold-rows`, `cold-covered`, `cold-shut`, `cold-idle`.
 
 #### THE BATCH RANK
 
