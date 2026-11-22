@@ -74,10 +74,14 @@ jobs:
       # Keyed on the commit, restored from the newest prefix match: Agda
       # invalidates by content, so a stale interface is rechecked, never
       # trusted.  The `agda-interfaces-` prefix is what cache-prune.yml trims.
+      # The stdlib's own `_build` rides along: uncached, every run spends
+      # about two minutes rechecking a library that never changes.
       - name: Cache Agda interfaces
         uses: actions/cache@v4
         with:
-          path: agda-impl/_build
+          path: |
+            agda-impl/_build
+            ~/agda-stdlib-2.3/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
