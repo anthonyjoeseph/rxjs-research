@@ -276,12 +276,11 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 
 #### THE READER
 
-Untried: the annotation's connect shows its source's run, each emit wrapped,
-then nothing at its end; a reader's runs are the source's joined late. Settled by
-reading the annotation's scan and connect, and the reader's scan and hot,
-run by run.
+Untried: a reader's runs are the source's joined late, its idles and rests the
+source's. Settled by reading the reader's scan, each and hot run by run, over
+the annotation's rows (`ann-row`).
 
-Members: `conn-src`, `conn-end`, `read-back`, `read-idle`, `read-rest`.
+Members: `read-back`, `read-idle`, `read-rest`.
 
 #### THE BATCH RANK
 

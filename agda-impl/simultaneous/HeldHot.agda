@@ -69,7 +69,7 @@ prefix-in (i ∙ x) ys refl = ∈-map⁺ (i ∙_) (head-in x ys)
 em : ∀ {P : Set} → ¬ ¬ (P ⊎ ¬ P)
 em k = k (inj₂ λ x → k (inj₁ x))
 
-module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
+module HotRun {A : Set} (S : EmissionSet A) (sb : Pos)
                (flat  : ∀ {y e l ys e′} → S y e → S (y ⊕ (l ∷ ys)) e′ → ⊥)
                (func  : ∀ {y e e′} → S y e → S y e′ → e ≡ e′)
                (after : ∀ {y e} → S y e → sb ≺ y)
@@ -77,10 +77,10 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
                (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c)
                (shows : Shows S) where
 
-  σ : EmissionSet (IE A)
+  σ : EmissionSet A
   σ = Proper S
 
-  Rd : EmissionSet (IE A)
+  Rd : EmissionSet A
   Rd = enter (hot σ) sb
 
   shift : Pos → Pos
@@ -148,11 +148,6 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
   lift-vis {e = skip}  _ ()
   lift-vis {e = pin _} _ ()
 
-  ev-same : ∀ {e : Ev (IE A)} → Visible e → EvSame e e
-  ev-same {out x} _ = ev-out (same-refl x)
-  ev-same {end}   _ = ev-end
-  ev-same {skip}  ()
-  ev-same {pin _} ()
 
   ----------------------------------------------------------------------
   -- The reading's own shape
@@ -168,13 +163,13 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
   rd-proper (x , _) (y , _) with rj-σ x | src-vis y tt
   ... | k , refl , _ , σk | k′ , refl , σk′ = λ lt → proj₂ σk (proj₁ σk′) (reflect (proj₁ σk′) (proj₁ σk) lt)
 
-  bare-pin : ∀ {e : Ev (IE A)} {r} → Bare e → e ≡ pin r → ⊥
+  bare-pin : ∀ {e : Ev A} {r} → Bare e → e ≡ pin r → ⊥
   bare-pin {pin _} () _
   bare-pin {out _} _ ()
   bare-pin {skip}  _ ()
   bare-pin {end}   _ ()
 
-  bare-end : ∀ {e : Ev (IE A)} → Bare e → e ≡ end → ⊥
+  bare-end : ∀ {e : Ev A} → Bare e → e ≡ end → ⊥
   bare-end {end}   () _
   bare-end {out _} _ ()
   bare-end {skip}  _ ()
@@ -244,25 +239,21 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
   aft-fwd (some sy) sk a = down sy sk a
 
   -- Every run met of the reading is the source's, moved.
-  back-go : ∀ {c rs′} → Cur c → Run Rd (shiftM c) rs′ → Σ _ λ rs → Run S c rs × RowsAt Sh rs′ rs
-  back-go cu [] = [] , [] , []ᵃ
-  back-go {c} cu (((((x , _) , _) , _) , vi , ac , lf) ∷ run) with src-vis x vi
-  ... | k , refl , σk with back-go (some (proj₁ σk)) run
-  ...   | rs , run′ , eq =
-    (k , _) ∷ rs , (((σk , few-vis (proj₁ σk) vi) , vi , aft-back cu (proj₁ σk) ac , least) ∷ run′) , (refl , ev-same vi) ∷ᵃ eq
+  shR : Pos × Ev A → Pos × Ev A
+  shR (y , e) = shift y , e
+
+  run-back : ∀ {c rs′} → Cur c → Run Rd (shiftM c) rs′ → Σ _ λ rs → Run S c rs × rs′ ≡ L.map shR rs
+  run-back cu [] = [] , [] , refl
+  run-back {c} cu (((((x , _) , _) , _) , vi , ac , lf) ∷ run) with src-vis x vi
+  ... | k , refl , σk with run-back (some (proj₁ σk)) run
+  ...   | rs , run′ , refl =
+    (k , _) ∷ rs , (((σk , few-vis (proj₁ σk) vi) , vi , aft-back cu (proj₁ σk) ac , least) ∷ run′) , refl
     where
       least : ∀ {k₂ e₂} → S k₂ e₂ → Visible e₂ → After c k₂ → k ≼ k₂
       least s₂ v₂ a₂ lt = lf (lift-vis s₂ v₂) v₂ (aft-fwd cu s₂ a₂) (down s₂ (proj₁ σk) lt)
 
-  back : ∀ {rs′} → Met Rd rs′ → Σ _ λ rs → Met S rs × RowsAt Sh rs′ rs
-  back = back-go none
-
-  cursor-at : ∀ {rs′ rs : List (Pos × Ev (IE A))} → RowsAt Sh rs′ rs → ∀ c → cursor (shiftM c) rs′ ≡ shiftM (cursor c rs)
-  cursor-at []ᵃ              c = refl
-  cursor-at ((refl , _) ∷ᵃ eq) c = cursor-at eq (just _)
-
   -- Where a run met stands: nowhere yet, or at a row it met.
-  Last : Maybe Pos → List (Pos × Ev (IE A)) → Set
+  Last : Maybe Pos → List (Pos × Ev A) → Set
   Last nothing  rs = ⊤
   Last (just y) rs = Σ _ λ e → (y , e) ∈ rs × S y e × Visible e
 
@@ -276,26 +267,6 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
   last-cur : ∀ {c rs} → Last c rs → Cur c
   last-cur {nothing} _               = none
   last-cur {just _}  (_ , _ , sy , _) = some sy
-
-  ----------------------------------------------------------------------
-  -- Rest
-
-  rest-hot : Rest S → Rest Rd
-  rest-hot R {rs′} m z bq with back m
-  ... | rs , run , eq with memAt eq bq
-  ...   | q , _ , bq′ , refl , same-mark e
-    with R run (subst (λ r → proj₂ r ≡ 0) (cntAt eq) z)
-           (subst (λ n → (q , out (instEmit (mark begin) n)) ∈ rs) (trans (sym (e refl)) (cong proj₁ (cntAt eq))) bq′)
-  ...     | ks , h = L.map shift ks , pick
-    where
-      pick : ∀ {y e} → Rd y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf (shift q) → y ∈ L.map shift ks
-      pick (x , _) ay iq with src x
-      ... | k , refl , _ , sk =
-        ∈-map⁺ shift (h sk (aft-back (last-cur (last-met run)) sk (subst (λ c → After c (shift k)) (cursor-at eq nothing) ay))
-                           (trans (sym (rootOf-ext k _)) (trans iq (rootOf-ext q _))))
-
-  ----------------------------------------------------------------------
-  -- Idle
 
   -- WHERE A POSITION HAS FEW ROWS BEFORE IT IN THE READING, BEFORE EVERY
   -- END, it has few before it in the source: a row of the source before it
@@ -321,6 +292,54 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
 
     few : ¬ ¬ Few S w
     few = shows (ls , listed)
+
+-- Over marks, the reading holds what the source holds.
+module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
+               (flat  : ∀ {y e l ys e′} → S y e → S (y ⊕ (l ∷ ys)) e′ → ⊥)
+               (func  : ∀ {y e e′} → S y e → S y e′ → e ≡ e′)
+               (after : ∀ {y e} → S y e → sb ≺ y)
+               (few-vis : ∀ {y e} → S y e → Visible e → Few S y)
+               (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c)
+               (shows : Shows S) where
+  open HotRun S sb flat func after few-vis proper-vis shows public
+
+  ev-same : ∀ {e : Ev (IE A)} → Visible e → EvSame e e
+  ev-same {out x} _ = ev-out (same-refl x)
+  ev-same {end}   _ = ev-end
+  ev-same {skip}  ()
+  ev-same {pin _} ()
+
+  -- A run of the source's rows, moved, relabels nothing.
+  rows-at : ∀ {c rs} → Run S c rs → RowsAt Sh (L.map shR rs) rs
+  rows-at [] = []ᵃ
+  rows-at ((_ , vi , _) ∷ run) = (refl , ev-same vi) ∷ᵃ rows-at run
+
+  back : ∀ {rs′} → Met Rd rs′ → Σ _ λ rs → Met S rs × RowsAt Sh rs′ rs
+  back m with run-back none m
+  ... | rs , run , refl = rs , run , rows-at run
+
+  cursor-at : ∀ {rs′ rs : List (Pos × Ev (IE A))} → RowsAt Sh rs′ rs → ∀ c → cursor (shiftM c) rs′ ≡ shiftM (cursor c rs)
+  cursor-at []ᵃ              c = refl
+  cursor-at ((refl , _) ∷ᵃ eq) c = cursor-at eq (just _)
+  ----------------------------------------------------------------------
+  -- Rest
+
+  rest-hot : Rest S → Rest Rd
+  rest-hot R {rs′} m z bq with back m
+  ... | rs , run , eq with memAt eq bq
+  ...   | q , _ , bq′ , refl , same-mark e
+    with R run (subst (λ r → proj₂ r ≡ 0) (cntAt eq) z)
+           (subst (λ n → (q , out (instEmit (mark begin) n)) ∈ rs) (trans (sym (e refl)) (cong proj₁ (cntAt eq))) bq′)
+  ...     | ks , h = L.map shift ks , pick
+    where
+      pick : ∀ {y e} → Rd y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf (shift q) → y ∈ L.map shift ks
+      pick (x , _) ay iq with src x
+      ... | k , refl , _ , sk =
+        ∈-map⁺ shift (h sk (aft-back (last-cur (last-met run)) sk (subst (λ c → After c (shift k)) (cursor-at eq nothing) ay))
+                           (trans (sym (rootOf-ext k _)) (trans iq (rootOf-ext q _))))
+
+  ----------------------------------------------------------------------
+  -- Idle
 
   Goal : List (Pos × Ev (IE A)) → Pos → Set
   Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
