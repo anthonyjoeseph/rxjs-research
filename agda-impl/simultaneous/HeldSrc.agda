@@ -47,7 +47,9 @@ open import denotation.Laws.Shows using (Step; k-shows; shows-k; sk-down; sk-tru
 open import denotation.Laws.Worlds.Leaves using (of-inv)
 open import denotation.Laws.Modulus using (≺→≼; ≺-≼-≺; ≺-irrefl; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-split; entered-few)
 open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; hots-at; tag-outer)
-open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none)
+open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none; Fresh; fresh-adm)
+open import simultaneous.Routed using (Placed; Adm; adm-∪)
+open import denotation.Laws.Worlds using (plain-ix)
 open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 
@@ -121,9 +123,10 @@ data Opens {A : Set} : IE A → Set where
 module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-               (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
+               (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p)
                (H₁ : Held (enter (ev m (FlatHots.trig m ρ op f s env p) (FlatHots.env₀ m ρ op f s env p)) (FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]))
                           ((FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]) ∷ p ∷ cs))
+               (tp : Placed (Fresh eh) (FlatHots.σ₁ m ρ op f s env p))
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
                (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p)) (FlatHots.p₀ m ρ op f s env p))
@@ -138,6 +141,20 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   g₂ : GoodEnv (hot σ₂ ∷ hot σ₁ ∷ env₀)
   g₂ = good-cons L₂ (good-cons L₁ (good-cons L₀ gd))
+
+  -- Admissible under the binders, past the flatMap's three connects.
+  ad₂ : Adm (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (Fresh eh)
+  ad₂ = adm-∪ {t = σ₂} (adm-∪ {t = σ₁} (adm-∪ {t = σ₀} (fresh-adm eh)))
+
+  fr₀₀ : Fresh eh p₀₀
+  fr₀₀ = Adm.bare (fresh-adm eh) (Adm.bare (fresh-adm eh) (Adm.bare (fresh-adm eh) fr λ ()) λ ()) λ ()
+
+  fr₁ : Fresh eh (p₀₀ ⊕ [ ix 1 ])
+  fr₁ = Adm.step ad₂ ok₂ fr₀₀ plain-ix
+
+  -- The binders, read under a lane's hot.
+  eh₄ : ∀ {t} → EnvHeld (λ i → there (there (there (there (ρ i))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+  eh₄ = record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }
 
   g₃ : GoodEnv env′
   g₃ = good-cons L₃ g₂
@@ -221,12 +238,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₂ (_ , _ , b , refl) = done b
 
   -- The lanes' rows, each as it claims, over the programs they share.
-  lane-fit : Fit σ₃
+  lane-fit : Fit (Fresh eh) σ₃
   lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
-               (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r))
-               (λ a L q okq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                   (good-cons L g₂) eh q okq eq))
-               (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
+               (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂
+               (λ a L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) eh₄ q okq fq eq)
+                                   (IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) eh₄ q okq fq eq))
+               (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
 
   lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
   lane-named = Fit.fine lane-fit

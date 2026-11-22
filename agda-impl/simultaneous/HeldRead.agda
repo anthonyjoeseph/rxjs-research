@@ -66,13 +66,15 @@ open import simultaneous.Relabel using (Same; same-mark; same-value)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
 open import simultaneous.HeldTake using (name-ext; ex-ext)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.HeldBase using (Bound; IH; ih)
+open import simultaneous.HeldBase using (Bound; IH; ih; Ann; Gap; EnvHeld; Fresh; apart-at)
+open import simultaneous.Routed using (PlacedD)
+import Relation.Nullary as Nl
 open import simultaneous.HeldJoin using (Joined; module Join)
 
 open import Data.List.Properties using (∷ʳ-injective; map-++)
 open import Data.Unit using (tt)
 open import denotation.EmissionSet using (DenEnv; Few; module Connecting; skip; pin)
-open import denotation.Laws.Worlds using (InvD; Lawful; _∪ʰ_; Ok; world-after; full; Shows)
+open import denotation.Laws.Worlds using (InvD; Lawful; _∪ʰ_; Ok; world-after; full; Shows; GoodEnv)
 open import denotation.Laws using (good-cons)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-trans)
@@ -85,7 +87,7 @@ open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.CombSent using (assoc³)
 open import simultaneous.Layers using (snoc-view)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab)
 
 -- The reader of a binder's meaning.
 RD : ∀ {X} → Den (AIE X) → Den (IE X)
@@ -114,7 +116,7 @@ Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 -- positive (`Held.covered`), so `Joined` has no constructor for that run,
 -- and the reader's own `Held.covered` fails on its end.  Only marks lie in
 -- the gap and no former subscribes a lane on a mark, so no elaborated
--- reader is ever subscribed there; `HeldD` does not yet say so.
+-- reader is subscribed there (`Fresh`).
 --
 -- RECOVERY: git show 23124ea8 restores `FlatLayer`, a merge of closed
 --   lanes met in turn with the reader's `each₂` instance, and the hot's
@@ -122,19 +124,14 @@ Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 
 postulate
   -- A run the reader meets is one of the source's, joined late.
-  read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {rs′} → Met (enter (RD d) p) rs′
+  read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
             → Joined (Src b) Rl (p ∷ cs) rs′
-  read-idle : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Idle (enter (RD d) p)
-  read-rest : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Rest (enter (RD d) p)
+  read-idle : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Idle (enter (RD d) p)
+  read-rest : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Rest (enter (RD d) p)
 
 -- The source holds where the binder subscribes it.
 held-src : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → Held (Src b) (s₀ b ∷ Bound.outer b)
-held-src b = Bound.held b (s₀ b) (ok-step (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b)))
-               (early-inst [ ix 1 ] (early-inst [ ix 1 ] (Bound.ep b)))
-
--- The binder's annotated source, as the connect's source shows it.
-Ann : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → EmissionSet (AIE X)
-Ann b = enter (ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b)) (Bound.at b ⊕ [ ix 1 ])
+held-src b = Bound.held b
 
 -- What an annotated row carries: a source emit, or the source's end.
 data AnnEv {X : Set} : Maybe (IE X) → Ev (IE X) → Set where
@@ -557,7 +554,7 @@ sub-ex : ∀ {os cs y} → (∀ {c} → c ∈ os → c ∈ cs) → Ex os y → E
 sub-ex f (here s)  = ∈-ex (f (here refl)) s
 sub-ex f (there e) = sub-ex (λ i → f (there i)) e
 
-module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ep : Early p) where
+module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) where
 
   HS : Held (Src b) (s₀ b ∷ Bound.outer b)
   HS = held-src b
@@ -586,7 +583,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ep : Early 
   ... | inj₁ (_ , (zs , refl) , s) = early-inst zs (Held.ends HS s)
   ... | inj₂ (zs , refl)           = early-inst zs ep
 
-  module J = Join Rl rt exR named (read-back b p) HS
+  module J = Join Rl rt exR named (read-back b p ng) HS
 
   held : Held T′ (p ∷ cs)
   held = record
@@ -599,8 +596,8 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ep : Early 
     ; ends    = ends
     ; done    = done
     ; late    = late
-    ; idle    = read-idle b p
-    ; rest    = read-rest b p }
+    ; idle    = read-idle b p ng
+    ; rest    = read-rest b p ng }
     where
       routing : ∀ {y m n} → T′ y (out (instEmit (mark m) n)) → Routing m
       routing x with read-row b p x
@@ -621,6 +618,12 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ep : Early 
         in subst (λ r → Valued r × opos r ⊑ (y₀ ⊕ zs)) (sym (rootOf-ext y₀ zs)) (v , ⊑-trans o (zs , refl))
       ... | inj₂ ()
 
+-- A READER'S ROWS A LANE CAN HANG ON ARE ADMISSIBLE: each lies below a
+-- binder's row a lane can hang on, outside every binder's last gap.
+postulate
+  placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) (env : DenEnv Δ) cs → GoodEnv env
+                   → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (connected i)) env)
+
 held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
-held-connected nothing  ρ i = ih λ env cs g eh p ok ep → Reader.held (eh i) p ep
-held-connected (just n) ρ i = ih λ env cs g eh p ok ep → Reader.held (eh i) p ep
+held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected nothing ρ i)
+held-connected (just n) ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected (just n) ρ i)

@@ -44,7 +44,8 @@ open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-s
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence; _|>′_)
-open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev)
+open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev; Fresh)
+open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
@@ -196,9 +197,10 @@ lane-of f o exhaustᶠ          nb l = l
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-               (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
+               (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p)
                (H₁ : Held (enter (ev m (FlatHots.trig m ρ op f s env p) (FlatHots.env₀ m ρ op f s env p)) (FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]))
                           ((FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]) ∷ p ∷ cs))
+               (tp : Placed (Fresh eh) (FlatHots.σ₁ m ρ op f s env p))
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
                (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p)) (FlatHots.p₀ m ρ op f s env p))
@@ -207,7 +209,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
-  open CombSrc m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
   -- THE REAL FLATMAP, READ THROUGH ITS POLICY: its outer is the hot
   -- outer's values, each lane a value's elaborated lane.
@@ -495,14 +497,14 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
 
   private
     module LO = LaneOnce m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
-                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) cs
-                  (λ a L q okq eq → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                      (good-cons L g₂) eh q okq eq)
+                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂ cs
+                  (λ a L → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) eh₄)
+                  (λ a L → IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) eh₄)
 
   -- A LANE STARTS ONCE.
   start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
              → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
-  start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
+  start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q

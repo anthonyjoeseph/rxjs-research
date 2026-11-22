@@ -18,7 +18,13 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_; cas
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx; Few)
 open import simultaneous.SObs using (lone; Part; ext; module Elaborate)
-open import simultaneous.Routed using (Held; HeldD; Early)
+open import simultaneous.Routed using (Held; HeldD; Early; Placed; PlacedD; Adm; Shown; adm-at; s-value; s-done; s-end)
+open import simultaneous.LaneLocal using (inv-ev; emptyE; of-outer; shown-vis; Fit)
+open import simultaneous.CombSent using (hots-at)
+open import simultaneous.Layers using (pinby-vis)
+open import denotation.Laws.Worlds using (InvAt; W; W⁼; step; here; inW; plain-ix; plain-last; Plain; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-injˡ; ⊕-injʳ; ⊕-identityʳ)
+open import denotation.EmissionSet using (Ev; module Op; module Connecting)
+open import Data.Sum using (inj₂)
 open import simultaneous.HeldIn using (HeldIn; held-in)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
@@ -39,7 +45,7 @@ open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
-  Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
+  Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; mapIE; scanIE; passes)
 open import simultaneous.HeldComb using (ev; RunHeld; run-row; held-runs)
 open import simultaneous.Routed using (valued; Rest; Routing; r-begin; r-over)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ)
@@ -65,7 +71,9 @@ open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (sym; cong; subst)
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
-open import denotation.EmissionSet using (module TakeWhile)
+open import denotation.EmissionSet using (module TakeWhile; module Scan; map-out; map-end)
+open import simultaneous.DenRows using (scan-out)
+open import Data.Bool using (T; not)
 open import denotation.Read using (Run)
 import denotation.Read as Run
 open import Data.Bool using (Bool)
@@ -93,22 +101,104 @@ record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
     env   : DenEnv Θ
     at    : Pos
     outer : List Pos
-    held  : HeldD (Hots env) (ev m src env) outer
+    held  : Held (enter (ev m src env) ((at ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) (((at ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ∷ outer)
     good  : GoodEnv env
     ok    : Ok (Hots env) at
     ep    : Early at
     under : ∀ {c} → c ∈ at ∷ outer → c ∈ cs
     is    : d ≡ hot (Proper (enter (ev m (annotate src) env) (at ⊕ [ ix 1 ])))
 
-EnvHeld : ∀ {Γ Δ} → (∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → DenEnv Δ → List Pos → Set₁
-EnvHeld {Γ} ρ env cs = ∀ {X} (i : X ∈ Γ) → Bound (lookup env (ρ (∈-map⁺ AIE i))) cs
+-- The binder's annotated source, as the connect's source shows it.
+Ann : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → EmissionSet (AIE X)
+Ann b = enter (ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b)) (Bound.at b ⊕ [ ix 1 ])
 
--- Held under every environment of held binders.  A record, so that a
--- statement about a former is compared by its arguments, never by the
--- elaborated tree its meaning unfolds to.
+-- AN ANNOTATED HOT'S LAST GAP: under the queued lane that tells its
+-- `nothing`, short of that lane's end.  A reader joined there meets a
+-- lone end.
+GapIn : ∀ {X} → EmissionSet (AIE X) → Pos → Set
+GapIn t y = Σ Pos λ c → Σ Routes λ r → t ((c ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (r , nothing))
+          × (c ⊕ [ ix 1 ]) ⊑ y × Nl.¬ (((c ⊕ [ ix 1 ]) ⊕ [ last ]) ⊑ y)
+
+Gap : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos → Set
+Gap b = GapIn (Ann b)
+
+-- An annotated row a reader's lane can hang on: a value, or the end.
+data AShown {X : Set} : Ev (AIE X) → Set where
+  a-value : ∀ {r a n} → AShown (out (r , just (instEmit (value a) n)))
+  a-end   : AShown end
+
+-- EVERY BINDER IN SCOPE HELD, and no row a reader of one can hang a lane
+-- on in any binder's last gap.
+record EnvHeld {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (env : DenEnv Δ) (cs : List Pos) : Set₁ where
+  field
+    bound : ∀ {X} (i : X ∈ Γ) → Bound (lookup env (ρ (∈-map⁺ AIE i))) cs
+    apart : ∀ {X Y} (i : X ∈ Γ) (j : Y ∈ Γ) {y e} → Ann (bound i) y e → AShown e → Nl.¬ Gap (bound j) y
+
+-- Outside every gap of a scope, one binder at a time.
+Apart : ∀ (Γ : List Set) → (∀ {X} → X ∈ Γ → Pos → Set) → Pos → Set
+Apart []      G y = ⊤
+Apart (_ ∷ Γ) G y = Nl.¬ G (here refl) y × Apart Γ (λ {X} i → G {X} (there i)) y
+
+apart-at : ∀ {Γ} {G : ∀ {X} → X ∈ Γ → Pos → Set} {y} → Apart Γ G y → ∀ {X} (i : X ∈ Γ) → Nl.¬ G i y
+apart-at (n , _) (here refl) = n
+apart-at (_ , a) (there i)   = apart-at a i
+
+apart-all : ∀ {Γ} {G : ∀ {X} → X ∈ Γ → Pos → Set} {y} → (∀ {X} (i : X ∈ Γ) → Nl.¬ G i y) → Apart Γ G y
+apart-all {[]}    f = tt
+apart-all {_ ∷ Γ} f = f (here refl) , apart-all {Γ} (λ {X} i → f {X} (there i))
+
+-- ADMISSIBLE UNDER THE BINDERS: in no binder's last gap.
+Fresh : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env cs} → EnvHeld ρ env cs → Pos → Set
+Fresh {Γ} eh = Apart Γ (λ {X} i → Gap (EnvHeld.bound eh {X} i))
+
+-- A binder's `nothing` row is a hot row: its hot is read past it.
+gap-hot : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) {X} (i : X ∈ Γ) {n r}
+        → Ann (EnvHeld.bound eh i) n (out (r , nothing)) → Hots env n
+gap-hot {ρ = ρ} {env} eh i a =
+  hots-at env (ρ (∈-map⁺ AIE i)) (Bound.is b) (a , λ ce cq → pinby-vis tt (InvAt.quiet IA ce a cq))
+  where
+    b  = EnvHeld.bound eh i
+    IA = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+
+-- A gap is entered at its own second child alone.
+gap-bare : ∀ {X} (t : EmissionSet (AIE X)) {q l} → GapIn t (q ⊕ [ l ]) → (l ≡ ix 1 → ⊥) → GapIn t q
+gap-bare t {q} (c , r , a , h , ne) nl with ⊑-snoc q h
+... | inj₁ h′ = c , r , a , h′ , λ e → ne (⊑-trans e (⊑-snoc⁺ q))
+... | inj₂ eq = ⊥-elim (nl (sym (⊕-injʳ c q eq)))
+
+-- A GAP'S OWN SECOND CHILD IS NO ADMISSIBLE POSITION: the `nothing` row
+-- below it is a hot row in its world.
+fresh-step : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) {q}
+           → Ok (Hots env) q → Fresh eh q → Fresh eh (q ⊕ [ ix 1 ])
+fresh-step eh {q} (_ , dj) fq = apart-all λ i → go i
+  where
+    go : ∀ {X} (i : X ∈ _) → Nl.¬ Gap (EnvHeld.bound eh i) (q ⊕ [ ix 1 ])
+    go i (c , r , a , h , ne) with ⊑-snoc q h
+    ... | inj₁ h′ = apart-at fq i (c , r , a , h′ , λ e → ne (⊑-trans e (⊑-snoc⁺ q)))
+    ... | inj₂ eq with ⊕-injˡ c q eq
+    ...   | refl = dj (gap-hot eh i a) (step (inW (step here plain-ix)) plain-ix) (⊑-inside {(q ⊕ [ ix 1 ]) ⊕ [ ix 0 ]} ([] , sym (⊕-identityʳ _)))
+
+-- Formers keep admissibility under the binders.
+fresh-adm : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) → Adm (Hots env) (Fresh eh)
+fresh-adm eh = record { step = st ; bare = bare ; copy = λ fq → bare fq λ () }
+  where
+    bare : ∀ {q l} → Fresh eh q → (l ≡ ix 1 → ⊥) → Fresh eh (q ⊕ [ l ])
+    bare fq nl = apart-all λ i g → apart-at fq i (gap-bare (Ann (EnvHeld.bound eh i)) g nl)
+    st : ∀ {q l} → Ok _ q → Fresh eh q → Plain l → Fresh eh (q ⊕ [ l ])
+    st ok fq (plain-ix {1})             = fresh-step eh ok fq
+    st ok fq (plain-ix {0})             = bare fq λ ()
+    st ok fq (plain-ix {suc (suc _)})   = bare fq λ ()
+    st ok fq plain-last                 = bare fq λ ()
+
+-- Held under every environment of held binders, at every position
+-- admissible under them, with every row a lane can hang on admissible.
+-- A record, so that a statement about a former is compared by its
+-- arguments, never by the elaborated tree its meaning unfolds to.
 record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) : Set₁ where
   constructor ih
-  field holds : ∀ (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → HeldD (Hots env) (ev m (elab ρ o) env) cs
+  field
+    holds  : ∀ (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs) → HeldD (Hots env) (Fresh eh) (ev m (elab ρ o) env) cs
+    placed : ∀ (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ o) env)
 
 ------------------------------------------------------------------------
 -- The formers
@@ -160,14 +250,18 @@ empty-few nothing  env q = [ q ⊕ [ last ] ] , λ { (at-end , _) → here refl 
 empty-few (just n) env q = [ q ⊕ [ last ] ] , λ { (at-end , _) → here refl }
 
 held-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
-held-empty nothing  ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
-held-empty (just n) ρ = ih λ env cs g eh p ok ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
+held-empty nothing  ρ = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) })
+                          λ env cs g eh p ok fr ep → Fit.placed (emptyE nothing env (fresh-adm eh) p ok fr ep)
+held-empty (just n) ρ = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) })
+                          λ env cs g eh p ok fr ep → Fit.placed (emptyE (just n) env (fresh-adm eh) p ok fr ep)
 
 held-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
-held-of nothing  ρ xs = ih λ env cs g eh p ok ep →
-  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
-held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
-  Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
+held-of nothing  ρ xs = ih
+  (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x)
+  λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer nothing _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh)
+held-of (just n) ρ xs = ih
+  (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x)
+  λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer (just n) _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh)
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
@@ -208,27 +302,72 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
   done x with row x tt
   ... | ()
 
+-- WHAT A LANE CAN HANG ON, as each one-input former and a cold show it:
+-- a cold's rows and its steps' lie below its subscription or in a timer
+-- it creates, in its world; a map, a scan and a takeWhile keep their
+-- source's positions, a takeWhile's own end one step below a value.
+postulate
+  placed-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) (env : DenEnv Δ) cs → GoodEnv env
+              → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (cold c)) env)
+
+shown-map : ∀ {A B} (f : A → B) (x : IE A) → Shown (out (mapIE f x)) → Shown {A} (out x)
+shown-map f (instEmit (value _) _) _      = s-value
+shown-map f (instEmit (mark _) _)  s-done = s-done
+
+shown-scan : ∀ {A B} (f : B → A → B) st (x : IE A) → Shown (out (proj₂ (scanIE f st x))) → Shown {A} (out x)
+shown-scan f st (instEmit (value _) _) _      = s-value
+shown-scan f st (instEmit (mark _) _)  s-done = s-done
+
+-- A value a takeWhile stops on is a value: marks pass.
+fails-shown : ∀ {X} (kp : X → Bool) {x : IE X} → T (not (passes kp x)) → Shown (out x)
+fails-shown kp {instEmit (value _) _} _ = s-value
+fails-shown kp {instEmit (mark _) _} ()
+
+placed-map-den : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) {W F} → PlacedD W F d → PlacedD W F (Op.map (mapIE f) d)
+placed-map-den f d pl p ok fp ep (map-out {a = x} t , _) sh = pl p ok fp ep t (shown-map f x sh)
+placed-map-den f d pl p ok fp ep (map-end t , _)      s-end = pl p ok fp ep t s-end
+
+placed-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W F} → PlacedD W F d
+                → PlacedD W F (Op.map proj₂ (Op.scan (scanIE f) z d))
+placed-scan-den f z d pl p ok fp ep (map-out t , _) sh with scan-out (scanIE f) z d p t
+... | st , x , r , refl = pl p ok fp ep r (shown-scan f st x sh)
+placed-scan-den f z d pl p ok fp ep (map-end (Scan.send r , _) , _) s-end = pl p ok fp ep r s-end
+
+placed-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H F} → Adm H F → PlacedD H F d
+                → PlacedD H F (Op.takeWhile incl (passes kp) d)
+placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.pass t _ _ , _)    sh    = pl p ok fp ep t sh
+placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.fail t nk _ _ , _) _     = Adm.bare ad (pl p ok fp ep t (fails-shown kp nk)) λ ()
+placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.stop t nk _ , _)   s-end = Adm.bare ad (pl p ok fp ep t (fails-shown kp nk)) λ ()
+placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.tend t _ , _)      s-end = pl p ok fp ep t s-end
+
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
-held-cold m ρ c = ih λ env cs g eh p ok ep →
+held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
   let open ColdHeld p (enter (ev m (elab ρ (cold c)) env) p) (cold-rows m c env p) in
   held-runs named routing (early ep) (ends ep) done late (cold-idle m c env p) (cold-rest m c env p) λ mt → record
     { covered = λ r₁ r₂ eq cr ne → cold-covered m c env p mt r₁ r₂ eq cr λ { (here s) → ne (here s) ; (there ()) }
     ; exact   = λ r₁ r₂ eq → ⊥-elim (no-stop (proj₁ (run-row r₁ (subst (Met _) eq mt))))
-    ; shut    = cold-shut m c env p mt }
+    ; shut    = cold-shut m c env p mt })
+  (placed-cold m ρ c)
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
-held-map nothing  ρ f s (ih h) = ih λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
-held-map (just n) ρ f s (ih h) = ih λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh)
+held-map nothing  ρ f s (ih h pl) = ih (λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                        λ env cs g eh → placed-map-den f (⟦ elab ρ s ⟧ env) (pl env cs g eh)
+held-map (just n) ρ f s (ih h pl) = ih (λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh))
+                                        λ env cs g eh → placed-map-den f (approx n (elab ρ s) env) (pl env cs g eh)
 
 held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
-held-takeWhile nothing  ρ i p s (ih h) = ih λ env cs g eh →
-  held-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g)
-held-takeWhile (just n) ρ i p s (ih h) = ih λ env cs g eh →
-  held-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g)
+held-takeWhile nothing  ρ i p s (ih h pl) = ih
+  (λ env cs g eh → held-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g))
+  λ env cs g eh → placed-take-den i p (⟦ elab ρ s ⟧ env) (fresh-adm eh) (pl env cs g eh)
+held-takeWhile (just n) ρ i p s (ih h pl) = ih
+  (λ env cs g eh → held-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g))
+  λ env cs g eh → placed-take-den i p (approx n (elab ρ s) env) (fresh-adm eh) (pl env cs g eh)
 
 held-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
-held-scan nothing  ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh)
-held-scan (just n) ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh)
+held-scan nothing  ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                           λ env cs g eh → placed-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) (pl env cs g eh)
+held-scan (just n) ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh))
+                                           λ env cs g eh → placed-scan-den f (z , marked begin) (approx n (elab ρ s) env) (pl env cs g eh)
 
 -- A binder held under `cs` is held under more.
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
@@ -280,15 +419,95 @@ postulate
                  → ∀ {D} → Tracks D (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))
                           (enter (ev m (elab (ext ρ) b) (hot (Proper (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ]))
 
+-- A connect's rows are its body's, read past the source made hot.
+placed-conn : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) → GoodEnv env
+            → ∀ {F G : Pos → Set} → (∀ {y} → G y → F y) → ∀ p → Ok (Hots env) p
+            → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
+               → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ])
+               → Placed G (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ])))
+            → Placed F (enter (ev m (connect A′ B′) env) p)
+placed-conn nothing A′ B′ env g gf p ok k (Connecting.body x , _) sh =
+  gf (k (src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) (body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) x sh)
+  where
+    Is = inv-⟦⟧ A′ env g
+    IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (⟦ B′ ⟧ (hot t ∷ env))
+    IF L = inv-⟦⟧ B′ (hot _ ∷ env) (good-cons L g)
+placed-conn (just n) A′ B′ env g gf p ok k (Connecting.body x , _) sh =
+  gf (k (src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
+        (body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok) x sh)
+  where
+    Is = inv-approx n A′ env g
+    IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
+    IF L = inv-approx n B′ (hot _ ∷ env) (good-cons L g)
+
+-- A connect's annotated source, read at its own subscription.
+AnnAt : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → Pos → EmissionSet (AIE A)
+AnnAt m ρ s env p = enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ])
+
+-- A NEW BINDER KEEPS THE BINDERS APART.  Its rows a lane can hang on lie
+-- below its source's, outside its own last gap and every older binder's;
+-- an older binder's are hot rows, none in the new binder's world; and
+-- the body is subscribed short of the new binder's rows.
+postulate
+  ann-apart : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
+            → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ s) env)
+            → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
+            → ∀ {y e} → AnnAt m ρ s env p y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
+  apart-new : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
+            → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ s) env)
+            → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
+            → ∀ {Y} (j : Y ∈ Γ) {y e} → AnnAt m ρ s env p y e → AShown e → Nl.¬ Gap (EnvHeld.bound eh j) y
+  apart-old : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
+            → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p
+            → ∀ {Y} (j : Y ∈ Γ) {y e} → Ann (EnvHeld.bound eh j) y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
+  body-fresh : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → GoodEnv env
+             → ∀ p → Ok (Hots env) p → Nl.¬ GapIn (AnnAt m ρ s env p) (p ⊕ [ ix 0 ])
+
+-- A CONNECT'S BINDER, made at `p`: its source held below the annotation,
+-- and the binders in scope widened past it.
+module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (hs : IH m ρ s)
+                (env : DenEnv Δ) (cs : List Pos) (g : GoodEnv env) (eh : EnvHeld ρ env cs)
+                (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p) where
+
+  ad = fresh-adm eh
+
+  σ : EmissionSet (AIE A)
+  σ = Proper (AnnAt m ρ s env p)
+
+  nb : Bound (hot σ) (p ∷ cs)
+  nb = record
+    { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs
+    ; held = IH.holds hs env cs g eh ((p ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ok-step _ (ok-step p ok))
+               (Adm.step ad (ok-step p ok) (Adm.step ad ok fr plain-ix) plain-ix) (early-inst [ ix 1 ] (early-inst [ ix 1 ] ep))
+    ; good = g ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
+
+  bd : ∀ {X} (i : X ∈ A ∷ Γ) → Bound (lookup (hot σ ∷ env) (ext ρ (∈-map⁺ AIE i))) (p ∷ cs)
+  bd (here refl) = nb
+  bd (there i)   = widen (EnvHeld.bound eh i)
+
+  pl = IH.placed hs env cs g eh
+
+  ap : ∀ {X Y} (i : X ∈ A ∷ Γ) (j : Y ∈ A ∷ Γ) {y e} → Ann (bd i) y e → AShown e → Nl.¬ Gap (bd j) y
+  ap (here refl) (here refl) = ann-apart m ρ s env cs g eh pl p ok fr ep
+  ap (here refl) (there j)   = apart-new m ρ s env cs g eh pl p ok fr ep j
+  ap (there i)   (here refl) = apart-old m ρ s env cs g eh p ok i
+  ap (there i)   (there j)   = EnvHeld.apart eh i j
+
+  eh′ : EnvHeld (ext ρ) (hot σ ∷ env) (p ∷ cs)
+  eh′ = record { bound = bd ; apart = ap }
+
+  fr′ : Fresh eh′ (p ⊕ [ ix 0 ])
+  fr′ = body-fresh m ρ s env g p ok , Adm.bare ad fr (λ ())
+
 held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
-held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
-  conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
-    held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g)
-      (λ { (here refl) → record { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs ; held = hs env cs g eh
-                                ; good = g ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
-         ; (there i)   → widen (eh i) })
-      (p ⊕ [ ix 0 ]) ok₀ ep₀)
+held-connect m ρ s b hs hb = ih
+  (λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
+    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
+      held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ ep₀))
+  λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
+    placed-conn m (annotate (elab ρ s)) _ env g proj₂ p ok λ L ok₀ →
+      IH.placed (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep)
 
 -- A FLATMAP'S SCAN HOLDS, read past the connects that share its outer:
 -- the trigger at `p ⊕ [ ix 1 ]`, the outer as its lane, the closer,
