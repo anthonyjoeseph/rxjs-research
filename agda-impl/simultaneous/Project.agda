@@ -1,28 +1,14 @@
 {-# OPTIONS --guardedness #-}
 
--- A RUN, SPLIT BY BRANCH.  A reading that merges branches, each read
--- through a join (`denotation.EmissionSet.Rejoin`), shows each branch row
--- one `sub` label below where the branch shows it.  `Proj` relates a run
--- of the reading to the rows of it one branch sent, where the branch shows
--- them: what a counter over that branch's rows is read against.
+-- WHAT A READER MEETS FIRST, IT MET: a run's prefix is a run.
 module simultaneous.Project where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.List using (List; []; _∷_; _++_)
+open import Data.Product using (_×_)
 
-open import denotation.Position using (Pos; sub; _⊕_)
+open import denotation.Position using (Pos)
 open import denotation.EmissionSet using (Ev)
 open import denotation.Read using (Run; []; _∷_)
-
--- The rows a run's branch sent: each row the tag reads as the branch's,
--- where the branch shows it; every other row dropped.
-data Proj {X Y : Set} (tag : Ev X → Maybe (Ev Y)) : List (Pos × Ev X) → List (Pos × Ev Y) → Set where
-  []   : Proj tag [] []
-  keep : ∀ {q e y e′ w rx rs} → tag e ≡ just e′ → q ≡ y ⊕ [ sub w ] → Proj tag rx rs
-       → Proj tag ((q , e) ∷ rx) ((y , e′) ∷ rs)
-  drop : ∀ {q e rx rs} → tag e ≡ nothing → Proj tag rx rs → Proj tag ((q , e) ∷ rx) rs
 
 -- What a reader meets first, it met.
 run-prefix : ∀ {A t c} (xs : List (Pos × Ev A)) {ys} → Run t c (xs ++ ys) → Run t c xs

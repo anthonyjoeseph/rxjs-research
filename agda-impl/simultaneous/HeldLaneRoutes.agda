@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; nothing)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (ℕ; suc; _≤_)
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -37,10 +37,13 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; end; Few; _≼_; _≺_; enter; hot; EmissionSet; Den; Ended; module Joining)
 open import Data.Empty using (⊥; ⊥-elim)
 open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ)
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≺→≼; ≼-or-≻; ≺-irrefl)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≺→≼; ≼-or-≻; ≺-irrefl; ≼-refl; ≼-trans; ≼-split)
+open import denotation.Laws.Truth.Connect.Cuts using (step≼; next≺)
+open import denotation.Laws.Fold using (latest)
+open import denotation.EmissionSet using (Reach; module Switch)
 open import denotation.Laws.Count using (em; reach-down)
-open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at)
-open import simultaneous.HeldLanes using (lane-past)
+open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-one)
+open import simultaneous.HeldLanes using (lane-past; bproj-mem)
 open import simultaneous.Layers using () renaming (run-row to run-row∈)
 open import simultaneous.ColdIdle using (aft-or-in)
 open import simultaneous.CombSent using (src-op)
@@ -61,13 +64,14 @@ open import denotation.Laws.Worlds using (world-after; ok-step)
 open import simultaneous.HeldTake using (module TakeBack)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.LaneStart using (done-of)
+open import simultaneous.LaneInnerEnd using (inner-ends)
 open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Shut using (r₀)
+open import simultaneous.LaneEpoch using (module Lanes)
 open import simultaneous.Routed using (Held; Early; Placed; nameOf)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.HeldComb using (ev; init; past)
-open import simultaneous.FlatLanes using (BProj; Tg; brTag) renaming (keep to bkeep; drop to bdrop)
+open import simultaneous.FlatLanes using (BProj; Tg; brTag; end-last) renaming (keep to bkeep; drop to bdrop)
 open import simultaneous.LaneSplit using (Ln)
 open import simultaneous.HeldSrc using (module CombSrc; named-at)
 open import simultaneous.HeldLanes using (module CombLanes)
@@ -90,6 +94,25 @@ join-done switchᶠ           f o (Joining.rend () _ _)
 join-done exhaustᶠ          f o (Joining.oend _ d)         = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
 join-done exhaustᶠ          f o (Joining.lend _ _ _ _ _ d) = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
 join-done exhaustᶠ          f o (Joining.rend () _ _)
+
+-- A SWITCH'S END HAS A LAST VALUE PAST ANY BEFORE IT: the end's reach
+-- lists every joiner row before it, each value's silent row among them, so
+-- the latest of those values is there, and no later value supersedes it.
+switch-last : ∀ {A B} (f : A → Den B) (o : EmissionSet A) {y} → Reach (Switch.JoinT f o) y end
+            → ∀ {q a} → o q (out a) → q ≺ y
+            → ¬ ¬ Σ Pos λ q* → Σ A λ a* → o q* (out a*) × q ≼ q* × ¬ Superseded o q* y
+switch-last {A} f o {y} (ks , h) {q} {a} xo qy κ = latest V (y ⊕ [ ix 0 ]) (ks ++ [ y ]) λ
+  { (inj₁ none) → none (listed xo qy) (q , refl , a , xo , ≼-refl {q}) (next≺ {q} {y} qy)
+  ; (inj₂ (_ , (q* , refl , a* , xo* , qq*) , _ , mx)) →
+      κ (q* , a* , xo* , qq* , λ (q′ , a′ , xo′ , q*q′ , q′y) →
+        mx (listed xo′ q′y) (q′ , refl , a′ , xo′ , ≼-trans {q} {q*} {q′} qq* (≺→≼ {q*} {q′} q*q′)) (next≺ {q′} {y} q′y)
+           (next≺ {q*} {q′} q*q′)) }
+  where
+    V : Pos → Set
+    V z = Σ Pos λ k → z ≡ k ⊕ [ ix 0 ] × Σ A λ b → o k (out b) × q ≼ k
+
+    listed : ∀ {k b} → o k (out b) → k ≺ y → (k ⊕ [ ix 0 ]) ∈ ks ++ [ y ]
+    listed {k} x ky = [ (λ lt → ∈-++⁺ˡ (h (Joining.val x) lt tt)) , (λ eq → ∈-++⁺ʳ ks (here eq)) ]′ (≼-split {k ⊕ [ ix 0 ]} {y} (step≼ {k} {y} ky))
 
 -- Only a switch cuts.
 cut-switch : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k} → View.CutAt f o op q k → op ≡ switchᶠ
@@ -144,21 +167,22 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   LaneEmit q x v = Σ A λ a → Σ Pos λ y → RO q (out a) × x ≡ (y ⊕ [ sub LS.J ] , out (Ln v)) × RV.Lane op q a y (out v)
 
   -- LANE `q`'S OWN COUNT along rows the source met, read forward.
-  data OC (q : Pos) : List Row → Routes → Set where
-    oc[]   : OC q [] r₀
-    oc-in  : ∀ {r c x v} → OC q r c → LaneEmit q x v → OC q (r ++ [ x ]) (count c v)
-    oc-out : ∀ {r c x} → OC q r c → (∀ {v} → LaneEmit q x v → ⊥) → OC q (r ++ [ x ]) c
+  open Lanes {B} op Own (LaneMark laneStart) (LaneMark laneDone) act LaneEmit using (OC; module Run)
 
   -- A lane's inner, ahead of its take.
   inner : A → Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   inner a = flatMap (mergeᶠ nothing) (λ k → shareˢ (g a k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
   postulate
-    -- THE COUNTER IS AT MOST WHAT THE LIVE LANES HOLD OF ITS INSTANT: where
-    -- it is not empty, a lane started, never done nor cut, holds a route of
-    -- the scan's instant.
-    lanes-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ¬ Flat.lanes (St rx₁) ≡ 0
-               → ¬ ¬ Σ Pos λ q → AC.Live [] rx₁ q × Σ Routes λ c → OC q rx₁ c × proj₁ c ≡ Flat.at (St rx₁) × Σ ℕ λ k → proj₂ c ≡ suc k
+    -- A LANE BEGINS ONLY WHILE LIVE: its `begin` row follows its
+    -- `laneStart`, and neither its `laneDone` nor a cut of it.
+    emit-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+              → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.Live [] xs q
+
+    -- A LANE'S `laneDone` FOLLOWS THE CARRIES OF ALL IT COUNTED: the scan
+    -- has accumulated at least the lane's own count.
+    done-carried : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+                 → ∀ {q n c} → LaneEmit q x (instEmit (mark laneDone) n) → OC q xs c → proj₂ c ≤ Flat.acc (St xs)
 
     -- A LIVE LANE IS IDLE WHERE THE LANES ARE: holding a route, it is of the
     -- instant of any position before every lane row still to come.
@@ -166,18 +190,51 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
               → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
               → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf w
 
-    -- A LANE'S INNER NEVER ENDS BEFORE ITS `laneDone`: its counted frame
-    -- sends it as the lane's source completes, and the inner ends only
-    -- once both parts have.
-    inner-done : ∀ a {s c} → Ok (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) s → enter (ev m (inner a) (hot σ₂ ∷ hot σ₁ ∷ env₀)) s c end
-               → ¬ TakeWhile.Failed true undone (enter (ev m (inner a) (hot σ₂ ∷ hot σ₁ ∷ env₀)) s) c → ⊥
 
-    -- A SWITCH'S LANES END PAST A LAST VALUE: past any value before the
-    -- lanes' end lies one no later value cuts by it.  Owed: the end's
-    -- reach lists every joiner row before it, each value's silent row
-    -- among them, so a greatest value is there.
-    last-before : op ≡ switchᶠ → ∀ {y} → σ₃ y end → ∀ {q a} → RO q (out a) → q ≺ y
-                → ¬ ¬ Σ Pos λ q* → Σ A λ a* → RO q* (out a*) × q ≼ q* × ¬ RV.CutAt op q* y
+  -- The run holds no end short of its last row.
+  end-free : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {c} → (c , end) ∈ rx₁ → ⊥
+  end-free rx₁ {z} {e} {rx₂} mt i with ∈-∃++ i
+  ... | a₁ , b₁ , refl = nonempty b₁ (end-last I-M a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ rx₂)) mt))
+    where
+      nonempty : ∀ b₂ → b₂ ++ (z , e) ∷ rx₂ ≡ [] → ⊥
+      nonempty []      ()
+      nonempty (_ ∷ _) ()
+
+  -- EVERY LANE ROW THE SCAN MEETS IS SOME LANE'S EMIT.
+  lane-emit : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {k v} → (k , out (Tg laneB v)) ∈ rx₁
+            → Σ Pos λ q → LaneEmit q (k , out (Tg laneB v)) v
+  lane-emit rx₁ mt i with lane-run mt
+  ... | rs , pr , run , _ with bproj-mem pr (∈-++⁺ˡ i)
+  ...   | y , refl , j with σ₃-lane (proj₁ (run-row∈ run j))
+  ...     | q , a , xo , _ , l , _ = q , a , y , xo , refl , l
+
+  -- AN EMIT IS ONE LANE'S.
+  emit-one : ∀ {q q′ x v v′} → LaneEmit q x v → LaneEmit q′ x v′ → q ≡ q′
+  emit-one (_ , y , xo , refl , l) (_ , y′ , xo′ , e , l′) with ⊕-injˡ y y′ (cong proj₁ e)
+  ... | refl = lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
+
+  -- THE COUNTER IS AT MOST WHAT THE LIVE LANES HOLD OF ITS INSTANT: where
+  -- it is not empty, a lane started, never done nor cut, holds a route of
+  -- the scan's instant.
+  lanes-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ¬ Flat.lanes (St rx₁) ≡ 0
+             → ¬ ¬ Σ Pos λ q → AC.Live [] rx₁ q × Σ Routes λ c → OC q rx₁ c × proj₁ c ≡ Flat.at (St rx₁) × Σ ℕ λ k → proj₂ c ≡ suc k
+  lanes-live rx₁ mt =
+    Run.lanes-held rx₁ (λ {c} → end-free rx₁ mt {c})
+      (λ xs x ys eq {k} {v} x≡ κ → κ (emit-at (subst (_∈ rx₁) x≡ (in-r₁ rx₁ xs x ys eq)) x≡))
+      (λ { {q} {x} {v} (_ , y , _ , eq , _) → y ⊕ [ sub LS.J ] , eq })
+      (λ {q} {q′} {x} {v} {v′} → emit-one {q} {q′} {x} {v} {v′})
+      (λ { {q} {x} (a , y , n , xo , eq , l) → n , a , y , xo , eq , l })
+      (emit-live rx₁ mt) (done-carried rx₁ mt)
+    where
+      emit-at : ∀ {x k v} → (k , out (Tg laneB v)) ∈ rx₁ → x ≡ (k , out (Tg laneB v)) → Σ Pos λ q → LaneEmit q x v
+      emit-at {v = v} i x≡ = let (q , le) = lane-emit rx₁ mt i in q , subst (λ x′ → LaneEmit q x′ v) (sym x≡) le
+
+  -- A LANE'S INNER NEVER ENDS BEFORE ITS `laneDone`.
+  inner-done : ∀ a {s c} → enter (ev m (inner a) (hot σ₂ ∷ hot σ₁ ∷ env₀)) s c end
+             → ¬ TakeWhile.Failed true undone (enter (ev m (inner a) (hot σ₂ ∷ hot σ₁ ∷ env₀)) s) c → ⊥
+  inner-done a {s} re nf = inner-ends _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s re nf
 
   -- A LANE'S END FOLLOWS ITS `laneDone`: the take stops just past it.
   lane-end-done : ∀ {q a c} → RO q (out a) → RV.Lane op q a c end
@@ -186,7 +243,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
   ... | s , oks , r , _ , back with lane-end m undone (inner a) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks r
-  ...   | inj₂ (re , nf) = ⊥-elim (inner-done a oks re nf)
+  ...   | inj₂ (re , nf) = ⊥-elim (inner-done a re nf)
   ...   | inj₁ (w , a′ , refl , rf , nk) with done-of a′ nk
   ...     | n , refl = w ⊕ [ ix 0 ] , n
                      , back rf (world-after (InvAt.world (inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks) rf)
@@ -196,6 +253,15 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- The lanes' rows, as the joiner shows them.
   σ-join : ∀ {y e} → σ₃ y e → RV.Join op y e
   σ-join σy = proj₁ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σy))
+
+  -- A SWITCH'S LANES END PAST A LAST VALUE: past any value before the
+  -- lanes' end lies one no later value cuts by it.
+  last-before : op ≡ switchᶠ → ∀ {y} → σ₃ y end → ∀ {q a} → RO q (out a) → q ≺ y
+              → ¬ ¬ Σ Pos λ q* → Σ A λ a* → RO q* (out a*) × q ≼ q* × ¬ RV.CutAt op q* y
+  last-before op≡ {y} ry xo qy κ =
+    switch-last fL RO (subst (λ o₀ → Reach (RV.Join o₀) y end) op≡
+                         (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ ry))))
+      xo qy λ (q* , a* , xo* , qq* , nc) → κ (q* , a* , xo* , qq* , subst (λ o₀ → ¬ RV.CutAt o₀ q* y) (sym op≡) nc)
 
   -- A lane's row before a row of the lanes, never cut by it, is the lanes'.
   σ₃-before : ∀ {q a k b y} → RO q (out a) → RV.Runs op q → RV.Lane op q a k (out b) → ¬ RV.CutAt op q y → k ≺ y → σ₃ y end → σ₃ k (out b)
