@@ -163,6 +163,17 @@ noov-o {T} {e} {i} refl h = same-≺⁻ (cascade T e (ix i)) (ix 1 ∷ ix 0 ∷ 
 noov-e : ∀ {T e} → NoOv (cascade T e last) (cascade T e last ∙ (ix 1 ∷ last ∷ []))
 noov-e () _
 
+inr : ∀ {X : Set} {rs zs} {x : X} → rs ≡ zs → x ∈ zs → x ∈ rs
+inr refl m = m
+
+-- No row of the subscribe burst lies in a fresh instant.
+not-now : ∀ {p J zs ws} → p ⊕ zs ≡ (J ∙ ws) → Fresh p J → ⊥
+not-now {p} {J} {zs} eq f = fresh-self (subst (Fresh p) (trans (cong instant (sym eq)) (instant-⊑ {p} {p ⊕ zs} (zs , refl))) f)
+
+-- A begin, and the step it opens.
+beg-name : ∀ {A p q n} → ColdRow {A} p q (out (instEmit (mark begin) n)) → Σ Instant λ K → q ≡ B⁰ K × n ≡ nm (K ∙ []) × Fresh p K
+beg-name (step-begin f) = _ , refl , refl , f
+
 module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t y e → Visible e → ColdRow p y e)
   (vb : ∀ {T e i a} → t (cascade T e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])) (out (instEmit (value a) (cascade T e (ix i) ∙ [ ix 1 ])))
       → t (cascade T e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ [])) (out (instEmit (mark begin) (cascade T e (ix i) ∙ [ ix 1 ]))))
@@ -175,14 +186,8 @@ module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t 
   lt0 : ∀ {n} → n ≡ 0 → 0 < n → ⊥
   lt0 refl ()
 
-  inr : ∀ {rs zs} {x : Pos × Ev (IE A)} → rs ≡ zs → x ∈ zs → x ∈ rs
-  inr refl m = m
-
   Bg : Instant → Ev (IE A)
   Bg J = out (instEmit (mark begin) (nm (J ∙ [])))
-
-  not-now : ∀ {J zs} → p ⊕ zs ≡ B⁰ J → Fresh p J → ⊥
-  not-now {J} {zs} eq f = fresh-self (subst (Fresh p) (trans (cong instant (sym eq)) (instant-⊑ {p} {p ⊕ zs} (zs , refl))) f)
 
   -- The row where a fresh step begins is its begin.
   at-beg : ∀ {J k e} → ColdRow p k e → k ≡ B⁰ J → Fresh p J → e ≡ Bg J
@@ -192,10 +197,6 @@ module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t 
   at-beg (step-value _) ()
   at-beg (step-over _)  ()
   at-beg (step-end _)   ()
-
-  -- A begin, and the step it opens.
-  beg-name : ∀ {q n} → ColdRow {A} p q (out (instEmit (mark begin) n)) → Σ Instant λ K → q ≡ B⁰ K × n ≡ nm (K ∙ []) × Fresh p K
-  beg-name (step-begin f) = _ , refl , refl , f
 
   -- A value of a fresh instant is its step's.
   val-at : ∀ {K y a j} → ColdRow {A} p y (out (instEmit (value a) j)) → rootOf y ≡ (K ∙ []) → Fresh p K

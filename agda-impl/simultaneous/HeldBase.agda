@@ -41,7 +41,7 @@ open import Data.Unit using (⊤; tt)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
 open import simultaneous.HeldComb using (ev; RunHeld; run-row; held-runs)
-open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-over)
+open import simultaneous.Routed using (valued; Rest; Routing; r-begin; r-over)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ)
 open import denotation.Laws.Worlds using (⊑-inside)
 open import simultaneous.InstEmit using (stop; completed)
@@ -77,6 +77,7 @@ open import simultaneous.HeldComb using (RunHeld)
 open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
 open import simultaneous.ColdBegin using (same-≺)
 open import simultaneous.ColdRuns using (quiet-fold; cold-covered; cold-shut)
+open import simultaneous.ColdIdle using (cold-idle)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -167,9 +168,6 @@ held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
 
 postulate
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
-
-postulate
-  cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
