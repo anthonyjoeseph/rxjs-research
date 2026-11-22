@@ -239,7 +239,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   -- The lanes' rows, each as it claims, over the programs they share.
   lane-fit : Fit (Fresh eh) σ₃
-  lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+  lane-fit = proper-fit (LaneReal.realE m {Fr = Fresh eh} op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
                (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂
                (λ a {t} L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
                                    (good-cons L g₂) (eh₄ {t}) q okq fq eq)
