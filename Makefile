@@ -86,8 +86,14 @@ gate-cheap:
 	  $(MAKE) --no-print-directory $$t || exit $$?; \
 	done
 
+# STAGED: one Agda process holds every module it checks until it exits, so
+# a cold cone over the held tower outgrows the heap in one process though
+# no module does alone.  Each stage writes its interfaces and exits; the
+# next loads them.  Main is still the last stage, and the claim graph.
+AGDA_STAGES := simultaneous/Held.agda
+
 agda:
-	@cd $(SRC) && $(AGDA) $(AGDA_PROFILE) Main.agda
+	@cd $(SRC) && for f in $(AGDA_STAGES) Main.agda; do $(AGDA) $(AGDA_PROFILE) $$f || exit $$?; done
 
 # THE DEV LOOP: one module and the cone BELOW it, never what consumes it.
 # Same `AGDA`, so the cache it warms is the one `make agda` reads.

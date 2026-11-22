@@ -325,27 +325,29 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   body-before : ∀ xs → (body b ⊕ xs) ≺ s₀ b
   body-before xs = subst (_≺ s₀ b) (sym (⊕-assoc (Bound.at b ⊕ [ ix 1 ]) [ ix 0 ] xs)) (≺-part (Bound.at b ⊕ [ ix 1 ]) xs [] refl)
 
-  fan : Pos → List Pos
-  fan y₀ = proj₁ (read-fan b p y₀)
+  module Fan {w x} (rw : T′ w (out x)) where
+    fan : Pos → List Pos
+    fan y₀ = proj₁ (read-fan b p rw y₀)
 
-  fans : List Pos → List Pos
-  fans []       = []
-  fans (k ∷ ks) = fan k ++ fans ks
+    fans : List Pos → List Pos
+    fans []       = []
+    fans (k ∷ ks) = fan k ++ fans ks
 
-  fans-in : ∀ {k ks y} → k ∈ ks → y ∈ fan k → y ∈ fans ks
-  fans-in {ks = k ∷ ks} (here refl) i = ∈-++⁺ˡ i
-  fans-in {ks = k ∷ ks} (there j)   i = ∈-++⁺ʳ (fan k) (fans-in j i)
+    fans-in : ∀ {k ks y} → k ∈ ks → y ∈ fan k → y ∈ fans ks
+    fans-in {ks = k ∷ ks} (here refl) i = ∈-++⁺ˡ i
+    fans-in {ks = k ∷ ks} (there j)   i = ∈-++⁺ʳ (fan k) (fans-in j i)
 
   RestAt : List (Pos × Ev (IE X)) → Pos → Set
   RestAt rs′ q = Σ (List Pos) λ ks → ∀ {y e} → T′ y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ ks
 
   -- The reader's rows past its cursor lie under the source's rows past
   -- the source's cursor, under the cursor's row, or are its end.
-  lift-rest : ∀ {rs′ q q₀ c₀ ws e₁} → cursor nothing rs′ ≡ just (c₀ ⊕ ws) → Src b c₀ e₁ → rootOf q₀ ≡ rootOf q
+  lift-rest : ∀ {w x} → T′ w (out x) → ∀ {rs′ q q₀ c₀ ws e₁} → cursor nothing rs′ ≡ just (c₀ ⊕ ws) → Src b c₀ e₁ → rootOf q₀ ≡ rootOf q
             → (ks : List Pos) → (∀ {y e} → Src b y e → c₀ ≺ y → rootOf y ≡ rootOf q₀ → y ∈ ks)
             → RestAt rs′ q
-  lift-rest {rs′} {q} {q₀} {c₀} {ws} cur′ sc₀ iq₀ ks h = (p ⊕ [ last ]) ∷ fan c₀ ++ fans ks , pick-row
+  lift-rest rw {rs′} {q} {q₀} {c₀} {ws} cur′ sc₀ iq₀ ks h = (p ⊕ [ last ]) ∷ fan c₀ ++ fans ks , pick-row
     where
+      open Fan rw
       pick-row : ∀ {y e} → T′ y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ (p ⊕ [ last ]) ∷ fan c₀ ++ fans ks
       pick-row r a iq with under r
       ... | inj₂ (inj₁ refl) = here refl
@@ -356,12 +358,12 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
             (⊑-≼ {c₀} {c₀ ⊕ ws} (ws , refl)))
           (subst (λ c → After c (body b ⊕ xs)) cur′ a)))
       ... | inj₁ (y₁ , e₁′ , (zs , refl) , s₁) with c₀ <ᵖ y₁ in e
-      ...   | true = there (∈-++⁺ʳ (fan c₀) (fans-in k∈ (proj₂ (read-fan b p y₁) r s₁ (zs , refl))))
+      ...   | true = there (∈-++⁺ʳ (fan c₀) (fans-in k∈ (proj₂ (read-fan b p rw y₁) r s₁ (zs , refl))))
         where
           k∈ : y₁ ∈ ks
           k∈ = h s₁ (to≺ c₀ y₁ e) (trans (sym (rootOf-ext y₁ zs)) (trans iq (sym iq₀)))
       ...   | false with ≼-split {y₁} {c₀} (λ h′ → subst T e h′)
-      ...     | inj₂ refl = there (∈-++⁺ˡ (proj₂ (read-fan b p c₀) r s₁ (zs , refl)))
+      ...     | inj₂ refl = there (∈-++⁺ˡ (proj₂ (read-fan b p rw c₀) r s₁ (zs , refl)))
       ...     | inj₁ lt   = ⊥-elim (≺-irrefl {y₁ ⊕ zs} (≺-trans {y₁ ⊕ zs} {c₀ ⊕ ws} {y₁ ⊕ zs} below a′))
         where
           a′ : (c₀ ⊕ ws) ≺ (y₁ ⊕ zs)
@@ -390,7 +392,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
 
       from-cur : ∀ {q₀} → rootOf q₀ ≡ rootOf q → SrcRest q₀ → Cur → RestAt (js ++ rs₁′) q
       from-cur {q₀} iq₀ (ks , h) (c′ , c₀ , ec′ , ec₀ , (ws , refl) , e₁ , i₁) =
-        lift-rest {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} ec′ (proj₁ (run-row run (∈-++⁺ʳ pre i₁))) iq₀ ks
+        lift-rest (proj₁ (run-row m bq)) {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} ec′ (proj₁ (run-row run (∈-++⁺ʳ pre i₁))) iq₀ ks
           (λ {y} {e} s a r → h {y} {e} s (subst (λ c → After c y) (sym ec₀) a) r)
 
       Begun : Set
