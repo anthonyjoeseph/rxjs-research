@@ -265,8 +265,7 @@ hangs lanes only where its children do. Settled by bodies, or a lane hung
 on a row inside a gap.
 
 Members: `ann-apart`, `apart-new`, `apart-old`, `body-fresh`,
-`placed-cold`, `placed-map-den`, `placed-scan-den`, `placed-take-den`,
-`placed-connected`, `placed-flatMap`.
+`placed-cold`, `placed-connected`, `placed-flatMap`.
 
 #### THE FINITE REST
 
