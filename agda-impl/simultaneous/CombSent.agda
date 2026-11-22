@@ -339,7 +339,7 @@ assoc³ r a b c = trans (cong (_⊕ [ c ]) (⊕-assoc r [ a ] [ b ])) (⊕-assoc
 -- subscribed: no row lies under another, so a lane of a row before the
 -- hot's end ends before it too.
 module EachEnd {X Y : Set} (g : X → List Y) (t : EmissionSet X) (L : Lawful t) (Good : Pos → Set)
-               (ext : ∀ {c} → Good c → ∀ zs → Good (c ⊕ zs)) (t-end : ∀ {c} → t c end → Good c) (s : Pos) (gs : Good s) where
+               (ext : ∀ {c} → Good c → ∀ l → (l ≡ ix 1 → ⊥) → Good (c ⊕ [ l ])) (t-end : ∀ {c} → t c end → Good c) (s : Pos) (gs : Good s) where
   private
     module Mg = Merge (λ x → Op.of (g x)) (enter (hot t) s)
 
@@ -362,8 +362,8 @@ module EachEnd {X Y : Set} (g : X → List Y) (t : EmissionSet X) (L : Lawful t)
   lane-past x _ (shown _ () _) _
 
   each-end : ∀ {c} → enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (g x)) (hot t)) s c end → Good c
-  each-end (Mg.oend (ended y _ , _) _ , _) = ext (t-end y) [ sub s ]
-  each-end (Mg.oend (late _ _ , _) _ , _)  = ext gs [ last ]
+  each-end (Mg.oend (ended y _ , _) _ , _) = ext (t-end y) (sub s) λ ()
+  each-end (Mg.oend (late _ _ , _) _ , _)  = ext gs last λ ()
   each-end (Mg.oend (shown _ () _ , _) _ , _)
   each-end (Mg.lane _ _ _ _ () , _)
   each-end (Mg.lend {q} {a} (shown x _ sr , _) _ (l , _) _ _ ((_ , (rj , _) , c₀c) , _) , _)
@@ -385,14 +385,14 @@ closer-good nothing {Δ} {A} {B} t env L Good ext t-end s gs x =
   CatGood.cat-end (λ b → ⟦ Clo {Δ} {A} {B} b ⟧ (hot t All.∷ env)) Good ext lane s gs x
   where
     lane : ∀ a {s c} → Good s → enter (⟦ Clo {Δ} {A} {B} a ⟧ (hot t All.∷ env)) s c end → Good c
-    lane true  {s} gs x = EachEnd.each-end closing t L Good ext t-end s gs x
+    lane true  {s} gs x = EachEnd.each-end closing t L Good (λ g l _ → ext g [ l ]) t-end s gs x
     lane false {s} gs x with of-end s 0 (marked outerDone ∷ []) (proj₁ x)
     ... | refl = ext gs [ last ]
 closer-good (just n) {Δ} {A} {B} t env L Good ext t-end s gs x =
   CatGood.cat-end (λ b → approx n (Clo {Δ} {A} {B} b) (hot t All.∷ env)) Good ext lane s gs x
   where
     lane : ∀ a {s c} → Good s → enter (approx n (Clo {Δ} {A} {B} a) (hot t All.∷ env)) s c end → Good c
-    lane true  {s} gs x = EachEnd.each-end closing t L Good ext t-end s gs x
+    lane true  {s} gs x = EachEnd.each-end closing t L Good (λ g l _ → ext g [ l ]) t-end s gs x
     lane false {s} gs x with of-end s 0 (marked outerDone ∷ []) (proj₁ x)
     ... | refl = ext gs [ last ]
 
