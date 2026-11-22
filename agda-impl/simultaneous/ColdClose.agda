@@ -5,29 +5,25 @@
 -- indexed label, a completion at the last.  A value step's render sends
 -- its over after the begin, in the same lane (`vclose`); the instant
 -- makes few rows, so the over is reached as the begin is.  A completion
--- step closes with the cold's end (`cold-cdclose`).
+-- step closes with the cold's end (`simultaneous.ColdEnd.cold-cdclose`).
 module simultaneous.ColdClose where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Relation.Nullary using (yes; no)
-open import Relation.Nullary.Decidable using (T?)
 
 open import Tree using (mergeᶠ; cold; of; map)
-open import denotation.Position using (Pos; ix; last; cascade; _∙_; _⊕_; _≟ᵖ_; _<ᵖ_; root; instant)
+open import denotation.Position using (Pos; ix; last; cascade; _∙_; _⊕_; _≟ᵖ_; root)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; Ev; out; end; at-out; on-out; on-skip; _≺_; _≼_; Reach; Dep;
+open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; out; end; at-out; on-out; on-skip; _≺_; _≼_; Reach;
   Truncate; module Op; module Joining; module Merge; module Scan)
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-split)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
 open import denotation.Laws.Worlds using (_⊑_)
 open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import simultaneous.HeldComb using (ev)
@@ -39,29 +35,10 @@ import simultaneous.ColdFew as CF
 open import simultaneous.ColdShape using (module Shape; ROut; v-begin; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs;
   fc-ends; fm-ticks; r-outs)
 open import simultaneous.ColdBegin using (same-≺; rz)
-open import simultaneous.ColdRuns using (btw; B⁰)
+open import simultaneous.ColdRuns using (B⁰)
+open import simultaneous.ColdEnd using (reach-on; cold-cdclose)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render; concatˢ)
-
--- Before a position or at it.
-aft? : ∀ c y → c ≺ y ⊎ y ≼ c
-aft? c y with T? (c <ᵖ y)
-... | yes h = inj₁ h
-... | no h  = inj₂ h
-
--- A row past a reached row of its instant is reached, the instant making
--- few rows.
-reach-on : ∀ {X} {t : EmissionSet X} {q y} {v : X} {e : Ev X} → Reach t q (out v)
-         → Σ (List Pos) (λ ks → ∀ {k e′} → t k e′ → instant k ≡ instant q → k ∈ ks)
-         → q ≺ y → instant q ≡ instant y → Reach t y e
-reach-on {t = t} {q = q} {y} {e = e} (ks₁ , h) (ks₂ , g) qy iq = ks₁ ++ ks₂ , go
-  where
-    go : ∀ {k e′} → t k e′ → k ≺ y → Dep y e k e′ → k ∈ ks₁ ++ ks₂
-    go {k} r ky _ with aft? k q
-    ... | inj₁ kq = ∈-++⁺ˡ (h r kq tt)
-    ... | inj₂ qk with ≼-split {q} {k} qk
-    ...   | inj₁ qk′ = ∈-++⁺ʳ ks₁ (g r (btw q k y qk′ ky iq))
-    ...   | inj₂ refl = ∈-++⁺ʳ ks₁ (g r refl)
 
 ------------------------------------------------------------------------
 -- The closes, from the cold's parts
@@ -193,13 +170,6 @@ cold-vclose : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {T e i}
             → enter (ev m (coldˢ c) env) p (cascade T e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ [])) (out (instEmit (mark over) (cascade T e (ix i) ∙ [ ix 1 ])))
 cold-vclose nothing  c env p x = ClosesOf.At.vclose env nothing c p x
 cold-vclose (just n) c env p x = ClosesOf.At.vclose env (just n) c p x
-
--- A completion step begun closes with the cold's end: every lane the
--- whole runs has ended there.
-postulate
-  cold-cdclose : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {T e}
-               → enter (ev m (coldˢ c) env) p (B⁰ (cascade T e last)) (out (instEmit (mark begin) (nm (cascade T e last ∙ []))))
-               → enter (ev m (coldˢ c) env) p (cascade T e last ∙ (ix 1 ∷ last ∷ [])) end
 
 -- A step begun closes in its instant: a value step with its over, a
 -- completion with the cold's end.
