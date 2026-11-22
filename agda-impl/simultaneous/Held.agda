@@ -39,7 +39,7 @@ open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok�
 open import Data.List.Relation.Unary.Any using (there)
 open import simultaneous.InstEmit using (begin; stop; subscribed; completed; laneStart; carry; laneDone; burstEnd; instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import Data.Product using (Σ; _,_)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 import denotation.Laws.ShowsJoin as SJ
 open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; empty-few; held-cold; held-connect;
   held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
