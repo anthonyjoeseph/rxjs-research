@@ -53,7 +53,7 @@ open import simultaneous.Relabel using (RowsAt; []ᵃ; _∷ᵃ_)
 open import simultaneous.HeldBase using (Bound; Ann; Gap)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldRead using (Rl; Src; AnnEv; ann-just; ann-none; pre-noend)
-open import simultaneous.HeldRead using (ev-ann; cn-inv; z₀; CnO; Cn; ev-cn; Fm; module AnnConn; mv; last-mv; end-back)
+open import simultaneous.HeldRead using (ev-ann; cn-inv; z₀; CnO; Cn; ev-cn; Fm; module AnnConn; mv; last-mv; end-back; ev-g₀)
 open import simultaneous.CombSent using (assoc³)
 open import denotation.EmissionSet using (Few; module Connecting)
 open import denotation.Laws.Fold using (fold)
@@ -460,22 +460,13 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
                         conv {cb ⊕ [ ix 1 ]} {AC.CT.mpos cb} {p} {AC.CT.fpos cb} (⊑-snoc⁺ (cb ⊕ [ ix 1 ])) mp pc (⊑-snoc⁺ (cb ⊕ [ ix 1 ])) ,
                         λ fp → ⊑-≼ fp pc))
 
-  -- THE BODY'S END PAST THE MARK IS THE CONNECT'S: the source rows before
-  -- it are its rows up to its own end, none lying under that end.
-  fin-at : ∀ {cb} → AC.CT.R cb end → ∀ k → cb ≡ AC.HR.shift k → AC.σ k end → Ann b (AC.CT.fpos cb) end
-  fin-at {cb} yc k refl σk =
-    subst (λ D′ → enter D′ a₁ (AC.CT.fpos cb) end) (sym eqA) (MS.lift (SL.toSc (send ce)))
+  -- THE SOURCE ROWS BEFORE ANYTHING UNDER A ROW of it are its rows up to
+  -- that row: none lies under it.
+  few-under : ∀ {k e} → AC.σ k e → Few AC.σ k → ∀ {F} → k ⊑ F
+            → Σ (List Pos) λ ys → ∀ {y e′} → AC.σ y e′ → (y ⊕ [ ix 0 ]) ≺ F → y ∈ ys
+  few-under {k} σk ks {F} kF = k ∷ proj₁ ks , pick
     where
-      F : Pos
-      F = AC.CT.fpos cb
-
-      kF : k ⊑ F
-      kF = _ , assoc³ k (sub AC.sb) (ix 1) last
-
-      ks : Few AC.σ k
-      ks = AC.few-vis σk tt
-
-      pick : ∀ {y e} → AC.σ y e → (y ⊕ [ ix 0 ]) ≺ F → y ∈ (k ∷ proj₁ ks)
+      pick : ∀ {y e′} → AC.σ y e′ → (y ⊕ [ ix 0 ]) ≺ F → y ∈ (k ∷ proj₁ ks)
       pick {y} sy lt with ≼-or-≻ y k
       ... | inj₁ yk with ≼-split {y} {k} yk
       ...   | inj₁ y<k = there (proj₂ ks sy y<k)
@@ -484,13 +475,59 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
       ... | [] , eq = ⊥-elim (≺-irrefl {k} (subst (k ≺_) (trans eq (⊕-identityʳ k)) ky))
       ... | (_ ∷ _) , eq = ⊥-elim (InvAt.flat AC.Iσ σk (subst (λ z → AC.σ z _) eq sy))
 
-      xk : AC.CT.C F end
-      xk = AC.CT.lift (AC.CT.fin yc)
+  -- A row of the closed body under a source row is the connect's.
+  body-cn : ∀ {k e F e′} → AC.σ k e → Visible e → k ⊑ F → AC.CT.C F e′ → Cn b F e′
+  body-cn {k} {e} {F} {e′} σk v kF xk = subst (λ D′ → enter D′ a₁ F e′) (sym evc)
+    (Connecting.body xk , conn-reach {r = a₁} {e = e′} (few-under σk (AC.few-vis σk v) kF)
+      (entered-reach (Fm (Bound.m b) {X = X} (Bound.env b) (hot (Proper AC.σ))) (a₁ ⊕ [ ix 0 ]) xk))
 
-      ce : Cn b F end
-      ce = subst (λ D′ → enter D′ a₁ F end) (sym evc)
-             (Connecting.body xk , conn-reach {r = a₁} {e = end} (k ∷ proj₁ ks , pick)
-               (entered-reach (Fm (Bound.m b) {X = X} (Bound.env b) (hot (Proper AC.σ))) (a₁ ⊕ [ ix 0 ]) xk))
+  -- The source's reading, as the closed body reads it.
+  rd-r : ∀ {y e} → AC.HR.Rd y e → AC.CT.R y e
+  rd-r {y} {e} = subst (λ D′ → enter D′ AC.sb y e) (sym (ev-g₀ (Bound.m b) (Bound.env b) (hot (Proper AC.σ))))
+
+  -- THE BODY'S END PAST THE MARK IS THE CONNECT'S.
+  fin-at : ∀ {cb} → AC.CT.R cb end → ∀ k → cb ≡ AC.HR.shift k → AC.σ k end → Ann b (AC.CT.fpos cb) end
+  fin-at {cb} yc k refl σk =
+    subst (λ D′ → enter D′ a₁ (AC.CT.fpos cb) end) (sym eqA)
+      (MS.lift (SL.toSc (send (body-cn σk tt (_ , assoc³ k (sub AC.sb) (ix 1) last) (AC.CT.lift (AC.CT.fin yc))))))
+
+  -- Each annotated row stands where a row of the connect does.
+  cn-at : ∀ {k e} → Ann b k e → Σ _ (Cn b k)
+  cn-at {k} {e} ak with MS.unmap (subst (λ D′ → enter D′ a₁ k e) eqA ak)
+  ... | _ , (sval ac , _) , _          = _ , proj₁ (proj₂ (proj₂ (cn-of ac)))
+  ... | _ , (Scan.sstep t , _) , _     = _ , t
+  ... | _ , (Scan.spin t , _) , _      = _ , t
+  ... | _ , (Scan.send t , _) , _      = _ , t
+
+  few-of-cn : ∀ {w} → Few (Cn b) w → Few (Ann b) w
+  few-of-cn (ks , h) = ks , λ y lt → h (proj₂ (cn-at y)) lt
+
+  -- A SOURCE VALUE IS ANNOTATED where the closed body reads it.
+  show-val : ∀ {k x} → Src b k (out x) → Σ Routes λ r → Ann b (k ⊕ [ sub AC.sb ]) (out (r , just x))
+  show-val {k} {x} sk = _ , to-ann (proj₂ (fold-ann cw (few-of-cn (entered-few C a₁ tt cw))))
+    where
+      σk : AC.σ k (out (just x))
+      σk = AC.MR.lift sk
+
+      cw : Cn b (k ⊕ [ sub AC.sb ]) (out (just x))
+      cw = body-cn σk tt ([ sub AC.sb ] , refl) (AC.CT.lift (AC.CT.src (rd-r (AC.HR.lift-vis σk tt)) (λ ())))
+
+  -- THE SOURCE'S END IS ANNOTATED by the nothing past it, then the end.
+  show-end : ∀ {k} → Src b k end
+           → Σ Routes λ r → Ann b (AC.CT.mpos (AC.HR.shift k)) (out (r , nothing)) × Ann b (AC.CT.fpos (AC.HR.shift k)) end
+  show-end {k} sk = _ , to-ann (proj₂ (fold-ann (mark yc ce) (few-ann {AC.HR.shift k} ae))) , ae
+    where
+      σk : AC.σ k end
+      σk = AC.MR.lift sk
+
+      yc : AC.CT.R (AC.HR.shift k) end
+      yc = rd-r (AC.HR.lift-vis σk tt)
+
+      ae : Ann b (AC.CT.fpos (AC.HR.shift k)) end
+      ae = fin-at yc k refl σk
+
+      ce : Cn b (AC.CT.fpos (AC.HR.shift k)) end
+      ce = proj₁ (proj₂ (proj₂ (cn-end ae)))
 
   fin : ∀ {m r} → Ann b m (out (r , nothing)) → Σ Pos λ c → Ann b c end × m ≺ c
   fin am with cn-u (ann-cn am)
@@ -506,6 +543,17 @@ ann-gap b = AnnVals.gap b
 -- The annotation's nothing is its last value.
 ann-last : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {m r j a} → Ann b m (out (r , nothing)) → Ann b j (out a) → m ≺ j → ⊥
 ann-last b = AnnVals.none-last b
+
+-- A source value is annotated below it.
+src-ann : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {k x} → Src b k (out x)
+        → Σ Routes λ r → Ann b (k ⊕ [ sub (AnnConn.sb b) ]) (out (r , just x))
+src-ann b = AnnVals.show-val b
+
+-- The source's end is annotated below it: the nothing, then the end.
+src-ann-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {k} → Src b k end
+            → Σ Routes λ r → Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (r , nothing))
+                           × Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ last ]) end
+src-ann-end b = AnnVals.show-end b
 
 -- The annotation's nothing is followed by its end.
 ann-fin : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {m r} → Ann b m (out (r , nothing))

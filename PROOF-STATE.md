@@ -250,11 +250,12 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### THE READER
 
-Untried: the reader shows every source row past one of its own rows,
-silent rows included, through annotation, hot, scan and merge. Settled by
-bodies over the reader's layers, or a source row the reader skips.
+Untried: the reader shows a silent source row past its subscribe, silent
+at the connect, the annotation, the hot, the scan and the merge, each
+row reaching few. Settled by bodies over the reader's layers, or a silent
+source row the reader skips.
 
-Members: `read-shows`.
+Members: `read-silent`.
 
 #### LISTED BINDERS
 

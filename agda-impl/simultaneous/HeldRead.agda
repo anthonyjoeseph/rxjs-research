@@ -102,18 +102,6 @@ Src b = enter (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b)
 Rl : Pos → Pos → Set
 Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 
--- THE READER SHOWS EACH SOURCE ROW IT IS SUBSCRIBED BEFORE: a row of the
--- source past a row of the reader, with few rows before it and none of the
--- source's ends, shows below itself, visibly if it is visible.  The source
--- row is wrapped by the annotation's connect below it, read by the hot past
--- the reader's subscription, scanned, and its lane's emit is the reader's
--- row; a silent row stays a silent row at each layer, and the source's end
--- is the annotation's end below it, which the reader ends on.
-postulate
-  read-shows : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p
-             → ∀ {q e₀ k e} → enter (RD d) p q e₀ → q ≺ k → Src b k e → Few (Src b) k → (∀ {c} → Src b c end → k ≼ c)
-             → Σ Path λ zs → Σ (Ev (IE X)) λ e′ → enter (RD d) p (k ⊕ zs) e′ × (Visible e → Visible e′)
-
 -- The annotation's connect body, before every row of the source.
 body : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos
 body b = (Bound.at b ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
