@@ -139,11 +139,6 @@ postulate
 Under : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos → Set
 Under {X} b y = (Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀) ⊎ Rl y (body b)
 
--- EVERY ROW OF THE ANNOTATION LIES UNDER A SOURCE ROW, or under its
--- connect body: the body's own steps, the concat's, lie under no source
--- row.
-postulate
-  ann-under : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {y e} → Ann b y e → Under b y
 
 -- The source holds where the binder subscribes it.
 held-src : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → Held (Src b) (s₀ b ∷ Bound.outer b)

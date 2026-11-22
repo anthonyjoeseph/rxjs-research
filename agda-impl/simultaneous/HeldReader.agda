@@ -50,7 +50,7 @@ open import denotation.Position using (Pos; ix; _⊕_; sub)
 open import denotation.EmissionSet using (EmissionSet; Den; enter; hot; Proper; module Op; module Merge; module Scan; heard; out; LaneOf) renaming (shown to r-shown; ended to r-ended; late to r-late)
 open import denotation.Read using (Visible)
 open import simultaneous.HeldBase using (Bound)
-open import simultaneous.HeldRead using (Under; under-ext; JS; Fl; lane-in; Rl-trans)
+open import simultaneous.HeldRead using (JS; Fl; lane-in)
 open import simultaneous.DenRows using (scan-out; hot-out)
 open import denotation.EmissionSet using (Ended; _≺_; end)
 open import denotation.Position using (last)
@@ -90,12 +90,81 @@ open import simultaneous.HeldTrigger using (≺-part)
 open import denotation.EmissionSet using (heard; LaneOf; Ended)
 open import denotation.Laws.Modulus using (≼-refl)
 open import simultaneous.HeldRead using (RD; Rl; Src; Under; body; held-src; read-back; read-end; read-fan; read-idle; read-row; s₀; z₀)
-open import simultaneous.HeldRead using (ann-under; rd-mg)
+open import simultaneous.HeldRead using (Rl-trans; under-ext; rd-mg; module AnnConn; ev-ann; ev-cn; CnO; Cn; Fm)
+open import simultaneous.HeldMap using (module MapRun)
+open import denotation.EmissionSet using (module Connecting)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.Position using (_≟ᵖ_; root)
 open import simultaneous.SObs using (lone; module Elaborate)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab)
+
+-- EVERY ROW OF THE ANNOTATION LIES UNDER A SOURCE ROW, or under its
+-- connect body: the body's own steps, the concat's, lie under no source
+-- row.  Its scan and map keep their source's positions; the connect's
+-- subject rows lie under the source's, its body's under the concat's
+-- outer, or under the hot reading of the source and that reading's ends.
+module AnnUnder {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
+  module A = AnnConn b
+
+  rl0 : ∀ {k} → Rl k k
+  rl0 {k} = [] , sym (⊕-identityʳ k)
+
+  σ-u : ∀ {k e} → A.σ k e → Under b k
+  σ-u {k} x with A.MR.unmap x
+  ... | e₀ , sk , _ = inj₁ (k , e₀ , rl0 , sk)
+
+  hr-u : ∀ {k e} → A.HR.Rd k e → Under b k
+  hr-u (r-shown (x , _) _ _ , _) = under-ext b ([ sub A.sb ] , refl) (σ-u x)
+  hr-u (heard (x , _) _ , _)    = under-ext b ([ sub A.sb ] , refl) (σ-u x)
+  hr-u (r-ended (x , _) _ , _)  = under-ext b ([ sub A.sb ] , refl) (σ-u x)
+  hr-u (r-late _ _ , _)         = inj₂ (Rl-trans ([ last ] , refl) (Rl-trans ([ ix 1 ] , refl) ([ ix 0 ] , refl)))
+
+  u-u : ∀ {k e} → A.CT.U k e → Under b k
+  u-u (A.CT.src y _) = hr-u (A.to y)
+  u-u (A.CT.hnd y)   = under-ext b ([ ix 0 ] , refl) (hr-u (A.to y))
+  u-u (A.CT.mk y)    = under-ext b (Rl-trans ([ ix 0 ] , refl) ([ ix 1 ] , refl)) (hr-u (A.to y))
+  u-u (A.CT.fin y)   = under-ext b (Rl-trans ([ last ] , refl) ([ ix 1 ] , refl)) (hr-u (A.to y))
+
+  base-u : ∀ {k} → k ∈ A.CT.base → Rl k (body b)
+  base-u (here refl)                 = Rl-trans ([ ix 0 ] , refl) ([ ix 0 ] , refl)
+  base-u (there (here refl))         = Rl-trans ([ ix 0 ] , refl) ([ ix 1 ] , refl)
+  base-u (there (there (here refl))) = [ last ] , refl
+
+  c-u : ∀ {k e} → A.CT.C k e → Under b k
+  c-u y with A.CT.classify (proj₁ y)
+  ... | inj₁ i      = inj₂ (base-u i)
+  ... | inj₂ (_ , u) = u-u u
+
+  module Cc = Connecting A.a₁ A.σ (enter (Fm (Bound.m b) (Bound.env b) (hot (Proper A.σ))) A.P₀)
+
+  cc-u : ∀ {k e} → enter (Op.connect (Op.map just A.D) (Fm (Bound.m b) (Bound.env b))) A.a₁ k e → Under b k
+  cc-u (Cc.body y , _)         = c-u y
+  cc-u (Cc.burst y _ , _)      = under-ext b ([ ix 0 ] , refl) (σ-u y)
+  cc-u (Cc.echo y _ _ _ , _)   = under-ext b ([ ix 0 ] , refl) (σ-u y)
+  cc-u (Cc.kept y _ _ _ , _)   = under-ext b ([ ix 0 ] , refl) (σ-u y)
+
+  cn-u : ∀ {k e} → Cn b k e → Under b k
+  cn-u {k} {e} x = cc-u (subst (λ D′ → enter D′ A.a₁ k e) (ev-cn (Bound.m b) (Bound.src b) (Bound.env b)) x)
+
+  Sa : Den (Routes × AIE X)
+  Sa = Op.scan annStep z₀ (ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b))
+
+  sc-u : ∀ {k e} → enter Sa A.a₁ k e → Under b k
+  sc-u (Scan.sval (Scan.acc₀ t _) , _)   = cn-u t
+  sc-u (Scan.sval (Scan.acc _ t _ _) , _) = cn-u t
+  sc-u (Scan.sstep t , _)                = cn-u t
+  sc-u (Scan.spin t , _)                 = cn-u t
+  sc-u (Scan.send t , _)                 = cn-u t
+
+  module MA = MapRun proj₂ Sa A.a₁
+
+  ann-u : ∀ {y e} → Ann b y e → Under b y
+  ann-u {y} {e} aq with MA.unmap (subst (λ D′ → enter D′ A.a₁ y e) (ev-ann (Bound.m b) (Bound.src b) (Bound.env b)) aq)
+  ... | _ , s , _ = sc-u s
+
+ann-under : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {y e} → Ann b y e → Under b y
+ann-under b = AnnUnder.ann-u b
 
 -- A silent row of a reader of a hot whose rows lie under the source.
 module Quiet {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (t : EmissionSet (AIE X)) (u : ∀ {y e} → t y e → Under b y) (p : Pos) where
