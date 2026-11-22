@@ -10,10 +10,10 @@
 -- later state the emit it read, so the lanes are the joins and then the
 -- source's rows past the cut, each below its source row.
 --
--- Where the hot ended past the subscribe, the annotation's nothing lies
--- past it too (the reader is not in the last gap), and the hot's end
--- follows it: the lanes end below the source's end.  Where it ended at or
--- before the subscribe, every row met is the late end.
+-- Where the hot ended past the subscribe, that the annotation's nothing
+-- lies past it too (the reader is not in the last gap) is not refuted,
+-- and the hot's end follows it: the lanes end below the source's end.
+-- Where it ended at or before the subscribe, every row met is the late end.
 module simultaneous.HeldBack where
 
 open import Data.Bool using (true; false; T)
@@ -59,8 +59,7 @@ open import denotation.EmissionSet using (Few; module Connecting)
 open import denotation.Laws.Fold using (fold)
 open import denotation.Laws.Worlds using (conv; ⊑-snoc⁺; ⊑-≼; _⊑_; ⊑-refl; ⊕-identityʳ)
 open import adequacy.Up using (conn-reach)
-open import denotation.Laws.Modulus using (≼-or-≻; ≼-refl; ≺→≼; ≼-≺-≺; ≼-split; ≺-ext; entered-reach)
-open import Relation.Nullary using (Dec; yes; no)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺→≼; ≼-≺-≺; ≼-split; ≺-ext; entered-reach)
 open import simultaneous.DenRows using (map-out′)
 open import simultaneous.ScanAcc using (module AccRun)
 open import simultaneous.HeldConnect using (vis-dep)
@@ -326,40 +325,11 @@ module AnnRun {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
 ann-run : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {q x} → Ann b q (out x) → Σ _ λ ra → Met (Ann b) (ra ++ [ (q , out x) ])
 ann-run b = AnnRun.run b
 
--- THE LATEST VALUE AMONG LISTED ROWS, or none: each listed row's event is
--- in hand, so which of them is a value is decided.
-module LatestVal {A : Set} (t : EmissionSet A) (fu : ∀ {y e e′} → t y e → t y e′ → e ≡ e′) where
-  Val : Pos → Set
-  Val k = Σ A λ a → t k (out a)
-
-  Latest : List Pos → Set
-  Latest ks = (∀ {k} → k ∈ ks → Val k → ⊥) ⊎ Σ Pos λ v → Val v × v ∈ ks × (∀ {k} → k ∈ ks → Val k → k ≼ v)
-
-  not-val : ∀ {k e} → t k e → (∀ {a} → out a ≡ e → ⊥) → Val k → ⊥
-  not-val x nv (_ , y) = nv (fu y x)
-
-  val? : ∀ {k} e → t k e → Dec (Val k)
-  val? (out a) x = yes (a , x)
-  val? skip    x = no (not-val x λ ())
-  val? (pin _) x = no (not-val x λ ())
-  val? end     x = no (not-val x λ ())
-
-  latest : ∀ ks → (∀ {k} → k ∈ ks → Σ _ (t k)) → Latest ks
-  latest []       _ = inj₁ λ ()
-  latest (k ∷ ks) s = add (val? _ (proj₂ (s (here refl)))) (latest ks (λ i → s (there i)))
-    where
-      add : Dec (Val k) → Latest ks → Latest (k ∷ ks)
-      add (no nv)  (inj₁ none)              = inj₁ λ { (here refl) vk → nv vk ; (there i) → none i }
-      add (no nv)  (inj₂ (v , vv , i , mx)) = inj₂ (v , vv , there i , λ { (here refl) vk → ⊥-elim (nv vk) ; (there i′) → mx i′ })
-      add (yes vk) (inj₁ none)              = inj₂ (k , vk , here refl , λ { (here refl) _ → ≼-refl {k} ; (there i) vk′ → ⊥-elim (none i vk′) })
-      add (yes vk) (inj₂ (v , vv , i , mx)) with ≼-or-≻ v k
-      ... | inj₁ vk≼ = inj₂ (k , vk , here refl , λ { (here refl) _ → ≼-refl {k} ; {k′} (there i′) vk′ → ≼-trans {k′} {v} {k} (mx i′ vk′) vk≼ })
-      ... | inj₂ kv  = inj₂ (v , vv , there i , λ { (here refl) _ → ≺→≼ {k} {v} kv ; (there i′) → mx i′ })
-
 -- THE ANNOTATION'S VALUES ARE ITS CONNECT'S, each with its fold: the
--- source's values, then the nothing that closes it (`CatRuns`), whose
--- fold runs from the latest annotated value before it, the annotation
--- being listed (`Bound.lists`).  So the nothing is the last value, and
+-- source's values, then the nothing that closes it (`CatRuns`).  A fold
+-- is not refuted where few rows precede (`denotation.Laws.Fold.fold`),
+-- and no more: which rows precede may hang on an older hot's synchronous
+-- loop no row of this one shows.  So the nothing is the last value, and
 -- lies where the end's last gap opens.
 module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   open AnnRun b using (a₁; C; Sa; eqA)
@@ -367,7 +337,6 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   module MS = MapRun proj₂ Sa a₁
   module SL = ScanLayer annStep z₀ C a₁ (InvAt.func (cn-inv b))
   open Scan annStep z₀ (Cn b) using (Acc; acc₀; acc; sval; send)
-  module LV = LatestVal (Ann b) (InvAt.func (AnnRun.IA b))
 
   evc : ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b) ≡ Op.connect (Op.map just (ev (Bound.m b) (Bound.src b) (Bound.env b))) (Fm (Bound.m b) (Bound.env b))
   evc = ev-cn (Bound.m b) (Bound.src b) (Bound.env b)
@@ -435,30 +404,21 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   mark {cb} yc ce = subst (λ D′ → enter D′ a₁ (AC.CT.mpos cb) (out nothing)) (sym evc)
     (AC.CR.lift (subst (λ D′ → enter D′ a₁ (AC.CT.fpos cb) end) evc ce) tt (AC.CT.lift (AC.CT.mk yc)) (AC.CT.m≺f cb))
 
-  few-ann : ∀ {cb} → Ann b (AC.CT.fpos cb) end → Few (Ann b) (AC.CT.mpos cb)
-  few-ann {cb} ce with entered-few (ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b)) a₁ (λ {k′} {e′} → tt) ce
-  ... | ks , h = ks , λ {k} y lt → h y (≺-trans {k} {AC.CT.mpos cb} {AC.CT.fpos cb} lt (AC.CT.m≺f cb))
+  -- A value of the connect has its fold, not refuted.
+  fold-ann : ∀ {w a} → Cn b w (out a) → Nl.¬ Nl.¬ (Σ _ λ st₀ → Acc w (annStep st₀ a))
+  fold-ann x = fold annStep z₀ (Cn b) (entered-few C a₁ tt x) x
 
-  -- A value with few annotated rows before it has its fold: the latest
-  -- annotated value before it, or none.  A value of the connect between
-  -- would have its own (`fold`), and be listed.
-  fold-ann : ∀ {w a} → Cn b w (out a) → Few (Ann b) w → Σ _ λ st₀ → Acc w (annStep st₀ a)
-  fold-ann {w} {a} x F with Bound.lists b F
-  ... | ks , cover , sound with LV.latest ks (λ i → proj₂ (sound i))
-  ...   | inj₁ none = z₀ , acc₀ x λ {k} y kw →
-            fold annStep z₀ (Cn b) (entered-few C a₁ tt y) y λ { (_ , ac) → none (cover (to-ann ac) kw) (_ , to-ann ac) }
-  ...   | inj₂ (v , (_ , av) , i , mx) with from-ann av
-  ...     | st , ac , refl = st , acc ac x (proj₁ (sound i)) λ {k} y vk kw →
-            fold annStep z₀ (Cn b) (entered-few C a₁ tt y) y λ { (_ , ack) → mx (cover (to-ann ack) kw) (_ , to-ann ack) vk }
-
-  gap : ∀ p → Nl.¬ Gap b p → ∀ {c} → Ann b c end → p ≺ c → Σ Pos λ m → Σ Routes λ r → Ann b m (out (r , nothing)) × p ≺ m
-  gap p ng {c} ce pc with cn-end ce
-  ... | cb , yc , ce′ , refl with fold-ann (mark yc ce′) (few-ann ce)
-  ...   | st , ac with ≼-or-≻ (AC.CT.mpos cb) p
-  ...     | inj₂ pm = AC.CT.mpos cb , proj₁ st , to-ann ac , pm
-  ...     | inj₁ mp = ⊥-elim (ng (cb , proj₁ st , to-ann ac ,
+  gap : ∀ p → Nl.¬ Gap b p → ∀ {c} → Ann b c end → p ≺ c
+      → Nl.¬ Nl.¬ (Σ Pos λ m → Σ Routes λ r → Ann b m (out (r , nothing)) × p ≺ m)
+  gap p ng {c} ce pc k with cn-end ce
+  ... | cb , yc , ce′ , refl = fold-ann (mark yc ce′) at
+    where
+      at : Nl.¬ (Σ _ λ st₀ → Acc (AC.CT.mpos cb) (annStep st₀ nothing))
+      at (st₀ , ac) with ≼-or-≻ (AC.CT.mpos cb) p
+      ... | inj₂ pm = k (AC.CT.mpos cb , proj₁ (annStep st₀ nothing) , to-ann ac , pm)
+      ... | inj₁ mp = ng (cb , proj₁ (annStep st₀ nothing) , to-ann ac ,
                         conv {cb ⊕ [ ix 1 ]} {AC.CT.mpos cb} {p} {AC.CT.fpos cb} (⊑-snoc⁺ (cb ⊕ [ ix 1 ])) mp pc (⊑-snoc⁺ (cb ⊕ [ ix 1 ])) ,
-                        λ fp → ⊑-≼ fp pc))
+                        λ fp → ⊑-≼ fp pc)
 
   -- THE SOURCE ROWS BEFORE ANYTHING UNDER A ROW of it are its rows up to
   -- that row: none lies under it.
@@ -494,20 +454,9 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
     subst (λ D′ → enter D′ a₁ (AC.CT.fpos cb) end) (sym eqA)
       (MS.lift (SL.toSc (send (body-cn σk tt (_ , assoc³ k (sub AC.sb) (ix 1) last) (AC.CT.lift (AC.CT.fin yc))))))
 
-  -- Each annotated row stands where a row of the connect does.
-  cn-at : ∀ {k e} → Ann b k e → Σ _ (Cn b k)
-  cn-at {k} {e} ak with MS.unmap (subst (λ D′ → enter D′ a₁ k e) eqA ak)
-  ... | _ , (sval ac , _) , _          = _ , proj₁ (proj₂ (proj₂ (cn-of ac)))
-  ... | _ , (Scan.sstep t , _) , _     = _ , t
-  ... | _ , (Scan.spin t , _) , _      = _ , t
-  ... | _ , (Scan.send t , _) , _      = _ , t
-
-  few-of-cn : ∀ {w} → Few (Cn b) w → Few (Ann b) w
-  few-of-cn (ks , h) = ks , λ y lt → h (proj₂ (cn-at y)) lt
-
   -- A SOURCE VALUE IS ANNOTATED where the closed body reads it.
-  show-val : ∀ {k x} → Src b k (out x) → Σ Routes λ r → Ann b (k ⊕ [ sub AC.sb ]) (out (r , just x))
-  show-val {k} {x} sk = _ , to-ann (proj₂ (fold-ann cw (few-of-cn (entered-few C a₁ tt cw))))
+  show-val : ∀ {k x} → Src b k (out x) → Nl.¬ Nl.¬ (Σ Routes λ r → Ann b (k ⊕ [ sub AC.sb ]) (out (r , just x)))
+  show-val {k} {x} sk h = fold-ann cw λ sa → h (_ , to-ann (proj₂ sa))
     where
       σk : AC.σ k (out (just x))
       σk = AC.MR.lift sk
@@ -517,8 +466,8 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
 
   -- THE SOURCE'S END IS ANNOTATED by the nothing past it, then the end.
   show-end : ∀ {k} → Src b k end
-           → Σ Routes λ r → Ann b (AC.CT.mpos (AC.HR.shift k)) (out (r , nothing)) × Ann b (AC.CT.fpos (AC.HR.shift k)) end
-  show-end {k} sk = _ , to-ann (proj₂ (fold-ann (mark yc ce) (few-ann {AC.HR.shift k} ae))) , ae
+           → Nl.¬ Nl.¬ (Σ Routes λ r → Ann b (AC.CT.mpos (AC.HR.shift k)) (out (r , nothing)) × Ann b (AC.CT.fpos (AC.HR.shift k)) end)
+  show-end {k} sk h = fold-ann (mark yc ce) λ sa → h (_ , to-ann (proj₂ sa) , ae)
     where
       σk : AC.σ k end
       σk = AC.MR.lift sk
@@ -538,24 +487,26 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   ... | AC.CT.mk {cb} yc with AC.HR.src-vis (proj₁ (AC.to yc)) tt
   ...   | k , eq , σk = AC.CT.fpos cb , fin-at yc k eq (proj₁ σk) , AC.CT.m≺f cb
 
--- Out of the last gap, the annotation's nothing lies past a reader its end does.
+-- Out of the last gap, the annotation's nothing lies past a reader its end
+-- does: not refuted, since its fold is no more.
 ann-gap : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {c} → Ann b c end → p ≺ c
-        → Σ Pos λ m → Σ Routes λ r → Ann b m (out (r , nothing)) × p ≺ m
+        → Nl.¬ Nl.¬ (Σ Pos λ m → Σ Routes λ r → Ann b m (out (r , nothing)) × p ≺ m)
 ann-gap b = AnnVals.gap b
 
 -- The annotation's nothing is its last value.
 ann-last : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {m r j a} → Ann b m (out (r , nothing)) → Ann b j (out a) → m ≺ j → ⊥
 ann-last b = AnnVals.none-last b
 
--- A source value is annotated below it.
+-- A source value is annotated below it, not refuted.
 src-ann : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {k x} → Src b k (out x)
-        → Σ Routes λ r → Ann b (k ⊕ [ sub (AnnConn.sb b) ]) (out (r , just x))
+        → Nl.¬ Nl.¬ (Σ Routes λ r → Ann b (k ⊕ [ sub (AnnConn.sb b) ]) (out (r , just x)))
 src-ann b = AnnVals.show-val b
 
--- The source's end is annotated below it: the nothing, then the end.
+-- The source's end is annotated below it, not refuted: the nothing, then
+-- the end.
 src-ann-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {k} → Src b k end
-            → Σ Routes λ r → Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (r , nothing))
-                           × Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ last ]) end
+            → Nl.¬ Nl.¬ (Σ Routes λ r → Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (r , nothing))
+                                     × Ann b (((k ⊕ [ sub (AnnConn.sb b) ]) ⊕ [ ix 1 ]) ⊕ [ last ]) end)
 src-ann-end b = AnnVals.show-end b
 
 -- The annotation's nothing is followed by its end.

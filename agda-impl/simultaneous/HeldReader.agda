@@ -120,6 +120,17 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.Position using (_≟ᵖ_; root)
 open import simultaneous.SObs using (lone; module Elaborate)
 
+open import denotation.Laws using (inv-⟦⟧; good-cons)
+open import denotation.Laws.Worlds using (Ok)
+open import denotation.Laws.Worlds.Leaves using (ine-pin)
+open import denotation.EmissionSet using (coldAt)
+open import simultaneous.TableEnv using (ok-mono)
+open import simultaneous.CombSent using (hots-at)
+open import simultaneous.HeldReadBack using (read-joined; module Back)
+open import simultaneous.Layers using (run-past-end)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.Bool using (if_then_else_)
+
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab)
 
 -- A position past one below a row is past the row.
@@ -202,6 +213,46 @@ module AnnUnder {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
 
 ann-under : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {y e} → Ann b y e → Under b y
 ann-under b = AnnUnder.ann-u b
+
+-- A READER SHOWS NO PIN: its scan's pins are the hot's, and a hot joined
+-- shows none; its lanes are `of`s.
+module NoPin {X} (A : EmissionSet (AIE X)) (p : Pos) where
+  D : Den (AIE X)
+  D = hot (Proper A)
+
+  Sc : Den (JS X)
+  Sc = Op.scan joinStep (true , ([] , [])) D
+
+  hot-nopin : ∀ {k r} → enter D p k (pin r) → ⊥
+  hot-nopin (r-shown _ () _ , _)
+
+  sc-nopin : ∀ {k r} → enter Sc p k (pin r) → ⊥
+  sc-nopin (Scan.spin h , _) = hot-nopin h
+
+  fl-nopin : ∀ (st : JS X) s {k r} → enter (Fl st) s k (pin r) → ⊥
+  fl-nopin st s x = go x
+    where
+      module Mg = Merge (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (enter (Op.of (true ∷ false ∷ [])) s)
+      go : ∀ {k r} → enter (Fl st) s k (pin r) → ⊥
+      go (Mg.opin (o , _) , _)                = ine-pin o
+      go (Mg.lane _ _ ((l , _) , _) _ _ , _)  = ine-pin l
+      go (Mg.left _ _ ((l , _) , _) _ _ , _)  = ine-pin l
+      go (Mg.run () _ , _)
+
+  module Mg = Merge Fl (enter Sc p)
+
+  rd-nopin : ∀ {k r} → enter (RD D) p k (pin r) → ⊥
+  rd-nopin x with rd-mg D p x
+  ... | (Mg.opin y , _)               = sc-nopin y
+  ... | (Mg.lane {q = q} {a = a} _ _ (l , _) _ _ , _) = fl-nopin a (q ⊕ [ ix 1 ]) l
+  ... | (Mg.left {q = q} {a = a} _ _ (l , _) _ _ , _) = fl-nopin a (q ⊕ [ ix 1 ]) l
+  ... | (Mg.run () _ , _)
+
+-- A binder's hot rows are the scope's.
+hots-one : ∀ {Δ X} (env : DenEnv Δ) (j : X ∈ Δ) {c} → Hots (lookup env j ∷ᵉ []ᵉ) c → Hots env c
+hots-one env j {c} h with lookup env j in eq
+... | hot t    = [ (λ { (_ , x) → hots-at env j eq x }) , (λ ()) ]′ h
+... | coldAt _ = ⊥-elim h
 
 -- A silent row of a reader of a hot whose rows lie under the source.
 module Quiet {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (t : EmissionSet (AIE X)) (u : ∀ {y e} → t y e → Under b y) (p : Pos) where
@@ -297,7 +348,7 @@ cur-run js pre {y} {e} {rs} {(y′ , e′) ∷ rsᵗ′} ((r , _) ∷ᵃ ra) wit
 ... | c′ , c , e₁ , e₂ , rc , ev , i =
   c′ , c , trans (cursor-++ nothing js ((y′ , e′) ∷ rsᵗ′)) e₁ , trans (cursor-++ nothing pre ((y , e) ∷ rs)) e₂ , rc , ev , i
 
-module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) where
+module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) (okr : Ok (Hots (d ∷ᵉ []ᵉ)) p) where
 
   HS : Held (Src b) (s₀ b ∷ Bound.outer b)
   HS = held-src b
@@ -326,7 +377,17 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   ... | inj₁ (_ , (zs , refl) , s) = early-inst zs (Held.ends HS s)
   ... | inj₂ refl                  = early-inst [ last ] ep
 
-  module J = Join Rl rt exR named (read-back b p ng) HS
+  module J = Join Rl rt exR named (read-joined b p ng) HS
+
+  -- The reader is lawful where it is subscribed.
+  IT : InvAt (Hots (d ∷ᵉ []ᵉ)) p T′
+  IT = inv-⟦⟧ (reader (connected (here refl))) (d ∷ᵉ []ᵉ) gd p okr
+    where
+      gd : GoodEnv (d ∷ᵉ []ᵉ)
+      gd = subst (λ D′ → GoodEnv (D′ ∷ᵉ []ᵉ)) (sym (Bound.is b)) (good-cons (Back.LA b p ng) (λ ()))
+
+  t-nopin : ∀ {k r} → T′ k (pin r) → ⊥
+  t-nopin {k} {r} x = NoPin.rd-nopin (Ann b) p (subst (λ D′ → enter (RD D′) p k (pin r)) (Bound.is b) x)
 
   -- The source is lawful where the binder subscribes it.
   IS : InvAt (Hots (Bound.env b)) (s₀ b) (Src b)
@@ -442,14 +503,28 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       sim-case (inj₁ ceq)          = from-begin (trans (sym (cong proj₂ ceq)) z) (J.src-begin run jeq ra m (λ i → i) bq (cong proj₁ ceq))
       sim-case (inj₂ (_ , _ , nb)) = ⊥-elim (lookup nb (out-in bq) is-begin)
 
+  -- A RUN HOLDING THE READER'S END has its cursor there, and nothing follows.
+  end-cursor : ∀ {c rs q′} → Run T′ c rs → (q′ , end) ∈ rs → cursor c rs ≡ just q′
+  end-cursor ((((x , _) , _) , _) ∷ run) (here refl) with run-past-end x run
+  ... | refl = refl
+  end-cursor (_ ∷ run) (there i) = end-cursor run i
+
+  rest-end : ∀ {rs′ q′} → Met T′ rs′ → (q′ , end) ∈ rs′ → ∀ q → RestAt rs′ q
+  rest-end {rs′} {q′} m ei q = [] , λ {y} r a _ → ⊥-elim (after r (subst (λ c → After c y) (end-cursor m ei) a))
+    where
+      after : ∀ {y e} → T′ y e → q′ ≺ y → ⊥
+      after r lt with InvAt.quiet IT (proj₁ (run-row m ei)) r lt
+      ... | _ , refl , _ = t-nopin r
+
   -- PAST A ZERO COUNT THE READER FINISHES THE INSTANT, as its source does.
   rest : Rest T′
   rest {rs′} m z {q} bq with read-back b p ng m
-  ... | j-late h = ⊥-elim (out-end (proj₁ (h bq)))
+  ... | inj₂ ((_ , ei) , _) = rest-end m ei q
+  ... | inj₁ (j-late h) = ⊥-elim (out-end (proj₁ (h bq)))
     where out-end : ∀ {x : IE X} → out x ≡ end → ⊥
           out-end ()
-  ... | j-part h = ⊥-elim (zero-suc (trans (sym z) (proj₂ (begins-held h bq))))
-  ... | j-read run jeq ra = rest-read m z bq run jeq ra
+  ... | inj₁ (j-part h) = ⊥-elim (zero-suc (trans (sym z) (proj₂ (begins-held h bq))))
+  ... | inj₁ (j-read run jeq ra) = rest-read m z bq run jeq ra
 
   ----------------------------------------------------------------------
   -- Idle
@@ -523,8 +598,8 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       Shown k e = Σ Path λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′) × After (cursor nothing (js ++ rs₁′)) (k ⊕ zs)
 
       shown : ∀ {k e} → Src b k e → c ≺ k → Few (Src b) k → (∀ {c₁} → Src b c₁ end → k ≼ c₁)
-            → (Silent e → ∀ {y} → Rl y k → Few T′ y) → Shown k e
-      shown {k} {e} sk ck fk lv fz = with-aft (read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv fz)
+            → (Silent e → ∀ {y} → Rl y k → Few T′ y) → Nl.¬ Nl.¬ (Shown k e)
+      shown {k} {e} sk ck fk lv fz h = read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv fz λ x → h (with-aft x)
         where
           with-aft : Σ Path (λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′)) → Shown k e
           with-aft (zs , e′ , r , v) = zs , e′ , r , v , aft zs sk ck
@@ -538,7 +613,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
         [ inj₁ , (λ nq → inj₂ (trans nq (sym (trans (cong nameOf eq) (name-ext y (l ∷ zs)))))) ]′ (I run ne (few-vis sy vy) (a-of cy) least)
         where
           least : ∀ {y₂ e₂} → Src b y₂ e₂ → Visible e₂ → After (cursor nothing S) y₂ → y ≼ y₂
-          least {y₂} {e₂} s₂ v₂ a₂ lt = blocked (shown s₂ (c-of a₂) (few-vis s₂ v₂) (live s₂ v₂) λ sl → ⊥-elim (loud v₂ sl))
+          least {y₂} {e₂} s₂ v₂ a₂ lt = shown s₂ (c-of a₂) (few-vis s₂ v₂) (live s₂ v₂) (λ sl → ⊥-elim (loud v₂ sl)) blocked
             where
               blocked : Shown y₂ e₂ → ⊥
               blocked (zs₂ , e′ , r , vv , a) =
@@ -552,7 +627,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
           not-past {y} {e} sy vy ay yw = em {Σ Path λ ys → w ≡ y ⊕ ys} λ
             { (inj₁ ([] , eq))     → ≺-irrefl {y} (subst (y ≺_) (trans eq (⊕-identityʳ y)) yw)
             ; (inj₁ (l ∷ zs , eq)) → nu (y , e , sy , vy , c-of ay , l , zs , eq)
-            ; (inj₂ np)            → blocked np (shown sy (c-of ay) (few-vis sy vy) (live sy vy) λ sl → ⊥-elim (loud vy sl)) }
+            ; (inj₂ np)            → shown sy (c-of ay) (few-vis sy vy) (live sy vy) (λ sl → ⊥-elim (loud vy sl)) (blocked np) }
             where
               blocked : (Σ Path (λ ys → w ≡ y ⊕ ys) → ⊥) → Shown y e → ⊥
               blocked np (zs , e′ , r , vv , a) =
@@ -585,7 +660,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
             ; (inj₂ np) → lw r (vv tt) a (to≺ (c₁ ⊕ zs) w (<ᵖ-apart c₁ w zs (from≺ c₁ w (≺-trans {c₁} {k} {w} c₁k kw)) λ ys eq → np (ys , eq))) }
 
           after : c ≺ c₁ → ⊥
-          after cc₁ = blocked (shown se cc₁ (few-vis se tt) (live se tt) λ ())
+          after cc₁ = shown se cc₁ (few-vis se tt) (live se tt) (λ ()) blocked
 
       -- A source row with few rows before it, before the position, is listed:
       -- at or before the cursor, or shown, below a row of the reader's or above the position.
@@ -597,7 +672,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
           past-c : (k ∈ ls → ⊥) → c ≺ k → ⊥
           past-c nin ck = em {Σ Path λ ys → w ≡ k ⊕ ys} λ
             { (inj₁ (ys , eq)) → nin (there (∈-++⁺ʳ (proj₁ fc) (cov-∈ {w} {proj₁ F} (inj₁ (ys , eq)))))
-            ; (inj₂ np)        → into np (shown sk ck fk (live-past sk ck kw) λ _ → few-below np) }
+            ; (inj₂ np)        → shown sk ck fk (live-past sk ck kw) (λ _ → few-below np) (into np) }
             where
               -- Below `k`, before the position: the reader has few rows there.
               few-below : (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → ∀ {y} → Rl y k → Few T′ y
@@ -686,9 +761,10 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   -- they join.
   idle : Idle T′
   idle {rs′} m ne′ {w} F aw lw with read-back b p ng m
-  ... | j-late h          = late-goal {rs′} {w} h ne′
-  ... | j-part h          = part-any (snoc-view rs′) m h ne′ F aw lw
-  ... | j-read run jeq ra = read-goal refl run jeq ra m ne′ F aw lw
+  ... | inj₂ ((_ , ei) , _)     = ⊥-elim (ne′ ei)
+  ... | inj₁ (j-late h)          = late-goal {rs′} {w} h ne′
+  ... | inj₁ (j-part h)          = part-any (snoc-view rs′) m h ne′ F aw lw
+  ... | inj₁ (j-read run jeq ra) = read-goal refl run jeq ra m ne′ F aw lw
 
   held : Held T′ (p ∷ cs)
   held = record
@@ -730,5 +806,7 @@ postulate
                    → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (connected i)) env)
 
 held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
-held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected nothing ρ i)
-held-connected (just n) ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected (just n) ρ i)
+held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep
+                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected nothing ρ i)
+held-connected (just n) ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep
+                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected (just n) ρ i)
