@@ -888,7 +888,8 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   -- none.
   lane-start-at : ∀ m s → (∀ {y n} → enter (ev m (Sh lanePart) (hot (Proper (enter (ev m empty ρ) (laneAt s ⊕ [ ix 1 ]))) ∷ ρ)) ((laneAt s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
                 → ∀ {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark laneStart) n)) → y ≡ C.startAt m s
-  lane-start-at m s hn {y} {n} r = C.start-at m s hn (subst (λ d → enter d s y (out (instEmit (mark laneStart) n))) (lane-eq m) r)
+  lane-start-at nothing  s hn {y} {n} r = C.start-at nothing s hn (subst (λ d → enter d s y (out (instEmit (mark laneStart) n))) (lane-eq nothing) r)
+  lane-start-at (just k) s hn {y} {n} r = C.start-at (just k) s hn (subst (λ d → enter d s y (out (instEmit (mark laneStart) n))) (lane-eq (just k)) r)
 
   -- A LANE SHOWS ITS `laneStart`, below its subscription's first child.
   lane-start-row : ∀ m s → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s (C.startAt m s) (out (marked laneStart)) × Under (s ⊕ [ ix 0 ]) (C.startAt m s)
