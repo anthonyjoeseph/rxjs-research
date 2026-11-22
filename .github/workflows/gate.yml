@@ -87,9 +87,13 @@ jobs:
             agda-interfaces-${{ runner.os }}-
 
       # Agda's heap cap lives in the Makefile's AGDA, so a session hits the
-      # same ceiling CI does.
+      # same ceiling CI does.  Per-module times close the log: a "Checking"
+      # line opens a module before its imports, so the gaps between them
+      # misattribute a parent's body to its last child.
       - name: make gate
         run: make gate
+        env:
+          AGDA_PROFILE: --profile=modules
 
   bug-cache:
     runs-on: ubuntu-latest
