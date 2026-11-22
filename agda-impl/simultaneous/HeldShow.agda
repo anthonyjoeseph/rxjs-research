@@ -316,7 +316,7 @@ read-silent {X} {d} b p ng {k} {e} pk sk sl fk lv fr =
 read-shows : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p
            → ∀ {q e₀ k e} → enter (RD d) p q e₀ → q ≺ k → Src b k e → Few (Src b) k → (∀ {c} → Src b c end → k ≼ c)
            → (Silent e → ∀ {y} → Rl y k → Few (enter (RD d) p) y)
-           → Σ Path λ zs → Σ (Ev (IE X)) λ e′ → enter (RD d) p (k ⊕ zs) e′ × (Visible e → Visible e′)
+           → Nl.¬ Nl.¬ (Σ Path λ zs → Σ (Ev (IE X)) λ e′ → enter (RD d) p (k ⊕ zs) e′ × (Visible e → Visible e′))
 read-shows {X} {d} b p ng {q} {e₀} {k} {e} rq qk sk fk lv fz = go e sk fz
   where
     module S = Show b p ng
@@ -350,8 +350,8 @@ read-shows {X} {d} b p ng {q} {e₀} {k} {e} rq qk sk fk lv fz = go e sk fz
     fin (r , am , ae) = shown′ {e′ = end} tt (Rl-trans ([ sub p ] , refl) (_ , assoc³ k (sub sb) (ix 1) last))
                           (to-rd b p ng (S.end-row pm am ae (AnnConn.CT.m≺f b w)))
 
-    go : ∀ e′ → Src b k e′ → (Silent e′ → ∀ {y} → Rl y k → Few (enter (RD d) p) y) → Out e′
-    go (out x) sk′ _   = val (src-ann b sk′)
-    go end     sk′ _   = fin (src-ann-end b sk′)
-    go skip    sk′ fz′ = silent {e′ = skip} hush (read-silent b p ng pk sk′ hush fk lv (fz′ hush))
-    go (pin r) sk′ fz′ = silent {e′ = pin r} held (read-silent b p ng pk sk′ held fk lv (fz′ held))
+    go : ∀ e′ → Src b k e′ → (Silent e′ → ∀ {y} → Rl y k → Few (enter (RD d) p) y) → Nl.¬ Nl.¬ (Out e′)
+    go (out x) sk′ _   h = src-ann b sk′ λ v → h (val v)
+    go end     sk′ _   h = src-ann-end b sk′ λ v → h (fin v)
+    go skip    sk′ fz′ h = h (silent {e′ = skip} hush (read-silent b p ng pk sk′ hush fk lv (fz′ hush)))
+    go (pin r) sk′ fz′ h = h (silent {e′ = pin r} held (read-silent b p ng pk sk′ held fk lv (fz′ held)))

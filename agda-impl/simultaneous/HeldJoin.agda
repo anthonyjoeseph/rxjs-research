@@ -416,16 +416,28 @@ module Past {A : Set} (R : Pos → Pos → Set) (t : EmissionSet (IE A)) {pre y�
       nob : (y₀ , e₀) ∷ rs ≡ [] ++ (y₁ , e₁) ∷ r₂₀ → NoBegin e₀
       nob refl = same-nob s nb′
 
+-- A count holding a route of a named instant is decided: not refuting it
+-- proves it.
+named-stable : ∀ {c : Pos × ℕ} {n} → ¬ ¬ (Σ ℕ λ k → c ≡ (n , suc k)) → Σ ℕ λ k → c ≡ (n , suc k)
+named-stable {a , zero}  nn = ⊥-elim (nn λ { (_ , ()) })
+named-stable {a , suc k} {n} nn with a ≟ᵖ n
+... | yes refl = k , refl
+... | no ne    = ⊥-elim (nn λ { (_ , refl) → ne refl })
+
+suc-stable : ∀ {m : ℕ} → ¬ ¬ (Σ ℕ λ k → m ≡ suc k) → Σ ℕ λ k → m ≡ suc k
+suc-stable {zero}  nn = ⊥-elim (nn λ { (_ , ()) })
+suc-stable {suc k} _  = k , refl
+
 module Join {A : Set} {t t′ : EmissionSet (IE A)} {cs cs′ : List Pos} (R : Pos → Pos → Set)
             (rt  : ∀ {y′ y} → R y′ y → rootOf y′ ≡ rootOf y)
             (exR : ∀ {y′ y} → R y′ y → Ex cs y → Ex cs′ y′)
             (named′ : ∀ {y n} → t′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y)
-            (back : ∀ {rs′} → Met t′ rs′ → Joined t R cs′ rs′)
+            (back : ∀ {rs′} → Met t′ rs′ → ¬ ¬ Joined t R cs′ rs′)
             (H : Held t cs) where
 
-  covered′ : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′ → Carried e′ → ¬ Ex cs′ y
-           → Σ ℕ λ k → cnt r₁′ ≡ (nameOf y , suc k)
-  covered′ m r₁′ {y} {e′} r₂′ eq c nx with back m
+  covered-j : ∀ {rs′} → Joined t R cs′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′ → Carried e′ → ¬ Ex cs′ y
+            → Σ ℕ λ k → cnt r₁′ ≡ (nameOf y , suc k)
+  covered-j j r₁′ {y} {e′} r₂′ eq c nx with j
   ... | j-late h = ⊥-elim (nx (proj₂ (h (subst ((y , e′) ∈_) (sym eq) (∈-++⁺ʳ r₁′ (here refl))))))
   ... | j-part h = ⊥-elim (carried-nb c (proj₂ (h (subst ((y , e′) ∈_) (sym eq) (∈-++⁺ʳ r₁′ (here refl))))))
   ... | j-read {pre} {e = e₀} {js = js} {rs₁′} run jeq ra with split-begins js rs₁′ r₁′ r₂′ (js-begins {r = cnt pre} {e₀} jeq) (carried-nb c) eq
@@ -436,9 +448,14 @@ module Join {A : Set} {t t′ : EmissionSet (IE A)} {cs cs′ : List Pos} (R : P
   ...         | inj₁ ceq = k , trans ceq (trans ck (cong (λ n → n , suc k) (sym (cong nm (rt r)))))
   ...         | inj₂ (_ , z , _) = ⊥-elim (zero-suc (trans (sym z) (cong proj₂ ck)))
 
-  exact′ : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y n} r₂′ → rs′ ≡ r₁′ ++ (y , out (instEmit (mark stop) n)) ∷ r₂′
-         → Σ ℕ λ k → proj₂ (cnt r₁′) ≡ suc k
-  exact′ m r₁′ {y} {n} r₂′ eq with back m
+  -- A count read back is decided, so not refuting it is enough.
+  covered′ : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y e′} r₂′ → rs′ ≡ r₁′ ++ (y , e′) ∷ r₂′ → Carried e′ → ¬ Ex cs′ y
+           → Σ ℕ λ k → cnt r₁′ ≡ (nameOf y , suc k)
+  covered′ m r₁′ r₂′ eq c nx = named-stable λ h → back m λ j → h (covered-j j r₁′ r₂′ eq c nx)
+
+  exact-j : ∀ {rs′} → Joined t R cs′ rs′ → ∀ r₁′ {y n} r₂′ → rs′ ≡ r₁′ ++ (y , out (instEmit (mark stop) n)) ∷ r₂′
+          → Σ ℕ λ k → proj₂ (cnt r₁′) ≡ suc k
+  exact-j j r₁′ {y} {n} r₂′ eq with j
   ... | j-late h = ⊥-elim (out-end (proj₁ (h (subst ((y , _) ∈_) (sym eq) (∈-++⁺ʳ r₁′ (here refl))))))
     where out-end : out (instEmit {A = A} (mark stop) n) ≡ end → ⊥
           out-end ()
@@ -496,8 +513,14 @@ module Join {A : Set} {t t′ : EmissionSet (IE A)} {cs cs′ : List Pos} (R : P
     Held.shut H run (pre ++ (y₁ , e₁) ∷ r₁ᵗ) r₂ (trans (cong (pre ++_) eq₂) (sym (++-assoc pre ((y₁ , e₁) ∷ r₁ᵗ) r₂)))
       (trans (sym (cong proj₂ ceq)) z) bq₀ vy₂ (trans (sym (rt ry)) (trans iq (sym iq₀)))
 
-  shut′ : Shut t′
-  shut′ m r₁′ r₂′ eq z {q} bq {y} {a} {j} vy iq with back m
+  exact′ : ∀ {rs′} → Met t′ rs′ → ∀ r₁′ {y n} r₂′ → rs′ ≡ r₁′ ++ (y , out (instEmit (mark stop) n)) ∷ r₂′
+         → Σ ℕ λ k → proj₂ (cnt r₁′) ≡ suc k
+  exact′ m r₁′ r₂′ eq = suc-stable λ h → back m λ j → h (exact-j j r₁′ r₂′ eq)
+
+  shut-j : ∀ {rs′} → Met t′ rs′ → Joined t R cs′ rs′ → ∀ r₁′ r₂′ → rs′ ≡ r₁′ ++ r₂′ → proj₂ (cnt r₁′) ≡ 0
+         → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt r₁′)))) ∈ r₁′
+         → ∀ {y a j} → (y , out (instEmit (value a) j)) ∈ r₂′ → rootOf y ≡ rootOf q → ⊥
+  shut-j m jd r₁′ r₂′ eq z {q} bq {y} {a} {j} vy iq with jd
   ... | j-late h = out-end (proj₁ (h (subst ((y , _) ∈_) (sym eq) (∈-++⁺ʳ r₁′ vy))))
     where out-end : out (instEmit {A = A} (value a) j) ≡ end → ⊥
           out-end ()
@@ -505,3 +528,6 @@ module Join {A : Set} {t t′ : EmissionSet (IE A)} {cs cs′ : List Pos} (R : P
     where val-begin : ∀ {n} → out (instEmit {A = A} (value a) j) ≡ out (instEmit (mark begin) n) → ⊥
           val-begin ()
   ... | j-read run jeq ra = shut-read m run jeq ra r₁′ r₂′ eq z bq vy iq
+
+  shut′ : Shut t′
+  shut′ m r₁′ r₂′ eq z bq vy iq = back m λ jd → shut-j m jd r₁′ r₂′ eq z bq vy iq

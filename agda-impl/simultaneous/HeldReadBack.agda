@@ -459,10 +459,10 @@ module Back {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Ga
       sh (q₁ , aq , pq , eq) = from-ann m (subst (λ y → O.Vis k y e) eq v) pq (proj₂ (ann-run b (proj₁ aq)))
 
   -- THE ANCHOR THE HOT'S END, PAST THE SUBSCRIBE: the annotation's run to
-  -- its nothing, then its end.
+  -- its nothing, then its end, not refuted, as the nothing's fold is not.
   ended : ∀ {ys k e c} → Met O.E (ys ++ [ (k , e) ]) → O.Vis k (c ⊕ [ sub p ]) e → Proper A c end → p ≺ c
-        → BackR (ys ++ [ (k , e) ])
-  ended {ys} {k} {e} {c} m v cp pc = e₁ (ann-gap b p ng (proj₁ cp) pc)
+        → Nl.¬ Nl.¬ (BackR (ys ++ [ (k , e) ]))
+  ended {ys} {k} {e} {c} m v cp pc h = ann-gap b p ng (proj₁ cp) pc λ g → h (e₁ g)
     where
       e₃ : ∀ {m₀ r ra′} → A m₀ (out (r , nothing)) → p ≺ m₀
          → (Σ _ λ sc → Met (Src b) sc × ARows r₀ (ra′ ++ [ (m₀ , out (r , nothing)) ]) sc)
@@ -502,26 +502,37 @@ module Back {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Ga
       row : ∀ {y e} → (y , e) ∈ rs′ → e ≡ end × Ex (p ∷ cs) y
       row i = at-late (proj₂ (O.vis (proj₁ (run-row m i)) (proj₂ (run-row m i))))
 
+  -- READ BACK POSITIVELY, or, where the last row met is the reader's end
+  -- read off the hot's end past the subscribe, not refuted.
+  Back⁺ : List (Pos × Ev (IE X)) → Set
+  Back⁺ rs′ = BackR rs′ ⊎ (Σ Pos (λ q → (q , end) ∈ rs′) × Nl.¬ Nl.¬ (BackR rs′))
+
+  -- A row anchored at the scan's end is the reader's end.
+  end-of : ∀ {ys k e q} → O.Vis k q e → enter Sc p q end → Σ Pos (λ q′ → (q′ , end) ∈ ys ++ [ (k , e) ])
+  end-of {ys} (O.vend _) _ = _ , ∈-++⁺ʳ ys (here refl)
+  end-of (O.vlane x _) sq with SO.sc-fu x sq
+  ... | ()
+
   -- The anchor of the last row met: a value, the hot's end past the
   -- subscribe, or its late end.
   anchored : ∀ {ys k e q} → Met O.E (ys ++ [ (k , e) ]) → O.Vis k q e → Σ (Ev (JS X)) (λ e₀ → enter Sc p q e₀ × Visible e₀)
-           → BackR (ys ++ [ (k , e) ])
-  anchored m v (out _ , sq , _)                                 = shown m v sq
-  anchored m v (end , (Scan.send (r-ended ce pc , _) , _) , _) = ended m v ce pc
-  anchored m v (end , (Scan.send (r-late ce cp , _) , _) , _)  = late m ce cp
+           → Back⁺ (ys ++ [ (k , e) ])
+  anchored m v (out _ , sq , _)                                    = inj₁ (shown m v sq)
+  anchored m v (end , sq@(Scan.send (r-ended ce pc , _) , _) , _) = inj₂ (end-of v sq , ended m v ce pc)
+  anchored m v (end , (Scan.send (r-late ce cp , _) , _) , _)     = inj₁ (late m ce cp)
   anchored m v (end , (Scan.send (r-shown _ () _ , _) , _) , _)
   anchored m v (skip , _ , ())
   anchored m v (pin _ , _ , ())
 
-  back-at : ∀ {rs′} → (rs′ ≡ [] ⊎ Σ _ λ ys → Σ _ λ y → rs′ ≡ ys ++ [ y ]) → Met O.E rs′ → BackR rs′
-  back-at (inj₁ refl) _ = b-nil refl
+  back-at : ∀ {rs′} → (rs′ ≡ [] ⊎ Σ _ λ ys → Σ _ λ y → rs′ ≡ ys ++ [ y ]) → Met O.E rs′ → Back⁺ rs′
+  back-at (inj₁ refl) _ = inj₁ (b-nil refl)
   back-at (inj₂ (ys , (k , e) , refl)) m = at-vis (O.vis (proj₁ rr) (proj₂ rr))
     where
       rr = run-row m (∈-++⁺ʳ ys (here refl))
-      at-vis : Σ Pos (λ q → O.Vis k q e) → BackR (ys ++ [ (k , e) ])
+      at-vis : Σ Pos (λ q → O.Vis k q e) → Back⁺ (ys ++ [ (k , e) ])
       at-vis (q , v) = anchored m v (O.vis-anc v)
 
-  back : ∀ {rs′} → Met O.E rs′ → BackR rs′
+  back : ∀ {rs′} → Met O.E rs′ → Back⁺ rs′
   back {rs′} m = back-at (snoc-view rs′) m
 
   to-joined : ∀ {rs′} → BackR rs′ → Joined (Src b) Rl (p ∷ cs) rs′
@@ -529,6 +540,11 @@ module Back {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Ga
   to-joined (b-nil refl)                                        = j-part (λ ())
   to-joined (b-part {sc₁ = sc₁} {e₁ = e₁} _ jeq pj _ _)         = j-part (λ i → js-begins {r = cnt sc₁} {e = e₁} jeq (pre-∈ pj i))
   to-joined (b-read (further refl mS jeq at))                   = j-read mS jeq at
+
+  to-joined⁺ : ∀ {rs′} → Back⁺ rs′
+             → Joined (Src b) Rl (p ∷ cs) rs′ ⊎ (Σ Pos (λ q → (q , end) ∈ rs′) × Nl.¬ Nl.¬ (Joined (Src b) Rl (p ∷ cs) rs′))
+  to-joined⁺ (inj₁ br)       = inj₁ (to-joined br)
+  to-joined⁺ (inj₂ (ei , nb)) = inj₂ (ei , λ h → nb λ br → h (to-joined br))
 
   end-out : ∀ {x : IE X} → end ≡ out x → ⊥
   end-out ()
@@ -543,11 +559,25 @@ module Back {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Ga
     inj₁ (sc₁ , w₁ , e₁ , S₀ , js , mS , jeq , pj , rl , u , e′ , subst (λ D′ → enter (RD D′) p u e′) (sym (Bound.is b)) x , vi , au , ru)
   to-part _  _  (b-read f) = inj₂ f
 
--- A RUN THE READER MEETS IS ONE OF THE SOURCE'S, JOINED LATE.
+  to-part⁺ : ∀ {rs′ q e} → Begins rs′ → (q , e) ∈ rs′ → Back⁺ rs′ → Part b p rs′ ⊎ Further b rs′
+  to-part⁺ bs qi (inj₁ br)            = to-part bs qi br
+  to-part⁺ bs _  (inj₂ ((_ , ei) , _)) = ⊥-elim (end-out (proj₂ (bs ei)))
+
+-- A RUN THE READER MEETS IS ONE OF THE SOURCE'S, JOINED LATE: positively,
+-- or, ending in the reader's end read off the hot's, not refuted.  Which
+-- rows of the annotation precede its nothing may hang on an older hot's
+-- synchronous loop the annotation never shows, so its fold is no more.
 read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
-          → Joined (Src b) Rl (p ∷ cs) rs′
-read-back b p ng {rs′} m = Back.to-joined b p ng (Back.back b p ng (subst (λ D → Met (enter (RD D) p) rs′) (Bound.is b) m))
+          → Joined (Src b) Rl (p ∷ cs) rs′ ⊎ (Σ Pos (λ q → (q , end) ∈ rs′) × Nl.¬ Nl.¬ (Joined (Src b) Rl (p ∷ cs) rs′))
+read-back b p ng {rs′} m = Back.to-joined⁺ b p ng (Back.back b p ng (subst (λ D → Met (enter (RD D) p) rs′) (Bound.is b) m))
+
+-- The same, not refuted either way.
+read-joined : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
+            → Nl.¬ Nl.¬ (Joined (Src b) Rl (p ∷ cs) rs′)
+read-joined b p ng m with read-back b p ng m
+... | inj₁ j       = λ h → h j
+... | inj₂ (_ , nj) = nj
 
 read-part : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′ q e} → Met (enter (RD d) p) rs′
           → Begins rs′ → (q , e) ∈ rs′ → Part b p rs′ ⊎ Further b rs′
-read-part b p ng {rs′} m bs qi = Back.to-part b p ng bs qi (Back.back b p ng (subst (λ D → Met (enter (RD D) p) rs′) (Bound.is b) m))
+read-part b p ng {rs′} m bs qi = Back.to-part⁺ b p ng bs qi (Back.back b p ng (subst (λ D → Met (enter (RD D) p) rs′) (Bound.is b) m))
