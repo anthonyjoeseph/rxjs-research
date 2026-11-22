@@ -71,7 +71,7 @@ open import simultaneous.HeldIn using (HeldIn; held-in)
 open import denotation.Laws.Shows using (few-down)
 
 held-comb : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
-            (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs
+            (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs)
           → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
           → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
           → let open FlatHots m ρ op f s env p in
