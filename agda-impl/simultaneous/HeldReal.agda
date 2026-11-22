@@ -102,67 +102,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-
-  -- A CUT THE SWITCH'S SCAN MEETS IS AN OUTER VALUE'S `outerOpen`, at the
-  -- source's reading of the outer's row.
-  cut-row : ∀ {rx} → Met M rx → ∀ {x} → x ∈ rx → rowKind markAct switchᶠ x ≡ kCut
-          → Σ Pos λ c → Σ A λ a → Σ _ λ n → σ₁ c (out (instEmit (value a) n)) × proj₁ x ≡ c ⊕ [ sub OS.J ] × Σ _ λ v → M (c ⊕ [ sub OS.J ]) (out v)
-  cut-row mt {k , out (just (inj₁ (b , instEmit (mark mk) n)))} i kc with open-cut mk kc
-  cut-row mt {k , out (just (inj₁ (laneB , _)))} i kc | refl with lane-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
-  cut-row mt {k , out (just (inj₁ (closeB , _)))} i kc | refl with close-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
-  cut-row {rx} mt {k , out (just (inj₁ (outerB , _)))} i kc | refl with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
-  ... | rs , pr , run , _ with bproj-memʰ pr i
-  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , _ , proj₁ (run-row∈ mt i)
-  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
-  cut-row mt {_ , out (just (inj₁ (_ , instEmit (value _) _)))} i ()
-  cut-row mt {_ , out (just (inj₂ _))} i ()
-  cut-row mt {_ , out nothing} i ()
-  cut-row mt {_ , end} i ()
-  cut-row mt {_ , skip} i ()
-  cut-row mt {_ , pin _} i ()
-
-  -- A SWITCH'S ARRIVAL THE SCAN MEETS PAST A LANE'S START IS A LATER
-  -- VALUE'S, before every lane row the scan meets next.
-  switch-cut : op ≡ switchᶠ → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q} → AC.CutIn [] r₁ q
-             → Σ Pos λ q′ → Σ A λ a′ → RO q′ (out a′) × q ≺ q′ × (∀ {y b} → σ₃ y (out b) → z ≡ y ⊕ [ sub LS.J ] → q′ ≺ y)
-  switch-cut op≡ r₁ {z} {e} {r₂} mt {q} (xs , ys , r≡ , si , cb) with find si | find cb
-  ... | x₀ , i₀ , (a , y₀ , n , xo , refl , l) | xc , ic , kc with ∈-∃++ ic
-  ...   | ys₁ , ys₂ , refl with cut-row (run-prefix r₁ mt) (subst (xc ∈_) (sym r≡) (∈-++⁺ʳ xs (∈-++⁺ʳ ys₁ (here refl))))
-                               (subst (λ o′ → rowKind markAct o′ xc ≡ kCut) op≡ kc)
-  ...     | c , a′ , n′ , σc , pc , v , mc = ro-at c , a′ , ro-of σc , q≺ , later
-    where
-      W : List Row
-      W = (z , e) ∷ r₂
-
-      eqL : r₁ ++ W ≡ (xs ++ ys₁) ++ xc ∷ (ys₂ ++ W)
-      eqL = trans (cong (_++ W) r≡) (trans (++-assoc xs (ys₁ ++ xc ∷ ys₂) W)
-              (trans (cong (xs ++_) (++-assoc ys₁ (xc ∷ ys₂) W)) (sym (++-assoc xs ys₁ (xc ∷ (ys₂ ++ W))))))
-
-      x₀≺xc : (y₀ ⊕ [ sub LS.J ]) ≺ (c ⊕ [ sub OS.J ])
-      x₀≺xc = subst ((y₀ ⊕ [ sub LS.J ]) ≺_) pc (met-before (xs ++ ys₁) {proj₁ xc} {proj₂ xc} {ys₂ ++ W} (subst (Met M) eqL mt) (∈-++⁺ˡ i₀))
-
-      xc≺z : (c ⊕ [ sub OS.J ]) ≺ z
-      xc≺z = subst (_≺ z) pc (met-before r₁ mt (subst (xc ∈_) (sym r≡) (∈-++⁺ʳ xs (∈-++⁺ʳ ys₁ (here refl)))))
-
-      q≺y₀ : q ≺ y₀
-      q≺y₀ = ≺-trans {q} {q ⊕ [ ix 1 ]} {y₀} (≺-ext q []) (proj₂ (subst (λ o′ → RV.Lane o′ q a y₀ (out (instEmit (mark laneStart) n))) op≡ l))
-
-      q≺ : q ≺ ro-at c
-      q≺ with ≼-or-≻ (ro-at c) q
-      ... | inj₂ lt = lt
-      ... | inj₁ le = ⊥-elim (≺-absurd {y₀ ⊕ [ sub LS.J ]} {c ⊕ [ sub OS.J ]} x₀≺xc
-                        (≺-trans {c ⊕ [ sub OS.J ]} {ro-at c} {y₀ ⊕ [ sub LS.J ]} (J≺ro c)
-                          (≼-≺-≺ {ro-at c} {q} {y₀ ⊕ [ sub LS.J ]} le (≺-trans {q} {y₀} {y₀ ⊕ [ sub LS.J ]} q≺y₀ (≺-ext y₀ [])))))
-
-      later : ∀ {y b} → σ₃ y (out b) → z ≡ y ⊕ [ sub LS.J ] → ro-at c ≺ y
-      later {y} σy refl with ≼-or-≻ y (ro-at c)
-      ... | inj₂ lt = lt
-      ... | inj₁ le with ≼-or-≻ (c ⊕ [ sub OS.J ]) y
-      ...   | inj₁ xy = ⊥-elim (lane-in-outer op≡ σc σy xy le)
-      ...   | inj₂ yx = ⊥-elim (≺-irrefl {c ⊕ [ sub OS.J ]} (≺-≼-≺ {c ⊕ [ sub OS.J ]} {y ⊕ [ sub LS.J ]} {c ⊕ [ sub OS.J ]} xc≺z
-                          (lane-under σy (subst (λ d → enter d P (c ⊕ [ sub OS.J ]) (out v)) (src-op tk env′ m) mc) yx)))
+  open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → ¬ AC.DoneIn [] xs q

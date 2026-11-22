@@ -15,7 +15,7 @@ open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Membership.Propositional using (find)
-open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.List.Relation.Unary.Any.Properties using (++⁻)
 open import Data.Unit using (tt)
@@ -36,27 +36,29 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; end; skip; pin; Few; _≼_; _≺_; enter; hot; EmissionSet; Den; Ended; module Joining)
 open import Data.Empty using (⊥; ⊥-elim)
-open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ)
-open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≺→≼; ≼-or-≻; ≺-irrefl; ≼-refl; ≼-trans; ≼-split)
+open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ; ⊕-identityʳ)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≼-or-≻; ≺-irrefl; ≼-refl; ≼-trans; ≼-split; ≺-absurd)
 open import denotation.Laws.Truth.Connect.Cuts using (step≼; next≺)
 open import denotation.Laws.Fold using (latest)
 open import denotation.EmissionSet using (Reach; module Switch)
-open import denotation.Laws.Count using (em; reach-down)
-open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-one)
-open import simultaneous.HeldLanes using (lane-past; bproj-mem)
-open import simultaneous.Layers using () renaming (run-row to run-row∈)
+open import denotation.Laws.Count using (em; reach-down; child)
+open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-at₂; lane-one)
+open import simultaneous.HeldLanes using (lane-past; bproj-mem; bproj-memʰ; open-cut; open-routing)
+open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
+open import simultaneous.HeldLim using (run-below)
+import simultaneous.LaneStart as LaneStart
 open import simultaneous.ColdIdle using (aft-or-in)
-open import simultaneous.CombSent using (src-op)
+open import simultaneous.CombSent using (src-op; closing-mark)
 open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; carry; outerOpen; valuesOf)
 open import simultaneous.Project using (run-prefix)
 open import denotation.EmissionSet using (Ev; Superseded)
 open import Data.Maybe using (just)
-open import simultaneous.ScanCount using (rowKind; markAct)
+open import simultaneous.ScanCount using (rowKind; markAct; row-cut)
 open import simultaneous.LaneCount using (kCut)
-open import denotation.Read using (Visible; After; cursor)
+open import denotation.Read using (Visible; After; cursor; Run) renaming (_∷_ to _∷ᴿ_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
-open import simultaneous.SObs using (lone; module Elaborate; Flat; laneB; outerB; lanePart; burstPart)
-open import Data.Bool using (Bool; T; not; true)
+open import simultaneous.SObs using (lone; module Elaborate; Flat; laneB; outerB; closeB; lanePart; burstPart)
+open import Data.Bool using (Bool; T; not; true; false)
 open import Data.Unit using (⊤)
 open import denotation.Position using (last)
 open import denotation.EmissionSet using (module Op; module TakeWhile)
@@ -141,6 +143,31 @@ lane-end : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : DenEnv
 lane-end nothing  keep o ρ g s ok = take-end keep (ev nothing o ρ) s (inv-ev nothing o ρ g s ok)
 lane-end (just n) keep o ρ g s ok = take-end keep (ev (just n) o ρ) s (inv-ev (just n) o ρ g s ok)
 
+-- A TAKE'S ROWS ALL LIE BY ITS FAILING VALUE: none passes after it, and
+-- it fails once.
+take-before : ∀ {X : Set} (keep : X → Bool) (d : Den X) (s : Pos) → ∀ {k a k′ a′}
+            → enter (Op.takeWhile true keep d) s k (out a) → T (not (keep a))
+            → enter (Op.takeWhile true keep d) s k′ (out a′) → k′ ≼ k
+take-before keep d s (TakeWhile.pass _ kp _ , _) nk _ = ⊥-elim (both kp nk)
+  where
+    both : ∀ {b} → T b → T (not b) → ⊥
+    both {true}  _ ()
+    both {false} () _
+take-before keep d s (TakeWhile.fail {q = f} x _ nf _ , _) nk (TakeWhile.pass {q = q′} x′ _ nf′ , _) with ≼-or-≻ q′ f
+... | inj₁ q′f = ≺→≼ {q′} {f ⊕ [ ix 0 ]} (≼-≺-≺ {q′} {f} {f ⊕ [ ix 0 ]} q′f (≺-ext f []))
+... | inj₂ fq′ = ⊥-elim (nf′ (f , _ , x , nk , fq′))
+take-before keep d s (TakeWhile.fail {q = f} x _ nf _ , _) nk (TakeWhile.fail {q = f′} x′ nk′ nf′ _ , _) with ≼-or-≻ f′ f
+... | inj₂ ff′ = ⊥-elim (nf′ (f , _ , x , nk , ff′))
+... | inj₁ f′f with ≼-split {f′} {f} f′f
+...   | inj₁ lt   = ⊥-elim (nf (f′ , _ , x′ , nk′ , lt))
+...   | inj₂ refl = ≼-refl {f ⊕ [ ix 0 ]}
+
+lane-before : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) (s : Pos) → ∀ {k a k′ a′}
+            → enter (ev m (takeWhile true keep o) ρ) s k (out a) → T (not (keep a))
+            → enter (ev m (takeWhile true keep o) ρ) s k′ (out a′) → k′ ≼ k
+lane-before nothing  keep o ρ s = take-before keep (ev nothing o ρ) s
+lane-before (just n) keep o ρ s = take-before keep (ev (just n) o ρ) s
+
 -- The scan's state past two runs, the first unended, is past the second
 -- from where the first left it.
 past-++ : ∀ {B} op (o : Out B) xs ys → (∀ {c} → (c , end) ∈ xs → ⊥) → past op o (xs ++ ys) ≡ past op (past op o xs) ys
@@ -193,19 +220,6 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   inner a = flatMap (mergeᶠ nothing) (λ k → shareˢ (g a k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
   postulate
-    -- A LANE'S `begin` IS MET PAST ITS `laneStart`.
-    begin-started : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-                  → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.StartIn [] xs q
-
-    -- NOTHING OF A LANE IS MET PAST ITS `laneDone`.
-    done-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-               → ∀ {q v} → LaneEmit q x v → AC.DoneIn [] xs q → ⊥
-
-    -- NOTHING OF A LANE IS MET PAST A CUT OF IT: the later value's
-    -- `outerOpen` the scan met supersedes the lane before its row.
-    cut-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-              → ∀ {q v} → LaneEmit q x v → AC.CutIn [] xs q → ⊥
-
     -- A LANE'S `laneDone` IS MET JUST PAST ITS CARRIES: the rows the run
     -- met before it end in at least as many carries as the lane counts,
     -- told by its lane part's step just before the `laneDone`, with no
@@ -244,6 +258,151 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ... | refl = lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
+
+  -- NOTHING OF A LANE FOLLOWS ITS `laneDone`: its take fails there, and
+  -- no row of one subscription lies under another.
+  done-last : ∀ {q a yd y n v} → RO q (out a) → RV.Lane op q a yd (out (instEmit (mark laneDone) n)) → RV.Lane op q a y (out v)
+            → (yd ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ]) → ⊥
+  done-last {q} {a} {yd} {y} xo ld l lt with lane-at₂ op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo ld l
+  ... | s , oks , rd , ry with ≼-split {y} {yd} (lane-before m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) s rd tt ry)
+  ...   | inj₂ refl = ≺-irrefl {y ⊕ [ sub LS.J ]} lt
+  ...   | inj₁ y≺yd with child {y} {yd} (sub LS.J) y≺yd
+  ...     | inj₂ lt′ = ≺-irrefl {y ⊕ [ sub LS.J ]}
+                (≺-trans {y ⊕ [ sub LS.J ]} {yd} {y ⊕ [ sub LS.J ]} lt′ (≺-trans {yd} {yd ⊕ [ sub LS.J ]} {y ⊕ [ sub LS.J ]} (≺-ext yd {sub LS.J} []) lt))
+  ...     | inj₁ ([] , e) = ≺-irrefl {y} (subst (y ≺_) (trans e (⊕-identityʳ y)) y≺yd)
+  ...     | inj₁ (_ ∷ _ , refl) = InvAt.flat (inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks) ry rd
+
+  -- NOTHING OF A LANE IS MET PAST ITS `laneDone`.
+  done-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+             → ∀ {q v} → LaneEmit q x v → AC.DoneIn [] xs q → ⊥
+  done-final rx₁ mt xs x ys eq (a , y , xo , refl , l) dn with find dn
+  ... | _ , i , (a′ , yd , n , xo′ , refl , ld) with ro-func xo xo′
+  ...   | refl = done-last xo ld l (met-before xs (split-met rx₁ mt xs _ ys eq) i)
+
+  -- A CUT THE SWITCH'S SCAN MEETS IS AN OUTER VALUE'S `outerOpen`, at the
+  -- source's reading of the outer's row.
+  cut-row : ∀ {rx} → Met M rx → ∀ {x} → x ∈ rx → rowKind markAct switchᶠ x ≡ kCut
+          → Σ Pos λ c → Σ A λ a → Σ _ λ n → σ₁ c (out (instEmit (value a) n)) × proj₁ x ≡ c ⊕ [ sub OS.J ] × Σ _ λ v → M (c ⊕ [ sub OS.J ]) (out v)
+  cut-row mt {k , out (just (inj₁ (b , instEmit (mark mk) n)))} i kc with open-cut mk kc
+  cut-row mt {k , out (just (inj₁ (laneB , _)))} i kc | refl with lane-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
+  cut-row mt {k , out (just (inj₁ (closeB , _)))} i kc | refl with close-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
+  cut-row {rx} mt {k , out (just (inj₁ (outerB , _)))} i kc | refl with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+  ... | rs , pr , run , _ with bproj-memʰ pr i
+  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , _ , proj₁ (run-row∈ mt i)
+  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
+  cut-row mt {_ , out (just (inj₁ (_ , instEmit (value _) _)))} i ()
+  cut-row mt {_ , out (just (inj₂ _))} i ()
+  cut-row mt {_ , out nothing} i ()
+  cut-row mt {_ , end} i ()
+  cut-row mt {_ , skip} i ()
+  cut-row mt {_ , pin _} i ()
+
+  -- A SWITCH'S ARRIVAL THE SCAN MEETS PAST A LANE'S START IS A LATER
+  -- VALUE'S, before every lane row the scan meets next.
+  switch-cut : op ≡ switchᶠ → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q} → AC.CutIn [] r₁ q
+             → Σ Pos λ q′ → Σ A λ a′ → RO q′ (out a′) × q ≺ q′ × (∀ {y b} → σ₃ y (out b) → z ≡ y ⊕ [ sub LS.J ] → q′ ≺ y)
+  switch-cut op≡ r₁ {z} {e} {r₂} mt {q} (xs , ys , r≡ , si , cb) with find si | find cb
+  ... | x₀ , i₀ , (a , y₀ , n , xo , refl , l) | xc , ic , kc with ∈-∃++ ic
+  ...   | ys₁ , ys₂ , refl with cut-row (run-prefix r₁ mt) (subst (xc ∈_) (sym r≡) (∈-++⁺ʳ xs (∈-++⁺ʳ ys₁ (here refl))))
+                               (subst (λ o′ → rowKind markAct o′ xc ≡ kCut) op≡ kc)
+  ...     | c , a′ , n′ , σc , pc , v , mc = ro-at c , a′ , ro-of σc , q≺ , later
+    where
+      W : List Row
+      W = (z , e) ∷ r₂
+
+      eqL : r₁ ++ W ≡ (xs ++ ys₁) ++ xc ∷ (ys₂ ++ W)
+      eqL = trans (cong (_++ W) r≡) (trans (++-assoc xs (ys₁ ++ xc ∷ ys₂) W)
+              (trans (cong (xs ++_) (++-assoc ys₁ (xc ∷ ys₂) W)) (sym (++-assoc xs ys₁ (xc ∷ (ys₂ ++ W))))))
+
+      x₀≺xc : (y₀ ⊕ [ sub LS.J ]) ≺ (c ⊕ [ sub OS.J ])
+      x₀≺xc = subst ((y₀ ⊕ [ sub LS.J ]) ≺_) pc (met-before (xs ++ ys₁) {proj₁ xc} {proj₂ xc} {ys₂ ++ W} (subst (Met M) eqL mt) (∈-++⁺ˡ i₀))
+
+      xc≺z : (c ⊕ [ sub OS.J ]) ≺ z
+      xc≺z = subst (_≺ z) pc (met-before r₁ mt (subst (xc ∈_) (sym r≡) (∈-++⁺ʳ xs (∈-++⁺ʳ ys₁ (here refl)))))
+
+      q≺y₀ : q ≺ y₀
+      q≺y₀ = ≺-trans {q} {q ⊕ [ ix 1 ]} {y₀} (≺-ext q []) (proj₂ (subst (λ o′ → RV.Lane o′ q a y₀ (out (instEmit (mark laneStart) n))) op≡ l))
+
+      q≺ : q ≺ ro-at c
+      q≺ with ≼-or-≻ (ro-at c) q
+      ... | inj₂ lt = lt
+      ... | inj₁ le = ⊥-elim (≺-absurd {y₀ ⊕ [ sub LS.J ]} {c ⊕ [ sub OS.J ]} x₀≺xc
+                        (≺-trans {c ⊕ [ sub OS.J ]} {ro-at c} {y₀ ⊕ [ sub LS.J ]} (J≺ro c)
+                          (≼-≺-≺ {ro-at c} {q} {y₀ ⊕ [ sub LS.J ]} le (≺-trans {q} {y₀} {y₀ ⊕ [ sub LS.J ]} q≺y₀ (≺-ext y₀ [])))))
+
+      later : ∀ {y b} → σ₃ y (out b) → z ≡ y ⊕ [ sub LS.J ] → ro-at c ≺ y
+      later {y} σy refl with ≼-or-≻ y (ro-at c)
+      ... | inj₂ lt = lt
+      ... | inj₁ le with ≼-or-≻ (c ⊕ [ sub OS.J ]) y
+      ...   | inj₁ xy = ⊥-elim (lane-in-outer op≡ σc σy xy le)
+      ...   | inj₂ yx = ⊥-elim (≺-irrefl {c ⊕ [ sub OS.J ]} (≺-≼-≺ {c ⊕ [ sub OS.J ]} {y ⊕ [ sub LS.J ]} {c ⊕ [ sub OS.J ]} xc≺z
+                          (lane-under σy (subst (λ d → enter d P (c ⊕ [ sub OS.J ]) (out v)) (src-op tk env′ m) mc) yx)))
+
+  -- A lane's row before a row of the lanes, never cut by it, is the lanes'.
+  σ₃-before : ∀ {q a k b y e} → RO q (out a) → RV.Runs op q → RV.Lane op q a k (out b) → ¬ RV.CutAt op q y → k ≺ y → σ₃ y e → σ₃ k (out b)
+  σ₃-before {q} {a} {k} {b} {y} xo rn l nc ky σy =
+    R-from (join-in op fL RO xo rn l (λ c → nc (cutat-up op fL RO {q} {k} {y} ky c))
+           , reach-down {q = y} {w = k} {e = e} {e₁ = out b}
+               (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σy))) ky tt)
+    , λ {c} ce → ≺→≼ {k} {c} (≺-≼-≺ {k} {y} {c} ky (proj₂ σy ce))
+
+  -- Two rows of one lane, in order, keep it under the lanes' tag: the
+  -- earlier is not above the later, one subscription's rows lying flat.
+  lane-J : ∀ {q a y₀ y e₀ e} → RO q (out a) → RV.Lane op q a y₀ e₀ → RV.Lane op q a y e → y₀ ≺ y
+         → (y₀ ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ])
+  lane-J {q} {a} {y₀} {y} xo l₀ l y₀y with lane-at₂ op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l₀ l
+  ... | s , oks , r₀ , r with child {y₀} {y} (sub LS.J) y₀y
+  ...   | inj₂ lt = ≺-trans {y₀ ⊕ [ sub LS.J ]} {y} {y ⊕ [ sub LS.J ]} lt (≺-ext y {sub LS.J} [])
+  ...   | inj₁ ([] , e) = ⊥-elim (≺-irrefl {y₀} (subst (y₀ ≺_) (trans e (⊕-identityʳ y₀)) y₀y))
+  ...   | inj₁ (_ ∷ _ , refl) = ⊥-elim (InvAt.flat (inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks) r₀ r)
+
+  -- A row of the met run before a row it met there is met before it.
+  in-prefix : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+            → ∀ {u} → u ∈ rx₁ ++ (z , e) ∷ rx₂ → proj₁ u ≺ proj₁ x → u ∈ xs
+  in-prefix rx₁ {z} {e} {rx₂} mt xs x ys refl {u} i ux with ∈-++⁻ xs (subst (u ∈_) (++-assoc xs (x ∷ ys) ((z , e) ∷ rx₂)) i)
+  ... | inj₁ i′ = i′
+  ... | inj₂ (here refl) = ⊥-elim (≺-irrefl {proj₁ x} ux)
+  ... | inj₂ (there i′) with run-tail xs (subst (Met M) (++-assoc xs (x ∷ ys) ((z , e) ∷ rx₂)) mt)
+  ...   | _ ∷ᴿ rn = ⊥-elim (≺-absurd {proj₁ u} {proj₁ x} ux (run-after rn i′))
+
+  -- A LANE'S `begin` IS MET PAST ITS `laneStart`: the lane shows the mark
+  -- before the `begin`, never cut between, so the lanes show it too, and
+  -- their run, having met the later row, met it first.
+  begin-started : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+                → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.StartIn [] xs q
+  begin-started rx₁ mt xs x ys eq {q} le@(a , y , xo , refl , l) with lane-run mt
+  ... | rs , pr , run , _ with bproj-mem pr (∈-++⁺ˡ (subst (_ ∈_) (sym eq) (∈-++⁺ʳ xs (here refl))))
+  ...   | y′ , e′ , j with ⊕-injˡ y y′ e′
+  ...     | refl with σ₃-lane (proj₁ (run-row∈ run j))
+  ...       | q″ , a″ , xo″ , rn , l″ , nc with emit-one le (a″ , y , xo″ , refl , l″)
+  ...         | refl with ro-func xo xo″
+  ...           | refl with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+                     (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+                     (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
+  ...             | s , oks , r , _ , back with LaneStart.begin-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r
+  ...               | y₀ , r₀ , sy₀ , y₀y with aft-or-in run (σ₃-before xo rn (back r₀ sy₀) nc y₀y (proj₁ (run-row∈ run j))) tt j
+  ...                 | inj₁ af = ⊥-elim (≺-absurd {y₀} {y} y₀y (run-below run af j))
+  ...                 | inj₂ (e″ , i₀) with InvAt.func I₃ (proj₁ (proj₁ (run-row∈ run i₀))) (proj₁ (σ₃-before xo rn (back r₀ sy₀) nc y₀y (proj₁ (run-row∈ run j))))
+  ...                   | refl = any-map (λ { refl → a , y₀ , _ , xo , refl , back r₀ sy₀ })
+                                   (in-prefix rx₁ mt xs _ ys eq (bproj-in pr i₀) (lane-J xo (back r₀ sy₀) l y₀y))
+
+  -- NOTHING OF A LANE IS MET PAST A CUT OF IT: the later value's
+  -- `outerOpen` the scan met supersedes the lane before its row.
+  cut-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+            → ∀ {q v} → LaneEmit q x v → AC.CutIn [] xs q → ⊥
+  cut-final rx₁ mt xs x ys eq {q} le@(a , y , xo , refl , l) ci@(_ , _ , _ , _ , cb) with find cb
+  ... | xc , _ , kc with row-cut op xc kc
+  ...   | op≡ with switch-cut op≡ xs (split-met rx₁ mt xs _ ys eq) ci | lane-run mt
+  ...     | q′ , a′ , xo′ , qq′ , later | rs , pr , run , _ with bproj-mem pr (∈-++⁺ˡ (subst (_ ∈_) (sym eq) (∈-++⁺ʳ xs (here refl))))
+  ...       | y′ , e′ , j with σ₃-lane (proj₁ (run-row∈ run j))
+  ...         | q″ , a″ , xo″ , rn , l″ , nc with emit-one le (a″ , y′ , xo″ , cong (λ k → k , _) e′ , l″)
+  ...           | refl = nc (subst (λ o₀ → RV.CutAt o₀ q y′) (sym op≡) (q′ , a′ , xo′ , qq′ , later (proj₁ (run-row∈ run j)) e′))
 
   -- A LANE BEGINS ONLY WHILE LIVE: its `begin` row follows its
   -- `laneStart`, and neither its `laneDone` nor a cut of it.
@@ -318,14 +477,6 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
     switch-last fL RO (subst (λ o₀ → Reach (RV.Join o₀) y end) op≡
                          (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ ry))))
       xo qy λ (q* , a* , xo* , qq* , nc) → κ (q* , a* , xo* , qq* , subst (λ o₀ → ¬ RV.CutAt o₀ q* y) (sym op≡) nc)
-
-  -- A lane's row before a row of the lanes, never cut by it, is the lanes'.
-  σ₃-before : ∀ {q a k b y} → RO q (out a) → RV.Runs op q → RV.Lane op q a k (out b) → ¬ RV.CutAt op q y → k ≺ y → σ₃ y end → σ₃ k (out b)
-  σ₃-before {q} {a} {k} {b} {y} xo rn l nc ky σy =
-    R-from (join-in op fL RO xo rn l (λ c → nc (cutat-up op fL RO {q} {k} {y} ky c))
-           , reach-down {q = y} {w = k} {e = end} {e₁ = out b}
-               (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σy))) ky tt)
-    , λ {c} ce → ≺→≼ {k} {c} (≺-≼-≺ {k} {y} {c} ky (proj₂ σy ce))
 
   -- A LANE ROW THE SCAN NEVER MET LIES PAST THE LANES' RUN.
   after-of : ∀ {rx rs} → BProj laneB (λ x → x) LS.J rx rs → Met σ₃ rs → ∀ {k b} → σ₃ k (out b)
