@@ -458,8 +458,8 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
 
   -- A visible row of the source has few rows before it, and lies before every end.
   few-vis : ∀ {k e} → Src b k e → Visible e → Few (Src b) k
-  few-vis {k} {out x} sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (full {q = k} {e = out x} tt) sk
-  few-vis {k} {end}   sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (full {q = k} {e = end} tt) sk
+  few-vis {k} {out x} sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (λ {k′} {e′} → full {q = k} {e = out x} tt {k′} {e′}) sk
+  few-vis {k} {end}   sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (λ {k′} {e′} → full {q = k} {e = end} tt {k′} {e′}) sk
 
   live : ∀ {k e} → Src b k e → Visible e → ∀ {c} → Src b c end → k ≼ c
   live sk v sc ck = pinby-vis v (InvAt.quiet IS sc sk ck)
@@ -629,7 +629,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   -- A run of joins alone names the source's route at the row they join,
   -- which the source's idle names: the position lies below that row.
   name-of : ∀ (ys : List (Pos × Ev (IE X))) q {e} x n → e ≡ out x → x ≡ instEmit (mark begin) n → proj₁ (cnt (ys ++ [ (q , e) ])) ≡ n
-  name-of ys q _ n refl refl = trans (cong proj₁ (cnt-++ ys [ (q , out (instEmit (mark begin) n)) ])) (begin-name (cnt ys) n)
+  name-of ys q _ n refl refl = trans (cong proj₁ (cnt-++ ys [ (q , out (instEmit (mark begin) n)) ])) (begin-name {A = X} (cnt ys) n)
 
   part-goal : ∀ {rs′ ys q e w} → rs′ ≡ ys ++ [ (q , e) ] → Met T′ rs′ → Begins rs′ → (∀ {c} → (c , end) ∈ rs′ → ⊥) → Few T′ w
             → After (cursor nothing rs′) w → (∀ {y e′} → T′ y e′ → Visible e′ → After (cursor nothing rs′) y → w ≼ y) → Goal rs′ w
@@ -680,7 +680,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   -- they join.
   idle : Idle T′
   idle {rs′} m ne′ {w} F aw lw with read-back b p ng m
-  ... | j-late h          = late-goal h ne′
+  ... | j-late h          = late-goal {rs′} {w} h ne′
   ... | j-part h          = part-any (snoc-view rs′) m h ne′ F aw lw
   ... | j-read run jeq ra = read-goal refl run jeq ra m ne′ F aw lw
 
