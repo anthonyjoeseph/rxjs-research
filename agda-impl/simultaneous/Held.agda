@@ -113,6 +113,14 @@ trig-fit m {A = A} ρ s env cs g eh hs p ok fr ep L₀ =
     lane false q okq fq eq = held-fit (IH.holds (hs (λ i → there (ρ i))) (hot σ₀ ∷ env) cs g₀ eh₀ q okq fq eq)
                                       (IH.placed (hs (λ i → there (ρ i))) (hot σ₀ ∷ env) cs g₀ eh₀ q okq fq eq)
 
+-- A FLATMAP HANGS ITS LANES ON ADMISSIBLE ROWS: the trigger's, the
+-- closer's and every inner's, each placed by its own child.
+postulate
+  placed-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
+                 → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
+                 → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
+                 → ∀ env cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (flatMap op f s)) env)
+
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
@@ -130,14 +138,6 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
                                   (proj₁ r) sh)
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃))))
   (placed-flatMap m ρ op f s hs hf)
-
--- A FLATMAP HANGS ITS LANES ON ADMISSIBLE ROWS: the trigger's, the
--- closer's and every inner's, each placed by its own child.
-postulate
-  placed-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
-                 → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
-                 → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-                 → ∀ env cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (flatMap op f s)) env)
 
 -- A DEFER'S LIMIT KEEPS ITS INSTANTS FINITE: past a zero count, finitely
 -- many rows of the instant last begun.  Each approximant's rest bounds only
