@@ -129,24 +129,6 @@ postulate
 body : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos
 body b = (Bound.at b ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
 
--- FINITELY MANY READER ROWS LIE UNDER A SOURCE ROW: those its
--- annotation, the hot, the scan and the scan's lanes put there.
---
--- The list is built from a value row of the reader, `w`.  The scan's first
--- state carries a join lane as long as the source's joins at the reader's
--- subscribe, and every later state carries none (`joinStep` clears the
--- flag); the lanes' positions are bounded only once that first join list is
--- in hand, and `w` is what reaches it, through its lane's scan row and the
--- scan's accumulator back to the seed.
---
--- DEAD ROUTE: with no reader row in hand the list cannot be built
---   constructively — whether the scan has a first row at all is undecidable,
---   and the first row's lane count is the source's join count at an unknown
---   row, with no bound from `y₀`.
-postulate
-  read-fan   : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {w x} → enter (RD d) p w (out x) → ∀ y₀
-             → Σ (List Pos) λ ks → ∀ {y e e₀} → enter (RD d) p y e → Src b y₀ e₀ → Rl y y₀ → y ∈ ks
-
 -- Under a source row, or under the annotation's connect body.
 Under : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos → Set
 Under {X} b y = (Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀) ⊎ Rl y (body b)
