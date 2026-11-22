@@ -84,13 +84,12 @@ of-val₁ x s = at-out , of-reach s 0 (x ∷ []) {s ⊕ [ ix 0 ]} {out x}
 of-end₁ : ∀ {X : Set} (x : X) s → enter (Op.of (x ∷ [])) s (s ⊕ [ last ]) end
 of-end₁ x s = on-out at-end , of-reach s 0 (x ∷ []) {s ⊕ [ last ]} {end}
 
-module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
+-- A READING CLOSED BY ONE VALUE: its rows but its end, then where it ends,
+-- the hand-off, the value and the end.
+module CloseRuns {B : Set} (R : EmissionSet B) (mk₀ : B)
              (proper : ∀ {q e c} → R q e → R c end → q ≼ c)
              (func   : ∀ {q e e′} → R q e → R q e′ → e ≡ e′)
              (r-few  : ∀ {q e} → R q e → Few R q) where
-
-  mk₀ : IE A
-  mk₀ = instEmit (mark completed) n₀
 
   hpos mpos fpos : Pos → Pos
   hpos c = c ⊕ [ ix 0 ]
@@ -99,7 +98,7 @@ module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
 
   -- The reading's rows but its end; where it ends, the hand-off, the mark
   -- and the end.
-  data U : EmissionSet (IE A) where
+  data U : EmissionSet B where
     src : ∀ {q e} → R q e → (e ≡ end → ⊥) → U q e
     hnd : ∀ {c} → R c end → U (hpos c) skip
     mk  : ∀ {c} → R c end → U (mpos c) (out mk₀)
@@ -215,7 +214,7 @@ module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
       ... | inj₂ ne′  = l (src y′ ne′) v ak
 
   step-mk : ∀ {c cb} → Pre c → R cb end → Seen U (mpos cb) (out mk₀) × Visible (out mk₀) × Least U c (mpos cb)
-          → Seen R cb end × Visible (end {IE A}) × Least R c cb
+          → Seen R cb end × Visible (end {B}) × Least R c cb
   step-mk {c} {cb} pc yc ((_ , fw) , _ , _ , l) = ((yc , end≼ yc) , few-end-UR yc (c≺m cb) fw) , tt , pc yc , least
     where
       least : ∀ {k e′} → R k e′ → Visible e′ → After c k → cb ≼ k
@@ -223,13 +222,13 @@ module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
       ... | inj₁ refl = end≼ yc y′
       ... | inj₂ ne′  = λ kc → l (src y′ ne′) v ak (≺-trans {k} {cb} {mpos cb} kc (c≺m cb))
 
-  data Tail (cb : Pos) : List (Pos × Ev (IE A)) → Set where
+  data Tail (cb : Pos) : List (Pos × Ev B) → Set where
     t-none : Tail cb []
     t-fin  : Tail cb [ (fpos cb , end) ]
 
   -- A run met of the closed stream: one of the reading's, or the
   -- reading's up to its end, then the mark, then perhaps the end.
-  data Shape (c : Maybe Pos) : List (Pos × Ev (IE A)) → Set where
+  data Shape (c : Maybe Pos) : List (Pos × Ev B) → Set where
     open′ : ∀ {rs} → Run R c rs → Pre (cursor c rs) → Shape c rs
     shut  : ∀ {cb r t} → Run R c (r ++ [ (cb , end) ]) → R cb end → Tail cb t → Shape c (r ++ (mpos cb , out mk₀) ∷ t)
 
@@ -272,6 +271,17 @@ module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
   past-mk : ∀ {cb t y} r → Tail cb t → After (cursor nothing (r ++ (mpos cb , out mk₀) ∷ t)) y → mpos cb ≺ y
   past-mk {y = y} r t-none a     = subst (λ c → After c y) (cur-mid nothing r []) a
   past-mk {cb} {y = y} r t-fin a = ≺-trans {mpos cb} {fpos cb} {y} (m≺f cb) (subst (λ c → After c y) (cur-mid nothing r _) a)
+
+-- Closed by a completion mark.
+module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
+             (proper : ∀ {q e c} → R q e → R c end → q ≼ c)
+             (func   : ∀ {q e e′} → R q e → R q e′ → e ≡ e′)
+             (r-few  : ∀ {q e} → R q e → Few R q) where
+
+  mk₀ : IE A
+  mk₀ = instEmit (mark completed) n₀
+
+  open CloseRuns R mk₀ proper func r-few public
 
   cnt-mk : ∀ r q → cnt (r ++ [ (q , out mk₀) ]) ≡ cnt r
   cnt-mk r q = from-++ _ r [ (q , out mk₀) ]
@@ -442,31 +452,32 @@ module Close {A : Set} (R : EmissionSet (IE A)) (n₀ : Pos)
 -- rows all lie past the outer's end, then a lane showing one mark.  The
 -- outer's rows are silent, and each other row is one of the closed
 -- stream's, where it is.
-module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
+module CatRuns {B : Set} (G : Bool → Den B) (P : Pos) (mk₀ : B)
                 (proper : ∀ {q e c} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) c end → q ≼ c)
                 (func   : ∀ {q e e′} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e′ → e ≡ e′)
                 (r-few  : ∀ {q e} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → Few (enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ])) q)
                 (r-late : ∀ {k e} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) k e → (P ⊕ [ last ]) ≺ k)
                 (r-nopin : ∀ {k r} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) k (pin r) → ⊥)
                 (of-row : ∀ {s y e} → enter (G false) s y e
-                        → (y ≡ s ⊕ [ ix 0 ] × e ≡ out (instEmit (mark completed) n₀)) ⊎ (y ≡ s ⊕ [ last ] × e ≡ end))
-                (of-val : ∀ s → enter (G false) s (s ⊕ [ ix 0 ]) (out (instEmit (mark completed) n₀)))
+                        → (y ≡ s ⊕ [ ix 0 ] × e ≡ out mk₀) ⊎ (y ≡ s ⊕ [ last ] × e ≡ end))
+                (of-val : ∀ s → enter (G false) s (s ⊕ [ ix 0 ]) (out mk₀))
                 (of-end : ∀ s → enter (G false) s (s ⊕ [ last ]) end) where
+
 
   sb : Pos
   sb = (P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
 
-  R : EmissionSet (IE A)
+  R : EmissionSet B
   R = enter (G true) sb
 
-  open Close R n₀ proper func r-few
+  open CloseRuns R mk₀ proper func r-few public
   open Two P
   module Bd = Bounded 1 G O
 
-  C : EmissionSet (IE A)
+  C : EmissionSet B
   C = enter (Op.flatMap (mergeᶠ (just 1)) G (Op.of (true ∷ false ∷ []))) P
 
-  In : Pos → EmissionSet (IE A)
+  In : Pos → EmissionSet B
   In c = enter (G false) (c ⊕ [ ix 1 ])
 
   sb≺e₁ : sb ≺ e₁
@@ -550,7 +561,7 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
   base = (q₀ ⊕ [ ix 0 ]) ∷ (q₁ ⊕ [ ix 0 ]) ∷ e₁ ∷ []
 
   -- EVERY ROW OF THE CONCAT is the outer's, or one of the closed stream's.
-  classify : ∀ {k e′} → Bd.JoinT k e′ → k ∈ base ⊎ Σ (Ev (IE A)) λ e₀ → U k e₀
+  classify : ∀ {k e′} → Bd.JoinT k e′ → k ∈ base ⊎ Σ (Ev B) λ e₀ → U k e₀
   classify (Bd.val x) with of-two P x
   ... | inj₁ (refl , _) = inj₁ (here refl)
   ... | inj₂ (refl , _) = inj₁ (there (here refl))
@@ -638,6 +649,27 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
   back ((((y , pr) , fw) , vi , ac , lf) ∷ run) =
     (((vis y vi , λ ce → pr (lift ce)) , (proj₁ fw , λ y′ lt → proj₂ fw (lift y′) lt)) , vi , ac , λ y′ v a → lf (lift y′) v a) ∷ back run
 
+  -- The concat ends only past its mark's first effect.
+  closes : ∀ {c} → C c end → Σ Pos λ f → C f (out mk₀) × (f ⊕ [ ix 0 ]) ≺ c
+  closes y with end-row y
+  ... | src _ ne = ⊥-elim (ne refl)
+  ... | fin {c₀} yc = mpos c₀ , lift (mk yc) ,
+          subst (_≺ fpos c₀) (sym (⊕-assoc (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [ ix 0 ])) (≺-part (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [] refl)
+
+-- Closed by a completion mark.
+module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
+                (proper : ∀ {q e c} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) c end → q ≼ c)
+                (func   : ∀ {q e e′} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e′ → e ≡ e′)
+                (r-few  : ∀ {q e} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) q e → Few (enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ])) q)
+                (r-late : ∀ {k e} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) k e → (P ⊕ [ last ]) ≺ k)
+                (r-nopin : ∀ {k r} → enter (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) k (pin r) → ⊥)
+                (of-row : ∀ {s y e} → enter (G false) s y e
+                        → (y ≡ s ⊕ [ ix 0 ] × e ≡ out (instEmit (mark completed) n₀)) ⊎ (y ≡ s ⊕ [ last ] × e ≡ end))
+                (of-val : ∀ s → enter (G false) s (s ⊕ [ ix 0 ]) (out (instEmit (mark completed) n₀)))
+                (of-end : ∀ s → enter (G false) s (s ⊕ [ last ]) end) where
+  open CatRuns G P (instEmit (mark completed) n₀) proper func r-few r-late r-nopin of-row of-val of-end public
+  open Close R n₀ proper func r-few using (module Holds)
+
   rest : Rest U → Rest C
   rest R′ m z bq with R′ (back m) z bq
   ... | ks , h = base ++ ks , λ (j , _) ay ry → pick j ay ry
@@ -646,13 +678,6 @@ module CatClose {A : Set} (G : Bool → Den (IE A)) (P n₀ : Pos)
       pick j ay ry with classify j
       ... | inj₁ m        = ∈-++⁺ˡ m
       ... | inj₂ (_ , u′) = ∈-++⁺ʳ base (h u′ ay ry)
-
-  -- The concat ends only past its mark's first effect.
-  closes : ∀ {c} → C c end → Σ Pos λ f → C f (out mk₀) × (f ⊕ [ ix 0 ]) ≺ c
-  closes y with end-row y
-  ... | src _ ne = ⊥-elim (ne refl)
-  ... | fin {c₀} yc = mpos c₀ , lift (mk yc) ,
-          subst (_≺ fpos c₀) (sym (⊕-assoc (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [ ix 0 ])) (≺-part (c₀ ⊕ [ ix 1 ]) [ ix 0 ] [] refl)
 
   held : ∀ {cs} → Held R cs → Held C cs
   held H = held-same (λ r → _ , row r , same-refl _) end-row (λ m → _ , back m , rows-refl (back m))
