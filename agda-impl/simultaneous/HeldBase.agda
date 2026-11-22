@@ -4,7 +4,7 @@
 -- operators, the connects, and the hots a flatMap's scan reads past.
 module simultaneous.HeldBase where
 
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
@@ -14,7 +14,7 @@ open import Data.Nat using (ℕ; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_; _∙_; cascade)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_; cascade)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; hot; enter; Proper; ⟦_⟧; DenEnv; approx; Few)
 open import simultaneous.SObs using (lone; Part; ext; module Elaborate)
@@ -40,14 +40,13 @@ open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
-open import simultaneous.HeldComb using (ev; RunHeld; ShutRun; run-row; held-runs)
+open import simultaneous.HeldComb using (ev; RunHeld; run-row; held-runs)
 open import simultaneous.Routed using (valued; Idle; Rest; Routing; r-begin; r-over)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ)
 open import denotation.Laws.Worlds using (⊑-inside)
 open import simultaneous.InstEmit using (stop; completed)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Ex)
-open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.InstEmit using (instEmit; value; mark; over)
@@ -58,7 +57,7 @@ open import simultaneous.ColdFew using (cold-step-few; of-below)
 open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
-open import denotation.EmissionSet using (Ev; out; end)
+open import denotation.EmissionSet using (out; end)
 open import denotation.Laws.Worlds using (ok-step; _⊑_)
 open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
@@ -66,22 +65,18 @@ open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (sym; cong; subst)
 open import Tree using (mergeᶠ)
 open import Data.Bool using (true; false)
-open import denotation.EmissionSet using (skip; pin; module TakeWhile)
+open import denotation.EmissionSet using (module TakeWhile)
 open import denotation.Read using (Run)
 import denotation.Read as Run
-open import Data.Bool using (Bool; T)
-open import denotation.Position using (isLt; cmpPath)
-open import denotation.Simultaneity using (reflⁱ)
-open import denotation.EmissionSet using (_≺_)
-open import simultaneous.Routed using (cnt; Carried)
-open import simultaneous.HeldComb using (ShutRun)
+open import Data.Bool using (Bool)
 open import denotation.Position using (Path)
 open import denotation.EmissionSet using (InE; at-end; at-out; on-out)
 open import denotation.Events using (ofᴱ)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
-open import simultaneous.Relations using (values)
 open import simultaneous.HeldComb using (RunHeld)
 open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
+open import simultaneous.ColdBegin using (same-≺)
+open import simultaneous.ColdRuns using (quiet-fold; cold-covered; cold-shut)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -127,15 +122,6 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
   in-burst x v with below x v
   ... | zs , refl = here (⊑-inside {p} {p ⊕ zs} (zs , refl) , rootOf-ext p zs)
 
-  quiet-fold : ∀ c (rs : List (Pos × Ev (IE A))) → (∀ {y m n} → (y , out (instEmit (mark m) n)) ∈ rs → ⊥)
-             → L.foldl count c (values rs) ≡ c
-  quiet-fold c []                                    h = refl
-  quiet-fold c ((y , out (instEmit (value a) n)) ∷ rs) h = quiet-fold c rs (λ i → h (there i))
-  quiet-fold c ((y , out (instEmit (mark m) n)) ∷ rs)  h = ⊥-elim (h (here refl))
-  quiet-fold c ((y , end) ∷ rs)                      h = quiet-fold c rs (λ i → h (there i))
-  quiet-fold c ((y , skip) ∷ rs)                     h = quiet-fold c rs (λ i → h (there i))
-  quiet-fold c ((y , pin _) ∷ rs)                    h = quiet-fold c rs (λ i → h (there i))
-
   runs : ∀ {rs} → Met t rs → RunHeld (p ∷ cs) rs
   runs {rs} mt = record
     { covered = λ r₁ r₂ eq _ ne → let (x , v) = run-row r₁ (subst (Met t) eq mt) in ⊥-elim (ne (in-burst x v))
@@ -144,7 +130,7 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
 
   held : Held t (p ∷ cs)
   held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x))
-    (λ mt _ _ _ _ → inj₁ (cong proj₂ (quiet-fold r₀ _ (λ i → no-mark (proj₁ (run-row∈ mt i))))))
+    (λ mt _ _ _ _ → inj₁ (cong proj₂ (quiet-fold {A} r₀ _ (λ i → no-mark (proj₁ (run-row∈ mt i))))))
     (λ mt _ bq → ⊥-elim (no-mark (proj₁ (run-row∈ mt bq))))
     runs
     where
@@ -182,24 +168,13 @@ held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
 postulate
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
--- A step's route opens at its begin and nothing comes between: what the
--- cold's runs ask needs the order of its rows, which `ColdRow` does not
--- carry.
 postulate
-  cold-covered : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs
-               → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex [ p ] y
-               → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
-  cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
   cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
 cold-rest m c env p mt _ bq with cold-step-few m c env p (proj₁ (run-row∈ mt bq))
 ... | ks , h = ks , λ xy _ ry → h xy ry
-
-private
-  same-≺ : ∀ i x y → T (isLt (cmpPath x y)) → (i ∙ x) ≺ (i ∙ y)
-  same-≺ i x y h rewrite reflⁱ i = h
 
 -- WHAT EACH ROW OF THE COLD HOLDS, read off its shape.
 module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t y e → Visible e → ColdRow p y e) where

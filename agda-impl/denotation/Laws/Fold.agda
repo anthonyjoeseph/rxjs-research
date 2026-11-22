@@ -47,12 +47,12 @@ module _ {A B : Set} (f : B → A → B) (z : B) (t : EmissionSet A) where
   Val : Pos → Set
   Val k = Σ A λ a → t k (out a)
 
-  fold : ∀ {w} → Few t w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
-  fold = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)) step
+  fold : ∀ {w} → Few t w → ∀ {a} → t w (out a) → ¬ ¬ Σ B λ b → Acc w (f b a)
+  fold = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ B λ b → Acc w (f b a)) step
     where
-      step : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ B (Acc v))
-           → ∀ {a} → t w (out a) → ¬ ¬ Σ B (Acc w)
+      step : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ B λ b → Acc v (f b a))
+           → ∀ {a} → t w (out a) → ¬ ¬ Σ B λ b → Acc w (f b a)
       step {w} (ks , h) ih {a} x ¬A = latest Val w ks λ
-        { (inj₁ none) → ¬A (f z a , acc₀ x λ y kw → none (h y kw) (_ , y) kw)
+        { (inj₁ none) → ¬A (z , acc₀ x λ y kw → none (h y kw) (_ , y) kw)
         ; (inj₂ (v , (_ , xv) , vw , mx)) → ih xv vw xv λ
-            { (b , av) → ¬A (f b a , acc av x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
+            { (b , av) → ¬A (_ , acc av x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
