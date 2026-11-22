@@ -98,13 +98,13 @@ open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.Layers using (pinby-vis; snoc-view; run-tail; cursor-snoc; cursor-in; pre-∈)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.Routed using (Idle)
-open import denotation.Read using (Run; Least)
-open import denotation.EmissionSet using (Few)
+open import denotation.Read using (Run; Least; loud)
+open import denotation.EmissionSet using (Few; Silent)
 open import denotation.Position using (Path; Label)
 open import denotation.Events using (<ᵖ-between)
-open import denotation.Laws.Modulus using (≺-ext; ≼-or-≻; entered-few)
+open import denotation.Laws.Modulus using (≺-ext; ≼-or-≻; entered-few; ≺→≼)
 open import denotation.Laws.Worlds using (full; Shows)
-open import denotation.Laws.Shows using (cover; cov-∈)
+open import denotation.Laws.Shows using (cover; cov-∈; few-down)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (any?) renaming (map to any-map)
@@ -522,8 +522,9 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       Shown : Pos → Ev (IE X) → Set
       Shown k e = Σ Path λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′) × After (cursor nothing (js ++ rs₁′)) (k ⊕ zs)
 
-      shown : ∀ {k e} → Src b k e → c ≺ k → Few (Src b) k → (∀ {c₁} → Src b c₁ end → k ≼ c₁) → Shown k e
-      shown {k} {e} sk ck fk lv = with-aft (read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv)
+      shown : ∀ {k e} → Src b k e → c ≺ k → Few (Src b) k → (∀ {c₁} → Src b c₁ end → k ≼ c₁)
+            → (Silent e → ∀ {y} → Rl y k → Few T′ y) → Shown k e
+      shown {k} {e} sk ck fk lv fz = with-aft (read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv fz)
         where
           with-aft : Σ Path (λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′)) → Shown k e
           with-aft (zs , e′ , r , v) = zs , e′ , r , v , aft zs sk ck
@@ -537,7 +538,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
         [ inj₁ , (λ nq → inj₂ (trans nq (sym (trans (cong nameOf eq) (name-ext y (l ∷ zs)))))) ]′ (I run ne (few-vis sy vy) (a-of cy) least)
         where
           least : ∀ {y₂ e₂} → Src b y₂ e₂ → Visible e₂ → After (cursor nothing S) y₂ → y ≼ y₂
-          least {y₂} {e₂} s₂ v₂ a₂ lt = blocked (shown s₂ (c-of a₂) (few-vis s₂ v₂) (live s₂ v₂))
+          least {y₂} {e₂} s₂ v₂ a₂ lt = blocked (shown s₂ (c-of a₂) (few-vis s₂ v₂) (live s₂ v₂) λ sl → ⊥-elim (loud v₂ sl))
             where
               blocked : Shown y₂ e₂ → ⊥
               blocked (zs₂ , e′ , r , vv , a) =
@@ -551,7 +552,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
           not-past {y} {e} sy vy ay yw = em {Σ Path λ ys → w ≡ y ⊕ ys} λ
             { (inj₁ ([] , eq))     → ≺-irrefl {y} (subst (y ≺_) (trans eq (⊕-identityʳ y)) yw)
             ; (inj₁ (l ∷ zs , eq)) → nu (y , e , sy , vy , c-of ay , l , zs , eq)
-            ; (inj₂ np)            → blocked np (shown sy (c-of ay) (few-vis sy vy) (live sy vy)) }
+            ; (inj₂ np)            → blocked np (shown sy (c-of ay) (few-vis sy vy) (live sy vy) λ sl → ⊥-elim (loud vy sl)) }
             where
               blocked : (Σ Path (λ ys → w ≡ y ⊕ ys) → ⊥) → Shown y e → ⊥
               blocked np (zs , e′ , r , vv , a) =
@@ -584,7 +585,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
             ; (inj₂ np) → lw r (vv tt) a (to≺ (c₁ ⊕ zs) w (<ᵖ-apart c₁ w zs (from≺ c₁ w (≺-trans {c₁} {k} {w} c₁k kw)) λ ys eq → np (ys , eq))) }
 
           after : c ≺ c₁ → ⊥
-          after cc₁ = blocked (shown se cc₁ (few-vis se tt) (live se tt))
+          after cc₁ = blocked (shown se cc₁ (few-vis se tt) (live se tt) λ ())
 
       -- A source row with few rows before it, before the position, is listed:
       -- at or before the cursor, or shown, below a row of the reader's or above the position.
@@ -596,8 +597,12 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
           past-c : (k ∈ ls → ⊥) → c ≺ k → ⊥
           past-c nin ck = em {Σ Path λ ys → w ≡ k ⊕ ys} λ
             { (inj₁ (ys , eq)) → nin (there (∈-++⁺ʳ (proj₁ fc) (cov-∈ {w} {proj₁ F} (inj₁ (ys , eq)))))
-            ; (inj₂ np)        → into np (shown sk ck fk (live-past sk ck kw)) }
+            ; (inj₂ np)        → into np (shown sk ck fk (live-past sk ck kw) λ _ → few-below np) }
             where
+              -- Below `k`, before the position: the reader has few rows there.
+              few-below : (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → ∀ {y} → Rl y k → Few T′ y
+              few-below np (zs , refl) = few-down F (≺→≼ {k ⊕ zs} {w} (to≺ (k ⊕ zs) w (<ᵖ-apart k w zs (from≺ k w kw) λ ys eq → np (ys , eq))))
+
               into : (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → Shown k e → ⊥
               into np (zs , e′ , r , _ , _) =
                 nin (there (∈-++⁺ʳ (proj₁ fc) (cov-∈ {w} {proj₁ F} (inj₂ (any-map (λ eq → subst (k ⊑_) eq (zs , refl))

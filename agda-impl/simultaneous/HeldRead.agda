@@ -62,7 +62,7 @@ open import simultaneous.Routed using (Held; nameOf)
 open import simultaneous.Relabel using (Same)
 open import simultaneous.HeldTake using (name-ext)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.HeldBase using (Bound; Ann; Gap)
+open import simultaneous.HeldBase using (Bound; Ann)
 import Relation.Nullary as Nl
 
 open import Data.List.Properties using (∷ʳ-injective; map-++)

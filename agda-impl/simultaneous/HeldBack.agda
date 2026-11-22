@@ -476,10 +476,13 @@ module AnnVals {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
       ... | (_ ∷ _) , eq = ⊥-elim (InvAt.flat AC.Iσ σk (subst (λ z → AC.σ z _) eq sy))
 
   -- A row of the closed body under a source row is the connect's.
-  body-cn : ∀ {k e F e′} → AC.σ k e → Visible e → k ⊑ F → AC.CT.C F e′ → Cn b F e′
-  body-cn {k} {e} {F} {e′} σk v kF xk = subst (λ D′ → enter D′ a₁ F e′) (sym evc)
-    (Connecting.body xk , conn-reach {r = a₁} {e = e′} (few-under σk (AC.few-vis σk v) kF)
+  body-cnᶠ : ∀ {k e F e′} → AC.σ k e → Few AC.σ k → k ⊑ F → AC.CT.C F e′ → Cn b F e′
+  body-cnᶠ {k} {e} {F} {e′} σk fk kF xk = subst (λ D′ → enter D′ a₁ F e′) (sym evc)
+    (Connecting.body xk , conn-reach {r = a₁} {e = e′} (few-under σk fk kF)
       (entered-reach (Fm (Bound.m b) {X = X} (Bound.env b) (hot (Proper AC.σ))) (a₁ ⊕ [ ix 0 ]) xk))
+
+  body-cn : ∀ {k e F e′} → AC.σ k e → Visible e → k ⊑ F → AC.CT.C F e′ → Cn b F e′
+  body-cn σk v = body-cnᶠ σk (AC.few-vis σk v)
 
   -- The source's reading, as the closed body reads it.
   rd-r : ∀ {y e} → AC.HR.Rd y e → AC.CT.R y e

@@ -248,15 +248,6 @@ bodies, or a row whose creator chain is cut unlike its image's.
 Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 `scan-order`, `take-order`, `defer-order`.
 
-#### THE READER
-
-Untried: the reader shows a silent source row past its subscribe, silent
-at the connect, the annotation, the hot, the scan and the merge, each
-row reaching few. Settled by bodies over the reader's layers, or a silent
-source row the reader skips.
-
-Members: `read-silent`.
-
 #### LISTED BINDERS
 
 Untried: a new binder's annotation lists its rows wherever finitely many
