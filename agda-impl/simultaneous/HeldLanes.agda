@@ -321,17 +321,20 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   -- A LANE'S `laneDone` IN THE REAL FLATMAP FOLLOWS ITS `laneStart` THERE.
   lane-begins : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n)) → σ₃ y (out (instEmit (mark laneDone) n))
               → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
-  lane-begins {q} {a} {y} {n} xo l σd with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
-  ... | s , _ , r , sk , back with lane-starts r
-  ...   | y₀ , n₀ , r₀ , sy₀ , lt with σ₃-lane σd
-  ...     | q′ , a′ , xo′ , rn , l′ , nc with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
-  ...       | refl with ro-func xo xo′
-  ...         | refl = y₀ , n₀ , back r₀ sy₀
-                     , (R-from (join-in op fL RO xo rn (back r₀ sy₀) (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
+  lane-begins {q} {a} {y} {n} xo l σd =
+    let (_ , _ , r , _ , back) = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+            (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+            (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
+        (y₀ , n₀ , r₀ , sy₀ , lt) = lane-starts r
+        (_ , _ , xo′ , rn , l′ , nc) = σ₃-lane σd
+    in begin-at (back r₀ sy₀) lt rn nc (lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+            (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+            (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′)
+    where
+      begin-at : ∀ {y₀ n₀ q′} → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → RV.Runs op q′ → ¬ RV.CutAt op q′ y → q ≡ q′
+               → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
+      begin-at {y₀} {n₀} L₀ lt rn nc refl = y₀ , n₀ , L₀
+                     , (R-from (join-in op fL RO xo rn L₀ (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
                                 , reach-down {q = y} {w = y₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
