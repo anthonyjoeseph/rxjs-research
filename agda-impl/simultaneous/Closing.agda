@@ -54,7 +54,7 @@ open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; cl
 open import simultaneous.Relations using (Met; values; values-++; ranked; Left; Exits; Over; lastValue; carried; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
 open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name; enter-few; visible-unpinned)
 open import simultaneous.Erasure using (module Reaching)
-open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; cursor-in; run-has; from≺; run-det; run-++; after-≺)
+open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; cursor-in; pre-∈; run-has; from≺; run-det; run-++; after-≺)
 open import simultaneous.Batcher using (released; released-held; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;
   grouped-run; pending-one; closed-snoc; stamped-asEmits)
 
@@ -365,10 +365,6 @@ Covers t rs y = ∀ {k e} → t k e → Visible e → k ≼ y → After (cursor 
 Dry : ∀ {A : Set} → EmissionSet A → List (Pos × Ev A) → Set
 Dry t rs = ∀ {k e} → t k e → Visible e → After (cursor nothing rs) k → ⊥
 
-prefix-in : ∀ {X : Set} {xs ys : List X} {x} → Prefix _≡_ xs ys → x ∈ xs → x ∈ ys
-prefix-in (refl Prefix.∷ _) (here refl) = here refl
-prefix-in (_ Prefix.∷ p)    (there m)   = there (prefix-in p m)
-
 vis? : ∀ {A} (e : Ev A) → Dec (Visible e)
 vis? (out _) = yes tt
 vis? end     = yes tt
@@ -446,7 +442,7 @@ module Pass {A : Set} (o : SObs [] A) where
             in fin rs′ run′ (run-det (λ x _ x′ _ → at-func (elaborate (plain o)) x x′) mx run′)
             where
               fin : ∀ rs′ → Met X (rs′ ++ [ (u , eu) ]) → Prefix _≡_ rs (rs′ ++ [ (u , eu) ]) ⊎ Prefix _≡_ (rs′ ++ [ (u , eu) ]) rs → Out
-              fin rs′ run′ (inj₂ p) = ⊥-elim (not-past mx (prefix-in p (∈-++⁺ʳ rs′ (here refl))) au)
+              fin rs′ run′ (inj₂ p) = ⊥-elim (not-past mx (pre-∈ p (∈-++⁺ʳ rs′ (here refl))) au)
               fin rs′ run′ (inj₁ p) =
                 let zs , eq = prefix-ext p
                     uk : ∀ k → After (cursor nothing (rs ++ zs)) k → u ≺ k

@@ -291,6 +291,15 @@ prefix-split (refl ∷ p) with prefix-split p
 ... | inj₁ eq            = inj₁ (cong (_ ∷_) eq)
 ... | inj₂ (z , zs , eq) = inj₂ (z , zs , cong (_ ∷_) eq)
 
+-- A run ending in a row is not empty.
+snoc≢[] : ∀ {B : Set} (r : List B) z → r ++ [ z ] ≡ [] → ⊥
+snoc≢[] []      _ ()
+snoc≢[] (_ ∷ _) _ ()
+
+pre-∈ : ∀ {B : Set} {xs ys : List B} {x} → Prefix _≡_ xs ys → x ∈ xs → x ∈ ys
+pre-∈ (refl ∷ _) (here refl) = here refl
+pre-∈ (_ ∷ pr)   (there i)   = there (pre-∈ pr i)
+
 snoc-view : ∀ {A : Set} (xs : List A) → xs ≡ [] ⊎ Σ (List A) λ ys → Σ A λ y → xs ≡ ys ++ [ y ]
 snoc-view []       = inj₁ refl
 snoc-view (x ∷ xs) with snoc-view xs

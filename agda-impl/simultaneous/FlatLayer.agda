@@ -13,7 +13,6 @@ open import Data.List using (List; []; _∷_; concatMap; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-concatMap⁺; ∈-++⁺ʳ; ∈-++⁺ˡ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
-open import Data.List.Relation.Unary.Any.Properties using (++⁺ʳ)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc)
@@ -37,12 +36,7 @@ open import denotation.Laws.Modulus using (≼-split; entered-few; ≺-irrefl; �
 open import adequacy.SubOne using (lift-in)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Layers using (to≺; from≺; pinby-vis; after-≺; run-row; run-has; run-det; run-++; run-tail; run-after;
-  run-past-end; cursor-++; cursor-snoc; prefix-split; last-in)
-
--- A run ending in a row is not empty.
-snoc≢[] : ∀ {B : Set} (r : List B) z → r ++ [ z ] ≡ [] → ⊥
-snoc≢[] []      _ ()
-snoc≢[] (_ ∷ _) _ ()
+  run-past-end; cursor-++; cursor-snoc; prefix-split; last-in; snoc≢[])
 
 ------------------------------------------------------------------------
 -- An `of`
@@ -95,12 +89,6 @@ module OfMet {A : Set} (p : Pos) (xs₀ : List A) where
 
   of-met : Met O (ofVals p 0 xs₀ ++ [ (p ⊕ [ last ] , end) ])
   of-met = go 0 xs₀ (λ r → r) (λ y _ _ → proj₁ y) (λ _ → tt)
-
-  -- No row is silent or pinned.
-  of-vis : ∀ i (ys : List A) {k e} → InE (ofᴱ p i ys) k e → Visible e
-  of-vis i []       at-end     = tt
-  of-vis i (y ∷ ys) at-out     = tt
-  of-vis i (y ∷ ys) (on-out r) = of-vis (suc i) ys r
 
   -- Each row lies one label below.
   of-lab : ∀ {k e} → InE (ofᴱ p 0 xs₀) k e → Σ Label λ x → k ≡ p ⊕ [ x ]

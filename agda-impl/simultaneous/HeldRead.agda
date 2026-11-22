@@ -64,7 +64,6 @@ open import simultaneous.HeldTake using (name-ext)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldBase using (Bound; Ann; Gap)
 import Relation.Nullary as Nl
-open import simultaneous.HeldJoin using (Joined)
 
 open import Data.List.Properties using (∷ʳ-injective; map-++)
 open import Data.Unit using (tt)
@@ -80,7 +79,7 @@ open import simultaneous.HeldHot using (module HotRun)
 open import simultaneous.HeldClose using (module CatRuns; of-row₁; of-val₁; of-end₁)
 open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.CombSent using (assoc³)
-open import simultaneous.Layers using (snoc-view)
+open import simultaneous.Layers using (snoc-view; snoc≢[])
 open import denotation.EmissionSet using (LaneOf; Ended)
 open import denotation.Laws.Worlds.Leaves using (of-idx)
 
@@ -183,10 +182,6 @@ values-mv s ((_ , out _) ∷ sc) = cong (just _ ∷_) (values-mv s sc)
 values-mv s ((_ , skip) ∷ sc)  = values-mv s sc
 values-mv s ((_ , pin _) ∷ sc) = values-mv s sc
 values-mv s ((_ , end) ∷ sc)   = values-mv s sc
-
-snoc≢[] : ∀ {B : Set} (r : List B) z → r ++ [ z ] ≡ [] → ⊥
-snoc≢[] []      _ ()
-snoc≢[] (_ ∷ _) _ ()
 
 -- The last row of a moved run is the last source row's.
 last-mv : ∀ {X} s {r y e} (sc : List (Pos × Ev (IE X))) → r ++ [ (y , e) ] ≡ L.map (mv s) sc

@@ -16,7 +16,7 @@
 -- before the subscribe, every row met is the late end.
 module simultaneous.HeldBack where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
@@ -26,7 +26,7 @@ open import Data.List.Properties using (++-assoc; ++-identityʳ; map-++; ∷ʳ-i
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
@@ -58,7 +58,7 @@ open import simultaneous.HeldBase using (Bound; Ann; Gap)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldJoin using (Joined; j-late; j-part; j-read; jl; js-begins; Begins)
 open import simultaneous.HeldRead using (RD; Rl; Src; s₀; Rl-trans; AnnEv; ann-just; ann-none; ann-end; pre-noend; JS)
-open import simultaneous.HeldRead using (ev-ann; cn-inv; z₀; CnO; Cn; ev-cn; Fm; module AnnConn; mv; last-mv; end-back; snoc≢[])
+open import simultaneous.HeldRead using (ev-ann; cn-inv; z₀; CnO; Cn; ev-cn; Fm; module AnnConn; mv; last-mv; end-back)
 open import simultaneous.CombSent using (assoc³)
 open import denotation.EmissionSet using (Few; module Connecting)
 open import denotation.Laws.Fold using (fold)
@@ -72,7 +72,7 @@ open import simultaneous.HeldMap using (module MapRun; mapRows; mapRow)
 open import simultaneous.DenRows using (scan-out; hot-out)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.Layers using (module ScanLayer; scanRows; snoc-view; run-row; run-tail; run-after; run-++; run-past-end;
-  cursor-snoc; to≺; pinby-vis)
+  cursor-snoc; to≺; pinby-vis; snoc≢[]; pre-∈)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.FlatLayer using (module ScanOrder; module Each₂; ofVals)
 
@@ -162,10 +162,6 @@ pre-split (j ∷ js) []         = inj₁ []
 pre-split (j ∷ js) (refl ∷ pr) with pre-split js pr
 ... | inj₁ pr′                = inj₁ (refl ∷ pr′)
 ... | inj₂ (m , M′ , refl , pr′) = inj₂ (m , M′ , refl , pr′)
-
-pre-∈ : ∀ {B : Set} {xs ys : List B} {x} → Prefix _≡_ xs ys → x ∈ xs → x ∈ ys
-pre-∈ (refl ∷ _) (here refl) = here refl
-pre-∈ (_ ∷ pr)   (there i)   = there (pre-∈ pr i)
 
 nil-pre : ∀ {B : Set} {xs : List B} {x} → Prefix _≡_ xs [] → x ∈ xs → ⊥
 nil-pre [] ()
