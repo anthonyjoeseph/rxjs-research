@@ -17,7 +17,7 @@ open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵉ; _∷_ to _∷ᵉ_)
 open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 

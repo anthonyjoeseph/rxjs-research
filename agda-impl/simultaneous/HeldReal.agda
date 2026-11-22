@@ -184,7 +184,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     pick {y} {y₀} σs lt ws mw i =
       let (_ , pr , run , _) = lane-run mw
           (yd , ed , j) = bproj-mem pr i
-      in bproj-back pr (run-has (InvAt.func I₃) run σs tt tt (subst (y₀ ≼_) (⊕-injˡ y yd ed) (≺→≼ {y₀} {y} lt)) j)
+      in bproj-back pr (run-has (λ x x′ → InvAt.func I₃ (proj₁ x) (proj₁ x′)) run σs tt tt (subst (y₀ ≼_) (⊕-injˡ y yd ed) (≺→≼ {y₀} {y} lt)) j)
 
     st-dn : ∀ {k k′ n n′} → _≡_ {A = Row} (k , out (just (inj₁ (laneB , instEmit (mark laneStart) n)))) (k′ , out (just (inj₁ (laneB , instEmit (mark laneDone) n′)))) → ⊥
     st-dn e with cong proj₂ e

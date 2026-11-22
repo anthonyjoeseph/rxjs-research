@@ -14,13 +14,11 @@ open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; suc)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (cong)
 open import Tree using (mergeᶠ)
 open import denotation.Position using (sub)
-open import denotation.Events using (ofᴱ)
-open import denotation.EmissionSet using (Ev; hot; Proper; module Op; InE; at-out; on-out)
+open import denotation.EmissionSet using (Ev; hot; Proper; module Op)
 open import denotation.Laws.Worlds using (⊕-assoc)
 open import denotation.Read using (Run; _∷_; [])
 open import simultaneous.Routed using (cnt)
@@ -42,7 +40,7 @@ open import denotation.Laws.Worlds using (InvAt; Hots; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (of-end)
 open import denotation.Laws.Modulus using (≼-split; ≺-irrefl; ≺-≼-≺; ≼-trans; ≺-ext)
 open import simultaneous.Layers using (from≺)
-open import simultaneous.LaneLocal using (inv-ev)
+open import simultaneous.LaneLocal using (inv-ev; of-ix)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup) renaming ([] to []ᵉ; _∷_ to _∷ᵉ_)
@@ -400,10 +398,6 @@ nameOf-rl {w = w} (zs , refl) = name-ext w zs
 JS : Set → Set
 JS X = Bool × (List (IE X) × List (IE X))
 
-of-pos : ∀ {A} p i (xs : List A) {y v} → InE (ofᴱ p i xs) y (out v) → Σ ℕ λ j → y ≡ p ⊕ [ ix j ]
-of-pos p i (x ∷ xs) at-out     = i , refl
-of-pos p i (x ∷ xs) (on-out r) = of-pos p (suc i) xs r
-
 pick : ∀ {A : Set} (c : Bool) {f g : List A} {x} → x ∈ (if c then f else g) → x ∈ f ⊎ x ∈ g
 pick true  i = inj₁ i
 pick false i = inj₂ i
@@ -417,7 +411,7 @@ row-each {X} D p r
                                    (Op.of (true ∷ false ∷ []))) (Op.scan joinStep (true , ([] , [])) D) p r
 ... | q , st , sq , lane , _
   with merge-out (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ [])) (q ⊕ [ ix 1 ]) lane
-...   | q′ , c , cq , inner , _ with of-pos _ 0 _ (proj₁ cq) | of-pos _ 0 _ (proj₁ inner)
+...   | q′ , c , cq , inner , _ with of-ix _ 0 _ (proj₁ cq) | of-ix _ 0 _ (proj₁ inner)
 ...     | j′ , refl | j , refl =
   q , st , sq , pick c (of-mem _ 0 _ (proj₁ inner)) ,
   Rl-trans ([ ix j ] , refl) (Rl-trans ([ ix 1 ] , refl) (Rl-trans ([ ix j′ ] , refl) ([ ix 1 ] , refl)))
@@ -498,7 +492,7 @@ lane-end : ∀ {X} (st : JS X) q {k}
 lane-end st q l with merge-end (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ [])) (q ⊕ [ ix 1 ]) l
 ... | inj₁ (x , _) with of-end _ 0 _ x
 ...   | refl = Rl-trans ([ last ] , refl) ([ ix 1 ] , refl)
-lane-end st q l | inj₂ (q′ , c , (cq , _) , (le , _) , _) with of-pos _ 0 _ cq | of-end _ 0 _ le
+lane-end st q l | inj₂ (q′ , c , (cq , _) , (le , _) , _) with of-ix _ 0 _ cq | of-end _ 0 _ le
 ... | j , refl | refl = Rl-trans ([ last ] , refl) (Rl-trans ([ ix 1 ] , refl) (Rl-trans ([ ix j ] , refl) ([ ix 1 ] , refl)))
 
 -- No end of a lawful stream lies past a value and before what lies below it.
