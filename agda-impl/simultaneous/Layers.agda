@@ -300,6 +300,15 @@ pre-∈ : ∀ {B : Set} {xs ys : List B} {x} → Prefix _≡_ xs ys → x ∈ xs
 pre-∈ (refl ∷ _) (here refl) = here refl
 pre-∈ (_ ∷ pr)   (there i)   = there (pre-∈ pr i)
 
+pre-++ : ∀ {B : Set} {xs ys zs : List B} → Prefix _≡_ xs ys → Prefix _≡_ xs (ys ++ zs)
+pre-++ []        = []
+pre-++ (eq ∷ pr) = eq ∷ pre-++ pr
+
+-- A row met before the last lies before it.
+before-last : ∀ {A} {t : EmissionSet A} {c} xs {y e k e′} → Run t c (xs ++ [ (k , e′) ]) → (y , e) ∈ xs → y ≺ k
+before-last (_ ∷ xs) (_ ∷ run) (here refl) = run-after run (++⁺ʳ xs (here refl))
+before-last (_ ∷ xs) (_ ∷ run) (there i)   = before-last xs run i
+
 snoc-view : ∀ {A : Set} (xs : List A) → xs ≡ [] ⊎ Σ (List A) λ ys → Σ A λ y → xs ≡ ys ++ [ y ]
 snoc-view []       = inj₁ refl
 snoc-view (x ∷ xs) with snoc-view xs
