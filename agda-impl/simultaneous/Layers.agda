@@ -103,13 +103,13 @@ scanRows f b ((q , pin _) ∷ rx) = scanRows f b rx
 -- value of the source has its fold, so a row least among the scan's is
 -- least among the source's; the fold met is the fold of the values met,
 -- for the one before a value is the value met before it.
-module ScanLayer {A B : Set} (f : B → A → B) (z : B) (d : Den A) (P : Pos) {H : Pos → Set} (IS : InvAt H P (enter d P)) where
+module ScanLayer {A B : Set} (f : B → A → B) (z : B) (d : Den A) (P : Pos) (fu : ∀ {y e e′} → enter d P y e → enter d P y e′ → e ≡ e′) where
   open Scan f z (enter d P) using (Acc; acc₀; acc; ScanT; sval; sstep; spin; send)
 
   S  = enter d P
   Sc = enter (Op.scan f z d) P
 
-  open AccF f z {S} (InvAt.func IS) using (acc-val; acc-func)
+  open AccF f z {S} fu using (acc-val; acc-func)
 
   toSc : ∀ {y e} → ScanT y e → Sc y e
   toSc x = x , scan-reach (entered-reach d P) x
@@ -184,12 +184,12 @@ module ScanLayer {A B : Set} (f : B → A → B) (z : B) (d : Den A) (P : Pos) {
 
 scan-out : ∀ {A B} (f : B → A → B) z (s : Obs Timeline [] A) {sc} → Met (at (scan f z s)) sc
          → Σ _ λ rx → Met (at s) rx × values sc ≡ scans f z (values rx) × (Ends sc → Ends rx)
-scan-out f z s m with ScanLayer.out-go f z (⟦ s ⟧ []) root (inv-at s) ScanLayer.none m
+scan-out f z s m with ScanLayer.out-go f z (⟦ s ⟧ []) root (InvAt.func (inv-at s)) ScanLayer.none m
 ... | rx , mx , eq , en , _ = rx , mx , eq , en
 
 scan-in : ∀ {A B} (f : B → A → B) z (s : Obs Timeline [] A) {rx} → Met (at s) rx
         → Σ _ λ sc → Met (at (scan f z s)) sc × values sc ≡ scans f z (values rx) × (Ends rx → Ends sc)
-scan-in f z s = ScanLayer.in-go f z (⟦ s ⟧ []) root (inv-at s) ScanLayer.none
+scan-in f z s = ScanLayer.in-go f z (⟦ s ⟧ []) root (InvAt.func (inv-at s)) ScanLayer.none
 
 ------------------------------------------------------------------------
 -- Runs

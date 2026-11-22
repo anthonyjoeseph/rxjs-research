@@ -73,7 +73,7 @@ comb-gen : ∀ {B} op (d : Den (Maybe (Input B))) P {H H′ : Pos → Set}
          → ∀ {rs} → Met (enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (proj₂ x)) (Op.scan (react op) init d)) P) rs
          → ¬ ¬ Σ _ λ rx → Met (enter d P) rx × Σ _ λ ext → rs ++ ext ≡ outRows op init rx
 comb-gen op d P IS ISc fuE mt no = EachOpen.each-out proj₂ (Op.scan (react op) init d) P ISc fuE mt λ (sc , ms , ext , eq) →
-  let (rx , mx , _ , _ , eqs) = ScanLayer.out-go (react op) init d P IS ScanLayer.none ms in
+  let (rx , mx , _ , _ , eqs) = ScanLayer.out-go (react op) init d P (InvAt.func IS) ScanLayer.none ms in
   no (rx , mx , ext , trans eq (trans (cong (eachRows proj₂) eqs) (each-scan op init rx)))
 
 -- WHAT THE SCANNED STREAM MEETS IS LAID OUT FROM WHAT ITS SOURCE MEETS: a
