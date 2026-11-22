@@ -25,7 +25,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; nameOf; nm; Valued; opos; cnt)
 open import simultaneous.HeldIn using (Upto)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
-open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit)
+open import simultaneous.LaneLocal using (inv-ev; late-ext)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
@@ -568,7 +568,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
   mdone x with m-rows x tt
   ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
-  ... | lane {w = w} y = early-inst [ sub w ] (Fit.fine lane-fit y)
+  ... | lane {w = w} y = early-inst [ sub w ] (lane-done y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   comb-runs : ∀ {rx} → Met M rx → Upto (Few R) rx → RunHeld cs′ (outRows op init rx)

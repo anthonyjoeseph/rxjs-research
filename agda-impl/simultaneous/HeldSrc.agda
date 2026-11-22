@@ -237,17 +237,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ... | inj₁ (_ , refl)     = under
   ... | inj₂ (_ , _ , b , refl) = done b
 
-  -- The lanes' rows, each as it claims, over the programs they share.  Opaque:
-  -- every consumer reads a field, and the body is the whole lane.
-  opaque
-    lane-fit : Fit (Fresh eh) σ₃
-    lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
-                 (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂
-                 (λ a {t} L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                     (good-cons L g₂) (eh₄ {t}) q okq fq eq)
-                                     (IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                     (good-cons L g₂) (eh₄ {t}) q okq fq eq))
-                 (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
+  -- The lanes' rows, each as it claims, over the programs they share.
+  lane-fit : Fit (Fresh eh) σ₃
+  lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+               (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂
+               (λ a {t} L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) (eh₄ {t}) q okq fq eq)
+                                   (IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) (eh₄ {t}) q okq fq eq))
+               (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
 
   lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
   lane-named = Fit.fine lane-fit
@@ -257,6 +255,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   lane-late   : ∀ {q n} → σ₃ q (out (instEmit (mark over) n)) → Valued (rootOf q) × opos (rootOf q) ⊑ q
   lane-late = Fit.fine lane-fit
+
+  lane-done   : ∀ {q n} → σ₃ q (out (instEmit (mark completed) n)) → Early q
+  lane-done = Fit.fine lane-fit
 
   -- A lane's end lies before its step's over.
   lane-ends   : ∀ {q} → σ₃ q end → Early q
