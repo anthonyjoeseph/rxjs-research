@@ -94,6 +94,8 @@ record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
     at    : Pos
     outer : List Pos
     held  : HeldD (Hots env) (ev m src env) outer
+    ok    : Ok (Hots env) at
+    ep    : Early at
     under : ∀ {c} → c ∈ at ∷ outer → c ∈ cs
     is    : d ≡ hot (Proper (enter (ev m (annotate src) env) (at ⊕ [ ix 1 ])))
 
@@ -166,9 +168,6 @@ held-of nothing  ρ xs = ih λ env cs g eh p ok ep →
 held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
   Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
 
-postulate
-  held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
-
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
 cold-rest m c env p mt _ bq with cold-step-few m c env p (proj₁ (run-row∈ mt bq))
@@ -234,7 +233,7 @@ held-scan (just n) ρ f z s (ih h) = ih λ env cs g eh → held-scan-den f (z , 
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
 widen b = record
   { m = Bound.m b ; src = Bound.src b ; env = Bound.env b ; at = Bound.at b ; outer = Bound.outer b
-  ; held = Bound.held b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
+  ; held = Bound.held b ; ok = Bound.ok b ; ep = Bound.ep b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
 
 -- EVERY HANG SHOWS: past a position, a reader reaching few rows before
 -- it finds few rows there, for every size of the reach.
@@ -286,7 +285,7 @@ held-connect m ρ s b (ih hs) hb = ih λ env cs g eh p ok ep →
   conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
     held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g)
       (λ { (here refl) → record { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs ; held = hs env cs g eh
-                                ; under = λ i → i ; is = refl }
+                                ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
          ; (there i)   → widen (eh i) })
       (p ⊕ [ ix 0 ]) ok₀ ep₀)
 
