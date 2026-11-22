@@ -281,9 +281,9 @@ on the scan's run split onto that branch; read on the scan's lanes
 counter, not the lanes' own count, which a carried route outlives. Then the
 defer limit's rest (no one approximant bounds it). Settled when each former's leaf is a body.
 
-Members: `emit-live`, `done-carried`, `live-idle`, `held-current`,
-`live-current`, `value-open`, `over-open`, `end-open`, `comb-shut`,
-`scan-idle`, `lim-rest`.
+Members: `begin-started`, `done-final`, `cut-final`, `carries-before`,
+`live-idle`, `held-current`, `live-current`, `value-open`, `over-open`,
+`end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
 
 #### THE BATCH RANK
 

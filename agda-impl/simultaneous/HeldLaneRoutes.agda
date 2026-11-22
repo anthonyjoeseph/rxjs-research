@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; nothing)
-open import Data.Nat using (ℕ; suc; _≤_)
+open import Data.Nat using (ℕ; suc; _+_; _≤_)
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -34,7 +34,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; connected; takeWhile; flatMap; of)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (DenEnv; out; end; Few; _≼_; _≺_; enter; hot; EmissionSet; Den; Ended; module Joining)
+open import denotation.EmissionSet using (DenEnv; out; end; skip; pin; Few; _≼_; _≺_; enter; hot; EmissionSet; Den; Ended; module Joining)
 open import Data.Empty using (⊥; ⊥-elim)
 open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≺-≼-≺; ≺→≼; ≼-or-≻; ≺-irrefl; ≼-refl; ≼-trans; ≼-split)
@@ -47,7 +47,7 @@ open import simultaneous.HeldLanes using (lane-past; bproj-mem)
 open import simultaneous.Layers using () renaming (run-row to run-row∈)
 open import simultaneous.ColdIdle using (aft-or-in)
 open import simultaneous.CombSent using (src-op)
-open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; outerOpen; valuesOf)
+open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; carry; outerOpen; valuesOf)
 open import simultaneous.Project using (run-prefix)
 open import denotation.EmissionSet using (Ev; Superseded)
 open import Data.Maybe using (just)
@@ -76,7 +76,7 @@ open import simultaneous.LaneSplit using (Ln)
 open import simultaneous.HeldSrc using (module CombSrc; named-at)
 open import simultaneous.HeldLanes using (module CombLanes)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; laneˢ; each; shareˢ; counted; framed; undone)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; Out; Input; react; laneˢ; each; shareˢ; counted; framed; undone)
 
 -- A JOINER'S END: its outer has ended there, and every lane run, past its
 -- value and never cut.
@@ -141,6 +141,25 @@ lane-end : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : DenEnv
 lane-end nothing  keep o ρ g s ok = take-end keep (ev nothing o ρ) s (inv-ev nothing o ρ g s ok)
 lane-end (just n) keep o ρ g s ok = take-end keep (ev (just n) o ρ) s (inv-ev (just n) o ρ g s ok)
 
+-- The scan's state past two runs, the first unended, is past the second
+-- from where the first left it.
+past-++ : ∀ {B} op (o : Out B) xs ys → (∀ {c} → (c , end) ∈ xs → ⊥) → past op o (xs ++ ys) ≡ past op (past op o xs) ys
+past-++ op o []                 ys _  = refl
+past-++ op o ((_ , out x) ∷ xs) ys ne = past-++ op (react op o x) xs ys (λ i → ne (there i))
+past-++ op o ((_ , end) ∷ xs)   ys ne = ⊥-elim (ne (here refl))
+past-++ op o ((_ , skip) ∷ xs)  ys ne = past-++ op o xs ys (λ i → ne (there i))
+past-++ op o ((_ , pin _) ∷ xs) ys ne = past-++ op o xs ys (λ i → ne (there i))
+
+-- Lane carries, row after row.
+data Carries {B : Set} : List (Pos × Ev (Maybe (Input B))) → Set where
+  c[] : Carries []
+  c∷  : ∀ {k n cs} → Carries cs → Carries ((k , out (Tg laneB (instEmit (mark carry) n))) ∷ cs)
+
+-- EACH CARRY RAISES THE SCAN'S ACCUMULATOR BY ONE.
+acc-carries : ∀ {B} op (o : Out B) {cs} → Carries cs → L.length cs + Flat.acc (proj₁ o) ≡ Flat.acc (proj₁ (past op o cs))
+acc-carries op o c[] = refl
+acc-carries op o (c∷ {cs = cs} cc) = trans (sym (ℕP.+-suc (L.length cs) (Flat.acc (proj₁ o)))) (acc-carries op _ cc)
+
 module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                   (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                   (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
@@ -174,15 +193,26 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   inner a = flatMap (mergeᶠ nothing) (λ k → shareˢ (g a k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
   postulate
-    -- A LANE BEGINS ONLY WHILE LIVE: its `begin` row follows its
-    -- `laneStart`, and neither its `laneDone` nor a cut of it.
-    emit-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-              → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.Live [] xs q
+    -- A LANE'S `begin` IS MET PAST ITS `laneStart`.
+    begin-started : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+                  → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.StartIn [] xs q
 
-    -- A LANE'S `laneDone` FOLLOWS THE CARRIES OF ALL IT COUNTED: the scan
-    -- has accumulated at least the lane's own count.
-    done-carried : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-                 → ∀ {q n c} → LaneEmit q x (instEmit (mark laneDone) n) → OC q xs c → proj₂ c ≤ Flat.acc (St xs)
+    -- NOTHING OF A LANE IS MET PAST ITS `laneDone`.
+    done-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+               → ∀ {q v} → LaneEmit q x v → AC.DoneIn [] xs q → ⊥
+
+    -- NOTHING OF A LANE IS MET PAST A CUT OF IT: the later value's
+    -- `outerOpen` the scan met supersedes the lane before its row.
+    cut-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+              → ∀ {q v} → LaneEmit q x v → AC.CutIn [] xs q → ⊥
+
+    -- A LANE'S `laneDone` IS MET JUST PAST ITS CARRIES: the rows the run
+    -- met before it end in at least as many carries as the lane counts,
+    -- told by its lane part's step just before the `laneDone`, with no
+    -- other row between.
+    carries-before : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+                   → ∀ {q n c} → LaneEmit q x (instEmit (mark laneDone) n) → OC q xs c
+                   → Σ (List Row) λ pre → Σ (List Row) λ cs → xs ≡ pre ++ cs × Carries cs × proj₂ c ≤ L.length cs
 
     -- A LIVE LANE IS IDLE WHERE THE LANES ARE: holding a route, it is of the
     -- instant of any position before every lane row still to come.
@@ -214,6 +244,32 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ... | refl = lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
+
+  -- A LANE BEGINS ONLY WHILE LIVE: its `begin` row follows its
+  -- `laneStart`, and neither its `laneDone` nor a cut of it.
+  emit-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+            → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.Live [] xs q
+  emit-live rx₁ mt xs x ys eq {q} le@(a , y , xo , refl , l) =
+    own , begin-started rx₁ mt xs x ys eq le , done-final rx₁ mt xs x ys eq le , cut-final rx₁ mt xs x ys eq le
+    where
+      own : Own q
+      own with lane-run mt
+      ... | rs , pr , run , _ with bproj-mem pr (∈-++⁺ˡ (subst (_ ∈_) (sym eq) (∈-++⁺ʳ xs (here refl))))
+      ...   | y′ , e′ , j with σ₃-lane (proj₁ (run-row∈ run j))
+      ...     | q″ , a″ , xo″ , rn , l″ , _ with emit-one le (a″ , y′ , xo″ , cong (λ k → k , _) e′ , l″)
+      ...       | refl = a″ , xo″ , rn
+
+  -- A LANE'S `laneDone` FOLLOWS THE CARRIES OF ALL IT COUNTED: the scan
+  -- has accumulated at least the lane's own count.
+  done-carried : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+               → ∀ {q n c} → LaneEmit q x (instEmit (mark laneDone) n) → OC q xs c → proj₂ c ≤ Flat.acc (St xs)
+  done-carried rx₁ mt xs x ys eq {c = c} le oc with carries-before rx₁ mt xs x ys eq le oc
+  ... | pre , cs , refl , cc , lc =
+    ℕP.≤-trans lc (ℕP.≤-trans (ℕP.m≤m+n (L.length cs) (Flat.acc (St pre)))
+      (ℕP.≤-reflexive (trans (acc-carries op (past op init pre) cc) (cong (λ o → Flat.acc (proj₁ o)) (sym (past-++ op init pre cs nopre))))))
+    where
+      nopre : ∀ {k} → (k , end) ∈ pre → ⊥
+      nopre i = end-free rx₁ mt (subst (_ ∈_) (sym eq) (∈-++⁺ˡ (∈-++⁺ˡ i)))
 
   -- THE COUNTER IS AT MOST WHAT THE LIVE LANES HOLD OF ITS INSTANT: where
   -- it is not empty, a lane started, never done nor cut, holds a route of
