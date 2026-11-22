@@ -251,10 +251,11 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 #### THE READER
 
 Untried since `Fresh`: a reader subscribed outside its hot's last gap meets
-the source's runs joined late, idles and rests as the source does. Settled
-by the three bodies over `Join`, or a reader outside the gap that breaks.
+the source's runs joined late and idles as the source does; its rows lie
+under source rows, finitely many under each. Settled by bodies over `Join`
+and the reader's layers, or a reader outside the gap that breaks.
 
-Members: `read-back`, `read-idle`, `read-rest`.
+Members: `read-back`, `read-idle`, `read-fan`, `read-quiet`.
 
 #### PLACEMENT
 

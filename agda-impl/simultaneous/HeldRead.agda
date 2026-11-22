@@ -11,7 +11,7 @@ module simultaneous.HeldRead where
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ʳ)
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe)
 open import Data.Product using (proj₁; proj₂)
@@ -74,8 +74,16 @@ open import Data.Unit using (tt)
 open import denotation.EmissionSet using (DenEnv; Few; module Connecting; skip; pin)
 open import denotation.Laws.Worlds using (InvD; Lawful; _∪ʰ_; Ok; world-after; full; Shows; GoodEnv)
 open import denotation.Laws using (good-cons)
-open import denotation.Read using (Visible)
+open import denotation.Read using (Visible; After; cursor)
 open import denotation.Laws.Modulus using (≺-trans)
+open import denotation.Laws.Worlds using (⊑-≼)
+open import denotation.Events using (<ᵖ-apart)
+open import denotation.Position using (_<ᵖ_)
+open import simultaneous.Layers using (to≺; cursor-++)
+open import simultaneous.Relabel using (RowsAt; []ᵃ; _∷ᵃ_)
+open import simultaneous.HeldJoin using (j-late; j-part; j-read; module Past; begins-held; out-in; is-begin; Sim)
+open import Data.List.Properties using (++-identityʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ)
 open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.HeldConnect using (module ConnRun)
 open import simultaneous.HeldMap using (module MapRun; mapEv; mapRows)
@@ -125,7 +133,16 @@ postulate
   read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
             → Joined (Src b) Rl (p ∷ cs) rs′
   read-idle : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Idle (enter (RD d) p)
-  read-rest : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Rest (enter (RD d) p)
+
+-- FINITELY MANY READER ROWS LIE UNDER A SOURCE ROW: those its
+-- annotation, the hot, the scan and the scan's lanes put there.  A
+-- silent row of the reader lies under a source row too: the reader adds
+-- no silence of its own.
+postulate
+  read-fan   : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p y₀
+             → Σ (List Pos) λ ks → ∀ {y e e₀} → enter (RD d) p y e → Src b y₀ e₀ → Rl y y₀ → y ∈ ks
+  read-quiet : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y e} → enter (RD d) p y e → Nl.¬ Visible e
+             → Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀
 
 -- The source holds where the binder subscribes it.
 held-src : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → Held (Src b) (s₀ b ∷ Bound.outer b)
@@ -452,12 +469,12 @@ join-name b pre {e = e} run refl {x} ji with jl-in (cnt pre) e ji | run-tail pre
 -- A ROW THE READER SHOWS: a source row moved below, or a join.
 read-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} {x : IE X} → enter (RD d) p y (out x)
          → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-           ⊎ x ≡ instEmit (mark begin) (nameOf y)
+           ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
 read-row {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) (Bound.is b) r)
   where
     row-hot : enter (RD (hot (Proper (Ann b)))) p y (out x)
             → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-              ⊎ x ≡ instEmit (mark begin) (nameOf y)
+              ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
     row-hot r′ with row-each (hot (Proper (Ann b))) p r′
     ... | q , st , sq , xi , yq with scan-out joinStep (true , ([] , [])) (hot (Proper (Ann b))) p sq
     ...   | st₀ , (rt , me) , hq , refl with hot-out hq
@@ -470,7 +487,10 @@ read-row {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) 
         moved ann-just = proj₁ (run-row run (∈-++⁺ʳ pre (here refl)))
     ...         | inj₁ ji with join-name b pre run rc ji
     ...           | xb , nw =
-      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl (Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)))))))
+      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl yw)))) ,
+            w , e , yw , proj₁ (run-row run (∈-++⁺ʳ pre (here refl))))
+      where
+        yw = Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)
 
 ------------------------------------------------------------------------
 -- A reader end
@@ -508,7 +528,7 @@ val-end-under IA {q} {a} {c} aq ce qc ys cy with ≼-split {q} {c} qc
 
 -- THE READER ENDS below the source's end, or in its own subscribe.
 read-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} → enter (RD d) p y end
-         → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ (Σ Path λ zs → y ≡ p ⊕ zs)
+         → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
 read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.is b) r)
   where
     IA : InvAt (Hots (Bound.env b)) (Bound.at b ⊕ [ ix 1 ]) (Ann b)
@@ -520,13 +540,13 @@ read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.i
     Sc : Den (JS X)
     Sc = Op.scan joinStep (true , ([] , [])) D
 
-    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ (Σ Path λ zs → y ≡ p ⊕ zs)
+    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
     end-hot r′ with merge-end (λ (st : JS X) → Op.flatMap (mergeᶠ nothing) (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st)))
                                                 (Op.of (true ∷ false ∷ []))) Sc p r′
     ... | inj₁ (Scan.send h , _) with h
     ...   | (r-ended (ce , _) _ , _) with ann-end b ce
     ...     | w , cw , sw = inj₁ (w , Rl-trans ([ sub p ] , refl) cw , sw)
-    end-hot r′ | inj₁ (Scan.send h , _) | (r-late _ _ , _) = inj₂ ([ last ] , refl)
+    end-hot r′ | inj₁ (Scan.send h , _) | (r-late _ _ , _) = inj₂ refl
     end-hot r′ | inj₁ (Scan.send h , _) | (r-shown _ () _ , _)
     end-hot r′ | inj₂ (q , st , sq , l , c₀ , (Scan.send h₀ , _) , c₀y) with scan-out joinStep (true , ([] , [])) D p sq | lane-end st q l
     ... | _ , _ , hq , _ | zs , refl with hot-out hq | h₀
@@ -547,6 +567,22 @@ sync-up {c} {y} zs (ins , rt) =
 sub-ex : ∀ {os cs y} → (∀ {c} → c ∈ os → c ∈ cs) → Ex os y → Ex cs y
 sub-ex f (here s)  = ∈-ex (f (here refl)) s
 sub-ex f (there e) = sub-ex (λ i → f (there i)) e
+
+-- Two runs a row apart move their cursors alike, onto a row met.
+cur-just : ∀ {A B} {R : Pos → Pos → Set} {y′ y} {e : Ev (IE A)} {rs′ : List (Pos × Ev (IE B))} {rs} → R y′ y → RowsAt R rs′ rs
+         → Σ Pos λ c′ → Σ Pos λ c → cursor (just y′) rs′ ≡ just c′ × cursor (just y) rs ≡ just c × R c′ c
+           × Σ (Ev (IE A)) λ e₁ → (c , e₁) ∈ (y , e) ∷ rs
+cur-just {e = e} r []ᵃ = _ , _ , refl , refl , r , e , here refl
+cur-just r ((r′ , _) ∷ᵃ ra) with cur-just r′ ra
+... | c′ , c , e₁ , e₂ , rc , ev , i = c′ , c , e₁ , e₂ , rc , ev , there i
+
+cur-run : ∀ {A B} {R : Pos → Pos → Set} (js : List (Pos × Ev (IE B))) (pre : List (Pos × Ev (IE A))) {y e rs rs′}
+        → RowsAt R rs′ ((y , e) ∷ rs)
+        → Σ Pos λ c′ → Σ Pos λ c → cursor nothing (js ++ rs′) ≡ just c′ × cursor nothing (pre ++ (y , e) ∷ rs) ≡ just c × R c′ c
+          × Σ (Ev (IE A)) λ e₁ → (c , e₁) ∈ (y , e) ∷ rs
+cur-run js pre {y} {e} {rs} {(y′ , e′) ∷ rsᵗ′} ((r , _) ∷ᵃ ra) with cur-just {e = e} r ra
+... | c′ , c , e₁ , e₂ , rc , ev , i =
+  c′ , c , trans (cursor-++ nothing js ((y′ , e′) ∷ rsᵗ′)) e₁ , trans (cursor-++ nothing pre ((y , e) ∷ rs)) e₂ , rc , ev , i
 
 module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) where
 
@@ -570,14 +606,119 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   named : ∀ {y n} → T′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y
   named x with read-row b p x
   ... | inj₁ (y₀ , _ , (zs , refl) , s , same-mark e) = trans (e refl) (trans (Held.named HS s) (sym (name-ext y₀ zs)))
-  ... | inj₂ refl = refl
+  ... | inj₂ (refl , _) = refl
 
   ends : ∀ {y} → T′ y end → Early y
   ends x with read-end b p x
   ... | inj₁ (_ , (zs , refl) , s) = early-inst zs (Held.ends HS s)
-  ... | inj₂ (zs , refl)           = early-inst zs ep
+  ... | inj₂ refl                  = early-inst [ last ] ep
 
   module J = Join Rl rt exR named (read-back b p ng) HS
+
+  -- The source is lawful where the binder subscribes it.
+  IS : InvAt (Hots (Bound.env b)) (s₀ b) (Src b)
+  IS = inv-ev (Bound.m b) (Bound.src b) (Bound.env b) (Bound.good b) (s₀ b)
+         (ok-step (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b)))
+
+  -- Below a row of the source, before a later one.
+  past : ∀ {k y e e′} zs → Src b k e → Src b y e′ → k ≺ y → (k ⊕ zs) ≺ y
+  past {k} {y} zs sk sy ky = to≺ (k ⊕ zs) y (<ᵖ-apart k y zs (from≺ k y ky) apart)
+    where
+      apart : ∀ ys → y ≡ k ⊕ ys → ⊥
+      apart []       eq = ≺-irrefl {k} (subst (k ≺_) (trans eq (⊕-identityʳ k)) ky)
+      apart (l ∷ ls) eq = InvAt.flat IS sk (subst (λ z → Src b z _) eq sy)
+
+  -- Every row of the reader lies under a row of the source, or is its own end.
+  under : ∀ {y e} → T′ y e → (Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀) ⊎ y ≡ p ⊕ [ last ]
+  under {e = out x} r with read-row b p r
+  ... | inj₁ (y₀ , x₀ , ry , s , _)  = inj₁ (y₀ , out x₀ , ry , s)
+  ... | inj₂ (_ , y₀ , e₀ , ry , s) = inj₁ (y₀ , e₀ , ry , s)
+  under {e = end} r with read-end b p r
+  ... | inj₁ (y₀ , ry , s) = inj₁ (y₀ , end , ry , s)
+  ... | inj₂ eq            = inj₂ eq
+  under {e = skip}  r = inj₁ (read-quiet b p r (λ ()))
+  under {e = pin _} r = inj₁ (read-quiet b p r (λ ()))
+
+  fan : Pos → List Pos
+  fan y₀ = proj₁ (read-fan b p y₀)
+
+  fans : List Pos → List Pos
+  fans []       = []
+  fans (k ∷ ks) = fan k ++ fans ks
+
+  fans-in : ∀ {k ks y} → k ∈ ks → y ∈ fan k → y ∈ fans ks
+  fans-in {ks = k ∷ ks} (here refl) i = ∈-++⁺ˡ i
+  fans-in {ks = k ∷ ks} (there j)   i = ∈-++⁺ʳ (fan k) (fans-in j i)
+
+  RestAt : List (Pos × Ev (IE X)) → Pos → Set
+  RestAt rs′ q = Σ (List Pos) λ ks → ∀ {y e} → T′ y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ ks
+
+  -- The reader's rows past its cursor lie under the source's rows past
+  -- the source's cursor, under the cursor's row, or are its end.
+  lift-rest : ∀ {rs′ q q₀ c₀ ws e₁} → cursor nothing rs′ ≡ just (c₀ ⊕ ws) → Src b c₀ e₁ → rootOf q₀ ≡ rootOf q
+            → (ks : List Pos) → (∀ {y e} → Src b y e → c₀ ≺ y → rootOf y ≡ rootOf q₀ → y ∈ ks)
+            → RestAt rs′ q
+  lift-rest {rs′} {q} {q₀} {c₀} {ws} cur′ sc₀ iq₀ ks h = (p ⊕ [ last ]) ∷ fan c₀ ++ fans ks , pick-row
+    where
+      pick-row : ∀ {y e} → T′ y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ (p ⊕ [ last ]) ∷ fan c₀ ++ fans ks
+      pick-row r a iq with under r
+      ... | inj₂ refl = here refl
+      ... | inj₁ (y₁ , e₁′ , (zs , refl) , s₁) with c₀ <ᵖ y₁ in e
+      ...   | true = there (∈-++⁺ʳ (fan c₀) (fans-in k∈ (proj₂ (read-fan b p y₁) r s₁ (zs , refl))))
+        where
+          k∈ : y₁ ∈ ks
+          k∈ = h s₁ (to≺ c₀ y₁ e) (trans (sym (rootOf-ext y₁ zs)) (trans iq (sym iq₀)))
+      ...   | false with ≼-split {y₁} {c₀} (λ h′ → subst T e h′)
+      ...     | inj₂ refl = there (∈-++⁺ˡ (proj₂ (read-fan b p c₀) r s₁ (zs , refl)))
+      ...     | inj₁ lt   = ⊥-elim (≺-irrefl {y₁ ⊕ zs} (≺-trans {y₁ ⊕ zs} {c₀ ⊕ ws} {y₁ ⊕ zs} below a′))
+        where
+          a′ : (c₀ ⊕ ws) ≺ (y₁ ⊕ zs)
+          a′ = subst (λ c → After c (y₁ ⊕ zs)) cur′ a
+          below : (y₁ ⊕ zs) ≺ (c₀ ⊕ ws)
+          below = ≺-≼-≺ {y₁ ⊕ zs} {c₀} {c₀ ⊕ ws} (past zs s₁ sc₀ lt) (⊑-≼ {c₀} {c₀ ⊕ ws} (ws , refl))
+
+  -- A run read past the joins: the source's count is the reader's, and
+  -- holds nothing with a begin of the instant met.
+  rest-read : ∀ {pre y₀ e₀ rs js rs₁′} → Met T′ (js ++ rs₁′) → proj₂ (cnt (js ++ rs₁′)) ≡ 0
+            → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt (js ++ rs₁′))))) ∈ js ++ rs₁′
+            → Met (Src b) (pre ++ (y₀ , e₀) ∷ rs) → L.map proj₂ js ≡ L.map out (jl (cnt pre) e₀)
+            → RowsAt Rl rs₁′ ((y₀ , e₀) ∷ rs) → RestAt (js ++ rs₁′) q
+  rest-read {pre} {y₀} {e₀} {rs} {js} {rs₁′} m z {q} bq run jeq ra =
+    sim-case (Past.sim-split Rl (Src b) {pre} jeq {r₂ = []} (sym (++-identityʳ ((y₀ , e₀) ∷ rs))) ra (λ ()))
+    where
+      S : List (Pos × Ev (IE X))
+      S = pre ++ (y₀ , e₀) ∷ rs
+
+      Cur : Set
+      Cur = Σ Pos λ c′ → Σ Pos λ c → cursor nothing (js ++ rs₁′) ≡ just c′ × cursor nothing S ≡ just c × Rl c′ c
+            × Σ (Ev (IE X)) λ e₁ → (c , e₁) ∈ (y₀ , e₀) ∷ rs
+
+      SrcRest : Pos → Set
+      SrcRest q₀ = Σ (List Pos) λ ks → ∀ {y e} → Src b y e → After (cursor nothing S) y → rootOf y ≡ rootOf q₀ → y ∈ ks
+
+      from-cur : ∀ {q₀} → rootOf q₀ ≡ rootOf q → SrcRest q₀ → Cur → RestAt (js ++ rs₁′) q
+      from-cur {q₀} iq₀ (ks , h) (c′ , c₀ , ec′ , ec₀ , (ws , refl) , e₁ , i₁) =
+        lift-rest {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} ec′ (proj₁ (run-row run (∈-++⁺ʳ pre i₁))) iq₀ ks
+          (λ {y} {e} s a r → h {y} {e} s (subst (λ c → After c y) (sym ec₀) a) r)
+
+      Begun : Set
+      Begun = Σ Pos λ q₀ → (q₀ , out (instEmit (mark begin) (proj₁ (cnt S)))) ∈ S × rootOf q₀ ≡ rootOf q
+
+      from-begin : proj₂ (cnt S) ≡ 0 → Begun → RestAt (js ++ rs₁′) q
+      from-begin z₀ (q₀ , bq₀ , iq₀) = from-cur {q₀} iq₀ (Held.rest HS run z₀ bq₀) (cur-run js pre ra)
+
+      sim-case : Sim (cnt (js ++ rs₁′)) (cnt S) (values (js ++ rs₁′)) → RestAt (js ++ rs₁′) q
+      sim-case (inj₁ ceq)          = from-begin (trans (sym (cong proj₂ ceq)) z) (J.src-begin run jeq ra m (λ i → i) bq (cong proj₁ ceq))
+      sim-case (inj₂ (_ , _ , nb)) = ⊥-elim (lookup nb (out-in bq) is-begin)
+
+  -- PAST A ZERO COUNT THE READER FINISHES THE INSTANT, as its source does.
+  rest : Rest T′
+  rest {rs′} m z {q} bq with read-back b p ng m
+  ... | j-late h = ⊥-elim (out-end (proj₁ (h bq)))
+    where out-end : ∀ {x : IE X} → out x ≡ end → ⊥
+          out-end ()
+  ... | j-part h = ⊥-elim (zero-suc (trans (sym z) (proj₂ (begins-held h bq))))
+  ... | j-read run jeq ra = rest-read m z bq run jeq ra
 
   held : Held T′ (p ∷ cs)
   held = record
@@ -591,26 +732,26 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
     ; done    = done
     ; late    = late
     ; idle    = read-idle b p ng
-    ; rest    = read-rest b p ng }
+    ; rest    = rest }
     where
       routing : ∀ {y m n} → T′ y (out (instEmit (mark m) n)) → Routing m
       routing x with read-row b p x
       ... | inj₁ (_ , _ , _ , s , same-mark _) = Held.routing HS s
-      ... | inj₂ refl = r-begin
+      ... | inj₂ (refl , _) = r-begin
       early : ∀ {y a n} → T′ y (out (instEmit (value a) n)) → Early y
       early x with read-row b p x
       ... | inj₁ (_ , _ , (zs , refl) , s , same-value) = early-inst zs (Held.early HS s)
-      ... | inj₂ ()
+      ... | inj₂ (() , _)
       done : ∀ {y n} → T′ y (out (instEmit (mark completed) n)) → Early y
       done x with read-row b p x
       ... | inj₁ (_ , _ , (zs , refl) , s , same-mark _) = early-inst zs (Held.done HS s)
-      ... | inj₂ ()
+      ... | inj₂ (() , _)
       late : ∀ {y n} → T′ y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
       late x with read-row b p x
       ... | inj₁ (y₀ , _ , (zs , refl) , s , same-mark _) =
         let (v , o) = Held.late HS s
         in subst (λ r → Valued r × opos r ⊑ (y₀ ⊕ zs)) (sym (rootOf-ext y₀ zs)) (v , ⊑-trans o (zs , refl))
-      ... | inj₂ ()
+      ... | inj₂ (() , _)
 
 -- A READER'S ROWS A LANE CAN HANG ON ARE ADMISSIBLE: each lies below a
 -- binder's row a lane can hang on, outside every binder's last gap.
