@@ -407,7 +407,7 @@ scan-truth {A} {B} f z {s} {s′} R p ok = placing (record
 
     -- Each input row shows, a value classically.
     image : ∀ {k e₀} → t k e₀ → ¬ ¬ (Σ (Ev B) λ e → Truncate S k e × Lbl e₀ e)
-    image {e₀ = out a} y n = fold f z t (entered-few s p tt y) y λ { (b , ac) → n (out b , (Scan.sval ac , lift re (Scan.sval ac)) , l-out) }
+    image {e₀ = out a} y n = fold f z t (entered-few s p tt y) y λ { (_ , ac) → n (out _ , (Scan.sval ac , lift re (Scan.sval ac)) , l-out) }
     image {e₀ = skip}  y n = n (skip , (Scan.sstep y , lift re (Scan.sstep y)) , l-skip)
     image {e₀ = pin r} y n = n (pin r , (Scan.spin y , lift re (Scan.spin y)) , l-pin)
     image {e₀ = end}   y n = n (end , (Scan.send y , lift re (Scan.send y)) , l-end)

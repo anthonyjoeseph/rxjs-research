@@ -221,27 +221,32 @@ three-in s a b c (on-out (on-out at-out))          = _ , there (there (there (th
 three-in s a b c (on-out (on-out (on-out at-end))) = _ , there (there (there (there (there (there (there (here refl))))))) , assoc³ s (ix 0) (ix 1) last
 
 -- A value's step: begin, value and over under each name minted.
+rv-raw : ∀ {A : Set} (a : A) s {y ev}
+      → Merge.JoinT (λ n → Op.of (instEmit (mark begin) n ∷ instEmit (value a) n ∷ instEmit (mark over) n ∷ [])) (enter (Op.cold Mint) s) y ev
+      → Rendered s y
+rv-raw a s (Joining.val (x , _)) with mint-out s x
+... | refl = _ , there (there (there (here refl))) , ⊕-assoc s [ ix 0 ] [ ix 0 ]
+rv-raw a s (Joining.step (x , _))    = mint-in s x
+rv-raw a s (Joining.opin (x , _))    = mint-in s x
+rv-raw a s (Joining.oend (x , _) _)  = mint-in s x
+rv-raw a s (Joining.opass (x , _) _) = mint-in s x
+rv-raw a s (Joining.lane (x , _) _ ((l , _) , _) _ _) with mint-out s x
+... | refl = three-in s _ _ _ l
+rv-raw a s (Joining.lend (x , _) _ ((l , _) , _) _ _ _) with mint-out s x
+... | refl = three-in s _ _ _ l
+rv-raw a s (Joining.lpass (x , _) _ ((l , _) , _) _ _ _) with mint-out s x
+... | refl = three-in s _ _ _ l
+rv-raw a s (Joining.hand _ _ _ _ ())
+rv-raw a s (Joining.left _ _ ((l , _) , _) _ _) = ⊥-elim (ine-pin l)
+rv-raw a s (Joining.run () _)
+rv-raw a s (Joining.rend () _ _)
+rv-raw a s (Joining.rpass () _ _)
+rv-raw a s (Joining.rhand () _)
+
 rv-in : ∀ {A : Set} (a : A) s {y ev}
       → enter (Op.flatMap (mergeᶠ nothing) (λ n → Op.of (instEmit (mark begin) n ∷ instEmit (value a) n ∷ instEmit (mark over) n ∷ [])) (Op.cold Mint)) s y ev
       → Rendered s y
-rv-in a s (Joining.val (x , _) , _) with mint-out s x
-... | refl = _ , there (there (there (here refl))) , ⊕-assoc s [ ix 0 ] [ ix 0 ]
-rv-in a s (Joining.step (x , _) , _)    = mint-in s x
-rv-in a s (Joining.opin (x , _) , _)    = mint-in s x
-rv-in a s (Joining.oend (x , _) _ , _)  = mint-in s x
-rv-in a s (Joining.opass (x , _) _ , _) = mint-in s x
-rv-in a s (Joining.lane (x , _) _ ((l , _) , _) _ _ , _) with mint-out s x
-... | refl = three-in s _ _ _ l
-rv-in a s (Joining.lend (x , _) _ ((l , _) , _) _ _ _ , _) with mint-out s x
-... | refl = three-in s _ _ _ l
-rv-in a s (Joining.lpass (x , _) _ ((l , _) , _) _ _ _ , _) with mint-out s x
-... | refl = three-in s _ _ _ l
-rv-in a s (Joining.hand _ _ _ _ () , _)
-rv-in a s (Joining.left _ _ ((l , _) , _) _ _ , _) = ⊥-elim (ine-pin l)
-rv-in a s (Joining.run () _ , _)
-rv-in a s (Joining.rend () _ _ , _)
-rv-in a s (Joining.rpass () _ _ , _)
-rv-in a s (Joining.rhand () _ , _)
+rv-in a s (r , _) = rv-raw a s r
 
 -- A completion's step: a begin for the name minted.
 cd-in : ∀ {A : Set} s {y ev} → enter (Op.map (λ n → instEmit {A = A} (mark begin) n) (Op.cold Mint)) s y ev → Rendered s y

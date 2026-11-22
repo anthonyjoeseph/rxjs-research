@@ -268,13 +268,12 @@ bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch; read on the scan's lanes
 counter, not the lanes' own count, which a carried route outlives. Then a reader's joins, the
-defer limit's rest (no one approximant bounds it), and the cold's rows'
-order. Settled when each former's leaf is a body.
+defer limit's rest (no one approximant bounds it), and a cold's step
+closing in its instant (a completion's end: lanes done). Settled when each former's leaf is a body.
 
 Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `value-open`, `over-open`, `end-open`, `comb-shut`, `scan-idle`,
-`held-connected`, `lim-rest`, `cold-covered`, `cold-shut`,
-`cold-idle`.
+`held-connected`, `lim-rest`, `cold-cdclose`.
 
 #### THE BATCH RANK
 
