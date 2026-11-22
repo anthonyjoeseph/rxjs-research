@@ -153,7 +153,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   fr₁ = Adm.step ad₂ ok₂ fr₀₀ plain-ix
 
   -- The binders, read under a lane's hot.
-  eh₄ : ∀ {t} → EnvHeld (λ i → there (there (there (there (ρ i))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+  eh₄ : ∀ {t : EmissionSet ⊤} → EnvHeld (λ i → there (there (there (there (ρ i))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
   eh₄ = record { bound = λ {X} i → EnvHeld.bound eh {X} i ; apart = λ {X} {Y} i j → EnvHeld.apart eh {X} {Y} i j }
 
   g₃ : GoodEnv env′
