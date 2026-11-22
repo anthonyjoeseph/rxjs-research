@@ -257,7 +257,7 @@ held-merged : ∀ {A} (s : Obs Timeline [] (IE A))
             → HeldTo unfinished (enter (beside s) root) (root ∷ [])
 held-merged s = Beside.held s (λ {w} {c} → completing-closed s sb₀ (tt , λ ()) {w} {c})
 
-held-wrapped : ∀ {A} (s : Obs Timeline [] (IE A)) → HeldD (Hots []ᵉ) (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
-held-wrapped s hs =
+held-wrapped : ∀ {A} {F : Pos → Set} (s : Obs Timeline [] (IE A)) → (∀ {y} → F y) → HeldD (Hots []ᵉ) F (⟦ s ⟧ []ᵉ) [] → Held (enter (⟦ wrapped s ⟧ []ᵉ) root) (root ∷ [])
+held-wrapped s fr hs =
   held-until (beside s) root (root ∷ []) (inv-⟦⟧ (merge (completing s) (cold (lone (marked subscribed)))) []ᵉ (λ ()) root (tt , λ ()))
-    (held-merged s (held-completing s sb₀ [] (tt , λ ()) (hs (sb₀ ⊕ [ ix 1 ]) (tt , λ ()) λ ())))
+    (held-merged s (held-completing s sb₀ [] (tt , λ ()) (hs (sb₀ ⊕ [ ix 1 ]) (tt , λ ()) fr λ ())))

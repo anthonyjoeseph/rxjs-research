@@ -74,18 +74,26 @@ jobs:
       # Keyed on the commit, restored from the newest prefix match: Agda
       # invalidates by content, so a stale interface is rechecked, never
       # trusted.  The `agda-interfaces-` prefix is what cache-prune.yml trims.
+      # The stdlib's own `_build` rides along: uncached, every run spends
+      # about two minutes rechecking a library that never changes.
       - name: Cache Agda interfaces
         uses: actions/cache@v6
         with:
-          path: agda-impl/_build
+          path: |
+            agda-impl/_build
+            ~/agda-stdlib-2.3/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
       # Agda's heap cap lives in the Makefile's AGDA, so a session hits the
-      # same ceiling CI does.
+      # same ceiling CI does.  Per-module times close the log: a "Checking"
+      # line opens a module before its imports, so the gaps between them
+      # misattribute a parent's body to its last child.
       - name: make gate
         run: make gate
+        env:
+          AGDA_PROFILE: --profile=modules
 
   bug-cache:
     runs-on: ubuntu-latest

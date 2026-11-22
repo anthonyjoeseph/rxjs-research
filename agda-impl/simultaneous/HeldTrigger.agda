@@ -33,10 +33,10 @@ open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws using (good-cons; inv-⟦⟧)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≼-refl; ≺-ext; entered-reach)
-open import denotation.Laws.Worlds using (Ok; InvAt; Hots; GoodEnv; ok-step; ok-in; world-after; ⊕-assoc; ⊕-injˡ)
+open import denotation.Laws.Worlds using (Ok; InvAt; Hots; GoodEnv; ok-step; ok-in; world-after; ⊕-assoc; ⊕-injˡ; plain-ix)
 open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Routed using (Held; HeldD; Early; Ex; Sync; Rest)
+open import simultaneous.Routed using (Held; HeldD; Early; Ex; Sync; Rest; Adm; adm-∪)
 open import simultaneous.Relabel using (held-same)
 open import simultaneous.HeldConnect using (early-inst; held-ex; same-refl; rows-refl)
 open import simultaneous.HeldDefer using (sync-up)
@@ -415,7 +415,7 @@ blk nothing  ρ s env r sb lt = Blk.blocked r sb lt
 blk (just n) ρ s env r sb lt = Blk.blocked r sb lt
 
 module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs p
-            (g : GoodEnv env) (ok : Ok (Hots env) p) (ep : Early p) where
+            (g : GoodEnv env) (ok : Ok (Hots env) p) (ep : Early p) {F : Pos → Set} (ad : Adm (Hots env) F) (fr : F p) where
 
   σ₀ : EmissionSet ⊤
   σ₀ = Proper (enter (ev m empty env) (p ⊕ [ ix 1 ]))
@@ -481,6 +481,9 @@ module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   ep₁ : Early s₁
   ep₁ = early-inst [ ix 1 ] (early-inst [ sub sb ] (early-inst [ last ] (early-inst [ ix 1 ] ep)))
 
+  fr₁ : F s₁
+  fr₁ = Adm.step (adm-∪ ad) okc (Adm.copy ad (Adm.bare ad (Adm.step ad ok fr plain-ix) λ ())) plain-ix
+
   I₁ : InvAt (Hots env′) s₁ (enter (G false) s₁)
   I₁ = inv-ev m (elab (λ i → there (ρ i)) s) env′ g′ s₁ ok₁
 
@@ -488,19 +491,19 @@ module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   ex {y} (here sy) = there (here (sync-up {p} {y} (ix 1 ∷ last ∷ sub sb ∷ ix 1 ∷ []) (subst (λ z → Sync z y) eq-s₁ sy)))
   ex (there x) = there (there x)
 
-  held : HeldD (Hots env′) (ev m (elab (λ i → there (ρ i)) s) env′) cs
+  held : HeldD (Hots env′) F (ev m (elab (λ i → there (ρ i)) s) env′) cs
        → Held (enter (Op.flatMap (mergeᶠ (just 1)) G (Op.of (true ∷ false ∷ []))) P) (P ∷ p ∷ cs)
   held hd = Cat.held G P cb Bk sb≺cb q₁≺cb e₁≺cb (λ y → world-after (InvAt.world I₁ y) (InvAt.real I₁ y))
-    (λ y → proj₂ (InvAt.pinned I₁ y)) (held-ex ex (hd s₁ ok₁ ep₁))
+    (λ y → proj₂ (InvAt.pinned I₁ y)) (held-ex ex (hd s₁ ok₁ fr₁ ep₁))
 
 -- A SHARED OUTER HOLDS as the outer does: the trigger's lane holds
 -- nothing, and the outer is subscribed once, as the trigger ends, inside
 -- the share's own burst, which the share's subscription exempts.
 held-trigger : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs p
-             → GoodEnv env → Ok (Hots env) p → Early p
+             → GoodEnv env → Ok (Hots env) p → Early p → ∀ {F} → Adm (Hots env) F → F p
              → let σ₀ = Proper (enter (ev m empty env) (p ⊕ [ ix 1 ])) in
-               HeldD (Hots (hot σ₀ ∷ env)) (ev m (elab (λ i → there (ρ i)) s) (hot σ₀ ∷ env)) cs
+               HeldD (Hots (hot σ₀ ∷ env)) F (ev m (elab (λ i → there (ρ i)) s) (hot σ₀ ∷ env)) cs
              → Held (enter (ev m (flatMap (mergeᶠ (just 1)) (λ c → srcLane ρ s c) (of (true ∷ false ∷ []))) (hot σ₀ ∷ env)) ((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))
                     (((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ∷ p ∷ cs)
-held-trigger nothing  ρ s env cs p g ok ep hd = Trig.held nothing ρ s env cs p g ok ep hd
-held-trigger (just n) ρ s env cs p g ok ep hd = Trig.held (just n) ρ s env cs p g ok ep hd
+held-trigger nothing  ρ s env cs p g ok ep ad fr hd = Trig.held nothing ρ s env cs p g ok ep ad fr hd
+held-trigger (just n) ρ s env cs p g ok ep ad fr hd = Trig.held (just n) ρ s env cs p g ok ep ad fr hd

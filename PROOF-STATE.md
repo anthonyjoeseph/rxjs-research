@@ -250,12 +250,22 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### THE READER
 
-Refuted at a reader joined in its hot's last gap, under the annotation's
-nothing row: `Ok` and `Early` admit it, and it shows a lone end no route
-covers. Settled by an admissibility in `HeldD` that keeps subscriptions out
-of a hot's last gap (no lane hangs on a mark), or a reader that holds there.
+Untried since `Fresh`: a reader subscribed outside its hot's last gap meets
+the source's runs joined late, idles and rests as the source does. Settled
+by the three bodies over `Join`, or a reader outside the gap that breaks.
 
 Members: `read-back`, `read-idle`, `read-rest`.
+
+#### PLACEMENT
+
+Untried: every row a lane hangs on lies outside every binder's last gap.
+A connect's new binder must keep its gap clear of the old rows and its
+body's subscription (`apart-new`, `apart-old`, `body-fresh`); each former
+hangs lanes only where its children do. Settled by bodies, or a lane hung
+on a row inside a gap.
+
+Members: `ann-apart`, `apart-new`, `apart-old`, `body-fresh`,
+`placed-cold`, `placed-connected`, `placed-flatMap`.
 
 #### THE FINITE REST
 

@@ -577,12 +577,14 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   down : ∀ k P {e₂ n} → enter (Sv k) P e₂ (out (instEmit (mark laneDone) n))
        → k ≡ lanePart × Σ Pos λ v₂ → Σ _ λ yst → Σ _ λ a₂ → enter (Sc k (H₁ P) (H₂ P k)) (Bp P) v₂ (out yst)
          × enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a₂) × (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ e₂
-  down k P {e₂} svr with merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
-  ... | v₂ , yst , scr , inr , lt₁ with merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
-  ...   | w , c , ow , ll , _ with scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
-  ...     | st , a₀ , fa , eq with pick yst st a₀ eq (proj₁ ow) (proj₁ ll) tt
-  ...       | refl with Frame.fr-done k (H₁ P) (H₂ P k) (Bp P) fa (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
-  ...         | refl , vlt = refl , v₂ , yst , _ , scr , fa , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
+  down k P {e₂} svr =
+    let (v₂ , yst , scr , inr , lt₁) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
+        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
+        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
+        ea = pick yst st a₀ eq (proj₁ ow) (proj₁ ll) tt
+        (ek , vlt) = Frame.fr-done k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) (sym ea) fa)
+                       (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
+    in ek , v₂ , yst , a₀ , scr , fa , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
 
   -- What a part's connect shows as `laneStart` is the lane part's split of
   -- its frame's first mark, when its share shows none.
@@ -726,14 +728,16 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
       -- No `laneDone` comes before it.
       nF : ¬ TakeWhile.Failed true undone (enter MM s) E₀
-      nF (q′ , a′ , x′ , nk′ , lt′) with done-of a′ nk′
-      ... | n , refl = late (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s x′)
+      nF (q′ , a′ , x′ , nk′ , lt′) =
+        let (n , ea) = done-of a′ nk′
+        in late n (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s (subst (λ a → enter MM s q′ (out a)) ea x′))
         where
-          late : (Σ Pos λ kq → Σ Part λ k → OS kq (out k) × enter (Sv k) (kq ⊕ [ ix 1 ]) q′ (out (instEmit (mark laneDone) n)) × (kq ⊕ [ ix 1 ]) ≺ q′) → ⊥
-          late (_ , _ , (at-out , _) , svr , _) with down lanePart P svr
-          ... | _ , v₂ , _ , _ , _ , _ , vlt , v₂q = ≺-absurd {E₀} {q′} (≺-trans {E₀} {v₂} {q′} (vlt u-E₀) v₂q) lt′
-          late (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr))
-          late (_ , _ , (on-out (on-out ()) , _) , _ , _)
+          late : ∀ n → (Σ Pos λ kq → Σ Part λ k → OS kq (out k) × enter (Sv k) (kq ⊕ [ ix 1 ]) q′ (out (instEmit (mark laneDone) n)) × (kq ⊕ [ ix 1 ]) ≺ q′) → ⊥
+          late n (_ , _ , (at-out , _) , svr , _) =
+            let (_ , v₂ , _ , _ , _ , _ , vlt , v₂q) = down lanePart P svr
+            in ≺-absurd {E₀} {q′} (≺-trans {E₀} {v₂} {q′} (vlt u-E₀) v₂q) lt′
+          late n (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr))
+          late n (_ , _ , (on-out (on-out ()) , _) , _ , _)
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
@@ -867,21 +871,26 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   module C (m : Maybe ℕ) = Core (λ k (h : Den ⊤) → ev m (Sh k) (h ∷ ρ)) (λ k j (h : Den ⊤) (h′ : Den (IE B)) → ev m (piece k j) (h′ ∷ h ∷ ρ))
     (pc0 m) (pc0-at m) (pc1 m) (pc2 m) (sh-b m) (pc0-b m) (pc2-l m) (pc0-rows m) (pc0-ls m) (sh-past m)
 
+  -- The elaborated lane IS the core's, paid once: each reading below
+  -- moves along it, rather than re-converting its whole denotation.
+  lane-eq : ∀ m → ev m (laneˢ (laneSrc ρ′ o)) ρ ≡ C.LaneD m
+  lane-eq nothing  = refl
+  lane-eq (just n) = refl
+
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
   lane-starts : ∀ m s {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark laneDone) n))
               → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
-  lane-starts nothing  s r = C.core nothing s r
-  lane-starts (just n) s r = C.core (just n) s r
+  lane-starts m s {y} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
+    (C.core m s (subst (λ d → enter d s y (out (instEmit (mark laneDone) n))) (lane-eq m) r))
 
   -- A LANE SHOWS `laneStart` AT ONE PLACE, when its lane part's share shows
   -- none.
   lane-start-at : ∀ m s → (∀ {y n} → enter (ev m (Sh lanePart) (hot (Proper (enter (ev m empty ρ) (laneAt s ⊕ [ ix 1 ]))) ∷ ρ)) ((laneAt s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
                 → ∀ {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark laneStart) n)) → y ≡ C.startAt m s
-  lane-start-at nothing  s hn r = C.start-at nothing s hn r
-  lane-start-at (just n) s hn r = C.start-at (just n) s hn r
+  lane-start-at nothing  s hn {y} {n} r = C.start-at nothing s hn (subst (λ d → enter d s y (out (instEmit (mark laneStart) n))) (lane-eq nothing) r)
+  lane-start-at (just k) s hn {y} {n} r = C.start-at (just k) s hn (subst (λ d → enter d s y (out (instEmit (mark laneStart) n))) (lane-eq (just k)) r)
 
   -- A LANE SHOWS ITS `laneStart`, below its subscription's first child.
   lane-start-row : ∀ m s → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s (C.startAt m s) (out (marked laneStart)) × Under (s ⊕ [ ix 0 ]) (C.startAt m s)
-  lane-start-row nothing  s = C.start-row nothing s
-  lane-start-row (just n) s = C.start-row (just n) s
+  lane-start-row m s = subst (λ d → enter d s (C.startAt m s) (out (marked laneStart)) × Under (s ⊕ [ ix 0 ]) (C.startAt m s)) (sym (lane-eq m)) (C.start-row m s)

@@ -36,9 +36,12 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst)
 open import simultaneous.DenRows using (bounded-out; each-one)
 open import simultaneous.LaneLocal using (inv-ev; EndsEarly; held-fit; module FlatFit; module LaneReal; each-vals; of-outer;
-  empty-ends)
+  empty-ends; Outer)
 open import simultaneous.RealView using (module View)
-open import simultaneous.Routed using (HeldD; Routing)
+open import simultaneous.Routed using (HeldD; Routing; Placed; PlacedD; Adm; adm-∪)
+open import denotation.Laws.Worlds using (plain-ix)
+open import denotation.EmissionSet using (end)
+open import Data.Unit using (tt)
 import simultaneous.LaneStart as LaneStart
 open LaneStart using (laneAt)
 
@@ -55,14 +58,16 @@ flat-at : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (o : Obs Timeline Γ X
 flat-at nothing  op g o ρ p r = r
 flat-at (just _) op g o ρ p r = r
 
-module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timeline Γ B)
+module LaneOnce (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (ρ₄ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ ⊤ ∷ IE B ∷ IE A ∷ Θ)
                 (t₂ : EmissionSet (IE B)) (t₁ : EmissionSet (IE A)) (env₀ : DenEnv Θ)
                 (g₂ : GoodEnv (hot t₂ ∷ hot t₁ ∷ env₀)) (L₁ : Lawful t₁)
-                (tv : ∀ {r b n} → t₁ r (out (instEmit (value b) n)) → Early r) (te : EndsEarly t₁) (cs : List Pos)
-                (held : ∀ a {t} → Lawful t → HeldD (Hots (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀)) (ev m (elab ρ₄ (f a)) (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀)) cs) where
+                (tv : ∀ {r b n} → t₁ r (out (instEmit (value b) n)) → Early r) (te : EndsEarly t₁) (tp : Placed Fr t₁)
+                (ad : Adm (Hots (hot t₂ ∷ hot t₁ ∷ env₀)) Fr) (cs : List Pos)
+                (held : ∀ a {t} → Lawful t → HeldD (Hots (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀)) Fr (ev m (elab ρ₄ (f a)) (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀)) cs)
+                (placed : ∀ a {t} → Lawful t → PlacedD (Hots (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀)) Fr (ev m (elab ρ₄ (f a)) (hot t ∷ hot t₂ ∷ hot t₁ ∷ env₀))) where
 
-  open LaneReal m op f ρ₄ t₂ t₁ env₀ g₂ L₁ tv te (λ a L p ok ep → held-fit (held a L p ok ep)) using (env₂; x; srcE; laneE)
+  open LaneReal m op f ρ₄ t₂ t₁ env₀ g₂ L₁ tv te tp ad (λ a L p ok fp ep → held-fit (held a L p ok fp ep) (placed a L p ok fp ep)) using (env₂; x; srcE; laneE)
 
   dR : Den A
   dR = ev m (each valuesOf (connected (there (here refl)))) env₂
@@ -76,27 +81,35 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timelin
   Il : ∀ a → InvD (Hots env₂) (fL a)
   Il a = inv-ev m (laneˢ (x a)) env₂ g₂
 
-  vals : ∀ p → Early p → (∀ {q a} → enter dR p q (out a) → Early q) × EndsEarly (enter dR p)
-  vals p ep = each-vals m t₂ t₁ env₀ L₁ tv te p ep
+  -- An outer row is reachable and clear.
+  ok-o : ∀ p → Ok (Hots env₂) p → ∀ {q e} → enter dR p q e → Ok (Hots env₂) q
+  ok-o p ok xo = ok-in ok (InvAt.world (Id p ok) xo) (InvAt.real (Id p ok) xo)
+
+  vals : ∀ p → Ok (Hots env₂) p → Fr p → Early p → Outer Fr (enter dR p)
+  vals p ok fp ep = each-vals m t₂ t₁ env₀ g₂ L₁ ad tv te tp p ok fp ep
 
   -- TWO ROWS OF ONE LANE ARE ITS VALUE'S OWN, at one admissible, early
   -- subscription.
-  lane-sub₂ : ∀ op′ p → Ok (Hots env₂) p → Early p → ∀ {q a k e k′ e′} → enter dR p q (out a)
+  lane-sub₂ : ∀ op′ p → Ok (Hots env₂) p → Fr p → Early p → ∀ {q a k e k′ e′} → enter dR p q (out a)
             → View.Lane fL (enter dR p) op′ q a k e → View.Lane fL (enter dR p) op′ q a k′ e′
-            → Σ Pos λ s → Ok (Hots env₂) s × Early s × enter (fL a) s k e × enter (fL a) s k′ e′
-  lane-sub₂ (mergeᶠ nothing) p ok ep {q} xo (r , _) (r′ , _) =
-    _ , ok-step q (ok-in ok (InvAt.world (Id p ok) xo) (InvAt.real (Id p ok) xo)) , early-inst [ ix 1 ] (proj₁ (vals p ep) xo) , r , r′
-  lane-sub₂ switchᶠ p ok ep {q} xo (r , _) (r′ , _) =
-    _ , ok-step q (ok-in ok (InvAt.world (Id p ok) xo) (InvAt.real (Id p ok) xo)) , early-inst [ ix 1 ] (proj₁ (vals p ep) xo) , r , r′
-  lane-sub₂ exhaustᶠ p ok ep {q} xo (r , _) (r′ , _) =
-    _ , ok-step q (ok-in ok (InvAt.world (Id p ok) xo) (InvAt.real (Id p ok) xo)) , early-inst [ ix 1 ] (proj₁ (vals p ep) xo) , r , r′
-  lane-sub₂ (mergeᶠ (just n)) p ok ep xo (i , s , sb , r , _) (i′ , s′ , sb′ , r′ , _) with BoundedI.sub-same ok n fL Il (Id p ok) sb sb′
-  ... | refl = let (es , oks) = FlatFit.Bd.start-at fL dR Id Il laneE p ok (proj₁ (vals p ep)) (proj₂ (vals p ep)) n i (proj₁ sb) (proj₂ sb)
-               in s , oks , es , r , r′
+            → Σ Pos λ s → Ok (Hots env₂) s × Fr s × Early s × enter (fL a) s k e × enter (fL a) s k′ e′
+  lane-sub₂ (mergeᶠ nothing) p ok fp ep {q} xo (r , _) (r′ , _) =
+    _ , ok-step q (ok-o p ok xo) , Adm.step ad (ok-o p ok xo) (proj₂ (proj₂ (vals p ok fp ep)) xo tt) plain-ix
+      , early-inst [ ix 1 ] (proj₁ (vals p ok fp ep) xo) , r , r′
+  lane-sub₂ switchᶠ p ok fp ep {q} xo (r , _) (r′ , _) =
+    _ , ok-step q (ok-o p ok xo) , Adm.step ad (ok-o p ok xo) (proj₂ (proj₂ (vals p ok fp ep)) xo tt) plain-ix
+      , early-inst [ ix 1 ] (proj₁ (vals p ok fp ep) xo) , r , r′
+  lane-sub₂ exhaustᶠ p ok fp ep {q} xo (r , _) (r′ , _) =
+    _ , ok-step q (ok-o p ok xo) , Adm.step ad (ok-o p ok xo) (proj₂ (proj₂ (vals p ok fp ep)) xo tt) plain-ix
+      , early-inst [ ix 1 ] (proj₁ (vals p ok fp ep) xo) , r , r′
+  lane-sub₂ (mergeᶠ (just n)) p ok fp ep xo (i , s , sb , r , _) (i′ , s′ , sb′ , r′ , _) with BoundedI.sub-same ok n fL Il (Id p ok) sb sb′
+  ... | refl = let (es , oks , fs) = FlatFit.Bd.start-at fL dR ad Id Il laneE p ok (proj₁ V) (proj₁ (proj₂ V)) (proj₂ (proj₂ V)) n i (proj₁ sb) (proj₂ sb)
+               in s , oks , fs , es , r , r′
+    where V = vals p ok fp ep
 
   -- THE LANE PART'S SHARE SHOWS NO `laneStart`: its blocker shows nothing,
   -- and the program below is held where the bounded merge subscribes it.
-  module Share (a : A) (s : Pos) (ok : Ok (Hots env₂) s) (es : Early s) where
+  module Share (a : A) (s : Pos) (ok : Ok (Hots env₂) s) (fs : Fr s) (es : Early s) where
     P : Pos
     P = laneAt s
 
@@ -112,11 +125,17 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timelin
     IF : ∀ {t} → Lawful t → InvD (Hots (hot t ∷ env₂)) (F (hot t))
     IF L = inv-ev m _ (hot _ ∷ env₂) (good-cons L g₂)
 
-    okP : Ok (Hots env₂) P
-    okP = ok-step (s ⊕ [ ix 0 ]) (ok-in ok (InvAt.world Io xo) (InvAt.real Io xo))
+    ok₀ : Ok (Hots env₂) (s ⊕ [ ix 0 ])
+    ok₀ = ok-in ok (InvAt.world Io xo) (InvAt.real Io xo)
       where
         Io = inv-ev m (of (lanePart ∷ burstPart ∷ [])) env₂ g₂ s ok
         xo = of-first m lanePart (burstPart ∷ []) env₂ s
+
+    okP : Ok (Hots env₂) P
+    okP = ok-step (s ⊕ [ ix 0 ]) ok₀
+
+    fP : Fr P
+    fP = Adm.step ad ok₀ (Adm.bare ad fs λ ()) plain-ix
 
     eP : Early P
     eP = early-inst [ ix 1 ] (early-inst [ ix 0 ] es)
@@ -124,8 +143,8 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timelin
     Lt : Lawful tS
     Lt = src-lawful {s = ev m (empty {A = ⊤}) env₂} {F = F} Is IF P okP
 
-    tee : EndsEarly tS
-    tee = empty-ends m env₂ (P ⊕ [ ix 1 ]) (early-inst [ ix 1 ] eP)
+    tee : EndsEarly tS × (∀ {c} → tS c end → Fr c)
+    tee = empty-ends m env₂ ad (P ⊕ [ ix 1 ]) (early-inst [ ix 1 ] eP) (Adm.step ad okP fP plain-ix)
 
     env′ : DenEnv (⊤ ∷ IE B ∷ IE A ∷ Θ)
     env′ = hot tS ∷ env₂
@@ -136,8 +155,17 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timelin
     Q : Pos
     Q = (P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
 
+    ad′ : Adm (Hots env′) Fr
+    ad′ = adm-∪ {t = tS} ad
+
+    okP₀ : Ok (Hots env′) (P ⊕ [ ix 0 ])
+    okP₀ = body-ok {s = ev m (empty {A = ⊤}) env₂} {F = F} Is IF P okP
+
     okQ : Ok (Hots env′) Q
-    okQ = ok-step (P ⊕ [ ix 0 ]) (body-ok {s = ev m (empty {A = ⊤}) env₂} {F = F} Is IF P okP)
+    okQ = ok-step (P ⊕ [ ix 0 ]) okP₀
+
+    fQ : Fr Q
+    fQ = Adm.step ad′ okP₀ (Adm.bare ad′ fP λ ()) plain-ix
 
     eQ : Early Q
     eQ = early-inst [ ix 1 ] (early-inst [ ix 0 ] eP)
@@ -158,21 +186,22 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} (op : FlatOp) (f : A → Obs Timelin
     share-quiet r with bounded-out 1 fc dQ Q (flat-at m (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ [])) env′ Q r)
     ... | _ , true  , _ , _ , _ , _ , (l , _) = blk m l
     ... | _ , false , i , s′ , _ , (N , St) , (l , _) =
-      let (es′ , oks′) = FlatFit.Bd.start-at fc dQ (inv-ev m (of (true ∷ false ∷ [])) env′ g′) (λ c → inv-ev m (x a lanePart c) env′ g′)
-                           (srcE a lanePart tS Lt tee) Q okQ (proj₁ (of-outer m _ env′ Q eQ)) (proj₂ (of-outer m _ env′ Q eQ)) 1 i N St
-      in lane-routing (Held.routing (held a Lt s′ oks′ es′) l)
+      let (es′ , oks′ , fs′) = FlatFit.Bd.start-at fc dQ ad′ (inv-ev m (of (true ∷ false ∷ [])) env′ g′) (λ c → inv-ev m (x a lanePart c) env′ g′)
+                           (srcE a lanePart tS Lt tee) Q okQ (proj₁ O) (proj₁ (proj₂ O)) (proj₂ (proj₂ O)) 1 i N St
+      in lane-routing (Held.routing (held a Lt s′ oks′ fs′ es′) l)
       where
+        O = of-outer m _ env′ ad′ Q okQ fQ eQ
         lane-routing : Routing laneStart → ⊥
         lane-routing ()
 
   -- A LANE STARTS ONCE: its two `laneStart`s, read at one admissible, early
   -- subscription, are where its frame shows its first mark.
-  start-once : ∀ p → Ok (Hots env₂) p → Early p → ∀ {q a y y′ n n′} → enter dR p q (out a)
+  start-once : ∀ p → Ok (Hots env₂) p → Fr p → Early p → ∀ {q a y y′ n n′} → enter dR p q (out a)
              → View.Lane fL (enter dR p) op q a y (out (instEmit (mark laneStart) n)) → View.Lane fL (enter dR p) op q a y′ (out (instEmit (mark laneStart) n′))
              → y ≡ y′
-  start-once p ok ep {a = a} xo l l′ with lane-sub₂ op p ok ep xo l l′
-  ... | s , oks , es , r , r′ = trans (at r) (sym (at r′))
+  start-once p ok fp ep {a = a} xo l l′ with lane-sub₂ op p ok fp ep xo l l′
+  ... | s , oks , fs , es , r , r′ = trans (at r) (sym (at r′))
     where
-      open Share a s oks es using (share-quiet)
+      open Share a s oks fs es using (share-quiet)
       at : ∀ {y n} → enter (fL a) s y (out (instEmit (mark laneStart) n)) → y ≡ LaneStart.C.startAt (λ i → ρ₄ i) (f a) env₂ m s
       at = LaneStart.lane-start-at (λ i → ρ₄ i) (f a) env₂ m s share-quiet

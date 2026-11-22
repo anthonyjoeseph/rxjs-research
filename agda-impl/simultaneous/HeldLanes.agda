@@ -44,7 +44,8 @@ open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-s
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence; _|>′_)
-open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev)
+open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev; Fresh)
+open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
@@ -196,9 +197,10 @@ lane-of f o exhaustᶠ          nb l = l
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-               (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
+               (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p)
                (H₁ : Held (enter (ev m (FlatHots.trig m ρ op f s env p) (FlatHots.env₀ m ρ op f s env p)) (FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]))
                           ((FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]) ∷ p ∷ cs))
+               (tp : Placed (Fresh eh) (FlatHots.σ₁ m ρ op f s env p))
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
                (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p)) (FlatHots.p₀ m ρ op f s env p))
@@ -207,7 +209,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
-  open CombSrc m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
   -- THE REAL FLATMAP, READ THROUGH ITS POLICY: its outer is the hot
   -- outer's values, each lane a value's elaborated lane.
@@ -319,17 +321,20 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   -- A LANE'S `laneDone` IN THE REAL FLATMAP FOLLOWS ITS `laneStart` THERE.
   lane-begins : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n)) → σ₃ y (out (instEmit (mark laneDone) n))
               → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
-  lane-begins {q} {a} {y} {n} xo l σd with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
-  ... | s , _ , r , sk , back with lane-starts r
-  ...   | y₀ , n₀ , r₀ , sy₀ , lt with σ₃-lane σd
-  ...     | q′ , a′ , xo′ , rn , l′ , nc with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
-  ...       | refl with ro-func xo xo′
-  ...         | refl = y₀ , n₀ , back r₀ sy₀
-                     , (R-from (join-in op fL RO xo rn (back r₀ sy₀) (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
+  lane-begins {q} {a} {y} {n} xo l σd =
+    let (_ , _ , r , _ , back) = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+            (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+            (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
+        (y₀ , n₀ , r₀ , sy₀ , lt) = lane-starts r
+        (_ , _ , xo′ , rn , l′ , nc) = σ₃-lane σd
+    in begin-at (back r₀ sy₀) lt rn nc (lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+            (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+            (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′)
+    where
+      begin-at : ∀ {y₀ n₀ q′} → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → RV.Runs op q′ → ¬ RV.CutAt op q′ y → q ≡ q′
+               → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
+      begin-at {y₀} {n₀} L₀ lt rn nc refl = y₀ , n₀ , L₀
+                     , (R-from (join-in op fL RO xo rn L₀ (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
                                 , reach-down {q = y} {w = y₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
@@ -494,15 +499,15 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   ... | refl = refl
 
   private
-    module LO = LaneOnce m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
-                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) cs
-                  (λ a L q okq eq → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                      (good-cons L g₂) eh q okq eq)
+    module LO = LaneOnce m {Fr = Fresh eh} op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂ cs
+                  (λ a {t} L → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
+                  (λ a {t} L → IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
 
   -- A LANE STARTS ONCE.
   start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
              → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
-  start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
+  start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q

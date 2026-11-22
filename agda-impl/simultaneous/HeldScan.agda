@@ -134,6 +134,6 @@ held-scan-at g sm z d p H = held-same row end-row back′ fwd (rest-same every b
     ... | sc , run , refl with Sr.back run
     ...   | rx , run′ , rel = rx , run′ , rows rel
 
-held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W} cs → HeldD W d cs
-              → HeldD W (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
-held-scan-den f z d cs h p ok ep = held-scan-at (scanIE f) (same-scanIE f) z d p (h p ok ep)
+held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W F} cs → HeldD W F d cs
+              → HeldD W F (Op.map proj₂ (Op.scan (scanIE f) z d)) cs
+held-scan-den f z d cs h p ok fr ep = held-scan-at (scanIE f) (same-scanIE f) z d p (h p ok fr ep)

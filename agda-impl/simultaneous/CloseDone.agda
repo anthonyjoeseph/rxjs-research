@@ -94,7 +94,7 @@ module CloseDone (m : Maybe ℕ) {Δ A B} (t : EmissionSet (IE A)) (env : DenEnv
   pastS {k} r = subst (_≺ k) (sym (⊕-assoc s [ ix 0 ] [ ix 1 ])) (past (ix 0 ∷ ix 1 ∷ []) r)
 
   module Mg = Merge (λ x → Op.of (closing {A} {B} x)) (enter (hot t) s₁)
-  module EE = EachEnd (closing {A} {B}) t L (λ _ → ⊤) (λ _ _ → tt) (λ _ → tt) s₁ tt
+  module EE = EachEnd (closing {A} {B}) t L (λ _ → ⊤) (λ _ _ _ → tt) (λ _ → tt) s₁ tt
 
   ------------------------------------------------------------------------
   -- The concat's outer: the first part's value, then the second's

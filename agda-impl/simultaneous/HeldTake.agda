@@ -547,11 +547,11 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
     { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
     ; early = early ; ends = ends ; done = done ; late = late ; idle = idle ; rest = rest }
 
-held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H} cs → HeldD H d cs → InvD H d → HeldD H (Op.takeWhile incl (passes kp) d) cs
-held-take-den {X} incl kp d cs h inv p ok ep =
+held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H F} cs → HeldD H F d cs → InvD H d → HeldD H F (Op.takeWhile incl (passes kp) d) cs
+held-take-den {X} incl kp d cs h inv p ok fr ep =
   Holds.holds incl (passes kp) d (p ∷ cs) p (inv p ok) (held-to H) fails (λ m r₁ r₂ eq nk nx → Held.covered H m r₁ r₂ eq (carried nk) nx) fearly
   where
-    H = h p ok ep
+    H = h p ok fr ep
 
     fails : ∀ {x : IE X} → T (not (passes kp x)) → Inert x
     fails {instEmit (value _) _} _ = i-value

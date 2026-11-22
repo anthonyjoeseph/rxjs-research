@@ -25,7 +25,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; nameOf; nm; Valued; opos; cnt)
 open import simultaneous.HeldIn using (Upto)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
-open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit)
+open import simultaneous.LaneLocal using (inv-ev; late-ext)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
@@ -42,7 +42,8 @@ open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
 import simultaneous.LaneStart as LaneStart
 open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-≺-≺)
-open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH)
+open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH; Fresh)
+open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
 
@@ -56,7 +57,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
-open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
+open import simultaneous.Layers using (run-tail; run-after; run-has) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
@@ -86,9 +87,10 @@ open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-me
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-               (p : Pos) (ok : Ok (Hots env) p) (ep : Early p)
+               (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p)
                (H₁ : Held (enter (ev m (FlatHots.trig m ρ op f s env p) (FlatHots.env₀ m ρ op f s env p)) (FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]))
                           ((FlatHots.c m ρ op f s env p ⊕ [ ix 1 ]) ∷ p ∷ cs))
+               (tp : Placed (Fresh eh) (FlatHots.σ₁ m ρ op f s env p))
                (L₁ : Lawful (FlatHots.σ₁ m ρ op f s env p)) (L₂ : Lawful (FlatHots.σ₂ m ρ op f s env p))
                (L₃ : Lawful (FlatHots.σ₃ m ρ op f s env p))
                (ok₁ : Ok (Hots (hot (FlatHots.σ₁ m ρ op f s env p) ∷ FlatHots.env₀ m ρ op f s env p)) (FlatHots.p₀ m ρ op f s env p))
@@ -96,9 +98,9 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                          (FlatHots.p₀₀ m ρ op f s env p))
                (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
                (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
-  open CombLanes m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open FlatHots m ρ op f s env p
-  open CombSrc m ρ op f s env cs gd eh hf p ok ep H₁ L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
 
   -- A CUT THE SWITCH'S SCAN MEETS IS AN OUTER VALUE'S `outerOpen`, at the
   -- source's reading of the outer's row.
@@ -179,13 +181,10 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     pick : ∀ {y y₀ n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → ∀ ws → Met M ws
          → (y ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneDone) n)))) ∈ ws
          → (y₀ ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) ∈ ws
-    pick {y} σs lt ws mw i with lane-run mw
-    ... | rs , pr , run , _ with bproj-mem pr i
-    ...   | yd , ed , j with ⊕-injˡ y yd ed
-    ...     | refl with ∈-∃++ j
-    ...       | r , r′ , refl with run-catch r run σs tt tt lt
-    ...         | r₁′ , r₂′ , e″ , refl with InvAt.func I₃ (proj₁ (proj₁ (run-row∈ run (∈-++⁺ˡ (∈-++⁺ʳ r₁′ (here refl)))))) (proj₁ σs)
-    ...           | refl = bproj-back pr (∈-++⁺ˡ (∈-++⁺ʳ r₁′ (here refl)))
+    pick {y} {y₀} σs lt ws mw i =
+      let (_ , pr , run , _) = lane-run mw
+          (yd , ed , j) = bproj-mem pr i
+      in bproj-back pr (run-has (λ x x′ → InvAt.func I₃ (proj₁ x) (proj₁ x′)) run σs tt tt (subst (y₀ ≼_) (⊕-injˡ y yd ed) (≺→≼ {y₀} {y} lt)) j)
 
     st-dn : ∀ {k k′ n n′} → _≡_ {A = Row} (k , out (just (inj₁ (laneB , instEmit (mark laneStart) n)))) (k′ , out (just (inj₁ (laneB , instEmit (mark laneDone) n′)))) → ⊥
     st-dn e with cong proj₂ e
@@ -193,13 +192,22 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
   -- EACH `laneDone` THE SCAN MEETS FOLLOWS ITS LANE'S START THERE.
   done-started : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → AC.StartIn [] xs q
-  done-started r₁ mt xs x ys eq {q} (a , y , n , xo , refl , l) with lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ refl)
-  ... | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′
-  ...   | refl with lane-begins xo l σd
-  ...     | y₀ , n₀ , l₀ , σs , le with ∈-++⁻ xs (pick σs (start-before σs σd le) (xs ++ [ _ ])
-              (run-prefix (xs ++ [ _ ]) (subst (Met M) (sym (++-assoc xs [ _ ] (ys ++ _))) (split-met r₁ mt xs _ ys eq))) (∈-++⁺ʳ xs (here refl)))
-  ...       | inj₁ i = any-map (λ { refl → a , y₀ , n₀ , xo , refl , l₀ }) i
-  ...       | inj₂ (here e″) = ⊥-elim (st-dn e″)
+  done-started r₁ {z} {e} {r₂} mt xs x ys eq {q} (a , y , n , xo , refl , l) =
+    let (y′ , e′ , _ , σd) = lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs x ys eq) (inj₂ refl)
+    in begun (subst (λ w → σ₃ w (out (instEmit (mark laneDone) n))) (sym (⊕-injˡ y y′ e′)) σd)
+    where
+      begun : σ₃ y (out (instEmit (mark laneDone) n)) → AC.StartIn [] xs q
+      begun σd = fin (lane-begins xo l σd)
+        where
+          mw : Met M (xs ++ [ x ])
+          mw = run-prefix (xs ++ [ x ]) (subst (Met M) (sym (++-assoc xs [ x ] (ys ++ (z , e) ∷ r₂))) (split-met r₁ mt xs x ys eq))
+          sel : ∀ y₀ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀))
+              → (y₀ ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) ∈ xs ++ [ x ] → AC.StartIn [] xs q
+          sel y₀ n₀ l₀ i = [ (λ i → any-map (λ { refl → a , y₀ , n₀ , xo , refl , l₀ }) i)
+                           , (λ { (here e″) → ⊥-elim (st-dn e″) ; (there ()) }) ]′ (∈-++⁻ xs i)
+          fin : (Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y)
+              → AC.StartIn [] xs q
+          fin (y₀ , n₀ , l₀ , σs , le) = sel y₀ n₀ l₀ (pick σs (start-before σs σd le) (xs ++ [ x ]) mw (∈-++⁺ʳ xs (here refl)))
 
   -- A `laneDone` THE SCAN MEETS IS A RUN LANE'S.
   done-mark : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markAct op x ≡ kDone
@@ -566,7 +574,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
   mdone x with m-rows x tt
   ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
-  ... | lane {w = w} y = early-inst [ sub w ] (Fit.fine lane-fit y)
+  ... | lane {w = w} y = early-inst [ sub w ] (lane-done y)
   ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   comb-runs : ∀ {rx} → Met M rx → Upto (Few R) rx → RunHeld cs′ (outRows op init rx)

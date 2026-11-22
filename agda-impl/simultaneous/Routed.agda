@@ -32,26 +32,26 @@ module simultaneous.Routed where
 
 open import Data.Bool using (T)
 open import Data.Nat using (ℕ; suc)
-open import Data.List using (List; []; _∷_; _++_)
+open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_)
+open import Data.Sum using (_⊎_; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; inside; _⊕_; cascade; _∙_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; sub; inside; _⊕_; cascade; _∙_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
 open import denotation.Read using (Visible; After; cursor)
 open import Data.Maybe using (nothing)
 open import Data.List.Membership.Propositional using (_∈_)
-open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed)
+open import simultaneous.InstEmit using (Mark; instEmit; value; mark; begin; stop; over; subscribed; completed; laneDone)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (Shut; r₀)
-open import denotation.Laws.Worlds using (Ok; _⊑_)
+open import denotation.Laws.Worlds using (Ok; _⊑_; Plain; plain-ix; _∪ʰ_; widen; real-snoc; shrink)
 open import Data.Empty using (⊥)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count)
@@ -148,6 +148,50 @@ record Held {A : Set} (t : EmissionSet (IE A)) (cs : List Pos) : Set where
     rest    : Rest t
 
 -- Held at every admissible subscription, exempt for its own burst and
--- `cs`.  No subscription is made in a value step past its value.
-HeldD : ∀ {A} → (Pos → Set) → Den (IE A) → List Pos → Set
-HeldD H d cs = ∀ p → Ok H p → Early p → Held (enter d p) (p ∷ cs)
+-- `cs`: reachable, clear of the hot rows `H`, and `F`.  No subscription
+-- is made in a value step past its value.
+HeldD : ∀ {A} → (Pos → Set) → (Pos → Set) → Den (IE A) → List Pos → Set
+HeldD H F d cs = ∀ p → Ok H p → F p → Early p → Held (enter d p) (p ∷ cs)
+
+-- A row a lane can hang on: a value, or an end a queued lane waits for,
+-- and the `laneDone` a lane's end follows.
+data Shown {A : Set} : Ev (IE A) → Set where
+  s-value : ∀ {a n} → Shown (out (instEmit (value a) n))
+  s-done  : ∀ {n} → Shown (out (instEmit (mark laneDone) n))
+  s-end   : Shown end
+
+-- EVERY ROW A LANE CAN HANG ON IS ADMISSIBLE.  Marks may fall anywhere:
+-- no former subscribes on one.
+Placed : ∀ {A} → (Pos → Set) → EmissionSet (IE A) → Set
+Placed F t = ∀ {y e} → t y e → Shown e → F y
+
+PlacedD : ∀ {A} → (Pos → Set) → (Pos → Set) → Den (IE A) → Set
+PlacedD H F d = ∀ p → Ok H p → F p → Early p → Placed F (enter d p)
+
+-- AN ADMISSIBILITY FORMERS CAN KEEP: past an admissible row a plain step
+-- stays admissible where the hot rows `H` are clear of it, any step but
+-- a second child stays admissible anywhere, and so does a reader's copy.
+record Adm (H F : Pos → Set) : Set where
+  field
+    step : ∀ {q l} → Ok H q → F q → Plain l → F (q ⊕ (l ∷ []))
+    bare : ∀ {q l} → F q → (l ≡ ix 1 → ⊥) → F (q ⊕ (l ∷ []))
+    copy : ∀ {h e} → F h → F (h ⊕ (sub e ∷ []))
+
+-- More hot rows keep an admissibility.
+adm-∪ : ∀ {B H F} {t : EmissionSet B} → Adm H F → Adm (H ∪ʰ t) F
+adm-∪ {t = t} a = record
+  { step = λ (r , d) → Adm.step a (r , λ hh w ins → d (inj₂ hh) (widen t w) ins)
+  ; bare = Adm.bare a
+  ; copy = Adm.copy a }
+
+-- A child of a reachable position clear of the hot rows is as clear.
+ok-ix : ∀ {H} p {i} → Ok H p → Ok H (p ⊕ [ ix i ])
+ok-ix p (r , d) = real-snoc p plain-ix r , λ hh w ins → d hh (shrink w) ins
+
+-- Any child of an admissible row clear of the hot rows is admissible.
+adm-at : ∀ {H F q} → Adm H F → Ok H q → F q → ∀ l → F (q ⊕ [ l ])
+adm-at a ok fq (ix 1)             = Adm.step a ok fq plain-ix
+adm-at a ok fq (ix 0)             = Adm.bare a fq λ ()
+adm-at a ok fq (ix (suc (suc _))) = Adm.bare a fq λ ()
+adm-at a ok fq (sub _)            = Adm.copy a fq
+adm-at a ok fq last               = Adm.bare a fq λ ()

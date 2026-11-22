@@ -18,7 +18,7 @@ open import denotation.Laws.Modulus using (entered-reach)
 open import denotation.Laws.Worlds using (⊑-trans; ⊑-inside; inside-⊑)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Sync; Ex; Rest)
+open import simultaneous.Routed using (Held; Sync; Ex; Rest; Placed)
 open import simultaneous.Relabel using (held-same; Same; Rows≈)
 open import simultaneous.HeldConnect using (rootOf-ext; held-ex; same-refl; rows-refl)
 
@@ -71,3 +71,8 @@ held-defer {X} s p cs H = held-ex ex (held-same row end-row back′ (λ _ x _ k 
     rest′ : Rest B → Rest D
     rest′ R m z bq with R (back m) z bq
     ... | ks , h = (p ⊕ [ ix 0 ]) ∷ ks , λ { (guard , _) _ _ → here refl ; (body x , _) ay rt → there (h x ay rt) }
+
+-- A defer hangs a lane only where its body does: the guard shows nothing.
+placed-defer : ∀ {X : Set} {F : Pos → Set} (s : Den (IE X)) p → Placed F (enter s (p ⊕ [ ix 1 ])) → Placed F (enter (Op.defer s) p)
+placed-defer s p pl (body x , _) sh = pl x sh
+placed-defer s p pl (guard , _) ()
