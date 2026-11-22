@@ -28,11 +28,16 @@ AGDA_SRC := $(shell find $(SRC) -name '*.agda' -not -path '*/_build/*' -not -pat
 # step never finishes and GitHub keeps no log), and fails the same way in a
 # session.  A healthy full check peaks under 8 GB.  An RTS flag is not an
 # Agda option, so it leaves the interface cache valid.
+#
+# THE NURSERY IS LARGE: at GHC's default allocation area a third of a full
+# check is garbage collection, most of it a million minor collections.
+# 256 MB halves the collector's time; a gigabyte buys nothing more.
+# `--save-metas` was measured too, and is slower.
 # ─────────────────────────────────────────────────────────────────────────
 AGDA_BIN ?= agda
 export AGDA_BIN
 AGDA_HEAP := 12G
-AGDA := $(AGDA_BIN) +RTS -M$(AGDA_HEAP) -RTS -W error
+AGDA := $(AGDA_BIN) +RTS -M$(AGDA_HEAP) -A256m -RTS -W error
 
 # PER-DEFINITION TIMES, opt in: `make agda AGDA_PROFILE=--profile=definitions`.
 # Agda leaves profiling options out of an interface's validity key, so this
