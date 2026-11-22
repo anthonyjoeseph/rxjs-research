@@ -74,8 +74,7 @@ module HotRun {A : Set} (S : EmissionSet A) (sb : Pos)
                (func  : ∀ {y e e′} → S y e → S y e′ → e ≡ e′)
                (after : ∀ {y e} → S y e → sb ≺ y)
                (few-vis : ∀ {y e} → S y e → Visible e → Few S y)
-               (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c)
-               (shows : Shows S) where
+               (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c) where
 
   σ : EmissionSet A
   σ = Proper S
@@ -271,7 +270,7 @@ module HotRun {A : Set} (S : EmissionSet A) (sb : Pos)
   -- WHERE A POSITION HAS FEW ROWS BEFORE IT IN THE READING, BEFORE EVERY
   -- END, it has few before it in the source: a row of the source before it
   -- is proper, and is in the reading once every row before it is.
-  module FewBack {w} (F : Few Rd w) (wend : ∀ {c} → S c end → w ≼ shift c) where
+  module FewBack (shows : Shows S) {w} (F : Few Rd w) (wend : ∀ {c} → S c end → w ≼ shift c) where
 
     ls : List Pos
     ls = L.map parent (proj₁ F) ++ prefixes w
@@ -301,7 +300,7 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
                (few-vis : ∀ {y e} → S y e → Visible e → Few S y)
                (proper-vis : ∀ {c y e} → S c end → S y e → Visible e → y ≼ c)
                (shows : Shows S) where
-  open HotRun S sb flat func after few-vis proper-vis shows public
+  open HotRun S sb flat func after few-vis proper-vis public
 
   ev-same : ∀ {e : Ev (IE A)} → Visible e → EvSame e e
   ev-same {out x} _ = ev-out (same-refl x)
@@ -369,7 +368,7 @@ module HotRead {A : Set} (S : EmissionSet (IE A)) (sb : Pos)
     goal {c} refl lc aw lw =
       decidable-stable ((proj₂ (cnt rs) ≟ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng → em {Under c} λ
         { (inj₁ (y , e , sy , vy , ay , l , zs , eq)) → ng (under y sy vy ay l zs eq)
-        ; (inj₂ nu) → FewBack.few F (wend lc lw) λ fw → ng (clear nu fw) }
+        ; (inj₂ nu) → FewBack.few shows F (wend lc lw) λ fw → ng (clear nu fw) }
       where
         cu = last-cur lc
 

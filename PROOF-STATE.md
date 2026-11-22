@@ -248,13 +248,14 @@ bodies, or a row whose creator chain is cut unlike its image's.
 Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 `scan-order`, `take-order`, `defer-order`.
 
-#### THE READER
+#### LISTED BINDERS
 
-Untried since `Fresh`: a reader subscribed outside its hot's last gap meets
-the source's runs joined late, idles and rests as the source does. Settled
-by the three bodies over `Join`, or a reader outside the gap that breaks.
+Untried: a new binder's annotation lists its rows wherever finitely many
+precede, as a closed program's do (`listed`). Constructively necessary: a
+reader read back owes a positive source run to the end. Settled by `listed`
+over open programs whose binders are listed, or a binder that cannot be.
 
-Members: `read-back`, `read-idle`, `read-rest`.
+Members: `ann-listing`.
 
 #### PLACEMENT
 

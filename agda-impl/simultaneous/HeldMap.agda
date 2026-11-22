@@ -14,6 +14,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (_≼_)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin; Den; enter; module Op; map-out; map-end; map-skip;
   map-pin)
 open import denotation.Read using (Run; []; _∷_; Visible)
@@ -79,6 +80,23 @@ module MapRun {A B : Set} (g : A → B) (d : Den A) (p : Pos) where
   ... | e , y , refl | sc , run′ , refl =
     _ ∷ sc , (((y , λ z → pr (lift z)) , ks , λ z k≺ → few (lift z) k≺) , visible-back e vi , aft
              , λ z v a → lst (lift z) (visible-map _ v) a) ∷ run′ , refl
+
+  -- A run met of the source, mapped, is met of the map.
+  fwd : ∀ {c sc} → Run S c sc → Run M c (mapRows g sc)
+  fwd [] = []
+  fwd {c} (_∷_ {q = q} {e = e} (((x , pr) , ks , few) , vi , aft , lst) run) =
+    (((lift x , end-of) , ks , λ z k≺ → few (proj₁ (proj₂ (unmap z))) k≺) , visible-map e vi , aft
+      , λ z v a → lst (proj₁ (proj₂ (unmap z))) (vis-of z v) a) ∷ fwd run
+    where
+      end-of : ∀ {c′} → M c′ end → q ≼ c′
+      end-of z with unmap z
+      ... | end , y , refl = pr y
+      ... | out _ , _ , ()
+      ... | skip , _ , ()
+      ... | pin _ , _ , ()
+      vis-of : ∀ {k e′} (z : M k e′) → Visible e′ → Visible (proj₁ (unmap z))
+      vis-of z v with unmap z
+      ... | e₁ , _ , refl = visible-back e₁ v
 
 ------------------------------------------------------------------------
 -- Held through a map

@@ -54,25 +54,21 @@ open import Tree using (connected)
 open import denotation.Position using (Pos; Path; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; enter; ⟦_⟧; out; end)
-open import denotation.Laws.Worlds using (ok-step; ⊑-inside; inside-⊑; ⊑-trans; _⊑_)
+open import denotation.Laws.Worlds using (ok-step)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; completed)
+open import simultaneous.InstEmit using (instEmit; mark; begin)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Early; Ex; Sync; Idle; Rest; nameOf; r-begin; Routing; Valued; opos)
-open import simultaneous.Readings using (rootOf)
-open import simultaneous.Relabel using (Same; same-mark; same-value)
-open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
-open import simultaneous.HeldTake using (name-ext; ex-ext)
+open import simultaneous.Routed using (Held; nameOf)
+open import simultaneous.Relabel using (Same)
+open import simultaneous.HeldTake using (name-ext)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.HeldBase using (Bound; IH; ih; Ann; Gap; EnvHeld; Fresh; apart-at)
-open import simultaneous.Routed using (PlacedD)
+open import simultaneous.HeldBase using (Bound; Ann)
 import Relation.Nullary as Nl
-open import simultaneous.HeldJoin using (Joined; module Join)
 
 open import Data.List.Properties using (∷ʳ-injective; map-++)
 open import Data.Unit using (tt)
 open import denotation.EmissionSet using (DenEnv; Few; module Connecting; skip; pin)
-open import denotation.Laws.Worlds using (InvD; Lawful; _∪ʰ_; Ok; world-after; full; Shows; GoodEnv)
+open import denotation.Laws.Worlds using (InvD; Lawful; _∪ʰ_; Ok; world-after; full; Shows)
 open import denotation.Laws using (good-cons)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-trans)
@@ -83,7 +79,9 @@ open import simultaneous.HeldHot using (module HotRun)
 open import simultaneous.HeldClose using (module CatRuns; of-row₁; of-val₁; of-end₁)
 open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.CombSent using (assoc³)
-open import simultaneous.Layers using (snoc-view)
+open import simultaneous.Layers using (snoc-view; snoc≢[])
+open import denotation.EmissionSet using (LaneOf; Ended)
+open import denotation.Laws.Worlds.Leaves using (of-idx)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab)
 
@@ -104,28 +102,14 @@ Src b = enter (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b)
 Rl : Pos → Pos → Set
 Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 
--- A READER JOINED IN ITS HOT'S LAST GAP SHOWS A LONE END.  Every
--- position under the annotation's nothing row lies between that row and
--- the annotation's end, so a reader subscribed there meets only the end,
--- below the source's end, with no begin before it.  `Ok` admits such a
--- position (no hot row lies in its world), and `Early` too when the
--- source completes in a timer's last step, which is no value step.  Where
--- the source ended outside its exempt bursts its count before the end is
--- positive (`Held.covered`), so `Joined` has no constructor for that run,
--- and the reader's own `Held.covered` fails on its end.  Only marks lie in
--- the gap and no former subscribes a lane on a mark, so no elaborated
--- reader is subscribed there (`Fresh`).
---
--- RECOVERY: git show 23124ea8 restores `FlatLayer`, a merge of closed
---   lanes met in turn with the reader's `each₂` instance, and the hot's
---   func/flat/quiet off `Lawful` (`HotInv`), the forward half of a body.
+-- The annotation's connect body, before every row of the source.
+body : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos
+body b = (Bound.at b ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
 
-postulate
-  -- A run the reader meets is one of the source's, joined late.
-  read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
-            → Joined (Src b) Rl (p ∷ cs) rs′
-  read-idle : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Idle (enter (RD d) p)
-  read-rest : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Rest (enter (RD d) p)
+-- Under a source row, or under the annotation's connect body.
+Under : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos → Set
+Under {X} b y = (Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀) ⊎ Rl y (body b)
+
 
 -- The source holds where the binder subscribes it.
 held-src : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → Held (Src b) (s₀ b ∷ Bound.outer b)
@@ -186,10 +170,6 @@ values-mv s ((_ , out _) ∷ sc) = cong (just _ ∷_) (values-mv s sc)
 values-mv s ((_ , skip) ∷ sc)  = values-mv s sc
 values-mv s ((_ , pin _) ∷ sc) = values-mv s sc
 values-mv s ((_ , end) ∷ sc)   = values-mv s sc
-
-snoc≢[] : ∀ {B : Set} (r : List B) z → r ++ [ z ] ≡ [] → ⊥
-snoc≢[] []      _ ()
-snoc≢[] (_ ∷ _) _ ()
 
 -- The last row of a moved run is the last source row's.
 last-mv : ∀ {X} s {r y e} (sc : List (Pos × Ev (IE X))) → r ++ [ (y , e) ] ≡ L.map (mv s) sc
@@ -268,7 +248,7 @@ module AnnConn {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   proper-vis sc sy v cy with InvAt.quiet Iσ sc sy cy
   ... | _ , refl , _ = v
 
-  module HR = HotRun σ sb (InvAt.flat Iσ) (InvAt.func Iσ) (λ {y} y′ → ≺-trans {sb} {r₁} {y} sb≺r (aft y′)) few-vis proper-vis sh
+  module HR = HotRun σ sb (InvAt.flat Iσ) (InvAt.func Iσ) (λ {y} y′ → ≺-trans {sb} {r₁} {y} sb≺r (aft y′)) few-vis proper-vis
 
   G : Bool → Den (Maybe (IE X))
   G = Gm m env (hot (Proper σ))
@@ -452,12 +432,12 @@ join-name b pre {e = e} run refl {x} ji with jl-in (cnt pre) e ji | run-tail pre
 -- A ROW THE READER SHOWS: a source row moved below, or a join.
 read-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} {x : IE X} → enter (RD d) p y (out x)
          → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-           ⊎ x ≡ instEmit (mark begin) (nameOf y)
+           ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
 read-row {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) (Bound.is b) r)
   where
     row-hot : enter (RD (hot (Proper (Ann b)))) p y (out x)
             → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-              ⊎ x ≡ instEmit (mark begin) (nameOf y)
+              ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
     row-hot r′ with row-each (hot (Proper (Ann b))) p r′
     ... | q , st , sq , xi , yq with scan-out joinStep (true , ([] , [])) (hot (Proper (Ann b))) p sq
     ...   | st₀ , (rt , me) , hq , refl with hot-out hq
@@ -470,7 +450,10 @@ read-row {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) 
         moved ann-just = proj₁ (run-row run (∈-++⁺ʳ pre (here refl)))
     ...         | inj₁ ji with join-name b pre run rc ji
     ...           | xb , nw =
-      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl (Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)))))))
+      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl yw)))) ,
+            w , e , yw , proj₁ (run-row run (∈-++⁺ʳ pre (here refl))))
+      where
+        yw = Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)
 
 ------------------------------------------------------------------------
 -- A reader end
@@ -508,7 +491,7 @@ val-end-under IA {q} {a} {c} aq ce qc ys cy with ≼-split {q} {c} qc
 
 -- THE READER ENDS below the source's end, or in its own subscribe.
 read-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} → enter (RD d) p y end
-         → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ (Σ Path λ zs → y ≡ p ⊕ zs)
+         → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
 read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.is b) r)
   where
     IA : InvAt (Hots (Bound.env b)) (Bound.at b ⊕ [ ix 1 ]) (Ann b)
@@ -520,13 +503,13 @@ read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.i
     Sc : Den (JS X)
     Sc = Op.scan joinStep (true , ([] , [])) D
 
-    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ (Σ Path λ zs → y ≡ p ⊕ zs)
+    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
     end-hot r′ with merge-end (λ (st : JS X) → Op.flatMap (mergeᶠ nothing) (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st)))
                                                 (Op.of (true ∷ false ∷ []))) Sc p r′
     ... | inj₁ (Scan.send h , _) with h
     ...   | (r-ended (ce , _) _ , _) with ann-end b ce
     ...     | w , cw , sw = inj₁ (w , Rl-trans ([ sub p ] , refl) cw , sw)
-    end-hot r′ | inj₁ (Scan.send h , _) | (r-late _ _ , _) = inj₂ ([ last ] , refl)
+    end-hot r′ | inj₁ (Scan.send h , _) | (r-late _ _ , _) = inj₂ refl
     end-hot r′ | inj₁ (Scan.send h , _) | (r-shown _ () _ , _)
     end-hot r′ | inj₂ (q , st , sq , l , c₀ , (Scan.send h₀ , _) , c₀y) with scan-out joinStep (true , ([] , [])) D p sq | lane-end st q l
     ... | _ , _ , hq , _ | zs , refl with hot-out hq | h₀
@@ -536,88 +519,48 @@ read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.i
         (subst (c ≺_) (⊕-assoc q₁ [ sub p ] zs) (≺-≼-≺ {c} {c ⊕ [ sub p ]} (≺-ext c []) c₀y)))
     ...   | _ | (r-shown _ () _ , _)
 
-sync-up : ∀ {c y} zs → Sync (c ⊕ zs) y → Sync c y
-sync-up {c} {y} zs (ins , rt) =
-  ⊑-inside {c} {y} (⊑-trans {c} {c ⊕ zs} {y} (zs , refl) (inside-⊑ (c ⊕ zs) y ins)) , trans rt (rootOf-ext c zs)
+under-ext : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {y′ y} → Rl y′ y → Under b y → Under b y′
+under-ext b r (inj₁ (y₀ , e₀ , r₀ , s)) = inj₁ (y₀ , e₀ , Rl-trans r r₀ , s)
+under-ext b r (inj₂ r₀)                 = inj₂ (Rl-trans r r₀)
 
-∈-ex : ∀ {cs c y} → c ∈ cs → Sync c y → Ex cs y
-∈-ex (here refl) s = here s
-∈-ex (there i)   s = there (∈-ex i s)
+-- An `of` lies under its subscribe.
+of-in : ∀ {A} s (xs : List A) {y e} → enter (Op.of xs) s y e → Rl y s
+of-in s xs r with of-idx s 0 xs (proj₁ r)
+... | inj₁ (j , _ , refl) = [ ix j ] , refl
+... | inj₂ refl           = [ last ] , refl
 
-sub-ex : ∀ {os cs y} → (∀ {c} → c ∈ os → c ∈ cs) → Ex os y → Ex cs y
-sub-ex f (here s)  = ∈-ex (f (here refl)) s
-sub-ex f (there e) = sub-ex (λ i → f (there i)) e
+-- A scan state's lanes lie under their subscribe.
+lane-in : ∀ {X} (st : JS X) s {k e}
+        → enter (Op.flatMap (mergeᶠ nothing) (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ []))) s k e
+        → Rl k s
+lane-in {X} st s (r , _) = go r
+  where
+    F : Bool → Den (IE X)
+    F c = Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))
+    module Mg = Merge F (enter (Op.of (true ∷ false ∷ [])) s)
+    viaL : ∀ {q a k e} → enter (Op.of (true ∷ false ∷ [])) s q (out a) → LaneOf F q a k e → Rl k s
+    viaL {a = a} x (l , _) = Rl-trans (Rl-trans (of-in _ _ l) ([ ix 1 ] , refl)) (of-in s _ x)
+    go : ∀ {k e} → Mg.JoinT k e → Rl k s
+    go (Mg.val x)              = Rl-trans ([ ix 0 ] , refl) (of-in s _ x)
+    go (Mg.step x)             = of-in s _ x
+    go (Mg.opin x)             = of-in s _ x
+    go (Mg.oend x _)           = of-in s _ x
+    go (Mg.opass x _)          = of-in s _ x
+    go (Mg.lane x _ L _ _)     = viaL x L
+    go (Mg.lend x _ L _ _ _)   = viaL x L
+    go (Mg.lpass x _ L _ _ _)  = viaL x L
+    go (Mg.hand _ _ _ _ ())
+    go (Mg.left x _ L _ _)     = viaL x L
+    go (Mg.run () _)
+    go (Mg.rend () _ _)
+    go (Mg.rpass () _ _)
+    go (Mg.rhand () _)
 
-module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) where
+-- A scan state's lanes.
+Fl : ∀ {X} → JS X → Den (IE X)
+Fl st = Op.flatMap (mergeᶠ nothing) (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ []))
 
-  HS : Held (Src b) (s₀ b ∷ Bound.outer b)
-  HS = held-src b
-
-  T′ : EmissionSet (IE X)
-  T′ = enter (RD d) p
-
-  rt : ∀ {y′ y} → Rl y′ y → rootOf y′ ≡ rootOf y
-  rt {y = y} (zs , refl) = rootOf-ext y zs
-
-  lift : ∀ {y} → Ex (s₀ b ∷ Bound.outer b) y → Ex (p ∷ cs) y
-  lift {y} (here s) = there (∈-ex (Bound.under b (here refl))
-    (sync-up {Bound.at b} {y} [ ix 1 ] (sync-up {Bound.at b ⊕ [ ix 1 ]} {y} [ ix 1 ] s)))
-  lift (there e) = there (sub-ex (λ i → Bound.under b (there i)) e)
-
-  exR : ∀ {y′ y} → Rl y′ y → Ex (s₀ b ∷ Bound.outer b) y → Ex (p ∷ cs) y′
-  exR (zs , refl) e = lift (ex-ext zs e)
-
-  named : ∀ {y n} → T′ y (out (instEmit (mark begin) n)) → n ≡ nameOf y
-  named x with read-row b p x
-  ... | inj₁ (y₀ , _ , (zs , refl) , s , same-mark e) = trans (e refl) (trans (Held.named HS s) (sym (name-ext y₀ zs)))
-  ... | inj₂ refl = refl
-
-  ends : ∀ {y} → T′ y end → Early y
-  ends x with read-end b p x
-  ... | inj₁ (_ , (zs , refl) , s) = early-inst zs (Held.ends HS s)
-  ... | inj₂ (zs , refl)           = early-inst zs ep
-
-  module J = Join Rl rt exR named (read-back b p ng) HS
-
-  held : Held T′ (p ∷ cs)
-  held = record
-    { named   = named
-    ; covered = J.covered′
-    ; exact   = J.exact′
-    ; routing = routing
-    ; shut    = J.shut′
-    ; early   = early
-    ; ends    = ends
-    ; done    = done
-    ; late    = late
-    ; idle    = read-idle b p ng
-    ; rest    = read-rest b p ng }
-    where
-      routing : ∀ {y m n} → T′ y (out (instEmit (mark m) n)) → Routing m
-      routing x with read-row b p x
-      ... | inj₁ (_ , _ , _ , s , same-mark _) = Held.routing HS s
-      ... | inj₂ refl = r-begin
-      early : ∀ {y a n} → T′ y (out (instEmit (value a) n)) → Early y
-      early x with read-row b p x
-      ... | inj₁ (_ , _ , (zs , refl) , s , same-value) = early-inst zs (Held.early HS s)
-      ... | inj₂ ()
-      done : ∀ {y n} → T′ y (out (instEmit (mark completed) n)) → Early y
-      done x with read-row b p x
-      ... | inj₁ (_ , _ , (zs , refl) , s , same-mark _) = early-inst zs (Held.done HS s)
-      ... | inj₂ ()
-      late : ∀ {y n} → T′ y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
-      late x with read-row b p x
-      ... | inj₁ (y₀ , _ , (zs , refl) , s , same-mark _) =
-        let (v , o) = Held.late HS s
-        in subst (λ r → Valued r × opos r ⊑ (y₀ ⊕ zs)) (sym (rootOf-ext y₀ zs)) (v , ⊑-trans o (zs , refl))
-      ... | inj₂ ()
-
--- A READER'S ROWS A LANE CAN HANG ON ARE ADMISSIBLE: each lies below a
--- binder's row a lane can hang on, outside every binder's last gap.
-postulate
-  placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) (env : DenEnv Δ) cs → GoodEnv env
-                   → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (connected i)) env)
-
-held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
-held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected nothing ρ i)
-held-connected (just n) ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at fr i) ep) (placed-connected (just n) ρ i)
+-- The reader is a merge of its scan's lanes.
+rd-mg : ∀ {X} (D : Den (AIE X)) p {y e} → enter (RD D) p y e
+      → enter (Op.flatMap (mergeᶠ nothing) Fl (Op.scan joinStep (true , ([] , [])) D)) p y e
+rd-mg D p r = r

@@ -2,7 +2,10 @@
 
 ## `make agda` checks `agda-impl/Main.agda`
 
-`cd agda-impl && $(AGDA) Main.agda`. Main's imports ARE the build's coverage:
+`cd agda-impl && $(AGDA) Main.agda`, after each of `AGDA_STAGES` in its own
+process: a process keeps every module it checked resident until it exits, so a
+cold tower outgrows the heap in one process though no module does alone. Main's
+imports ARE the build's coverage:
 anything Main does not reach is not checked. `make gate` runs it after the cheap
 block. A cold check of the whole tree is short, but detach it anyway when
 unsure — see [bg.md](bg.md).
@@ -23,7 +26,7 @@ Capped, it fails as `Heap exhausted` in CI and locally alike, so an OOM seen
 in CI reproduces with `make check F=<module>`. Lower it to fail fast
 (`AGDA_HEAP=4G`); never raise it to get green — a module that needs more is
 unfolding something (CLAUDE.md, "A transparent definition unfolds into its
-consumers"). A healthy full check peaks under 8 GB.
+consumers"). A healthy module peaks under 8 GB; a whole cold tower in one process does not, which is what `AGDA_STAGES` is for.
 
 ## A WARNING IS A BUILD FAILURE
 
