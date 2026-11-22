@@ -21,10 +21,8 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
-open import Relation.Nullary using (yes; no)
-open import Relation.Nullary.Decidable using (T?)
 
-open import denotation.Position using (Pos; cascade; ix; last; _∙_; _≟ᵖ_; _<ᵖ_; instant; root)
+open import denotation.Position using (Pos; cascade; ix; last; _∙_; _≟ᵖ_; instant; root)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; enter; Ev; out; end; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
@@ -39,18 +37,13 @@ open import simultaneous.Layers using (run-after; run-row)
 open import simultaneous.ColdFew using (Fresh)
 open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
 open import simultaneous.ColdBegin using (same-≺)
+open import simultaneous.ColdClose using (aft?; cold-close)
 open import simultaneous.ColdRuns using (run-has-ex; after-in; values-∈; rise; nm-inst; btw; B⁰; not-now; beg-name)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count; coldˢ)
 
 ------------------------------------------------------------------------
 -- Runs
-
--- Before a position or at it.
-aft? : ∀ c y → c ≺ y ⊎ y ≼ c
-aft? c y with T? (c <ᵖ y)
-... | yes h = inj₁ h
-... | no h  = inj₂ h
 
 -- The cursor past a run holding a row: a row of it, at or past that row.
 cur : ∀ {A} {t : EmissionSet A} {c} rs {q e} → Run t c rs → (q , e) ∈ rs
@@ -147,15 +140,6 @@ module Idles {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t
 
 ------------------------------------------------------------------------
 -- The cold
-
--- A step begun closes in its instant: a value step with its over, a
--- completion with the cold's end.
-postulate
-  cold-close : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {T e l}
-             → enter (ev m (coldˢ c) env) p (B⁰ (cascade T e l)) (out (instEmit (mark begin) (nm (cascade T e l ∙ []))))
-             → (Σ ℕ λ i → l ≡ ix i × enter (ev m (coldˢ c) env) p (cascade T e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
-                                         (out (instEmit (mark over) (nm (cascade T e l ∙ [])))))
-               ⊎ (l ≡ last × enter (ev m (coldˢ c) env) p (cascade T e l ∙ (ix 1 ∷ last ∷ [])) end)
 
 cold-idle : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
 cold-idle m c env p = Idles.idle p (enter (ev m (coldˢ c) env) p) (cold-rows m c env p)

@@ -273,7 +273,7 @@ closing in its instant (a completion's end: lanes done). Settled when each forme
 
 Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `value-open`, `over-open`, `end-open`, `comb-shut`, `scan-idle`,
-`held-connected`, `lim-rest`, `cold-close`.
+`held-connected`, `lim-rest`, `cold-cdclose`.
 
 #### THE BATCH RANK
 
