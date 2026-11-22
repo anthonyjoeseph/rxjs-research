@@ -195,13 +195,17 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
   -- EACH `laneDone` THE SCAN MEETS FOLLOWS ITS LANE'S START THERE.
   done-started : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → AC.StartIn [] xs q
-  done-started r₁ mt xs x ys eq {q} (a , y , n , xo , refl , l) with lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ refl)
-  ... | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′
-  ...   | refl with lane-begins xo l σd
-  ...     | y₀ , n₀ , l₀ , σs , le with ∈-++⁻ xs (pick σs (start-before σs σd le) (xs ++ [ _ ])
-              (run-prefix (xs ++ [ _ ]) (subst (Met M) (sym (++-assoc xs [ _ ] (ys ++ _))) (split-met r₁ mt xs _ ys eq))) (∈-++⁺ʳ xs (here refl)))
-  ...       | inj₁ i = any-map (λ { refl → a , y₀ , n₀ , xo , refl , l₀ }) i
-  ...       | inj₂ (here e″) = ⊥-elim (st-dn e″)
+  done-started r₁ mt xs x ys eq {q} (a , y , n , xo , refl , l) =
+    let (y′ , e′ , _ , σd) = lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ refl)
+    in begun (subst (λ w → σ₃ w (out (instEmit (mark laneDone) n))) (sym (⊕-injˡ y y′ e′)) σd)
+    where
+      begun : σ₃ y (out (instEmit (mark laneDone) n)) → AC.StartIn [] xs q
+      begun σd =
+        let (y₀ , n₀ , l₀ , σs , le) = lane-begins xo l σd
+        in [ (λ i → any-map (λ { refl → a , y₀ , n₀ , xo , refl , l₀ }) i)
+           , (λ { (here e″) → ⊥-elim (st-dn e″) ; (there ()) }) ]′
+             (∈-++⁻ xs (pick σs (start-before σs σd le) (xs ++ [ _ ])
+               (run-prefix (xs ++ [ _ ]) (subst (Met M) (sym (++-assoc xs [ _ ] (ys ++ _))) (split-met r₁ mt xs _ ys eq))) (∈-++⁺ʳ xs (here refl))))
 
   -- A `laneDone` THE SCAN MEETS IS A RUN LANE'S.
   done-mark : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markAct op x ≡ kDone
