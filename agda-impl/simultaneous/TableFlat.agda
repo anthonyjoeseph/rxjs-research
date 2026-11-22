@@ -263,9 +263,12 @@ module Vals {Γ A} n (s : Obs Timeline Γ A) (ρ : ℕ → All Tb.Listed Γ) (p 
   isMarker : ℕ → Pos → Bool
   isMarker N y = anyᵇ (λ v → does ((ValAt.q v ⊕ [ ix 0 ]) ≟ᵖ y)) (valsAt N)
 
-module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
-  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
-  (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
+-- THE ELABORATED PARTS, their subscriptions and hots: everything a
+-- flatMap's elaboration lists that no environment's record reaches.  Two
+-- environments' flatMaps share these terms outright, so the closer's
+-- table, opaque, compares by its arguments rather than by its listing.
+module Elab {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+  {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N)) (p* : Pos) where
 
   ----------------------------------------------------------------------
   -- The elaborated parts
@@ -322,14 +325,23 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   uρ*h : ∀ N → UncutEnv (ρ*h N)
   uρ*h N = proj₂ (proj₂ (listC-ok (3 + N) n shared {ρ*s N} (uρ*s N) (p* ⊕ [ ix 0 ] ⊕ [ ix 1 ]))) , uρ*s N
 
-  cl-tab : ℕ → Tb.Listed (IE B)
-  cl-tab N = hotOf (proj₁ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ])))
+  opaque
+    cl-tab : ℕ → Tb.Listed (IE B)
+    cl-tab N = hotOf (proj₁ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ])))
 
   ρ*c : ℕ → All Tb.Listed (IE B ∷ IE A ∷ ⊤ ∷ Δ)
   ρ*c N = cl-tab N ∷ ρ*h N
 
-  uρ*c : ∀ N → UncutEnv (ρ*c N)
-  uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
+  opaque
+    unfolding cl-tab
+    uρ*c : ∀ N → UncutEnv (ρ*c N)
+    uρ*c N = proj₂ (proj₂ (listC-ok (3 + N) n closer {ρ*h N} (uρ*h N) (c₃ ⊕ [ ix 1 ]))) , uρ*h N
+
+module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
+  (ρ : ℕ → All Tb.Listed Γ) (uρ : ∀ N → UncutEnv (ρ N)) {Δ} (ρι : Ren Γ Δ) (ρ* : ℕ → All Tb.Listed Δ) (uρ* : ∀ N → UncutEnv (ρ* N))
+  (env : EnvR ρ ρι ρ*) (p p* : Pos) (ad : Admits (lw env) p) (ad* : Admits (lw* env) p*) where
+
+  open Elab n f s ρι ρ* uρ* p* public
 
   -- Each hot listed off its lawful source, each body admissible.
   ttD : HotD (lw* env) tt-tab
@@ -350,14 +362,18 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
   ad₃ : Admits Dh c₃
   ad₃ = admits-body n shared uρ*s Ds (p* ⊕ [ ix 0 ]) ad₄
 
-  clD : HotD Dh cl-tab
-  clD = listHot n closer uρ*h Dh c₃ ad₃
+  opaque
+    unfolding cl-tab
+    clD : HotD Dh cl-tab
+    clD = listHot n closer uρ*h Dh c₃ ad₃
 
   Dc : DenOf ρ*c
   Dc = den-cons clD
 
-  ad₂ : Admits Dc c₂
-  ad₂ = admits-body n closer uρ*h Dh c₃ ad₃
+  opaque
+    unfolding cl-tab uρ*c clD
+    ad₂ : Admits Dc c₂
+    ad₂ = admits-body n closer uρ*h Dh c₃ ad₃
 
   ad₁ : Admits Dc c₁
   ad₁ = admits-step Dc ad₂
