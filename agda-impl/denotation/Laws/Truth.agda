@@ -93,10 +93,10 @@ few-pins (ks , h) = ks , h
 pins-via : ∀ {A B} {Y : EmissionSet A} {Z : EmissionSet B} {r v} → (∀ {k} → Y k (pin r) → k ≺ v → Z k (pin r)) → Pins Z r v → Pins Y r v
 pins-via f (ks , h) = ks , λ y kv → h (f y kv) kv
 
-private
-  instant-⊑ : ∀ {w y} → w ⊑ y → instant y ≡ instant w
-  instant-⊑ {i ∙ _} (_ , refl) = refl
+instant-⊑ : ∀ {w y} → w ⊑ y → instant y ≡ instant w
+instant-⊑ {i ∙ _} (_ , refl) = refl
 
+private
   instant-⊕ : ∀ s ys → instant (s ⊕ ys) ≡ instant s
   instant-⊕ (i ∙ _) _ = refl
 

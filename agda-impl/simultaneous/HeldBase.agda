@@ -51,15 +51,16 @@ open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.InstEmit using (instEmit; value; mark; over)
-open import simultaneous.Routed using (nameOf; nm; Valued; opos)
+open import simultaneous.Routed using (nameOf; Valued; opos)
 open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
+open import simultaneous.ColdFew using (cold-step-few; of-below)
 open import simultaneous.Relations using (Met)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (Ev; out; end)
 open import denotation.Laws.Worlds using (ok-step; _⊑_)
-open import Data.Sum using (inj₁; inj₂)
+open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
 open import Relation.Binary.PropositionalEquality using (sym; cong; subst)
@@ -75,12 +76,12 @@ open import denotation.EmissionSet using (_≺_)
 open import simultaneous.Routed using (cnt; Carried)
 open import simultaneous.HeldComb using (ShutRun)
 open import denotation.Position using (Path)
-open import denotation.EmissionSet using (InE; at-out; at-end; on-out)
+open import denotation.EmissionSet using (InE; at-end; at-out; on-out)
 open import denotation.Events using (ofᴱ)
-open import denotation.Laws.Worlds.Leaves using (of-idx)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import simultaneous.Relations using (values)
 open import simultaneous.HeldComb using (RunHeld)
+open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
 
 ------------------------------------------------------------------------
 -- Programs and their binders
@@ -155,11 +156,6 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
       ... | zs , refl = early-inst zs ep
 
 -- The rows of `of` and of `empty`.
-of-below : ∀ {X} p i (ys : List X) {y e} → InE (ofᴱ p i ys) y e → Σ Path λ zs → y ≡ p ⊕ zs
-of-below p i ys x with of-idx p i ys x
-... | inj₁ (j , _ , eq) = [ ix j ] , eq
-... | inj₂ eq           = [ last ] , eq
-
 of-vals : ∀ {X} p i (ys : List X) {y v} → InE (ofᴱ p i ys) y (out v) → v ∈ ys
 of-vals p i (_ ∷ ys) at-out     = here refl
 of-vals p i (_ ∷ ys) (on-out r) = there (of-vals p (suc i) ys r)
@@ -186,39 +182,15 @@ held-of (just n) ρ xs = ih λ env cs g eh p ok ep →
 postulate
   held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 
--- THE COLD'S ROWS, subscribed at `p`: its synchronous values and end lie
--- in the subscribe burst, named `root`.  Each async step at `I` renders
--- under its lane at `I ∙ [ ix 1 ]`: a value step's `of` sends begin,
--- value and over beneath `nm I ⊕ [ ix 0 ]`, the over at `opos I`.  A
--- completion is an instant of its own, even straight after a value: its
--- begin lies where a value step's does, under the name one queued lane
--- further down, and the cold's end carries that route
--- (`simultaneous.Routed.Carried`) from where the step's lane completes.
-data ColdRow {A : Set} (p : Pos) : Pos → Ev (IE A) → Set where
-  now-value  : ∀ zs {a} → ColdRow p (p ⊕ zs) (out (instEmit (value a) root))
-  now-end    : ∀ zs → ColdRow p (p ⊕ zs) end
-  step-begin : ∀ {t e l} → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
-                                     (out (instEmit (mark begin) (nm (cascade t e l ∙ []))))
-  step-value : ∀ {t e i a} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
-                                       (out (instEmit (value a) (nm (cascade t e (ix i) ∙ []))))
-  step-over  : ∀ {t e i} → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
-                                     (out (instEmit (mark over) (nm (cascade t e (ix i) ∙ []))))
-  step-end   : ∀ {t e} → ColdRow p (cascade t e last ∙ (ix 1 ∷ last ∷ [])) end
-
 -- A step's route opens at its begin and nothing comes between: what the
 -- cold's runs ask needs the order of its rows, which `ColdRow` does not
 -- carry.
 postulate
-  cold-rows    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {y e}
-               → enter (ev m (coldˢ c) env) p y e → Visible e → ColdRow p y e
   cold-covered : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs
                → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂ → Carried e → ¬ Ex [ p ] y
                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   cold-shut    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {rs} → Met (enter (ev m (coldˢ c) env) p) rs → ShutRun rs
   cold-idle    : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Idle (enter (ev m (coldˢ c) env) p)
-  -- A cold's step makes finitely many rows, past its over or not.
-  cold-step-few : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p {q n} → enter (ev m (coldˢ c) env) p q (out (instEmit (mark begin) n))
-                → Σ (List Pos) λ ks → ∀ {y e} → enter (ev m (coldˢ c) env) p y e → rootOf y ≡ rootOf q → y ∈ ks
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
