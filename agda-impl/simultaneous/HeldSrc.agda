@@ -154,7 +154,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   -- The binders, read under a lane's hot.
   eh₄ : ∀ {t} → EnvHeld (λ i → there (there (there (there (ρ i))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-  eh₄ = record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }
+  eh₄ = record { bound = λ {X} i → EnvHeld.bound eh {X} i ; apart = λ {X} {Y} i j → EnvHeld.apart eh {X} {Y} i j }
 
   g₃ : GoodEnv env′
   g₃ = good-cons L₃ g₂
@@ -241,10 +241,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   lane-fit : Fit (Fresh eh) σ₃
   lane-fit = proper-fit (LaneReal.realE m op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
                (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂
-               (λ a L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                   (good-cons L g₂) eh₄ q okq fq eq)
-                                   (IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot _ ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
-                                   (good-cons L g₂) eh₄ q okq fq eq))
+               (λ a {t} L q okq fq eq → held-fit (IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) (eh₄ {t}) q okq fq eq)
+                                   (IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs
+                                   (good-cons L g₂) (eh₄ {t}) q okq fq eq))
                (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep)))))
 
   lane-named  : ∀ {q n} → σ₃ q (out (instEmit (mark begin) n)) → n ≡ nameOf q
