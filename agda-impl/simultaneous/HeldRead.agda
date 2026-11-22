@@ -104,6 +104,22 @@ Src b = enter (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b)
 Rl : Pos → Pos → Set
 Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 
+-- A READER JOINED IN ITS HOT'S LAST GAP SHOWS A LONE END.  Every
+-- position under the annotation's nothing row lies between that row and
+-- the annotation's end, so a reader subscribed there meets only the end,
+-- below the source's end, with no begin before it.  `Ok` admits such a
+-- position (no hot row lies in its world), and `Early` too when the
+-- source completes in a timer's last step, which is no value step.  Where
+-- the source ended outside its exempt bursts its count before the end is
+-- positive (`Held.covered`), so `Joined` has no constructor for that run,
+-- and the reader's own `Held.covered` fails on its end.  Only marks lie in
+-- the gap and no former subscribes a lane on a mark, so no elaborated
+-- reader is ever subscribed there; `HeldD` does not yet say so.
+--
+-- RECOVERY: git show 23124ea8 restores `FlatLayer`, a merge of closed
+--   lanes met in turn with the reader's `each₂` instance, and the hot's
+--   func/flat/quiet off `Lawful` (`HotInv`), the forward half of a body.
+
 postulate
   -- A run the reader meets is one of the source's, joined late.
   read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {rs′} → Met (enter (RD d) p) rs′

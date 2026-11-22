@@ -16,7 +16,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import denotation.Position using (Pos; sub; last; _⊕_)
 open import denotation.Events using (<ᵖ-split; <ᵖ-down)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; EmissionSet; _≺_; _≼_; hot; Rejoin; shown; heard; ended; late; enter)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Bare; EmissionSet; _≺_; _≼_; hot; Rejoin; shown; heard; ended; late)
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≺-absurd; ≺-ext; ≼-trans; ≼-false)
 open import denotation.Laws.Worlds using (_∪ʰ_; Lawful; W; W⁼; step; join; here; inW; Plain; plain-last; plain-sub; real-snoc; real-sub; Real; InvD; _⊑_; ⊑-snoc; ⊑-inside; ext≢; not-up; nest-in; named-view; named-e; anc-≼; world-anc⁼; world-after; ⊕-assoc; ⊕-injˡ; ⊕-injʳ)
 
@@ -113,17 +113,3 @@ lawful-hot {H = H} {t} L p ok = record
     ... | inj₂ e   = anc-≼ (world-anc⁼ vp) (proj₁ ok) (world-after (step (inW (wo vq)) pl) (real-snoc q pl (re vq)))
       where vp : W⁼ (H ∪ʰ t) (q ⊕ [ l ]) p
             vp = named-e (named-view {h = q′} (subst (W⁼ (H ∪ʰ t) (q ⊕ [ l ])) e v)) λ eq → plain-sub pl (sym (⊕-injʳ q′ q eq))
-
--- A JOINER ANYWHERE keeps the hot's order: one event at a position, none
--- under another, nothing past an end.  Wherever it is subscribed.
-module _ {A} {t : EmissionSet A} (L : Lawful t) (p : Pos) where
-  private module V = HI {H = λ _ → ⊥} {p} L
-
-  hot-func : ∀ {y e e′} → enter (hot t) p y e → enter (hot t) p y e′ → e ≡ e′
-  hot-func x x′ = V.fu (V.view (proj₁ x)) (V.view (proj₁ x′))
-
-  hot-flat : ∀ {y e l ys e′} → enter (hot t) p y e → enter (hot t) p (y ⊕ (l ∷ ys)) e′ → ⊥
-  hot-flat x x′ = V.fl (V.view (proj₁ x)) (V.view (proj₁ x′)) refl
-
-  hot-quiet : ∀ {c y e} → enter (hot t) p c end → enter (hot t) p y e → c ≺ y → ⊥
-  hot-quiet c y cy = V.bu (V.view (proj₁ c)) (V.view (proj₁ y)) cy

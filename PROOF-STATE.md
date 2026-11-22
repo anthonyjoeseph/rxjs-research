@@ -248,6 +248,15 @@ bodies, or a row whose creator chain is cut unlike its image's.
 Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 `scan-order`, `take-order`, `defer-order`.
 
+#### THE READER
+
+Refuted at a reader joined in its hot's last gap, under the annotation's
+nothing row: `Ok` and `Early` admit it, and it shows a lone end no route
+covers. Settled by an admissibility in `HeldD` that keeps subscriptions out
+of a hot's last gap (no lane hangs on a mark), or a reader that holds there.
+
+Members: `read-back`, `read-idle`, `read-rest`.
+
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
@@ -273,14 +282,6 @@ defer limit's rest (no one approximant bounds it). Settled when each former's le
 Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 `value-open`, `over-open`, `end-open`, `comb-shut`, `scan-idle`,
 `lim-rest`.
-
-#### THE READER
-
-Untried: a reader's runs are the source's joined late, its idles and rests the
-source's. Settled by reading the reader's scan, each and hot run by run, over
-the annotation's rows (`ann-row`).
-
-Members: `read-back`, `read-idle`, `read-rest`.
 
 #### THE BATCH RANK
 
