@@ -276,12 +276,12 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 
 #### THE READER
 
-Untried: a binder's reader shows its source's rows moved below them, its
-joins named for the instant first met, and runs that are the source's
-joined late. Settled by reading the reader's scan and hot through the
-annotation's connect, row by row.
+Untried: an annotated row is a source row met beside the source's count
+before it, and a reader's runs are the source's joined late. Settled by
+reading the annotation's scan and connect, and the reader's scan and hot,
+run by run.
 
-Members: `read-row`, `read-end`, `read-back`, `read-idle`, `read-rest`.
+Members: `ann-row`, `ann-end`, `read-back`, `read-idle`, `read-rest`.
 
 #### THE BATCH RANK
 
