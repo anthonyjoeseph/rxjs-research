@@ -222,24 +222,11 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       (subst (Met M) (trans (cong (λ t → xs ++ u ∷ t) (++-assoc ys₁ (v ∷ ys₂) zs)) (sym (++-assoc xs (u ∷ ys₁) (v ∷ ys₂ ++ zs)))) mt)
       (∈-++⁺ʳ xs (here refl))
 
-  -- A LATER VALUE'S LANE ROW THE SCAN MET PAST A LANE'S START CUTS IT IN
-  -- THE SCAN: the later value's `outerOpen` lies before its lane's rows,
-  -- and past the first lane's start, which no later value had cut.
-  cut-met : op ≡ switchᶠ → ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q} → AC.StartIn [] rx₁ q
-          → ∀ {q′ a′ k b} → RO q′ (out a′) → q ≺ q′ → RV.Lane op q′ a′ k (out b)
-          → (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∈ rx₁ → ¬ ¬ AC.CutIn [] rx₁ q
-  cut-met op≡ rx₁ {z} {e} {rx₂} mt {q} si {q′} {a′} {k} {b} xo′ qq′ l′ i κ =
-    let (x₀ , i₀ , mk₀) = find si
-        (xs , ys , eq) = ∈-∃++ i
-        (r′ , _ , σr′ , q′≡) = ro-row xo′
-    in cut-at op≡ xs ys (subst (λ r → Met M (r ++ (z , e) ∷ rx₂)) eq mt) (subst (x₀ ∈_) eq i₀) mk₀ xo′ qq′ l′ σr′ q′≡
-         (λ c → κ (subst (λ r → AC.CutIn [] r q) (sym eq) c))
-
   cut-at : op ≡ switchᶠ → ∀ xs ys {z e rx₂ q q′ a′ k b} → Met M ((xs ++ (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∷ ys) ++ (z , e) ∷ rx₂)
          → ∀ {x₀} → x₀ ∈ xs ++ (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∷ ys → LaneMark laneStart q x₀
          → RO q′ (out a′) → q ≺ q′ → RV.Lane op q′ a′ k (out b)
          → ∀ {r′ n′} → σ₁ r′ (out (instEmit (value a′) n′)) → q′ ≡ ro-at r′
-         → ¬ AC.CutIn [] (xs ++ (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∷ ys) q
+         → ¬ ¬ AC.CutIn [] (xs ++ (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∷ ys) q
   cut-at op≡ xs ys {z} {e} {rx₂} {q} {q′} {a′} {k} {b} mt {x₀} i₀ (a , y₀ , n₀ , xo , refl , l) xo′ qq′ l′ {r′} σr′ q′≡ nc =
     met-open xs (split-met (xs ++ row ∷ ys) mt xs _ ys refl) σr′ jz
       λ oa → let (o , io , (_ , r″ , n″ , σr″ , q″≡ , o≡)) = find oa
@@ -258,7 +245,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       σs = let (y′ , e′ , _ , σs′) = lane-mark (run-prefix (xs ++ row ∷ ys) mt) i₀ (inj₁ refl)
            in subst (λ w → σ₃ w (out (instEmit (mark laneStart) n₀))) (sym (⊕-injˡ y₀ y′ e′)) σs′
 
-      lane≢outer : ∀ {u : Maybe (Ev (IE B))} {v} → just u ≡ v → v ≡ nothing → ⊥
+      lane≢outer : ∀ {u : Ev (IE B)} {v} → just u ≡ v → v ≡ nothing → ⊥
       lane≢outer refl ()
 
       cut : ∀ r″ {a″ n″} → σ₁ r″ (out (instEmit (value a″) n″)) → ro-at r′ ≡ ro-at r″ → ∀ xs₁ xs₂
@@ -299,6 +286,19 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
                   , (λ { (here eq′) → ⊥-elim (lane≢outer (cong (λ r → brTag {B} laneB (proj₂ r)) eq′) refl)
                        ; (there j) → ⊥-elim (opened (met-order xs₁ mt′ j)) }) ]′
                   (++⁻ xs₁ (subst (_ ∈_) E i₀))
+
+  -- A LATER VALUE'S LANE ROW THE SCAN MET PAST A LANE'S START CUTS IT IN
+  -- THE SCAN: the later value's `outerOpen` lies before its lane's rows,
+  -- and past the first lane's start, which no later value had cut.
+  cut-met : op ≡ switchᶠ → ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q} → AC.StartIn [] rx₁ q
+          → ∀ {q′ a′ k b} → RO q′ (out a′) → q ≺ q′ → RV.Lane op q′ a′ k (out b)
+          → (k ⊕ [ sub LS.J ] , out (Tg laneB b)) ∈ rx₁ → ¬ ¬ AC.CutIn [] rx₁ q
+  cut-met op≡ rx₁ {z} {e} {rx₂} mt {q} si {q′} {a′} {k} {b} xo′ qq′ l′ i κ =
+    let (x₀ , i₀ , mk₀) = find si
+        (xs , ys , eq) = ∈-∃++ i
+        (r′ , _ , σr′ , q′≡) = ro-row xo′
+    in cut-at op≡ xs ys (subst (λ r → Met M (r ++ (z , e) ∷ rx₂)) eq mt) (subst (x₀ ∈_) eq i₀) mk₀ xo′ qq′ l′ σr′ q′≡
+         (λ c → κ (subst (λ r → AC.CutIn [] r q) (sym eq) c))
 
   -- A LIVE LANE STILL SHOWS A ROW BEFORE THE LANES' END: its `laneDone`,
   -- or, where a later value cuts it, the last value's.
