@@ -52,7 +52,7 @@ open import Data.Product using (proj₁; proj₂)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; from)
-open import simultaneous.HeldRead using (held-connected)
+open import simultaneous.HeldReader using (held-connected)
 open import simultaneous.HeldComb using (ev)
 import Relation.Nullary as Nl
 open import Data.Sum using ([_,_]′)
