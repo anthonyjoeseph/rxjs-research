@@ -36,7 +36,7 @@ open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
 open import simultaneous.BranchSplit using (SrcOf; bview)
-open import simultaneous.LaneSplit using (Ln; lane-proj; module HotSplit)
+open import simultaneous.LaneSplit using (Ln; module HotSplit)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.CloseDone using (module CloseDone)
 open import simultaneous.CombSent using (Clo)
@@ -50,7 +50,7 @@ open import simultaneous.CombSent using (fed-op; Fed; sent-track; trackers-out; 
 open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHots; IH; ev-none; Fresh; fresh-adm)
 open import simultaneous.Routed using (Placed; Adm; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
-open import simultaneous.FlatLanes using (laneTag; end-last; BProj; past-within; within-of; within₀; cl; co)
+open import simultaneous.FlatLanes using (end-last; BProj; past-within; within-of; within₀; co)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
@@ -68,7 +68,7 @@ open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
 open import Data.Bool using (true; false)
-open import simultaneous.Project using (Proj; run-prefix)
+open import simultaneous.Project using (run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
@@ -447,24 +447,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       ...   | inj₁ ([] , refl) = ≺-irrefl {(y ⊕ []) ⊕ [ sub J ]} (subst (λ z → ((y ⊕ []) ⊕ [ sub J ]) ≺ (z ⊕ [ sub J ])) (sym (⊕-identityʳ y)) lt′)
       ...   | inj₁ (l ∷ ws , refl) = Lawful.flat L₃ ry ry′
 
-  postulate
-    -- THE LANES END WITH THE SCAN HOLDING NONE OF THEIR ROUTES: where the
-    -- lanes' next row past what the source met is their end, every lane has
-    -- sent its `laneDone`, its routes stopped, ended or handed on.
-    --
-    -- REFUTED: cf901010 lane-end-shut over the lanes' own count, by a lane whose inner completes asynchronously: its completion's begin is carried, never stopped
-    lane-end-shut : ∀ rx₁ {q a rx₂ rs y} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → σ₃ y end → After (cursor nothing rs) y
-                  → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
-
-    -- WHILE THE SCAN STILL COUNTS A LANE ROUTE, THE LANES' NEXT ROW IS OF
-    -- THEIR INSTANT: the instant the lanes' own count names, past a run of
-    -- them, is that of any position before every lane row still to come.
-    --
-    -- REFUTED: 1e9665c7 lane-idle as the lanes' own `Idle`, by a merge whose first lane completes asynchronously while a second is pending: the completion's begin is carried, so the lanes' count keeps its instant as the second lane begins another
-    lane-idle : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → Proj laneTag rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
-              → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
-              → proj₁ (cnt rs) ≡ nameOf w
-
   -- THE HOT ROWS UNDER AN OUTER ROW: itself, or the closer's, under one of
   -- its `sub`s naming a position at or past any `Q` at or before the
   -- closer's subscription; the environment's, never.
@@ -584,30 +566,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
               → Σ _ λ rs → BProj laneB (λ x → x) LS.J rx₁ rs × Met σ₃ rs × Σ Pos λ w → (w ≡ q ⊎ q ≡ w ⊕ [ sub LS.J ]) × LN.NextAt (cursor nothing rs) w
     lane-next rx₁ {q} {a} {rx₂} mt = LN.next-at {rx₁} {q} {a} {rx₂} (lane-run (run-prefix rx₁ mt))
       (run-tail rx₁ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out a) ∷ rx₂)) (src-op tk env′ m) mt)) (bview laneB (out a))
-
-  -- The lanes' counter is none, or of the name the lanes last began,
-  -- with a route of it open.
-  lanes-count : ∀ {rx rs} → Met M rx → BProj laneB (λ x → x) LS.J rx rs
-              → Flat.lanes (proj₁ (past op init rx)) ≡ 0
-              ⊎ Flat.at (proj₁ (past op init rx)) ≡ proj₁ (cnt rs) × Σ ℕ λ k → proj₂ (cnt rs) ≡ suc k
-  lanes-count {rx} {rs} mt pr =
-    within-of (past-within {B} {B} cl (λ x → x) (λ _ _ → refl) LS.J op init r₀ rx rs
-      (λ r₁ r₂ eq → end-last (inv-ev m src env′ g₃ P ok₃) r₁ (subst (Met M) eq mt)) pr (within₀ {B} laneB r₀))
-
-  -- Where the lanes still count a route, no lane end is next.
-  lane-shut : ∀ rx₁ {q a rx₂ rs} → Met M (rx₁ ++ (q , out a) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ¬ Flat.lanes (proj₁ (past op init rx₁)) ≡ 0
-            → ∀ {y} → σ₃ y end → After (cursor nothing rs) y → (∀ {k x} → σ₃ k (out x) → After (cursor nothing rs) k → y ≼ k) → ⊥
-  lane-shut rx₁ mt pr nz ry ay all = nz (lane-end-shut rx₁ mt (lane-proj pr) ry ay all)
-
-  lanes-current : ∀ rx₁ {q a rx₂} → Met M (rx₁ ++ (q , out a) ∷ rx₂)
-                → Flat.lanes (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
-  lanes-current rx₁ mt with lane-next rx₁ mt
-  ... | rs , pr , _ , w , wq , fw , af , outl , endl with lanes-count (run-prefix rx₁ mt) pr
-  ...   | inj₁ z = inj₁ z
-  ...   | inj₂ (at≡ , _) with Flat.lanes (proj₁ (past op init rx₁)) ℕ.≟ 0
-  ...     | Nl.yes z = inj₁ z
-  ...     | Nl.no nz =
-    inj₂ (trans at≡ (trans (lane-idle rx₁ mt (lane-proj pr) nz fw af (LN.idle-least {cursor nothing rs} {w} (lane-shut rx₁ {rs = rs} mt pr nz) outl endl)) (named-at LS.J wq)))
 
   -- The outer's next row past what the source met.
   opaque
