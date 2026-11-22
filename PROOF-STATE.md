@@ -276,12 +276,12 @@ Members: `lane-end-shut`, `lane-idle`, `held-current`, `live-current`,
 
 #### THE READER
 
-Untried: an annotated row is a source row met beside the source's count
-before it, and a reader's runs are the source's joined late. Settled by
+Untried: the annotation's connect shows its source's run, each emit wrapped,
+then nothing at its end; a reader's runs are the source's joined late. Settled by
 reading the annotation's scan and connect, and the reader's scan and hot,
 run by run.
 
-Members: `ann-row`, `ann-end`, `read-back`, `read-idle`, `read-rest`.
+Members: `conn-src`, `conn-end`, `read-back`, `read-idle`, `read-rest`.
 
 #### THE BATCH RANK
 

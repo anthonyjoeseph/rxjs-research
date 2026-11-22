@@ -28,6 +28,13 @@ open import simultaneous.DenRows using (merge-out; hot-out; of-mem; scan-out)
 open import simultaneous.Layers using (run-row; run-tail; run-past-end)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.HeldJoin using (jl; jl-in; zero-suc)
+open import Tree using (Obs; connect; map; of)
+open import denotation.EmissionSet using (map-end)
+open import denotation.Laws.Modulus using (entered-few)
+open import simultaneous.DenRows using (map-out′)
+open import simultaneous.HeldConnect using (vis-dep; same-refl)
+open import simultaneous.ScanAcc using (module AccRun)
+open import simultaneous.Relations using (values)
 open import denotation.Position using (last)
 open import denotation.Events using (<ᵖ-between)
 open import denotation.EmissionSet using (module Merge; module Scan; Ended; _≺_; _≼_) renaming (ended to r-ended; late to r-late; shown to r-shown)
@@ -62,7 +69,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldBase using (Bound; IH; ih)
 open import simultaneous.HeldJoin using (Joined; module Join)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; reader; annotate; joinStep)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ)
 
 -- The reader of a binder's meaning.
 RD : ∀ {X} → Den (AIE X) → Den (IE X)
@@ -102,24 +109,71 @@ data AnnEv {X : Set} : Maybe (IE X) → Ev (IE X) → Set where
   ann-just : ∀ {e} → AnnEv (just e) (out e)
   ann-none : AnnEv nothing end
 
+-- The annotation's connect: the source wrapped, read through its own subject, then nothing.
+CnO : ∀ {Θ X} → Obs Timeline Θ (IE X) → Obs Timeline Θ (Maybe (IE X))
+CnO s = connect (map just s) (concatˢ (connected (here refl)) (of (nothing ∷ [])))
+
+Cn : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → EmissionSet (Maybe (IE X))
+Cn b = enter (ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b)) (Bound.at b ⊕ [ ix 1 ])
+
 postulate
-  -- AN ANNOTATED ROW IS A SOURCE ROW MET, beside the routes the source
-  -- held before it.
-  ann-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {q r me} → Ann b q (out (r , me))
-          → Σ (List (Pos × Ev (IE X))) λ pre → Σ Pos λ w → Σ (Ev (IE X)) λ e
-            → Met (Src b) (pre ++ [ (w , e) ]) × r ≡ cnt pre × Rl q w × AnnEv me e
-  -- An annotation ends below its source's end.
-  ann-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {c} → Ann b c end → Σ Pos λ w → Rl c w × Src b w end
+  -- THE ANNOTATION'S CONNECT SHOWS ITS SOURCE'S RUN: each emit wrapped,
+  -- then nothing at the source's end.
+  conn-src : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {rx q x} → Met (Cn b) (rx ++ [ (q , out x) ])
+           → Σ (List (Pos × Ev (IE X))) λ pre → Σ Pos λ w → Σ (Ev (IE X)) λ e
+             → Met (Src b) (pre ++ [ (w , e) ]) × values rx ≡ L.map just (values pre) × Rl q w × AnnEv x e
+  -- It ends below the source's end.
+  conn-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {c} → Cn b c end → Σ Pos λ w → Rl c w × Src b w end
+
+cn-inv : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → InvAt (Hots (Bound.env b)) (Bound.at b ⊕ [ ix 1 ]) (Cn b)
+cn-inv b = inv-ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+
+-- The annotation's first state.
+z₀ : ∀ {X} → Routes × AIE X
+z₀ = (root , 0) , ((root , 0) , nothing)
+
+ev-ann : ∀ m {Θ X} (s : Obs Timeline Θ (IE X)) env → ev m (annotate s) env ≡ Op.map proj₂ (Op.scan annStep z₀ (ev m (CnO s) env))
+ev-ann nothing  s env = refl
+ev-ann (just _) s env = refl
+
+ann-snd : ∀ {X} (st : Routes × AIE X) x → proj₂ (annStep st x) ≡ (proj₁ st , x)
+ann-snd st (just _) = refl
+ann-snd st nothing  = refl
+
+-- The routes an annotation carries count the emits it wrapped.
+ann-fold : ∀ {X} (st : Routes × AIE X) (vs : List (IE X)) → proj₁ (L.foldl annStep st (L.map just vs)) ≡ L.foldl count (proj₁ st) vs
+ann-fold st []       = refl
+ann-fold st (v ∷ vs) = ann-fold (annStep st (just v)) vs
+
+-- AN ANNOTATED ROW IS A SOURCE ROW MET, beside the routes the source
+-- held before it.
+ann-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {q r me} → Ann b q (out (r , me))
+        → Σ (List (Pos × Ev (IE X))) λ pre → Σ Pos λ w → Σ (Ev (IE X)) λ e
+          → Met (Src b) (pre ++ [ (w , e) ]) × r ≡ cnt pre × Rl q w × AnnEv me e
+ann-row {X} b {q} {r} {me} aq
+  with map-out′ proj₂ (Op.scan annStep z₀ (ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b))) (Bound.at b ⊕ [ ix 1 ])
+         (subst (λ D → enter D (Bound.at b ⊕ [ ix 1 ]) q (out (r , me))) (ev-ann (Bound.m b) (Bound.src b) (Bound.env b)) aq)
+... | st , (Scan.sval ac , _) , eq₁
+  with AccRun.acc-run annStep z₀ (cn-inv b) (λ x v → entered-few (ev (Bound.m b) (CnO (Bound.src b)) (Bound.env b)) (Bound.at b ⊕ [ ix 1 ]) (vis-dep v) x) ac
+...   | rx , x , _ , run , eq₂ with conn-src b run
+...     | pre , w , e , srun , vq , qw , ann =
+  pre , w , e , srun ,
+  trans (cong proj₁ pair) (trans (cong (λ vs → proj₁ (L.foldl annStep z₀ vs)) vq) (ann-fold z₀ (values pre))) ,
+  qw , subst (λ m′ → AnnEv m′ e) (sym (cong proj₂ pair)) ann
+  where
+    pair : (r , me) ≡ (proj₁ (L.foldl annStep z₀ (values rx)) , x)
+    pair = trans eq₁ (trans (cong proj₂ eq₂) (ann-snd _ x))
+
+-- An annotation ends below its source's end.
+ann-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {c} → Ann b c end → Σ Pos λ w → Rl c w × Src b w end
+ann-end b {c} ce with subst (λ D → enter D (Bound.at b ⊕ [ ix 1 ]) c end) (ev-ann (Bound.m b) (Bound.src b) (Bound.env b)) ce
+... | (map-end (Scan.send x , _) , _) = conn-end b x
 
 Rl-trans : ∀ {x y z} → Rl x y → Rl y z → Rl x z
 Rl-trans {z = z} (zs , refl) (ws , refl) = ws ++ zs , ⊕-assoc z ws zs
 
 nameOf-rl : ∀ {y w} → Rl y w → nameOf y ≡ nameOf w
 nameOf-rl {w = w} (zs , refl) = name-ext w zs
-
-same-refl : ∀ {A} (x : IE A) → Same x x
-same-refl (instEmit (value _) _) = same-value
-same-refl (instEmit (mark _) _)  = same-mark (λ _ → refl)
 
 ------------------------------------------------------------------------
 -- A reader row
