@@ -58,7 +58,7 @@ open import denotation.Laws.Worlds using (ok-step)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; begin)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Held; Idle; nameOf)
+open import simultaneous.Routed using (Held; nameOf)
 open import simultaneous.Relabel using (Same)
 open import simultaneous.HeldTake using (name-ext)
 open import simultaneous.HeldComb using (ev)
@@ -103,27 +103,17 @@ Src b = enter (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b)
 Rl : Pos → Pos → Set
 Rl y′ y = Σ Path λ zs → y′ ≡ y ⊕ zs
 
--- A READER JOINED IN ITS HOT'S LAST GAP SHOWS A LONE END.  Every
--- position under the annotation's nothing row lies between that row and
--- the annotation's end, so a reader subscribed there meets only the end,
--- below the source's end, with no begin before it.  `Ok` admits such a
--- position (no hot row lies in its world), and `Early` too when the
--- source completes in a timer's last step, which is no value step.  Where
--- the source ended outside its exempt bursts its count before the end is
--- positive (`Held.covered`), so `Joined` has no constructor for that run,
--- and the reader's own `Held.covered` fails on its end.  Only marks lie in
--- the gap and no former subscribes a lane on a mark, so no elaborated
--- reader is subscribed there (`Fresh`).
---
--- RECOVERY: git show 23124ea8 restores `FlatLayer`, a merge of closed
---   lanes met in turn with the reader's `each₂` instance, and the hot's
---   func/flat/quiet off `Lawful` (`HotInv`), the forward half of a body.
-
+-- THE READER SHOWS EACH SOURCE ROW IT IS SUBSCRIBED BEFORE: a row of the
+-- source past a row of the reader, with few rows before it and none of the
+-- source's ends, shows below itself, visibly if it is visible.  The source
+-- row is wrapped by the annotation's connect below it, read by the hot past
+-- the reader's subscription, scanned, and its lane's emit is the reader's
+-- row; a silent row stays a silent row at each layer, and the source's end
+-- is the annotation's end below it, which the reader ends on.
 postulate
-  -- A run the reader meets is one of the source's, joined late.
-  read-back : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → ∀ {rs′} → Met (enter (RD d) p) rs′
-            → Joined (Src b) Rl (p ∷ cs) rs′
-  read-idle : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p → Idle (enter (RD d) p)
+  read-shows : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p → Nl.¬ Gap b p
+             → ∀ {q e₀ k e} → enter (RD d) p q e₀ → q ≺ k → Src b k e → Few (Src b) k → (∀ {c} → Src b c end → k ≼ c)
+             → Σ Path λ zs → Σ (Ev (IE X)) λ e′ → enter (RD d) p (k ⊕ zs) e′ × (Visible e → Visible e′)
 
 -- The annotation's connect body, before every row of the source.
 body : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → Pos

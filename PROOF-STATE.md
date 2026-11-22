@@ -250,13 +250,21 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### THE READER
 
-Untried since `Fresh`: a reader subscribed outside its hot's last gap meets
-the source's runs joined late and idles as the source does. Each reader row
-reads back to a source row (`read-row`); left is that the rows read back form
-the source's run. Settled by bodies over `Join` and the reader's layers, or a
-reader outside the gap that breaks.
+Untried: the reader shows every source row past one of its own rows,
+silent rows included, through annotation, hot, scan and merge; and a run of
+joins alone has its next visible row below the row the joins join. Settled
+by bodies over the reader's layers, or a source row the reader skips.
 
-Members: `read-back`, `read-idle`.
+Members: `read-shows`, `read-part`.
+
+#### LISTED BINDERS
+
+Untried: a new binder's annotation lists its rows wherever finitely many
+precede, as a closed program's do (`listed`). Constructively necessary: a
+reader read back owes a positive source run to the end. Settled by `listed`
+over open programs whose binders are listed, or a binder that cannot be.
+
+Members: `ann-listing`.
 
 #### PLACEMENT
 

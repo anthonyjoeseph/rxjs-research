@@ -165,20 +165,21 @@ module ScanLayer {A B : Set} (f : B → A → B) (z : B) (d : Den A) (P : Pos) (
   out-go st (((((spin _ , _) , _) , _) , () , _) ∷ _)
 
   in-go : ∀ {c b rx} → St c b → Run S c rx
-        → Σ _ λ sc → Run Sc c sc × values sc ≡ scans f b (values rx) × (Ends rx → Ends sc)
-  in-go st [] = [] , [] , refl , λ ()
+        → Σ _ λ sc → Run Sc c sc × values sc ≡ scans f b (values rx) × (Ends rx → Ends sc) × sc ≡ scanRows f b rx
+  in-go st [] = [] , [] , refl , (λ ()) , refl
   in-go {c} {b} st (_∷_ {e = out a} (((x , prop) , _) , _ , aft , lst) run) with in-go (some (next st x aft lst)) run
-  ... | sc , run′ , eq , en =
+  ... | sc , run′ , eq , en , eqr =
     (_ , out (f b a)) ∷ sc ,
     (((toSc (sval ac) , λ { (send y , _) → prop y }) , entered-few (Op.scan f z d) P tt (toSc (sval ac))) , tt , aft , least-scan {c} lst) ∷ run′ ,
     cong (f b a ∷_) eq ,
-    λ { (here ()) ; (there h) → there (en h) }
+    (λ { (here ()) ; (there h) → there (en h) }) ,
+    cong ((_ , out (f b a)) ∷_) eqr
     where ac = next st x aft lst
   in-go {c} st (_∷_ {e = end} (((x , prop) , _) , _ , aft , lst) run) with run-past-end {t = S} x run
   ... | refl =
     (_ , end) ∷ [] ,
     (((toSc (send x) , λ { (send y , _) → prop y }) , entered-few (Op.scan f z d) P tt (toSc (send x))) , tt , aft , least-scan {c} lst) ∷ [] ,
-    refl , λ _ → here refl
+    refl , (λ _ → here refl) , refl
   in-go st (_∷_ {e = skip}  (_ , () , _) _)
   in-go st (_∷_ {e = pin _} (_ , () , _) _)
 
@@ -189,7 +190,8 @@ scan-out f z s m with ScanLayer.out-go f z (⟦ s ⟧ []) root (InvAt.func (inv-
 
 scan-in : ∀ {A B} (f : B → A → B) z (s : Obs Timeline [] A) {rx} → Met (at s) rx
         → Σ _ λ sc → Met (at (scan f z s)) sc × values sc ≡ scans f z (values rx) × (Ends rx → Ends sc)
-scan-in f z s = ScanLayer.in-go f z (⟦ s ⟧ []) root (InvAt.func (inv-at s)) ScanLayer.none
+scan-in f z s m with ScanLayer.in-go f z (⟦ s ⟧ []) root (InvAt.func (inv-at s)) ScanLayer.none m
+... | sc , ms , eq , en , _ = sc , ms , eq , en
 
 ------------------------------------------------------------------------
 -- Runs
@@ -216,6 +218,13 @@ cursor-++ c ((q , _) ∷ xs) ys = cursor-++ (just q) xs ys
 cursor-snoc : ∀ {A} c (xs : List (Pos × Ev A)) {q e} → cursor c (xs ++ [ (q , e) ]) ≡ just q
 cursor-snoc c xs {q} {e} = cursor-++ c xs [ (q , e) ]
 
+-- A cursor is where the run began or a row it met.
+cursor-in : ∀ {A} c (xs : List (Pos × Ev A)) {y} → cursor c xs ≡ just y → c ≡ just y ⊎ Σ (Ev A) λ e → (y , e) ∈ xs
+cursor-in c []             eq = inj₁ eq
+cursor-in c ((q , e) ∷ xs) eq with cursor-in (just q) xs eq
+... | inj₁ refl     = inj₂ (e , here refl)
+... | inj₂ (e′ , m) = inj₂ (e′ , there m)
+
 after-≺ : ∀ c {k k′} → After c k → k ≺ k′ → After c k′
 after-≺ nothing  _ _ = tt
 after-≺ (just c) {k} {k′} a b = ≺-trans {c} {k} {k′} a b
@@ -239,13 +248,13 @@ run-has fu {rs = (q , e₁) ∷ _} {v} ((((x₁ , _) , _) , _ , _ , lst) ∷ run
 ...   | there m′  = there (run-has fu run x vi qv vk m′)
 
 -- Two readers from one cursor meet one run, one a prefix of the other.
-run-det : ∀ {A} {t : EmissionSet A} → (∀ {y e e′} → t y e → t y e′ → e ≡ e′)
+run-det : ∀ {A} {t : EmissionSet A} → (∀ {y e e′} → t y e → Visible e → t y e′ → Visible e′ → e ≡ e′)
         → ∀ {c xs ys} → Run t c xs → Run t c ys → Prefix _≡_ xs ys ⊎ Prefix _≡_ ys xs
 run-det fu [] _ = inj₁ []
 run-det fu (_ ∷ _) [] = inj₂ []
 run-det fu (_∷_ {q = q₁} {e = e₁} h₁@(((x₁ , _) , _) , vi₁ , a₁ , l₁) r₁) (_∷_ {q = q₂} h₂@(((x₂ , _) , _) , vi₂ , a₂ , l₂) r₂)
   with ≼-antisym {q₁} {q₂} (l₁ x₂ vi₂ a₂) (l₂ x₁ vi₁ a₁)
-... | refl with fu x₁ x₂
+... | refl with fu x₁ vi₁ x₂ vi₂
 ...   | refl with run-det fu r₁ r₂
 ...     | inj₁ p = inj₁ (refl ∷ p)
 ...     | inj₂ p = inj₂ (refl ∷ p)
@@ -619,7 +628,7 @@ module EachLayer {X Y : Set} (f : X → List Y) (d : Den X) (P : Pos) {H : Pos �
       rl = ys ++ [ (k , e) ]
 
       longer : Prefix _≡_ rl rs′
-      longer with run-det fuE m mE
+      longer with run-det (λ x _ x′ _ → fuE x x′) m mE
       ... | inj₁ pr = pr
       ... | inj₂ pr with prefix-split pr
       ...   | inj₁ eq′ = subst (Prefix _≡_ rl) (sym eq′) (subst (λ w → Prefix _≡_ w rl) eq′ pr)

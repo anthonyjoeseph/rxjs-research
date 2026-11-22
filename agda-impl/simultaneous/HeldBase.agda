@@ -58,6 +58,7 @@ import Relation.Nullary as Nl
 open import Data.Product using (Σ; proj₂)
 open import simultaneous.InstEmit using (instEmit; value; mark; over)
 open import simultaneous.Routed using (nameOf; Valued; opos)
+open import simultaneous.Listing using (Listing)
 open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.ColdFew using (cold-step-few; of-below)
@@ -92,8 +93,8 @@ open import simultaneous.ColdIdle using (cold-idle)
 -- Programs and their binders
 
 -- A connect's binder: its source annotated, read hot past the connect
--- at `at`, the source holding, and every burst it is exempt for one the
--- reader is exempt for too.
+-- at `at`, the source holding, every burst it is exempt for one the
+-- reader is exempt for too, and the annotation's rows listed.
 record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
   field
     {Θ}   : List Set
@@ -108,6 +109,7 @@ record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
     ep    : Early at
     under : ∀ {c} → c ∈ at ∷ outer → c ∈ cs
     is    : d ≡ hot (Proper (enter (ev m (annotate src) env) (at ⊕ [ ix 1 ])))
+    lists : Listing (enter (ev m (annotate src) env) (at ⊕ [ ix 1 ]))
 
 -- The binder's annotated source, as the connect's source shows it.
 Ann : ∀ {X} {d : Den (AIE X)} {cs} → Bound d cs → EmissionSet (AIE X)
@@ -374,7 +376,7 @@ held-scan (just n) ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
 widen b = record
   { m = Bound.m b ; src = Bound.src b ; env = Bound.env b ; at = Bound.at b ; outer = Bound.outer b
-  ; held = Bound.held b ; good = Bound.good b ; ok = Bound.ok b ; ep = Bound.ep b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
+  ; held = Bound.held b ; good = Bound.good b ; ok = Bound.ok b ; ep = Bound.ep b ; under = λ i → there (Bound.under b i) ; is = Bound.is b ; lists = Bound.lists b }
 
 -- EVERY HANG SHOWS: past a position, a reader reaching few rows before
 -- it finds few rows there, for every size of the reach.
@@ -464,6 +466,13 @@ postulate
   body-fresh : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → GoodEnv env
              → ∀ p → Ok (Hots env) p → Nl.¬ GapIn (AnnAt m ρ s env p) (p ⊕ [ ix 0 ])
 
+-- A NEW BINDER'S ROWS ARE LISTED wherever finitely many precede, as a
+-- closed program's are (`simultaneous.Listing.listed`): the source reads
+-- only the binders in scope, and each of theirs is listed.
+postulate
+  ann-listing : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
+              → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Listing (AnnAt m ρ s env p)
+
 -- A CONNECT'S BINDER, made at `p`: its source held below the annotation,
 -- and the binders in scope widened past it.
 module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (hs : IH m ρ s)
@@ -480,7 +489,7 @@ module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
     { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs
     ; held = IH.holds hs env cs g eh ((p ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ok-step _ (ok-step p ok))
                (Adm.step ad (ok-step p ok) (Adm.step ad ok fr plain-ix) plain-ix) (early-inst [ ix 1 ] (early-inst [ ix 1 ] ep))
-    ; good = g ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
+    ; good = g ; ok = ok ; ep = ep ; under = λ i → i ; is = refl ; lists = ann-listing m ρ s env cs g eh p ok }
 
   bd : ∀ {X} (i : X ∈ A ∷ Γ) → Bound (lookup (hot σ ∷ env) (ext ρ (∈-map⁺ AIE i))) (p ∷ cs)
   bd (here refl) = nb
