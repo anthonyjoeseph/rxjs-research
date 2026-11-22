@@ -57,7 +57,7 @@ open import Relation.Nullary.Decidable using (decidable-stable)
 open import Relation.Nullary using (¬_)
 import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
-open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
+open import simultaneous.Layers using (run-tail; run-after; run-has) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; irrⁱ; triⁱ; transⁱ)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
@@ -181,13 +181,10 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     pick : ∀ {y y₀ n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → ∀ ws → Met M ws
          → (y ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneDone) n)))) ∈ ws
          → (y₀ ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) ∈ ws
-    pick {y} σs lt ws mw i with lane-run mw
-    ... | rs , pr , run , _ with bproj-mem pr i
-    ...   | yd , ed , j with ⊕-injˡ y yd ed
-    ...     | refl with ∈-∃++ j
-    ...       | r , r′ , refl with run-catch r run σs tt tt lt
-    ...         | r₁′ , r₂′ , e″ , refl with InvAt.func I₃ (proj₁ (proj₁ (run-row∈ run (∈-++⁺ˡ (∈-++⁺ʳ r₁′ (here refl)))))) (proj₁ σs)
-    ...           | refl = bproj-back pr (∈-++⁺ˡ (∈-++⁺ʳ r₁′ (here refl)))
+    pick {y} {y₀} σs lt ws mw i =
+      let (_ , pr , run , _) = lane-run mw
+          (yd , ed , j) = bproj-mem pr i
+      in bproj-back pr (run-has (InvAt.func I₃) run σs tt tt (subst (y₀ ≼_) (⊕-injˡ y yd ed) (≺→≼ {y₀} {y} lt)) j)
 
     st-dn : ∀ {k k′ n n′} → _≡_ {A = Row} (k , out (just (inj₁ (laneB , instEmit (mark laneStart) n)))) (k′ , out (just (inj₁ (laneB , instEmit (mark laneDone) n′)))) → ⊥
     st-dn e with cong proj₂ e
