@@ -275,7 +275,7 @@ module AnnConn {X} {d : Den (AIE X)} {cs} (b : Bound d cs) where
   proper-vis sc sy v cy with InvAt.quiet Iσ sc sy cy
   ... | _ , refl , _ = v
 
-  module HR = HotRun σ sb (InvAt.flat Iσ) (InvAt.func Iσ) (λ {y} y′ → ≺-trans {sb} {r₁} {y} sb≺r (aft y′)) few-vis proper-vis sh
+  module HR = HotRun σ sb (InvAt.flat Iσ) (InvAt.func Iσ) (λ {y} y′ → ≺-trans {sb} {r₁} {y} sb≺r (aft y′)) few-vis proper-vis
 
   G : Bool → Den (Maybe (IE X))
   G = Gm m env (hot (Proper σ))

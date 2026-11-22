@@ -39,7 +39,7 @@ AGDA_SRC := $(shell find $(SRC) -name '*.agda' -not -path '*/_build/*' -not -pat
 AGDA_BIN ?= agda
 export AGDA_BIN
 AGDA_HEAP := 12G
-AGDA := $(AGDA_BIN) +RTS -M$(AGDA_HEAP) -A256m -G3 -RTS -W error
+AGDA := $(AGDA_BIN) +RTS -M$(AGDA_HEAP) -A256m -RTS -W error
 
 # PER-DEFINITION TIMES, opt in: `make agda AGDA_PROFILE=--profile=definitions`.
 # Agda leaves profiling options out of an interface's validity key, so this
@@ -90,7 +90,7 @@ gate-cheap:
 # a cold cone over the held tower outgrows the heap in one process though
 # no module does alone.  Each stage writes its interfaces and exits; the
 # next loads them.  Main is still the last stage, and the claim graph.
-AGDA_STAGES := simultaneous/Held.agda
+AGDA_STAGES := simultaneous/Held.agda simultaneous/Erasure.agda simultaneous/Closing.agda
 
 agda:
 	@cd $(SRC) && for f in $(AGDA_STAGES) Main.agda; do $(AGDA) $(AGDA_PROFILE) $$f || exit $$?; done
