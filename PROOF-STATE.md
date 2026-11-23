@@ -288,11 +288,11 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 
 Unproven: the share's rows are the program's at the same places, and
 the hot read's rows at the frame's connected lane are the merge's.
-Riskiest: `rows-lift` — the read's end hands the bounded frame to its
-queued `laneDone`, so only its other rows land in the merge; settled by
-reading the connected piece's rows through the bounded merge.
+Riskiest: `rows-shown` — a connected-piece row with no share end yet
+must reach the merge through the frame, the scan's fold, the map, both
+connects and the outer merge; settled by that upward chain.
 
-Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-lift`, `rows-shown`.
+Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-shown`, `rows-skip`.
 
 #### A LANE'S RUN IN THE LANES'
 

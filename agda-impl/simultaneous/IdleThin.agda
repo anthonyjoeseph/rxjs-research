@@ -3,7 +3,8 @@
 -- A STREAM SHOWING ITS PROGRAM'S ROWS IS IDLE LIKE IT, UP TO ITS CUT
 -- (`Thin.idle`).  Every visible row of the stream is the program's, or a
 -- value moving no route at a place the program holds nothing; the program
--- has few rows wherever the stream does, and its values are the stream's.  A run met of the stream, thinned of its silent
+-- has few rows wherever the stream does, and its values are, classically,
+-- the stream's.  A run met of the stream, thinned of its silent
 -- values, is then a run of the program with the same count.
 --
 -- Past the program's end the program waits on nothing, so a reader there
@@ -46,7 +47,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
             (proper-vis : ∀ {c y e} → u c end → u y e → Visible e → y ≼ c) (iu : Idle u)
             (vis : ∀ {q v} → t q (out v) → u q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → u q e′ → ⊥)))
             (few-to : ∀ {w} → Few t w → ¬ ¬ Few u w) (u-few : ∀ {q e} → u q e → Visible e → Few u q)
-            (lift-vis : ∀ {q v} → u q (out v) → t q (out v))
+            (lift-vis : ∀ {q v} → u q (out v) → ¬ ¬ t q (out v))
             (late : ∀ {c} → u c end → ∀ {w} → c ≺ w → Few t w → Unfailed keep t w → (∀ {c′} → t c′ end → w ≼ c′) → ¬ ¬ (instant w ≡ instant c)) where
 
   Row : Set
@@ -93,7 +94,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
     in (((y , λ ce → proper-vis ce y vi) , u-few y vi) , vi , i2 ac , lu) ∷ r′ , j2 , j1
     where
       lu : ∀ {k e′} → u k e′ → Visible e′ → After c′ k → q ≼ k
-      lu {e′ = out _} uk vk ak = lst (lift-vis uk) vk (i1 uk ak)
+      lu {e′ = out _} uk vk ak = λ kq → lift-vis uk λ tk → lst tk vk (i1 uk ak) kq
       lu {e′ = end}   uk _  _  = proper-vis uk y vi
       lu {e′ = skip}  _  () _
       lu {e′ = pin _} _  () _
@@ -103,7 +104,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
       i2′ qy = after-≺ c′ (i2 ac) qy
 
       i1′ : ∀ {k v} → u k (out v) → After c′ k → q ≺ k
-      i1′ {k} uk ak with ≼-split {q} {k} (lst (lift-vis uk) tt (i1 uk ak))
+      i1′ {k} uk ak with ≼-split {q} {k} (λ kq → lift-vis uk λ tk → lst tk tt (i1 uk ak) kq)
       ... | inj₁ lt   = lt
       ... | inj₂ refl = ⊥-elim (nu uk)
 
@@ -141,7 +142,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
       ng (back {c} (iu mu ne′ fu ac lc) (cong (λ j → nm (j ∙ [])) (sym ic)))
       where
         lc : ∀ {y e} → u y e → Visible e → After (cursor nothing rs′) y → c ≼ y
-        lc {y} {e = out _} uy vy ay = ≺→≼ {c} {y} (≺-≼-≺ {c} {w} {y} cw (lw (lift-vis uy) vy (j1 uy ay)))
+        lc {y} {e = out _} uy vy ay = λ yc → lift-vis uy λ ty → ≺→≼ {c} {y} (≺-≼-≺ {c} {w} {y} cw (lw ty vy (j1 uy ay))) yc
         lc {e = end}   uy _  _  = proper-vis uy uc tt
         lc {e = skip}  _  () _
         lc {e = pin _} _  () _
@@ -161,7 +162,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
         ... | refl = ⊥-elim (ne i)
 
     lu : ∀ {y e} → u y e → Visible e → After (cursor nothing rs′) y → w ≼ y
-    lu {e = out _} uy vy ay = lw (lift-vis uy) vy (j1 uy ay)
+    lu {e = out _} uy vy ay = λ yw → lift-vis uy λ ty → lw ty vy (j1 uy ay) yw
     lu {y} {e = end} uy _ ay with ≼-or-≻ w y
     ... | inj₁ le = le
     ... | inj₂ yw = ⊥-elim (late uy yw fw unf tend λ ic → from-late uy yw ay ic)

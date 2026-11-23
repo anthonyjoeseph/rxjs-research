@@ -13,7 +13,8 @@ open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here; there; any?)
+open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
@@ -189,13 +190,21 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       -- its values shown as they are.
       sh-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Sh q (out v)
 
-      -- Each row of the reading but its end lies at a row of the merge
-      -- (the end, the frame's connected piece's, hands the frame to its
-      -- queued `laneDone`, a skip just past it),
-      rows-lift : ∀ {q e} → HR.Rd q e → Σ (Ev (IE B)) (Mg q) ⊎ e ≡ end
+      -- A value of the reading is the merge's, classically: the frame's
+      -- scan shows it once it has folded the frame's rows before it,
+      rows-shown : ∀ {q v} → HR.Rd q (out v) → ¬ ¬ Mg q (out v)
 
-      -- its values shown as they are.
-      rows-shown : ∀ {q v} → HR.Rd q (out v) → Mg q (out v)
+      -- and a skip of the reading is the merge's.
+      rows-skip : ∀ {q} → HR.Rd q skip → Mg q skip
+
+    -- EACH ROW OF THE READING BUT ITS END LIES AT A ROW OF THE MERGE.  The
+    -- end, the frame's connected piece's, hands the frame to its queued
+    -- `laneDone`, a skip just past it.
+    rows-lift : ∀ {q e} → HR.Rd q e → ¬ ¬ (Σ (Ev (IE B)) (Mg q) ⊎ e ≡ end)
+    rows-lift {e = out _} r k = rows-shown r λ y → k (inj₁ (_ , y))
+    rows-lift {e = skip}  r k = k (inj₁ (skip , rows-skip r))
+    rows-lift {e = end}   _ k = k (inj₂ refl)
+    rows-lift {e = pin _} (shown _ () _ , _)
 
     -- A VALUE OF THE MERGE IS THE FRAME'S READING OF THE SHARE'S, or a
     -- frame mark at a place the reading holds nothing.
@@ -302,7 +311,7 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       in Thin.idle undone Sh (Prog s′) Ish (λ uc uy v cy → pinby-vis v (InvAt.quiet Ip uc uy cy)) (Held.idle (held a Lt s′ oks′ fs′ es′))
            (λ x → inj₁ (sh-vis rn x)) (λ fw k → k (proj₁ fw , λ x lt → proj₂ fw (proj₂ (sh-lift rn x)) lt))
            (λ { {e = out _} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt ; {e = end} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt })
-           (sh-shown rn) (sh-late rn) mt ne (sh-unf rn) fw aw lw
+           (λ x k → k (sh-shown rn x)) (sh-late rn) mt ne (sh-unf rn) fw aw lw
 
     -- The reading's end is the share's, moved.
     rd-end : ∀ {c} → HR.Rd c end → Σ Pos λ E → Sh E end × instant c ≡ instant E
@@ -326,8 +335,10 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     -- the one row more.
     rows-few : ∀ {w} → Few Mg w → ¬ ¬ Few HR.Rd w
     rows-few {w} (ks , h) k = em {Σ Pos λ c → HR.Rd c end} λ
-      { (inj₁ (c , rc)) → k (c ∷ ks , λ {y′} x lt → [ (λ (_ , y) → there (h y lt)) , (λ { refl → here (≼-antisym {y′} {c} (HR.rd-proper x rc) (HR.rd-proper rc x)) }) ]′ (rows-lift x))
-      ; (inj₂ ne) → k (ks , λ x lt → [ (λ (_ , y) → h y lt) , (λ { refl → ⊥-elim (ne (_ , x)) }) ]′ (rows-lift x)) }
+      { (inj₁ (c , rc)) → k (c ∷ ks , λ {y′} x lt → decidable-stable (any? (y′ ≟ᵖ_) (c ∷ ks)) λ ni → rows-lift x λ
+          { (inj₁ (_ , y)) → ni (there (h y lt)) ; (inj₂ refl) → ni (here (≼-antisym {y′} {c} (HR.rd-proper x rc) (HR.rd-proper rc x))) })
+      ; (inj₂ ne) → k (ks , λ {y′} x lt → decidable-stable (any? (y′ ≟ᵖ_) ks) λ ni → rows-lift x λ
+          { (inj₁ (_ , y)) → ni (h y lt) ; (inj₂ refl) → ne (_ , x) }) }
 
     -- THE MERGE IS IDLE UP TO ITS `laneDone`.
     merged-idle : IdleTo undone Mg
