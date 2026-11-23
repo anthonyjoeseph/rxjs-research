@@ -8,16 +8,18 @@
 module simultaneous.LaneIdle where
 
 open import Data.Bool using (true; false; T; not)
-open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Data.Sum using (_⊎_; inj₁)
+open import Data.Sum using (_⊎_; inj₁; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; yes; no)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
@@ -25,9 +27,11 @@ open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _∙_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; Few; _≺_; module Op; module Bounded)
+open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
+open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼)
+open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using (Run; []; _∷_)
-open import denotation.Laws.Worlds using (Ok; InvAt; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
+open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; value)
@@ -40,6 +44,10 @@ open import simultaneous.LaneLocal using (inv-ev; EndsEarly; held-fit; module Fl
 open import simultaneous.LaneOnce using (module LaneOnce)
 open import simultaneous.RealView using (module View)
 open import simultaneous.IdleThin using (module Thin)
+open import simultaneous.ConcatTwo using (module Two)
+open import simultaneous.EnterFew using (enter-few)
+open import simultaneous.ColdIdle using (mid)
+open import simultaneous.LaneDoneRow using (done-row)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; laneˢ; undone; counted; framed; shareˢ; count)
 
@@ -47,6 +55,28 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ev-take : ∀ m {Γ X} (k : X → _) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) → ev m (takeWhile true k o) ρ ≡ Op.takeWhile true k (ev m o ρ)
 ev-take nothing  k o ρ = refl
 ev-take (just _) k o ρ = refl
+
+-- An `of`, read as the meaning's or an approximant's, is the `of`'s.
+of-to : ∀ m {Γ X} (xs : List X) (ρ : DenEnv Γ) p {y e} → enter (ev m (of xs) ρ) p y e → enter (Op.of xs) p y e
+of-to nothing  xs ρ p r = r
+of-to (just _) xs ρ p r = r
+
+of-from : ∀ m {Γ X} (xs : List X) (ρ : DenEnv Γ) p {y e} → enter (Op.of xs) p y e → enter (ev m (of xs) ρ) p y e
+of-from nothing  xs ρ p r = r
+of-from (just _) xs ρ p r = r
+
+-- A flatMap read through its parts is the flatMap's.
+flat-from : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) p {y e}
+          → enter (Op.flatMap op (λ c → ev m (g c) ρ) (ev m o ρ)) p y e → enter (ev m (flatMap op g o) ρ) p y e
+flat-from nothing  op g o ρ p r = r
+flat-from (just _) op g o ρ p r = r
+
+-- An `each` of nothing over a hot pins nothing: the hot's pins are heard
+-- as skips, and its lanes are empty `of`s.
+hot-each-nopin : ∀ {X Y} (t : EmissionSet X) s {k r} → enter (Op.flatMap (mergeᶠ nothing) (λ _ → Op.of {Y} []) (hot t)) s k (pin r) → ⊥
+hot-each-nopin t s (Merge.opin (shown _ () _ , _) , _)
+hot-each-nopin t s (Merge.left _ _ ((l , _) , _) _ _ , _) = ine-pin l
+hot-each-nopin t s (Merge.run () _ , _)
 
 -- IDLENESS IS A PROPERTY OF THE ROWS: two sets holding the same rows are
 -- idle together.
@@ -117,20 +147,78 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       -- its values shown as they are.
       rows-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Mg q (out v)
 
-      -- THE END'S INSTANT HOLDING FEW ROWS OF THE MERGE, THE SHARE'S MERGE
-      -- ENDS THERE: at the program's end, or, the program ending in the
-      -- subscribing instant, at its outer's, the program's rows before that
-      -- being few.  Nothing ends the share otherwise: a connect's endless
-      -- synchronous burst can leave endlessly many pins past the program's
-      -- end.
-      share-ends : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → (ks : List Pos) → (∀ {y e} → Mg y e → instant y ≡ instant c → y ∈ ks)
-                 → ¬ ¬ (Σ Pos λ e → Sh e end × instant e ≡ instant c)
+    -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT.
+    share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
+    share-done se = done-row ρ₄ (f a) env₂ m s (inv-ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′ g′ Q okQ) se
 
-      -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT: the frame's
-      -- second lane, reading it, ends one label under it, and the third,
-      -- queued behind, shows the `laneDone`.  Only ¬¬: the scan's state
-      -- there folds every value before it (`Fold.fold`).
-      share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
+    -- The share's bounded merge: its outer `of [ true , false ]`, its first
+    -- lane the blocker, its second the program.
+    module T2 = Two fc (enter dQ Q) Q true false (λ {y} {e} r → of-to m (true ∷ false ∷ []) env′ Q {y} {e} r)
+                                                  (λ {y} {e} r → of-from m (true ∷ false ∷ []) env′ Q {y} {e} r)
+
+    fi : ∀ c → InvD (Hots env′) (fc c)
+    fi c = inv-ev m (x a lanePart c) env′ g′
+
+    Io : InvAt (Hots env′) Q (enter dQ Q)
+    Io = inv-ev m (of (true ∷ false ∷ [])) env′ g′ Q okQ
+
+    -- The blocker pins nothing.
+    blk-np : ∀ m′ {s′ k r} → enter (ev m′ (x a lanePart true) env′) s′ k (pin r) → ⊥
+    blk-np nothing  {s′} = hot-each-nopin tS s′
+    blk-np (just _) {s′} = hot-each-nopin tS s′
+
+    -- THE END'S INSTANT HOLDING FEW ROWS OF THE MERGE, THE SHARE'S MERGE
+    -- ENDS THERE: at the program's end, or, the program ending in the
+    -- subscribing instant, at its outer's.  Its rows before that are the
+    -- blocker's, which are few before its end and none past it, and the
+    -- program's, few before its end and past it in its instant.
+    share-ends : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → (ks : List Pos) → (∀ {y e} → Mg y e → instant y ≡ instant c → y ∈ ks)
+               → ¬ ¬ (Σ Pos λ e → Sh e end × instant e ≡ instant c)
+    share-ends {s′} rn@(i , q , N , St₀) {c} uc ks h k =
+      k (E , flat-from m (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ [])) env′ Q (R.row ea) , E2.end-inst ea)
+      where
+        St : Bounded.Starts 1 fc (enter dQ Q) 1 T2.q₁ (Bounded.Sched 1 fc (enter dQ Q) 1) s′
+        St = T2.second (λ ()) refl (N , St₀)
+
+        Ip : InvAt (Hots env′) s′ (Prog s′)
+        Ip = inv-ev m (elab ρ₄ (f a)) env′ g′ s′ (proj₁ (proj₂ (runs-at rn)))
+
+        c₀ = proj₁ (T2.first-end St)
+        e₀ = proj₂ (T2.first-end St)
+
+        u₀ : ∀ {c′} → After (fc true) (T2.q₀ ⊕ [ ix 1 ]) c′ end → c′ ≡ c₀
+        u₀ e′ = BoundedI.lane-end okQ 1 fc fi Io T2.sub₀ e′ e₀
+
+        module E2 = T2.End {c₀} {c} {s′} e₀ u₀ St (uc , world-after (InvAt.world Ip uc) (InvAt.real Ip uc))
+
+        E = proj₁ E2.end-at
+        ea = proj₂ E2.end-at
+
+        Ib : InvAt (Hots env′) (T2.q₀ ⊕ [ ix 1 ]) (enter (fc true) (T2.q₀ ⊕ [ ix 1 ]))
+        Ib = BoundedI.LI okQ 1 fc fi Io T2.sub₀
+
+        rb = enter-few (fc true) (T2.q₀ ⊕ [ ix 1 ]) (proj₁ e₀) tt
+        rc = enter-few (ev m (elab ρ₄ (f a)) env′) s′ uc tt
+
+        KS : List Pos
+        KS = c₀ ∷ c ∷ (proj₁ rb ++ proj₁ rc ++ ks)
+
+        -- The blocker's rows: up to its end, it pinning nothing.
+        blk-in : ∀ {y e} → After (fc true) (T2.q₀ ⊕ [ ix 1 ]) y e → y ≺ E → y ∈ KS
+        blk-in {y} {e} (r , _) _ =
+          [ (λ le → [ (λ lt → there (there (∈-++⁺ˡ (proj₂ rb r lt)))) , here ]′ (≼-split {y} {c₀} le))
+          , (λ c₀y → let (_ , eq , _) = InvAt.quiet Ib (proj₁ e₀) r c₀y in ⊥-elim (blk-np m (subst (enter (fc true) (T2.q₀ ⊕ [ ix 1 ]) y) eq r))) ]′
+          (≼-or-≻ y c₀)
+
+        -- The program's: up to its end, and past it in its instant.
+        prog-in : ∀ {y e} → After (fc false) s′ y e → y ≺ E → y ∈ KS
+        prog-in {y} (r , _) yE =
+          [ (λ le → [ (λ lt → there (there (∈-++⁺ʳ (proj₁ rb) (∈-++⁺ˡ (proj₂ rc r lt))))) , (λ eq → there (here eq)) ]′ (≼-split {y} {c} le))
+          , (λ cy → there (there (∈-++⁺ʳ (proj₁ rb) (∈-++⁺ʳ (proj₁ rc)
+                      (h (proj₂ (rows-lift rn r)) (mid c c y E (≼-refl {c}) cy (≺→≼ {y} {E} yE) (sym (E2.end-inst ea)))))))) ]′
+          (≼-or-≻ y c)
+
+        module R = E2.Row E KS blk-in prog-in
 
     -- THE END'S INSTANT HOLDING FEW ROWS OF THE MERGE, ITS `laneDone`
     -- FALLS THERE.

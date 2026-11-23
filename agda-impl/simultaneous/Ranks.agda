@@ -42,8 +42,9 @@ open import Relation.Nullary using (yes; no; ¬?)
 
 open import denotation.Position using (Pos; _≟ᵖ_; Instant; frame; root; _≟ⁱ_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Seen; Den; hot; coldAt; enter; Truncate; Few; ⟦_⟧)
+open import denotation.EmissionSet using (Ev; out; skip; end; pin; Unpinned; EmissionSet; Seen; Few; ⟦_⟧)
 open import denotation.Read using (Run; []; _∷_; Visible)
+open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Readings using (instantOf; stamped; closed)
@@ -238,16 +239,6 @@ rank-instant {q = q} {q′} x x′ r r′ with triⁱ (instantOf q) (instantOf q
 ------------------------------------------------------------------------
 -- A reading's ranks
 
--- An unpinned row truncated has finitely many rows before it.
-truncate-few : ∀ {A} {X : EmissionSet A} {q e} → Truncate X q e → Unpinned e → Few (Truncate X) q
-truncate-few {e = out _} (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
-truncate-few {e = skip}  (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
-truncate-few {e = end}   (_ , ks , c) _ = ks , λ r lt → c (proj₁ r) lt tt
-
--- So has an unpinned row of a reading.
-enter-few : ∀ {A} (d : Den A) p {q e} → enter d p q e → Unpinned e → Few (enter d p) q
-enter-few (hot t)    p = truncate-few
-enter-few (coldAt f) p = truncate-few
 
 -- A visible row is unpinned.
 visible-unpinned : ∀ {A} {e : Ev A} → Visible e → Unpinned e

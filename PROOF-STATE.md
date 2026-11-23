@@ -288,13 +288,13 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 
 Unproven: through the lane's six layers (merge, two connects, count,
 frame, the share's bounded merge), its values are its program's or frame
-marks off the program's places, and a share's end runs the `laneDone` in
-its instant. Riskiest: the share ending in the program end's instant
-(`share-ends`) from the merge's few rows there, at the program's end or
-its outer's, deciding which by position. Settled by building the share's
-end row, with few rows before it, from the program's.
+marks off the program's places, and the blocker ends so the program
+runs. Riskiest: the merge's
+values sorted into the program's and silent marks (`rows-vis`), the frame
+marks landing where the program holds nothing. Settled by reading each
+layer's value back to its frame piece.
 
-Members: `share-ends`, `share-done`, `rows-vis`, `prog-runs`, `rows-lift`, `rows-shown`.
+Members: `rows-vis`, `prog-runs`, `rows-lift`, `rows-shown`.
 
 #### A LANE'S RUN IN THE LANES'
 
