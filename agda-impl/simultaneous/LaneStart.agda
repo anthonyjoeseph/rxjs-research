@@ -9,224 +9,40 @@
 -- the share, whose rows all lie past it.
 module simultaneous.LaneStart where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
-open import Data.Bool.Properties using (T-≡)
+open import Data.Bool using (true; false; T; not; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; _++_)
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; _<_; s≤s; z≤n)
+open import Data.Nat using (ℕ; suc; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Function using (Equivalence)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap)
-open import denotation.Position using (Pos; Label; ix; last; root; _≟ᵖ_; _⊕_)
-open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part; ix-<)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; InE; at-out; on-out; at-end; _≺_; _≼_; Few; Truncate; LaneOf;
-  module Op; module Joining; module Values; module Bounded; module Merge; module Scan;
-  module TakeWhile; module Connecting)
+open import denotation.Position using (Pos; ix; last; root; _≟ᵖ_; _⊕_)
+open import denotation.Events using (Timeline; fresh; ofᴱ)
+open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; InE; at-out; on-out; at-end; _≺_; _≼_;
+  Few; LaneOf; module Op; module Joining; module Values; module Bounded; module Merge;
+  module Scan; module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd)
-open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ; notT)
-open import denotation.Laws.Worlds.Leaves using (of-reach; of-idx)
+open import denotation.Laws.Worlds using (notT)
+open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Count using (reach-down)
-open import denotation.Laws.Shows using (few-reach)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.DenRows using (conn-out; merge-out; scan-out; bounded-out; hot-out; each-one; of-mem)
 open import simultaneous.LaneEndSched using (ls-one; ls-true; of-one)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.LaneLayers using (Under; acc-row; bd-lane-past; conn-few; done-of; few-row; few-tr; join-few; join-past; of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans; under-≺; under-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
-
-------------------------------------------------------------------------
--- Positions below a position
-
-Under : Pos → Pos → Set
-Under x y = Σ (List Label) λ ys → y ≡ x ⊕ ys
-
-under-refl : ∀ x → Under x x
-under-refl x = [] , sym (⊕-identityʳ x)
-
-under-⊕ : ∀ {x y} → Under x y → ∀ l → Under x (y ⊕ [ l ])
-under-⊕ {x} (ys , refl) l = ys ++ [ l ] , ⊕-assoc x ys [ l ]
-
-under-trans : ∀ {x y z} → Under x y → Under y z → Under x z
-under-trans {x} (ys , refl) (zs , refl) = ys ++ zs , ⊕-assoc x ys zs
-
--- A position below a child lies past its parent,
-under-ext : ∀ x {l y} → Under (x ⊕ [ l ]) y → x ≺ y
-under-ext x {l} (ys , refl) = subst (x ≺_) (sym (⊕-assoc x [ l ] ys)) (≺-ext x ys)
-
--- and before every later child.
-under-≺ : ∀ p {i j y} → i < j → Under (p ⊕ [ ix i ]) y → y ≺ (p ⊕ [ ix j ])
-under-≺ p {i} {j} lt (ys , refl) = subst (_≺ (p ⊕ [ ix j ])) (sym (⊕-assoc p [ ix i ] ys)) (Equivalence.from T-≡ (<ᵖ-part p ys [] (ix-< lt)))
-
--- and before its parent's last.
-under-last : ∀ p {i y} → Under (p ⊕ [ ix i ]) y → y ≺ (p ⊕ [ last ])
-under-last p {i} (ys , refl) = subst (_≺ (p ⊕ [ last ])) (sym (⊕-assoc p [ ix i ] ys)) (Equivalence.from T-≡ (<ᵖ-part p ys [] refl))
-
-------------------------------------------------------------------------
--- Where an operator's rows lie, from where its inputs' do
-
--- A lane starts past its value,
-starts-after : ∀ {A B} {n : ℕ} {f : A → Den B} {o : EmissionSet A} {i q ls′ s} → Bounded.Starts n f o i q ls′ s → q ≺ s
-starts-after {q = q} (Bounded.room _)                    = ≺-ext q []
-starts-after {q = q} (Bounded.freed _ _)                 = ≺-ext q []
-starts-after {q = q} (Bounded.queued {c} _ qc _ _ _)     = ≺-trans {q} {c} {c ⊕ [ ix 1 ]} qc (≺-ext c [])
-
--- so its rows do.
-bd-lane-past : ∀ {A B} {n : ℕ} {f : A → Den B} {o : EmissionSet A} {q a k e} → Bounded.Lane n f o q a k e → q ≺ k
-bd-lane-past {q = q} {k = k} (_ , s , (_ , st) , (_ , sl)) = ≺-trans {q} {s} {k} (starts-after st) sl
-
--- A list's rows lie past its subscription.
-of-after : ∀ {X : Set} p (xs : List X) {k e} → enter (Op.of xs) p k e → p ≺ k
-of-after p xs (x , _) with of-idx p 0 xs x
-... | inj₁ (j , _ , refl) = ≺-ext p []
-... | inj₂ refl           = ≺-ext p []
-
--- A one-value list's rows are its value and its end.
-one-rows : ∀ {X : Set} p (x : X) {y e} → InE (ofᴱ p 0 (x ∷ [])) y e → y ≡ p ⊕ [ ix 0 ] ⊎ y ≡ p ⊕ [ last ]
-one-rows p x at-out          = inj₁ refl
-one-rows p x (on-out at-end) = inj₂ refl
-
--- A joiner's rows lie past `p` when its outer's, its lanes' and its
--- background's do.
-join-past : ∀ {A B} {Lane : Pos → A → EmissionSet B} {o : EmissionSet A} {Bg : EmissionSet B} {Over Runs : Pos → Set} {Cut : Pos → Pos → Set} {Hand : Pos → Set} {p}
-          → (∀ {k e} → o k e → p ≺ k) → (∀ {q a k e} → o q (out a) → Lane q a k e → q ≺ k) → (∀ {k e} → Bg k e → p ≺ k)
-          → ∀ {k e} → Joining.JoinT Lane o Bg Over Runs Cut Hand k e → p ≺ k
-join-past {p = p} po pl pb (Joining.val {q} x)               = ≺-trans {p} {q} {q ⊕ [ ix 0 ]} (po x) (≺-ext q [])
-join-past po pl pb (Joining.step x)                          = po x
-join-past po pl pb (Joining.opin x)                          = po x
-join-past po pl pb (Joining.oend x _)                        = po x
-join-past po pl pb (Joining.opass x _)                       = po x
-join-past {p = p} po pl pb (Joining.lane {q} {k = k} x _ l _ _)  = ≺-trans {p} {q} {k} (po x) (pl x l)
-join-past {p = p} po pl pb (Joining.lend {q} {c = c} x _ l _ _ _)  = ≺-trans {p} {q} {c} (po x) (pl x l)
-join-past {p = p} po pl pb (Joining.lpass {q} {c = c} x _ l _ _ _) = ≺-trans {p} {q} {c} (po x) (pl x l)
-join-past {p = p} po pl pb (Joining.hand {q} {c = c} x _ l _ _)  = ≺-trans {p} {c} {c ⊕ [ ix 0 ]} (≺-trans {p} {q} {c} (po x) (pl x l)) (≺-ext c [])
-join-past {p = p} po pl pb (Joining.left {q} {k = k} x _ l _ _)  = ≺-trans {p} {q} {k} (po x) (pl x l)
-join-past po pl pb (Joining.run b _)                         = pb b
-join-past po pl pb (Joining.rend b _ _)                      = pb b
-join-past po pl pb (Joining.rpass b _ _)                     = pb b
-join-past {p = p} po pl pb (Joining.rhand {c} b _)           = ≺-trans {p} {c} {c ⊕ [ ix 0 ]} (pb b) (≺-ext c [])
-
--- What fails a lane's `takeWhile` is a `laneDone`.
-done-of : ∀ {B} (a : IE B) → T (not (undone a)) → Σ Pos λ n → a ≡ instEmit (mark laneDone) n
-done-of (instEmit (mark laneDone) n) _  = n , refl
-done-of (instEmit (value _) _)      ()
-done-of (instEmit (mark begin) _)      ()
-done-of (instEmit (mark over) _)       ()
-done-of (instEmit (mark stop) _)       ()
-done-of (instEmit (mark subscribed) _) ()
-done-of (instEmit (mark completed) _)  ()
-done-of (instEmit (mark outerOpen) _)  ()
-done-of (instEmit (mark outerClose) _) ()
-done-of (instEmit (mark laneStart) _)  ()
-done-of (instEmit (mark carry) _)      ()
-done-of (instEmit (mark burstEnd) _)   ()
-done-of (instEmit (mark outerDone) _)  ()
-
-------------------------------------------------------------------------
--- An operator's rows before `v`, from its inputs'
-
-few-tr : ∀ {A} {t : EmissionSet A} {v} → Few t v → Few (Truncate t) v
-few-tr (ks , h) = ks , λ x lt → h (proj₁ x) lt
-
-few-row : ∀ {A} {t : EmissionSet A} {q e} → t q e → Few t q → Truncate t q e
-few-row x F = x , few-reach F
-
--- A joiner's: its outer's, its lanes', its background's, and the
--- first child of each.
-join-few : ∀ {A B} {Lane : Pos → A → EmissionSet B} {o : EmissionSet A} {Bg : EmissionSet B} {Over Runs : Pos → Set} {Cut : Pos → Pos → Set} {Hand : Pos → Set} {v}
-         → Few o v → (Σ (List Pos) λ kl → ∀ {q a k e} → o q (out a) → Lane q a k e → k ≺ v → k ∈ kl) → Few Bg v
-         → Few (Joining.JoinT Lane o Bg Over Runs Cut Hand) v
-join-few {Lane = Lane} {o} {Bg} {Over} {Runs} {Cut} {Hand} {v} (ko , ho) (kl , hl) (kb , hb) = Ks , go
-  where
-    ix₀ : Pos → Pos
-    ix₀ k = k ⊕ [ ix 0 ]
-
-    Ks : List Pos
-    Ks = ko ++ (L.map ix₀ ko ++ (kl ++ (L.map ix₀ kl ++ (kb ++ L.map ix₀ kb))))
-
-    dn : ∀ {k} → (k ⊕ [ ix 0 ]) ≺ v → k ≺ v
-    dn {k} lt = ≺-trans {k} {k ⊕ [ ix 0 ]} {v} (≺-ext k []) lt
-
-    i₂ : ∀ {k} → k ∈ L.map ix₀ ko → k ∈ Ks
-    i₃ : ∀ {k} → k ∈ kl → k ∈ Ks
-    i₄ : ∀ {k} → k ∈ L.map ix₀ kl → k ∈ Ks
-    i₅ : ∀ {k} → k ∈ kb → k ∈ Ks
-    i₆ : ∀ {k} → k ∈ L.map ix₀ kb → k ∈ Ks
-    i₂ i = ∈-++⁺ʳ ko (∈-++⁺ˡ i)
-    i₃ i = ∈-++⁺ʳ ko (∈-++⁺ʳ (L.map ix₀ ko) (∈-++⁺ˡ i))
-    i₄ i = ∈-++⁺ʳ ko (∈-++⁺ʳ (L.map ix₀ ko) (∈-++⁺ʳ kl (∈-++⁺ˡ i)))
-    i₅ i = ∈-++⁺ʳ ko (∈-++⁺ʳ (L.map ix₀ ko) (∈-++⁺ʳ kl (∈-++⁺ʳ (L.map ix₀ kl) (∈-++⁺ˡ i))))
-    i₆ i = ∈-++⁺ʳ ko (∈-++⁺ʳ (L.map ix₀ ko) (∈-++⁺ʳ kl (∈-++⁺ʳ (L.map ix₀ kl) (∈-++⁺ʳ kb i))))
-
-    go : ∀ {k e} → Joining.JoinT Lane o Bg Over Runs Cut Hand k e → k ≺ v → k ∈ Ks
-    go (Joining.val {q} x) lt               = i₂ (∈-map⁺ ix₀ (ho x (dn {q} lt)))
-    go (Joining.step x) lt                  = ∈-++⁺ˡ (ho x lt)
-    go (Joining.opin x) lt                  = ∈-++⁺ˡ (ho x lt)
-    go (Joining.oend x _) lt                = ∈-++⁺ˡ (ho x lt)
-    go (Joining.opass x _) lt               = ∈-++⁺ˡ (ho x lt)
-    go (Joining.lane x _ l _ _) lt          = i₃ (hl x l lt)
-    go (Joining.lend x _ l _ _ _) lt        = i₃ (hl x l lt)
-    go (Joining.lpass x _ l _ _ _) lt       = i₃ (hl x l lt)
-    go (Joining.hand {c = c} x _ l _ _) lt  = i₄ (∈-map⁺ ix₀ (hl x l (dn {c} lt)))
-    go (Joining.left x _ l _ _) lt          = i₃ (hl x l lt)
-    go (Joining.run b _) lt                 = i₅ (hb b lt)
-    go (Joining.rend b _ _) lt              = i₅ (hb b lt)
-    go (Joining.rpass b _ _) lt             = i₅ (hb b lt)
-    go (Joining.rhand {c} b _) lt           = i₆ (∈-map⁺ ix₀ (hb b (dn {c} lt)))
-
--- A connect's: its body's, when its source's rows lie past `v`.
-conn-few : ∀ {A B} p (σ : EmissionSet A) (β : EmissionSet B) {v} → (∀ {k e} → σ k e → v ≺ k) → Few β v → Few (Connecting.ConnT p σ β) v
-conn-few p σ β {v} past (ks , h) = ks , go
-  where
-    no : ∀ {k e} → σ k e → (k ⊕ [ ix 0 ]) ≺ v → ∀ {z} → z ∈ ks
-    no {k} x lt = ⊥-elim (≺-absurd {v} {k} (past x) (≺-trans {k} {k ⊕ [ ix 0 ]} {v} (≺-ext k []) lt))
-
-    go : ∀ {k e} → Connecting.ConnT p σ β k e → k ≺ v → k ∈ ks
-    go (Connecting.body b) lt         = h b lt
-    go (Connecting.burst x _) lt      = no x lt
-    go (Connecting.echo x _ _ _) lt   = no x lt
-    go (Connecting.kept x _ _ _) lt   = no x lt
-
--- A scan's: its input's.
-acc-row : ∀ {A B} {f : B → A → B} {z : B} {t : EmissionSet A} {q b} → Scan.Acc f z t q b → Σ A λ a → t q (out a)
-acc-row (Scan.acc₀ x _)    = _ , x
-acc-row (Scan.acc _ x _ _) = _ , x
-
-scan-few : ∀ {A B} (f : B → A → B) (z : B) (t : EmissionSet A) {v} → Few t v → Few (Scan.ScanT f z t) v
-scan-few f z t {v} (ks , h) = ks , go
-  where
-    go : ∀ {k e} → Scan.ScanT f z t k e → k ≺ v → k ∈ ks
-    go (Scan.sval a) lt  = h (proj₂ (acc-row a)) lt
-    go (Scan.sstep x) lt = h x lt
-    go (Scan.spin x) lt  = h x lt
-    go (Scan.send x) lt  = h x lt
-
--- A takeWhile's: its input's, and their first and last children.
-take-few : ∀ {A} incl (keep : A → Bool) (t : EmissionSet A) {v} → Few t v → Few (TakeWhile.TakeT incl keep t) v
-take-few incl keep t {v} (ks , h) = Ks , go
-  where
-    Ks : List Pos
-    Ks = ks ++ (L.map (λ k → k ⊕ [ ix 0 ]) ks ++ L.map (λ k → k ⊕ [ last ]) ks)
-
-    go : ∀ {k e} → TakeWhile.TakeT incl keep t k e → k ≺ v → k ∈ Ks
-    go (TakeWhile.pass x _ _) lt       = ∈-++⁺ˡ (h x lt)
-    go (TakeWhile.fail {q} x _ _ _) lt = ∈-++⁺ʳ ks (∈-++⁺ˡ (∈-map⁺ (λ k → k ⊕ [ ix 0 ]) (h x (≺-trans {q} {q ⊕ [ ix 0 ]} {v} (≺-ext q []) lt))))
-    go (TakeWhile.stop {q} x _ _) lt   = ∈-++⁺ʳ ks (∈-++⁺ʳ (L.map (λ k → k ⊕ [ ix 0 ]) ks) (∈-map⁺ (λ k → k ⊕ [ last ]) (h x (≺-trans {q} {q ⊕ [ last ]} {v} (≺-ext q []) lt))))
-    go (TakeWhile.step x _) lt         = ∈-++⁺ˡ (h x lt)
-    go (TakeWhile.tend x _) lt         = ∈-++⁺ˡ (h x lt)
-    go (TakeWhile.left x _ _) lt       = ∈-++⁺ˡ (h x lt)
 
 ------------------------------------------------------------------------
 -- The lane, as layers of operators over its children
@@ -256,6 +72,7 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   -- part's mark its `laneStart`.
   (pc0-rows : ∀ k h h′ s {y e} → enter (PC k 0 h h′) s y e → y ≡ s ⊕ [ ix 0 ] ⊎ y ≡ s ⊕ [ last ])
   (pc0-ls   : ∀ h h′ s {y a} → enter (PC lanePart 0 h h′) s y (out a) → a ≡ marked laneStart)
+  (pc0-be   : ∀ h h′ s {y a} → enter (PC burstPart 0 h h′) s y (out a) → a ≡ marked burstEnd)
   -- A share's rows lie past its subscription.
   (sh-past  : ∀ k h p {y e} → enter (SH k h) p y e → p ≺ y) where
 
@@ -477,6 +294,29 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         go burstPart refl {s = s} (on-out (on-out at-out) , _) _ l = ⊥-elim (pc2 h h′ s l)
         go _ _ (on-out (on-out (on-out ())) , _) _ _
 
+    -- What shows a `begin` in the frame is the lane part's second or third
+    -- piece, past every position below the first value.
+    fr-begin : ∀ {y n} → enter (Fr k h h′) P y (out (instEmit (mark begin) n))
+             → (k ≡ burstPart → (∀ {p y a} → enter h′ p y (out a) → ⊥)) → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
+    fr-begin r hb with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
+    ... | q , j , i , s , oq , sb , (l , sl) = go k refl oq sb l sl
+      where
+        ne-ls : ∀ {n} → instEmit (mark begin) n ≡ ls → ⊥
+        ne-ls ()
+        ne-be : ∀ {n} → instEmit (mark begin) n ≡ marked {B} burstEnd → ⊥
+        ne-be ()
+        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y n} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out (instEmit (mark begin) n)) → s ≺ y
+           → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
+        go lanePart refl {s = s} (at-out , _) _ l _ = ⊥-elim (ne-ls (pc0-ls h h′ s l))
+        go burstPart refl {s = s} (at-out , _) _ l _ = ⊥-elim (ne-be (pc0-be h h′ s l))
+        go lanePart refl {s = s} {y} (on-out at-out , _) (_ , st) _ sl =
+          refl , λ {u} un → ≺-trans {u} {P ⊕ [ ix 1 ]} {y} (under-≺ P {0} {1} {u} (s≤s z≤n) un) (≺-trans {P ⊕ [ ix 1 ]} {s} {y} (starts-after st) sl)
+        go burstPart refl {s = s} (on-out at-out , _) _ l _ = ⊥-elim (hb refl (pc1 burstPart h h′ s l))
+        go lanePart refl {s = s} {y} (on-out (on-out at-out) , _) (_ , st) _ sl =
+          refl , λ {u} un → ≺-trans {u} {P ⊕ [ ix 2 ]} {y} (under-≺ P {0} {2} {u} (s≤s z≤n) un) (≺-trans {P ⊕ [ ix 2 ]} {s} {y} (starts-after st) sl)
+        go burstPart refl {s = s} (on-out (on-out at-out) , _) _ l _ = ⊥-elim (pc2 h h′ s l)
+        go _ _ (on-out (on-out (on-out ())) , _) _ _ _
+
   ----------------------------------------------------------------------
   -- The scan's split
 
@@ -569,6 +409,36 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   ... | refl , refl = refl , refl
   pick-at _ _ _ refl (on-out (on-out ())) _
 
+  -- The split's first list holds no `begin` either,
+  bg-rep : ∀ k {n} → instEmit (mark begin) n ∈ L.replicate k (marked {B} carry) → ⊥
+  bg-rep (suc k) (here ())
+  bg-rep (suc k) (there i) = bg-rep k i
+
+  bg-no : ∀ (st : Routes × (List (IE B) × List (IE B))) e {n} → instEmit (mark begin) n ∈ proj₁ (proj₂ (laneStep st e)) → ⊥
+  bg-no st (instEmit (value _) _)      ()
+  bg-no st (instEmit (mark begin) _)      ()
+  bg-no st (instEmit (mark over) _)       ()
+  bg-no st (instEmit (mark stop) _)       ()
+  bg-no st (instEmit (mark outerOpen) _)  ()
+  bg-no st (instEmit (mark outerClose) _) ()
+  bg-no st (instEmit (mark laneStart) _)  ()
+  bg-no st (instEmit (mark carry) _)      ()
+  bg-no st (instEmit (mark laneDone) _) i = bg-rep (proj₂ (proj₁ st)) i
+  bg-no st (instEmit (mark burstEnd) _)   ()
+  bg-no st (instEmit (mark outerDone) _)  ()
+  bg-no st (instEmit (mark subscribed) _) ()
+  bg-no st (instEmit (mark completed) _)  ()
+
+  -- so a `begin` the split shows is the scan's read.
+  pick-begin : ∀ (y : Routes × (List (IE B) × List (IE B))) st a₀ → y ≡ laneStep st a₀ → ∀ {U w c q n}
+             → InE (ofᴱ U 0 (true ∷ false ∷ [])) w (out c)
+             → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out (instEmit (mark begin) n))
+             → a₀ ≡ instEmit (mark begin) n
+  pick-begin _ st a₀ refl at-out l = ⊥-elim (bg-no st a₀ (of-mem _ 0 _ l))
+  pick-begin _ st a₀ refl (on-out at-out) l with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
+  ... | _ , refl = refl
+  pick-begin _ _ _ refl (on-out (on-out ())) _
+
   ----------------------------------------------------------------------
   -- Down, then up
 
@@ -597,6 +467,19 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         (ea , ey) = pick-at yst st a₀ eq (proj₁ ow) (proj₁ ll)
         (ek , ev₂) = Frame.fr-start k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) ea fa) hn
     in ek , trans ey (cong (λ v → Split.E₀ (v ⊕ [ ix 1 ])) ev₂)
+
+  -- The `begin` a part's connect shows is the lane part's, past its
+  -- frame's first piece.
+  down-begin : ∀ k P {e₂ n} → enter (Sv k) P e₂ (out (instEmit (mark begin) n))
+             → k ≡ lanePart × Σ Pos λ v₂ → (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ e₂
+  down-begin k P {e₂} svr =
+    let (v₂ , yst , scr , inr , lt₁) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
+        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
+        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
+        ea = pick-begin yst st a₀ eq (proj₁ ow) (proj₁ ll)
+        (ek , vlt) = Frame.fr-begin k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) ea fa)
+                       (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
+    in ek , v₂ , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
 
   h₂-no : ∀ P k → (∀ {y n} → enter (SH k (H₁ P)) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
         → ∀ {p y n} → enter (H₂ P k) p y (out (instEmit (mark laneStart) n)) → ⊥
@@ -739,6 +622,46 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
           late n (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr))
           late n (_ , _ , (on-out (on-out ()) , _) , _ , _)
 
+  -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
+  -- subscription.
+  core-begin : ∀ s {y n} → enter LaneD s y (out (instEmit (mark begin) n))
+             → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
+  core-begin s (TakeWhile.fail _ () _ _ , _)
+  core-begin s {y} {n} x@(TakeWhile.pass r _ nF , _) = part (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
+    where
+    fin : ∀ kq k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
+        → (k ≡ lanePart × Σ Pos λ v₂ → (∀ {u} → Under (Bp (kq ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ y)
+        → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
+    fin kq k okq (refl , v₂ , vlt , v₂y) = E₀ , take₀ , s-E₀ , lt₀
+     where
+      P : Pos
+      P = kq ⊕ [ ix 1 ]
+      open Up P using (u-E₀; u-P; sv-row)
+      open Split (Frame.V₀ lanePart (H₁ P) (H₂ P lanePart) (Bp P) ⊕ [ ix 1 ]) using (E₀)
+
+      lt₀ : E₀ ≺ y
+      lt₀ = ≺-trans {E₀} {v₂} {y} (vlt u-E₀) v₂y
+
+      P-E₀ : P ≺ E₀
+      P-E₀ = under-ext P u-P
+
+      s-E₀ : s ≺ E₀
+      s-E₀ = ≺-trans {s} {kq} {E₀} (of-after s (lanePart ∷ burstPart ∷ []) okq) (under-ext kq (under-trans (under-⊕ (under-refl P) (ix 0)) u-P))
+
+      mm₀ : enter MM s E₀ (out ls)
+      mm₀ = Joining.lane okq tt (sv-row , P-E₀) (λ ()) tt , reach-down {q = y} {w = E₀} {e = out (instEmit (mark begin) n)} {e₁ = out ls} (proj₂ r) lt₀ tt
+
+      nF₀ : ¬ TakeWhile.Failed true undone (enter MM s) E₀
+      nF₀ (q′ , a′ , x′ , nk′ , lt′) = nF (q′ , a′ , x′ , nk′ , ≺-trans {q′} {E₀} {y} lt′ lt₀)
+
+      take₀ : enter LaneD s E₀ (out ls)
+      take₀ = TakeWhile.pass mm₀ tt nF₀ , reach-down {q = y} {w = E₀} {e = out (instEmit (mark begin) n)} {e₁ = out ls} (proj₂ x) lt₀ tt
+
+    part : (Σ Pos λ kq → Σ Part λ k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
+             × enter (Sv k) (kq ⊕ [ ix 1 ]) y (out (instEmit (mark begin) n)) × (kq ⊕ [ ix 1 ]) ≺ y)
+         → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
+    part (kq , k , okq , svr , _) = fin kq k okq (down-begin k (kq ⊕ [ ix 1 ]) svr)
+
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
   core : ∀ s {y n} → enter LaneD s y (out (instEmit (mark laneDone) n))
@@ -864,12 +787,16 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   pc0-ls nothing  h h′ s (r , _) = proj₂ (of-one s _ r)
   pc0-ls (just _) h h′ s (r , _) = proj₂ (of-one s _ r)
 
+  pc0-be : ∀ m (h : Den ⊤) (h′ : Den (IE B)) s {y a} → enter (ev m (piece {B = B} burstPart 0) (h′ ∷ h ∷ ρ)) s y (out a) → a ≡ marked burstEnd
+  pc0-be nothing  h h′ s (r , _) = proj₂ (of-one s _ r)
+  pc0-be (just _) h h′ s (r , _) = proj₂ (of-one s _ r)
+
   sh-past : ∀ m k (h : Den ⊤) p {y e} → enter (ev m (Sh k) (h ∷ ρ)) p y e → p ≺ y
   sh-past nothing  k h p (r , _) = join-past {p = p} (of-after p (true ∷ false ∷ [])) (λ _ → bd-lane-past) (λ ()) r
   sh-past (just _) k h p (r , _) = join-past {p = p} (of-after p (true ∷ false ∷ [])) (λ _ → bd-lane-past) (λ ()) r
 
   module C (m : Maybe ℕ) = Core (λ k (h : Den ⊤) → ev m (Sh k) (h ∷ ρ)) (λ k j (h : Den ⊤) (h′ : Den (IE B)) → ev m (piece k j) (h′ ∷ h ∷ ρ))
-    (pc0 m) (pc0-at m) (pc1 m) (pc2 m) (sh-b m) (pc0-b m) (pc2-l m) (pc0-rows m) (pc0-ls m) (sh-past m)
+    (pc0 m) (pc0-at m) (pc1 m) (pc2 m) (sh-b m) (pc0-b m) (pc2-l m) (pc0-rows m) (pc0-ls m) (pc0-be m) (sh-past m)
 
   -- The elaborated lane IS the core's, paid once: each reading below
   -- moves along it, rather than re-converting its whole denotation.
@@ -883,6 +810,13 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
               → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
   lane-starts m s {y} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
     (C.core m s (subst (λ d → enter d s y (out (instEmit (mark laneDone) n))) (lane-eq m) r))
+
+  -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
+  -- subscription.
+  begin-starts : ∀ m s {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark begin) n))
+              → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
+  begin-starts m s {y} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
+    (C.core-begin m s (subst (λ d → enter d s y (out (instEmit (mark begin) n))) (lane-eq m) r))
 
   -- A LANE SHOWS `laneStart` AT ONE PLACE, when its lane part's share shows
   -- none.
