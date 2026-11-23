@@ -108,7 +108,7 @@ own-apart b {y} a sh (c , r , an , h , nl) with ann-row b an
         ... | inj₁ wc = ⊑-cmp w we wc weG
     go ae a-end eg ae′ with ≼-split {y} {G ⊕ [ last ]} (λ lt → pinby-vis tt (InvAt.quiet IA ae′ ae lt))
     ... | inj₁ lt = pinby-vis tt (InvAt.quiet IA ae ae′ lt)
-    ... | inj₂ eq = nl (subst ((c ⊕ [ ix 1 ]) ⊕ [ last ] ⊑_) (sym eq) (subst (λ z → (z ⊕ [ last ]) ⊑ (G ⊕ [ last ])) eg (⊑-refl _)))
+    ... | inj₂ eq = nl (subst (λ z → ((c ⊕ [ ix 1 ]) ⊕ [ last ]) ⊑ z) (sym eq) (subst (λ z → (z ⊕ [ last ]) ⊑ (G ⊕ [ last ])) eg (⊑-refl _)))
 
 -- AN OLDER BINDER'S ROWS ARE HOT, AND NONE IN THE NEW BINDER'S WORLD:
 -- a value or end is a hot row, and a gap's lane lies in the world of `p`.
