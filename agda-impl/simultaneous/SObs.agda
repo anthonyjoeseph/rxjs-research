@@ -97,7 +97,7 @@ open import Relation.Nullary using (does)
 open import Tree using (Obs; Later; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; merge)
 open import denotation.Events using (Timeline; From; fixed)
 import denotation.Events as Evs
-open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
+open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed; valuesOf)
 
 -- An author's cold: a timeline fixed relative to its subscription.
 data Fixed (A : Set) : Set₁ where
@@ -152,9 +152,9 @@ record Flat (N : Set) : Set where
     -- the instant's over has passed
     spent : Bool
     -- routes open through the outer and through the lanes; routes of an
-    -- ended lane covering a queued lane's burst; routes the lane now
-    -- ending holds; routes cut, waiting on the connects in scope
-    outer lanes held acc parked : ℕ
+    -- ended lane covering a queued lane's burst; routes cut, waiting on
+    -- the connects in scope
+    outer lanes held parked : ℕ
     -- each connect in scope, by index: the routes it holds
     live : List (N × ℕ)
 
@@ -362,23 +362,25 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   piece lanePart  0 = of (marked laneStart ∷ [])
   piece burstPart 0 = of (marked burstEnd ∷ [])
   piece _         1 = connected (here refl)
-  piece lanePart  2 = of (marked laneDone ∷ [])
+  piece lanePart  2 = of (marked (laneDone 0) ∷ [])
   piece _         _ = empty
 
   framed : ∀ {Θ B} → Part → E (IE B ∷ Θ) (IE B)
   framed k = flatMap (mergeᶠ (just 1)) (piece k) (of (0 ∷ 1 ∷ 2 ∷ []))
 
-  -- A lane counts its routes, and tells them as it ends: the carries,
-  -- then the emit.
-  laneStep : ∀ {A} → Routes × (List (IE A) × List (IE A)) → IE A → Routes × (List (IE A) × List (IE A))
-  laneStep (r , _) (instEmit (mark laneDone) n) = r , (replicate (proj₂ r) (marked carry) , instEmit (mark laneDone) n ∷ [])
-  laneStep (r , _) e = count r e , ([] , e ∷ [])
+  -- A lane counts its routes, and tells them in its end.
+  tell : ∀ {A} → Routes → IE A → IE A
+  tell r (instEmit (mark (laneDone _)) n) = instEmit (mark (laneDone (proj₂ r))) n
+  tell r e                                = e
+
+  laneStep : ∀ {A} → Routes × IE A → IE A → Routes × IE A
+  laneStep (r , _) e = count r e , tell r e
 
   counted : ∀ {Θ B} → E Θ (IE B) → E Θ (IE B)
-  counted s = each₂ (λ x → proj₁ (proj₂ x)) (λ x → proj₂ (proj₂ x)) (scan laneStep ((name , 0) , ([] , [])) s)
+  counted s = map proj₂ (scan laneStep ((name , 0) , marked begin) s)
 
   undone : ∀ {B} → IE B → Bool
-  undone (instEmit (mark laneDone) _) = false
+  undone (instEmit (mark (laneDone _)) _) = false
   undone _                            = true
 
   -- The lane, gated to its own part, under its subject, ending at its own
@@ -475,7 +477,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   stopped b n s (suc _) = bump b (_∸ 1) s , instEmit (mark stop) n ∷ []
 
   anew : N → Flat N → Flat N
-  anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; acc = 0 ; parked = 0 ; spent = false }
+  anew n s = record s { at = n ; outer = 0 ; lanes = 0 ; held = 0 ; parked = 0 ; spent = false }
 
   entered : Branch → N → Flat N → Flat N
   entered b n s with does (n ≟ Flat.at s)
@@ -499,16 +501,14 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   onMark op b s begin      n = begun b n s
   onMark op b s stop       n = stopped b n s (if Flat.spent s then 0 else share b s)
   onMark op b s over       n = overed n s
-  onMark op b s carry      n = record s { acc = suc (Flat.acc s) } , []
   onMark op b s outerOpen  n = arrive op n s
   onMark op b s outerClose n = s , []
   onMark op b s laneStart  n =
     record s { active = suc (Flat.active s)
              ; queue = Flat.queue s ∸ 1 ; dead = false } , []
-  onMark op b s laneDone   n =
-    ended (Flat.acc s ⊓ Flat.lanes s) n
-      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                ; dead = true })
+  onMark op b s (laneDone k) n =
+    ended (k ⊓ Flat.lanes s) n
+      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ k ; dead = true })
   onMark op b s burstEnd   n = burstOver (isZero (Flat.held s) ∨ Flat.dead s) n s
   onMark op b s outerDone  n = left n (record s { finished = true })
   onMark op b s m          n = s , instEmit (mark m) n ∷ []
@@ -545,7 +545,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
 
   combined : ∀ {Δ A B} → FlatOp → E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes) → E (IE B ∷ IE B ∷ IE A ∷ Δ) (IE B)
   combined op tk = each proj₂
-    (scan (react op) (flat name 0 0 false false false 0 0 0 0 0 [] , [])
+    (scan (react op) (flat name 0 0 false false false 0 0 0 0 [] , [])
       (takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))))
 
   -- The outer `O` is read first by the scan, then by the real flatMap,
@@ -710,8 +710,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
     mark-held _     outerOpen  n b = kept b
     mark-held _     outerClose n b = kept b
     mark-held _     laneStart  n b = kept b
-    mark-held _     carry      n b = kept b
-    mark-held _     laneDone   n b = kept b
+    mark-held _     (laneDone _) n b = kept b
     mark-held _     burstEnd   n b = kept b
     mark-held _     outerDone  n b = kept b
 
@@ -767,8 +766,7 @@ module Elaborate {C : Set → Set₁} {N : Set} (_≟_ : DecidableEquality N) (n
   mark-step _     outerOpen  n b = inj₁ (refl , refl)
   mark-step _     outerClose n b = inj₁ (refl , refl)
   mark-step _     laneStart  n b = inj₁ (refl , refl)
-  mark-step _     carry      n b = inj₁ (refl , refl)
-  mark-step _     laneDone   n b = inj₁ (refl , refl)
+  mark-step _     (laneDone _) n b = inj₁ (refl , refl)
   mark-step _     burstEnd   n b = inj₁ (refl , refl)
   mark-step _     outerDone  n b = inj₁ (refl , refl)
 

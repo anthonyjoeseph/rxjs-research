@@ -11,7 +11,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
-open import Data.Nat using (suc; _∸_; _⊓_; _+_)
+open import Data.Nat using (ℕ; suc; _∸_; _⊓_; _+_)
 open import Relation.Nullary using (does)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
@@ -20,7 +20,7 @@ open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
-open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
+open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; over; stop; outerOpen; outerClose; laneStart;
   laneDone; burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; isZero; Branch; outerB; laneB; closeB; lone; module Elaborate)
 open import simultaneous.HeldComb using (past)
@@ -32,7 +32,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone
 -- How a mark moves `active`,
 markAct : FlatOp → Mark → Kind
 markAct _       laneStart = kStart
-markAct _       laneDone  = kDone
+markAct _       (laneDone _) = kDone
 markAct switchᶠ outerOpen = kCut
 markAct _       _         = kOther
 
@@ -51,15 +51,15 @@ rowKind k op (_ , e) = evKind k op e
 
 -- A ROW THAT LOWERS THE COUNTER IS A `laneDone`.
 row-done : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markAct op x ≡ kDone
-         → Σ Pos λ k → Σ Branch λ b → Σ _ λ n → x ≡ (k , out (just (inj₁ (b , instEmit (mark laneDone) n))))
+         → Σ Pos λ k → Σ Branch λ b → Σ _ λ n → Σ ℕ λ c → x ≡ (k , out (just (inj₁ (b , instEmit (mark (laneDone c)) n))))
 row-done op (k , out (just (inj₁ (b , instEmit (mark m) n)))) eq with mark-done op m eq
-  where mark-done : ∀ op m → markAct op m ≡ kDone → m ≡ laneDone
-        mark-done _ laneDone _ = refl
+  where mark-done : ∀ op m → markAct op m ≡ kDone → Σ ℕ λ c → m ≡ laneDone c
+        mark-done _ (laneDone c) _ = c , refl
         mark-done _ begin () ; mark-done _ over () ; mark-done _ stop () ; mark-done _ outerClose ()
-        mark-done _ laneStart () ; mark-done _ carry () ; mark-done _ burstEnd () ; mark-done _ outerDone ()
+        mark-done _ laneStart () ; mark-done _ burstEnd () ; mark-done _ outerDone ()
         mark-done _ subscribed () ; mark-done _ completed ()
         mark-done switchᶠ outerOpen () ; mark-done (mergeᶠ _) outerOpen () ; mark-done exhaustᶠ outerOpen ()
-... | refl = k , b , n , refl
+... | (c , refl) = k , b , n , c , refl
 row-done op (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
 row-done op (_ , out (just (inj₂ _))) ()
 row-done op (_ , out nothing) ()
@@ -73,12 +73,12 @@ row-cut switchᶠ    _                                                  _  = ref
 row-cut (mergeᶠ _) (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut m eq
   where mark-cut : ∀ {k} m → markAct (mergeᶠ k) m ≡ kCut → mergeᶠ k ≡ switchᶠ
         mark-cut begin () ; mark-cut over () ; mark-cut stop () ; mark-cut outerOpen () ; mark-cut outerClose ()
-        mark-cut laneStart () ; mark-cut carry () ; mark-cut laneDone () ; mark-cut burstEnd () ; mark-cut outerDone ()
+        mark-cut laneStart () ; mark-cut (laneDone _) () ; mark-cut burstEnd () ; mark-cut outerDone ()
         mark-cut subscribed () ; mark-cut completed ()
 row-cut exhaustᶠ   (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut m eq
   where mark-cut : ∀ m → markAct exhaustᶠ m ≡ kCut → exhaustᶠ ≡ switchᶠ
         mark-cut begin () ; mark-cut over () ; mark-cut stop () ; mark-cut outerOpen () ; mark-cut outerClose ()
-        mark-cut laneStart () ; mark-cut carry () ; mark-cut laneDone () ; mark-cut burstEnd () ; mark-cut outerDone ()
+        mark-cut laneStart () ; mark-cut (laneDone _) () ; mark-cut burstEnd () ; mark-cut outerDone ()
         mark-cut subscribed () ; mark-cut completed ()
 row-cut (mergeᶠ _) (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
 row-cut (mergeᶠ _) (_ , out (just (inj₂ _))) ()
@@ -159,8 +159,7 @@ react-active switchᶠ           (s , _) (just (inj₁ (b , instEmit (mark outer
 react-active exhaustᶠ          (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
 react-active op (s , _) (just (inj₁ (b , instEmit (mark outerClose) n))) = refl
 react-active op (s , _) (just (inj₁ (b , instEmit (mark laneStart) n))) = refl
-react-active op (s , _) (just (inj₁ (b , instEmit (mark carry) n))) = refl
-react-active op (s , _) (just (inj₁ (b , instEmit (mark laneDone) n))) = proj₁ (ended-act (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }))
+react-active op (s , _) (just (inj₁ (b , instEmit (mark (laneDone c)) n))) = proj₁ (ended-act (c ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ c ; dead = true }))
 react-active op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj₁ (burst-act (isZero (Flat.held s) ∨ Flat.dead s) n s)
 react-active op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₁ (left-act n (record s { finished = true }))
 react-active op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
@@ -178,8 +177,7 @@ react-queue switchᶠ           (s , _) (just (inj₁ (b , instEmit (mark outerO
 react-queue exhaustᶠ          (s , _) (just (inj₁ (b , instEmit (mark outerOpen) n))) = refl
 react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerClose) n))) = refl
 react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneStart) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark carry) n))) = refl
-react-queue op (s , _) (just (inj₁ (b , instEmit (mark laneDone) n))) = proj₂ (ended-act (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }))
+react-queue op (s , _) (just (inj₁ (b , instEmit (mark (laneDone c)) n))) = proj₂ (ended-act (c ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ c ; dead = true }))
 react-queue op (s , _) (just (inj₁ (b , instEmit (mark burstEnd) n))) = proj₂ (burst-act (isZero (Flat.held s) ∨ Flat.dead s) n s)
 react-queue op (s , _) (just (inj₁ (b , instEmit (mark outerDone) n))) = proj₂ (left-act n (record s { finished = true }))
 react-queue op (s , _) (just (inj₁ (b , instEmit (mark subscribed) n))) = refl
@@ -222,7 +220,7 @@ row-start op (k , out (just (inj₁ (b , instEmit (mark m) n)))) eq with mark-st
   where mark-start : ∀ op m → markQue op m ≡ kDone → m ≡ laneStart
         mark-start _ laneStart _ = refl
         mark-start _ begin () ; mark-start _ over () ; mark-start _ stop () ; mark-start _ outerClose ()
-        mark-start _ carry () ; mark-start _ laneDone () ; mark-start _ burstEnd () ; mark-start _ outerDone ()
+        mark-start _ (laneDone _) () ; mark-start _ burstEnd () ; mark-start _ outerDone ()
         mark-start _ subscribed () ; mark-start _ completed ()
         mark-start (mergeᶠ (just _)) outerOpen () ; mark-start (mergeᶠ nothing) outerOpen ()
         mark-start switchᶠ outerOpen () ; mark-start exhaustᶠ outerOpen ()
@@ -239,7 +237,7 @@ que-cut : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markQue op x 
 que-cut op (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut op m eq
   where mark-cut : ∀ op m → markQue op m ≡ kCut → ⊥
         mark-cut _ begin () ; mark-cut _ over () ; mark-cut _ stop () ; mark-cut _ outerClose ()
-        mark-cut _ laneStart () ; mark-cut _ carry () ; mark-cut _ laneDone () ; mark-cut _ burstEnd () ; mark-cut _ outerDone ()
+        mark-cut _ laneStart () ; mark-cut _ (laneDone _) () ; mark-cut _ burstEnd () ; mark-cut _ outerDone ()
         mark-cut _ subscribed () ; mark-cut _ completed ()
         mark-cut (mergeᶠ (just _)) outerOpen () ; mark-cut (mergeᶠ nothing) outerOpen ()
         mark-cut switchᶠ outerOpen () ; mark-cut exhaustᶠ outerOpen ()

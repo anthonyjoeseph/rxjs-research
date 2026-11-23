@@ -4,7 +4,7 @@
 -- off them.
 module simultaneous.LaneEndSched where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -42,10 +42,9 @@ open import denotation.Up using (up; up-⊕)
 open import simultaneous.TableEnv using (_⊕ˡ_; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at; admits-step)
 open import simultaneous.TreeBounded using (listHot; admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
-open import simultaneous.DenRows using (conn-out; merge-out; hot-out; scan-out; bounded-out; of-mem; each-one)
-open import simultaneous.ElabUndone using (Undone; Sends; sd-[]; sd-rep)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
-  laneDone; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.DenRows using (conn-out; map-out′; hot-out; scan-out; bounded-out; each-one)
+open import simultaneous.ElabUndone using (Undone; tell-undone)
+open import simultaneous.InstEmit using (begin; laneStart; laneDone)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; blockˢ; laneSrc; elab; counted; framed; piece; laneStep; undone; marked)
 
@@ -114,41 +113,6 @@ acc-last one (Scan.acc₀ r _) with one r
 ... | refl = _ , refl
 acc-last one (Scan.acc _ r _ _) with one r
 ... | refl = _ , refl
-
-------------------------------------------------------------------------
--- What `counted`'s scan sends
-
--- The scan's second list is what it read.
-ls-one : ∀ {X} (s : Routes × (List (IE X) × List (IE X))) e → proj₂ (proj₂ (laneStep s e)) ≡ e ∷ []
-ls-one s (instEmit (value _) _)      = refl
-ls-one s (instEmit (mark begin) _)      = refl
-ls-one s (instEmit (mark over) _)       = refl
-ls-one s (instEmit (mark stop) _)       = refl
-ls-one s (instEmit (mark outerOpen) _)  = refl
-ls-one s (instEmit (mark outerClose) _) = refl
-ls-one s (instEmit (mark laneStart) _)  = refl
-ls-one s (instEmit (mark carry) _)      = refl
-ls-one s (instEmit (mark laneDone) _)   = refl
-ls-one s (instEmit (mark burstEnd) _)   = refl
-ls-one s (instEmit (mark outerDone) _)  = refl
-ls-one s (instEmit (mark subscribed) _) = refl
-ls-one s (instEmit (mark completed) _)  = refl
-
--- Its first list ends no lane.
-ls-true : ∀ {X} (s : Routes × (List (IE X) × List (IE X))) e → Sends (proj₁ (proj₂ (laneStep s e)))
-ls-true s (instEmit (value _) _)      = sd-[]
-ls-true s (instEmit (mark begin) _)      = sd-[]
-ls-true s (instEmit (mark over) _)       = sd-[]
-ls-true s (instEmit (mark stop) _)       = sd-[]
-ls-true s (instEmit (mark outerOpen) _)  = sd-[]
-ls-true s (instEmit (mark outerClose) _) = sd-[]
-ls-true s (instEmit (mark laneStart) _)  = sd-[]
-ls-true s (instEmit (mark carry) _)      = sd-[]
-ls-true s (instEmit (mark laneDone) _)   = sd-rep (proj₂ (proj₁ s)) carry root tt
-ls-true s (instEmit (mark burstEnd) _)   = sd-[]
-ls-true s (instEmit (mark outerDone) _)  = sd-[]
-ls-true s (instEmit (mark subscribed) _) = sd-[]
-ls-true s (instEmit (mark completed) _)  = sd-[]
 
 -- An `of` of one value shows it at its first child.
 of-one : ∀ {X : Set} p (x : X) {q y} → ES.InE (ofᴱ p 0 (x ∷ [])) q (out y) → q ≡ p ⊕ [ ix 0 ] × y ≡ x
@@ -365,14 +329,11 @@ module Ending {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.m
   M : Obs Timeline Θ (IE B)
   M = flatMap (mergeᶠ nothing) (λ k → shareˢ (x k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
-  inner : Routes × (List (IE B) × List (IE B)) → Obs Timeline (IE B ∷ ⊤ ∷ Θ) (IE B)
-  inner y = flatMap (mergeᶠ nothing) (λ c → of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (of (true ∷ false ∷ []))
-
-  z₀ : Routes × (List (IE B) × List (IE B))
-  z₀ = (root , 0) , ([] , [])
+  z₀ : Routes × IE B
+  z₀ = (root , 0) , marked begin
 
   ld : IE B
-  ld = marked laneDone
+  ld = marked (laneDone 0)
 
   ρ₀ : DenEnv Θ
   ρ₀ = den D N
@@ -410,26 +371,16 @@ module Ending {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.m
     FrP : EmissionSet (IE B)
     FrP = enter (capprox K n (framed k) ρ₂P) BP
 
-    -- The lane's of, picking its scan's second list.
-    pick-lane : ∀ v y s₀ a₀ → FrP v (out a₀) → y ≡ laneStep s₀ a₀ → ∀ {w c q a}
-              → enter (Op.of (true ∷ false ∷ [])) (v ⊕ [ ix 1 ]) w (out c)
-              → ES.InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out a)
-              → T (not (undone a)) → Σ Pos λ v′ → Σ (IE B) λ a₁ → q ≡ emitAt v′ × FrP v′ (out a₁) × T (not (undone a₁))
-    pick-lane v _ s₀ a₀ fa refl (at-out , _) l nu = ⊥-elim (notT _ nu (ls-true s₀ a₀ (of-mem _ 0 _ l)))
-    pick-lane v _ s₀ a₀ fa refl (on-out at-out , _) l nu with of-one _ a₀ (subst (λ xs → ES.InE (ofᴱ _ 0 xs) _ (out _)) (ls-one s₀ a₀) l)
-    ... | refl , refl = v , a₀ , refl , fa , nu
-    pick-lane v _ s₀ a₀ fa refl (on-out (on-out ()) , _) _ _
-
     -- What the lane ends the take with is what its scan read.
     peel : ∀ {q a} → enter (capprox K n (shareˢ (x k) (counted (framed k))) ρ₀) P q (out a) → T (not (undone a))
-         → Σ Pos λ v → Σ (IE B) λ a₀ → q ≡ emitAt v × FrP v (out a₀) × T (not (undone a₀))
-    peel r nu =
+         → Σ (IE B) λ a₀ → FrP q (out a₀) × T (not (undone a₀))
+    peel {a = a} r nu =
       let r₁ = conn-out (capprox K n empty ρ₀) (λ h → capprox K n (connect (Sh k) (counted (framed k))) (h ∷ ρ₀)) P r
           r₂ = conn-out (capprox K n (Sh k) ρ₁P) (λ h → capprox K n (counted (framed k)) (h ∷ ρ₁P)) (P ⊕ [ ix 0 ]) r₁
-          (v , y , sv , il , _) = merge-out (λ y → capprox K n (inner y) ρ₂P) (Op.scan laneStep z₀ (capprox K n (framed k) ρ₂P)) BP r₂
-          (w , c , ow , (ll , _) , _) = merge-out (λ c → Op.of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (Op.of (true ∷ false ∷ [])) (v ⊕ [ ix 1 ]) il
+          (y , sv , ya) = map-out′ proj₂ (Op.scan laneStep z₀ (capprox K n (framed k) ρ₂P)) BP r₂
           (s₀ , a₀ , fa , eq) = scan-out laneStep z₀ (capprox K n (framed k) ρ₂P) BP sv
-      in pick-lane v y s₀ a₀ fa eq ow ll nu
+      in a₀ , fa , subst (λ b → T (not b)) (tell-undone (proj₁ s₀) a₀)
+                     (subst (λ z → T (not (undone z))) (trans ya (cong proj₂ eq)) nu)
 
     -- The second part reads the share, whose rows are its children's.
     h₂-u : ∀ {s v a} → enter (ES.hot (Proper σ₂P)) s v (out a) → T (undone a)

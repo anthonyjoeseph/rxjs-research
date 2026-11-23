@@ -136,8 +136,7 @@ finished (instEmit (mark Marks.stop) _)        ()
 finished (instEmit (mark Marks.outerOpen) _)   ()
 finished (instEmit (mark Marks.outerClose) _)  ()
 finished (instEmit (mark Marks.laneStart) _)   ()
-finished (instEmit (mark Marks.carry) _)       ()
-finished (instEmit (mark Marks.laneDone) _)    ()
+finished (instEmit (mark (Marks.laneDone _)) _)    ()
 finished (instEmit (mark Marks.burstEnd) _)    ()
 finished (instEmit (mark Marks.outerDone) _)   ()
 finished (instEmit (mark Marks.subscribed) _)  ()
@@ -326,10 +325,9 @@ restamp-ok a e (instEmit (mark Marks.stop) _)       = refl , refl
 restamp-ok a e (instEmit (mark Marks.outerOpen) _)  = refl , refl
 restamp-ok a e (instEmit (mark Marks.outerClose) _) = refl , refl
 restamp-ok a e (instEmit (mark Marks.laneStart) _)  = refl , refl
-restamp-ok a e (instEmit (mark Marks.laneDone) _)   = refl , refl
+restamp-ok a e (instEmit (mark (Marks.laneDone _)) _)   = refl , refl
 restamp-ok a e (instEmit (mark Marks.burstEnd) _)   = refl , refl
 restamp-ok a e (instEmit (mark Marks.outerDone) _)  = refl , refl
-restamp-ok a e (instEmit (mark Marks.carry) _)      = refl , refl
 restamp-ok a e (instEmit (mark Marks.subscribed) _) = refl , refl
 restamp-ok a e (instEmit (mark completed) _)        = refl , refl
 

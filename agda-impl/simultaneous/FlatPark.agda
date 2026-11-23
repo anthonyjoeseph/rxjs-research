@@ -21,7 +21,7 @@ open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; end; skip; pin)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; outerB; laneB; closeB; isZero; lone; module Elaborate)
 open import simultaneous.HeldComb using (past)
@@ -99,11 +99,10 @@ private
   onMark-park op b begin      n s p = begun-park b n s p
   onMark-park op b stop       n s p = stopped-park b n s (if Flat.spent s then 0 else share b s) p
   onMark-park op b over       n s p = overed-park n s p
-  onMark-park op b carry      n s p = p
   onMark-park op b outerOpen  n s p = arrive-park op n s p
   onMark-park op b outerClose n s p = p
   onMark-park op b laneStart  n s p = p
-  onMark-park op b laneDone   n s p = ended-park (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }) p
+  onMark-park op b (laneDone kd) n s p = ended-park (kd ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) p
   onMark-park op b burstEnd   n s p = burst-park (isZero (Flat.held s) ∨ Flat.dead s) n s p
   onMark-park op b outerDone  n s p = left-park n (record s { finished = true }) p
   onMark-park op b subscribed n s p = p

@@ -9,15 +9,15 @@
 -- the share, whose rows all lie past it.
 module simultaneous.LaneStart where
 
-open import Data.Bool using (true; false; T; not; if_then_else_)
+open import Data.Bool using (true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; s≤s; z≤n)
+open import Data.Nat using (ℕ; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -26,29 +26,32 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap)
 open import denotation.Position using (Pos; ix; last; root; _≟ᵖ_; _⊕_)
-open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; InE; at-out; on-out; at-end; _≺_; _≼_;
-  Few; LaneOf; module Op; module Joining; module Values; module Bounded; module Merge;
-  module Scan; module TakeWhile; module Connecting)
+open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; Den; DenEnv; hot; enter; out; Proper; at-out; on-out; at-end;
+  _≺_; _≼_; Few; LaneOf; module Op; module Joining; module Values; module Bounded;
+  module Merge; module Scan; module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (notT)
 open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Count using (reach-down)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.DenRows using (conn-out; merge-out; scan-out; bounded-out; hot-out; each-one; of-mem)
-open import simultaneous.LaneEndSched using (ls-one; ls-true; of-one)
+open import simultaneous.DenRows using (conn-out; merge-out; map-out′; scan-out; bounded-out; hot-out; each-one)
+open import simultaneous.LaneEndSched using (of-one)
+open import simultaneous.ElabUndone using (tell-undone; tell-back)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.LaneLayers using (Under; acc-row; bd-lane-past; conn-few; done-of; few-row; few-tr; join-few; join-past; of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans; under-≺; under-⊕)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; begin; burstEnd)
+open import simultaneous.LaneLayers using (Under; map-few; bd-lane-past; conn-few; few-row; few-tr; join-few; join-past; of-after;
+  one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans;
+  under-≺; under-⊕)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; tell; undone; marked; piece)
 
 ------------------------------------------------------------------------
 -- The lane, as layers of operators over its children
 
-z₀ : ∀ {B} → Routes × (List (IE B) × List (IE B))
-z₀ = (root , 0) , ([] , [])
+z₀ : ∀ {B} → Routes × IE B
+z₀ = (root , 0) , marked begin
 
 -- A lane's lane part, subscribed under its first value.
 laneAt : Pos → Pos
@@ -79,17 +82,14 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   ls : IE B
   ls = marked laneStart
 
-  Inner : Routes × (List (IE B) × List (IE B)) → Den (IE B)
-  Inner y = Op.flatMap (mergeᶠ nothing) (λ b → Op.of (if b then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (Op.of (true ∷ false ∷ []))
-
   Fr : Part → Den ⊤ → Den (IE B) → Den (IE B)
   Fr k h h′ = Op.flatMap (mergeᶠ (just 1)) (λ j → PC k j h h′) (Op.of (0 ∷ 1 ∷ 2 ∷ []))
 
-  Sc : Part → Den ⊤ → Den (IE B) → Den (Routes × (List (IE B) × List (IE B)))
+  Sc : Part → Den ⊤ → Den (IE B) → Den (Routes × IE B)
   Sc k h h′ = Op.scan laneStep z₀ (Fr k h h′)
 
   Ct : Part → Den ⊤ → Den (IE B) → Den (IE B)
-  Ct k h h′ = Op.flatMap (mergeᶠ nothing) Inner (Sc k h h′)
+  Ct k h h′ = Op.map proj₂ (Sc k h h′)
 
   Sv : Part → Den (IE B)
   Sv k = Op.connect Op.empty (λ h → Op.connect (SH k h) (λ h′ → Ct k h h′))
@@ -223,51 +223,16 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     fr-few : ∀ {v} → Under V₀ v → Few Bd.JoinT v
     fr-few uv = join-few (o-few uv) ([ V₀ ] , l-few uv) ([] , λ ())
 
-    -- The frame's only value below its first mark is the mark,
-    fr-out-at : ∀ {v y b} → Under V₀ v → enter (Fr k h h′) P y (out b) → y ≺ v → y ≡ V₀
-    fr-out-at {v} uv r with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
-    ... | _ , _ , _ , _ , oq , sb , (l , sl) = go oq sb l sl
-      where
-        go : ∀ {q j i s y b} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out b) → s ≺ y → y ≺ v → y ≡ V₀
-        go (at-out , _) (nth , st) l _ _ with nth-zero nth
-        ... | refl with starts-0 st
-        ...   | refl = proj₁ (pc0-at k h h′ S₀ l)
-        go {s = s} {y} (on-out at-out , _) (_ , st) _ sl lt =
-          ⊥-elim (≺-absurd {v} {P ⊕ [ ix 1 ]} (under-≺ P (s≤s z≤n) (under-trans u-V₀ uv)) (≺-trans {P ⊕ [ ix 1 ]} {s} {v} (starts-after st) (≺-trans {s} {y} {v} sl lt)))
-        go {s = s} {y} (on-out (on-out at-out) , _) (_ , st) _ sl lt =
-          ⊥-elim (≺-absurd {v} {P ⊕ [ ix 2 ]} (under-≺ P (s≤s z≤n) (under-trans u-V₀ uv)) (≺-trans {P ⊕ [ ix 2 ]} {s} {v} (starts-after st) (≺-trans {s} {y} {v} sl lt)))
-        go (on-out (on-out (on-out ())) , _) _ _ _ _
-
-    -- the lane part's `laneStart`,
-    fr-val : k ≡ lanePart → ∀ {a} → enter (Fr k h h′) P V₀ (out a) → a ≡ marked laneStart
-    fr-val refl r with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
-    ... | _ , _ , _ , _ , oq , sb , (l , sl) = go oq sb l sl
-      where
-        go : ∀ {q j i s a} → O q (out j) → Bd.Sub i q s j → enter (f j) s V₀ (out a) → s ≺ V₀ → a ≡ marked laneStart
-        go (at-out , _) (nth , st) l _ with nth-zero nth
-        ... | refl with starts-0 st
-        ...   | refl = pc0-ls h h′ S₀ l
-        go {s = s} (on-out at-out , _) (_ , st) _ sl =
-          ⊥-elim (≺-absurd {V₀} {P ⊕ [ ix 1 ]} (under-≺ P (s≤s z≤n) u-V₀) (≺-trans {P ⊕ [ ix 1 ]} {s} {V₀} (starts-after st) sl))
-        go {s = s} (on-out (on-out at-out) , _) (_ , st) _ sl =
-          ⊥-elim (≺-absurd {V₀} {P ⊕ [ ix 2 ]} (under-≺ P (s≤s z≤n) u-V₀) (≺-trans {P ⊕ [ ix 2 ]} {s} {V₀} (starts-after st) sl))
-        go (on-out (on-out (on-out ())) , _) _ _ _
-
-    -- so the scan's fold there is its first step.
-    sc-val : k ≡ lanePart → ∀ {b} → Scan.Acc laneStep z₀ (enter (Fr k h h′) P) V₀ b → b ≡ laneStep z₀ (marked laneStart)
-    sc-val e (Scan.acc₀ x _)   = cong (laneStep z₀) (fr-val e x)
-    sc-val e (Scan.acc a _ lt _) = ⊥-elim (fr-min (proj₂ (acc-row a)) lt)
-
     -- What ends a lane in the frame is the lane part's second or third
     -- piece, past every position below the first value.
-    fr-done : ∀ {y n} → enter (Fr k h h′) P y (out (instEmit (mark laneDone) n))
+    fr-done : ∀ {y a} → enter (Fr k h h′) P y (out a) → T (not (undone a))
             → (k ≡ burstPart → (∀ {p y a} → enter h′ p y (out a) → ⊥)) → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
-    fr-done r hb with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
+    fr-done {a = a} r nu hb with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
     ... | q , j , i , s , oq , sb , (l , sl) = go k refl oq sb l sl
       where
-        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y n} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out (instEmit (mark laneDone) n)) → s ≺ y
+        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out a) → s ≺ y
            → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
-        go _ _ {s = s} (at-out , _) _ l _ = ⊥-elim (proj₂ (pc0-at k h h′ s l))
+        go _ _ {s = s} (at-out , _) _ l _ = ⊥-elim (notT (undone a) nu (proj₂ (pc0-at k h h′ s l)))
         go lanePart refl {s = s} {y} (on-out at-out , _) (_ , st) _ sl =
           refl , λ {u} un → ≺-trans {u} {P ⊕ [ ix 1 ]} {y} (under-≺ P {0} {1} {u} (s≤s z≤n) un) (≺-trans {P ⊕ [ ix 1 ]} {s} {y} (starts-after st) sl)
         go burstPart refl {s = s} (on-out at-out , _) _ l _ = ⊥-elim (hb refl (pc1 burstPart h h′ s l))
@@ -318,168 +283,45 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         go _ _ (on-out (on-out (on-out ())) , _) _ _ _
 
   ----------------------------------------------------------------------
-  -- The scan's split
-
-  -- What the split shows that ends a lane is what the scan read.
-  pick : ∀ (y : Routes × (List (IE B) × List (IE B))) st a₀ → y ≡ laneStep st a₀ → ∀ {U w c q a}
-       → InE (ofᴱ U 0 (true ∷ false ∷ [])) w (out c)
-       → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out a) → T (not (undone a)) → a ≡ a₀
-  pick _ st a₀ refl at-out l nu = ⊥-elim (notT _ nu (ls-true st a₀ (of-mem _ 0 _ l)))
-  pick _ st a₀ refl (on-out at-out) l nu with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
-  ... | refl , refl = refl
-  pick _ _ _ refl (on-out (on-out ())) _ _
-
-  -- The split's first list holds no `laneStart`: carries, if anything.
-  rep-no : ∀ k {n} → instEmit (mark laneStart) n ∈ L.replicate k (marked {B} carry) → ⊥
-  rep-no (suc k) (here ())
-  rep-no (suc k) (there i) = rep-no k i
-
-  ls-no : ∀ (st : Routes × (List (IE B) × List (IE B))) e {n} → instEmit (mark laneStart) n ∈ proj₁ (proj₂ (laneStep st e)) → ⊥
-  ls-no st (instEmit (value _) _)      ()
-  ls-no st (instEmit (mark begin) _)      ()
-  ls-no st (instEmit (mark over) _)       ()
-  ls-no st (instEmit (mark stop) _)       ()
-  ls-no st (instEmit (mark outerOpen) _)  ()
-  ls-no st (instEmit (mark outerClose) _) ()
-  ls-no st (instEmit (mark laneStart) _)  ()
-  ls-no st (instEmit (mark carry) _)      ()
-  ls-no st (instEmit (mark laneDone) _) i = rep-no (proj₂ (proj₁ st)) i
-  ls-no st (instEmit (mark burstEnd) _)   ()
-  ls-no st (instEmit (mark outerDone) _)  ()
-  ls-no st (instEmit (mark subscribed) _) ()
-  ls-no st (instEmit (mark completed) _)  ()
-
-  -- The split of the first piece's mark, at `U`, shows it at its second
-  -- lane's first child: one of few rows.
-  module Split (U : Pos) where
-    W₀ E₀ : Pos
-    W₀ = U ⊕ [ ix 1 ]
-    E₀ = (W₀ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
-
-    ks : List Pos
-    ks = ((U ⊕ [ ix 0 ]) ⊕ [ ix 0 ]) ∷ (W₀ ⊕ [ ix 0 ]) ∷ (U ⊕ [ last ]) ∷ (((U ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ [ last ])
-       ∷ E₀ ∷ ((W₀ ⊕ [ ix 1 ]) ⊕ [ last ]) ∷ []
-
-    Sp : EmissionSet (IE B)
-    Sp = enter (Inner (laneStep z₀ ls)) U
-
-    Raw : EmissionSet (IE B)
-    Raw = Merge.JoinT (λ b → Op.of (if b then proj₁ (proj₂ (laneStep z₀ ls)) else proj₂ (proj₂ (laneStep z₀ ls)))) (enter (Op.of (true ∷ false ∷ [])) U)
-
-    all-in : ∀ {y e} → Raw y e → y ∈ ks
-    all-in (Joining.val (at-out , _))                                         = here refl
-    all-in (Joining.val (on-out at-out , _))                                  = there (here refl)
-    all-in (Joining.val (on-out (on-out ()) , _))
-    all-in (Joining.step (on-out (on-out ()) , _))
-    all-in (Joining.opin (on-out (on-out ()) , _))
-    all-in (Joining.oend (on-out (on-out at-end) , _) _)                      = there (there (here refl))
-    all-in (Joining.opass (on-out (on-out at-end) , _) _)                     = there (there (here refl))
-    all-in (Joining.lane (at-out , _) _ ((at-end , _) , _) _ ())
-    all-in (Joining.lane (on-out at-out , _) _ ((at-out , _) , _) _ _)        = there (there (there (there (here refl))))
-    all-in (Joining.lane (on-out at-out , _) _ ((on-out at-end , _) , _) _ ())
-    all-in (Joining.lane (on-out (on-out ()) , _) _ _ _ _)
-    all-in (Joining.lend (at-out , _) _ ((at-end , _) , _) _ _ _)             = there (there (there (here refl)))
-    all-in (Joining.lend (on-out at-out , _) _ ((on-out at-end , _) , _) _ _ _) = there (there (there (there (there (here refl)))))
-    all-in (Joining.lend (on-out (on-out ()) , _) _ _ _ _ _)
-    all-in (Joining.lpass (at-out , _) _ ((at-end , _) , _) _ _ _)            = there (there (there (here refl)))
-    all-in (Joining.lpass (on-out at-out , _) _ ((on-out at-end , _) , _) _ _ _) = there (there (there (there (there (here refl)))))
-    all-in (Joining.lpass (on-out (on-out ()) , _) _ _ _ _ _)
-    all-in (Joining.hand _ _ _ _ ())
-    all-in (Joining.left (at-out , _) _ ((() , _) , _) _ _)
-    all-in (Joining.left (on-out at-out , _) _ ((on-out () , _) , _) _ _)
-    all-in (Joining.left (on-out (on-out ()) , _) _ _ _ _)
-    all-in (Joining.run () _)
-    all-in (Joining.rend () _ _)
-    all-in (Joining.rpass () _ _)
-    all-in (Joining.rhand () _)
-
-    row : Sp E₀ (out ls)
-    row = Joining.lane (on-out at-out , of-reach U 0 (true ∷ false ∷ []) {W₀} {out false}) tt ((at-out , of-reach (W₀ ⊕ [ ix 1 ]) 0 (ls ∷ []) {E₀} {out ls}) , ≺-ext (W₀ ⊕ [ ix 1 ]) [])
-            (λ ()) tt
-        , ks , λ x _ _ → all-in x
-
-  -- What the split shows as `laneStart` is the scan's read, at its second
-  -- lane's first child.
-  pick-at : ∀ (y : Routes × (List (IE B) × List (IE B))) st a₀ → y ≡ laneStep st a₀ → ∀ {U w c q n}
-          → InE (ofᴱ U 0 (true ∷ false ∷ [])) w (out c)
-          → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out (instEmit (mark laneStart) n))
-          → a₀ ≡ instEmit (mark laneStart) n × q ≡ Split.E₀ U
-  pick-at _ st a₀ refl at-out l = ⊥-elim (ls-no st a₀ (of-mem _ 0 _ l))
-  pick-at _ st a₀ refl (on-out at-out) l with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
-  ... | refl , refl = refl , refl
-  pick-at _ _ _ refl (on-out (on-out ())) _
-
-  -- The split's first list holds no `begin` either,
-  bg-rep : ∀ k {n} → instEmit (mark begin) n ∈ L.replicate k (marked {B} carry) → ⊥
-  bg-rep (suc k) (here ())
-  bg-rep (suc k) (there i) = bg-rep k i
-
-  bg-no : ∀ (st : Routes × (List (IE B) × List (IE B))) e {n} → instEmit (mark begin) n ∈ proj₁ (proj₂ (laneStep st e)) → ⊥
-  bg-no st (instEmit (value _) _)      ()
-  bg-no st (instEmit (mark begin) _)      ()
-  bg-no st (instEmit (mark over) _)       ()
-  bg-no st (instEmit (mark stop) _)       ()
-  bg-no st (instEmit (mark outerOpen) _)  ()
-  bg-no st (instEmit (mark outerClose) _) ()
-  bg-no st (instEmit (mark laneStart) _)  ()
-  bg-no st (instEmit (mark carry) _)      ()
-  bg-no st (instEmit (mark laneDone) _) i = bg-rep (proj₂ (proj₁ st)) i
-  bg-no st (instEmit (mark burstEnd) _)   ()
-  bg-no st (instEmit (mark outerDone) _)  ()
-  bg-no st (instEmit (mark subscribed) _) ()
-  bg-no st (instEmit (mark completed) _)  ()
-
-  -- so a `begin` the split shows is the scan's read.
-  pick-begin : ∀ (y : Routes × (List (IE B) × List (IE B))) st a₀ → y ≡ laneStep st a₀ → ∀ {U w c q n}
-             → InE (ofᴱ U 0 (true ∷ false ∷ [])) w (out c)
-             → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) q (out (instEmit (mark begin) n))
-             → a₀ ≡ instEmit (mark begin) n
-  pick-begin _ st a₀ refl at-out l = ⊥-elim (bg-no st a₀ (of-mem _ 0 _ l))
-  pick-begin _ st a₀ refl (on-out at-out) l with of-one _ a₀ (subst (λ xs → InE (ofᴱ _ 0 xs) _ (out _)) (ls-one st a₀) l)
-  ... | _ , refl = refl
-  pick-begin _ _ _ refl (on-out (on-out ())) _
-
-  ----------------------------------------------------------------------
   -- Down, then up
+
+  -- What a part's connect shows is what its scan read, told.
+  ct-read : ∀ k P {y a} → enter (Sv k) P y (out a)
+          → Σ (Routes × IE B) λ st → Σ (IE B) λ a₀ → enter (Sc k (H₁ P) (H₂ P k)) (Bp P) y (out (laneStep st a₀))
+            × enter (Fr k (H₁ P) (H₂ P k)) (Bp P) y (out a₀) × tell (proj₁ st) a₀ ≡ a
+  ct-read k P svr =
+    let (yst , scr , ya) = map-out′ proj₂ (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
+        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
+    in st , a₀ , subst (λ z → enter (Sc k (H₁ P) (H₂ P k)) (Bp P) _ (out z)) eq scr , fa , sym (trans ya (cong proj₂ eq))
 
   -- The `laneDone` a part's connect shows is the lane part's, past its
   -- frame's first piece.
-  down : ∀ k P {e₂ n} → enter (Sv k) P e₂ (out (instEmit (mark laneDone) n))
-       → k ≡ lanePart × Σ Pos λ v₂ → Σ _ λ yst → Σ _ λ a₂ → enter (Sc k (H₁ P) (H₂ P k)) (Bp P) v₂ (out yst)
-         × enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a₂) × (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ e₂
-  down k P {e₂} svr =
-    let (v₂ , yst , scr , inr , lt₁) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
-        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
-        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
-        ea = pick yst st a₀ eq (proj₁ ow) (proj₁ ll) tt
-        (ek , vlt) = Frame.fr-done k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) (sym ea) fa)
+  down : ∀ k P {e₂ a} → enter (Sv k) P e₂ (out a) → T (not (undone a))
+       → k ≡ lanePart × Σ _ λ yst → Σ _ λ a₂ → enter (Sc k (H₁ P) (H₂ P k)) (Bp P) e₂ (out yst)
+         × enter (Fr k (H₁ P) (H₂ P k)) (Bp P) e₂ (out a₂) × (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ e₂)
+  down k P {e₂} svr nu =
+    let (st , a₀ , scr , fa , ea) = ct-read k P svr
+        nu₀ = subst (λ b → T (not b)) (tell-undone (proj₁ st) a₀) (subst (λ z → T (not (undone z))) (sym ea) nu)
+        (ek , vlt) = Frame.fr-done k (H₁ P) (H₂ P k) (Bp P) fa nu₀
                        (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
-    in ek , v₂ , yst , a₀ , scr , fa , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
+    in ek , _ , a₀ , scr , fa , vlt
 
-  -- What a part's connect shows as `laneStart` is the lane part's split of
-  -- its frame's first mark, when its share shows none.
+  -- What a part's connect shows as `laneStart` is the lane part's frame's
+  -- first mark, when its share shows none.
   down-start : ∀ k P {y n} → enter (Sv k) P y (out (instEmit (mark laneStart) n)) → (∀ {p y n} → enter (H₂ P k) p y (out (instEmit (mark laneStart) n)) → ⊥)
-             → k ≡ lanePart × y ≡ Split.E₀ (Frame.V₀ k (H₁ P) (H₂ P k) (Bp P) ⊕ [ ix 1 ])
+             → k ≡ lanePart × y ≡ Frame.V₀ k (H₁ P) (H₂ P k) (Bp P)
   down-start k P svr hn =
-    let (v₂ , yst , scr , inr , _) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
-        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
-        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
-        (ea , ey) = pick-at yst st a₀ eq (proj₁ ow) (proj₁ ll)
-        (ek , ev₂) = Frame.fr-start k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) ea fa) hn
-    in ek , trans ey (cong (λ v → Split.E₀ (v ⊕ [ ix 1 ])) ev₂)
+    let (st , a₀ , _ , fa , ea) = ct-read k P svr
+    in Frame.fr-start k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) _ (out a)) (tell-back (proj₁ st) a₀ ea tt) fa) hn
 
   -- The `begin` a part's connect shows is the lane part's, past its
   -- frame's first piece.
   down-begin : ∀ k P {e₂ n} → enter (Sv k) P e₂ (out (instEmit (mark begin) n))
-             → k ≡ lanePart × Σ Pos λ v₂ → (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ e₂
+             → k ≡ lanePart × (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ e₂)
   down-begin k P {e₂} svr =
-    let (v₂ , yst , scr , inr , lt₁) = merge-out Inner (Sc k (H₁ P) (H₂ P k)) (Bp P) (sv-out k P svr)
-        (w , c , ow , ll , _) = merge-out (λ b → Op.of (if b then proj₁ (proj₂ yst) else proj₂ (proj₂ yst))) (Op.of (true ∷ false ∷ [])) (v₂ ⊕ [ ix 1 ]) inr
-        (st , a₀ , fa , eq) = scan-out laneStep z₀ (Fr k (H₁ P) (H₂ P k)) (Bp P) scr
-        ea = pick-begin yst st a₀ eq (proj₁ ow) (proj₁ ll)
-        (ek , vlt) = Frame.fr-begin k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) v₂ (out a)) ea fa)
-                       (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
-    in ek , v₂ , vlt , ≺-trans {v₂} {v₂ ⊕ [ ix 1 ]} {e₂} (≺-ext v₂ []) lt₁
+    let (st , a₀ , _ , fa , ea) = ct-read k P svr
+    in Frame.fr-begin k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) e₂ (out a)) (tell-back (proj₁ st) a₀ ea tt) fa)
+         (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
 
   h₂-no : ∀ P k → (∀ {y n} → enter (SH k (H₁ P)) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
         → ∀ {p y n} → enter (H₂ P k) p y (out (instEmit (mark laneStart) n)) → ⊥
@@ -487,7 +329,7 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
   -- Where a lane shows its `laneStart`.
   startAt : Pos → Pos
-  startAt s = Split.E₀ (Frame.V₀ lanePart (H₁ (laneAt s)) (H₂ (laneAt s) lanePart) (Bp (laneAt s)) ⊕ [ ix 1 ])
+  startAt s = Frame.V₀ lanePart (H₁ (laneAt s)) (H₂ (laneAt s) lanePart) (Bp (laneAt s))
 
   bl : burstPart ≡ lanePart → ⊥
   bl ()
@@ -509,8 +351,10 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   -- The lane part's split of its first mark, a row of every layer of its
   -- connect: each layer's rows before it are few.
   module Up (P : Pos) where
-    open Frame lanePart (H₁ P) (H₂ P lanePart) (Bp P) using (V₀; u-V₀; fr₀; fr-min; fr-few; fr-out-at; sc-val)
-    open Split (V₀ ⊕ [ ix 1 ]) using (W₀; E₀; row; ks; all-in)
+    open Frame lanePart (H₁ P) (H₂ P lanePart) (Bp P) using (V₀; u-V₀; fr₀; fr-min; fr-few)
+
+    E₀ : Pos
+    E₀ = V₀
 
     Q : Pos
     Q = P ⊕ [ ix 0 ]
@@ -518,14 +362,11 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     FrE : EmissionSet (IE B)
     FrE = enter (Fr lanePart (H₁ P) (H₂ P lanePart)) (Bp P)
 
-    ScE : EmissionSet (Routes × (List (IE B) × List (IE B)))
+    ScE : EmissionSet (Routes × IE B)
     ScE = enter (Sc lanePart (H₁ P) (H₂ P lanePart)) (Bp P)
 
-    u-V₀E : Under V₀ E₀
-    u-V₀E = under-⊕ (under-⊕ (under-⊕ (under-⊕ (under-refl V₀) (ix 1)) (ix 1)) (ix 1)) (ix 0)
-
     u-E₀ : Under (Bp P ⊕ [ ix 0 ]) E₀
-    u-E₀ = under-trans u-V₀ u-V₀E
+    u-E₀ = u-V₀
 
     u-Bp : Under (Bp P) E₀
     u-Bp = under-trans (under-⊕ (under-refl (Bp P)) (ix 0)) u-E₀
@@ -536,14 +377,8 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     sc-few : ∀ {v} → Under V₀ v → Few (Scan.ScanT laneStep z₀ FrE) v
     sc-few uv = scan-few laneStep z₀ FrE (few-tr (fr-few uv))
 
-    -- The split's lane is the only one below it.
-    ct-few : Few (Merge.JoinT Inner ScE) E₀
-    ct-few = join-few (few-tr (sc-few u-V₀E)) (ks , hl) ([] , λ ())
-      where
-        hl : ∀ {q y k e} → ScE q (out y) → LaneOf Inner q y k e → k ≺ E₀ → k ∈ ks
-        hl {q} {y} {k} (Scan.sval a , _) (l , ql) lt with fr-out-at u-V₀E (proj₂ (acc-row a)) (≺-trans {q} {q ⊕ [ ix 1 ]} {E₀} (≺-ext q []) (≺-trans {q ⊕ [ ix 1 ]} {k} {E₀} ql lt))
-        ... | refl with sc-val refl a
-        ...   | refl = all-in (proj₁ l)
+    ct-few : Few (MapT proj₂ ScE) E₀
+    ct-few = map-few proj₂ ScE (few-tr (sc-few (under-refl V₀)))
 
     -- The share lies past it, as does the empty source.
     in-few : Few (Connecting.ConnT Q (enter (SH lanePart (H₁ P)) (Q ⊕ [ ix 1 ])) (enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P))) E₀
@@ -561,7 +396,7 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     sc-row = few-row (Scan.sval (Scan.acc₀ (few-row (fr₀ refl) (fr-few (under-refl V₀))) fr-min)) (sc-few (under-refl V₀))
 
     ct-row : enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) E₀ (out ls)
-    ct-row = few-row (Joining.lane sc-row tt (row , under-ext (V₀ ⊕ [ ix 1 ]) (under-⊕ (under-⊕ (under-refl W₀) (ix 1)) (ix 0))) (λ ()) tt) ct-few
+    ct-row = few-row (map-out sc-row) ct-few
 
     sv-row : enter (Sv lanePart) P E₀ (out ls)
     sv-row = few-row (Connecting.body (few-row (Connecting.body ct-row) in-few)) sv-few
@@ -611,16 +446,14 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
       -- No `laneDone` comes before it.
       nF : ¬ TakeWhile.Failed true undone (enter MM s) E₀
-      nF (q′ , a′ , x′ , nk′ , lt′) =
-        let (n , ea) = done-of a′ nk′
-        in late n (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s (subst (λ a → enter MM s q′ (out a)) ea x′))
+      nF (q′ , a′ , x′ , nk′ , lt′) = late (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s x′)
         where
-          late : ∀ n → (Σ Pos λ kq → Σ Part λ k → OS kq (out k) × enter (Sv k) (kq ⊕ [ ix 1 ]) q′ (out (instEmit (mark laneDone) n)) × (kq ⊕ [ ix 1 ]) ≺ q′) → ⊥
-          late n (_ , _ , (at-out , _) , svr , _) =
-            let (_ , v₂ , _ , _ , _ , _ , vlt , v₂q) = down lanePart P svr
-            in ≺-absurd {E₀} {q′} (≺-trans {E₀} {v₂} {q′} (vlt u-E₀) v₂q) lt′
-          late n (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr))
-          late n (_ , _ , (on-out (on-out ()) , _) , _ , _)
+          late : (Σ Pos λ kq → Σ Part λ k → OS kq (out k) × enter (Sv k) (kq ⊕ [ ix 1 ]) q′ (out a′) × (kq ⊕ [ ix 1 ]) ≺ q′) → ⊥
+          late (_ , _ , (at-out , _) , svr , _) =
+            let (_ , _ , _ , _ , _ , vlt) = down lanePart P svr nk′
+            in ≺-absurd {E₀} {q′} (vlt u-E₀) lt′
+          late (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr nk′))
+          late (_ , _ , (on-out (on-out ()) , _) , _ , _)
 
   -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
@@ -630,17 +463,16 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   core-begin s {y} {n} x@(TakeWhile.pass r _ nF , _) = part (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
     where
     fin : ∀ kq k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
-        → (k ≡ lanePart × Σ Pos λ v₂ → (∀ {u} → Under (Bp (kq ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ y)
+        → (k ≡ lanePart × (∀ {u} → Under (Bp (kq ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) u → u ≺ y))
         → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
-    fin kq k okq (refl , v₂ , vlt , v₂y) = E₀ , take₀ , s-E₀ , lt₀
+    fin kq k okq (refl , vlt) = E₀ , take₀ , s-E₀ , lt₀
      where
       P : Pos
       P = kq ⊕ [ ix 1 ]
-      open Up P using (u-E₀; u-P; sv-row)
-      open Split (Frame.V₀ lanePart (H₁ P) (H₂ P lanePart) (Bp P) ⊕ [ ix 1 ]) using (E₀)
+      open Up P using (E₀; u-E₀; u-P; sv-row)
 
       lt₀ : E₀ ≺ y
-      lt₀ = ≺-trans {E₀} {v₂} {y} (vlt u-E₀) v₂y
+      lt₀ = vlt u-E₀
 
       P-E₀ : P ≺ E₀
       P-E₀ = under-ext P u-P
@@ -664,38 +496,23 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
-  core : ∀ s {y n} → enter LaneD s y (out (instEmit (mark laneDone) n))
+  core : ∀ s {y a} → enter LaneD s y (out a) → T (not (undone a))
        → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
-  core s (TakeWhile.pass _ () _ , _)
-  core s x@(TakeWhile.fail r _ nF _ , _) = split₁ s x r nF (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
+  core s (TakeWhile.pass _ u _ , _) nu = ⊥-elim (notT _ nu u)
+  core s {a = a} x@(TakeWhile.fail {q = q} r nk nF _ , _) _ = split (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
     where
-    split₂ : ∀ s {q n} kq k → enter LaneD s (q ⊕ [ ix 0 ]) (out (instEmit (mark laneDone) n)) → enter MM s q (out (instEmit (mark laneDone) n))
-           → ¬ TakeWhile.Failed true undone (enter MM s) q → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
-           → enter (Sv k) (kq ⊕ [ ix 1 ]) q (out (instEmit (mark laneDone) n))
-           → (k ≡ lanePart × Σ Pos λ v₂ → Σ (Routes × (List (IE B) × List (IE B))) λ yst → Σ (IE B) λ a₂
-               → enter (Sc k (H₁ (kq ⊕ [ ix 1 ])) (H₂ (kq ⊕ [ ix 1 ]) k)) (Bp (kq ⊕ [ ix 1 ])) v₂ (out yst)
-               × enter (Fr k (H₁ (kq ⊕ [ ix 1 ])) (H₂ (kq ⊕ [ ix 1 ]) k)) (Bp (kq ⊕ [ ix 1 ])) v₂ (out a₂)
-               × (∀ {u} → Under (Bp (kq ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) u → u ≺ v₂) × v₂ ≺ q)
-           → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ (q ⊕ [ ix 0 ])
-
-    split₁ : ∀ s {q n} → enter LaneD s (q ⊕ [ ix 0 ]) (out (instEmit (mark laneDone) n)) → enter MM s q (out (instEmit (mark laneDone) n))
-           → ¬ TakeWhile.Failed true undone (enter MM s) q
-           → (Σ Pos λ kq → Σ Part λ k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
-               × enter (Sv k) (kq ⊕ [ ix 1 ]) q (out (instEmit (mark laneDone) n)) × (kq ⊕ [ ix 1 ]) ≺ q)
-           → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ (q ⊕ [ ix 0 ])
-    split₁ s x r nF (kq , k , okq , svr , _) = split₂ s kq k x r nF okq svr (down k (kq ⊕ [ ix 1 ]) svr)
-    split₂ s {q} {n} kq k x r nF okq svr (refl , v₂ , yst , a₂ , scr , fa , vlt , v₂e₂) = E₀ , take₀ , s-E₀ , ≺-trans {E₀} {q} {q ⊕ [ ix 0 ]} lt₀ (≺-ext q [])
+    split : (Σ Pos λ kq → Σ Part λ k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
+               × enter (Sv k) (kq ⊕ [ ix 1 ]) q (out a) × (kq ⊕ [ ix 1 ]) ≺ q)
+          → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ (q ⊕ [ ix 0 ])
+    split (kq , k , okq , svr , _) with down k (kq ⊕ [ ix 1 ]) svr nk
+    ... | refl , _ , _ , _ , _ , vlt = E₀ , take₀ , s-E₀ , ≺-trans {E₀} {q} {q ⊕ [ ix 0 ]} lt₀ (≺-ext q [])
      where
       P : Pos
       P = kq ⊕ [ ix 1 ]
-      open Up P using (u-E₀; u-P; sv-row)
-      open Split (Frame.V₀ lanePart (H₁ P) (H₂ P lanePart) (Bp P) ⊕ [ ix 1 ]) using (E₀)
+      open Up P using (E₀; u-E₀; u-P; sv-row)
 
       lt₀ : E₀ ≺ q
-      lt₀ = ≺-trans {E₀} {v₂} {q} (vlt u-E₀) v₂e₂
-
-      sv₀ : enter (Sv lanePart) P E₀ (out ls)
-      sv₀ = sv-row
+      lt₀ = vlt u-E₀
 
       P-E₀ : P ≺ E₀
       P-E₀ = under-ext P u-P
@@ -704,13 +521,13 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
       s-E₀ = ≺-trans {s} {kq} {E₀} (of-after s (lanePart ∷ burstPart ∷ []) okq) (under-ext kq (under-trans (under-⊕ (under-refl P) (ix 0)) u-P))
 
       mm₀ : enter MM s E₀ (out ls)
-      mm₀ = Joining.lane okq tt (sv₀ , P-E₀) (λ ()) tt , reach-down {q = q} {w = E₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out ls} (proj₂ r) lt₀ tt
+      mm₀ = Joining.lane okq tt (sv-row , P-E₀) (λ ()) tt , reach-down {q = q} {w = E₀} {e = out a} {e₁ = out ls} (proj₂ r) lt₀ tt
 
       nF₀ : ¬ TakeWhile.Failed true undone (enter MM s) E₀
       nF₀ (q′ , a′ , x′ , nk′ , lt′) = nF (q′ , a′ , x′ , nk′ , ≺-trans {q′} {E₀} {q} lt′ lt₀)
 
       take₀ : enter LaneD s E₀ (out ls)
-      take₀ = TakeWhile.pass mm₀ tt nF₀ , reach-down {q = q ⊕ [ ix 0 ]} {w = E₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out ls} (proj₂ x) (≺-trans {E₀} {q} {q ⊕ [ ix 0 ]} lt₀ (≺-ext q [])) tt
+      take₀ = TakeWhile.pass mm₀ tt nF₀ , reach-down {q = q ⊕ [ ix 0 ]} {w = E₀} {e = out a} {e₁ = out ls} (proj₂ x) (≺-trans {E₀} {q} {q ⊕ [ ix 0 ]} lt₀ (≺-ext q [])) tt
 
 ------------------------------------------------------------------------
 -- The lane, read at either meaning
@@ -806,10 +623,10 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
-  lane-starts : ∀ m s {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark laneDone) n))
+  lane-starts : ∀ m s {y k n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark (laneDone k)) n))
               → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
-  lane-starts m s {y} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
-    (C.core m s (subst (λ d → enter d s y (out (instEmit (mark laneDone) n))) (lane-eq m) r))
+  lane-starts m s {y} {k} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
+    (C.core m s (subst (λ d → enter d s y (out (instEmit (mark (laneDone k)) n))) (lane-eq m) r) tt)
 
   -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.

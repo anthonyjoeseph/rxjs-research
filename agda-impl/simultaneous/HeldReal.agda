@@ -104,39 +104,39 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
-  done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → ¬ AC.DoneIn [] xs q
-  done-once r₁ mt xs x ys eq (a , y , n , xo , refl , l) di with find di
-  ... | _ , i , (a′ , y′ , n′ , xo′ , refl , l′) with ro-func xo xo′
+  done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.DoneIn [] xs q
+  done-once r₁ mt xs x ys eq (_ , a , y , n , xo , refl , l) di with find di
+  ... | _ , i , (_ , a′ , y′ , n′ , xo′ , refl , l′) with ro-func xo xo′
   ...   | refl with done-one xo l l′
   ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} (met-before xs (split-met r₁ mt xs _ ys eq) i)
 
   private
-    start-before : ∀ {y y₀ n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → σ₃ y (out (instEmit (mark laneDone) n)) → y₀ ≼ y → y₀ ≺ y
+    start-before : ∀ {y y₀ kd n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → σ₃ y (out (instEmit (mark (laneDone kd)) n)) → y₀ ≼ y → y₀ ≺ y
     start-before {y} {y₀} σs σd le with ≼-split {y₀} {y} le
     ... | inj₁ lt = lt
     ... | inj₂ refl with InvAt.func I₃ (proj₁ σs) (proj₁ σd)
     ...   | ()
 
     -- A lane row before one the scan meets is met before it.
-    pick : ∀ {y y₀ n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → ∀ ws → Met M ws
-         → (y ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneDone) n)))) ∈ ws
+    pick : ∀ {y y₀ kd n n₀} → σ₃ y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → ∀ ws → Met M ws
+         → (y ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark (laneDone kd)) n)))) ∈ ws
          → (y₀ ⊕ [ sub LS.J ] , out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) ∈ ws
-    pick {y} {y₀} σs lt ws mw i =
+    pick {y} {y₀} {kd} σs lt ws mw i =
       let (_ , pr , run , _) = lane-run mw
           (yd , ed , j) = bproj-mem pr i
       in bproj-back pr (run-has (λ x x′ → InvAt.func I₃ (proj₁ x) (proj₁ x′)) run σs tt tt (subst (y₀ ≼_) (⊕-injˡ y yd ed) (≺→≼ {y₀} {y} lt)) j)
 
-    st-dn : ∀ {k k′ n n′} → _≡_ {A = Row} (k , out (just (inj₁ (laneB , instEmit (mark laneStart) n)))) (k′ , out (just (inj₁ (laneB , instEmit (mark laneDone) n′)))) → ⊥
+    st-dn : ∀ {k k′ kd n n′} → _≡_ {A = Row} (k , out (just (inj₁ (laneB , instEmit (mark laneStart) n)))) (k′ , out (just (inj₁ (laneB , instEmit (mark (laneDone kd)) n′)))) → ⊥
     st-dn e with cong proj₂ e
     ... | ()
 
   -- EACH `laneDone` THE SCAN MEETS FOLLOWS ITS LANE'S START THERE.
-  done-started : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → AC.StartIn [] xs q
-  done-started r₁ {z} {e} {r₂} mt xs x ys eq {q} (a , y , n , xo , refl , l) =
-    let (y′ , e′ , _ , σd) = lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs x ys eq) (inj₂ refl)
-    in begun (subst (λ w → σ₃ w (out (instEmit (mark laneDone) n))) (sym (⊕-injˡ y y′ e′)) σd)
+  done-started : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → AC.StartIn [] xs q
+  done-started r₁ {z} {e} {r₂} mt xs x ys eq {q} (kd , a , y , n , xo , refl , l) =
+    let (y′ , e′ , _ , σd) = lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs x ys eq) (inj₂ (kd , refl))
+    in begun (subst (λ w → σ₃ w (out (instEmit (mark (laneDone kd)) n))) (sym (⊕-injˡ y y′ e′)) σd)
     where
-      begun : σ₃ y (out (instEmit (mark laneDone) n)) → AC.StartIn [] xs q
+      begun : σ₃ y (out (instEmit (mark (laneDone kd)) n)) → AC.StartIn [] xs q
       begun σd = fin (lane-begins xo l σd)
         where
           mw : Met M (xs ++ [ x ])
@@ -151,19 +151,19 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
   -- A `laneDone` THE SCAN MEETS IS A RUN LANE'S.
   done-mark : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markAct op x ≡ kDone
-            → Σ Pos λ q → LaneMark laneDone q x × Own q
+            → Σ Pos λ q → DoneMark q x × Own q
   done-mark r₁ mt xs x ys eq kx with row-done op x kx
-  ... | k , b , n , refl with lane-mark (run-prefix r₁ mt) {k = k} {b = b} {mk = laneDone} {n = n} (in-r₁ r₁ xs _ ys eq) (inj₂ refl)
+  ... | k , b , n , c , refl with lane-mark (run-prefix r₁ mt) {k = k} {b = b} {mk = laneDone c} {n = n} (in-r₁ r₁ xs _ ys eq) (inj₂ (c , refl))
   ...   | y , refl , refl , σd with σ₃-lane σd
-  ...     | q , a , xo , rn , l , _ = q , (a , y , n , xo , refl , l) , (a , xo , rn)
+  ...     | q , a , xo , rn , l , _ = q , (c , a , y , n , xo , refl , l) , (a , xo , rn)
 
   -- NO SCAN CUT FALLS BETWEEN A LANE'S START AND ITS `laneDone`.
-  done-uncut : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneDone q x → ¬ AC.CutIn [] xs q
-  done-uncut r₁ mt xs x ys eq {q} (a , y , n , xo , refl , l) ci with ci
+  done-uncut : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.CutIn [] xs q
+  done-uncut r₁ mt xs x ys eq {q} (kd , a , y , n , xo , refl , l) ci with ci
   ... | _ , _ , _ , _ , cb with find cb
   ...   | xc , _ , kc with row-cut op xc kc
   ...     | op≡ with switch-cut op≡ xs (split-met r₁ mt xs _ ys eq) ci
-  ...       | q′ , a′ , xo′ , qq′ , later with lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ refl)
+  ...       | q′ , a′ , xo′ , qq′ , later with lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ (kd , refl))
   ...         | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′
   ...           | refl with σ₃-lane σd
   ...             | q₀ , a₀ , xo₀ , _ , l₀ , nc₀ with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
@@ -174,7 +174,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- EACH `laneDone` THE SCAN MEETS ENDS A LANE IT MET START, AND NEVER MET
   -- END OR CUT.
   done-live : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markAct op x ≡ kDone
-            → ¬ ¬ Σ Pos λ q → LaneMark laneDone q x × AC.Live [] xs q
+            → ¬ ¬ Σ Pos λ q → DoneMark q x × AC.Live [] xs q
   done-live r₁ mt xs x ys eq kx κ with done-mark r₁ mt xs x ys eq kx
   ... | q , dm , own = κ (q , dm , own , done-started r₁ mt xs x ys eq dm , done-once r₁ mt xs x ys eq dm , done-uncut r₁ mt xs x ys eq dm)
 
@@ -199,12 +199,12 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   lanes-by r₁ {z} {n} {r₂} mt a0 q0 Fv zv {q} {a} x rn nc ¬g =
     lane-started r₁ mt q0 Fv zv x rn nc λ si →
       AC.drained r₁ (λ xs y ys eq → past-active op init xs y (no-end r₁ mt xs eq))
-        (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , refl , _) → refl })
+        (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , _ , refl , _) → refl })
         (λ _ _ _ _ _ _ → start-one) (done-live r₁ mt) a0 (a , x , rn) si (cut-never r₁ mt x nc) done-by
     where
       done-by : AC.DoneIn r₁ r₁ q → ⊥
       done-by di with find di
-      ... | _ , i , (a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
+      ... | _ , i , (_ , a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
       ...   | refl | c , lc , ic = ¬g (c , lc , λ zc → ≺-absurd {y ⊕ [ sub LS.J ]} {z} (met-before r₁ mt i)
               (instant-≺ z (y ⊕ [ sub LS.J ]) (subst (instantOf z ≺ⁱ_) (trans ic (sym (inst-⊕ y [ sub LS.J ]))) zc)))
 

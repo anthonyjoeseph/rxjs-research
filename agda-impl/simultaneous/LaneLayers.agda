@@ -22,14 +22,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Tree using (of)
 open import denotation.Position using (Pos; Label; ix; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part; ix-<)
-open import denotation.EmissionSet using (EmissionSet; Den; enter; out; InE; at-out; on-out; at-end; _≺_; Few; Truncate; module Op;
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-pin; map-end; Den; enter; out; InE; at-out; on-out; at-end; _≺_; Few; Truncate; module Op;
   module Joining; module Bounded; module Scan; module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-absurd)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (of-idx)
 open import denotation.Laws.Shows using (few-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; burstEnd; outerDone; subscribed; completed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
 
@@ -105,8 +105,8 @@ join-past po pl pb (Joining.rpass b _ _)                     = pb b
 join-past {p = p} po pl pb (Joining.rhand {c} b _)           = ≺-trans {p} {c} {c ⊕ [ ix 0 ]} (pb b) (≺-ext c [])
 
 -- What fails a lane's `takeWhile` is a `laneDone`.
-done-of : ∀ {B} (a : IE B) → T (not (undone a)) → Σ Pos λ n → a ≡ instEmit (mark laneDone) n
-done-of (instEmit (mark laneDone) n) _  = n , refl
+done-of : ∀ {B} (a : IE B) → T (not (undone a)) → Σ ℕ λ k → Σ Pos λ n → a ≡ instEmit (mark (laneDone k)) n
+done-of (instEmit (mark (laneDone k)) n) _  = k , n , refl
 done-of (instEmit (value _) _)      ()
 done-of (instEmit (mark begin) _)      ()
 done-of (instEmit (mark over) _)       ()
@@ -116,7 +116,6 @@ done-of (instEmit (mark completed) _)  ()
 done-of (instEmit (mark outerOpen) _)  ()
 done-of (instEmit (mark outerClose) _) ()
 done-of (instEmit (mark laneStart) _)  ()
-done-of (instEmit (mark carry) _)      ()
 done-of (instEmit (mark burstEnd) _)   ()
 done-of (instEmit (mark outerDone) _)  ()
 
@@ -184,6 +183,16 @@ conn-few p σ β {v} past (ks , h) = ks , go
     go (Connecting.burst x _) lt      = no x lt
     go (Connecting.echo x _ _ _) lt   = no x lt
     go (Connecting.kept x _ _ _) lt   = no x lt
+
+-- A map's: its input's.
+map-few : ∀ {A B} (f : A → B) (t : EmissionSet A) {v} → Few t v → Few (MapT f t) v
+map-few f t {v} (ks , h) = ks , go
+  where
+    go : ∀ {k e} → MapT f t k e → k ≺ v → k ∈ ks
+    go (map-out x) lt  = h x lt
+    go (map-skip x) lt = h x lt
+    go (map-pin x) lt  = h x lt
+    go (map-end x) lt  = h x lt
 
 -- A scan's: its input's.
 acc-row : ∀ {A B} {f : B → A → B} {z : B} {t : EmissionSet A} {q b} → Scan.Acc f z t q b → Σ A λ a → t q (out a)

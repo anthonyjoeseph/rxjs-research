@@ -26,7 +26,7 @@ open import simultaneous.FlatLanes using (Tg)
 open import simultaneous.BranchSplit using (SrcOf; OwnOf; K; kout; kskip; kend; mev; module BranchSplit)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Input; opening; count)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed)
 
 -- The outer's row, as the source tags it.
 Ou : ∀ {B} → IE B → Maybe (Input B)
@@ -43,8 +43,7 @@ count-open c        (instEmit (mark stop) _)       = refl
 count-open c        (instEmit (mark outerOpen) _)  = refl
 count-open c        (instEmit (mark outerClose) _) = refl
 count-open c        (instEmit (mark laneStart) _)  = refl
-count-open c        (instEmit (mark carry) _)      = refl
-count-open c        (instEmit (mark laneDone) _)   = refl
+count-open c        (instEmit (mark (laneDone _)) _)   = refl
 count-open c        (instEmit (mark burstEnd) _)   = refl
 count-open c        (instEmit (mark outerDone) _)  = refl
 count-open c        (instEmit (mark subscribed) _) = refl

@@ -33,7 +33,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; EmissionSet; out; end; skip; pin)
 open import denotation.Read using (Run; []; _∷_; loud)
 open import denotation.Laws.Worlds using (InvAt; pinby-silent)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart;
   laneDone; burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; Branch; outerB; laneB; closeB; isZero; lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
@@ -224,13 +224,12 @@ quiet-same : ∀ {B} op b m n s → (m ≡ begin → ⊥) → (m ≡ stop → �
 quiet-same op b begin      n s nb _  _  = ⊥-elim (nb refl)
 quiet-same op b stop       n s _  ns _  = ⊥-elim (ns refl)
 quiet-same op b over       n s _  _  no′ = ⊥-elim (no′ refl)
-quiet-same op b carry      n s _  _  _  = same ≤-refl ≤-refl refl refl
 quiet-same op b outerOpen  n s _  _  _  = arrive-same op n s
 quiet-same op b outerClose n s _  _  _  = same ≤-refl ≤-refl refl refl
 quiet-same op b laneStart  n s _  _  _  = same ≤-refl ≤-refl refl refl
-quiet-same op b laneDone   n s _  _  _  =
-  same-trans (same (m∸n≤m (Flat.lanes s) (Flat.acc s)) ≤-refl refl refl)
-    (ended-same (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }))
+quiet-same op b (laneDone kd)   n s _  _  _  =
+  same-trans (same (m∸n≤m (Flat.lanes s) (kd)) ≤-refl refl refl)
+    (ended-same (kd ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }))
 quiet-same op b burstEnd   n s _  _  _  = burst-same (isZero (Flat.held s) ∨ Flat.dead s) n s
 quiet-same op b outerDone  n s _  _  _  = same-trans (same ≤-refl ≤-refl refl refl) (left-same n (record s { finished = true }))
 quiet-same op b subscribed n s _  _  _  = same ≤-refl ≤-refl refl refl
@@ -264,11 +263,10 @@ onMark-other : ∀ {B} op b b′ m n s {c} → (b′ ≡ b → ⊥) → Within b
 onMark-other op b b′ begin      n s ne L = begun-other b b′ n s ne L
 onMark-other op b b′ stop       n s ne L = within-sameB (stopped-other b b′ n s (if Flat.spent s then 0 else share b′ s) ne) L
 onMark-other op b b′ over       n s ne L = overed-within b n s L
-onMark-other {B} op b b′ carry      n s ne L = quiet {B} op b′ b carry n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ outerOpen  n s ne L = quiet {B} op b′ b outerOpen n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ outerClose n s ne L = quiet {B} op b′ b outerClose n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ laneStart  n s ne L = quiet {B} op b′ b laneStart n s (λ ()) (λ ()) (λ ()) L
-onMark-other {B} op b b′ laneDone   n s ne L = quiet {B} op b′ b laneDone n s (λ ()) (λ ()) (λ ()) L
+onMark-other {B} op b b′ (laneDone kd) n s ne L = quiet {B} op b′ b (laneDone kd) n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ burstEnd   n s ne L = quiet {B} op b′ b burstEnd n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ outerDone  n s ne L = quiet {B} op b′ b outerDone n s (λ ()) (λ ()) (λ ()) L
 onMark-other {B} op b b′ subscribed n s ne L = quiet {B} op b′ b subscribed n s (λ ()) (λ ()) (λ ()) L
@@ -348,11 +346,10 @@ onMark-own cb op stop       n s cm ck L = stopped-own cb n s cm ck L
 onMark-own {b = b} cb op over n s cm ck L with Flat.spent s in e
 ... | true  = within-zero (Within.spent L e)
 ... | false = within-zero (zero-share b _ refl refl)
-onMark-own {B} {b} cb op carry      n s cm ck L = quiet {B} op b b carry n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op outerOpen  n s cm ck L = quiet {B} op b b outerOpen n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op outerClose n s cm ck L = quiet {B} op b b outerClose n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op laneStart  n s cm ck L = quiet {B} op b b laneStart n s (λ ()) (λ ()) (λ ()) L
-onMark-own {B} {b} cb op laneDone   n s cm ck L = quiet {B} op b b laneDone n s (λ ()) (λ ()) (λ ()) L
+onMark-own {B} {b} cb op (laneDone kd) n s cm ck L = quiet {B} op b b (laneDone kd) n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op burstEnd   n s cm ck L = quiet {B} op b b burstEnd n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op outerDone  n s cm ck L = quiet {B} op b b outerDone n s (λ ()) (λ ()) (λ ()) L
 onMark-own {B} {b} cb op subscribed n s cm ck L = quiet {B} op b b subscribed n s (λ ()) (λ ()) (λ ()) L

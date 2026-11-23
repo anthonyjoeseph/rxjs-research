@@ -8,7 +8,7 @@
 -- its third part sends, which the schedule puts where the reader ends.
 module simultaneous.LaneEnd where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -23,10 +23,10 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 open import Relation.Nullary using (¬_; Dec; yes; no)
 
-open import Tree using (Obs; mergeᶠ; empty; of; flatMap; takeWhile; scan; connect)
+open import Tree using (Obs; mergeᶠ; empty; of; map; flatMap; takeWhile; scan; connect)
 open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; out; end; DenEnv; enter; Proper; ended; late; at-out; on-out; _≺_; _≼_; Few;
+open import denotation.EmissionSet using (EmissionSet; map-out; out; end; DenEnv; enter; Proper; ended; late; at-out; on-out; _≺_; _≼_; Few;
   module Op; module Joining; module Connecting; module Scan; module TakeWhile)
 import denotation.EmissionSet as ES
 open import denotation.Laws.Modulus using (≺-trans; ≺-irrefl; ≼-refl; ≺→≼; ≺-ext)
@@ -52,8 +52,7 @@ open import simultaneous.InstEmit using (stop)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; elab; counted; framed; piece; laneStep; undone; marked)
 
-open import simultaneous.LaneEndSched using (laneX; readerR; emitAt; ≺-ˡ; raw-in; hot-in; tr-in; dec-end; acc-last;
-  module Ending)
+open import simultaneous.LaneEndSched using (laneX; readerR; ≺-ˡ; raw-in; hot-in; tr-in; dec-end; acc-last; module Ending)
 
 ------------------------------------------------------------------------
 -- One layer's row, read forward
@@ -76,6 +75,11 @@ merge-raw : ∀ {Γ X Y} K n (f : X → Obs Timeline Γ Y) (s : Obs Timeline Γ 
           → enter (capprox K n s ρ) p q (out a) → enter (capprox K n (f a) ρ) (q ⊕ [ ix 1 ]) k (out y) → (q ⊕ [ ix 1 ]) ≺ k
           → Raw (capprox K n (flatMap (mergeᶠ nothing) f s) ρ) p k (out y)
 merge-raw K n f s ρ p oq l lt = Joining.lane oq tt (l , lt) (λ ()) tt
+
+-- A map's value, its source's.
+map-raw : ∀ {Γ X Y} K n (f : X → Y) (s : Obs Timeline Γ X) (ρ : DenEnv Γ) p {q a}
+        → enter (capprox K n s ρ) p q (out a) → Raw (capprox K n (map f s) ρ) p q (out (f a))
+map-raw K n f s ρ p r = map-out r
 
 -- A scan's value, its fold.
 scan-raw : ∀ {Γ X Y} K n (f : Y → X → Y) (z : Y) (s : Obs Timeline Γ X) (ρ : DenEnv Γ) p {q c}
@@ -210,7 +214,7 @@ module Lane {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map
 
     V Q : Pos
     V = (E₁ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
-    Q = emitAt V
+    Q = V
 
     Fr : EmissionSet (IE B)
     Fr = enter (capprox K n (framed lanePart) ρ₂) Bc
@@ -230,33 +234,32 @@ module Lane {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map
     IFr = inv-capprox K n (framed lanePart) ρ₂ (den-ok D₂ N) Bc okB
 
     -- The scan's state there folds the third part's mark.
-    acc-at : ∀ {y} → Scan.Acc laneStep z₀ Fr V y → Σ (Routes × (List (IE B) × List (IE B))) λ b → y ≡ laneStep b ld
+    acc-at : ∀ {y} → Scan.Acc laneStep z₀ Fr V y → Σ (Routes × IE B) λ b → y ≡ laneStep b ld
     acc-at = acc-last (λ r → out-inj (InvAt.func IFr r fr-val))
 
     W : Pos
     W = V ⊕ [ ix 1 ]
 
-    lane-s : ∀ {i s} → i ≡ 2 → Bd.Sub i (Bc ⊕ [ ix 2 ]) s 2 → emitAt (s ⊕ [ ix 0 ]) ≡ Q
-    lane-s refl sb = cong (λ s′ → emitAt (s′ ⊕ [ ix 0 ])) (proj₂ (proj₂ (BI.sub-fun sb sb₂)))
+    lane-s : ∀ {i s} → i ≡ 2 → Bd.Sub i (Bc ⊕ [ ix 2 ]) s 2 → s ⊕ [ ix 0 ] ≡ Q
+    lane-s refl sb = cong (λ s′ → s′ ⊕ [ ix 0 ]) (proj₂ (proj₂ (BI.sub-fun sb sb₂)))
 
     -- The lane part's `laneDone` is the third part's, at `Q`.
-    lane-q : ∀ {q v} → q ≡ emitAt v
-           → lanePart ≡ lanePart × Σ ℕ (λ i → Σ Pos λ s → Bd.Sub i (Bc ⊕ [ ix 2 ]) s 2 × v ≡ s ⊕ [ ix 0 ]) → q ≡ Q
-    lane-q refl (_ , i , s , sb , refl) = lane-s (nth-inj (proj₁ sb) nth₂) sb
+    lane-q : ∀ {v} → lanePart ≡ lanePart × Σ ℕ (λ i → Σ Pos λ s → Bd.Sub i (Bc ⊕ [ ix 2 ]) s 2 × v ≡ s ⊕ [ ix 0 ]) → v ≡ Q
+    lane-q (_ , i , s , sb , refl) = lane-s (nth-inj (proj₁ sb) nth₂) sb
 
 
     burst-no : burstPart ≡ lanePart → ⊥
     burst-no ()
 
 
-    lane-p : ∀ {q P} → P ≡ L → (Σ Pos λ v → Σ (IE B) λ a₀ → q ≡ emitAt v × Peel.FrP lanePart P v (out a₀) × T (not (undone a₀))) → q ≡ Q
-    lane-p refl (v , a₀ , eq , fr , nu₀) = lane-q eq (Peel.fr-back lanePart L fr nu₀)
+    lane-p : ∀ {q P} → P ≡ L → (Σ (IE B) λ a₀ → Peel.FrP lanePart P q (out a₀) × T (not (undone a₀))) → q ≡ Q
+    lane-p refl (a₀ , fr , nu₀) = lane-q (Peel.fr-back lanePart L fr nu₀)
 
-    burst-p : ∀ {q P} → (Σ Pos λ v → Σ (IE B) λ a₀ → q ≡ emitAt v × Peel.FrP burstPart P v (out a₀) × T (not (undone a₀))) → q ≡ Q
-    burst-p {P = P} (v , a₀ , eq , fr , nu₀) = ⊥-elim (burst-no (proj₁ (Peel.fr-back burstPart P fr nu₀)))
+    burst-p : ∀ {q P} → (Σ (IE B) λ a₀ → Peel.FrP burstPart P q (out a₀) × T (not (undone a₀))) → q ≡ Q
+    burst-p {P = P} (a₀ , fr , nu₀) = ⊥-elim (burst-no (proj₁ (Peel.fr-back burstPart P fr nu₀)))
 
     back-v : ∀ {q₁ k q} → enter (Op.of (lanePart ∷ burstPart ∷ [])) st q₁ (out k)
-           → (Σ Pos λ v → Σ (IE B) λ a₀ → q ≡ emitAt v × Peel.FrP k (q₁ ⊕ [ ix 1 ]) v (out a₀) × T (not (undone a₀))) → q ≡ Q
+           → (Σ (IE B) λ a₀ → Peel.FrP k (q₁ ⊕ [ ix 1 ]) q (out a₀) × T (not (undone a₀))) → q ≡ Q
     back-v (at-out , _)        pr = lane-p refl pr
     back-v (on-out at-out , _) pr = burst-p pr
     back-v (on-out (on-out ()) , _) _
@@ -282,9 +285,12 @@ module Lane {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map
 
     -- Forward: the mark through `counted`, both connects, the merge and
     -- the take.
-    module Fwd (b : Routes × (List (IE B) × List (IE B))) (ac : Scan.Acc laneStep z₀ Fr V (laneStep b ld)) where
-      y : Routes × (List (IE B) × List (IE B))
+    module Fwd (b : Routes × IE B) (ac : Scan.Acc laneStep z₀ Fr V (laneStep b ld)) where
+      y : Routes × IE B
       y = laneStep b ld
+
+      ld′ : IE B
+      ld′ = proj₂ y
 
       -- Every position and environment below is spelled as the
       -- operator above it computes it.
@@ -303,51 +309,39 @@ module Lane {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map
       Bp : Pos
       Bp = (P₀ ⊕ [ ix 0 ]) ⊕ [ ix 0 ]
 
-      o-false : enter (capprox K n (of (true ∷ false ∷ [])) env₂) (V ⊕ [ ix 1 ]) ((V ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (out false)
-      o-false = raw-in K n (of (true ∷ false ∷ [])) tt {ℓ₂ N} {env₂} (den-ex D₂ N) (u₂ N) (V ⊕ [ ix 1 ]) (on-out at-out)
-
-      o-ld : enter (capprox K n (of (if false then proj₁ (proj₂ y) else proj₂ (proj₂ y))) env₂) (((V ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) Q (out ld)
-      o-ld = raw-in K n (of (if false then proj₁ (proj₂ y) else proj₂ (proj₂ y))) tt {ℓ₂ N} {env₂} (den-ex D₂ N) (u₂ N)
-        (((V ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) at-out
-
-      in-val : enter (capprox K n (inner y) env₂) (V ⊕ [ ix 1 ]) Q (out ld)
-      in-val = raw-in K n (inner y) tt {ℓ₂ N} {env₂} (den-ex D₂ N) (u₂ N) (V ⊕ [ ix 1 ])
-        (merge-raw K n (λ c → of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (of (true ∷ false ∷ [])) env₂ (V ⊕ [ ix 1 ])
-          o-false o-ld (≺-ext (((V ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) []))
-
       sv : enter (capprox K n (scan laneStep z₀ (framed lanePart)) env₂) Bp V (out y)
       sv = raw-in K n (scan laneStep z₀ (framed lanePart)) tt {ℓ₂ N} {env₂} (den-ex D₂ N) (u₂ N) Bp
         (scan-raw K n laneStep z₀ (framed lanePart) env₂ Bp ac)
 
-      ct-val : enter (capprox K n ccf env₂) Bp Q (out ld)
+      ct-val : enter (capprox K n ccf env₂) Bp Q (out ld′)
       ct-val = raw-in K n ccf tt {ℓ₂ N} {env₂} (den-ex D₂ N) (u₂ N) Bp
-        (merge-raw K n inner (scan laneStep z₀ (framed lanePart)) env₂ Bp sv in-val (≺-ˡ (V ⊕ [ ix 1 ]) (ix 1) (ix 1 ∷ ix 0 ∷ [])))
+        (map-raw K n proj₂ (scan laneStep z₀ (framed lanePart)) env₂ Bp sv)
 
-      c₁-val : enter (capprox K n (connect (Sh lanePart) ccf) env₁) (P₀ ⊕ [ ix 0 ]) Q (out ld)
+      c₁-val : enter (capprox K n (connect (Sh lanePart) ccf) env₁) (P₀ ⊕ [ ix 0 ]) Q (out ld′)
       c₁-val = raw-in K n (connect (Sh lanePart) ccf) tt {ℓ₁ N} {env₁} (den-ex D₁ N) (u₁ N) (P₀ ⊕ [ ix 0 ])
         (conn-raw K n (Sh lanePart) ccf env₁ (P₀ ⊕ [ ix 0 ]) ct-val)
 
-      c₀-val : Row K n (shareˢ (x lanePart) ccf) ρ₀ P₀ Q (out ld)
-      c₀-val = connR K n (empty {A = ⊤}) (connect (Sh lanePart) ccf) {ρ N} {ρ₀} (den-ex D N) (u N) P₀ Q (out ld)
-        (toRow K n (connect (Sh lanePart) ccf) env₁ (P₀ ⊕ [ ix 0 ]) Q (out ld) c₁-val)
+      c₀-val : Row K n (shareˢ (x lanePart) ccf) ρ₀ P₀ Q (out ld′)
+      c₀-val = connR K n (empty {A = ⊤}) (connect (Sh lanePart) ccf) {ρ N} {ρ₀} (den-ex D N) (u N) P₀ Q (out ld′)
+        (toRow K n (connect (Sh lanePart) ccf) env₁ (P₀ ⊕ [ ix 0 ]) Q (out ld′) c₁-val)
 
       L-Q : P₀ ≺ Q
-      L-Q = ≺-trans {L} {E} {Q} (≺-trans {L} {T′} {E} L-T T-e) (≺-ˡ E (sub R) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ []))
+      L-Q = ≺-trans {L} {E} {Q} (≺-trans {L} {T′} {E} L-T T-e) (≺-ˡ E (sub R) (ix 1 ∷ ix 0 ∷ []))
 
       oq : enter (capprox K n (of (lanePart ∷ burstPart ∷ [])) ρ₀) st (st ⊕ [ ix 0 ]) (out lanePart)
       oq = raw-in K n (of (lanePart ∷ burstPart ∷ [])) tt {ρ N} {ρ₀} (den-ex D N) (u N) st at-out
 
-      m-val : Row K n M ρ₀ st Q (out ld)
-      m-val = mergeR K n (λ k → shareˢ (x k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) {ρ N} {ρ₀} (den-ex D N) (u N) st (st ⊕ [ ix 0 ]) lanePart Q ld
+      m-val : Row K n M ρ₀ st Q (out ld′)
+      m-val = mergeR K n (λ k → shareˢ (x k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ [])) {ρ N} {ρ₀} (den-ex D N) (u N) st (st ⊕ [ ix 0 ]) lanePart Q ld′
         (toRow K n (of (lanePart ∷ burstPart ∷ [])) ρ₀ st (st ⊕ [ ix 0 ]) (out lanePart) oq) c₀-val L-Q
 
       final : Row K n (laneˢ x) ρ₀ st (Q ⊕ [ last ]) end
-      final = stopR K n undone M {ρ N} {ρ₀} (den-ex D N) (u N) st Q ld m-val tt nf
+      final = stopR K n undone M {ρ N} {ρ₀} (den-ex D N) (u N) st Q ld′ m-val tt nf
 
     end-row : ¬ ¬ Row K n (laneˢ x) ρ₀ st (Q ⊕ [ last ]) end
     end-row ¬r = fold laneStep z₀ Fr few-fr fr-val λ { (_ , ac) → go ac }
       where
-        go′ : ∀ {y} → Scan.Acc laneStep z₀ Fr V y → (Σ (Routes × (List (IE B) × List (IE B))) λ b → y ≡ laneStep b ld) → ⊥
+        go′ : ∀ {y} → Scan.Acc laneStep z₀ Fr V y → (Σ (Routes × IE B) λ b → y ≡ laneStep b ld) → ⊥
         go′ ac (b , refl) = ¬r (Fwd.final b ac)
 
         go : ∀ {y} → Scan.Acc laneStep z₀ Fr V y → ⊥
@@ -371,6 +365,6 @@ module Lane {Θ : List Set} {B : Set} n {Γ′} (ρ′ : ∀ {X} → X ∈ L.map
   -- THE ELABORATED LANE'S END, AS `laneˢ` SHOWS IT, at the caller's own
   -- spelling of the trigger, the lane and the row: each equation is
   -- checked on its own small term, never under a listing.
-  lane-end : ∀ {t o′ q e} → t ≡ trig N → o′ ≡ laneˢ x → q ≡ emitAt (e ⊕ˡ (sub (readerR st) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+  lane-end : ∀ {t o′ q e} → t ≡ trig N → o′ ≡ laneˢ x → q ≡ (e ⊕ˡ (sub (readerR st) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
            → TR (listC K n (elab ρ′ o) (t ∷ ρ N) (laneX st)) e end → TR (Tab n o′ ρ st N) q end
   lane-end refl refl refl xt = tr-tab {o = laneˢ x} (At.row xt)

@@ -7,10 +7,9 @@
 -- programs they subscribe hold.
 module simultaneous.LaneLocal where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
-open import Data.Bool.Properties using (T-≡)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; replicate)
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
@@ -20,34 +19,31 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Function using (Equivalence)
 open import denotation.Read using (Visible)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; takeWhile; flatMap; connect; connected)
-open import denotation.Position using (Pos; Path; root; _≟ᵖ_; ix; sub; last; _⊕_)
-open import denotation.Events using (Timeline; fresh; <ᵖ-apart; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; Ev; Den; hot; enter; Proper; DenEnv; out; end; _≺_; shown; ended; late; at-end; InE; at-out; on-out;
-  Superseded; module Op; module Joiner; module Bounded; module Values; module Merge;
-  module Scan; module TakeWhile; module Exhaust; module Connecting)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_)
+open import denotation.Events using (Timeline; fresh; ofᴱ)
+open import denotation.EmissionSet using (EmissionSet; map-out; map-end; Ev; Den; hot; enter; Proper; DenEnv; out; end; shown; ended;
+  late; at-end; InE; at-out; on-out; Superseded; module Op; module Joiner; module Bounded;
+  module Values; module Scan; module TakeWhile; module Exhaust; module Connecting)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
-open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≼-or-≻)
-open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊕-assoc; ⊕-identityʳ; ⊑-trans; _⊑_; plain-ix)
+open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊑-trans; _⊑_; plain-ix)
 open import denotation.Laws.Worlds.Leaves using (of-end)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; stop; subscribed; completed; outerOpen; outerClose;
-  laneStart; carry; laneDone; burstEnd; outerDone; valuesOf)
+  laneStart; laneDone; burstEnd; outerDone; valuesOf)
 open import simultaneous.Routed using (Held; Early; Valued; opos; nameOf; nm; Shown; s-value; s-done; s-end; Placed; Adm; adm-∪; adm-at; ok-ix)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import simultaneous.DenRows using (merge-out; hot-out; of-mem; nth-row)
 open import simultaneous.CombSent using (of-at; module EachEnd)
-open import simultaneous.Layers using (pinby-vis)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone
-  using (IE; AIE; Routes; elab; laneˢ; laneSrc; shareˢ; blockˢ; counted; framed; piece; laneStep; undone; each; marked)
+  using (IE; AIE; Routes; elab; laneˢ; laneSrc; shareˢ; blockˢ; counted; framed; piece; laneStep; tell; undone; each; marked)
 
 -- Either reading is lawful.
 inv-ev : ∀ m {Γ A} (o : Obs Timeline Γ A) (ρ : DenEnv Γ) → GoodEnv ρ → InvD (Hots ρ) (ev m o ρ)
@@ -67,8 +63,7 @@ Fine (instEmit (value _) _)          y = Early y
 Fine (instEmit (mark begin) n)       y = n ≡ nameOf y
 Fine (instEmit (mark over) _)        y = Valued (rootOf y) × opos (rootOf y) ⊑ y
 Fine (instEmit (mark laneStart) _)   y = Early y
-Fine (instEmit (mark carry) _)       y = Early y
-Fine (instEmit (mark laneDone) _)    y = Early y
+Fine (instEmit (mark (laneDone _)) _)    y = Early y
 Fine (instEmit (mark burstEnd) _)    y = Early y
 Fine (instEmit (mark stop) _)        y = ⊤
 Fine (instEmit (mark subscribed) _)  y = ⊤
@@ -83,8 +78,7 @@ fine-ext (instEmit (value _) _)         zs f = early-inst zs f
 fine-ext (instEmit (mark begin) _) {y} zs f = trans f (cong nm (sym (rootOf-ext y zs)))
 fine-ext (instEmit (mark over) _) {y} zs f = late-ext {y} zs f
 fine-ext (instEmit (mark laneStart) _)  zs f = early-inst zs f
-fine-ext (instEmit (mark carry) _)      zs f = early-inst zs f
-fine-ext (instEmit (mark laneDone) _)   zs f = early-inst zs f
+fine-ext (instEmit (mark (laneDone _)) _)   zs f = early-inst zs f
 fine-ext (instEmit (mark burstEnd) _)   zs f = early-inst zs f
 fine-ext (instEmit (mark stop) _)       zs f = tt
 fine-ext (instEmit (mark subscribed) _) zs f = tt
@@ -137,8 +131,7 @@ held-fit {t = t} H pl = fit fine (Held.ends H) pl
     fine {x = instEmit (mark begin) _}      r = Held.named H r
     fine {x = instEmit (mark over) _}       r = Held.late H r
     fine {x = instEmit (mark laneStart) _}  r with () ← Held.routing H r
-    fine {x = instEmit (mark carry) _}      r with () ← Held.routing H r
-    fine {x = instEmit (mark laneDone) _}   r with () ← Held.routing H r
+    fine {x = instEmit (mark (laneDone _)) _} r with () ← Held.routing H r
     fine {x = instEmit (mark burstEnd) _}   r with () ← Held.routing H r
     fine {x = instEmit (mark stop) _}       r = tt
     fine {x = instEmit (mark subscribed) _} r = tt
@@ -196,21 +189,6 @@ empty-fit ad p _ fp ep = fit (λ { (() , _) }) (λ { (at-end , _) → early-inst
 lone-early : ∀ {B} {x₀ : IE B} → (∀ {y} → Early y → Fine x₀ y) → ∀ {x y} → x ∈ (x₀ ∷ []) → Early y → Fine x y
 lone-early h (here refl) e = h e
 lone-early h (there ())
-
--- No row lies under another, and none visible past the end: below a
--- row before the end lies nothing past it.
-row-before-end : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {r c a} → X r (out a) → X c end → ∀ zs → (r ⊕ zs) ≺ c
-row-before-end I {r} {c} x y zs = Equivalence.from T-≡ (<ᵖ-apart r c zs (Equivalence.to T-≡ r≺c) apart)
-  where
-    r≺c : r ≺ c
-    r≺c with ≼-or-≻ r c
-    ... | inj₂ cr = ⊥-elim (pinby-vis tt (InvAt.quiet I y x cr))
-    ... | inj₁ rc with ≼-split {r} {c} rc
-    ...   | inj₁ lt = lt
-    ...   | inj₂ refl with () ← InvAt.func I x y
-    apart : ∀ ys → c ≡ r ⊕ ys → ⊥
-    apart []       eq   = ≺-irrefl {r} (subst (r ≺_) (trans eq (⊕-identityʳ r)) r≺c)
-    apart (l ∷ ys) refl = InvAt.flat I x y
 
 ------------------------------------------------------------------------
 -- A flatMap, under every policy
@@ -353,91 +331,41 @@ conn-fit {Fr = Fr} Q {s} {F} ad Is IF Qs LF p ok fp ep =
     Fb = LF (src-lawful {s = s} {F = F} Is IF p ok) (Qs p ok fp ep) (p ⊕ [ ix 0 ]) (body-ok {s = s} {F = F} Is IF p ok)
             (Adm.bare ad fp λ ()) (early-inst [ ix 0 ] ep)
 
-rep-mem : ∀ {X : Set} k {e x : X} → e ∈ replicate k x → e ≡ x
-rep-mem (suc k) (here refl) = refl
-rep-mem (suc k) (there m)   = rep-mem k m
-
 data Done {B : Set} : IE B → Set where
-  done : ∀ {n} → Done (instEmit (mark laneDone) n)
+  done : ∀ {k n} → Done (instEmit (mark (laneDone k)) n)
 
--- What a lane tells of a row: the row, or at its `laneDone` the carries.
-told-is : ∀ {B} st (x : IE B) b {e} → e ∈ (if b then proj₁ (proj₂ (laneStep st x)) else proj₂ (proj₂ (laneStep st x)))
-        → e ≡ x ⊎ (Done x × e ≡ marked carry)
-told-is st (instEmit (mark laneDone) _) true  m = inj₂ (done , rep-mem (proj₂ (proj₁ st)) m)
-told-is st (instEmit (mark laneDone) _) false (here refl) = inj₁ refl
-told-is st (instEmit (mark laneDone) _) false (there ())
-told-is st (instEmit (value _) _)         true  ()
-told-is st (instEmit (value _) _)         false (here refl) = inj₁ refl
-told-is st (instEmit (value _) _)         false (there ())
-told-is st (instEmit (mark begin) _)      true  ()
-told-is st (instEmit (mark begin) _)      false (here refl) = inj₁ refl
-told-is st (instEmit (mark begin) _)      false (there ())
-told-is st (instEmit (mark over) _)       true  ()
-told-is st (instEmit (mark over) _)       false (here refl) = inj₁ refl
-told-is st (instEmit (mark over) _)       false (there ())
-told-is st (instEmit (mark stop) _)       true  ()
-told-is st (instEmit (mark stop) _)       false (here refl) = inj₁ refl
-told-is st (instEmit (mark stop) _)       false (there ())
-told-is st (instEmit (mark subscribed) _) true  ()
-told-is st (instEmit (mark subscribed) _) false (here refl) = inj₁ refl
-told-is st (instEmit (mark subscribed) _) false (there ())
-told-is st (instEmit (mark completed) _)  true  ()
-told-is st (instEmit (mark completed) _)  false (here refl) = inj₁ refl
-told-is st (instEmit (mark completed) _)  false (there ())
-told-is st (instEmit (mark outerOpen) _)  true  ()
-told-is st (instEmit (mark outerOpen) _)  false (here refl) = inj₁ refl
-told-is st (instEmit (mark outerOpen) _)  false (there ())
-told-is st (instEmit (mark outerClose) _) true  ()
-told-is st (instEmit (mark outerClose) _) false (here refl) = inj₁ refl
-told-is st (instEmit (mark outerClose) _) false (there ())
-told-is st (instEmit (mark laneStart) _)  true  ()
-told-is st (instEmit (mark laneStart) _)  false (here refl) = inj₁ refl
-told-is st (instEmit (mark laneStart) _)  false (there ())
-told-is st (instEmit (mark carry) _)      true  ()
-told-is st (instEmit (mark carry) _)      false (here refl) = inj₁ refl
-told-is st (instEmit (mark carry) _)      false (there ())
-told-is st (instEmit (mark burstEnd) _)   true  ()
-told-is st (instEmit (mark burstEnd) _)   false (here refl) = inj₁ refl
-told-is st (instEmit (mark burstEnd) _)   false (there ())
-told-is st (instEmit (mark outerDone) _)  true  ()
-told-is st (instEmit (mark outerDone) _)  false (here refl) = inj₁ refl
-told-is st (instEmit (mark outerDone) _)  false (there ())
+-- What a lane tells of a row: the row, or at its `laneDone` the routes.
+tell-is : ∀ {B} r (x : IE B) → tell r x ≡ x ⊎ (Done x × Done (tell r x))
+tell-is r (instEmit (mark (laneDone _)) _) = inj₂ (done , done)
+tell-is r (instEmit (value _) _)        = inj₁ refl
+tell-is r (instEmit (mark begin) _)      = inj₁ refl
+tell-is r (instEmit (mark over) _)       = inj₁ refl
+tell-is r (instEmit (mark stop) _)       = inj₁ refl
+tell-is r (instEmit (mark subscribed) _) = inj₁ refl
+tell-is r (instEmit (mark completed) _)  = inj₁ refl
+tell-is r (instEmit (mark outerOpen) _)  = inj₁ refl
+tell-is r (instEmit (mark outerClose) _) = inj₁ refl
+tell-is r (instEmit (mark laneStart) _)  = inj₁ refl
+tell-is r (instEmit (mark burstEnd) _)   = inj₁ refl
+tell-is r (instEmit (mark outerDone) _)  = inj₁ refl
 
-told-fine : ∀ {B} st (x : IE B) b {e y} → e ∈ (if b then proj₁ (proj₂ (laneStep st x)) else proj₂ (proj₂ (laneStep st x)))
-          → Fine x y → Fine e y
-told-fine st x b m f with told-is st x b m
-... | inj₁ refl          = f
-... | inj₂ (done , refl) = f
+done-fine : ∀ {B} {x e : IE B} {y} → Done x → Done e → Fine x y → Fine e y
+done-fine done done f = f
+
+tell-fine : ∀ {B} r (x : IE B) {y} → Fine x y → Fine (tell r x) y
+tell-fine r x f with tell r x | tell-is r x
+... | _ | inj₁ refl       = f
+... | _ | inj₂ (dx , de)  = done-fine dx de f
 
 -- A told row a lane can hang on is the row itself.
-told-shown : ∀ {B} st (x : IE B) b {e} → e ∈ (if b then proj₁ (proj₂ (laneStep st x)) else proj₂ (proj₂ (laneStep st x)))
-           → Shown (out e) → Shown (out x)
-told-shown st x b m sh with told-is st x b m
-... | inj₁ refl     = sh
-... | inj₂ (_ , refl) with sh
-...   | ()
+tell-shown : ∀ {B} r (x : IE B) → Shown (out (tell r x)) → Shown (out x)
+tell-shown r x sh with tell r x | tell-is r x
+... | _ | inj₁ refl      = sh
+... | _ | inj₂ (done , _) = s-done
 
--- Two `of` lanes over two values end under their subscription.
-pair-under : ∀ {X : Set} (F : Bool → List X) s {c}
-           → enter (Op.flatMap (mergeᶠ nothing) (λ b → Op.of (F b)) (Op.of (true ∷ false ∷ []))) s c end → Σ Path λ zs → c ≡ s ⊕ zs
-pair-under F s (Merge.oend o _ , _) = [ last ] , of-end s 0 (true ∷ false ∷ []) (proj₁ o)
-pair-under F s (Merge.lane _ _ _ _ () , _)
-pair-under F s (Merge.lend {q} {b} o _ (l , _) _ _ _ , _) with of-at s 0 (true ∷ false ∷ []) (proj₁ o)
-... | l₀ , refl = l₀ ∷ ix 1 ∷ last ∷ [] ,
-  trans (of-end ((s ⊕ [ l₀ ]) ⊕ [ ix 1 ]) 0 (F b) (proj₁ l))
-        (trans (cong (_⊕ [ last ]) (⊕-assoc s [ l₀ ] [ ix 1 ])) (⊕-assoc s (l₀ ∷ ix 1 ∷ []) [ last ]))
-pair-under F s (Merge.run () _ , _)
-pair-under F s (Merge.rend () _ _ , _)
-
--- A LANE'S COUNT SHOWS ITS ROWS: each at its row, or a carry beside it.
-module CountedFit {B : Set} {H Fr : Pos → Set} (z : Routes × (List (IE B) × List (IE B))) (d : Den (IE B)) (ad : Adm H Fr)
-                  (Id : InvD H d) (Fd : FitD H Fr d) (p : Pos) (ok : Ok H p) (fp : Fr p) (ep : Early p) where
-
-  Lanes : Routes × (List (IE B) × List (IE B)) → Den (IE B)
-  Lanes x = Op.flatMap (mergeᶠ nothing) (λ b → Op.of (if b then proj₁ (proj₂ x) else proj₂ (proj₂ x))) (Op.of (true ∷ false ∷ []))
-
-  S : EmissionSet (Routes × (List (IE B) × List (IE B)))
-  S = enter (Op.scan laneStep z d) p
+-- A LANE'S COUNT SHOWS ITS ROWS, each at its row.
+module CountedFit {B : Set} {H Fr : Pos → Set} (z : Routes × IE B) (d : Den (IE B))
+                  (Fd : FitD H Fr d) (p : Pos) (ok : Ok H p) (fp : Fr p) (ep : Early p) where
 
   F = Fd p ok fp ep
 
@@ -445,54 +373,21 @@ module CountedFit {B : Set} {H Fr : Pos → Set} (z : Routes × (List (IE B) × 
   acc-last (Scan.acc₀ x _)            = z , _ , x , refl
   acc-last (Scan.acc {b = b} _ x _ _) = b , _ , x , refl
 
-  fine : ∀ {y e} → enter (Op.flatMap (mergeᶠ nothing) Lanes (Op.scan laneStep z d)) p y (out e) → Fine e y
-  fine {e = e} r with merge-out Lanes (Op.scan laneStep z d) p r
-  ... | q , st , (Scan.sval ac , _) , l , _
-    with merge-out (λ b → Op.of (if b then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ [])) (q ⊕ [ ix 1 ]) l
-  ...   | q₂ , b , (o₂ , _) , l₂ , _ with of-at (q ⊕ [ ix 1 ]) 0 (true ∷ false ∷ []) o₂ | of-at (q₂ ⊕ [ ix 1 ]) 0 _ (proj₁ l₂)
-  ...     | l₀ , refl | l₁ , refl with acc-last ac
-  ...       | st′ , x , tq , refl =
-    fine-ext e [ l₁ ] (fine-ext e [ ix 1 ] (fine-ext e [ l₀ ] (fine-ext e [ ix 1 ]
-      (told-fine st′ x b (of-mem _ 0 _ (proj₁ l₂)) (Fit.fine F tq)))))
+  fine : ∀ {y e} → enter (Op.map proj₂ (Op.scan laneStep z d)) p y (out e) → Fine e y
+  fine (map-out (Scan.sval ac , _) , _) with acc-last ac
+  ... | st′ , x , tq , refl = tell-fine (proj₁ st′) x (Fit.fine F tq)
 
-  ends′ : ∀ {y} → enter (Op.flatMap (mergeᶠ nothing) Lanes (Op.scan laneStep z d)) p y end → Early y × Fr y
-  ends′ (Merge.oend (Scan.send t , _) _ , _) = Fit.ends F t , Fit.placed F t s-end
-  ends′ (Merge.lane _ _ _ _ () , _)
-  ends′ (Merge.lend {q} (Scan.sval ac , _) _ (l , _) _ _ ((c₀ , (Scan.send t₀ , _) , c₀c) , _) , _)
-    with acc-last ac | pair-under _ (q ⊕ [ ix 1 ]) l
-  ... | _ , _ , tq , _ | zs , refl = ⊥-elim (c₀c (subst (_≺ c₀) (sym (⊕-assoc q [ ix 1 ] zs)) (row-before-end (Id p ok) tq t₀ (ix 1 ∷ zs))))
-  ends′ (Merge.run () _ , _)
-  ends′ (Merge.rend () _ _ , _)
+  ends : ∀ {y} → enter (Op.map proj₂ (Op.scan laneStep z d)) p y end → Early y
+  ends (map-end (Scan.send t , _) , _) = Fit.ends F t
 
-  -- A told row a lane can hang on lies four children below its row.
-  placed-out : ∀ {y e} → enter (Op.flatMap (mergeᶠ nothing) Lanes (Op.scan laneStep z d)) p y (out e) → Shown (out e) → Fr y
-  placed-out {e = e} r sh with merge-out Lanes (Op.scan laneStep z d) p r
-  ... | q , st , (Scan.sval ac , _) , l , _
-    with merge-out (λ b → Op.of (if b then proj₁ (proj₂ st) else proj₂ (proj₂ st))) (Op.of (true ∷ false ∷ [])) (q ⊕ [ ix 1 ]) l
-  ...   | q₂ , b , (o₂ , _) , l₂ , _ with of-ix (q ⊕ [ ix 1 ]) 0 (true ∷ false ∷ []) o₂ | of-at (q₂ ⊕ [ ix 1 ]) 0 _ (proj₁ l₂)
-  ...     | j₀ , refl | l₁ , refl with acc-last ac
-  ...       | st′ , x , tq , refl =
-    adm-at ad ok₃ (Adm.step ad ok₂ (adm-at ad ok₁ (Adm.step ad okq fq plain-ix) (ix j₀)) plain-ix) l₁
-    where
-      okq = ok-in ok (InvAt.world (Id p ok) tq) (InvAt.real (Id p ok) tq)
-      fq  = Fit.placed F tq (told-shown st′ x b (of-mem _ 0 _ (proj₁ l₂)) sh)
-      ok₁ = ok-ix q okq
-      ok₂ = ok-ix (q ⊕ [ ix 1 ]) ok₁
-      ok₃ = ok-ix ((q ⊕ [ ix 1 ]) ⊕ [ ix j₀ ]) ok₂
+  placed : Placed Fr (enter (Op.map proj₂ (Op.scan laneStep z d)) p)
+  placed {e = out _} (map-out (Scan.sval ac , _) , _) sh with acc-last ac
+  ... | st′ , x , tq , refl = Fit.placed F tq (tell-shown (proj₁ st′) x sh)
+  placed {e = end}   (map-end (Scan.send t , _) , _) _ = Fit.placed F t s-end
 
-  ends : ∀ {y} → enter (Op.flatMap (mergeᶠ nothing) Lanes (Op.scan laneStep z d)) p y end → Early y
-  ends r = proj₁ (ends′ r)
-
-  placed : Placed Fr (enter (Op.flatMap (mergeᶠ nothing) Lanes (Op.scan laneStep z d)) p)
-  placed {e = out _} r sh = placed-out r sh
-  placed {e = end}   r _  = proj₂ (ends′ r)
-
-counted-fit : ∀ {B H Fr} {z : Routes × (List (IE B) × List (IE B))} {d : Den (IE B)} → Adm H Fr → InvD H d → FitD H Fr d
-            → FitD H Fr (Op.flatMap (mergeᶠ nothing)
-                        (λ x → Op.flatMap (mergeᶠ nothing) (λ b → Op.of (if b then proj₁ (proj₂ x) else proj₂ (proj₂ x))) (Op.of (true ∷ false ∷ [])))
-                        (Op.scan laneStep z d))
-counted-fit {z = z} {d} ad Id Fd p ok fp ep =
-  fit (CountedFit.fine z d ad Id Fd p ok fp ep) (CountedFit.ends z d ad Id Fd p ok fp ep) (CountedFit.placed z d ad Id Fd p ok fp ep)
+counted-fit : ∀ {B H Fr} {z : Routes × IE B} {d : Den (IE B)} → FitD H Fr d → FitD H Fr (Op.map proj₂ (Op.scan laneStep z d))
+counted-fit {z = z} {d} Fd p ok fp ep =
+  fit (CountedFit.fine z d Fd p ok fp ep) (CountedFit.ends z d Fd p ok fp ep) (CountedFit.placed z d Fd p ok fp ep)
 
 -- An `each` that tells nothing, over a lawful hot: it ends where the
 -- hot does, or where it is subscribed.
@@ -542,7 +437,7 @@ vals-early {Fr = Fr} t L It ad tv te tp p ok fp ep = (λ r → proj₁ (row r)) 
 
 -- A lane's `takeWhile` fails only at its own `laneDone`.
 undone-done : ∀ {B} {x : IE B} → T (not (undone x)) → Done x
-undone-done {x = instEmit (mark laneDone) _}   _ = done
+undone-done {x = instEmit (mark (laneDone _)) _} _ = done
 undone-done  {x = instEmit (value _) _}         ()
 undone-done  {x = instEmit (mark begin) _}      ()
 undone-done  {x = instEmit (mark over) _}       ()
@@ -552,7 +447,6 @@ undone-done  {x = instEmit (mark completed) _}  ()
 undone-done  {x = instEmit (mark outerOpen) _}  ()
 undone-done  {x = instEmit (mark outerClose) _} ()
 undone-done  {x = instEmit (mark laneStart) _}  ()
-undone-done  {x = instEmit (mark carry) _}      ()
 undone-done  {x = instEmit (mark burstEnd) _}   ()
 undone-done  {x = instEmit (mark outerDone) _}  ()
 
@@ -620,8 +514,8 @@ blockE (just n) t env ad L te tf = block-fit t L te tf ad
 
 countedE : ∀ m {Γ B} (s : Obs Timeline Γ (IE B)) (ρ : DenEnv Γ) {H Fr} → Adm H Fr → InvD H (ev m s ρ) → FitD H Fr (ev m s ρ)
          → FitD H Fr (ev m (counted s) ρ)
-countedE nothing  s ρ ad I F = counted-fit {d = ev nothing s ρ} ad I F
-countedE (just n) s ρ ad I F = counted-fit {d = ev (just n) s ρ} ad I F
+countedE nothing  s ρ ad I F = counted-fit {d = ev nothing s ρ} F
+countedE (just n) s ρ ad I F = counted-fit {d = ev (just n) s ρ} F
 
 each-vals : ∀ m {Θ A B Fr} (t₂ : EmissionSet (IE B)) (t₁ : EmissionSet (IE A)) (env₀ : DenEnv Θ) → GoodEnv (hot t₂ ∷ hot t₁ ∷ env₀)
           → Lawful t₁ → Adm (Hots (hot t₂ ∷ hot t₁ ∷ env₀)) Fr

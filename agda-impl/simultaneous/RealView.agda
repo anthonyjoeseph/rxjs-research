@@ -162,6 +162,16 @@ lane-at (mergeᶠ (just n)) d f Id If p ok x (i , s , sb , r , sk) = s , okS sb 
 lane-at switchᶠ           d f Id If p ok {q} x (r , sk) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , sk , _,_
 lane-at exhaustᶠ          d f Id If p ok {q} x (r , sk) = _ , ok-step q (ok-in ok (InvAt.world (Id p ok) x) (InvAt.real (Id p ok) x)) , r , sk , _,_
 
+-- Any other row of the lane is its value's row at that same subscription.
+lane-fwd : ∀ {A B H} op (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) p (ok : Ok H p)
+         → ∀ {q a k e k′ e′} (x : enter d p q (out a)) (l : View.Lane f (enter d p) op q a k e) → View.Lane f (enter d p) op q a k′ e′
+         → enter (f a) (proj₁ (lane-at op d f Id If p ok x l)) k′ e′
+lane-fwd (mergeᶠ nothing)  d f Id If p ok x (r , _) (r′ , _) = r′
+lane-fwd switchᶠ           d f Id If p ok x (r , _) (r′ , _) = r′
+lane-fwd exhaustᶠ          d f Id If p ok x (r , _) (r′ , _) = r′
+lane-fwd (mergeᶠ (just n)) d f Id If p ok x (i , s , sb , r , _) (i′ , s′ , sb′ , r′ , _) with BoundedI.sub-same ok n f If (Id p ok) sb sb′
+... | refl = r′
+
 private
   out-end : ∀ {B : Set} {b : B} → _≡_ {A = Ev B} (out b) end → ⊥
   out-end ()

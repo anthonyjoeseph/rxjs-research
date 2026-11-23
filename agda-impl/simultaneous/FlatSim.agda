@@ -30,7 +30,7 @@ open import Relation.Nullary using (yes; no)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; flat; outerB; laneB; closeB; isZero; lone; module Elaborate)
 
@@ -53,7 +53,7 @@ data Inv : Routes → Flat Pos → Set where
   dead : ∀ {s} → Flat.spent s ≡ true → tot s ≡ 0 → Inv (Flat.at s , 0) s
 
 -- The scan starts with nothing counted.
-inv₀ : Inv (root , 0) (flat root 0 0 false false false 0 0 0 0 0 [])
+inv₀ : Inv (root , 0) (flat root 0 0 false false false 0 0 0 0 [])
 inv₀ = live refl z≤n
 
 ------------------------------------------------------------------------
@@ -234,9 +234,9 @@ private
       shuffle = solve-∀
 
   -- Past the over the lanes hold nothing to hand on.
-  spent-k : ∀ {c} s → Inv c s → Flat.spent s ≡ true → Flat.acc s ⊓ Flat.lanes s ≡ 0
-  spent-k s (live sp _) e with () ← trans (sym e) sp
-  spent-k s (dead sp z) e rewrite proj₂ (proj₁ (zero₄ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) z)) = ⊓-zeroʳ (Flat.acc s)
+  spent-k : ∀ {c} s kd → Inv c s → Flat.spent s ≡ true → kd ⊓ Flat.lanes s ≡ 0
+  spent-k s kd (live sp _) e with () ← trans (sym e) sp
+  spent-k s kd (dead sp z) e rewrite proj₂ (proj₁ (zero₄ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s) z)) = ⊓-zeroʳ kd
 
 -- A lane ended holding `k`, from a state that split them off.
 ended-hand : ∀ {B c s} s₁ k n → Flat.at s₁ ≡ Flat.at s → Flat.spent s₁ ≡ Flat.spent s → k + tot s₁ ≡ tot s
@@ -248,10 +248,10 @@ ended-hand s₁ k n ea es et kz i with Flat.queue s₁
 ...   | true  | suc _ = cutL s₁ k n ea es et i
 ...   | false | _     = cutL s₁ k n ea es et i
 
-laneDone-inv : ∀ {B} op b n s {c} → Inv c s → Inv (after c (onMark {B} op b s laneDone n)) (proj₁ (onMark {B} op b s laneDone n))
-laneDone-inv op b n s i =
-  ended-hand (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
-                       ; dead = true }) _ n refl refl (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s)) (spent-k s i) i
+laneDone-inv : ∀ {B} op b kd n s {c} → Inv c s → Inv (after c (onMark {B} op b s (laneDone kd) n)) (proj₁ (onMark {B} op b s (laneDone kd) n))
+laneDone-inv op b kd n s i =
+  ended-hand (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd
+                       ; dead = true }) _ n refl refl (handed′ (Flat.outer s) (Flat.lanes s) kd (Flat.held s) (Flat.parked s)) (spent-k s kd i) i
 
 burstEnd-inv : ∀ {B} op b n s {c} → Inv c s → Inv (after c (onMark {B} op b s burstEnd n)) (proj₁ (onMark {B} op b s burstEnd n))
 burstEnd-inv op b n s i with isZero (Flat.held s) ∨ Flat.dead s
@@ -291,11 +291,10 @@ onMark-inv : ∀ {B} op b m n s {c} → Inv c s → Inv (after c (onMark {B} op 
 onMark-inv op b begin      n s i = begun-inv b n s i
 onMark-inv op b stop       n s i = stopped-inv b n s i
 onMark-inv op b over       n s i = overed-inv n s i
-onMark-inv op b carry      n s i = keep refl refl refl i
 onMark-inv op b outerOpen  n s i = arrive-inv op n s i
 onMark-inv op b outerClose n s i = i
 onMark-inv op b laneStart  n s i = keep refl refl refl i
-onMark-inv op b laneDone   n s i = laneDone-inv op b n s i
+onMark-inv op b (laneDone kd) n s i = laneDone-inv op b kd n s i
 onMark-inv op b burstEnd   n s i = burstEnd-inv op b n s i
 onMark-inv op b outerDone  n s i = left-hand (record s { finished = true }) n refl refl refl i
 onMark-inv op b subscribed n s (live sp le) = live sp le
@@ -386,13 +385,12 @@ private
   onMark-sent op b begin      n s i = begun-sent n s i
   onMark-sent op b stop       n s i = stopped-sent b n s (if Flat.spent s then 0 else share b s) i
   onMark-sent op b over       n s i = overed-sent n s i
-  onMark-sent op b carry      n s i = none i
   onMark-sent op b outerOpen  n s i = arrive-sent op n s i
   onMark-sent op b outerClose n s i = none i
   onMark-sent op b laneStart  n s i = none i
-  onMark-sent op b laneDone   n s i =
-    ended-sent (Flat.acc s ⊓ Flat.lanes s) n
-      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
+  onMark-sent op b (laneDone kd)   n s i =
+    ended-sent (kd ⊓ Flat.lanes s) n
+      (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd
                 ; dead = true }) i
   onMark-sent op b burstEnd   n s i = burst-sent (isZero (Flat.held s) ∨ Flat.dead s) n s i
   onMark-sent op b outerDone  n s i = left-sent n (record s { finished = true }) i
@@ -524,14 +522,13 @@ onMark-exact : ∀ {B} op b m n s {c} → (m ≡ begin → b ≡ closeB → ⊥)
 onMark-exact op b begin      n s nc i e = begun-exact b n s (nc refl) i e
 onMark-exact op b stop       n s nc i e = stopped-exact b n s i e
 onMark-exact op b over       n s nc i e = overed-exact n s i e
-onMark-exact op b carry      n s nc i e = e
 onMark-exact op b outerOpen  n s nc i e = arrive-exact op n s i e
 onMark-exact op b outerClose n s nc i e = e
 onMark-exact op b laneStart  n s nc i e = e
-onMark-exact op b laneDone   n s nc i e =
-  ended-exact (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0
+onMark-exact op b (laneDone kd)   n s nc i e =
+  ended-exact (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd
                         ; dead = true }) _ n i e refl
-    (handed′ (Flat.outer s) (Flat.lanes s) (Flat.acc s) (Flat.held s) (Flat.parked s))
+    (handed′ (Flat.outer s) (Flat.lanes s) (kd) (Flat.held s) (Flat.parked s))
 onMark-exact op b burstEnd   n s nc i e with isZero (Flat.held s) ∨ Flat.dead s
 ... | true  = e
 ... | false = cut-exact (Flat.held s) n _ i e refl (hold₀ (Flat.outer s) (Flat.lanes s) (Flat.held s) (Flat.parked s))

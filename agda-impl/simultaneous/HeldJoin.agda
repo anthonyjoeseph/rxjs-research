@@ -31,7 +31,7 @@ open import Relation.Nullary using (¬_; yes; no)
 open import denotation.Position using (Pos; root; frame; cascade; ix; sub; last; _∙_; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; skip; pin)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++)
@@ -59,8 +59,7 @@ begin? (instEmit (mark over) _)       = inj₂ λ ()
 begin? (instEmit (mark outerOpen) _)  = inj₂ λ ()
 begin? (instEmit (mark outerClose) _) = inj₂ λ ()
 begin? (instEmit (mark laneStart) _)  = inj₂ λ ()
-begin? (instEmit (mark carry) _)      = inj₂ λ ()
-begin? (instEmit (mark laneDone) _)   = inj₂ λ ()
+begin? (instEmit (mark (laneDone _)) _)   = inj₂ λ ()
 begin? (instEmit (mark burstEnd) _)   = inj₂ λ ()
 begin? (instEmit (mark outerDone) _)  = inj₂ λ ()
 begin? (instEmit (mark subscribed) _) = inj₂ λ ()
@@ -83,8 +82,7 @@ joins-nb (m , k) (instEmit (mark over) _)       _  = refl
 joins-nb (m , k) (instEmit (mark outerOpen) _)  _  = refl
 joins-nb (m , k) (instEmit (mark outerClose) _) _  = refl
 joins-nb (m , k) (instEmit (mark laneStart) _)  _  = refl
-joins-nb (m , k) (instEmit (mark carry) _)      _  = refl
-joins-nb (m , k) (instEmit (mark laneDone) _)   _  = refl
+joins-nb (m , k) (instEmit (mark (laneDone _)) _)   _  = refl
 joins-nb (m , k) (instEmit (mark burstEnd) _)   _  = refl
 joins-nb (m , k) (instEmit (mark outerDone) _)  _  = refl
 joins-nb (m , k) (instEmit (mark subscribed) _) _  = refl
@@ -155,8 +153,7 @@ nb-zero (instEmit (mark over) _)       (m , .0) refl _  = refl
 nb-zero (instEmit (mark outerOpen) _)  (m , .0) refl _  = refl
 nb-zero (instEmit (mark outerClose) _) (m , .0) refl _  = refl
 nb-zero (instEmit (mark laneStart) _)  (m , .0) refl _  = refl
-nb-zero (instEmit (mark carry) _)      (m , .0) refl _  = refl
-nb-zero (instEmit (mark laneDone) _)   (m , .0) refl _  = refl
+nb-zero (instEmit (mark (laneDone _)) _)   (m , .0) refl _  = refl
 nb-zero (instEmit (mark burstEnd) _)   (m , .0) refl _  = refl
 nb-zero (instEmit (mark outerDone) _)  (m , .0) refl _  = refl
 nb-zero (instEmit (mark subscribed) _) (m , .0) refl _  = refl
@@ -174,8 +171,7 @@ nb-back (instEmit (mark over) _)       (m , k)           nb ()
 nb-back (instEmit (mark outerOpen) _)  (m , k)           nb e = refl , _ , e
 nb-back (instEmit (mark outerClose) _) (m , k)           nb e = refl , _ , e
 nb-back (instEmit (mark laneStart) _)  (m , k)           nb e = refl , _ , e
-nb-back (instEmit (mark carry) _)      (m , k)           nb e = refl , _ , e
-nb-back (instEmit (mark laneDone) _)   (m , k)           nb e = refl , _ , e
+nb-back (instEmit (mark (laneDone _)) _)   (m , k)           nb e = refl , _ , e
 nb-back (instEmit (mark burstEnd) _)   (m , k)           nb e = refl , _ , e
 nb-back (instEmit (mark outerDone) _)  (m , k)           nb e = refl , _ , e
 nb-back (instEmit (mark subscribed) _) (m , k)           nb e = refl , _ , e
