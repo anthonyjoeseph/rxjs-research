@@ -284,24 +284,15 @@ a body.
 Members: `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
 
-#### A LANE'S ROWS ARE ITS PROGRAM'S
-
-Unproven: the share, a bounded merge of a blocker and the program, shows
-the program's rows at the same places once the blocker ends. Riskiest:
-`prog-runs` — the blocker ends, so the second lane starts; settled by
-the blocker's end, read through `simultaneous.ConcatTwo`.
-
-Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`.
-
 #### A LANE'S RUN IN THE LANES'
 
-Untried: the rows a live lane shows that the scan's source met are a run
-of the lane, and a wait for the lanes' next row is one for its next.
-Hardest: a switch's lane cut past the cursor, whose later rows are no
-lanes' rows; the cutter's own first row precedes them. Settled by
-bodies, or a cut lane's row before every lanes' row past the cursor.
+Untried: a wait the lanes' rows few precede, and past their cursor before
+their next, is so for a live lane. Hardest: a lane row the lanes never
+show — cut past the cursor, or unreachable in the join; the cutter's own
+first row precedes a cut one. Settled by bodies, or a lane row before the
+wait that no lanes' row past the cursor precedes.
 
-Members: `own-run`, `lane-few`, `lane-least`.
+Members: `lane-few`, `lane-least`.
 
 #### THE BATCH RANK
 
