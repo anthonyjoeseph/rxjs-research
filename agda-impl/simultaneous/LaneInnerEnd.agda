@@ -2,13 +2,13 @@
 
 -- A LANE'S INNER ENDS ONLY PAST ITS `laneDone` (`inner-ends`).  The
 -- inner's end waits on its lane part's connect; that connect's end is its
--- `counted` merge's, which waits on its scan, so on its frame; the frame's
--- end waits on its third piece, the `laneDone`.  Read back up, the scan
--- folds the frame's values up to that one, the split shows the `laneDone`,
--- and every layer shows it before its own end.
+-- `counted` map's, which is its scan's, so its frame's; the frame's end
+-- waits on its third piece, the `laneDone`.  Read back up, the scan folds
+-- the frame's values up to that one, the map shows it told its lane's
+-- routes, and every layer shows it before its own end.
 module simultaneous.LaneInnerEnd where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (not; T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
@@ -28,14 +28,14 @@ open import denotation.Position using (Pos; ix; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; out; end; at-out; on-out; _≺_; _≼_; Few; Ended; module Op;
   module Values; module Bounded; module Merge; module Scan; module TakeWhile;
-  module Connecting; module Joining)
+  module Connecting; module Joining; map-out; map-end)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds.Leaves using (of-reach; of-end)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Fold using (fold)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.TakeKit using (ix<last)
-open import simultaneous.CombSent using (reach-below; module Two)
+open import simultaneous.CombSent using (reach-below)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (laneDone)
 open import simultaneous.LaneLayers using (starts-after)
@@ -133,7 +133,7 @@ first-before {x = x} {y} p {c} (c′ , (e , _) , c′c) with of-end p 0 (x ∷ y
 module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ ∷ Θ) (o : Obs Timeline Γ′ B) (ρ : DenEnv Θ) where
 
   ld : IE B
-  ld = marked laneDone
+  ld = marked (laneDone 0)
 
   -- The lane part's third piece shows its `laneDone` before it ends.
   pc2-done : ∀ m (h : Den ⊤) (h′ : Den (IE B)) s {y} → enter (ev m (piece {B = B} lanePart 2) (h′ ∷ h ∷ ρ)) s y end
@@ -142,27 +142,15 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   pc2-done (just _) h h′ s e = (at-out , of-reach s 0 (ld ∷ []) {s ⊕ [ ix 0 ]} {out ld}) , one-done s ld e
 
   module _ (m : Maybe ℕ) where
-    open C ρ′ o ρ m using (MM; Sv; Ct; Sc; Fr; Inner; H₁; H₂; Bp)
+    open C ρ′ o ρ m using (MM; Sv; Ct; Sc; Fr; H₁; H₂; Bp)
 
-    -- Below a frame's start, the split of its `laneDone` lies past the
-    -- start, by a fixed path.
-    up : ∀ (s′ : Pos) → s′ ≺ (((((s′ ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
-    up s′ = ≺-trans {s′} {w} {R} (≺-ext s′ [])
-              (≺-trans {w} {U} {R} (≺-ext w [])
-                (≺-trans {U} {U ⊕ [ ix 1 ]} {R} (≺-ext U [])
-                  (≺-trans {U ⊕ [ ix 1 ]} {V} {R} (≺-ext (U ⊕ [ ix 1 ]) []) (≺-ext V []))))
-      where
-        w = s′ ⊕ [ ix 0 ]
-        U = w ⊕ [ ix 1 ]
-        V = (U ⊕ [ ix 1 ]) ⊕ [ ix 1 ]
-        R = V ⊕ [ ix 0 ]
-
-    -- THE COUNTED MERGE SHOWS ITS `laneDone` BEFORE IT ENDS: its scan has
-    -- ended, so its frame, so the frame's third piece; the scan folds the
-    -- frame up to that piece's `laneDone`, and its split shows it.
+    -- THE COUNTED STREAM SHOWS ITS `laneDone` BEFORE IT ENDS: it ends
+    -- where its scan does, so its frame has ended, so the frame's third
+    -- piece; the scan folds the frame up to that piece's `laneDone`, and
+    -- the map shows it, told its lane's routes.
     ct-ld : ∀ P {c₁} → enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) c₁ end
-          → ¬ ¬ Σ Pos λ R → enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) R (out ld) × R ≺ c₁ × Bp P ≺ R
-    ct-ld P {c₁} (cj , rct) = from-sc (proj₁ dct)
+          → ¬ ¬ Σ Pos λ R → Σ (IE B) λ a → enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) R (out a) × T (not (undone a)) × R ≺ c₁ × Bp P ≺ R
+    ct-ld P {c₁} (map-end (Scan.send (fj , rf) , r₂) , rct) = from-lane (proj₂ dfr T₃.ob₂ (2 , 2 , T₃.nth₂) (T₃.third-before (proj₁ dfr)) (λ ()))
       where
         h₁ : Den ⊤
         h₁ = H₁ P
@@ -182,79 +170,45 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
         FrE : EmissionSet (IE B)
         FrE = enter (Fr lanePart h₁ h₂) Q
 
-        ScE : EmissionSet (Routes × (List (IE B) × List (IE B)))
+        ScE : EmissionSet (Routes × IE B)
         ScE = enter (Sc lanePart h₁ h₂) Q
 
-        dct : Merge.Done Inner ScE c₁
-        dct = merge-done Inner ScE cj
+        dfr : Bd.Done c₁
+        dfr = bounded-done 1 fr T₃.O fj
 
-        from-sc : Ended ScE c₁ → ¬ ¬ Σ Pos λ R → enter (Ct lanePart h₁ h₂) Q R (out ld) × R ≺ c₁ × Q ≺ R
-        from-sc (c₂ , (Scan.send (fj , rf) , r₂) , c₂c₁) = from-lane (proj₂ dfr T₃.ob₂ (2 , 2 , T₃.nth₂) (T₃.third-before (proj₁ dfr)) (λ ()))
+        from-lane : Ended (Bd.Lane (Q ⊕ [ ix 2 ]) 2) c₁ → ¬ ¬ Σ Pos λ R → Σ (IE B) λ a → enter (Ct lanePart h₁ h₂) Q R (out a) × T (not (undone a)) × R ≺ c₁ × Q ≺ R
+        from-lane (c₃ , (i , s′ , sb , (pe , _)) , c₃c₁) κ =
+          fold laneStep z₀ FrE few-fr frow λ (b , ac) → to-ct b ac
           where
-            dfr : Bd.Done c₂
-            dfr = bounded-done 1 fr T₃.O fj
+            w : Pos
+            w = s′ ⊕ [ ix 0 ]
 
-            from-lane : Ended (Bd.Lane (Q ⊕ [ ix 2 ]) 2) c₂ → ¬ ¬ Σ Pos λ R → enter (Ct lanePart h₁ h₂) Q R (out ld) × R ≺ c₁ × Q ≺ R
-            from-lane (c₃ , (i , s′ , sb , (pe , _)) , c₃c₂) κ =
-              fold laneStep z₀ FrE few-fr frow λ (b , ac) → to-ct b ac
+            pd : enter (fr 2) s′ w (out ld) × w ≺ c₃
+            pd = pc2-done m h₁ h₂ s′ pe
+
+            w≺c₁ : w ≺ c₁
+            w≺c₁ = ≺-≼-≺ {w} {c₃} {c₁} (proj₂ pd) c₃c₁
+
+            frow : FrE w (out ld)
+            frow = Bd.lane T₃.ob₂ (2 , 2 , T₃.nth₂) (i , s′ , sb , proj₁ pd , ≺-ext s′ []) (λ ()) tt , reach-below {a = ld} rf w≺c₁
+
+            few-fr : Few FrE w
+            few-fr = proj₁ rf , λ {k} x lt → proj₂ rf (proj₁ x) (≺-trans {k} {w} {c₁} lt w≺c₁) tt
+
+            Q≺w : Q ≺ w
+            Q≺w = ≺-trans {Q} {s′} {w} (≺-trans {Q} {Q ⊕ [ ix 2 ]} {s′} (≺-ext Q []) (starts-after (proj₂ sb))) (≺-ext s′ [])
+
+            to-ct : ∀ b → Scan.Acc laneStep z₀ FrE w (laneStep b ld) → ⊥
+            to-ct b ac = κ (w , proj₂ y , ctrow , tt , w≺c₁ , Q≺w)
               where
-                w U V R : Pos
-                w = s′ ⊕ [ ix 0 ]
-                U = w ⊕ [ ix 1 ]
-                V = (U ⊕ [ ix 1 ]) ⊕ [ ix 1 ]
-                R = V ⊕ [ ix 0 ]
+                y : Routes × IE B
+                y = laneStep b ld
 
-                pd : enter (fr 2) s′ w (out ld) × w ≺ c₃
-                pd = pc2-done m h₁ h₂ s′ pe
+                scrow : ScE w (out y)
+                scrow = Scan.sval ac , reach-below {a = y} r₂ w≺c₁
 
-                w≺c₂ : w ≺ c₂
-                w≺c₂ = ≺-≼-≺ {w} {c₃} {c₂} (proj₂ pd) c₃c₂
-
-                w≺c₁ : w ≺ c₁
-                w≺c₁ = ≺-≼-≺ {w} {c₂} {c₁} w≺c₂ c₂c₁
-
-                frow : FrE w (out ld)
-                frow = Bd.lane T₃.ob₂ (2 , 2 , T₃.nth₂) (i , s′ , sb , proj₁ pd , ≺-ext s′ []) (λ ()) tt , reach-below {a = ld} rf w≺c₂
-
-                few-fr : Few FrE w
-                few-fr = proj₁ rf , λ {k} x lt → proj₂ rf (proj₁ x) (≺-trans {k} {w} {c₂} lt w≺c₂) tt
-
-                Q≺s′ : Q ≺ s′
-                Q≺s′ = ≺-trans {Q} {Q ⊕ [ ix 2 ]} {s′} (≺-ext Q []) (starts-after (proj₂ sb))
-
-                U≺R : U ≺ R
-                U≺R = ≺-trans {U} {U ⊕ [ ix 1 ]} {R} (≺-ext U []) (≺-trans {U ⊕ [ ix 1 ]} {V} {R} (≺-ext (U ⊕ [ ix 1 ]) []) (≺-ext V []))
-
-                to-ct : ∀ b → Scan.Acc laneStep z₀ FrE w (laneStep b ld) → ⊥
-                to-ct b ac = from-in (proj₂ dct scrow tt w≺c₁ (λ ()))
-                  where
-                    y : Routes × (List (IE B) × List (IE B))
-                    y = laneStep b ld
-
-                    scrow : ScE w (out y)
-                    scrow = Scan.sval ac , reach-below {a = y} r₂ w≺c₂
-
-                    from-in : Ended (λ k e → enter (Inner y) U k e × U ≺ k) c₁ → ⊥
-                    from-in (c₄ , ((ij , ri) , _) , c₄c₁) = from-of (proj₂ dI (Two.snd-row true false U) tt (Two.snd-before true false U (proj₁ dI)) (λ ()))
-                      where
-                        dI : Merge.Done (λ c → Op.of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (enter (Op.of (true ∷ false ∷ [])) U) c₄
-                        dI = merge-done (λ c → Op.of (if c then proj₁ (proj₂ y) else proj₂ (proj₂ y))) (enter (Op.of (true ∷ false ∷ [])) U) ij
-
-                        from-of : Ended (λ k e → enter (Op.of (ld ∷ [])) V k e × V ≺ k) c₄ → ⊥
-                        from-of (c₅ , (le , _) , c₅c₄) = κ (R , ctrow , R≺c₁ , ≺-trans {Q} {s′} {R} Q≺s′ (up s′))
-                          where
-                            R≺c₄ : R ≺ c₄
-                            R≺c₄ = ≺-≼-≺ {R} {c₅} {c₄} (one-done V ld le) c₅c₄
-
-                            R≺c₁ : R ≺ c₁
-                            R≺c₁ = ≺-≼-≺ {R} {c₄} {c₁} R≺c₄ c₄c₁
-
-                            irow : enter (Inner y) U R (out ld)
-                            irow = Joining.lane (Two.snd-row true false U) tt ((at-out , of-reach V 0 (ld ∷ []) {R} {out ld}) , ≺-ext V []) (λ ()) tt
-                                 , reach-below {a = ld} ri R≺c₄
-
-                            ctrow : enter (Ct lanePart h₁ h₂) Q R (out ld)
-                            ctrow = Joining.lane scrow tt (irow , U≺R) (λ ()) tt , reach-below {a = ld} rct R≺c₁
+                ctrow : enter (Ct lanePart h₁ h₂) Q w (out (proj₂ y))
+                ctrow = map-out scrow , reach-below {a = proj₂ y} rct w≺c₁
 
     -- A LANE'S INNER NEVER ENDS BEFORE ITS `laneDone`.
     inner-end : ∀ s {c} → enter MM s c end → ¬ TakeWhile.Failed true undone (enter MM s) c → ⊥
@@ -277,22 +231,22 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
         K≺c = first-before s (proj₁ dm)
 
         from-sv : Ended (λ k e → enter (Sv lanePart) P k e × P ≺ k) c → ⊥
-        from-sv (c₁ , ((Connecting.body (Connecting.body cte , r₁) , r₀) , _) , c₁c) = ct-ld P cte λ (R , ctrow , R≺c₁ , Q≺R) → lift ctrow R≺c₁ Q≺R
+        from-sv (c₁ , ((Connecting.body (Connecting.body cte , r₁) , r₀) , _) , c₁c) = ct-ld P cte λ (R , a , ctrow , na , R≺c₁ , Q≺R) → lift ctrow na R≺c₁ Q≺R
           where
-            lift : ∀ {R} → enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) R (out ld) → R ≺ c₁ → Bp P ≺ R → ⊥
-            lift {R} ctrow R≺c₁ Q≺R = nF (R , ld , mmrow , tt , R≺c)
+            lift : ∀ {R a} → enter (Ct lanePart (H₁ P) (H₂ P lanePart)) (Bp P) R (out a) → T (not (undone a)) → R ≺ c₁ → Bp P ≺ R → ⊥
+            lift {R} {a} ctrow na R≺c₁ Q≺R = nF (R , a , mmrow , na , R≺c)
               where
                 R≺c : R ≺ c
                 R≺c = ≺-≼-≺ {R} {c₁} {c} R≺c₁ c₁c
 
-                svrow : enter (Sv lanePart) P R (out ld)
-                svrow = Connecting.body (Connecting.body ctrow , reach-below {a = ld} r₁ R≺c₁) , reach-below {a = ld} r₀ R≺c₁
+                svrow : enter (Sv lanePart) P R (out a)
+                svrow = Connecting.body (Connecting.body ctrow , reach-below {a = a} r₁ R≺c₁) , reach-below {a = a} r₀ R≺c₁
 
                 P≺R : P ≺ R
                 P≺R = ≺-trans {P} {Bp P} {R} (≺-trans {P} {P ⊕ [ ix 0 ]} {Bp P} (≺-ext P []) (≺-ext (P ⊕ [ ix 0 ]) [])) Q≺R
 
-                mmrow : enter MM s R (out ld)
-                mmrow = Joining.lane ok tt (svrow , P≺R) (λ ()) tt , reach-below {a = ld} rc R≺c
+                mmrow : enter MM s R (out a)
+                mmrow = Joining.lane ok tt (svrow , P≺R) (λ ()) tt , reach-below {a = a} rc R≺c
 
   -- The lane's inner, as the elaboration builds it, is the core's.
   inner-ends : ∀ m s {c} → enter (ev m (flatMap (mergeᶠ nothing) (λ k → shareˢ (laneSrc ρ′ o k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) ρ) s c end

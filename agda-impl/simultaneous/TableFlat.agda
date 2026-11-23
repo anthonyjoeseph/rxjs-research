@@ -702,7 +702,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- `laneDone`'s, which follows the share's end, the lane's own.
       outImage endImage : Pos → Pos
       outImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ [ sub (readerR stE) ])
-      endImage y = emitAt (Rel.φ (Out.rel lane) N y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
+      endImage y = (Rel.φ (Out.rel lane) N y ⊕ˡ (sub (readerR stE) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ]
 
     -- A lane's end is never late.
     end-nl : ∀ {N} (R : LaneRec N) {c} → TR (LaneRec.tab R) c end → ¬ Rel.Late (Out.rel (LaneRec.lane R)) N c

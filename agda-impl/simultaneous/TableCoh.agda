@@ -114,7 +114,7 @@ module Two {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
     out-x x y = cong₂ (λ u v → emitAt (u ⊕ [ sub (readerR v) ])) (LaneX.φ≡ x y) (LaneX.stE≡ x)
 
     end-x : ∀ {N} {R : P.LaneRec N} {R′ : P′.LaneRec N} → LaneX R R′ → ∀ y → P.LaneRec.endImage R y ≡ P′.LaneRec.endImage R′ y
-    end-x x y = cong₂ (λ u v → emitAt (u ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
+    end-x x y = cong₂ (λ u v → (u ⊕ˡ (sub (readerR v) ∷ ix 1 ∷ ix 0 ∷ [])) ⊕ [ last ])
                       (LaneX.φ≡ x y) (LaneX.stE≡ x)
 
     -- A lane at alike subscriptions maps alike and is late alike in the

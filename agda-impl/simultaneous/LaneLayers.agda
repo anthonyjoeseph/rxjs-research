@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Tree using (of)
 open import denotation.Position using (Pos; Label; ix; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; ofᴱ; <ᵖ-part; ix-<)
-open import denotation.EmissionSet using (EmissionSet; Den; enter; out; InE; at-out; on-out; at-end; _≺_; Few; Truncate; module Op;
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; map-skip; map-pin; map-end; Den; enter; out; InE; at-out; on-out; at-end; _≺_; Few; Truncate; module Op;
   module Joining; module Bounded; module Scan; module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-absurd)
 open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
@@ -183,6 +183,16 @@ conn-few p σ β {v} past (ks , h) = ks , go
     go (Connecting.burst x _) lt      = no x lt
     go (Connecting.echo x _ _ _) lt   = no x lt
     go (Connecting.kept x _ _ _) lt   = no x lt
+
+-- A map's: its input's.
+map-few : ∀ {A B} (f : A → B) (t : EmissionSet A) {v} → Few t v → Few (MapT f t) v
+map-few f t {v} (ks , h) = ks , go
+  where
+    go : ∀ {k e} → MapT f t k e → k ≺ v → k ∈ ks
+    go (map-out x) lt  = h x lt
+    go (map-skip x) lt = h x lt
+    go (map-pin x) lt  = h x lt
+    go (map-end x) lt  = h x lt
 
 -- A scan's: its input's.
 acc-row : ∀ {A B} {f : B → A → B} {z : B} {t : EmissionSet A} {q b} → Scan.Acc f z t q b → Σ A λ a → t q (out a)

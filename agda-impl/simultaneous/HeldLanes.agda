@@ -122,9 +122,9 @@ lane-once nothing  keep o ρ g s ok = take-once keep (ev nothing o ρ) s (inv-ev
 lane-once (just n) keep o ρ g s ok = take-once keep (ev (just n) o ρ) s (inv-ev (just n) o ρ g s ok)
 
 -- No lane mark is read above a flatMap.
-lane-routing : ∀ {mk} → mk ≡ laneStart ⊎ mk ≡ laneDone → Routing mk → ⊥
+lane-routing : ∀ {mk} → mk ≡ laneStart ⊎ Σ ℕ (λ kd → mk ≡ laneDone kd) → Routing mk → ⊥
 lane-routing (inj₁ refl) ()
-lane-routing (inj₂ refl) ()
+lane-routing (inj₂ (_ , refl)) ()
 
 -- A BRANCH'S ROW A PROJECTION MEETS IS KEPT, one `sub J` below its own,
 bproj-mem : ∀ {B b J} {rx : List (Pos × Ev (Maybe (Input B)))} {rs k x}
@@ -265,11 +265,15 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   act : List Row → ℕ
   act r = Flat.active (proj₁ (past op init r))
 
-  module AC = Count _≟ᵖ_ (rowKind markAct op) Own (LaneMark laneStart) (LaneMark laneDone) act
+  -- A lane's `laneDone`, telling whatever it counted.
+  DoneMark : Pos → Row → Set
+  DoneMark q x = Σ ℕ λ kd → LaneMark (laneDone kd) q x
+
+  module AC = Count _≟ᵖ_ (rowKind markAct op) Own (LaneMark laneStart) DoneMark act
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
-  lane-starts : ∀ {a s y n} → enter (fL a) s y (out (instEmit (mark laneDone) n))
+  lane-starts : ∀ {a s y kd n} → enter (fL a) s y (out (instEmit (mark (laneDone kd)) n))
               → Σ Pos λ y₀ → Σ _ λ n₀ → enter (fL a) s y₀ (out (instEmit (mark laneStart) n₀)) × s ≺ y₀ × y₀ ≺ y
   lane-starts {a} {s} r =
     let (y₀ , r₀ , lt₀ , lt) = LaneStart.lane-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r in y₀ , _ , r₀ , lt₀ , lt
@@ -282,7 +286,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo xo′ l l′
 
   -- A LANE ENDS IN ITS `laneDone`'s INSTANT.
-  done-ends : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n))
+  done-ends : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n))
             → Σ Pos λ c → RV.Lane op q a c end × instantOf c ≡ instantOf y
   done-ends x l with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
@@ -319,9 +323,9 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   σ₃-lane (r , _) = join-out op fL RO (proj₁ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) r))
 
   -- A LANE'S `laneDone` IN THE REAL FLATMAP FOLLOWS ITS `laneStart` THERE.
-  lane-begins : ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n)) → σ₃ y (out (instEmit (mark laneDone) n))
+  lane-begins : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → σ₃ y (out (instEmit (mark (laneDone kd)) n))
               → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
-  lane-begins {q} {a} {y} {n} xo l σd =
+  lane-begins {q} {a} {y} {kd} {n} xo l σd =
     let (_ , _ , r , _ , back) = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
             (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
             (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
@@ -335,24 +339,24 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
       begin-at {y₀} {n₀} L₀ lt rn nc refl = y₀ , n₀ , L₀
                      , (R-from (join-in op fL RO xo rn L₀ (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
-                                , reach-down {q = y} {w = y₀} {e = out (instEmit (mark laneDone) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
+                                , reach-down {q = y} {w = y₀} {e = out (instEmit (mark (laneDone kd)) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
 
   -- A LANE MARK THE SCAN MEETS IS A LANE'S ROW, one `sub J` below it.
-  lane-mark : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx → mk ≡ laneStart ⊎ mk ≡ laneDone
+  lane-mark : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx → mk ≡ laneStart ⊎ Σ ℕ (λ kd → mk ≡ laneDone kd)
             → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark mk) n))
   lane-mark mt {b = laneB} i _ with lane-run mt
   ... | rs , pr , run , _ with bproj-mem pr i
   ...   | y , refl , j = y , refl , refl , proj₁ (run-row∈ run j)
   lane-mark mt {b = outerB} i mk with outer-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ (λ { refl → [ (λ ()) , (λ ()) ]′ mk })
+  ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk })
   ...   | refl = ⊥-elim (lane-routing mk (Held.routing H₁ (proj₁ ox)))
   lane-mark mt {b = closeB} i mk with close-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ { refl → [ (λ ()) , (λ ()) ]′ mk }) (λ { refl → [ (λ ()) , (λ ()) ]′ mk }))
+  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk }) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk }))
 
   -- A LANE'S `laneDone`s ARE ONE ROW.
-  done-one : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneDone) n)) → RV.Lane op q a y′ (out (instEmit (mark laneDone) n′)) → y ≡ y′
+  done-one : ∀ {q a y y′ kd kd′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → RV.Lane op q a y′ (out (instEmit (mark (laneDone kd′)) n′)) → y ≡ y′
   done-one x l l′ with lane-at₂ op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) x l l′

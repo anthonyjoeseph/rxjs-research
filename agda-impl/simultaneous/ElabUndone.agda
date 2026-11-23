@@ -31,11 +31,56 @@ open import simultaneous.SObs using (lone; ext; Tag; val; cdone; tick; flat; Fla
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; map-out′; scan-out; take-row; of-mem; each-one; module Cat)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; E; AIE; Routes; elab; srcLane; laneSrc; annotate; undone; joins;
-  joinStep; annStep; render; phase; passes; mapIE; scanIE; combined; react; onMark; cut; unpark; arrive; ended; burstOver;
+  joinStep; annStep; tell; render; phase; passes; mapIE; scanIE; combined; react; onMark; cut; unpark; arrive; ended; burstOver;
   left; begun; stopped; overed; share; setAt; concatˢ; marked; closer; laneˢ; each; trackers; Out; Input; going; fed)
 
 ------------------------------------------------------------------------
 -- What ends no lane
+
+-- A lane's tell ends a lane just where its emit does.
+tell-undone : ∀ {X} r (e : IE X) → undone (tell r e) ≡ undone e
+tell-undone r (instEmit (value _) _)        = refl
+tell-undone r (instEmit (mark (laneDone _)) _) = refl
+tell-undone r (instEmit (mark begin) _)      = refl
+tell-undone r (instEmit (mark over) _)       = refl
+tell-undone r (instEmit (mark stop) _)       = refl
+tell-undone r (instEmit (mark outerOpen) _)  = refl
+tell-undone r (instEmit (mark outerClose) _) = refl
+tell-undone r (instEmit (mark laneStart) _)  = refl
+tell-undone r (instEmit (mark burstEnd) _)   = refl
+tell-undone r (instEmit (mark outerDone) _)  = refl
+tell-undone r (instEmit (mark subscribed) _) = refl
+tell-undone r (instEmit (mark completed) _)  = refl
+
+-- What a lane tells that ends no lane is what it read.
+tell-back : ∀ {X} r (e : IE X) {a} → tell r e ≡ a → T (undone a) → e ≡ a
+tell-back r (instEmit (mark (laneDone _)) _) refl ()
+tell-back r (instEmit (value _) _)        q _ = q
+tell-back r (instEmit (mark begin) _)      q _ = q
+tell-back r (instEmit (mark over) _)       q _ = q
+tell-back r (instEmit (mark stop) _)       q _ = q
+tell-back r (instEmit (mark outerOpen) _)  q _ = q
+tell-back r (instEmit (mark outerClose) _) q _ = q
+tell-back r (instEmit (mark laneStart) _)  q _ = q
+tell-back r (instEmit (mark burstEnd) _)   q _ = q
+tell-back r (instEmit (mark outerDone) _)  q _ = q
+tell-back r (instEmit (mark subscribed) _) q _ = q
+tell-back r (instEmit (mark completed) _)  q _ = q
+
+-- A told `laneDone` carries its lane's routes.
+tell-done : ∀ {X} r (e : IE X) {kd n} → tell r e ≡ instEmit (mark (laneDone kd)) n → kd ≡ proj₂ r
+tell-done r (instEmit (mark (laneDone _)) _) refl = refl
+tell-done r (instEmit (value _) _)        ()
+tell-done r (instEmit (mark begin) _)      ()
+tell-done r (instEmit (mark over) _)       ()
+tell-done r (instEmit (mark stop) _)       ()
+tell-done r (instEmit (mark outerOpen) _)  ()
+tell-done r (instEmit (mark outerClose) _) ()
+tell-done r (instEmit (mark laneStart) _)  ()
+tell-done r (instEmit (mark burstEnd) _)   ()
+tell-done r (instEmit (mark outerDone) _)  ()
+tell-done r (instEmit (mark subscribed) _) ()
+tell-done r (instEmit (mark completed) _)  ()
 
 -- No row of `d` ends a lane.
 Undone : ∀ {X} → Den (IE X) → Set
