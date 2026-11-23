@@ -616,7 +616,7 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         -- Nothing else under the split before the `laneDone`
 
         only : ∀ {y e} → LDE y (out e) → Under (U v₂) y → y ≺ yd → Σ ℕ λ i → i < proj₂ (proj₁ (pre ac₂)) × y ≡ Bs v₂ ⊕ [ ix i ]
-        only r uy lt = go (kind r)
+        only r uy lt = go (kind r) uy lt
           where
             go : ∀ {y e} → Kind y e → Under (U v₂) y → y ≺ yd → Σ ℕ λ i → i < proj₂ (proj₁ (pre ac₂)) × y ≡ Bs v₂ ⊕ [ ix i ]
             go (k-done refl) _ lt′ = ⊥-elim (≺-irrefl {yd} lt′)
