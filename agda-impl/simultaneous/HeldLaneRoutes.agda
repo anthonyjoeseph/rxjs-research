@@ -231,7 +231,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
     -- A LIVE LANE'S ROWS A PREFIX MET ARE A RUN OF THE LANE: the source
     -- meets every lane row in order, each its lane's first past the last.
-    lane-run : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → AC.Live [] rx₁ q
+    own-run : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → AC.Live [] rx₁ q
              → (oc : OC q rx₁ c) → Met (RV.Lane op q a) (lane-rows oc)
 
     -- A WAIT THE LANES' ROWS FEW PRECEDE IS ONE A LIVE LANE'S DO.
@@ -254,7 +254,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   live-idle rx₁ mt pr lv@((a , xo , _) , _) oc {w} fw af lw =
     let (af′ , lw′) = lane-least rx₁ mt pr xo lv oc af lw
     in subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf w) (cnt-lane oc)
-         (lane-idle-own xo (lane-run rx₁ mt xo lv oc) (lane-rows-end oc) (lane-few rx₁ mt xo lv fw) af′ lw′)
+         (lane-idle-own xo (own-run rx₁ mt xo lv oc) (lane-rows-end oc) (lane-few rx₁ mt xo lv fw) af′ lw′)
 
 
   -- The run holds no end short of its last row.

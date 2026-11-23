@@ -294,7 +294,7 @@ Hardest: a switch's lane cut past the cursor, whose later rows are no
 lanes' rows; the cutter's own first row precedes them. Settled by
 bodies, or a cut lane's row before every lanes' row past the cursor.
 
-Members: `lane-run`, `lane-few`, `lane-least`.
+Members: `own-run`, `lane-few`, `lane-least`.
 
 #### THE BATCH RANK
 
