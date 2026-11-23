@@ -48,7 +48,7 @@ open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-value; Routing; r-completed; Idle; Rest; cnt; nameOf; nm;
   Valued; opos)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
-open import simultaneous.HeldTo using (Unfailed; HeldTo; held-to)
+open import simultaneous.HeldTo using (Unfailed; IdleTo; HeldTo; held-to)
 open import simultaneous.HeldIn using (++-split)
 open import simultaneous.Layers using (cursor-snoc; after-≺)
 open import simultaneous.TakeKit using (apart; ix<last; module Take) renaming (Run to Shape)
@@ -234,6 +234,105 @@ data Inert {X : Set} : IE X → Set where
 
 -- A TAKE HOLDS WHAT ITS SOURCE HOLDS when it fails only at inert rows
 -- whose instant its source holds a route of, early ones.
+-- A TAKE'S IDLENESS needs of its source only its idleness up to the
+-- first failure, and that the failing value moves no route: so a take
+-- cut at a frame mark is idle as well as one cut at a value.
+module TakeIdle {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H : Pos → Set}
+                (p : Pos) (iv : InvAt H p (enter d p)) (hidle : IdleTo keep (enter d p))
+                (silent : ∀ {x} → T (not (keep x)) → ∀ r → count r x ≡ r) where
+
+  open TakeBack {H = H} incl keep d p iv
+
+  Row : Set
+  Row = Pos × Ev (IE X)
+
+  snoc-out : ∀ {a} → T (not (keep a)) → ∀ xs y → cnt (xs ++ [ (y , out a) ]) ≡ cnt xs
+  snoc-out {a} nk xs y =
+    trans (cong (L.foldl count r₀) (values-++ xs [ (y , out a) ])) (trans (foldl-++ count r₀ (values xs) [ a ]) (silent nk _))
+
+
+  unf : ∀ {w} → ¬ Failed w → Unfailed keep S w
+  unf {w} nF {f} {a} x nk fw = nF (f , a , x , nk , ≺-trans {f} {f ⊕ [ ix 0 ]} {w} (≺-ext f {ix 0} []) fw)
+
+  unf₀ : ∀ {f a} → S f (out a) → ¬ Failed f → Unfailed keep S (f ⊕ [ ix 0 ])
+  unf₀ {f} fx nF {g} {b} x nk gf with below-or-under g f (ix 0) (≺-trans {g} {g ⊕ [ ix 0 ]} {f ⊕ [ ix 0 ]} (≺-ext g {ix 0} []) gf)
+  ... | inj₂ (l′ , ls , refl) = InvAt.flat iv fx x
+  ... | inj₁ gf′ with ≼-split {g} {f} gf′
+  ...   | inj₁ lt   = nF (g , b , x , nk , lt)
+  ...   | inj₂ refl = ≺-irrefl {g ⊕ [ ix 0 ]} gf
+
+  Goal : List Row → Pos → Set
+  Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
+
+  idle-clean : ∀ {rs} → Met S rs → Cur (cursor nothing rs) → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few Tk w
+             → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
+  idle-clean {rs} m cu ne {w} fw aw lw =
+    decidable-stable ((proj₂ (cnt rs) ≟ⁿ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng → em λ
+      { (inj₂ nF) → ng (hidle m ne (unf nF) (proj₁ fw , λ x kw → proj₂ fw (below nF x kw) kw) aw (λ x v ay yw → lw (below nF x yw) v ay yw))
+      ; (inj₁ (f₀ , a₀ , x₀ , nk₀ , f₀w)) → min-fail x₀ nk₀ λ (f , b , xf , nkf , nFf , ff₀) →
+          let fw′ = ≼-≺-≺ {f} {f₀} {w} ff₀ f₀w
+              stp = lw (up (stop xf nkf nFf)) tt (after-≺ (cursor nothing rs) (cur-before cu xf nkf) (≺-ext f []))
+          in ng (⊎-map (λ z → z) (λ e → trans e (sym (under-of {f} {w} fw′ stp)))
+                  (hidle m ne (unf nFf) (few-S tt xf) (cur-before cu xf nkf) λ {y} x v ay yf → lw (below nFf x yf) v ay (≺-trans {y} {f} {w} yf fw′))) }
+
+  idle-v : ∀ {rs₀ f a} → Met S (rs₀ ++ [ (f , out a) ]) → S f (out a)
+         → T (not (keep a)) → ¬ Failed f
+         → (∀ {c} → (c , end) ∈ rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ] → ⊥) → ∀ {w}
+         → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) w
+         → (∀ {y e} → Tk y e → Visible e → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) y → w ≼ y)
+         → Goal (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) w
+  idle-v {rs₀} {f} {a} run fx nk nF ne {w} aw lw =
+    ⊎-map (λ z → trans (cong proj₂ E) z) (λ e → trans (cong proj₁ E) (trans e (trans (name-ext f [ ix 0 ]) (sym nmw))))
+      (hidle run ne′ (unf₀ fx nF) few0 aft0 least0)
+    where
+      E : cnt (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) ≡ cnt (rs₀ ++ [ (f , out a) ])
+      E = trans (snoc-out nk rs₀ _) (sym (snoc-out nk rs₀ f))
+
+      aw′ : (f ⊕ [ ix 0 ]) ≺ w
+      aw′ = subst (λ c → After c w) (cursor-snoc nothing rs₀) aw
+
+      nmw : nameOf w ≡ nameOf f
+      nmw = under-of {f} {w} (≺-trans {f} {f ⊕ [ ix 0 ]} {w} (≺-ext f []) aw′)
+              (lw (up (stop fx nk nF)) tt (subst (λ c → After c (f ⊕ [ last ])) (sym (cursor-snoc nothing rs₀)) (ix<last f)))
+
+      ne′ : ∀ {c} → (c , end) ∈ rs₀ ++ [ (f , out a) ] → ⊥
+      ne′ x with ∈-++⁻ rs₀ x
+      ... | inj₁ i         = ne (∈-++⁺ˡ i)
+      ... | inj₂ (here ())
+      ... | inj₂ (there ())
+
+      few0 : Few S (f ⊕ [ ix 0 ])
+      few0 = f ∷ proj₁ (few-S tt fx) , go
+        where
+          go : ∀ {k e′} → S k e′ → k ≺ (f ⊕ [ ix 0 ]) → k ∈ f ∷ proj₁ (few-S tt fx)
+          go {k} x kf with below-or-under k f (ix 0) kf
+          ... | inj₂ (l′ , ls , refl) = ⊥-elim (InvAt.flat iv fx x)
+          ... | inj₁ kf′ with ≼-split {k} {f} kf′
+          ...   | inj₁ lt   = there (proj₂ (few-S tt fx) x lt)
+          ...   | inj₂ refl = here refl
+
+      aft0 : After (cursor nothing (rs₀ ++ [ (f , out a) ])) (f ⊕ [ ix 0 ])
+      aft0 = subst (λ c → After c (f ⊕ [ ix 0 ])) (sym (cursor-snoc nothing rs₀)) (≺-ext f [])
+
+      least0 : ∀ {y e} → S y e → Visible e → After (cursor nothing (rs₀ ++ [ (f , out a) ])) y → (f ⊕ [ ix 0 ]) ≼ y
+      least0 {y} x _ ay = ≺→≼ {f ⊕ [ ix 0 ]} {y} (apart R [ ix 0 ] fx x (subst (λ c → After c y) (cursor-snoc nothing rs₀) ay))
+
+  idle-cut : ∀ {rs} → Cut nothing rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w}
+           → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
+  idle-cut (cut {rs₀} refl run fx nk nF (tl-ve _) _) ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (there (here refl))))
+  idle-cut (cut {rs₀} refl run fx nk nF tl-e _)     ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (here refl)))
+  idle-cut (cut {rs₀} refl run fx nk nF (tl-v _) _) ne aw lw = idle-v run fx nk nF ne aw lw
+
+  idle : Idle Tk
+  idle m ne fw aw lw with back c-none m
+  ... | inj₁ (m′ , cu) = idle-clean m′ cu ne fw aw lw
+  ... | inj₂ ct        = idle-cut ct ne aw lw
+
+
+inert-silent : ∀ {X : Set} {a : IE X} → Inert a → ∀ r → count r a ≡ r
+inert-silent i-value _ = refl
+inert-silent i-done  _ = refl
+
 module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H : Pos → Set} (cs : List Pos)
              (p : Pos) (iv : InvAt H p (enter d p)) (h : HeldTo keep (enter d p) cs)
              (fails : ∀ {x} → T (not (keep x)) → Inert x)
@@ -243,6 +342,7 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
 
   open TakeBack {H = H} incl keep d p iv
   module HS = HeldTo h
+  open TakeIdle incl keep d p iv HS.idle (λ nk → inert-silent (fails nk)) using (idle)
 
   Row : Set
   Row = Pos × Ev (IE X)
@@ -398,86 +498,6 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
   shut m r₁ r₂ eq z bq yv rt with back c-none m
   ... | inj₁ (m′ , _) = HS.shut m′ r₁ r₂ eq z bq yv rt
   ... | inj₂ ct       = shut-cut ct r₁ r₂ eq z bq yv rt
-
-  ----------------------------------------------------------------------
-  -- Idle
-
-  unf : ∀ {w} → ¬ Failed w → Unfailed keep S w
-  unf {w} nF {f} {a} x nk fw = nF (f , a , x , nk , ≺-trans {f} {f ⊕ [ ix 0 ]} {w} (≺-ext f {ix 0} []) fw)
-
-  unf₀ : ∀ {f a} → S f (out a) → ¬ Failed f → Unfailed keep S (f ⊕ [ ix 0 ])
-  unf₀ {f} fx nF {g} {b} x nk gf with below-or-under g f (ix 0) (≺-trans {g} {g ⊕ [ ix 0 ]} {f ⊕ [ ix 0 ]} (≺-ext g {ix 0} []) gf)
-  ... | inj₂ (l′ , ls , refl) = InvAt.flat iv fx x
-  ... | inj₁ gf′ with ≼-split {g} {f} gf′
-  ...   | inj₁ lt   = nF (g , b , x , nk , lt)
-  ...   | inj₂ refl = ≺-irrefl {g ⊕ [ ix 0 ]} gf
-
-  Goal : List Row → Pos → Set
-  Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
-
-  idle-clean : ∀ {rs} → Met S rs → Cur (cursor nothing rs) → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few Tk w
-             → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
-  idle-clean {rs} m cu ne {w} fw aw lw =
-    decidable-stable ((proj₂ (cnt rs) ≟ⁿ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng → em λ
-      { (inj₂ nF) → ng (HS.idle m ne (unf nF) (proj₁ fw , λ x kw → proj₂ fw (below nF x kw) kw) aw (λ x v ay yw → lw (below nF x yw) v ay yw))
-      ; (inj₁ (f₀ , a₀ , x₀ , nk₀ , f₀w)) → min-fail x₀ nk₀ λ (f , b , xf , nkf , nFf , ff₀) →
-          let fw′ = ≼-≺-≺ {f} {f₀} {w} ff₀ f₀w
-              stp = lw (up (stop xf nkf nFf)) tt (after-≺ (cursor nothing rs) (cur-before cu xf nkf) (≺-ext f []))
-          in ng (⊎-map (λ z → z) (λ e → trans e (sym (under-of {f} {w} fw′ stp)))
-                  (HS.idle m ne (unf nFf) (few-S tt xf) (cur-before cu xf nkf) λ {y} x v ay yf → lw (below nFf x yf) v ay (≺-trans {y} {f} {w} yf fw′))) }
-
-  idle-v : ∀ {rs₀ f a} → Inert a → Met S (rs₀ ++ [ (f , out a) ]) → S f (out a)
-         → T (not (keep a)) → ¬ Failed f
-         → (∀ {c} → (c , end) ∈ rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ] → ⊥) → ∀ {w}
-         → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) w
-         → (∀ {y e} → Tk y e → Visible e → After (cursor nothing (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ])) y → w ≼ y)
-         → Goal (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) w
-  idle-v {rs₀} {f} {a} va run fx nk nF ne {w} aw lw =
-    ⊎-map (λ z → trans (cong proj₂ E) z) (λ e → trans (cong proj₁ E) (trans e (trans (name-ext f [ ix 0 ]) (sym nmw))))
-      (HS.idle run ne′ (unf₀ fx nF) few0 aft0 least0)
-    where
-      E : cnt (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a) ]) ≡ cnt (rs₀ ++ [ (f , out a) ])
-      E = trans (cnt-snoc va rs₀ (inj₂ refl)) (sym (cnt-snoc va rs₀ (inj₂ refl)))
-
-      aw′ : (f ⊕ [ ix 0 ]) ≺ w
-      aw′ = subst (λ c → After c w) (cursor-snoc nothing rs₀) aw
-
-      nmw : nameOf w ≡ nameOf f
-      nmw = under-of {f} {w} (≺-trans {f} {f ⊕ [ ix 0 ]} {w} (≺-ext f []) aw′)
-              (lw (up (stop fx nk nF)) tt (subst (λ c → After c (f ⊕ [ last ])) (sym (cursor-snoc nothing rs₀)) (ix<last f)))
-
-      ne′ : ∀ {c} → (c , end) ∈ rs₀ ++ [ (f , out a) ] → ⊥
-      ne′ x with ∈-++⁻ rs₀ x
-      ... | inj₁ i         = ne (∈-++⁺ˡ i)
-      ... | inj₂ (here ())
-      ... | inj₂ (there ())
-
-      few0 : Few S (f ⊕ [ ix 0 ])
-      few0 = f ∷ proj₁ (few-S tt fx) , go
-        where
-          go : ∀ {k e′} → S k e′ → k ≺ (f ⊕ [ ix 0 ]) → k ∈ f ∷ proj₁ (few-S tt fx)
-          go {k} x kf with below-or-under k f (ix 0) kf
-          ... | inj₂ (l′ , ls , refl) = ⊥-elim (InvAt.flat iv fx x)
-          ... | inj₁ kf′ with ≼-split {k} {f} kf′
-          ...   | inj₁ lt   = there (proj₂ (few-S tt fx) x lt)
-          ...   | inj₂ refl = here refl
-
-      aft0 : After (cursor nothing (rs₀ ++ [ (f , out a) ])) (f ⊕ [ ix 0 ])
-      aft0 = subst (λ c → After c (f ⊕ [ ix 0 ])) (sym (cursor-snoc nothing rs₀)) (≺-ext f [])
-
-      least0 : ∀ {y e} → S y e → Visible e → After (cursor nothing (rs₀ ++ [ (f , out a) ])) y → (f ⊕ [ ix 0 ]) ≼ y
-      least0 {y} x _ ay = ≺→≼ {f ⊕ [ ix 0 ]} {y} (apart R [ ix 0 ] fx x (subst (λ c → After c y) (cursor-snoc nothing rs₀) ay))
-
-  idle-cut : ∀ {rs} → Cut nothing rs → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w}
-           → After (cursor nothing rs) w → (∀ {y e} → Tk y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Goal rs w
-  idle-cut (cut {rs₀} refl run fx nk nF (tl-ve _) _) ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (there (here refl))))
-  idle-cut (cut {rs₀} refl run fx nk nF tl-e _)     ne _ _ = ⊥-elim (ne (∈-++⁺ʳ rs₀ (here refl)))
-  idle-cut (cut {rs₀} refl run fx nk nF (tl-v _) _) ne aw lw = idle-v (fails nk) run fx nk nF ne aw lw
-
-  idle : Idle Tk
-  idle m ne fw aw lw with back c-none m
-  ... | inj₁ (m′ , cu) = idle-clean m′ cu ne fw aw lw
-  ... | inj₂ ct        = idle-cut ct ne aw lw
 
   ----------------------------------------------------------------------
   -- Rest

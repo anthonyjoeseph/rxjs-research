@@ -72,7 +72,7 @@ open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Relations using (Met; outs; outs-++; values)
 open import simultaneous.LaneEpoch using (module Lanes)
-open import simultaneous.Routed using (Held; Early; Placed; nameOf; Idle; cnt)
+open import simultaneous.Routed using (Held; Early; Placed; nameOf; cnt)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.HeldComb using (ev; init; past)
 open import simultaneous.FlatLanes using (BProj; Tg; brTag; end-last) renaming (keep to bkeep; drop to bdrop)
@@ -225,10 +225,6 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   cnt-lane (oc-out oc _) = cnt-lane oc
 
   postulate
-    -- A LANE IS IDLE ON ITS OWN: holding a route, it is of the instant of
-    -- any position few of its rows precede before its next row.
-    lane-idle-own : ∀ {q a} → RO q (out a) → Idle (RV.Lane op q a)
-
     -- A LIVE LANE'S ROWS A PREFIX MET ARE A RUN OF THE LANE: the source
     -- meets every lane row in order, each its lane's first past the last.
     own-run : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → AC.Live [] rx₁ q

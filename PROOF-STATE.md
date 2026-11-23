@@ -277,14 +277,23 @@ Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch. Riskiest: one lane idle on
-its own (`lane-idle-own`), from its program's `idle` through the frame,
-the share's blocker and the take to its `laneDone`, which must fall at
-the instant the program completes. Then the defer limit's rest (no one
-approximant bounds it). Settled when each former's leaf is a body.
+on the scan's run split onto that branch. Riskiest: the defer limit's
+rest (no one approximant bounds it). Settled when each former's leaf is
+a body.
 
-Members: `lane-idle-own`, `held-current`, `live-current`, `value-open`, `over-open`,
+Members: `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
+
+#### A LANE'S ROWS ARE ITS PROGRAM'S
+
+Unproven: through the lane's six layers (merge, two connects, count,
+frame, the share's bounded merge), its values are its program's or frame
+marks off the program's places, and the lane part's `laneDone` falls
+under the program's end. Riskiest: that placement (`rows-late`), which
+needs the bounded merge's end, and so the frame's last piece, under its
+last lane's end. Settled by reading each layer's rows down to the next.
+
+Members: `rows-late`, `rows-vis`, `prog-runs`, `rows-lift`, `rows-shown`.
 
 #### A LANE'S RUN IN THE LANES'
 

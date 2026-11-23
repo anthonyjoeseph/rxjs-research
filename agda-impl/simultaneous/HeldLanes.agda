@@ -22,7 +22,7 @@ open import denotation.EmissionSet using (hot; enter; DenEnv; module Op; Ev; out
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Routing; Held; Early)
+open import simultaneous.Routed using (Routing; Held; Early; Idle)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; PinBy; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.EachRow using (each-row; each-at; each-end; each-before)
@@ -89,6 +89,7 @@ open import Data.List.Relation.Unary.Any.Properties using () renaming (++⁺ʳ t
 open import Data.List.Membership.Propositional using (find)
 open import Tree using (mergeᶠ; exhaustᶠ)
 open import simultaneous.LaneOnce using (module LaneOnce)
+open import simultaneous.LaneIdle using (module LaneIdle)
 open import denotation.Laws using (good-cons)
 open import simultaneous.HeldConnect using (early-inst)
 
@@ -507,6 +508,15 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                   (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂ cs
                   (λ a {t} L → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
                   (λ a {t} L → IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
+
+    module LI = LaneIdle m {Fr = Fresh eh} op f (λ i → there (there (there (there (ρ i))))) σ₂ σ₁ env₀ g₂ L₁
+                  (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂ cs
+                  (λ a {t} L → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
+                  (λ a {t} L → IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
+
+  -- A LANE IS IDLE ON ITS OWN.
+  lane-idle-own : ∀ {q a} → RO q (out a) → Idle (RV.Lane op q a)
+  lane-idle-own = LI.lane-idle op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- A LANE STARTS ONCE.
   start-once : ∀ {q a y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
