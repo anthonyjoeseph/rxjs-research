@@ -225,9 +225,15 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   cnt-lane (oc-out oc _) = cnt-lane oc
 
   postulate
-    -- A WAIT THE LANES' ROWS FEW PRECEDE IS ONE A LIVE LANE'S DO.
-    lane-few : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a} → RO q (out a) → AC.Live [] rx₁ q
-             → ∀ {w} → Few σ₃ w → Few (RV.Lane op q a) w
+    -- A WAIT THE LANES' ROWS FEW PRECEDE, PAST THEIR CURSOR AND BEFORE THEIR
+    -- NEXT, IS ONE A LIVE LANE'S ROWS FEW PRECEDE.  Without the cursor and
+    -- the next row it is false: a switch's lane cut by a later value reads
+    -- on in a hot source, rows the lanes never show, before a wait past
+    -- them all; the cutter's own first row, a lanes' row past the cursor,
+    -- keeps every such wait before them.
+    lane-few : ∀ rx₁ {z e rx₂ rs} → Met M (rx₁ ++ (z , e) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ∀ {q a} → RO q (out a)
+             → AC.Live [] rx₁ q → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w
+             → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y) → Few (RV.Lane op q a) w
 
     -- A WAIT PAST THE LANES' CURSOR AND BEFORE THEIR NEXT ROW IS PAST A
     -- LIVE LANE'S CURSOR AND BEFORE ITS NEXT: its rows past its cursor are
@@ -509,7 +515,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   live-idle rx₁ mt pr lv@((a , xo , _) , _) oc {w} fw af lw =
     let (af′ , lw′) = lane-least rx₁ mt pr xo lv oc af lw
     in subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf w) (cnt-lane oc)
-         (lane-idle-own xo (own-run rx₁ mt xo oc) (lane-rows-end oc) (lane-few rx₁ mt xo lv fw) af′ lw′)
+         (lane-idle-own xo (own-run rx₁ mt xo oc) (lane-rows-end oc) (lane-few rx₁ mt pr xo lv fw af lw) af′ lw′)
 
 
   -- A LANE'S `begin` IS MET PAST ITS `laneStart`: the lane shows the mark
