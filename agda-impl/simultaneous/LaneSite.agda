@@ -16,6 +16,7 @@ open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_; replicate)
 import Data.List as L
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.Maybe using (Maybe; just; nothing)
