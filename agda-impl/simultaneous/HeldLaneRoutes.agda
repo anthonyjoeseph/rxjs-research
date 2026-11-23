@@ -496,35 +496,35 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- through the subscription its rows share.
   done-site : ∀ {q a yd n} → RO q (out a) → RV.Lane op q a yd (out (instEmit (mark laneDone) n))
             → Σ Pos λ w → Σ Pos λ base → Σ Routes λ r → DoneAt q a yd w base (proj₂ r) × FoldAt q a w r
-  done-site {q} {a} {yd} xo ld = Sited.w S , Sited.base S , Sited.r S , D , fold-map up dn (Sited.fold S)
+  done-site {q} {a} {yd} xo ld = Sited.w Sᵈ , Sited.base Sᵈ , Sited.r Sᵈ , Dᵈ , fold-map upᵈ dnᵈ (Sited.fold Sᵈ)
     where
-      L = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      Lᵈ = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
             (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
             (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo ld
 
-      s : Pos
-      s = proj₁ L
+      sᵈ : Pos
+      sᵈ = proj₁ Lᵈ
 
-      I : InvAt _ s (enter (fL a) s)
-      I = inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s (proj₁ (proj₂ L))
+      Iᵈ : InvAt _ sᵈ (enter (fL a) sᵈ)
+      Iᵈ = inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ sᵈ (proj₁ (proj₂ Lᵈ))
 
-      S : Sited (enter (fL a) s) yd
-      S = lane-site _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ m s (proj₁ (proj₂ L)) (proj₁ (proj₂ (proj₂ L)))
+      Sᵈ : Sited (enter (fL a) sᵈ) yd
+      Sᵈ = lane-site _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ m sᵈ (proj₁ (proj₂ Lᵈ)) (proj₁ (proj₂ (proj₂ Lᵈ)))
 
-      up : ∀ {y e} → enter (fL a) s y e → RV.Lane op q a y e
-      up x = proj₂ (proj₂ (proj₂ (proj₂ L))) x (world-after (InvAt.world I x) (InvAt.real I x))
+      upᵈ : ∀ {y e} → enter (fL a) sᵈ y e → RV.Lane op q a y e
+      upᵈ x = proj₂ (proj₂ (proj₂ (proj₂ Lᵈ))) x (world-after (InvAt.world Iᵈ x) (InvAt.real Iᵈ x))
 
-      dn : ∀ {y e} → RV.Lane op q a y e → enter (fL a) s y e
-      dn l = lane-fwd op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+      dnᵈ : ∀ {y e} → RV.Lane op q a y e → enter (fL a) sᵈ y e
+      dnᵈ l = lane-fwd op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
                (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
                (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo ld l
 
-      D : DoneAt q a yd (Sited.w S) (Sited.base S) (proj₂ (Sited.r S))
-      D = record
-        { w-yd    = Sited.w-yd S
-        ; w-base  = Sited.w-base S
-        ; carries = λ i<k → up (proj₁ (Sited.carries S i<k)) , proj₂ (Sited.carries S i<k)
-        ; only    = λ l u lt → Sited.only S (dn l) u lt
+      Dᵈ : DoneAt q a yd (Sited.w Sᵈ) (Sited.base Sᵈ) (proj₂ (Sited.r Sᵈ))
+      Dᵈ = record
+        { w-yd    = Sited.w-yd Sᵈ
+        ; w-base  = Sited.w-base Sᵈ
+        ; carries = λ i<k → upᵈ (proj₁ (Sited.carries Sᵈ i<k)) , proj₂ (Sited.carries Sᵈ i<k)
+        ; only    = λ l u lt → Sited.only Sᵈ (dnᵈ l) u lt
         }
 
   -- One lane's rows at one place show one emit.
