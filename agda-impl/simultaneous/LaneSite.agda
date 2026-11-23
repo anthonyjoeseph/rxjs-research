@@ -213,7 +213,7 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     h₂ : Den (IE B)
     h₂ = H₂ P burstPart
 
-    open Frame burstPart h₁ h₂ (Bp P) using (O; f; ob₀; nth₀; S₀; sb₀; V₀; u-V₀; nth-zero; starts-0; fr-min; fr-few)
+    open Frame burstPart h₁ h₂ (Bp P) using (O; f; ob₀; nth₀; S₀; sb₀; V₀; u-V₀; nth-zero; starts-0; fr-min; fr-few) public
 
     FrEb : EmissionSet (IE B)
     FrEb = enter (Fr burstPart h₁ h₂) (Bp P)
