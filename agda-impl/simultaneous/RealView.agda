@@ -34,7 +34,7 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import denotation.Position using (ix; _⊕_)
-open import denotation.EmissionSet using (Ev; Ended; Superseded; _≼_; module Joining; module Values)
+open import denotation.EmissionSet using (Ev; Ended; Superseded; _≼_; Work; module Joining; module Values)
 open import denotation.Laws.Modulus using (≼-refl; ≼-trans; ≼-or-≻; ≺→≼; ≺-trans; ≺-ext; ≺-≼-≺; ≺-absurd)
 open import denotation.Laws.Count using (em)
 open import denotation.Laws.Shows using (∈-stable)
@@ -127,13 +127,13 @@ join-out switchᶠ           f o (Joining.run () _)
 join-out exhaustᶠ          f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
 join-out exhaustᶠ          f o (Joining.run () _)
 
--- and each lane's value row, run and not cut there, is one.
-join-in : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q a k b} → o q (out a) → View.Runs f o op q
-        → View.Lane f o op q a k (out b) → ¬ View.CutAt f o op q k → View.Join f o op k (out b)
-join-in (mergeᶠ nothing)  f o x r l nc = Joining.lane x r l (λ ()) _
-join-in (mergeᶠ (just n)) f o x r l nc = Joining.lane x r l (λ ()) _
-join-in switchᶠ           f o x r l nc = Joining.lane x r l nc _
-join-in exhaustᶠ          f o x r l nc = Joining.lane x r l (λ ()) _
+-- and each lane's working row, run and not cut there, is one.
+join-in : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q a k e} → o q (out a) → View.Runs f o op q
+        → View.Lane f o op q a k e → ¬ View.CutAt f o op q k → Work e → View.Join f o op k e
+join-in (mergeᶠ nothing)  f o x r l nc w = Joining.lane x r l (λ ()) w
+join-in (mergeᶠ (just n)) f o x r l nc w = Joining.lane x r l (λ ()) w
+join-in switchᶠ           f o x r l nc w = Joining.lane x r l nc w
+join-in exhaustᶠ          f o x r l nc w = Joining.lane x r l (λ ()) w
 
 -- A CUT BY A ROW IS A CUT BY EVERY LATER ROW.
 cutat-up : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k k′} → k ≺ k′ → View.CutAt f o op q k → View.CutAt f o op q k′
