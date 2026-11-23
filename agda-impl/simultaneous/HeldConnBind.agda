@@ -78,7 +78,7 @@ AnnAt m ρ s env p = enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ])
 -- lies under it, and the end lies past the gap's lane.
 own-apart : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) → ∀ {y e} → Ann b y e → AShown e → Nl.¬ Gap b y
 own-apart b {y} a sh (c , r , an , h , nl) with ann-row b an
-... | pre , we , _ , run , _ , _ , ann-none = src-ann-end b swe λ (_ , am′ , ae′) → go sh (gl am′) ae′
+... | pre , we , _ , run , _ , _ , ann-none = src-ann-end b swe λ (_ , am′ , ae′) → go a sh (gl am′) ae′
   where
     open Bound b using (m; src; env; good; at; ok)
     IA = inv-ev m (annotate src) env good (at ⊕ [ ix 1 ]) (ok-step at ok)
@@ -96,8 +96,8 @@ own-apart b {y} a sh (c , r , an , h , nl) with ann-row b an
     clash sk sk′ (inj₂ le) with same-lead IS sk′ sk le
     ... | refl with InvAt.func IS sk sk′
     ...   | ()
-    go : ∀ {e} → AShown e → G ≡ c ⊕ [ ix 1 ] → Ann b (G ⊕ [ last ]) end → ⊥
-    go a-value eg _ with ann-row b a
+    go : ∀ {e} → Ann b y e → AShown e → G ≡ c ⊕ [ ix 1 ] → Ann b (G ⊕ [ last ]) end → ⊥
+    go av a-value eg _ with ann-row b av
     ... | pre′ , w , _ , run′ , _ , rl , ann-just = clash (proj₁ (run-row⁺ pre′ run′)) swe lead
       where
         weG : we ⊑ (c ⊕ [ ix 1 ])
@@ -106,8 +106,8 @@ own-apart b {y} a sh (c , r , an , h , nl) with ann-row b an
         lead with ⊑-cmp w (c ⊕ [ ix 1 ]) rl h
         ... | inj₂ cw = inj₂ (⊑-trans weG cw)
         ... | inj₁ wc = ⊑-cmp w we wc weG
-    go a-end eg ae′ with ≼-split {y} {G ⊕ [ last ]} (λ lt → pinby-vis tt (InvAt.quiet IA ae′ a lt))
-    ... | inj₁ lt = pinby-vis tt (InvAt.quiet IA a ae′ lt)
+    go ae a-end eg ae′ with ≼-split {y} {G ⊕ [ last ]} (λ lt → pinby-vis tt (InvAt.quiet IA ae′ ae lt))
+    ... | inj₁ lt = pinby-vis tt (InvAt.quiet IA ae ae′ lt)
     ... | inj₂ eq = nl (subst ((c ⊕ [ ix 1 ]) ⊕ [ last ] ⊑_) (sym eq) (subst (λ z → (z ⊕ [ last ]) ⊑ (G ⊕ [ last ])) eg (⊑-refl _)))
 
 -- AN OLDER BINDER'S ROWS ARE HOT, AND NONE IN THE NEW BINDER'S WORLD:
