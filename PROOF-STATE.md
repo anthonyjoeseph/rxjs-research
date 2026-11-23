@@ -286,13 +286,14 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 
 #### A LANE'S RUN IN THE LANES'
 
-Untried: a wait the lanes' rows few precede, and past their cursor before
-their next, is so for a live lane. Hardest: a lane row the lanes never
-show — cut past the cursor, or unreachable in the join; the cutter's own
-first row precedes a cut one. Settled by bodies, or a lane row before the
-wait that no lanes' row past the cursor precedes.
+Untried: a live lane's out row the source never met is no earlier than a
+lanes' row past their cursor; its quiet rows before a wait the lanes' rows
+few precede are few. Hardest: a cut row (the cutter's own first row should
+precede it) and one the join reaches only past infinitely many rows.
+Settled by bodies, or an unmet live-lane row before every lanes' row past
+the cursor.
 
-Members: `lane-few`, `lane-least`.
+Members: `unmet-shown`, `lane-quiet`.
 
 #### THE BATCH RANK
 
