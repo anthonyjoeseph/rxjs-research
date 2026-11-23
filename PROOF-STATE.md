@@ -277,13 +277,34 @@ Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch. Riskiest: a live lane's count
-read through its inner's `idle` (`live-idle`), whose wait is the lanes'
-next row, not the lane's own. Then the defer limit's rest (no one
-approximant bounds it). Settled when each former's leaf is a body.
+on the scan's run split onto that branch. Riskiest: the defer limit's
+rest (no one approximant bounds it). Settled when each former's leaf is
+a body.
 
-Members: `live-idle`, `held-current`, `live-current`, `value-open`, `over-open`,
+Members: `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
+
+#### A LANE'S ROWS ARE ITS PROGRAM'S
+
+Unproven: through the lane's six layers (merge, two connects, count,
+frame, the share's bounded merge), its values are its program's or frame
+marks off the program's places, and a share's end runs the `laneDone` in
+its instant. Riskiest: the share ending in the program end's instant
+(`share-ends`) from the merge's few rows there, at the program's end or
+its outer's, deciding which by position. Settled by building the share's
+end row, with few rows before it, from the program's.
+
+Members: `share-ends`, `share-done`, `rows-vis`, `prog-runs`, `rows-lift`, `rows-shown`.
+
+#### A LANE'S RUN IN THE LANES'
+
+Untried: the rows a live lane shows that the scan's source met are a run
+of the lane, and a wait for the lanes' next row is one for its next.
+Hardest: a switch's lane cut past the cursor, whose later rows are no
+lanes' rows; the cutter's own first row precedes them. Settled by
+bodies, or a cut lane's row before every lanes' row past the cursor.
+
+Members: `own-run`, `lane-few`, `lane-least`.
 
 #### THE BATCH RANK
 

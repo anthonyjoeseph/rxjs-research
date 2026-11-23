@@ -13,7 +13,7 @@ module simultaneous.HeldLaneRoutes where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Properties using (++-assoc)
+open import Data.List.Properties using (++-assoc; map-++; foldl-++)
 open import Data.List.Membership.Propositional using (find)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
@@ -70,9 +70,9 @@ open import simultaneous.LaneLayers using (done-of)
 open import simultaneous.LaneInnerEnd using (inner-ends)
 open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Relations using (Met)
+open import simultaneous.Relations using (Met; outs; outs-++; values)
 open import simultaneous.LaneEpoch using (module Lanes)
-open import simultaneous.Routed using (Held; Early; Placed; nameOf)
+open import simultaneous.Routed using (Held; Early; Placed; nameOf; cnt)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.HeldComb using (ev; init; past)
 open import simultaneous.FlatLanes using (BProj; Tg; brTag; end-last) renaming (keep to bkeep; drop to bdrop)
@@ -202,12 +202,55 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   inner : A → Obs Timeline (IE B ∷ IE A ∷ ⊤ ∷ Δ) (IE B)
   inner a = flatMap (mergeᶠ nothing) (λ k → shareˢ (g a k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))
 
+  -- LANE `q`'S ROWS A PREFIX MET, as the lane shows them, in order.
+  lane-rows : ∀ {q xs c} → OC q xs c → List (Pos × Ev (IE B))
+  lane-rows oc[] = []
+  lane-rows (oc-in {v = v} oc (_ , y , _)) = lane-rows oc ++ [ (y , out v) ]
+  lane-rows (oc-out oc _) = lane-rows oc
+
+  -- They hold no end,
+  lane-rows-end : ∀ {q xs c} (oc : OC q xs c) {k} → (k , end) ∈ lane-rows oc → ⊥
+  lane-rows-end oc[] ()
+  lane-rows-end (oc-in oc _) i with ∈-++⁻ (lane-rows oc) i
+  ... | inj₁ i′ = lane-rows-end oc i′
+  ... | inj₂ (here ())
+  lane-rows-end (oc-out oc _) i = lane-rows-end oc i
+
+  -- and the lane's count is theirs.
+  cnt-lane : ∀ {q xs c} (oc : OC q xs c) → cnt (lane-rows oc) ≡ c
+  cnt-lane oc[] = refl
+  cnt-lane (oc-in {v = v} oc (_ , y , _)) =
+    trans (cong (L.foldl count r₀) (trans (cong (L.map proj₂) (outs-++ (lane-rows oc) [ (y , out v) ])) (map-++ proj₂ (outs (lane-rows oc)) [ (y , v) ])))
+          (trans (foldl-++ count r₀ (values (lane-rows oc)) [ v ]) (cong (λ r → count r v) (cnt-lane oc)))
+  cnt-lane (oc-out oc _) = cnt-lane oc
+
   postulate
-    -- A LIVE LANE IS IDLE WHERE THE LANES ARE: holding a route, it is of the
-    -- instant of any position before every lane row still to come.
-    live-idle : ∀ rx₁ {z e rx₂ rs} → Met M (rx₁ ++ (z , e) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ∀ {q c} → AC.Live [] rx₁ q → OC q rx₁ c
-              → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
-              → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf w
+    -- A LIVE LANE'S ROWS A PREFIX MET ARE A RUN OF THE LANE: the source
+    -- meets every lane row in order, each its lane's first past the last.
+    own-run : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → AC.Live [] rx₁ q
+             → (oc : OC q rx₁ c) → Met (RV.Lane op q a) (lane-rows oc)
+
+    -- A WAIT THE LANES' ROWS FEW PRECEDE IS ONE A LIVE LANE'S DO.
+    lane-few : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {q a} → RO q (out a) → AC.Live [] rx₁ q
+             → ∀ {w} → Few σ₃ w → Few (RV.Lane op q a) w
+
+    -- A WAIT PAST THE LANES' CURSOR AND BEFORE THEIR NEXT ROW IS PAST A
+    -- LIVE LANE'S CURSOR AND BEFORE ITS NEXT: its rows past its cursor are
+    -- the lanes' past theirs, or past a cutter's own rows.
+    lane-least : ∀ rx₁ {z e rx₂ rs} → Met M (rx₁ ++ (z , e) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ∀ {q a c} → RO q (out a)
+               → AC.Live [] rx₁ q → (oc : OC q rx₁ c)
+               → ∀ {w} → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+               → After (cursor nothing (lane-rows oc)) w × (∀ {y e} → RV.Lane op q a y e → Visible e → After (cursor nothing (lane-rows oc)) y → w ≼ y)
+
+  -- A LIVE LANE IS IDLE WHERE THE LANES ARE: holding a route, it is of the
+  -- instant of any position before every lane row still to come.
+  live-idle : ∀ rx₁ {z e rx₂ rs} → Met M (rx₁ ++ (z , e) ∷ rx₂) → BProj laneB (λ x → x) LS.J rx₁ rs → ∀ {q c} → AC.Live [] rx₁ q → OC q rx₁ c
+            → ∀ {w} → Few σ₃ w → After (cursor nothing rs) w → (∀ {y e} → σ₃ y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+            → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf w
+  live-idle rx₁ mt pr lv@((a , xo , _) , _) oc {w} fw af lw =
+    let (af′ , lw′) = lane-least rx₁ mt pr xo lv oc af lw
+    in subst (λ r → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf w) (cnt-lane oc)
+         (lane-idle-own xo (own-run rx₁ mt xo lv oc) (lane-rows-end oc) (lane-few rx₁ mt xo lv fw) af′ lw′)
 
 
   -- The run holds no end short of its last row.
