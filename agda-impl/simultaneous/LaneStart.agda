@@ -41,9 +41,9 @@ open import simultaneous.LaneEndSched using (of-one)
 open import simultaneous.ElabUndone using (tell-undone; tell-back)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; begin; burstEnd)
-open import simultaneous.LaneLayers using (Under; map-few; acc-row; bd-lane-past; conn-few; few-row; few-tr; join-few; join-past;
-  of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl;
-  under-trans; under-≺; under-⊕)
+open import simultaneous.LaneLayers using (Under; map-few; bd-lane-past; conn-few; few-row; few-tr; join-few; join-past; of-after;
+  one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans;
+  under-≺; under-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; tell; undone; marked; piece)
 
@@ -222,41 +222,6 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
     fr-few : ∀ {v} → Under V₀ v → Few Bd.JoinT v
     fr-few uv = join-few (o-few uv) ([ V₀ ] , l-few uv) ([] , λ ())
-
-    -- The frame's only value below its first mark is the mark,
-    fr-out-at : ∀ {v y b} → Under V₀ v → enter (Fr k h h′) P y (out b) → y ≺ v → y ≡ V₀
-    fr-out-at {v} uv r with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
-    ... | _ , _ , _ , _ , oq , sb , (l , sl) = go oq sb l sl
-      where
-        go : ∀ {q j i s y b} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out b) → s ≺ y → y ≺ v → y ≡ V₀
-        go (at-out , _) (nth , st) l _ _ with nth-zero nth
-        ... | refl with starts-0 st
-        ...   | refl = proj₁ (pc0-at k h h′ S₀ l)
-        go {s = s} {y} (on-out at-out , _) (_ , st) _ sl lt =
-          ⊥-elim (≺-absurd {v} {P ⊕ [ ix 1 ]} (under-≺ P (s≤s z≤n) (under-trans u-V₀ uv)) (≺-trans {P ⊕ [ ix 1 ]} {s} {v} (starts-after st) (≺-trans {s} {y} {v} sl lt)))
-        go {s = s} {y} (on-out (on-out at-out) , _) (_ , st) _ sl lt =
-          ⊥-elim (≺-absurd {v} {P ⊕ [ ix 2 ]} (under-≺ P (s≤s z≤n) (under-trans u-V₀ uv)) (≺-trans {P ⊕ [ ix 2 ]} {s} {v} (starts-after st) (≺-trans {s} {y} {v} sl lt)))
-        go (on-out (on-out (on-out ())) , _) _ _ _ _
-
-    -- the lane part's `laneStart`,
-    fr-val : k ≡ lanePart → ∀ {a} → enter (Fr k h h′) P V₀ (out a) → a ≡ marked laneStart
-    fr-val refl r with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
-    ... | _ , _ , _ , _ , oq , sb , (l , sl) = go oq sb l sl
-      where
-        go : ∀ {q j i s a} → O q (out j) → Bd.Sub i q s j → enter (f j) s V₀ (out a) → s ≺ V₀ → a ≡ marked laneStart
-        go (at-out , _) (nth , st) l _ with nth-zero nth
-        ... | refl with starts-0 st
-        ...   | refl = pc0-ls h h′ S₀ l
-        go {s = s} (on-out at-out , _) (_ , st) _ sl =
-          ⊥-elim (≺-absurd {V₀} {P ⊕ [ ix 1 ]} (under-≺ P (s≤s z≤n) u-V₀) (≺-trans {P ⊕ [ ix 1 ]} {s} {V₀} (starts-after st) sl))
-        go {s = s} (on-out (on-out at-out) , _) (_ , st) _ sl =
-          ⊥-elim (≺-absurd {V₀} {P ⊕ [ ix 2 ]} (under-≺ P (s≤s z≤n) u-V₀) (≺-trans {P ⊕ [ ix 2 ]} {s} {V₀} (starts-after st) sl))
-        go (on-out (on-out (on-out ())) , _) _ _ _
-
-    -- so the scan's fold there is its first step.
-    sc-val : k ≡ lanePart → ∀ {b} → Scan.Acc laneStep z₀ (enter (Fr k h h′) P) V₀ b → b ≡ laneStep z₀ (marked laneStart)
-    sc-val e (Scan.acc₀ x _)   = cong (laneStep z₀) (fr-val e x)
-    sc-val e (Scan.acc a _ lt _) = ⊥-elim (fr-min (proj₂ (acc-row a)) lt)
 
     -- What ends a lane in the frame is the lane part's second or third
     -- piece, past every position below the first value.

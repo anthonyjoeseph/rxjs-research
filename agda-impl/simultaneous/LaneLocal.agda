@@ -8,7 +8,6 @@
 module simultaneous.LaneLocal where
 
 open import Data.Bool using (Bool; true; false; T; not)
-open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -20,22 +19,18 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Function using (Equivalence)
 open import denotation.Read using (Visible)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; takeWhile; flatMap; connect; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_)
-open import denotation.Events using (Timeline; fresh; <ᵖ-apart; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; map-out; map-end; Ev; Den; hot; enter; Proper; DenEnv; out; end; _≺_; shown;
-  ended; late; at-end; InE; at-out; on-out; Superseded; module Op; module Joiner;
-  module Bounded; module Values; module Scan; module TakeWhile; module Exhaust;
-  module Connecting)
+open import denotation.Events using (Timeline; fresh; ofᴱ)
+open import denotation.EmissionSet using (EmissionSet; map-out; map-end; Ev; Den; hot; enter; Proper; DenEnv; out; end; shown; ended;
+  late; at-end; InE; at-out; on-out; Superseded; module Op; module Joiner; module Bounded;
+  module Values; module Scan; module TakeWhile; module Exhaust; module Connecting)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
-open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≼-or-≻)
-open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊕-identityʳ; ⊑-trans; _⊑_;
-  plain-ix)
+open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊑-trans; _⊑_; plain-ix)
 open import denotation.Laws.Worlds.Leaves using (of-end)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; stop; subscribed; completed; outerOpen; outerClose;
@@ -46,7 +41,6 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import simultaneous.DenRows using (merge-out; hot-out; of-mem; nth-row)
 open import simultaneous.CombSent using (of-at; module EachEnd)
-open import simultaneous.Layers using (pinby-vis)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone
   using (IE; AIE; Routes; elab; laneˢ; laneSrc; shareˢ; blockˢ; counted; framed; piece; laneStep; tell; undone; each; marked)
@@ -195,21 +189,6 @@ empty-fit ad p _ fp ep = fit (λ { (() , _) }) (λ { (at-end , _) → early-inst
 lone-early : ∀ {B} {x₀ : IE B} → (∀ {y} → Early y → Fine x₀ y) → ∀ {x y} → x ∈ (x₀ ∷ []) → Early y → Fine x y
 lone-early h (here refl) e = h e
 lone-early h (there ())
-
--- No row lies under another, and none visible past the end: below a
--- row before the end lies nothing past it.
-row-before-end : ∀ {A H p} {X : EmissionSet A} → InvAt H p X → ∀ {r c a} → X r (out a) → X c end → ∀ zs → (r ⊕ zs) ≺ c
-row-before-end I {r} {c} x y zs = Equivalence.from T-≡ (<ᵖ-apart r c zs (Equivalence.to T-≡ r≺c) apart)
-  where
-    r≺c : r ≺ c
-    r≺c with ≼-or-≻ r c
-    ... | inj₂ cr = ⊥-elim (pinby-vis tt (InvAt.quiet I y x cr))
-    ... | inj₁ rc with ≼-split {r} {c} rc
-    ...   | inj₁ lt = lt
-    ...   | inj₂ refl with () ← InvAt.func I x y
-    apart : ∀ ys → c ≡ r ⊕ ys → ⊥
-    apart []       eq   = ≺-irrefl {r} (subst (r ≺_) (trans eq (⊕-identityʳ r)) r≺c)
-    apart (l ∷ ys) refl = InvAt.flat I x y
 
 ------------------------------------------------------------------------
 -- A flatMap, under every policy

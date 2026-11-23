@@ -170,15 +170,6 @@ lane-before : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : Den
 lane-before nothing  keep o ρ s = take-before keep (ev nothing o ρ) s
 lane-before (just n) keep o ρ s = take-before keep (ev (just n) o ρ) s
 
--- The scan's state past two runs, the first unended, is past the second
--- from where the first left it.
-past-++ : ∀ {B} op (o : Out B) xs ys → (∀ {c} → (c , end) ∈ xs → ⊥) → past op o (xs ++ ys) ≡ past op (past op o xs) ys
-past-++ op o []                 ys _  = refl
-past-++ op o ((_ , out x) ∷ xs) ys ne = past-++ op (react op o x) xs ys (λ i → ne (there i))
-past-++ op o ((_ , end) ∷ xs)   ys ne = ⊥-elim (ne (here refl))
-past-++ op o ((_ , skip) ∷ xs)  ys ne = past-++ op o xs ys (λ i → ne (there i))
-past-++ op o ((_ , pin _) ∷ xs) ys ne = past-++ op o xs ys (λ i → ne (there i))
-
 module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                   (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                   (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
