@@ -37,7 +37,7 @@ open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv
 open import denotation.Laws.Worlds.Leaves using (of-end)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; stop; subscribed; completed; outerOpen; outerClose;
-  laneStart; carry; laneDone; burstEnd; outerDone; valuesOf)
+  laneStart; laneDone; burstEnd; outerDone; valuesOf)
 open import simultaneous.Routed using (Held; Early; Valued; opos; nameOf; nm; Shown; s-value; s-done; s-end; Placed; Adm; adm-∪; adm-at; ok-ix)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.HeldComb using (ev)
@@ -67,8 +67,7 @@ Fine (instEmit (value _) _)          y = Early y
 Fine (instEmit (mark begin) n)       y = n ≡ nameOf y
 Fine (instEmit (mark over) _)        y = Valued (rootOf y) × opos (rootOf y) ⊑ y
 Fine (instEmit (mark laneStart) _)   y = Early y
-Fine (instEmit (mark carry) _)       y = Early y
-Fine (instEmit (mark laneDone) _)    y = Early y
+Fine (instEmit (mark (laneDone _)) _)    y = Early y
 Fine (instEmit (mark burstEnd) _)    y = Early y
 Fine (instEmit (mark stop) _)        y = ⊤
 Fine (instEmit (mark subscribed) _)  y = ⊤
@@ -83,8 +82,7 @@ fine-ext (instEmit (value _) _)         zs f = early-inst zs f
 fine-ext (instEmit (mark begin) _) {y} zs f = trans f (cong nm (sym (rootOf-ext y zs)))
 fine-ext (instEmit (mark over) _) {y} zs f = late-ext {y} zs f
 fine-ext (instEmit (mark laneStart) _)  zs f = early-inst zs f
-fine-ext (instEmit (mark carry) _)      zs f = early-inst zs f
-fine-ext (instEmit (mark laneDone) _)   zs f = early-inst zs f
+fine-ext (instEmit (mark (laneDone _)) _)   zs f = early-inst zs f
 fine-ext (instEmit (mark burstEnd) _)   zs f = early-inst zs f
 fine-ext (instEmit (mark stop) _)       zs f = tt
 fine-ext (instEmit (mark subscribed) _) zs f = tt
@@ -363,8 +361,8 @@ data Done {B : Set} : IE B → Set where
 -- What a lane tells of a row: the row, or at its `laneDone` the carries.
 told-is : ∀ {B} st (x : IE B) b {e} → e ∈ (if b then proj₁ (proj₂ (laneStep st x)) else proj₂ (proj₂ (laneStep st x)))
         → e ≡ x ⊎ (Done x × e ≡ marked carry)
-told-is st (instEmit (mark laneDone) _) true  m = inj₂ (done , rep-mem (proj₂ (proj₁ st)) m)
-told-is st (instEmit (mark laneDone) _) false (here refl) = inj₁ refl
+told-is st (instEmit (mark (laneDone _)) _) true  m = inj₂ (done , rep-mem (proj₂ (proj₁ st)) m)
+told-is st (instEmit (mark (laneDone _)) _) false (here refl) = inj₁ refl
 told-is st (instEmit (mark laneDone) _) false (there ())
 told-is st (instEmit (value _) _)         true  ()
 told-is st (instEmit (value _) _)         false (here refl) = inj₁ refl
@@ -393,8 +391,6 @@ told-is st (instEmit (mark outerClose) _) false (there ())
 told-is st (instEmit (mark laneStart) _)  true  ()
 told-is st (instEmit (mark laneStart) _)  false (here refl) = inj₁ refl
 told-is st (instEmit (mark laneStart) _)  false (there ())
-told-is st (instEmit (mark carry) _)      true  ()
-told-is st (instEmit (mark carry) _)      false (here refl) = inj₁ refl
 told-is st (instEmit (mark carry) _)      false (there ())
 told-is st (instEmit (mark burstEnd) _)   true  ()
 told-is st (instEmit (mark burstEnd) _)   false (here refl) = inj₁ refl

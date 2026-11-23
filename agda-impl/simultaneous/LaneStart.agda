@@ -39,7 +39,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.DenRows using (conn-out; merge-out; scan-out; bounded-out; hot-out; each-one; of-mem)
 open import simultaneous.LaneEndSched using (ls-one; ls-true; of-one)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; burstEnd; outerDone; subscribed; completed)
 open import simultaneous.LaneLayers using (Under; acc-row; bd-lane-past; conn-few; done-of; few-row; few-tr; join-few; join-past; of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans; under-≺; under-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
@@ -342,8 +342,7 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   ls-no st (instEmit (mark outerOpen) _)  ()
   ls-no st (instEmit (mark outerClose) _) ()
   ls-no st (instEmit (mark laneStart) _)  ()
-  ls-no st (instEmit (mark carry) _)      ()
-  ls-no st (instEmit (mark laneDone) _) i = rep-no (proj₂ (proj₁ st)) i
+  ls-no st (instEmit (mark (laneDone _)) _) i = rep-no (proj₂ (proj₁ st)) i
   ls-no st (instEmit (mark burstEnd) _)   ()
   ls-no st (instEmit (mark outerDone) _)  ()
   ls-no st (instEmit (mark subscribed) _) ()
@@ -422,8 +421,7 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
   bg-no st (instEmit (mark outerOpen) _)  ()
   bg-no st (instEmit (mark outerClose) _) ()
   bg-no st (instEmit (mark laneStart) _)  ()
-  bg-no st (instEmit (mark carry) _)      ()
-  bg-no st (instEmit (mark laneDone) _) i = bg-rep (proj₂ (proj₁ st)) i
+  bg-no st (instEmit (mark (laneDone _)) _) i = bg-rep (proj₂ (proj₁ st)) i
   bg-no st (instEmit (mark burstEnd) _)   ()
   bg-no st (instEmit (mark outerDone) _)  ()
   bg-no st (instEmit (mark subscribed) _) ()

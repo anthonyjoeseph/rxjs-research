@@ -38,7 +38,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
 open import denotation.Laws.Count using (em)
 open import simultaneous.SObs using (Flat; laneB; outerB; closeB; lone; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.HeldComb using (past; init)
 open import simultaneous.ScanCount using (rowKind; markAct; pstep; past-snoc)
@@ -148,8 +148,7 @@ cut-mark _          over       ()
 cut-mark _          stop       ()
 cut-mark _          outerClose ()
 cut-mark _          laneStart  ()
-cut-mark _          carry      ()
-cut-mark _          laneDone   ()
+cut-mark _          (laneDone _) ()
 cut-mark _          burstEnd   ()
 cut-mark _          outerDone  ()
 cut-mark _          subscribed ()
@@ -166,25 +165,25 @@ cut-lanes op o (k , end)   ()
 cut-lanes op o (k , skip)  ()
 cut-lanes op o (k , pin _) ()
 
--- A LANE'S `laneDone` DROPS THE ROUTES CARRIED: the counter falls by
--- what the scan accumulated, so by any share within it.
-done-within : ∀ {B} op (o : Out B) n₁ {n S e} → Within laneB (proj₁ o) (n , S) → e ≤ Flat.acc (proj₁ o)
-            → Within laneB (proj₁ (react op o (just (inj₁ (laneB , instEmit (mark laneDone) n₁))))) (n , S ∸ e)
-done-within op (s , os) n₁ {n} {S} {e} (within sp le nm) ea = within sp′ le′ nm′
+-- A LANE'S `laneDone` DROPS THE ROUTES IT TELLS: the counter falls by
+-- them, so by any share within them.
+done-within : ∀ {B} op (o : Out B) n₁ {n S e kd} → Within laneB (proj₁ o) (n , S) → e ≤ kd
+            → Within laneB (proj₁ (react op o (just (inj₁ (laneB , instEmit (mark (laneDone kd)) n₁))))) (n , S ∸ e)
+done-within op (s , os) n₁ {n} {S} {e} {kd} (within sp le nm) ea = within sp′ le′ nm′
   where
     s₁ : Flat Pos
-    s₁ = record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }
+    s₁ = record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }
 
-    sm = ended-same {_} (Flat.acc s ⊓ Flat.lanes s) n₁ s₁
+    sm = ended-same {_} (kd ⊓ Flat.lanes s) n₁ s₁
 
-    low : Flat.lanes (proj₁ (ended {_} (Flat.acc s ⊓ Flat.lanes s) n₁ s₁)) ≤ Flat.lanes s ∸ Flat.acc s
+    low : Flat.lanes (proj₁ (ended {_} (kd ⊓ Flat.lanes s) n₁ s₁)) ≤ Flat.lanes s ∸ kd
     low = Same.lowL sm
 
-    zero-at : Flat.lanes s ≡ 0 → Flat.lanes (proj₁ (ended {_} (Flat.acc s ⊓ Flat.lanes s) n₁ s₁)) ≡ 0
-    zero-at z = n≤0⇒n≡0 (≤-trans low (≤-reflexive (trans (cong (_∸ Flat.acc s) z) (0∸n≡0 (Flat.acc s)))))
+    zero-at : Flat.lanes s ≡ 0 → Flat.lanes (proj₁ (ended {_} (kd ⊓ Flat.lanes s) n₁ s₁)) ≡ 0
+    zero-at z = n≤0⇒n≡0 (≤-trans low (≤-reflexive (trans (cong (_∸ kd) z) (0∸n≡0 kd))))
 
     sp′ = λ t → zero-at (sp (trans (sym (Same.sp≡ sm)) t))
-    le′ = ≤-trans low (≤-trans (∸-monoˡ-≤ (Flat.acc s) le) (∸-monoʳ-≤ S ea))
+    le′ = ≤-trans low (≤-trans (∸-monoˡ-≤ kd le) (∸-monoʳ-≤ S ea))
     nm′ = [ (λ z → inj₁ (zero-at z)) , (λ a → inj₂ (trans (Same.at≡ sm) a)) ]′ nm
 
 ------------------------------------------------------------------------
@@ -255,10 +254,10 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
              (lane-of : ∀ xs x ys → rx ≡ xs ++ x ∷ ys → ∀ {k v} → x ≡ (k , out (Tg laneB v)) → ¬ ¬ Σ Pos λ q → LE q x v)
              (le-row : ∀ {q x v} → LE q x v → Σ Pos λ k → x ≡ (k , out (Tg laneB v)))
              (le-one : ∀ {q q′ x v v′} → LE q x v → LE q′ x v′ → q ≡ q′)
-             (dn-le : ∀ {q x} → Dn q x → Σ _ λ n → LE q x (instEmit (mark laneDone) n))
+             (dn-le : ∀ {q x} → Dn q x → Σ _ λ kd → Σ _ λ n → LE q x (instEmit (mark (laneDone kd)) n))
              (emit-live : ∀ xs x ys → rx ≡ xs ++ x ∷ ys → ∀ {q n} → LE q x (instEmit (mark begin) n) → AC.Live [] xs q)
-             (done-carried : ∀ xs x ys → rx ≡ xs ++ x ∷ ys → ∀ {q n c} → LE q x (instEmit (mark laneDone) n) → OC q xs c
-                           → proj₂ c ≤ Flat.acc (Sc xs)) where
+             (done-told : ∀ xs x ys → rx ≡ xs ++ x ∷ ys → ∀ {q kd n c} → LE q x (instEmit (mark (laneDone kd)) n) → OC q xs c
+                        → proj₂ c ≤ kd) where
 
     module _ (xs : List Row) (x : Row) (ys : List Row) (eq : rx ≡ xs ++ x ∷ ys) where
       x-in : x ∈ rx
@@ -277,7 +276,7 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
         where
           ent′ : ∀ {q} → q ∈ K → Σ Routes λ c → OC q (xs ++ [ x ]) c × R n (xs ++ [ x ]) q c (e q)
           ent′ i with ent i
-          ... | c , oc , le , nmd , lv = c , oc-out oc nl , le , nmd , [ inj₁ , (λ l → inj₂ (live-keep l nk (λ d → nl (proj₂ (dn-le d))))) ]′ lv
+          ... | c , oc , le , nmd , lv = c , oc-out oc nl , le , nmd , [ inj₁ , (λ l → inj₂ (live-keep l nk (λ d → nl (proj₂ (proj₂ (dn-le d)))))) ]′ lv
 
       -- A cut empties every share.
       reset-all : Ep xs → (∀ {q c} → OC q xs c → Σ Routes λ c′ → OC q (xs ++ [ x ]) c′) → Flat.lanes (Sc (xs ++ [ x ])) ≡ 0
@@ -348,12 +347,12 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
       keep : (rowKind markAct op x ≡ kCut → ⊥) → ∀ {n′} (e′ : Pos → ℕ) → n′ ≡ n → (∀ {q} → ¬ q ≡ q₀ → e′ q ≡ e q)
            → ∀ {q c} → ¬ q ≡ q₀ → R n xs q c (e q) → R n′ (xs ++ [ x ]) q c (e′ q)
       keep nk e′ refl same {q} {c} ne′ (le , nmd , lv) = subst (R n (xs ++ [ x ]) q c) (sym (same ne′))
-        (le , nmd , [ inj₁ , (λ l → inj₂ (live-keep l nk (λ d → other ne′ (proj₂ (dn-le d))))) ]′ lv)
+        (le , nmd , [ inj₁ , (λ l → inj₂ (live-keep l nk (λ d → other ne′ (proj₂ (proj₂ (dn-le d)))))) ]′ lv)
 
       -- The sending lane's own share, past a row that neither cuts nor ends it.
-      live₀ : (rowKind markAct op x ≡ kCut → ⊥) → (∀ {n₁} → v ≡ instEmit (mark laneDone) n₁ → ⊥)
+      live₀ : (rowKind markAct op x ≡ kCut → ⊥) → (∀ {kd n₁} → v ≡ instEmit (mark (laneDone kd)) n₁ → ⊥)
             → AC.Live [] xs q₀ → AC.Live [] (xs ++ [ x ]) q₀
-      live₀ nk nd l = live-keep l nk (λ d → nd (sym (emit≡ (proj₂ (dn-le d)))))
+      live₀ nk nd l = live-keep l nk (λ d → nd (sym (emit≡ (proj₂ (proj₂ (dn-le d))))))
 
     ------------------------------------------------------------------------
     -- Each kind of lane row
@@ -370,7 +369,7 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
           nk : rowKind markAct op x ≡ kCut → ⊥
           nk ()
 
-          nd : ∀ {n₂} → instEmit (mark begin) n₁ ≡ instEmit (mark laneDone) n₂ → ⊥
+          nd : ∀ {kd n₂} → instEmit (mark begin) n₁ ≡ instEmit (mark (laneDone kd)) n₂ → ⊥
           nd ()
 
           lv : AC.Live [] (xs ++ [ x ]) q₀
@@ -434,7 +433,7 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
           nk : rowKind markAct op x ≡ kCut → ⊥
           nk ()
 
-          nd : ∀ {n₂} → instEmit (mark stop) n₁ ≡ instEmit (mark laneDone) n₂ → ⊥
+          nd : ∀ {kd n₂} → instEmit (mark stop) n₁ ≡ instEmit (mark (laneDone kd)) n₂ → ⊥
           nd ()
 
           e′ : Pos → ℕ
@@ -461,14 +460,14 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
           e′ : Pos → ℕ
           e′ = set q₀ 0 e
 
-      done-row : ∀ n₁ (eq : rx ≡ xs ++ (k , out (Tg laneB (instEmit (mark laneDone) n₁))) ∷ ys)
-               → LE q₀ (k , out (Tg laneB (instEmit (mark laneDone) n₁))) (instEmit (mark laneDone) n₁)
-               → Ep (xs ++ [ (k , out (Tg laneB (instEmit (mark laneDone) n₁))) ])
-      done-row n₁ eq le₀ = build n e′ W′
-                             (λ {c} _ _ → subst (R n (xs ++ [ x ]) q₀ (count {B} c (instEmit (mark laneDone) n₁))) (sym (set-self q₀ 0 e)) zero-R)
+      done-row : ∀ kd n₁ (eq : rx ≡ xs ++ (k , out (Tg laneB (instEmit (mark (laneDone kd)) n₁))) ∷ ys)
+               → LE q₀ (k , out (Tg laneB (instEmit (mark (laneDone kd)) n₁))) (instEmit (mark (laneDone kd)) n₁)
+               → Ep (xs ++ [ (k , out (Tg laneB (instEmit (mark (laneDone kd)) n₁))) ])
+      done-row kd n₁ eq le₀ = build n e′ W′
+                             (λ {c} _ _ → subst (R n (xs ++ [ x ]) q₀ (count {B} c (instEmit (mark (laneDone kd)) n₁))) (sym (set-self q₀ 0 e)) zero-R)
                              (keep nk e′ refl (λ ne′ → set-other 0 e ne′))
         where
-          open LaneRow xs k (instEmit (mark laneDone) n₁) ys eq q₀ le₀ E i₀
+          open LaneRow xs k (instEmit (mark (laneDone kd)) n₁) ys eq q₀ le₀ E i₀
 
           nk : rowKind markAct op x ≡ kCut → ⊥
           nk ()
@@ -476,9 +475,9 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
           e′ : Pos → ℕ
           e′ = set q₀ 0 e
 
-          ea : e₀ ≤ Flat.acc (Sc xs)
+          ea : e₀ ≤ kd
           ea with ent i₀
-          ... | c₀ , oc₀ , le , _ = ≤-trans le (done-carried xs x ys eq le₀ oc₀)
+          ... | c₀ , oc₀ , le , _ = ≤-trans le (done-told xs x ys eq le₀ oc₀)
 
           W′ : Within laneB (Sc (xs ++ [ x ])) (n , sumK K e′)
           W′ = subst (λ z → Within laneB (Sc (xs ++ [ x ])) (n , z)) (sym (done-eq (sumK K e′) e₀ S (sum-set K 0 e u i₀)))
@@ -486,7 +485,7 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
 
       -- A row its lane's count and the scan's counter both pass over.
       idle-row : ∀ v (eq : rx ≡ xs ++ (k , out (Tg laneB v)) ∷ ys) → LE q₀ (k , out (Tg laneB v)) v
-               → (∀ c → count c v ≡ c) → (∀ {n₁} → v ≡ instEmit (mark laneDone) n₁ → ⊥)
+               → (∀ c → count c v ≡ c) → (∀ {kd n₁} → v ≡ instEmit (mark (laneDone kd)) n₁ → ⊥)
                → (rowKind markAct op (k , out (Tg laneB v)) ≡ kCut → ⊥)
                → Ep (xs ++ [ (k , out (Tg laneB v)) ])
       idle-row v eq le₀ cid nd nk = build n e (subst (Within laneB (Sc (xs ++ [ x ]))) (cid (n , S)) W₀) f (keep nk e refl (λ _ → refl))
@@ -520,7 +519,7 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
       lane-row (instEmit (mark begin) n₁)     eq le₀ = begin-row n₁ eq le₀
       lane-row (instEmit (mark stop) n₁)      eq le₀ = stop-row n₁ eq le₀
       lane-row (instEmit (mark over) n₁)      eq le₀ = over-row n₁ eq le₀
-      lane-row (instEmit (mark laneDone) n₁)  eq le₀ = done-row n₁ eq le₀
+      lane-row (instEmit (mark (laneDone kd)) n₁) eq le₀ = done-row kd n₁ eq le₀
       lane-row (instEmit (mark outerOpen) n₁) eq le₀ with markAct op outerOpen in kx
       ... | kCut   = cut-row _ eq le₀ kx
       ... | kStart = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ c → kS (trans (sym kx) c))
@@ -534,7 +533,6 @@ module Lanes {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
               kO ()
       lane-row (instEmit (mark outerClose) n₁) eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())
       lane-row (instEmit (mark laneStart) n₁)  eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())
-      lane-row (instEmit (mark carry) n₁)      eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())
       lane-row (instEmit (mark burstEnd) n₁)   eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())
       lane-row (instEmit (mark outerDone) n₁)  eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())
       lane-row (instEmit (mark subscribed) n₁) eq le₀ = idle-row _ eq le₀ (λ _ → refl) (λ ()) (λ ())

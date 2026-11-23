@@ -137,8 +137,7 @@ tally-step (batching l a h k , rel) _ (instEmit (mark completed) n) (refl , refl
 tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerOpen) n) (refl , refl , z) f  = (refl , refl , z) , refl
 tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerClose) n) (refl , refl , z) f = (refl , refl , z) , refl
 tally-step (batching l a h k , rel) _ (instEmit (mark Marks.laneStart) n) (refl , refl , z) f  = (refl , refl , z) , refl
-tally-step (batching l a h k , rel) _ (instEmit (mark Marks.carry) n) (refl , refl , z) f      = (refl , refl , z) , refl
-tally-step (batching l a h k , rel) _ (instEmit (mark Marks.laneDone) n) (refl , refl , z) f   = (refl , refl , z) , refl
+tally-step (batching l a h k , rel) _ (instEmit (mark (Marks.laneDone _)) n) (refl , refl , z) f   = (refl , refl , z) , refl
 tally-step (batching l a h k , rel) _ (instEmit (mark Marks.burstEnd) n) (refl , refl , z) f   = (refl , refl , z) , refl
 tally-step (batching l a h k , rel) _ (instEmit (mark Marks.outerDone) n) (refl , refl , z) f  = (refl , refl , z) , refl
 
@@ -162,8 +161,7 @@ count-name r       (instEmit (mark completed) _ ∷ xs)        = count-name r xs
 count-name r       (instEmit (mark Marks.outerOpen) _ ∷ xs)  = count-name r xs
 count-name r       (instEmit (mark Marks.outerClose) _ ∷ xs) = count-name r xs
 count-name r       (instEmit (mark Marks.laneStart) _ ∷ xs)  = count-name r xs
-count-name r       (instEmit (mark Marks.carry) _ ∷ xs)      = count-name r xs
-count-name r       (instEmit (mark Marks.laneDone) _ ∷ xs)   = count-name r xs
+count-name r       (instEmit (mark (Marks.laneDone _)) _ ∷ xs)   = count-name r xs
 count-name r       (instEmit (mark Marks.burstEnd) _ ∷ xs)   = count-name r xs
 count-name r       (instEmit (mark Marks.outerDone) _ ∷ xs)  = count-name r xs
 
@@ -181,8 +179,7 @@ module Count {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
   fit pre (instEmit (mark Marks.outerOpen) _) rest e  = inj₁ tt
   fit pre (instEmit (mark Marks.outerClose) _) rest e = inj₁ tt
   fit pre (instEmit (mark Marks.laneStart) _) rest e  = inj₁ tt
-  fit pre (instEmit (mark Marks.carry) _) rest e      = inj₁ tt
-  fit pre (instEmit (mark Marks.laneDone) _) rest e   = inj₁ tt
+  fit pre (instEmit (mark (Marks.laneDone _)) _) rest e   = inj₁ tt
   fit pre (instEmit (mark Marks.burstEnd) _) rest e   = inj₁ tt
   fit pre (instEmit (mark Marks.outerDone) _) rest e  = inj₁ tt
 
@@ -314,10 +311,9 @@ module Walk {A : Set} (o : SObs [] A) {rx} (mx : Met (elaborated o) rx) where
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.outerOpen) _) ∷ ys) eq es ea el e0 (_ , st)  = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.outerClose) _) ∷ ys) eq es ea el e0 (_ , st) = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.laneStart) _) ∷ ys) eq es ea el e0 (_ , st)  = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
-    go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.laneDone) _) ∷ ys) eq es ea el e0 (_ , st)   = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
+    go s@(batching l a h r , rel) xs (w@(instEmit (mark (Marks.laneDone _)) _) ∷ ys) eq es ea el e0 (_ , st)   = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.burstEnd) _) ∷ ys) eq es ea el e0 (_ , st)   = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
     go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.outerDone) _) ∷ ys) eq es ea el e0 (_ , st)  = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
-    go s@(batching l a h r , rel) xs (w@(instEmit (mark Marks.carry) _) ∷ ys) eq es ea el e0 (_ , st)      = continue s xs w ys eq es st (tt , inj₁ refl) ea el e0
 
     continue : ∀ (s : Step A) xs w ys → ws ≡ xs ++ w ∷ ys → after bstart xs ≡ s → Stamps (nameStep (lastBegin root xs) w) ys
              → (Named (proj₁ s) w × (proj₂ (bstep s w) ≡ [] ⊎ Fresh (Batching.at (proj₁ s)) (stamped ys)))

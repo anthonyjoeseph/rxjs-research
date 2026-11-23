@@ -45,7 +45,7 @@ open import Data.Empty using (⊥-elim)
 open import Data.List.Relation.Unary.Any using () renaming (map to any-map)
 open import denotation.Laws.Worlds using (⊑-trans; ⊑-inside; inside-⊑)
 open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
-open import simultaneous.InstEmit using (carry; outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.InstEmit using (outerOpen; outerClose; laneStart; laneDone; burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (isZero; outerB; laneB; closeB)
 open import Relation.Nullary using (does)
 open import simultaneous.Readings using (rootOf)
@@ -65,7 +65,7 @@ ev (just n) o ρ = approx n o ρ
 
 -- The scan's first state: nothing counted, no output.
 init : ∀ {B} → Out B
-init = flat root 0 0 false false false 0 0 0 0 0 [] , []
+init = flat root 0 0 false false false 0 0 0 0 [] , []
 
 -- A step's outputs, laid under the row that caused them.
 lay : ∀ {B} → Pos → ℕ → List (IE B) → List (Pos × Ev (IE B))
@@ -374,8 +374,8 @@ private
   parked≤ : ∀ s → Flat.parked s ≤ tot s
   parked≤ s = m≤n+m (Flat.parked s) _
 
-  ended≤ : ∀ s → Flat.acc s ⊓ Flat.lanes s + Flat.held s ≤ tot s
-  ended≤ s = ≤-trans (+-monoˡ-≤ (Flat.held s) (≤-trans (m⊓n≤n (Flat.acc s) (Flat.lanes s)) (m≤n+m (Flat.lanes s) (Flat.outer s))))
+  ended≤ : ∀ s kd → kd ⊓ Flat.lanes s + Flat.held s ≤ tot s
+  ended≤ s kd = ≤-trans (+-monoˡ-≤ (Flat.held s) (≤-trans (m⊓n≤n kd (Flat.lanes s)) (m≤n+m (Flat.lanes s) (Flat.outer s))))
                      (m≤m+n _ (Flat.parked s))
 
   share≤ : ∀ b s → share b s ≤ tot s
@@ -448,11 +448,10 @@ private
     mark-l op b begin      n s iv oo dn = begun-l b n s
     mark-l op b stop       n s iv oo dn = stopped-l b n s _ (stop≤ b s iv)
     mark-l op b over       n s iv oo dn = overed-l n s (λ sp → oo sp refl)
-    mark-l op b carry      n s iv oo dn = _
     mark-l op b outerOpen  n s iv oo dn = arrive-l op n s (≤-trans (lanes≤ s) (inv-tot iv))
     mark-l op b outerClose n s iv oo dn = _
     mark-l op b laneStart  n s iv oo dn = _
-    mark-l op b laneDone   n s iv oo dn = ended-l (Flat.acc s ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true }) (≤-trans (ended≤ s) (inv-tot iv))
+    mark-l op b (laneDone kd) n s iv oo dn = ended-l (kd ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) (≤-trans (ended≤ s kd) (inv-tot iv))
     mark-l op b burstEnd   n s iv oo dn = burst-l (isZero (Flat.held s) ∨ Flat.dead s) n s (≤-trans (held≤ s) (inv-tot iv))
     mark-l op b outerDone  n s iv oo dn = left-l n (record s { finished = true }) (≤-trans (outer≤ s) (inv-tot iv))
     mark-l op b subscribed n s iv oo dn = quiet (λ ()) (λ ()) (λ ())

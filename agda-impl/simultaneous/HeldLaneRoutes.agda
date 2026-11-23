@@ -50,7 +50,7 @@ open import simultaneous.HeldLim using (run-below)
 import simultaneous.LaneStart as LaneStart
 open import simultaneous.ColdIdle using (aft-or-in)
 open import simultaneous.CombSent using (src-op; closing-mark)
-open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; carry; outerOpen; valuesOf)
+open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; outerOpen; valuesOf)
 open import simultaneous.Project using (run-prefix)
 open import denotation.EmissionSet using (Ev; Superseded)
 open import Data.Maybe using (just)

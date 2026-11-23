@@ -25,7 +25,7 @@ open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Few; _≺_)
 open import denotation.Read using (Visible; After; cursor)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
@@ -66,8 +66,7 @@ count-same r {instEmit (mark over) _}       (same-mark _) = refl
 count-same r {instEmit (mark outerOpen) _}  (same-mark _) = refl
 count-same r {instEmit (mark outerClose) _} (same-mark _) = refl
 count-same r {instEmit (mark laneStart) _}  (same-mark _) = refl
-count-same r {instEmit (mark carry) _}      (same-mark _) = refl
-count-same r {instEmit (mark laneDone) _}   (same-mark _) = refl
+count-same r {instEmit (mark (laneDone _)) _}   (same-mark _) = refl
 count-same r {instEmit (mark burstEnd) _}   (same-mark _) = refl
 count-same r {instEmit (mark outerDone) _}  (same-mark _) = refl
 count-same r {instEmit (mark subscribed) _} (same-mark _) = refl

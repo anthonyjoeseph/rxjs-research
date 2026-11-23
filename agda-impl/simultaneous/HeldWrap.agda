@@ -34,7 +34,7 @@ open import denotation.Laws using (inv-⟦⟧; good-cons)
 open import denotation.Laws.Shows using (k-shows)
 open import denotation.Laws.ShowsEv using (sk-⟦⟧)
 open import denotation.Laws.Worlds using (Hots; InvAt; InvD; Ok; Lawful; Shows; _∪ʰ_; ok-step; world-after; full; ⊕-assoc)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values; values-++)
@@ -70,8 +70,7 @@ held-until {X} d p cs iv h = Holds.holds true unfinished d cs p iv h fails fcov 
     fails {instEmit (mark outerOpen) _}  ()
     fails {instEmit (mark outerClose) _} ()
     fails {instEmit (mark laneStart) _}  ()
-    fails {instEmit (mark carry) _}      ()
-    fails {instEmit (mark laneDone) _}   ()
+    fails {instEmit (mark (laneDone _)) _}   ()
     fails {instEmit (mark burstEnd) _}   ()
     fails {instEmit (mark outerDone) _}  ()
     fails {instEmit (mark subscribed) _} ()

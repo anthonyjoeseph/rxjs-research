@@ -44,7 +44,7 @@ open import simultaneous.TreeBounded using (listHot; admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; scan-out; bounded-out; of-mem; each-one)
 open import simultaneous.ElabUndone using (Undone; Sends; sd-[]; sd-rep)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart;
   laneDone; burstEnd; outerDone; subscribed; completed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; blockˢ; laneSrc; elab; counted; framed; piece; laneStep; undone; marked)
@@ -127,8 +127,7 @@ ls-one s (instEmit (mark stop) _)       = refl
 ls-one s (instEmit (mark outerOpen) _)  = refl
 ls-one s (instEmit (mark outerClose) _) = refl
 ls-one s (instEmit (mark laneStart) _)  = refl
-ls-one s (instEmit (mark carry) _)      = refl
-ls-one s (instEmit (mark laneDone) _)   = refl
+ls-one s (instEmit (mark (laneDone _)) _)   = refl
 ls-one s (instEmit (mark burstEnd) _)   = refl
 ls-one s (instEmit (mark outerDone) _)  = refl
 ls-one s (instEmit (mark subscribed) _) = refl
@@ -143,8 +142,7 @@ ls-true s (instEmit (mark stop) _)       = sd-[]
 ls-true s (instEmit (mark outerOpen) _)  = sd-[]
 ls-true s (instEmit (mark outerClose) _) = sd-[]
 ls-true s (instEmit (mark laneStart) _)  = sd-[]
-ls-true s (instEmit (mark carry) _)      = sd-[]
-ls-true s (instEmit (mark laneDone) _)   = sd-rep (proj₂ (proj₁ s)) carry root tt
+ls-true s (instEmit (mark (laneDone _)) _)   = sd-rep (proj₂ (proj₁ s)) carry root tt
 ls-true s (instEmit (mark burstEnd) _)   = sd-[]
 ls-true s (instEmit (mark outerDone) _)  = sd-[]
 ls-true s (instEmit (mark subscribed) _) = sd-[]

@@ -157,7 +157,7 @@ HeldD H F d cs = ∀ p → Ok H p → F p → Early p → Held (enter d p) (p �
 -- and the `laneDone` a lane's end follows.
 data Shown {A : Set} : Ev (IE A) → Set where
   s-value : ∀ {a n} → Shown (out (instEmit (value a) n))
-  s-done  : ∀ {n} → Shown (out (instEmit (mark laneDone) n))
+  s-done  : ∀ {k n} → Shown (out (instEmit (mark (laneDone k)) n))
   s-end   : Shown end
 
 -- EVERY ROW A LANE CAN HANG ON IS ADMISSIBLE.  Marks may fall anywhere:

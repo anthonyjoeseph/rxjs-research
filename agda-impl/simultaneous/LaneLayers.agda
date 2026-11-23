@@ -29,7 +29,7 @@ open import denotation.Laws.Worlds using (⊕-assoc; ⊕-identityʳ)
 open import denotation.Laws.Worlds.Leaves using (of-idx)
 open import denotation.Laws.Shows using (few-reach)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; carry; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; burstEnd; outerDone; subscribed; completed)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; undone; marked; piece)
 
@@ -105,8 +105,8 @@ join-past po pl pb (Joining.rpass b _ _)                     = pb b
 join-past {p = p} po pl pb (Joining.rhand {c} b _)           = ≺-trans {p} {c} {c ⊕ [ ix 0 ]} (pb b) (≺-ext c [])
 
 -- What fails a lane's `takeWhile` is a `laneDone`.
-done-of : ∀ {B} (a : IE B) → T (not (undone a)) → Σ Pos λ n → a ≡ instEmit (mark laneDone) n
-done-of (instEmit (mark laneDone) n) _  = n , refl
+done-of : ∀ {B} (a : IE B) → T (not (undone a)) → Σ ℕ λ k → Σ Pos λ n → a ≡ instEmit (mark (laneDone k)) n
+done-of (instEmit (mark (laneDone k)) n) _  = k , n , refl
 done-of (instEmit (value _) _)      ()
 done-of (instEmit (mark begin) _)      ()
 done-of (instEmit (mark over) _)       ()
@@ -116,7 +116,6 @@ done-of (instEmit (mark completed) _)  ()
 done-of (instEmit (mark outerOpen) _)  ()
 done-of (instEmit (mark outerClose) _) ()
 done-of (instEmit (mark laneStart) _)  ()
-done-of (instEmit (mark carry) _)      ()
 done-of (instEmit (mark burstEnd) _)   ()
 done-of (instEmit (mark outerDone) _)  ()
 

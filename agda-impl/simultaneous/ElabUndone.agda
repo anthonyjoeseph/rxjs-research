@@ -25,7 +25,7 @@ open import denotation.Position using (root; _≟ᵖ_; _⊕_; ix)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (out; Den; hot; Proper; DenEnv; enter; module Op; module DeferT)
 open import denotation.Laws.Cut using (capprox)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; carry; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (lone; ext; Tag; val; cdone; tick; flat; Flat; isZero; module Elaborate)
 open import simultaneous.DenRows using (conn-out; merge-out; hot-out; map-out′; scan-out; take-row; of-mem; each-one; module Cat)
@@ -123,13 +123,12 @@ onMark-u : ∀ {B} op b s m n → Sends {B} (proj₂ (onMark op b s m n))
 onMark-u op b s begin      n = begun-u b n s
 onMark-u op b s stop       n = stopped-u b n s (if Flat.spent s then 0 else share b s)
 onMark-u op b s over       n = overed-u n s
-onMark-u op b s carry      n = sd-[]
 onMark-u op b s outerOpen  n = arrive-u op n s
 onMark-u op b s outerClose n = sd-[]
 onMark-u op b s laneStart  n = sd-[]
-onMark-u op b s laneDone   n =
-  ended-u (Flat.acc s ⊓ Flat.lanes s) n
-    (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ Flat.acc s ; acc = 0 ; dead = true })
+onMark-u op b s (laneDone k) n =
+  ended-u (k ⊓ Flat.lanes s) n
+    (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ k ; dead = true })
 onMark-u op b s burstEnd   n = burstOver-u (isZero (Flat.held s) Data.Bool.∨ Flat.dead s) n s
 onMark-u op b s outerDone  n = left-u n (record s { finished = true })
 onMark-u op b s subscribed n = sd-one subscribed n tt
@@ -153,8 +152,7 @@ joins-u (m , k) (instEmit (mark stop) _)       i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark outerOpen) _)  i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark outerClose) _) i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark laneStart) _)  i = sd-rep k begin m tt i
-joins-u (m , k) (instEmit (mark carry) _)      i = sd-rep k begin m tt i
-joins-u (m , k) (instEmit (mark laneDone) _)   i = sd-rep k begin m tt i
+joins-u (m , k) (instEmit (mark (laneDone _)) _)   i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark burstEnd) _)   i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark outerDone) _)  i = sd-rep k begin m tt i
 joins-u (m , k) (instEmit (mark subscribed) _) i = sd-rep k begin m tt i
@@ -182,8 +180,7 @@ mark-u stop       _ u = u
 mark-u outerOpen  _ u = u
 mark-u outerClose _ u = u
 mark-u laneStart  _ u = u
-mark-u carry      _ u = u
-mark-u laneDone   _ ()
+mark-u (laneDone _) _ ()
 mark-u burstEnd   _ u = u
 mark-u outerDone  _ u = u
 mark-u subscribed _ u = u
@@ -235,7 +232,7 @@ react-u op z d p r with each-one proj₂ (Op.scan (react op) z d) p r
 ...   | st , inp , _ , eq = react-sends op st inp (subst (λ w → _ ∈ proj₂ w) eq yi)
 
 comb-u : ∀ N n {Δ A B} op (tk : E (IE B ∷ IE B ∷ IE A ∷ Δ) (ℕ × Routes)) (env : DenEnv (IE B ∷ IE B ∷ IE A ∷ Δ)) → Undone (capprox N n (combined op tk) env)
-comb-u N n op tk env = react-u op (flat root 0 0 false false false 0 0 0 0 0 [] , [])
+comb-u N n op tk env = react-u op (flat root 0 0 false false false 0 0 0 0 [] , [])
   (capprox N n (takeWhile false going (flatMap (mergeᶠ nothing) (fed tk) (of (true ∷ false ∷ [])))) env)
 
 -- Four connects show their innermost body's rows.

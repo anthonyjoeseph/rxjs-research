@@ -33,7 +33,7 @@ open import Data.List using (_++_; [_])
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥-elim)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import simultaneous.InstEmit using (begin; stop; subscribed; completed; laneStart; carry; laneDone; burstEnd; instEmit; value; mark; over; outerOpen; outerClose; outerDone)
+open import simultaneous.InstEmit using (begin; stop; subscribed; completed; laneStart; laneDone; burstEnd; instEmit; value; mark; over; outerOpen; outerClose; outerDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 import denotation.Laws.ShowsJoin as SJ
@@ -99,8 +99,7 @@ routing-stable {completed}  _ = r-completed
 routing-stable {outerOpen}  h = ⊥-elim (h λ ())
 routing-stable {outerClose} h = ⊥-elim (h λ ())
 routing-stable {laneStart}  h = ⊥-elim (h λ ())
-routing-stable {carry}      h = ⊥-elim (h λ ())
-routing-stable {laneDone}   h = ⊥-elim (h λ ())
+routing-stable {laneDone _} h = ⊥-elim (h λ ())
 routing-stable {burstEnd}   h = ⊥-elim (h λ ())
 routing-stable {outerDone}  h = ⊥-elim (h λ ())
 
