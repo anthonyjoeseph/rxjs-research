@@ -42,7 +42,8 @@ open import denotation.Laws.Truth.Connect.Cuts using (step≼; next≺)
 open import denotation.Laws.Fold using (latest)
 open import denotation.EmissionSet using (Reach; Dep; module Switch)
 open import denotation.Laws.Count using (em; reach-down; child)
-open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-at₂; lane-one)
+open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-at₂; lane-fwd; lane-one)
+open import simultaneous.LaneSite using (FoldOf; f-none; f-step; fold-map; Sited; lane-site)
 open import simultaneous.HeldLanes using (lane-past; bproj-mem; bproj-memʰ; open-cut; open-routing)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.HeldLim using (run-below)
@@ -487,19 +488,44 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       only    : ∀ {y v} → RV.Lane op q a y (out v) → Under w y → y ≺ yd → Σ ℕ λ i → i ℕ.< k × y ≡ base ⊕ [ ix i ]
 
   -- THE LANE'S COUNT BEFORE `x`: its rows' emits there, folded in order.
-  data FoldAt (q : Pos) (a : A) : Pos → Routes → Set where
-    f-none : ∀ {x} → (∀ {y v} → RV.Lane op q a y (out v) → y ≺ x → ⊥) → FoldAt q a x r₀
-    f-step : ∀ {x y v r} → FoldAt q a y r → RV.Lane op q a y (out v) → y ≺ x
-           → (∀ {y′ v′} → RV.Lane op q a y′ (out v′) → y ≺ y′ → y′ ≺ x → ⊥) → FoldAt q a x (count r v)
+  FoldAt : Pos → A → Pos → Routes → Set
+  FoldAt q a = FoldOf (λ y v → RV.Lane op q a y (out v))
 
-  postulate
-    -- A LANE'S `laneDone` SITS PAST ITS CARRIES, as many as the lane
-    -- counted over its rows before them: its step's split, under the scan's
-    -- row, shows the carries, then the `laneDone`, and the scan's state
-    -- there is the fold of the frame's values before that row, each the
-    -- emit of a lane row before the split.
-    done-site : ∀ {q a yd n} → RO q (out a) → RV.Lane op q a yd (out (instEmit (mark laneDone) n))
-              → Σ Pos λ w → Σ Pos λ base → Σ Routes λ r → DoneAt q a yd w base (proj₂ r) × FoldAt q a w r
+  -- A LANE'S `laneDone` SITS PAST ITS CARRIES, as many as the lane
+  -- counted over its rows before them: the lane's own site, read back
+  -- through the subscription its rows share.
+  done-site : ∀ {q a yd n} → RO q (out a) → RV.Lane op q a yd (out (instEmit (mark laneDone) n))
+            → Σ Pos λ w → Σ Pos λ base → Σ Routes λ r → DoneAt q a yd w base (proj₂ r) × FoldAt q a w r
+  done-site {q} {a} {yd} xo ld = Sited.w S , Sited.base S , Sited.r S , D , fold-map up dn (Sited.fold S)
+    where
+      L = lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+            (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+            (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo ld
+
+      s : Pos
+      s = proj₁ L
+
+      I : InvAt _ s (enter (fL a) s)
+      I = inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s (proj₁ (proj₂ L))
+
+      S : Sited (enter (fL a) s) yd
+      S = lane-site _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ m s (proj₁ (proj₂ L)) (proj₁ (proj₂ (proj₂ L)))
+
+      up : ∀ {y e} → enter (fL a) s y e → RV.Lane op q a y e
+      up x = proj₂ (proj₂ (proj₂ (proj₂ L))) x (world-after (InvAt.world I x) (InvAt.real I x))
+
+      dn : ∀ {y e} → RV.Lane op q a y e → enter (fL a) s y e
+      dn l = lane-fwd op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+               (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+               (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo ld l
+
+      D : DoneAt q a yd (Sited.w S) (Sited.base S) (proj₂ (Sited.r S))
+      D = record
+        { w-yd    = Sited.w-yd S
+        ; w-base  = Sited.w-base S
+        ; carries = λ i<k → up (proj₁ (Sited.carries S i<k)) , proj₂ (Sited.carries S i<k)
+        ; only    = λ l u lt → Sited.only S (dn l) u lt
+        }
 
   -- One lane's rows at one place show one emit.
   lane-func : ∀ {q a y e e′} → RO q (out a) → RV.Lane op q a y e → RV.Lane op q a y e′ → e ≡ e′
