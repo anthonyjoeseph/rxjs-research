@@ -424,28 +424,50 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
              × ((y ≡ I v × e ≡ val ac)
                 ⊎ (Σ ℕ λ i → Σ Pos λ n → y ≡ Bs v ⊕ [ ix i ] × i < proj₂ (proj₁ (pre ac)) × e ≡ marked carry × val ac ≡ instEmit (mark laneDone) n))
 
+    -- A split's row, read without normalising the layers above it.
+    Spl : Pos → St → Pos → IE B → Set
+    Spl u b y e = Σ Pos λ w → Σ Bool λ c → enter (Op.of (true ∷ false ∷ [])) u w (out c)
+                × enter (Op.of (if c then proj₁ (proj₂ b) else proj₂ (proj₂ b))) (w ⊕ [ ix 1 ]) y (out e) × (w ⊕ [ ix 1 ]) ≺ y
+
+    spl : ∀ b u {y e} → enter (Inner b) u y (out e) → Spl u b y e
+    spl b u r = merge-out (λ c → Op.of (if c then proj₁ (proj₂ b) else proj₂ (proj₂ b))) (Op.of (true ∷ false ∷ [])) u r
+
+    img-sp : ∀ {v b y e} (ac : Ac v b) → ScE v (out b) → Spl (U v) b y e → View y e
+    img-sp {v} {b} {y} {e} ac scr (w , c , ow , ll , _) = v , b , ac , scr ,
+      split-row (pre ac) (val ac) (proj₁ ow)
+        (subst (λ z → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ z) else proj₂ (proj₂ z))) y (out e)) (b-eq ac) (proj₁ ll))
+
+    img-sc : ∀ {y e} → Σ Pos (λ v → Σ St λ b → ScE v (out b) × enter (Inner b) (U v) y (out e) × U v ≺ y) → View y e
+    img-sc (v , b , scr@(Scan.sval ac , _) , inr , _) = img-sp ac scr (spl b (U v) inr)
+
     img : ∀ {y e} → SvE y (out e) → View y e
-    img r with merge-out Inner (Sc lanePart h₁ h₂) FB (sv-out lanePart P r)
-    ... | v , b , scr@(Scan.sval ac , _) , inr , _ with merge-out (λ c → Op.of (if c then proj₁ (proj₂ b) else proj₂ (proj₂ b))) (Op.of (true ∷ false ∷ [])) (U v) inr
-    ...   | w , c , ow , ll , _ = v , b , ac , scr ,
-            split-row (pre ac) (val ac) (proj₁ ow)
-              (subst (λ z → InE (ofᴱ (w ⊕ [ ix 1 ]) 0 (if c then proj₁ (proj₂ z) else proj₂ (proj₂ z))) _ (out _)) (b-eq ac) (proj₁ ll))
+    img r = img-sc (merge-out Inner (Sc lanePart h₁ h₂) FB (sv-out lanePart P r))
 
     -- The burst part's connect shows its `burstEnd`, alone.
+    bo-sp : ∀ {y a} → Spl (U (FrB.V₀ Pb)) (laneStep z₀ (marked burstEnd)) y a → y ≡ Ib × a ≡ marked burstEnd
+    bo-sp (w , c , ow , ll , _) with split-row z₀ (marked burstEnd) (proj₁ ow) (proj₁ ll)
+    ... | inj₁ (refl , refl) = refl , refl
+    ... | inj₂ (_ , _ , _ , _ , _ , ())
+
+    bo-ac : ∀ {v b y a} → Scan.Acc laneStep z₀ (FrB.FrEb Pb) v b → enter (Inner b) (U v) y (out a) → y ≡ Ib × a ≡ marked burstEnd
+    bo-ac {v} {b} ac inr with FrB.acc-b Pb ac
+    ... | refl , refl = bo-sp (spl b (U v) inr)
+
+    bo-sc : ∀ {y a} → Σ Pos (λ v → Σ St λ b → FrB.ScEb Pb v (out b) × enter (Inner b) (U v) y (out a) × U v ≺ y) → y ≡ Ib × a ≡ marked burstEnd
+    bo-sc (v , b , (Scan.sval ac , _) , inr , _) = bo-ac ac inr
+
     burst-only : ∀ {y a} → SbE y (out a) → y ≡ Ib × a ≡ marked burstEnd
-    burst-only r with merge-out Inner (Sc burstPart (H₁ Pb) (H₂ Pb burstPart)) (Bp Pb) (sv-out burstPart Pb r)
-    ... | v , b , (Scan.sval ac , _) , inr , _ with FrB.acc-b Pb ac
-    ...   | refl , refl with merge-out (λ c → Op.of (if c then proj₁ (proj₂ b) else proj₂ (proj₂ b))) (Op.of (true ∷ false ∷ [])) (U v) inr
-    ...     | w , c , ow , ll , _ with split-row z₀ (marked burstEnd) (proj₁ ow) (proj₁ ll)
-    ...       | inj₁ (refl , refl) = refl , refl
-    ...       | inj₂ (_ , _ , _ , _ , _ , ())
+    burst-only r = bo-sc (merge-out Inner (Sc burstPart (H₁ Pb) (H₂ Pb burstPart)) (Bp Pb) (sv-out burstPart Pb r))
 
     -- The lanes' merge shows a part's connect.
+    mm-at : ∀ {y e} → Σ Pos (λ q → Σ Part λ k → OS q (out k) × enter (Sv k) (q ⊕ [ ix 1 ]) y (out e) × (q ⊕ [ ix 1 ]) ≺ y)
+          → (SvE y (out e) × P ≺ y) ⊎ (SbE y (out e) × Pb ≺ y)
+    mm-at (_ , _ , (at-out , _) , svr , lt)          = inj₁ (svr , lt)
+    mm-at (_ , _ , (on-out at-out , _) , svr , lt)   = inj₂ (svr , lt)
+    mm-at (_ , _ , (on-out (on-out ()) , _) , _ , _)
+
     mm-anat : ∀ {y e} → MME y (out e) → (SvE y (out e) × P ≺ y) ⊎ (SbE y (out e) × Pb ≺ y)
-    mm-anat r with merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r
-    ... | _ , _ , (at-out , _) , svr , lt             = inj₁ (svr , lt)
-    ... | _ , _ , (on-out at-out , _) , svr , lt      = inj₂ (svr , lt)
-    ... | _ , _ , (on-out (on-out ()) , _) , _ , _
+    mm-anat r = mm-at (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
 
     -- The frame's rows lie flat, one value at each, and the burst part's
     -- rows lie apart from the lane part's.
