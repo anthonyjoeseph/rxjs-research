@@ -250,9 +250,11 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### PLACEMENT
 
-Untried: every row a lane hangs on lies outside every binder's last gap:
-each former hangs lanes only where its children do. Settled by bodies, or
-a lane hung on a row inside a gap.
+Every row a lane hangs on lies outside every binder's last gap. Open: a
+hot row under an admissible subscription itself. `Disj` bars hot rows
+under the world only, and a cold's synchronous rows lie at `p ⊕ zs` with
+`zs` unconstrained, so a gap's lane past `p` may lead a joined hot row.
+Settled by `Ok` barring a hot row under `p`, or a hot row there.
 
 Members: `placed-cold`, `placed-connected`, `placed-flatMap`.
 
