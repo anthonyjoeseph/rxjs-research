@@ -19,7 +19,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Data.Sum using (_⊎_; inj₁; [_,_]′)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_; yes; no)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
@@ -28,7 +28,7 @@ open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMa
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
-open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼)
+open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using (Run; []; _∷_)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
@@ -48,7 +48,8 @@ open import simultaneous.ConcatTwo using (module Two)
 open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.ColdIdle using (mid)
 open import simultaneous.LaneDoneRow using (done-row)
-open import simultaneous.HeldHot using (module HotRead)
+open import simultaneous.LaneVis using (lane-vis; hot-lab)
+open import simultaneous.HeldHot using (module HotRead; em)
 open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.ElabUndone using (Undone)
 open import simultaneous.CombSent using (assoc³)
@@ -188,15 +189,20 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       -- its values shown as they are.
       sh-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Sh q (out v)
 
-      -- A value of the merge is the frame's reading of the share's, or a
-      -- frame mark at a place the reading holds nothing.
-      rows-vis : ∀ {q v} → Mg q (out v) → HR.Rd q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → HR.Rd q e′ → ⊥))
-
-      -- Each row of the reading lies at a row of the merge,
-      rows-lift : ∀ {q e} → HR.Rd q e → Σ (Ev (IE B)) (Mg q)
+      -- Each row of the reading but its end lies at a row of the merge
+      -- (the end, the frame's connected piece's, hands the frame to its
+      -- queued `laneDone`, a skip just past it),
+      rows-lift : ∀ {q e} → HR.Rd q e → Σ (Ev (IE B)) (Mg q) ⊎ e ≡ end
 
       -- its values shown as they are.
       rows-shown : ∀ {q v} → HR.Rd q (out v) → Mg q (out v)
+
+    -- A VALUE OF THE MERGE IS THE FRAME'S READING OF THE SHARE'S, or a
+    -- frame mark at a place the reading holds nothing.
+    rows-vis : ∀ {q v} → Mg q (out v) → HR.Rd q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → HR.Rd q e′ → ⊥))
+    rows-vis r with lane-vis ρ₄ (f a) env₂ m (λ {t} → pu a {t}) s r
+    ... | inj₁ h          = inj₁ h
+    ... | inj₂ (ly , sv) = inj₂ (sv , λ rd → hot-lab rd ly)
 
     -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT.
     share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
@@ -294,7 +300,9 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
           (es′ , oks′ , fs′) = runs-at rn
           Ip = inv-ev m (elab ρ₄ (f a)) env′ g′ s′ oks′
       in Thin.idle undone Sh (Prog s′) Ish (λ uc uy v cy → pinby-vis v (InvAt.quiet Ip uc uy cy)) (Held.idle (held a Lt s′ oks′ fs′ es′))
-           (λ x → inj₁ (sh-vis rn x)) (sh-lift rn) (sh-shown rn) (sh-late rn) mt ne (sh-unf rn) fw aw lw
+           (λ x → inj₁ (sh-vis rn x)) (λ fw k → k (proj₁ fw , λ x lt → proj₂ fw (proj₂ (sh-lift rn x)) lt))
+           (λ { {e = out _} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt ; {e = end} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt })
+           (sh-shown rn) (sh-late rn) mt ne (sh-unf rn) fw aw lw
 
     -- The reading's end is the share's, moved.
     rd-end : ∀ {c} → HR.Rd c end → Σ Pos λ E → Sh E end × instant c ≡ instant E
@@ -314,10 +322,17 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
         before : ∀ {y} → instant y ≡ instant c → y ≺ w
         before {y} iy = instant-≺ y w (subst (_≺ⁱ instant w) (sym iy) (≺-instant c w cw λ e → ne (sym e)))
 
+    -- FEW ROWS OF THE MERGE BEFORE A PLACE, FEW OF THE READING: its end
+    -- the one row more.
+    rows-few : ∀ {w} → Few Mg w → ¬ ¬ Few HR.Rd w
+    rows-few {w} (ks , h) k = em {Σ Pos λ c → HR.Rd c end} λ
+      { (inj₁ (c , rc)) → k (c ∷ ks , λ {y′} x lt → [ (λ (_ , y) → there (h y lt)) , (λ { refl → here (≼-antisym {y′} {c} (HR.rd-proper x rc) (HR.rd-proper rc x)) }) ]′ (rows-lift x))
+      ; (inj₂ ne) → k (ks , λ x lt → [ (λ (_ , y) → h y lt) , (λ { refl → ⊥-elim (ne (_ , x)) }) ]′ (rows-lift x)) }
+
     -- THE MERGE IS IDLE UP TO ITS `laneDone`.
     merged-idle : IdleTo undone Mg
     merged-idle = Thin.idle undone Mg HR.Rd (inv-ev m (merged a) env₂ g₂ s ok) (λ rc ry _ → HR.rd-proper ry rc)
-                    (HR.idle-hot sh-idle) (rows-vis) (rows-lift) (rows-shown) rows-late
+                    (HR.idle-hot sh-idle) (rows-vis) (rows-few) (λ x _ → HR.rd-few x) (rows-shown) rows-late
 
   -- A `laneDone` moves no route.
   silent : ∀ {y : IE B} → T (not (undone y)) → ∀ r → count r y ≡ r

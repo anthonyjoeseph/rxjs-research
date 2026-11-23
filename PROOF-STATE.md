@@ -287,13 +287,12 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 #### A LANE'S ROWS ARE ITS PROGRAM'S
 
 Unproven: the share's rows are the program's at the same places, and
-the merge's rows read through the hot read at the frame's connected lane
-(rekeyed under `sub z`) are the read's values or frame marks. Riskiest:
-`rows-vis` — the burst part's burstEnd and a laneStart/laneDone landing
-off every position the read holds. Settled by reading each frame piece
-back to a reading position, or a mark at a read position.
+the hot read's rows at the frame's connected lane are the merge's.
+Riskiest: `rows-lift` — the read's end hands the bounded frame to its
+queued `laneDone`, so only its other rows land in the merge; settled by
+reading the connected piece's rows through the bounded merge.
 
-Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-vis`, `rows-lift`, `rows-shown`.
+Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-lift`, `rows-shown`.
 
 #### A LANE'S RUN IN THE LANES'
 

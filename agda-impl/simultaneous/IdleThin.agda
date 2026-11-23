@@ -2,9 +2,8 @@
 
 -- A STREAM SHOWING ITS PROGRAM'S ROWS IS IDLE LIKE IT, UP TO ITS CUT
 -- (`Thin.idle`).  Every visible row of the stream is the program's, or a
--- value moving no route at a place the program holds nothing; every row
--- of the program sits at a row of the stream, its visible ones shown as
--- they are but its end.  A run met of the stream, thinned of its silent
+-- value moving no route at a place the program holds nothing; the program
+-- has few rows wherever the stream does, and its values are the stream's.  A run met of the stream, thinned of its silent
 -- values, is then a run of the program with the same count.
 --
 -- Past the program's end the program waits on nothing, so a reader there
@@ -46,7 +45,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos → Set} {q₁ : Pos} (It : InvAt H q₁ t)
             (proper-vis : ∀ {c y e} → u c end → u y e → Visible e → y ≼ c) (iu : Idle u)
             (vis : ∀ {q v} → t q (out v) → u q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → u q e′ → ⊥)))
-            (lift : ∀ {q e} → u q e → Σ (Ev (IE X)) (t q))
+            (few-to : ∀ {w} → Few t w → ¬ ¬ Few u w) (u-few : ∀ {q e} → u q e → Visible e → Few u q)
             (lift-vis : ∀ {q v} → u q (out v) → t q (out v))
             (late : ∀ {c} → u c end → ∀ {w} → c ≺ w → Few t w → Unfailed keep t w → (∀ {c′} → t c′ end → w ≼ c′) → ¬ ¬ (instant w ≡ instant c)) where
 
@@ -81,9 +80,6 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
   ends (kp _ th)   (there i)   = there (ends th i)
   ends (dp _ _ th) i           = there (ends th i)
 
-  few : ∀ {w} → Few t w → Few u w
-  few (ks , h) = ks , λ x lt → h (proj₂ (lift x)) lt
-
   -- READ ALONG A RUN: the thinned rows are a run of the program, and past
   -- the stream's cursor is past the program's, and a row of the program's
   -- but its end past its cursor is past the stream's.
@@ -92,9 +88,9 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
       → Run u c′ rs′ × (∀ {y} → After (cursor c rs) y → After (cursor c′ rs′) y)
                      × (∀ {k v} → u k (out v) → After (cursor c′ rs′) k → After (cursor c rs) k)
   run [] [] i2 i1 = [] , i2 , i1
-  run {c} {c′} ((((x , _) , fw) , vi , ac , lst) ∷ r) (kp {q} y th) i2 i1 =
+  run {c} {c′} ((((x , _) , _) , vi , ac , lst) ∷ r) (kp {q} y th) i2 i1 =
     let (r′ , j2 , j1) = run r th (λ a → a) (λ _ a → a)
-    in (((y , λ ce → proper-vis ce y vi) , few fw) , vi , i2 ac , lu) ∷ r′ , j2 , j1
+    in (((y , λ ce → proper-vis ce y vi) , u-few y vi) , vi , i2 ac , lu) ∷ r′ , j2 , j1
     where
       lu : ∀ {k e′} → u k e′ → Visible e′ → After c′ k → q ≼ k
       lu {e′ = out _} uk vk ak = lst (lift-vis uk) vk (i1 uk ak)
@@ -139,9 +135,10 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
     back (inj₂ e) nz = inj₂ (trans (cong proj₁ E) (trans e nz))
 
     -- Past the program's end: its count there, of its instant.
-    from-late : ∀ {c} → u c end → c ≺ w → After (cursor nothing rs′) c → instant w ≡ instant c → Goal rs w
+    from-late : ∀ {c} → u c end → c ≺ w → After (cursor nothing rs′) c → instant w ≡ instant c → ⊥
     from-late {c} uc cw ac ic =
-      back {c} (iu mu ne′ (few (proj₁ fw , λ {k} x lt → proj₂ fw x (≺-trans {k} {c} {w} lt cw))) ac lc) (cong (λ j → nm (j ∙ [])) (sym ic))
+      few-to (proj₁ fw , λ {k} x lt → proj₂ fw x (≺-trans {k} {c} {w} lt cw)) λ fu →
+      ng (back {c} (iu mu ne′ fu ac lc) (cong (λ j → nm (j ∙ [])) (sym ic)))
       where
         lc : ∀ {y e} → u y e → Visible e → After (cursor nothing rs′) y → c ≼ y
         lc {y} {e = out _} uy vy ay = ≺→≼ {c} {y} (≺-≼-≺ {c} {w} {y} cw (lw (lift-vis uy) vy (j1 uy ay)))
@@ -167,12 +164,12 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
     lu {e = out _} uy vy ay = lw (lift-vis uy) vy (j1 uy ay)
     lu {y} {e = end} uy _ ay with ≼-or-≻ w y
     ... | inj₁ le = le
-    ... | inj₂ yw = ⊥-elim (late uy yw fw unf tend λ ic → ng (from-late uy yw ay ic))
+    ... | inj₂ yw = ⊥-elim (late uy yw fw unf tend λ ic → from-late uy yw ay ic)
     lu {e = skip}  _  () _
     lu {e = pin _} _  () _
 
     absurd : ⊥
-    absurd = ng (back {w} (iu mu ne′ (few fw) (proj₁ (proj₂ R) aw) lu) refl)
+    absurd = few-to fw λ fu → ng (back {w} (iu mu ne′ fu (proj₁ (proj₂ R) aw) lu) refl)
 
   idle : IdleTo keep t
   idle {rs} mt ne {w} unf fw aw lw with thin mt ne
