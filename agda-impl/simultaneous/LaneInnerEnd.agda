@@ -8,10 +8,10 @@
 -- routes, and every layer shows it before its own end.
 module simultaneous.LaneInnerEnd where
 
-open import Data.Bool using (not; T)
+open import Data.Bool using (true; not; T)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)

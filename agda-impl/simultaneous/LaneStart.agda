@@ -9,15 +9,15 @@
 -- the share, whose rows all lie past it.
 module simultaneous.LaneStart where
 
-open import Data.Bool using (true; false; T; not; if_then_else_)
+open import Data.Bool using (true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_])
+open import Data.List using ([]; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc; s≤s; z≤n)
+open import Data.Nat using (ℕ; s≤s; z≤n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -26,22 +26,24 @@ open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; mergeᶠ; empty; of; flatMap)
 open import denotation.Position using (Pos; ix; last; root; _≟ᵖ_; _⊕_)
-open import denotation.Events using (Timeline; fresh; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; MapT; map-out; Den; DenEnv; hot; enter; out; Proper; InE; at-out; on-out; at-end; _≺_; _≼_;
-  Few; LaneOf; module Op; module Joining; module Values; module Bounded; module Merge;
-  module Scan; module TakeWhile; module Connecting)
+open import denotation.Events using (Timeline; fresh)
+open import denotation.EmissionSet using (EmissionSet; MapT; map-out; Den; DenEnv; hot; enter; out; Proper; at-out; on-out; at-end;
+  _≺_; _≼_; Few; LaneOf; module Op; module Joining; module Values; module Bounded;
+  module Merge; module Scan; module TakeWhile; module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd)
 open import denotation.Laws.Worlds using (notT)
 open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Count using (reach-down)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.DenRows using (conn-out; merge-out; map-out′; scan-out; bounded-out; hot-out; each-one; of-mem)
+open import simultaneous.DenRows using (conn-out; merge-out; map-out′; scan-out; bounded-out; hot-out; each-one)
 open import simultaneous.LaneEndSched using (of-one)
 open import simultaneous.ElabUndone using (tell-undone; tell-back)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.LaneLayers using (Under; map-few; acc-row; bd-lane-past; conn-few; done-of; few-row; few-tr; join-few; join-past; of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl; under-trans; under-≺; under-⊕)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; begin; burstEnd)
+open import simultaneous.LaneLayers using (Under; map-few; acc-row; bd-lane-past; conn-few; few-row; few-tr; join-few; join-past;
+  of-after; one-rows; scan-few; starts-after; take-few; under-ext; under-last; under-refl;
+  under-trans; under-≺; under-⊕)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; laneSrc; laneStep; tell; undone; marked; piece)
 

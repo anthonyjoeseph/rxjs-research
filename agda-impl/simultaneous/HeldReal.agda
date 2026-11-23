@@ -199,12 +199,12 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   lanes-by r₁ {z} {n} {r₂} mt a0 q0 Fv zv {q} {a} x rn nc ¬g =
     lane-started r₁ mt q0 Fv zv x rn nc λ si →
       AC.drained r₁ (λ xs y ys eq → past-active op init xs y (no-end r₁ mt xs eq))
-        (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , refl , _) → refl })
+        (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , _ , refl , _) → refl })
         (λ _ _ _ _ _ _ → start-one) (done-live r₁ mt) a0 (a , x , rn) si (cut-never r₁ mt x nc) done-by
     where
       done-by : AC.DoneIn r₁ r₁ q → ⊥
       done-by di with find di
-      ... | _ , i , (a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
+      ... | _ , i , (_ , a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
       ...   | refl | c , lc , ic = ¬g (c , lc , λ zc → ≺-absurd {y ⊕ [ sub LS.J ]} {z} (met-before r₁ mt i)
               (instant-≺ z (y ⊕ [ sub LS.J ]) (subst (instantOf z ≺ⁱ_) (trans ic (sym (inst-⊕ y [ sub LS.J ]))) zc)))
 

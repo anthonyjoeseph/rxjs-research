@@ -7,10 +7,10 @@
 -- programs they subscribe hold.
 module simultaneous.LaneLocal where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Bool.Properties using (T-≡)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; [_]; replicate)
+open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (_∷_)
@@ -25,15 +25,17 @@ open import denotation.Read using (Visible)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; empty; of; takeWhile; flatMap; connect; connected)
-open import denotation.Position using (Pos; Path; root; _≟ᵖ_; ix; sub; last; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; last; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-apart; ofᴱ)
-open import denotation.EmissionSet using (EmissionSet; map-out; map-end; Ev; Den; hot; enter; Proper; DenEnv; out; end; _≺_; shown; ended; late; at-end; InE; at-out; on-out;
-  Superseded; module Op; module Joiner; module Bounded; module Values; module Merge;
-  module Scan; module TakeWhile; module Exhaust; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; map-out; map-end; Ev; Den; hot; enter; Proper; DenEnv; out; end; _≺_; shown;
+  ended; late; at-end; InE; at-out; on-out; Superseded; module Op; module Joiner;
+  module Bounded; module Values; module Scan; module TakeWhile; module Exhaust;
+  module Connecting)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≼-or-≻)
-open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊕-assoc; ⊕-identityʳ; ⊑-trans; _⊑_; plain-ix)
+open import denotation.Laws.Worlds using (Ok; InvD; InvAt; Lawful; Hots; GoodEnv; _∪ʰ_; ok-step; ok-in; ⊕-identityʳ; ⊑-trans; _⊑_;
+  plain-ix)
 open import denotation.Laws.Worlds.Leaves using (of-end)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (InstEmit; instEmit; value; mark; begin; over; stop; subscribed; completed; outerOpen; outerClose;

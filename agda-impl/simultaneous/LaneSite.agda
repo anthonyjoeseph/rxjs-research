@@ -28,11 +28,13 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs)
 open import denotation.Position using (Pos; ix; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh; <ᵖ-apart; <ᵖ-between)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; at-out; at-end; on-out; _≺_; _≼_;
-  Few; MapT; map-out; module Op; module Joining; module Bounded; module Merge; module Scan; module TakeWhile; module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; at-out; at-end; on-out; _≺_; _≼_; Few;
+  MapT; map-out; module Op; module Joining; module Bounded; module Scan; module TakeWhile;
+  module Connecting)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≼-≺-≺; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd; ≼-or-≻; ≼-split)
-open import denotation.Laws.Worlds using (notT; Hots; GoodEnv; Ok; Lawful; InvAt; InvD; W⁼; inW; w-up; plain-ix; ok-in; ok-step; ⊕-injˡ; ⊕-injʳ; ⊕-identityʳ; ⊑-≼)
-open import denotation.Laws.Worlds.Leaves using (of-reach; of-rows; of-in; empty-inv; of-inv)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; InvAt; InvD; inW; plain-ix; ok-in; ok-step; ⊕-injˡ; ⊕-injʳ;
+  ⊕-identityʳ; ⊑-≼)
+open import denotation.Laws.Worlds.Leaves using (of-reach; empty-inv; of-inv)
 open import denotation.Laws.Count using (reach-down)
 open import denotation.Laws.Connect using (module Apart)
 open import denotation.Laws.JoinInv using (module Kids)
@@ -44,9 +46,9 @@ open import simultaneous.Layers using (to≺; from≺)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; value; begin; over; stop; outerOpen; outerClose; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.LaneLayers using (Under; acc-row; bd-lane-past; conn-few; few-row; few-tr; join-past; map-few; of-after; scan-few;
-  under-ext; under-last; under-refl; under-trans; under-≺; under-⊕)
+open import simultaneous.InstEmit using (instEmit; mark; laneStart; laneDone; burstEnd)
+open import simultaneous.LaneLayers using (Under; acc-row; bd-lane-past; conn-few; few-row; few-tr; join-past; map-few; of-after;
+  scan-few; under-ext; under-refl; under-trans; under-≺; under-⊕)
 import simultaneous.LaneStart as LaneStart
 open LaneStart using (z₀; module Core)
 

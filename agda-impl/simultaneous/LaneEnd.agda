@@ -8,7 +8,7 @@
 -- its third part sends, which the schedule puts where the reader ends.
 module simultaneous.LaneEnd where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -52,8 +52,7 @@ open import simultaneous.InstEmit using (stop)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; elab; counted; framed; piece; laneStep; undone; marked)
 
-open import simultaneous.LaneEndSched using (laneX; readerR; emitAt; ≺-ˡ; raw-in; hot-in; tr-in; dec-end; acc-last;
-  module Ending)
+open import simultaneous.LaneEndSched using (laneX; readerR; ≺-ˡ; raw-in; hot-in; tr-in; dec-end; acc-last; module Ending)
 
 ------------------------------------------------------------------------
 -- One layer's row, read forward

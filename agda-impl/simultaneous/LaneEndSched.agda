@@ -4,7 +4,7 @@
 -- off them.
 module simultaneous.LaneEndSched where
 
-open import Data.Bool using (Bool; true; false; T; not; if_then_else_)
+open import Data.Bool using (Bool; true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -42,10 +42,9 @@ open import denotation.Up using (up; up-⊕)
 open import simultaneous.TableEnv using (_⊕ˡ_; DenOf; den; den-ex; den-ok; den-cons; Admits; admits-ix; admits-at; admits-step)
 open import simultaneous.TreeBounded using (listHot; admits-body)
 open import simultaneous.TableRows using (⊕ˡ-⊕; part-≺)
-open import simultaneous.DenRows using (conn-out; merge-out; map-out′; hot-out; scan-out; bounded-out; of-mem; each-one)
-open import simultaneous.ElabUndone using (Undone; Sends; sd-[]; sd-rep; tell-undone)
-open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart;
-  laneDone; burstEnd; outerDone; subscribed; completed)
+open import simultaneous.DenRows using (conn-out; map-out′; hot-out; scan-out; bounded-out; each-one)
+open import simultaneous.ElabUndone using (Undone; tell-undone)
+open import simultaneous.InstEmit using (begin; laneStart; laneDone)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneˢ; shareˢ; blockˢ; laneSrc; elab; counted; framed; piece; laneStep; undone; marked)
 
