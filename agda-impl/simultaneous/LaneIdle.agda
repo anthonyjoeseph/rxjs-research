@@ -149,7 +149,7 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
 
     -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT.
     share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
-    share-done se = done-row ρ₄ (f a) env₂ m s se
+    share-done se = done-row ρ₄ (f a) env₂ m s (inv-ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′ g′ Q okQ) se
 
     -- The share's bounded merge: its outer `of [ true , false ]`, its first
     -- lane the blocker, its second the program.
