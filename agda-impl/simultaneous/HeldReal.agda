@@ -36,6 +36,7 @@ open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
+open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?)
 open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
@@ -447,6 +448,55 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     live-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                  → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+
+    -- A BOUNDED MERGE'S LANE END HANDING ITS ROUTES TO A QUEUED LANE KEEPS
+    -- THE SOURCE IN ITS INSTANT while the scan holds them: rxjs subscribes
+    -- the queued lane inside that lane's end, and its burst ends there.
+    held-queued : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {d xd} r₂ {q e rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , e) ∷ rx₂) → Visible e → LD xd
+                → Flat.held (proj₁ (past op init r₁)) ≡ 0 → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
+                → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
+    -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
+    -- holds its routes: the outer has ended, no other lane runs or waits,
+    -- so the flatMap ends with it, and the source with the flatMap.
+    held-final : ∀ r₁ {d xd} r₂ {q e rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , e) ∷ rx₂) → Visible e → LD xd
+               → Flat.held (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
+               → Flat.finished (proj₁ (past op init r₁)) ≡ true → Flat.active (proj₁ (past op init r₁)) ℕ.∸ 1 ≡ 0
+               → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
+
+  -- A LANE'S END HANDING ITS ROUTES TO A QUEUED LANE: only a bounded merge
+  -- queues (`queue-free`).
+  held-handoff : ∀ r₁ {d xd} r₂ {q e rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , e) ∷ rx₂) → Visible e → LD xd
+               → Flat.held (proj₁ (past op init r₁)) ≡ 0 → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
+               → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
+  held-handoff r₁ r₂ mt v ld h0 qn th with bounded? op
+  ... | inj₁ (_ , eq) = held-queued eq r₁ r₂ mt v ld h0 qn th
+  ... | inj₂ nb       = ⊥-elim (qn (queue-free op nb r₁))
+
+  -- THE ROUTES THE SCAN HOLDS ARE OF THE SOURCE'S NEXT ROW'S INSTANT, OR
+  -- NONE: held since a lane's end, in its instant (`held-onset`), which a
+  -- live lane's count put the scan in.
+  held-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+               → Flat.held (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+  held-current rx₁ {q} {e} {rx₂} mt v with Flat.held (proj₁ (past op init rx₁)) ℕ.≟ 0
+  ... | Nl.yes z = inj₁ z
+  ... | Nl.no nz with held-onset op rx₁ nz
+  ...   | r₁ , d , xd , r₂ , refl , ld , h0 , ln , at≡ , th = inj₂ (trans at≡ (trans at-d (cong (λ i → nm (i ∙ [])) inst)))
+    where
+      mt′ : Met M (r₁ ++ (d , out xd) ∷ (r₂ ++ (q , e) ∷ rx₂))
+      mt′ = subst (Met M) (++-assoc r₁ ((d , out xd) ∷ r₂) ((q , e) ∷ rx₂)) mt
+
+      at-d : Flat.at (proj₁ (past op init r₁)) ≡ nameOf d
+      at-d = [ (λ z → ⊥-elim (ln z)) , (λ a → a) ]′
+        (LaneRoutes.lanes-current m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ r₁ mt′)
+
+      why : ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
+          ⊎ (Flat.queue (proj₁ (past op init r₁)) ≡ 0 × Flat.finished (proj₁ (past op init r₁)) ≡ true × Flat.active (proj₁ (past op init r₁)) ℕ.∸ 1 ≡ 0)
+          → instantOf d ≡ instantOf q
+      why (inj₁ qn)              = held-handoff r₁ r₂ mt v ld h0 qn th
+      why (inj₂ (q0 , fi , a0)) = held-final r₁ r₂ mt v ld h0 q0 fi a0 th
+
+      inst : instantOf d ≡ instantOf q
+      inst = why (onset-why op (past op init r₁) ld (thru-head op r₂ th))
 
   parked-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
                  → Flat.parked (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
