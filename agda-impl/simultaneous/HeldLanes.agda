@@ -45,7 +45,7 @@ open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-s
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence; _|>′_)
-open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev; Fresh)
+open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; shows-ev; Fresh; ev-undone; eh-u)
 open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ)
@@ -513,6 +513,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                   (λ r → Held.early H₁ (proj₁ r)) (λ r → Held.ends H₁ (proj₁ r)) tp ad₂ cs
                   (λ a {t} L → IH.holds (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
                   (λ a {t} L → IH.placed (hf a (λ i → there (there (there (there (ρ i)))))) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) cs (good-cons L g₂) (eh₄ {t}))
+                  (λ a {t} → ev-undone m (λ i → there (there (there (there (ρ i))))) (f a) (hot t ∷ hot σ₂ ∷ hot σ₁ ∷ env₀) (eh-u (eh₄ {t})))
 
   -- A LANE IS IDLE ON ITS OWN.
   lane-idle-own : ∀ {q a} → RO q (out a) → Idle (RV.Lane op q a)

@@ -286,15 +286,14 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 
 #### A LANE'S ROWS ARE ITS PROGRAM'S
 
-Unproven: through the lane's six layers (merge, two connects, count,
-frame, the share's bounded merge), its values are its program's or frame
-marks off the program's places, and the blocker ends so the program
-runs. Riskiest: the merge's
-values sorted into the program's and silent marks (`rows-vis`), the frame
-marks landing where the program holds nothing. Settled by reading each
-layer's value back to its frame piece.
+Unproven: the share's rows are the program's at the same places, and
+the merge's rows read through the hot read at the frame's connected lane
+(rekeyed under `sub z`) are the read's values or frame marks. Riskiest:
+`rows-vis` — the burst part's burstEnd and a laneStart/laneDone landing
+off every position the read holds. Settled by reading each frame piece
+back to a reading position, or a mark at a read position.
 
-Members: `rows-vis`, `prog-runs`, `rows-lift`, `rows-shown`.
+Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-vis`, `rows-lift`, `rows-shown`.
 
 #### A LANE'S RUN IN THE LANES'
 

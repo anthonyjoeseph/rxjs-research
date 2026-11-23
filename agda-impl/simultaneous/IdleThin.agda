@@ -9,8 +9,8 @@
 --
 -- Past the program's end the program waits on nothing, so a reader there
 -- reads the program's count at that end, which names its instant: a
--- reader past the end with few rows before it and no cut before it is
--- in that instant.
+-- reader past the end with few rows before it, no cut before it and the
+-- stream's own end not before it is in that instant.
 module simultaneous.IdleThin where
 
 open import Data.Bool using (Bool)
@@ -19,7 +19,7 @@ open import Data.List using (List; []; _∷_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ) renaming (_≟_ to _≟ⁿ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -39,15 +39,16 @@ open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Idle; cnt; nameOf; nm)
 open import simultaneous.HeldTo using (Unfailed; IdleTo)
-open import simultaneous.Layers using (after-≺)
+open import simultaneous.Layers using (after-≺; Last; last-met)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count)
 
-module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos → Set} {q₀ : Pos} (Iu : InvAt H q₀ u) (iu : Idle u)
+module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos → Set} {q₁ : Pos} (It : InvAt H q₁ t)
+            (proper-vis : ∀ {c y e} → u c end → u y e → Visible e → y ≼ c) (iu : Idle u)
             (vis : ∀ {q v} → t q (out v) → u q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → u q e′ → ⊥)))
             (lift : ∀ {q e} → u q e → Σ (Ev (IE X)) (t q))
             (lift-vis : ∀ {q v} → u q (out v) → t q (out v))
-            (late : ∀ {c} → u c end → ∀ {w} → c ≺ w → Few t w → Unfailed keep t w → ¬ ¬ (instant w ≡ instant c)) where
+            (late : ∀ {c} → u c end → ∀ {w} → c ≺ w → Few t w → Unfailed keep t w → (∀ {c′} → t c′ end → w ≼ c′) → ¬ ¬ (instant w ≡ instant c)) where
 
   Row : Set
   Row = Pos × Ev (IE X)
@@ -82,11 +83,6 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
 
   few : ∀ {w} → Few t w → Few u w
   few (ks , h) = ks , λ x lt → h (proj₂ (lift x)) lt
-
-  -- Nothing the program shows lies past its end.
-  proper-vis : ∀ {c y e} → u c end → u y e → Visible e → y ≼ c
-  proper-vis uc uy vi cy with InvAt.quiet Iu uc uy cy
-  ... | _ , refl , _ = vi
 
   -- READ ALONG A RUN: the thinned rows are a run of the program, and past
   -- the stream's cursor is past the program's, and a row of the program's
@@ -153,11 +149,25 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
         lc {e = skip}  _  () _
         lc {e = pin _} _  () _
 
+    -- The stream's end lies past the run's cursor: nothing but a pin follows it.
+    tend : ∀ {c′} → t c′ end → w ≼ c′
+    tend {c′} tc = lw tc tt (aft (cursor nothing rs) (last-met mt))
+      where
+        aft : ∀ c → Last t c rs → After c c′
+        aft nothing  _ = tt
+        aft (just y) (e , i , ty , vy) with ≼-or-≻ c′ y
+        ... | inj₂ yc = yc
+        ... | inj₁ cy with ≼-split {c′} {y} cy
+        ...   | inj₁ lt with InvAt.quiet It tc ty lt
+        ...     | _ , refl , _ = ⊥-elim vy
+        aft (just y) (e , i , ty , vy) | inj₁ cy | inj₂ refl with InvAt.func It tc ty
+        ... | refl = ⊥-elim (ne i)
+
     lu : ∀ {y e} → u y e → Visible e → After (cursor nothing rs′) y → w ≼ y
     lu {e = out _} uy vy ay = lw (lift-vis uy) vy (j1 uy ay)
     lu {y} {e = end} uy _ ay with ≼-or-≻ w y
     ... | inj₁ le = le
-    ... | inj₂ yw = ⊥-elim (late uy yw fw unf λ ic → ng (from-late uy yw ay ic))
+    ... | inj₂ yw = ⊥-elim (late uy yw fw unf tend λ ic → ng (from-late uy yw ay ic))
     lu {e = skip}  _  () _
     lu {e = pin _} _  () _
 
