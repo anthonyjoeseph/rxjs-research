@@ -38,7 +38,8 @@ open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.CombSent using (reach-below; module Two)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (laneDone)
-open import simultaneous.LaneStart using (module C; starts-after; z₀)
+open import simultaneous.LaneLayers using (starts-after)
+open import simultaneous.LaneStart using (module C; z₀)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; laneSrc; laneStep; undone; marked; piece; shareˢ; counted; framed)
 

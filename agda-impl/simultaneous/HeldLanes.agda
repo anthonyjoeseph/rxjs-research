@@ -39,6 +39,7 @@ open import Data.Unit using (tt)
 open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.Count using (reach-down)
+import simultaneous.LaneLayers as LaneLayers
 import simultaneous.LaneStart as LaneStart
 open import denotation.Laws.Modulus using (entered-few; T-not; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≼-≺-≺; ≼-or-≻; ≺-absurd)
 open import denotation.Events using (<ᵖ-part; <ᵖ-between)
@@ -547,8 +548,8 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   lane-shows-start : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a} → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × q ⊑ y₀
   lane-shows-start nb {q} {a} =
     let (r , u) = LaneStart.lane-start-row _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m (q ⊕ [ ix 1 ])
-    in _ , _ , lane-of fL RO op nb (r , LaneStart.under-ext (q ⊕ [ ix 1 ]) u)
-     , LaneStart.under-trans (LaneStart.under-⊕ (LaneStart.under-⊕ (LaneStart.under-refl q) (ix 1)) (ix 0)) u
+    in _ , _ , lane-of fL RO op nb (r , LaneLayers.under-ext (q ⊕ [ ix 1 ]) u)
+     , LaneLayers.under-trans (LaneLayers.under-⊕ (LaneLayers.under-⊕ (LaneLayers.under-refl q) (ix 1)) (ix 0)) u
 
   private
     few-reach : ∀ {X : Set} {t : EmissionSet X} {k e} → Few t k → ES.Reach t k e

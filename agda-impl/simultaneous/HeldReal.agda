@@ -40,8 +40,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
-import simultaneous.LaneStart as LaneStart
-open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; ≼-or-≻; ≼-≺-≺)
+open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
 open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
@@ -73,16 +72,16 @@ open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-z
 open import simultaneous.RealView using (real-ends; lane-one)
 open import simultaneous.InstEmit using (valuesOf)
 
-open import Tree using (Obs; FlatOp; of; map; flatMap; connected; switchᶠ)
+open import Tree using (Obs; FlatOp; of; map; flatMap; connected)
 
 
-open import simultaneous.LaneCount using (kDone; kCut)
+open import simultaneous.LaneCount using (kDone)
 open import simultaneous.ScanCount using (rowKind; markAct; past-active; row-cut; row-done)
 open import Data.List.Membership.Propositional using (find)
-open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁻)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; named-at; next-≼; o-value; o-done)
 
-open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem; bproj-memʰ; open-cut; open-routing)
+open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
