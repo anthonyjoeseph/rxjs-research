@@ -758,10 +758,10 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
         ad₀ = admits-row n (f (LaneRec.a R)) uρ (lw env) (LaneRec.adm R) cx
         ad₀* : Admits Dc st
         ad₀* = admits-row n (laneˢ (λ k c′ → laneSrc ρι⁴ (f (LaneRec.a R)) k c′)) uρ*c Dc (LaneRec.adm* R) (lane-end-image R cx)
-        ys = ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
+        ys = ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ laneXs st
         alL : Aligned (maps env) ρ (c ⊕ [ ix 1 ]) (laneL st)
         alL = aligned-r* {Ψ = maps env} {ρ = ρ} (aligned-⊕ {Ψ = maps env} {ρ = ρ} (end-cuts R cx) (ix 1) (sub r))
-                (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
+                (ix 1 ∷ ix 0 ∷ last ∷ ix 1 ∷ ix 0 ∷ ix 1 ∷ [])
 
     -- The last of some lanes that `h` picks: a queued lane is listed after
     -- the lane it waited on.
@@ -858,7 +858,7 @@ module Flat {Γ A B} n (f : A → Obs Timeline Γ B) (s : Obs Timeline Γ A)
       -- the source's of it stripped, the markers', and the source's ends.
       bk′ : ℕ → Pos → List Pos
       bk′ N l = L.concatMap (λ R → let Rl = Out.rel (LaneRec.lane R) in
-                                     Rel.bk Rl N (ups 5 l) ++ Rel.bk Rl N (ups 8 l) ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk Rl N (ups 9 l))) (lanes N)
+                                     Rel.bk Rl N (ups 5 l) ++ Rel.bk Rl N (ups 4 l) ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk Rl N (ups 5 l))) (lanes N)
              ++ Rel.bk (Out.rel Os) N (up l)
              ++ L.map (λ k → k ⊕ [ ix 0 ]) (Rel.bk (Out.rel Os) N (ups 5 l))
              ++ endsOf (S N)
