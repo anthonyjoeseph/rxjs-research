@@ -22,6 +22,7 @@ open import Relation.Nullary using (¬_)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
 open import Data.Unit using (tt)
+import Data.Unit
 open import Data.List.Relation.Unary.All using ([])
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix; []; _∷_)
@@ -314,6 +315,18 @@ snoc-view []       = inj₁ refl
 snoc-view (x ∷ xs) with snoc-view xs
 ... | inj₁ refl           = inj₂ ([] , x , refl)
 ... | inj₂ (ys , y , refl) = inj₂ (x ∷ ys , y , refl)
+
+-- Where a run met stands: nowhere yet, or at a row it met.
+Last : ∀ {A} → EmissionSet A → Maybe Pos → List (Pos × Ev A) → Set
+Last t nothing  rs = Data.Unit.⊤
+Last t (just y) rs = Σ _ λ e → (y , e) ∈ rs × t y e × Visible e
+
+last-met : ∀ {A} {t : EmissionSet A} {rs} → Run t nothing rs → Last t (cursor nothing rs) rs
+last-met {t = t} {rs} run with snoc-view rs
+... | inj₁ refl = tt
+... | inj₂ (ys , (q , e) , refl) =
+  subst (λ z → Last t z (ys ++ [ (q , e) ])) (sym (cursor-snoc nothing ys))
+    (e , ∈-++⁺ʳ ys (here refl) , run-row run (∈-++⁺ʳ ys (here refl)))
 
 last-in : ∀ {A : Set} (ys : List A) {y} xs {z zs} → ys ++ [ y ] ≡ xs ++ z ∷ zs → y ∈ (z ∷ zs)
 last-in []       []       refl = here refl

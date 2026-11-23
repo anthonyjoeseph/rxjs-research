@@ -26,7 +26,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (_≟_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
@@ -46,7 +46,8 @@ open import simultaneous.Routed using (Held; Idle; Rest; cnt; nameOf; nm; opos)
 open import simultaneous.Relabel using (same-mark; EvSame; ev-out; ev-end; RowsAt; []ᵃ; _∷ᵃ_; cntAt; memAt; endAt; held-move)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst; same-refl)
 open import simultaneous.HeldTake using (ex-ext)
-open import simultaneous.Layers using (to≺; from≺; snoc-view; cursor-snoc; run-row)
+open import simultaneous.Layers using (to≺; from≺; last-met)
+import simultaneous.Layers as Layers
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 
@@ -251,17 +252,8 @@ module HotRun {A : Set} (S : EmissionSet A) (sb : Pos)
       least : ∀ {k₂ e₂} → S k₂ e₂ → Visible e₂ → After c k₂ → k ≼ k₂
       least s₂ v₂ a₂ lt = lf (lift-vis s₂ v₂) v₂ (aft-fwd cu s₂ a₂) (down s₂ (proj₁ σk) lt)
 
-  -- Where a run met stands: nowhere yet, or at a row it met.
   Last : Maybe Pos → List (Pos × Ev A) → Set
-  Last nothing  rs = ⊤
-  Last (just y) rs = Σ _ λ e → (y , e) ∈ rs × S y e × Visible e
-
-  last-met : ∀ {rs} → Met S rs → Last (cursor nothing rs) rs
-  last-met {rs} run with snoc-view rs
-  ... | inj₁ refl = tt
-  ... | inj₂ (ys , (q , e) , refl) =
-    subst (λ z → Last z (ys ++ [ (q , e) ])) (sym (cursor-snoc nothing ys))
-      (e , ∈-++⁺ʳ ys (here refl) , run-row run (∈-++⁺ʳ ys (here refl)))
+  Last = Layers.Last S
 
   last-cur : ∀ {c rs} → Last c rs → Cur c
   last-cur {nothing} _               = none

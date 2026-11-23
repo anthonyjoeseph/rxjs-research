@@ -11,7 +11,8 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; suc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
+open import simultaneous.ElabUndone using (Undone; AUndone; EnvU; hot-u; ann-u⟦⟧; ann-uᵃ; elab-undone⟦⟧; elab-undoneᵃ)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; _⊕_; cascade)
@@ -93,7 +94,9 @@ open import simultaneous.ColdIdle using (cold-idle)
 
 -- A connect's binder: its source annotated, read hot past the connect
 -- at `at`, the source holding, every burst it is exempt for one the
--- reader is exempt for too.
+-- reader is exempt for too, and the source ending no lane: a binder
+-- whose source showed a `laneDone` would put one in a lane's rows that
+-- no frame piece sent, so a lane's rows would not be its program's.
 record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
   field
     {Θ}   : List Set
@@ -104,6 +107,7 @@ record Bound {X : Set} (d : Den (AIE X)) (cs : List Pos) : Set₁ where
     outer : List Pos
     held  : Held (enter (ev m src env) ((at ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) (((at ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) ∷ outer)
     good  : GoodEnv env
+    undone : Undone (ev m src env)
     ok    : Ok (Hots env) at
     ep    : Early at
     under : ∀ {c} → c ∈ at ∷ outer → c ∈ cs
@@ -134,6 +138,21 @@ record EnvHeld {Γ Δ} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (env :
   field
     bound : ∀ {X} (i : X ∈ Γ) → Bound (lookup env (ρ (∈-map⁺ AIE i))) cs
     apart : ∀ {X Y} (i : X ∈ Γ) (j : Y ∈ Γ) {y e} → Ann (bound i) y e → AShown e → Nl.¬ Gap (bound j) y
+
+-- An elaborated program ends no lane where its binders end none.
+ev-undone : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) (env : DenEnv Δ) → EnvU ρ env → Undone (ev m (elab ρ o) env)
+ev-undone nothing  ρ o env eu = elab-undone⟦⟧ ρ o env eu
+ev-undone (just n) ρ o env eu = elab-undoneᵃ n ρ o env eu
+
+-- An annotated source ends no lane where the source ends none.
+ann-ev : ∀ m {Θ X} (src : Obs Timeline Θ (IE X)) (env : DenEnv Θ) → Undone (ev m src env) → AUndone (ev m (annotate src) env)
+ann-ev nothing  src env u = ann-u⟦⟧ src env u
+ann-ev (just n) src env u = ann-uᵃ n src env u
+
+-- No binder in scope ends a lane: each annotates a source that ends none.
+eh-u : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} → EnvHeld ρ env cs → EnvU ρ env
+eh-u eh i = subst AUndone (sym (Bound.is b)) (hot-u (ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b)) (ann-ev (Bound.m b) (Bound.src b) (Bound.env b) (Bound.undone b)))
+  where b = EnvHeld.bound eh i
 
 -- Outside every gap of a scope, one binder at a time.
 Apart : ∀ (Γ : List Set) → (∀ {X} → X ∈ Γ → Pos → Set) → Pos → Set
@@ -374,7 +393,7 @@ held-scan (just n) ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
 widen b = record
   { m = Bound.m b ; src = Bound.src b ; env = Bound.env b ; at = Bound.at b ; outer = Bound.outer b
-  ; held = Bound.held b ; good = Bound.good b ; ok = Bound.ok b ; ep = Bound.ep b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
+  ; held = Bound.held b ; good = Bound.good b ; undone = Bound.undone b ; ok = Bound.ok b ; ep = Bound.ep b ; under = λ i → there (Bound.under b i) ; is = Bound.is b }
 
 -- EVERY HANG SHOWS: past a position, a reader reaching few rows before
 -- it finds few rows there, for every size of the reach.
@@ -480,7 +499,7 @@ module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
     { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs
     ; held = IH.holds hs env cs g eh ((p ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ok-step _ (ok-step p ok))
                (Adm.step ad (ok-step p ok) (Adm.step ad ok fr plain-ix) plain-ix) (early-inst [ ix 1 ] (early-inst [ ix 1 ] ep))
-    ; good = g ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
+    ; good = g ; undone = ev-undone m ρ s env (eh-u eh) ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
 
   bd : ∀ {X} (i : X ∈ A ∷ Γ) → Bound (lookup (hot σ ∷ env) (ext ρ (∈-map⁺ AIE i))) (p ∷ cs)
   bd (here refl) = nb
