@@ -251,13 +251,13 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 #### PLACEMENT
 
 Untried: every row a lane hangs on lies outside every binder's last gap.
-A connect's new binder must keep its gap clear of the old rows and its
-body's subscription (`apart-new`, `apart-old`, `body-fresh`); each former
-hangs lanes only where its children do. Settled by bodies, or a lane hung
-on a row inside a gap.
+A connect's new binder must keep its own rows out of its gap and every
+older binder's: a world position past a join need not lie in the world,
+so a gap's lane may lead a joined hot row. Each former hangs lanes only
+where its children do. Settled by bodies, or a lane hung on a row inside a gap.
 
-Members: `ann-apart`, `apart-new`, `apart-old`, `body-fresh`,
-`placed-cold`, `placed-connected`, `placed-flatMap`.
+Members: `ann-apart`, `apart-new`, `placed-cold`, `placed-connected`,
+`placed-flatMap`.
 
 #### THE FINITE REST
 

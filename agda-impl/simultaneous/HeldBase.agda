@@ -67,6 +67,11 @@ open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (out; end)
 open import denotation.Laws.Worlds using (ok-step; _⊑_)
+open import denotation.Laws.Worlds using (Anc; anc-lead; anc-view; parent-fun; step-parent; world-anc; real-snoc)
+open import denotation.Laws.Modulus using (ticks)
+open import denotation.Laws.Worlds using (w-up; shrink⁼)
+open import denotation.Read using (Visible)
+open import Data.Sum using (inj₁)
 open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -477,11 +482,43 @@ postulate
             → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ s) env)
             → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
             → ∀ {Y} (j : Y ∈ Γ) {y e} → AnnAt m ρ s env p y e → AShown e → Nl.¬ Gap (EnvHeld.bound eh j) y
-  apart-old : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
-            → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p
-            → ∀ {Y} (j : Y ∈ Γ) {y e} → Ann (EnvHeld.bound eh j) y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
-  body-fresh : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → GoodEnv env
-             → ∀ p → Ok (Hots env) p → Nl.¬ GapIn (AnnAt m ρ s env p) (p ⊕ [ ix 0 ])
+
+-- AN OLDER BINDER'S ROWS ARE HOT, AND NONE IN THE NEW BINDER'S WORLD:
+-- a value or end is a hot row, and a gap's lane lies in the world of `p`.
+apart-old : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
+          → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p
+          → ∀ {Y} (j : Y ∈ Γ) {y e} → Ann (EnvHeld.bound eh j) y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
+apart-old m ρ s env cs g eh p ok j {y} a sh (c , r , a′ , h , _) = proj₂ ok hy lane (⊑-inside h)
+  where
+    b  = EnvHeld.bound eh j
+    IB = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+    IA = inv-ev m (annotate (elab ρ s)) env g (p ⊕ [ ix 1 ]) (ok-step p ok)
+    vis : ∀ {X} {e : Ev (AIE X)} → AShown e → Visible e
+    vis a-value = tt
+    vis a-end   = tt
+    hy : Hots env y
+    hy = hots-at env (ρ (∈-map⁺ AIE j)) (Bound.is b) (a , λ ce cq → pinby-vis (vis sh) (InvAt.quiet IB ce a cq))
+    lane : W (Hots env) p (c ⊕ [ ix 1 ])
+    lane with w-up plain-ix (inW (InvAt.world IA a′))
+    ... | inj₂ v = shrink⁼ v
+    ... | inj₁ eq with ⊕-injʳ p (c ⊕ [ ix 1 ]) eq
+    ...   | ()
+
+-- THE BODY IS SUBSCRIBED OUTSIDE ITS SOURCE'S GAPS: a gap's lane descends
+-- from the source's subscription at `p ⊕ [ ix 1 ]`, and nothing that does
+-- leads `p ⊕ [ ix 0 ]`, reachable before it.
+body-fresh : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → GoodEnv env
+           → ∀ p → Ok (Hots env) p → Nl.¬ GapIn (AnnAt m ρ s env p) (p ⊕ [ ix 0 ])
+body-fresh m ρ s env g p ok (c , r , a , h , _) =
+  anc-lead (lane (world-anc (InvAt.world IA a))) h (real-snoc p plain-ix (proj₁ ok)) (ticks p 0)
+  where
+    IA = inv-ev m (annotate (elab ρ s)) env g (p ⊕ [ ix 1 ]) (ok-step p ok)
+    lane : Anc (p ⊕ [ ix 1 ]) ((c ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) → Anc (p ⊕ [ ix 1 ]) (c ⊕ [ ix 1 ])
+    lane x with anc-view x
+    ... | inj₁ eq with ⊕-injʳ p (c ⊕ [ ix 1 ]) eq
+    ...   | ()
+    lane x | inj₂ (_ , y , pb) with parent-fun pb (step-parent (c ⊕ [ ix 1 ]) plain-ix)
+    ...   | refl = y
 
 -- A CONNECT'S BINDER, made at `p`: its source held below the annotation,
 -- and the binders in scope widened past it.
