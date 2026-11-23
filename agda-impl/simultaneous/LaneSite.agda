@@ -524,24 +524,24 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
 
         -- Each layer shows, before the split, what the layer below does.
         ct-up : ∀ {v b y e} → ScE v (out b) → enter (Inner b) (U v) y (out e) → U v ≺ y → y ≺ q₂ → enter (Ct lanePart h₁ h₂) FB y (out e)
-        ct-up sc inr uy yq = Joining.lane sc tt (inr , uy) (λ ()) tt , reach-down {q = q₂} (proj₂ ctq) yq tt
+        ct-up {y = y} {e} sc inr uy yq = Joining.lane sc tt (inr , uy) (λ ()) tt , reach-down {q = q₂} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ ctq) yq tt
 
         sv-up : ∀ {y e} → enter (Ct lanePart h₁ h₂) FB y (out e) → y ≺ q₂ → SvE y (out e)
-        sv-up ct yq = Connecting.body (Connecting.body ct , reach-down {q = q₂} (proj₂ (mid-out lanePart P svq)) yq tt)
-                    , reach-down {q = q₂} (proj₂ svq) yq tt
+        sv-up {y} {e} ct yq = Connecting.body (Connecting.body ct , reach-down {q = q₂} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ (mid-out lanePart P svq)) yq tt)
+                    , reach-down {q = q₂} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ svq) yq tt
 
         mm-up : ∀ {y e} → SvE y (out e) → P ≺ y → y ≺ q₂ → MME y (out e)
-        mm-up sv Py yq = Joining.lane okK tt (sv , Py) (λ ()) tt , reach-down {q = q₂} (proj₂ mmq) yq tt
+        mm-up {y} {e} sv Py yq = Joining.lane okK tt (sv , Py) (λ ()) tt , reach-down {q = q₂} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ mmq) yq tt
 
         mb-up : ∀ {y e} → SbE y (out e) → Pb ≺ y → y ≺ q₂ → MME y (out e)
-        mb-up sb Py yq = Joining.lane okKb tt (sb , Py) (λ ()) tt , reach-down {q = q₂} (proj₂ mmq) yq tt
+        mb-up {y} {e} sb Py yq = Joining.lane okKb tt (sb , Py) (λ ()) tt , reach-down {q = q₂} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ mmq) yq tt
 
         ld-up : ∀ {y e} → MME y (out e) → T (undone e) → y ≺ q₂ → LDE y (out e)
-        ld-up {y} mm kp yq = TakeWhile.pass mm kp (λ (q′ , a′ , x′ , nk′ , lt′) → nF (q′ , a′ , x′ , nk′ , ≺-trans {q′} {y} {q₂} lt′ yq))
-                           , reach-down {q = yd} (proj₂ ldq) (≺-trans {y} {q₂} {yd} yq q≺yd) tt
+        ld-up {y} {e} mm kp yq = TakeWhile.pass mm kp (λ (q′ , a′ , x′ , nk′ , lt′) → nF (q′ , a′ , x′ , nk′ , ≺-trans {q′} {y} {q₂} lt′ yq))
+                           , reach-down {q = yd} {w = y} {e = out (instEmit (mark laneDone) n)} {e₁ = out e} (proj₂ ldq) (≺-trans {y} {q₂} {yd} yq q≺yd) tt
 
         sc-at : ∀ {v b} (ac : Ac v b) → v ≺ v₂ → ScE v (out b)
-        sc-at ac lt = Scan.sval ac , reach-down {q = v₂} (proj₂ scr) lt tt
+        sc-at {v} {b} ac lt = Scan.sval ac , reach-down {q = v₂} {w = v} {e = out b₂} {e₁ = out b} (proj₂ scr) lt tt
 
         Iq : ∀ {v b} (ac : Ac v b) → v ≺ v₂ → I v ≺ q₂
         Iq {v} ac lt = far (val-row ac) (val-row ac₂) lt (under-trans (u-vU v) (u-UI v)) (under-trans (u-vU v₂) (u-UI v₂))
