@@ -41,7 +41,7 @@ open import simultaneous.InstEmit using (begin; stop; subscribed; completed; lan
 open import Data.Product using (Σ; _,_)
 open import Data.Unit using (⊤; tt)
 import denotation.Laws.ShowsJoin as SJ
-open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; empty-few; held-cold; held-connect;
+open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; empty-few; held-cold;
   held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
 open import simultaneous.Routed using (Adm; PlacedD; Placed; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
@@ -53,6 +53,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; from)
 open import simultaneous.HeldReader using (held-connected)
+open import simultaneous.HeldConnBind using (held-connect)
 open import simultaneous.HeldComb using (ev)
 import Relation.Nullary as Nl
 open import Data.Sum using ([_,_]′)
