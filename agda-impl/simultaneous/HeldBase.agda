@@ -27,7 +27,7 @@ open import denotation.Laws.Worlds using (InvAt; W; step; here; inW; plain-ix; p
   ⊕-injʳ; ⊕-identityʳ)
 open import denotation.EmissionSet using (Ev; module Op; module Connecting)
 open import Data.Sum using (inj₂)
-open import simultaneous.HeldIn using (HeldIn; held-in)
+open import simultaneous.HeldIn using (HeldIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
 open import simultaneous.HeldScan using (held-scan-den)
@@ -67,6 +67,8 @@ open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (out; end)
 open import denotation.Laws.Worlds using (ok-step; _⊑_)
+open import denotation.Read using (Visible)
+open import Data.Sum using (inj₁)
 open import Data.Sum using (inj₁)
 open import Data.Unit using (tt)
 open import Data.Empty using (⊥-elim)
@@ -459,75 +461,6 @@ placed-conn (just n) A′ B′ env g gf p ok k (Connecting.body x , _) sh =
     Is = inv-approx n A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
     IF L = inv-approx n B′ (hot _ ∷ env) (good-cons L g)
-
--- A connect's annotated source, read at its own subscription.
-AnnAt : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → Pos → EmissionSet (AIE A)
-AnnAt m ρ s env p = enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ])
-
--- A NEW BINDER KEEPS THE BINDERS APART.  Its rows a lane can hang on lie
--- below its source's, outside its own last gap and every older binder's;
--- an older binder's are hot rows, none in the new binder's world; and
--- the body is subscribed short of the new binder's rows.
-postulate
-  ann-apart : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
-            → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ s) env)
-            → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
-            → ∀ {y e} → AnnAt m ρ s env p y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
-  apart-new : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
-            → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ s) env)
-            → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
-            → ∀ {Y} (j : Y ∈ Γ) {y e} → AnnAt m ρ s env p y e → AShown e → Nl.¬ Gap (EnvHeld.bound eh j) y
-  apart-old : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs → GoodEnv env
-            → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p
-            → ∀ {Y} (j : Y ∈ Γ) {y e} → Ann (EnvHeld.bound eh j) y e → AShown e → Nl.¬ GapIn (AnnAt m ρ s env p) y
-  body-fresh : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → GoodEnv env
-             → ∀ p → Ok (Hots env) p → Nl.¬ GapIn (AnnAt m ρ s env p) (p ⊕ [ ix 0 ])
-
--- A CONNECT'S BINDER, made at `p`: its source held below the annotation,
--- and the binders in scope widened past it.
-module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (hs : IH m ρ s)
-                (env : DenEnv Δ) (cs : List Pos) (g : GoodEnv env) (eh : EnvHeld ρ env cs)
-                (p : Pos) (ok : Ok (Hots env) p) (fr : Fresh eh p) (ep : Early p) where
-
-  ad = fresh-adm eh
-
-  σ : EmissionSet (AIE A)
-  σ = Proper (AnnAt m ρ s env p)
-
-  nb : Bound (hot σ) (p ∷ cs)
-  nb = record
-    { m = m ; src = elab ρ s ; env = env ; at = p ; outer = cs
-    ; held = IH.holds hs env cs g eh ((p ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) (ok-step _ (ok-step p ok))
-               (Adm.step ad (ok-step p ok) (Adm.step ad ok fr plain-ix) plain-ix) (early-inst [ ix 1 ] (early-inst [ ix 1 ] ep))
-    ; good = g ; undone = ev-undone m ρ s env (eh-u eh) ; ok = ok ; ep = ep ; under = λ i → i ; is = refl }
-
-  bd : ∀ {X} (i : X ∈ A ∷ Γ) → Bound (lookup (hot σ ∷ env) (ext ρ (∈-map⁺ AIE i))) (p ∷ cs)
-  bd (here refl) = nb
-  bd (there i)   = widen (EnvHeld.bound eh i)
-
-  pl = IH.placed hs env cs g eh
-
-  ap : ∀ {X Y} (i : X ∈ A ∷ Γ) (j : Y ∈ A ∷ Γ) {y e} → Ann (bd i) y e → AShown e → Nl.¬ Gap (bd j) y
-  ap (here refl) (here refl) = ann-apart m ρ s env cs g eh pl p ok fr ep
-  ap (here refl) (there j)   = apart-new m ρ s env cs g eh pl p ok fr ep j
-  ap (there i)   (here refl) = apart-old m ρ s env cs g eh p ok i
-  ap (there i)   (there j)   = EnvHeld.apart eh i j
-
-  eh′ : EnvHeld (ext ρ) (hot σ ∷ env) (p ∷ cs)
-  eh′ = record { bound = bd ; apart = ap }
-
-  fr′ : Fresh eh′ (p ⊕ [ ix 0 ])
-  fr′ = body-fresh m ρ s env g p ok , Adm.bare ad fr (λ ())
-
-held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
-             → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
-held-connect m ρ s b hs hb = ih
-  (λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
-    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
-      held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ ep₀))
-  λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
-    placed-conn m (annotate (elab ρ s)) _ env g proj₂ p ok λ L ok₀ →
-      IH.placed (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep)
 
 -- A FLATMAP'S SCAN HOLDS, read past the connects that share its outer:
 -- the trigger at `p ⊕ [ ix 1 ]`, the outer as its lane, the closer,
