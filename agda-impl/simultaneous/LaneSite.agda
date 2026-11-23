@@ -170,6 +170,11 @@ under-≼ u = ⊑-≼ u
 undone-false : ∀ {X} (a : IE X) → T (undone a) → T (not (undone a)) → ⊥
 undone-false a u nu = notT (undone a) nu u
 
+-- Two positions, by their order: an eliminator, so no `with` abstracts a
+-- large context.
+tri : ∀ {C : Set} {v w : Pos} → (w ≺ v → C) → (v ≺ w → C) → (v ≡ w → C) → C
+tri {v = v} {w} a b c = [ (λ vw → [ b , c ]′ (≼-split {v} {w} vw)) , a ]′ (≼-or-≻ v w)
+
 ------------------------------------------------------------------------
 -- The site, over the lane's layers
 
@@ -563,11 +568,7 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         ld-anat (TakeWhile.fail {q = q′} x nk nF′ _ , _) = inj₁ (cong (_⊕ [ ix 0 ]) same)
           where
             same : q′ ≡ q₂
-            same with ≼-or-≻ q′ q₂
-            ... | inj₂ q₂q′ = ⊥-elim (nF′ (q₂ , _ , mmq , tt , q₂q′))
-            ... | inj₁ q′q₂ with ≼-split {q′} {q₂} q′q₂
-            ...   | inj₁ lt = ⊥-elim (nF (q′ , _ , x , nk , lt))
-            ...   | inj₂ eq = eq
+            same = tri {v = q′} {q₂} (λ q₂q′ → ⊥-elim (nF′ (q₂ , _ , mmq , tt , q₂q′))) (λ lt → ⊥-elim (nF (q′ , _ , x , nk , lt))) (λ eq → eq)
 
         -- WHAT A ROW OF THE LANE IS: its `laneDone`, the burst part's
         -- `burstEnd`, or a frame value's split.
@@ -577,14 +578,15 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
           k-val   : ∀ {v b} (ac : Ac v b) → y ≡ I v → e ≡ val ac → T (undone e) → Kind y e
           k-carry : ∀ {v b} (ac : Ac v b) i {n′} → y ≡ Bs v ⊕ [ ix i ] → i < proj₂ (proj₁ (pre ac)) → val ac ≡ instEmit (mark laneDone) n′ → Kind y e
 
+        kind-sv : ∀ {y e} → View y e → T (undone e) → Kind y e
+        kind-sv (_ , _ , ac , _ , inj₁ (ey , ee)) kp                    = k-val ac ey ee kp
+        kind-sv (_ , _ , ac , _ , inj₂ (i , _ , ey , lt , _ , vd′)) _ = k-carry ac i ey lt vd′
+
+        kind-mm : ∀ {y e} → MME y (out e) → T (undone e) → Kind y e
+        kind-mm mm kp = [ (λ x → kind-sv (img (proj₁ x)) kp) , (λ x → k-burst (proj₁ (burst-only (proj₁ x))) (proj₁ x)) ]′ (mm-anat mm)
+
         kind : ∀ {y e} → LDE y (out e) → Kind y e
-        kind r with ld-anat r
-        ... | inj₁ eq = k-done eq
-        ... | inj₂ (mm , kp) with mm-anat mm
-        ...   | inj₂ (sb , _) = k-burst (proj₁ (burst-only sb)) sb
-        ...   | inj₁ (sv , _) with img sv
-        ...     | _ , _ , ac , _ , inj₁ (ey , ee)                    = k-val ac ey ee kp
-        ...     | _ , _ , ac , _ , inj₂ (i , _ , ey , lt , _ , vd′) = k-carry ac i ey lt vd′
+        kind r = [ k-done , (λ x → kind-mm (proj₁ x) (proj₂ x)) ]′ (ld-anat r)
 
         -- A split's rows lie under its value's.
         Anch : Pos → Set
@@ -619,16 +621,14 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
             go : ∀ {y e} → Kind y e → Under (U v₂) y → y ≺ yd → Σ ℕ λ i → i < proj₂ (proj₁ (pre ac₂)) × y ≡ Bs v₂ ⊕ [ ix i ]
             go (k-done refl) _ lt′ = ⊥-elim (≺-irrefl {yd} lt′)
             go (k-burst refl sb) uy′ _ = ⊥-elim (ap svq sb (P≺U (val-row ac₂)) uy′)
-            go {y} (k-val {v} ac refl ee kp) uy′ lt′ with ≼-or-≻ v₂ v
-            ... | inj₂ vv₂ = ⊥-elim (under-≼ uy′ (far (val-row ac) (val-row ac₂) vv₂ (u-v (u-UI v)) (u-vU v₂)))
-            ... | inj₁ v₂v with ≼-split {v₂} {v} v₂v
-            ...   | inj₁ lt₂ = ⊥-elim (≺-absurd {y} {yd} lt′ (far (val-row ac₂) (val-row ac) lt₂ u-yd (u-v (u-UI v))))
-            ...   | inj₂ refl = ⊥-elim (subst (λ a → T (undone a)) (trans ee (trans (proj₂ (pre-val ac ac₂)) vd)) kp)
-            go {y} (k-carry {v} ac i refl lt₀ _) uy′ lt′ with ≼-or-≻ v₂ v
-            ... | inj₂ vv₂ = ⊥-elim (under-≼ uy′ (far (val-row ac) (val-row ac₂) vv₂ (u-v (u-UB v i)) (u-vU v₂)))
-            ... | inj₁ v₂v with ≼-split {v₂} {v} v₂v
-            ...   | inj₁ lt₂ = ⊥-elim (≺-absurd {y} {yd} lt′ (far (val-row ac₂) (val-row ac) lt₂ u-yd (u-v (u-UB v i))))
-            ...   | inj₂ refl = i , subst (λ st → i < proj₂ (proj₁ st)) (proj₁ (pre-val ac ac₂)) lt₀ , refl
+            go {y} (k-val {v} ac refl ee kp) uy′ lt′ = tri {v = v₂} {v}
+              (λ vv₂ → ⊥-elim (under-≼ uy′ (far (val-row ac) (val-row ac₂) vv₂ (u-v (u-UI v)) (u-vU v₂))))
+              (λ lt₂ → ⊥-elim (≺-absurd {y} {yd} lt′ (far (val-row ac₂) (val-row ac) lt₂ u-yd (u-v (u-UI v)))))
+              (λ { refl → ⊥-elim (subst (λ a → T (undone a)) (trans ee (trans (proj₂ (pre-val ac ac₂)) vd)) kp) })
+            go {y} (k-carry {v} ac i refl lt₀ _) uy′ lt′ = tri {v = v₂} {v}
+              (λ vv₂ → ⊥-elim (under-≼ uy′ (far (val-row ac) (val-row ac₂) vv₂ (u-v (u-UB v i)) (u-vU v₂))))
+              (λ lt₂ → ⊥-elim (≺-absurd {y} {yd} lt′ (far (val-row ac₂) (val-row ac) lt₂ u-yd (u-v (u-UB v i)))))
+              (λ { refl → i , subst (λ st → i < proj₂ (proj₁ st)) (proj₁ (pre-val ac ac₂)) lt₀ , refl })
 
         ----------------------------------------------------------------
         -- The fold
@@ -637,17 +637,14 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         T₀ y e = LDE y (out e) × (y ≡ Ib → ⊥)
 
         U≺yd : ∀ {v b} (ac : Ac v b) → v ≼ v₂ → U v ≺ yd
-        U≺yd {v} ac h with ≼-split {v} {v₂} h
-        ... | inj₁ lt = far (val-row ac) (val-row ac₂) lt (u-vU v) u-yd
-        ... | inj₂ refl = ≺-trans {U v} {q₂} {yd} (U≺I v) q≺yd
+        U≺yd {v} ac h = [ (λ lt → far (val-row ac) (val-row ac₂) lt (u-vU v) u-yd) , (λ { refl → ≺-trans {U v} {q₂} {yd} (U≺I v) q≺yd }) ]′ (≼-split {v} {v₂} h)
 
         -- An anchored row of the lane against a value's split.
         before-U : ∀ {v b y} (ac : Ac v b) → Anch y → (∀ {v′ b′} (ac′ : Ac v′ b′) → v′ ≺ v → ⊥) → y ≺ U v → ⊥
-        before-U {v} {y = y} ac (v′ , _ , ac′ , uy , _) mn lt with ≼-or-≻ v v′
-        ... | inj₂ v′v = mn ac′ v′v
-        ... | inj₁ vv′ with ≼-split {v} {v′} vv′
-        ...   | inj₁ lt′ = ≺-absurd {y} {U v} lt (far (val-row ac) (val-row ac′) lt′ (u-vU v) (u-v uy))
-        ...   | inj₂ refl = under-≼ uy lt
+        before-U {v} {y = y} ac (v′ , _ , ac′ , uy , _) mn lt = tri {v = v} {v′}
+          (λ v′v → mn ac′ v′v)
+          (λ lt′ → ≺-absurd {y} {U v} lt (far (val-row ac) (val-row ac′) lt′ (u-vU v) (u-v uy)))
+          (λ { refl → under-≼ uy lt })
 
         claim : ∀ {v b} (ac : Ac v b) → v ≼ v₂ → FoldOf T₀ (U v) (proj₁ (pre ac))
         claim {v} ac₀@(Scan.acc₀ x mn) h = f-none λ {y} (r , nb) lt → gap (anch (kind r)) nb lt
@@ -673,13 +670,10 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
                 go : (y ≡ yd ⊎ y ≡ Ib) ⊎ Anch y → ⊥
                 go (inj₁ (inj₁ eq)) = ≺-absurd {yd} {I v₀} (subst (_≺ I v₀) eq yI) (≺-trans {I v₀} {q₂} {yd} (Iq a v₀v₂) q≺yd)
                 go (inj₁ (inj₂ eq))   = nb eq
-                go (inj₂ (v′ , _ , ac′ , uy′ , k)) with ≼-or-≻ v₀ v′
-                ... | inj₂ v′v₀ = uy (far (val-row ac′) (val-row a) v′v₀ (u-v uy′) (u-vU v₀))
-                ... | inj₁ v₀v′ with ≼-split {v₀} {v′} v₀v′
-                ...   | inj₁ lt′ = ≺-absurd {y} {I v₀} yI (far (val-row a) (val-row ac′) lt′ (u-v (u-UI v₀)) (u-v uy′))
-                ...   | inj₂ refl with k
-                ...     | inj₁ eq = ≺-irrefl {I v₀} (subst (_≺ I v₀) eq yI)
-                ...     | inj₂ nu = undone-false (val ac′) (undone-before ac′ v₀v₂) nu
+                go (inj₂ (v′ , _ , ac′ , uy′ , k)) = tri {v = v₀} {v′}
+                  (λ v′v₀ → uy (far (val-row ac′) (val-row a) v′v₀ (u-v uy′) (u-vU v₀)))
+                  (λ lt′ → ≺-absurd {y} {I v₀} yI (far (val-row a) (val-row ac′) lt′ (u-v (u-UI v₀)) (u-v uy′)))
+                  (λ { refl → [ (λ eq → ≺-irrefl {I v₀} (subst (_≺ I v₀) eq yI)) , (λ nu → undone-false (val ac′) (undone-before ac′ v₀v₂) nu) ]′ k })
 
             -- Nothing of the lane between `v₀`'s split and `v`'s value.
             btw : ∀ {y′ e′} → T₀ y′ e′ → I v₀ ≺ y′ → y′ ≺ U v → ⊥
@@ -688,17 +682,13 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
                 go : (y′ ≡ yd ⊎ y′ ≡ Ib) ⊎ Anch y′ → ⊥
                 go (inj₁ (inj₁ eq)) = ≺-absurd {yd} {U v} (subst (_≺ U v) eq yU) (U≺yd (Scan.acc a x lt nx) h)
                 go (inj₁ (inj₂ eq))   = nb eq
-                go (inj₂ (v′ , _ , ac′ , uy′ , k)) with ≼-or-≻ v₀ v′
-                ... | inj₂ v′v₀ = ≺-absurd {I v₀} {y′} Iy (far (val-row ac′) (val-row a) v′v₀ (u-v uy′) (u-v (u-UI v₀)))
-                ... | inj₁ v₀v′ with ≼-split {v₀} {v′} v₀v′
-                ...   | inj₁ lt′ with ≼-or-≻ v v′
-                ...     | inj₂ v′v = nx (val-row ac′) lt′ v′v
-                ...     | inj₁ vv′ with ≼-split {v} {v′} vv′
-                ...       | inj₁ lt″ = ≺-absurd {y′} {U v} yU (far x (val-row ac′) lt″ (u-vU v) (u-v uy′))
-                ...       | inj₂ refl = under-≼ uy′ yU
-                go (inj₂ (v′ , _ , ac′ , uy′ , k)) | inj₁ v₀v′ | inj₂ refl with k
-                ... | inj₁ eq = ≺-irrefl {I v₀} (subst (I v₀ ≺_) eq Iy)
-                ... | inj₂ nu = undone-false (val ac′) (undone-before ac′ v₀v₂) nu
+                go (inj₂ (v′ , _ , ac′ , uy′ , k)) = tri {v = v₀} {v′}
+                  (λ v′v₀ → ≺-absurd {I v₀} {y′} Iy (far (val-row ac′) (val-row a) v′v₀ (u-v uy′) (u-v (u-UI v₀))))
+                  (λ lt′ → tri {v = v} {v′}
+                     (λ v′v → nx (val-row ac′) lt′ v′v)
+                     (λ lt″ → ≺-absurd {y′} {U v} yU (far x (val-row ac′) lt″ (u-vU v) (u-v uy′)))
+                     (λ { refl → under-≼ uy′ yU }))
+                  (λ { refl → [ (λ eq → ≺-irrefl {I v₀} (subst (I v₀ ≺_) eq Iy)) , (λ nu → undone-false (val ac′) (undone-before ac′ v₀v₂) nu) ]′ k })
 
         has : Ib ≺ U v₂ → LDE Ib (out (marked burstEnd))
         has lt = ld-up (mb-up sv-row P≺Ib Ibq) tt Ibq
@@ -719,15 +709,19 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
           ; fold = fold
           }
 
+      ld≢be : ∀ {n} → instEmit (mark laneDone) n ≡ marked burstEnd → ⊥
+      ld≢be ()
+
+      site-v : ∀ {q n} → View q (instEmit (mark laneDone) n) → SvE q (out (instEmit (mark laneDone) n)) → MME q (out (instEmit (mark laneDone) n))
+             → LDE (q ⊕ [ ix 0 ]) (out (instEmit (mark laneDone) n)) → ¬ TakeWhile.Failed true undone MME q → Sited LDE (q ⊕ [ ix 0 ])
+      site-v (v₂ , b₂ , ac₂ , scr , inj₁ (refl , vd)) svq mmq ldq nF = Chain.sited ac₂ (sym vd) scr svq mmq ldq nF
+      site-v (_ , _ , _ , _ , inj₂ (_ , _ , _ , _ , () , _)) _ _ _ _
+
       -- A LANE'S `laneDone` SITS AT ITS SPLIT.
       site : ∀ {yd n} → LDE yd (out (instEmit (mark laneDone) n)) → Sited LDE yd
       site (TakeWhile.pass _ () _ , _)
-      site ldq@(TakeWhile.fail mmq nk nF tt , _) with mm-anat mmq
-      ... | inj₂ (sb , _) with proj₂ (burst-only sb)
-      ...   | ()
-      site ldq@(TakeWhile.fail mmq nk nF tt , _) | inj₁ (svq , _) with img svq
-      ...   | v₂ , b₂ , ac₂ , scr , inj₁ (refl , vd) = Chain.sited ac₂ (sym vd) scr svq mmq ldq nF
-      ...   | _ , _ , _ , _ , inj₂ (_ , _ , _ , _ , () , _)
+      site ldq@(TakeWhile.fail mmq nk nF tt , _) =
+        [ (λ x → site-v (img (proj₁ x)) (proj₁ x) mmq ldq nF) , (λ x → ⊥-elim (ld≢be (proj₂ (burst-only (proj₁ x))))) ]′ (mm-anat mmq)
 
 ------------------------------------------------------------------------
 -- The lane, as the elaboration builds it
