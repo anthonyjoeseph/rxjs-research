@@ -52,7 +52,8 @@ import simultaneous.Spec as Spec
 open Spec _≟ᵖ_ using (batchSimultaneousᴰ)
 open import simultaneous.Prefixes using (prefix-≡; prefix-trans; prefix-++; closed-prefix; prefix-ext)
 open import simultaneous.Relations using (Met; values; values-++; ranked; Left; Exits; Over; lastValue; carried; stampedᴮ; grouped; Closes; Batches; elaborated; batched)
-open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name; enter-few; visible-unpinned)
+open import simultaneous.Ranks using (unrank; Carries; carried-rel; closed-rel; module Relabel; ranks-x; ranks-b; batch-rank; name-rank; rank-name; visible-unpinned)
+open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.Erasure using (module Reaching)
 open import simultaneous.Layers using (scan-out; scan-in; each-out; each-in; run-row; at-func; cursor-snoc; cursor-in; pre-∈; run-has; from≺; run-det; run-++; after-≺)
 open import simultaneous.Batcher using (released; released-held; after; after-snoc; released-++; Stamps; stamps-of; Named; Good; stamped-prefix; stamped-++;

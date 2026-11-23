@@ -109,6 +109,25 @@ module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a�
   sub₀ : Sub 0 q₀ (q₀ ⊕ [ ix 1 ]) a₀
   sub₀ = nth₀ , room (s≤s z≤n)
 
+  -- A lane of the second value starts as the second lane.
+  second : (a₀ ≡ a₁ → ⊥) → ∀ {i q s a} → a ≡ a₁ → Sub i q s a → Starts 1 q₁ (Sched 1) s
+  second ne eq (n , st) with nth-c n
+  ... | n₀ = ⊥-elim (ne eq)
+  ... | n₁ = st
+
+  -- The first lane's end, and the second lane starts at one.
+  end-of : ∀ {c} → Ends 0 [] c → After (f a₀) (q₀ ⊕ [ ix 1 ]) c end
+  end-of (_ , _ , _ , n , st , e) with nth-c n
+  ... | n₀ with starts₀ st
+  ...   | refl = e
+
+  first-end : ∀ {s} → Starts 1 q₁ (Sched 1) s → Σ Pos λ c₀ → After (f a₀) (q₀ ⊕ [ ix 1 ]) c₀ end
+  first-end (room (s≤s ()))
+  first-end (freed _ (inj₁ (c , ec , _)))               = c , end-of ec
+  first-end (freed _ (inj₂ ()))
+  first-end (queued {c} _ _ (inj₁ (_ , ec , refl)) _ _) = c , end-of ec
+  first-end (queued _ _ (inj₂ ()) _ _)
+
   module End {c₀ c₁ s₁ : Pos} (e₀ : After (f a₀) (q₀ ⊕ [ ix 1 ]) c₀ end) (u₀ : ∀ {c} → After (f a₀) (q₀ ⊕ [ ix 1 ]) c end → c ≡ c₀)
              (st₁ : Starts 1 q₁ (Sched 1) s₁) (e₁ : After (f a₁) s₁ c₁ end) where
 
@@ -117,9 +136,7 @@ module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a�
 
     -- The first lane ends once.
     ends₀ : ∀ {c} → Ends 0 [] c → c ≡ c₀
-    ends₀ (_ , _ , _ , n , st , e) with nth-c n
-    ... | n₀ with starts₀ st
-    ...   | refl = u₀ e
+    ends₀ ec = u₀ (end-of ec)
 
     -- The second lane starts past the first's end.
     past₀ : ∀ {s} → Starts 1 q₁ (Sched 1) s → c₀ ≺ s
@@ -204,7 +221,15 @@ module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a�
     end-inst (at-outer lt) = trans (inst-ext Q [ last ]) (sym (mid Q Q c₁ qL (≼-refl {Q}) Qc₁ (≺→≼ {c₁} {qL} lt) (sym (inst-ext Q [ last ]))))
 
     -- THE MERGE'S END, with few rows before it when its lanes have.
-    module Row (E : Pos) (ks : List Pos) (fl : ∀ {i q s a y e} → Sub i q s a → After (f a) s y e → y ≺ E → y ∈ ks) where
+    module Row (E : Pos) (ks : List Pos) (fl₀ : ∀ {y e} → After (f a₀) (q₀ ⊕ [ ix 1 ]) y e → y ≺ E → y ∈ ks)
+               (fl₁ : ∀ {y e} → After (f a₁) s₁ y e → y ≺ E → y ∈ ks) where
+
+      fl : ∀ {i q s a y e} → Sub i q s a → After (f a) s y e → y ≺ E → y ∈ ks
+      fl (n , st) l lt with nth-c n
+      ... | n₀ with starts₀ st
+      ...   | refl = fl₀ l lt
+      fl (n , st) l lt | n₁ with starts₁ st
+      ...   | refl = fl₁ l lt
 
       ks′ : List Pos
       ks′ = (q₀ ⊕ [ ix 0 ]) ∷ (q₁ ⊕ [ ix 0 ]) ∷ qL ∷ (ks ++ L.map (_⊕ [ ix 0 ]) ks)
