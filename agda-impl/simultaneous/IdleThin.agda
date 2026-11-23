@@ -8,15 +8,14 @@
 -- values, is then a run of the program with the same count.
 --
 -- Past the program's end the program waits on nothing, so a reader there
--- reads the program's count at that end, which names its instant: the
--- stream's first cut lies under the program's end, so a reader before it
--- and past the end is under the end too, of the same instant.
+-- reads the program's count at that end, which names its instant: a
+-- reader past the end with few rows before it and no cut before it is
+-- in that instant.
 module simultaneous.IdleThin where
 
-open import Data.Bool using (Bool; true; false; T; not)
-open import Data.Bool.Properties using (T-≡)
+open import Data.Bool using (Bool)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List using (List; []; _∷_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -25,44 +24,30 @@ open import Data.Nat using (ℕ) renaming (_≟_ to _≟ⁿ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
-open import Function using (Equivalence)
 open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Nullary using (¬_)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; inside; _<ᵖ_; _⊕_)
-open import denotation.Events using (Timeline; fresh; <ᵖ-split; <ᵖ-step; <ᵖ-over)
+open import denotation.Position using (Pos; root; _≟ᵖ_; instant; _∙_)
+open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; skip; end; pin; Few; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
 open import denotation.Laws.Modulus using (≺-trans; ≺→≼; ≺-≼-≺; ≼-or-≻; ≼-split)
-open import denotation.Laws.Worlds using (InvAt; ⊑-inside; inside-⊑; ⊕-assoc; _⊑_)
+open import denotation.Laws.Worlds using (InvAt)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Idle; cnt; nameOf)
+open import simultaneous.Routed using (Idle; cnt; nameOf; nm)
 open import simultaneous.HeldTo using (Unfailed; IdleTo)
-open import simultaneous.HeldTake using (name-ext)
 open import simultaneous.Layers using (after-≺)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count)
-
--- PAST A POSITION AND AT OR BEFORE ONE UNDER IT IS UNDER IT.
-between : ∀ c w zs → c ≺ w → w ≼ (c ⊕ zs) → c ⊑ w
-between c w zs cw wz with inside c w in ins
-... | true  = inside-⊑ c w (subst T (sym ins) tt)
-... | false = ⊥-elim (wz (Equivalence.from T-≡ (<ᵖ-over c w zs step none)))
-  where
-    none : ∀ l ls → w ≡ c ⊕ (l ∷ ls) → ⊥
-    none l ls eq = subst T ins (⊑-inside {c} {w} (l ∷ ls , eq))
-    step : (c ⊕ [ ix 0 ]) <ᵖ w ≡ true
-    step with <ᵖ-split (c ⊕ [ ix 0 ]) w (<ᵖ-step c w (Equivalence.to T-≡ cw))
-    ... | inj₁ t′ = t′
-    ... | inj₂ eq = ⊥-elim (none (ix 0) [] (sym eq))
 
 module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos → Set} {q₀ : Pos} (Iu : InvAt H q₀ u) (iu : Idle u)
             (vis : ∀ {q v} → t q (out v) → u q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → u q e′ → ⊥)))
             (lift : ∀ {q e} → u q e → Σ (Ev (IE X)) (t q))
             (lift-vis : ∀ {q v} → u q (out v) → t q (out v))
-            (late : ∀ {c} → u c end → Σ Pos λ f → Σ (IE X) λ v → t f (out v) × T (not (keep v)) × c ⊑ f) where
+            (late : ∀ {c} → u c end → ∀ {w} → c ≺ w → Few t w → Unfailed keep t w → ¬ ¬ (instant w ≡ instant c)) where
 
   Row : Set
   Row = Pos × Ev (IE X)
@@ -126,7 +111,7 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
       i2′ qy = after-≺ c′ (i2 ac) qy
 
       i1′ : ∀ {k v} → u k (out v) → After c′ k → q ≺ k
-      i1′ uk ak with ≼-split (lst (lift-vis uk) tt (i1 uk ak))
+      i1′ {k} uk ak with ≼-split {q} {k} (lst (lift-vis uk) tt (i1 uk ak))
       ... | inj₁ lt   = lt
       ... | inj₂ refl = ⊥-elim (nu uk)
 
@@ -137,7 +122,9 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
               (fw : Few t w) (aw : After (cursor nothing rs) w) (lw : ∀ {y e} → t y e → Visible e → After (cursor nothing rs) y → w ≼ y)
               (ng : Goal rs w → ⊥) where
 
-    R = run mt th (λ _ → tt) (λ _ _ → tt)
+    R : Run u nothing rs′ × (∀ {y} → After (cursor nothing rs) y → After (cursor nothing rs′) y)
+                          × (∀ {k v} → u k (out v) → After (cursor nothing rs′) k → After (cursor nothing rs) k)
+    R = run {nothing} {nothing} mt th (λ _ → tt) (λ _ _ → tt)
 
     mu : Met u rs′
     mu = proj₁ R
@@ -156,11 +143,9 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
     back (inj₂ e) nz = inj₂ (trans (cong proj₁ E) (trans e nz))
 
     -- Past the program's end: its count there, of its instant.
-    late-goal : ∀ {c} → u c end → c ≺ w → After (cursor nothing rs′) c → Goal rs w
-    late-goal {c} uc cw ac with late uc
-    ... | f , v , tf , nk , zs , refl with between c w (zs ++ [ ix 0 ]) cw (subst (w ≼_) (⊕-assoc c zs [ ix 0 ]) (λ fw′ → unf tf nk fw′))
-    ...   | ys , wy = back (iu mu ne′ (few (proj₁ fw , λ x lt → proj₂ fw x (≺-trans {_} {c} {w} lt cw))) ac lc)
-                        (trans (sym (name-ext c ys)) (cong nameOf (sym wy)))
+    from-late : ∀ {c} → u c end → c ≺ w → After (cursor nothing rs′) c → instant w ≡ instant c → Goal rs w
+    from-late {c} uc cw ac ic =
+      back {c} (iu mu ne′ (few (proj₁ fw , λ {k} x lt → proj₂ fw x (≺-trans {k} {c} {w} lt cw))) ac lc) (cong (λ j → nm (j ∙ [])) (sym ic))
       where
         lc : ∀ {y e} → u y e → Visible e → After (cursor nothing rs′) y → c ≼ y
         lc {y} {e = out _} uy vy ay = ≺→≼ {c} {y} (≺-≼-≺ {c} {w} {y} cw (lw (lift-vis uy) vy (j1 uy ay)))
@@ -172,12 +157,12 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
     lu {e = out _} uy vy ay = lw (lift-vis uy) vy (j1 uy ay)
     lu {y} {e = end} uy _ ay with ≼-or-≻ w y
     ... | inj₁ le = le
-    ... | inj₂ yw = ⊥-elim (ng (late-goal uy yw ay))
+    ... | inj₂ yw = ⊥-elim (late uy yw fw unf λ ic → ng (from-late uy yw ay ic))
     lu {e = skip}  _  () _
     lu {e = pin _} _  () _
 
     absurd : ⊥
-    absurd = ng (back (iu mu ne′ (few fw) (proj₁ (proj₂ R) aw) lu) refl)
+    absurd = ng (back {w} (iu mu ne′ (few fw) (proj₁ (proj₂ R) aw) lu) refl)
 
   idle : IdleTo keep t
   idle {rs} mt ne {w} unf fw aw lw with thin mt ne

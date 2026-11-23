@@ -8,6 +8,7 @@
 module simultaneous.LaneIdle where
 
 open import Data.Bool using (true; false; T; not)
+open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
@@ -17,14 +18,16 @@ open import Data.Nat using (ℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Nullary using (¬_; yes; no)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; takeWhile)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _∙_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; Few; module Op; module Bounded)
+open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; Few; _≺_; module Op; module Bounded)
 open import denotation.Read using (Run; []; _∷_)
-open import denotation.Laws.Worlds using (Ok; InvAt; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after; _⊑_)
+open import denotation.Laws.Worlds using (Ok; InvAt; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; value)
@@ -32,7 +35,7 @@ open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst)
 open import simultaneous.HeldTake using (module TakeIdle)
-open import simultaneous.HeldTo using (IdleTo)
+open import simultaneous.HeldTo using (IdleTo; Unfailed)
 open import simultaneous.LaneLocal using (inv-ev; EndsEarly; held-fit; module FlatFit; module LaneReal; undone-done; done; of-outer)
 open import simultaneous.LaneOnce using (module LaneOnce)
 open import simultaneous.RealView using (module View)
@@ -51,9 +54,6 @@ module Same {X : Set} {t u : EmissionSet (IE X)} (to : ∀ {y e} → t y e → u
 
   few : ∀ {w} → Few t w → Few u w
   few (ks , h) = ks , λ x lt → h (from x) lt
-
-  few′ : ∀ {w} → Few u w → Few t w
-  few′ (ks , h) = ks , λ x lt → h (to x) lt
 
   run : ∀ {c rs} → Run t c rs → Run u c rs
   run [] = []
@@ -86,6 +86,10 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     Mg : EmissionSet (IE B)
     Mg = enter (ev m (merged a) env₂) s
 
+    -- The lane part's share, at its subscription.
+    Sh : EmissionSet (IE B)
+    Sh = enter (ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′) Q
+
     Prog : Pos → EmissionSet (IE B)
     Prog s′ = enter (ev m (elab ρ₄ (f a)) env′) s′
 
@@ -113,10 +117,39 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       -- its values shown as they are.
       rows-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Mg q (out v)
 
-      -- THE LANE PART'S `laneDone` LIES UNDER THE PROGRAM'S END: its frame
-      -- runs the `laneDone` once the share's merge ends, which is once the
-      -- program does.
-      rows-late : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × c ⊑ f′
+      -- THE END'S INSTANT HOLDING FEW ROWS OF THE MERGE, THE SHARE'S MERGE
+      -- ENDS THERE: at the program's end, or, the program ending in the
+      -- subscribing instant, at its outer's, the program's rows before that
+      -- being few.  Nothing ends the share otherwise: a connect's endless
+      -- synchronous burst can leave endlessly many pins past the program's
+      -- end.
+      share-ends : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → (ks : List Pos) → (∀ {y e} → Mg y e → instant y ≡ instant c → y ∈ ks)
+                 → ¬ ¬ (Σ Pos λ e → Sh e end × instant e ≡ instant c)
+
+      -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT: the frame's
+      -- second lane, reading it, ends one label under it, and the third,
+      -- queued behind, shows the `laneDone`.  Only ¬¬: the scan's state
+      -- there folds every value before it (`Fold.fold`).
+      share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
+
+    -- THE END'S INSTANT HOLDING FEW ROWS OF THE MERGE, ITS `laneDone`
+    -- FALLS THERE.
+    done-in : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → (ks : List Pos) → (∀ {y e} → Mg y e → instant y ≡ instant c → y ∈ ks)
+            → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant c)
+    done-in rn uc ks h k = share-ends rn uc ks h λ (e , se , ie) → share-done se λ (f′ , v , x , nk , if) → k (f′ , v , x , nk , trans if ie)
+
+    -- A READER PAST THE PROGRAM'S END, BEFORE ANY CUT AND WITH FEW ROWS
+    -- BEFORE IT, IS IN THE END'S INSTANT: were it later, the end's instant
+    -- would hold few rows, so a cut before the reader.
+    rows-late : ∀ {s′} → Runs s′ → ∀ {c} → Prog s′ c end → ∀ {w} → c ≺ w → Few Mg w → Unfailed undone Mg w → ¬ ¬ (instant w ≡ instant c)
+    rows-late rn {c} uc {w} cw (ks , fw) unf k with instant w ≟ⁱ instant c
+    ... | yes eq = k eq
+    ... | no ne  = done-in rn uc ks (λ {y} x iy → fw x (before {y} iy)) λ (f′ , v , x , nk , if) → unf x nk (before {f′ ⊕ [ ix 0 ]} (ext f′ if))
+      where
+        before : ∀ {y} → instant y ≡ instant c → y ≺ w
+        before {y} iy = instant-≺ y w (subst (_≺ⁱ instant w) (sym iy) (≺-instant c w cw λ e → ne (sym e)))
+        ext : ∀ f′ → instant f′ ≡ instant c → instant (f′ ⊕ [ ix 0 ]) ≡ instant c
+        ext (_ ∙ _) e = e
 
     -- THE MERGE IS IDLE UP TO ITS `laneDone`.
     merged-idle : IdleTo undone Mg
