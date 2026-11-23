@@ -339,7 +339,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       begin-at : ∀ {y₀ n₀ q′} → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → y₀ ≺ y → RV.Runs op q′ → ¬ RV.CutAt op q′ y → q ≡ q′
                → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × σ₃ y₀ (out (instEmit (mark laneStart) n₀)) × y₀ ≼ y
       begin-at {y₀} {n₀} L₀ lt rn nc refl = y₀ , n₀ , L₀
-                     , (R-from (join-in op fL RO xo rn L₀ (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c))
+                     , (R-from (join-in op fL RO xo rn L₀ (λ c → nc (cutat-up op fL RO {q} {y₀} {y} lt c)) tt
                                 , reach-down {q = y} {w = y₀} {e = out (instEmit (mark (laneDone kd)) n)} {e₁ = out (instEmit (mark laneStart) n₀)} (proj₂ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) (proj₁ σd))) lt tt)
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
@@ -612,7 +612,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
         y₀≺v : y₀ ≺ v
         y₀≺v = before-inst {y₀} {c ⊕ [ sub w′ ]} {v} (≺-trans {y₀} {x₀} {c ⊕ [ sub w′ ]} (≺-ext y₀ []) x₀≺z) zv
         rR : R y₀ (out (instEmit (mark laneStart) n₀))
-        rR = R-from (join-in op fL RO xo rn l (never-cut op fL RO nc) , proj₁ fJ , λ {k} x lt _ → proj₂ fJ x (≺-trans {k} {y₀} {v} lt y₀≺v))
+        rR = R-from (join-in op fL RO xo rn l (never-cut op fL RO nc) tt , proj₁ fJ , λ {k} x lt _ → proj₂ fJ x (≺-trans {k} {y₀} {v} lt y₀≺v))
         σs : σ₃ y₀ (out (instEmit (mark laneStart) n₀))
         σs = rR , λ {c′} rc → [ (λ le → le) , (λ lt → ⊥-elim (pin-not (InvAt.quiet I₃ rc rR lt))) ]′ (≼-or-≻ y₀ c′)
     in lane-shown σs (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {x₀} {c ⊕ [ sub w′ ]} x₀≺z)

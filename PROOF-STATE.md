@@ -284,16 +284,6 @@ a body.
 Members: `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
 
-#### A LANE'S RUN IN THE LANES'
-
-Untried: a wait the lanes' rows few precede, and past their cursor before
-their next, is so for a live lane. Hardest: a lane row the lanes never
-show — cut past the cursor, or unreachable in the join; the cutter's own
-first row precedes a cut one. Settled by bodies, or a lane row before the
-wait that no lanes' row past the cursor precedes.
-
-Members: `lane-few`, `lane-least`.
-
 #### THE BATCH RANK
 
 Untried: the batcher keeps the elaborated run's instants, an `each`
