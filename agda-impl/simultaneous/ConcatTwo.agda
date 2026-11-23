@@ -19,19 +19,22 @@ open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import denotation.Position using (Pos; ix; last; instant; _∙_; _⊕_)
+open import denotation.Position using (Pos; ix; last; instant; _⊕_)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; enter; out; end; at-out; on-out; at-end; _≺_; _≼_; After; Truncate; module Op; module Values; module Bounded)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≺-≼-≺; ≼-refl; ≺→≼; ≺-irrefl; ≼-or-≻)
 open import denotation.Laws.Worlds using (⊕-injˡ)
 open import denotation.Laws.Worlds.Leaves using (of-reach; of-end-row)
 open import denotation.Laws.Cut using (ix-asc)
+open import denotation.Laws.Truth using (instant-⊕)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.LaneLayers using (starts-after)
 open import simultaneous.ColdIdle using (mid)
 
--- A step below a position stays in its instant.
-inst-ext : ∀ p zs → instant (p ⊕ zs) ≡ instant p
-inst-ext (_ ∙ _) _ = refl
+-- The first lane of a concat starts at once.
+starts₀ : ∀ {A B} {f : A → Den B} {o : EmissionSet A} {q s} → Bounded.Starts 1 f o 0 q [] s → s ≡ q ⊕ [ ix 1 ]
+starts₀ (Bounded.room _)            = refl
+starts₀ (Bounded.freed () _)
+starts₀ (Bounded.queued () _ _ _ _)
 
 -- `O` holds the rows of `of [ a₀ , a₁ ]` read at `Q`.
 module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a₁ : A)
@@ -99,12 +102,6 @@ module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a�
   ...   | refl = n₀
   nth-c n | r₁ with nth-inj n nth₁
   ...   | refl = n₁
-
-  -- The first lane starts at once.
-  starts₀ : ∀ {q s} → Starts 0 q [] s → s ≡ q ⊕ [ ix 1 ]
-  starts₀ (room _)            = refl
-  starts₀ (freed () _)
-  starts₀ (queued () _ _ _ _)
 
   sub₀ : Sub 0 q₀ (q₀ ⊕ [ ix 1 ]) a₀
   sub₀ = nth₀ , room (s≤s z≤n)
@@ -218,7 +215,7 @@ module Two {A B : Set} (f : A → Den B) (O : EmissionSet A) (Q : Pos) (a₀ a�
     -- The merge ends in its second lane's end's instant.
     end-inst : ∀ {E} → EndAt E → instant E ≡ instant c₁
     end-inst (at-lane _)   = refl
-    end-inst (at-outer lt) = trans (inst-ext Q [ last ]) (sym (mid Q Q c₁ qL (≼-refl {Q}) Qc₁ (≺→≼ {c₁} {qL} lt) (sym (inst-ext Q [ last ]))))
+    end-inst (at-outer lt) = trans (instant-⊕ Q [ last ]) (sym (mid Q Q c₁ qL (≼-refl {Q}) Qc₁ (≺→≼ {c₁} {qL} lt) (sym (instant-⊕ Q [ last ]))))
 
     -- THE MERGE'S END, with few rows before it when its lanes have.
     module Row (E : Pos) (ks : List Pos) (fl₀ : ∀ {y e} → After (f a₀) (q₀ ⊕ [ ix 1 ]) y e → y ≺ E → y ∈ ks)

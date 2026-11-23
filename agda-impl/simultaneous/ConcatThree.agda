@@ -16,7 +16,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; s≤s; z≤n)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
@@ -29,7 +29,8 @@ open import denotation.Laws.Worlds.Leaves using (of-reach; of-end-row)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Nth using (module Nths)
 open import simultaneous.LaneLayers using (under-refl; under-⊕; under-≺; join-few)
-open import simultaneous.ConcatTwo using (inst-ext)
+open import simultaneous.ConcatTwo using (starts₀)
+open import denotation.Laws.Truth using (instant-⊕)
 
 -- A one-value `of`'s rows: its value, then its end.
 data R1 {B : Set} (x : B) (s : Pos) : Pos → Ev B → Set where
@@ -40,20 +41,11 @@ r1 : ∀ {B} (x : B) s {y e} → enter (Op.of (x ∷ [])) s y e → R1 x s y e
 r1 x s (at-out , _)        = o1
 r1 x s (on-out at-end , _) = e1
 
-module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : EmissionSet B) {e : Pos}
-             (f0→ : ∀ s {y e′} → enter (f 0) s y e′ → enter (Op.of (x₀ ∷ [])) s y e′)
-             (f0← : ∀ s {y e′} → enter (Op.of (x₀ ∷ [])) s y e′ → enter (f 0) s y e′)
-             (f1→ : ∀ s {y e′} → enter (f 1) s y e′ → enter (hot T) s y e′)
-             (f1← : ∀ s {y e′} → enter (hot T) s y e′ → enter (f 1) s y e′)
-             (f2→ : ∀ s {y e′} → enter (f 2) s y e′ → enter (Op.of (x₂ ∷ [])) s y e′)
-             (f2← : ∀ s {y e′} → enter (Op.of (x₂ ∷ [])) s y e′ → enter (f 2) s y e′)
-             (te : T e end) (tu : ∀ {c} → T c end → c ≡ e) (tl : ∀ {y e′} → T y e′ → y ≼ e) (tf : Few T e)
-             (q₂e : (F ⊕ [ ix 2 ]) ≺ e) where
-
+-- `of [ 0 , 1 , 2 ]` read at `F`: its rows, and its values by index.
+module Of3 (F : Pos) where
   O : EmissionSet ℕ
   O = enter (Op.of (0 ∷ 1 ∷ 2 ∷ [])) F
 
-  open Bounded 1 f O
   open Values O using (Nth; first; next)
   open Nths O using (nth-val; nth-inj)
 
@@ -63,47 +55,11 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
   q₂ = F ⊕ [ ix 2 ]
   qL = F ⊕ [ last ]
 
-  -- The lanes' subscriptions and ends, and where the third lane's value lies.
-  S₀ c₀ s₁ c₁ s₂ w : Pos
-  S₀ = q₀ ⊕ [ ix 1 ]
-  c₀ = S₀ ⊕ [ last ]
-  s₁ = q₁ ⊕ [ ix 1 ]
-  c₁ = e ⊕ [ sub s₁ ]
-  s₂ = c₁ ⊕ [ ix 1 ]
-  w  = s₂ ⊕ [ ix 0 ]
-
-  ------------------------------------------------------------------------
-  -- Order
-
   lt01 : q₀ ≺ q₁
   lt01 = ix-asc F (s≤s z≤n)
 
   lt12 : q₁ ≺ q₂
   lt12 = ix-asc F (s≤s (s≤s z≤n))
-
-  c₀q₁ : c₀ ≺ q₁
-  c₀q₁ = under-≺ F (s≤s z≤n) (under-⊕ (under-⊕ (under-refl q₀) (ix 1)) last)
-
-  c₀q₂ : c₀ ≺ q₂
-  c₀q₂ = ≺-trans {c₀} {q₁} {q₂} c₀q₁ lt12
-
-  s₁q₂ : s₁ ≺ q₂
-  s₁q₂ = under-≺ F (s≤s (s≤s z≤n)) (under-⊕ (under-refl q₁) (ix 1))
-
-  s₁e : s₁ ≺ e
-  s₁e = ≺-trans {s₁} {q₂} {e} s₁q₂ q₂e
-
-  ec₁ : e ≺ c₁
-  ec₁ = ≺-ext e []
-
-  q₂c₁ : q₂ ≺ c₁
-  q₂c₁ = ≺-trans {q₂} {e} {c₁} q₂e ec₁
-
-  c₀c₁ : c₀ ≺ c₁
-  c₀c₁ = ≺-trans {c₀} {q₂} {c₁} c₀q₂ q₂c₁
-
-  ------------------------------------------------------------------------
-  -- The outer's values
 
   data ORow : Pos → Ev ℕ → Set where
     r₀ : ORow q₀ (out 0)
@@ -167,13 +123,61 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
   nth-c n | r₂ with nth-inj n nth₂
   ...   | refl = n₂
 
+  ofin : ∀ {k e′} → O k e′ → k ∈ (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [])
+  ofin x with o-row x
+  ... | r₀ = here refl
+  ... | r₁ = there (here refl)
+  ... | r₂ = there (there (here refl))
+  ... | rL = there (there (there (here refl)))
+
+module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : EmissionSet B) {e : Pos}
+             (f0→ : ∀ s {y e′} → enter (f 0) s y e′ → enter (Op.of (x₀ ∷ [])) s y e′)
+             (f0← : ∀ s {y e′} → enter (Op.of (x₀ ∷ [])) s y e′ → enter (f 0) s y e′)
+             (f1→ : ∀ s {y e′} → enter (f 1) s y e′ → enter (hot T) s y e′)
+             (f1← : ∀ s {y e′} → enter (hot T) s y e′ → enter (f 1) s y e′)
+             (f2→ : ∀ s {y e′} → enter (f 2) s y e′ → enter (Op.of (x₂ ∷ [])) s y e′)
+             (f2← : ∀ s {y e′} → enter (Op.of (x₂ ∷ [])) s y e′ → enter (f 2) s y e′)
+             (te : T e end) (tu : ∀ {c} → T c end → c ≡ e) (tl : ∀ {y e′} → T y e′ → y ≼ e) (tf : Few T e)
+             (q₂e : (F ⊕ [ ix 2 ]) ≺ e) where
+
+  open Of3 F public
+  open Bounded 1 f O
+
+  -- The lanes' subscriptions and ends, and where the third lane's value lies.
+  S₀ c₀ s₁ c₁ s₂ w : Pos
+  S₀ = q₀ ⊕ [ ix 1 ]
+  c₀ = S₀ ⊕ [ last ]
+  s₁ = q₁ ⊕ [ ix 1 ]
+  c₁ = e ⊕ [ sub s₁ ]
+  s₂ = c₁ ⊕ [ ix 1 ]
+  w  = s₂ ⊕ [ ix 0 ]
+
+  ------------------------------------------------------------------------
+  -- Order
+
+  c₀q₁ : c₀ ≺ q₁
+  c₀q₁ = under-≺ F (s≤s z≤n) (under-⊕ (under-⊕ (under-refl q₀) (ix 1)) last)
+
+  c₀q₂ : c₀ ≺ q₂
+  c₀q₂ = ≺-trans {c₀} {q₁} {q₂} c₀q₁ lt12
+
+  s₁q₂ : s₁ ≺ q₂
+  s₁q₂ = under-≺ F (s≤s (s≤s z≤n)) (under-⊕ (under-refl q₁) (ix 1))
+
+  s₁e : s₁ ≺ e
+  s₁e = ≺-trans {s₁} {q₂} {e} s₁q₂ q₂e
+
+  ec₁ : e ≺ c₁
+  ec₁ = ≺-ext e []
+
+  q₂c₁ : q₂ ≺ c₁
+  q₂c₁ = ≺-trans {q₂} {e} {c₁} q₂e ec₁
+
+  c₀c₁ : c₀ ≺ c₁
+  c₀c₁ = ≺-trans {c₀} {q₂} {c₁} c₀q₂ q₂c₁
+
   ------------------------------------------------------------------------
   -- The first lane
-
-  starts₀ : ∀ {q s} → Starts 0 q [] s → s ≡ q ⊕ [ ix 1 ]
-  starts₀ (room _)            = refl
-  starts₀ (freed () _)
-  starts₀ (queued () _ _ _ _)
 
   end₀ : After (f 0) S₀ c₀ end
   end₀ = f0← S₀ (of-end-row S₀ 0 (x₀ ∷ []) , of-reach S₀ 0 (x₀ ∷ []) {c₀} {end}) , ≺-ext S₀ []
@@ -282,14 +286,7 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
 
   -- Few rows before anywhere.
   few : ∀ v → Few JoinT v
-  few v = join-few {v = v} (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [] , ofin) (kl , λ _ l _ → lanes l) ([] , λ ())
-    where
-      ofin : ∀ {k e′} → O k e′ → k ≺ v → k ∈ (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [])
-      ofin x _ with o-row x
-      ... | r₀ = here refl
-      ... | r₁ = there (here refl)
-      ... | r₂ = there (there (here refl))
-      ... | rL = there (there (there (here refl)))
+  few v = join-few {v = v} (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [] , λ x _ → ofin x) (kl , λ _ l _ → lanes l) ([] , λ ())
 
   row : Truncate JoinT w (out x₂)
   row = raw , proj₁ (few w) , λ x lt _ → proj₂ (few w) x lt
@@ -298,4 +295,4 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
   e≺w = ≺-trans {e} {c₁} {w} ec₁ (≺-trans {c₁} {s₂} {w} (≺-ext c₁ []) (≺-ext s₂ []))
 
   w-inst : instant w ≡ instant e
-  w-inst = trans (inst-ext s₂ [ ix 0 ]) (trans (inst-ext c₁ [ ix 1 ]) (inst-ext e [ sub s₁ ]))
+  w-inst = trans (instant-⊕ s₂ [ ix 0 ]) (trans (instant-⊕ c₁ [ ix 1 ]) (instant-⊕ e [ sub s₁ ]))

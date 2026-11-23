@@ -96,10 +96,11 @@ pins-via f (ks , h) = ks , λ y kv → h (f y kv) kv
 instant-⊑ : ∀ {w y} → w ⊑ y → instant y ≡ instant w
 instant-⊑ {i ∙ _} (_ , refl) = refl
 
-private
-  instant-⊕ : ∀ s ys → instant (s ⊕ ys) ≡ instant s
-  instant-⊕ (i ∙ _) _ = refl
+-- A step below a position stays in its instant.
+instant-⊕ : ∀ s ys → instant (s ⊕ ys) ≡ instant s
+instant-⊕ (i ∙ _) _ = refl
 
+private
   -- Under the first row, before every row under a later one.
   first-before : ∀ s {i z y} → (s ⊕ [ ix 0 ]) ⊑ z → (s ⊕ [ ix (suc i) ]) ⊑ y → z ≺ y
   first-before s {i} (u , refl) (v , refl) rewrite ⊕-assoc s [ ix 0 ] u | ⊕-assoc s [ ix (suc i) ] v =

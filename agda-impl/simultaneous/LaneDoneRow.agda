@@ -9,11 +9,11 @@
 -- burst part's lane has few rows anywhere.
 module simultaneous.LaneDoneRow where
 
-open import Data.Bool using (true; false; not; T)
+open import Data.Bool using (not; T)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -43,23 +43,10 @@ open import simultaneous.InstEmit using (laneStart; laneDone)
 open import simultaneous.LaneLayers using (Under; under-refl; under-⊕; under-≺; few-row; few-tr; map-few; scan-few; join-few)
 open import simultaneous.LaneSite using (between-under)
 open import simultaneous.ConcatThree using (module Three)
+open import simultaneous.BurstFew using (conn-few-src; burst-few)
 open import simultaneous.LaneStart using (module C; Sh; sh-past; laneAt; z₀)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; laneStep; undone; marked; piece; shareˢ; counted; framed; laneSrc)
-
--- A connect's rows before `v`: its body's, and the first children of its
--- source's.
-conn-few-src : ∀ {A B} p (σ : EmissionSet A) (β : EmissionSet B) {v} → Few σ v → Few β v → Few (Connecting.ConnT p σ β) v
-conn-few-src p σ β {v} (ks , hs) (kb , hb) = kb ++ L.map (_⊕ [ ix 0 ]) ks , go
-  where
-    src : ∀ {k e} → σ k e → (k ⊕ [ ix 0 ]) ≺ v → (k ⊕ [ ix 0 ]) ∈ (kb ++ L.map (_⊕ [ ix 0 ]) ks)
-    src {k} x lt = ∈-++⁺ʳ kb (∈-map⁺ (_⊕ [ ix 0 ]) (hs x (≺-trans {k} {k ⊕ [ ix 0 ]} {v} (≺-ext k []) lt)))
-
-    go : ∀ {k e} → Connecting.ConnT p σ β k e → k ≺ v → k ∈ (kb ++ L.map (_⊕ [ ix 0 ]) ks)
-    go (Connecting.body b) lt       = ∈-++⁺ˡ (hb b lt)
-    go (Connecting.burst x _) lt    = src x lt
-    go (Connecting.echo x _ _ _) lt = src x lt
-    go (Connecting.kept x _ _ _) lt = src x lt
 
 -- A lawful set's row before a position under its end is at or before
 -- the end: past it, it would lie under the end.
@@ -157,10 +144,6 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
         Bw : Bp P ≺ Th.w
         Bw = ≺-trans {Bp P} {e} {Th.w} (≺-trans {Bp P} {Q′ ⊕ [ ix 1 ]} {e} (ix-asc Q′ (s≤s z≤n)) Qe) Th.e≺w
 
-    postulate
-      -- The burst part's lane has few rows before anywhere.
-      burst-few : ∀ s v → Few (enter (Sv burstPart) ((s ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) v
-
     -- THE LANE SHOWS ITS `laneDone` IN ITS SHARE'S ENDING INSTANT.
     core-row : ∀ s {H p} → InvAt H p (ShE (laneAt s)) → ∀ {e} → ShE (laneAt s) e end
              → ¬ ¬ Σ Pos λ f′ → Σ (IE B) λ v → enter MM s f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e
@@ -226,7 +209,7 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
             go (on-out at-out , _) _           = there (here refl)
             go (on-out (on-out at-end) , _) _  = there (there (here refl))
 
-        bf = burst-few s w
+        bf = burst-few ρ′ o ρ m s w
 
         lf : Σ (List Pos) λ kl → ∀ {q a k e′} → OS q (out a) → LaneOf Sv q a k e′ → k ≺ w → k ∈ kl
         lf = proj₁ svf ++ proj₁ bf , go
