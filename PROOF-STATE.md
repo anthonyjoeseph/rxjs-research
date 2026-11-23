@@ -284,15 +284,6 @@ a body.
 Members: `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
 
-#### A LANE'S ROWS ARE ITS PROGRAM'S
-
-Unproven: the share, a bounded merge of a blocker and the program, shows
-the program's rows at the same places once the blocker ends. Riskiest:
-`prog-runs` — the blocker ends, so the second lane starts; settled by
-the blocker's end, read through `simultaneous.ConcatTwo`.
-
-Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`.
-
 #### A LANE'S RUN IN THE LANES'
 
 Untried: the rows a live lane shows that the scan's source met are a run

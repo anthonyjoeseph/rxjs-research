@@ -44,7 +44,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.CombSent using (assoc³; of-two)
 open import simultaneous.LaneLocal using (inv-ev)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; srcLane)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; srcLane; blockˢ)
 
 ≺-part : ∀ p {a b} ys zs → a <ˡ b ≡ true → (p ⊕ (a ∷ ys)) ≺ (p ⊕ (b ∷ zs))
 ≺-part p ys zs h = Equivalence.from T-≡ (<ᵖ-part p ys zs h)
@@ -220,18 +220,17 @@ module Two (P : Pos) where
   ... | refl , _ | inj₂ (refl , _) = ≺-irrefl {q₁} lt
 
 
--- A CONCAT OF A LANE SHOWING ONLY ITS END AT `cb`, THEN A LANE: every
--- row a reader meets is the second lane's, subscribed at `cb ⊕ [ ix 1 ]`.
 -- A bounded merge's first lane starts at its value.
 start-0 : ∀ {A B : Set} {n f} {o : EmissionSet A} {q s} → Bounded.Starts {A} {B} (suc n) f o 0 q [] s → s ≡ q ⊕ [ ix 1 ]
 start-0 (Bounded.room _) = refl
 start-0 (Bounded.freed () _)
 start-0 (Bounded.queued () _ _ _ _)
 
-module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) cb)
-           (sb≺cb : ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ≺ cb) (q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb) (e₁≺cb : (P ⊕ [ last ]) ≺ cb)
-           (after  : ∀ {y e} → enter (G false) (cb ⊕ [ ix 1 ]) y e → (cb ⊕ [ ix 1 ]) ≺ y)
-           (pinned : ∀ {y r} → enter (G false) (cb ⊕ [ ix 1 ]) y (pin r) → T (inside r y)) where
+-- A CONCAT OF A LANE SHOWING ONLY ITS END AT `cb`, THEN A LANE: every
+-- row a reader meets is the second lane's, subscribed at `cb ⊕ [ ix 1 ]`,
+-- past the first's end.
+module Cat₀ {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) cb)
+            (sb≺cb : ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ≺ cb) (q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb) where
 
   open Two P
   open Blocked B
@@ -281,6 +280,26 @@ module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true
       none : Bd.Kth (_≺ cb) (Bd.Sched 1) 0 → ⊥
       none (inj₁ (_ , E , lt)) = ≺-irrefl {cb} (subst (_≺ cb) (ends-0 E) lt)
       none (inj₂ ())
+
+  -- The second lane's subscription is the only one of the value `false`.
+  sub₁ : Bd.Sub 1 q₁ s₁ false
+  sub₁ = nth₁ , st₁
+
+  sub-s₁ : ∀ {i q s} → Bd.Sub i q s false → s ≡ s₁
+  sub-s₁ {zero} (N , _) with nth-0 N
+  ... | _ , ()
+  sub-s₁ {suc zero} (N , St) with nth-1 N
+  ... | refl , _ = start-1 St
+  sub-s₁ {suc (suc _)} (N , _) = ⊥-elim (nth-2 N)
+
+module Cat {A : Set} (G : Bool → Den (IE A)) (P cb : Pos) (B : Blocked (G true) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) cb)
+           (sb≺cb : ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ≺ cb) (q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb) (e₁≺cb : (P ⊕ [ last ]) ≺ cb)
+           (after  : ∀ {y e} → enter (G false) (cb ⊕ [ ix 1 ]) y e → (cb ⊕ [ ix 1 ]) ≺ y)
+           (pinned : ∀ {y r} → enter (G false) (cb ⊕ [ ix 1 ]) y (pin r) → T (inside r y)) where
+
+  open Two P
+  open Blocked B
+  open Cat₀ G P cb B sb≺cb q₁≺cb public
 
   lane₁ : ∀ {k e} → In k e → Bd.Lane q₁ false k e
   lane₁ y = 1 , s₁ , (nth₁ , st₁) , (y , after y)
@@ -409,10 +428,34 @@ pos-sb : ∀ p → (((p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) ⊕ [ ix 1 ] �
 pos-sb p = trans (cong (_⊕ [ ix 1 ]) (assoc³ p (ix 0) (ix 1) (ix 0))) (⊕-assoc p (ix 0 ∷ ix 1 ∷ ix 0 ∷ []) [ ix 1 ])
 
 -- Either reading of the waiting lane.
-blk : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) (r sb : Pos) (lt : sb ≺ (r ⊕ [ last ]))
-    → Blocked (ev m (srcLane ρ s true) (hot (Proper (enter (ev m empty env) r)) ∷ env)) sb ((r ⊕ [ last ]) ⊕ [ sub sb ])
-blk nothing  ρ s env r sb lt = Blk.blocked r sb lt
-blk (just n) ρ s env r sb lt = Blk.blocked r sb lt
+blk : ∀ m {Δ A} (env : DenEnv Δ) (r sb : Pos) (lt : sb ≺ (r ⊕ [ last ]))
+    → Blocked (ev m (blockˢ {X = IE A}) (hot (Proper (enter (ev m empty env) r)) ∷ env)) sb ((r ⊕ [ last ]) ⊕ [ sub sb ])
+blk nothing  env r sb lt = Blk.blocked r sb lt
+blk (just n) env r sb lt = Blk.blocked r sb lt
+
+-- A share's places: its outer's, its waiting lane's subscription, and
+-- that lane's end, past the empty source's.
+module Spots (p : Pos) where
+
+  P sb cb : Pos
+  P  = (p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+  sb = (P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
+  cb = ((p ⊕ [ ix 1 ]) ⊕ [ last ]) ⊕ [ sub sb ]
+
+  eq-cb : cb ≡ p ⊕ (ix 1 ∷ last ∷ sub sb ∷ [])
+  eq-cb = assoc³ p (ix 1) last (sub sb)
+
+  sb≺e₀ : sb ≺ ((p ⊕ [ ix 1 ]) ⊕ [ last ])
+  sb≺e₀ = subst₂ _≺_ (sym (pos-sb p)) (sym (⊕-assoc p [ ix 1 ] [ last ])) (≺-part p (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ []) refl)
+
+  sb≺cb : sb ≺ cb
+  sb≺cb = subst₂ _≺_ (sym (pos-sb p)) (sym eq-cb) (≺-part p (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ sub sb ∷ []) refl)
+
+  q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb
+  q₁≺cb = subst₂ _≺_ (sym (assoc³ p (ix 0) (ix 1) (ix 1))) (sym eq-cb) (≺-part p (ix 1 ∷ ix 1 ∷ []) (last ∷ sub sb ∷ []) refl)
+
+  e₁≺cb : (P ⊕ [ last ]) ≺ cb
+  e₁≺cb = subst₂ _≺_ (sym (assoc³ p (ix 0) (ix 1) last)) (sym eq-cb) (≺-part p (ix 1 ∷ last ∷ []) (last ∷ sub sb ∷ []) refl)
 
 module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) cs p
             (g : GoodEnv env) (ok : Ok (Hots env) p) (ep : Early p) {F : Pos → Set} (ad : Adm (Hots env) F) (fr : F p) where
@@ -423,10 +466,9 @@ module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   env′ : DenEnv (⊤ ∷ Δ)
   env′ = hot σ₀ ∷ env
 
-  P sb cb s₁ : Pos
-  P  = (p ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
-  sb = (P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]
-  cb = ((p ⊕ [ ix 1 ]) ⊕ [ last ]) ⊕ [ sub sb ]
+  open Spots p
+
+  s₁ : Pos
   s₁ = cb ⊕ [ ix 1 ]
 
   G : Bool → Den (IE A)
@@ -442,26 +484,11 @@ module Trig (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X
   ok₀ = body-ok {A = ⊤} {B = ⊤} {s = ev m empty env} {F = λ h → ev m empty (h ∷ env)}
           (inv-ev m empty env g) (λ L → inv-ev m empty (hot _ ∷ env) (good-cons L g)) p ok
 
-  eq-cb : cb ≡ p ⊕ (ix 1 ∷ last ∷ sub sb ∷ [])
-  eq-cb = assoc³ p (ix 1) last (sub sb)
-
   eq-s₁ : s₁ ≡ p ⊕ (ix 1 ∷ last ∷ sub sb ∷ ix 1 ∷ [])
   eq-s₁ = trans (cong (_⊕ [ ix 1 ]) eq-cb) (⊕-assoc p (ix 1 ∷ last ∷ sub sb ∷ []) [ ix 1 ])
 
-  sb≺e₀ : sb ≺ ((p ⊕ [ ix 1 ]) ⊕ [ last ])
-  sb≺e₀ = subst₂ _≺_ (sym (pos-sb p)) (sym (⊕-assoc p [ ix 1 ] [ last ])) (≺-part p (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ []) refl)
-
-  sb≺cb : sb ≺ cb
-  sb≺cb = subst₂ _≺_ (sym (pos-sb p)) (sym eq-cb) (≺-part p (ix 1 ∷ ix 0 ∷ ix 1 ∷ []) (last ∷ sub sb ∷ []) refl)
-
-  q₁≺cb : (P ⊕ [ ix 1 ]) ≺ cb
-  q₁≺cb = subst₂ _≺_ (sym (assoc³ p (ix 0) (ix 1) (ix 1))) (sym eq-cb) (≺-part p (ix 1 ∷ ix 1 ∷ []) (last ∷ sub sb ∷ []) refl)
-
-  e₁≺cb : (P ⊕ [ last ]) ≺ cb
-  e₁≺cb = subst₂ _≺_ (sym (assoc³ p (ix 0) (ix 1) last)) (sym eq-cb) (≺-part p (ix 1 ∷ last ∷ []) (last ∷ sub sb ∷ []) refl)
-
   Bk : Blocked (G true) sb cb
-  Bk = blk m ρ s env (p ⊕ [ ix 1 ]) sb sb≺e₀
+  Bk = blk m env (p ⊕ [ ix 1 ]) sb sb≺e₀
 
   -- Where the outer is subscribed: past the waiting lane's end.
   okP : Ok (Hots env′) P

@@ -28,7 +28,7 @@ open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
+open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using (Run; []; _∷_)
@@ -59,7 +59,7 @@ open import simultaneous.HeldHot using (module HotRead; em)
 open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.ElabUndone using (Undone; tell-back; tell-undone)
 open import simultaneous.CombSent using (assoc³)
-open import simultaneous.HeldTrigger using (≺-part)
+open import simultaneous.HeldTrigger using (≺-part; Blocked; blk; module Spots; module Cat₀; module Cat)
 open import simultaneous.Layers using (pinby-vis)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Worlds using (full; notT)
@@ -89,6 +89,29 @@ flat-from : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (o : Obs Timeline Γ
           → enter (Op.flatMap op (λ c → ev m (g c) ρ) (ev m o ρ)) p y e → enter (ev m (flatMap op g o) ρ) p y e
 flat-from nothing  op g o ρ p r = r
 flat-from (just _) op g o ρ p r = r
+
+-- A flatMap over an `of`, read as the meaning's or an approximant's, is
+-- the operator's over the `of`.
+flat-of-to : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (xs : List X) (ρ : DenEnv Γ) p {y e}
+           → enter (ev m (flatMap op g (of xs)) ρ) p y e → enter (Op.flatMap op (λ c → ev m (g c) ρ) (Op.of xs)) p y e
+flat-of-to nothing  op g xs ρ p r = r
+flat-of-to (just _) op g xs ρ p r = r
+
+flat-of-from : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (xs : List X) (ρ : DenEnv Γ) p {y e}
+             → enter (Op.flatMap op (λ c → ev m (g c) ρ) (Op.of xs)) p y e → enter (ev m (flatMap op g (of xs)) ρ) p y e
+flat-of-from nothing  op g xs ρ p r = r
+flat-of-from (just _) op g xs ρ p r = r
+
+-- A bounded merge's lane over an `of` is the same lane read either way.
+sub-of-to : ∀ m {Γ X Y} n (G : X → Den Y) (xs : List X) (ρ : DenEnv Γ) p {i q s a}
+          → Bounded.Sub n G (enter (ev m (of xs) ρ) p) i q s a → Bounded.Sub n G (enter (Op.of xs) p) i q s a
+sub-of-to nothing  n G xs ρ p r = r
+sub-of-to (just _) n G xs ρ p r = r
+
+sub-of-from : ∀ m {Γ X Y} n (G : X → Den Y) (xs : List X) (ρ : DenEnv Γ) p {i q s a}
+            → Bounded.Sub n G (enter (Op.of xs) p) i q s a → Bounded.Sub n G (enter (ev m (of xs) ρ) p) i q s a
+sub-of-from nothing  n G xs ρ p r = r
+sub-of-from (just _) n G xs ρ p r = r
 
 -- An `each` of nothing over a hot pins nothing: the hot's pins are heard
 -- as skips, and its lanes are empty `of`s.
@@ -222,19 +245,43 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     rows-skip : ∀ {q} → HR.Rd q skip → Mg q skip
     rows-skip {q} r = up-skip m s HR.rd-proper HR.rd-few r (rd-z r) (sh-few-rd r (λ {_} {_} → tt)) (≺-trans {Bd} {z} {q} Bz (rd-z r))
 
-    postulate
-      -- The blocker ends, so the program runs.
-      prog-runs : Σ Pos Runs
+    -- THE SHARE IS A CONCAT of its blocker, which ends where the empty
+    -- source does, then the program, subscribed past that end.
+    module SP = Spots P
 
-      -- A value of the share is the program's,
-      sh-vis : ∀ {s′} → Runs s′ → ∀ {q v} → Sh q (out v) → Prog s′ q (out v)
+    Bk : Blocked (fc true) SP.sb SP.cb
+    Bk = blk m env₂ (P ⊕ [ ix 1 ]) SP.sb SP.sb≺e₀
 
-      -- each row of the program lies at a row of the share,
-      sh-lift : ∀ {s′} → Runs s′ → ∀ {q e} → Prog s′ q e → Σ (Ev (IE B)) (Sh q)
+    module C0 = Cat₀ fc Q SP.cb Bk SP.sb≺cb SP.q₁≺cb
 
-      -- its values shown as they are.
-      sh-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Sh q (out v)
+    -- The blocker ends, so the program runs.
+    prog-runs : Σ Pos Runs
+    prog-runs = C0.s₁ , 1 , Q ⊕ [ ix 1 ] , sub-of-from m 1 fc (true ∷ false ∷ []) env′ Q C0.sub₁
 
+    runs-s₁ : ∀ {s′} → Runs s′ → s′ ≡ C0.s₁
+    runs-s₁ (_ , _ , sb) = C0.sub-s₁ (sub-of-to m 1 fc (true ∷ false ∷ []) env′ Q sb)
+
+    I₁ : InvAt (Hots env′) C0.s₁ (Prog C0.s₁)
+    I₁ = inv-ev m (elab ρ₄ (f a)) env′ g′ C0.s₁ (proj₁ (proj₂ (runs-at (proj₂ prog-runs))))
+
+    module CC = Cat fc Q SP.cb Bk SP.sb≺cb SP.q₁≺cb SP.e₁≺cb
+                  (λ y → world-after (InvAt.world I₁ y) (InvAt.real I₁ y)) (λ y → proj₂ (InvAt.pinned I₁ y))
+
+    to-s₁ : ∀ {s′} → Runs s′ → ∀ {q e} → Prog s′ q e → Prog C0.s₁ q e
+    to-s₁ rn {q} {e} r = subst (λ c → Prog c q e) (runs-s₁ rn) r
+
+    -- A value of the share is the program's,
+    sh-vis : ∀ {s′} → Runs s′ → ∀ {q v} → Sh q (out v) → Prog s′ q (out v)
+    sh-vis rn {q} {v} r = subst (λ c → Prog c q (out v)) (sym (runs-s₁ rn))
+                            (CC.row (flat-of-to m (mergeᶠ (just 1)) (x a lanePart) (true ∷ false ∷ []) env′ Q r))
+
+    -- each row of the program lies at a row of the share,
+    sh-lift : ∀ {s′} → Runs s′ → ∀ {q e} → Prog s′ q e → Σ (Ev (IE B)) (Sh q)
+    sh-lift rn r = _ , flat-of-from m (mergeᶠ (just 1)) (x a lanePart) (true ∷ false ∷ []) env′ Q (CC.lift (to-s₁ rn r))
+
+    -- its values shown as they are.
+    sh-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Sh q (out v)
+    sh-shown rn r = flat-of-from m (mergeᶠ (just 1)) (x a lanePart) (true ∷ false ∷ []) env′ Q (CC.lift (to-s₁ rn r))
 
     -- EACH ROW OF THE READING BUT ITS END LIES AT A ROW OF THE MERGE.  The
     -- end, the frame's connected piece's, hands the frame to its queued
