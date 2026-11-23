@@ -550,11 +550,12 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         val-sv {v} ac lt = sv-up (ct-up (sc-at ac lt) (inner-row ac) (U≺I v) (Iq ac lt)) (Iq ac lt)
 
         -- Nothing ends the lane before `v₂`.
+        ub : ∀ {v b} (ac : Ac v b) → v ≺ v₂ → Σ ℕ (λ n′ → val ac ≡ instEmit (mark laneDone) n′) → ⊥
+        ub {v} ac lt (n′ , eq) = nF (I v , val ac , mm-up (val-sv ac lt) (≺-trans {P} {U v} {I v} (P≺U (val-row ac)) (U≺I v)) (Iq ac lt)
+                                          , subst (λ a → T (not (undone a))) (sym eq) tt , Iq ac lt)
+
         undone-before : ∀ {v b} (ac : Ac v b) → v ≺ v₂ → T (undone (val ac))
-        undone-before {v} ac lt with ls-view (pre ac) (val ac)
-        ... | inj₂ (kp , _) = kp
-        ... | inj₁ (n′ , eq) = ⊥-elim (nF (I v , val ac , mm-up (val-sv ac lt) (≺-trans {P} {U v} {I v} (P≺U (val-row ac)) (U≺I v)) (Iq ac lt)
-                                          , subst (λ a → T (not (undone a))) (sym eq) tt , Iq ac lt))
+        undone-before ac lt = [ (λ d → ⊥-elim (ub ac lt d)) , proj₁ ]′ (ls-view (pre ac) (val ac))
 
         -- The lane's failing row is its `laneDone`'s.
         ld-anat : ∀ {y e} → LDE y (out e) → y ≡ yd ⊎ (MME y (out e) × T (undone e))
