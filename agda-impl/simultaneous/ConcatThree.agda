@@ -16,13 +16,13 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; s≤s; z≤n)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import denotation.Position using (Pos; ix; sub; last; instant; _⊕_)
-open import denotation.EmissionSet using (EmissionSet; Den; Ev; hot; enter; out; end; at-out; on-out; at-end; _≺_; _≼_; After; Few; Truncate;
+open import denotation.EmissionSet using (EmissionSet; Den; Ev; hot; enter; out; end; at-out; on-out; at-end; _≺_; _≼_; After; Few; Truncate; Work;
   Rejoin; shown; heard; ended; late; module Op; module Values; module Bounded)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans; ≼-refl; ≺→≼; ≺-irrefl; ≺-absurd; ≼-split)
 open import denotation.Laws.Worlds.Leaves using (of-reach; of-end-row)
@@ -130,6 +130,108 @@ module Of3 (F : Pos) where
   ... | r₂ = there (there (here refl))
   ... | rL = there (there (there (here refl)))
 
+-- THE FRAME'S FIRST LANE, a one-value `of`, ends before the second value
+-- arrives, so the second lane starts at once, whatever it reads.
+module Front {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ : B)
+             (f0→ : ∀ s {y e′} → enter (f 0) s y e′ → enter (Op.of (x₀ ∷ [])) s y e′)
+             (f0← : ∀ s {y e′} → enter (Op.of (x₀ ∷ [])) s y e′ → enter (f 0) s y e′) where
+
+  open Of3 F public
+  open Bounded 1 f O
+
+  S₀ c₀ s₁ : Pos
+  S₀ = q₀ ⊕ [ ix 1 ]
+  c₀ = S₀ ⊕ [ last ]
+  s₁ = q₁ ⊕ [ ix 1 ]
+
+  c₀q₁ : c₀ ≺ q₁
+  c₀q₁ = under-≺ F (s≤s z≤n) (under-⊕ (under-⊕ (under-refl q₀) (ix 1)) last)
+
+  ------------------------------------------------------------------------
+  -- The first lane
+
+  end₀ : After (f 0) S₀ c₀ end
+  end₀ = f0← S₀ (of-end-row S₀ 0 (x₀ ∷ []) , of-reach S₀ 0 (x₀ ∷ []) {c₀} {end}) , ≺-ext S₀ []
+
+  ends₀ : Ends 0 [] c₀
+  ends₀ = q₀ , 0 , S₀ , nth₀ , room (s≤s z≤n) , end₀
+
+  end-of₀ : ∀ {c} → Ends 0 [] c → c ≡ c₀
+  end-of₀ (_ , _ , _ , n , st , (r , _)) with nth-c n
+  ... | n₀ with starts₀ st
+  ...   | refl with r1 x₀ S₀ (f0→ S₀ r)
+  ...     | e1 = refl
+
+  starts₁ : ∀ {s} → Starts 1 q₁ (Sched 1) s → s ≡ s₁
+  starts₁ (room (s≤s ()))
+  starts₁ (freed _ _) = refl
+  starts₁ (queued {c} _ qc (inj₁ (_ , ec , refl)) _ _) = ⊥-elim (≺-absurd {c₀} {q₁} c₀q₁ (subst (q₁ ≺_) (end-of₀ ec) qc))
+  starts₁ (queued _ _ (inj₂ ()) _ _)
+
+  st₁ : Starts 1 q₁ (Sched 1) s₁
+  st₁ = freed (s≤s z≤n) (inj₁ (c₀ , ends₀ , c₀q₁))
+
+-- A ROW OF THE MIDDLE LANE, BUT ITS END, IS THE MERGE'S (`Mid.row`), its
+-- rows before it few: the first lane's are two, the middle's its own, and
+-- the third lane starts past some end of the middle's, so past the row.
+-- Nothing is asked of the hot's end.
+module Mid {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ : B) (T : EmissionSet B)
+           (f0→ : ∀ s {y e′} → enter (f 0) s y e′ → enter (Op.of (x₀ ∷ [])) s y e′)
+           (f0← : ∀ s {y e′} → enter (Op.of (x₀ ∷ [])) s y e′ → enter (f 0) s y e′)
+           (f1→ : ∀ s {y e′} → enter (f 1) s y e′ → enter (hot T) s y e′)
+           (f1← : ∀ s {y e′} → enter (hot T) s y e′ → enter (f 1) s y e′)
+           (rp : ∀ {y e′ c} → enter (hot T) ((F ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) y e′ → enter (hot T) ((F ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) c end → y ≼ c)
+           (rf : ∀ {y e′} → enter (hot T) ((F ⊕ [ ix 1 ]) ⊕ [ ix 1 ]) y e′ → Few (enter (hot T) ((F ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) y) where
+
+  open Front f F x₀ f0→ f0← public
+  open Bounded 1 f O
+
+  c₀q₂ : c₀ ≺ q₂
+  c₀q₂ = ≺-trans {c₀} {q₁} {q₂} c₀q₁ lt12
+
+  -- An end of the middle lane is the hot's, read.
+  end-row₁ : ∀ {c} → Ends 1 (Sched 1) c → enter (hot T) s₁ c end
+  end-row₁ (_ , _ , _ , n , st , (r , _)) with nth-c n
+  ... | n₁ with starts₁ st
+  ...   | refl = f1→ s₁ r
+
+  -- The third lane starts past an end of the middle's.
+  starts₂ : ∀ {s} → Starts 2 q₂ (Sched 2) s → Σ Pos λ c → Ends 1 (Sched 1) c × c ≺ s
+  starts₂ (room (s≤s ()))
+  starts₂ (freed _ (inj₁ ((c , ec , lt) , _))) = c , ec , ≺-trans {c} {q₂} {q₂ ⊕ [ ix 1 ]} lt (≺-ext q₂ [])
+  starts₂ (freed _ (inj₂ (inj₁ (_ , ()))))
+  starts₂ (freed _ (inj₂ (inj₂ ())))
+  starts₂ (queued _ _ (inj₁ (c , ec , refl)) _ _) = c , ec , ≺-ext c []
+  starts₂ (queued _ qc (inj₂ (inj₁ (_ , ec , refl))) _ _) = ⊥-elim (≺-absurd {c₀} {q₂} c₀q₂ (subst (q₂ ≺_) (end-of₀ ec) qc))
+  starts₂ (queued _ _ (inj₂ (inj₂ ())) _ _)
+
+  module _ {y e′} (r : enter (hot T) s₁ y e′) where
+
+    kl : List Pos
+    kl = (S₀ ⊕ [ ix 0 ]) ∷ c₀ ∷ proj₁ (rf r)
+
+    lf₀ : ∀ {s k e″} → Starts 0 q₀ [] s → enter (f 0) s k e″ → k ∈ kl
+    lf₀ st r′ with starts₀ st
+    ... | refl with r1 x₀ S₀ (f0→ S₀ r′)
+    ...   | o1 = here refl
+    ...   | e1 = there (here refl)
+
+    lanes : ∀ {q a k e″} → Lane q a k e″ → k ≺ y → k ∈ kl
+    lanes (_ , _ , (n , st) , (r′ , _)) lt with nth-c n
+    ... | n₀ = lf₀ st r′
+    lanes (_ , _ , (n , st) , (r′ , _)) lt | n₁ with starts₁ st
+    ... | refl = there (there (proj₂ (rf r) (f1→ s₁ r′) lt))
+    lanes {k = k} (_ , s , (n , st) , (_ , sk)) lt | n₂ with starts₂ st
+    ... | c , ec , cs = ⊥-elim (rp r (end-row₁ ec) (≺-trans {c} {s} {y} cs (≺-trans {s} {k} {y} sk lt)))
+
+    -- Few rows before it,
+    few : Few JoinT y
+    few = join-few {v = y} (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [] , λ x _ → ofin x) (kl , λ _ l lt → lanes l lt) ([] , λ ())
+
+    -- and the row itself.
+    row : s₁ ≺ y → Work e′ → Truncate JoinT y e′
+    row sy wk = lane ob₁ (1 , 1 , nth₁) (1 , s₁ , (nth₁ , st₁) , (f1← s₁ r , sy)) (λ ()) wk , proj₁ few , λ x lt _ → proj₂ few x lt
+
 module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : EmissionSet B) {e : Pos}
              (f0→ : ∀ s {y e′} → enter (f 0) s y e′ → enter (Op.of (x₀ ∷ [])) s y e′)
              (f0← : ∀ s {y e′} → enter (Op.of (x₀ ∷ [])) s y e′ → enter (f 0) s y e′)
@@ -140,23 +242,17 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
              (te : T e end) (tu : ∀ {c} → T c end → c ≡ e) (tl : ∀ {y e′} → T y e′ → y ≼ e) (tf : Few T e)
              (q₂e : (F ⊕ [ ix 2 ]) ≺ e) where
 
-  open Of3 F public
+  open Front f F x₀ f0→ f0← public
   open Bounded 1 f O
 
-  -- The lanes' subscriptions and ends, and where the third lane's value lies.
-  S₀ c₀ s₁ c₁ s₂ w : Pos
-  S₀ = q₀ ⊕ [ ix 1 ]
-  c₀ = S₀ ⊕ [ last ]
-  s₁ = q₁ ⊕ [ ix 1 ]
+  -- The second lane's end, and where the third lane's value lies.
+  c₁ s₂ w : Pos
   c₁ = e ⊕ [ sub s₁ ]
   s₂ = c₁ ⊕ [ ix 1 ]
   w  = s₂ ⊕ [ ix 0 ]
 
   ------------------------------------------------------------------------
   -- Order
-
-  c₀q₁ : c₀ ≺ q₁
-  c₀q₁ = under-≺ F (s≤s z≤n) (under-⊕ (under-⊕ (under-refl q₀) (ix 1)) last)
 
   c₀q₂ : c₀ ≺ q₂
   c₀q₂ = ≺-trans {c₀} {q₁} {q₂} c₀q₁ lt12
@@ -177,31 +273,7 @@ module Three {B : Set} (f : ℕ → Den B) (F : Pos) (x₀ x₂ : B) (T : Emissi
   c₀c₁ = ≺-trans {c₀} {q₂} {c₁} c₀q₂ q₂c₁
 
   ------------------------------------------------------------------------
-  -- The first lane
-
-  end₀ : After (f 0) S₀ c₀ end
-  end₀ = f0← S₀ (of-end-row S₀ 0 (x₀ ∷ []) , of-reach S₀ 0 (x₀ ∷ []) {c₀} {end}) , ≺-ext S₀ []
-
-  ends₀ : Ends 0 [] c₀
-  ends₀ = q₀ , 0 , S₀ , nth₀ , room (s≤s z≤n) , end₀
-
-  end-of₀ : ∀ {c} → Ends 0 [] c → c ≡ c₀
-  end-of₀ (_ , _ , _ , n , st , (r , _)) with nth-c n
-  ... | n₀ with starts₀ st
-  ...   | refl with r1 x₀ S₀ (f0→ S₀ r)
-  ...     | e1 = refl
-
-  ------------------------------------------------------------------------
   -- The second lane
-
-  starts₁ : ∀ {s} → Starts 1 q₁ (Sched 1) s → s ≡ s₁
-  starts₁ (room (s≤s ()))
-  starts₁ (freed _ _) = refl
-  starts₁ (queued {c} _ qc (inj₁ (_ , ec , refl)) _ _) = ⊥-elim (≺-absurd {c₀} {q₁} c₀q₁ (subst (q₁ ≺_) (end-of₀ ec) qc))
-  starts₁ (queued _ _ (inj₂ ()) _ _)
-
-  st₁ : Starts 1 q₁ (Sched 1) s₁
-  st₁ = freed (s≤s z≤n) (inj₁ (c₀ , ends₀ , c₀q₁))
 
   -- The hot's rows, rejoined: finitely many.
   rj : Σ (List Pos) λ ks → ∀ {k e′} → Rejoin s₁ T k e′ → k ∈ ks

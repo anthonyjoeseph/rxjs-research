@@ -49,21 +49,26 @@ open import simultaneous.ConcatTwo using (module Two)
 open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.ColdIdle using (mid)
 open import simultaneous.LaneDoneRow using (done-row)
-open import simultaneous.LaneVis using (lane-vis; hot-lab)
+open import simultaneous.LaneVis using (lane-vis; hot-lab; sh-u)
+open import simultaneous.LaneUp using (module Lift)
+open import simultaneous.LaneSite using (between-under)
+open import simultaneous.LaneLayers using (under-⊕; under-refl)
+open import denotation.Up using (up; up-⊕)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import simultaneous.HeldHot using (module HotRead; em)
 open import simultaneous.HeldBase using (shows-ev)
-open import simultaneous.ElabUndone using (Undone)
+open import simultaneous.ElabUndone using (Undone; tell-back; tell-undone)
 open import simultaneous.CombSent using (assoc³)
 open import simultaneous.HeldTrigger using (≺-part)
 open import simultaneous.Layers using (pinby-vis)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Worlds using (full; notT)
 open import denotation.Laws.Truth using (instant-⊕)
-open import denotation.Laws.Modulus using (≺-irrefl; ≺-≼-≺; ≺-trans; entered-few)
+open import denotation.Laws.Modulus using (≺-irrefl; ≺-≼-≺; ≺-trans; entered-few; ≺-ext)
 open import denotation.Position using (sub)
-open import denotation.EmissionSet using (shown; ended; late; _≼_; skip)
+open import denotation.EmissionSet using (shown; ended; late; _≼_; skip; Dep)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; laneˢ; undone; counted; framed; shareˢ; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; laneˢ; undone; counted; framed; shareˢ; count; laneStep)
 
 -- A take of the meaning or of an approximant is the take of its source's.
 ev-take : ∀ m {Γ X} (k : X → _) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) → ev m (takeWhile true k o) ρ ≡ Op.takeWhile true k (ev m o ρ)
@@ -177,6 +182,46 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     module HR = HotRead Sh z (InvAt.flat Ish) (InvAt.func Ish) (λ {y} y′ → ≺-trans {z} {Q} {y} z≺Q (sh-aft y′)) sh-few sh-proper
                   (shows-ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′ g′ Q okQ)
 
+    open Lift ρ₄ (f a) env₂ using (up-val; up-skip)
+
+    -- The read's rows lie past its subscription, past the frame's.
+    rd-z : ∀ {y e} → HR.Rd y e → z ≺ y
+    rd-z = HR.rd-past {z} (λ {y} y′ → ≺-trans {z} {Q} {y} z≺Q (sh-aft y′))
+
+    Bz : Bd ≺ z
+    Bz = ≺-trans {Bd} {Bd ⊕ [ ix 1 ]} {z} (≺-ext Bd []) (≺-ext (Bd ⊕ [ ix 1 ]) [])
+
+    -- THE SHARE HAS FEW ROWS BEFORE A ROW OF THE READ WAITING ON ALL BEFORE
+    -- IT: those before its source row are proper, so read before it, and
+    -- none lies under it.
+    sh-few-rd : ∀ {y e} → HR.Rd y e → (∀ {k e′} → Dep y e k e′) → Few Sh y
+    sh-few-rd (rj , ks , c) d with HR.rj-σ rj
+    ... | k₀ , refl , _ , (sk₀ , pk₀) = k₀ ∷ L.map up ks , pick
+      where
+        pick : ∀ {j e′} → Sh j e′ → j ≺ HR.shift k₀ → j ∈ (k₀ ∷ L.map up ks)
+        pick {j} sj jy with ≼-split {j} {k₀} (λ k₀j → let (ys , eq) = between-under (under-⊕ (under-refl k₀) (sub z)) k₀j jy in HR.apart sk₀ sj k₀j ys eq)
+        ... | inj₂ refl = here refl
+        ... | inj₁ jk₀  = there (subst (_∈ L.map up ks) (up-⊕ j (sub z))
+                                  (∈-map⁺ up (c (proj₂ (HR.rj (sj , λ {c′} sc cj → pk₀ sc (≺-trans {c′} {j} {k₀} cj jk₀)))) (HR.down sj sk₀ jk₀) d)))
+
+    -- A VALUE OF THE READING IS THE MERGE'S, classically: the frame's scan
+    -- shows it once it has folded the frame's values before it, and tells
+    -- it as it is, ending no lane.
+    rows-shown : ∀ {q v} → HR.Rd q (out v) → ¬ ¬ Mg q (out v)
+    rows-shown {q} {v} r k =
+      up-val m s HR.rd-proper HR.rd-few r (rd-z r) (sh-few-rd r (λ {_} {_} → tt)) (≺-trans {Bd} {z} {q} Bz (rd-z r))
+        λ (b , x′) → k (subst (λ c → Mg q (out c)) (told b) x′)
+      where
+        uv : T (undone v)
+        uv = sh-u ρ₄ (f a) env₂ m (λ {t} → pu a {t}) (proj₁ (proj₂ (proj₂ (HR.src-vis (proj₁ r) tt))))
+
+        told : ∀ (b : _ × IE B) → proj₂ (laneStep b v) ≡ v
+        told b = sym (tell-back (proj₁ b) v refl (subst T (sym (tell-undone (proj₁ b) v)) uv))
+
+    -- A skip of the reading is the merge's.
+    rows-skip : ∀ {q} → HR.Rd q skip → Mg q skip
+    rows-skip {q} r = up-skip m s HR.rd-proper HR.rd-few r (rd-z r) (sh-few-rd r (λ {_} {_} → tt)) (≺-trans {Bd} {z} {q} Bz (rd-z r))
+
     postulate
       -- The blocker ends, so the program runs.
       prog-runs : Σ Pos Runs
@@ -190,12 +235,6 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
       -- its values shown as they are.
       sh-shown : ∀ {s′} → Runs s′ → ∀ {q v} → Prog s′ q (out v) → Sh q (out v)
 
-      -- A value of the reading is the merge's, classically: the frame's
-      -- scan shows it once it has folded the frame's rows before it,
-      rows-shown : ∀ {q v} → HR.Rd q (out v) → ¬ ¬ Mg q (out v)
-
-      -- and a skip of the reading is the merge's.
-      rows-skip : ∀ {q} → HR.Rd q skip → Mg q skip
 
     -- EACH ROW OF THE READING BUT ITS END LIES AT A ROW OF THE MERGE.  The
     -- end, the frame's connected piece's, hands the frame to its queued

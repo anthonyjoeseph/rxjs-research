@@ -286,13 +286,12 @@ Members: `held-current`, `live-current`, `value-open`, `over-open`,
 
 #### A LANE'S ROWS ARE ITS PROGRAM'S
 
-Unproven: the share's rows are the program's at the same places, and
-the hot read's rows at the frame's connected lane are the merge's.
-Riskiest: `rows-shown` — a connected-piece row with no share end yet
-must reach the merge through the frame, the scan's fold, the map, both
-connects and the outer merge; settled by that upward chain.
+Unproven: the share, a bounded merge of a blocker and the program, shows
+the program's rows at the same places once the blocker ends. Riskiest:
+`prog-runs` — the blocker ends, so the second lane starts; settled by
+the blocker's end, read through `simultaneous.ConcatTwo`.
 
-Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`, `rows-shown`, `rows-skip`.
+Members: `prog-runs`, `sh-vis`, `sh-lift`, `sh-shown`.
 
 #### A LANE'S RUN IN THE LANES'
 
