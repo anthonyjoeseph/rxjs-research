@@ -14,12 +14,15 @@
 module simultaneous.InstEmit where
 
 open import Data.List using (List; []; _∷_)
+open import Data.Nat using (ℕ)
 
 data Mark : Set where
   -- read above every flatMap
   begin over stop : Mark
   -- one flatMap's own, consumed by its scan
-  outerOpen outerClose laneStart carry laneDone burstEnd outerDone : Mark
+  outerOpen outerClose laneStart burstEnd outerDone : Mark
+  -- a lane's end, telling the routes the lane holds
+  laneDone : ℕ → Mark
   -- the whole run's, sent at the top and read by the batcher
   subscribed completed : Mark
 
