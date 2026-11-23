@@ -277,13 +277,24 @@ Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch. Riskiest: a live lane's count
-read through its inner's `idle` (`live-idle`), whose wait is the lanes'
-next row, not the lane's own. Then the defer limit's rest (no one
+on the scan's run split onto that branch. Riskiest: one lane idle on
+its own (`lane-idle-own`), from its program's `idle` through the frame,
+the share's blocker and the take to its `laneDone`, which must fall at
+the instant the program completes. Then the defer limit's rest (no one
 approximant bounds it). Settled when each former's leaf is a body.
 
-Members: `live-idle`, `held-current`, `live-current`, `value-open`, `over-open`,
+Members: `lane-idle-own`, `held-current`, `live-current`, `value-open`, `over-open`,
 `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
+
+#### A LANE'S RUN IN THE LANES'
+
+Untried: the rows a live lane shows that the scan's source met are a run
+of the lane, and a wait for the lanes' next row is one for its next.
+Hardest: a switch's lane cut past the cursor, whose later rows are no
+lanes' rows; the cutter's own first row precedes them. Settled by
+bodies, or a cut lane's row before every lanes' row past the cursor.
+
+Members: `lane-run`, `lane-few`, `lane-least`.
 
 #### THE BATCH RANK
 
