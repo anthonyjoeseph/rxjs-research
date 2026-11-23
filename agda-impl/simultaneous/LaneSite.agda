@@ -710,7 +710,7 @@ module Site {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
           ; fold = fold
           }
 
-      ld≢be : ∀ {n} → instEmit (mark laneDone) n ≡ marked burstEnd → ⊥
+      ld≢be : ∀ {n} → _≡_ {A = IE B} (instEmit (mark laneDone) n) (marked burstEnd) → ⊥
       ld≢be ()
 
       site-v : ∀ {q n} → View q (instEmit (mark laneDone) n) → SvE q (out (instEmit (mark laneDone) n)) → MME q (out (instEmit (mark laneDone) n))
