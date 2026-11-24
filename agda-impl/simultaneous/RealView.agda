@@ -19,6 +19,7 @@ open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (DenEnv; enter)
 open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ; ok-step; ok-in; ⊑-refl)
 import denotation.Laws.JoinInv as JoinInv
+import adequacy.Cursor as AC
 open import Data.Nat.Properties using (<-cmp)
 open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import denotation.Laws.Shows using (k-shows; shows-k)
@@ -52,19 +53,12 @@ open import simultaneous.Instants using (_≺ⁱ_)
 
 module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
-  -- The value at `q`'s lane.
+  -- The value at `q`'s lane, and whether it runs one: adequacy's policy.
   Lane : FlatOp → Pos → A → EmissionSet B
-  Lane (mergeᶠ nothing)  = LaneOf f
-  Lane (mergeᶠ (just n)) = Bounded.Lane n f o
-  Lane switchᶠ           = LaneOf f
-  Lane exhaustᶠ          = LaneOf f
+  Lane op = AC.Pol.Lane (AC.polF op f o)
 
-  -- The value at `q` runs its lane.
   Runs : FlatOp → Pos → Set
-  Runs (mergeᶠ nothing)  _ = ⊤
-  Runs (mergeᶠ (just n)) q = Bounded.Indexed n f o q
-  Runs switchᶠ           _ = ⊤
-  Runs exhaustᶠ          q = Exhaust.Run f o q
+  Runs op = AC.Pol.Runs (AC.polF op f o)
 
   -- A later value cuts the value at `q`'s lane.
   Cut : FlatOp → Pos → Set
@@ -78,10 +72,7 @@ module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
   -- The joiner itself.
   Join : FlatOp → EmissionSet B
-  Join (mergeᶠ nothing)  = Merge.JoinT f o
-  Join (mergeᶠ (just n)) = Bounded.JoinT n f o
-  Join switchᶠ           = Switch.JoinT f o
-  Join exhaustᶠ          = Exhaust.JoinT f o
+  Join op = AC.JoinF op f o
 
   -- The outer has ended by the instant `I`,
   OuterBy : _ → Set

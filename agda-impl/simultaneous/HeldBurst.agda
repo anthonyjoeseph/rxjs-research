@@ -153,10 +153,6 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (inner; done-before; end-σ; lane-end-done)
 
-  -- NO VALUE OF THE REAL FLATMAP'S OUTER LIES STRICTLY UNDER ANOTHER.
-  postulate
-    ro-nest : ∀ {q a l ls a′} → RO q (out a) → RO (q ⊕ (l ∷ ls)) (out a′) → ⊥
-
   E₄ : DenEnv (IE B ∷ IE A ∷ ⊤ ∷ Δ)
   E₄ = hot σ₂ ∷ hot σ₁ ∷ env₀
 
@@ -180,6 +176,10 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
 
   If : ∀ a → InvD (Hots E₄) (fL a)
   If a = inv-ev m (laneˢ (g a)) E₄ g₂
+
+  -- NO VALUE OF THE REAL FLATMAP'S OUTER LIES STRICTLY UNDER ANOTHER.
+  ro-nest : ∀ {q a l ls a′} → RO q (out a) → RO (q ⊕ (l ∷ ls)) (out a′) → ⊥
+  ro-nest = InvAt.flat (Id Q okQ)
 
   -- Where the scan's source reads a lane's row.
   Lr : IE B → Maybe (Input B)
