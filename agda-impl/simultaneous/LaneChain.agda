@@ -224,15 +224,22 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   Sat : FlatOp → Pos → Set
   Sat op t = Σ Pos λ q → Σ A λ a → Σ Pos λ k → Σ (Ev B) λ e → Σ (O q (out a)) λ x → Σ (Lane op q a k e) λ l → subOf op x l ≡ t
 
-  -- EVERY LANE SUBSCRIBED UNDER A CHAIN'S START IS A LINK, WITH A LANE
-  -- SUBSCRIBED AT ITS END, OR LIES UNDER THE CHAIN'S TOP.
+  -- A value's lane ending inside its subscription.
+  Linked : FlatOp → Pos → A → Set
+  Linked op q a = Σ Pos λ c′ → Σ (O q (out a)) λ x → Σ (Lane op q a c′ end) λ le → Sync (subOf op x le) c′
+
+  -- EVERY LANE SUBSCRIBED UNDER A CHAIN'S START IS A LINK, ENDING IN ITS
+  -- SUBSCRIPTION WITH A LANE SUBSCRIBED AT ITS END, OR LIES UNDER THE
+  -- CHAIN'S TOP.
   along : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {c s} → Chain op c s → Sat op s → ∀ {q a k e} (x : O q (out a)) (l : Lane op q a k e)
-        → W⁼ H (c ⊕ [ ix 1 ]) (subOf op x l) → (∀ {c′} → Lane op q a c′ end → Sat op (c′ ⊕ [ ix 1 ])) ⊎ W⁼ H s (subOf op x l)
+        → W⁼ H (c ⊕ [ ix 1 ]) (subOf op x l)
+        → ((∀ {c′} → Lane op q a c′ end → Sat op (c′ ⊕ [ ix 1 ])) × Linked op q a) ⊎ W⁼ H s (subOf op x l)
   along op bd from _ x l v = inj₂ v
-  along op bd (link x′ l′ le _ ch) top x l v with along op bd ch (_ , _ , _ , _ , x′ , l′ , refl) x l v
+  along op bd (link {c′ = c′} x′ l′ le sy ch) top x l v with along op bd ch (_ , _ , _ , _ , x′ , l′ , refl) x l v
   ... | inj₁ k = inj₁ k
   ... | inj₂ v′ with sub-in op bd x′ l′ x l v′
-  ...   | inj₁ (refl , refl) = inj₁ λ lc → subst (λ t → Sat op (t ⊕ [ ix 1 ])) (end-one op x′ le lc) top
+  ...   | inj₁ (refl , refl) = inj₁ ((λ lc → subst (λ t → Sat op (t ⊕ [ ix 1 ])) (end-one op x′ le lc) top)
+                                    , c′ , x′ , le , subst (λ t → Sync t c′) (sub-one op x′ l′ le) sy)
   ...   | inj₂ (c″ , lc″ , w) = inj₂ (subst (λ t → W⁼ H (t ⊕ [ ix 1 ]) (subOf op x l)) (end-one op x′ lc″ le) w)
 
   -- The chain to `s` starts at the end of a lane ending outside its

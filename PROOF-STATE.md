@@ -279,8 +279,15 @@ flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
-Members: `live-current`, `hand-bursts`, `end-tot`, `comb-shut`,
-`scan-idle`.
+Members: `live-current`, `end-tot`, `comb-shut`, `scan-idle`.
+
+#### THE LANE'S BURST END
+
+Untried: a lane's `burstEnd` lies past every row of its subscribe burst,
+its burst part subscribing after its lane part's synchronous run.
+Settled by reading the row positions `laneˢ` gives its two parts.
+
+Members: `burst-past`.
 
 #### THE BATCH RANK
 

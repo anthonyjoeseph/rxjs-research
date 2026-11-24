@@ -25,7 +25,7 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (DenEnv; out; end; enter; hot; _≺_)
+open import denotation.EmissionSet using (DenEnv; out; end; enter; hot; _≺_; _≼_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; isZero; laneB)
 open import Data.Nat.Properties using (m+n≡0⇒n≡0)
@@ -151,7 +151,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; module OS; g₂; named; met-before; lane-run)
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own; lane-fresh-own; lane-mark; σ₃-lane)
+    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own; lane-fresh-own; lane-mark; lane-row; σ₃-lane)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
     using (lane-end-done; St; LaneEmit; done-told; next-idle; own-snoc; lane-rows; cnt-lane; module QL; catch-by; in-prefix; out-pin)
   open LaneHold m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
@@ -240,14 +240,6 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       l₁      : RV.Lane op q₁ a₁ k₁ e₁
       sub₁    : CH.subOf op x₁ l₁ ≡ c ⊕ [ ix 1 ]
       before₁ : q₁ ≺ c
-
-  postulate
-    -- NO BURST'S END IS READ PAST THE BASE WITH ITS LANE RUNNING: the
-    -- lanes of the chain end in their bursts, and the queued lane's burst
-    -- holds its row.
-    hand-bursts : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
-                → ∀ a {k b n} c → r₂ ≡ a ++ (k , out (Tg b (instEmit (mark burstEnd) n))) ∷ c
-                → Flat.dead (After r₁ xd a) ≡ true
 
   -- NO VALUE LIES BETWEEN A LANE'S `laneDone` AND ITS END: the two
   -- stand beside each other at the lane's take point, in the lane's
@@ -623,6 +615,28 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
     in nl (conv {Target.y T} {Target.y T} {y} {Target.z T} (⊑-refl (Target.y T)) (≺→≼ {Target.y T} {y} yy)
              (≺-trans {y} {y ⊕ [ sub LS.J ]} {Target.z T} (≺-ext y []) jz) (⊑-snoc⁺ (Target.y T)))
 
+  -- A ROW READ BETWEEN THE BASE'S AND THE QUEUED LANE'S LIES UNDER THE
+  -- BASE'S TAKE POINT: both rows do, and a row there leads none of it.
+  past-base : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ (sp : rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂) (B₀ : Base (Target.sb T) d xd)
+            → ∀ {y} → d ≺ (y ⊕ [ sub LS.J ]) → (y ⊕ [ sub LS.J ]) ≺ Target.z T → AtBase.w₀ rx₁ T r₁ r₂ sp B₀ ⊑ y
+  past-base rx₁ T r₁ {d} r₂ sp B₀ {y} dy yz =
+    [ (λ h → h) , (λ e → ⊥-elim (≺-irrefl {d} (≺-trans {d} {J y} {d} dy
+                          (subst (_≺ d) e (subst (AB.w₀ ≺_) (sym (proj₂ wd)) (≺-ext AB.w₀ [ sub LS.J ])))))) ]′
+      (⊑-snoc y (conv {AB.w₀} {d} {J y} {Target.z T} wd (≺→≼ {d} {J y} dy) yz wz))
+    where
+      module AB = AtBase rx₁ T r₁ r₂ sp B₀
+
+      J : Pos → Pos
+      J w = w ⊕ [ sub LS.J ]
+
+      wd : AB.w₀ ⊑ d
+      wd = ix 0 ∷ [ sub LS.J ] , trans (Base.at₀ B₀) (trans (cong J (proj₁ (proj₂ AB.sib))) (⊕-assoc AB.w₀ [ ix 0 ] [ sub LS.J ]))
+
+      wz : AB.w₀ ⊑ Target.z T
+      wz = ⊑-trans (⊑-trans (⊑-trans ([ last ] , proj₂ (proj₂ AB.sib)) (CH.chain-⊑ (CH.Base.chain (Base.base B₀))))
+                     (inside-⊑ (Target.sb T) (Target.y T) (proj₁ (Target.sy T))))
+             (⊑-snoc⁺ (Target.y T))
+
   -- A LANE SUBSCRIBED UNDER THE BASE'S END, DONE BEFORE THE QUEUED
   -- LANE'S ROW, HAS A LANE QUEUED AT ITS END: down the chain it is a link,
   -- the next subscribed at its end; past the chain's top it is the queued
@@ -634,7 +648,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   queued-next rx₁ T B xo ld lc v jz
     with CH.along op (proj₂ (CH.bounded op (Target.xo T) (Target.l T) (Target.nq T))) (CH.Base.chain B)
            (_ , _ , _ , _ , Target.xo T , Target.l T , refl) xo ld v
-  ... | inj₁ k = let (_ , _ , _ , _ , x₁ , l₁ , e) = k lc in next-of (proj₂ (CH.bounded op (Target.xo T) (Target.l T) (Target.nq T))) xo lc x₁ l₁ e
+  ... | inj₁ k = let (_ , _ , _ , _ , x₁ , l₁ , e) = proj₁ k lc in next-of (proj₂ (CH.bounded op (Target.xo T) (Target.l T) (Target.nq T))) xo lc x₁ l₁ e
   ... | inj₂ v′ with CH.sub-in op (proj₂ (CH.bounded op (Target.xo T) (Target.l T) (Target.nq T))) (Target.xo T) (Target.l T) xo ld v′
   ...   | inj₁ (refl , refl) = ⊥-elim (target-done rx₁ T ld jz)
   ...   | inj₂ (_ , lcT , w) = ⊥-elim (target-after rx₁ T lcT xo ld w jz)
@@ -661,17 +675,8 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       order : d ≺ J y × J y ≺ z
       order = run-btw r₁ r₂ (subst (Met M) (++-assoc r₁ ((d , out xd) ∷ r₂) ((z , out (Ln v)) ∷ rx₂)) mt) i
 
-      wd : AB.w₀ ⊑ d
-      wd = ix 0 ∷ [ sub LS.J ] , trans (Base.at₀ B₀) (trans (cong J (proj₁ (proj₂ AB.sib))) (⊕-assoc AB.w₀ [ ix 0 ] [ sub LS.J ]))
-
-      wz : AB.w₀ ⊑ z
-      wz = ⊑-trans (⊑-trans (⊑-trans ([ last ] , proj₂ (proj₂ AB.sib)) (CH.chain-⊑ (CH.Base.chain Bs))) (inside-⊑ sb (Target.y T) (proj₁ sy)))
-             (⊑-snoc⁺ (Target.y T))
-
       w₀y : AB.w₀ ⊑ y
-      w₀y = [ (λ h → h) , (λ e → ⊥-elim (≺-irrefl {d} (≺-trans {d} {J y} {d} (proj₁ order)
-                                  (subst (_≺ d) e (subst (AB.w₀ ≺_) (sym (proj₂ wd)) (≺-ext AB.w₀ [ sub LS.J ])))))) ]′
-              (⊑-snoc y (conv {AB.w₀} {d} {J y} {z} wd (≺→≼ {d} {J y} (proj₁ order)) (proj₂ order) wz))
+      w₀y = past-base rx₁ T r₁ r₂ refl B₀ (proj₁ order) (proj₂ order)
 
       -- The base lane's `laneDone` is the base's.
       same : ∀ {q′ a′} → q′ ≡ CH.Base.q₀ Bs → a′ ≡ CH.Base.a₀ Bs → (xo′ : RO q′ (out a′))
@@ -708,6 +713,97 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
             nx = done-queued rx₁ T r₁ r₂ sp B₀ xo′ ld lc (subst (_ ∈_) (sym eq) (∈-++⁺ʳ a (here refl)))
             past≡ = past-app op init r₁ {d} {xd} {a} (no-end rx₁ (Target.mt T) r₁ sp)
         in inj₁ (subst (λ S → ¬ Flat.queue (proj₁ S) ≡ 0) past≡ (Waits.waiting (r₁ ++ (d , out xd) ∷ a) mt″ xo′ lc ld yc refl nx))
+
+  -- A LANE'S `burstEnd` CLOSES ITS SUBSCRIBE BURST: the lane's burst
+  -- part subscribes past its lane part's synchronous run.
+  postulate
+    burst-past : ∀ {q a y e yb n} (xo : RO q (out a)) (l : RV.Lane op q a y e) → Sync (CH.subOf op xo l) y
+               → RV.Lane op q a yb (out (instEmit (mark burstEnd) n)) → y ≼ yb
+
+  -- A LANE'S `burstEnd` LIES BEFORE ITS `laneDone`: its take keeps it.
+  burst-first : ∀ {q a yb yd n kd n′} (xo : RO q (out a)) → RV.Lane op q a yb (out (instEmit (mark burstEnd) n))
+              → RV.Lane op q a yd (out (instEmit (mark (laneDone kd)) n′)) → yd ≺ yb → ⊥
+  burst-first {yb = yb} {yd} xo lb ld lt =
+    [ (λ e → ≺-irrefl {yb} (subst (_≺ yb) (sym e) lt))
+    , (λ (bl , _) → ≺-irrefl {yb} (≺-trans {yb} {yd} {yb} bl lt)) ]′
+      (lane-first m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (CH.subOf op xo lb) (CH.sub-ok op xo lb)
+        (CH.sub-row op xo lb lb) (CH.sub-row op xo lb ld) tt)
+
+  -- NO ROW OF A LANE SITS UNDER ANOTHER.
+  row-flat : ∀ {q a y y′ v v′} (xo : RO q (out a)) → RV.Lane op q a y (out v) → RV.Lane op q a y′ (out v′) → y ≺ y′ → ¬ y ⊑ y′
+  row-flat {y = y} xo l l′ lt ([] , e) = ≺-irrefl {y} (subst (y ≺_) (trans e (⊕-identityʳ y)) lt)
+  row-flat {a = a} {v′ = v′} xo l l′ lt (_ ∷ _ , e) =
+    InvAt.flat (CH.sub-inv op xo l) (CH.sub-row op xo l l) (subst (λ t → enter (fL a) (CH.subOf op xo l) t (out v′)) e (CH.sub-row op xo l l′))
+
+  -- NO LANE'S `burstEnd` IS READ PAST THE BASE: the base lane's lies
+  -- before its `laneDone`; a link ends in its burst, so before its
+  -- `burstEnd`; the queued lane's burst holds its row; and a lane
+  -- subscribed under the queued lane's end lies past that row.
+  burst-none : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
+             → ∀ {q a y n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark burstEnd) n))
+             → (y ⊕ [ sub LS.J ] , out (Ln (instEmit (mark burstEnd) n))) ∈ r₂ → ⊥
+  burst-none rx₁ T r₁ {d} {xd} r₂ refl B₀ {q} {a} {y} {n} xo lb i =
+    [ (λ (eq , ea) → base-burst eq ea xo lb) , beyond ]′
+      (CH.under-ended op bd (CH.Base.x₀ Bs) (CH.Base.l₀ Bs) xo lb (λ ()) AB.ww (past-base rx₁ T r₁ r₂ refl B₀ (proj₁ order) (proj₂ order)))
+    where
+      module AB = AtBase rx₁ T r₁ r₂ refl B₀
+      open Target T using (z; mt; v; rx₂; sy)
+
+      Bs : CH.Base op (Target.sb T)
+      Bs = Base.base B₀
+
+      J : Pos → Pos
+      J w = w ⊕ [ sub LS.J ]
+
+      bd = proj₂ (CH.bounded op (Target.xo T) (Target.l T) (Target.nq T))
+
+      order : d ≺ J y × J y ≺ z
+      order = run-btw r₁ r₂ (subst (Met M) (++-assoc r₁ ((d , out xd) ∷ r₂) ((z , out (Ln v)) ∷ rx₂)) mt) i
+
+      base-burst : ∀ {q′ a′} → q′ ≡ CH.Base.q₀ Bs → a′ ≡ CH.Base.a₀ Bs → (xo′ : RO q′ (out a′))
+                 → RV.Lane op q′ a′ y (out (instEmit (mark burstEnd) n)) → ⊥
+      base-burst refl refl xo′ lb′ =
+        [ (λ e → ≺-irrefl {d} (subst (d ≺_) (trans (cong J e) (sym (Base.at₀ B₀))) (proj₁ order)))
+        , (λ (lt , nl) → ≺-irrefl {d} (≺-trans {d} {J y} {d} (proj₁ order)
+              (subst (J y ≺_) (sym (Base.at₀ B₀)) (snoc-lead (sub LS.J) lt (⊑-refl (Base.y₀ B₀)) nl)))) ]′
+          (lane-first m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (CH.subOf op xo′ lb′) (CH.sub-ok op xo′ lb′)
+            (CH.sub-row op xo′ lb′ lb′) (CH.sub-row op xo′ lb′ (Base.ld₀ B₀)) tt)
+
+      linked : ∀ {c′} (x′ : RO q (out a)) (le : RV.Lane op q a c′ end) → Sync (CH.subOf op x′ le) c′ → ⊥
+      linked {c′} x′ le syn =
+        burst-first x′ lb (proj₁ (proj₂ (proj₂ (proj₂ (lane-end-done x′ le)))))
+          (≺-≼-≺ {proj₁ (lane-end-done x′ le)} {c′} {y} (proj₂ (proj₂ (proj₂ (proj₂ (lane-end-done x′ le))))) (burst-past x′ le syn lb))
+
+      queued : ∀ {q′ a′} → q′ ≡ Target.Q T → a′ ≡ Target.a T → RV.Lane op q′ a′ y (out (instEmit (mark burstEnd) n)) → ⊥
+      queued refl refl lb′ =
+        [ (λ yt → ≺-irrefl {J y} (≺-trans {J y} {z} {J y} (proj₂ order)
+                    (snoc-lead (sub LS.J) yt (⊑-refl y) (row-flat (Target.xo T) (Target.l T) lb′ yt))))
+        , (λ e → ≺-irrefl {J y} (subst (λ t → J y ≺ J t) e (proj₂ order))) ]′
+          (≼-split {Target.y T} {y} (burst-past (Target.xo T) (Target.l T) sy lb′))
+
+      beyond : W⁼ (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (CH.Base.c₀ Bs ⊕ [ ix 1 ]) (CH.subOf op xo lb) → ⊥
+      beyond w =
+        [ (λ (_ , _ , x′ , le , syn) → linked x′ le syn)
+        , (λ v′ → [ (λ (eq , ea) → queued eq ea lb) , (λ (_ , lcT , w′) → target-after rx₁ T lcT xo lb w′ (proj₂ order)) ]′
+                    (CH.sub-in op bd (Target.xo T) (Target.l T) xo lb v′)) ]′
+          (CH.along op bd (CH.Base.chain Bs) (_ , _ , _ , _ , Target.xo T , Target.l T , refl) xo lb w)
+
+  -- NO BURST'S END IS READ PAST THE BASE.
+  hand-bursts : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
+              → ∀ a {k b n} c → r₂ ≡ a ++ (k , out (Tg b (instEmit (mark burstEnd) n))) ∷ c
+              → Flat.dead (After r₁ xd a) ≡ true
+  hand-bursts rx₁ T r₁ r₂ sp B₀ a {k} {b} {n} c eq =
+    ⊥-elim (bursts-at rx₁ T r₁ r₂ sp B₀ a c eq
+      (lane-row (Target.mt T) {k = k} {b = b} {mk = burstEnd} {n = n}
+        (∈-++⁺ˡ (subst (_ ∈_) (sym sp) (∈-++⁺ʳ r₁ (there (subst (_ ∈_) (sym eq) (∈-++⁺ʳ a (here refl)))))))
+        (λ ()) (λ ()) (λ ()) (λ ())))
+    where
+      bursts-at : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
+                → ∀ a {k b n} c → r₂ ≡ a ++ (k , out (Tg b (instEmit (mark burstEnd) n))) ∷ c
+                → Σ Pos (λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark burstEnd) n))) → ⊥
+      bursts-at rx₁ T r₁ r₂ sp B₀ a c eq (y , refl , refl , σb) =
+        burst-none rx₁ T r₁ r₂ sp B₀ (proj₁ (proj₂ (proj₂ (σ₃-lane σb)))) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (σ₃-lane σb))))))
+          (subst (_ ∈_) (sym eq) (∈-++⁺ʳ a (here refl)))
 
   -- A cut leaves the instant where it was.
   cut-at : ∀ k n (s : Flat Pos) → Flat.at (proj₁ (cut {B} k n s)) ≡ Flat.at s
