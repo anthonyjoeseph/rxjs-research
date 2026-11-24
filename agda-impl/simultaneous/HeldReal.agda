@@ -43,7 +43,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
-open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl; entered-few)
 open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
@@ -89,8 +89,7 @@ open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark;
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 open import simultaneous.HeldBurst using (module CombBurst)
-open import adequacy.Census using (module Count)
-open import adequacy.Cursor using (Cur; bef; Owes; Slots; Waiting; Whole)
+open import adequacy.QueuedAt using (few-nth; module QueuedAt)
 open import denotation.EmissionSet using (module Bounded; module Values)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
@@ -508,7 +507,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   module Queue (k : ℕ) where
     open Bounded k fL RO using (Sub; Lane)
     open Values RO using (Nth)
-    module Cn = Count okQ k fL If (Id Q okQ)
+    module QA = QueuedAt okQ k fL If (Id Q okQ)
 
     -- A `laneDone` the scan reads at `x`: its lane, and the lane's end
     -- in its instant.
@@ -525,28 +524,12 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         row    : Lane q₀ a₀ yd (out b₀)
         ends   : Lane q₀ a₀ ce end
 
-    -- THE JOINER'S BOOK AT A CURSOR: the lanes begun and the values
-    -- waiting (adequacy's `Slots`, `Waiting`, `Whole`, `Census`).  `whole`
-    -- and `waiting` pin `ws` to the values passed and not yet started.
-    record Book (C : Cur) : Set where
-      field
-        {vs ws} : List (Pos × A)
-        {n d}   : ℕ
-        slots   : Slots Cn.P C vs ws n
-        waiting : Waiting C Cn.P RO vs ws (L.map proj₂ ws)
-        whole   : Whole C Cn.P RO vs ws
-        census  : Cn.Census C vs (L.length vs) d
-        dead    : d + n ≡ L.length vs
-        begun   : ∀ {q a y e} → RO q (out a) → Lane q a y e → ¬ Owes C y → (q , a) ∈ vs
-        started : ∀ {q a} → (q , a) ∈ vs → ¬ ¬ Σ Pos λ y → Σ Pos λ n → Lane q a y (out (instEmit (mark laneStart) n)) × ¬ Owes C y
-
     postulate
-      -- THE JOINER KEEPS A BOOK before a lane end the scan reads: the
-      -- outer values before it are finitely many, each read as an
-      -- `outerOpen`.  Adequacy's `Admit`, `LaneEnd` and `slots-mv` are
-      -- the three steps, there along a machine run.
-      book-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
-                  → ¬ ¬ Book (bef (Done.ce D))
+      -- A LANE BEGUN BEFORE A LANE'S END SHOWS ITS START BEFORE IT: the
+      -- start is the lane's first row, and the ended lane's end lies
+      -- past the begun lane's subscription, or under its own.
+      started-by : ∀ {x} (D : Done x) {i q a s} → Sub i q s a → s ≺ Done.ce D
+                 → Σ Pos λ y → Σ Pos λ n → Lane q a y (out (instEmit (mark laneStart) n)) × y ≺ Done.ce D
 
     -- A VALUE WHOSE `outerOpen` THE SCAN READS BEFORE A LANE'S ROW LIES
     -- BEFORE THAT ROW.
@@ -596,21 +579,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
               let (y₀ , _ , r₀ , s₀ , lt₀) = lane-starts (Run.fwd xo rn l ld′)
               in ≺-irrefl {c} (≺-trans {c} {yd′} {c} (subst (_≺ yd′) (sym (start-once xo l (Run.back xo rn l r₀ s₀))) lt₀) y′c)
 
-    -- With a value waiting every slot is taken, and the queue's head
-    -- starts one step below the first owed end.
-    head : ∀ {x} (D : Done x) (Bk : Book (bef (Done.ce D))) → ¬ Book.ws Bk ≡ []
-         → Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
-    head D Bk ne with Book.ws Bk | Book.slots Bk | Book.waiting Bk | ne
-    ... | []           | _                   | _                   | ne′ = ⊥-elim (ne′ refl)
-    ... | (q , a) ∷ ws′ | Lv , _ , inj₁ ()   | _                   | _
-    ... | (q , a) ∷ ws′ | Lv , _ , inj₂ refl | _ , _ , wf , _ , _ | _  =
-      let open Done D ; open Book Bk using (vs; census; dead; begun)
-          (Lvs , nx , _) = Cn.nths-split vs Lv
-          (i , sb) = Cn.head-at Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx {ws = ws′}
-                       (_ , _ , begun val row (λ le → le before) , ends , (λ ()) , ≼-refl {ce})
-                       (λ (_ , _ , _ , _ , _ , o) → o)
-      in i , q , a , sb
-
   -- A BOUNDED MERGE'S LANE END WITH A LANE QUEUED STARTS ONE IN ITS
   -- INSTANT: rxjs subscribes the queued lane inside the end, where the
   -- schedule starts it (`Bounded.queued`, at the end's `ix 1`).
@@ -618,14 +586,15 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
               → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
               → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
   queued-next {k} refl r₁ {x} {xl} mt ld nz {q′} mq xq no =
-    book-at refl r₁ mt D λ Bk →
     queue-live refl r₁ mt nz λ (qv , av , xo , oi , ns) →
       let (rw , i , om) = find oi
           qce = ≺-trans {qv} {yd} {ce} (opened-before om row (subst (proj₁ rw ≺_) at-x (met-before r₁ mt i))) before
-      in [ (λ iv → Book.started Bk iv λ (y , n , l , ny) → [ (λ cy → ny cy) , between xo ns l ]′ (≼-or-≻ ce y))
-         , (λ iw → let (_ , _ , _ , sb) = head D Bk (nonempty iw) in
-             start-shown refl D sb mq cq λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same)) ]′
-         (Book.whole Bk xo (λ le → le qce) tt)
+      in few-nth RO (entered-few (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) {qv} {out av} (λ {_} {_} → tt) xo) xo λ (iv , nv) →
+         QA.queued-at ends nv qce λ
+           { (inj₁ e) → let (_ , sb , sc) = QA.early-at e nv
+                            (y , n , l , yce) = started-by D sb sc
+                        in between xo ns l yce
+           ; (inj₂ (_ , _ , _ , sb)) → start-shown refl D sb mq cq λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same) }
     where
       open Queue k
       D : Done x
@@ -634,10 +603,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
       cq : instantOf ce ≺ⁱ instantOf q′
       cq = subst (_≺ⁱ instantOf q′) (sym same) xq
-
-      nonempty : ∀ {w} {ws : List (Pos × A)} → w ∈ ws → ¬ ws ≡ []
-      nonempty (here _)  ()
-      nonempty (there _) ()
 
       -- A begun lane the scan has not seen start starts in the end's
       -- instant, past the `laneDone`.

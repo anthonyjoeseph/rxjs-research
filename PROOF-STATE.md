@@ -280,8 +280,17 @@ on the scan's run split onto that branch. Riskiest: the defer limit's
 rest (no one approximant bounds it). Settled when each former's leaf is
 a body.
 
-Members: `book-at`, `opened-before`, `live-current`, `lane-tot`, `outer-tot`, `close-tot`,
+Members: `live-current`, `lane-tot`, `outer-tot`, `close-tot`,
 `over-tot`, `end-tot`, `comb-shut`, `scan-idle`, `lim-rest`.
+
+#### THE MERGE'S LANE POSITIONS
+
+Unproven: a bounded merge's lane end lies past the second child of each
+value or other lane end before it, and a begun lane's start precedes it.
+Settled by the world laws (`Disj`, `rel`) placing every lane row off a
+first child.
+
+Members: `end-past`, `started-by`.
 
 #### THE BATCH RANK
 
