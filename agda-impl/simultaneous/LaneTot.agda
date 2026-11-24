@@ -12,6 +12,7 @@ open import Data.List.Membership.Propositional using (_∈_; find)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
 import Data.Nat as ℕ
@@ -111,8 +112,8 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ...     | Q , a , xo , _ , l , _ = Q , a , y , xo , refl , l
 
   -- A lane's value or completion lies before its step's over.
-  lane-early : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (Ln x)) ∷ rx₂) → Opens x → Early q
-  lane-early rx₁ mt o with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
+  row-early : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (Ln x)) ∷ rx₂) → Opens x → Early q
+  row-early rx₁ mt o with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
   ... | lane {w = w} y = early-inst [ sub w ] (fine-early o (Fit.fine lane-fit y))
     where
       fine-early : ∀ {x y′} → Opens x → Fine x y′ → Early y′
@@ -140,7 +141,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
               → Carried (out v) → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
               → Σ ℕ λ k → tot (St rx₁) ≡ suc k
   lane-queued rx₁ {y} Ov mt xo l nq sy car ovf res nx =
-    pos-tot λ z₀ → held-on op (nameOf z) o r₂ along at held lv (subst (λ S → Flat.held (proj₁ S) ≡ 0) past≡ (held-of z₀))
+    pos-tot λ z₀ → held-on op (nameOf z) o r₂ along at held lv (subst (λ S → Flat.held (proj₁ S) ≡ 0) past≡ (held-of {St rx₁} z₀))
     where
       z : Pos
       z = y ⊕ [ sub LS.J ]
@@ -332,8 +333,8 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   ...   | no ns  = pos-tot λ z → oc-total Q rx₁ λ (c , oc) →
             let (k , c≡) = lane-own rx₁ mt xo l ns car nx oc
             in lanes-floor rx₁ Ov mt (lane-alive rx₁ mt xo l car) oc
-                 (trans (cong proj₁ c≡) (cong nm (rootOf-ext y [ sub LS.J ]))) (λ e → 0≢suc (trans (sym e) (cong proj₂ c≡)))
-                 ovf res (lanes-of z)
+                 (trans (cong proj₁ c≡) (cong nm (sym (rootOf-ext y [ sub LS.J ])))) (λ e → 0≢suc (trans (sym e) (cong proj₂ c≡)))
+                 ovf res (lanes-of {St rx₁} z)
     where
       0≢suc : ∀ {k} → 0 ≡ suc k → ⊥
       0≢suc ()
@@ -341,7 +342,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- A LANE'S VALUE OR COMPLETION: no over of its instant comes first.
   lane-tot : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (laneB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
            → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
-  lane-tot rx₁ mt o = lane-carried rx₁ ⊥ mt (opens-carried o) (λ i ik → over-early rx₁ mt (lane-early rx₁ mt o) i ik) [ (λ f → f) , ⊥-elim ]′
+  lane-tot rx₁ mt o = lane-carried rx₁ ⊥ mt (opens-carried o) (λ i ik → over-early rx₁ mt (row-early rx₁ mt o) i ik) [ (λ f → f) , ⊥-elim ]′
     where
       opens-carried : ∀ {x} → Opens x → Carried (out x)
       opens-carried o-value = c-value

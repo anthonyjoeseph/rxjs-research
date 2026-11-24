@@ -11,9 +11,10 @@ module simultaneous.LaneQueued where
 
 import Data.List as L
 open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
+open import Data.Nat using (ℕ; zero; suc; _+_)
 import Data.Nat as ℕ
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
@@ -24,11 +25,11 @@ open import Relation.Nullary using (¬_)
 open import Tree using (Obs; FlatOp)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≺_)
+open import denotation.EmissionSet using (DenEnv; out; end; enter; hot; _≺_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; isZero)
 open import Data.Nat.Properties using (m+n≡0⇒n≡0)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Bool using (_∧_)
 open import simultaneous.InstEmit using (instEmit; mark; laneDone; burstEnd)
 open import simultaneous.Relations using (Met)
@@ -50,8 +51,8 @@ open import Data.List.Membership.Propositional.Properties using (∈-∃++)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Properties using (++-assoc)
-open import denotation.Read using (Run)
-open import denotation.EmissionSet using (EmissionSet)
+open import denotation.Read using (Run; _∷_)
+open import denotation.EmissionSet using (EmissionSet; Ev)
 open import simultaneous.Layers using (run-after)
 open import simultaneous.Instants using (btw)
 open import simultaneous.TakeCut using (inst-⊕)
@@ -67,7 +68,7 @@ open import Data.List.Properties using (∷-injective)
 open import Data.Sum using ([_,_]′)
 open import Data.Unit using (tt)
 open import Data.List.Membership.Propositional using (find)
-open import Data.List.Membership.Propositional.Properties using (lose)
+open import Data.List.Membership.Propositional using (lose)
 open import denotation.Position using (last)
 open import denotation.Laws.Worlds using (InvAt; _⊑_; ⊑-inside; inside-⊑; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; world-after)
 open import denotation.Laws.Modulus using (≺-irrefl)
@@ -75,15 +76,17 @@ open import denotation.Laws.BoundedInv using (end-uniq)
 open import simultaneous.HeldLanes using (lane-take)
 open import simultaneous.Routed using (c-done)
 open import Relation.Nullary using (yes; no)
-open import Tree using (mergeᶠ)
+open import Tree using (mergeᶠ; connected)
 open import simultaneous.ScanCount using (past-queue; markQue; que-cut)
 open import simultaneous.LaneCount using (kStart)
 open import simultaneous.InstEmit using (outerOpen; value)
 open import Data.List.Relation.Unary.Any using (Any)
 open import denotation.Laws.Modulus using (≺-trans; ≺-ext; ≼-≺-≺; ≺→≼)
-open import denotation.Laws.Worlds using (conv; ⊑-≼; ⊑-refl)
+open import denotation.Laws.Worlds using (conv; ⊑-≼; ⊑-refl; ⊑-cmp; ⊕-injˡ; W; W⁼; inW; w-up; plain-ix)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺-≼-≺)
+open import simultaneous.HeldLanes using (bproj-mem)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; Input; react; each; connected; laneˢ; cut; ended; anyHolds; undone)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; Input; react; each; laneˢ; cut; ended; anyHolds; undone)
 
 module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
               (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -100,13 +103,13 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
               (ok₃ : Ok (Hots (FlatHots.env′ m ρ op f s env p)) (FlatHots.P m ρ op f s env p))
               (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
-  open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; module OS; g₂; named; met-before)
+  open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; module OS; g₂; named; met-before; lane-run)
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func)
+    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (lane-end-done; St; LaneEmit; done-told; next-idle; own-snoc; lane-rows; cnt-lane; module QL)
+    using (lane-end-done; St; LaneEmit; done-told; next-idle; own-snoc; lane-rows; cnt-lane; module QL; catch-by; in-prefix; out-pin)
   open LaneHold m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (OvBefore; Live?; lanes-at; lanes-floor; done-live; lane-covered)
+    using (OvBefore; Live?; lanes-at; lanes-floor; done-live)
   open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (oc-total; OC; oc-in)
 
   -- ROUTES HANDED AT A LANE'S END, held to a row `z` past it: the
@@ -130,7 +133,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
              → Flat.dead (proj₁ (past op (react op (past op init r₁) xd) a)) ≡ true
 
   -- A queued lane's row in its burst, as the scan's source reads it.
-  record Target (rx₁ : List Row) : Set where
+  record Target (rx₁ : List Row) : Set₁ where
     field
       {y Q} : Pos
       {v}   : IE B
@@ -176,19 +179,6 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   After r₁ xd a = proj₁ (past op (react op (past op init r₁) xd) a)
 
   postulate
-    -- THE BASE'S `laneDone` IS MET BEFORE THE QUEUED LANE'S ROW: it lies
-    -- before the base's end, below the chain's subscriptions, so before
-    -- the row.
-    base-read : ∀ rx₁ (T : Target rx₁) (B₀ : CH.Base op (Target.sb T)) {y₀ kd n₀}
-              → RV.Lane op (CH.Base.q₀ B₀) (CH.Base.a₀ B₀) y₀ (out (instEmit (mark (laneDone kd)) n₀)) → y₀ ≺ CH.Base.c₀ B₀
-              → (y₀ ⊕ [ sub LS.J ] , out (Ln (instEmit (mark (laneDone kd)) n₀))) ∈ rx₁
-
-    -- NO VALUE LIES BETWEEN A LANE'S `laneDone` AND ITS END: the two
-    -- stand beside each other at the lane's take point, under which the
-    -- outer shows nothing.
-    done-ahead : ∀ {q a y kd n c q′ a′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → RV.Lane op q a c end
-               → RO q′ (out a′) → q′ ≺ c → q′ ≺ y
-
     -- NO ENVIRONMENT BURST STARTS AT A LANE'S `laneDone`: the lanes' own
     -- exemptions are their outer scopes' subscriptions, which `cs` lists.
     done-unlisted : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → y ∈ cs → ⊥
@@ -207,6 +197,96 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
                 → ∀ a {k b n} c → r₂ ≡ a ++ (k , out (Tg b (instEmit (mark burstEnd) n))) ∷ c
                 → Flat.dead (After r₁ xd a) ≡ true
 
+  -- NO VALUE LIES BETWEEN A LANE'S `laneDone` AND ITS END: the two
+  -- stand beside each other at the lane's take point, in the lane's
+  -- world, where no value lies.
+  done-ahead : ∀ {q a y kd n c q′ a′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → RV.Lane op q a c end
+             → RO q′ (out a′) → q′ ≺ c → q′ ≺ y
+  done-ahead {y = y} {c = c} {q′ = q′} x ld lc x′ qc with ≼-or-≻ y q′
+  ... | inj₂ lt = lt
+  ... | inj₁ le = ⊥-elim (CH.past-lane op x ld ww x′ (conv {w} {y} {q′} {c} ([ ix 0 ] , ey) le qc ([ last ] , ec)))
+    where
+      S : Pos
+      S = CH.subOf op x ld
+
+      tp₀ = lane-take m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ S (CH.sub-ok op x ld) (CH.sub-row op x ld ld) tt
+
+      w : Pos
+      w = proj₁ tp₀
+
+      ey : y ≡ w ⊕ [ ix 0 ]
+      ey = proj₁ (proj₂ tp₀)
+
+      ec : c ≡ w ⊕ [ last ]
+      ec = end-uniq (CH.sub-inv op x ld) (CH.sub-row op x ld lc) (proj₂ (proj₂ tp₀))
+
+      wy : W (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) S y
+      wy = InvAt.world (CH.sub-inv op x ld) (CH.sub-row op x ld ld)
+
+      ww : W⁼ (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) S w
+      ww = [ (λ e → ⊥-elim (≺-irrefl {S} (subst (S ≺_) (trans ey (sym e)) (world-after wy (InvAt.real (CH.sub-inv op x ld) (CH.sub-row op x ld ld))))))
+           , (λ v → v) ]′ (w-up plain-ix (inW (subst (W (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) S) ey wy)))
+
+  -- THE BASE LANE'S TAKE POINT: its `laneDone` and end stand beside each
+  -- other there, the `laneDone` first.
+  module TakePoint {s} (B₀ : CH.Base op s) {y₀ kd n₀} (ld₀ : RV.Lane op (CH.Base.q₀ B₀) (CH.Base.a₀ B₀) y₀ (out (instEmit (mark (laneDone kd)) n₀)))
+                   (yc : y₀ ≺ CH.Base.c₀ B₀) where
+    x₀′ : RO (CH.Base.q₀ B₀) (out (CH.Base.a₀ B₀))
+    x₀′ = CH.Base.x₀ B₀
+
+    -- The base lane's subscription.
+    S₀ : Pos
+    S₀ = CH.subOf op x₀′ (CH.Base.l₀ B₀)
+
+    -- THE `laneDone` LIES BESIDE THE END: the lane is a take, failing at
+    -- its `laneDone` and ending beside it.
+    sib : Σ Pos λ w → y₀ ≡ w ⊕ [ ix 0 ] × CH.Base.c₀ B₀ ≡ w ⊕ [ last ]
+    sib = let (w , e , r) = lane-take m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ S₀ (CH.sub-ok op x₀′ (CH.Base.l₀ B₀))
+                              (CH.sub-row op x₀′ (CH.Base.l₀ B₀) ld₀) tt
+          in w , e , end-uniq (CH.sub-inv op x₀′ (CH.Base.l₀ B₀)) (CH.sub-row op x₀′ (CH.Base.l₀ B₀) (CH.Base.l₀ B₀)) r
+
+    w₀ : Pos
+    w₀ = proj₁ sib
+
+    -- So the `laneDone` is not over the end.
+    beside : y₀ ⊑ CH.Base.c₀ B₀ → ⊥
+    beside h with ⊑-snoc w₀ (subst (y₀ ⊑_) (proj₂ (proj₂ sib)) h)
+    ... | inj₁ h′ = ≺-irrefl {y₀} (≼-≺-≺ {y₀} {w₀} {y₀} (⊑-≼ h′) (subst (w₀ ≺_) (sym (proj₁ (proj₂ sib))) (≺-ext w₀ [])))
+    ... | inj₂ e  = ≺-irrefl {y₀} (subst (y₀ ≺_) (sym (trans e (sym (proj₂ (proj₂ sib))))) yc)
+
+  -- THE BASE'S `laneDone` IS MET BEFORE THE QUEUED LANE'S ROW: it lies
+  -- before the base's end, below the chain's subscriptions, so before
+  -- the row, and the lanes, never cut in a bounded merge, show it.
+  base-read : ∀ rx₁ (T : Target rx₁) (B₀ : CH.Base op (Target.sb T)) {y₀ kd n₀}
+            → RV.Lane op (CH.Base.q₀ B₀) (CH.Base.a₀ B₀) y₀ (out (instEmit (mark (laneDone kd)) n₀)) → y₀ ≺ CH.Base.c₀ B₀
+            → (y₀ ⊕ [ sub LS.J ] , out (Ln (instEmit (mark (laneDone kd)) n₀))) ∈ rx₁
+  base-read rx₁ T B₀ {y₀} ld₀ yc =
+    let (rs , pr , run , _) = lane-run mt
+        (y′ , e′ , j) = bproj-mem pr (∈-++⁺ʳ rx₁ (here refl))
+        bd = proj₂ (CH.bounded op xo l nq)
+    in in-prefix rx₁ mt
+         (catch-by pr run (CH.Base.x₀ B₀) (CH.runs-of op bd (CH.Base.l₀ B₀)) ld₀ (CH.uncut-of op bd)
+           (subst (λ w → (w , out v) ∈ rs) (sym (⊕-injˡ y y′ e′)) j) out-pin y₀y)
+         jy
+    where
+      open Target T
+      open TakePoint B₀ ld₀ yc using (beside)
+
+      c₀y : CH.Base.c₀ B₀ ⊑ y
+      c₀y = ⊑-trans (CH.chain-⊑ (CH.Base.chain B₀)) (inside-⊑ sb y (proj₁ sy))
+
+      y₀y : y₀ ≺ y
+      y₀y = ≺-≼-≺ {y₀} {CH.Base.c₀ B₀} {y} yc (⊑-≼ c₀y)
+
+      jy : (y₀ ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ])
+      jy with ≼-or-≻ (y ⊕ [ sub LS.J ]) (y₀ ⊕ [ sub LS.J ])
+      ... | inj₂ lt = lt
+      ... | inj₁ le with ⊑-cmp y₀ (CH.Base.c₀ B₀)
+                           (conv {y₀} {y₀} {y} {y₀ ⊕ [ sub LS.J ]} (⊑-refl y₀) (≺→≼ {y₀} {y} y₀y)
+                             (≺-≼-≺ {y} {y ⊕ [ sub LS.J ]} {y₀ ⊕ [ sub LS.J ]} (≺-ext y []) le) (⊑-snoc⁺ y₀)) c₀y
+      ...   | inj₁ h = ⊥-elim (beside h)
+      ...   | inj₂ h = ⊥-elim (≺-irrefl {y₀} (≺-≼-≺ {y₀} {CH.Base.c₀ B₀} {y₀} yc (⊑-≼ h)))
+
   -- A QUEUED LANE'S CHAIN HAS A BASE, MET BEFORE ITS ROW.
   hand-base : ∀ rx₁ (T : Target rx₁) → Σ (List Row) λ r₁ → Σ Pos λ d → Σ (Maybe (Input B)) λ xd → Σ (List Row) λ r₂
             → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ × Base (Target.sb T) d xd
@@ -222,9 +302,9 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   -- Rows of a run between two of its rows lie between them.
   run-btw : ∀ {X} {t : EmissionSet X} {c} r₁ {d e₁} r₂ {z e₂ r₃ k e} → Run t c (r₁ ++ (d , e₁) ∷ (r₂ ++ (z , e₂) ∷ r₃)) → (k , e) ∈ r₂ → d ≺ k × k ≺ z
   run-btw (_ ∷ r₁) r₂ (_ ∷ run) i = run-btw r₁ r₂ run i
-  run-btw []       r₂ (_ ∷ run) i = run-after run (∈-++⁺ˡ i) , below r₂ run i
+  run-btw {X} {t} []       r₂ (_ ∷ run) i = run-after run (∈-++⁺ˡ i) , below r₂ run i
     where
-      below : ∀ {c′} r {z e₂ r₃ k e} → Run _ c′ (r ++ (z , e₂) ∷ r₃) → (k , e) ∈ r → k ≺ z
+      below : ∀ {c′} r {z : Pos} {e₂ : Ev X} {r₃ k e} → Run t c′ (r ++ (z , e₂) ∷ r₃) → (k , e) ∈ r → k ≺ z
       below (_ ∷ r) (_ ∷ run′) (here refl) = run-after run′ (∈-++⁺ʳ r (here refl))
       below (_ ∷ r) (_ ∷ run′) (there j)   = below r run′ j
 
@@ -269,22 +349,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
     dz : nameOf d ≡ nameOf z
     dz = cong (λ w → nm (w ∙ [])) (base-inst rx₁ T B₀)
 
-    x₀′ : RO (CH.Base.q₀ base) (out (CH.Base.a₀ base))
-    x₀′ = CH.Base.x₀ base
-
-    -- The base lane's subscription.
-    S₀ : Pos
-    S₀ = CH.subOf op x₀′ (CH.Base.l₀ base)
-
-    -- THE `laneDone` LIES BESIDE THE END: the lane is a take, failing at
-    -- its `laneDone` and ending beside it.
-    sib : Σ Pos λ w → y₀ ≡ w ⊕ [ ix 0 ] × CH.Base.c₀ base ≡ w ⊕ [ last ]
-    sib = let (w , e , r) = lane-take m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ S₀ (CH.sub-ok op x₀′ (CH.Base.l₀ base))
-                              (CH.sub-row op x₀′ (CH.Base.l₀ base) ld₀) tt
-          in w , e , end-uniq (CH.sub-inv op x₀′ (CH.Base.l₀ base)) (CH.sub-row op x₀′ (CH.Base.l₀ base) (CH.Base.l₀ base)) r
-
-    w₀ : Pos
-    w₀ = proj₁ sib
+    open TakePoint base ld₀ done₀ public
 
     -- SO IT LIES OUTSIDE ITS SUBSCRIPTION'S BURST, as the end does: what
     -- leads it, past the subscription, leads the end.
@@ -314,14 +379,14 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
         cz = ⊑-trans (⊑-trans (⊑-trans (subst (c′ ⊑_) (sym (proj₂ (proj₂ sib))) (⊑-trans h (⊑-snoc⁺ w₀))) (CH.chain-⊑ (CH.Base.chain base)))
                (inside-⊑ _ y (proj₁ sy))) (⊑-snoc⁺ y)
 
-        rz : instantOf z ∙ [] ≡ instantOf c′ ∙ []
+        rz : (instantOf z ∙ []) ≡ (instantOf c′ ∙ [])
         rz = trans (cong (_∙ []) (trans (sym (base-inst rx₁ T B₀)) (trans (cong instantOf at₀) (inst-⊕ y₀ [ sub LS.J ])))) rt
 
     -- THE BASE LANE ENDS HOLDING A ROUTE: its `laneDone`, outside its
     -- burst and every exemption, is covered.
     holds : ∀ {c} (oc : OC (CH.Base.q₀ base) r₁ c) → Σ ℕ λ k → proj₂ c ≡ suc k
     holds oc =
-      let (k , e) = lane-covered x₀′ (own-snoc r₁ mt′ x₀′ oc le) (lane-rows oc) [] refl ld₀ c-done
+      let (k , e) = lane-done-own x₀′ ld₀ (lane-rows oc) (own-snoc r₁ mt′ x₀′ oc le)
                       (subst (λ s′ → ¬ Sync s′ y₀) (sym (CH.sub-one op x₀′ ld₀ (CH.Base.l₀ base))) ns) free
       in k , trans (sym (cong proj₂ (cnt-lane oc))) (cong proj₂ e)
 
@@ -402,7 +467,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
                  (B₀ : Base (Target.sb T) d xd) where
     open Target T using (xo; l; nq)
     open Base B₀
-    open AtBase rx₁ T r₁ r₂ sp B₀ using (mt′; x₀′; sib)
+    open AtBase rx₁ T r₁ r₂ sp B₀ using (mt′; x₀′; beside)
     open CH.Base base using (q₁; a₁; x₁; l₁; sub₁; before₁; l₀; c₀)
 
     bd : op ≡ mergeᶠ (just (proj₁ (CH.bounded op xo l nq)))
@@ -417,12 +482,6 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
            (≺-trans {proj₁ ro ⊕ [ sub OS.J ]} {ro-at (proj₁ ro)} {y₀ ⊕ [ sub LS.J ]} (J≺ro (proj₁ ro))
              (≺-trans {ro-at (proj₁ ro)} {y₀} {y₀ ⊕ [ sub LS.J ]}
                (subst (_≺ y₀) (proj₂ (proj₂ (proj₂ ro))) (done-ahead x₀′ ld₀ l₀ x₁ before₁)) (≺-ext y₀ [])))
-
-    -- A `laneDone` is not over its lane's end: the two are siblings.
-    beside : y₀ ⊑ c₀ → ⊥
-    beside h with ⊑-snoc (proj₁ sib) (subst (y₀ ⊑_) (proj₂ (proj₂ sib)) h)
-    ... | inj₁ h′ = ≺-irrefl {y₀} (≼-≺-≺ {y₀} {proj₁ sib} {y₀} (⊑-≼ h′) (subst (proj₁ sib ≺_) (sym (proj₁ (proj₂ sib))) (≺-ext (proj₁ sib) [])))
-    ... | inj₂ e  = ≺-irrefl {y₀} (subst (y₀ ≺_) (sym (trans e (sym (proj₂ (proj₂ sib))))) done₀)
 
     -- The first lane starts past the base's end, so after its `laneDone`.
     late : ∀ {x} → x ∈ r₁ → LaneMark laneStart q₁ x → ⊥
@@ -446,7 +505,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
 
     waiting : ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
     waiting q0 = met-open r₁ mt′ (proj₁ (proj₂ (proj₂ ro))) jd λ oi →
-      QL.covered r₁ r₁ (λ xs y ys eq → past-queue op init xs y (no-end r₁ mt′ xs eq))
+      QL.covered r₁ (λ xs y ys eq → past-queue op init xs y (no-end r₁ mt′ xs eq))
         (λ { (_ , _ , _ , _ , _ , refl) → subst (λ o → markQue o outerOpen ≡ kStart) (sym bd) refl })
         (λ { (_ , _ , _ , _ , refl , _) → refl })
         (λ _ _ _ _ _ _ → open-one)

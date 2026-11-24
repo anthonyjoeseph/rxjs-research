@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -35,8 +35,9 @@ open import denotation.Read using (Run; []; _∷_)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; value)
-open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm; Sync; Ex; Carried)
+open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
+open import simultaneous.Relations using (Met)
+open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm; Sync; Ex; Carried; cnt; nameOf)
 open import simultaneous.Counts using (Counts; module Alike; counts-held; counts-at; module TakeCounts)
 open import simultaneous.HeldTake using (name-ext; sync-ext; ex-ext)
 open import simultaneous.HeldDefer using (sync-up)
@@ -516,6 +517,21 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
   sub-is switchᶠ           p ok fp ep xo l                 = refl
   sub-is exhaustᶠ          p ok fp ep xo l                 = refl
   sub-is (mergeᶠ (just n)) p ok fp ep xo (i , s , sb , _ , _) = refl
+
+  -- A LANE'S `laneDone` HOLDS A ROUTE, outside its burst and every
+  -- exemption: the frame reads it past its program's end, and the count
+  -- moves at no row between.
+  postulate
+    done-sub : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → ∀ r₁ {y kd n}
+             → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync s y → ¬ Ex cs y
+             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+
+  lane-done : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+            → ∀ r₁ {y kd n} → Met (View.Lane fL (enter dR p) op′ q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ])
+            → ¬ Sync (proj₁ (lane-at op′ dR fL Id Il p ok xo l)) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  lane-done op′ p ok fp ep {q} {a} xo l r₁ mt ns nx =
+    let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo l
+    in done-sub a s oks fs es r₁ (Alike.run to from mt) (subst (λ c → ¬ Sync c _) (sym (sub-is op′ p ok fp ep xo l)) ns) nx
 
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)

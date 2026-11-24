@@ -432,6 +432,19 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ...   | _ ∷ᴿ rn = ⊥-elim (≺-absurd {proj₁ u} {proj₁ x} ux (run-after rn i′))
 
   opaque
+    -- A RUNNING LANE'S ROW BEFORE ANY ROW THE LANES' RUN HOLDS, never cut
+    -- by it, is in that run.
+    catch-by : ∀ {rx rs} → BProj laneB (λ x → x) LS.J rx rs → Met σ₃ rs → ∀ {q a k b y e} → RO q (out a) → RV.Runs op q
+             → RV.Lane op q a k (out b) → ¬ RV.CutAt op q y → (y , e) ∈ rs → (∀ {r} → e ≡ pin r → ⊥) → k ≺ y
+             → (k ⊕ [ sub LS.J ] , out (Ln b)) ∈ rx
+    catch-by {rx} {rs} pr run {k = k} {b = b} {y = y} xo rn lk nc j np ky =
+      [ (λ af → ⊥-elim (≺-absurd {k} {y} ky (run-below run af j)))
+      , (λ (e″ , i₀) → bproj-in pr (subst (λ e₀ → (k , e₀) ∈ rs) (InvAt.func I₃ (proj₁ (proj₁ (run-row∈ run i₀))) (proj₁ σk)) i₀)) ]′
+      (aft-or-in run σk tt j)
+      where
+        σk : σ₃ k (out b)
+        σk = σ₃-before xo rn lk nc ky (proj₁ (run-row∈ run j)) np
+
     -- A LANE'S ROW BEFORE A ROW OF IT THE LANES' RUN HOLDS IS IN THAT RUN.
     catch-run : ∀ {rx rs} → BProj laneB (λ x → x) LS.J rx rs → Met σ₃ rs → ∀ {q a y v k b} → RO q (out a)
               → RV.Lane op q a y (out v) → (y , out v) ∈ rs → RV.Lane op q a k (out b) → k ≺ y
@@ -442,12 +455,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       in go (emit-one (a , y , xo , refl , l) (a″ , y , xo″ , refl , l″)) rn nc xo″
       where
         go : ∀ {q″ a″} → q ≡ q″ → RV.Runs op q″ → ¬ RV.CutAt op q″ y → RO q″ (out a″) → (k ⊕ [ sub LS.J ] , out (Ln b)) ∈ rx
-        go refl rn nc _ = [ (λ af → ⊥-elim (≺-absurd {k} {y} ky (run-below run af j)))
-                          , (λ (e″ , i₀) → bproj-in pr (subst (λ e₀ → (k , e₀) ∈ rs) (InvAt.func I₃ (proj₁ (proj₁ (run-row∈ run i₀))) (proj₁ σk)) i₀)) ]′
-                          (aft-or-in run σk tt j)
-          where
-            σk : σ₃ k (out b)
-            σk = σ₃-before xo rn lk nc ky (proj₁ (run-row∈ run j)) out-pin
+        go refl rn nc _ = catch-by pr run xo rn lk nc j out-pin ky
 
     -- A LANE'S ROW BEFORE A ROW OF IT THE RUN MET IS MET BEFORE THAT ROW:
     -- the lanes show it, never cut between, and their run met it first.
@@ -548,7 +556,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   next-idle r mt (a , y , xo , refl , l) oc =
     let (af , lt) = next-row r mt xo oc refl l
     in subst (λ c → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf (y ⊕ [ sub LS.J ])) (cnt-lane oc)
-         (Sum.map₂ (λ e → trans e (cong nm (rootOf-ext y [ sub LS.J ])))
+         (Sum.map₂ (λ e → trans e (cong nm (sym (rootOf-ext y [ sub LS.J ]))))
            (lane-idle-own xo (own-run r mt xo oc) (lane-rows-end oc) (proj₂ (lane-seen xo l)) af lt))
 
   -- A LANE'S UNDONE EMIT, NO PIECE'S MARK, IS MET PAST ITS `laneStart`:

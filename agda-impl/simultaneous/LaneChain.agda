@@ -13,7 +13,7 @@ open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Maybe using (nothing; just)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
 open import Relation.Nullary using (¬_; yes; no)
@@ -21,10 +21,11 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; After; enter; out; end; _≺_; module Bounded)
-open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; _⊑_)
+open import denotation.Laws.Worlds using (InvD; InvAt; Ok; W⁼; here; nest⁼; Plain; plain-ix; inside-⊑; conv; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; _⊑_)
 open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
+open BoundedI using (seat′)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Routed using (Sync)
@@ -34,7 +35,7 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   O : EmissionSet A
   O = enter d p
 
-  open View f O using (Lane)
+  open View f O using (Lane; Runs; CutAt)
 
   -- Where a lane subscribes, read off one of its rows.
   subOf : ∀ op {q a k e} → O q (out a) → Lane op q a k e → Pos
@@ -74,6 +75,30 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   bounded switchᶠ           x l nq = ⊥-elim (nq refl)
   bounded exhaustᶠ          x l nq = ⊥-elim (nq refl)
   bounded (mergeᶠ (just n)) x l nq = n , refl
+
+  -- A bounded merge runs every lane it has and cuts none.
+  runs-of : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {q a k e} → Lane op q a k e → Runs op q
+  runs-of _ refl (i , _ , (ni , _) , _) = i , _ , ni
+
+  uncut-of : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {q y} → ¬ CutAt op q y
+  uncut-of _ refl ()
+
+  -- A LANE'S SUBSCRIPTION SITS IN THE WORLD OF A VALUE'S SECOND CHILD:
+  -- its own value's, or, queued, the value down its chain of ends.
+  seated : ∀ op {q a k e} (x : O q (out a)) (l : Lane op q a k e) → Σ Pos λ r → Σ A λ b → O r (out b) × W⁼ H (r ⊕ [ ix 1 ]) (subOf op x l)
+  seated (mergeᶠ nothing)  x l = _ , _ , x , here
+  seated switchᶠ           x l = _ , _ , x , here
+  seated exhaustᶠ          x l = _ , _ , x , here
+  seated (mergeᶠ (just n)) x (i , s , sb , r) = seat-at (BoundedI.seat* ok n f If (Id p ok) sb)
+    where
+      seat-at : ∀ {i} → BoundedI.Seat ok n f If (Id p ok) i s → Σ Pos λ r → Σ A λ b → O r (out b) × W⁼ H (r ⊕ [ ix 1 ]) s
+      seat-at (seat′ _ _ _ nr rw) = _ , _ , Nths.nth-val O nr , rw
+
+  -- SO NO VALUE LIES UNDER A LANE'S WORLD: a value there would sit
+  -- under the world of another value's second child.
+  past-lane : ∀ op {q a k e q′ a′ w} (x : O q (out a)) (l : Lane op q a k e) → W⁼ H (subOf op x l) w → O q′ (out a′) → w ⊑ q′ → ⊥
+  past-lane op x l ww x′ wq =
+    let (_ , _ , xr , rw) = seated op x l in InvAt.under (Id p ok) xr x′ plain-ix (nest⁼ rw ww) wq
 
   -- One value's lanes share one subscription.
   sub-one : ∀ op {q a k e k′ e′} (x : O q (out a)) (l : Lane op q a k e) (l′ : Lane op q a k′ e′) → subOf op x l ≡ subOf op x l′

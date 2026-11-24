@@ -8,6 +8,7 @@ module simultaneous.LaneHold where
 
 import Data.List as L
 open import Data.List using (List; []; _∷_; _++_; [_])
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Membership.Propositional using (_∈_; find)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
 open import Data.List.Properties using (++-assoc)
@@ -78,7 +79,7 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-  open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (oc-total; oc[]; oc-in; oc-out)
+  open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (OC; oc-total; oc[]; oc-in; oc-out)
 
   -- The overs met before a row, of its instant, leave `Ov`.
   OvBefore : List Row → Pos → Set → Set
@@ -111,7 +112,7 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       ... | a₁ , b₁ , refl with find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ()))
       ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) with ro-func xo xo₀
       ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]}
-                  (subst (_≺ y ⊕ [ sub LS.J ]) (cong (_⊕ [ sub LS.J ]) (start-once xo l₀ l)) (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀)))
+                  (subst (_≺ (y ⊕ [ sub LS.J ])) (cong (_⊕ [ sub LS.J ]) (start-once xo l₀ l)) (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀)))
 
       step : ∀ {c} v → proj₂ c ≡ 0 → (∀ {n′} → v ≡ instEmit (mark begin) n′ → ⊥) → proj₂ (count {B} c v) ≡ 0
       step (instEmit (mark begin) _) _ nb = ⊥-elim (nb refl)
@@ -146,7 +147,7 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   stop-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark stop) n) → OC q xs c
            → proj₁ c ≡ nameOf (proj₁ x) × ¬ proj₂ c ≡ 0
   stop-own xs mt {q} {n} le@(a , y , xo , refl , l) oc =
-    trans (sym (cong proj₁ c≡)) (trans name (cong nm (rootOf-ext y [ sub LS.J ]))) ,
+    trans (sym (cong proj₁ c≡)) (trans name (cong nm (sym (rootOf-ext y [ sub LS.J ])))) ,
     λ z → 0≢suc (trans (sym z) (trans (sym (cong proj₂ c≡)) (proj₂ (lane-exact xo rn (lane-rows oc) [] refl))))
     where
       rn : Met (RV.Lane op q a) (lane-rows oc ++ [ (y , out (instEmit (mark stop) n)) ])
@@ -187,8 +188,8 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       (λ xs x ys eq le → done-live xs (sm xs x ys eq) le)
       (λ xs x ys eq → done-told rx₁ mt xs x ys eq)
       (λ xs x ys eq → start-own xs (sm xs x ys eq))
-      (λ xs x ys eq ik le o → let (cn , nz′) = stop-own xs (sm xs x ys eq) le o in trans cn (in-name ik) , nz′)
-      (λ xs x ys eq ik le o → Sum.map₂ (λ cn → trans cn (in-name ik)) (next-idle xs (sm xs x ys eq) le o))
+      (λ xs x ys eq ik le o → let (cn , nz′) = stop-own xs (sm xs x ys eq) le o in trans cn (in-name {proj₁ x} ik) , nz′)
+      (λ xs x ys eq ik le o → Sum.map₂ (λ cn → trans cn (in-name {proj₁ x} ik)) (next-idle xs (sm xs x ys eq) le o))
       (λ xs k b n ys eq → begin-name (in-r₁ rx₁ xs _ ys eq))
       (λ xs k b ys eq → name-begin (in-r₁ rx₁ xs _ ys eq))
       (λ xs x ys eq a → fwd xs x ys eq (find a))

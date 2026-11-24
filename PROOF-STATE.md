@@ -270,15 +270,6 @@ holds a route. Settled by bodies, or a body emptied under a looping source.
 Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 `tracks-real`.
 
-#### THE TAKE POINT
-
-Untried: a lane's `laneDone` and end are siblings under its take point,
-a position of the lane's program; nothing yet keeps the outer's values
-off it. Settled by an apartness of the outer's positions from a lane's,
-or by a run with a value between the two.
-
-Members: `done-ahead`.
-
 #### THE UNLISTED LANE ENDS
 
 Suspect: nothing `held-comb` assumes keeps an exempting subscription in
@@ -287,6 +278,16 @@ invariant placing `cs` before the flatMap, or by a run where a queued lane
 then lacks a route.
 
 Members: `done-unlisted`.
+
+#### THE LANE'S LAST COUNT
+
+Untried: a lane's `laneDone` follows its program's end in the frame, so
+it tells the count the end is covered by. Open: whether the end's
+exemptions are the `laneDone`'s. Settled by a run moving the end's cover
+up through the share, frame and take, or by an end exempt where its
+`laneDone` is not.
+
+Members: `done-sub`.
 
 #### THE HELD STREAMS
 
@@ -297,7 +298,7 @@ flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
-Members: `live-current`, `base-read`, `hand-dones`, `hand-bursts`,
+Members: `live-current`, `hand-dones`, `hand-bursts`,
 `end-tot`, `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK

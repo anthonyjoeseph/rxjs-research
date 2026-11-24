@@ -105,11 +105,6 @@ left-keep n s with isZero (Flat.active s) ∧ isZero (Flat.queue s)
 ... | true  = keep refl refl refl
 ... | false = keep-trans (keep refl refl refl) (cut-keep (Flat.outer s) n (record s { outer = 0 }))
 
-unpark-keep : ∀ {B} n s → Keep s (proj₁ (unpark {B} n s))
-unpark-keep n s with anyHolds (Flat.at s) (Flat.live s)
-... | true  = keep refl refl refl
-... | false = keep refl refl refl
-
 -- A connect's move.
 conn-keep : ∀ {B} op i r s (os : List (IE B)) → Keep s (proj₁ (react {B} op (s , os) (just (inj₂ (i , r)))))
 conn-keep op i r s os with anyHolds (Flat.at s) (setAt i r (Flat.live s))

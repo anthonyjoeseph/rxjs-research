@@ -281,13 +281,6 @@ module _ {B : Set} {N : Pos} {In : Pos → Set} {Ov : Set} where
         ; below = λ e → ⊥-elim (c-off L na e)
         ; ahead = λ _ → cv (proj₁ (Good.beg G refl) refl) }
 
-  -- An over or an outer end: never in the instant, so never at the name.
-  off-mark : ∀ {q e} op b m n s c c′ rest → (m ≡ begin → ⊥) → (In q → ⊥) → proj₁ c′ ≡ proj₁ c
-           → Ab s c ((q , e) ∷ rest) → Ab (proj₁ (onMark {B} op b s m n)) c′ rest
-  off-mark op b m n s c c′ rest nb nq cc L with Flat.at s ≟ᵖ N
-  ... | yes a = ⊥-elim (nq (Above.ahead L a (here refl)))
-  ... | no na = off-above (λ e → na (trans (sym (at-same op b m n s nb)) e)) (λ e → c-off L na (trans (sym cc) e))
-
   -- An over at the name spends it.
   over-on : ∀ {q e c c′ rest} n s → Flat.at s ≡ N → Ov → Ab s c ((q , e) ∷ rest) → Ab (proj₁ (overed {B} n s)) c′ rest
   over-on n s a ov L with Flat.spent s in sp

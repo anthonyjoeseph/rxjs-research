@@ -22,7 +22,7 @@ open import denotation.EmissionSet using (hot; enter; DenEnv; module Op; Ev; out
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Routing; Held; Early; Idle; Sync; Ex)
+open import simultaneous.Routed using (Routing; Held; Early; Idle; Sync; Ex; cnt; nameOf)
 open import simultaneous.Counts using (Counts)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; PinBy; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc; ⊑-snoc) renaming (W to Wld)
 open import denotation.Laws.BoundedInv using (module BoundedI)
@@ -606,6 +606,12 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   sub-at xo l = proj₁ (lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
     (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
     (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l)
+
+  -- A LANE'S `laneDone` HOLDS A ROUTE, outside its burst and every exemption.
+  lane-done-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → ∀ r₁ {y kd n}
+                → Met (RV.Lane op q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y
+                → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  lane-done-own = LI.lane-done op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → Counts (RV.Lane op q a) (λ y → Sync (sub-at xo l) y ⊎ Ex cs y)
