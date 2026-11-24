@@ -727,13 +727,11 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
              → (∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (z , e) ∷ []) rs′ → Met σ₁ rs′
                 → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf z , suc k))
              → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
-  outer-hold rx₁ {z} {e} {rx₂} Ov mt ovf res nod cv
-    with OS.run′ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (z , e) ∷ [])) (src-op tk env′ m)
-                   (run-prefix (rx₁ ++ (z , e) ∷ []) (subst (Met M) (sym (++-assoc rx₁ ((z , e) ∷ []) rx₂)) mt)))
-  ... | rs′ , pr′ , rσ , _ with cv pr′ rσ
-  ...   | rs , pr , _ , cov =
-    pos (ℕP.≤-trans (subst (ℕ._≤ Flat.outer S) (cong proj₂ cov) held′)
-                    (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.lanes S)) (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.held S)) (ℕP.m≤m+n _ (Flat.parked S)))))
+  outer-hold rx₁ {z} {e} {rx₂} Ov mt ovf res nod cv =
+    let (_ , pr′ , rσ , _) = OS.run′ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (z , e) ∷ [])) (src-op tk env′ m)
+                                       (run-prefix (rx₁ ++ (z , e) ∷ []) (subst (Met M) (sym (++-assoc rx₁ ((z , e) ∷ []) rx₂)) mt)))
+        (rs , pr , _ , cov) = cv pr′ rσ
+    in hold rs pr cov
     where
       N = nameOf z
       S = proj₁ (past op init rx₁)
@@ -775,13 +773,21 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       start : Above N In Ov (proj₁ (init {B})) r₀ rx₁
       start = record { live = λ _ → inj₁ refl ; below = λ e → e , inj₂ z≤n ; ahead = in-root }
 
-      fin : Above N In Ov S (cnt rs) []
-      fin = past-above OS.J op init r₀ rx₁ rs (λ r₁ r₂ eq → end-last I-M r₁ (subst (Met M) eq mx)) pr good conv start
+      -- The counter, read at the count the outer's rows leave.
+      hold : ∀ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs → ∀ {k} → cnt rs ≡ (N , suc k) → Σ ℕ λ k → tot S ≡ suc k
+      hold rs pr cov =
+        pos (ℕP.≤-trans (subst (ℕ._≤ Flat.outer S) (cong proj₂ cov) held′)
+                        (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.lanes S)) (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.held S)) (ℕP.m≤m+n _ (Flat.parked S)))))
+        where
+          fin : Above N In Ov S (cnt rs) []
+          fin = past-above OS.J op init r₀ rx₁ rs (λ r₁ r₂ eq → end-last I-M r₁ (subst (Met M) eq mx)) pr good conv start
 
-      held′ : proj₂ (cnt rs) ℕ.≤ Flat.outer S
-      held′ with Above.below fin (cong proj₁ cov)
-      ... | _ , inj₂ l = l
-      ... | a , inj₁ t with () ← trans (sym (res (Above.live fin a))) t
+          f≢t : false ≡ true → ⊥
+          f≢t ()
+
+          held′ : proj₂ (cnt rs) ℕ.≤ Flat.outer S
+          held′ = let (a , o) = Above.below fin (cong proj₁ cov)
+                  in [ (λ t → ⊥-elim (f≢t (trans (sym (res (Above.live fin a))) t))) , (λ l → l) ]′ o
 
   -- A CARRIED OUTER ROW FINDS A ROUTE THE SCAN COUNTS.  The outer holds a
   -- route of the row's instant there, and no `outerDone` lies before it.
