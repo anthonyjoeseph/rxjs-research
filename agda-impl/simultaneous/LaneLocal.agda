@@ -56,7 +56,8 @@ late-ext : ∀ {q} zs → Valued (rootOf q) × opos (rootOf q) ⊑ q
 late-ext {q} zs (v , o) = subst (λ I → Valued I × opos I ⊑ (q ⊕ zs)) (sym (rootOf-ext q zs)) (v , ⊑-trans o (zs , refl))
 
 ------------------------------------------------------------------------
--- A row's own claim: an `outerOpen`, never, as no lane opens an outer.
+-- A row's own claim: an `outerOpen` or an `outerDone`, never, as no lane
+-- opens or ends an outer.
 
 Fine : ∀ {A} → IE A → Pos → Set
 Fine (instEmit (value _) _)          y = Early y
@@ -70,7 +71,7 @@ Fine (instEmit (mark subscribed) _)  y = ⊤
 Fine (instEmit (mark completed) _)   y = Early y
 Fine (instEmit (mark outerOpen) _)   y = ⊥
 Fine (instEmit (mark outerClose) _)  y = ⊤
-Fine (instEmit (mark outerDone) _)   y = ⊤
+Fine (instEmit (mark outerDone) _)   y = ⊥
 
 -- Below a row, its claim holds as it did.
 fine-ext : ∀ {A} (x : IE A) {y} zs → Fine x y → Fine x (y ⊕ zs)
@@ -85,7 +86,7 @@ fine-ext (instEmit (mark subscribed) _) zs f = tt
 fine-ext (instEmit (mark completed) _)  zs f = early-inst zs f
 fine-ext (instEmit (mark outerOpen) _)  zs f = f
 fine-ext (instEmit (mark outerClose) _) zs f = tt
-fine-ext (instEmit (mark outerDone) _)  zs f = tt
+fine-ext (instEmit (mark outerDone) _)  zs f = f
 
 -- EVERY ROW AS IT CLAIMS, the end before its step's over, and every row
 -- a lane can hang on admissible.
@@ -138,7 +139,7 @@ held-fit {t = t} H pl = fit fine (Held.ends H) pl
     fine {x = instEmit (mark completed) _}  r = Held.done H r
     fine {x = instEmit (mark outerOpen) _}  r with () ← Held.routing H r
     fine {x = instEmit (mark outerClose) _} r = tt
-    fine {x = instEmit (mark outerDone) _}  r = tt
+    fine {x = instEmit (mark outerDone) _}  r with () ← Held.routing H r
 
 ------------------------------------------------------------------------
 -- The leaves
