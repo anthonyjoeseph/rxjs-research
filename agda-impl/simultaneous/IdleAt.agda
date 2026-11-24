@@ -167,7 +167,7 @@ module IdleAt {X V} {d : Den (AIE X)} {cs} (b : Bound d cs) {S : List (Pos × Ev
       after-c : c ≺ c₁ → ⊥
       after-c cc₁ = em {Σ Path λ ys → w ≡ c₁ ⊕ ys} λ
         { (inj₁ (ys , eq)) → flat-k (<ᵖ-between c₁ k ys (from≺ c₁ k c₁k) (from≺ k (c₁ ⊕ ys) (subst (k ≺_) eq kw)))
-        ; (inj₂ np)        → shown se cc₁ (few-vis se tt) (live se tt) c₁w np (λ ()) (blocked tt c₁w np) }
+        ; (inj₂ np)        → shown se cc₁ (few-vis se tt) (live se tt) c₁w np (λ ()) (blocked {e = end} tt c₁w np) }
 
   -- A source row with few rows before it, before the position, is listed:
   -- at or before the cursor, or shown, below a row of the reading's or above the position.

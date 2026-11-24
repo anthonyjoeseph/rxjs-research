@@ -88,7 +88,6 @@ open import denotation.Laws.Worlds using (world-after; GoodEnv)
 open import denotation.Read using (Visible; After; cursor)
 open import denotation.Laws.Modulus using (≺-trans)
 open import denotation.Laws.Worlds using (⊑-≼)
-open import denotation.Events using (<ᵖ-apart)
 open import denotation.Position using (_<ᵖ_)
 open import simultaneous.Layers using (to≺; cursor-++)
 open import simultaneous.Relabel using (RowsAt; []ᵃ; _∷ᵃ_)
@@ -98,28 +97,23 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ)
 open import simultaneous.HeldTrigger using (≺-part)
 open import denotation.EmissionSet using (heard; LaneOf; Ended)
 open import denotation.Laws.Modulus using (≼-refl)
-open import simultaneous.HeldRead using (RD; Rl; Src; Under; body; held-src; read-end; read-row; s₀; z₀; pre-noend)
+open import simultaneous.HeldRead using (RD; Rl; Src; Under; body; read-end; read-row; s₀; z₀; pre-noend)
 open import simultaneous.HeldShow using (read-shows)
+open import simultaneous.IdleAt using (module SrcLaws; module IdleAt; Goal)
 open import simultaneous.HeldReadBack using (read-back; read-part; Part; Further; further)
 open import simultaneous.HeldJoin using (begin-name; cnt-++; mem-of; jl-in; Begins)
-open import simultaneous.HeldHot using (em)
-open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.Layers using (pinby-vis; snoc-view; run-tail; cursor-snoc; cursor-in; pre-∈)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.Routed using (Idle)
-open import denotation.Read using (Run; Least; loud)
+open import denotation.Read using (Run; Least)
 open import denotation.EmissionSet using (Few; Silent)
-open import denotation.Position using (Path; Label)
+open import denotation.Position using (Path)
 open import denotation.Events using (<ᵖ-between)
-open import denotation.Laws.Modulus using (≺-ext; ≼-or-≻; entered-few; ≺→≼)
-open import denotation.Laws.Worlds using (full; Shows)
-open import denotation.Laws.Shows using (cover; cov-∈; few-down)
+open import denotation.Laws.Modulus using (≺-ext)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (any?) renaming (map to any-map)
-open import Data.Nat using (_≟_)
 open import Data.Sum using ([_,_]′)
-open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
 open import simultaneous.Relabel using (endAt)
 open import simultaneous.HeldRead using (Rl-trans; under-ext; rd-mg; module AnnConn; ev-ann; ev-cn; CnO; Cn; Fm)
 open import simultaneous.HeldMap using (module MapRun)
@@ -359,8 +353,7 @@ cur-run js pre {y} {e} {rs} {(y′ , e′) ∷ rsᵗ′} ((r , _) ∷ᵃ ra) wit
 
 module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) (okr : Ok (Hots (d ∷ᵉ []ᵉ)) p) where
 
-  HS : Held (Src b) (s₀ b ∷ Bound.outer b)
-  HS = held-src b
+  open SrcLaws b using (HS; IS; past; few-vis; live; shS)
 
   T′ : EmissionSet (IE X)
   T′ = enter (RD d) p
@@ -397,19 +390,6 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
 
   t-nopin : ∀ {k r} → T′ k (pin r) → ⊥
   t-nopin {k} {r} x = NoPin.rd-nopin (Ann b) p (subst (λ D′ → enter (RD D′) p k (pin r)) (Bound.is b) x)
-
-  -- The source is lawful where the binder subscribes it.
-  IS : InvAt (Hots (Bound.env b)) (s₀ b) (Src b)
-  IS = inv-ev (Bound.m b) (Bound.src b) (Bound.env b) (Bound.good b) (s₀ b)
-         (ok-step (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b)))
-
-  -- Below a row of the source, before a later one.
-  past : ∀ {k y e e′} zs → Src b k e → Src b y e′ → k ≺ y → (k ⊕ zs) ≺ y
-  past {k} {y} zs sk sy ky = to≺ (k ⊕ zs) y (<ᵖ-apart k y zs (from≺ k y ky) apart)
-    where
-      apart : ∀ ys → y ≡ k ⊕ ys → ⊥
-      apart []       eq = ≺-irrefl {k} (subst (k ≺_) (trans eq (⊕-identityʳ k)) ky)
-      apart (l ∷ ls) eq = InvAt.flat IS sk (subst (λ z → Src b z _) eq sy)
 
   quiet : ∀ {y} → Under b y
         → (Σ Pos λ y₀ → Σ (Ev (IE X)) λ e₀ → Rl y y₀ × Src b y₀ e₀) ⊎ y ≡ p ⊕ [ last ] ⊎ Rl y (body b)
@@ -538,21 +518,6 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   ----------------------------------------------------------------------
   -- Idle
 
-  Goal : List (Pos × Ev (IE X)) → Pos → Set
-  Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
-
-  -- A visible row of the source has few rows before it, and lies before every end.
-  few-vis : ∀ {k e} → Src b k e → Visible e → Few (Src b) k
-  few-vis {k} {out x} sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (λ {k′} {e′} → full {q = k} {e = out x} tt {k′} {e′}) sk
-  few-vis {k} {end}   sk _ = entered-few (ev (Bound.m b) (Bound.src b) (Bound.env b)) (s₀ b) (λ {k′} {e′} → full {q = k} {e = end} tt {k′} {e′}) sk
-
-  live : ∀ {k e} → Src b k e → Visible e → ∀ {c} → Src b c end → k ≼ c
-  live sk v sc ck = pinby-vis v (InvAt.quiet IS sc sk ck)
-
-  shS : Shows (Src b)
-  shS = shows-ev (Bound.m b) (Bound.src b) (Bound.env b) (Bound.good b) (s₀ b)
-          (ok-step (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b)))
-
   -- PAST THE JOINS THE READER IDLES WHERE ITS SOURCE DOES: a position
   -- below a source row past the cursor takes that row's route; one below
   -- none has few source rows before it, each shown below itself, and is
@@ -589,12 +554,6 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       rc : Σ (Ev (IE X)) λ e → T′ (c ⊕ ws) e
       rc = rc-of (cursor-in nothing (js ++ rs₁′) ec′)
 
-      a-of : ∀ {y} → c ≺ y → After (cursor nothing S) y
-      a-of {y} cy = subst (λ x → After x y) (sym ec) cy
-
-      c-of : ∀ {y} → After (cursor nothing S) y → c ≺ y
-      c-of {y} a = subst (λ x → After x y) ec a
-
       cw : c ≺ w
       cw = below-≺ c ws (subst (λ x → After x w) ec′ aw)
 
@@ -603,99 +562,16 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       aft {k} zs sk ck = subst (λ x → After x (k ⊕ zs)) (sym ec′)
         (≺-≼-≺ {c ⊕ ws} {k} {k ⊕ zs} (past ws sc sk ck) (⊑-≼ {k} {k ⊕ zs} (zs , refl)))
 
-      Shown : Pos → Ev (IE X) → Set
-      Shown k e = Σ Path λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′) × After (cursor nothing (js ++ rs₁′)) (k ⊕ zs)
-
-      shown : ∀ {k e} → Src b k e → c ≺ k → Few (Src b) k → (∀ {c₁} → Src b c₁ end → k ≼ c₁)
-            → (Silent e → ∀ {y} → Rl y k → Few T′ y) → Nl.¬ Nl.¬ (Shown k e)
-      shown {k} {e} sk ck fk lv fz h = read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv fz λ x → h (with-aft x)
+      shown : ∀ {k e} → Src b k e → c ≺ k → Few (Src b) k → (∀ {c₁} → Src b c₁ end → k ≼ c₁) → k ≺ w
+            → (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → (Silent e → ∀ {y} → Rl y k → Few T′ y)
+            → Nl.¬ Nl.¬ (Σ Path λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′) × After (cursor nothing (js ++ rs₁′)) (k ⊕ zs))
+      shown {k} {e} sk ck fk lv _ _ fz h = read-shows b p ng (proj₂ rc) (past ws sc sk ck) sk fk lv fz λ x → h (with-aft x)
         where
-          with-aft : Σ Path (λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′)) → Shown k e
+          with-aft : Σ Path (λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′))
+                   → Σ Path λ zs → Σ (Ev (IE X)) λ e′ → T′ (k ⊕ zs) e′ × (Visible e → Visible e′) × After (cursor nothing (js ++ rs₁′)) (k ⊕ zs)
           with-aft (zs , e′ , r , v) = zs , e′ , r , v , aft zs sk ck
 
-      Beneath : Set
-      Beneath = Σ Pos λ y → Σ (Ev (IE X)) λ e → Src b y e × Visible e × c ≺ y × Σ Label λ l → Σ Path λ zs → w ≡ y ⊕ (l ∷ zs)
-
-      -- Below a source row past the cursor: that row's route.
-      beneath : Beneath → Goal S w
-      beneath (y , e , sy , vy , cy , l , zs , eq) =
-        [ inj₁ , (λ nq → inj₂ (trans nq (sym (trans (cong nameOf eq) (name-ext y (l ∷ zs)))))) ]′ (I run ne (few-vis sy vy) (a-of cy) least)
-        where
-          least : ∀ {y₂ e₂} → Src b y₂ e₂ → Visible e₂ → After (cursor nothing S) y₂ → y ≼ y₂
-          least {y₂} {e₂} s₂ v₂ a₂ lt = shown s₂ (c-of a₂) (few-vis s₂ v₂) (live s₂ v₂) (λ sl → ⊥-elim (loud v₂ sl)) blocked
-            where
-              blocked : Shown y₂ e₂ → ⊥
-              blocked (zs₂ , e′ , r , vv , a) =
-                lw r (vv v₂) a (subst ((y₂ ⊕ zs₂) ≺_) (sym eq) (≺-trans {y₂ ⊕ zs₂} {y} {y ⊕ (l ∷ zs)} (past zs₂ s₂ sy lt) (≺-ext y zs)))
-
-      -- Below no source row past the cursor: the source's own route.
-      clear : (Beneath → ⊥) → Few (Src b) w → Goal S w
-      clear nu fw = I run ne fw (a-of cw) not-past
-        where
-          not-past : ∀ {y e} → Src b y e → Visible e → After (cursor nothing S) y → w ≼ y
-          not-past {y} {e} sy vy ay yw = em {Σ Path λ ys → w ≡ y ⊕ ys} λ
-            { (inj₁ ([] , eq))     → ≺-irrefl {y} (subst (y ≺_) (trans eq (⊕-identityʳ y)) yw)
-            ; (inj₁ (l ∷ zs , eq)) → nu (y , e , sy , vy , c-of ay , l , zs , eq)
-            ; (inj₂ np)            → shown sy (c-of ay) (few-vis sy vy) (live sy vy) (λ sl → ⊥-elim (loud vy sl)) (blocked np) }
-            where
-              blocked : (Σ Path (λ ys → w ≡ y ⊕ ys) → ⊥) → Shown y e → ⊥
-              blocked np (zs , e′ , r , vv , a) =
-                lw r (vv vy) a (to≺ (y ⊕ zs) w (<ᵖ-apart y w zs (from≺ y w yw) λ ys eq → np (ys , eq)))
-
-      fc : Few (Src b) c
-      fc = few-vis sc vc
-
-      ls : List Pos
-      ls = c ∷ proj₁ fc ++ cover w (proj₁ F)
-
-      -- A row past the cursor and before the position lies before every end:
-      -- an end past the cursor is shown, and the position lies below it.
-      live-past : ∀ {k e} → Src b k e → c ≺ k → k ≺ w → ∀ {c₁} → Src b c₁ end → k ≼ c₁
-      live-past {k} {e} sk ck kw {c₁} se c₁k = [ before , after ]′ (≼-or-≻ c₁ c)
-        where
-          before : c₁ ≼ c → ⊥
-          before c₁c =
-            [ (λ lt → pinby-vis vc (InvAt.quiet IS se sc lt))
-            , (λ eq → ne (∈-++⁺ʳ pre (subst (λ e′ → (c , e′) ∈ (y₀ , e₀) ∷ rs)
-                                       (InvAt.func IS sc (subst (λ z → Src b z end) eq se)) i₁))) ]′ (≼-split {c₁} {c} c₁c)
-
-          flat-k : Σ Path (λ zs′ → k ≡ c₁ ⊕ zs′) → ⊥
-          flat-k ([] , eq)      = ≺-irrefl {c₁} (subst (c₁ ≺_) (trans eq (⊕-identityʳ c₁)) c₁k)
-          flat-k (l ∷ zs′ , eq) = InvAt.flat IS se (subst (λ z → Src b z e) eq sk)
-
-          blocked : Shown c₁ end → ⊥
-          blocked (zs , e′ , r , vv , a) = em {Σ Path λ ys → w ≡ c₁ ⊕ ys} λ
-            { (inj₁ (ys , eq)) → flat-k (<ᵖ-between c₁ k ys (from≺ c₁ k c₁k) (from≺ k (c₁ ⊕ ys) (subst (k ≺_) eq kw)))
-            ; (inj₂ np) → lw r (vv tt) a (to≺ (c₁ ⊕ zs) w (<ᵖ-apart c₁ w zs (from≺ c₁ w (≺-trans {c₁} {k} {w} c₁k kw)) λ ys eq → np (ys , eq))) }
-
-          after : c ≺ c₁ → ⊥
-          after cc₁ = shown se cc₁ (few-vis se tt) (live se tt) (λ ()) blocked
-
-      -- A source row with few rows before it, before the position, is listed:
-      -- at or before the cursor, or shown, below a row of the reader's or above the position.
-      listed : ∀ {k e} → Src b k e → Few (Src b) k → k ≺ w → k ∈ ls
-      listed {k} {e} sk fk kw = decidable-stable (any? (k ≟ᵖ_) ls) λ nin →
-        [ (λ kc → [ (λ lt → nin (there (∈-++⁺ˡ (proj₂ fc sk lt)))) , (λ eq → nin (here eq)) ]′ (≼-split {k} {c} kc))
-        , past-c nin ]′ (≼-or-≻ k c)
-        where
-          past-c : (k ∈ ls → ⊥) → c ≺ k → ⊥
-          past-c nin ck = em {Σ Path λ ys → w ≡ k ⊕ ys} λ
-            { (inj₁ (ys , eq)) → nin (there (∈-++⁺ʳ (proj₁ fc) (cov-∈ {w} {proj₁ F} (inj₁ (ys , eq)))))
-            ; (inj₂ np)        → shown sk ck fk (live-past sk ck kw) (λ _ → few-below np) (into np) }
-            where
-              -- Below `k`, before the position: the reader has few rows there.
-              few-below : (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → ∀ {y} → Rl y k → Few T′ y
-              few-below np (zs , refl) = few-down F (≺→≼ {k ⊕ zs} {w} (to≺ (k ⊕ zs) w (<ᵖ-apart k w zs (from≺ k w kw) λ ys eq → np (ys , eq))))
-
-              into : (Σ Path (λ ys → w ≡ k ⊕ ys) → ⊥) → Shown k e → ⊥
-              into np (zs , e′ , r , _ , _) =
-                nin (there (∈-++⁺ʳ (proj₁ fc) (cov-∈ {w} {proj₁ F} (inj₂ (any-map (λ eq → subst (k ⊑_) eq (zs , refl))
-                  (proj₂ F r (to≺ (k ⊕ zs) w (<ᵖ-apart k w zs (from≺ k w kw) λ ys eq → np (ys , eq)))))))))
-
-      goal : Goal S w
-      goal = decidable-stable ((proj₂ (cnt S) ≟ 0) ⊎-dec (proj₁ (cnt S) ≟ᵖ nameOf w)) λ ng → em {Beneath} λ
-        { (inj₁ u)  → ng (beneath u)
-        ; (inj₂ nu) → shS (ls , listed) λ fw → ng (clear nu fw) }
+      open IdleAt b run ne ec (∈-++⁺ʳ pre i₁) T′ (λ y _ → After (cursor nothing (js ++ rs₁′)) y) F cw lw shown using (goal) public
 
     goal : Goal S w
     goal = at (cur-run js pre ra)
@@ -761,7 +637,7 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
   part-any {w = w} (inj₁ eq)                  _ _ _   _ _  _  = subst (λ r → Goal r w) (sym eq) (inj₁ refl)
   part-any         (inj₂ (ys , (q , e) , eq)) m h ne′ F aw lw = part-goal eq m h ne′ F aw lw
 
-  late-goal : ∀ {rs′ w} → (∀ {y e} → (y , e) ∈ rs′ → e ≡ end × Ex (p ∷ cs) y) → (∀ {c} → (c , end) ∈ rs′ → ⊥) → Goal rs′ w
+  late-goal : ∀ {rs′ : List (Pos × Ev (IE X))} {w} → (∀ {y e} → (y , e) ∈ rs′ → e ≡ end × Ex (p ∷ cs) y) → (∀ {c} → (c , end) ∈ rs′ → ⊥) → Goal rs′ w
   late-goal {[]}           _ _  = inj₁ refl
   late-goal {(y , e) ∷ _} h ne′ = ⊥-elim (ne′ (here (cong (y ,_) (sym (proj₁ (h (here refl)))))))
 
