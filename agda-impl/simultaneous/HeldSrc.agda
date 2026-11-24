@@ -56,6 +56,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; ShutRun; outRows; init; from; past)
+open import simultaneous.FlatSim using (tot)
 open import simultaneous.HeldComb using (ShutRun; ev)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
@@ -276,17 +277,18 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   cs′ = P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs
 
   -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met:
-  -- the routes open at a row are of its instant; a value read, a live
-  -- over read, and the end find one open unless exempt; and a dead
-  -- instant stays dead.
+  -- a value read, a live over read, and the end find a route the scan
+  -- counts (`tot`) unless exempt, the end's of its instant; and a dead
+  -- instant stays dead.  What the scan sends is its counters
+  -- (`exact-past`), so these are the sent count's.
   postulate
-    value-open    : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
-                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
-    over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
+    value-tot     : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+                  → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+    over-tot      : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
                   → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
-                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
-    end-open      : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
-                  → Σ ℕ λ k → from r₀ (outRows op init rx₁) ≡ (nameOf q , suc k)
+                  → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+    end-tot       : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
+                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q × Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
     comb-shut     : ∀ {rx} → Met M rx → ShutRun (outRows op init rx)
     -- IDLE BETWEEN ROWS: where a reader of the scan waits on nothing before
     -- a position few rows precede, the routes it counts are of that

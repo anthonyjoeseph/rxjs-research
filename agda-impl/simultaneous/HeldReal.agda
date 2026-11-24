@@ -22,7 +22,8 @@ open import denotation.EmissionSet using (hot; enter; DenEnv; module Op; out; en
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB; isZero)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Held; Early; nameOf; nm; Valued; opos; cnt)
+open import simultaneous.Routed using (Held; Early; nameOf; nm; Valued; opos; cnt; Ex)
+open import Data.Product.Properties using (×-≡,≡→≡)
 open import simultaneous.HeldIn using (Upto)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
 open import simultaneous.LaneLocal using (inv-ev; late-ext; Fit)
@@ -81,7 +82,7 @@ open import simultaneous.LaneCount using (kDone)
 open import simultaneous.ScanCount using (rowKind; markAct; past-active; past-queue; row-cut; row-done)
 open import Data.List.Membership.Propositional using (find)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
-open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; named-at; next-≼; o-value; o-done)
+open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; named-at; next-≼; o-value; o-done; Opens)
 
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
@@ -838,6 +839,23 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   nocb : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → ∀ r₁ {q′ x} r₂ → rx₁ ≡ r₁ ++ (q′ , out x) ∷ r₂ → NoCB x
   nocb rx₁ {q} {e} {rx₂} mt r₁ {q′} r₂ refl refl =
     no-cb (m-rows (proj₁ (run-row r₁ (subst (Met M) (++-assoc r₁ ((q′ , _) ∷ r₂) ((q , e) ∷ rx₂)) mt))) tt)
+
+  -- What the scan sends at a value, a live over and the end is its
+  -- counters, which the branches keep open there.
+  value-open : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+             → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
+  value-open rx₁ mt o ne = let (k , e) = value-tot rx₁ mt o ne in k , trans (exact-past op rx₁ (nocb rx₁ mt)) e
+
+  over-open : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
+            → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
+            → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
+  over-open rx₁ mt sp ne = let (k , e) = over-tot rx₁ mt sp ne in k , trans (exact-past op rx₁ (nocb rx₁ mt)) e
+
+  end-open : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
+           → Σ ℕ λ k → from r₀ (outRows op init rx₁) ≡ (nameOf q , suc k)
+  end-open rx₁ mt ne =
+    let (a≡ , k , e) = end-tot rx₁ mt ne
+    in k , ×-≡,≡→≡ (trans (inv-at (inv-past op rx₁)) a≡ , trans (exact-past op rx₁ (nocb rx₁ mt)) e)
 
   -- Four counters each of the instant or none: their sum is.
   sum-current : ∀ {X : Set} (a b c d : ℕ) → (a ≡ 0 ⊎ X) → (b ≡ 0 ⊎ X) → (c ≡ 0 ⊎ X) → (d ≡ 0 ⊎ X) → a + b + c + d ≡ 0 ⊎ X
