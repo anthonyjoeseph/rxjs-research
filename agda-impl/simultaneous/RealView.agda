@@ -46,8 +46,8 @@ open import denotation.Up using (up; up-⊕)
 open import simultaneous.Instants using (triⁱ; transⁱ; instant-≺)
 open import simultaneous.TakeCut using (inst-⊕)
 open import denotation.Position using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Den; out; end; After; LaneOf; _≺_; Few; Truncate; module Merge; module Bounded;
-  module Switch; module Exhaust)
+open import denotation.EmissionSet using (EmissionSet; Den; out; end; After; LaneOf; _≺_; Few; Truncate; module Bounded;
+  module Exhaust)
 open import denotation.Laws.Worlds using (Shows)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_)
