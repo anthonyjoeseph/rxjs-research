@@ -37,6 +37,8 @@ open import simultaneous.InstEmit using (begin; instEmit; value; mark; over; out
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
+open import simultaneous.ScanLive using (LastIn; live-last; holds-at)
+open import simultaneous.HeldRead using (pre-noend)
 open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?; finished-from; thru-split; past-dead; start-dead;
   burst-clears; find-ld; past-app)
 open import simultaneous.TakeCut using (inst-⊕)
@@ -490,12 +492,22 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   LnMk mk n = just (inj₁ (laneB , instEmit (mark mk) n))
 
   postulate
-    -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
-    -- scan's rows.  Owed: the run split onto that connect's tracker, and
-    -- the binder's own `idle` (`Bound.held`) read through `annotate`.
-    live-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                 → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
-                 → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+    -- A CONNECT IN SCOPE REPORTING A ROUTE HELD IDLES IN THAT ROUTE'S
+    -- INSTANT, so the scan's next row lies there.  Owed: the binder's
+    -- source run to the report (`ann-row`), its `idle` at the scan's next
+    -- row, and every source row past the report and before that row shown
+    -- by the tracker in the scan's source, as `IdleRead` does for a reader.
+    track-held : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → ∀ {i r} → LastIn i r rx₁
+               → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf q
+
+  -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
+  -- scan's rows: what the scan holds is a connect's last report.
+  live-current : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
+               → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
+               → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
+  live-current rx₁ {q} {e} {rx₂} mt v h with live-last op rx₁ (pre-noend rx₁ (run-prefix (rx₁ ++ [ (q , e) ]) (subst (Met M) (sym (++-assoc rx₁ [ (q , e) ] rx₂)) mt))) h
+  ... | i , r , hr , li with holds-at hr
+  ...   | at≡ , nz = [ (λ z → ⊥-elim (nz z)) , (λ eq → trans (sym at≡) eq) ]′ (track-held rx₁ mt v li)
 
   -- A BOUNDED MERGE'S LANES COUNTED AT A LANE'S END, by adequacy's census
   -- at the cursor before it: every slot taken and a value waiting, the
