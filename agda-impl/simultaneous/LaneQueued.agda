@@ -151,7 +151,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; module OS; g₂; named; met-before; lane-run)
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own; lane-fresh-own; lane-mark; lane-row; σ₃-lane)
+    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own; lane-burst-own; lane-fresh-own; lane-mark; lane-row; σ₃-lane)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
     using (lane-end-done; St; LaneEmit; done-told; next-idle; own-snoc; lane-rows; cnt-lane; module QL; catch-by; in-prefix; out-pin)
   open LaneHold m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
@@ -714,12 +714,6 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
             past≡ = past-app op init r₁ {d} {xd} {a} (no-end rx₁ (Target.mt T) r₁ sp)
         in inj₁ (subst (λ S → ¬ Flat.queue (proj₁ S) ≡ 0) past≡ (Waits.waiting (r₁ ++ (d , out xd) ∷ a) mt″ xo′ lc ld yc refl nx))
 
-  -- A LANE'S `burstEnd` CLOSES ITS SUBSCRIBE BURST: the lane's burst
-  -- part subscribes past its lane part's synchronous run.
-  postulate
-    burst-past : ∀ {q a y e yb n} (xo : RO q (out a)) (l : RV.Lane op q a y e) → Sync (CH.subOf op xo l) y
-               → RV.Lane op q a yb (out (instEmit (mark burstEnd) n)) → y ≼ yb
-
   -- A LANE'S `burstEnd` LIES BEFORE ITS `laneDone`: its take keeps it.
   burst-first : ∀ {q a yb yd n kd n′} (xo : RO q (out a)) → RV.Lane op q a yb (out (instEmit (mark burstEnd) n))
               → RV.Lane op q a yd (out (instEmit (mark (laneDone kd)) n′)) → yd ≺ yb → ⊥
@@ -772,14 +766,14 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       linked : ∀ {c′} (x′ : RO q (out a)) (le : RV.Lane op q a c′ end) → Sync (CH.subOf op x′ le) c′ → ⊥
       linked {c′} x′ le syn =
         burst-first x′ lb (proj₁ (proj₂ (proj₂ (proj₂ (lane-end-done x′ le)))))
-          (≺-≼-≺ {proj₁ (lane-end-done x′ le)} {c′} {y} (proj₂ (proj₂ (proj₂ (proj₂ (lane-end-done x′ le))))) (burst-past x′ le syn lb))
+          (≺-≼-≺ {proj₁ (lane-end-done x′ le)} {c′} {y} (proj₂ (proj₂ (proj₂ (proj₂ (lane-end-done x′ le))))) (lane-burst-own x′ le tt syn lb))
 
       queued : ∀ {q′ a′} → q′ ≡ Target.Q T → a′ ≡ Target.a T → RV.Lane op q′ a′ y (out (instEmit (mark burstEnd) n)) → ⊥
       queued refl refl lb′ =
         [ (λ yt → ≺-irrefl {J y} (≺-trans {J y} {z} {J y} (proj₂ order)
                     (snoc-lead (sub LS.J) yt (⊑-refl y) (row-flat (Target.xo T) (Target.l T) lb′ yt))))
         , (λ e → ≺-irrefl {J y} (subst (λ t → J y ≺ J t) e (proj₂ order))) ]′
-          (≼-split {Target.y T} {y} (burst-past (Target.xo T) (Target.l T) sy lb′))
+          (≼-split {Target.y T} {y} (lane-burst-own (Target.xo T) (Target.l T) tt sy lb′))
 
       beyond : W⁼ (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (CH.Base.c₀ Bs ⊕ [ ix 1 ]) (CH.subOf op xo lb) → ⊥
       beyond w =

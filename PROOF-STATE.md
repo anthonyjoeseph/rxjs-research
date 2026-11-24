@@ -281,14 +281,6 @@ leaf is a body.
 
 Members: `live-current`, `end-tot`, `comb-shut`, `scan-idle`.
 
-#### THE LANE'S BURST END
-
-Untried: a lane's `burstEnd` lies past every row of its subscribe burst,
-its burst part subscribing after its lane part's synchronous run.
-Settled by reading the row positions `laneˢ` gives its two parts.
-
-Members: `burst-past`.
-
 #### THE BATCH RANK
 
 Untried: the batcher keeps the elaborated run's instants, an `each`

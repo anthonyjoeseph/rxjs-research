@@ -29,14 +29,14 @@ open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _⊕_)
 open import denotation.Events using (Timeline; fresh; inside-self)
-open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge; Ended)
+open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; _≼_; After; shown; module Op; module Bounded; module Merge; Ended)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using ([]; _∷_; Run)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after; ⊕-identityʳ; ⊕-assoc)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
+open import simultaneous.InstEmit using (instEmit; value; mark; laneDone; burstEnd)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm; Sync; Ex; Carried; c-end; cnt; nameOf)
 open import simultaneous.Counts using (idle-row; Counts; module Alike; counts-held; counts-at; module TakeCounts)
@@ -75,7 +75,9 @@ import simultaneous.Layers as Layers
 open import simultaneous.Relabel using (RowsAt; cntAt)
 open import simultaneous.Shut using (r₀)
 open import denotation.Position using (Label)
-open import denotation.Laws.Worlds using (full; notT)
+open import denotation.Laws.Worlds using (full; notT; _⊑_; inside-⊑)
+open import simultaneous.LaneChain using (module Chains)
+import simultaneous.LaneBurst as LaneBurst
 open import denotation.Laws.Truth using (instant-⊕; past)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-≼-≺; ≺-trans; entered-few; ≺-ext)
 open import denotation.Position using (sub; last)
@@ -818,6 +820,18 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
   lane-fresh : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
              → Fr (proj₁ (lane-at op′ dR fL Id Il p ok xo l))
   lane-fresh op′ p ok fp ep xo l = subst Fr (sub-is op′ p ok fp ep xo l) (proj₁ (proj₂ (proj₂ (lane-sub op′ p ok fp ep xo l))))
+
+  -- A LANE'S `burstEnd` CLOSES ITS SUBSCRIBE BURST: it lies by what the
+  -- lane shows or ends with in its subscription's instant.
+  lane-burst : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a y e yb n} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a y e)
+             → Visible e → Sync (proj₁ (lane-at op′ dR fL Id Il p ok xo l)) y
+             → View.Lane fL (enter dR p) op′ q a yb (out (instEmit (mark burstEnd) n)) → y ≼ yb
+  lane-burst op′ p ok fp ep {q} {a} {y} xo l v sy lb =
+    let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo l
+        eq = sub-is op′ p ok fp ep xo l
+    in LaneBurst.lane-burst (λ i → ρ₄ i) (f a) env₂ g₂ m s oks (Share.share-mark a s oks fs es (λ ()))
+         (λ hh le → Chains.sub-cold dR fL Id Il p ok op′ xo l hh (subst (_⊑ _) eq le))
+         (to l) v (subst (_⊑ y) (sym eq) (inside-⊑ _ _ (proj₁ sy))) (to lb)
 
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)

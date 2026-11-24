@@ -24,7 +24,7 @@ open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; After; enter; out; end; _≺_; module Bounded)
 open import denotation.Laws.Worlds using (InvD; InvAt; Ok; W⁼; here; nest⁼; plain-ix; inside-⊑; conv; ⊕-identityʳ; ⊑-refl; ⊑-trans;
-  ⊑-snoc⁺; _⊑_; nest; inW; ⊕-injˡ; world-after)
+  ⊑-snoc⁺; _⊑_; nest; inW; ⊕-injˡ; world-after; nest-in; ⊑-inside; step)
 open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl; ≺-ext; ≺-trans; ≼-or-≻; ≼-antisym)
 open import denotation.Laws.JoinInv using (end≢out)
 open import denotation.Laws.Nth using (module Nths)
@@ -103,6 +103,12 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   past-lane : ∀ op {q a k e q′ a′ w} (x : O q (out a)) (l : Lane op q a k e) → W⁼ H (subOf op x l) w → O q′ (out a′) → w ⊑ q′ → ⊥
   past-lane op x l ww x′ wq =
     let (_ , _ , xr , rw) = seated op x l in InvAt.under (Id p ok) xr x′ plain-ix (nest⁼ rw ww) wq
+
+  -- NO HOT ROW LIES UNDER A LANE'S SUBSCRIPTION: it sits in the world of
+  -- a value's second child, which holds none.
+  sub-cold : ∀ op {q a k e} (x : O q (out a)) (l : Lane op q a k e) → ∀ {h} → H h → subOf op x l ⊑ h → ⊥
+  sub-cold op x l hh le =
+    let (_ , _ , xr , rw) = seated op x l in proj₂ ok hh (nest-in (step (inW (InvAt.world (Id p ok) xr)) plain-ix) rw) (⊑-inside le)
 
   -- One value's lanes share one subscription.
   sub-one : ∀ op {q a k e k′ e′} (x : O q (out a)) (l : Lane op q a k e) (l′ : Lane op q a k′ e′) → subOf op x l ≡ subOf op x l′

@@ -625,6 +625,11 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                 → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   lane-done-own = LI.lane-done op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
+  -- A LANE'S `burstEnd` CLOSES ITS SUBSCRIBE BURST.
+  lane-burst-own : ∀ {q a y e yb n} (xo : RO q (out a)) (l : RV.Lane op q a y e) → Visible e → Sync (sub-at xo l) y
+                 → RV.Lane op q a yb (out (instEmit (mark burstEnd) n)) → y ≼ yb
+  lane-burst-own = LI.lane-burst op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
+
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → Counts (RV.Lane op q a) (λ y → Sync (sub-at xo l) y ⊎ Ex cs y)
   lane-counts-own = LI.lane-counts op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
