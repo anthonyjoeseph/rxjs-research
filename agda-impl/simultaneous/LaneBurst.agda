@@ -13,7 +13,7 @@
 -- the merge, lies past the `burstEnd` in the same instant.
 module simultaneous.LaneBurst where
 
-open import Data.Bool using (true; false; T; not)
+open import Data.Bool using (true; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
 import Data.List as L
@@ -21,8 +21,8 @@ open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; s≤s; z≤n)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 open import Relation.Nullary using (¬_)
@@ -39,7 +39,7 @@ open import simultaneous.HeldComb using (ev)
 open import simultaneous.DenRows using (bounded-out; hot-out)
 open import simultaneous.LaneEndSched using (of-one)
 open import simultaneous.ElabUndone using (tell-back)
-open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
+open import simultaneous.SObs using (lone; lanePart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; laneStart; burstEnd)
 open import simultaneous.LaneLayers using (under-refl; under-trans; under-≺; under-⊕)
 open import simultaneous.LaneSite using (module S; module Inv; under-≼)
