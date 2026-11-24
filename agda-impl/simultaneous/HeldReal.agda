@@ -37,7 +37,7 @@ open import simultaneous.InstEmit using (begin; instEmit; value; mark; over; out
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
-open import simultaneous.ScanLive using (LastIn; live-last; holds-at)
+open import simultaneous.ScanLive using (live-last; holds-at)
 open import simultaneous.HeldRead using (pre-noend)
 open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?; finished-from; thru-split; past-dead; start-dead;
   burst-clears; find-ld; past-app)
@@ -87,6 +87,7 @@ open import simultaneous.ScanCount using (rowKind; markAct; past-active; past-qu
 open import Data.List.Membership.Propositional using (find)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark; open-value; named-at; next-≼; o-value; o-done; Opens)
+open import simultaneous.TrackHeld using (module CombTrack)
 
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
@@ -112,6 +113,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open CombTrack m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (track-held)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut; queue-live)
   open LaneTot m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (value-tot; over-tot)
   open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next; Q; okQ; Id; If; module Start; module Run; lane-σ₃; no-end-before; sent-few)
@@ -490,15 +492,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- A lane's mark, as the scan's source shows it.
   LnMk : Mark → Pos → Maybe (Input B)
   LnMk mk n = just (inj₁ (laneB , instEmit (mark mk) n))
-
-  postulate
-    -- A CONNECT IN SCOPE REPORTING A ROUTE HELD IDLES IN THAT ROUTE'S
-    -- INSTANT, so the scan's next row lies there.  Owed: the binder's
-    -- source run to the report (`ann-row`), its `idle` at the scan's next
-    -- row, and every source row past the report and before that row shown
-    -- by the tracker in the scan's source, as `IdleRead` does for a reader.
-    track-held : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e → ∀ {i r} → LastIn i r rx₁
-               → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf q
 
   -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
   -- scan's rows: what the scan holds is a connect's last report.

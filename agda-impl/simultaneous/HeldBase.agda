@@ -89,6 +89,17 @@ import denotation.Read as Run
 open import Data.Bool using (Bool)
 open import denotation.Position using (Path)
 open import denotation.EmissionSet using (InE; at-end; at-out; on-out)
+open import denotation.Prefixes using (prefixes; self-∈)
+import Data.List.Relation.Unary.Any as Any
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-concatMap⁺)
+open import Data.List using (_++_)
+open import Data.Maybe using (maybe′)
+open import Relation.Binary.PropositionalEquality using (trans)
+open import denotation.Read using (After; cursor)
+open import denotation.Laws.Modulus using (≼-or-≻; ≼-split)
+open import denotation.Events using (<ᵖ-between)
+open import simultaneous.Layers using (from≺)
+open import denotation.Laws.Worlds using (⊕-identityʳ)
 open import denotation.Events using (ofᴱ)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁻)
 open import simultaneous.HeldComb using (RunHeld)
@@ -566,6 +577,42 @@ ev-none nothing  s env P (TakeWhile.fail _ _ _ () , _)
 ev-none (just n) s env P (TakeWhile.pass _ () _ , _)
 ev-none (just n) s env P (TakeWhile.fail _ _ _ () , _)
 
+-- A READING UNDER A TRACKED SOURCE IS TRACKED: each row of it lies at a
+-- listed position or at one of finitely many offsets under a source row,
+-- so past the cursor its rows of the instant are under the source's
+-- there, or under one of the cursor's ancestors.
+tracks-under : ∀ {A X B} {D : Pos → Set} {σ : EmissionSet A} {τ : EmissionSet X} {β : EmissionSet (IE B)} (fs : List Pos) (Z : List Path)
+             → (∀ {k e} → τ k e → k ∈ fs ⊎ Σ Pos λ y → Σ (Ev A) λ e′ → σ y e′ × Σ Path λ zs → zs ∈ Z × k ≡ y ⊕ zs)
+             → Tracks D σ β → Tracks D τ β
+tracks-under {σ = σ} {τ = τ} fs Z sh tr {rs} m up z {q} bq = fs ++ L.concatMap (λ y → L.map (y ⊕_) Z) (anc ++ ks) , at
+  where
+    ks : List Pos
+    ks = proj₁ (tr m up z bq)
+
+    anc : List Pos
+    anc = maybe′ prefixes [] (cursor nothing rs)
+
+    src-at : ∀ cur → cursor nothing rs ≡ cur → ∀ {y e′} → σ y e′ → ∀ zs → After cur (y ⊕ zs) → rootOf y ≡ rootOf q
+           → y ∈ maybe′ prefixes [] cur ++ ks
+    src-at nothing ec sy zs a r = proj₂ (tr m up z bq) sy (subst (λ c → After c _) (sym ec) tt) r
+    src-at (just c) ec {y} sy zs a r with ≼-or-≻ y c
+    ... | inj₂ cy = ∈-++⁺ʳ (prefixes c) (proj₂ (tr m up z bq) sy (subst (λ c′ → After c′ y) (sym ec) cy) r)
+    ... | inj₁ yc with ≼-split {y} {c} yc
+    ...   | inj₂ refl = ∈-++⁺ˡ (subst (λ w → c ∈ prefixes w) (⊕-identityʳ c) (self-∈ c []))
+    ...   | inj₁ lt with <ᵖ-between y c zs (from≺ y c lt) (from≺ c (y ⊕ zs) a)
+    ...     | ws , refl = ∈-++⁺ˡ (self-∈ y ws)
+
+    -- A source row with a row under it past the cursor: past the cursor
+    -- itself, or above it.
+    src-in : ∀ {y e′} → σ y e′ → ∀ zs → After (cursor nothing rs) (y ⊕ zs) → rootOf y ≡ rootOf q → y ∈ anc ++ ks
+    src-in = src-at (cursor nothing rs) refl
+
+    at : ∀ {k e} → τ k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ fs ++ L.concatMap (λ y → L.map (y ⊕_) Z) (anc ++ ks)
+    at tk a r with sh tk
+    ... | inj₁ i = ∈-++⁺ˡ i
+    ... | inj₂ (y , e′ , sy , zs , zZ , refl) =
+      ∈-++⁺ʳ fs (∈-concatMap⁺ (λ y′ → L.map (y′ ⊕_) Z) (Any.map (λ { refl → ∈-map⁺ (y ⊕_) zZ }) (src-in sy zs a (trans (sym (rootOf-ext y zs)) r))))
+
 module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (s : Obs Timeline Γ A) (env : DenEnv Δ) (p : Pos) where
 
@@ -626,9 +673,21 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- INSTANT: the connects between them run the scan as their body, and
   -- the scan reads the outer itself, parking what it cuts while a connect
   -- in scope holds a route.
+  --
+  -- DEAD ROUTE: through `comb-run`, as `scan-idle` goes. A run of the scan is laid out by a run of its source had only under ¬¬, and the rows left are a Σ of a list, which no ¬¬ yields
   postulate
     tracks-trig   : ∀ {D} → Tracks D (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) scanned
-    tracks-closer : ∀ {D} → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])) scanned
+
+    -- THE CLOSER READS THE OUTER: each of its rows lies under an outer row,
+    -- at one of finitely many offsets (the reading's and the `each`'s),
+    -- or is one of its own finitely many (its subscription, the
+    -- `outerDone`, its end).
+    closer-under : Σ (List Pos) λ fs → Σ (List Path) λ Z → ∀ {k e} → enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) k e
+                 → k ∈ fs ⊎ Σ Pos λ y → Σ (Ev (IE A)) λ e′ → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) y e′ × Σ Path λ zs → zs ∈ Z × k ≡ y ⊕ zs
+
+  -- The closer empties with the outer.
+  tracks-closer : ∀ {D} → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])) scanned
+  tracks-closer {D} = tracks-under (proj₁ closer-under) (proj₁ (proj₂ closer-under)) (proj₂ (proj₂ closer-under)) (tracks-trig {D})
 
   -- The scan, read only where the real flatMap has few rows before.
   --

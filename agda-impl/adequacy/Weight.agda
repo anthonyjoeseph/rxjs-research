@@ -28,7 +28,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; con
 open import Relation.Nullary using (does; yes; no)
 
 open import Tree using (Obs; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer)
-open import denotation.Position using (Pos; Path; _∙_; ix; last; _≟ᵖ_; _⊕_)
+open import denotation.Position using (Pos; ix; last; _≟ᵖ_; _⊕_)
+open import denotation.Prefixes using (prefixes)
 open import denotation.Events using (Timeline)
 open import operation.Key using (Key; at; after; never; _<ᴷ_)
 open import operation.PureObservable using (module Machine; due)
@@ -219,16 +220,6 @@ Wᶜ ks P C k = Weigh.pot ks P C 0 (plug (Conf.ctx k) (Conf.foc k)) + climb k
 -- THE WEIGHT.
 W : ∀ {R} → List Pos → Pos → Conf R → ℕ
 W ks P k = Wᶜ ks P (Clock k) k
-
--- Each non-empty prefix of a path, itself included.
-prefixesᵗ : Path → List Path
-prefixesᵗ []      = []
-prefixesᵗ (l ∷ q) = [ l ] ∷ mapL (l ∷_) (prefixesᵗ q)
-
--- Each prefix of a position, its instant's root and itself included: a
--- timer's step is its instant's root.
-prefixes : Pos → List Pos
-prefixes (i ∙ q) = (i ∙ []) ∷ mapL (i ∙_) (prefixesᵗ q)
 
 -- Each listed position and its ancestors.
 anc : List Pos → List Pos
