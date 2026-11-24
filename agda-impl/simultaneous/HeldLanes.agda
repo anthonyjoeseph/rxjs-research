@@ -490,13 +490,13 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     outer-shown σr (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {r ⊕ [ sub OS.J ]} {z} jz)
       λ (_ , _ , mo , _ , _ , pn) → κ (open-caught r₁ mt σr jz (shown-at (toM mo) (pn refl)))
 
-  -- EACH VALUE OF THE REAL FLATMAP'S OUTER HAS ITS `outerOpen` MET BEFORE
-  -- THE CLOSER'S `outerDone`.
-  open-met : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+  -- EACH VALUE OF THE REAL FLATMAP'S OUTER HAS ITS `outerOpen` MET BY THE
+  -- CLOSER'S `outerDone`.
+  open-met : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
            → ∀ {q a} → RO q (out a) → ¬ ¬ Any (OpenMark q) r₁
-  open-met r₁ mt xo with ro-row xo
-  ... | r , _ , σr , refl with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
-  ...   | _ , w′ , σk , refl = met-open r₁ mt σr (CD.before-done σr (proj₁ σk) OS.J w′)
+  open-met r₁ {z} mt mz₀ le xo with ro-row xo
+  ... | r , _ , σr , refl with close-sent mz₀
+  ...   | c , w′ , σk , refl = met-open r₁ mt σr (≺-≼-≺ {r ⊕ [ sub OS.J ]} {c ⊕ [ sub w′ ]} {z} (CD.before-done σr (proj₁ σk) OS.J w′) le)
 
   -- EACH `outerOpen` QUEUES ONE LANE.
   open-one : ∀ {x q q′} → OpenMark q x → OpenMark q′ x → q ≡ q′
@@ -545,13 +545,13 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       λ oi → κ (ro-at r , (a , y , n , xo , refl , l) , (a , xo , rn) , oi , start-first r₁ mt xs _ ys eq (a , y , n , xo , refl , l)
                 , λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc)
 
-  -- WITH NO LANE QUEUED AT THE CLOSER'S `outerDone`, EACH LANE OF A
-  -- BOUNDED MERGE HAS STARTED: its value's `outerOpen` was met before the
-  -- mark, and the queue rises at each and falls at each lane's start.
-  queued-started : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
+  -- WITH NO LANE QUEUED BY OR PAST THE CLOSER'S `outerDone`, EACH LANE
+  -- OF A BOUNDED MERGE HAS STARTED: its value's `outerOpen` was met before
+  -- the mark, and the queue rises at each and falls at each lane's start.
+  queued-started : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
                  → que r₁ ≡ 0 → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ ¬ AC.StartIn [] r₁ q
-  queued-started bd r₁ mt q0 xo rn κ =
-    open-met r₁ mt xo λ oi →
+  queued-started bd r₁ mt mz₀ le q0 xo rn κ =
+    open-met r₁ mt mz₀ le xo λ oi →
       QC.drained r₁ (λ xs y ys eq → past-queue op init xs y (no-end r₁ mt xs eq))
         (λ { (_ , _ , _ , _ , _ , refl) → subst (λ o → markQue o outerOpen ≡ kStart) (sym bd) refl })
         (λ { (_ , _ , _ , _ , refl , _) → refl })
@@ -587,14 +587,14 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     ... | inj₂ (inj₁ eq) = instant-≺ k v (subst (_≺ⁱ instantOf v) (sym eq) zv)
     ... | inj₂ (inj₂ gt) = ⊥-elim (≺-absurd {k} {z} kz (instant-≺ z k gt))
 
-  -- AN IMMEDIATE LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S
-  -- `outerDone`: its `laneStart` lies under its value, so before the mark,
+  -- AN IMMEDIATE LANE RUN AND NEVER CUT HAS STARTED BY OR PAST THE
+  -- CLOSER'S `outerDone`: its `laneStart` lies under its value, so before the mark,
   -- and the real flatMap, with few rows before a later instant, shows it.
-  start-met : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-            → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
+  start-met : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
+            → ∀ {v} → Few R v → instantOf z₀ ≺ⁱ instantOf v
             → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
-  start-met nb r₁ mt {v} Fv zv {q} {a} xo rn nc with ro-row xo
-  ... | r , _ , σr , refl with close-sent (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))
+  start-met nb r₁ {z} mt mz₀ le {v} Fv zv {q} {a} xo rn nc with ro-row xo
+  ... | r , _ , σr , refl with close-sent mz₀
   ...   | c , w′ , σk , refl = λ κ → lane-shows-start nb {q} {a} |>′ λ (y₀ , n₀ , l , ys , qy) →
     join-shows op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
@@ -615,17 +615,19 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
         rR = R-from (join-in op fL RO xo rn l (never-cut op fL RO nc) tt , proj₁ fJ , λ {k} x lt _ → proj₂ fJ x (≺-trans {k} {y₀} {v} lt y₀≺v))
         σs : σ₃ y₀ (out (instEmit (mark laneStart) n₀))
         σs = rR , λ {c′} rc → [ (λ le → le) , (λ lt → ⊥-elim (pin-not (InvAt.quiet I₃ rc rR lt))) ]′ (≼-or-≻ y₀ c′)
-    in lane-shown σs (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {x₀} {c ⊕ [ sub w′ ]} x₀≺z)
-         λ (z′ , e″ , m′ , _ , _ , pr) → κ (start-caught r₁ mt xo l x₀≺z (shown-at′ m′ (pr refl)))
+        x₀≺z′ : x₀ ≺ z
+        x₀≺z′ = ≺-≼-≺ {x₀} {c ⊕ [ sub w′ ]} {z} x₀≺z le
+    in lane-shown σs (mq′ (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) (≺→≼ {x₀} {z} x₀≺z′)
+         λ (z′ , e″ , m′ , _ , _ , pr) → κ (start-caught r₁ mt xo l x₀≺z′ (shown-at′ m′ (pr refl)))
     where
       pin-not : ∀ {c′ b} → PinBy c′ (out b) → ⊥
       pin-not (_ , () , _)
 
-  -- A LANE RUN AND NEVER CUT HAS STARTED BY THE CLOSER'S `outerDone`, with
-  -- no lane queued there.
-  lane-started : ∀ r₁ {z n r₂} → Met M (r₁ ++ (z , out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) ∷ r₂)
-               → Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {v} → Few R v → instantOf z ≺ⁱ instantOf v
+  -- A LANE RUN AND NEVER CUT HAS STARTED BY OR PAST THE CLOSER'S
+  -- `outerDone`, with no lane queued there.
+  lane-started : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
+               → Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {v} → Few R v → instantOf z₀ ≺ⁱ instantOf v
                → ∀ {q a} → RO q (out a) → RV.Runs op q → ¬ RV.Cut op q → ¬ ¬ AC.StartIn [] r₁ q
-  lane-started r₁ mt q0 Fv zv xo rn nc with bounded? op
-  ... | inj₁ (_ , bd) = queued-started bd r₁ mt q0 xo rn
-  ... | inj₂ nb       = start-met nb r₁ mt Fv zv xo rn nc
+  lane-started r₁ mt mz₀ le q0 Fv zv xo rn nc with bounded? op
+  ... | inj₁ (_ , bd) = queued-started bd r₁ mt mz₀ le q0 xo rn
+  ... | inj₂ nb       = start-met nb r₁ mt mz₀ le Fv zv xo rn nc

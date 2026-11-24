@@ -17,7 +17,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_)
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong)
 open import Relation.Nullary using (¬_; does)
 
@@ -322,3 +322,118 @@ bounded? (mergeᶠ (just k)) = inj₁ (k , refl)
 bounded? (mergeᶠ nothing)  = inj₂ λ _ ()
 bounded? switchᶠ           = inj₂ λ _ ()
 bounded? exhaustᶠ          = inj₂ λ _ ()
+
+-- A step from `s` to `s′`: finished after, it was finished before, or `D`.
+record Fin (D : Set) (s s′ : Flat Pos) : Set where
+  constructor fin
+  field frun : Flat.finished s′ ≡ true → Flat.finished s ≡ true ⊎ D
+
+-- The row a scan reads an `outerDone` from.
+OD : ∀ {B} → Maybe (Input B) → Set
+OD x = Σ Branch λ b → Σ Pos λ n → x ≡ just (inj₁ (b , instEmit (mark outerDone) n))
+
+private
+  fkeep : ∀ {D s s′} → Flat.finished s′ ≡ Flat.finished s → Fin D s s′
+  fkeep e = fin λ t → inj₁ (trans (sym e) t)
+
+  bump-fin : ∀ b f s → Flat.finished (bump b f s) ≡ Flat.finished s
+  bump-fin outerB f s = refl
+  bump-fin laneB  f s = refl
+  bump-fin closeB f s = refl
+
+  cut-fin : ∀ {B} k n s → Flat.finished (proj₁ (cut {B} k n s)) ≡ Flat.finished s
+  cut-fin k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = refl
+  ... | false | true  = refl
+  ... | false | false = refl
+
+  ended-fin : ∀ {B} k n s → Flat.finished (proj₁ (ended {B} k n s)) ≡ Flat.finished s
+  ended-fin k n s with isZero (Flat.queue s)
+  ... | false = refl
+  ... | true with Flat.finished s ∧ isZero (Flat.active s)
+  ...   | true  = refl
+  ...   | false = cut-fin (k + Flat.held s) n (record s { held = 0 })
+
+  begun-fin : ∀ {B} b n s → Flat.finished (proj₁ (begun {B} b n s)) ≡ Flat.finished s
+  begun-fin b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
+  ... | true  = refl
+  ... | false with does (n ≟ᵖ Flat.at s)
+  ...   | true  = bump-fin b suc s
+  ...   | false = bump-fin b suc (anew n s)
+
+  stopped-fin : ∀ {B} b n s k → Flat.finished (proj₁ (stopped {B} b n s k)) ≡ Flat.finished s
+  stopped-fin b n s zero    = refl
+  stopped-fin b n s (suc _) = bump-fin b (_∸ 1) s
+
+  overed-fin : ∀ {B} n s → Flat.finished (proj₁ (overed {B} n s)) ≡ Flat.finished s
+  overed-fin n s with Flat.spent s
+  ... | true  = refl
+  ... | false = refl
+
+  arrive-fin : ∀ {B} op n s → Flat.finished (proj₁ (arrive {B} op n s)) ≡ Flat.finished s
+  arrive-fin (mergeᶠ (just _)) n s = refl
+  arrive-fin (mergeᶠ nothing)  n s = refl
+  arrive-fin switchᶠ           n s = cut-fin (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
+  arrive-fin exhaustᶠ          n s = refl
+
+  burst-fin : ∀ {B} h n s → Flat.finished (proj₁ (burstOver {B} h n s)) ≡ Flat.finished s
+  burst-fin true  n s = refl
+  burst-fin false n s = cut-fin (Flat.held s) n (record s { held = 0 })
+
+  unpark-fin : ∀ {B} n s → Flat.finished (proj₁ (unpark {B} n s)) ≡ Flat.finished s
+  unpark-fin n s with anyHolds (Flat.at s) (Flat.live s)
+  ... | true  = refl
+  ... | false = refl
+
+  onMark-fin : ∀ {B} op b m n s → Fin (m ≡ outerDone) s (proj₁ (onMark {B} op b s m n))
+  onMark-fin op b begin         n s = fkeep (begun-fin b n s)
+  onMark-fin op b stop          n s = fkeep (stopped-fin b n s (if Flat.spent s then 0 else _))
+  onMark-fin op b over          n s = fkeep (overed-fin n s)
+  onMark-fin op b outerOpen     n s = fkeep (arrive-fin op n s)
+  onMark-fin op b outerClose    n s = fkeep refl
+  onMark-fin op b laneStart     n s = fkeep refl
+  onMark-fin op b (laneDone kd) n s =
+    fkeep (ended-fin (kd ⊓ Flat.lanes s) n (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }))
+  onMark-fin op b burstEnd      n s = fkeep (burst-fin (isZero (Flat.held s) ∨ Flat.dead s) n s)
+  onMark-fin op b outerDone     n s = fin λ _ → inj₂ refl
+  onMark-fin op b subscribed    n s = fkeep refl
+  onMark-fin op b completed     n s = fkeep refl
+
+  od-of : ∀ {B} b {m} n → m ≡ outerDone → OD {B} (just (inj₁ (b , instEmit (mark m) n)))
+  od-of b n refl = b , n , refl
+
+-- ONE ROW READ: only an `outerDone` finishes the scan.
+react-fin : ∀ {B} op (o : Out B) x → Fin (OD x) (proj₁ o) (proj₁ (react op o x))
+react-fin op o (just (inj₁ (b , instEmit (value v) n))) = fkeep refl
+react-fin op o (just (inj₁ (b , instEmit (mark m) n)))  =
+  fin λ t → [ inj₁ , (λ e → inj₂ (od-of b n e)) ]′ (Fin.frun (onMark-fin op b m n (proj₁ o)) t)
+react-fin op o (just (inj₂ (j , r)))                    = fkeep (unpark-fin root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }))
+react-fin op o nothing                                  = fkeep refl
+
+-- Where a run's scan finished: before it, or at an `outerDone` in it.
+FinIn : ∀ {B} → Out B → List (Pos × Ev (Maybe (Input B))) → Set
+FinIn {B} o rx = Flat.finished (proj₁ o) ≡ true ⊎ (Σ (List (Pos × Ev (Maybe (Input B)))) λ r₁ → Σ Pos λ k → Σ (Maybe (Input B)) λ x →
+  Σ (List (Pos × Ev (Maybe (Input B)))) λ r₂ → rx ≡ r₁ ++ (k , out x) ∷ r₂ × OD x)
+
+fin-back : ∀ {B} op (o : Out B) rx → Flat.finished (proj₁ (past op o rx)) ≡ true → FinIn o rx
+fin-back op o []                 h = inj₁ h
+fin-back op o ((q , end) ∷ rx)   h = inj₁ h
+fin-back op o ((q , skip) ∷ rx)  h with fin-back op o rx h
+... | inj₁ g = inj₁ g
+... | inj₂ (r₁ , k , x , r₂ , refl , od) = inj₂ ((q , skip) ∷ r₁ , k , x , r₂ , refl , od)
+fin-back op o ((q , pin w) ∷ rx) h with fin-back op o rx h
+... | inj₁ g = inj₁ g
+... | inj₂ (r₁ , k , x , r₂ , refl , od) = inj₂ ((q , pin w) ∷ r₁ , k , x , r₂ , refl , od)
+fin-back op o ((q , out x) ∷ rx) h with fin-back op (react op o x) rx h
+... | inj₂ (r₁ , k , y , r₂ , refl , od) = inj₂ ((q , out x) ∷ r₁ , k , y , r₂ , refl , od)
+... | inj₁ g with Fin.frun (react-fin op o x) g
+...   | inj₁ g′ = inj₁ g′
+...   | inj₂ od = inj₂ ([] , q , x , rx , refl , od)
+
+-- A SCAN FINISHED PAST A RUN READ AN `outerDone` IN IT.
+finished-from : ∀ {B} op rx → Flat.finished (proj₁ (past {B} op init rx)) ≡ true
+              → Σ (List (Pos × Ev (Maybe (Input B)))) λ r₁ → Σ Pos λ k → Σ (Maybe (Input B)) λ x → Σ (List (Pos × Ev (Maybe (Input B)))) λ r₂ →
+                rx ≡ r₁ ++ (k , out x) ∷ r₂ × OD x
+finished-from op rx f with fin-back op init rx f
+... | inj₁ ()
+... | inj₂ r = r
