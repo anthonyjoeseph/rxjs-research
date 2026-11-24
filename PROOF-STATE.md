@@ -270,15 +270,6 @@ holds a route. Settled by bodies, or a body emptied under a looping source.
 Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 `tracks-real`.
 
-#### THE UNLISTED LANE ENDS
-
-Suspect: nothing `held-comb` assumes keeps an exempting subscription in
-`cs` off a lane's `laneDone`; with no binders `cs` is free. Settled by an
-invariant placing `cs` before the flatMap, or by a run where a queued lane
-then lacks a route.
-
-Members: `done-unlisted`.
-
 #### THE LANE'S LAST COUNT
 
 Untried: a lane's `laneDone` follows its program's end in the frame, so

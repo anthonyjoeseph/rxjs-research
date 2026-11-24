@@ -44,6 +44,8 @@ open import Data.Empty using (⊥)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; valuesOf)
 open import Data.Product using (_×_; _,_; proj₁)
+open import denotation.Laws.Modulus using (≺-trans; ≺-ext)
+open import denotation.EmissionSet using (_≺_)
 open import Data.Unit using (⊤; tt)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
@@ -169,9 +171,10 @@ apart-all : ∀ {Γ} {G : ∀ {X} → X ∈ Γ → Pos → Set} {y} → (∀ {X}
 apart-all {[]}    f = tt
 apart-all {_ ∷ Γ} f = f (here refl) , apart-all {Γ} (λ {X} i → f {X} (there i))
 
--- ADMISSIBLE UNDER THE BINDERS: in no binder's last gap.
+-- ADMISSIBLE UNDER THE BINDERS: in no binder's last gap, and past every
+-- subscription the binders list.
 Fresh : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env cs} → EnvHeld ρ env cs → Pos → Set
-Fresh {Γ} eh = Apart Γ (λ {X} i → Gap (EnvHeld.bound eh {X} i))
+Fresh {Γ} {cs = cs} eh p = Apart Γ (λ {X} i → Gap (EnvHeld.bound eh {X} i)) p × (∀ {c} → c ∈ cs → c ≺ p)
 
 -- A binder's `nothing` row is a hot row: its hot is read past it.
 gap-hot : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) {X} (i : X ∈ Γ) {n r}
@@ -192,7 +195,7 @@ gap-bare t {q} (c , r , a , h , ne) nl with ⊑-snoc q h
 -- below it is a hot row in its world.
 fresh-step : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) {q}
            → Ok (Hots env) q → Fresh eh q → Fresh eh (q ⊕ [ ix 1 ])
-fresh-step eh {q} (_ , dj) fq = apart-all λ i → go i
+fresh-step eh {q} (_ , dj) (fq , bq) = apart-all (λ i → go i) , λ {c} ci → ≺-trans {c} {q} {q ⊕ [ ix 1 ]} (bq ci) (≺-ext q [])
   where
     go : ∀ {X} (i : X ∈ _) → Nl.¬ Gap (EnvHeld.bound eh i) (q ⊕ [ ix 1 ])
     go i (c , r , a , h , ne) with ⊑-snoc q h
@@ -205,7 +208,8 @@ fresh-adm : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env 
 fresh-adm eh = record { step = st ; bare = bare ; copy = λ fq → bare fq λ () }
   where
     bare : ∀ {q l} → Fresh eh q → (l ≡ ix 1 → ⊥) → Fresh eh (q ⊕ [ l ])
-    bare fq nl = apart-all λ i g → apart-at fq i (gap-bare (Ann (EnvHeld.bound eh i)) g nl)
+    bare {q} {l} (fq , bq) nl = apart-all (λ i g → apart-at fq i (gap-bare (Ann (EnvHeld.bound eh i)) g nl))
+                              , λ {c} ci → ≺-trans {c} {q} {q ⊕ [ l ]} (bq ci) (≺-ext q [])
     st : ∀ {q l} → Ok _ q → Fresh eh q → Plain l → Fresh eh (q ⊕ [ l ])
     st ok fq (plain-ix {1})             = fresh-step eh ok fq
     st ok fq (plain-ix {0})             = bare fq λ ()

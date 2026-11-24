@@ -66,7 +66,7 @@ open import simultaneous.HeldRead using (s₀; Src; ann-row; ann-end; module Ann
 open import simultaneous.HeldBack using (ann-last; src-ann-end)
 open import simultaneous.HeldComb using () renaming (run-row to run-row⁺)
 open import denotation.Laws.Worlds using (⊑-cmp; ⊑-refl; same-lead)
-open import denotation.Laws.Modulus using (≼-split)
+open import denotation.Laws.Modulus using (≼-split; ≺-ext)
 
 -- A connect's annotated source, read at its own subscription.
 AnnAt : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (env : DenEnv Δ) → Pos → EmissionSet (AIE A)
@@ -191,7 +191,7 @@ module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       from : Row → ⊥
       from (w , _ , sw , shw , rl) with ⊑-cmp w (c ⊕ [ ix 1 ]) rl h
       ... | inj₁ wc = proj₂ ok₂ (gap-hot eh j an) (InvAt.world IS sw) (⊑-inside (⊑-trans wc (⊑-snoc⁺ (c ⊕ [ ix 1 ]))))
-      ... | inj₂ cw = apart-at (at₂ pl sw shw) j (c , r , an , cw , λ lw → nl (⊑-trans lw rl))
+      ... | inj₂ cw = apart-at (proj₁ (at₂ pl sw shw)) j (c , r , an , cw , λ lw → nl (⊑-trans lw rl))
 
   ap : ∀ {X Y} (i : X ∈ A ∷ Γ) (j : Y ∈ A ∷ Γ) {y e} → Ann (bd i) y e → AShown e → Nl.¬ Gap (bd j) y
   ap (here refl) (here refl) = own-apart nb
@@ -203,7 +203,8 @@ module ConnBind (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   eh′ = record { bound = bd ; apart = ap }
 
   fr′ : Fresh eh′ (p ⊕ [ ix 0 ])
-  fr′ = body-fresh m ρ s env g p ok , Adm.bare ad fr (λ ())
+  fr′ = (body-fresh m ρ s env g p ok , proj₁ (Adm.bare ad fr (λ ())))
+      , λ { (here refl) → ≺-ext p L.[] ; (there ci) → proj₂ (Adm.bare ad fr (λ ())) ci }
 
 held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
@@ -212,5 +213,5 @@ held-connect m ρ s b hs hb = ih
     conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
       held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ ep₀))
   λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
-    placed-conn m (annotate (elab ρ s)) _ env g proj₂ p ok λ L ok₀ →
+    placed-conn m (annotate (elab ρ s)) _ env g (λ { ((_ , a) , b) → a , λ {c} ci → b (there ci) }) p ok λ L ok₀ →
       IH.placed (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep)

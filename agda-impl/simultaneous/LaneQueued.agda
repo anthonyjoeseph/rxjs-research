@@ -104,7 +104,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; module OS; g₂; named; met-before; lane-run)
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own)
+    using (Row; RO; module RV; sub-at; fL; done-ends; no-end; Own; LaneMark; DoneMark; act; ro-row; ro-at; J≺ro; met-open; OpenMark; open-one; start-live; ro-func; lane-done-own; lane-fresh-own)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
     using (lane-end-done; St; LaneEmit; done-told; next-idle; own-snoc; lane-rows; cnt-lane; module QL; catch-by; in-prefix; out-pin)
   open LaneHold m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
@@ -177,11 +177,13 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
   After : List Row → Maybe (Input B) → List Row → Flat Pos
   After r₁ xd a = proj₁ (past op (react op (past op init r₁) xd) a)
 
-  postulate
-    -- NO ENVIRONMENT BURST STARTS AT A LANE'S `laneDone`: the lanes' own
-    -- exemptions are their outer scopes' subscriptions, which `cs` lists.
-    done-unlisted : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → y ∈ cs → ⊥
+  -- NO ENVIRONMENT BURST STARTS AT A LANE'S `laneDone`: the binders list
+  -- only subscriptions before the lane's, which lies before its rows.
+  done-unlisted : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → y ∈ cs → ⊥
+  done-unlisted {y = y} xo ld ci = ≺-irrefl {y} (≺-trans {y} {CH.subOf op xo ld} {y} (proj₂ (lane-fresh-own xo ld) ci)
+    (world-after (InvAt.world (CH.sub-inv op xo ld) (CH.sub-row op xo ld ld)) (InvAt.real (CH.sub-inv op xo ld) (CH.sub-row op xo ld ld))))
 
+  postulate
     -- A LANE END READ PAST THE BASE FINDS A LANE QUEUED: the lanes of
     -- the chain end one by one, each with the next opened and unstarted,
     -- and no other lane's row lies under the base's end.

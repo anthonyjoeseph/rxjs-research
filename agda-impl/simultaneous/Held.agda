@@ -217,7 +217,7 @@ same-restamp st (instEmit (mark completed) _)  = same-mark λ ()
 -- THE BATCHER'S SOURCE HOLDS: the wrapped program, restamped.
 held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
 held-top o hy = held-scan-at restamp same-restamp (root , marked begin) (⟦ wrapped s ⟧ []ᵉ) root
-  (held-wrapped s tt (IH.holds hy []ᵉ [] (λ ()) record { bound = λ () ; apart = λ () }))
+  (held-wrapped s (tt , λ ()) (IH.holds hy []ᵉ [] (λ ()) record { bound = λ () ; apart = λ () }))
   where
     s = elab (λ i → i) (plain o)
 

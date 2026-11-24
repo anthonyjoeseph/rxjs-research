@@ -533,6 +533,11 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo l
     in done-sub a s oks fs es r₁ (Alike.run to from mt) (subst (λ c → ¬ Sync c _) (sym (sub-is op′ p ok fp ep xo l)) ns) nx
 
+  -- A LANE'S SUBSCRIPTION IS ADMISSIBLE.
+  lane-fresh : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+             → Fr (proj₁ (lane-at op′ dR fL Id Il p ok xo l))
+  lane-fresh op′ p ok fp ep xo l = subst Fr (sub-is op′ p ok fp ep xo l) (proj₁ (proj₂ (proj₂ (lane-sub op′ p ok fp ep xo l))))
+
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
               → Counts (View.Lane fL (enter dR p) op′ q a) (λ y → Sync (proj₁ (lane-at op′ dR fL Id Il p ok xo l)) y ⊎ Ex cs y)

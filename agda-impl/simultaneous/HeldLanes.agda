@@ -607,6 +607,10 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
     (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l)
 
+  -- A LANE'S SUBSCRIPTION IS ADMISSIBLE.
+  lane-fresh-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → Fresh eh (sub-at xo l)
+  lane-fresh-own = LI.lane-fresh op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
+
   -- A LANE'S `laneDone` HOLDS A ROUTE, outside its burst and every exemption.
   lane-done-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → ∀ r₁ {y kd n}
                 → Met (RV.Lane op q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y
