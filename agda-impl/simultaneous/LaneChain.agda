@@ -10,20 +10,23 @@ open import Data.Bool using (T)
 open import Data.Bool.Properties using (T?)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
-open import Data.Nat using (ℕ; _<_)
+open import Data.Nat using (ℕ; _<_; <-cmp)
+open import Relation.Binary using (tri<; tri≈; tri>)
+open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Maybe using (nothing; just)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst; trans; cong)
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; After; enter; out; end; _≺_; module Bounded)
 open import denotation.Laws.Worlds using (InvD; InvAt; Ok; W⁼; here; nest⁼; plain-ix; inside-⊑; conv; ⊕-identityʳ; ⊑-refl; ⊑-trans;
-  ⊑-snoc⁺; _⊑_)
-open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl)
+  ⊑-snoc⁺; _⊑_; nest; inW; ⊕-injˡ; world-after)
+open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl; ≺-ext; ≺-trans; ≼-or-≻; ≼-antisym)
+open import denotation.Laws.JoinInv using (end≢out)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
 open BoundedI using (seat′)
@@ -111,6 +114,126 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
   -- A lane ends once.
   end-one : ∀ op {q a c c′} → O q (out a) → Lane op q a c end → Lane op q a c′ end → c ≡ c′
   end-one op x l l′ = let (s , oks , r , r′) = lane-at₂ op d f Id If p ok x l l′ in end-uniq (If _ s oks) r r′
+
+  -- A LANE WITH A ROW UNDER AN ENDED LANE'S WORLD IS THAT LANE'S VALUE,
+  -- OR SUBSCRIBED UNDER ITS END: a lane apart lies in another value's
+  -- second child, and one the ended lane is queued under leads none of
+  -- that world.
+  module Under (n : ℕ) where
+    open Bounded n f O using (Sub; room; freed; queued)
+    open BoundedI ok n f If (Id p ok) using (Lr; lr-row; lr-hand; lr-w; LI; sub-fun; rel; apart; queued-in; apart-lead; apart-ww; lane-end; nest-back;
+      x-lead; end-w; row-w; sub-same)
+
+    -- A lane subscribed past its value's second child was queued at an
+    -- end after the value.
+    q-before : ∀ {i q s a c} → Sub i q s a → s ≡ c ⊕ [ ix 1 ] → ¬ s ≡ q ⊕ [ ix 1 ] → q ≺ c
+    q-before (_ , room _)    _ nq = ⊥-elim (nq refl)
+    q-before (_ , freed _ _) _ nq = ⊥-elim (nq refl)
+    q-before {q = q} {c = c} (_ , queued {c′} _ qc _ _ _) e _ = subst (q ≺_) (⊕-injˡ c′ c e) qc
+
+    -- A lane subscribed in a lane's world is that lane, or subscribed
+    -- under an end of it.
+    sub-in : ∀ {i₀ q₀ s₀ a₀ i q s a} → Sub i₀ q₀ s₀ a₀ → Sub i q s a → W⁼ H s₀ s
+           → (q ≡ q₀ × a ≡ a₀) ⊎ Σ Pos λ c → After (f a₀) s₀ c end × W⁼ H (c ⊕ [ ix 1 ]) s
+    sub-in {i₀} {i = i} sb₀ sb v with <-cmp i₀ i
+    ... | tri≈ _ refl _ = let (eq , ea , _) = sub-fun sb sb₀ in inj₁ (eq , ea)
+    ... | tri< lt _ _ with rel lt sb₀ sb
+    ...   | apart xr xr′ nr rw rw′ = ⊥-elim (apart-ww xr xr′ nr (nest⁼ rw v) rw′)
+    ...   | queued-in ac _ v′ = inj₂ (_ , ac , v′)
+    sub-in {i₀} {i = i} sb₀ sb v | tri> _ _ gt with rel gt sb sb₀
+    ... | apart xr xr′ nr rw rw′ = ⊥-elim (apart-ww xr xr′ nr rw (nest⁼ rw′ v))
+    ... | queued-in ac Q v′ = ⊥-elim (nest-back sb ac (nest⁼ (nest⁼ v′ v) (inW (lr-w sb hd))) hd (⊑-refl _))
+      where
+        hd = lr-hand ac Q refl
+
+    ly : ∀ {i q s a y e} → Sub i q s a → After (f a) s y e → (e ≡ end → ⊥) → Lr a s y
+    ly sb r ne = lr-row r (λ re _ → ne (InvAt.func (LI sb) (proj₁ r) (proj₁ re)))
+
+    go : ∀ {i₀ q₀ s₀ a₀ c₀ i q s a y e w} → Sub i₀ q₀ s₀ a₀ → After (f a₀) s₀ c₀ end → Sub i q s a → After (f a) s y e
+       → (e ≡ end → ⊥) → W⁼ H s₀ w → w ⊑ y → (q ≡ q₀ × a ≡ a₀) ⊎ W⁼ H (c₀ ⊕ [ ix 1 ]) s
+    go {i₀} {i = i} sb₀ ac₀ sb r ne ww le with <-cmp i₀ i
+    ... | tri≈ _ refl _ = let (eq , ea , _) = sub-fun sb sb₀ in inj₁ (eq , ea)
+    ... | tri< lt _ _ with rel lt sb₀ sb
+    ...   | apart xr xr′ nr rw rw′ = ⊥-elim (apart-lead xr xr′ nr (nest⁼ rw ww) (nest rw′ (lr-w sb (ly sb r ne))) le)
+    ...   | queued-in ac _ v with lane-end sb₀ ac ac₀
+    ...     | refl = inj₂ v
+    go {i₀} {i = i} sb₀ ac₀ sb r ne ww le | tri> _ _ gt with rel gt sb sb₀
+    ... | apart xr xr′ nr rw rw′ = ⊥-elim (apart-lead xr′ xr (λ eq → nr (sym eq)) (nest⁼ rw′ ww) (nest rw (lr-w sb (ly sb r ne))) le)
+    ... | queued-in ac _ v = ⊥-elim (nest-back sb ac (nest⁼ v ww) (ly sb r ne) le)
+
+    -- A LANE SUBSCRIBED UNDER A LANE'S END LIES PAST THAT LANE'S ROWS:
+    -- the end follows them, and the second lane is queued after the
+    -- first, which leads none of its rows.
+    -- The first leads none of the second's rows.
+    past-lead : ∀ {iT qT sT aT yT bT c i q s a y e} → Sub iT qT sT aT → After (f aT) sT yT (out bT) → After (f aT) sT c end
+              → Sub i q s a → After (f a) s y e → (e ≡ end → ⊥) → W⁼ H (c ⊕ [ ix 1 ]) s → yT ⊑ y → ⊥
+    past-lead {iT} {i = i} {y = y} sbT rT acT sb r ne v le with <-cmp iT i
+    ... | tri≈ _ refl _ with sub-fun sb sbT
+    ...   | refl , refl , refl = nest-back sbT acT (nest⁼ v (inW (row-w sbT r))) (ly sbT r ne) (⊑-refl y)
+    past-lead sbT rT acT sb r ne v le | tri< lt _ _ = x-lead sbT sb (rel lt sbT sb) (ly sbT rT (λ ())) (ly sb r ne) le
+    past-lead {y = y} sbT rT acT sb r ne v le | tri> _ _ gt with rel gt sb sbT
+    ... | apart xr xr′ nr rw rw′ = apart-ww xr xr′ nr rw (nest⁼ rw′ (nest⁼ (inW (end-w sbT acT)) v))
+    ... | queued-in ac _ v′ = nest-back sb ac (nest⁼ (nest⁼ v′ (nest⁼ (inW (end-w sbT acT)) v)) (inW (row-w sb r))) (ly sb r ne) (⊑-refl y)
+
+    -- A LANE SUBSCRIBED UNDER A LANE'S END LIES PAST THAT LANE'S ROWS:
+    -- the end follows them, and the second lane is queued after the
+    -- first, which leads none of its rows.
+    past-end : ∀ {iT qT sT aT yT bT c i q s a y e} → Sub iT qT sT aT → After (f aT) sT yT (out bT) → After (f aT) sT c end
+             → Sub i q s a → After (f a) s y e → (e ≡ end → ⊥) → W⁼ H (c ⊕ [ ix 1 ]) s → yT ≺ y × (yT ⊑ y → ⊥)
+    past-end {yT = yT} {c = c} {y = y} sbT rT acT sb r ne v = before , past-lead sbT rT acT sb r ne v
+      where
+        cy : c ≺ y
+        cy with nest⁼ v (inW (row-w sb r))
+        ... | here   = ≺-ext c []
+        ... | inW w′ = ≺-trans {c} {c ⊕ [ ix 1 ]} {y} (≺-ext c []) (world-after w′ (InvAt.real (LI sb) (proj₁ r)))
+
+        before : yT ≺ y
+        before with ≼-or-≻ yT c
+        ... | inj₂ cy′ with InvAt.quiet (LI sbT) (proj₁ acT) (proj₁ rT) cy′
+        ...   | _ , () , _
+        before | inj₁ le with ≼-or-≻ c yT
+        ... | inj₂ lt = ≺-trans {yT} {c} {y} lt cy
+        ... | inj₁ le′ = ⊥-elim (end≢out (InvAt.func (LI sbT) (proj₁ acT) (subst (λ t → enter (f _) _ t (out _)) (≼-antisym {yT} {c} le le′) (proj₁ rT))))
+
+  past-end : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {qT aT yT bT c q a y e} (xT : O qT (out aT)) → Lane op qT aT yT (out bT) → Lane op qT aT c end
+           → (x : O q (out a)) (l : Lane op q a y e) → (e ≡ end → ⊥) → W⁼ H (c ⊕ [ ix 1 ]) (subOf op x l) → yT ≺ y × (yT ⊑ y → ⊥)
+  past-end _ {n} refl {aT = aT} {c = c} xT (_ , _ , sbT , rT) (_ , _ , sbT′ , acT) x (_ , _ , sb , r) =
+    Under.past-end n sbT rT (subst (λ t → After (f aT) t c end) (BoundedI.sub-same ok n f If (Id p ok) sbT′ sbT) acT) sb r
+
+  under-ended : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {q₀ a₀ c₀ q a y e w} (x₀ : O q₀ (out a₀)) (l₀ : Lane op q₀ a₀ c₀ end)
+                (x : O q (out a)) (l : Lane op q a y e) → (e ≡ end → ⊥) → W⁼ H (subOf op x₀ l₀) w → w ⊑ y
+              → (q ≡ q₀ × a ≡ a₀) ⊎ W⁼ H (c₀ ⊕ [ ix 1 ]) (subOf op x l)
+  under-ended _ {n} refl x₀ (_ , _ , sb₀ , ac₀) x (_ , _ , sb , r) = Under.go n sb₀ ac₀ sb r
+
+  -- A lane subscribed past its value's second child was queued at an
+  -- end after the value.
+  queued-at : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {q a k e c} (x : O q (out a)) (l : Lane op q a k e)
+            → subOf op x l ≡ c ⊕ [ ix 1 ] → ¬ subOf op x l ≡ q ⊕ [ ix 1 ] → q ≺ c
+  queued-at _ {n} refl x (_ , _ , sb , _) = Under.q-before n sb
+
+  -- A LANE SUBSCRIBED IN A LANE'S WORLD IS THAT LANE'S VALUE, OR
+  -- SUBSCRIBED UNDER THAT LANE'S END.
+  sub-in : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {q₀ a₀ k₀ e₀ q a k e} (x₀ : O q₀ (out a₀)) (l₀ : Lane op q₀ a₀ k₀ e₀)
+           (x : O q (out a)) (l : Lane op q a k e) → W⁼ H (subOf op x₀ l₀) (subOf op x l)
+         → (q ≡ q₀ × a ≡ a₀) ⊎ Σ Pos λ c → Lane op q₀ a₀ c end × W⁼ H (c ⊕ [ ix 1 ]) (subOf op x l)
+  sub-in _ {n} refl x₀ (_ , _ , sb₀ , _) x (_ , _ , sb , _) v with Under.sub-in n sb₀ sb v
+  ... | inj₁ e = inj₁ e
+  ... | inj₂ (c , ac , w) = inj₂ (c , (_ , _ , sb₀ , ac) , w)
+
+  -- A lane subscribed at `t`.
+  Sat : FlatOp → Pos → Set
+  Sat op t = Σ Pos λ q → Σ A λ a → Σ Pos λ k → Σ (Ev B) λ e → Σ (O q (out a)) λ x → Σ (Lane op q a k e) λ l → subOf op x l ≡ t
+
+  -- EVERY LANE SUBSCRIBED UNDER A CHAIN'S START IS A LINK, WITH A LANE
+  -- SUBSCRIBED AT ITS END, OR LIES UNDER THE CHAIN'S TOP.
+  along : ∀ op {n} → op ≡ mergeᶠ (just n) → ∀ {c s} → Chain op c s → Sat op s → ∀ {q a k e} (x : O q (out a)) (l : Lane op q a k e)
+        → W⁼ H (c ⊕ [ ix 1 ]) (subOf op x l) → (∀ {c′} → Lane op q a c′ end → Sat op (c′ ⊕ [ ix 1 ])) ⊎ W⁼ H s (subOf op x l)
+  along op bd from _ x l v = inj₂ v
+  along op bd (link x′ l′ le _ ch) top x l v with along op bd ch (_ , _ , _ , _ , x′ , l′ , refl) x l v
+  ... | inj₁ k = inj₁ k
+  ... | inj₂ v′ with sub-in op bd x′ l′ x l v′
+  ...   | inj₁ (refl , refl) = inj₁ λ lc → subst (λ t → Sat op (t ⊕ [ ix 1 ])) (end-one op x′ le lc) top
+  ...   | inj₂ (c″ , lc″ , w) = inj₂ (subst (λ t → W⁼ H (t ⊕ [ ix 1 ]) (subOf op x l)) (end-one op x′ lc″ le) w)
 
   -- The chain to `s` starts at the end of a lane ending outside its
   -- subscription, where its first lane, of a value before that end, was
