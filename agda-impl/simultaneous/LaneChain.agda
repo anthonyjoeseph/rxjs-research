@@ -8,7 +8,7 @@ module simultaneous.LaneChain where
 
 open import Data.Bool using (T)
 open import Data.Bool.Properties using (T?)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using ([]; _∷_; [_])
 open import Data.Nat using (ℕ; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
@@ -21,7 +21,7 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; After; enter; out; end; _≺_; module Bounded)
-open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊑-refl; ⊑-trans; ⊑-snoc⁺; _⊑_)
+open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊕-identityʳ; ⊑-refl; ⊑-trans; ⊑-snoc⁺; _⊑_)
 open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
@@ -114,7 +114,7 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
     -- No value lies strictly between another and a position under it.
     between : ∀ {q q′ c a a′} → O q (out a) → O q′ (out a′) → q ≺ q′ → q′ ≺ c → T (inside (q ⊕ [ ix 1 ]) c) → ⊥
     between {q} {q′} {c} x x′ qq cq ins with conv {q} {q} {q′} {c} (⊑-refl q) (≺→≼ {q} {q′} qq) cq (⊑-trans (⊑-snoc⁺ q) (inside-⊑ _ _ ins))
-    ... | [] , e = ≺-irrefl {q} (subst (q ≺_) e qq)
+    ... | [] , e = ≺-irrefl {q} (subst (q ≺_) (trans e (⊕-identityʳ q)) qq)
     ... | (_ ∷ _) , refl = InvAt.flat (Id p ok) x x′
 
     go : ∀ i → Acc _<_ i → ∀ {q s a k e} → Sub i q s a → After (f a) s k e → ¬ s ≡ q ⊕ [ ix 1 ] → Base (mergeᶠ (just n)) s

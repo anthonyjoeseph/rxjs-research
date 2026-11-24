@@ -32,7 +32,7 @@ open import simultaneous.HeldComb using (past)
 open import simultaneous.FlatLanes using (bump-at; bump-sp; does-no)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Out; Input; react; onMark; begun; bump; stopped; overed;
-  cut; unpark; arrive; ended; burstOver; left; anyHolds)
+  cut; unpark; arrive; ended; burstOver; left; anyHolds; setAt)
 
 -- What a row read at `s` asks for the routes of `A` held to survive it.
 Keeps : ∀ {B} → Pos → Flat Pos → Maybe (Input B) → Set
@@ -99,8 +99,8 @@ private
   mv : ∀ {s s′ Ov} → Same s s′ → Moved s s′ Ov
   mv (same h a p) = moved a (λ z → trans p z) λ nz → inj₁ λ z → nz (trans (sym h) z)
 
-  same-refl : ∀ {s} → Same s s
-  same-refl = same refl refl refl
+  same-then : ∀ {s s₁ s₂} → Same s s₁ → Same s₁ s₂ → Same s s₂
+  same-then (same h a p) (same h′ a′ p′) = same (trans h′ h) (trans a′ a) (trans p′ p)
 
   bump-same : ∀ b f s → Same s (bump b f s)
   bump-same b f s = same (hd b) (bump-at b f s) (bump-sp b f s)
@@ -112,14 +112,14 @@ private
 
   cut-same : ∀ {B} k n s → Same s (proj₁ (cut {B} k n s))
   cut-same k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
-  ... | true  | _     = same-refl
-  ... | false | true  = same-refl
-  ... | false | false = same-refl
+  ... | true  | _     = same refl refl refl
+  ... | false | true  = same refl refl refl
+  ... | false | false = same refl refl refl
 
   unpark-same : ∀ {B} n s → Same s (proj₁ (unpark {B} n s))
   unpark-same n s with anyHolds (Flat.at s) (Flat.live s)
-  ... | true  = same-refl
-  ... | false = same-refl
+  ... | true  = same refl refl refl
+  ... | false = same refl refl refl
 
   isZero-0 : ∀ {k} → isZero k ≡ true → k ≡ 0
   isZero-0 {zero} _ = refl
@@ -127,25 +127,25 @@ private
 
   begun-mv : ∀ {B Ov} A b n s → n ≡ A → Flat.at s ≡ A → Moved s (proj₁ (begun {B} b n s)) Ov
   begun-mv A b n s e a with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
-  ... | true  = mv same-refl
+  ... | true  = mv (same refl refl refl)
   ... | false with does (n ≟ᵖ Flat.at s) in d
   ...   | true  = mv (bump-same b suc s)
   ...   | false = ⊥-elim (does-no d (trans e (sym a)))
 
   stopped-mv : ∀ {B Ov} b n s k → Moved s (proj₁ (stopped {B} b n s k)) Ov
-  stopped-mv b n s zero    = mv same-refl
+  stopped-mv b n s zero    = mv (same refl refl refl)
   stopped-mv b n s (suc _) = mv (bump-same b (_∸ 1) s)
 
   overed-mv : ∀ {B Ov} → Ov → ∀ n s → Moved s (proj₁ (overed {B} n s)) Ov
   overed-mv ov n s with Flat.spent s in e
-  ... | true  = mv same-refl
+  ... | true  = mv (same refl refl refl)
   ... | false = moved refl (λ z → ⊥-elim (t≢f (trans (sym z) e))) λ _ → inj₂ (ov , refl)
 
   arrive-mv : ∀ {B Ov} op n s → Moved s (proj₁ (arrive {B} op n s)) Ov
-  arrive-mv (mergeᶠ (just _)) n s = mv same-refl
-  arrive-mv (mergeᶠ nothing)  n s = mv same-refl
-  arrive-mv switchᶠ           n s = mv (cut-same (Flat.lanes s) n (record s { active = 0 ; lanes = 0 }))
-  arrive-mv exhaustᶠ          n s = mv same-refl
+  arrive-mv (mergeᶠ (just _)) n s = mv (same refl refl refl)
+  arrive-mv (mergeᶠ nothing)  n s = mv (same refl refl refl)
+  arrive-mv switchᶠ           n s = mv (same-then (same refl refl refl) (cut-same (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })))
+  arrive-mv exhaustᶠ          n s = mv (same refl refl refl)
 
   -- A lane's end, past a lane queued or with the flatMap ending: the
   -- routes it hands are added to those held.
@@ -165,12 +165,12 @@ private
           cong₂∧ refl refl = refl
 
   burst-mv : ∀ {B Ov} h n s → h ≡ true → Moved s (proj₁ (burstOver {B} h n s)) Ov
-  burst-mv .true n s refl = mv same-refl
+  burst-mv .true n s refl = mv (same refl refl refl)
 
   left-mv : ∀ {B Ov} n s → Moved s (proj₁ (left {B} n (record s { finished = true }))) Ov
   left-mv n s with isZero (Flat.active s) ∧ isZero (Flat.queue s)
-  ... | true  = mv same-refl
-  ... | false = mv (cut-same (Flat.outer s) n (record s { finished = true ; outer = 0 }))
+  ... | true  = mv (same refl refl refl)
+  ... | false = mv (same-then (same refl refl refl) (cut-same (Flat.outer s) n (record s { finished = true ; outer = 0 })))
 
   IsOver : ∀ {B} → Maybe (Input B) → Set
   IsOver {B} x = Σ Branch λ b → Σ Pos λ n → x ≡ just (inj₁ (b , instEmit (mark over) n))
@@ -181,20 +181,20 @@ private
   onMark-mv op A b stop          n s k a = stopped-mv b n s (if Flat.spent s then 0 else _)
   onMark-mv op A b over          n s k a = overed-mv (b , n , refl) n s
   onMark-mv op A b outerOpen     n s k a = arrive-mv op n s
-  onMark-mv op A b outerClose    n s k a = mv same-refl
-  onMark-mv op A b laneStart     n s k a = mv same-refl
+  onMark-mv op A b outerClose    n s k a = mv (same refl refl refl)
+  onMark-mv op A b laneStart     n s k a = mv (same refl refl refl)
   onMark-mv op A b (laneDone kd) n s k a =
-    ended-mv (kd ⊓ Flat.lanes s) n s (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) same-refl k
+    ended-mv (kd ⊓ Flat.lanes s) n s (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) (same refl refl refl) k
   onMark-mv op A b burstEnd      n s k a = burst-mv _ n s (trans (cong (isZero (Flat.held s) ∨_) k) (∨-zeroʳ _))
   onMark-mv op A b outerDone     n s k a = left-mv n s
-  onMark-mv op A b subscribed    n s k a = mv same-refl
-  onMark-mv op A b completed     n s k a = mv same-refl
+  onMark-mv op A b subscribed    n s k a = mv (same refl refl refl)
+  onMark-mv op A b completed     n s k a = mv (same refl refl refl)
 
   react-mv : ∀ {B} op A (o : Out B) x → Keeps A (proj₁ o) x → Flat.at (proj₁ o) ≡ A → Moved (proj₁ o) (proj₁ (react op o x)) (IsOver x)
-  react-mv op A o (just (inj₁ (b , instEmit (value v) n))) k a = mv same-refl
+  react-mv op A o (just (inj₁ (b , instEmit (value v) n))) k a = mv (same refl refl refl)
   react-mv op A o (just (inj₁ (b , instEmit (mark m) n)))  k a = onMark-mv op A b m n (proj₁ o) k a
-  react-mv op A o (just (inj₂ (j , r)))                    k a = mv (unpark-same root _)
-  react-mv op A o nothing                                  k a = mv same-refl
+  react-mv op A o (just (inj₂ (j , r)))                    k a = mv (same-then (same refl refl refl) (unpark-same root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) })))
+  react-mv op A o nothing                                  k a = mv (same refl refl refl)
 
   -- A step that keeps the instant and a spent mark.
   record Kept (s s′ : Flat Pos) : Set where
@@ -229,8 +229,8 @@ private
   onMark-kept op A b outerClose    n s k a = kept refl (λ z → z)
   onMark-kept op A b laneStart     n s k a = kept refl (λ z → z)
   onMark-kept op A b (laneDone kd) n s k a =
-    ended-kept (kd ⊓ Flat.lanes s) n s (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) same-refl
-  onMark-kept op A b burstEnd      n s k a = burst-kept _ n s
+    ended-kept (kd ⊓ Flat.lanes s) n s (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) (same refl refl refl)
+  onMark-kept op A b burstEnd      n s k a = burst-kept (isZero (Flat.held s) ∨ Flat.dead s) n s
   onMark-kept op A b outerDone     n s k a = kp (left-mv {Ov = ⊤} n s)
   onMark-kept op A b subscribed    n s k a = kept refl (λ z → z)
   onMark-kept op A b completed     n s k a = kept refl (λ z → z)
@@ -238,7 +238,7 @@ private
   react-kept : ∀ {B} op A (o : Out B) x → Names A x → Flat.at (proj₁ o) ≡ A → Kept (proj₁ o) (proj₁ (react op o x))
   react-kept op A o (just (inj₁ (b , instEmit (value v) n))) k a = kept refl (λ z → z)
   react-kept op A o (just (inj₁ (b , instEmit (mark m) n)))  k a = onMark-kept op A b m n (proj₁ o) k a
-  react-kept op A o (just (inj₂ (j , r)))                    k a = kp (mv {Ov = ⊤} (unpark-same root _))
+  react-kept op A o (just (inj₂ (j , r)))                    k a = kp (mv {Ov = ⊤} (same-then (same refl refl refl) (unpark-same root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) }))))
   react-kept op A o nothing                                  k a = kept refl (λ z → z)
 
   keeps-names : ∀ {B A s} (x : Maybe (Input B)) → Keeps A s x → Names A x
