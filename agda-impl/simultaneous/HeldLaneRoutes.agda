@@ -27,6 +27,7 @@ import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
+import Data.Sum as Sum
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; cong₂; subst)
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Nullary.Decidable using (decidable-stable)
@@ -74,7 +75,8 @@ open import simultaneous.TakeKit using (ix<last)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Relations using (Met; outs; outs-++; values)
 open import simultaneous.LaneEpoch using (module Lanes)
-open import simultaneous.Routed using (Held; Early; Placed; nameOf; cnt)
+open import simultaneous.Routed using (Held; Early; Placed; nameOf; nm; cnt)
+open import simultaneous.HeldConnect using (rootOf-ext)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; Fresh; shows-ev)
 open import denotation.Laws.Shows using (few-reach; ∈-stable)
 open import simultaneous.HeldComb using (ev; init; past)
@@ -506,19 +508,24 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- so, with the row met next, if it is the lane's.
   own-snoc : ∀ r {x rx₂} → Met M (r ++ x ∷ rx₂) → ∀ {q a c v} → RO q (out a) → (oc : OC q r c) → (le : LaneEmit q x v)
            → Met (RV.Lane op q a) (lane-rows (oc-in oc le))
+  next-row : ∀ r {x rx₂} → Met M (r ++ x ∷ rx₂) → ∀ {q a c y v} → RO q (out a) → (oc : OC q r c) → x ≡ (y ⊕ [ sub LS.J ] , out (Ln v))
+           → RV.Lane op q a y (out v)
+           → After (cursor nothing (lane-rows oc)) y × (∀ {k e′} → RV.Lane op q a k e′ → Visible e′ → After (cursor nothing (lane-rows oc)) k → y ≼ k)
   own-run : ∀ r {z e rx₂} → Met M (r ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → (oc : OC q r c) → Met (RV.Lane op q a) (lane-rows oc)
   own-run _ mt xo oc[] = []ᴿ
   own-run _ {z} {e} {rx₂} mt xo (oc-in {r} {x = x} oc le) = own-snoc r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc le
   own-run _ {z} {e} {rx₂} mt xo (oc-out {r} {x = x} oc _) = own-run r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc
 
-  own-snoc r {x} {rx₂} mt {q} {a} {v = v} xo oc (a′ , y , xo′ , x≡ , l′) =
-    run-++ rec ((lane-seen xo l , tt , aft (rows-last oc) , least) ∷ᴿ []ᴿ)
+  own-snoc r mt {q} {a} {v = v} xo oc (a′ , y , xo′ , x≡ , l′) =
+    let (af , lt) = next-row r mt xo oc x≡ l in run-++ (own-run r mt xo oc) ((lane-seen xo l , tt , af , lt) ∷ᴿ []ᴿ)
+    where
+      l : RV.Lane op q a y (out v)
+      l = subst (λ b → RV.Lane op q b y (out v)) (sym (ro-func xo xo′)) l′
+
+  next-row r mt {q} {a} {y = y} {v} xo oc x≡ l = aft (rows-last oc) , least
     where
       rec : Met (RV.Lane op q a) (lane-rows oc)
       rec = own-run r mt xo oc
-
-      l : RV.Lane op q a y (out v)
-      l = subst (λ b → RV.Lane op q b y (out v)) (sym (ro-func xo xo′)) l′
 
       aft : _ → After (cursor nothing (lane-rows oc)) y
       aft (inj₁ eq) = subst (λ c → After c y) (sym eq) tt
@@ -534,6 +541,15 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
         in ≺-irrefl {k} (run-below rec ak j)
       least {e′ = skip}  _ () _
       least {e′ = pin _} _ () _
+
+  -- A LANE IS IDLE AT ITS ROW MET NEXT: zero, or of that row's instant.
+  next-idle : ∀ r {x rx₂} → Met M (r ++ x ∷ rx₂) → ∀ {q c v} → LaneEmit q x v → (oc : OC q r c)
+            → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf (proj₁ x)
+  next-idle r mt (a , y , xo , refl , l) oc =
+    let (af , lt) = next-row r mt xo oc refl l
+    in subst (λ c → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf (y ⊕ [ sub LS.J ])) (cnt-lane oc)
+         (Sum.map₂ (λ e → trans e (cong nm (rootOf-ext y [ sub LS.J ])))
+           (lane-idle-own xo (own-run r mt xo oc) (lane-rows-end oc) (proj₂ (lane-seen xo l)) af lt))
 
   -- A LANE'S UNDONE EMIT, NO PIECE'S MARK, IS MET PAST ITS `laneStart`:
   -- the lane shows the mark before it, never cut between, so the lanes

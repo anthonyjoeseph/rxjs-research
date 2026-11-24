@@ -155,10 +155,6 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     stop-ex : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
             → (l : RV.Lane op q a y (out (instEmit (mark stop) n))) → Sync (sub-at xo l) y ⊎ Ex cs y → proj₁ (cnt r₁) ≡ nameOf y
 
-    -- A LANE ENDS COUNTING NOTHING, or routes of its end's own instant.
-    done-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q kd n c} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → OC q xs c
-             → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf (proj₁ x)
-
   -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`: a begin of it would
   -- follow a `laneStart` of it, and it starts once.
   start-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark laneStart) n) → OC q xs c
@@ -248,7 +244,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
         (λ xs x ys eq → done-told rx₁ mt xs x ys eq)
         (λ xs x ys eq → start-own xs (sm xs x ys eq))
         (λ xs x ys eq ik le o → let (cn , nz′) = stop-own xs (sm xs x ys eq) le o in trans cn (in-name ik) , nz′)
-        (λ xs x ys eq ik le o → Sum.map₂ (λ cn → trans cn (in-name ik)) (done-own xs (sm xs x ys eq) le o))
+        (λ xs x ys eq ik le o → Sum.map₂ (λ cn → trans cn (in-name ik)) (next-idle xs (sm xs x ys eq) le o))
         (λ xs k b n ys eq → begin-name (in-r₁ rx₁ xs _ ys eq))
         (λ xs k b ys eq → name-begin (in-r₁ rx₁ xs _ ys eq))
         (λ xs x ys eq a → fwd xs x ys eq (find a))

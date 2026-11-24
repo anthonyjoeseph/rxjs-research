@@ -297,7 +297,7 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     rows-vis : ∀ {q v} → Mg q (out v) → HR.Rd q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → HR.Rd q e′ → ⊥))
     rows-vis r with lane-vis ρ₄ (f a) env₂ m (λ {t} → pu a {t}) s r
     ... | inj₁ h          = inj₁ h
-    ... | inj₂ (ly , sv) = inj₂ (sv , λ rd → hot-lab rd ly)
+    ... | inj₂ (ly , sv) = inj₂ (proj₁ sv , λ rd → hot-lab rd ly)
 
     -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT.
     share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)

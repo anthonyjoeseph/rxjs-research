@@ -280,7 +280,7 @@ on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
 Members: `live-current`, `lane-burst`,
-`lane-exact`, `lane-covered`, `stop-ex`, `done-own`, `end-tot`,
+`lane-exact`, `lane-covered`, `stop-ex`, `end-tot`,
 `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK

@@ -790,7 +790,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   outer-tot : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
             → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
   outer-tot rx₁ mt o-value _ with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
-  ... | outer _ eq = open-value eq
+  ... | outer _ eq = ⊥-elim (open-value eq)
   outer-tot rx₁ {q} mt (o-done {n = n}) nx = outer-floor rx₁ ⊥ mt carried ovf [ (λ f → f) , ⊥-elim ]′ nx
     where
       carried : ∀ x₀ → opening {A} {B} x₀ ≡ instEmit (mark completed) n → Carried (out x₀)
