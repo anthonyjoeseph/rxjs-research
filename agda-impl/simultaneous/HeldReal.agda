@@ -577,7 +577,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     ... | (q , a) ∷ ws′ | Lv , _ , inj₂ refl | _ , _ , wf , _ , _ | _  =
       let open Done D ; open Joined J using (vs; census; dead; begun)
           (Lvs , nx , _) = Cn.nths-split vs Lv
-          (i , sb) = Cn.head-at {ws = ws′} Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx
+          (i , sb) = Cn.head-at Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx {ws = ws′}
                        (_ , _ , begun val row (λ le → ≺-absurd {yd} {ce} before le) , ends , (λ ()) , ≼-refl {ce})
                        (λ (_ , _ , _ , _ , _ , o) → o)
       in i , q , a , sb
