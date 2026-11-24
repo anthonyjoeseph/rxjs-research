@@ -56,8 +56,8 @@ open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneSt
 open import simultaneous.Project using (run-prefix)
 open import denotation.EmissionSet using (Ev; Superseded; Seen; Work)
 open import Data.Maybe using (just)
-open import simultaneous.ScanCount using (rowKind; markAct; row-cut)
-open import simultaneous.LaneCount using (kCut)
+open import simultaneous.ScanCount using (rowKind; markAct; row-cut; markQue; row-open; past-queue; que-cut)
+open import simultaneous.LaneCount using (kCut; kStart; module Count)
 open import denotation.Read using (Visible; After; cursor; Run) renaming (_∷_ to _∷ᴿ_; [] to []ᴿ)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; laneB; outerB; closeB; lanePart; burstPart)
@@ -282,19 +282,49 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ... | _ , i , (_ , a′ , yd , n , xo′ , refl , ld) with ro-func xo xo′
   ...   | refl = done-last xo ld l (met-before xs (split-met rx₁ mt xs _ ys eq) i)
 
+  -- AN `outerOpen` THE SCAN MEETS IS AN OUTER VALUE'S, at the source's
+  -- reading of the outer's row.
+  open-row : ∀ {rx} → Met M rx → ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark outerOpen) n)))) ∈ rx
+           → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × b ≡ outerB × n ≡ n′
+  open-row mt {b = laneB} i with lane-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
+  open-row mt {b = closeB} i with close-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
+  open-row {rx} mt {b = outerB} i with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+  ... | rs , pr , run , _ with bproj-memʰ pr i
+  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , refl , refl
+  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
+
+  module QL = Count _≟ᵖ_ (rowKind markQue op) (λ q → Σ A λ a → RO q (out a)) OpenMark (LaneMark laneStart) que
+
+  -- WITH A BOUNDED MERGE'S QUEUE UP, A VALUE THE SCAN MET OPENED HAS NOT
+  -- STARTED: the queue counts the opens met less the starts.
+  queue-live : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ¬ que r₁ ≡ 0
+             → ¬ ¬ Σ Pos λ q → Σ A λ a → RO q (out a) × Any (OpenMark q) r₁ × ¬ Any (LaneMark laneStart q) r₁
+  queue-live bd r₁ mt nz κ =
+    QL.alive r₁ (λ xs y ys eq → past-queue op init xs y (no-end r₁ mt xs eq)) refl
+      (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ _ x _ _ kc → que-cut op x kc) st-new (λ _ _ _ _ → start-one)
+      (λ xs x ys eq kx κ′ → start-live r₁ mt xs x ys eq kx λ (q , lm , (a , xo , _) , rest) → κ′ (q , lm , (a , xo) , rest))
+      nz λ (q , (a , xo) , oi , nd) → κ (q , a , xo , oi , nd)
+    where
+      st-new : ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → rowKind markQue op x ≡ kStart
+             → ¬ ¬ Σ Pos λ q → (Σ A λ a → RO q (out a)) × OpenMark q x × ¬ Any (OpenMark q) xs
+      st-new xs x ys eq kx κ′ with row-open op bd x kx
+      ... | k′ , b , n , refl with open-row (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq)
+      ...   | c , a , n′ , σc , refl , refl , refl = κ′ (ro-at c , (a , ro-of σc) , (a , c , n′ , σc , refl , refl) , fresh)
+        where
+          fresh : ¬ Any (OpenMark (ro-at c)) xs
+          fresh oi with find oi
+          ... | _ , i , (_ , c′ , _ , _ , e , refl) with ⊕-injˡ c c′ e
+          ...   | refl = ≺-irrefl {c ⊕ [ sub OS.J ]} (met-before xs (split-met r₁ mt xs _ ys eq) i)
+
   -- A CUT THE SWITCH'S SCAN MEETS IS AN OUTER VALUE'S `outerOpen`, at the
   -- source's reading of the outer's row.
   cut-row : ∀ {rx} → Met M rx → ∀ {x} → x ∈ rx → rowKind markAct switchᶠ x ≡ kCut
           → Σ Pos λ c → Σ A λ a → Σ _ λ n → σ₁ c (out (instEmit (value a) n)) × proj₁ x ≡ c ⊕ [ sub OS.J ] × Σ _ λ v → M (c ⊕ [ sub OS.J ]) (out v)
   cut-row mt {k , out (just (inj₁ (b , instEmit (mark mk) n)))} i kc with open-cut mk kc
-  cut-row mt {k , out (just (inj₁ (laneB , _)))} i kc | refl with lane-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
-  cut-row mt {k , out (just (inj₁ (closeB , _)))} i kc | refl with close-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
-  cut-row {rx} mt {k , out (just (inj₁ (outerB , _)))} i kc | refl with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
-  ... | rs , pr , run , _ with bproj-memʰ pr i
-  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , _ , proj₁ (run-row∈ mt i)
-  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
+  ... | refl with open-row mt i
+  ...   | c , a , _ , σc , refl , refl , refl = c , a , _ , σc , refl , _ , proj₁ (run-row∈ mt i)
   cut-row mt {_ , out (just (inj₁ (_ , instEmit (value _) _)))} i ()
   cut-row mt {_ , out (just (inj₂ _))} i ()
   cut-row mt {_ , out nothing} i ()

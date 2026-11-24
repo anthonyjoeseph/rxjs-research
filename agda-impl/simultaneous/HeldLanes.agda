@@ -285,12 +285,12 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
 
   -- A LANE ENDS IN ITS `laneDone`'s INSTANT.
   done-ends : ∀ {q a y kd n} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n))
-            → Σ Pos λ c → RV.Lane op q a c end × instantOf c ≡ instantOf y
+            → Σ Pos λ c → RV.Lane op q a c end × instantOf c ≡ instantOf y × y ≺ c
   done-ends x l with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) x l
   ... | s , oks , r , sk , back with lane-take m undone _ (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks r tt
-  ...   | w , refl , e = w ⊕ [ last ] , back e (≺-trans {s} {w ⊕ [ ix 0 ]} {w ⊕ [ last ]} sk (ix<last w)) , trans (inst-⊕ w [ last ]) (sym (inst-⊕ w [ ix 0 ]))
+  ...   | w , refl , e = w ⊕ [ last ] , back e (≺-trans {s} {w ⊕ [ ix 0 ]} {w ⊕ [ last ]} sk (ix<last w)) , trans (inst-⊕ w [ last ]) (sym (inst-⊕ w [ ix 0 ])) , ix<last w
 
   I-RO : InvAt (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) (p₀₀ ⊕ [ ix 1 ]) RO
   I-RO = inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
@@ -565,24 +565,28 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
         (λ _ _ _ _ _ _ → open-one) (start-live r₁ mt) q0 (_ , xo , rn) oi
         (λ (_ , _ , _ , _ , cb) → let (xc , _ , kc) = find cb in que-cut op xc kc) κ
 
+  -- A LANE SUBSCRIBED AT `s` SHOWS ITS `laneStart` under `s`'s first step.
+  start-under : ∀ {a} s → Σ Pos λ y₀ → Σ _ λ n₀ → enter (fL a) s y₀ (out (instEmit (mark laneStart) n₀)) × LaneLayers.Under (s ⊕ [ ix 0 ]) y₀
+  start-under {a} s = let (r , u) = LaneStart.lane-start-row _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s in _ , _ , r , u
+
   -- AN IMMEDIATE LANE SHOWS ITS `laneStart`, under its value.
   lane-shows-start : (∀ k → op ≡ mergeᶠ (just k) → ⊥) → ∀ {q a} → Σ Pos λ y₀ → Σ _ λ n₀ → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) × q ⊑ y₀
   lane-shows-start nb {q} {a} =
-    let (r , u) = LaneStart.lane-start-row _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m (q ⊕ [ ix 1 ])
+    let (_ , _ , r , u) = start-under {a} (q ⊕ [ ix 1 ])
     in _ , _ , lane-of fL RO op nb (r , LaneLayers.under-ext (q ⊕ [ ix 1 ]) u)
      , LaneLayers.under-trans (LaneLayers.under-⊕ (LaneLayers.under-⊕ (LaneLayers.under-refl q) (ix 1)) (ix 0)) u
+
+  -- A `laneStart` the source shows before a row the scan meets is met.
+  start-caught : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q a y₀ n₀} → RO q (out a)
+               → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → (y₀ ⊕ [ sub LS.J ]) ≺ z
+               → M (y₀ ⊕ [ sub LS.J ]) (out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) → AC.StartIn [] r₁ q
+  start-caught r₁ mt xo l jz mo with run-catch r₁ mt mo tt tt jz
+  ... | a₁ , b₁ , e₁ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ a₁ (here refl))))) mo
+  ...   | refl = any-++ʳ a₁ (here (_ , _ , _ , xo , refl , l))
 
   private
     few-reach : ∀ {X : Set} {t : EmissionSet X} {k e} → Few t k → ES.Reach t k e
     few-reach f = proj₁ f , λ x lt _ → proj₂ f x lt
-
-    -- A `laneStart` the source shows before a row the scan meets is met.
-    start-caught : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q a y₀ n₀} → RO q (out a)
-                 → RV.Lane op q a y₀ (out (instEmit (mark laneStart) n₀)) → (y₀ ⊕ [ sub LS.J ]) ≺ z
-                 → M (y₀ ⊕ [ sub LS.J ]) (out (just (inj₁ (laneB , instEmit (mark laneStart) n₀)))) → AC.StartIn [] r₁ q
-    start-caught r₁ mt xo l jz mo with run-catch r₁ mt mo tt tt jz
-    ... | a₁ , b₁ , e₁ , refl with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ a₁ (here refl))))) mo
-    ...   | refl = any-++ʳ a₁ (here (_ , _ , _ , xo , refl , l))
 
     shown-at′ : ∀ {z′ e″ k e} → LS.M′ z′ e″ → z′ ≡ k × e″ ≡ e → M k e
     shown-at′ mo (refl , refl) = toM mo

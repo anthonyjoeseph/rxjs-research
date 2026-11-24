@@ -13,7 +13,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _+_; suc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst; subst₂)
 
 open import Tree using (Obs; FlatOp; of; map; flatMap; mergeᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; _⊕_; _∙_)
@@ -32,7 +32,7 @@ open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; l
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
+open import Data.List.Relation.Unary.Any using (Any; here; there) renaming (map to any-map)
 open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerDone; laneStart; laneDone; burstEnd; Mark)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
@@ -43,7 +43,7 @@ open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
 open import denotation.Laws.Shows using (k-shows; sk-trunc)
-open import denotation.Laws.Modulus using (≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≼-split; ≺→≼; ≺-≼-≺; ≺-ext; ≺-trans; ≺-absurd; ≼-refl)
 open import simultaneous.HeldBase using (shows-ev; EnvHeld; module FlatHots; IH; Fresh)
 open import simultaneous.Routed using (Placed)
 open import simultaneous.FlatLanes using (end-last; past-within; co; bproj-end; Within; within; brTag; BProj; Tg; tagged) renaming (keep to bkeep; drop to bdrop)
@@ -72,7 +72,9 @@ import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
 open import simultaneous.OuterSplit using (count-open)
 open import simultaneous.ScanPast using (run-catch; past-split; left-cut; both-zero; all-drop)
-open import simultaneous.RealView using (real-ends; lane-one)
+open import simultaneous.RealView using (real-ends; lane-one; nth-out)
+open import simultaneous.LaneLayers using (under-ext)
+open import simultaneous.HeldBurst using (under-inst; inst-le)
 open import simultaneous.InstEmit using (valuesOf)
 
 open import Tree using (Obs; FlatOp; of; map; flatMap; connected)
@@ -108,8 +110,8 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-  open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut)
-  open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next; Q; okQ; Id; If)
+  open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut; queue-live)
+  open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next; Q; okQ; Id; If; module Start; module Run; lane-σ₃; no-end-before; sent-few)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.DoneIn [] xs q
@@ -250,7 +252,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       done-by : AC.DoneIn r₁ r₁ q → ⊥
       done-by di with find di
       ... | _ , i , (_ , a′ , y , n′ , x′ , refl , l) with ro-func x x′ | done-ends x′ l
-      ...   | refl | c , lc , ic = ¬g (c , lc , λ Ic → rI i (subst (I ≺ⁱ_) (trans ic (sym (inst-⊕ y [ sub LS.J ]))) Ic))
+      ...   | refl | c , lc , ic , _ = ¬g (c , lc , λ Ic → rI i (subst (I ≺ⁱ_) (trans ic (sym (inst-⊕ y [ sub LS.J ]))) Ic))
 
   -- The real flatMap's outer has ended by the closer's `outerDone`.
   outer-by : ∀ {z n} → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → RV.OuterBy (instantOf z)
@@ -512,10 +514,11 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     -- in its instant.
     record Done (x : Pos) : Set where
       field
-        {ce yd w q₀} : Pos
-        {a₀}         : A
-        {b₀}         : IE B
-        at-x   : x ≡ yd ⊕ [ sub w ]
+        {ce yd q₀} : Pos
+        {a₀}       : A
+        {b₀}       : IE B
+        at-x   : x ≡ yd ⊕ [ sub LS.J ]
+        seen   : σ₃ yd (out b₀)
         before : yd ≺ ce
         same   : instantOf ce ≡ instantOf x
         val    : RO q₀ (out a₀)
@@ -535,50 +538,71 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         census  : Cn.Census C vs (L.length vs) d
         dead    : d + n ≡ L.length vs
         begun   : ∀ {q a y e} → RO q (out a) → Lane q a y e → ¬ Owes C y → (q , a) ∈ vs
-
-    -- The book as the scan counts it: a value waits while its queue is up.
-    record Joined (C : Cur) (st : Flat Pos) : Set where
-      field
-        book  : Book C
-        queue : ¬ Flat.queue st ≡ 0 → ¬ Book.ws book ≡ []
-      open Book book public
+        started : ∀ {q a} → (q , a) ∈ vs → ¬ ¬ Σ Pos λ y → Σ Pos λ n → Lane q a y (out (instEmit (mark laneStart) n)) × ¬ Owes C y
 
     postulate
-      -- A `laneDone` READ IS A LANE'S, ENDING IN ITS INSTANT.
-      done-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → Done x
       -- THE JOINER KEEPS A BOOK before a lane end the scan reads: the
       -- outer values before it are finitely many, each read as an
       -- `outerOpen`.  Adequacy's `Admit`, `LaneEnd` and `slots-mv` are
       -- the three steps, there along a machine run.
+      -- A VALUE WHOSE `outerOpen` THE SCAN READS BEFORE A LANE'S ROW LIES
+      -- BEFORE THAT ROW.
+      opened-before : ∀ {q x y e} → OpenMark q x → σ₃ y e → proj₁ x ≺ (y ⊕ [ sub LS.J ]) → q ≺ y
       book-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
                   → ¬ ¬ Book (bef (Done.ce D))
-      -- THE SCAN'S QUEUE IS UP ONLY WHILE A VALUE WAITS: it rises at an
-      -- `outerOpen` and falls at a `laneStart` (`past-queue`), and no lane
-      -- starts before its value arrives.
-      queue-counts : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
-                   → (Bk : Book (bef (Done.ce D))) → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ¬ Book.ws Bk ≡ []
-      -- A LANE SUBSCRIBED ONE STEP BELOW A LANE'S END SHOWS ITS START IN
-      -- THE END'S INSTANT, past the ended lane's `laneDone`.
-      start-shown : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → (D : Done x)
-                  → ∀ {i q a} → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
-                  → ∀ {q′ a′} → M q′ (out a′) → instantOf (Done.ce D) ≺ⁱ instantOf q′
-                  → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf (Done.ce D)
 
-    -- THE SCAN COUNTS THE JOINER: its state before a `laneDone` it reads
-    -- is the joiner's at the cursor before that lane's end.
-    scan-joined : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
-                → ¬ ¬ Joined (bef (Done.ce D)) (proj₁ (past op init r₁))
-    scan-joined bd r₁ mt D no = book-at bd r₁ mt D λ Bk → no (record { book = Bk ; queue = queue-counts bd r₁ mt D Bk })
+    -- A `laneDone` READ IS A LANE'S, ENDING IN ITS INSTANT.
+    done-at : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → Done x
+    done-at refl r₁ mt (_ , kd , _ , refl) with lane-mark mt (∈-++⁺ʳ r₁ (here refl)) (inj₂ (kd , refl))
+    ... | y , refl , refl , σd with σ₃-lane σd
+    ...   | q₀ , a₀ , xo , _ , l , _ with done-ends xo l
+    ...     | c , lc , ic , yc = record { at-x = refl ; seen = σd ; before = yc ; same = trans ic (sym (inst-⊕ y [ sub LS.J ])) ; val = xo ; row = l ; ends = lc }
+
+    -- A LANE SUBSCRIBED ONE STEP BELOW A LANE'S END SHOWS ITS START IN
+    -- THE END'S INSTANT, past the ended lane's `laneDone`: the scan's
+    -- source shows the start before the next instant's value.
+    start-shown : op ≡ mergeᶠ (just k) → ∀ {x} → (D : Done x)
+                → ∀ {i q a} → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
+                → ∀ {q′ a′} → M q′ (out a′) → instantOf (Done.ce D) ≺ⁱ instantOf q′
+                → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf (Done.ce D)
+    start-shown refl {x} D {i} {q} {a} sb {q′} mq cq =
+      let (c , n , r , u) = start-under {a} (Done.ce D ⊕ [ ix 1 ]) in go c n r (under-ext (Done.ce D ⊕ [ ix 1 ]) u) (under-inst u)
+      where
+        open Done D
+        xo : RO q (out a)
+        xo = nth-out (proj₁ sb)
+        rn : RV.Runs (mergeᶠ (just k)) q
+        rn = i , a , proj₁ sb
+        go : ∀ c n → enter (fL a) (ce ⊕ [ ix 1 ]) c (out (instEmit (mark laneStart) n)) → (ce ⊕ [ ix 1 ]) ≺ c
+           → instantOf c ≡ instantOf ((ce ⊕ [ ix 1 ]) ⊕ [ ix 0 ])
+           → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf ce
+        go c n r sc u-c no =
+          lane-σ₃ xo rn l tt (λ ()) (≼-refl {c}) noend (sent-few mq cq′) λ σc →
+          Start.Shown.shown-M xo rn l mq cq′ σc refl refl λ mc →
+          no (c ⊕ [ sub LS.J ] , n , mc , subst (_≺ (c ⊕ [ sub LS.J ])) (sym at-x) (LS.mono seen σc ycd) , trans (inst-⊕ c [ sub LS.J ]) ic)
+          where
+            l : RV.Lane (mergeᶠ (just k)) q a c (out (instEmit (mark laneStart) n))
+            l = i , _ , sb , r , sc
+            ic : instantOf c ≡ instantOf ce
+            ic = trans u-c (trans (inst-⊕ (ce ⊕ [ ix 1 ]) [ ix 0 ]) (inst-⊕ ce [ ix 1 ]))
+            cq′ : instantOf c ≺ⁱ instantOf q′
+            cq′ = subst (_≺ⁱ instantOf q′) (sym ic) cq
+            ycd : yd ≺ c
+            ycd = ≺-trans {yd} {ce} {c} before (≺-trans {ce} {ce ⊕ [ ix 1 ]} {c} (≺-ext ce []) sc)
+            noend : ∀ {d} → R d end → d ≺ c → ⊥
+            noend = no-end-before xo rn (λ ()) λ {yd′} ld′ y′c →
+              let (y₀ , _ , r₀ , s₀ , lt₀) = lane-starts (Run.fwd xo rn l ld′)
+              in ≺-irrefl {c} (≺-trans {c} {yd′} {c} (subst (_≺ yd′) (sym (start-once xo l (Run.back xo rn l r₀ s₀))) lt₀) y′c)
 
     -- With a value waiting every slot is taken, and the queue's head
     -- starts one step below the first owed end.
-    head : ∀ {x st} (D : Done x) (J : Joined (bef (Done.ce D)) st) → ¬ Flat.queue st ≡ 0
+    head : ∀ {x} (D : Done x) (Bk : Book (bef (Done.ce D))) → ¬ Book.ws Bk ≡ []
          → Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
-    head D J nz with Joined.ws J | Joined.slots J | Joined.waiting J | Joined.queue J
-    ... | []           | _                   | _                   | qe = ⊥-elim (qe nz refl)
+    head D Bk ne with Book.ws Bk | Book.slots Bk | Book.waiting Bk | ne
+    ... | []           | _                   | _                   | ne′ = ⊥-elim (ne′ refl)
     ... | (q , a) ∷ ws′ | Lv , _ , inj₁ ()   | _                   | _
     ... | (q , a) ∷ ws′ | Lv , _ , inj₂ refl | _ , _ , wf , _ , _ | _  =
-      let open Done D ; open Joined J using (vs; census; dead; begun)
+      let open Done D ; open Book Bk using (vs; census; dead; begun)
           (Lvs , nx , _) = Cn.nths-split vs Lv
           (i , sb) = Cn.head-at Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx {ws = ws′}
                        (_ , _ , begun val row (λ le → le before) , ends , (λ ()) , ≼-refl {ce})
@@ -591,13 +615,57 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   queued-next : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
               → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
               → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
-  queued-next {k} bd r₁ {x} mt ld nz {q} mq xq no =
-    let D = done-at bd r₁ mt ld ; open Done D in
-    scan-joined bd r₁ mt D λ J →
-      let (_ , _ , _ , sb) = head D J nz in
-      start-shown bd r₁ mt ld D sb mq (subst (_≺ⁱ instantOf q) (sym same) xq)
-        λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same)
-    where open Queue k
+  queued-next {k} refl r₁ {x} {xl} mt ld nz {q′} mq xq no =
+    book-at refl r₁ mt D λ Bk →
+    queue-live refl r₁ mt nz λ (qv , av , xo , oi , ns) →
+      let (row , i , om) = find oi
+          qce = ≺-trans {qv} {yd} {ce} (opened-before om seen (subst (proj₁ row ≺_) at-x (met-before r₁ mt i))) before
+      in [ (λ iv → Book.started Bk iv λ (y , n , l , ny) → [ (λ cy → ny cy) , between xo ns l ]′ (≼-or-≻ ce y))
+         , (λ iw → let (_ , _ , _ , sb) = head D Bk (nonempty iw) in
+             start-shown refl D sb mq cq λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same)) ]′
+         (Book.whole Bk xo (λ le → le qce) tt)
+    where
+      open Queue k
+      D : Done x
+      D = done-at refl r₁ mt ld
+      open Done D
+
+      cq : instantOf ce ≺ⁱ instantOf q′
+      cq = subst (_≺ⁱ instantOf q′) (sym same) xq
+
+      nonempty : ∀ {w} {ws : List (Pos × A)} → w ∈ ws → ¬ ws ≡ []
+      nonempty (here _)  ()
+      nonempty (there _) ()
+
+      -- A begun lane the scan has not seen start starts in the end's
+      -- instant, past the `laneDone`.
+      between : ∀ {qv av y n} → RO qv (out av) → ¬ Any (LaneMark laneStart qv) r₁
+              → Lane qv av y (out (instEmit (mark laneStart) n)) → y ≺ ce
+              → ⊥
+      between {qv} {av} {y} {n} xo ns l@(il , _ , sbl , _) yce =
+        lane-σ₃ xo rn l tt (λ ()) (≼-refl {y}) noend (sent-few mq yq) λ σy →
+        Start.Shown.shown-M xo rn l mq yq σy refl refl λ my →
+        [ (λ xy → [ (λ lt → no (y ⊕ [ sub LS.J ] , n , my , lt , squeeze lt))
+                  , (λ e → ld-start (subst (λ z → M z (out (LnMk laneStart n))) (sym e) my)) ]′ (≼-split {x} {y ⊕ [ sub LS.J ]} xy))
+        , (λ jx → ns (start-caught r₁ mt xo l jx my)) ]′ (≼-or-≻ x (y ⊕ [ sub LS.J ]))
+        where
+          rn : RV.Runs (mergeᶠ (just k)) qv
+          rn = il , av , proj₁ sbl
+          yq : instantOf y ≺ⁱ instantOf q′
+          yq = inst-le {y} {ce} {q′} yce cq
+          noend : ∀ {d} → R d end → d ≺ y → ⊥
+          noend = no-end-before xo rn (λ ()) λ {yd′} ld′ y′y →
+            let (y₀ , _ , r₀ , s₀ , lt₀) = lane-starts (Run.fwd xo rn l ld′)
+            in ≺-irrefl {y} (≺-trans {y} {yd′} {y} (subst (_≺ yd′) (sym (start-once xo l (Run.back xo rn l r₀ s₀))) lt₀) y′y)
+          ld-start : M x (out (LnMk laneStart n)) → ⊥
+          ld-start mx with ld | InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl)))) mx
+          ... | (_ , _ , _ , refl) | ()
+          squeeze : x ≺ (y ⊕ [ sub LS.J ]) → instantOf (y ⊕ [ sub LS.J ]) ≡ instantOf x
+          squeeze lt with triⁱ (instantOf (y ⊕ [ sub LS.J ])) (instantOf x)
+          ... | inj₁ wx        = ⊥-elim (≺-irrefl {x} (≺-trans {x} {y ⊕ [ sub LS.J ]} {x} lt (instant-≺ (y ⊕ [ sub LS.J ]) x wx)))
+          ... | inj₂ (inj₁ e)  = e
+          ... | inj₂ (inj₂ xw) = ⊥-elim (≺-irrefl {y} (≺-trans {y} {ce} {y} yce
+                  (instant-≺ ce y (subst₂ _≺ⁱ_ (sym same) (inst-⊕ y [ sub LS.J ]) xw))))
 
   -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
   -- holds its routes: the scan finished at the closer's `outerDone`

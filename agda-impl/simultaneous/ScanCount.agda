@@ -232,6 +232,23 @@ row-start op (_ , end)   ()
 row-start op (_ , skip)  ()
 row-start op (_ , pin _) ()
 
+-- A ROW THAT RAISES A BOUNDED MERGE'S QUEUE IS AN `outerOpen`.
+row-open : ∀ {B k} op → op ≡ mergeᶠ (just k) → (x : Pos × Ev (Maybe (Input B))) → rowKind markQue op x ≡ kStart
+         → Σ Pos λ k′ → Σ Branch λ b → Σ _ λ n → x ≡ (k′ , out (just (inj₁ (b , instEmit (mark outerOpen) n))))
+row-open {k = k} _ refl (k′ , out (just (inj₁ (b , instEmit (mark m) n)))) eq with mark-open m eq
+  where mark-open : ∀ m → markQue (mergeᶠ (just k)) m ≡ kStart → m ≡ outerOpen
+        mark-open outerOpen _ = refl
+        mark-open begin () ; mark-open over () ; mark-open stop () ; mark-open outerClose ()
+        mark-open laneStart () ; mark-open (laneDone _) () ; mark-open burstEnd () ; mark-open outerDone ()
+        mark-open subscribed () ; mark-open completed ()
+... | refl = k′ , b , n , refl
+row-open _ refl (_ , out (just (inj₁ (_ , instEmit (value _) _)))) ()
+row-open _ refl (_ , out (just (inj₂ _))) ()
+row-open _ refl (_ , out nothing) ()
+row-open _ refl (_ , end)   ()
+row-open _ refl (_ , skip)  ()
+row-open _ refl (_ , pin _) ()
+
 -- and no row empties it.
 que-cut : ∀ {B} op (x : Pos × Ev (Maybe (Input B))) → rowKind markQue op x ≡ kCut → ⊥
 que-cut op (_ , out (just (inj₁ (_ , instEmit (mark m) _)))) eq = mark-cut op m eq
