@@ -85,6 +85,7 @@ open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark;
 
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
+open import simultaneous.HeldBurst using (module CombBurst)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -104,6 +105,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut)
+  open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.DoneIn [] xs q
@@ -500,13 +502,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     queued-next : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
                 → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
                 → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
-
-    -- A LANE'S START IS FOLLOWED IN ITS INSTANT BY A BURST'S END OR A LANE'S
-    -- END: the lane's flatMap subscribes its burst part inside the lane's
-    -- subscribe, and cuts it only at the lane's own `laneDone`.
-    burst-next : ∀ {y n q a} → M y (out (LnMk laneStart n)) → M q (out a) → instantOf y ≺ⁱ instantOf q
-               → ¬ ¬ Σ Pos λ b → Σ Pos λ n′ → (M b (out (LnMk burstEnd n′)) ⊎ Σ ℕ λ kd → M b (out (LnMk (laneDone kd) n′)))
-                 × y ≺ b × instantOf b ≡ instantOf y
 
   -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
   -- holds its routes: the scan finished at the closer's `outerDone`
