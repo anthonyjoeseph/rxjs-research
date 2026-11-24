@@ -272,13 +272,13 @@ Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 
 #### THE LANE'S LAST COUNT
 
-The run up to a `laneDone` has counted what it tells, and is named for
-its instant; open is only that the told count is not zero. Untried: the
-`laneDone` follows its program's end in the frame, so it tells the count
-the end is covered by. Settled by a run moving the end's cover up through
-the share, frame and take, or by an end exempt where its `laneDone` is not.
+The run up to a `laneDone` is the merge's, read back through the share to
+its program, whose end is covered; open is where the pieces sit. Riskiest:
+the merge's `laneDone` lies past the share's end, under the frame's third
+lane. Settled by the frame's anatomy and the share's end found in its
+program's.
 
-Members: `done-pos`.
+Members: `take-ld`, `ld-past`, `sh-prog-end`.
 
 #### THE HELD STREAMS
 
