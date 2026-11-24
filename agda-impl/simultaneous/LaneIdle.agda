@@ -11,6 +11,7 @@ open import Data.Bool using (true; false; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_]; _++_)
 import Data.List as L
+open import Data.List.Properties using (∷ʳ-injective; ++-assoc)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there; any?)
@@ -32,7 +33,7 @@ open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; ent
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using ([]; _∷_; Run)
-open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
+open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after; ⊕-identityʳ)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
@@ -44,7 +45,7 @@ open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.RealView using (lane-at)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst)
-open import simultaneous.HeldTake using (module TakeIdle)
+open import simultaneous.HeldTake using (module TakeIdle; module TakeBack)
 open import simultaneous.HeldTo using (IdleTo; Unfailed)
 open import simultaneous.LaneLocal using (inv-ev; EndsEarly; held-fit; module FlatFit; module LaneReal; undone-done; done; of-outer)
 open import simultaneous.LaneOnce using (module LaneOnce)
@@ -468,10 +469,33 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     -- share, so the share's run, which meets its end next; thinned again,
     -- the program's run, which meets the program's end next.
 
+    module TB = TakeBack true undone (ev m (merged a) env₂) s (inv-ev m (merged a) env₂ g₂ s ok)
+
+    snoc-cut : ∀ r₁ {rs₀ y f e a′} → r₁ ++ [ (y , e) ] ≡ rs₀ ++ [ (f ⊕ [ ix 0 ] , out a′) ] → Met Mg (rs₀ ++ [ (f , out a′) ])
+             → Met Mg (r₁ ++ [ (f , e) ]) × y ≡ f ⊕ [ ix 0 ]
+    snoc-cut r₁ {rs₀} eq r with ∷ʳ-injective r₁ rs₀ eq
+    ... | refl , refl = r , refl
+
+    snoc-end : ∀ (r₁ rs : List (Pos × Ev (IE B))) {y q : Pos} {v : IE B} → r₁ ++ [ (y , out v) ] ≡ rs ++ [ (q , end) ] → ⊥
+    snoc-end r₁ rs eq with ∷ʳ-injective r₁ rs eq
+    ... | _ , ()
+
+    -- The take's `laneDone` is its source's failing row, or under it.
+    take-ld : ∀ r₁ {y kd n} → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ])
+            → Σ Pos λ v₂ → Met Mg (r₁ ++ [ (v₂ , out (instEmit (mark (laneDone kd)) n)) ]) × Σ (List Label) λ zs → y ≡ v₂ ⊕ zs
+    take-ld r₁ {y} {kd} {n} mt = go (TB.back TB.c-none (subst (λ d → Met (enter d s) rows) (ev-take m undone (merged a) env₂) mt))
+      where
+        rows : List (Pos × Ev (IE B))
+        rows = r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]
+        go : TB.Back nothing rows → Σ Pos λ v₂ → Met Mg (r₁ ++ [ (v₂ , out (instEmit (mark (laneDone kd)) n)) ]) × Σ (List Label) λ zs → y ≡ v₂ ⊕ zs
+        go (inj₁ (rn , _)) = y , rn , [] , sym (⊕-identityʳ y)
+        go (inj₂ (TB.cut {rs₀} {f = f} sp r _ _ _ (TB.tl-v _) _)) =
+          f , proj₁ (snoc-cut r₁ sp r) , [ ix 0 ] , proj₂ (snoc-cut r₁ sp r)
+        go (inj₂ (TB.cut {rs₀} {f = f} {a′} sp _ _ _ _ (TB.tl-ve _) _)) =
+          ⊥-elim (snoc-end r₁ (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a′) ]) (trans sp (sym (++-assoc rs₀ [ (f ⊕ [ ix 0 ] , out a′) ] [ (f ⊕ [ Label.last ] , end) ]))))
+        go (inj₂ (TB.cut {rs₀} sp _ _ _ _ TB.tl-e _)) = ⊥-elim (snoc-end r₁ rs₀ sp)
+
     postulate
-      -- The take's `laneDone` is its source's failing row, or under it.
-      take-ld : ∀ r₁ {y kd n} → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ])
-              → Σ Pos λ v₂ → Met Mg (r₁ ++ [ (v₂ , out (instEmit (mark (laneDone kd)) n)) ]) × Σ (List Label) λ zs → y ≡ v₂ ⊕ zs
       -- The merge's `laneDone` lies under the frame's reading of the share's end.
       ld-past : ∀ {v₂ kd n} → Mg v₂ (out (instEmit (mark (laneDone kd)) n))
               → ¬ ¬ (Σ Pos λ E → Sh E end × Σ Label λ l → Σ (List Label) λ zs → v₂ ≡ HR.shift E ⊕ (l ∷ zs))
