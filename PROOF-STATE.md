@@ -250,13 +250,13 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### PLACEMENT
 
-Every row a lane hangs on lies outside every binder's last gap. Open: a
-hot row under an admissible subscription itself. `Disj` bars hot rows
-under the world only, and a cold's synchronous rows lie at `p ⊕ zs` with
-`zs` unconstrained, so a gap's lane past `p` may lead a joined hot row.
-Settled by `Ok` barring a hot row under `p`, or a hot row there.
+Every row a lane hangs on lies outside every binder's last gap. Open:
+the flatMap's scan emits below its source's branch rows, each a join in
+the world at `P` on a row of the trigger, the closer or the real
+flatMap; the real flatMap's rows need its lanes placed by the inner IH,
+and the scan's end needs locating. Settled by a body.
 
-Members: `placed-connected`, `placed-flatMap`.
+Members: `placed-flatMap`.
 
 #### THE FINITE REST
 

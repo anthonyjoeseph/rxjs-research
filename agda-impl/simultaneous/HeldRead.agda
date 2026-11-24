@@ -429,31 +429,46 @@ join-name b pre {e = e} run refl {x} ji with jl-in (cnt pre) e ji | run-tail pre
 ...   | inj₁ z  = ⊥-elim (zero-suc (trans (sym z) pk))
 ...   | inj₂ nw = xb , nw
 
--- A ROW THE READER SHOWS: a source row moved below, or a join.
-read-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} {x : IE X} → enter (RD d) p y (out x)
-         → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-           ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
-read-row {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) (Bound.is b) r)
+-- WHERE A READER ROW LIES: below its subscription's join on an annotated
+-- row past it, which carries the row's value, or a join's begin.
+read-at : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} {x : IE X} → enter (RD d) p y (out x)
+        → Σ Pos λ q₁ → Σ Routes λ r → Σ (Maybe (IE X)) λ me → Ann b q₁ (out (r , me)) × p ≺ q₁ × Rl y (q₁ ⊕ [ sub p ])
+          × (me ≡ just x ⊎ x ≡ instEmit (mark begin) (nameOf y))
+read-at {X} b p {y} {x} r = row-hot (subst (λ D → enter (RD D) p y (out x)) (Bound.is b) r)
   where
     row-hot : enter (RD (hot (Proper (Ann b)))) p y (out x)
-            → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
-              ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
+            → Σ Pos λ q₁ → Σ Routes λ r → Σ (Maybe (IE X)) λ me → Ann b q₁ (out (r , me)) × p ≺ q₁ × Rl y (q₁ ⊕ [ sub p ])
+              × (me ≡ just x ⊎ x ≡ instEmit (mark begin) (nameOf y))
     row-hot r′ with row-each (hot (Proper (Ann b))) p r′
     ... | q , st , sq , xi , yq with scan-out joinStep (true , ([] , [])) (hot (Proper (Ann b))) p sq
     ...   | st₀ , (rt , me) , hq , refl with hot-out hq
-    ...     | q₁ , (aq , _) , _ , refl with ann-row b aq
+    ...     | q₁ , (aq , _) , pq , refl with ann-row b aq
     ...       | pre , w , e , run , rc , qw , ann with js-mem st₀ rt me ann xi
-    ...         | inj₂ refl = inj₁ (w , x , yw , moved ann , same-refl x)
-      where
-        yw = Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)
-        moved : AnnEv (just x) e → Src b w (out x)
-        moved ann-just = proj₁ (run-row run (∈-++⁺ʳ pre (here refl)))
+    ...         | inj₂ refl = q₁ , rt , me , aq , pq , yq , inj₁ refl
     ...         | inj₁ ji with join-name b pre run rc ji
-    ...           | xb , nw =
-      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl yw)))) ,
-            w , e , yw , proj₁ (run-row run (∈-++⁺ʳ pre (here refl))))
-      where
-        yw = Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)
+    ...           | xb , nw = q₁ , rt , me , aq , pq , yq ,
+      inj₂ (trans xb (cong (λ n → instEmit (mark begin) n) (trans nw (sym (nameOf-rl (Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)))))))
+
+opaque
+  -- A ROW THE READER SHOWS: a source row moved below, or a join.
+  read-row : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} {x : IE X} → enter (RD d) p y (out x)
+           → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
+             ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
+  read-row {X} b p {y} {x} r with read-at b p r
+  ... | q₁ , rt , me , aq , _ , yq , how with ann-row b aq
+  ...   | pre , w , e , run , _ , qw , ann = go how ann
+    where
+      yw : Rl y w
+      yw = Rl-trans yq (Rl-trans ([ sub p ] , refl) qw)
+      src : Src b w e
+      src = proj₁ (run-row run (∈-++⁺ʳ pre (here refl)))
+      moved : ∀ {x′} → AnnEv (just x′) e → Src b w (out x′)
+      moved ann-just = src
+      go : (me ≡ just x ⊎ x ≡ instEmit (mark begin) (nameOf y)) → AnnEv me e
+         → (Σ Pos λ y₀ → Σ (IE X) λ x₀ → Rl y y₀ × Src b y₀ (out x₀) × Same x x₀)
+           ⊎ (x ≡ instEmit (mark begin) (nameOf y) × Σ Pos λ w → Σ (Ev (IE X)) λ e → Rl y w × Src b w e)
+      go (inj₁ refl) an = inj₁ (w , x , yw , moved an , same-refl x)
+      go (inj₂ xb)   _  = inj₂ (xb , w , e , yw , src)
 
 ------------------------------------------------------------------------
 -- A reader end
@@ -489,10 +504,11 @@ val-end-under IA {q} {a} {c} aq ce qc ys cy with ≼-split {q} {c} qc
 ...   | [] , eq      = ≺-irrefl {q} (subst (q ≺_) (trans eq (⊕-identityʳ q)) lt)
 ...   | (_ ∷ _) , refl = InvAt.flat IA aq ce
 
--- THE READER ENDS below the source's end, or in its own subscribe.
-read-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} → enter (RD d) p y end
-         → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
-read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.is b) r)
+-- THE READER ENDS at its subscription's join on the annotated end past
+-- it, or in its own subscribe.
+read-end-at : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} → enter (RD d) p y end
+            → (Σ Pos λ c → Ann b c end × p ≺ c × y ≡ c ⊕ [ sub p ]) ⊎ y ≡ p ⊕ [ last ]
+read-end-at {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.is b) r)
   where
     IA : InvAt (Hots (Bound.env b)) (Bound.at b ⊕ [ ix 1 ]) (Ann b)
     IA = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
@@ -503,12 +519,11 @@ read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.i
     Sc : Den (JS X)
     Sc = Op.scan joinStep (true , ([] , [])) D
 
-    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
+    end-hot : ∀ {y} → enter (RD D) p y end → (Σ Pos λ c → Ann b c end × p ≺ c × y ≡ c ⊕ [ sub p ]) ⊎ y ≡ p ⊕ [ last ]
     end-hot r′ with merge-end (λ (st : JS X) → Op.flatMap (mergeᶠ nothing) (λ c → Op.of (if c then proj₁ (proj₂ st) else proj₂ (proj₂ st)))
                                                 (Op.of (true ∷ false ∷ []))) Sc p r′
     ... | inj₁ (Scan.send h , _) with h
-    ...   | (r-ended (ce , _) _ , _) with ann-end b ce
-    ...     | w , cw , sw = inj₁ (w , Rl-trans ([ sub p ] , refl) cw , sw)
+    ...   | (r-ended (ce , _) pc , _) = inj₁ (_ , ce , pc , refl)
     end-hot r′ | inj₁ (Scan.send h , _) | (r-late _ _ , _) = inj₂ refl
     end-hot r′ | inj₁ (Scan.send h , _) | (r-shown _ () _ , _)
     end-hot r′ | inj₂ (q , st , sq , l , c₀ , (Scan.send h₀ , _) , c₀y) with scan-out joinStep (true , ([] , [])) D p sq | lane-end st q l
@@ -518,6 +533,15 @@ read-end {X} b p {y} r = end-hot (subst (λ D → enter (RD D) p y end) (Bound.i
       ⊥-elim (val-end-under IA aq ce (prop ce) ([ sub p ] ++ zs)
         (subst (c ≺_) (⊕-assoc q₁ [ sub p ] zs) (≺-≼-≺ {c} {c ⊕ [ sub p ]} (≺-ext c []) c₀y)))
     ...   | _ | (r-shown _ () _ , _)
+
+opaque
+  -- THE READER ENDS below the source's end, or in its own subscribe.
+  read-end : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) p {y} → enter (RD d) p y end
+           → (Σ Pos λ y₀ → Rl y y₀ × Src b y₀ end) ⊎ y ≡ p ⊕ [ last ]
+  read-end b p r with read-end-at b p r
+  ... | inj₂ eq                = inj₂ eq
+  ... | inj₁ (c , ce , _ , refl) with ann-end b ce
+  ...   | w , cw , sw = inj₁ (w , Rl-trans ([ sub p ] , refl) cw , sw)
 
 under-ext : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) {y′ y} → Rl y′ y → Under b y → Under b y′
 under-ext b r (inj₁ (y₀ , e₀ , r₀ , s)) = inj₁ (y₀ , e₀ , Rl-trans r r₀ , s)
