@@ -278,7 +278,7 @@ the merge's `laneDone` lies past the share's end, under the frame's third
 lane. Settled by the frame's anatomy and the share's end found in its
 program's.
 
-Members: `ld-past`, `sh-prog-end`.
+Members: `ld-past`.
 
 #### THE HELD STREAMS
 

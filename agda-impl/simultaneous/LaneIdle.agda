@@ -28,8 +28,8 @@ open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; of; flatMap; takeWhile)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instant; _⊕_)
-open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
+open import denotation.Events using (Timeline; fresh; inside-self)
+open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge; Ended)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using ([]; _∷_; Run)
@@ -51,7 +51,7 @@ open import simultaneous.LaneLocal using (inv-ev; EndsEarly; held-fit; module Fl
 open import simultaneous.LaneOnce using (module LaneOnce)
 open import simultaneous.RealView using (module View)
 open import simultaneous.IdleThin using (module Thin)
-open import simultaneous.ConcatTwo using (module Two)
+open import simultaneous.ConcatTwo using (module Two; starts₀)
 open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.ColdIdle using (mid)
 open import simultaneous.LaneDoneRow using (done-row)
@@ -76,7 +76,7 @@ open import simultaneous.Relabel using (RowsAt; cntAt)
 open import simultaneous.Shut using (r₀)
 open import denotation.Position using (Label)
 open import denotation.Laws.Worlds using (full; notT)
-open import denotation.Laws.Truth using (instant-⊕)
+open import denotation.Laws.Truth using (instant-⊕; past)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-≼-≺; ≺-trans; entered-few; ≺-ext)
 open import denotation.Position using (sub; last)
 open import denotation.EmissionSet using (shown; ended; late; _≼_; skip; Dep)
@@ -102,6 +102,11 @@ flat-from : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (o : Obs Timeline Γ
           → enter (Op.flatMap op (λ c → ev m (g c) ρ) (ev m o ρ)) p y e → enter (ev m (flatMap op g o) ρ) p y e
 flat-from nothing  op g o ρ p r = r
 flat-from (just _) op g o ρ p r = r
+
+flat-to : ∀ m {Γ X Y} op (g : X → Obs Timeline Γ Y) (o : Obs Timeline Γ X) (ρ : DenEnv Γ) p {y e}
+        → enter (ev m (flatMap op g o) ρ) p y e → enter (Op.flatMap op (λ c → ev m (g c) ρ) (ev m o ρ)) p y e
+flat-to nothing  op g o ρ p r = r
+flat-to (just _) op g o ρ p r = r
 
 -- A flatMap over an `of`, read as the meaning's or an approximant's, is
 -- the operator's over the `of`.
@@ -492,23 +497,86 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
         go (inj₂ (TB.cut {rs₀} {f = f} sp r _ _ _ (TB.tl-v _) _)) =
           f , proj₁ (snoc-cut r₁ sp r) , [ ix 0 ] , proj₂ (snoc-cut r₁ sp r)
         go (inj₂ (TB.cut {rs₀} {f = f} {a′} sp _ _ _ _ (TB.tl-ve _) _)) =
-          ⊥-elim (snoc-end r₁ (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a′) ]) (trans sp (sym (++-assoc rs₀ [ (f ⊕ [ ix 0 ] , out a′) ] [ (f ⊕ [ Label.last ] , end) ]))))
+          ⊥-elim (snoc-end r₁ (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a′) ]) (trans sp (sym (++-assoc rs₀ [ (f ⊕ [ ix 0 ] , out a′) ] [ (f ⊕ [ last ] , end) ]))))
         go (inj₂ (TB.cut {rs₀} sp _ _ _ _ TB.tl-e _)) = ⊥-elim (snoc-end r₁ rs₀ sp)
 
     postulate
       -- The merge's `laneDone` lies under the frame's reading of the share's end.
       ld-past : ∀ {v₂ kd n} → Mg v₂ (out (instEmit (mark (laneDone kd)) n))
               → ¬ ¬ (Σ Pos λ E → Sh E end × Σ Label λ l → Σ (List Label) λ zs → v₂ ≡ HR.shift E ⊕ (l ∷ zs))
-      -- The share ends at its program's end, or in its subscribing burst.
-      sh-prog-end : ∀ {E} → Sh E end → Σ Pos λ c → Prog C0.s₁ c end × c ≼ E × (E ≡ c ⊎ Sync s E)
+
+    pv : ∀ {c y e} → Prog C0.s₁ c end → Prog C0.s₁ y e → Visible e → y ≼ c
+    pv uc uy v cy = pinby-vis v (InvAt.quiet I₁ uc uy cy)
+
+    -- The share subscribes in the lane's burst.
+    sQ : Sync s Q
+    sQ = sync-up {s} {Q} [ ix 0 ] (sync-up {s ⊕ [ ix 0 ]} {Q} [ ix 1 ] (sync-up {P} {Q} [ ix 0 ]
+           (sync-up {P ⊕ [ ix 0 ]} {Q} [ ix 1 ] (subst T (sym (inside-self Q)) tt , refl))))
+
+    module BQ = Bounded 1 fc (enter dQ Q)
+
+    end-done : ∀ {E} → BQ.JoinT E end → BQ.Done E
+    end-done (BQ.oend _ d)         = d
+    end-done (BQ.lend _ _ _ _ _ d) = d
+    end-done (BQ.rend () _ _)
+
+    -- THE SHARE ENDS AT ITS PROGRAM'S END, OR AT ITS OUTER'S, in the
+    -- subscribing burst: never at its blocker's, which the program starts
+    -- past.
+    sh-prog-end : ∀ {E} → Sh E end → Σ Pos λ c → Prog C0.s₁ c end × c ≼ E × (E ≡ c ⊎ Sync s E)
+    sh-prog-end {E} se = c , pc , cE , at jt cE
+      where
+        jt : BQ.JoinT E end
+        jt = proj₁ (flat-to m (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ [])) env′ Q se)
+
+        over : ∀ {c′} → enter dQ Q c′ end → c′ ≼ E → T2.qL ≼ E
+        over x′ le with T2.o-row x′
+        ... | T2.rL = le
+
+        Lp : Ended (BQ.Lane T2.q₁ false) E
+        Lp = proj₂ (end-done jt) T2.ob₁ (1 , false , T2.nth₁)
+               (≺-≼-≺ {T2.q₁} {T2.qL} {E} (past Q 1) (over (proj₁ (proj₂ (proj₁ (end-done jt)))) (proj₂ (proj₂ (proj₁ (end-done jt)))))) (λ ())
+
+        c : Pos
+        c = proj₁ Lp
+
+        ln : BQ.Lane T2.q₁ false c end
+        ln = proj₁ (proj₂ Lp)
+
+        cE : c ≼ E
+        cE = proj₂ (proj₂ Lp)
+
+        s′ : Pos
+        s′ = proj₁ (proj₂ ln)
+
+        sb : BQ.Sub (proj₁ ln) T2.q₁ s′ false
+        sb = proj₁ (proj₂ (proj₂ ln))
+
+        pc : Prog C0.s₁ c end
+        pc = to-s₁ (proj₁ ln , T2.q₁ , sb) (proj₁ (proj₂ (proj₂ (proj₂ ln))))
+
+        St : BQ.Starts 1 T2.q₁ (BQ.Sched 1) s′
+        St = T2.second (λ ()) refl sb
+
+        blk-past : ∀ {i q s″ E′} → BQ.Sub i q s″ true → After (fc true) s″ E′ end → c ≼ E′ → ⊥
+        blk-past {E′ = E′} (n , st) aft cE′ with T2.nth-c n
+        ... | T2.n₀ with starts₀ st
+        ...   | refl = ≺-irrefl {E′} (≺-≼-≺ {E′} {c} {E′}
+                  (T2.End.c₀c₁ {E′} {c} {s′} aft (λ e′ → BoundedI.lane-end okQ 1 fc fi Io T2.sub₀ e′ aft) St (proj₂ (proj₂ (proj₂ ln)))) cE′)
+
+        at : ∀ {E′} → BQ.JoinT E′ end → c ≼ E′ → E′ ≡ c ⊎ Sync s E′
+        at (BQ.oend x′ _) _ with T2.o-row x′
+        ... | T2.rL = inj₂ (sync-ext {s} {Q} [ last ] sQ)
+        at {E′} (BQ.lend {a = false} _ _ (i , _ , sb′ , aft) _ _ _) cE′ =
+          inj₁ (≼-antisym {E′} {c} (pv pc (to-s₁ (i , _ , sb′) (proj₁ aft)) tt) cE′)
+        at (BQ.lend {a = true} _ _ (_ , _ , sb′ , aft) _ _ _) cE′ = ⊥-elim (blk-past sb′ aft cE′)
+        at (BQ.rend () _ _)
 
     module MT = Thin undone Mg HR.Rd (inv-ev m (merged a) env₂ g₂ s ok) (λ rc ry _ → HR.rd-proper ry rc)
                   (HR.idle-hot sh-idle) rows-vis rows-few (λ x _ → HR.rd-few x) rows-shown rows-late
     module PT = ST C0.s₁ (proj₂ prog-runs)
 
     -- The program's rows lie at or before its end.
-    pv : ∀ {c y e} → Prog C0.s₁ c end → Prog C0.s₁ y e → Visible e → y ≼ c
-    pv uc uy v cy = pinby-vis v (InvAt.quiet I₁ uc uy cy)
 
     -- A RUN OF THE MERGE MET UP TO A ROW PAST THE READING OF THE SHARE'S
     -- END COUNTS WHAT THE PROGRAM'S RUN UP TO ITS END DOES.
