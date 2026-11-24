@@ -33,7 +33,7 @@ open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; ent
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
 open import denotation.Read using ([]; _∷_; Run)
-open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after; ⊕-identityʳ)
+open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after; ⊕-identityʳ; ⊕-assoc)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
@@ -55,7 +55,7 @@ open import simultaneous.ConcatTwo using (module Two; starts₀)
 open import simultaneous.EnterFew using (enter-few)
 open import simultaneous.ColdIdle using (mid)
 open import simultaneous.LaneDoneRow using (done-row)
-open import simultaneous.LaneVis using (lane-vis; hot-lab; sh-u)
+open import simultaneous.LaneVis using (lane-vis; lane-ld; hot-lab; sh-u)
 open import simultaneous.LaneUp using (module Lift)
 open import simultaneous.LaneSite using (between-under)
 open import simultaneous.LaneLayers using (under-⊕; under-refl)
@@ -500,10 +500,11 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
           ⊥-elim (snoc-end r₁ (rs₀ ++ [ (f ⊕ [ ix 0 ] , out a′) ]) (trans sp (sym (++-assoc rs₀ [ (f ⊕ [ ix 0 ] , out a′) ] [ (f ⊕ [ last ] , end) ]))))
         go (inj₂ (TB.cut {rs₀} sp _ _ _ _ TB.tl-e _)) = ⊥-elim (snoc-end r₁ rs₀ sp)
 
-    postulate
-      -- The merge's `laneDone` lies under the frame's reading of the share's end.
-      ld-past : ∀ {v₂ kd n} → Mg v₂ (out (instEmit (mark (laneDone kd)) n))
-              → ¬ ¬ (Σ Pos λ E → Sh E end × Σ Label λ l → Σ (List Label) λ zs → v₂ ≡ HR.shift E ⊕ (l ∷ zs))
+    -- The merge's `laneDone` lies under the frame's reading of the share's end.
+    ld-past : ∀ {v₂ kd n} → Mg v₂ (out (instEmit (mark (laneDone kd)) n))
+            → ¬ ¬ (Σ Pos λ E → Sh E end × Σ Label λ l → Σ (List Label) λ zs → v₂ ≡ HR.shift E ⊕ (l ∷ zs))
+    ld-past r κ with lane-ld ρ₄ (f a) env₂ m (λ {t} → pu a {t}) s r tt
+    ... | E , se , eq = κ (E , se , ix 1 , [ ix 0 ] , trans eq (⊕-assoc (HR.shift E) [ ix 1 ] [ ix 0 ]))
 
     pv : ∀ {c y e} → Prog C0.s₁ c end → Prog C0.s₁ y e → Visible e → y ≼ c
     pv uc uy v cy = pinby-vis v (InvAt.quiet I₁ uc uy cy)

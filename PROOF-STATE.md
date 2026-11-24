@@ -270,16 +270,6 @@ holds a route. Settled by bodies, or a body emptied under a looping source.
 Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 `tracks-real`.
 
-#### THE LANE'S LAST COUNT
-
-The run up to a `laneDone` is the merge's, read back through the share to
-its program, whose end is covered; open is where the pieces sit. Riskiest:
-the merge's `laneDone` lies past the share's end, under the frame's third
-lane. Settled by the frame's anatomy and the share's end found in its
-program's.
-
-Members: `ld-past`.
-
 #### THE HELD STREAMS
 
 Probed, unproven: every elaborated stream names its begins for their
