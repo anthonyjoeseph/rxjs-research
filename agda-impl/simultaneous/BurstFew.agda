@@ -373,10 +373,6 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
       mm-row = Joining.lane (on-out at-out , of-reach s 0 (lanePart ∷ burstPart ∷ []) {s ⊕ [ ix 1 ]} {out burstPart}) tt
                  (sv-row , under-ext R u-R′) (λ ()) tt
 
-    -- Where the burst part's lane shows its `burstEnd`.
-    burstAt : Pos → Pos
-    burstAt s = BurstAt.Eb s
-
     -- THE BURST PART'S LANE HAS FEW ROWS BEFORE ANYWHERE.
     burst-few : ∀ s v → Few (enter (Sv burstPart) ((s ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) v
     burst-few s v = few-tr (BurstAt.svf s v)
