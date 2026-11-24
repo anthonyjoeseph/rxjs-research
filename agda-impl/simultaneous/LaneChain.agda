@@ -15,7 +15,7 @@ open import Data.Nat.Induction using (<-wellFounded)
 open import Induction.WellFounded using (Acc; acc)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Maybe using (nothing; just)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans; cong)
 open import Relation.Nullary using (¬_; yes; no)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
@@ -24,10 +24,11 @@ open import denotation.EmissionSet using (EmissionSet; Den; enter; out; end; _�
 open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊑-refl; ⊑-trans; ⊑-snoc⁺)
 open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl)
 open import denotation.Laws.Nth using (module Nths)
-open import denotation.Laws.BoundedInv using (module BoundedI)
-open import simultaneous.Readings using (rootOf)
+open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
+open import simultaneous.Readings using (rootOf; instantOf)
+open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Routed using (Sync)
-open import simultaneous.RealView using (module View; lane-at)
+open import simultaneous.RealView using (module View; lane-at; lane-at₂)
 
 module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) (p : Pos) (ok : Ok H p) where
   O : EmissionSet A
@@ -45,6 +46,15 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
     from : Chain op c (c ⊕ [ ix 1 ])
     link : ∀ {q a y e c′} (x : O q (out a)) (l : Lane op q a y e) → Lane op q a c′ end
          → Sync (subOf op x l) c′ → Chain op c (subOf op x l) → Chain op c (c′ ⊕ [ ix 1 ])
+
+  -- A chain stays in its start's instant.
+  chain-inst : ∀ {op c s} → Chain op c s → instantOf s ≡ instantOf c
+  chain-inst {c = c} from = inst-⊕ c [ ix 1 ]
+  chain-inst (link {c′ = c′} _ _ _ (_ , rt) ch) = trans (inst-⊕ c′ [ ix 1 ]) (trans (cong instantOf rt) (chain-inst ch))
+
+  -- A lane ends once.
+  end-one : ∀ op {q a c c′} → O q (out a) → Lane op q a c end → Lane op q a c′ end → c ≡ c′
+  end-one op x l l′ = let (s , oks , r , r′) = lane-at₂ op d f Id If p ok x l l′ in end-uniq (If _ s oks) r r′
 
   -- The chain to `s` starts at the end of a lane ending outside its
   -- subscription.

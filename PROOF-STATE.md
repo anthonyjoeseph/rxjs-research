@@ -279,8 +279,8 @@ flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
-Members: `live-current`, `base-read`, `hand-held`, `hand-inst`,
-`hand-dones`, `hand-bursts`, `end-tot`, `comb-shut`, `scan-idle`.
+Members: `live-current`, `base-read`, `base-queue`, `base-kd`, `base-lanes`,
+`base-at`, `hand-dones`, `hand-bursts`, `end-tot`, `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK
 

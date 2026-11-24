@@ -17,8 +17,8 @@ open import Data.Nat using (ℕ; zero; suc)
 import Data.Nat as ℕ
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Bool using (true)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Bool using (true; false)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (Obs; FlatOp)
@@ -26,7 +26,10 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≺_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
-open import simultaneous.SObs using (lone; module Elaborate; Flat)
+open import simultaneous.SObs using (lone; module Elaborate; Flat; isZero)
+open import Data.Nat.Properties using (m+n≡0⇒n≡0)
+open import Data.Empty using (⊥-elim)
+open import Data.Bool using (_∧_)
 open import simultaneous.InstEmit using (instEmit; mark; laneDone; burstEnd)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Readings using (instantOf)
@@ -45,8 +48,15 @@ open import simultaneous.InstEmit using (valuesOf)
 open import denotation.Laws.Worlds using (ok-step)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-++⁺ʳ)
+open import Data.List.Properties using (++-assoc)
+open import denotation.Read using (Run)
+open import denotation.EmissionSet using (EmissionSet)
+open import simultaneous.Layers using (run-after)
+open import simultaneous.Instants using (btw)
+open import simultaneous.TakeCut using (inst-⊕)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; Input; react; each; connected; laneˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; Input; react; each; connected; laneˢ; cut; ended; anyHolds)
 
 module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
               (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -64,7 +74,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
               (ep₃ : Early (FlatHots.P m ρ op f s env p)) where
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (cs′; module LS; g₂)
-  open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (Row; RO; module RV; sub-at; fL)
+  open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (Row; RO; module RV; sub-at; fL; done-ends)
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (lane-end-done)
 
   -- ROUTES HANDED AT A LANE'S END, held to a row `z` past it: the
@@ -124,6 +134,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       at₀   : d ≡ y₀ ⊕ [ sub LS.J ]
       xd₀   : xd ≡ Ln (instEmit (mark (laneDone kd)) n₀)
       done₀ : y₀ ≺ CH.Base.c₀ base
+      inst₀ : instantOf y₀ ≡ instantOf (CH.Base.c₀ base)
 
   -- The scan past the base's `laneDone`.
   After : List Row → Maybe (Input B) → List Row → Flat Pos
@@ -137,17 +148,26 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
               → RV.Lane op (CH.Base.q₀ B₀) (CH.Base.a₀ B₀) y₀ (out (instEmit (mark (laneDone kd)) n₀)) → y₀ ≺ CH.Base.c₀ B₀
               → (y₀ ⊕ [ sub LS.J ] , out (Ln (instEmit (mark (laneDone kd)) n₀))) ∈ rx₁
 
-    -- THE BASE'S `laneDone` LEAVES ROUTES HELD OF THE ROW'S INSTANT.
-    -- Route: its lane's count there is its end's, covered outside its
-    -- burst; the lanes counter holds it (`floor`); the queued lane is
-    -- opened and unstarted, so the queue is up.
-    hand-held : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
-              → ¬ Flat.held (proj₁ (react op (past op init r₁) xd)) ≡ 0 × Flat.at (proj₁ (react op (past op init r₁) xd)) ≡ nameOf (Target.z T)
+    -- AT THE BASE'S `laneDone` THE QUEUED LANE IS STILL WAITING: the
+    -- chain's first lane is opened before it and started past its end.
+    base-queue : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → (B₀ : Base (Target.sb T) d xd)
+               → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
 
-    -- EVERY ROW READ PAST THE BASE LIES IN THE ROW'S INSTANT: the base's
-    -- end is in it, and the chain stays there.
-    hand-inst : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
-              → ∀ {k e} → (k , e) ∈ r₂ → instantOf k ≡ instantOf (Target.z T)
+    -- THE BASE LANE ENDS HOLDING A ROUTE: its end lies outside its
+    -- subscription's burst, so its count there is covered, and its
+    -- `laneDone` carries that count.
+    base-kd : ∀ rx₁ (T : Target rx₁) {d xd} (B₀ : Base (Target.sb T) d xd) → 1 ℕ.≤ Base.kd B₀
+
+    -- THE SCAN HOLDS THE BASE LANE'S ROUTES: the lanes counter counts
+    -- every lane route of the instant met (`floor`).
+    base-lanes : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → (B₀ : Base (Target.sb T) d xd)
+               → 1 ℕ.≤ Flat.lanes (proj₁ (past op init r₁))
+
+    -- THE SCAN IS AT THE ROW'S INSTANT BY THE BASE'S `laneDone`: the base
+    -- lane's route of that instant was begun before it, and every row
+    -- since lies in it.
+    base-at : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → (B₀ : Base (Target.sb T) d xd)
+            → Flat.at (proj₁ (past op init r₁)) ≡ nameOf (Target.z T)
 
     -- A LANE END READ PAST THE BASE FINDS A LANE QUEUED: the lanes of
     -- the chain end one by one, each with the next opened and unstarted,
@@ -170,7 +190,77 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
     let B₀ = CH.base op (Target.xo T) (Target.l T) (Target.nq T)
         (y₀ , kd , n₀ , ld₀ , yc) = lane-end-done (CH.Base.x₀ B₀) (CH.Base.l₀ B₀)
         (r₁ , r₂ , sp) = ∈-∃++ (base-read rx₁ T B₀ ld₀ yc)
-    in r₁ , _ , _ , r₂ , sp , record { base = B₀ ; ld₀ = ld₀ ; at₀ = refl ; xd₀ = refl ; done₀ = yc }
+        (c′ , l′ , ic , _) = done-ends (CH.Base.x₀ B₀) ld₀
+    in r₁ , _ , _ , r₂ , sp
+     , record { base = B₀ ; ld₀ = ld₀ ; at₀ = refl ; xd₀ = refl ; done₀ = yc
+              ; inst₀ = trans (sym ic) (cong instantOf (CH.end-one op (CH.Base.x₀ B₀) l′ (CH.Base.l₀ B₀))) }
+
+  -- Rows of a run between two of its rows lie between them.
+  run-btw : ∀ {X} {t : EmissionSet X} {c} r₁ {d e₁} r₂ {z e₂ r₃ k e} → Run t c (r₁ ++ (d , e₁) ∷ (r₂ ++ (z , e₂) ∷ r₃)) → (k , e) ∈ r₂ → d ≺ k × k ≺ z
+  run-btw (_ ∷ r₁) r₂ (_ ∷ run) i = run-btw r₁ r₂ run i
+  run-btw []       r₂ (_ ∷ run) i = run-after run (∈-++⁺ˡ i) , below r₂ run i
+    where
+      below : ∀ {c′} r {z e₂ r₃ k e} → Run _ c′ (r ++ (z , e₂) ∷ r₃) → (k , e) ∈ r → k ≺ z
+      below (_ ∷ r) (_ ∷ run′) (here refl) = run-after run′ (∈-++⁺ʳ r (here refl))
+      below (_ ∷ r) (_ ∷ run′) (there j)   = below r run′ j
+
+  -- EVERY ROW READ PAST THE BASE LIES IN THE ROW'S INSTANT: the base's
+  -- end is in it, and the chain stays there.
+  hand-inst : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
+            → ∀ {k e} → (k , e) ∈ r₂ → instantOf k ≡ instantOf (Target.z T)
+  hand-inst rx₁ T r₁ {d} {xd} r₂ refl B₀ {k} i =
+    let open Target T
+        (dk , kz) = run-btw r₁ r₂ (subst (Met M) (++-assoc r₁ ((d , out xd) ∷ r₂) ((z , out (Ln v)) ∷ rx₂)) mt) i
+        dz : instantOf d ≡ instantOf z
+        dz = trans (cong instantOf (Base.at₀ B₀)) (trans (inst-⊕ (Base.y₀ B₀) [ sub LS.J ]) (trans (Base.inst₀ B₀)
+               (trans (sym (CH.chain-inst (CH.Base.chain (Base.base B₀)))) (trans (sym (cong instantOf (proj₂ sy))) (sym (inst-⊕ y [ sub LS.J ]))))))
+    in trans (btw d k z dk kz dz) dz
+
+  -- A cut leaves the instant where it was.
+  cut-at : ∀ k n (s : Flat Pos) → Flat.at (proj₁ (cut {B} k n s)) ≡ Flat.at s
+  cut-at k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = refl
+  ... | false | true  = refl
+  ... | false | false = refl
+
+  -- So does a lane's end.
+  ended-at : ∀ k n (s : Flat Pos) → Flat.at (proj₁ (ended {B} k n s)) ≡ Flat.at s
+  ended-at k n s with isZero (Flat.queue s)
+  ... | false = refl
+  ... | true with Flat.finished s ∧ isZero (Flat.active s)
+  ...   | true  = refl
+  ...   | false = cut-at (k + Flat.held s) n (record s { held = 0 })
+
+  -- A lane's end with a lane queued holds its routes.
+  ended-held : ∀ k n (s : Flat Pos) → ¬ Flat.queue s ≡ 0 → Flat.held (proj₁ (ended {B} k n s)) ≡ Flat.held s + k
+  ended-held k n s nq with isZero (Flat.queue s) in e
+  ... | false = refl
+  ... | true  = ⊥-elim (nq (zero-of (Flat.queue s) e))
+    where
+      zero-of : ∀ k → isZero k ≡ true → k ≡ 0
+      zero-of zero _ = refl
+
+  -- THE BASE'S `laneDone` LEAVES ROUTES HELD OF THE ROW'S INSTANT: with
+  -- the queued lane waiting, it holds the routes its lane ends with.
+  hand-held : ∀ rx₁ (T : Target rx₁) r₁ {d xd} r₂ → rx₁ ≡ r₁ ++ (d , out xd) ∷ r₂ → Base (Target.sb T) d xd
+            → ¬ Flat.held (proj₁ (react op (past op init r₁) xd)) ≡ 0 × Flat.at (proj₁ (react op (past op init r₁) xd)) ≡ nameOf (Target.z T)
+  hand-held rx₁ T r₁ {d} {xd} r₂ sp B₀ = go xd (Base.xd₀ B₀)
+    where
+      S = proj₁ (past op init r₁)
+
+      pos : ∀ {a b} → 1 ℕ.≤ a → 1 ℕ.≤ b → ¬ a ℕ.⊓ b ≡ 0
+      pos {zero}          ()  _
+      pos {suc _} {zero}  _   ()
+      pos {suc _} {suc _} _   _  ()
+
+      go : ∀ x → x ≡ Ln (instEmit (mark (laneDone (Base.kd B₀))) (Base.n₀ B₀))
+         → ¬ Flat.held (proj₁ (react op (past op init r₁) x)) ≡ 0 × Flat.at (proj₁ (react op (past op init r₁) x)) ≡ nameOf (Target.z T)
+      go _ refl =
+        let S′ = record S { active = Flat.active S ℕ.∸ 1 ; lanes = Flat.lanes S ℕ.∸ Base.kd B₀ ; dead = true }
+            k = Base.kd B₀ ℕ.⊓ Flat.lanes S
+        in (λ h → pos (base-kd rx₁ T B₀) (base-lanes rx₁ T r₁ r₂ sp B₀)
+                    (m+n≡0⇒n≡0 (Flat.held S) (trans (sym (ended-held k (Base.n₀ B₀) S′ (base-queue rx₁ T r₁ r₂ sp B₀))) h)))
+         , trans (ended-at k (Base.n₀ B₀) S′) (base-at rx₁ T r₁ r₂ sp B₀)
 
   -- IN A QUEUED LANE'S SUBSCRIBE BURST, an ended lane's routes are held
   -- to it, from the chain's base.
