@@ -19,8 +19,8 @@ open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt; Carried; c-done; c-over; nm-inst)
-open import simultaneous.HeldIn using (IdleIn; Upto)
+open import simultaneous.Routed using (Held; Early; Idle; Ex; nameOf; nm; Valued; opos; cnt; Carried; c-done; c-over; nm-inst)
+open import simultaneous.HeldIn using (IdleIn; Upto; RestIn)
 open import simultaneous.CombRun using (comb-run)
 open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
@@ -327,10 +327,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                   → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
     -- PAST A ZERO COUNT THE SCAN FINISHES THE INSTANT: once its count holds
     -- no route of the instant last begun, finitely many rows of it follow,
-    -- outer, branches and trackers together.
-    --
-    -- DEAD ROUTE: through `comb-run`, as `scan-idle` goes. The scan's run is laid out by a source run had only under ¬¬, and the list of rows left is a Σ, which no ¬¬ yields; nor does a premise of the scan's run bound the rows past its cursor
-    scan-rest     : Rest scanned
+    -- outer, branches and trackers together, wherever the real flatMap
+    -- has few rows before.
+    laid-rest     : Laid (Few R) scanned
+
+  scan-rest : RestIn (Few R) scanned
+  scan-rest = laid-tracks g₃ ok₃ laid-rest
 
   -- IDLE BETWEEN ROWS: the counts are decidable, so the run of the source
   -- the scan's run lays out from is had classically.

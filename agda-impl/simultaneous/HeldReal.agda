@@ -38,7 +38,7 @@ open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
 open import simultaneous.ScanLive using (live-last; holds-at)
-open import simultaneous.HeldRead using (pre-noend)
+open import simultaneous.LiveRuns using (pre-noend)
 open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?; finished-from; thru-split; past-dead; start-dead;
   burst-clears; find-ld; past-app)
 open import simultaneous.TakeCut using (inst-⊕)

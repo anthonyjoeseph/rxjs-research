@@ -411,15 +411,6 @@ js-mem (false , _) r (just _) ann-just (inj₂ (there ()))
 js-mem (false , _) r nothing  ann-none (inj₁ ())
 js-mem (false , _) r nothing  ann-none (inj₂ ())
 
--- No end is met before a run's last row.
-pre-noend : ∀ {A} {t : EmissionSet A} pre {w e c} → Run t nothing (pre ++ [ (w , e) ]) → (c , end) ∈ pre → ⊥
-pre-noend {t = t} pre {w} {e} {c} run i with ∈-∃++ i
-... | as , bs , refl with run-tail as (subst (Run t nothing) (++-assoc as ((c , end) ∷ bs) [ (w , e) ]) run)
-...   | (((ce , _) , _) , _) ∷ rest = nonempty bs (run-past-end ce rest)
-  where nonempty : ∀ (zs : List (Pos × Ev _)) → zs ++ [ (w , e) ] ≡ [] → ⊥
-        nonempty []      ()
-        nonempty (_ ∷ _) ()
-
 -- A join names the instant of the row it is sent before: the source
 -- idles there.
 join-name : ∀ {X} {d : Den (AIE X)} {cs} (b : Bound d cs) pre {w e r} → Met (Src b) (pre ++ [ (w , e) ]) → r ≡ cnt pre

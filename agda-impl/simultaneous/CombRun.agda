@@ -7,6 +7,12 @@
 module simultaneous.CombRun where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
+import Data.List as L
+open import Data.List.Properties using (++-conicalʳ)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Empty using (⊥; ⊥-elim)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (subst)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -19,16 +25,18 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 open import Tree using (Obs; mergeᶠ; scan)
 open import denotation.Position using (Pos; root; _≟ᵖ_; ix)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (out; end; skip; pin; enter; ⟦_⟧; Den; module Op; DenEnv)
-open import denotation.Read using ([]; _∷_)
+open import denotation.EmissionSet using (EmissionSet; out; end; skip; pin; enter; ⟦_⟧; Den; module Op; DenEnv; Few; module Scan)
+open import denotation.Laws.Modulus using (entered-few)
+open import denotation.Read using (Run; []; _∷_; Visible)
 open import denotation.Laws.Worlds using (InvAt; GoodEnv; Ok; Hots; ⊕-assoc)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import simultaneous.Relations using (Met)
-open import simultaneous.Layers using (run-row; snoc-view; scanRows; laneRows; eachRows; module ScanLayer; module EachLayer)
+open import simultaneous.Relations using (Met; values)
+open import simultaneous.Layers using (run-row; snoc-view; scanRows; laneRows; eachRows; module ScanLayer; module EachLayer; run-past-end)
 open import simultaneous.Prefixes using (prefix-ext)
 open import simultaneous.Reach using (module Reached)
 open import simultaneous.HeldComb using (ev; init; outRows; lay)
 open import simultaneous.LaneLocal using (inv-ev)
+open import simultaneous.ScanAcc using (module AccRun)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Out; Input; react; each)
 
@@ -66,6 +74,52 @@ each-scan op o ((q , end) ∷ rx)    = refl
 each-scan op o ((q , skip) ∷ rx)   = each-scan op o rx
 each-scan op o ((q , pin _) ∷ rx)  = each-scan op o rx
 
+-- A SCAN'S ROWS UP TO A VALUE are those before it and the value's fold.
+scan-snoc : ∀ {A B} (f : B → A → B) b {t : EmissionSet A} {c} rx {q a} → Run t c (rx ++ [ (q , out a) ])
+          → scanRows f b (rx ++ [ (q , out a) ]) ≡ scanRows f b rx ++ [ (q , out (f (L.foldl f b (values rx)) a)) ]
+scan-snoc f b []                  _         = refl
+scan-snoc f b ((y , out a′) ∷ rx) (_ ∷ run) = cong ((y , out (f b a′)) ∷_) (scan-snoc f (f b a′) rx run)
+scan-snoc f b ((y , end) ∷ rx) ((((x , _) , _) , _) ∷ run) with ++-conicalʳ rx _ (run-past-end x run)
+... | ()
+scan-snoc f b ((y , skip) ∷ rx)   ((_ , () , _) ∷ _)
+scan-snoc f b ((y , pin _) ∷ rx)  ((_ , () , _) ∷ _)
+
+-- THE SCANNED STREAM, NOT ENDED, READ BACK CONSTRUCTIVELY: its last row
+-- hangs under a value of the scan, whose fold is a chain of the source's
+-- values back to its first, and that chain is the run.
+module CombLive {B} op (d : Den (Maybe (Input B))) P {H H′ : Pos → Set}
+                (IS : InvAt H P (enter d P)) (ISc : InvAt H′ P (enter (Op.scan (react op) init d) P))
+                (fuE : ∀ {y e e′} → enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (proj₂ x)) (Op.scan (react op) init d)) P y e
+                                  → enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (proj₂ x)) (Op.scan (react op) init d)) P y e′ → e ≡ e′) where
+  open EachLayer proj₂ (Op.scan (react op) init d) P ISc using (E; vis; found; vlane; vend)
+
+  few : ∀ {q e} → enter d P q e → Visible e → Few (enter d P) q
+  few {e = out _} x _ = entered-few d P tt x
+  few {e = end}   x _ = entered-few d P tt x
+
+  open AccRun (react op) init IS few using (acc-run)
+
+  open Scan (react op) init (enter d P) using (Acc; sval)
+
+  acc-of : ∀ {q b} → enter (Op.scan (react op) init d) P q (out b) → Acc q b
+  acc-of (sval ac , _) = ac
+
+  comb-live : ∀ {rs} → Met E rs → (∀ {c} → (c , end) ∈ rs → ⊥)
+            → Σ _ λ rx → Met (enter d P) rx × Σ _ λ ext → rs ++ ext ≡ outRows op init rx
+  comb-live {rs} m ne with snoc-view rs
+  ... | inj₁ refl = [] , [] , [] , refl
+  ... | inj₂ (ys , (k , e) , refl) with run-row m (∈-++⁺ʳ ys (here refl))
+  ...   | kE , vi with vis kE vi
+  ...     | _ , vend _ = ⊥-elim (ne (∈-++⁺ʳ ys (here refl)))
+  ...     | q , v@(vlane x _) with acc-run (acc-of x)
+  ...       | rx , a , _ , run , _ =
+    let sc-eq = scan-snoc (react op) init rx run
+        (_ , msc , _ , _ , eqsc) = ScanLayer.in-go (react op) init d P (InvAt.func IS) ScanLayer.none run
+        (_ , _ , longer , _ , eqr) = found fuE m v (scanRows (react op) init rx) (subst (Met (enter (Op.scan (react op) init d) P)) (trans eqsc sc-eq) msc)
+    in rx ++ [ (q , out a) ] , run , proj₁ (prefix-ext longer) ,
+       trans (sym (proj₂ (prefix-ext longer)))
+         (trans eqr (trans (cong (eachRows proj₂) (sym sc-eq)) (each-scan op init (rx ++ [ (q , out a) ]))))
+
 comb-gen : ∀ {B} op (d : Den (Maybe (Input B))) P {H H′ : Pos → Set}
          → InvAt H P (enter d P) → InvAt H′ P (enter (Op.scan (react op) init d) P)
          → (∀ {y e e′} → enter (Op.flatMap (mergeᶠ nothing) (λ x → Op.of (proj₂ x)) (Op.scan (react op) init d)) P y e
@@ -78,9 +132,10 @@ comb-gen op d P IS ISc fuE mt no = EachOpen.each-out proj₂ (Op.scan (react op)
 
 -- WHAT THE SCANNED STREAM MEETS IS LAID OUT FROM WHAT ITS SOURCE MEETS: a
 -- run met of it is a prefix of what a run met of the source lays out.
--- DEAD ROUTE: the run constructed outright.  A source row whose step
---   outputs nothing shows no row in the scanned stream, yet the source run
---   must meet it; finding it decides a hot's rows, so the run is found only
+-- DEAD ROUTE: the run constructed outright, for a run met to its end.  A
+--   value's fold chains back through the source's values, but nothing
+--   chains the source's values past the last the scan lays a row under to
+--   its end; finding them decides a hot's rows, so the run is found only
 --   classically, through `simultaneous.Reach`.
 comb-run : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P → GoodEnv ρ → Ok (Hots ρ) P
          → ∀ {rs} → Met (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) rs
@@ -90,4 +145,16 @@ comb-run nothing op s ρ P g ok =
     (InvAt.func (inv-ev nothing (each proj₂ (scan (react op) init s)) ρ g P ok))
 comb-run (just n) op s ρ P g ok =
   comb-gen op (ev (just n) s ρ) P (inv-ev (just n) s ρ g P ok) (inv-ev (just n) (scan (react op) init s) ρ g P ok)
+    (InvAt.func (inv-ev (just n) (each proj₂ (scan (react op) init s)) ρ g P ok))
+
+-- WHAT THE SCANNED STREAM MEETS BEFORE ITS END is laid out, constructively,
+-- from what its source meets.
+comb-now : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P → GoodEnv ρ → Ok (Hots ρ) P
+         → ∀ {rs} → Met (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) rs → (∀ {c} → (c , end) ∈ rs → ⊥)
+         → Σ _ λ rx → Met (enter (ev m s ρ) P) rx × Σ _ λ ext → rs ++ ext ≡ outRows op init rx
+comb-now nothing op s ρ P g ok =
+  CombLive.comb-live op (⟦ s ⟧ ρ) P (inv-ev nothing s ρ g P ok) (inv-ev nothing (scan (react op) init s) ρ g P ok)
+    (InvAt.func (inv-ev nothing (each proj₂ (scan (react op) init s)) ρ g P ok))
+comb-now (just n) op s ρ P g ok =
+  CombLive.comb-live op (ev (just n) s ρ) P (inv-ev (just n) s ρ g P ok) (inv-ev (just n) (scan (react op) init s) ρ g P ok)
     (InvAt.func (inv-ev (just n) (each proj₂ (scan (react op) init s)) ρ g P ok))

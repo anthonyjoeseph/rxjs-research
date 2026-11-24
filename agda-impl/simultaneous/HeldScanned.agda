@@ -18,7 +18,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (enter; DenEnv; Ev; out; end)
 open import simultaneous.SObs using (ext; lone; module Elaborate)
 open import simultaneous.Relations using (Met)
-open import simultaneous.Routed using (Early; valued; Rest; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed; nameOf; nm;
+open import simultaneous.Routed using (Early; valued; Routing; r-begin; r-stop; r-over; r-subscribed; r-completed; nameOf; nm;
   Valued; opos; cnt)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; inside-⊑; ⊑-inside; _⊑_)
 open import simultaneous.LaneLocal using (inv-ev; late-ext)
@@ -41,7 +41,7 @@ open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; �
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped)
 open import simultaneous.HeldComb using (ev; CombIn; RunHeld; init; past; run-row; Laid; laid; ended; laid-in; runs-prefix; trim)
-open import simultaneous.HeldIn using (HeldIn; IdleIn; Upto)
+open import simultaneous.HeldIn using (HeldIn; IdleIn; Upto; RestIn)
 open import simultaneous.FlatSim using (react-sent; passed; routed; minted)
 open import simultaneous.Reach using (module Reached)
 open import Relation.Nullary.Decidable using (decidable-stable)
@@ -191,7 +191,7 @@ module Scanned (m : Maybe ℕ) {Γ B} op (s : Obs Timeline Γ (Maybe (Input B)))
 comb-held : ∀ m {Γ B} op (s : Obs Timeline Γ (Maybe (Input B))) (ρ : DenEnv Γ) P cs → GoodEnv ρ → Ok (Hots ρ) P
           → {D : Pos → Set} → (∀ {k y} → k ≼ y → D y → D k)
           → CombIn D op (enter (ev m s ρ) P) cs → IdleIn D (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
-          → Rest (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
+          → RestIn D (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P)
           → HeldIn D (enter (ev m (each proj₂ (scan (react op) init s)) ρ) P) cs
 comb-held m op s ρ P cs g ok dn ci id re = record
   { named   = named
@@ -204,5 +204,5 @@ comb-held m op s ρ P cs g ok dn ci id re = record
   ; done    = done
   ; late    = late
   ; idle    = id
-  ; rest    = λ mt _ → re mt }
+  ; rest    = re }
   where open Scanned m op s ρ P cs g ok dn ci

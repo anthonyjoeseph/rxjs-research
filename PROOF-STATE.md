@@ -250,14 +250,15 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 
 #### THE FINITE REST
 
-Blocked: past a zero count only finitely many rows of the instant last
-begun remain, a Σ of a list — but the scan's run is laid out by a source
-run had only under ¬¬ (`comb-run`). A connect's echoes are its source's
-rows: its body empties only once its source is done with the instant
-(`Tracks`). Settled by a constructive source run, or `Rest`/`Tracks`
-made ¬¬-stable through `Closing`'s exits.
+Unproven: past a zero count only finitely many rows of the instant last
+begun remain, read off the source run that lays the scan's run out
+(`Laid`). Open: why the source has finitely many rows of that instant
+past the run — the zero count must say each branch let go of it. A
+connect's echoes are its source's rows: its body empties only once its
+source is done with the instant (`Tracks`). Settled by a body for one
+`Laid` leaf, or a source looping in the instant past a zero count.
 
-Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-real`.
+Members: `laid-rest`, `connect-tracks`, `laid-trig`, `laid-real`.
 
 #### THE HELD STREAMS
 

@@ -41,7 +41,7 @@ open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Idle; cnt; nameOf; nm; Carried; c-stop)
 open import simultaneous.InstEmit using (instEmit; mark; stop)
 open import simultaneous.Counts using (Counts)
-open import simultaneous.HeldRead using (pre-noend)
+open import simultaneous.LiveRuns using (pre-noend)
 open import simultaneous.HeldTo using (Unfailed; IdleTo)
 open import simultaneous.Layers using (after-≺; Last; last-met; run-row)
 

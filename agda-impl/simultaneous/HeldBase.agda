@@ -69,6 +69,12 @@ open import simultaneous.Layers using (run-tail) renaming (run-row to run-row∈
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.ColdFew using (cold-step-few; of-below)
 open import simultaneous.Relations using (Met)
+open import simultaneous.CombRun using (comb-now)
+open import simultaneous.LiveRuns using (tracks-live)
+open import simultaneous.HeldComb using (outRows; init)
+open import simultaneous.Routed using (cnt)
+open import simultaneous.HeldIn using (Upto)
+open import denotation.EmissionSet using (out; end)
 open import simultaneous.HeldConnect using (rootOf-ext)
 open import denotation.Read using (Visible)
 open import denotation.EmissionSet using (out; end)
@@ -669,14 +675,26 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   M : EmissionSet (Maybe (Input B))
   M = enter (ev m src env′) P
 
+  -- WHAT A RUN OF THE SCAN LEAVES OF `σ` IN ITS INSTANT, read off a run of
+  -- the source that lays the scan's run out: past a zero count, finitely
+  -- many rows of `σ` in the instant the run last began.
+  Laid : ∀ {X} → (Pos → Set) → EmissionSet X → Set
+  Laid D σ = ∀ {rx rs ext} → Met M rx → rs ++ ext ≡ outRows op init rx → Met scanned rs → (∀ {k} → (k , end) ∈ rs → ⊥) → Upto D rs
+           → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+           → Σ (List Pos) λ ks → ∀ {k e} → σ k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
+
+  -- The scan tracks what its laid-out runs leave finitely many rows of: a
+  -- run not ended is laid out by a run of the source, constructively.
+  laid-tracks : ∀ {X} {D} {σ : EmissionSet X} → GoodEnv env′ → Ok (Hots env′) P → Laid D σ → Tracks D σ scanned
+  laid-tracks g₃ ok₃ ld = tracks-live λ mt ne up z bq →
+    let (rx , mx , ext , eq) = comb-now m op src env′ P g₃ ok₃ mt ne in ld mx eq mt ne up z bq
+
   -- THE SCAN EMPTIES ONLY ONCE THE OUTER AND THE CLOSER ARE DONE WITH THE
   -- INSTANT: the connects between them run the scan as their body, and
   -- the scan reads the outer itself, parking what it cuts while a connect
   -- in scope holds a route.
-  --
-  -- DEAD ROUTE: through `comb-run`, as `scan-idle` goes. A run of the scan is laid out by a run of its source had only under ¬¬, and the rows left are a Σ of a list, which no ¬¬ yields
   postulate
-    tracks-trig   : ∀ {D} → Tracks D (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) scanned
+    laid-trig     : ∀ {D} → Laid D (enter (ev m trig env₀) (c ⊕ [ ix 1 ]))
 
     -- THE CLOSER READS THE OUTER: each of its rows lies under an outer row,
     -- at one of finitely many offsets (the reading's and the `each`'s),
@@ -685,12 +703,18 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     closer-under : Σ (List Pos) λ fs → Σ (List Path) λ Z → ∀ {k e} → enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]) k e
                  → k ∈ fs ⊎ Σ Pos λ y → Σ (Ev (IE A)) λ e′ → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) y e′ × Σ Path λ zs → zs ∈ Z × k ≡ y ⊕ zs
 
+  tracks-trig : ∀ {D} → GoodEnv env′ → Ok (Hots env′) P → Tracks D (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) scanned
+  tracks-trig {D} g₃ ok₃ = laid-tracks g₃ ok₃ (laid-trig {D})
+
   -- The closer empties with the outer.
-  tracks-closer : ∀ {D} → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])) scanned
-  tracks-closer {D} = tracks-under (proj₁ closer-under) (proj₁ (proj₂ closer-under)) (proj₂ (proj₂ closer-under)) (tracks-trig {D})
+  tracks-closer : ∀ {D} → GoodEnv env′ → Ok (Hots env′) P → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])) scanned
+  tracks-closer {D} g₃ ok₃ = tracks-under (proj₁ closer-under) (proj₁ (proj₂ closer-under)) (proj₂ (proj₂ closer-under)) (tracks-trig {D} g₃ ok₃)
 
   -- The scan, read only where the real flatMap has few rows before.
   --
   -- REFUTED: 9e244736 `tracks-real` unrestricted, by a switch whose cut lane loops: the real flatMap never gets past the loop, while the scan reads on in the clairvoyant hot outer, meets an `outerDone` with the completion's route kept, and empties in an instant the real flatMap's rows still fill
   postulate
-    tracks-real   : Tracks (Few R) R scanned
+    laid-real     : Laid (Few R) R
+
+  tracks-real : GoodEnv env′ → Ok (Hots env′) P → Tracks (Few R) R scanned
+  tracks-real g₃ ok₃ = laid-tracks g₃ ok₃ laid-real
