@@ -221,7 +221,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     join-shows op ROd fL Id If Q okQ
       (shows-ev m (each valuesOf (connected (there (here refl)))) E₄ g₂ Q okQ)
       (λ a s′ oks → shows-ev m (laneˢ (g a)) E₄ g₂ s′ oks)
-      (proj₁ Fv , λ x fx lt → proj₂ Fv (prop (R-from (x , few-reach fx)) (≺→≼ lt)) lt) λ fJ →
+      (proj₁ Fv , λ {k′} x fx lt → proj₂ Fv (prop (R-from (x , few-reach fx)) (≺→≼ {k′} {v} lt)) lt) λ fJ →
       κ (prop (R-from (join-in op fL RO xo rn l nc wk , proj₁ fJ , λ {k′} x lt _ → proj₂ fJ x (≺-≼-≺ {k′} {k} {v} lt kv))) kv)
     where
       prop : ∀ {k′ e′} → R k′ e′ → k′ ≼ v → σ₃ k′ e′
