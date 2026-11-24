@@ -749,18 +749,18 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       before : ∀ {k e} → (k , e) ∈ rx₁ → k ≺ z
       before = met-before rx₁ mt
 
-      good : ∀ {k e} → (k , e) ∈ rx₁ → Good N In Ov k e
-      good {k} i = record
-        { beg = λ { refl → (λ e → name-in (trans (sym (named (row∈ i))) e)) , begin-name i }
-        ; ov  = λ { ik refl → ovf i ik }
-        ; nod = λ { ik refl → nod′ (row∈ i) (before i) ik } }
-
       -- Only the closer sends an `outerDone`.
       nod′ : ∀ {k b n} → M k (out (just (inj₁ (b , instEmit (mark outerDone) n)))) → k ≺ z → instantOf k ≡ instantOf z → ⊥
       nod′ r kz ik with m-rows r tt
       ... | outer y′ eq with () ← Held.routing H₁ (subst (λ w → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) _ (out w)) (open-mark eq (λ ())) (proj₁ y′))
       ... | lane y′ = Fit.fine lane-fit y′
       ... | close _ = nod r kz ik
+
+      good : ∀ {k e} → (k , e) ∈ rx₁ → Good N In Ov k e
+      good {k} i = record
+        { beg = λ { refl → (λ e → name-in (trans (sym (named (row∈ i))) e)) , begin-name i }
+        ; ov  = λ { ik refl → ovf i ik }
+        ; nod = λ { ik refl → nod′ (row∈ i) (before i) ik } }
 
       conv : Conv In rx₁
       conv r₁ {k} {e} r₂ refl ik {k′} {e′} i′ =

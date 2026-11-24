@@ -132,7 +132,12 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   postulate
     -- IN A QUEUED LANE'S SUBSCRIBE BURST, a route an ended lane handed on
-    -- (`held`) holds it.
+    -- (`held`) holds it.  Route: a queued lane subscribes at an earlier
+    -- lane's end; follow the chain of such ends down to one outside its
+    -- own lane's burst (a lane subscribed at its value never ends in its
+    -- burst while a later value is queued), whose count is positive and
+    -- whose `laneDone` hands it to `held`; every row between lies under
+    -- that end, a row of a lane of the chain, none of which cuts `held`.
     lane-queued : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
                 → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ sub-at xo l ≡ Q ⊕ [ ix 1 ] → Sync (sub-at xo l) y
                 → Carried (out v) → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
