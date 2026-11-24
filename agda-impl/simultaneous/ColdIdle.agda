@@ -92,8 +92,8 @@ module Idles {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t
   -- The row where a fresh value step closes is its over.
   at-over : ∀ {k e T e₀ i} → ColdRow {A} p k e → k ≡ (cascade T e₀ (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []))
           → Fresh p (cascade T e₀ (ix i)) → e ≡ out (instEmit (mark over) (nm (cascade T e₀ (ix i) ∙ [])))
-  at-over (now-value zs) eq f = ⊥-elim (not-now eq f)
-  at-over (now-end zs)   eq f = ⊥-elim (not-now eq f)
+  at-over (now-value _ zs) eq f = ⊥-elim (not-now eq f)
+  at-over (now-end _ zs)   eq f = ⊥-elim (not-now eq f)
   at-over (step-begin _) ()
   at-over (step-value _) ()
   at-over (step-over _)  refl f = refl
@@ -101,8 +101,8 @@ module Idles {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t
 
   -- The row where a fresh completion closes is the end.
   at-end : ∀ {k e T e₀} → ColdRow {A} p k e → k ≡ (cascade T e₀ last ∙ (ix 1 ∷ last ∷ [])) → Fresh p (cascade T e₀ last) → e ≡ end
-  at-end (now-value zs) eq f = ⊥-elim (not-now eq f)
-  at-end (now-end zs)   eq f = ⊥-elim (not-now eq f)
+  at-end (now-value _ zs) eq f = ⊥-elim (not-now eq f)
+  at-end (now-end _ zs)   eq f = ⊥-elim (not-now eq f)
   at-end (step-begin _) ()
   at-end (step-value _) ()
   at-end (step-over _)  ()

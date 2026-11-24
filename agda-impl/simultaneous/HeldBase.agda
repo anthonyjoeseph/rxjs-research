@@ -24,9 +24,13 @@ open import simultaneous.LaneLocal using (inv-ev; emptyE; of-outer; shown-vis; F
 open import simultaneous.CombSent using (hots-at)
 open import simultaneous.Layers using (pinby-vis)
 open import denotation.Laws.Worlds using (InvAt; W; step; here; inW; plain-ix; plain-last; Plain; ⊑-snoc; ⊑-snoc⁺; ⊑-trans; ⊕-injˡ;
-  ⊕-injʳ; ⊕-identityʳ)
+  ⊕-injʳ; ⊕-identityʳ; W⁼; w-up; ⊕-assoc; ∙-inj; ⊑-refl; ⊑-cmp)
+open import Data.List.Relation.Unary.All using (All)
+import Data.List.Relation.Unary.All.Properties as AllP
+open import denotation.Position using (_∙_)
+open import simultaneous.ColdFew using (fresh-past)
 open import denotation.EmissionSet using (Ev; module Op; module Connecting)
-open import Data.Sum using (inj₂)
+open import Data.Sum using (_⊎_; inj₂)
 open import simultaneous.HeldIn using (HeldIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
 open import simultaneous.HeldMap using (held-map-den)
@@ -308,12 +312,12 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
 
   early : Early p → ∀ {y a n} → t y (out (instEmit (value a) n)) → Early y
   early ep x with row x tt
-  ... | now-value zs = early-inst zs ep
+  ... | now-value {l} _ zs = early-inst (l ∷ zs) ep
   ... | step-value {t} {e} {i} _ = λ _ → same-≺ (cascade t e (ix i)) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []) (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 2 ∷ []) tt , λ { (_ , ()) }
 
   ends : Early p → ∀ {y} → t y end → Early y
   ends ep x with row x tt
-  ... | now-end zs = early-inst zs ep
+  ... | now-end {l} _ zs = early-inst (l ∷ zs) ep
   ... | step-end _   = λ ()
 
   late : ∀ {y n} → t y (out (instEmit (mark over) n)) → Valued (rootOf y) × opos (rootOf y) ⊑ y
@@ -328,13 +332,70 @@ module ColdHeld {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} �
   done x with row x tt
   ... | ()
 
+-- Down plain steps from a position, the world holds every position or
+-- the subscription lies on the way.
+w-pre : ∀ {H a} x zs → All Plain zs → W⁼ H a (x ⊕ zs) → W⁼ H a x ⊎ (x ⊑ a × a ⊑ (x ⊕ zs))
+w-pre x []       _          w = inj₁ (subst (W⁼ _ _) (⊕-identityʳ x) w)
+w-pre x (l ∷ zs) (pl ∷ ps) w with w-pre (x ⊕ [ l ]) zs ps (subst (W⁼ _ _) (sym (⊕-assoc x [ l ] zs)) w)
+... | inj₂ (xa , ay) = inj₂ (⊑-trans (⊑-snoc⁺ x) xa , subst (_ ⊑_) (⊕-assoc x [ l ] zs) ay)
+... | inj₁ w′ with w-up pl w′
+...   | inj₁ eq = inj₂ (subst (x ⊑_) (sym eq) (⊑-snoc⁺ x) , subst (_⊑ (x ⊕ (l ∷ zs))) (sym eq) (zs , sym (⊕-assoc x [ l ] zs)))
+...   | inj₂ w″ = inj₁ w″
+
+-- What follows a position on an all-plain path is all plain.
+plain-tail : ∀ {i ws} q zs → All Plain ws → (i ∙ ws) ≡ q ⊕ zs → All Plain zs
+plain-tail (k ∙ b) zs ps eq = AllP.++⁻ʳ b (subst (All Plain) (proj₂ (∙-inj eq)) ps)
+
 -- WHAT A LANE CAN HANG ON, as each one-input former and a cold show it:
 -- a cold's rows and its steps' lie below its subscription or in a timer
 -- it creates, in its world; a map, a scan and a takeWhile keep their
 -- source's positions, a takeWhile's own end one step below a value.
-postulate
-  placed-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) (env : DenEnv Δ) cs → GoodEnv env
-              → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (cold c)) env)
+--
+-- A cold's synchronous row lies one plain step into the world, and a
+-- step's row plain steps below a timer the world holds, so a gap there
+-- would hang its `nothing`, a hot row, in the world.
+module ColdPlaced {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs)
+                  {p} (ok : Ok (Hots env) p) (fr : Fresh eh p) where
+
+  gap-off : ∀ {X} (j : X ∈ Γ) {c r} → Ann (EnvHeld.bound eh j) ((c ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) (out (r , nothing))
+          → W⁼ (Hots env) p (c ⊕ [ ix 1 ]) → ⊥
+  gap-off j {c} a w = proj₂ ok (gap-hot eh j a) (step w (plain-ix {0})) (⊑-inside {(c ⊕ [ ix 1 ]) ⊕ [ ix 0 ]} (⊑-refl _))
+
+  now-apart : ∀ {l} → Plain l → ∀ zs {X} (j : X ∈ Γ) → Nl.¬ Gap (EnvHeld.bound eh j) (p ⊕ (l ∷ zs))
+  now-apart {l} pl zs j (c , r , a , h , nl) with ⊑-cmp (c ⊕ [ ix 1 ]) (p ⊕ [ l ]) h (zs , sym (⊕-assoc p [ l ] zs))
+  ... | inj₂ pc = proj₂ ok (gap-hot eh j a) (step here pl) (⊑-inside (⊑-trans pc (⊑-snoc⁺ _)))
+  ... | inj₁ cp with ⊑-snoc p cp
+  ...   | inj₁ cp′ = apart-at (proj₁ fr) j (c , r , a , cp′ , λ lp → nl (⊑-trans lp ((l ∷ zs) , refl)))
+  ...   | inj₂ eq  = gap-off j a (subst (W⁼ _ _) (sym eq) (inW (step here pl)))
+
+  step-apart : ∀ {i ws} → All Plain ws → W⁼ (Hots env) p (i ∙ ws) → ∀ {X} (j : X ∈ Γ) → Nl.¬ Gap (EnvHeld.bound eh j) (i ∙ ws)
+  step-apart ps w j (c , r , a , (zs , eq) , nl) with w-pre (c ⊕ [ ix 1 ]) zs (plain-tail (c ⊕ [ ix 1 ]) zs ps eq) (subst (W⁼ _ _) eq w)
+  ... | inj₁ wc        = gap-off j a wc
+  ... | inj₂ (cp , py) = apart-at (proj₁ fr) j (c , r , a , cp , λ lp → nl (⊑-trans lp (subst (p ⊑_) (sym eq) py)))
+
+  now-fresh : ∀ {l} → Plain l → ∀ zs → Fresh eh (p ⊕ (l ∷ zs))
+  now-fresh pl zs = apart-all (λ j → now-apart pl zs j) , λ {c} ci → ≺-trans {c} {p} {p ⊕ (_ ∷ zs)} (proj₂ fr ci) (≺-ext p zs)
+
+  step-fresh : ∀ {i ws} → All Plain ws → W⁼ (Hots env) p (i ∙ ws) → p ≺ (i ∙ ws) → Fresh eh (i ∙ ws)
+  step-fresh {i} {ws} ps w lt = apart-all (λ j → step-apart ps w j) , λ {c} ci → ≺-trans {c} {p} {i ∙ ws} (proj₂ fr ci) lt
+
+no-begin : ∀ {A n} → Shown {A} (out (instEmit (mark begin) n)) → ⊥
+no-begin ()
+
+no-over : ∀ {A n} → Shown {A} (out (instEmit (mark over) n)) → ⊥
+no-over ()
+
+placed-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) (env : DenEnv Δ) cs → GoodEnv env
+            → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (cold c)) env)
+placed-cold m ρ c env cs g eh p ok fr ep x sh with cold-rows m c env p x (shown-vis sh)
+... | now-value pl zs = ColdPlaced.now-fresh eh ok fr pl zs
+... | now-end pl zs   = ColdPlaced.now-fresh eh ok fr pl zs
+... | step-begin _    = ⊥-elim (no-begin sh)
+... | step-over _     = ⊥-elim (no-over sh)
+... | step-value f    = ColdPlaced.step-fresh eh ok fr (plain-ix ∷ plain-ix ∷ plain-ix ∷ plain-ix ∷ []ᵉ)
+                          (inW (InvAt.world (inv-ev m (elab ρ (cold c)) env g p ok) x)) (fresh-past (⊑-refl p) f)
+... | step-end f      = ColdPlaced.step-fresh eh ok fr (plain-ix ∷ plain-last ∷ []ᵉ)
+                          (inW (InvAt.world (inv-ev m (elab ρ (cold c)) env g p ok) x)) (fresh-past (⊑-refl p) f)
 
 shown-map : ∀ {A B} (f : A → B) (x : IE A) → Shown (out (mapIE f x)) → Shown {A} (out x)
 shown-map f (instEmit (value _) _) _      = s-value

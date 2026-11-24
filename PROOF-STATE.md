@@ -256,7 +256,7 @@ under the world only, and a cold's synchronous rows lie at `p ⊕ zs` with
 `zs` unconstrained, so a gap's lane past `p` may lead a joined hot row.
 Settled by `Ok` barring a hot row under `p`, or a hot row there.
 
-Members: `placed-cold`, `placed-connected`, `placed-flatMap`.
+Members: `placed-connected`, `placed-flatMap`.
 
 #### THE FINITE REST
 
