@@ -11,15 +11,17 @@
 module simultaneous.FlatHeld where
 
 open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_)
 import Data.Nat.Properties as ℕP
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong)
-open import Relation.Nullary using (¬_; does)
+open import Relation.Nullary using (¬_; does; Dec; yes; no)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
@@ -437,3 +439,156 @@ finished-from : ∀ {B} op rx → Flat.finished (proj₁ (past {B} op init rx)) 
 finished-from op rx f with fin-back op init rx f
 ... | inj₁ ()
 ... | inj₂ r = r
+
+-- WHERE A LANE'S BURST CAN END ITS HANDED ROUTES: `dead` is set by a
+-- `laneDone` alone and cleared by a `laneStart`; with none dead, a
+-- `burstEnd` stops whatever is held.
+private
+  cut-dead : ∀ {B} k n s → Flat.dead (proj₁ (cut {B} k n s)) ≡ Flat.dead s
+  cut-dead k n s with Flat.spent s | anyHolds (Flat.at s) (Flat.live s)
+  ... | true  | _     = refl
+  ... | false | true  = refl
+  ... | false | false = refl
+
+  bump-dead : ∀ b f s → Flat.dead (bump b f s) ≡ Flat.dead s
+  bump-dead outerB f s = refl
+  bump-dead laneB  f s = refl
+  bump-dead closeB f s = refl
+
+  unpark-dead : ∀ {B} n s → Flat.dead (proj₁ (unpark {B} n s)) ≡ Flat.dead s
+  unpark-dead n s with anyHolds (Flat.at s) (Flat.live s)
+  ... | true  = refl
+  ... | false = refl
+
+  begun-dead : ∀ {B} b n s → Flat.dead (proj₁ (begun {B} b n s)) ≡ Flat.dead s
+  begun-dead b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s
+  ... | true  = refl
+  ... | false with does (n ≟ᵖ Flat.at s)
+  ...   | true  = bump-dead b suc s
+  ...   | false = bump-dead b suc (anew n s)
+
+  stopped-dead : ∀ {B} b n s k → Flat.dead (proj₁ (stopped {B} b n s k)) ≡ Flat.dead s
+  stopped-dead b n s zero    = refl
+  stopped-dead b n s (suc _) = bump-dead b (_∸ 1) s
+
+  overed-dead : ∀ {B} n s → Flat.dead (proj₁ (overed {B} n s)) ≡ Flat.dead s
+  overed-dead n s with Flat.spent s
+  ... | true  = refl
+  ... | false = refl
+
+  arrive-dead : ∀ {B} op n s → Flat.dead (proj₁ (arrive {B} op n s)) ≡ Flat.dead s
+  arrive-dead (mergeᶠ (just _)) n s = refl
+  arrive-dead (mergeᶠ nothing)  n s = refl
+  arrive-dead switchᶠ           n s = cut-dead (Flat.lanes s) n (record s { active = 0 ; lanes = 0 })
+  arrive-dead exhaustᶠ          n s = refl
+
+  burst-dead : ∀ {B} h n s → Flat.dead (proj₁ (burstOver {B} h n s)) ≡ Flat.dead s
+  burst-dead true  n s = refl
+  burst-dead false n s = cut-dead (Flat.held s) n (record s { held = 0 })
+
+  left-dead : ∀ {B} n s → Flat.dead (proj₁ (left {B} n (record s { finished = true }))) ≡ Flat.dead s
+  left-dead n s with isZero (Flat.active s) ∧ isZero (Flat.queue s)
+  ... | true  = refl
+  ... | false = cut-dead (Flat.outer s) n (record s { finished = true ; outer = 0 })
+
+  onMark-dead : ∀ {B} op b m n s → ¬ IsDone m → Flat.dead s ≡ false → Flat.dead (proj₁ (onMark {B} op b s m n)) ≡ false
+  onMark-dead op b begin         n s _  h = trans (begun-dead b n s) h
+  onMark-dead op b stop          n s _  h = trans (stopped-dead b n s (if Flat.spent s then 0 else _)) h
+  onMark-dead op b over          n s _  h = trans (overed-dead n s) h
+  onMark-dead op b outerOpen     n s _  h = trans (arrive-dead op n s) h
+  onMark-dead op b outerClose    n s _  h = h
+  onMark-dead op b laneStart     n s _  h = refl
+  onMark-dead op b (laneDone kd) n s nd h = ⊥-elim (nd (kd , refl))
+  onMark-dead op b burstEnd      n s _  h = trans (burst-dead (isZero (Flat.held s) ∨ Flat.dead s) n s) h
+  onMark-dead op b outerDone     n s _  h = trans (left-dead n s) h
+  onMark-dead op b subscribed    n s _  h = h
+  onMark-dead op b completed     n s _  h = h
+
+-- ONE ROW READ, no `laneDone`: none dead stays none dead.
+react-dead : ∀ {B} op (o : Out B) x → ¬ LD x → Flat.dead (proj₁ o) ≡ false → Flat.dead (proj₁ (react op o x)) ≡ false
+react-dead op o (just (inj₁ (b , instEmit (value v) n))) nd h = h
+react-dead op o (just (inj₁ (b , instEmit (mark m) n)))  nd h = onMark-dead op b m n (proj₁ o) (λ { (kd , refl) → nd (b , kd , n , refl) }) h
+react-dead op o (just (inj₂ (j , r)))                    nd h = trans (unpark-dead root (record (proj₁ o) { live = setAt j r (Flat.live (proj₁ o)) })) h
+react-dead op o nothing                                  nd h = h
+
+-- A `laneStart` read: none dead.
+start-dead : ∀ {B} op (o : Out B) b n → Flat.dead (proj₁ (react op o (just (inj₁ (b , instEmit (mark laneStart) n))))) ≡ false
+start-dead op o b n = refl
+
+-- A run read with no `laneDone` and no end: none dead stays none dead.
+past-dead : ∀ {B} op (o : Out B) rx → (∀ {c} → (c , end) ∈ rx → ⊥) → (∀ {q x} → (q , out x) ∈ rx → ¬ LD x)
+          → Flat.dead (proj₁ o) ≡ false → Flat.dead (proj₁ (past op o rx)) ≡ false
+past-dead op o []                 ne nl h = h
+past-dead op o ((q , out x) ∷ rx) ne nl h = past-dead op (react op o x) rx (λ i → ne (there i)) (λ i → nl (there i)) (react-dead op o x (nl (here refl)) h)
+past-dead op o ((q , end) ∷ rx)   ne nl h = ⊥-elim (ne (here refl))
+past-dead op o ((q , skip) ∷ rx)  ne nl h = past-dead op o rx (λ i → ne (there i)) (λ i → nl (there i)) h
+past-dead op o ((q , pin _) ∷ rx) ne nl h = past-dead op o rx (λ i → ne (there i)) (λ i → nl (there i)) h
+
+-- A `burstEnd` read holding routes, none dead: it stops them all.
+burst-clears : ∀ {B} op (o : Out B) b n → ¬ Flat.held (proj₁ o) ≡ 0 → Flat.dead (proj₁ o) ≡ false
+             → Flat.held (proj₁ (react op o (just (inj₁ (b , instEmit (mark burstEnd) n))))) ≡ 0
+burst-clears op (s , _) b n nz df with Flat.held s | Flat.dead s
+... | zero  | _     = ⊥-elim (nz refl)
+burst-clears op (s , _) b n nz () | suc _ | true
+... | suc _ | false = cut-held (Flat.held s) n (record s { held = 0 })
+
+-- The scan holding routes throughout a run, at one of its rows.
+thru-split : ∀ {B} op (o : Out B) ra {b xb rb} → (∀ {c} → (c , end) ∈ ra → ⊥) → Thru op o (ra ++ (b , out xb) ∷ rb)
+           → ¬ Flat.held (proj₁ (past op o ra)) ≡ 0 × Thru op (react op (past op o ra) xb) rb
+thru-split op o []                 ne th       = th
+thru-split op o ((q , out x) ∷ ra) ne (_ , th) = thru-split op (react op o x) ra (λ i → ne (there i)) th
+thru-split op o ((q , end) ∷ ra)   ne th       = ⊥-elim (ne (here refl))
+thru-split op o ((q , skip) ∷ ra)  ne th       = thru-split op o ra (λ i → ne (there i)) th
+thru-split op o ((q , pin _) ∷ ra) ne th       = thru-split op o ra (λ i → ne (there i)) th
+
+-- Whether a row is a `laneDone`.
+ld? : ∀ {B} (x : Maybe (Input B)) → Dec (LD x)
+ld? (just (inj₁ (b , instEmit (value _) _)))           = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark begin) _)))        = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark over) _)))         = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark stop) _)))         = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark outerOpen) _)))    = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark outerClose) _)))   = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark laneStart) _)))    = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark burstEnd) _)))     = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark outerDone) _)))    = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark (laneDone kd)) n))) = yes (b , kd , n , refl)
+ld? (just (inj₁ (b , instEmit (mark subscribed) _)))   = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₁ (b , instEmit (mark completed) _)))    = no λ { (_ , _ , _ , ()) }
+ld? (just (inj₂ _))                                    = no λ { (_ , _ , _ , ()) }
+ld? nothing                                            = no λ { (_ , _ , _ , ()) }
+
+private
+  ld-skip : ∀ {B} q (e : Ev (Maybe (Input B))) → (∀ {x} → e ≡ out x → ⊥) → ∀ {rx}
+          → (Σ (List (Pos × Ev (Maybe (Input B)))) λ r₁ → Σ Pos λ k → Σ (Maybe (Input B)) λ x → Σ (List (Pos × Ev (Maybe (Input B)))) λ r₂ →
+               rx ≡ r₁ ++ (k , out x) ∷ r₂ × LD x)
+            ⊎ (∀ {k x} → (k , out x) ∈ rx → ¬ LD x)
+          → (Σ (List (Pos × Ev (Maybe (Input B)))) λ r₁ → Σ Pos λ k → Σ (Maybe (Input B)) λ x → Σ (List (Pos × Ev (Maybe (Input B)))) λ r₂ →
+               (q , e) ∷ rx ≡ r₁ ++ (k , out x) ∷ r₂ × LD x)
+            ⊎ (∀ {k x} → (k , out x) ∈ ((q , e) ∷ rx) → ¬ LD x)
+  ld-skip q e no-out (inj₁ (r₁ , k , y , r₂ , refl , l)) = inj₁ ((q , e) ∷ r₁ , k , y , r₂ , refl , l)
+  ld-skip q e no-out (inj₂ none) = inj₂ λ { (here eq) → ⊥-elim (no-out (sym (cong proj₂ eq))) ; (there i) → none i }
+
+-- A run's first `laneDone`, or none.
+find-ld : ∀ {B} (rx : List (Pos × Ev (Maybe (Input B))))
+        → (Σ (List (Pos × Ev (Maybe (Input B)))) λ r₁ → Σ Pos λ q → Σ (Maybe (Input B)) λ x → Σ (List (Pos × Ev (Maybe (Input B)))) λ r₂ →
+             rx ≡ r₁ ++ (q , out x) ∷ r₂ × LD x)
+        ⊎ (∀ {q x} → (q , out x) ∈ rx → ¬ LD x)
+find-ld [] = inj₂ λ ()
+find-ld ((q , out x) ∷ rx) with ld? x
+... | yes l = inj₁ ([] , q , x , rx , refl , l)
+... | no nl with find-ld rx
+...   | inj₁ (r₁ , k , y , r₂ , refl , l) = inj₁ ((q , out x) ∷ r₁ , k , y , r₂ , refl , l)
+...   | inj₂ none = inj₂ λ { (here refl) → nl ; (there i) → none i }
+find-ld ((q , end) ∷ rx)   = ld-skip q end (λ ()) (find-ld rx)
+find-ld ((q , skip) ∷ rx)  = ld-skip q skip (λ ()) (find-ld rx)
+find-ld ((q , pin w) ∷ rx) = ld-skip q (pin w) (λ ()) (find-ld rx)
+
+-- The scan past a row, past what it read before.
+past-app : ∀ {B} op (o : Out B) r₁ {q x r₂} → (∀ {c} → (c , end) ∈ r₁ → ⊥)
+         → past op o (r₁ ++ (q , out x) ∷ r₂) ≡ past op (react op (past op o r₁) x) r₂
+past-app op o []                 ne = refl
+past-app op o ((k , out y) ∷ r₁) ne = past-app op (react op o y) r₁ (λ i → ne (there i))
+past-app op o ((k , end) ∷ r₁)   ne = ⊥-elim (ne (here refl))
+past-app op o ((k , skip) ∷ r₁)  ne = past-app op o r₁ (λ i → ne (there i))
+past-app op o ((k , pin _) ∷ r₁) ne = past-app op o r₁ (λ i → ne (there i))

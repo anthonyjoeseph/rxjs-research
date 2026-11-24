@@ -7,7 +7,7 @@ module simultaneous.HeldReal where
 
 
 open import Data.List using (List; []; _∷_; _++_; [_])
-open import Data.List.Properties using (++-assoc)
+open import Data.List.Properties using (++-assoc; ∷-injectiveˡ; ∷-injectiveʳ; length-++)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
@@ -32,11 +32,12 @@ open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List.Relation.Unary.Any using (here; there) renaming (map to any-map)
-open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerDone; laneStart; laneDone)
+open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerDone; laneStart; laneDone; burstEnd; Mark)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (tt)
 open import simultaneous.FlatPark using (past-park)
-open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?; finished-from)
+open import simultaneous.FlatHeld using (LD; Thru; thru-head; held-onset; onset-why; queue-free; bounded?; finished-from; thru-split; past-dead; start-dead;
+  burst-clears; find-ld; past-app)
 open import simultaneous.TakeCut using (inst-⊕)
 import denotation.Laws.ShowsJoin as SJ
 open import denotation.Laws.ShowsOps using (module Take)
@@ -481,6 +482,10 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
           ly {e = skip}   _   () _
           ly {e = pin _}  _   () _
 
+  -- A lane's mark, as the scan's source shows it.
+  LnMk : Mark → Pos → Maybe (Input B)
+  LnMk mk n = just (inj₁ (laneB , instEmit (mark mk) n))
+
   postulate
     -- A CONNECT IN SCOPE KEEPS NO ROUTE PAST ITS INSTANT, read at the
     -- scan's rows.  Owed: the run split onto that connect's tracker, and
@@ -489,12 +494,19 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                  → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
 
-    -- A BOUNDED MERGE'S LANE END HANDING ITS ROUTES TO A QUEUED LANE KEEPS
-    -- THE SOURCE IN ITS INSTANT while the scan holds them: rxjs subscribes
-    -- the queued lane inside that lane's end, and its burst ends there.
-    held-queued : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {d xd} r₂ {q e rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , e) ∷ rx₂) → Visible e → LD xd
-                → Flat.held (proj₁ (past op init r₁)) ≡ 0 → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
-                → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
+    -- A BOUNDED MERGE'S LANE END WITH A LANE QUEUED STARTS ONE IN ITS
+    -- INSTANT: rxjs subscribes the queued lane inside the end, where the
+    -- schedule starts it (`Bounded.queued`, at the end's `ix 1`).
+    queued-next : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
+                → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
+                → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
+
+    -- A LANE'S START IS FOLLOWED IN ITS INSTANT BY A BURST'S END OR A LANE'S
+    -- END: the lane's flatMap subscribes its burst part inside the lane's
+    -- subscribe, and cuts it only at the lane's own `laneDone`.
+    burst-next : ∀ {y n q a} → M y (out (LnMk laneStart n)) → M q (out a) → instantOf y ≺ⁱ instantOf q
+               → ¬ ¬ Σ Pos λ b → Σ Pos λ n′ → (M b (out (LnMk burstEnd n′)) ⊎ Σ ℕ λ kd → M b (out (LnMk (laneDone kd) n′)))
+                 × y ≺ b × instantOf b ≡ instantOf y
 
   -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
   -- holds its routes: the scan finished at the closer's `outerDone`
@@ -554,13 +566,147 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       ... | inj₂ (here refl) = irrⁱ
       ... | inj₂ (there ())
 
+  private
+    -- A lane's start or end.
+    Kind : Maybe (Input B) → Set
+    Kind x = (Σ Pos λ n → x ≡ LnMk laneStart n) ⊎ LD x
+
+    -- Before a row of an instant before `I`, of an instant before `I`.
+    inst-pre : ∀ {k k′ I} → k ≺ k′ → instantOf k′ ≺ⁱ I → instantOf k ≺ⁱ I
+    inst-pre {k} {k′} kk h with triⁱ (instantOf k) (instantOf k′)
+    ... | inj₁ lt        = transⁱ lt h
+    ... | inj₂ (inj₁ eq) = subst (_≺ⁱ _) (sym eq) h
+    ... | inj₂ (inj₂ gt) = ⊥-elim (≺-absurd {k} {k′} kk (instant-≺ k′ k gt))
+
+    -- A row met past `x`, past every row before it.
+    cut-in : ∀ pre {x : Row} {rest r₁ y r₂} → pre ++ x ∷ rest ≡ r₁ ++ y ∷ r₂ → ¬ y ∈ (pre ++ [ x ])
+           → Σ (List Row) λ ra → rest ≡ ra ++ y ∷ r₂
+    cut-in []        {r₁ = []}     eq ny = ⊥-elim (ny (here (sym (∷-injectiveˡ eq))))
+    cut-in []        {r₁ = _ ∷ r₁} eq ny = r₁ , ∷-injectiveʳ eq
+    cut-in (_ ∷ pre) {r₁ = []}     eq ny = ⊥-elim (ny (here (sym (∷-injectiveˡ eq))))
+    cut-in (_ ∷ pre) {r₁ = _ ∷ r₁} eq ny = cut-in pre (∷-injectiveʳ eq) (λ i → ny (there i))
+
+    -- A visible row between `x` and `q` is met between them.
+    locate : ∀ pre {x xx} rest {q a rx₂ y v} → Met M ((pre ++ (x , out xx) ∷ rest) ++ (q , out a) ∷ rx₂) → M y (out v) → x ≺ y → y ≺ q
+           → Σ (List Row) λ ra → Σ (List Row) λ rb → rest ≡ ra ++ (y , out v) ∷ rb
+    locate pre {x} {xx} rest {q} {a} {rx₂} {y} {v} mt my xy yq with run-catch (pre ++ (x , out xx) ∷ rest) mt my tt tt yq
+    ... | r₁ , r₂ , e″ , eq with InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ˡ (subst ((y , e″) ∈_) (sym eq) (∈-++⁺ʳ r₁ (here refl)))))) my
+    ...   | refl = proj₁ (cut-in pre eq ny) , r₂ , proj₂ (cut-in pre eq ny)
+      where
+        mt′ : Met M (pre ++ (x , out xx) ∷ (rest ++ (q , out a) ∷ rx₂))
+        mt′ = subst (Met M) (++-assoc pre ((x , out xx) ∷ rest) ((q , out a) ∷ rx₂)) mt
+
+        ny : ¬ (y , out v) ∈ (pre ++ [ (x , out xx) ])
+        ny i with ∈-++⁻ pre i
+        ... | inj₁ j           = ≺-absurd {y} {x} (met-before pre mt′ j) xy
+        ... | inj₂ (here e)    = ≺-irrefl {x} (subst (x ≺_) (cong proj₁ e) xy)
+        ... | inj₂ (there ())
+
+    regroup : ∀ (pre : List Row) x ra b rb (tl : List Row) → (pre ++ x ∷ (ra ++ b ∷ rb)) ++ tl ≡ (pre ++ x ∷ ra) ++ b ∷ (rb ++ tl)
+    regroup pre x ra b rb tl =
+      trans (++-assoc pre (x ∷ (ra ++ b ∷ rb)) tl) (trans (cong (λ w → pre ++ x ∷ w) (++-assoc ra (b ∷ rb) tl)) (sym (++-assoc pre (x ∷ ra) (b ∷ (rb ++ tl)))))
+
+  -- THE HANDED ROUTES END IN THE LANE END'S INSTANT: from a lane's start
+  -- or end, held through to a row of a later instant, another start or
+  -- end of its instant follows before it, or a burst's end with none dead,
+  -- which stops what is held, or it is the last lane's end (`held-final`).
+  -- Each step moves to a later row of the run, so the run bounds them.
+  mutual
+    queued-loop : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ fuel pre {x xx} rest {q a rx₂} → ℕ.suc (L.length rest) ℕ.≤ fuel
+                → Met M ((pre ++ (x , out xx) ∷ rest) ++ (q , out a) ∷ rx₂) → Few R q → Kind xx
+                → instantOf x ≺ⁱ instantOf q → Thru op (react op (past op init pre) xx) rest → ⊥
+    queued-loop bd ℕ.zero pre rest () mt Fq kx xq th
+    queued-loop bd (ℕ.suc fuel) pre {x} {xx} rest {q} {a} {rx₂} (ℕ.s≤s lt) mt Fq (inj₂ ld) xq th =
+      [ (λ qn → queued-next bd pre mt₁ ld qn mq xq λ (y , n , my , xy , iy) →
+                  go-to bd fuel pre rest lt mt Fq th my (inj₁ (n , refl)) xy (subst (_≺ⁱ instantOf q) (sym iy) xq))
+      , (λ (q0 , fi , a0) → irrⁱ (subst (instantOf x ≺ⁱ_) (sym (held-final pre rest mt Fq ld q0 fi a0)) xq))
+      ]′ (onset-why op (past op init pre) ld (thru-head op rest th))
+      where
+        mt₁ : Met M (pre ++ (x , out xx) ∷ (rest ++ (q , out a) ∷ rx₂))
+        mt₁ = subst (Met M) (++-assoc pre ((x , out xx) ∷ rest) ((q , out a) ∷ rx₂)) mt
+
+        mq : M q (out a)
+        mq = proj₁ (run-row∈ mt (∈-++⁺ʳ (pre ++ (x , out xx) ∷ rest) (here refl)))
+    queued-loop bd (ℕ.suc fuel) pre {x} rest {q} {a} (ℕ.s≤s lt) mt Fq (inj₁ (n , refl)) xq th =
+      burst-next mx mq xq λ (b , n′ , kb , xb , ib) → burst-step bd fuel pre rest lt mt Fq th kb xb (subst (_≺ⁱ instantOf q) (sym ib) xq)
+      where
+        mx : M x (out (LnMk laneStart n))
+        mx = proj₁ (run-row∈ mt (∈-++⁺ˡ (∈-++⁺ʳ pre (here refl))))
+
+        mq : M q (out a)
+        mq = proj₁ (run-row∈ mt (∈-++⁺ʳ (pre ++ (x , out (LnMk laneStart n)) ∷ rest) (here refl)))
+
+    -- A burst's end past a lane's start: a lane's end before it is the next
+    -- step; with none, nothing dead, so the burst's end stops what is held.
+    burst-step : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ fuel pre {x n} rest {q a rx₂} → L.length rest ℕ.≤ fuel
+               → Met M ((pre ++ (x , out (LnMk laneStart n)) ∷ rest) ++ (q , out a) ∷ rx₂) → Few R q
+               → Thru op (react op (past op init pre) (LnMk laneStart n)) rest
+               → ∀ {b n′} → (M b (out (LnMk burstEnd n′)) ⊎ Σ ℕ λ kd → M b (out (LnMk (laneDone kd) n′))) → x ≺ b → instantOf b ≺ⁱ instantOf q → ⊥
+    burst-step bd fuel pre rest le mt Fq th (inj₂ (kd , mb)) xb bq = go-to bd fuel pre rest le mt Fq th mb (inj₂ (laneB , kd , _ , refl)) xb bq
+    burst-step bd fuel pre {x} {n} rest {q} {a} {rx₂} le mt Fq th {b} {n′} (inj₁ mb) xb bq with locate pre rest mt mb xb (instant-≺ b q bq)
+    ... | ra , rb , refl with find-ld ra
+    ...   | inj₁ (r₁ , z , xz , r₂ , refl , ldz) =
+            go-at bd fuel pre _ le mt Fq th r₁ (r₂ ++ (b , out (LnMk burstEnd n′)) ∷ rb) (++-assoc r₁ ((z , out xz) ∷ r₂) ((b , out (LnMk burstEnd n′)) ∷ rb)) (inj₂ ldz)
+              (inst-pre {z} {b} (met-before (pre ++ (x , out (LnMk laneStart n)) ∷ (r₁ ++ (z , out xz) ∷ r₂)) mtb (∈-++⁺ʳ pre (there (∈-++⁺ʳ r₁ (here refl))))) bq)
+      where
+        mtb : Met M ((pre ++ (x , out (LnMk laneStart n)) ∷ (r₁ ++ (z , out xz) ∷ r₂)) ++ (b , out (LnMk burstEnd n′)) ∷ (rb ++ (q , out a) ∷ rx₂))
+        mtb = subst (Met M) (regroup pre (x , out (LnMk laneStart n)) (r₁ ++ (z , out xz) ∷ r₂) (b , out (LnMk burstEnd n′)) rb ((q , out a) ∷ rx₂)) mt
+    ...   | inj₂ none = thru-head op rb (proj₂ sp) (burst-clears op (past op o₀ ra) laneB n′ (proj₁ sp) (past-dead op o₀ ra ne none (start-dead op (past op init pre) laneB n)))
+      where
+        o₀ = react op (past op init pre) (LnMk laneStart n)
+
+        ne : ∀ {c} → (c , end) ∈ ra → ⊥
+        ne i = no-end _ mt (pre ++ (x , out (LnMk laneStart n)) ∷ ra) (sym (++-assoc pre ((x , out (LnMk laneStart n)) ∷ ra) ((b , out (LnMk burstEnd n′)) ∷ rb))) (∈-++⁺ʳ pre (there i))
+
+        sp = thru-split op o₀ ra ne th
+
+    -- A start or end shown between `x` and `q`: the next step.
+    go-to : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ fuel pre {x xx} rest {q a rx₂} → L.length rest ℕ.≤ fuel
+          → Met M ((pre ++ (x , out xx) ∷ rest) ++ (q , out a) ∷ rx₂) → Few R q → Thru op (react op (past op init pre) xx) rest
+          → ∀ {y v} → M y (out v) → Kind v → x ≺ y → instantOf y ≺ⁱ instantOf q → ⊥
+    go-to bd fuel pre rest {q} le mt Fq th {y} my kv xy yq with locate pre rest mt my xy (instant-≺ y q yq)
+    ... | ra , rb , eq = go-at bd fuel pre rest le mt Fq th ra rb eq kv yq
+
+    -- A start or end met past `x`: the run past it is shorter.
+    go-at : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ fuel pre {x xx} rest {q a rx₂} → L.length rest ℕ.≤ fuel
+          → Met M ((pre ++ (x , out xx) ∷ rest) ++ (q , out a) ∷ rx₂) → Few R q → Thru op (react op (past op init pre) xx) rest
+          → ∀ ra {z xz} rb → rest ≡ ra ++ (z , out xz) ∷ rb → Kind xz → instantOf z ≺ⁱ instantOf q → ⊥
+    go-at bd fuel pre {x} {xx} rest {q} {a} {rx₂} le mt Fq th ra {z} {xz} rb refl kz zq =
+      queued-loop bd fuel (pre ++ (x , out xx) ∷ ra) rb lt′ mt′ Fq kz zq th′
+      where
+        lt′ : ℕ.suc (L.length rb) ℕ.≤ fuel
+        lt′ = ℕP.≤-trans (ℕP.m≤n+m (ℕ.suc (L.length rb)) (L.length ra)) (subst (ℕ._≤ fuel) (length-++ ra) le)
+
+        mt′ : Met M (((pre ++ (x , out xx) ∷ ra) ++ (z , out xz) ∷ rb) ++ (q , out a) ∷ rx₂)
+        mt′ = subst (λ r → Met M (r ++ (q , out a) ∷ rx₂)) (sym (++-assoc pre ((x , out xx) ∷ ra) ((z , out xz) ∷ rb))) mt
+
+        ne-pre : ∀ {c} → (c , end) ∈ pre → ⊥
+        ne-pre i = no-end _ mt pre refl i
+
+        ne : ∀ {c} → (c , end) ∈ ra → ⊥
+        ne i = no-end _ mt (pre ++ (x , out xx) ∷ ra) (sym (++-assoc pre ((x , out xx) ∷ ra) ((z , out xz) ∷ rb))) (∈-++⁺ʳ pre (there i))
+
+        th′ : Thru op (react op (past op init (pre ++ (x , out xx) ∷ ra)) xz) rb
+        th′ = subst (λ o → Thru op (react op o xz) rb) (sym (past-app op init pre ne-pre))
+                (proj₂ (thru-split op (react op (past op init pre) xx) ra ne th))
+
+  -- A BOUNDED MERGE'S LANE END HANDING ITS ROUTES TO A QUEUED LANE KEEPS
+  -- THE SOURCE IN ITS INSTANT while the scan holds them: a row of a later
+  -- instant is ruled out step by step from the end (`queued-loop`).
+  held-queued : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {d xd} r₂ {q a rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , out a) ∷ rx₂) → Few R q → LD xd
+              → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
+  held-queued bd r₁ {d} r₂ {q} mt Fq ld th with triⁱ (instantOf d) (instantOf q)
+  ... | inj₂ (inj₁ eq) = eq
+  ... | inj₂ (inj₂ qd) = ⊥-elim (≺-absurd {d} {q} (met-before (r₁ ++ (d , out _) ∷ r₂) mt (∈-++⁺ʳ r₁ (here refl))) (instant-≺ q d qd))
+  ... | inj₁ dq        = ⊥-elim (queued-loop bd (ℕ.suc (L.length r₂)) r₁ r₂ ℕP.≤-refl mt Fq (inj₂ ld) dq th)
+
   -- A LANE'S END HANDING ITS ROUTES TO A QUEUED LANE: only a bounded merge
   -- queues (`queue-free`).
-  held-handoff : ∀ r₁ {d xd} r₂ {q e rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , e) ∷ rx₂) → Visible e → LD xd
-               → Flat.held (proj₁ (past op init r₁)) ≡ 0 → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
+  held-handoff : ∀ r₁ {d xd} r₂ {q a rx₂} → Met M ((r₁ ++ (d , out xd) ∷ r₂) ++ (q , out a) ∷ rx₂) → Few R q → LD xd
+               → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
                → Thru op (react op (past op init r₁) xd) r₂ → instantOf d ≡ instantOf q
-  held-handoff r₁ r₂ mt v ld h0 qn th with bounded? op
-  ... | inj₁ (_ , eq) = held-queued eq r₁ r₂ mt v ld h0 qn th
+  held-handoff r₁ r₂ mt Fq ld qn th with bounded? op
+  ... | inj₁ (_ , eq) = held-queued eq r₁ r₂ mt Fq ld th
   ... | inj₂ nb       = ⊥-elim (qn (queue-free op nb r₁))
 
   -- THE ROUTES THE SCAN HOLDS ARE OF THE SOURCE'S NEXT ROW'S INSTANT, OR
@@ -571,7 +717,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   held-current rx₁ {q} {a} {rx₂} mt Fq with Flat.held (proj₁ (past op init rx₁)) ℕ.≟ 0
   ... | Nl.yes z = inj₁ z
   ... | Nl.no nz with held-onset op rx₁ nz
-  ...   | r₁ , d , xd , r₂ , refl , ld , h0 , ln , at≡ , th = inj₂ (trans at≡ (trans at-d (cong (λ i → nm (i ∙ [])) inst)))
+  ...   | r₁ , d , xd , r₂ , refl , ld , _ , ln , at≡ , th = inj₂ (trans at≡ (trans at-d (cong (λ i → nm (i ∙ [])) inst)))
     where
       mt′ : Met M (r₁ ++ (d , out xd) ∷ (r₂ ++ (q , out a) ∷ rx₂))
       mt′ = subst (Met M) (++-assoc r₁ ((d , out xd) ∷ r₂) ((q , out a) ∷ rx₂)) mt
@@ -583,7 +729,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       why : ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0
           ⊎ (Flat.queue (proj₁ (past op init r₁)) ≡ 0 × Flat.finished (proj₁ (past op init r₁)) ≡ true × Flat.active (proj₁ (past op init r₁)) ℕ.∸ 1 ≡ 0)
           → instantOf d ≡ instantOf q
-      why (inj₁ qn)              = held-handoff r₁ r₂ mt tt ld h0 qn th
+      why (inj₁ qn)              = held-handoff r₁ r₂ mt Fq ld qn th
       why (inj₂ (q0 , fi , a0)) = held-final r₁ r₂ mt Fq ld q0 fi a0
 
       inst : instantOf d ≡ instantOf q
