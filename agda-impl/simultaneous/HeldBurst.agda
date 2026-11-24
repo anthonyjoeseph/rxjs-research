@@ -209,9 +209,9 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       ... | inj₂ refl = here refl
 
       cand-in : ∀ {k z zs} → Step (k ⊕ [ sub LS.J ]) z → z ∈ zs → k ∈ L.concatMap cands zs
-      cand-in {k} (inj₁ refl) i = ∈-concat⁺′ (here (up1-⊕ k (sub LS.J))) (∈-map⁺ cands i)
+      cand-in {k} (inj₁ refl) i = ∈-concat⁺′ (here (sym (up1-⊕ k (sub LS.J)))) (∈-map⁺ cands i)
       cand-in {k} (inj₂ refl) i =
-        ∈-concat⁺′ (there (here (trans (cong up1 (up1-⊕ (k ⊕ [ sub LS.J ]) (ix 0))) (up1-⊕ k (sub LS.J))))) (∈-map⁺ cands i)
+        ∈-concat⁺′ (there (here (sym (trans (cong up1 (up1-⊕ (k ⊕ [ sub LS.J ]) (ix 0))) (up1-⊕ k (sub LS.J)))))) (∈-map⁺ cands i)
 
   -- An uncut running lane's row, past no end of the real flatMap before
   -- a position the lanes' rows before are few, is one of theirs.
