@@ -745,6 +745,15 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
     go xs []       e F κ = κ (subst Fl (sym (trans e (++-identityʳ xs))) F)
     go xs (y ∷ ys) e F κ = step xs y ys e F λ F′ → go (xs ++ [ y ]) ys (trans e (sym (++-assoc xs [ y ] ys))) F′ κ
 
+    -- A live lane holding a route of `N` finds the scan at `N`.
+    floor-at : ∀ {Q c} → AC.Live [] rx Q → OC Q rx c → proj₁ c ≡ N → ¬ proj₂ c ≡ 0 → ¬ ¬ Flat.at (Sc rx) ≡ N
+    floor-at {Q} {c} lv oc nm nz na = go [] rx refl fl₀ fin
+      where
+        fin : Fl rx → ⊥
+        fin (fl K sh u oK en nl fo ovv aN) with any? (Q ≟ᵖ_) K
+        ... | no ni = nz (zero-of (en Q oc lv nm) (oK ni))
+        ... | yes i = nz (zero-of (en Q oc lv nm) (zero-of (sum-mem K sh i) (nl na)))
+
     -- A live lane holding a route of `N` holds it in the lanes counter,
     -- unless the instant is over.
     floor : ∀ {Q c} → AC.Live [] rx Q → OC Q rx c → proj₁ c ≡ N → ¬ proj₂ c ≡ 0

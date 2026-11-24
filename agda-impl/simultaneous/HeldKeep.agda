@@ -41,6 +41,32 @@ Keeps A s (just (inj₁ (_ , instEmit (mark (laneDone _)) _))) = ¬ Flat.queue s
 Keeps A s (just (inj₁ (_ , instEmit (mark burstEnd) _)))     = Flat.dead s ≡ true
 Keeps A s _                                                 = ⊤
 
+-- What a row asks for the instant and a spent mark to survive it.
+Names : ∀ {B} → Pos → Maybe (Input B) → Set
+Names A (just (inj₁ (_ , instEmit (mark begin) n))) = n ≡ A
+Names A _                                           = ⊤
+
+-- A row names `A` when, being a begin, it names `A`.
+names-of : ∀ {B A} (x : Maybe (Input B)) → (∀ {b n} → x ≡ just (inj₁ (b , instEmit (mark begin) n)) → n ≡ A) → Names A x
+names-of (just (inj₁ (_ , instEmit (mark begin) n)))        e = e refl
+names-of (just (inj₁ (_ , instEmit (mark stop) n)))         e = tt
+names-of (just (inj₁ (_ , instEmit (mark over) n)))         e = tt
+names-of (just (inj₁ (_ , instEmit (mark outerOpen) n)))    e = tt
+names-of (just (inj₁ (_ , instEmit (mark outerClose) n)))   e = tt
+names-of (just (inj₁ (_ , instEmit (mark laneStart) n)))    e = tt
+names-of (just (inj₁ (_ , instEmit (mark (laneDone _)) n))) e = tt
+names-of (just (inj₁ (_ , instEmit (mark burstEnd) n)))     e = tt
+names-of (just (inj₁ (_ , instEmit (mark outerDone) n)))    e = tt
+names-of (just (inj₁ (_ , instEmit (mark subscribed) n)))   e = tt
+names-of (just (inj₁ (_ , instEmit (mark completed) n)))    e = tt
+names-of (just (inj₁ (_ , instEmit (value _) n)))           e = tt
+names-of (just (inj₂ _))                                    e = tt
+names-of nothing                                            e = tt
+
+-- Every row of a run.
+Named : ∀ {B} → Pos → List (Pos × Ev (Maybe (Input B))) → Set
+Named A rx = ∀ r₁ {q x} r₂ → rx ≡ r₁ ++ (q , out x) ∷ r₂ → Names A x
+
 -- Every row of a run, read where the scan stands.
 Along : ∀ {B} → FlatOp → Pos → Out B → List (Pos × Ev (Maybe (Input B))) → Set
 Along op A o rx = ∀ r₁ {q x} r₂ → rx ≡ r₁ ++ (q , out x) ∷ r₂ → Keeps A (proj₁ (past op o r₁)) x
@@ -170,17 +196,68 @@ private
   react-mv op A o (just (inj₂ (j , r)))                    k a = mv (unpark-same root _)
   react-mv op A o nothing                                  k a = mv same-refl
 
+  -- A step that keeps the instant and a spent mark.
+  record Kept (s s′ : Flat Pos) : Set where
+    constructor kept
+    field
+      at″ : Flat.at s′ ≡ Flat.at s
+      sp″ : Flat.spent s ≡ true → Flat.spent s′ ≡ true
+
+  kp : ∀ {s s′ Ov} → Moved s s′ Ov → Kept s s′
+  kp (moved a p _) = kept a p
+
+  kthen : ∀ {s₀ s s′} → Kept s₀ s → Same s s′ → Kept s₀ s′
+  kthen (kept a p) (same _ a′ p′) = kept (trans a′ a) (λ z → trans p′ (p z))
+
+  ended-kept : ∀ {B} k n s₀ s → Same s₀ s → Kept s₀ (proj₁ (ended {B} k n s))
+  ended-kept k n s₀ s (same h a p) with isZero (Flat.queue s)
+  ... | false = kept a (λ z → trans p z)
+  ... | true with Flat.finished s ∧ isZero (Flat.active s)
+  ...   | true  = kept a (λ z → trans p z)
+  ...   | false = kthen (kept a (λ z → trans p z)) (cut-same (k + Flat.held s) n (record s { held = 0 }))
+
+  burst-kept : ∀ {B} h n s → Kept s (proj₁ (burstOver {B} h n s))
+  burst-kept true  n s = kept refl (λ z → z)
+  burst-kept false n s = kthen (kept refl (λ z → z)) (cut-same (Flat.held s) n (record s { held = 0 }))
+
+  onMark-kept : ∀ {B} op A b m n s → Names {B} A (just (inj₁ (b , instEmit (mark m) n))) → Flat.at s ≡ A
+              → Kept s (proj₁ (onMark {B} op b s m n))
+  onMark-kept op A b begin         n s k a = kp (begun-mv {Ov = ⊤} A b n s k a)
+  onMark-kept op A b stop          n s k a = kp (stopped-mv {Ov = ⊤} b n s (if Flat.spent s then 0 else _))
+  onMark-kept op A b over          n s k a = kp (overed-mv {Ov = ⊤} tt n s)
+  onMark-kept op A b outerOpen     n s k a = kp (arrive-mv {Ov = ⊤} op n s)
+  onMark-kept op A b outerClose    n s k a = kept refl (λ z → z)
+  onMark-kept op A b laneStart     n s k a = kept refl (λ z → z)
+  onMark-kept op A b (laneDone kd) n s k a =
+    ended-kept (kd ⊓ Flat.lanes s) n s (record s { active = Flat.active s ∸ 1 ; lanes = Flat.lanes s ∸ kd ; dead = true }) same-refl
+  onMark-kept op A b burstEnd      n s k a = burst-kept _ n s
+  onMark-kept op A b outerDone     n s k a = kp (left-mv {Ov = ⊤} n s)
+  onMark-kept op A b subscribed    n s k a = kept refl (λ z → z)
+  onMark-kept op A b completed     n s k a = kept refl (λ z → z)
+
+  react-kept : ∀ {B} op A (o : Out B) x → Names A x → Flat.at (proj₁ o) ≡ A → Kept (proj₁ o) (proj₁ (react op o x))
+  react-kept op A o (just (inj₁ (b , instEmit (value v) n))) k a = kept refl (λ z → z)
+  react-kept op A o (just (inj₁ (b , instEmit (mark m) n)))  k a = onMark-kept op A b m n (proj₁ o) k a
+  react-kept op A o (just (inj₂ (j , r)))                    k a = kp (mv {Ov = ⊤} (unpark-same root _))
+  react-kept op A o nothing                                  k a = kept refl (λ z → z)
+
+  keeps-names : ∀ {B A s} (x : Maybe (Input B)) → Keeps A s x → Names A x
+  keeps-names x k = names-of x λ { refl → k }
+
+  named : ∀ {B} op A (o : Out B) rx → Along op A o rx → Named A rx
+  named op A o rx al r₁ {x = x} r₂ eq = keeps-names x (al r₁ r₂ eq)
+
 -- PAST AN OVER, SPENT: no row the run reads begins another instant.
-spent-on : ∀ {B} op A (o : Out B) rx → Along op A o rx → Flat.at (proj₁ o) ≡ A → Flat.spent (proj₁ o) ≡ true
+spent-on : ∀ {B} op A (o : Out B) rx → Named A rx → Flat.at (proj₁ o) ≡ A → Flat.spent (proj₁ o) ≡ true
          → Flat.spent (proj₁ (past op o rx)) ≡ true
-spent-on op A o []               al a sp = sp
-spent-on op A o ((q , end) ∷ rx) al a sp = sp
-spent-on op A o ((q , skip) ∷ rx) al a sp = spent-on op A o rx (λ r₁ r₂ eq → al ((q , skip) ∷ r₁) r₂ (cong (_ ∷_) eq)) a sp
-spent-on op A o ((q , pin w) ∷ rx) al a sp = spent-on op A o rx (λ r₁ r₂ eq → al ((q , pin w) ∷ r₁) r₂ (cong (_ ∷_) eq)) a sp
-spent-on op A o ((q , out x) ∷ rx) al a sp =
-  spent-on op A (react op o x) rx (λ r₁ r₂ eq → al ((q , out x) ∷ r₁) r₂ (cong (_ ∷_) eq)) (trans (Moved.at′ M) a) (Moved.sp′ M sp)
+spent-on op A o []               nm a sp = sp
+spent-on op A o ((q , end) ∷ rx) nm a sp = sp
+spent-on op A o ((q , skip) ∷ rx) nm a sp = spent-on op A o rx (λ r₁ r₂ eq → nm ((q , skip) ∷ r₁) r₂ (cong (_ ∷_) eq)) a sp
+spent-on op A o ((q , pin w) ∷ rx) nm a sp = spent-on op A o rx (λ r₁ r₂ eq → nm ((q , pin w) ∷ r₁) r₂ (cong (_ ∷_) eq)) a sp
+spent-on op A o ((q , out x) ∷ rx) nm a sp =
+  spent-on op A (react op o x) rx (λ r₁ r₂ eq → nm ((q , out x) ∷ r₁) r₂ (cong (_ ∷_) eq)) (trans (Kept.at″ K) a) (Kept.sp″ K sp)
   where
-    M = react-mv op A o x (al [] rx refl) a
+    K = react-kept op A o x (nm [] rx refl) a
 
 -- ROUTES HELD SURVIVE A RUN ASKING NOTHING OF THEM, unless it reads an
 -- over and the scan is live past it.
@@ -206,5 +283,5 @@ held-on op A o ((q , out x) ∷ rx) al a nz lv = go (Moved.hd′ M nz)
     go (inj₁ nz′) = held-on op A (react op o x) rx al′ (trans (Moved.at′ M) a) nz′
       λ (r₁ , ov) → lv ((q , out x) ∷ r₁ , let (k , b , n , r₂ , eq) = ov in k , b , n , r₂ , cong (_ ∷_) eq)
     go (inj₂ ((b , n , e) , sp)) =
-      ⊥-elim (t≢f (trans (sym (spent-on op A (react op o x) rx al′ (trans (Moved.at′ M) a) sp))
+      ⊥-elim (t≢f (trans (sym (spent-on op A (react op o x) rx (named op A (react op o x) rx al′) (trans (Moved.at′ M) a) sp))
         (lv ([] , q , b , n , rx , cong (λ z → (q , out z) ∷ rx) e))))

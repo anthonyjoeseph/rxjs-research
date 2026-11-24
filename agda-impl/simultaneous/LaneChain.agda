@@ -21,14 +21,14 @@ open import Relation.Nullary using (¬_; yes; no)
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; ix; _⊕_; _≟ᵖ_; inside)
 open import denotation.EmissionSet using (EmissionSet; Den; enter; out; end; _≺_; module Bounded)
-open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊑-refl; ⊑-trans; ⊑-snoc⁺)
+open import denotation.Laws.Worlds using (InvD; InvAt; Ok; inside-⊑; conv; ⊑-refl; ⊑-trans; ⊑-snoc⁺; _⊑_)
 open import denotation.Laws.Modulus using (≺→≼; ≺-irrefl)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.BoundedInv using (module BoundedI; end-uniq)
 open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.TakeCut using (inst-⊕)
 open import simultaneous.Routed using (Sync)
-open import simultaneous.RealView using (module View; lane-at; lane-at₂)
+open import simultaneous.RealView using (module View; lane-at; lane-at₂; lane-fwd)
 
 module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a → InvD H (f a)) (p : Pos) (ok : Ok H p) where
   O : EmissionSet A
@@ -47,10 +47,33 @@ module Chains {A B H} (d : Den A) (f : A → Den B) (Id : InvD H d) (If : ∀ a 
     link : ∀ {q a y e c′} (x : O q (out a)) (l : Lane op q a y e) → Lane op q a c′ end
          → Sync (subOf op x l) c′ → Chain op c (subOf op x l) → Chain op c (c′ ⊕ [ ix 1 ])
 
+  -- A chain lies under its start.
+  chain-⊑ : ∀ {op c s} → Chain op c s → c ⊑ s
+  chain-⊑ {c = c} from = ⊑-snoc⁺ c
+  chain-⊑ (link {c′ = c′} _ _ _ (ins , _) ch) = ⊑-trans (⊑-trans (chain-⊑ ch) (inside-⊑ _ _ ins)) (⊑-snoc⁺ c′)
+
   -- A chain stays in its start's instant.
   chain-inst : ∀ {op c s} → Chain op c s → instantOf s ≡ instantOf c
   chain-inst {c = c} from = inst-⊕ c [ ix 1 ]
   chain-inst (link {c′ = c′} _ _ _ (_ , rt) ch) = trans (inst-⊕ c′ [ ix 1 ]) (trans (cong instantOf rt) (chain-inst ch))
+
+  -- A lane's subscription is admissible, and every row of the lane is
+  -- its value's row there.
+  sub-ok : ∀ op {q a k e} (x : O q (out a)) (l : Lane op q a k e) → Ok H (subOf op x l)
+  sub-ok op x l = proj₁ (proj₂ (lane-at op d f Id If p ok x l))
+
+  sub-inv : ∀ op {q a k e} (x : O q (out a)) (l : Lane op q a k e) → InvAt H (subOf op x l) (enter (f a) (subOf op x l))
+  sub-inv op {a = a} x l = If a (subOf op x l) (sub-ok op x l)
+
+  sub-row : ∀ op {q a k e k′ e′} (x : O q (out a)) (l : Lane op q a k e) → Lane op q a k′ e′ → enter (f a) (subOf op x l) k′ e′
+  sub-row op x l l′ = lane-fwd op d f Id If p ok x l l′
+
+  -- One value's lanes share one subscription.
+  sub-one : ∀ op {q a k e k′ e′} (x : O q (out a)) (l : Lane op q a k e) (l′ : Lane op q a k′ e′) → subOf op x l ≡ subOf op x l′
+  sub-one (mergeᶠ nothing)  x l l′ = refl
+  sub-one switchᶠ           x l l′ = refl
+  sub-one exhaustᶠ          x l l′ = refl
+  sub-one (mergeᶠ (just n)) x (_ , _ , sb , _) (_ , _ , sb′ , _) = BoundedI.sub-same ok n f If (Id p ok) sb sb′
 
   -- A lane ends once.
   end-one : ∀ op {q a c c′} → O q (out a) → Lane op q a c end → Lane op q a c′ end → c ≡ c′

@@ -270,6 +270,15 @@ holds a route. Settled by bodies, or a body emptied under a looping source.
 Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 `tracks-real`.
 
+#### THE UNLISTED LANE ENDS
+
+Suspect: nothing `held-comb` assumes keeps an exempting subscription in
+`cs` off a lane's `laneDone`; with no binders `cs` is free. Settled by an
+invariant placing `cs` before the flatMap, or by a run where a queued lane
+then lacks a route.
+
+Members: `done-unlisted`.
+
 #### THE HELD STREAMS
 
 Probed, unproven: every elaborated stream names its begins for their
@@ -279,8 +288,8 @@ flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
-Members: `live-current`, `base-read`, `base-queue`, `base-kd`, `base-lanes`,
-`base-at`, `hand-dones`, `hand-bursts`, `end-tot`, `comb-shut`, `scan-idle`.
+Members: `live-current`, `base-read`, `base-queue`, `hand-dones`,
+`hand-bursts`, `end-tot`, `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK
 
