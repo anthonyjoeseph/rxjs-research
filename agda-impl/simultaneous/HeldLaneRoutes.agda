@@ -22,7 +22,7 @@ open import Data.Unit using (tt)
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Maybe using (Maybe; nothing)
-open import Data.Nat using (ℕ; suc; _≤_)
+open import Data.Nat using (ℕ; suc)
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)

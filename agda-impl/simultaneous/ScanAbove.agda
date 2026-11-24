@@ -17,7 +17,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _∸_; _≤_; z≤n; s≤s)
+open import Data.Nat using (zero; suc; _∸_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; m∸n≤m; ∸-monoˡ-≤)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -26,16 +26,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; does; yes; no)
 open import quickcheck.Tabled.Exact.Base using (≟-true)
 
-open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
+open import Tree using (mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
-open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; stop; over; outerOpen; outerClose; laneStart;
-  laneDone; burstEnd; outerDone; subscribed; completed)
-open import simultaneous.SObs using (Flat; Branch; outerB; laneB; closeB; isZero; lone; module Elaborate)
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
+  burstEnd; outerDone; subscribed; completed)
+open import simultaneous.SObs using (Flat; outerB; isZero; lone; module Elaborate)
 open import simultaneous.Relations using (values)
 open import simultaneous.HeldComb using (past)
-open import simultaneous.FlatLanes using (Tg; brTag; BProj; keep; drop; module BProj; other; tagged; bump-at; bump-sp; bump-other; ∧-t; does-no)
+open import simultaneous.FlatLanes using (Tg; brTag; BProj; keep; drop; module BProj; other; tagged; bump-at; bump-sp; bump-other; ∧-l; ∧-t; does-no)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Out; Input; react; onMark; begun; entered;
   bump; share; stopped; overed; cut; unpark; arrive; ended; burstOver; left; anyHolds; setAt; anew; opening)
@@ -112,9 +112,6 @@ entered-cases : ∀ b n s → (n ≡ Flat.at s × entered b n s ≡ bump b suc s
 entered-cases b n s with does (n ≟ᵖ Flat.at s) in e
 ... | true  = inj₁ (≟-true {n} {Flat.at s} e , refl)
 ... | false = inj₂ (does-no {n} {Flat.at s} e , refl)
-
-∧-l : ∀ {a b : Bool} → a ∧ b ≡ true → a ≡ true
-∧-l {true} _ = refl
 
 does-yes : ∀ {n m : Pos} → n ≡ m → does (n ≟ᵖ m) ≡ true
 does-yes {n} {m} e with n ≟ᵖ m

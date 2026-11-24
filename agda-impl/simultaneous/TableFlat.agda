@@ -42,7 +42,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; Unpinned; out; skip; end; pin; _≼_; _≺_; module Joining)
 open import denotation.Laws.Modulus using (⟨_⟩; upto; ≼-refl; ≼-trans; ≺→≼; ≺-ext; ≺-trans)
 import quickcheck.Tabled as Tb
-open import quickcheck.Tabled.Exact.Base using (any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; complete)
+open import quickcheck.Tabled.Exact.Base using (≟-true; any⁻; any⁺; ends⁺; ends⁻; bind⁻; values⁺; complete)
 open import Relation.Nullary.Decidable using (dec-true)
 open import Data.Maybe.Properties using (just-injective)
 open import simultaneous.TableRows using (merge-lane-out; lane-of; proper-in; rejoin-in; of-past; part-≺)
@@ -67,11 +67,6 @@ open import simultaneous.LaneEnd using (corr-end; module Lane)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; elab; each; laneˢ; laneSrc; srcLane; closer; combined; trackers)
 
-≟-true : ∀ x y → does (x ≟ᵖ y) ≡ true → x ≡ y
-≟-true x y with x ≟ᵖ y
-... | yes e = λ _ → e
-... | no _  = λ ()
-
 -- Two conditionals alike branch for branch.
 if-≡ : ∀ {X : Set} {b b′ : Bool} {x y x′ y′ : X} → b ≡ b′ → (b ≡ true → x ≡ x′) → (b ≡ false → y ≡ y′)
      → (if b then x else y) ≡ (if b′ then x′ else y′)
@@ -81,7 +76,7 @@ if-≡ {b = false} refl _ f = f refl
 -- A position some row of a list equals is in it.
 any-≟ : ∀ {xs k} → anyᵇ (λ k′ → does (k′ ≟ᵖ k)) xs ≡ true → k ∈ xs
 any-≟ {k = k} h with any⁻ h
-... | k′ , k′∈ , hk with ≟-true k′ k hk
+... | k′ , k′∈ , hk with ≟-true {k′} {k} hk
 ...   | refl = k′∈
 
 -- A row kept unless it is a pin at one of some positions.

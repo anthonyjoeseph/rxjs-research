@@ -8,24 +8,24 @@
 -- An over read past them leaves the scan spent to the end.
 module simultaneous.HeldKeep where
 
-open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
-open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.Bool using (true; false; _∧_; _∨_; if_then_else_)
+open import Data.Bool.Properties using (∨-zeroʳ; not-¬)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_)
+open import Data.Nat using (zero; suc; _+_; _∸_; _⊓_)
 open import Data.Nat.Properties using (m+n≡0⇒m≡0)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong)
 open import Relation.Nullary using (¬_; does)
 
 open import Tree using (FlatOp; mergeᶠ; switchᶠ; exhaustᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (Ev; out; end; skip; pin)
-open import simultaneous.InstEmit using (instEmit; value; mark; Mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
+open import simultaneous.InstEmit using (instEmit; value; mark; begin; stop; over; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.SObs using (Flat; Branch; isZero; lone; module Elaborate)
 open import simultaneous.HeldComb using (past)
@@ -76,9 +76,6 @@ OverIn : ∀ {B} → List (Pos × Ev (Maybe (Input B))) → Set
 OverIn rx = Σ _ λ r₁ → Σ Pos λ q → Σ Branch λ b → Σ Pos λ n → Σ _ λ r₂ → rx ≡ r₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ r₂
 
 private
-  t≢f : true ≡ false → ⊥
-  t≢f ()
-
   -- A step that keeps the instant and an over's mark, and the routes
   -- held unless it is an over.
   record Moved (s s′ : Flat Pos) (Ov : Set) : Set where
@@ -139,7 +136,7 @@ private
   overed-mv : ∀ {B Ov} → Ov → ∀ n s → Moved s (proj₁ (overed {B} n s)) Ov
   overed-mv ov n s with Flat.spent s in e
   ... | true  = mv (same refl refl refl)
-  ... | false = moved refl (λ z → ⊥-elim (t≢f (trans (sym z) e))) λ _ → inj₂ (ov , refl)
+  ... | false = moved refl (λ z → ⊥-elim ((not-¬ refl) (trans (sym z) e))) λ _ → inj₂ (ov , refl)
 
   arrive-mv : ∀ {B Ov} op n s → Moved s (proj₁ (arrive {B} op n s)) Ov
   arrive-mv (mergeᶠ (just _)) n s = mv (same refl refl refl)
@@ -159,7 +156,7 @@ private
     where
       no : ¬ Flat.queue s ≡ 0 ⊎ (Flat.finished s ≡ true × Flat.active s ≡ 0) → ⊥
       no (inj₁ qn)        = qn (isZero-0 e)
-      no (inj₂ (f , a0)) = t≢f (trans (sym (cong₂∧ f (cong isZero a0))) e₂)
+      no (inj₂ (f , a0)) = (not-¬ refl) (trans (sym (cong₂∧ f (cong isZero a0))) e₂)
         where
           cong₂∧ : ∀ {x y} → x ≡ true → y ≡ true → x ∧ y ≡ true
           cong₂∧ refl refl = refl
@@ -283,5 +280,5 @@ held-on op A o ((q , out x) ∷ rx) al a nz lv = go (Moved.hd′ M nz)
     go (inj₁ nz′) = held-on op A (react op o x) rx al′ (trans (Moved.at′ M) a) nz′
       λ (r₁ , ov) → lv ((q , out x) ∷ r₁ , let (k , b , n , r₂ , eq) = ov in k , b , n , r₂ , cong (_ ∷_) eq)
     go (inj₂ ((b , n , e) , sp)) =
-      ⊥-elim (t≢f (trans (sym (spent-on op A (react op o x) rx (named op A (react op o x) rx al′) (trans (Moved.at′ M) a) sp))
+      ⊥-elim ((not-¬ refl) (trans (sym (spent-on op A (react op o x) rx (named op A (react op o x) rx al′) (trans (Moved.at′ M) a) sp))
         (lv ([] , q , b , n , rx , cong (λ z → (q , out z) ∷ rx) e))))

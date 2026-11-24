@@ -23,7 +23,7 @@ open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; s
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
-open import simultaneous.Routed using (Held; Early; Rest)
+open import simultaneous.Routed using (Held; Early)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step)
 open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldWrap using (held-wrapped)

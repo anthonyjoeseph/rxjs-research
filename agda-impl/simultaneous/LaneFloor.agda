@@ -12,11 +12,11 @@
 module simultaneous.LaneFloor where
 
 open import Data.Bool using (Bool; true; false; _∧_; _∨_; if_then_else_)
+open import Data.Bool.Properties using (not-¬)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Properties using (++-assoc; ++-identityʳ; ∷ʳ-injective; ++-conicalʳ)
-open import Data.List.Membership.Propositional using (_∈_; find)
-open import Data.List.Membership.Propositional.Properties using (∈-∃++)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺ˡ; ++⁺ʳ; ++⁻)
 open import Data.List.Relation.Unary.All.Properties using (¬Any⇒All¬)
@@ -24,8 +24,8 @@ open import Data.List.Relation.Unary.AllPairs using () renaming ([] to []ᵖ; _�
 open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊓_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤0⇒n≡0; ∸-monoˡ-≤; ∸-monoʳ-≤; m∸n≤m; +-comm; +-suc;
-  +-identityʳ; +-cancelˡ-≡; +-cancelʳ-≤; +-monoʳ-≤; +-monoˡ-≤; m≤m+n; m≤n+m; m+n∸n≡m)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤0⇒n≡0; ∸-monoˡ-≤; ∸-monoʳ-≤; m∸n≤m; +-suc; +-identityʳ;
+  +-cancelʳ-≤; +-monoʳ-≤; m≤m+n; m≤n+m; m+n∸n≡m)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 import Data.Sum as Sum
@@ -40,10 +40,11 @@ open import simultaneous.SObs using (Flat; Branch; laneB; outerB; closeB; lone; 
 open import simultaneous.InstEmit using (instEmit; value; mark; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
 open import simultaneous.HeldComb using (past; init)
-open import simultaneous.ScanCount using (rowKind; markAct; pstep; past-snoc)
+open import simultaneous.ScanCount using (markAct; pstep; past-snoc)
 open import simultaneous.LaneCount using (kStart; kDone; kCut; kOther)
-open import simultaneous.FlatLanes using (Tg; does-no)
-open import simultaneous.LaneEpoch using (set; set-self; set-other; sumK; sum-zero; sum-set; begin-count; module Lanes)
+open import simultaneous.FlatLanes using (Tg; ∧-l; ∧-t; bump-at; bump-sp)
+open import quickcheck.Tabled.Exact.Base using (≟-true)
+open import simultaneous.LaneEpoch using (cancelʳ; set; set-self; set-other; sumK; sum-zero; sum-set; begin-count; module Lanes)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; Routes; count; Input; react; onMark; ended; begun; entered;
   stopped; overed; cut; arrive; burstOver; left; unpark; anyHolds; bump; anew; setAt)
@@ -52,18 +53,12 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 -- Arithmetic
 
 private
-  cancelʳ : ∀ k a b → a + k ≡ b + k → a ≡ b
-  cancelʳ k a b eq = +-cancelˡ-≡ k a b (trans (+-comm k a) (trans eq (+-comm b k)))
-
   -- What a share sum is past one share set lower.
   lower : ∀ a b c d → a + c ≡ b + d → d ≤ c → a ≤ b
   lower a b c d eq dc = +-cancelʳ-≤ c a b (≤-trans (≤-reflexive eq) (+-monoʳ-≤ b dc))
 
   lower∸ : ∀ a b c → a + c ≡ b → a ≡ b ∸ c
   lower∸ a b c eq = trans (sym (m+n∸n≡m a c)) (cong (_∸ c) eq)
-
-  t≢f : true ≡ false → ⊥
-  t≢f ()
 
 sum-mem : ∀ {q} K (e : Pos → ℕ) → q ∈ K → e q ≤ sumK K e
 sum-mem (_ ∷ K) e (here refl) = m≤m+n _ (sumK K e)
@@ -168,31 +163,6 @@ bl : Branch → ℕ
 bl laneB = 1
 bl _     = 0
 
-private
-  f≢t : false ≡ true → ⊥
-  f≢t ()
-
-does-yes : ∀ {n m : Pos} → does (n ≟ᵖ m) ≡ true → n ≡ m
-does-yes {n} {m} e with n ≟ᵖ m
-... | yes p = p
-... | no _  = ⊥-elim (f≢t e)
-
-∧-l : ∀ {a b : Bool} → a ∧ b ≡ true → a ≡ true
-∧-l {true} _ = refl
-
-∧-r : ∀ {a b : Bool} → a ∧ b ≡ true → b ≡ true
-∧-r {true} e = e
-
-bump-at : ∀ b f (s : Flat Pos) → Flat.at (bump b f s) ≡ Flat.at s
-bump-at outerB f s = refl
-bump-at laneB  f s = refl
-bump-at closeB f s = refl
-
-bump-sp : ∀ b f (s : Flat Pos) → Flat.spent (bump b f s) ≡ Flat.spent s
-bump-sp outerB f s = refl
-bump-sp laneB  f s = refl
-bump-sp closeB f s = refl
-
 bump-suc : ∀ b (s : Flat Pos) → Flat.lanes (bump b suc s) ≡ bl b + Flat.lanes s
 bump-suc outerB s = refl
 bump-suc laneB  s = refl
@@ -215,7 +185,7 @@ entered-cls b n s e with n ≟ᵖ Flat.at s
 
 begun-cls : ∀ {B} b n s → Begun b n s (proj₁ (begun {B} b n s))
 begun-cls b n s with does (n ≟ᵖ Flat.at s) ∧ Flat.spent s in e
-... | true  = ignored (does-yes (∧-l e)) (∧-r e) refl
+... | true  = ignored (≟-true (∧-l e)) (∧-t e) refl
 ... | false = entered-cls b n s e
 
 begin-name : ∀ {A} (c : Routes) n → proj₁ (count {A} c (instEmit (mark begin) n)) ≡ n
@@ -381,7 +351,7 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
       isStart _                             = false
 
       ns-of : ∀ {n v} → isStart v ≡ false → instEmit (mark laneStart) n ≡ v → ⊥
-      ns-of f e = t≢f (trans (cong isStart e) f)
+      ns-of f e = (not-¬ refl) (trans (cong isStart e) f)
 
       o≢l : outerB ≡ laneB → ⊥
       o≢l ()
@@ -425,7 +395,7 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
         other (entering a′ sp′ _ _) = fl (Fl.K F) (Fl.sh F) (Fl.uq F) (Fl.outK F) (ent-by xs x ys eq F (Fl.sh F) fin (λ _ → refl))
           (λ _ → Fl.nil F nat)
           (λ _ at′ → ⊥-elim (n≢ (trans (sym a′) at′)))
-          (λ sp _ → ⊥-elim (t≢f (trans (sym sp) sp′)))
+          (λ sp _ → ⊥-elim ((not-¬ refl) (trans (sym sp) sp′)))
           (λ at′ → ⊥-elim (n≢ (trans (sym a′) at′)))
     ... | yes refl = by-branch b eq
       where
@@ -439,14 +409,14 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
         grow {b} eq F@(fl K sh u oK en nl fo ovv aN) sh′ oK′ fin fout S≡ (ignored n≡ sp e₃) =
           fl K sh′ u oK′ (ent-by xs _ ys eq F sh′ fin fout)
             (λ na → ⊥-elim (na (trans (cong Flat.at e₃) (sym n≡))))
-            (λ sp′ _ → ⊥-elim (t≢f (trans (sym sp) (trans (sym (cong Flat.spent e₃)) sp′))))
+            (λ sp′ _ → ⊥-elim ((not-¬ refl) (trans (sym sp) (trans (sym (cong Flat.spent e₃)) sp′))))
             (λ _ _ → ++⁺ˡ (ovv sp (sym n≡)))
             (λ _ → inj₁ (++⁺ʳ xs (here (in-named xs k b ys eq))))
         grow {b} eq F@(fl K sh u oK en nl fo ovv aN) sh′ oK′ fin fout S≡ (entering a′ sp′ same bl≤) =
           fl K sh′ u oK′ (ent-by xs _ ys eq F sh′ fin fout)
             (λ na → ⊥-elim (na a′))
             (λ _ _ → flo′ (Flat.at (Sc xs) ≟ᵖ N))
-            (λ sp _ → ⊥-elim (t≢f (trans (sym sp) sp′)))
+            (λ sp _ → ⊥-elim ((not-¬ refl) (trans (sym sp) sp′)))
             (λ _ → inj₁ (++⁺ʳ xs (here (in-named xs k b ys eq))))
           where
             flo′ : Dec (Flat.at (Sc xs) ≡ N) → sumK K sh′ ≤ Flat.lanes (Sc (xs ++ [ (k , out (Tg b (instEmit (mark begin) N))) ]))
@@ -562,7 +532,7 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
     over-row xs k b n ys eq F@(fl K sh u oK en nl fo ovv aN) =
       fl K sh u oK (ent-by xs x ys eq F sh fin (λ _ → refl))
         (λ na → nl (λ a → na (trans at≡ a)))
-        (λ sp _ → ⊥-elim (t≢f (trans (sym sp≡) sp)))
+        (λ sp _ → ⊥-elim ((not-¬ refl) (trans (sym sp≡) sp)))
         (λ _ a → ++⁺ʳ xs (here (inx xs x ys eq F (trans (sym at≡) a) , k , b , n , refl)))
         (λ a → Sum.map₁ ++⁺ˡ (aN (trans (sym at≡) a)))
       where
@@ -767,5 +737,5 @@ module Floor {B : Set} (op : FlatOp) (Own : Pos → Set) (St Dn : Pos → Pos ×
             pick : Dec (Q ∈ K) → Dec (Flat.at (Sc rx) ≡ N) → ∀ b → Flat.spent (Sc rx) ≡ b → ⊥
             pick (no ni)  _        _     _ = nz (zero-of own (oK ni))
             pick (yes i)  (no na)  _     _ = S≢ i (nl na)
-            pick (yes i)  (yes a)  true  e = t≢f (trans (sym e) (hov (ovv e a)))
+            pick (yes i)  (yes a)  true  e = (not-¬ refl) (trans (sym e) (hov (ovv e a)))
             pick (yes i)  (yes a)  false e = S≢ i (zero-of (fo e a) z)

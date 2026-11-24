@@ -15,7 +15,7 @@ import Data.List.Relation.Unary.Any as Any
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Nat.Properties using (≤-refl; m≤m+n)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 open import Relation.Nullary using (¬_)
