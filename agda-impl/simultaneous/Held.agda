@@ -144,6 +144,15 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
 -- many rows of the instant last begun.  Each approximant's rest bounds only
 -- its own rows, and the limit's rows of an instant are those of every
 -- approximant together, which no one approximant's list bounds.
+--
+-- The route: one approximant meeting the run (`LimHeld.lift`) already
+-- shows every row of the limit past the zero cursor in that instant, so
+-- its own rest bounds them.  That needs no spin of it there: an unreached
+-- `defer` is subscribed only by a row a route carries, or inside an exempt
+-- burst, and both lie before the stop that zeroes the count.  Open: an
+-- exempt burst in an instant that also holds a begin, which `Ex` alone
+-- does not order before the zero.  The approximants' `Held` is had only at
+-- a fresh position, which this statement does not take.
 postulate
   lim-rest : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
            → (∀ n → IH (just n) ρ (defer l))

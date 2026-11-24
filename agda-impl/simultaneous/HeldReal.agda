@@ -535,11 +535,11 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         dead    : d + n ≡ L.length vs
         begun   : ∀ {q a y e} → RO q (out a) → Lane q a y e → ¬ Owes C y → (q , a) ∈ vs
 
-    -- The book as the scan counts it: its queue the waiting.
+    -- The book as the scan counts it: a value waits while its queue is up.
     record Joined (C : Cur) (st : Flat Pos) : Set where
       field
         book  : Book C
-        queue : Flat.queue st ≡ L.length (Book.ws book)
+        queue : ¬ Flat.queue st ≡ 0 → ¬ Book.ws book ≡ []
       open Book book public
 
     postulate
@@ -551,34 +551,36 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       -- the three steps, there along a machine run.
       book-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
                   → ¬ ¬ Book (bef (Done.ce D))
-      -- THE SCAN'S QUEUE COUNTS THE WAITING: an `outerOpen` read for each
-      -- value passed, a `laneStart` for each lane started.
+      -- THE SCAN'S QUEUE IS UP ONLY WHILE A VALUE WAITS: it rises at an
+      -- `outerOpen` and falls at a `laneStart` (`past-queue`), and no lane
+      -- starts before its value arrives.
       queue-counts : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
-                   → (Bk : Book (bef (Done.ce D))) → ¬ ¬ Flat.queue (proj₁ (past op init r₁)) ≡ L.length (Book.ws Bk)
+                   → (Bk : Book (bef (Done.ce D))) → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ¬ Book.ws Bk ≡ []
       -- A LANE SUBSCRIBED ONE STEP BELOW A LANE'S END SHOWS ITS START IN
       -- THE END'S INSTANT, past the ended lane's `laneDone`.
-      start-shown : op ≡ mergeᶠ (just k) → ∀ {yd w c i q a} → yd ≺ c → Sub i q (c ⊕ [ ix 1 ]) a
-                  → ∀ {q′ a′} → M q′ (out a′) → instantOf c ≺ⁱ instantOf q′
-                  → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × (yd ⊕ [ sub w ]) ≺ y × instantOf y ≡ instantOf c
+      start-shown : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → (D : Done x)
+                  → ∀ {i q a} → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
+                  → ∀ {q′ a′} → M q′ (out a′) → instantOf (Done.ce D) ≺ⁱ instantOf q′
+                  → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf (Done.ce D)
 
     -- THE SCAN COUNTS THE JOINER: its state before a `laneDone` it reads
     -- is the joiner's at the cursor before that lane's end.
     scan-joined : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
                 → ¬ ¬ Joined (bef (Done.ce D)) (proj₁ (past op init r₁))
-    scan-joined bd r₁ mt D no = book-at bd r₁ mt D λ Bk → queue-counts bd r₁ mt D Bk λ qe → no (record { book = Bk ; queue = qe })
+    scan-joined bd r₁ mt D no = book-at bd r₁ mt D λ Bk → no (record { book = Bk ; queue = queue-counts bd r₁ mt D Bk })
 
     -- With a value waiting every slot is taken, and the queue's head
     -- starts one step below the first owed end.
     head : ∀ {x st} (D : Done x) (J : Joined (bef (Done.ce D)) st) → ¬ Flat.queue st ≡ 0
          → Σ ℕ λ i → Σ Pos λ q → Σ A λ a → Sub i q (Done.ce D ⊕ [ ix 1 ]) a
     head D J nz with Joined.ws J | Joined.slots J | Joined.waiting J | Joined.queue J
-    ... | []           | _                   | _                   | qe = ⊥-elim (nz qe)
+    ... | []           | _                   | _                   | qe = ⊥-elim (qe nz refl)
     ... | (q , a) ∷ ws′ | Lv , _ , inj₁ ()   | _                   | _
     ... | (q , a) ∷ ws′ | Lv , _ , inj₂ refl | _ , _ , wf , _ , _ | _  =
       let open Done D ; open Joined J using (vs; census; dead; begun)
           (Lvs , nx , _) = Cn.nths-split vs Lv
           (i , sb) = Cn.head-at Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx {ws = ws′}
-                       (_ , _ , begun val row (λ le → ≺-absurd {yd} {ce} before le) , ends , (λ ()) , ≼-refl {ce})
+                       (_ , _ , begun val row (λ le → le before) , ends , (λ ()) , ≼-refl {ce})
                        (λ (_ , _ , _ , _ , _ , o) → o)
       in i , q , a , sb
 
@@ -592,8 +594,8 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
     let D = done-at bd r₁ mt ld ; open Done D in
     scan-joined bd r₁ mt D λ J →
       let (_ , _ , _ , sb) = head D J nz in
-      start-shown bd {w = w} before sb mq (subst (_≺ⁱ instantOf q) (sym same) xq)
-        λ (y , n , my , lt , iy) → no (y , n , my , subst (_≺ y) (sym at-x) lt , trans iy same)
+      start-shown bd r₁ mt ld D sb mq (subst (_≺ⁱ instantOf q) (sym same) xq)
+        λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same)
     where open Queue k
 
   -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
