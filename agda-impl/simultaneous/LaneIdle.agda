@@ -21,7 +21,7 @@ open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong; cong₂)
 open import Relation.Nullary using (¬_; yes; no)
 open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
 
@@ -30,15 +30,15 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; instan
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
-open import denotation.Laws.Worlds.Leaves using (ine-pin)
-open import denotation.Read using ([]; _∷_)
+open import denotation.Laws.Worlds.Leaves using (ine-pin; out-inj)
+open import denotation.Read using ([]; _∷_; Run; Least)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm; Sync; Ex; Carried; cnt; nameOf)
-open import simultaneous.Counts using (Counts; module Alike; counts-held; counts-at; module TakeCounts)
+open import simultaneous.Counts using (idle-row; Counts; module Alike; counts-held; counts-at; module TakeCounts)
 open import simultaneous.HeldTake using (name-ext; sync-ext; ex-ext)
 open import simultaneous.HeldDefer using (sync-up)
 open import simultaneous.RealView using (lane-at)
@@ -56,7 +56,7 @@ open import simultaneous.ColdIdle using (mid)
 open import simultaneous.LaneDoneRow using (done-row)
 open import simultaneous.LaneVis using (lane-vis; hot-lab; sh-u)
 open import simultaneous.LaneUp using (module Lift)
-open import simultaneous.LaneSite using (between-under)
+open import simultaneous.LaneSite using (between-under; FoldOf; f-none; f-step; Sited; lane-site)
 open import simultaneous.LaneLayers using (under-⊕; under-refl)
 open import denotation.Up using (up; up-⊕)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
@@ -65,7 +65,10 @@ open import simultaneous.HeldBase using (shows-ev)
 open import simultaneous.ElabUndone using (Undone; tell-back; tell-undone)
 open import simultaneous.CombSent using (assoc³)
 open import simultaneous.HeldTrigger using (≺-part; Blocked; blk; module Spots; module Cat₀; module Cat)
-open import simultaneous.Layers using (pinby-vis)
+open import simultaneous.Layers using (pinby-vis; snoc-view; run-row; run-tail; cursor-snoc)
+open import simultaneous.Project using (run-prefix)
+open import simultaneous.HeldRead using (pre-noend)
+open import simultaneous.HeldJoin using (cnt-++)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Worlds using (full; notT)
 open import denotation.Laws.Truth using (instant-⊕)
@@ -124,6 +127,33 @@ hot-each-nopin : ∀ {X Y} (t : EmissionSet X) s {k r} → enter (Op.flatMap (me
 hot-each-nopin t s (Merge.opin (shown _ () _ , _) , _)
 hot-each-nopin t s (Merge.left _ _ ((l , _) , _) _ _ , _) = ine-pin l
 hot-each-nopin t s (Merge.run () _ , _)
+
+-- A RUN MET UP TO A ROW HAS COUNTED THE FOLD BEFORE IT: each value row
+-- before it is met in order, and no end or other row is.
+private
+  last-row : ∀ {A} {t : EmissionSet (IE A)} ys {z ez x e} → Met t ((ys ++ [ (z , ez) ]) ++ [ (x , e) ])
+           → Σ (IE A) λ w → ez ≡ out w × t z (out w) × Least t (just z) x
+  last-row {t = t} ys {z} {ez} {x} {e} mt with run-row (run-prefix (ys ++ [ (z , ez) ]) mt) (∈-++⁺ʳ ys (here refl))
+                                             | subst (λ c → Run t c [ (x , e) ]) (cursor-snoc nothing ys) (run-tail (ys ++ [ (z , ez) ]) mt)
+  ... | zt , vi | (_ , _ , lst) ∷ [] = go ez zt vi (λ eq → pre-noend (ys ++ [ (z , ez) ]) mt (subst (λ q → (z , q) ∈ ys ++ [ (z , ez) ]) eq (∈-++⁺ʳ ys (here refl))))
+    where
+      go : ∀ ez′ → t z ez′ → Visible ez′ → (ez′ ≡ end → ⊥) → Σ (IE _) λ w → ez′ ≡ out w × t z (out w) × Least t (just z) x
+      go (out w) zt′ _ _  = w , refl , zt′ , lst
+      go skip    _   () _
+      go (pin _) _   () _
+      go end     _   _ ne = ⊥-elim (ne refl)
+
+met-fold : ∀ {A} {t : EmissionSet (IE A)} → (∀ {y e e′} → t y e → t y e′ → e ≡ e′)
+         → ∀ {x r} → FoldOf (λ k v → t k (out v)) x r → ∀ r₁ {e} → Met t (r₁ ++ [ (x , e) ]) → cnt r₁ ≡ r
+met-fold fu F r₁ mt with snoc-view r₁
+met-fold fu (f-none _) _ mt | inj₁ refl = refl
+met-fold fu (f-step F row yx btw) _ ((_ , _ , _ , lst) ∷ _) | inj₁ refl = ⊥-elim (lst row tt tt yx)
+met-fold fu (f-none nr) _ mt | inj₂ (ys , (z , ez) , refl) with last-row ys mt
+... | w , refl , zt , (zx , _) = ⊥-elim (nr zt zx)
+met-fold fu (f-step {y = y} {v} F row yx btw) _ mt | inj₂ (ys , (z , ez) , refl) with last-row ys mt
+... | w , refl , zt , (zx , lst) with ≼-antisym {z} {y} (λ yz → btw zt yz zx) (λ zy → lst row tt zy yx)
+...   | refl with out-inj (fu zt row)
+...     | refl = trans (cnt-++ ys [ (y , out v) ]) (cong (λ c → count c v) (met-fold fu F ys (run-prefix (ys ++ [ (y , out v) ]) mt)))
 
 module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (ρ₄ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ ⊤ ∷ IE B ∷ IE A ∷ Θ)
@@ -518,13 +548,31 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
   sub-is exhaustᶠ          p ok fp ep xo l                 = refl
   sub-is (mergeᶠ (just n)) p ok fp ep xo (i , s , sb , _ , _) = refl
 
-  -- A LANE'S `laneDone` HOLDS A ROUTE, outside its burst and every
-  -- exemption: the frame reads it past its program's end, and the count
-  -- moves at no row between.
+  -- A LANE'S `laneDone` TELLS A LIVE COUNT, outside its burst and every
+  -- exemption: the frame reads it past its program's end, which is
+  -- covered by a route.
   postulate
-    done-sub : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → ∀ r₁ {y kd n}
+    done-pos : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → ∀ r₁ {y kd n}
              → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync s y → ¬ Ex cs y
-             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+             → Σ ℕ λ k → kd ≡ suc k
+
+  -- A LANE'S `laneDone` HOLDS A ROUTE: the run met up to it has counted
+  -- what the `laneDone` tells, and an idle run names the row's instant.
+  done-sub : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → ∀ r₁ {y kd n}
+           → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync s y → ¬ Ex cs y
+           → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  done-sub a s ok fs es r₁ {y} {kd} {n} mt ns nx = k , cong₂ _,_ name (trans count′ kk)
+    where
+      Iˢ = inv-ev m (laneˢ (x a)) env₂ g₂ s ok
+      Sˢ = lane-site ρ₄ (f a) env₂ g₂ m s ok (proj₁ (run-row mt (∈-++⁺ʳ r₁ (here refl))))
+      k  = proj₁ (done-pos a s ok fs es r₁ mt ns nx)
+      kk = proj₂ (done-pos a s ok fs es r₁ mt ns nx)
+      count′ : proj₂ (cnt r₁) ≡ kd
+      count′ = trans (cong proj₂ (met-fold (InvAt.func Iˢ) (Sited.fold Sˢ) r₁ mt)) (sym (Sited.told Sˢ))
+      name : proj₁ (cnt r₁) ≡ nameOf y
+      name = [ (λ z → ⊥-elim (zero≢suc (trans (sym z) (trans count′ kk)))) , (λ eq → eq) ]′ (idle-row (idle-at a s ok fs es) r₁ mt)
+        where zero≢suc : ∀ {j} → 0 ≡ suc j → ⊥
+              zero≢suc ()
 
   lane-done : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
             → ∀ r₁ {y kd n} → Met (View.Lane fL (enter dR p) op′ q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ])

@@ -272,13 +272,13 @@ Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 
 #### THE LANE'S LAST COUNT
 
-Untried: a lane's `laneDone` follows its program's end in the frame, so
-it tells the count the end is covered by. Open: whether the end's
-exemptions are the `laneDone`'s. Settled by a run moving the end's cover
-up through the share, frame and take, or by an end exempt where its
-`laneDone` is not.
+The run up to a `laneDone` has counted what it tells, and is named for
+its instant; open is only that the told count is not zero. Untried: the
+`laneDone` follows its program's end in the frame, so it tells the count
+the end is covered by. Settled by a run moving the end's cover up through
+the share, frame and take, or by an end exempt where its `laneDone` is not.
 
-Members: `done-sub`.
+Members: `done-pos`.
 
 #### THE HELD STREAMS
 
