@@ -151,7 +151,7 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
     ... | inj₁ le′ = le′
     ... | inj₂ eq  = ⊥-elim (≺-irrefl {s} (subst (s ≺_) (sym eq) (≺-trans {s} {q} {q ⊕ [ l ]} (≺-trans {s} {P} {q} s≺P Pq) (≺-ext q []))))
 
-    be-undone : ∀ {a} → T (not (undone a)) → a ≡ marked burstEnd → ⊥
+    be-undone : ∀ {a : IE B} → T (not (undone a)) → a ≡ marked burstEnd → ⊥
     be-undone nk refl = nk
 
     -- A failing value is the lane part's.
