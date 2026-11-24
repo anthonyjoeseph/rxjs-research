@@ -175,8 +175,8 @@ module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t 
 
   -- The row where a fresh step begins is its begin.
   at-beg : ∀ {J k e} → ColdRow p k e → k ≡ B⁰ J → Fresh p J → e ≡ Bg J
-  at-beg (now-value zs) eq f = ⊥-elim (not-now eq f)
-  at-beg (now-end zs)   eq f = ⊥-elim (not-now eq f)
+  at-beg (now-value _ zs) eq f = ⊥-elim (not-now eq f)
+  at-beg (now-end _ zs)   eq f = ⊥-elim (not-now eq f)
   at-beg (step-begin _) refl f = refl
   at-beg (step-value _) ()
   at-beg (step-over _)  ()
@@ -185,8 +185,8 @@ module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t 
   -- A value of a fresh instant is its step's.
   val-at : ∀ {K y a j} → ColdRow {A} p y (out (instEmit (value a) j)) → rootOf y ≡ (K ∙ []) → Fresh p K
          → y ≡ (K ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ [])) × j ≡ nm (K ∙ [])
-  val-at (now-value zs) ro f =
-    ⊥-elim (fresh-self (subst (Fresh p) (trans (sym (cong instant ro)) (cong instant (rootOf-ext p zs))) f))
+  val-at (now-value {l} _ zs) ro f =
+    ⊥-elim (fresh-self (subst (Fresh p) (trans (sym (cong instant ro)) (cong instant (rootOf-ext p (l ∷ zs)))) f))
   val-at (step-value _) refl f = refl , refl
 
   -- Rows between a step's begin and its later rows hold no mark.
@@ -225,8 +225,8 @@ module Runs {A : Set} (p : Pos) (t : EmissionSet (IE A)) (row : ∀ {y e} → t 
           → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   covered mt r₁ {y} {e} r₂ eq cr ne with run-row mt (subst ((y , e) ∈_) (sym eq) (∈-++⁺ʳ r₁ (here refl)))
   ... | x , v with row x v
-  ...   | now-value zs = ⊥-elim (ne (here (⊑-inside {p} {p ⊕ zs} (zs , refl) , rootOf-ext p zs)))
-  ...   | now-end zs   = ⊥-elim (ne (here (⊑-inside {p} {p ⊕ zs} (zs , refl) , rootOf-ext p zs)))
+  ...   | now-value {l} _ zs = ⊥-elim (ne (here (⊑-inside {p} {p ⊕ (l ∷ zs)} ((l ∷ zs) , refl) , rootOf-ext p (l ∷ zs))))
+  ...   | now-end {l} _ zs   = ⊥-elim (ne (here (⊑-inside {p} {p ⊕ (l ∷ zs)} ((l ∷ zs) , refl) , rootOf-ext p (l ∷ zs))))
   ...   | step-begin _ with cr
   ...     | ()
   covered mt r₁ r₂ eq cr ne | x , v | step-value {T} {e′} {i} f =

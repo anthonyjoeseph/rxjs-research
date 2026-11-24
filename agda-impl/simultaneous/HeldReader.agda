@@ -33,7 +33,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup) renaming ([] to []ᵉ; _∷_ to _∷ᵉ_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (just; nothing)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
@@ -68,7 +68,16 @@ open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
 open import simultaneous.HeldTake using (name-ext; ex-ext)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.HeldBase using (Bound; IH; ih; Ann; Gap; EnvHeld; Fresh; apart-at)
+open import simultaneous.HeldBase using (Bound; IH; ih; Ann; Gap; EnvHeld; Fresh; apart-at; apart-all; gap-hot; AShown; a-value; a-end; ann-ev; fresh-adm)
+open import simultaneous.HeldRead using (read-at; read-end-at)
+open import simultaneous.Routed using (Adm)
+import simultaneous.Routed as Rt
+open import simultaneous.InstEmit using (laneDone)
+open import simultaneous.CombSent using (hots-at)
+open import simultaneous.Layers using (pinby-vis)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import denotation.Laws.Worlds using (W; join; here; ⊑-cmp; ⊑-snoc; ⊑-snoc⁺; ⊕-injʳ; Ok)
+open import denotation.Laws.Modulus using (≺-ext)
 open import simultaneous.Routed using (PlacedD)
 import Relation.Nullary as Nl
 open import simultaneous.HeldJoin using (module Join)
@@ -131,7 +140,7 @@ open import simultaneous.Layers using (run-past-end)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
 open import Data.Bool using (if_then_else_)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; reader; annotate; annStep; joinStep; concatˢ; elab; undone)
 
 -- A position past one below a row is past the row.
 below-≺ : ∀ y xs {w} → (y ⊕ xs) ≺ w → y ≺ w
@@ -799,11 +808,70 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
         in subst (λ r → Valued r × opos r ⊑ (y₀ ⊕ zs)) (sym (rootOf-ext y₀ zs)) (v , ⊑-trans o (zs , refl))
       ... | inj₂ (() , _)
 
--- A READER'S ROWS A LANE CAN HANG ON ARE ADMISSIBLE: each lies below a
--- binder's row a lane can hang on, outside every binder's last gap.
-postulate
-  placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) (env : DenEnv Δ) cs → GoodEnv env
-                   → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (connected i)) env)
+-- A READER'S ROWS A LANE CAN HANG ON ARE ADMISSIBLE: each lies below the
+-- reader's join on a binder's annotated row past its subscription.  That
+-- row lies outside every gap, and the join is in the reader's world, so
+-- a gap below it would hang its `nothing`, a hot row, in the world.
+module ReadPlaced {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs)
+                  {A} (i : A ∈ Γ) {p} (ok : Ok (Hots env) p) (fr : Fresh eh p) where
+
+  b = EnvHeld.bound eh i
+
+  vis : ∀ {X} {e : Ev (AIE X)} → AShown e → Visible e
+  vis a-value = tt
+  vis a-end   = tt
+
+  hy : ∀ {q e} → Ann b q e → AShown e → Hots env q
+  hy a sh = hots-at env (ρ (∈-map⁺ AIE i)) (Bound.is b) (a , λ ce cq → pinby-vis (vis sh) (InvAt.quiet IB ce a cq))
+    where
+      IB = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+
+  joined : ∀ {q₁ e} → Ann b q₁ e → AShown e → p ≺ q₁ → ∀ ws → Fresh eh ((q₁ ⊕ [ sub p ]) ⊕ ws)
+  joined {q₁} a sh pq ws = apart-all (λ j → off j) , λ {c} ci → ≺-trans {c} {p} {(q₁ ⊕ [ sub p ]) ⊕ ws} (proj₂ fr ci) (≺-trans {p} {q₁} {(q₁ ⊕ [ sub p ]) ⊕ ws} pq lt)
+    where
+      lt : q₁ ≺ ((q₁ ⊕ [ sub p ]) ⊕ ws)
+      lt = subst (q₁ ≺_) (sym (⊕-assoc q₁ [ sub p ] ws)) (≺-ext q₁ ws)
+      w : W (Hots env) p (q₁ ⊕ [ sub p ])
+      w = join (inj₁ (hy a sh)) here pq
+      off : ∀ {Y} (j : Y ∈ Γ) → Nl.¬ Gap (EnvHeld.bound eh j) ((q₁ ⊕ [ sub p ]) ⊕ ws)
+      off j (c , r , an , h , nl) with ⊑-cmp (c ⊕ [ ix 1 ]) (q₁ ⊕ [ sub p ]) h (ws , refl)
+      ... | inj₂ qc = proj₂ ok (gap-hot eh j an) w (⊑-inside (⊑-trans qc (⊑-snoc⁺ _)))
+      ... | inj₁ cq with ⊑-snoc q₁ cq
+      ...   | inj₁ cq′ = EnvHeld.apart eh i j a sh (c , r , an , cq′ , λ l → nl (⊑-trans l (⊑-trans (⊑-snoc⁺ q₁) (ws , refl))))
+      ...   | inj₂ eq with ⊕-injʳ c q₁ eq
+      ...     | ()
+
+  no-done : ∀ {q r k n} → Ann b q (out (r , just (instEmit (mark (laneDone k)) n))) → ⊥
+  no-done {k = k} {n = n} a = not-undone {k} {n} (ann-ev (Bound.m b) (Bound.src b) (Bound.env b) (Bound.undone b) (Bound.at b ⊕ [ ix 1 ]) a)
+    where
+      not-undone : ∀ {k n} → T (undone {A} (instEmit (mark (laneDone k)) n)) → ⊥
+      not-undone ()
+
+  Read : Pos → IE A → Set
+  Read y x = Σ Pos λ q₁ → Σ Routes λ r → Σ (Maybe (IE A)) λ me → Ann b q₁ (out (r , me)) × p ≺ q₁ × Rl y (q₁ ⊕ [ sub p ])
+             × (me ≡ just x ⊎ x ≡ instEmit (mark begin) (nameOf y))
+
+  read-val : ∀ {y a n} → Read y (instEmit (value a) n) → Fresh eh y
+  read-val (q₁ , r , _ , aq , pq , (ws , refl) , inj₁ refl) = joined aq a-value pq ws
+  read-val (_ , _ , _ , _ , _ , _ , inj₂ ())
+
+  read-done : ∀ {y k n} → Read y (instEmit (mark (laneDone k)) n) → ⊥
+  read-done (_ , _ , _ , aq , _ , _ , inj₁ refl) = no-done aq
+  read-done (_ , _ , _ , _ , _ , _ , inj₂ ())
+
+  read-fin : ∀ {y} → (Σ Pos λ c → Ann b c end × p ≺ c × y ≡ c ⊕ [ sub p ]) ⊎ y ≡ p ⊕ [ last ] → Fresh eh y
+  read-fin (inj₁ (c , ce , pc , refl)) = subst (Fresh eh) (⊕-identityʳ (c ⊕ [ sub p ])) (joined ce a-end pc [])
+  read-fin (inj₂ refl)                 = Adm.bare (fresh-adm eh) fr (λ ())
+
+  placed : ∀ {y e} → enter (RD (lookup env (ρ (∈-map⁺ AIE i)))) p y e → Rt.Shown e → Fresh eh y
+  placed x Rt.s-value = read-val (read-at b p x)
+  placed x Rt.s-done  = ⊥-elim (read-done (read-at b p x))
+  placed x Rt.s-end   = read-fin (read-end-at b p x)
+
+placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) (env : DenEnv Δ) cs → GoodEnv env
+                 → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (connected i)) env)
+placed-connected nothing  ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
+placed-connected (just n) ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
 
 held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep

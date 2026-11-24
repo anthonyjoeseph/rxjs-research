@@ -43,7 +43,7 @@ open import simultaneous.CombSent using (assoc³)
 open import simultaneous.ColdFew using (Fresh; fresh-past; ⊑₂; f-end; Leaf; module Pair; Ticks; Tickless; Rendered; RZ; Mint;
   mint-in; module Core; O; o-row; o-under)
 import simultaneous.ColdFew as CF
-open import simultaneous.ColdShape using (module Shape; ROut; v-value; v-over; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs;
+open import simultaneous.ColdShape using (module Shape; lead-⊑; ROut; v-value; v-over; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs;
   fc-ends; fm-ticks; r-outs)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render; concatˢ; phase)
@@ -238,7 +238,7 @@ module Begins {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → De
 
     eb : ∀ {T e} → Fresh p (cascade T e last) → Top (Eᵖ T e) end → ¬ ¬ Beg T e
     eb f (Joining.oend (Scan.send xm , _) _ , h)                = eb-m f xm h
-    eb f (Joining.lend (Scan.sval ac , _) _ (l , _) _ _ dn , _) = ⊥-elim (not-under (lane-end ac l dn) f)
+    eb f (Joining.lend (Scan.sval ac , _) _ (l , _) _ _ dn , _) = ⊥-elim (not-under (lead-⊑ (lane-end ac l dn)) f)
     eb f (Joining.lane _ _ _ _ () , _)
     eb f (Joining.run () _ , _)
     eb f (Joining.rend () _ _ , _)

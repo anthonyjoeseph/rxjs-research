@@ -48,7 +48,7 @@ open import simultaneous.CombSent using (assoc³)
 open import simultaneous.ColdFew using (Fresh; fresh-⊑; fresh-self; fresh-past; ⊑₂; Place; f-end; Leaf; module Pair; Ticks; Tickless;
   Rendered; RZ; Mint; mint-in; rv-raw; O; o-row; module Core)
 import simultaneous.ColdFew as CF
-open import simultaneous.ColdShape using (module Shape; ROut; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs; fc-ends; fm-ticks; r-outs)
+open import simultaneous.ColdShape using (module Shape; lead-⊑; ROut; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs; fc-ends; fm-ticks; r-outs)
 open import simultaneous.ColdBegin using (same-≺; rz; fm-backs)
 open import simultaneous.ColdRuns using (B⁰)
 open import simultaneous.ColdOrder using (⊕1-inj)
@@ -210,10 +210,10 @@ module Ends {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den 
 
       -- Every render has ended by the end.
       lc : ∀ x {q} → Acc p q x → ((q ⊕ [ ix 1 ]) ⊕ [ last ]) ≼ (cascade T e last ∙ (ix 1 ∷ last ∷ []))
-      lc (false , val a) {q} ac = past (early-r {q} {[ last ]} (read-early ac (λ ()) tt)) fP
-      lc (false , cdone) {q} ac = past (early-r {q} {[ last ]} (read-early ac (λ ()) tt)) fP
-      lc (false , tick)  {q} ac = past (tick-r {q} {false} {[ last ]} ac) fP
-      lc (true , tick)   {q} ac = past (tick-r {q} {true} {[ last ]} ac) fP
+      lc (false , val a) {q} ac = past (lead-⊑ (early-r {q} {[ last ]} (read-early ac (λ ()) tt))) fP
+      lc (false , cdone) {q} ac = past (lead-⊑ (early-r {q} {[ last ]} (read-early ac (λ ()) tt))) fP
+      lc (false , tick)  {q} ac = past (lead-⊑ (tick-r {q} {false} {[ last ]} ac)) fP
+      lc (true , tick)   {q} ac = past (lead-⊑ (tick-r {q} {true} {[ last ]} ac)) fP
       lc (true , val a) ac with val-row ac
       ... | T′ , e′ , i′ , refl , r₁ , _ =
         ≺→≼ {cascade T′ e′ (ix i′) ∙ (ix 1 ∷ last ∷ [])} {cascade T e last ∙ (ix 1 ∷ last ∷ [])}

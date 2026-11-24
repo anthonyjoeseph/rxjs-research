@@ -22,11 +22,11 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Function using (Equivalence)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 open import Relation.Nullary using (¬_)
 
 open import Tree using (mergeᶠ; cold; of; map)
-open import denotation.Position using (Pos; ix; last; root; cascade; _∙_; _⊕_; _≟ᵖ_; instant; nested; fired; Root; _▸_; tickᴿ; _<ˡ_)
+open import denotation.Position using (Pos; Label; ix; last; root; cascade; _∙_; _⊕_; _≟ᵖ_; instant; nested; fired; Root; _▸_; tickᴿ; _<ˡ_)
   renaming (tick to tickᵖ)
 open import denotation.Events using (Timeline; Events; fresh; From; done; quiet; at; Frame; emit; stall; close; Frame∞; From∞;
   frames; burst; start; timelineAt; ofᴱ; <ᵖ-part; ix-<)
@@ -34,8 +34,8 @@ open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; enter; Ev; o
   on-out; on-skip; _≺_; _≼_; map-out; map-skip; map-pin; map-end; module Op; module Joining; module Bounded; module Merge; module Scan)
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≺-trans; ≼-refl; ≺→≼; ≺-≼-≺; ≼-≺-≺; ≼-antisym; ≼-or-≻; ≺-ext; ≺-absurd)
-open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-refl; ⊕-assoc)
-open import denotation.Laws.Worlds.Leaves using (of-reach; of-end; ine-pin)
+open import denotation.Laws.Worlds using (_⊑_; ⊑-trans; ⊑-refl; ⊕-assoc; ⊕-identityʳ; Plain; plain-ix; plain-last; ⊑-snoc⁺)
+open import denotation.Laws.Worlds.Leaves using (of-reach; of-end; of-idx; ine-pin)
 open import denotation.Laws.Cut using (ix-asc)
 open import denotation.Laws.Nth using (module Nths)
 open import denotation.Laws.Truth using (instant-⊑)
@@ -60,9 +60,17 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 -- begin lies where a value step's does, under the name one queued lane
 -- further down, and the cold's end carries that route
 -- (`simultaneous.Routed.Carried`) from where the step's lane completes.
+-- A row of the subscribe burst: one plain step below the subscription,
+-- so in its world.
+Lead : Pos → Pos → Set
+Lead p y = Σ Label λ l → Plain l × (p ⊕ [ l ]) ⊑ y
+
+lead-⊑ : ∀ {p y} → Lead p y → p ⊑ y
+lead-⊑ {p} (_ , _ , u) = ⊑-trans (⊑-snoc⁺ p) u
+
 data ColdRow {A : Set} (p : Pos) : Pos → Ev (IE A) → Set where
-  now-value  : ∀ zs {a} → ColdRow p (p ⊕ zs) (out (instEmit (value a) root))
-  now-end    : ∀ zs → ColdRow p (p ⊕ zs) end
+  now-value  : ∀ {l} → Plain l → ∀ zs {a} → ColdRow p (p ⊕ (l ∷ zs)) (out (instEmit (value a) root))
+  now-end    : ∀ {l} → Plain l → ∀ zs → ColdRow p (p ⊕ (l ∷ zs)) end
   step-begin : ∀ {t e l} → Fresh p (cascade t e l) → ColdRow p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ []))
                                      (out (instEmit (mark begin) (nm (cascade t e l ∙ []))))
   step-value : ∀ {t e i a} → Fresh p (cascade t e (ix i)) → ColdRow p (cascade t e (ix i) ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 1 ∷ []))
@@ -309,18 +317,20 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
 
     -- Where the merge ends: under it, or past the cold's end.
     MgEnd : Pos → Set
-    MgEnd c = p ⊑ c ⊎ Σ Pos λ c′ → L1 (S₁ p) c′ end × Fired {Tag A} (S₁ (S₁ p)) c′ end × c ≡ (c′ ⊕ [ ix 1 ]) ⊕ [ last ]
+    MgEnd c = Lead p c ⊎ Σ Pos λ c′ → L1 (S₁ p) c′ end × Fired {Tag A} (S₁ (S₁ p)) c′ end × c ≡ (c′ ⊕ [ ix 1 ]) ⊕ [ last ]
 
     cat-up : ∀ {c} → CatEnd c → MgEnd c
-    cat-up (inj₁ u) = inj₁ (⊑-trans (⊑₂ p (ix 0) (ix 1)) u)
+    cat-up (inj₁ u) = inj₁ (ix 0 , plain-ix , ⊑-trans ([ ix 1 ] , refl) u)
     cat-up (inj₂ z) = inj₂ z
 
     mg-lend : ∀ {q a c} → (q ≡ p ⊕ [ ix 0 ] × a ≡ true) ⊎ (q ≡ p ⊕ [ ix 1 ] × a ≡ false) → enter (Fm a) (q ⊕ [ ix 1 ]) c end → MgEnd c
     mg-lend (inj₁ (refl , refl)) l = cat-up (cat-end (proj₁ (fm-true _ l)))
-    mg-lend (inj₂ (refl , refl)) l = inj₁ (⊑-trans (⊑₂ p (ix 1) (ix 1)) (proj₁ (fm-false _ l)))
+    mg-lend (inj₂ (refl , refl)) l = inj₁ (ix 1 , plain-ix , ⊑-trans ([ ix 1 ] , refl) (proj₁ (fm-false _ l)))
 
     mg-end : ∀ {c} → JoinT c end → MgEnd c
-    mg-end (Joining.oend x _)                = inj₁ (o-under p x)
+    mg-end (Joining.oend (x , _) _) with of-idx p 0 _ x
+    ... | inj₁ (j , _ , eq) = inj₁ (ix j , plain-ix , [] , trans eq (sym (⊕-identityʳ _)))
+    ... | inj₂ eq           = inj₁ (last , plain-last , [] , trans eq (sym (⊕-identityʳ _)))
     mg-end (Joining.lend x _ (l , _) _ _ _)  = mg-lend (o-row p x) l
     mg-end (Joining.rend () _ _)
 
@@ -440,11 +450,11 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     ------------------------------------------------------------------------
     -- The renders
 
-    now-v : ∀ {y} {a : A} → p ⊑ y → ColdRow p y (out (instEmit (value a) root))
-    now-v (zs , refl) = now-value zs
+    now-v : ∀ {y} {a : A} → Lead p y → ColdRow p y (out (instEmit (value a) root))
+    now-v {a = a} (l , pl , zs , refl) = subst (λ y → ColdRow p y (out (instEmit (value a) root))) (sym (⊕-assoc p [ l ] zs)) (now-value pl zs)
 
-    now-e : ∀ {y} → p ⊑ y → ColdRow {A} p y end
-    now-e (zs , refl) = now-end zs
+    now-e : ∀ {y} → Lead p y → ColdRow {A} p y end
+    now-e (l , pl , zs , refl) = subst (λ y → ColdRow {A} p y end) (sym (⊕-assoc p [ l ] zs)) (now-end pl zs)
 
     lo-v : ∀ {q₀ a k v} → ValAt q₀ a → VRow a (q₀ ⊕ [ ix 1 ]) k v → ColdRow p k (out v)
     lo-v (_ , _ , _ , refl , _ , f) v-begin = step-begin f
@@ -456,7 +466,7 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
 
     lo : ∀ x₀ {q₀ k v} → Acc p q₀ x₀ → ROut x₀ (q₀ ⊕ [ ix 1 ]) k v → ColdRow p k (out v)
     lo (false , val a) {q₀} ac (refl , refl) =
-      now-v (⊑-trans (⊑-trans ([ ix 0 ] , refl) (read-early ac (λ ()) tt)) ((ix 1 ∷ ix 0 ∷ []) , ⊕-assoc q₀ [ ix 1 ] [ ix 0 ]))
+      now-v (ix 0 , plain-ix , ⊑-trans (read-early ac (λ ()) tt) ((ix 1 ∷ ix 0 ∷ []) , ⊕-assoc q₀ [ ix 1 ] [ ix 0 ]))
     lo (true , val a)  ac vr            = lo-v (val-row ac) vr
     lo (true , cdone)  ac (refl , refl) = lo-c (cd-row ac)
     lo (false , cdone) ac ()
@@ -478,7 +488,7 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     val-end {w = w} (T , e , i , refl , r₁ , f) (c₀ , x , le) = ve (mg-end x) le
       where
         ve : MgEnd c₀ → c₀ ≼ (((cascade T e (ix i) ∙ []) ⊕ [ ix 1 ]) ⊕ w) → ⊥
-        ve (inj₁ u)                           _  = early-mg r₁ f x u
+        ve (inj₁ u)                           _  = early-mg r₁ f x (lead-⊑ u)
         ve (inj₂ (c′ , rc , f-end _ , refl)) le′ =
           le′ (instant-≺ (((cascade T e (ix i) ∙ []) ⊕ [ ix 1 ]) ⊕ w) ((c′ ⊕ [ ix 1 ]) ⊕ [ last ])
                  (≺-instant (cascade T e (ix i) ∙ []) c′ (step-before r₁ rc) (λ ())))
@@ -487,19 +497,19 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     cd-end {w = w} (c′ , rc , f-end f , refl) (c₀ , x , le) = ce (mg-end x) le
       where
         ce : MgEnd c₀ → c₀ ≼ ((((c′ ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) ⊕ w) → ⊥
-        ce (inj₁ u)                            _   = early-mg rc (fresh-⊑ pS f) x u
+        ce (inj₁ u)                            _   = early-mg rc (fresh-⊑ pS f) x (lead-⊑ u)
         ce (inj₂ (c″ , rc″ , f-end _ , refl)) le′ with lf-uniq _ rc rc″
         ... | refl = le′ (Equivalence.from T-≡ (<ᵖ-part (c′ ⊕ [ ix 1 ]) {ix 0} {last} (ix 1 ∷ w) [] refl))
 
-    tick-r : ∀ {q₀ b w} → Acc p q₀ (b , tick) → p ⊑ ((q₀ ⊕ [ ix 1 ]) ⊕ w)
+    tick-r : ∀ {q₀ b w} → Acc p q₀ (b , tick) → Lead p ((q₀ ⊕ [ ix 1 ]) ⊕ w)
     tick-r {q₀} {w = w} ac with mg-out p (proj₁ (acc-tag ac))
-    ... | inj₁ (_ , u)  = ⊑-trans (⊑-trans ([ ix 1 ] , refl) u) ((ix 1 ∷ w) , ⊕-assoc q₀ [ ix 1 ] w)
+    ... | inj₁ (_ , u)  = ix 1 , plain-ix , ⊑-trans u ((ix 1 ∷ w) , ⊕-assoc q₀ [ ix 1 ] w)
     ... | inj₂ (() , _)
 
-    early-r : ∀ {q₀ w} → (p ⊕ [ ix 0 ]) ⊑ q₀ → p ⊑ ((q₀ ⊕ [ ix 1 ]) ⊕ w)
-    early-r {q₀} {w} u = ⊑-trans (⊑-trans ([ ix 0 ] , refl) u) ((ix 1 ∷ w) , ⊕-assoc q₀ [ ix 1 ] w)
+    early-r : ∀ {q₀ w} → (p ⊕ [ ix 0 ]) ⊑ q₀ → Lead p ((q₀ ⊕ [ ix 1 ]) ⊕ w)
+    early-r {q₀} {w} u = ix 0 , plain-ix , ⊑-trans u ((ix 1 ∷ w) , ⊕-assoc q₀ [ ix 1 ] w)
 
-    le-u : ∀ x₀ {q₀ w} → Acc p q₀ x₀ → Merge.Done R (Sc p) ((q₀ ⊕ [ ix 1 ]) ⊕ w) → p ⊑ ((q₀ ⊕ [ ix 1 ]) ⊕ w)
+    le-u : ∀ x₀ {q₀ w} → Acc p q₀ x₀ → Merge.Done R (Sc p) ((q₀ ⊕ [ ix 1 ]) ⊕ w) → Lead p ((q₀ ⊕ [ ix 1 ]) ⊕ w)
     le-u (false , val a) {q₀} {w} ac dn = early-r {q₀} {w} (read-early ac (λ ()) tt)
     le-u (false , cdone) {q₀} {w} ac dn = early-r {q₀} {w} (read-early ac (λ ()) tt)
     le-u (false , tick)  {q₀} {w} ac dn = tick-r {q₀} {false} {w} ac
@@ -508,7 +518,7 @@ module Shape {A : Set} (Fc Fm : Bool → Den (Tag A)) (R : Bool × Tag A → Den
     le-u (true , cdone)  ac dn = ⊥-elim (cd-end (cd-row ac) (over-end dn))
 
     -- A render's end ends the whole only under the subscription.
-    lane-end : ∀ {q₀ x₀ c} → Acc p q₀ x₀ → enter (R x₀) (q₀ ⊕ [ ix 1 ]) c end → Merge.Done R (Sc p) c → p ⊑ c
+    lane-end : ∀ {q₀ x₀ c} → Acc p q₀ x₀ → enter (R x₀) (q₀ ⊕ [ ix 1 ]) c end → Merge.Done R (Sc p) c → Lead p c
     lane-end {q₀} {x₀} ac l dn with r-in x₀ (q₀ ⊕ [ ix 1 ]) l
     ... | w , _ , refl = le-u x₀ {q₀} {w} ac dn
 
