@@ -228,10 +228,10 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
 
   -- No end of the real flatMap comes before a position an uncut running
   -- lane shows no `laneDone` before.
-  no-end : ∀ {q₀ a₀ v} → RO q₀ (out a₀) → RV.Runs op q₀ → ¬ RV.CutAt op q₀ v
+  no-end-before : ∀ {q₀ a₀ v} → RO q₀ (out a₀) → RV.Runs op q₀ → ¬ RV.CutAt op q₀ v
          → (∀ {yd kd n} → RV.Lane op q₀ a₀ yd (out (instEmit (mark (laneDone kd)) n)) → yd ≺ v → ⊥)
          → ∀ {d} → R d end → d ≺ v → ⊥
-  no-end xo rn nc nd {d} rd dv =
+  no-end-before xo rn nc nd {d} rd dv =
     let (yd , kd , n , ld , ydd) = done-before xo rn (λ ct → nc (cutat-up op fL RO dv ct)) (end-σ rd)
     in nd ld (≺-trans {yd} {d} {_} ydd dv)
 
@@ -352,7 +352,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
           Fσ = sent-few mq (at-c eb-c)
 
           noend : ∀ {d} → R d end → d ≺ Eb → ⊥
-          noend = no-end xo rn (uncut u-Eb) (λ ld ydEb → nF (dn-failed ld ydEb))
+          noend = no-end-before xo rn (uncut u-Eb) (λ ld ydEb → nF (dn-failed ld ydEb))
 
           lane-σ : ∀ {k} (e : Ev (IE B)) → RV.Lane op q₀ a₀ k e → k ≺ Eb → ¬ ¬ Σ (Ev (IE B)) (σ₃ k)
           lane-σ {k} end lk kEb _ =
@@ -388,7 +388,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                  (below-or-under fv sL last (≺-trans {fv} {Eb} {sL ⊕ [ last ]} fEb (under-last sL u-s)))
             uf₀ = under-⊕ uf (ix 0)
             noend : ∀ {d} → R d end → d ≺ fv ⊕ [ ix 0 ] → ⊥
-            noend = no-end xo rn (uncut uf₀) λ ld ydv →
+            noend = no-end-before xo rn (uncut uf₀) λ ld ydv →
               ≺-irrefl {fv ⊕ [ ix 0 ]} (subst (_≺ fv ⊕ [ ix 0 ]) (lane-once m undone (inner a₀) E₄ g₂ sL oks (fwd ld) tt r′ nkf) ydv)
         in lane-σ₃ xo rn (back r′ (after r′)) tt (uncut uf₀) (≼-refl {fv ⊕ [ ix 0 ]}) noend (sent-few mq (at-c fc)) λ σf →
              next-at σf fc (≺-trans {c ⊕ [ sub w ]} {fv} {fv ⊕ [ ix 0 ]} cf (≺-ext fv {ix 0} []))
