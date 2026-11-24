@@ -12,7 +12,7 @@ open import Data.List.Membership.Propositional using (_∈_; find)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
 open import Data.List.Properties using (++-assoc)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
-open import Data.Maybe using (Maybe; just)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
@@ -26,11 +26,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym
 open import Relation.Nullary using (¬_; Dec; yes; no)
 
 open import Tree using (Obs; FlatOp; connected)
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_; inside; _∙_)
+open import denotation.Position using (Pos; Path; root; _≟ᵖ_; ix; sub; _⊕_; inside; _∙_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≼_)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step; ⊑-≼)
-open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺; ≺-irrefl)
+open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≼_; _≺_)
+open import denotation.Read using (Run) renaming (_∷_ to _∷ᴿ_)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step; ⊑-≼; InvAt; _⊑_; inside-⊑; ⊑-snoc; ⊕-assoc; ⊕-injˡ)
+open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺; ≺-irrefl; ≺-trans; ≺-ext; ≺→≼)
+open import simultaneous.Horizon using (past-sub)
+open import simultaneous.Shut using (r₀)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; laneB; outerB; closeB)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd;
   outerDone; subscribed; completed; valuesOf)
@@ -39,22 +42,23 @@ open import simultaneous.Readings using (rootOf; instantOf)
 open import simultaneous.Routed using (Held; Early; Placed; Ex; Sync; Carried; cnt; c-value; c-stop; c-done; c-over; nameOf; nm; Valued; opos)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import simultaneous.HeldTake using (ex-ext)
-open import simultaneous.Layers using () renaming (run-row to run-row∈)
+open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
+open import simultaneous.Counts using (Counts; pre; idle-row)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.RealView using (lane-at)
 open import simultaneous.LaneLocal using (Fit; Fine; inv-ev)
 open import simultaneous.LaneEpoch using (module Lanes)
 open import simultaneous.LaneFloor using (module Floor)
-open import simultaneous.FlatLanes using (Tg)
+open import simultaneous.FlatLanes using (Tg; BProj; module BProj; keep; drop; tagged; brTag)
 open import simultaneous.LaneSplit using (Ln)
 open import simultaneous.HeldBase using (EnvHeld; module FlatHots; IH; Fresh)
-open import simultaneous.HeldComb using (ev; init; past)
+open import simultaneous.HeldComb using (ev; init; past; from-++)
 open import simultaneous.FlatSim using (tot)
 open import simultaneous.HeldSrc using (module CombSrc; Opens; o-value; o-done)
 open import simultaneous.HeldLanes using (module CombLanes; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; each; laneˢ; count)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; each; laneˢ; count; opening)
 
 module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -116,13 +120,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     let (v , ok′) = late (proj₁ (run-row∈ (run-prefix rx₁ mt) i))
         rq = cong (_∙ []) ik
         (qo , _) = eq (subst Valued rq v)
-    in ≺-absurd {k} {q} (met-before rx₁ mt i) (≺-≼-≺ {q} {opos (rootOf q)} {k} qo (subst (λ r → opos r ≼ k) (sym rq) (⊑-≼ ok′)))
-
-  -- A lane's subscription, read off one of its rows.
-  sub-at : ∀ {Q a y e} → RO Q (out a) → RV.Lane op Q a y e → Pos
-  sub-at xo l = proj₁ (lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-    (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-    (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l)
+    in ≺-absurd {k} {q} (met-before rx₁ mt i) (≺-≼-≺ {q} {opos (rootOf q)} {k} qo (subst (λ r → opos r ≼ k) rq (⊑-≼ ok′)))
 
   -- The overs met before a row, of its instant, leave `Ov`.
   OvBefore : List Row → Pos → Set → Set
@@ -133,27 +131,151 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   Live? rx₁ Ov = Flat.spent (St rx₁) ≡ false ⊎ Ov → Flat.spent (St rx₁) ≡ false
 
   postulate
-    -- IN THE LANE'S OWN SUBSCRIBE BURST, a route of the outer value that
-    -- started the lane holds it, or, for a lane rxjs queued, a route an
-    -- ended lane handed on (`held`).
-    lane-burst : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
-               → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → Sync (sub-at xo l) y → Carried (out v)
-               → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
-               → Σ ℕ λ k → tot (St rx₁) ≡ suc k
+    -- IN A QUEUED LANE'S SUBSCRIBE BURST, a route an ended lane handed on
+    -- (`held`) holds it.
+    lane-queued : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
+                → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ sub-at xo l ≡ Q ⊕ [ ix 1 ] → Sync (sub-at xo l) y
+                → Carried (out v) → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
+                → Σ ℕ λ k → tot (St rx₁) ≡ suc k
 
-    -- A LANE'S STOP ENDS A ROUTE IT COUNTS: the lane's count is its
-    -- program's, whose stops end a route it holds.
-    lane-exact : ∀ {q a} → RO q (out a) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
-               → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
+  -- A projection keeps nothing of another branch's last row.
+  bproj-init : ∀ {b} {h : IE A → IE B} {J} rx {q e rs} → BProj b h J (rx ++ (q , e) ∷ []) rs → brTag b e ≡ nothing → BProj b h J rx rs
+  bproj-init {b = b} [] (keep BProj.[]) nl = ⊥-elim (tagged b nl)
+  bproj-init []       (drop _ BProj.[]) _  = BProj.[]
+  bproj-init (_ ∷ rx) (keep pr)          nl = keep (bproj-init rx pr nl)
+  bproj-init (_ ∷ rx) (drop t pr)        nl = drop t (bproj-init rx pr nl)
 
-    -- PAST ITS BURST, A ROW A LANE CARRIES FINDS A ROUTE OF ITS INSTANT
-    -- the lane counts, unless exempt: its program's rows do.
-    lane-covered : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂
-                 → (l : RV.Lane op q a y e) → Carried e → ¬ Sync (sub-at xo l) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  -- A branch's row met is a row of its projection, and back.
+  bproj-in : ∀ {b} {h : IE A → IE B} {J rx rs k v} → BProj b h J rx rs → (k , out (Tg b v)) ∈ rx
+           → Σ Pos λ y → Σ (IE A) λ x → k ≡ y ⊕ [ sub J ] × v ≡ h x × (y , out x) ∈ rs
+  bproj-in (keep pr) (here refl) = _ , _ , refl , refl , here refl
+  bproj-in (keep pr) (there i) = let (y , x , e₁ , e₂ , j) = bproj-in pr i in y , x , e₁ , e₂ , there j
+  bproj-in {b = b} (drop nl pr) (here refl) = ⊥-elim (tagged b nl)
+  bproj-in (drop nl pr) (there i) = bproj-in pr i
 
-    -- IN A BURST, A LANE'S STOP ENDS A ROUTE OF ITS OWN INSTANT.
-    stop-ex : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
-            → (l : RV.Lane op q a y (out (instEmit (mark stop) n))) → Sync (sub-at xo l) y ⊎ Ex cs y → proj₁ (cnt r₁) ≡ nameOf y
+  bproj-out : ∀ {b} {h : IE A → IE B} {J rx rs y e} → BProj b h J rx rs → (y , e) ∈ rs
+            → Σ (IE A) λ x → e ≡ out x × (y ⊕ [ sub J ] , out (Tg b (h x))) ∈ rx
+  bproj-out (keep pr) (here refl) = _ , refl , here refl
+  bproj-out (keep pr) (there j) = let (x , e , i) = bproj-out pr j in x , e , there i
+  bproj-out (drop _ pr) j = let (x , e , i) = bproj-out pr j in x , e , there i
+
+  -- The real flatMap's outer holds each outer row once.
+  ro-inj : ∀ r r′ → ro-at r ≡ ro-at r′ → r ≡ r′
+  ro-inj r r′ e = ⊕-injˡ r r′ (⊕-injˡ (r ⊕ [ sub q₀ ]) (r′ ⊕ [ sub q₀ ]) (⊕-injˡ ((r ⊕ [ sub q₀ ]) ⊕ [ ix 1 ]) ((r′ ⊕ [ sub q₀ ]) ⊕ [ ix 1 ])
+                    (trans (rw r) (trans e (sym (rw r′))))))
+    where
+      q₀ : Pos
+      q₀ = p₀₀ ⊕ [ ix 1 ]
+
+      rw : ∀ x → ((x ⊕ [ sub q₀ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ] ≡ ro-at x
+      rw x = trans (⊕-assoc (x ⊕ [ sub q₀ ]) [ ix 1 ] [ ix 0 ]) (⊕-assoc x [ sub q₀ ] (ix 1 ∷ ix 0 ∷ []))
+
+  -- IN THE BURST OF A LANE SUBSCRIBED AT ITS OUTER VALUE, the outer's
+  -- route of that value holds it: the outer meets nothing past the value
+  -- before the burst does, and the closer's `outerDone` lies past
+  -- everything under the value (`simultaneous.CloseDone`).
+  lane-room : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
+            → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → sub-at xo l ≡ Q ⊕ [ ix 1 ] → Sync (sub-at xo l) y
+            → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
+            → Σ ℕ λ k → tot (St rx₁) ≡ suc k
+  lane-room rx₁ {y} {v} {rx₂} Ov mt {a = a} xo l sq sy ovf res nx with ro-row xo
+  ... | r , n , σr , refl = pos-tot λ z₀ → met-open rx₁ mt σr rJ λ oa →
+          let (_ , t) = outer-hold rx₁ Ov mt ovf res nod (cv oa) in 0≢suc (trans (sym z₀) t)
+    where
+      q₀ : Pos
+      q₀ = p₀₀ ⊕ [ ix 1 ]
+
+      Y : Pos
+      Y = y ⊕ [ sub LS.J ]
+
+      0≢suc : ∀ {k} → 0 ≡ suc k → ⊥
+      0≢suc ()
+
+      ws : Path
+      ws = proj₁ (inside-⊑ (sub-at xo l) y (proj₁ sy))
+
+      zs′ : Path
+      zs′ = ix 1 ∷ ix 0 ∷ ix 1 ∷ ws L.++ [ sub LS.J ]
+
+      Y₁ : Y ≡ ro-at r ⊕ (ix 1 ∷ ws L.++ [ sub LS.J ])
+      Y₁ = trans (cong (_⊕ [ sub LS.J ]) (trans (proj₂ (inside-⊑ (sub-at xo l) y (proj₁ sy))) (cong (_⊕ ws) sq)))
+             (trans (⊕-assoc ((ro-at r) ⊕ [ ix 1 ]) ws [ sub LS.J ]) (⊕-assoc (ro-at r) [ ix 1 ] (ws L.++ [ sub LS.J ])))
+
+      Yr : Y ≡ r ⊕ (sub q₀ ∷ zs′)
+      Yr = trans Y₁ (⊕-assoc r (sub q₀ ∷ ix 1 ∷ ix 0 ∷ []) (ix 1 ∷ ws L.++ [ sub LS.J ]))
+
+      rY : r ⊑ Y
+      rY = sub q₀ ∷ zs′ , Yr
+
+      rJ : (r ⊕ [ sub OS.J ]) ≺ Y
+      rJ = ≺-trans {r ⊕ [ sub OS.J ]} {ro-at r} {Y} (J≺ro r) (subst (ro-at r ≺_) (sym Y₁) (≺-ext (ro-at r) (ws L.++ [ sub LS.J ])))
+
+      nod : ∀ {k n} → M k (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → k ≺ Y → instantOf k ≡ instantOf Y → ⊥
+      nod mk kY _ with close-sent mk
+      ... | c′ , w′ , σk , refl =
+        ≺-absurd {c′ ⊕ [ sub w′ ]} {Y} kY (subst (_≺ (c′ ⊕ [ sub w′ ])) (sym Yr) (CD.below-done σr (proj₁ σk) q₀ zs′ w′))
+
+      -- Past the value, the outer meets nothing before the burst.
+      none-past : ∀ rs₁ {x′} rs₂ → BProj outerB (opening {A} {B}) OS.J rx₁ (rs₁ ++ (r , out x′) ∷ rs₂)
+                → Met σ₁ (rs₁ ++ (r , out x′) ∷ rs₂) → rs₂ ≡ []
+      none-past rs₁ []             _  _  = refl
+      none-past rs₁ ((k , e) ∷ rs₃) pr rσ = ⊥-elim (≺-absurd {k ⊕ [ sub OS.J ]} {Y} kY Yk)
+        where
+          rk : r ≺ k
+          rk with run-tail rs₁ rσ
+          ... | _ ∷ᴿ rn = run-after rn (here refl)
+
+          σk : σ₁ k e
+          σk = proj₁ (run-row∈ rσ (∈-++⁺ʳ rs₁ (there (here refl))))
+
+          kY : (k ⊕ [ sub OS.J ]) ≺ Y
+          kY = met-before rx₁ mt (proj₂ (proj₂ (bproj-out pr (∈-++⁺ʳ rs₁ (there (here refl))))))
+
+          nk : r ⊑ (k ⊕ [ sub OS.J ]) → ⊥
+          nk rk′ with ⊑-snoc k rk′
+          ... | inj₁ r⊑k = ≺-irrefl {r} (subst (r ≺_) (OuterRow.σ₁-lead σr σk r⊑k) rk)
+          ... | inj₂ eq  = ≺-absurd {r} {k} rk (subst (k ≺_) (sym eq) (≺-ext k []))
+
+          Yk : Y ≺ (k ⊕ [ sub OS.J ])
+          Yk = past-sub {r} {Y} {k ⊕ [ sub OS.J ]} rY (≺→≼ {r} {k ⊕ [ sub OS.J ]} (≺-trans {r} {k} {k ⊕ [ sub OS.J ]} rk (≺-ext k []))) nk
+
+      cv : Any (OpenMark (ro-at r)) rx₁
+         → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (Y , out (Ln v)) ∷ []) rs′ → Met σ₁ rs′
+         → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf Y , suc k)
+      cv oa pr′ rσ with find oa
+      ... | _ , xi , (_ , r′ , _ , _ , eq , refl) with ro-inj r r′ eq
+      ...   | refl with bproj-in (bproj-init rx₁ pr′ refl) xi
+      ...     | y′ , x′ , e₁ , _ , j with ⊕-injˡ r y′ e₁
+      ...       | refl with ∈-∃++ j
+      ...         | rs₁ , rs₂ , refl with none-past rs₁ rs₂ (bproj-init rx₁ pr′ refl) rσ
+      ...           | refl with InvAt.func I₁ (proj₁ (proj₁ (run-row∈ rσ (∈-++⁺ʳ rs₁ (here refl))))) (proj₁ σr)
+      ...             | refl =
+        let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs₁ [] refl c-value (λ e → nx (subst (Ex cs′) (sym Yr) (ex-below (sub q₀ ∷ zs′) e)))
+        in _ , bproj-init rx₁ pr′ refl , k
+         , trans (from-++ r₀ rs₁ ((r , out (instEmit (value a) n)) ∷ [])) (trans cov (cong (_, suc k) (cong nm (sym (trans (cong rootOf Yr) (rootOf-ext r (sub q₀ ∷ zs′)))))))
+
+  -- IN A LANE'S OWN SUBSCRIBE BURST, a route of the outer value that
+  -- started the lane holds it, or, for a lane rxjs queued, a route an
+  -- ended lane handed on (`held`).
+  lane-burst : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
+             → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → Sync (sub-at xo l) y → Carried (out v)
+             → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
+             → Σ ℕ λ k → tot (St rx₁) ≡ suc k
+  lane-burst rx₁ Ov mt {Q} xo l sy car ovf res nx with sub-at xo l ≟ᵖ (Q ⊕ [ ix 1 ])
+  ... | yes sq = lane-room rx₁ Ov mt xo l sq sy ovf res nx
+  ... | no nq  = lane-queued rx₁ Ov mt xo l nq sy car ovf res nx
+
+  -- A LANE'S STOP ENDS A ROUTE IT COUNTS: the lane's count is its
+  -- program's, whose stops end a route it holds.
+  lane-exact : ∀ {q a} → RO q (out a) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
+             → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
+  lane-exact xo mt r₁ r₂ refl = Counts.stp (lane-counts-own xo (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl))))) r₁ (pre r₁ r₂ mt)
+
+  -- PAST ITS BURST, A VALUE A LANE CARRIES FINDS A ROUTE OF ITS INSTANT
+  -- the lane counts, unless exempt: its program's rows do.
+  lane-covered : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y v} r₂ → rs ≡ r₁ ++ (y , out v) ∷ r₂
+               → (l : RV.Lane op q a y (out v)) → Carried (out v) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  lane-covered xo mt r₁ r₂ refl l c ns nx = Counts.cov (lane-counts-own xo l) r₁ (pre r₁ r₂ mt) c [ ns , nx ]′
 
   -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`: a begin of it would
   -- follow a `laneStart` of it, and it starts once.
@@ -213,10 +335,9 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       0≢suc ()
 
       name : proj₁ (cnt (lane-rows oc)) ≡ nameOf y
-      name with sync? (sub-at xo l) y | any? (λ c′ → sync? c′ y) cs
-      ... | yes sy | _      = stop-ex xo rn (lane-rows oc) [] refl l (inj₁ sy)
-      ... | no _   | yes ex = stop-ex xo rn (lane-rows oc) [] refl l (inj₂ ex)
-      ... | no ns  | no nx  = cong proj₁ (proj₂ (lane-covered xo rn (lane-rows oc) [] refl l c-stop ns nx))
+      name with idle-row (lane-idle-own xo) (lane-rows oc) rn
+      ... | inj₂ e = e
+      ... | inj₁ z = ⊥-elim (0≢suc (trans (sym z) (proj₂ (lane-exact xo rn (lane-rows oc) [] refl))))
 
   done-live : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q kd n} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → AC.Live [] xs q
   done-live xs mt le = live-of xs mt le (done-started xs mt le)

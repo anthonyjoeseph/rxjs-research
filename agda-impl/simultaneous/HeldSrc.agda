@@ -705,26 +705,37 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     ... | Nl.no ne  = ⊥-elim (frame-least (subst (instantOf k ≺ⁱ_) (sym (trans (cong instant e′) (nm-inst (instantOf z))))
                         (≺-instant k z (met-before rx₁ mt i) ne)))
 
-  -- A CARRIED OUTER ROW FINDS A ROUTE THE SCAN COUNTS.  The outer holds a
-  -- route of the row's instant there; every row met before it keeps to
-  -- that instant as `simultaneous.ScanAbove` needs, so the scan's outer
-  -- counter holds at least as many, unless the scan is spent.  `Ov` is
-  -- what an over of that instant met before it leaves behind.
-  outer-floor : ∀ rx₁ {q x rx₂} (Ov : Set) → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂)
-              → (∀ x₀ → opening {A} {B} x₀ ≡ x → Carried (out x₀))
-              → (∀ {k} → k ≺ q → instantOf k ≡ instantOf q → Valued (rootOf k) × opos (rootOf k) ⊑ k → Ov)
-              → (Flat.spent (proj₁ (past op init rx₁)) ≡ false ⊎ Ov → Flat.spent (proj₁ (past op init rx₁)) ≡ false)
-              → ¬ Ex cs′ q → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
-  outer-floor rx₁ {q} {x} {rx₂} Ov mt carried ovf res nx
-    with OS.run′ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ [])) (src-op tk env′ m)
-                   (run-prefix (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ []) (subst (Met M) (sym (++-assoc rx₁ ((q , out (just (inj₁ (outerB , x)))) ∷ []) rx₂)) mt)))
-  ... | rs′ , pr′ , rσ , _ with bproj-snoc rx₁ pr′
-  ...   | rs , y , x₀ , pr , refl , refl , refl =
+  -- The outer's proper rows are its program's.
+  σ₁-run : ∀ {rs} → Met σ₁ rs → Met (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) rs
+  σ₁-run = run-up {S = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁)
+
+  -- A burst the outer is exempt for is one the source is exempt for, at
+  -- any row under the outer's.
+  ex-below : ∀ {y} zs → Ex ((c ⊕ [ ix 1 ]) ∷ p ∷ cs) y → Ex cs′ (y ⊕ zs)
+  ex-below {y} zs (here sy) = there (there (there (here (sync-up {c} {y ⊕ zs} [ ix 1 ] (sync-ext {c ⊕ [ ix 1 ]} {y} zs sy)))))
+  ex-below     zs (there e) = there (there (there (there (ex-ext zs e))))
+
+  -- THE SCAN'S OUTER COUNTER HOLDS THE OUTER'S ROUTES OF A ROW'S INSTANT
+  -- met before it, read off the outer's rows by `cv`: every row met
+  -- before it keeps to that instant as `simultaneous.ScanAbove` needs, so
+  -- the counter holds at least as many, unless the scan is spent.  `Ov`
+  -- is what an over of that instant met before it leaves behind.
+  outer-hold : ∀ rx₁ {z e rx₂} (Ov : Set) → Met M (rx₁ ++ (z , e) ∷ rx₂)
+             → (∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark over) n)))) ∈ rx₁ → instantOf k ≡ instantOf z → Ov)
+             → (Flat.spent (proj₁ (past op init rx₁)) ≡ false ⊎ Ov → Flat.spent (proj₁ (past op init rx₁)) ≡ false)
+             → (∀ {k n} → M k (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → k ≺ z → instantOf k ≡ instantOf z → ⊥)
+             → (∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (z , e) ∷ []) rs′ → Met σ₁ rs′
+                → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf z , suc k))
+             → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-hold rx₁ {z} {e} {rx₂} Ov mt ovf res nod cv
+    with OS.run′ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (z , e) ∷ [])) (src-op tk env′ m)
+                   (run-prefix (rx₁ ++ (z , e) ∷ []) (subst (Met M) (sym (++-assoc rx₁ ((z , e) ∷ []) rx₂)) mt)))
+  ... | rs′ , pr′ , rσ , _ with cv pr′ rσ
+  ...   | rs , pr , _ , cov =
     pos (ℕP.≤-trans (subst (ℕ._≤ Flat.outer S) (cong proj₂ cov) held′)
                     (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.lanes S)) (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.held S)) (ℕP.m≤m+n _ (Flat.parked S)))))
     where
-      Q = y ⊕ [ sub OS.J ]
-      N = nameOf Q
+      N = nameOf z
       S = proj₁ (past op init rx₁)
 
       open Inst rx₁ mt using (In; row∈; name-in; begin-name; in-root)
@@ -732,43 +743,30 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       pos : ∀ {a b} → suc a ℕ.≤ b → Σ ℕ λ k → b ≡ suc k
       pos {b = suc k} _ = k , refl
 
-      ny : nameOf y ≡ N
-      ny = cong nm (sym (rootOf-ext y [ sub OS.J ]))
-
-      ex-up : Ex ((c ⊕ [ ix 1 ]) ∷ p ∷ cs) y → Ex cs′ Q
-      ex-up (here sy) = there (there (there (here (sync-up {c} {Q} [ ix 1 ] (sync-ext {c ⊕ [ ix 1 ]} {y} [ sub OS.J ] sy)))))
-      ex-up (there e) = there (there (there (there (ex-ext [ sub OS.J ] e))))
-
-      run-σ : Met (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) (rs ++ (y , out x₀) ∷ [])
-      run-σ = run-up {S = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁) rσ
-
-      cov : cnt rs ≡ (nameOf y , suc (proj₁ (Held.covered H₁ run-σ rs [] refl (carried x₀ refl) (λ e → nx (ex-up e)))))
-      cov = proj₂ (Held.covered H₁ run-σ rs [] refl (carried x₀ refl) (λ e → nx (ex-up e)))
-
       mx : Met M rx₁
       mx = run-prefix rx₁ mt
 
-
-      before : ∀ {k e} → (k , e) ∈ rx₁ → k ≺ Q
+      before : ∀ {k e} → (k , e) ∈ rx₁ → k ≺ z
       before = met-before rx₁ mt
-
-      ⊥-done : ∀ {k b n} → M k (out (just (inj₁ (b , instEmit (mark outerDone) n)))) → k ≺ Q → ⊥
-      ⊥-done r kQ with m-rows r tt
-      ... | outer y′ eq with () ← Held.routing H₁ (subst (λ z → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) _ (out z)) (open-mark eq (λ ())) (proj₁ y′))
-      ... | lane y′ = Fit.fine lane-fit y′
-      ... | close _ = ≺-absurd {_} {Q} kQ (outer-before-done (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) r)
 
       good : ∀ {k e} → (k , e) ∈ rx₁ → Good N In Ov k e
       good {k} i = record
         { beg = λ { refl → (λ e → name-in (trans (sym (named (row∈ i))) e)) , begin-name i }
-        ; ov  = λ { ik refl → ovf (before i) ik (late (row∈ i)) }
-        ; nod = λ { _ refl → ⊥-done (row∈ i) (before i) } }
+        ; ov  = λ { ik refl → ovf i ik }
+        ; nod = λ { ik refl → nod′ (row∈ i) (before i) ik } }
+
+      -- Only the closer sends an `outerDone`.
+      nod′ : ∀ {k b n} → M k (out (just (inj₁ (b , instEmit (mark outerDone) n)))) → k ≺ z → instantOf k ≡ instantOf z → ⊥
+      nod′ r kz ik with m-rows r tt
+      ... | outer y′ eq with () ← Held.routing H₁ (subst (λ w → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) _ (out w)) (open-mark eq (λ ())) (proj₁ y′))
+      ... | lane y′ = Fit.fine lane-fit y′
+      ... | close _ = nod r kz ik
 
       conv : Conv In rx₁
       conv r₁ {k} {e} r₂ refl ik {k′} {e′} i′ =
         let mt′ = subst (Met M) (++-assoc r₁ ((k , e) ∷ r₂) _) mt
             kk′ = run-after (run-tail-at r₁ mt′) (∈-++⁺ˡ i′)
-        in trans (btw k k′ Q kk′ (before (∈-++⁺ʳ r₁ (there i′))) ik) ik
+        in trans (btw k k′ z kk′ (before (∈-++⁺ʳ r₁ (there i′))) ik) ik
         where
           run-tail-at : ∀ r₁ {ys} → Met M (r₁ ++ (k , e) ∷ ys) → Run M (just k) ys
           run-tail-at r₁ {ys} mt″ with run-tail r₁ mt″
@@ -781,9 +779,28 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       fin = past-above OS.J op init r₀ rx₁ rs (λ r₁ r₂ eq → end-last I-M r₁ (subst (Met M) eq mx)) pr good conv start
 
       held′ : proj₂ (cnt rs) ℕ.≤ Flat.outer S
-      held′ with Above.below fin (trans (cong proj₁ cov) ny)
+      held′ with Above.below fin (cong proj₁ cov)
       ... | _ , inj₂ l = l
       ... | a , inj₁ t with () ← trans (sym (res (Above.live fin a))) t
+
+  -- A CARRIED OUTER ROW FINDS A ROUTE THE SCAN COUNTS.  The outer holds a
+  -- route of the row's instant there, and no `outerDone` lies before it.
+  outer-floor : ∀ rx₁ {q x rx₂} (Ov : Set) → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂)
+              → (∀ x₀ → opening {A} {B} x₀ ≡ x → Carried (out x₀))
+              → (∀ {k} → k ≺ q → instantOf k ≡ instantOf q → Valued (rootOf k) × opos (rootOf k) ⊑ k → Ov)
+              → (Flat.spent (proj₁ (past op init rx₁)) ≡ false ⊎ Ov → Flat.spent (proj₁ (past op init rx₁)) ≡ false)
+              → ¬ Ex cs′ q → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-floor rx₁ {q} {x} {rx₂} Ov mt carried ovf res nx = outer-hold rx₁ Ov mt
+    (λ i ik → ovf (met-before rx₁ mt i) ik (late (proj₁ (run-row∈ (run-prefix rx₁ mt) i)))) res
+    (λ r kq _ → ≺-absurd {_} {q} kq (outer-before-done (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) r)) (cv carried nx)
+    where
+      cv : ∀ {q′ x′} → (∀ x₀ → opening {A} {B} x₀ ≡ x′ → Carried (out x₀)) → ¬ Ex cs′ q′
+         → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (q′ , out (just (inj₁ (outerB , x′)))) ∷ []) rs′ → Met σ₁ rs′
+         → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf q′ , suc k)
+      cv carried nx pr′ rσ with bproj-snoc rx₁ pr′
+      ... | rs , y , x₀ , pr , refl , refl , refl =
+        let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs [] refl (carried x₀ refl) (λ e → nx (ex-below [ sub OS.J ] e))
+        in rs , pr , k , trans cov (cong (_, suc k) (cong nm (sym (rootOf-ext y [ sub OS.J ]))))
 
   -- THE OUTER'S COMPLETION: no over of its instant comes before it, for
   -- an over follows the instant's completion.
@@ -803,7 +820,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       ovf {k} kq ik (v , ok′) =
         let rq = cong (_∙ []) ik
             (qo , _) = done-Q (subst Valued rq v)
-        in ≺-absurd {k} {q} kq (≺-≼-≺ {q} {opos (rootOf q)} {k} qo (subst (λ r → opos r ≼ k) (sym rq) (⊑-≼ ok′)))
+        in ≺-absurd {k} {q} kq (≺-≼-≺ {q} {opos (rootOf q)} {k} qo (subst (λ r → opos r ≼ k) rq (⊑-≼ ok′)))
 
   -- AN OUTER OVER: the scan, not spent, counts the over's route.
   outer-over : ∀ rx₁ {q n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , instEmit (mark over) n)))) ∷ rx₂)
