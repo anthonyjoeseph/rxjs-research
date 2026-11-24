@@ -20,6 +20,7 @@ open import Data.Bool using (Bool; true; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
+open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.List.Properties using (reverse-++; reverse-involutive)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-concat⁺′)
