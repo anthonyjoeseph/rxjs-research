@@ -23,10 +23,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; yes; no)
 open import Relation.Nullary.Decidable.Core using (¬¬-excluded-middle)
 
-open import denotation.Position using (Pos; ix; _⊕_)
-open import denotation.EmissionSet using (EmissionSet; Den; out; end; Few; After; _≺_; _≼_; module Bounded; module Values)
-open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-trans; ≼-refl; ≼-≺-≺; ≺-ext; few-ind)
-open import denotation.Laws.Worlds using (Ok; InvAt; InvD; plain-ix; inW; nest⁼; ⊑-refl)
+open import denotation.Position using (Pos; ix; sub; last; _⊕_; _≟ᵖ_)
+open import denotation.EmissionSet using (EmissionSet; Den; out; end; enter; Few; After; _≺_; _≼_; module Bounded; module Values)
+open import denotation.Laws.Modulus using (≼-or-≻; ≺-irrefl; ≺-trans; ≼-refl; ≼-≺-≺; ≺-ext; ≺-absurd; ≺→≼; few-ind)
+open import denotation.Laws.Worlds using (Ok; InvAt; InvD; W⁼; plain-ix; step; here; inW; nest; nest⁼; ⊑-refl; ⊑-snoc; ⊑-≼; _⊑_; world-after; world-after⁼;
+                                          w-up; leads; flat-under; conv; PinBy; ⊕-assoc; ⊕-identityʳ; ⊕-injʳ)
+open import denotation.Laws.JoinInv using (ix01; ix10)
+open import denotation.Events using (<ᵖ-between; <ᵖ-part)
+open import Data.Bool.Properties using (T-≡)
+open import Function using (Equivalence)
 open import denotation.Laws.Worlds.Leaves using (out-inj)
 open import denotation.Laws.Fold using (latest)
 open import denotation.Laws.Nth using (module Nths)
@@ -41,13 +46,13 @@ module _ {A : Set} (t : EmissionSet A) where
   open Values t using (Nth; first; next)
 
   few-nth : ∀ {w} → Few t w → ∀ {a} → t w (out a) → ¬ ¬ Σ ℕ λ i → Nth i w a
-  few-nth = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ ℕ λ i → Nth i w a) step
+  few-nth = few-ind (λ w → ∀ {a} → t w (out a) → ¬ ¬ Σ ℕ λ i → Nth i w a) by-latest
     where
       Val : Pos → Set
       Val k = Σ A λ a → t k (out a)
-      step : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ ℕ λ i → Nth i v a)
+      by-latest : ∀ {w} → Few t w → (∀ {v e} → t v e → v ≺ w → ∀ {a} → t v (out a) → ¬ ¬ Σ ℕ λ i → Nth i v a)
            → ∀ {a} → t w (out a) → ¬ ¬ Σ ℕ λ i → Nth i w a
-      step {w} (ks , h) ih x ¬N = latest Val w ks λ
+      by-latest {w} (ks , h) ih x ¬N = latest Val w ks λ
         { (inj₁ none) → ¬N (0 , first x λ y kw → none (h y kw) (_ , y) kw)
         ; (inj₂ (v , (_ , xv) , vw , mx)) → ih xv vw xv λ
             { (i , nv) → ¬N (suc i , next nv x vw λ y vk kw → mx (h y kw) (_ , y) kw vk) } }
@@ -56,20 +61,119 @@ module QueuedAt {A B H at} (ok : Ok H at) (m : ℕ) (F : A → Den B) (fi : ∀ 
   open Bounded m F O
   open Values O using (Nth; first; next)
   open Count ok m F fi Io using (Census; c-nil; c-dead; c-on; cen-lo; cen-hi; head-at; nths-snoc; ends-at; ends-fun; kth-le)
-  open BoundedI ok m F fi Io using (kth-cons; kth-down; kth-mono; kth-lane; ending; at-c; strip; split≼; seat*; seat′; row-w)
+  open BoundedI ok m F fi Io using (kth-cons; kth-down; kth-mono; kth-lane; ending; at-c; strip; split≼; seat*; seat′; row-w; end-w; LI; sub-fun;
+                                    lane-end; rel; apart; queued-in; apart-ww; apart-lead)
   open Nths O using (nth-val; nth-fun; nth-lt)
 
   -- Lane i subscribed before `c₀`.
   Early : Pos → ℕ → Set
   Early c₀ i = Σ Pos λ q → Σ A λ a → Σ Pos λ s → Sub i q s a × s ≺ c₀
 
-  postulate
-    -- A LANE'S END LIES PAST THE SECOND CHILD OF A VALUE, OR OF AnoTHER
-    -- LANE'S END, BEFORE IT: nothing of a lane sits under such a first
-    -- child, and κ lane ends where a lane is subscribed.
-    end-past : ∀ {j q a s c r} → Sub j q s a → After (F a) s c end
-             → (Σ A λ b → O r (out b)) ⊎ (Σ ℕ λ j′ → Ends j′ (Sched j′) r)
-             → r ≺ c → (r ⊕ [ ix 1 ]) ≺ c
+  ------------------------------------------------------------------------
+  -- A LANE'S END LIES PAST THE SECOND CHILD OF A VALUE, OR OF ANOTHER
+  -- LANE'S END, BEFORE IT: nothing of a lane sits under such a first
+  -- child, and no lane ends where a lane is subscribed.
+
+  private
+    -- Past the subscription and at or before a row under it: under it.
+    under-c₀ : ∀ s y c₀ → s ⊑ y → s ≺ c₀ → c₀ ≼ y → s ⊑ c₀
+    under-c₀ s y c₀ sy sc le =
+      [ (λ c₀y → conv {s} {s} {c₀} {y} (⊑-refl s) (≺→≼ {s} {c₀} sc) c₀y sy) , (λ eq → subst (s ⊑_) (sym eq) sy) ]′ (split≼ {c₀} {y} le)
+
+    -- Past `r` and not past its second child: at it, or under its first.
+    split-kid : ∀ r {c} → r ≺ c → (r ⊕ [ ix 1 ]) ≺ c ⊎ (c ≡ r ⊕ [ ix 1 ] ⊎ (r ⊕ [ ix 0 ]) ⊑ c)
+    split-kid r {c} rc with ≼-or-≻ c (r ⊕ [ ix 1 ])
+    ... | inj₂ lt = inj₁ lt
+    ... | inj₁ le with split≼ {c} {r ⊕ [ ix 1 ]} le
+    ...   | inj₂ eq = inj₂ (inj₁ eq)
+    ...   | inj₁ lt with <ᵖ-between r c [ ix 1 ] (Equivalence.to T-≡ rc) (Equivalence.to T-≡ lt)
+    ...     | [] , refl = ⊥-elim (≺-irrefl {r} (subst (r ≺_) (⊕-identityʳ r) rc))
+    ...     | ix zero ∷ ws , refl = inj₂ (inj₂ (ws , sym (⊕-assoc r [ ix 0 ] ws)))
+    ...     | ix (suc zero) ∷ ws , refl = ⊥-elim (⊑-≼ {r ⊕ [ ix 1 ]} {r ⊕ (ix 1 ∷ ws)} (ws , sym (⊕-assoc r [ ix 1 ] ws)) lt)
+    ...     | ix (suc (suc _)) ∷ ws , refl = ⊥-elim (≺-absurd {r ⊕ (ix (suc (suc _)) ∷ ws)} {r ⊕ [ ix 1 ]} lt (Equivalence.from T-≡ (<ᵖ-part r [] ws refl)))
+    ...     | sub _ ∷ ws , refl = ⊥-elim (≺-absurd {r ⊕ (sub _ ∷ ws)} {r ⊕ [ ix 1 ]} lt (Equivalence.from T-≡ (<ᵖ-part r [] ws refl)))
+    ...     | last ∷ ws , refl = ⊥-elim (≺-absurd {r ⊕ (last ∷ ws)} {r ⊕ [ ix 1 ]} lt (Equivalence.from T-≡ (<ᵖ-part r [] ws refl)))
+
+    -- A value's children: its lane's root, apart from every other lane;
+    -- its first child in no lane's world.
+    end-val : ∀ {j q a s c r b} → Sub j q s a → After (F a) s c end → O r (out b)
+            → c ≡ r ⊕ [ ix 1 ] ⊎ (r ⊕ [ ix 0 ]) ⊑ c → ⊥
+    end-val {s = s} {c} {r} sb af xr k with seat* sb
+    ... | seat′ {r = r₀} _ rs _ nr rw = [ at-kid , led ]′ k
+      where
+        xr₀ = nth-val nr
+        at-kid : c ≡ r ⊕ [ ix 1 ] → ⊥
+        at-kid eq with r ≟ᵖ r₀
+        ... | yes refl = world-after⁼ (subst (λ z → W⁼ H z s) (sym eq) rw) rs (proj₂ af)
+        ... | no ne    = apart-ww xr₀ xr (λ e → ne (sym e)) (nest⁼ rw (inW (row-w sb af))) (subst (W⁼ H (r ⊕ [ ix 1 ])) (sym eq) here)
+        led : (r ⊕ [ ix 0 ]) ⊑ c → ⊥
+        led = leads (proj₂ ok) (step (inW (InvAt.world Io xr)) plain-ix)
+                (λ v → [ (λ eq → ix10 (⊕-injʳ r₀ r eq)) , (λ v′ → InvAt.under Io xr₀ xr plain-ix v′ (⊑-refl r)) ]′ (w-up plain-ix v))
+                (λ le → [ flat-under Io xr xr₀ , (λ eq → ix01 (⊕-injʳ r r₀ eq)) ]′ (⊑-snoc r₀ le))
+                (nest⁼ rw (inW (row-w sb af)))
+
+    -- Two lanes' ends: apart, or one queued past the other.
+    end-ends : ∀ {j q a s c j′ q′ a′ s′ r} → Sub j q s a → After (F a) s c end → Sub j′ q′ s′ a′ → After (F a′) s′ r end
+             → r ≺ c → c ≡ r ⊕ [ ix 1 ] ⊎ (r ⊕ [ ix 0 ]) ⊑ c → (r ⊕ [ ix 1 ]) ≺ c
+    end-ends {j} {j′ = j′} sb af sb′ af′ rc k with <-cmp j j′
+    end-ends {r = r} sb af sb′ af′ rc k | tri≈ _ refl _ with sub-fun sb sb′
+    ... | refl , refl , refl = ⊥-elim (≺-irrefl {r} (subst (r ≺_) (lane-end sb af af′) rc))
+    end-ends {c = c} {r = r} sb af sb′ af′ rc k | tri< lt _ _ with rel lt sb sb′
+    ... | apart xr xr′ ne rw rw′ =
+      ⊥-elim ([ (λ eq → apart-ww xr xr′ ne (nest⁼ rw (inW (row-w sb af))) (subst (W⁼ H _) (sym eq) (nest⁼ rw′ (inW (end-w sb′ af′)))))
+              , (λ le → apart-lead xr′ xr (λ e → ne (sym e)) (nest⁼ rw′ (inW (step (inW (row-w sb′ af′)) plain-ix))) (nest rw (row-w sb af)) le) ]′ k)
+    ... | queued-in e _ v =
+      ⊥-elim (≺-irrefl {r} (≺-trans {r} {c} {r} rc (≺-trans {c} {c ⊕ [ ix 1 ]} {r} (≺-ext c [])
+        (world-after (nest (subst (λ z → W⁼ H (z ⊕ [ ix 1 ]) _) (lane-end sb e af) v) (row-w sb′ af′)) (InvAt.real (LI sb′) (proj₁ af′))))))
+    end-ends {c = c} {r = r} sb af sb′ af′ rc k | tri> _ _ gt with rel gt sb′ sb
+    ... | apart xr′ xr ne rw′ rw =
+      ⊥-elim ([ (λ eq → apart-ww xr′ xr ne (subst (W⁼ H _) (sym eq) (nest⁼ rw′ (inW (end-w sb′ af′)))) (nest⁼ rw (inW (row-w sb af))))
+              , (λ le → apart-lead xr′ xr ne (nest⁼ rw′ (inW (step (inW (row-w sb′ af′)) plain-ix))) (nest rw (row-w sb af)) le) ]′ k)
+    ... | queued-in e _ v = world-after (nest (subst (λ z → W⁼ H (z ⊕ [ ix 1 ]) _) (lane-end sb′ e af′) v) (row-w sb af)) (InvAt.real (LI sb) (proj₁ af))
+
+  end-past : ∀ {j q a s c r} → Sub j q s a → After (F a) s c end
+           → (Σ A λ b → O r (out b)) ⊎ (Σ ℕ λ j′ → Ends j′ (Sched j′) r)
+           → r ≺ c → (r ⊕ [ ix 1 ]) ≺ c
+  end-past {c = c} {r} sb af rt rc with split-kid r {c} rc
+  ... | inj₁ lt = lt
+  ... | inj₂ k with rt
+  ...   | inj₁ (_ , xr) = ⊥-elim (end-val {c = c} {r} sb af xr k)
+  ...   | inj₂ (_ , (_ , _ , _ , nj′ , st′ , af′)) = end-ends {c = c} {r = r} sb af (nj′ , st′) af′ rc k
+
+  private
+    no-pin : ∀ {c} {b : B} → PinBy c (out b) → ⊥
+    no-pin (_ , () , _)
+
+    no-eo : ∀ {b : B} → end ≡ out b → ⊥
+    no-eo ()
+
+    -- A lane's value lies before its end.
+    own-before : ∀ {i q a s y b c} → Sub i q s a → enter (F a) s y (out b) → enter (F a) s c end → y ≺ c
+    own-before {a = a} {s} {y} {c = c} sb ry rc with ≼-or-≻ c y
+    ... | inj₂ lt = lt
+    ... | inj₁ le = ⊥-elim ([ (λ lt → no-pin (InvAt.quiet (LI sb) rc ry lt))
+                            , (λ eq → no-eo (InvAt.func (LI sb) rc (subst (λ z → enter (F a) s z _) (sym eq) ry))) ]′ (split≼ {c} {y} le))
+
+  -- A LANE'S VALUE UNDER ITS SUBSCRIPTION LIES BEFORE A LANE'S END PAST
+  -- THAT SUBSCRIPTION: the end is the same lane's, or another's apart, or
+  -- queued past the first lane's end.
+  row-before : ∀ {i q a s y b j₀ q₀ a₀ s₀ c₀} → Sub i q s a → enter (F a) s y (out b) → s ⊑ y
+             → Sub j₀ q₀ s₀ a₀ → After (F a₀) s₀ c₀ end → s ≺ c₀ → y ≺ c₀
+  row-before {i} {s = s} {y} {j₀ = j₀} {c₀ = c₀} sb ry sy sb₀ af₀ sc with ≼-or-≻ c₀ y
+  ... | inj₂ lt = lt
+  ... | inj₁ le with <-cmp i j₀
+  ...   | tri≈ _ refl _ with sub-fun sb sb₀
+  ...     | refl , refl , refl = own-before sb ry (proj₁ af₀)
+  row-before {i} {s = s} {y} {j₀ = j₀} {c₀ = c₀} sb ry sy sb₀ af₀ sc | inj₁ le | tri< lt _ _ with rel lt sb sb₀
+  ... | apart xr xr₀ ne rw rw₀ = ⊥-elim (apart-lead xr xr₀ ne rw (nest rw₀ (row-w sb₀ af₀)) (under-c₀ s y c₀ sy sc le))
+  ... | queued-in {c} e _ v =
+    ≺-trans {y} {c} {c₀} (own-before sb ry (proj₁ e))
+      (≺-trans {c} {c ⊕ [ ix 1 ]} {c₀} (≺-ext c []) (world-after (nest v (row-w sb₀ af₀)) (InvAt.real (LI sb₀) (proj₁ af₀))))
+  row-before {i} {s = s} {y} {j₀ = j₀} {c₀ = c₀} sb ry sy sb₀ af₀ sc | inj₁ le | tri> _ _ gt with rel gt sb₀ sb
+  ... | apart xr₀ xr ne rw₀ rw = ⊥-elim (apart-lead xr xr₀ (λ e → ne (sym e)) rw (nest rw₀ (row-w sb₀ af₀)) (under-c₀ s y c₀ sy sc le))
+  ... | queued-in e _ v with seat* sb
+  ...   | seat′ _ rs _ _ _ =
+    ⊥-elim (world-after⁼ (subst (λ z → W⁼ H (z ⊕ [ ix 1 ]) s) (lane-end sb₀ e af₀) v) rs (≺-trans {s} {c₀} {c₀ ⊕ [ ix 1 ]} sc (≺-ext c₀ [])))
 
   ------------------------------------------------------------------------
   -- The values and lanes, by index

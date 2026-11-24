@@ -524,12 +524,15 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         row    : Lane q₀ a₀ yd (out b₀)
         ends   : Lane q₀ a₀ ce end
 
-    postulate
-      -- A LANE BEGUN BEFORE A LANE'S END SHOWS ITS START BEFORE IT: the
-      -- start is the lane's first row, and the ended lane's end lies
-      -- past the begun lane's subscription, or under its own.
-      started-by : ∀ {x} (D : Done x) {i q a s} → Sub i q s a → s ≺ Done.ce D
-                 → Σ Pos λ y → Σ Pos λ n → Lane q a y (out (instEmit (mark laneStart) n)) × y ≺ Done.ce D
+    -- A LANE BEGUN BEFORE A LANE'S END SHOWS ITS START BEFORE IT: the
+    -- start lies under the subscription's first child.
+    started-by : ∀ {x} (D : Done x) {i q a s} → Sub i q s a → s ≺ Done.ce D
+               → Σ Pos λ y → Σ Pos λ n → Lane q a y (out (instEmit (mark laneStart) n)) × y ≺ Done.ce D
+    started-by D {i} {q} {a} {s} sb sc =
+      let (y , n , r , u) = start-under {a} s
+          (j₀ , s₀ , sb₀ , af₀) = Done.ends D
+      in y , n , (i , s , sb , r , under-ext s u)
+       , QA.row-before sb r (ix 0 ∷ proj₁ u , trans (proj₂ u) (⊕-assoc s [ ix 0 ] (proj₁ u))) sb₀ af₀ sc
 
     -- A VALUE WHOSE `outerOpen` THE SCAN READS BEFORE A LANE'S ROW LIES
     -- BEFORE THAT ROW.

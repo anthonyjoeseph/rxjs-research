@@ -283,15 +283,6 @@ a body.
 Members: `live-current`, `lane-tot`, `outer-tot`, `close-tot`,
 `over-tot`, `end-tot`, `comb-shut`, `scan-idle`, `lim-rest`.
 
-#### THE MERGE'S LANE POSITIONS
-
-Unproven: a bounded merge's lane end lies past the second child of each
-value or other lane end before it, and a begun lane's start precedes it.
-Settled by the world laws (`Disj`, `rel`) placing every lane row off a
-first child.
-
-Members: `end-past`, `started-by`.
-
 #### THE BATCH RANK
 
 Untried: the batcher keeps the elaborated run's instants, an `each`
