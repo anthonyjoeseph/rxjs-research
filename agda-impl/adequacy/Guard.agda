@@ -23,7 +23,7 @@ open import denotation.EmissionSet using (EmissionSet; Ev; _≺_; _≼_; Truncat
 open import denotation.Read using (Visible)
 open import denotation.Laws.Modulus using (≼-false; ≼-or-≻; ≼-refl)
 open import denotation.Laws.BoundedInv using (first-child)
-open import adequacy.Weight using (prefixes; prefixesᵗ)
+open import denotation.Prefixes using (prefixes; self-∈)
 open import adequacy.Cursor using (Cur; bef; Behind; _≈_; alike; voc; NoFail; Rgn; Sound; Lane; Runs; Start; Kill; kill-out; polF; JoinF; LaneRg; LanesIn; JRl; JInv; joined; h-live; h-end; h-kill; Ze; e₀; e+)
 open import adequacy.Cursor.Frame using (Need; owes; dead; lane; lanecut; pnd; Fr; f-top; f-map; f-scan; f-cut; f-take; f-took; f-outer; f-lanes; f-lane; f-lnct; f-src; f-srcc; f-srcp; f-body; d-map; d-scan; d-cut; d-ln; d-take; d-outer; d-lanes; d-src; d-body; f-isle; f-islec; f-islep)
 open import adequacy.Rows using (module _≃_)
@@ -103,15 +103,6 @@ open import Data.Nat using (zero; suc; _≤_)
 open import Data.Nat.Properties using (n≤1+n)
 
 open import adequacy.IsleLift using (Zs; z₁; z+; zs-past; zl; zs-btw; zs-under; isle-pin; pn)
-
--- A position under another has it among its ancestors.
-self-∈ᵗ : ∀ l q zs → (l ∷ q) ∈ prefixesᵗ ((l ∷ q) ++ zs)
-self-∈ᵗ l []      zs = here refl
-self-∈ᵗ l (m ∷ q) zs = there (∈-map⁺ (l ∷_) (self-∈ᵗ m q zs))
-
-self-∈ : ∀ y zs → y ∈ prefixes (y ⊕ zs)
-self-∈ (i ∙ [])      zs = here refl
-self-∈ (i ∙ (l ∷ q)) zs = there (∈-map⁺ (i ∙_) (self-∈ᵗ l q zs))
 
 -- A row at a chain's foot, of an entry with few rows behind `q`, reaches
 -- what it depends on: those behind and the chain.

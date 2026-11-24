@@ -20,7 +20,9 @@ open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt; Carried; c-done; c-over; nm-inst)
-open import simultaneous.HeldIn using (IdleIn)
+open import simultaneous.HeldIn using (IdleIn; Upto)
+open import simultaneous.CombRun using (comb-run)
+open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
   _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
 open import simultaneous.LaneLocal using (inv-ev; Fit; proper-fit; held-fit; module LaneReal; late-ext)
@@ -69,6 +71,8 @@ open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
 open import Data.Bool using (true; false)
+open import Data.Bool using (T)
+open import denotation.Events using (inside-++; inside-self)
 open import simultaneous.Project using (run-prefix)
 import denotation.Read as Run
 import Data.Nat as ℕ
@@ -281,25 +285,59 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   cs′ : List Pos
   cs′ = P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs
 
-  -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met:
-  -- the end finds a route the scan counts (`tot`) unless exempt, of its
-  -- instant; and a dead instant stays dead.  What the scan sends is its
-  -- counters (`exact-past`), so these are the sent count's.
+  -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met.
+  -- What the scan sends is its counters (`exact-past`), so these are the
+  -- sent count's.
+  EndTot : List (Pos × Ev (Maybe (Input B))) → Pos → Set
+  EndTot rx₁ q = Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q × Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+
+  -- PAST A BRANCH'S END, the scan still counts that branch's route, of
+  -- the end's instant: the outer's completion route until the closer's
+  -- `outerDone`; a lane's until its `laneDone`; the closer's own.
   postulate
-    end-tot       : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
-                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q × Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+    end-outer : ∀ rx₁ {c w zs rx₂} → Met M (rx₁ ++ (c ⊕ [ sub w ] ⊕ zs , end) ∷ rx₂) → σ₁ c end → ¬ Ex cs′ (c ⊕ [ sub w ] ⊕ zs)
+              → EndTot rx₁ (c ⊕ [ sub w ] ⊕ zs)
+    end-lane  : ∀ rx₁ {c w zs rx₂} → Met M (rx₁ ++ (c ⊕ [ sub w ] ⊕ zs , end) ∷ rx₂) → σ₃ c end → ¬ Ex cs′ (c ⊕ [ sub w ] ⊕ zs)
+              → EndTot rx₁ (c ⊕ [ sub w ] ⊕ zs)
+    end-close : ∀ rx₁ {c w zs rx₂} → Met M (rx₁ ++ (c ⊕ [ sub w ] ⊕ zs , end) ∷ rx₂) → σ₂ c end → ¬ Ex cs′ (c ⊕ [ sub w ] ⊕ zs)
+              → EndTot rx₁ (c ⊕ [ sub w ] ⊕ zs)
+
+  -- THE END FINDS A ROUTE THE SCAN COUNTS, of its instant, unless exempt:
+  -- the scan's own end lies in its subscription's burst; past a branch's
+  -- end, that branch's route.
+  end-tot : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q → EndTot rx₁ q
+  end-tot rx₁ mt nx with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
+  ... | under {zs} = ⊥-elim (nx (here (subst T (sym (inside-++ P P zs (inside-self P))) tt , rootOf-ext P zs)))
+  ... | done (b-outer y) = end-outer rx₁ mt y nx
+  ... | done (b-lane y)  = end-lane rx₁ mt y nx
+  ... | done (b-close y) = end-close rx₁ mt y nx
+
+  postulate
     comb-shut     : ∀ {rx} → Met M rx → ShutRun (outRows op init rx)
-    -- IDLE BETWEEN ROWS: where a reader of the scan waits on nothing before
-    -- a position few rows precede, the routes it counts are of that
-    -- position's instant, or none, wherever the real flatMap has few rows
-    -- before.
+    -- IDLE BETWEEN ROWS, ON A RUN OF THE SOURCE: where a reader of the scan
+    -- waits on nothing before a position few rows precede, over a prefix
+    -- of what a run met of the source lays out, the routes it counts are
+    -- of that position's instant, or none, wherever the real flatMap has
+    -- few rows before.
     --
     -- REFUTED: 9e244736 `scan-idle` unrestricted, by a switch whose cut lane loops: the real flatMap never gets past the loop, while the scan reads on in the clairvoyant hot outer to the closer's `outerDone`, which keeps the outer completion's route as the counts empty, and waits in a later instant still holding it
-    scan-idle     : IdleIn (Few R) scanned
+    laid-idle     : ∀ {rx rs ext} → Met M rx → rs ++ ext ≡ outRows op init rx → Met scanned rs → Upto (Few R) rs
+                  → (∀ {c} → (c , end) ∈ rs → ⊥) → ∀ {w} → Few R w → Few scanned w → After (cursor nothing rs) w
+                  → (∀ {y e} → scanned y e → Visible e → After (cursor nothing rs) y → w ≼ y)
+                  → proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w
     -- PAST A ZERO COUNT THE SCAN FINISHES THE INSTANT: once its count holds
     -- no route of the instant last begun, finitely many rows of it follow,
     -- outer, branches and trackers together.
+    --
+    -- DEAD ROUTE: through `comb-run`, as `scan-idle` goes. The scan's run is laid out by a source run had only under ¬¬, and the list of rows left is a Σ, which no ¬¬ yields; nor does a premise of the scan's run bound the rows past its cursor
     scan-rest     : Rest scanned
+
+  -- IDLE BETWEEN ROWS: the counts are decidable, so the run of the source
+  -- the scan's run lays out from is had classically.
+  scan-idle : IdleIn (Few R) scanned
+  scan-idle {rs} mt up ne {w} fw fs aw lw =
+    decidable-stable ((proj₂ (cnt rs) ℕ.≟ 0) ⊎-dec (proj₁ (cnt rs) ≟ᵖ nameOf w)) λ ng →
+      comb-run m op src env′ P g₃ ok₃ mt λ (rx , mx , ext , eq) → ng (laid-idle mx eq mt up ne fw fs aw lw)
 
   -- THE READINGS UNDER THE SCAN'S SOURCE: the outer at its subscription,
   -- the closer over it, the lanes over both.

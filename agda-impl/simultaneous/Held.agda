@@ -42,7 +42,7 @@ open import simultaneous.InstEmit using (begin; stop; subscribed; completed; lan
 open import Data.Product using (Σ; _,_)
 open import Data.Unit using (⊤; tt)
 import denotation.Laws.ShowsJoin as SJ
-open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; empty-few; held-cold;
+open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; tracks-ev; placed-conn; empty-few; held-cold;
   held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
 open import simultaneous.Routed using (Adm; PlacedD; Placed; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
@@ -54,6 +54,7 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; from)
 open import simultaneous.HeldReader using (held-connected)
+open import simultaneous.FlatPlaced using (module FlatPlaced)
 open import simultaneous.HeldConnBind using (held-connect)
 open import simultaneous.HeldComb using (ev)
 import Relation.Nullary as Nl
@@ -115,23 +116,42 @@ trig-fit m {A = A} ρ s env cs g eh hs p ok fr ep L₀ =
     lane false q okq fq eq = held-fit (IH.holds (hs (λ i → there (ρ i))) (hot σ₀ ∷ env) cs g₀ eh₀ q okq fq eq)
                                       (IH.placed (hs (λ i → there (ρ i))) (hot σ₀ ∷ env) cs g₀ eh₀ q okq fq eq)
 
--- A FLATMAP HANGS ITS LANES ON ADMISSIBLE ROWS: the trigger's, the
--- closer's and every inner's, each placed by its own child.
-postulate
-  placed-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
-                 → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
-                 → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
-                 → ∀ env cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (flatMap op f s)) env)
+-- A FLATMAP HANGS ITS LANES ON ADMISSIBLE ROWS: its rows are its scan's,
+-- read past the four connects that share its outer.
+placed-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
+               → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
+               → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
+               → ∀ env cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ (flatMap op f s)) env)
+placed-flatMap m ρ op f s hs hf env cs g eh p ok fr ep =
+  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; σ₀) in
+  placed-conn m empty _ env g {F = Fresh eh} {G = Fresh eh} (λ x → x) p ok λ L₀ ok₀ →
+    placed-conn m trig _ _ (good-cons L₀ g) {F = Fresh eh} {G = Fresh eh} (λ x → x) c ok₀ λ L₁ ok₁ →
+      placed-conn m closer _ _ (good-cons L₁ (good-cons L₀ g)) {F = Fresh eh} {G = Fresh eh} (λ x → x) p₀ ok₁ λ L₂ ok₂ →
+        placed-conn m real _ _ (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) {F = Fresh eh} {G = Fresh eh} (λ x → x) p₀₀ ok₂ λ L₃ ok₃ →
+          FlatPlaced.placed m ρ op f s env cs g eh hf p ok fr ep
+            (held-trigger m ρ s env cs p g ok ep (fresh-adm eh) fr
+              (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }))
+            (λ r sh → Fit.placed (trig-fit m ρ s env cs g eh hs p ok fr ep L₀ (c ⊕ [ ix 1 ]) (ok-step c ok₀)
+                                    (Adm.step (adm-∪ {t = σ₀} (fresh-adm eh)) ok₀ (Adm.bare (fresh-adm eh) fr λ ()) plain-ix)
+                                    (early-inst [ ix 1 ] (early-inst [ ix 0 ] ep)))
+                                  (proj₁ r) sh)
+            L₁ L₂ L₃ ok₁ ok₂ ok₃
+            (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
 held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
-  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real; σ₀) in
-  conn-ev m empty _ env cs g p ok ep (tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
-    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ tracks-trig λ L₁ ok₁ ep₁ → held-in (
-      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ tracks-closer λ L₂ ok₂ ep₂ → held-in (
-        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ tracks-real λ L₃ ok₃ ep₃ →
+  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real; σ₀; σ₁; σ₂; env₀; tk) in
+  conn-ev m empty _ env cs g p ok ep (λ _ _ → tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
+    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀
+      (λ L₁ ok₁ → tracks-ev m closer (connect real (combined op tk)) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ λ L₂ ok₂ →
+                  tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
+                  tracks-trig) λ L₁ ok₁ ep₁ → held-in (
+      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁
+        (λ L₂ ok₂ → tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
+                    tracks-closer) λ L₂ ok₂ ep₂ → held-in (
+        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ (λ _ _ → tracks-real) λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok fr ep
             (held-trigger m ρ s env cs p g ok ep (fresh-adm eh) fr
               (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }))

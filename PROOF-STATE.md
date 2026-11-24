@@ -248,27 +248,16 @@ bodies, or a row whose creator chain is cut unlike its image's.
 Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 `scan-order`, `take-order`, `defer-order`.
 
-#### PLACEMENT
-
-Every row a lane hangs on lies outside every binder's last gap. Open:
-the flatMap's scan emits below its source's branch rows, each a join in
-the world at `P` on a row of the trigger, the closer or the real
-flatMap; the real flatMap's rows need its lanes placed by the inner IH,
-and the scan's end needs locating. Settled by a body.
-
-Members: `placed-flatMap`.
-
 #### THE FINITE REST
 
-Untried: past a zero count only finitely many rows of the instant last
-begun remain. The combinator scan loops synchronously, so its rest needs the count.
-A connect's echoes are its source's rows: where its body empties, its
-source must be done with the instant (`Tracks`), true of an elaborated
-body because each flatMap parks what it cuts while a connect in scope
-holds a route. Settled by bodies, or a body emptied under a looping source.
+Blocked: past a zero count only finitely many rows of the instant last
+begun remain, a Σ of a list — but the scan's run is laid out by a source
+run had only under ¬¬ (`comb-run`). A connect's echoes are its source's
+rows: its body empties only once its source is done with the instant
+(`Tracks`). Settled by a constructive source run, or `Rest`/`Tracks`
+made ¬¬-stable through `Closing`'s exits.
 
-Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
-`tracks-real`.
+Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-real`.
 
 #### THE HELD STREAMS
 
@@ -279,7 +268,8 @@ flatMap's scan counters, each the `idle` of what holds the routes, read
 on the scan's run split onto that branch. Settled when each former's
 leaf is a body.
 
-Members: `live-current`, `end-tot`, `comb-shut`, `scan-idle`.
+Members: `track-row`, `track-shows`, `end-outer`, `end-lane`, `end-close`,
+`comb-shut`, `laid-idle`, `closer-under`.
 
 #### THE BATCH RANK
 
