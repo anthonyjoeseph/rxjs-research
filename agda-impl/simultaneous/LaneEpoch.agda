@@ -52,10 +52,10 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 ------------------------------------------------------------------------
 -- Arithmetic and lists
 
-private
-  cancelʳ : ∀ k a b → a + k ≡ b + k → a ≡ b
-  cancelʳ k a b eq = +-cancelˡ-≡ k a b (trans (+-comm k a) (trans eq (+-comm b k)))
+cancelʳ : ∀ k a b → a + k ≡ b + k → a ≡ b
+cancelʳ k a b eq = +-cancelˡ-≡ k a b (trans (+-comm k a) (trans eq (+-comm b k)))
 
+private
   -- One step of a counter that a stop lowers by at most one.
   stop-le : ∀ a e S → a + e ≡ S + (e ∸ 1) → S ∸ 1 ≤ a
   stop-le a zero    S eq = ≤-trans (m∸n≤m S 1) (≤-reflexive (sym (trans (sym (+-identityʳ a)) (trans eq (+-identityʳ S)))))

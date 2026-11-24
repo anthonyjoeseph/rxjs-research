@@ -15,17 +15,18 @@ module simultaneous.IdleThin where
 
 open import Data.Bool using (Bool)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; [_])
 import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing; just)
-open import Data.Nat using (ℕ) renaming (_≟_ to _≟ⁿ_)
+open import Data.Nat using (ℕ; suc) renaming (_≟_ to _≟ⁿ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Relation.Nullary.Decidable using (decidable-stable; _⊎-dec_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁻)
 open import Relation.Nullary using (¬_)
 
 open import denotation.Position using (Pos; root; _≟ᵖ_; instant; _∙_)
@@ -37,9 +38,12 @@ open import denotation.Laws.Worlds using (InvAt)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.Relations using (Met; values)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Idle; cnt; nameOf; nm)
+open import simultaneous.Routed using (Idle; cnt; nameOf; nm; Carried; c-stop)
+open import simultaneous.InstEmit using (instEmit; mark; stop)
+open import simultaneous.Counts using (Counts)
+open import simultaneous.HeldRead using (pre-noend)
 open import simultaneous.HeldTo using (Unfailed; IdleTo)
-open import simultaneous.Layers using (after-≺; Last; last-met)
+open import simultaneous.Layers using (after-≺; Last; last-met; run-row)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count)
 
@@ -107,6 +111,42 @@ module Thin {X : Set} (keep : IE X → Bool) (t u : EmissionSet (IE X)) {H : Pos
       i1′ {k} uk ak with ≼-split {q} {k} (λ kq → lift-vis uk λ tk → lst tk tt (i1 uk ak) kq)
       ... | inj₁ lt   = lt
       ... | inj₂ refl = ⊥-elim (nu uk)
+
+  -- A kept row last among a run's rows is last among its thinning's.
+  snoc : ∀ r₁ {y v rs′} → Thin (r₁ ++ [ (y , out v) ]) rs′ → u y (out v)
+       → Σ (List Row) λ r₁′ → rs′ ≡ r₁′ ++ [ (y , out v) ] × Thin r₁ r₁′
+  snoc []       (kp _ [])     _  = [] , refl , []
+  snoc []       (dp _ nu _)   uy = ⊥-elim (nu uy)
+  snoc (_ ∷ r₁) (kp x th)     uy with snoc r₁ th uy
+  ... | r₁′ , refl , th′ = _ ∷ r₁′ , refl , kp x th′
+  snoc (_ ∷ r₁) (dp mu nu th) uy with snoc r₁ th uy
+  ... | r₁′ , refl , th′ = r₁′ , refl , dp mu nu th′
+
+  -- A RUN MET UP TO A ROW THE PROGRAM HOLDS is the program's, its silent
+  -- values dropped, so it counts what the program's run counts.
+  counts : ∀ {Y} → (∀ {q v} → t q (out v) → Carried (out v) → u q (out v)) → Counts u Y → Counts t Y
+  counts {Y} kc C = record { cov = cov ; stp = stp }
+    where
+      moved : ∀ r₁ {y v} → Met t (r₁ ++ [ (y , out v) ]) → Carried (out v)
+            → Σ (List Row) λ r₁′ → Met u (r₁′ ++ [ (y , out v) ]) × cnt r₁ ≡ cnt r₁′
+      moved r₁ {y} {v} m c with thin m ne | kc (proj₁ (run-row m (∈-++⁺ʳ r₁ (here refl)))) c
+        where
+          ne : ∀ {k} → (k , end) ∈ r₁ ++ [ (y , out v) ] → ⊥
+          ne i with ∈-++⁻ r₁ i
+          ... | inj₁ i₁ = pre-noend r₁ m i₁
+          ... | inj₂ (here ())
+          ... | inj₂ (there ())
+      ... | rs′ , th | uy with snoc r₁ th uy
+      ...   | r₁′ , refl , th₁ = r₁′ , proj₁ (run m th (λ a → a) (λ _ a → a)) , fold th₁ r₀
+
+      cov : ∀ r₁ {y v} → Met t (r₁ ++ [ (y , out v) ]) → Carried (out v) → ¬ Y y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+      cov r₁ m c nx with moved r₁ m c
+      ... | r₁′ , m′ , e with Counts.cov C r₁′ m′ c nx
+      ...   | k , e′ = k , trans e e′
+
+      stp : ∀ r₁ {y n} → Met t (r₁ ++ [ (y , out (instEmit (mark stop) n)) ]) → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
+      stp r₁ m with moved r₁ m c-stop
+      ... | r₁′ , m′ , e = subst (λ r → Σ ℕ λ k → proj₂ r ≡ suc k) (sym e) (Counts.stp C r₁′ m′)
 
   Goal : List Row → Pos → Set
   Goal rs w = proj₂ (cnt rs) ≡ 0 ⊎ proj₁ (cnt rs) ≡ nameOf w

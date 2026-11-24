@@ -19,6 +19,8 @@ open import denotation.Events using (Timeline)
 open import denotation.EmissionSet using (DenEnv; enter)
 open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ; ok-step; ok-in; ⊑-refl)
 import denotation.Laws.JoinInv as JoinInv
+import adequacy.Cursor as AC
+open import adequacy.Settle using (jlane)
 open import Data.Nat.Properties using (<-cmp)
 open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import denotation.Laws.Shows using (k-shows; shows-k)
@@ -44,27 +46,20 @@ open import denotation.Up using (up; up-⊕)
 open import simultaneous.Instants using (triⁱ; transⁱ; instant-≺)
 open import simultaneous.TakeCut using (inst-⊕)
 open import denotation.Position using (Pos)
-open import denotation.EmissionSet using (EmissionSet; Den; out; end; After; LaneOf; _≺_; Few; Truncate; module Merge; module Bounded;
-  module Switch; module Exhaust)
+open import denotation.EmissionSet using (EmissionSet; Den; out; end; After; LaneOf; _≺_; Few; Truncate; module Bounded;
+  module Exhaust)
 open import denotation.Laws.Worlds using (Shows)
 open import simultaneous.Readings using (instantOf)
 open import simultaneous.Instants using (_≺ⁱ_)
 
 module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
-  -- The value at `q`'s lane.
+  -- The value at `q`'s lane, and whether it runs one: adequacy's policy.
   Lane : FlatOp → Pos → A → EmissionSet B
-  Lane (mergeᶠ nothing)  = LaneOf f
-  Lane (mergeᶠ (just n)) = Bounded.Lane n f o
-  Lane switchᶠ           = LaneOf f
-  Lane exhaustᶠ          = LaneOf f
+  Lane op = AC.Pol.Lane (AC.polF op f o)
 
-  -- The value at `q` runs its lane.
   Runs : FlatOp → Pos → Set
-  Runs (mergeᶠ nothing)  _ = ⊤
-  Runs (mergeᶠ (just n)) q = Bounded.Indexed n f o q
-  Runs switchᶠ           _ = ⊤
-  Runs exhaustᶠ          q = Exhaust.Run f o q
+  Runs op = AC.Pol.Runs (AC.polF op f o)
 
   -- A later value cuts the value at `q`'s lane.
   Cut : FlatOp → Pos → Set
@@ -78,10 +73,7 @@ module View {A B : Set} (f : A → Den B) (o : EmissionSet A) where
 
   -- The joiner itself.
   Join : FlatOp → EmissionSet B
-  Join (mergeᶠ nothing)  = Merge.JoinT f o
-  Join (mergeᶠ (just n)) = Bounded.JoinT n f o
-  Join switchᶠ           = Switch.JoinT f o
-  Join exhaustᶠ          = Exhaust.JoinT f o
+  Join op = AC.JoinF op f o
 
   -- The outer has ended by the instant `I`,
   OuterBy : _ → Set
@@ -127,13 +119,17 @@ join-out switchᶠ           f o (Joining.run () _)
 join-out exhaustᶠ          f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
 join-out exhaustᶠ          f o (Joining.run () _)
 
+-- A kill before `k` is a cut by `k`.
+kill-cut : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q q′ k} → AC.Pol.Kill (AC.polF op f o) q q′ → q′ ≺ k → View.CutAt f o op q k
+kill-cut switchᶠ    f o (a′ , x , lt) lt′ = _ , a′ , x , lt , lt′
+kill-cut (mergeᶠ nothing)  f o ()
+kill-cut (mergeᶠ (just _)) f o ()
+kill-cut exhaustᶠ   f o ()
+
 -- and each lane's working row, run and not cut there, is one.
 join-in : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q a k e} → o q (out a) → View.Runs f o op q
         → View.Lane f o op q a k e → ¬ View.CutAt f o op q k → Work e → View.Join f o op k e
-join-in (mergeᶠ nothing)  f o x r l nc w = Joining.lane x r l (λ ()) w
-join-in (mergeᶠ (just n)) f o x r l nc w = Joining.lane x r l (λ ()) w
-join-in switchᶠ           f o x r l nc w = Joining.lane x r l nc w
-join-in exhaustᶠ          f o x r l nc w = Joining.lane x r l (λ ()) w
+join-in op f o x r l nc w = jlane op x r l (λ kl lt → nc (kill-cut op f o kl lt)) w
 
 -- A CUT BY A ROW IS A CUT BY EVERY LATER ROW.
 cutat-up : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k k′} → k ≺ k′ → View.CutAt f o op q k → View.CutAt f o op q k′

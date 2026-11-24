@@ -23,11 +23,12 @@ open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; s
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
 open import simultaneous.Relations using (elaborated)
 open import simultaneous.Shut using (Shut)
-open import simultaneous.Routed using (Held; Early; Rest)
+open import simultaneous.Routed using (Held; Early)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step)
 open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldWrap using (held-wrapped)
 open import simultaneous.HeldScan using (held-scan-at; Relabels)
+open import simultaneous.InstantTruth using (inst-meaning)
 open import simultaneous.HeldDefer using (held-defer; placed-defer)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.HeldTrigger using (held-trigger)
@@ -140,16 +141,6 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃))))
   (placed-flatMap m ρ op f s hs hf)
 
--- A DEFER'S LIMIT KEEPS ITS INSTANTS FINITE: past a zero count, finitely
--- many rows of the instant last begun.  Each approximant's rest bounds only
--- its own rows, and the limit's rows of an instant are those of every
--- approximant together, which no one approximant's list bounds.
-postulate
-  lim-rest : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-           → (∀ n → IH (just n) ρ (defer l))
-           → ∀ env cs → GoodEnv env → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Early p
-           → Rest (enter (⟦ elab ρ (defer l) ⟧ env) p)
-
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit, held
 -- wherever the approximants agree with it.
@@ -164,7 +155,8 @@ held-lim ρ l hs = ih (λ env cs g eh p ok fr ep →
   LimHeld.held (enter (⟦ elab ρ (defer l) ⟧ env) p) (λ n → enter (approx n (elab ρ (defer l)) env) p) (p ∷ cs)
     (lim-row ρ l env p)
     (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
-    (λ n → IH.holds (hs n) env cs g eh p ok fr ep) (lim-rest ρ l hs env cs g eh p ok ep))
+    (λ n → IH.holds (hs n) env cs g eh p ok fr ep)
+    (λ N fw sf lf {x} iw → inst-meaning (elab ρ (defer l)) env g p ok N fw sf lf {x} iw))
   λ env cs g eh p ok fr ep x sh → let (N , h) = lim-row ρ l env p x in IH.placed (hs N) env cs g eh p ok fr ep h sh
 
 held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
@@ -225,7 +217,7 @@ same-restamp st (instEmit (mark completed) _)  = same-mark λ ()
 -- THE BATCHER'S SOURCE HOLDS: the wrapped program, restamped.
 held-top : ∀ {A} (o : SObs [] A) → IH nothing (λ i → i) (plain o) → Held (elaborated o) (root ∷ [])
 held-top o hy = held-scan-at restamp same-restamp (root , marked begin) (⟦ wrapped s ⟧ []ᵉ) root
-  (held-wrapped s tt (IH.holds hy []ᵉ [] (λ ()) record { bound = λ () ; apart = λ () }))
+  (held-wrapped s (tt , λ ()) (IH.holds hy []ᵉ [] (λ ()) record { bound = λ () ; apart = λ () }))
   where
     s = elab (λ i → i) (plain o)
 

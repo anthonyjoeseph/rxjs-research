@@ -140,6 +140,16 @@ module TakeBack {A : Set} {H : Pos → Set} (incl : Bool) (keep : A → Bool) (d
     tl-ve : T incl → Tl f a ((f ⊕ [ ix 0 ] , out a) ∷ (f ⊕ [ last ] , end) ∷ [])
     tl-e  : Tl f a [ (f ⊕ [ last ] , end) ]
 
+  -- The values under a cut: the failing value, at its first child.
+  tl-val : ∀ {f a tl y x} → Tl f a tl → (y , out x) ∈ tl → y ≡ f ⊕ [ ix 0 ] × x ≡ a
+  tl-val (tl-v _)  (here refl)         = refl , refl
+  tl-val (tl-v _)  (there ())
+  tl-val (tl-ve _) (here refl)         = refl , refl
+  tl-val (tl-ve _) (there (here ()))
+  tl-val (tl-ve _) (there (there ()))
+  tl-val tl-e      (here ())
+  tl-val tl-e      (there ())
+
   -- A run cut at the first failing value.
   data Cut (c : Maybe Pos) (rs : List (Pos × Ev A)) : Set where
     cut : ∀ {rs₀ tl f a} → rs ≡ rs₀ ++ tl → Run S c (rs₀ ++ [ (f , out a) ]) → S f (out a) → T (not (keep a)) → ¬ Failed f
@@ -370,15 +380,6 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
 
   pre-q : ∀ {a tl} m {r} → All (Q a) tl → tl ≡ m ++ r → All (Q a) m
   pre-q m qs eq = all-++⁻ˡ m (subst (All _) eq qs)
-
-  tl-val : ∀ {f a tl y x} → Tl f a tl → (y , out x) ∈ tl → y ≡ f ⊕ [ ix 0 ] × x ≡ a
-  tl-val (tl-v _)  (here refl)         = refl , refl
-  tl-val (tl-v _)  (there ())
-  tl-val (tl-ve _) (here refl)         = refl , refl
-  tl-val (tl-ve _) (there (here ()))
-  tl-val (tl-ve _) (there (there ()))
-  tl-val tl-e      (here ())
-  tl-val tl-e      (there ())
 
   tl-row : ∀ {f a tl y e} → Tl f a tl → (y , e) ∈ tl → Σ Label λ l → y ≡ f ⊕ [ l ]
   tl-row (tl-v _)  (here refl)                = ix 0 , refl

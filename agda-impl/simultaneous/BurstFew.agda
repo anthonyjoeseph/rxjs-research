@@ -21,21 +21,22 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; s≤s)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; mergeᶠ)
 open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; _⊕_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; at-end; _≺_; Few; Truncate; Rejoin; shown;
-  heard; ended; late; LaneOf; MapT; module Op; module Joining; module Bounded;
-  module Connecting)
+open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; hot; enter; out; Proper; at-out; on-out; at-end; _≺_; Few; Truncate; Rejoin; shown;
+  heard; ended; late; LaneOf; MapT; map-out; module Op; module Joining; module Bounded;
+  module Connecting; module Scan; module Merge)
 open import denotation.Laws.Modulus using (≺-ext; ≺-trans)
 open import denotation.Laws.Truth using (Finite)
+open import denotation.Laws.Worlds.Leaves using (of-reach)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.SObs using (lone; burstPart; module Elaborate)
+open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (burstEnd)
-open import simultaneous.LaneLayers using (few-tr; map-few; scan-few)
+open import simultaneous.LaneLayers using (Under; few-row; few-tr; map-few; scan-few; under-ext; under-refl; under-trans; under-⊕)
 open import simultaneous.LaneStart using (module C; Sh; z₀)
 open import simultaneous.ConcatTwo using (module Two; starts₀)
 open import simultaneous.ConcatThree using (module Of3; o1; e1; r1)
@@ -158,8 +159,12 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   pb2→ nothing  h h′ s r = r
   pb2→ (just _) h h′ s r = r
 
+  pcb : ∀ m (h : Den ⊤) (h′ : Den (IE B)) s → enter (ev m (piece {B = B} burstPart 0) (h′ ∷ h ∷ ρ)) s (s ⊕ [ ix 0 ]) (out (marked burstEnd))
+  pcb nothing  h h′ s = at-out , of-reach s 0 (marked burstEnd ∷ []) {s ⊕ [ ix 0 ]} {out (marked burstEnd)}
+  pcb (just _) h h′ s = at-out , of-reach s 0 (marked burstEnd ∷ []) {s ⊕ [ ix 0 ]} {out (marked burstEnd)}
+
   module _ (m : Maybe ℕ) where
-    open C ρ′ o ρ m using (Sv; Ct; Sc; Fr; H₁; H₂; Bp)
+    open C ρ′ o ρ m using (Sv; Ct; Sc; Fr; H₁; H₂; Bp; module Frame)
 
     -- The burst part's share, over a finite hot: its blocker's rows, and
     -- the empty's end wherever it starts.
@@ -295,41 +300,79 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
       fin : Finite JoinT
       fin = fin-join (q₀ ∷ q₁ ∷ q₂ ∷ qL ∷ [] , ofin) (kl , λ _ l → lanes l) ([] , λ ())
 
+    -- The burst part's lane at `s`, its layers' rows few before anywhere.
+    module BurstAt (s : Pos) where
+      R R′ : Pos
+      R = (s ⊕ [ ix 1 ]) ⊕ [ ix 1 ]
+      R′ = R ⊕ [ ix 0 ]
+
+      h₁ = H₁ R
+      h₂ = H₂ R burstPart
+
+      Pe : Finite (Proper (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])))
+      Pe = [ (R ⊕ [ ix 1 ]) ⊕ [ last ] ] , λ { ((at-end , _) , _) → here refl }
+
+      module SF = ShareFin (Proper (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ]))) Pe (R′ ⊕ [ ix 1 ])
+
+      SHb : EmissionSet (IE B)
+      SHb = enter (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (R′ ⊕ [ ix 1 ])
+
+      fP : Finite (Proper SHb)
+      fP = proj₁ SF.fin-sh , λ x → proj₂ SF.fin-sh (proj₁ x)
+
+      module FF = FrameFin h₁ h₂ (proj₁ fP) (λ {s′} x → proj₂ (fin-rejoin s′ (Proper SHb) fP) (proj₁ x)) (Bp R)
+
+      FrbE : EmissionSet (IE B)
+      FrbE = enter (Fr burstPart h₁ h₂) (Bp R)
+
+      ScE = enter (Sc burstPart h₁ h₂) (Bp R)
+
+      scf : ∀ v → Few (Scan.ScanT laneStep z₀ FrbE) v
+      scf v = scan-few laneStep z₀ FrbE (fin-few (fin-tr FF.fin))
+
+      ctf : ∀ v → Few (MapT proj₂ ScE) v
+      ctf v = map-few proj₂ ScE (few-tr (scf v))
+
+      inf : ∀ v → Few (Connecting.ConnT R′ SHb (enter (Ct burstPart h₁ h₂) (Bp R))) v
+      inf v = conn-few-src R′ SHb (enter (Ct burstPart h₁ h₂) (Bp R)) (fin-few SF.fin-sh) (few-tr (ctf v))
+
+      svf : ∀ v → Few (Connecting.ConnT R (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])) (enter (Op.connect (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (λ h′ → Ct burstPart h₁ h′)) R′)) v
+      svf v = conn-few-src R (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])) (enter (Op.connect (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (λ h′ → Ct burstPart h₁ h′)) R′)
+                (fin-few (fin-empty {⊤} (R ⊕ [ ix 1 ]))) (few-tr (inf v))
+
+      -- The frame's first piece's mark, its `burstEnd`, a row of every
+      -- layer up to the parts' merge.
+      open Frame burstPart h₁ h₂ (Bp R) using (V₀; u-V₀; ob₀; nth₀; S₀; sb₀; fr-min) renaming (module Bd to FB)
+
+      be : IE B
+      be = marked burstEnd
+
+      Eb : Pos
+      Eb = V₀
+
+      fr-row : FB.JoinT V₀ (out be)
+      fr-row = Joining.lane ob₀ (0 , 0 , nth₀) (0 , S₀ , sb₀ , (pcb m h₁ h₂ S₀ , ≺-ext S₀ [])) (λ ()) tt
+
+      sc-row : ScE V₀ (out (laneStep z₀ be))
+      sc-row = few-row (Scan.sval (Scan.acc₀ (few-row fr-row (fin-few FF.fin)) fr-min)) (scf V₀)
+
+      sv-row : enter (Sv burstPart) R Eb (out be)
+      sv-row = few-row (Connecting.body (few-row (Connecting.body (few-row (map-out sc-row) (ctf V₀))) (inf V₀))) (svf V₀)
+
+      u-R′ : Under R′ V₀
+      u-R′ = under-trans (under-⊕ (under-⊕ (under-refl R′) (ix 0)) (ix 0)) u-V₀
+
+      u-R : Under R V₀
+      u-R = under-trans (under-⊕ (under-refl R) (ix 0)) u-R′
+
+      -- It lies below the burst part's subscription.
+      u-s : Under (s ⊕ [ ix 1 ]) Eb
+      u-s = under-trans (under-⊕ (under-refl (s ⊕ [ ix 1 ])) (ix 1)) u-R
+
+      mm-row : Merge.JoinT Sv (enter (Op.of (lanePart ∷ burstPart ∷ [])) s) Eb (out be)
+      mm-row = Joining.lane (on-out at-out , of-reach s 0 (lanePart ∷ burstPart ∷ []) {s ⊕ [ ix 1 ]} {out burstPart}) tt
+                 (sv-row , under-ext R u-R′) (λ ()) tt
+
     -- THE BURST PART'S LANE HAS FEW ROWS BEFORE ANYWHERE.
     burst-few : ∀ s v → Few (enter (Sv burstPart) ((s ⊕ [ ix 1 ]) ⊕ [ ix 1 ])) v
-    burst-few s v = few-tr svf
-      where
-        R R′ : Pos
-        R = (s ⊕ [ ix 1 ]) ⊕ [ ix 1 ]
-        R′ = R ⊕ [ ix 0 ]
-
-        h₁ = H₁ R
-        h₂ = H₂ R burstPart
-
-        Pe : Finite (Proper (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])))
-        Pe = [ (R ⊕ [ ix 1 ]) ⊕ [ last ] ] , λ { ((at-end , _) , _) → here refl }
-
-        module SF = ShareFin (Proper (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ]))) Pe (R′ ⊕ [ ix 1 ])
-
-        SHb : EmissionSet (IE B)
-        SHb = enter (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (R′ ⊕ [ ix 1 ])
-
-        fP : Finite (Proper SHb)
-        fP = proj₁ SF.fin-sh , λ x → proj₂ SF.fin-sh (proj₁ x)
-
-        module FF = FrameFin h₁ h₂ (proj₁ fP) (λ {s′} x → proj₂ (fin-rejoin s′ (Proper SHb) fP) (proj₁ x)) (Bp R)
-
-        FrbE : EmissionSet (IE B)
-        FrbE = enter (Fr burstPart h₁ h₂) (Bp R)
-
-        ScE = enter (Sc burstPart h₁ h₂) (Bp R)
-
-        ctf : Few (MapT proj₂ ScE) v
-        ctf = map-few proj₂ ScE (few-tr (scan-few laneStep z₀ FrbE (fin-few (fin-tr FF.fin))))
-
-        inf : Few (Connecting.ConnT R′ SHb (enter (Ct burstPart h₁ h₂) (Bp R))) v
-        inf = conn-few-src R′ SHb (enter (Ct burstPart h₁ h₂) (Bp R)) (fin-few SF.fin-sh) (few-tr ctf)
-
-        svf : Few (Connecting.ConnT R (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])) (enter (Op.connect (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (λ h′ → Ct burstPart h₁ h′)) R′)) v
-        svf = conn-few-src R (enter (Op.empty {⊤}) (R ⊕ [ ix 1 ])) (enter (Op.connect (ev m (Sh ρ′ o ρ burstPart) (h₁ ∷ ρ)) (λ h′ → Ct burstPart h₁ h′)) R′)
-                (fin-few (fin-empty {⊤} (R ⊕ [ ix 1 ]))) (few-tr inf)
+    burst-few s v = few-tr (BurstAt.svf s v)

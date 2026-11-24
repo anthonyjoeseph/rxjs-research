@@ -37,10 +37,10 @@ import Data.List as L
 open import Data.List.Relation.Unary.Any using (Any)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (¬_)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; sub; inside; _⊕_; cascade; _∙_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; last; sub; inside; _⊕_; cascade; _∙_; frame; instant)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Ev; out; end; Den; enter; _≺_; _≼_; Few)
 open import denotation.Read using (Visible; After; cursor)
@@ -67,6 +67,13 @@ nm _                       = root
 
 nameOf : Pos → Pos
 nameOf y = nm (rootOf y)
+
+-- A name's instant.
+nm-inst : ∀ K → instant (nm (K ∙ [])) ≡ K
+nm-inst frame                 = refl
+nm-inst (cascade t e last)    = refl
+nm-inst (cascade t e (ix _))  = refl
+nm-inst (cascade t e (sub _)) = refl
 
 -- A cold's value step.
 data Valued : Pos → Set where

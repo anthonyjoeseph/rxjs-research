@@ -43,14 +43,14 @@ open import denotation.Laws.Truth using (instant-⊑)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.SObs using (lone; Tag; val; cdone; tick; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over)
-open import simultaneous.Instants using (≺-instant; instant-≺)
+open import simultaneous.Instants using (≺-instant; instant-≺; btw)
 open import simultaneous.CombSent using (assoc³)
 open import simultaneous.ColdFew using (Fresh; fresh-⊑; fresh-self; fresh-past; ⊑₂; Place; f-end; Leaf; module Pair; Ticks; Tickless;
   Rendered; RZ; Mint; mint-in; rv-raw; O; o-row; module Core)
 import simultaneous.ColdFew as CF
 open import simultaneous.ColdShape using (module Shape; ROut; IsVal; lf-rows; lf-vals; lf-uniqs; lf-bes; fc-outs; fc-ends; fm-ticks; r-outs)
 open import simultaneous.ColdBegin using (same-≺; rz; fm-backs)
-open import simultaneous.ColdRuns using (btw; B⁰)
+open import simultaneous.ColdRuns using (B⁰)
 open import simultaneous.ColdOrder using (⊕1-inj)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; coldˢ; render; concatˢ; phase)

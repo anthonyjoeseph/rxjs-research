@@ -13,20 +13,25 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-∃++)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ)
-open import Data.Product using (Σ; _,_; proj₁; proj₂)
-open import Data.Maybe using (just)
-open import Relation.Binary.PropositionalEquality using (refl; sym; subst)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Maybe using (just; nothing)
+open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import denotation.Position using (Pos; root; _≟ᵖ_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; instant; _∙_)
 open import denotation.Events using (Timeline; fresh)
 open import simultaneous.SObs using (lone; module Elaborate)
-open import denotation.EmissionSet using (end; EmissionSet; Few; _≺_; _≼_)
+open import denotation.EmissionSet using (Ev; out; end; EmissionSet; Few; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; cursor; After; Visible)
-open import denotation.Laws.Modulus using (AgreeTo; upto; ≺→≼; ≼-refl; ≺-trans; ≺-≼-≺)
-open import denotation.Laws.Truth using (few-ag)
+open import denotation.Laws.Modulus using (AgreeTo; upto; ≺→≼; ≼-refl; ≼-split; ≺-trans; ≺-≼-≺)
+open import denotation.Laws.Truth using (few-ag; Safe)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Project using (run-prefix)
-open import simultaneous.Routed using (Held; Rest; Idle)
+open import simultaneous.Routed using (Held; Rest; Idle; cnt)
+open import simultaneous.InstEmit using (instEmit; mark; begin)
+open import simultaneous.Readings using (rootOf)
+open import simultaneous.Layers using (run-row; cursor-snoc; snoc-view)
+open import simultaneous.Instants using (btw)
 open import simultaneous.Shut using (Shut)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -84,12 +89,47 @@ module _ {X : Set} {t : EmissionSet X} where
 module LimHeld {A : Set} (t : EmissionSet (IE A)) (c : ℕ → EmissionSet (IE A)) (cs : List Pos)
                (row : ∀ {y e} → t y e → Σ ℕ λ N → c N y e)
                (agree : ∀ {q} → Few t q → Σ ℕ λ N → AgreeTo q t (c N))
-               (H : ∀ n → Held (c n) cs) (rest : Rest t) where
+               (H : ∀ n → Held (c n) cs)
+               (inst : ∀ N {w} → Few (c N) w → Safe (c N) w
+                     → Σ (List Pos) (λ ks → ∀ {k e} → c N k e → w ≺ k → instant k ≡ instant w → k ∈ ks)
+                     → ∀ {x} → instant x ≡ instant w → AgreeTo x (c N) t) where
 
   -- A run met up to a row is met by a reading.
   lift : ∀ r₁ {y e} → Met t (r₁ ++ [ (y , e) ]) → Σ ℕ λ N → Met (c N) (r₁ ++ [ (y , e) ])
   lift r₁ mt with agree (last-few r₁ mt)
   ... | N , ag = N , run-ag ag mt (upto-last r₁ mt)
+
+  -- Rest, at one run.
+  RestFor : List (Pos × Ev (IE A)) → Set
+  RestFor rs = Met t rs → proj₂ (cnt rs) ≡ 0 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+             → Σ (List Pos) λ ks → ∀ {y e} → t y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ ks
+
+  -- PAST A ZERO COUNT: a reading meeting the run is finite in the instant
+  -- left, by its own rest, so it is the limit there, and its list bounds
+  -- the limit's rows.
+  rest-at : ∀ r₁ {w e₀} → RestFor (r₁ ++ [ (w , e₀) ])
+  rest-at r₁ {w} {e₀} mt z {q} bq =
+    let (N , m′) = lift r₁ mt
+        (ks , hk) = Held.rest (H N) m′ z bq
+        (tw , vi) = run-row m′ (∈-++⁺ʳ r₁ (here refl))
+    in ks , λ {y} {e} ty ay ry →
+      let wy = subst (λ c′ → After c′ y) (cursor-snoc nothing r₁) ay
+          iy = cong instant ry
+          iw = in-q (upto-last r₁ mt bq) wy iy
+          left : ∀ {k e′} → c N k e′ → w ≺ k → instant k ≡ instant w → k ∈ ks
+          left {k} tk wk ik = hk tk (subst (λ c′ → After c′ k) (sym (cursor-snoc nothing r₁)) wk) (cong (λ i → i ∙ []) (trans ik iw))
+          ag = inst N (last-few r₁ m′) (inj₂ (e₀ , tw , vi)) (ks , left) {y} (trans iy (sym iw))
+      in hk (proj₂ (upto ag {y} {e} (≼-refl {y})) ty) ay ry
+    where
+      in-q : ∀ {y} → q ≼ w → w ≺ y → instant y ≡ instant q → instant w ≡ instant q
+      in-q {y} qw wy iy with ≼-split {q} {w} qw
+      ... | inj₁ lt   = btw q w y lt wy (sym iy)
+      ... | inj₂ refl = refl
+
+  rest : Rest t
+  rest {rs} with snoc-view rs
+  ... | inj₁ refl                  = λ _ _ ()
+  ... | inj₂ (r₁ , (w , e₀) , refl) = rest-at r₁ {w} {e₀}
 
   held : Held t cs
   held = record

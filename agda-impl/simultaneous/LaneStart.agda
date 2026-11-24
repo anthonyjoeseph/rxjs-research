@@ -259,18 +259,14 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
         go burstPart refl {s = s} (on-out (on-out at-out) , _) _ l = ⊥-elim (pc2 h h′ s l)
         go _ _ (on-out (on-out (on-out ())) , _) _ _
 
-    -- What shows a `begin` in the frame is the lane part's second or third
-    -- piece, past every position below the first value.
-    fr-begin : ∀ {y n} → enter (Fr k h h′) P y (out (instEmit (mark begin) n))
+    -- What the frame shows besides its pieces' marks is the lane part's
+    -- second or third piece, past every position below the first value.
+    fr-plain : ∀ {y a} → enter (Fr k h h′) P y (out a) → (a ≡ ls → ⊥) → (a ≡ marked burstEnd → ⊥)
              → (k ≡ burstPart → (∀ {p y a} → enter h′ p y (out a) → ⊥)) → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
-    fr-begin r hb with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
+    fr-plain {a = a} r ne-ls ne-be hb with bounded-out 1 f (Op.of (0 ∷ 1 ∷ 2 ∷ [])) P r
     ... | q , j , i , s , oq , sb , (l , sl) = go k refl oq sb l sl
       where
-        ne-ls : ∀ {n} → instEmit (mark begin) n ≡ ls → ⊥
-        ne-ls ()
-        ne-be : ∀ {n} → instEmit (mark begin) n ≡ marked {B} burstEnd → ⊥
-        ne-be ()
-        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y n} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out (instEmit (mark begin) n)) → s ≺ y
+        go : ∀ k′ → k′ ≡ k → ∀ {q j i s y} → O q (out j) → Bd.Sub i q s j → enter (f j) s y (out a) → s ≺ y
            → k ≡ lanePart × (∀ {u} → Under (P ⊕ [ ix 0 ]) u → u ≺ y)
         go lanePart refl {s = s} (at-out , _) _ l _ = ⊥-elim (ne-ls (pc0-ls h h′ s l))
         go burstPart refl {s = s} (at-out , _) _ l _ = ⊥-elim (ne-be (pc0-be h h′ s l))
@@ -314,13 +310,15 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
     let (st , a₀ , _ , fa , ea) = ct-read k P svr
     in Frame.fr-start k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) _ (out a)) (tell-back (proj₁ st) a₀ ea tt) fa) hn
 
-  -- The `begin` a part's connect shows is the lane part's, past its
-  -- frame's first piece.
-  down-begin : ∀ k P {e₂ n} → enter (Sv k) P e₂ (out (instEmit (mark begin) n))
+  -- An undone row a part's connect shows, no piece's mark, is the lane
+  -- part's, past its frame's first piece.
+  down-plain : ∀ k P {e₂ a} → enter (Sv k) P e₂ (out a) → T (undone a) → (a ≡ ls → ⊥) → (a ≡ marked burstEnd → ⊥)
              → k ≡ lanePart × (∀ {u} → Under (Bp P ⊕ [ ix 0 ]) u → u ≺ e₂)
-  down-begin k P {e₂} svr =
+  down-plain k P {e₂} svr u nl nb =
     let (st , a₀ , _ , fa , ea) = ct-read k P svr
-    in Frame.fr-begin k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) e₂ (out a)) (tell-back (proj₁ st) a₀ ea tt) fa)
+        back = tell-back (proj₁ st) a₀ ea u
+    in Frame.fr-plain k (H₁ P) (H₂ P k) (Bp P) (subst (λ a → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) e₂ (out a)) back fa)
+         nl nb
          (λ { refl r → sh-b (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out r)))) })
 
   h₂-no : ∀ P k → (∀ {y n} → enter (SH k (H₁ P)) ((P ⊕ [ ix 0 ]) ⊕ [ ix 1 ]) y (out (instEmit (mark laneStart) n)) → ⊥)
@@ -455,12 +453,12 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
           late (_ , _ , (on-out at-out , _) , svr , _) = bl (proj₁ (down burstPart _ svr nk′))
           late (_ , _ , (on-out (on-out ()) , _) , _ , _)
 
-  -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
-  -- subscription.
-  core-begin : ∀ s {y n} → enter LaneD s y (out (instEmit (mark begin) n))
+  -- A LANE'S UNDONE ROW, NO PIECE'S MARK, FOLLOWS ITS OWN `laneStart`,
+  -- both past its subscription.
+  core-plain : ∀ s {y a} → enter LaneD s y (out a) → T (undone a) → (a ≡ ls → ⊥) → (a ≡ marked burstEnd → ⊥)
              → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
-  core-begin s (TakeWhile.fail _ () _ _ , _)
-  core-begin s {y} {n} x@(TakeWhile.pass r _ nF , _) = part (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
+  core-plain s (TakeWhile.fail _ nk _ _ , _) u _ _ = ⊥-elim (notT _ nk u)
+  core-plain s {y} {a} x@(TakeWhile.pass r _ nF , _) u nl nb = part (merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r)
     where
     fin : ∀ kq k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
         → (k ≡ lanePart × (∀ {u} → Under (Bp (kq ⊕ [ ix 1 ]) ⊕ [ ix 0 ]) u → u ≺ y))
@@ -481,18 +479,18 @@ module Core {B : Set} (SH : Part → Den ⊤ → Den (IE B)) (PC : Part → ℕ 
       s-E₀ = ≺-trans {s} {kq} {E₀} (of-after s (lanePart ∷ burstPart ∷ []) okq) (under-ext kq (under-trans (under-⊕ (under-refl P) (ix 0)) u-P))
 
       mm₀ : enter MM s E₀ (out ls)
-      mm₀ = Joining.lane okq tt (sv-row , P-E₀) (λ ()) tt , reach-down {q = y} {w = E₀} {e = out (instEmit (mark begin) n)} {e₁ = out ls} (proj₂ r) lt₀ tt
+      mm₀ = Joining.lane okq tt (sv-row , P-E₀) (λ ()) tt , reach-down {q = y} {w = E₀} {e = out a} {e₁ = out ls} (proj₂ r) lt₀ tt
 
       nF₀ : ¬ TakeWhile.Failed true undone (enter MM s) E₀
       nF₀ (q′ , a′ , x′ , nk′ , lt′) = nF (q′ , a′ , x′ , nk′ , ≺-trans {q′} {E₀} {y} lt′ lt₀)
 
       take₀ : enter LaneD s E₀ (out ls)
-      take₀ = TakeWhile.pass mm₀ tt nF₀ , reach-down {q = y} {w = E₀} {e = out (instEmit (mark begin) n)} {e₁ = out ls} (proj₂ x) lt₀ tt
+      take₀ = TakeWhile.pass mm₀ tt nF₀ , reach-down {q = y} {w = E₀} {e = out a} {e₁ = out ls} (proj₂ x) lt₀ tt
 
     part : (Σ Pos λ kq → Σ Part λ k → enter (Op.of (lanePart ∷ burstPart ∷ [])) s kq (out k)
-             × enter (Sv k) (kq ⊕ [ ix 1 ]) y (out (instEmit (mark begin) n)) × (kq ⊕ [ ix 1 ]) ≺ y)
+             × enter (Sv k) (kq ⊕ [ ix 1 ]) y (out a) × (kq ⊕ [ ix 1 ]) ≺ y)
          → Σ Pos λ y₀ → enter LaneD s y₀ (out ls) × s ≺ y₀ × y₀ ≺ y
-    part (kq , k , okq , svr , _) = fin kq k okq (down-begin k (kq ⊕ [ ix 1 ]) svr)
+    part (kq , k , okq , svr , _) = fin kq k okq (down-plain k (kq ⊕ [ ix 1 ]) svr u nl nb)
 
   -- A LANE'S `laneDone` FOLLOWS ITS OWN `laneStart`, both past its
   -- subscription.
@@ -628,12 +626,13 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
   lane-starts m s {y} {k} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
     (C.core m s (subst (λ d → enter d s y (out (instEmit (mark (laneDone k)) n))) (lane-eq m) r) tt)
 
-  -- A LANE'S `begin` FOLLOWS ITS OWN `laneStart`, both past its
-  -- subscription.
-  begin-starts : ∀ m s {y n} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out (instEmit (mark begin) n))
-              → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
-  begin-starts m s {y} {n} r = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
-    (C.core-begin m s (subst (λ d → enter d s y (out (instEmit (mark begin) n))) (lane-eq m) r))
+  -- A LANE'S UNDONE ROW, NO PIECE'S MARK, FOLLOWS ITS OWN `laneStart`,
+  -- both past its subscription.
+  plain-starts : ∀ m s {y a} → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y (out a)
+               → T (undone a) → (a ≡ marked laneStart → ⊥) → (a ≡ marked burstEnd → ⊥)
+               → Σ Pos λ y₀ → enter (ev m (laneˢ (laneSrc ρ′ o)) ρ) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y
+  plain-starts m s {y} {a} r u nl nb = subst (λ d → Σ Pos λ y₀ → enter d s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y) (sym (lane-eq m))
+    (C.core-plain m s (subst (λ d → enter d s y (out a)) (lane-eq m) r) u nl nb)
 
   -- A LANE SHOWS `laneStart` AT ONE PLACE, when its lane part's share shows
   -- none.

@@ -9,21 +9,21 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; suc)
+open import Data.Nat using (ℕ; suc; z≤n)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (Obs; FlatOp; empty; of; map; flatMap; mergeᶠ)
-open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; Path)
+open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; last; _⊕_; Path; _∙_; instant)
 open import denotation.Events using (Timeline; <ᵖ-between; fresh; <ᵖ-part)
 open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; module Op; Ev; out; end; Few; _≼_; EmissionSet; Proper; _≺_)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB; closeB)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
-open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt)
+open import simultaneous.Routed using (Held; Early; Idle; Rest; Ex; nameOf; nm; Valued; opos; cnt; Carried; c-done; c-over; nm-inst)
 open import simultaneous.HeldIn using (IdleIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; ⊕-assoc; Ok; Lawful; Shows; ⊑-snoc; ⊕-identityʳ; ⊑-inside; ok-step; ok-in;
   _⊑_; InvAt; world-after; W; ⊑-≼; pinby-silent)
-open import simultaneous.LaneLocal using (inv-ev; Fit; proper-fit; held-fit; module LaneReal)
+open import simultaneous.LaneLocal using (inv-ev; Fit; proper-fit; held-fit; module LaneReal; late-ext)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
 open import simultaneous.DenRows using (map-out′; hot-out)
@@ -31,8 +31,8 @@ open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Relation.Unary.Any using (there)
-open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone; laneDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
 open import simultaneous.BranchSplit using (SrcOf; bview)
@@ -51,11 +51,12 @@ open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHo
 open import simultaneous.Routed using (Placed; Adm; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
 open import simultaneous.FlatLanes using (end-last; BProj; past-within; within-of; within₀; co)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
 open import simultaneous.HeldComb using (ev; ShutRun; outRows; init; from; past)
+open import simultaneous.FlatSim using (tot)
 open import simultaneous.HeldComb using (ShutRun; ev)
 open import Data.Bool.Properties using (T-≡)
 open import Relation.Nullary using (¬_)
@@ -63,7 +64,7 @@ import Relation.Nullary as Nl
 open import Data.Sum using (_⊎_; [_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺)
+open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; instant-≺; frame-least; btw)
 open import simultaneous.OwnEnds using (module OwnEnds)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 open import Function using (Equivalence)
@@ -75,7 +76,12 @@ import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.OuterSplit using (count-open; module OuterSplit)
-open import simultaneous.ProperIdle using (proper-idle)
+open import simultaneous.ScanAbove using (Good; Conv; Above; past-above; bproj-snoc)
+open import simultaneous.HeldDefer using (sync-up)
+open import simultaneous.HeldTake using (sync-ext; ex-ext)
+open import Data.List.Properties using (++-assoc)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ˡ; ∈-∃++)
+open import simultaneous.ProperIdle using (proper-idle; run-up)
 
 open import Tree using (Obs; FlatOp; empty; of; map; flatMap)
 
@@ -276,17 +282,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   cs′ = P ∷ p₀₀ ∷ p₀ ∷ c ∷ p ∷ cs
 
   -- THE SCAN'S COUNTERS TRACK THE BRANCHES, row by row of a run met:
-  -- the routes open at a row are of its instant; a value read, a live
-  -- over read, and the end find one open unless exempt; and a dead
-  -- instant stays dead.
+  -- the end finds a route the scan counts (`tot`) unless exempt, of its
+  -- instant; and a dead instant stays dead.  What the scan sends is its
+  -- counters (`exact-past`), so these are the sent count's.
   postulate
-    value-open    : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
-                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
-    over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
-                  → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
-                  → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
-    end-open      : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
-                  → Σ ℕ λ k → from r₀ (outRows op init rx₁) ≡ (nameOf q , suc k)
+    end-tot       : ∀ rx₁ {q rx₂} → Met M (rx₁ ++ (q , end) ∷ rx₂) → ¬ Ex cs′ q
+                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q × Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
     comb-shut     : ∀ {rx} → Met M rx → ShutRun (outRows op init rx)
     -- IDLE BETWEEN ROWS: where a reader of the scan waits on nothing before
     -- a position few rows precede, the routes it counts are of that
@@ -629,3 +630,224 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             (k-shows λ n → Take.sk-takeT false going (Op.flatMap (mergeᶠ nothing) (λ b → ev m (fed tk b) env′) (Op.of (true ∷ false ∷ []))) P I-fed (sk-trunc (FM2.sk-merge n)))
             (λ r → proj₂ (InvAt.pinned I-fed r)) (mq′ mq) (CS.dshow sh-σ₂) (r₁ , λ sc → ≺→≼ {z₁} {_} (aft sc)) zq
             λ (z , e″ , m′ , _ , z≼q , pr) → case (pr refl) z≼q m′
+
+  -- EVERY OUTER ROW THE SOURCE MEETS LIES BEFORE THE CLOSER'S `outerDone`.
+  outer-before-done : ∀ {k v z n} → M k (out (just (inj₁ (outerB , v)))) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
+                    → k ≺ z
+  outer-before-done mk mz with outer-sent mk | close-sent mz
+  ... | y₁ , w , _ , σy , _ , refl | y₂ , w′ , σy′ , refl = CD.before-done σy (proj₁ σy′) w w′
+
+  -- A row the run met lies before its last.
+  met-before : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {k e′} → (k , e′) ∈ r₁ → k ≺ z
+  met-before r₁ {z} {e} {r₂} mt i with ∈-∃++ i
+  ... | a₁ , b₁ , refl with run-tail a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ r₂)) mt)
+  ...   | _ ∷ᴿ rn = run-after rn (∈-++⁺ʳ b₁ (here refl))
+
+  named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
+  named x with m-rows x tt
+  ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
+    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (rootOf-ext c [ sub w ])))
+  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (rootOf-ext c [ sub w ])))
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
+  late x with m-rows x tt
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (Held.late H₁ (proj₁ y))
+  ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
+  mdone x with m-rows x tt
+  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
+  ... | lane {w = w} y = early-inst [ sub w ] (lane-done y)
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  -- A `laneDone` the run meets is a lane's: the outer routes none, and the
+  -- closer sends only its own marks.
+  done-laneB : ∀ {q b kd n} → M q (out (just (inj₁ (b , instEmit (mark (laneDone kd)) n)))) → b ≡ laneB
+  done-laneB x with m-rows x tt
+  ... | outer y eq with () ← Held.routing H₁ (subst (λ z → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) _ (out z)) (open-mark eq (λ ())) (proj₁ y))
+  ... | lane _ = refl
+  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
+
+  -- THE ROWS MET BEFORE `z`, READ BY `z`'S INSTANT: a begin is of it just
+  -- when it names it, past a row of it every row is, and every row is
+  -- where the instant is the frame's.
+  module Inst (rx₁ : List (Pos × Ev (Maybe (Input B)))) {z e rx₂} (mt : Met M (rx₁ ++ (z , e) ∷ rx₂)) where
+    In : Pos → Set
+    In k = instantOf k ≡ instantOf z
+
+    row∈ : ∀ {k e′} → (k , e′) ∈ rx₁ → M k e′
+    row∈ i = proj₁ (run-row∈ (run-prefix rx₁ mt) i)
+
+    in-name : ∀ {k} → In k → nameOf k ≡ nameOf z
+    in-name ik = cong (λ I → nm (I ∙ [])) ik
+
+    name-in : ∀ {k} → nameOf k ≡ nameOf z → In k
+    name-in {k} e′ = trans (sym (nm-inst (instantOf k))) (trans (cong instant e′) (nm-inst (instantOf z)))
+
+    begin-name : ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark begin) n)))) ∈ rx₁ → In k → n ≡ nameOf z
+    begin-name {k} i ik = trans (named (row∈ i)) (in-name {k} ik)
+
+    name-begin : ∀ {k b} → (k , out (just (inj₁ (b , instEmit (mark begin) (nameOf z))))) ∈ rx₁ → In k
+    name-begin {k} i = name-in {k} (sym (named (row∈ i)))
+
+    in-after : ∀ xs {k e′} ys → rx₁ ≡ xs ++ (k , e′) ∷ ys → ∀ {k′ e″} → (k′ , e″) ∈ xs → In k′ → In k
+    in-after xs {k} {e′} ys eq {k′} i ik =
+      let mt′ = subst (Met M) (trans (cong (_++ (z , e) ∷ rx₂) eq) (++-assoc xs ((k , e′) ∷ ys) ((z , e) ∷ rx₂))) mt
+          k′k = met-before xs mt′ i
+          kz  = met-before rx₁ mt (subst ((k , e′) ∈_) (sym eq) (∈-++⁺ʳ xs (here refl)))
+      in trans (btw k′ k z k′k kz ik) ik
+
+    in-root : root ≡ nameOf z → ∀ {k e′} → (k , e′) ∈ rx₁ → In k
+    in-root e′ {k} i with instantOf k ≟ⁱ instantOf z
+    ... | Nl.yes ik = ik
+    ... | Nl.no ne  = ⊥-elim (frame-least (subst (instantOf k ≺ⁱ_) (sym (trans (cong instant e′) (nm-inst (instantOf z))))
+                        (≺-instant k z (met-before rx₁ mt i) ne)))
+
+  -- The outer's proper rows are its program's.
+  σ₁-run : ∀ {rs} → Met σ₁ rs → Met (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) rs
+  σ₁-run = run-up {S = enter (ev m trig env₀) (c ⊕ [ ix 1 ])} (λ sc sy cy → pinby-silent (InvAt.quiet I₁ sc sy cy)) (InvAt.func I₁)
+
+  -- A burst the outer is exempt for is one the source is exempt for, at
+  -- any row under the outer's.
+  ex-below : ∀ {y} zs → Ex ((c ⊕ [ ix 1 ]) ∷ p ∷ cs) y → Ex cs′ (y ⊕ zs)
+  ex-below {y} zs (here sy) = there (there (there (here (sync-up {c} {y ⊕ zs} [ ix 1 ] (sync-ext {c ⊕ [ ix 1 ]} {y} zs sy)))))
+  ex-below     zs (there e) = there (there (there (there (ex-ext zs e))))
+
+  -- THE SCAN'S OUTER COUNTER HOLDS THE OUTER'S ROUTES OF A ROW'S INSTANT
+  -- met before it, read off the outer's rows by `cv`: every row met
+  -- before it keeps to that instant as `simultaneous.ScanAbove` needs, so
+  -- the counter holds at least as many, unless the scan is spent.  `Ov`
+  -- is what an over of that instant met before it leaves behind.
+  outer-hold : ∀ rx₁ {z e rx₂} (Ov : Set) → Met M (rx₁ ++ (z , e) ∷ rx₂)
+             → (∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark over) n)))) ∈ rx₁ → instantOf k ≡ instantOf z → Ov)
+             → (Flat.spent (proj₁ (past op init rx₁)) ≡ false ⊎ Ov → Flat.spent (proj₁ (past op init rx₁)) ≡ false)
+             → (∀ {k n} → M k (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → k ≺ z → instantOf k ≡ instantOf z → ⊥)
+             → (∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (z , e) ∷ []) rs′ → Met σ₁ rs′
+                → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf z , suc k))
+             → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-hold rx₁ {z} {e} {rx₂} Ov mt ovf res nod cv =
+    let (_ , pr′ , rσ , _) = OS.run′ (subst (λ d → Run (enter d P) nothing (rx₁ ++ (z , e) ∷ [])) (src-op tk env′ m)
+                                       (run-prefix (rx₁ ++ (z , e) ∷ []) (subst (Met M) (sym (++-assoc rx₁ ((z , e) ∷ []) rx₂)) mt)))
+        (rs , pr , _ , cov) = cv pr′ rσ
+    in hold rs pr cov
+    where
+      N = nameOf z
+      S = proj₁ (past op init rx₁)
+
+      open Inst rx₁ mt using (In; row∈; name-in; begin-name; in-root)
+
+      pos : ∀ {a b} → suc a ℕ.≤ b → Σ ℕ λ k → b ≡ suc k
+      pos {b = suc k} _ = k , refl
+
+      mx : Met M rx₁
+      mx = run-prefix rx₁ mt
+
+      before : ∀ {k e} → (k , e) ∈ rx₁ → k ≺ z
+      before = met-before rx₁ mt
+
+      -- Only the closer sends an `outerDone`.
+      nod′ : ∀ {k b n} → M k (out (just (inj₁ (b , instEmit (mark outerDone) n)))) → k ≺ z → instantOf k ≡ instantOf z → ⊥
+      nod′ r kz ik with m-rows r tt
+      ... | outer y′ eq with () ← Held.routing H₁ (subst (λ w → enter (ev m trig env₀) (c ⊕ [ ix 1 ]) _ (out w)) (open-mark eq (λ ())) (proj₁ y′))
+      ... | lane y′ = Fit.fine lane-fit y′
+      ... | close _ = nod r kz ik
+
+      good : ∀ {k e} → (k , e) ∈ rx₁ → Good N In Ov k e
+      good {k} i = record
+        { beg = λ { refl → (λ e → name-in {k} (trans (sym (named (row∈ i))) e)) , begin-name i }
+        ; ov  = λ { ik refl → ovf i ik }
+        ; nod = λ { ik refl → nod′ (row∈ i) (before i) ik } }
+
+      conv : Conv In rx₁
+      conv r₁ {k} {e} r₂ refl ik {k′} {e′} i′ =
+        let mt′ = subst (Met M) (++-assoc r₁ ((k , e) ∷ r₂) _) mt
+            kk′ = run-after (run-tail-at r₁ mt′) (∈-++⁺ˡ i′)
+        in trans (btw k k′ z kk′ (before (∈-++⁺ʳ r₁ (there i′))) ik) ik
+        where
+          run-tail-at : ∀ r₁ {ys} → Met M (r₁ ++ (k , e) ∷ ys) → Run M (just k) ys
+          run-tail-at r₁ {ys} mt″ with run-tail r₁ mt″
+          ... | _ ∷ᴿ rn = rn
+
+      start : Above N In Ov (proj₁ (init {B})) r₀ rx₁
+      start = record { live = λ _ → inj₁ refl ; below = λ e → e , inj₂ z≤n ; ahead = in-root }
+
+      -- The counter, read at the count the outer's rows leave.
+      hold : ∀ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs → ∀ {k} → cnt rs ≡ (N , suc k) → Σ ℕ λ k → tot S ≡ suc k
+      hold rs pr cov =
+        pos (ℕP.≤-trans (subst (ℕ._≤ Flat.outer S) (cong proj₂ cov) held′)
+                        (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.lanes S)) (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.held S)) (ℕP.m≤m+n _ (Flat.parked S)))))
+        where
+          fin : Above N In Ov S (cnt rs) []
+          fin = past-above OS.J op init r₀ rx₁ rs (λ r₁ r₂ eq → end-last I-M r₁ (subst (Met M) eq mx)) pr good conv start
+
+          f≢t : false ≡ true → ⊥
+          f≢t ()
+
+          held′ : proj₂ (cnt rs) ℕ.≤ Flat.outer S
+          held′ = let (a , o) = Above.below fin (cong proj₁ cov)
+                  in [ (λ t → ⊥-elim (f≢t (trans (sym (res (Above.live fin a))) t))) , (λ l → l) ]′ o
+
+  -- A CARRIED OUTER ROW FINDS A ROUTE THE SCAN COUNTS.  The outer holds a
+  -- route of the row's instant there, and no `outerDone` lies before it.
+  outer-floor : ∀ rx₁ {q x rx₂} (Ov : Set) → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂)
+              → (∀ x₀ → opening {A} {B} x₀ ≡ x → Carried (out x₀))
+              → (∀ {k} → k ≺ q → instantOf k ≡ instantOf q → Valued (rootOf k) × opos (rootOf k) ⊑ k → Ov)
+              → (Flat.spent (proj₁ (past op init rx₁)) ≡ false ⊎ Ov → Flat.spent (proj₁ (past op init rx₁)) ≡ false)
+              → ¬ Ex cs′ q → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-floor rx₁ {q} {x} {rx₂} Ov mt carried ovf res nx = outer-hold rx₁ Ov mt
+    (λ i ik → ovf (met-before rx₁ mt i) ik (late (proj₁ (run-row∈ (run-prefix rx₁ mt) i)))) res
+    (λ r kq _ → ≺-absurd {_} {q} kq (outer-before-done (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) r)) (cv carried nx)
+    where
+      cv : ∀ {q′ x′} → (∀ x₀ → opening {A} {B} x₀ ≡ x′ → Carried (out x₀)) → ¬ Ex cs′ q′
+         → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (q′ , out (just (inj₁ (outerB , x′)))) ∷ []) rs′ → Met σ₁ rs′
+         → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf q′ , suc k)
+      cv carried nx pr′ rσ with bproj-snoc rx₁ pr′
+      ... | rs , y , x₀ , pr , refl , refl , refl =
+        let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs [] refl (carried x₀ refl) (λ e → nx (ex-below [ sub OS.J ] e))
+        in rs , pr , k , trans cov (cong (_, suc k) (cong nm (sym (rootOf-ext y [ sub OS.J ]))))
+
+  -- THE OUTER'S COMPLETION: no over of its instant comes before it, for
+  -- an over follows the instant's completion.
+  outer-tot : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+            → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-tot rx₁ mt o-value _ with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
+  ... | outer _ eq = ⊥-elim (open-value eq)
+  outer-tot rx₁ {q} mt (o-done {n = n}) nx = outer-floor rx₁ ⊥ mt carried ovf [ (λ f → f) , ⊥-elim ]′ nx
+    where
+      carried : ∀ x₀ → opening {A} {B} x₀ ≡ instEmit (mark completed) n → Carried (out x₀)
+      carried x₀ eq rewrite open-mark eq (λ ()) = c-done
+
+      done-Q : Early q
+      done-Q = mdone (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl))))
+
+      ovf : ∀ {k} → k ≺ q → instantOf k ≡ instantOf q → Valued (rootOf k) × opos (rootOf k) ⊑ k → ⊥
+      ovf {k} kq ik (v , ok′) =
+        let rq = cong (_∙ []) ik
+            (qo , _) = done-Q (subst Valued rq v)
+        in ≺-absurd {k} {q} kq (≺-≼-≺ {q} {opos (rootOf q)} {k} qo (subst (λ r → opos r ≼ k) rq (⊑-≼ ok′)))
+
+  -- AN OUTER OVER: the scan, not spent, counts the over's route.
+  outer-over : ∀ rx₁ {q n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , instEmit (mark over) n)))) ∷ rx₂)
+             → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
+             → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  outer-over rx₁ mt sp = outer-floor rx₁ ⊤ mt carried (λ _ _ _ → tt) (λ _ → sp)
+    where
+      carried : ∀ {n} x₀ → opening {A} {B} x₀ ≡ instEmit (mark over) n → Carried (out x₀)
+      carried x₀ eq rewrite open-mark eq (λ ()) = c-over
+
+  -- The closer sends no over.
+  close-over : ∀ rx₁ {q n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (closeB , instEmit (mark over) n)))) ∷ rx₂) → ⊥
+  close-over rx₁ mt with m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt
+  ... | close y = closing-mark (close-marks y) (λ ()) (λ ())
+
+  -- The closer sends only marks it closes with: no value, no completion.
+  close-tot : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (closeB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+            → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  close-tot rx₁ {x = x} mt o _ = ⊥-elim (no-open (m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt) o)
+    where
+      no-open : ∀ {q′} → MRow q′ (out (just (inj₁ (closeB , x)))) → Opens x → ⊥
+      no-open (close y) o-value = closing-value (close-marks y)
+      no-open (close y) o-done  = closing-mark (close-marks y) (λ ()) (λ ())
+

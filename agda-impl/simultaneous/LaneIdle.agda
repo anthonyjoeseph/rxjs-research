@@ -17,7 +17,7 @@ open import Data.List.Relation.Unary.Any using (here; there; any?)
 open import Relation.Nullary.Decidable using (decidable-stable)
 open import Data.List.Relation.Unary.All using (_∷_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; suc)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -31,12 +31,17 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; Den; Ev; DenEnv; hot; enter; out; end; pin; Few; _≺_; After; shown; module Op; module Bounded; module Merge)
 open import denotation.Laws.Modulus using (≼-or-≻; ≼-split; ≼-refl; ≺→≼; ≼-antisym)
 open import denotation.Laws.Worlds.Leaves using (ine-pin)
-open import denotation.Read using (Run; []; _∷_)
+open import denotation.Read using ([]; _∷_)
 open import denotation.Laws.Worlds using (Ok; InvAt; InvD; Lawful; Hots; GoodEnv; ok-step; plain-ix; world-after)
 open import denotation.Laws.BoundedInv using (module BoundedI)
 open import simultaneous.SObs using (lone; lanePart; burstPart; module Elaborate)
-open import simultaneous.InstEmit using (instEmit; value)
-open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm)
+open import simultaneous.InstEmit using (instEmit; value; mark; laneDone)
+open import simultaneous.Relations using (Met)
+open import simultaneous.Routed using (Held; Early; Idle; HeldD; Placed; PlacedD; Adm; Sync; Ex; Carried; cnt; nameOf)
+open import simultaneous.Counts using (Counts; module Alike; counts-held; counts-at; module TakeCounts)
+open import simultaneous.HeldTake using (name-ext; sync-ext; ex-ext)
+open import simultaneous.HeldDefer using (sync-up)
+open import simultaneous.RealView using (lane-at)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldConnect using (early-inst)
 open import simultaneous.HeldTake using (module TakeIdle)
@@ -65,7 +70,7 @@ open import denotation.Read using (Visible)
 open import denotation.Laws.Worlds using (full; notT)
 open import denotation.Laws.Truth using (instant-⊕)
 open import denotation.Laws.Modulus using (≺-irrefl; ≺-≼-≺; ≺-trans; entered-few; ≺-ext)
-open import denotation.Position using (sub)
+open import denotation.Position using (sub; last)
 open import denotation.EmissionSet using (shown; ended; late; _≼_; skip; Dep)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; elab; laneˢ; undone; counted; framed; shareˢ; count; laneStep)
@@ -119,20 +124,6 @@ hot-each-nopin : ∀ {X Y} (t : EmissionSet X) s {k r} → enter (Op.flatMap (me
 hot-each-nopin t s (Merge.opin (shown _ () _ , _) , _)
 hot-each-nopin t s (Merge.left _ _ ((l , _) , _) _ _ , _) = ine-pin l
 hot-each-nopin t s (Merge.run () _ , _)
-
--- IDLENESS IS A PROPERTY OF THE ROWS: two sets holding the same rows are
--- idle together.
-module Same {X : Set} {t u : EmissionSet (IE X)} (to : ∀ {y e} → t y e → u y e) (from : ∀ {y e} → u y e → t y e) where
-
-  few : ∀ {w} → Few t w → Few u w
-  few (ks , h) = ks , λ x lt → h (from x) lt
-
-  run : ∀ {c rs} → Run t c rs → Run u c rs
-  run [] = []
-  run ((((x , pe) , fw) , v , ac , lst) ∷ r) = (((to x , λ ce → pe (from ce)) , few fw) , v , ac , λ k v′ a → lst (from k) v′ a) ∷ run r
-
-  idle : Idle u → Idle t
-  idle iu mt ne fw aw lw = iu (run mt) ne (few fw) aw λ x v a → lw (from x) v a
 
 module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f : A → Obs Timeline Γ B)
                 (ρ₄ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ ⊤ ∷ IE B ∷ IE A ∷ Θ)
@@ -297,7 +288,7 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     rows-vis : ∀ {q v} → Mg q (out v) → HR.Rd q (out v) ⊎ ((∀ r → count r v ≡ r) × (∀ {e′} → HR.Rd q e′ → ⊥))
     rows-vis r with lane-vis ρ₄ (f a) env₂ m (λ {t} → pu a {t}) s r
     ... | inj₁ h          = inj₁ h
-    ... | inj₂ (ly , sv) = inj₂ (sv , λ rd → hot-lab rd ly)
+    ... | inj₂ (ly , sv) = inj₂ (proj₁ sv , λ rd → hot-lab rd ly)
 
     -- THE SHARE'S END RUNS THE `laneDone`, IN ITS INSTANT.
     share-done : ∀ {e} → Sh e end → ¬ ¬ (Σ Pos λ f′ → Σ (IE B) λ v → Mg f′ (out v) × T (not (undone v)) × instant f′ ≡ instant e)
@@ -388,16 +379,23 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     sh-unf : ∀ {s′} → Runs s′ → ∀ {w} → Unfailed undone Sh w
     sh-unf {s′} rn x nk _ = notT _ nk (pu a s′ (sh-vis rn x))
 
+    -- THE SHARE IS ITS PROGRAM'S ROWS, the blocker's dropped, where the
+    -- program runs.
+    module ST (s′ : Pos) (rn : Runs s′) where
+      Ip : InvAt (Hots env′) s′ (Prog s′)
+      Ip = inv-ev m (elab ρ₄ (f a)) env′ g′ s′ (proj₁ (proj₂ (runs-at rn)))
+
+      Hp : Held (Prog s′) (s′ ∷ cs)
+      Hp = held a Lt s′ (proj₁ (proj₂ (runs-at rn))) (proj₂ (proj₂ (runs-at rn))) (proj₁ (runs-at rn))
+
+      open Thin undone Sh (Prog s′) Ish (λ uc uy v cy → pinby-vis v (InvAt.quiet Ip uc uy cy)) (Held.idle Hp)
+             (λ x → inj₁ (sh-vis rn x)) (λ fw k → k (proj₁ fw , λ x lt → proj₂ fw (proj₂ (sh-lift rn x)) lt))
+             (λ { {e = out _} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt ; {e = end} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt })
+             (λ x k → k (sh-shown rn x)) (sh-late rn) public
+
     -- THE SHARE IS IDLE, where its program runs.
     sh-idle : Idle Sh
-    sh-idle mt ne fw aw lw =
-      let (s′ , rn) = prog-runs
-          (es′ , oks′ , fs′) = runs-at rn
-          Ip = inv-ev m (elab ρ₄ (f a)) env′ g′ s′ oks′
-      in Thin.idle undone Sh (Prog s′) Ish (λ uc uy v cy → pinby-vis v (InvAt.quiet Ip uc uy cy)) (Held.idle (held a Lt s′ oks′ fs′ es′))
-           (λ x → inj₁ (sh-vis rn x)) (λ fw k → k (proj₁ fw , λ x lt → proj₂ fw (proj₂ (sh-lift rn x)) lt))
-           (λ { {e = out _} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt ; {e = end} x _ → enter-few (ev m (elab ρ₄ (f a)) env′) s′ x tt })
-           (λ x k → k (sh-shown rn x)) (sh-late rn) mt ne (sh-unf rn) fw aw lw
+    sh-idle mt ne fw aw lw = ST.idle (proj₁ prog-runs) (proj₂ prog-runs) mt ne (sh-unf (proj₂ prog-runs)) fw aw lw
 
     -- The reading's end is the share's, moved.
     rd-end : ∀ {c} → HR.Rd c end → Σ Pos λ E → Sh E end × instant c ≡ instant E
@@ -430,6 +428,42 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     merged-idle : IdleTo undone Mg
     merged-idle = Thin.idle undone Mg HR.Rd (inv-ev m (merged a) env₂ g₂ s ok) (λ rc ry _ → HR.rd-proper ry rc)
                     (HR.idle-hot sh-idle) (rows-vis) (rows-few) (λ x _ → HR.rd-few x) (rows-shown) rows-late
+
+    -- A carried value of the merge is the reading's: the frame's marks
+    -- are carried by nothing.
+    rows-carried : ∀ {q v} → Mg q (out v) → Carried (out v) → HR.Rd q (out v)
+    rows-carried r c with lane-vis ρ₄ (f a) env₂ m (λ {t} → pu a {t}) s r
+    ... | inj₁ h       = h
+    ... | inj₂ (_ , sv) = ⊥-elim (proj₂ sv c)
+
+    -- THE PROGRAM'S BURST LIES IN THE LANE'S, read where the frame reads it.
+    sync-s₁ : ∀ {y} → Sync C0.s₁ y → Sync s y
+    sync-s₁ {y} sy =
+      sync-up {s} {y} [ ix 0 ] (sync-up {s ⊕ [ ix 0 ]} {y} [ ix 1 ] (sync-up {P} {y} [ ix 1 ] (sync-up {P ⊕ [ ix 1 ]} {y} [ last ]
+        (sync-up {(P ⊕ [ ix 1 ]) ⊕ [ last ]} {y} [ sub SP.sb ] (sync-up {SP.cb} {y} [ ix 1 ] sy)))))
+
+    ex-move : ∀ {y} → Ex (C0.s₁ ∷ cs) y → Sync s (HR.shift y) ⊎ Ex cs (HR.shift y)
+    ex-move {y} (here sy)  = inj₁ (sync-ext {s} {y} [ sub z ] (sync-s₁ sy))
+    ex-move {y} (there ex) = inj₂ (ex-ext {cs} {y} [ sub z ] ex)
+
+    -- THE MERGE COUNTS WHAT ITS PROGRAM COUNTS, exempt for the lane's burst.
+    mg-counts : Counts Mg (λ y → Sync s y ⊎ Ex cs y)
+    mg-counts =
+      Thin.counts undone Mg HR.Rd (inv-ev m (merged a) env₂ g₂ s ok) (λ rc ry _ → HR.rd-proper ry rc)
+        (HR.idle-hot sh-idle) rows-vis rows-few (λ x _ → HR.rd-few x) rows-shown rows-late rows-carried
+        (counts-at HR.Sh (λ { {y = y} refl → name-ext y [ sub z ] }) (λ { refl ex → ex-move ex }) HR.back
+          (ST.counts C0.s₁ (proj₂ prog-runs) (λ x _ → sh-vis (proj₂ prog-runs) x) (counts-held (ST.Hp C0.s₁ (proj₂ prog-runs)))))
+
+  -- No route carries a `laneDone`.
+  done-free : ∀ {v : IE B} → T (not (undone v)) → Carried (out v) → ⊥
+  done-free nk c with undone-done nk | c
+  ... | done | ()
+
+  -- A LANE COUNTS WHAT ITS PROGRAM COUNTS at an admissible, fresh, early
+  -- subscription: its take cuts only at its `laneDone`.
+  counts-sub : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → Counts (enter (fL a) s) (λ y → Sync s y ⊎ Ex cs y)
+  counts-sub a s ok fs es = subst (λ d → Counts (enter d s) (λ y → Sync s y ⊎ Ex cs y)) (sym (ev-take m undone (merged a) env₂))
+    (TakeCounts.counts true undone (ev m (merged a) env₂) s (inv-ev m (merged a) env₂ g₂ s ok) done-free (Rows.mg-counts a s ok fs es))
 
   -- A `laneDone` moves no route.
   silent : ∀ {y : IE B} → T (not (undone y)) → ∀ r → count r y ≡ r
@@ -474,4 +508,40 @@ module LaneIdle (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
   lane-idle op′ p ok fp ep xo {[]} _ _ _ _ _ = inj₁ refl
   lane-idle op′ p ok fp ep xo {_ ∷ _} mt@((((r , _) , _) , _) ∷ _) =
     let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo r
-    in Same.idle to from (idle-at _ s oks fs es) mt
+    in Alike.idle to from (idle-at _ s oks fs es) mt
+
+  -- A lane's subscription read off its row is the one its rows lie past.
+  sub-is : ∀ op′ p (ok : Ok (Hots env₂) p) (fp : Fr p) (ep : Early p) {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+         → proj₁ (lane-sub op′ p ok fp ep xo l) ≡ proj₁ (lane-at op′ dR fL Id Il p ok xo l)
+  sub-is (mergeᶠ nothing)  p ok fp ep xo l                 = refl
+  sub-is switchᶠ           p ok fp ep xo l                 = refl
+  sub-is exhaustᶠ          p ok fp ep xo l                 = refl
+  sub-is (mergeᶠ (just n)) p ok fp ep xo (i , s , sb , _ , _) = refl
+
+  -- A LANE'S `laneDone` HOLDS A ROUTE, outside its burst and every
+  -- exemption: the frame reads it past its program's end, and the count
+  -- moves at no row between.
+  postulate
+    done-sub : ∀ a s → Ok (Hots env₂) s → Fr s → Early s → ∀ r₁ {y kd n}
+             → Met (enter (fL a) s) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync s y → ¬ Ex cs y
+             → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+
+  lane-done : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+            → ∀ r₁ {y kd n} → Met (View.Lane fL (enter dR p) op′ q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ])
+            → ¬ Sync (proj₁ (lane-at op′ dR fL Id Il p ok xo l)) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
+  lane-done op′ p ok fp ep {q} {a} xo l r₁ mt ns nx =
+    let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo l
+    in done-sub a s oks fs es r₁ (Alike.run to from mt) (subst (λ c → ¬ Sync c _) (sym (sub-is op′ p ok fp ep xo l)) ns) nx
+
+  -- A LANE'S SUBSCRIPTION IS ADMISSIBLE.
+  lane-fresh : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+             → Fr (proj₁ (lane-at op′ dR fL Id Il p ok xo l))
+  lane-fresh op′ p ok fp ep xo l = subst Fr (sub-is op′ p ok fp ep xo l) (proj₁ (proj₂ (proj₂ (lane-sub op′ p ok fp ep xo l))))
+
+  -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
+  lane-counts : ∀ op′ p (ok : Ok (Hots env₂) p) → Fr p → Early p → ∀ {q a k e} (xo : enter dR p q (out a)) (l : View.Lane fL (enter dR p) op′ q a k e)
+              → Counts (View.Lane fL (enter dR p) op′ q a) (λ y → Sync (proj₁ (lane-at op′ dR fL Id Il p ok xo l)) y ⊎ Ex cs y)
+  lane-counts op′ p ok fp ep {q} {a} xo l =
+    let (s , oks , fs , es , to , from) = lane-sub op′ p ok fp ep xo l
+    in subst (λ c → Counts (View.Lane fL (enter dR p) op′ q a) (λ y → Sync c y ⊎ Ex cs y)) (sub-is op′ p ok fp ep xo l)
+         (Alike.counts to from (counts-sub a s oks fs es))

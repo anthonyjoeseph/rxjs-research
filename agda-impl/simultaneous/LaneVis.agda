@@ -2,7 +2,7 @@
 
 -- A LANE'S VALUES, AHEAD OF ITS TAKE, ARE ITS LANE PART'S SHARE READ HOT
 -- AT ITS FRAME'S SECOND PIECE, OR MARKS ONE STEP PAST A PIECE'S
--- SUBSCRIPTION THAT MOVE NO ROUTE (`lane-vis`).  The frame's first piece
+-- SUBSCRIPTION THAT NO ROUTE CARRIES (`lane-vis`).  The frame's first piece
 -- is a one-value `of`, ended below its value before the second arrives,
 -- so the second starts at once below the second value; the burst part's
 -- share shows nothing; every other piece is a one-value `of` of a mark.
@@ -29,6 +29,7 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; hot; enter; out; Proper; _≺_; at-out; on-out; shown; heard; ended; late; module Op; module Bounded)
 open import denotation.Laws.Modulus using (≺-absurd)
 open import simultaneous.HeldComb using (ev)
+open import simultaneous.Routed using (Carried)
 open import simultaneous.SObs using (lone; Part; lanePart; burstPart; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; begin; over; stop; outerOpen; outerClose; laneStart; burstEnd; outerDone;
   subscribed; completed)
@@ -48,20 +49,24 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 Silent : ∀ {B} → IE B → Set
 Silent v = ∀ r → count r v ≡ r
 
--- What a lane tells is as silent as what it read.
-tell-silent : ∀ {B} r (a : IE B) → Silent a → Silent (tell r a)
-tell-silent r (instEmit (mark (laneDone _)) _) _ = λ _ → refl
-tell-silent r (instEmit (value _) _)        h = h
-tell-silent r (instEmit (mark begin) _)      h = h
-tell-silent r (instEmit (mark over) _)       h = h
-tell-silent r (instEmit (mark stop) _)       h = h
-tell-silent r (instEmit (mark outerOpen) _)  h = h
-tell-silent r (instEmit (mark outerClose) _) h = h
-tell-silent r (instEmit (mark laneStart) _)  h = h
-tell-silent r (instEmit (mark burstEnd) _)   h = h
-tell-silent r (instEmit (mark outerDone) _)  h = h
-tell-silent r (instEmit (mark subscribed) _) h = h
-tell-silent r (instEmit (mark completed) _)  h = h
+-- A mark no route carries, moving none.
+Quiet : ∀ {B} → IE B → Set
+Quiet v = Silent v × (Carried (out v) → ⊥)
+
+-- What a lane tells is as quiet as what it read.
+tell-quiet : ∀ {B} r (a : IE B) → Quiet a → Quiet (tell r a)
+tell-quiet r (instEmit (mark (laneDone _)) _) _ = (λ _ → refl) , λ ()
+tell-quiet r (instEmit (value _) _)        h = h
+tell-quiet r (instEmit (mark begin) _)      h = h
+tell-quiet r (instEmit (mark over) _)       h = h
+tell-quiet r (instEmit (mark stop) _)       h = h
+tell-quiet r (instEmit (mark outerOpen) _)  h = h
+tell-quiet r (instEmit (mark outerClose) _) h = h
+tell-quiet r (instEmit (mark laneStart) _)  h = h
+tell-quiet r (instEmit (mark burstEnd) _)   h = h
+tell-quiet r (instEmit (mark outerDone) _)  h = h
+tell-quiet r (instEmit (mark subscribed) _) h = h
+tell-quiet r (instEmit (mark completed) _)  h = h
 
 -- A hot's joined rows lie under the joiner's `sub`, or a `last` past it.
 hot-lab : ∀ {A} {t : EmissionSet A} {z q e} → enter (hot t) z q e → lastL q ≡ ix 0 → ⊥
@@ -104,7 +109,7 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
     -- A FRAME'S VALUE: the lane part's second piece's reading of its share,
     -- or a mark one step past its piece's subscription.
     fr-vis : ∀ k P {y a} → enter (Fr k (H₁ P) (H₂ P k)) (Bp P) y (out a)
-           → (k ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out a)) ⊎ (lastL y ≡ ix 0 × Silent a)
+           → (k ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out a)) ⊎ (lastL y ≡ ix 0 × Quiet a)
     fr-vis k P r with bounded-out 1 (λ j → ev m (piece {B = B} k j) (H₂ P k ∷ H₁ P ∷ ρ)) (Op.of (0 ∷ 1 ∷ 2 ∷ [])) (Bp P) r
     ... | _ , _ , _ , _ , _ , (nth , st) , (l , _) = go k (O3.nth-c nth) st l
       where
@@ -128,32 +133,32 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
         starts₁ k′ (Bounded.queued _ _ (inj₂ ()) _ _)
 
         go : ∀ k′ {i q j s y a} → O3.NthC i q j → Bd.Starts k′ i q (Bd.Sched k′ i) s → enter (ev m (piece {B = B} k′ j) (H₂ P k′ ∷ H₁ P ∷ ρ)) s y (out a)
-           → (k′ ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out a)) ⊎ (lastL y ≡ ix 0 × Silent a)
+           → (k′ ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out a)) ⊎ (lastL y ≡ ix 0 × Quiet a)
         go lanePart {s = s} O3.n₀ _ l =
-          inj₂ (step0 s (proj₁ (pc0-at ρ′ o ρ m lanePart (H₁ P) (H₂ P lanePart) s l)) , subst Silent (sym (pc0-ls ρ′ o ρ m (H₁ P) (H₂ P lanePart) s l)) (λ _ → refl))
+          inj₂ (step0 s (proj₁ (pc0-at ρ′ o ρ m lanePart (H₁ P) (H₂ P lanePart) s l)) , subst Quiet (sym (pc0-ls ρ′ o ρ m (H₁ P) (H₂ P lanePart) s l)) ((λ _ → refl) , λ ()))
         go burstPart {s = s} O3.n₀ _ l =
-          inj₂ (step0 s (proj₁ (pc0-at ρ′ o ρ m burstPart (H₁ P) (H₂ P burstPart) s l)) , subst Silent (sym (pc0-be ρ′ o ρ m (H₁ P) (H₂ P burstPart) s l)) (λ _ → refl))
+          inj₂ (step0 s (proj₁ (pc0-at ρ′ o ρ m burstPart (H₁ P) (H₂ P burstPart) s l)) , subst Quiet (sym (pc0-be ρ′ o ρ m (H₁ P) (H₂ P burstPart) s l)) ((λ _ → refl) , λ ()))
         go lanePart {s = s} {y} {a} O3.n₁ st l =
           inj₁ (refl , subst (λ w → enter (H₂ P lanePart) w y (out a)) (starts₁ lanePart st) (pc1 ρ′ o ρ m lanePart (H₁ P) (H₂ P lanePart) s l))
         go burstPart {s = s} O3.n₁ _ l =
           ⊥-elim (sh-b ρ′ o ρ m (H₁ P) _ (proj₁ (proj₁ (proj₂ (hot-out (pc1 ρ′ o ρ m burstPart (H₁ P) (H₂ P burstPart) s l))))))
         go lanePart {s = s} O3.n₂ _ l =
           let (ey , ea) = of-one s _ (proj₁ (p2→ ρ′ o ρ m (H₁ P) (H₂ P lanePart) s l))
-          in inj₂ (step0 s ey , subst Silent (sym ea) (λ _ → refl))
+          in inj₂ (step0 s ey , subst Quiet (sym ea) ((λ _ → refl) , λ ()))
         go burstPart {s = s} O3.n₂ _ l = ⊥-elim (pc2 ρ′ o ρ m (H₁ P) (H₂ P burstPart) s l)
 
     -- A PART'S VALUE, told by its scan: its frame's, the share's left as
     -- it was read.
-    part : ∀ k P {y v} → enter (Sv k) P y (out v) → (k ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out v)) ⊎ (lastL y ≡ ix 0 × Silent v)
+    part : ∀ k P {y v} → enter (Sv k) P y (out v) → (k ≡ lanePart × enter (H₂ P lanePart) (zOf P) y (out v)) ⊎ (lastL y ≡ ix 0 × Quiet v)
     part k P {y} {v} svr with ct-read k P svr
     ... | st , a₀ , _ , fa , ea with fr-vis k P fa
-    ...   | inj₂ (ly , sa) = inj₂ (ly , subst Silent ea (tell-silent (proj₁ st) a₀ sa))
+    ...   | inj₂ (ly , sa) = inj₂ (ly , subst Quiet ea (tell-quiet (proj₁ st) a₀ sa))
     ...   | inj₁ (ek , h) = inj₁ (ek , subst (λ b → enter (H₂ P lanePart) (zOf P) y (out b)) (tell-back (proj₁ st) a₀ ea ua) h)
       where
         ua : T (undone v)
         ua = subst (λ b → T (undone b)) ea (subst T (sym (tell-undone (proj₁ st) a₀)) (sh-u m pu (proj₁ (proj₁ (proj₂ (hot-out h))))))
 
-    mm-vis : ∀ s {y v} → enter MM s y (out v) → enter (H₂ (laneAt s) lanePart) (zOf (laneAt s)) y (out v) ⊎ (lastL y ≡ ix 0 × Silent v)
+    mm-vis : ∀ s {y v} → enter MM s y (out v) → enter (H₂ (laneAt s) lanePart) (zOf (laneAt s)) y (out v) ⊎ (lastL y ≡ ix 0 × Quiet v)
     mm-vis s r with merge-out Sv (Op.of (lanePart ∷ burstPart ∷ [])) s r
     ... | _ , _ , (at-out , _) , svr , _ = [ (λ (_ , h) → inj₁ h) , inj₂ ]′ (part lanePart (laneAt s) svr)
     ... | _ , _ , (on-out at-out , _) , svr , _ = [ (λ { (() , _) }) , inj₂ ]′ (part burstPart _ svr)
@@ -164,6 +169,6 @@ module _ {Θ B Γ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ′ → X ∈ ⊤ �
            → enter (ev m (flatMap (mergeᶠ nothing) (λ k → shareˢ (laneSrc ρ′ o k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) ρ) s y (out v)
            → enter (hot (Proper (enter (ev m (Sh ρ′ o ρ lanePart) (hot (Proper (enter (ev m empty ρ) (laneAt s ⊕ [ ix 1 ]))) ∷ ρ)) ((laneAt s ⊕ [ ix 0 ]) ⊕ [ ix 1 ]))))
                (zOf (laneAt s)) y (out v)
-             ⊎ (lastL y ≡ ix 0 × Silent v)
+             ⊎ (lastL y ≡ ix 0 × Quiet v)
   lane-vis nothing  pu s r = mm-vis nothing pu s r
   lane-vis (just n) pu s r = mm-vis (just n) pu s r

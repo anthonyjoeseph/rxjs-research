@@ -25,7 +25,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (¬_; Dec; yes; no)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
-open import denotation.Position using (Pos; Instant; frame; cascade; ix; last; sub; _∙_; _⊕_; _≟ᵖ_; _≟ⁱ_; instant; root)
+open import denotation.Position using (Pos; Instant; cascade; ix; last; _∙_; _⊕_; _≟ᵖ_; instant; root)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (EmissionSet; DenEnv; enter; Ev; out; skip; pin; end; _≺_; _≼_)
 open import denotation.Read using (Run; []; _∷_; Visible; After; cursor)
@@ -36,12 +36,12 @@ open import simultaneous.HeldComb using (ev; ShutRun)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
-open import simultaneous.Routed using (nm; nameOf; cnt; Carried; Ex; c-value)
+open import simultaneous.Routed using (nm; nameOf; cnt; Carried; Ex; c-value; nm-inst)
 open import simultaneous.Relations using (Met; values; values-++)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Readings using (rootOf)
 open import simultaneous.HeldConnect using (rootOf-ext)
-open import simultaneous.Instants using (_≺ⁱ_; ≺-instant; irrⁱ; transⁱ)
+open import simultaneous.Instants using (btw)
 open import simultaneous.Layers using (run-tail; run-after; run-row)
 open import simultaneous.ColdFew using (Fresh; fresh-self)
 open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begin; step-value; step-over; step-end; cold-rows)
@@ -126,21 +126,6 @@ dec-open (m , zero)  n = no λ { (_ , ()) }
 dec-open (m , suc k) n with m ≟ᵖ n
 ... | yes refl = yes (k , refl)
 ... | no ne    = no λ { (_ , refl) → ne refl }
-
--- A name's instant.
-nm-inst : ∀ K → instant (nm (K ∙ [])) ≡ K
-nm-inst frame                 = refl
-nm-inst (cascade t e last)    = refl
-nm-inst (cascade t e (ix _))  = refl
-nm-inst (cascade t e (sub _)) = refl
-
--- Between two rows of one instant, only that instant.
-btw : ∀ a x b → a ≺ x → x ≺ b → instant a ≡ instant b → instant x ≡ instant a
-btw a x b ax xb ab with instant x ≟ⁱ instant a
-... | yes e  = e
-... | no ne with ≺-instant a x ax (λ e → ne (sym e)) | instant x ≟ⁱ instant b
-...   | ia | yes e  = ⊥-elim (irrⁱ (subst (instant a ≺ⁱ_) (trans e (sym ab)) ia))
-...   | ia | no ne′ = ⊥-elim (irrⁱ (subst (instant a ≺ⁱ_) (sym ab) (transⁱ ia (≺-instant x b xb ne′))))
 
 ------------------------------------------------------------------------
 -- A cold's runs

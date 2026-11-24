@@ -280,6 +280,9 @@ does-no {n} {m} e q with n ≟ᵖ m
 does-no () q | yes _
 ... | no nq = nq q
 
+∧-l : ∀ {a b : Bool} → a ∧ b ≡ true → a ≡ true
+∧-l {true} _ = refl
+
 ∧-t : ∀ {a b : Bool} → a ∧ b ≡ true → b ≡ true
 ∧-t {true} e = e
 

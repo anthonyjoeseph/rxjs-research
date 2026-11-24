@@ -270,18 +270,27 @@ holds a route. Settled by bodies, or a body emptied under a looping source.
 Members: `scan-rest`, `connect-tracks`, `tracks-trig`, `tracks-closer`,
 `tracks-real`.
 
+#### THE LANE'S LAST COUNT
+
+Untried: a lane's `laneDone` follows its program's end in the frame, so
+it tells the count the end is covered by. Open: whether the end's
+exemptions are the `laneDone`'s. Settled by a run moving the end's cover
+up through the share, frame and take, or by an end exempt where its
+`laneDone` is not.
+
+Members: `done-sub`.
+
 #### THE HELD STREAMS
 
 Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch. Riskiest: the defer limit's
-rest (no one approximant bounds it). Settled when each former's leaf is
-a body.
+on the scan's run split onto that branch. Settled when each former's
+leaf is a body.
 
-Members: `held-queued`, `live-current`, `value-open`, `over-open`,
-`end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
+Members: `live-current`, `hand-dones`, `hand-bursts`,
+`end-tot`, `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK
 

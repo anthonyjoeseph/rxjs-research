@@ -18,13 +18,13 @@ open import Data.Nat using (suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (m≤n⇒m≤1+n)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 open import Data.Unit using (tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; cong; subst)
-open import Relation.Nullary using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_; refl; sym; trans; cong; subst)
+open import Relation.Nullary using (¬_; yes; no)
 open import Data.Bool.Properties using (T-≡)
 open import Function using (Equivalence)
 
 open import denotation.Position using (Instant; frame; cascade; Cmp; lt; eq; gt; isLt; lexi; cmpInstant; cmpPath; _<ⁱ_; _∙_;
-  instant; tick)
+  instant; tick; _≟ⁱ_)
 open import denotation.EmissionSet using (_≺_)
 open import denotation.Simultaneity using (eqⁱ; reflⁱ; ltⁱ; gtⁱ; earlier-tick)
 
@@ -166,6 +166,14 @@ sorted-⊂ {xs} {ys} sx sy sub wy wx =
 ... | lt = lt→≺ⁱ c
 ... | eq = ⊥-elim (ne (eqⁱ a b c))
 ... | gt = ⊥-elim h
+
+-- Between two rows of one instant, only that instant.
+btw : ∀ a x b → a ≺ x → x ≺ b → instant a ≡ instant b → instant x ≡ instant a
+btw a x b ax xb ab with instant x ≟ⁱ instant a
+... | yes e  = e
+... | no ne with ≺-instant a x ax (λ e → ne (sym e)) | instant x ≟ⁱ instant b
+...   | ia | yes e  = ⊥-elim (irrⁱ (subst (instant a ≺ⁱ_) (trans e (sym ab)) ia))
+...   | ia | no ne′ = ⊥-elim (irrⁱ (subst (instant a ≺ⁱ_) (sym ab) (transⁱ ia (≺-instant x b xb ne′))))
 
 -- A row of an earlier instant is before.
 instant-≺ : ∀ k q → instant k ≺ⁱ instant q → k ≺ q
