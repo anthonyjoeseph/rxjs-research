@@ -28,6 +28,7 @@ open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step)
 open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldWrap using (held-wrapped)
 open import simultaneous.HeldScan using (held-scan-at; Relabels)
+open import simultaneous.InstantTruth using (inst-meaning)
 open import simultaneous.HeldDefer using (held-defer; placed-defer)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.HeldTrigger using (held-trigger)
@@ -140,25 +141,6 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃))))
   (placed-flatMap m ρ op f s hs hf)
 
--- A DEFER'S LIMIT KEEPS ITS INSTANTS FINITE: past a zero count, finitely
--- many rows of the instant last begun.  Each approximant's rest bounds only
--- its own rows, and the limit's rows of an instant are those of every
--- approximant together, which no one approximant's list bounds.
---
--- The route: one approximant meeting the run (`LimHeld.lift`) already
--- shows every row of the limit past the zero cursor in that instant, so
--- its own rest bounds them.  That needs no spin of it there: an unreached
--- `defer` is subscribed only by a row a route carries, or inside an exempt
--- burst, and both lie before the stop that zeroes the count.  Open: an
--- exempt burst in an instant that also holds a begin, which `Ex` alone
--- does not order before the zero.  The approximants' `Held` is had only at
--- a fresh position, which this statement does not take.
-postulate
-  lim-rest : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
-           → (∀ n → IH (just n) ρ (defer l))
-           → ∀ env cs → GoodEnv env → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Early p
-           → Rest (enter (⟦ elab ρ (defer l) ⟧ env) p)
-
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit, held
 -- wherever the approximants agree with it.
@@ -173,7 +155,8 @@ held-lim ρ l hs = ih (λ env cs g eh p ok fr ep →
   LimHeld.held (enter (⟦ elab ρ (defer l) ⟧ env) p) (λ n → enter (approx n (elab ρ (defer l)) env) p) (p ∷ cs)
     (lim-row ρ l env p)
     (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
-    (λ n → IH.holds (hs n) env cs g eh p ok fr ep) (lim-rest ρ l hs env cs g eh p ok ep))
+    (λ n → IH.holds (hs n) env cs g eh p ok fr ep)
+    (λ N fw sf lf {x} iw → inst-meaning (elab ρ (defer l)) env g p ok N fw sf lf {x} iw))
   λ env cs g eh p ok fr ep x sh → let (N , h) = lim-row ρ l env p x in IH.placed (hs N) env cs g eh p ok fr ep h sh
 
 held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)

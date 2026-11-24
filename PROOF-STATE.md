@@ -276,12 +276,11 @@ Probed, unproven: every elaborated stream names its begins for their
 instants, counts a route of its own instant under every row outside the
 bursts it is exempt for, and keeps dead instants dead. Hardest:
 flatMap's scan counters, each the `idle` of what holds the routes, read
-on the scan's run split onto that branch. Riskiest: the defer limit's
-rest (no one approximant bounds it). Settled when each former's leaf is
-a body.
+on the scan's run split onto that branch. Settled when each former's
+leaf is a body.
 
 Members: `live-current`, `lane-tot`, `outer-tot`, `close-tot`,
-`over-tot`, `end-tot`, `comb-shut`, `scan-idle`, `lim-rest`.
+`over-tot`, `end-tot`, `comb-shut`, `scan-idle`.
 
 #### THE BATCH RANK
 

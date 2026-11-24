@@ -39,7 +39,8 @@ open import simultaneous.ColdShape using (ColdRow; now-value; now-end; step-begi
 open import simultaneous.ColdBegin using (same-≺)
 open import simultaneous.ColdEnd using (aft?)
 open import simultaneous.ColdClose using (cold-close)
-open import simultaneous.ColdRuns using (run-has-ex; after-in; values-∈; rise; nm-inst; btw; B⁰; not-now; beg-name)
+open import simultaneous.Instants using (btw)
+open import simultaneous.ColdRuns using (run-has-ex; after-in; values-∈; rise; nm-inst; B⁰; not-now; beg-name)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count; coldˢ)
 

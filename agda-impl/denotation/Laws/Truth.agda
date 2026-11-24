@@ -238,24 +238,24 @@ module _ {A : Set} {t t′ : EmissionSet A} (tr : Truth t t′) where
     blocked {s} {x} c after F = spin-few (λ i → let (z , e , sz , tz) = shows c i (few-down F (≺→≼ {s ⊕ [ ix (suc i) ]} {x} (after (suc i)))) in
       z , e , sz , tz , ≺-trans {z} {s ⊕ [ ix (suc i) ]} {x} (below-next s sz ≤-refl) (after (suc i))) F
 
-    -- Nothing at or before a safe few-bounded row lies past a cut's first.
-    clear : ∀ {x} → Few t x → Safe t x → ∀ {y} → y ≼ x → ¬ Lie Cut y
-    clear {x} F safe {y} yx (s , c , i , l) = at safe (where? s x) (first c)
-      where
-        at : Safe t x → x ≺ (s ⊕ [ ix 0 ]) ⊎ Spun s x ⊎ (∀ j → (s ⊕ [ ix j ]) ≺ x)
-           → (Σ Pos λ z → Σ (Ev A) λ e′ → (s ⊕ [ ix 0 ]) ⊑ z × t z e′) → ⊥
-        at _ (inj₁ xs) _ =
-          ≺→≼ {s ⊕ [ ix 0 ]} {s ⊕ [ ix (suc i) ]} (Equivalence.from T-≡ (<ᵖ-part s [] [] (ix-< {0} {suc i} (s≤s z≤n))))
-            (≼-≺-≺ {s ⊕ [ ix (suc i) ]} {x} {s ⊕ [ ix 0 ]} (≼-trans {s ⊕ [ ix (suc i) ]} {y} {x} (⊑-≼ {s ⊕ [ ix (suc i) ]} {y} l) yx) xs)
-        at _ (inj₂ (inj₂ after)) _ = blocked c after F
-        at (inj₂ (e₀ , tx , v)) (inj₂ (inj₁ (j , sx))) _ = loud v (silent c (j , sx) tx)
-        at (inj₁ opens) (inj₂ (inj₁ (j , sx))) (z , e′ , z0 , tz) =
-          opens tz (trans (trans (instant-⊑ z0) (instant-⊕ s [ ix 0 ])) (sym (trans (instant-⊑ sx) (instant-⊕ s [ ix j ]))))
-            (≺-≼-≺ {z} {y} {x} (first-before s z0 l) yx)
-
     -- With finitely many rows, nothing lies past a cut's first.
     none : Finite t → ∀ {y} → ¬ Lie Cut y
     none (ks , h) (s , c , _) = blocked c (past s) (ks , λ tk _ → h tk)
+
+  -- Nothing at or before a safe few-bounded row lies past a cut's first.
+  clear : ∀ {x} → Few t x → Safe t x → ∀ {y} → y ≼ x → ¬ Lie Cut y
+  clear {x} F safe {y} yx (s , c , i , l) = at safe (where? s x) (first c)
+    where
+      at : Safe t x → x ≺ (s ⊕ [ ix 0 ]) ⊎ Spun s x ⊎ (∀ j → (s ⊕ [ ix j ]) ≺ x)
+         → (Σ Pos λ z → Σ (Ev A) λ e′ → (s ⊕ [ ix 0 ]) ⊑ z × t z e′) → ⊥
+      at _ (inj₁ xs) _ =
+        ≺→≼ {s ⊕ [ ix 0 ]} {s ⊕ [ ix (suc i) ]} (Equivalence.from T-≡ (<ᵖ-part s [] [] (ix-< {0} {suc i} (s≤s z≤n))))
+          (≼-≺-≺ {s ⊕ [ ix (suc i) ]} {x} {s ⊕ [ ix 0 ]} (≼-trans {s ⊕ [ ix (suc i) ]} {y} {x} (⊑-≼ {s ⊕ [ ix (suc i) ]} {y} l) yx) xs)
+      at _ (inj₂ (inj₂ after)) _ = blocked c after F
+      at (inj₂ (e₀ , tx , v)) (inj₂ (inj₁ (j , sx))) _ = loud v (silent c (j , sx) tx)
+      at (inj₁ opens) (inj₂ (inj₁ (j , sx))) (z , e′ , z0 , tz) =
+        opens tz (trans (trans (instant-⊑ z0) (instant-⊕ s [ ix 0 ])) (sym (trans (instant-⊑ sx) (instant-⊕ s [ ix j ]))))
+          (≺-≼-≺ {z} {y} {x} (first-before s z0 l) yx)
 
   -- SAFE, THE NEXT: a few-bounded safe row's past is the next's.
   truth-lies : ∀ {x} → Few t x → Safe t x → AgreeTo x t t′
