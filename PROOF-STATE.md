@@ -248,16 +248,6 @@ bodies, or a row whose creator chain is cut unlike its image's.
 Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 `scan-order`, `take-order`, `defer-order`.
 
-#### PLACEMENT
-
-Every row a lane hangs on lies outside every binder's last gap. Open:
-the flatMap's scan emits below its source's branch rows, each a join in
-the world at `P` on a row of the trigger, the closer or the real
-flatMap; the real flatMap's rows need its lanes placed by the inner IH,
-and the scan's end needs locating. Settled by a body.
-
-Members: `placed-flatMap`.
-
 #### THE FINITE REST
 
 Untried: past a zero count only finitely many rows of the instant last
