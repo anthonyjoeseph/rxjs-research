@@ -16,7 +16,7 @@
 -- value, and the source's own rows before it are few.
 module simultaneous.HeldBurst where
 
-open import Data.Bool using (Bool; true; T; not)
+open import Data.Bool using (true; T; not)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.List using (List; []; _∷_; [_])
 import Data.List as L
@@ -33,11 +33,11 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; subst₂; cong)
 open import Relation.Nullary using (¬_)
 
-open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; connected; of)
-open import denotation.Position using (Pos; Label; ix; sub; last; root; _≟ᵖ_; _⊕_; _∙_)
+open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; connected; of)
+open import denotation.Position using (Pos; ix; sub; last; root; _≟ᵖ_; _⊕_; _∙_)
 open import denotation.Events using (Timeline; fresh)
-open import denotation.EmissionSet using (EmissionSet; Den; DenEnv; Ev; hot; enter; out; end; skip; pin; Few; Work; Superseded;
-  _≺_; _≼_; at-out; on-out; module Op; module Merge)
+open import denotation.EmissionSet using (Den; DenEnv; Ev; hot; enter; out; end; skip; pin; Few; Work; Superseded; _≺_; _≼_; at-out;
+  on-out; module Op; module Merge)
 open import denotation.Laws.Modulus using (entered-few; ≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≼-or-≻; ≼-split; ≺-irrefl; ≼-refl; ≺-absurd)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; InvAt; InvD; ok-step; world-after)
 open import denotation.Laws.Worlds.Leaves using (of-inv)

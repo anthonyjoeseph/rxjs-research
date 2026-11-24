@@ -280,7 +280,7 @@ on the scan's run split onto that branch. Riskiest: the defer limit's
 rest (no one approximant bounds it). Settled when each former's leaf is
 a body.
 
-Members: `queued-next`, `live-current`, `value-open`, `ro-nest`,
+Members: `queue-waits`, `start-shown`, `live-current`, `value-open`, `ro-nest`,
 `over-open`, `end-open`, `comb-shut`, `scan-idle`, `lim-rest`.
 
 #### THE BATCH RANK

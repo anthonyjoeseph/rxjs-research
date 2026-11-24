@@ -86,6 +86,9 @@ open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark;
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 open import simultaneous.HeldBurst using (module CombBurst)
+open import adequacy.Census using (module Count)
+open import adequacy.Cursor using (bef; Owes; Nths)
+open import denotation.EmissionSet using (module Bounded; module Values)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -105,7 +108,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut)
-  open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next)
+  open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next; Q; okQ; Id; If)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   done-once : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.DoneIn [] xs q
@@ -496,12 +499,59 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                  → anyHolds (Flat.at (proj₁ (past op init rx₁))) (Flat.live (proj₁ (past op init rx₁))) ≡ true
                  → Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
 
-    -- A BOUNDED MERGE'S LANE END WITH A LANE QUEUED STARTS ONE IN ITS
-    -- INSTANT: rxjs subscribes the queued lane inside the end, where the
-    -- schedule starts it (`Bounded.queued`, at the end's `ix 1`).
-    queued-next : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
-                → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
-                → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
+  -- A BOUNDED MERGE'S LANES COUNTED AT A LANE'S END `c`, by adequacy's
+  -- census at the cursor before `c`: every slot taken and a value
+  -- waiting, the queue's head starts one step below `c`.
+  module Queue (k : ℕ) where
+    open Bounded k fL RO using (Sub; Lane)
+    open Values RO using (Nth)
+    module Cn = Count okQ k fL If (Id Q okQ)
+
+    -- What the scan's queue stands for at a `laneDone` it reads at `x`:
+    -- the lanes begun, as many dead before the lane's end `c` as leave
+    -- every slot taken, and the next value passed.
+    record Waits (x : Pos) : Set where
+      field
+        {c yd w q₀ q} : Pos
+        {a₀ a}        : A
+        {vs}          : List (Pos × A)
+        {d}           : ℕ
+        at-x   : x ≡ yd ⊕ [ sub w ]
+        before : yd ≺ c
+        same   : instantOf c ≡ instantOf x
+        listed : Nths RO 0 vs
+        census : Cn.Census (bef c) vs (L.length vs) d
+        full   : d + k ≡ L.length vs
+        begun  : (q₀ , a₀) ∈ vs
+        ends   : Lane q₀ a₀ c end
+        passed : ¬ Owes (bef c) q
+        next   : Nth (L.length vs) q a
+
+    postulate
+      -- THE SCAN'S QUEUE COUNTS THE LANES WAITING.
+      queue-waits : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
+                  → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ¬ ¬ Waits x
+      -- A LANE SUBSCRIBED ONE STEP BELOW A LANE'S END SHOWS ITS START IN
+      -- THE END'S INSTANT, past the ended lane's `laneDone`.
+      start-shown : op ≡ mergeᶠ (just k) → ∀ {yd w c i q a} → yd ≺ c → Sub i q (c ⊕ [ ix 1 ]) a
+                  → ∀ {q′ a′} → M q′ (out a′) → instantOf c ≺ⁱ instantOf q′
+                  → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × (yd ⊕ [ sub w ]) ≺ y × instantOf y ≡ instantOf c
+
+    head : ∀ {x} (W : Waits x) → Σ ℕ λ i → Sub i (Waits.q W) (Waits.c W ⊕ [ ix 1 ]) (Waits.a W)
+    head W = Cn.head-at {ws = []} listed census full passed next (_ , _ , begun , ends , (λ ()) , ≼-refl {c}) (λ (_ , _ , _ , _ , _ , o) → o)
+      where open Waits W
+
+  -- A BOUNDED MERGE'S LANE END WITH A LANE QUEUED STARTS ONE IN ITS
+  -- INSTANT: rxjs subscribes the queued lane inside the end, where the
+  -- schedule starts it (`Bounded.queued`, at the end's `ix 1`).
+  queued-next : ∀ {k} → op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl
+              → ¬ Flat.queue (proj₁ (past op init r₁)) ≡ 0 → ∀ {q a} → M q (out a) → instantOf x ≺ⁱ instantOf q
+              → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × x ≺ y × instantOf y ≡ instantOf x
+  queued-next {k} bd r₁ {x} mt ld nz {q} mq xq no = queue-waits bd r₁ mt ld nz λ W →
+    let open Waits W in
+    start-shown bd {w = w} before (proj₂ (head W)) mq (subst (_≺ⁱ instantOf q) (sym same) xq)
+      λ (y , n , my , lt , iy) → no (y , n , my , subst (_≺ y) (sym at-x) lt , trans iy same)
+    where open Queue k
 
   -- THE LAST LANE'S END KEEPS THE SOURCE IN ITS INSTANT while the scan
   -- holds its routes: the scan finished at the closer's `outerDone`
