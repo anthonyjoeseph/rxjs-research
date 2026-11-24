@@ -36,7 +36,7 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; end; skip; pin; Few; _≼_; _≺_; enter; hot; EmissionSet; Den; Ended; module Joining)
 open import Data.Empty using (⊥; ⊥-elim)
-open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ; ⊕-identityʳ; full)
+open import denotation.Laws.Worlds using (InvAt; ⊕-injˡ; ⊕-identityʳ; full; ⊕-assoc)
 open import denotation.Laws.Modulus using (entered-few; ≺-trans; ≺-ext; ≺-≼-≺; ≼-≺-≺; ≺→≼; ≼-or-≻; ≺-irrefl; ≼-refl; ≼-trans; ≼-split; ≺-absurd)
 open import denotation.Laws.Truth.Connect.Cuts using (step≼; next≺)
 open import denotation.Laws.Fold using (latest)
@@ -311,11 +311,16 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
              → ¬ ¬ Σ Pos λ q → (Σ A λ a → RO q (out a)) × OpenMark q x × ¬ Any (OpenMark q) xs
       st-new xs x ys eq kx κ′ with row-open op bd x kx
       ... | k′ , b , n , refl with open-row (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq)
-      ...   | c , a , n′ , σc , refl , refl , refl = κ′ (ro-at c , (a , ro-of σc) , (a , c , n′ , σc , refl , refl) , fresh)
+      ...   | c , a , n′ , σc , refl , refl , refl = κ′ (ro-at c , (a , ro-of σc) , (a , c , n′ , σc , refl , refl) , unmet)
         where
-          fresh : ¬ Any (OpenMark (ro-at c)) xs
-          fresh oi with find oi
-          ... | _ , i , (_ , c′ , _ , _ , e , refl) with ⊕-injˡ c c′ e
+          ro-inj : ∀ c c′ → ro-at c ≡ ro-at c′ → c ≡ c′
+          ro-inj c c′ e = ⊕-injˡ c c′ (⊕-injˡ (c ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) (c′ ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) (⊕-injˡ ((c ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) ⊕ [ ix 1 ]) ((c′ ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) ⊕ [ ix 1 ]) (trans (sym (asc c)) (trans e (asc c′)))))
+            where
+              asc : ∀ x → ro-at x ≡ ((x ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ]
+              asc x = sym (trans (⊕-assoc (x ⊕ [ sub (p₀₀ ⊕ [ ix 1 ]) ]) [ ix 1 ] [ ix 0 ]) (⊕-assoc x [ sub (p₀₀ ⊕ [ ix 1 ]) ] (ix 1 ∷ ix 0 ∷ [])))
+          unmet : ¬ Any (OpenMark (ro-at c)) xs
+          unmet oi with find oi
+          ... | _ , i , (_ , c′ , _ , _ , e , refl) with ro-inj c c′ e
           ...   | refl = ≺-irrefl {c ⊕ [ sub OS.J ]} (met-before xs (split-met r₁ mt xs _ ys eq) i)
 
   -- A CUT THE SWITCH'S SCAN MEETS IS AN OUTER VALUE'S `outerOpen`, at the

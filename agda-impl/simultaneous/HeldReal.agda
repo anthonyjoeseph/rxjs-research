@@ -545,11 +545,13 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       -- outer values before it are finitely many, each read as an
       -- `outerOpen`.  Adequacy's `Admit`, `LaneEnd` and `slots-mv` are
       -- the three steps, there along a machine run.
-      -- A VALUE WHOSE `outerOpen` THE SCAN READS BEFORE A LANE'S ROW LIES
-      -- BEFORE THAT ROW.
-      opened-before : ∀ {q x y e} → OpenMark q x → σ₃ y e → proj₁ x ≺ (y ⊕ [ sub LS.J ]) → q ≺ y
       book-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
                   → ¬ ¬ Book (bef (Done.ce D))
+
+    -- A VALUE WHOSE `outerOpen` THE SCAN READS BEFORE A LANE'S ROW LIES
+    -- BEFORE THAT ROW.
+    opened-before : ∀ {q x q′ a′ y e} → OpenMark q x → Lane q′ a′ y e → proj₁ x ≺ (y ⊕ [ sub LS.J ]) → q ≺ y
+    opened-before (_ , _ , _ , σr , refl , refl) l lt = UnderPast.read-past k σr l lt
 
     -- A `laneDone` READ IS A LANE'S, ENDING IN ITS INSTANT.
     done-at : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → Done x
@@ -618,8 +620,8 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   queued-next {k} refl r₁ {x} {xl} mt ld nz {q′} mq xq no =
     book-at refl r₁ mt D λ Bk →
     queue-live refl r₁ mt nz λ (qv , av , xo , oi , ns) →
-      let (row , i , om) = find oi
-          qce = ≺-trans {qv} {yd} {ce} (opened-before om seen (subst (proj₁ row ≺_) at-x (met-before r₁ mt i))) before
+      let (rw , i , om) = find oi
+          qce = ≺-trans {qv} {yd} {ce} (opened-before om row (subst (proj₁ rw ≺_) at-x (met-before r₁ mt i))) before
       in [ (λ iv → Book.started Bk iv λ (y , n , l , ny) → [ (λ cy → ny cy) , between xo ns l ]′ (≼-or-≻ ce y))
          , (λ iw → let (_ , _ , _ , sb) = head D Bk (nonempty iw) in
              start-shown refl D sb mq cq λ (y , n , my , lt , iy) → no (y , n , my , lt , trans iy same)) ]′
@@ -640,7 +642,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       -- A begun lane the scan has not seen start starts in the end's
       -- instant, past the `laneDone`.
       between : ∀ {qv av y n} → RO qv (out av) → ¬ Any (LaneMark laneStart qv) r₁
-              → Lane qv av y (out (instEmit (mark laneStart) n)) → y ≺ ce
+              → RV.Lane (mergeᶠ (just k)) qv av y (out (instEmit (mark laneStart) n)) → y ≺ ce
               → ⊥
       between {qv} {av} {y} {n} xo ns l@(il , _ , sbl , _) yce =
         lane-σ₃ xo rn l tt (λ ()) (≼-refl {y}) noend (sent-few mq yq) λ σy →
@@ -658,8 +660,10 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
             let (y₀ , _ , r₀ , s₀ , lt₀) = lane-starts (Run.fwd xo rn l ld′)
             in ≺-irrefl {y} (≺-trans {y} {yd′} {y} (subst (_≺ yd′) (sym (start-once xo l (Run.back xo rn l r₀ s₀))) lt₀) y′y)
           ld-start : M x (out (LnMk laneStart n)) → ⊥
-          ld-start mx with ld | InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl)))) mx
-          ... | (_ , _ , _ , refl) | ()
+          ld-start mx = no-st ld (InvAt.func I-M (proj₁ (run-row∈ mt (∈-++⁺ʳ r₁ (here refl)))) mx)
+            where
+              no-st : ∀ {v} → LD v → out v ≡ out (LnMk laneStart n) → ⊥
+              no-st (_ , _ , _ , refl) ()
           squeeze : x ≺ (y ⊕ [ sub LS.J ]) → instantOf (y ⊕ [ sub LS.J ]) ≡ instantOf x
           squeeze lt with triⁱ (instantOf (y ⊕ [ sub LS.J ])) (instantOf x)
           ... | inj₁ wx        = ⊥-elim (≺-irrefl {x} (≺-trans {x} {y ⊕ [ sub LS.J ]} {x} lt (instant-≺ (y ⊕ [ sub LS.J ]) x wx)))

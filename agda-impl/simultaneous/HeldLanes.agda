@@ -12,7 +12,7 @@ import Data.List as L
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All using (lookup; _∷_) renaming ([] to []ᵉ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst)
 
 open import Tree using (Obs; FlatOp; map)
@@ -23,7 +23,12 @@ open import simultaneous.SObs using (lone; module Elaborate; Flat; outerB; laneB
 open import simultaneous.Relations using (Met)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Routed using (Routing; Held; Early; Idle)
-open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; PinBy; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc) renaming (W to Wld)
+open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; Shows; PinBy; ok-step; _⊑_; InvAt; ⊕-injˡ; ok-in; ⊑-cmp; ⊑-refl; ⊑-inside; ⊕-assoc; ⊑-snoc) renaming (W to Wld)
+open import denotation.Laws.BoundedInv using (module BoundedI)
+open import simultaneous.RealView using (nth-out)
+open import simultaneous.CombSent using (starts-after)
+open import denotation.Laws.Count using (⊑?; child)
+open import Relation.Nullary using (yes; no)
 open import denotation.Laws.HotBelow using (under-hot)
 open import simultaneous.EachRow using (each-row; each-at; each-end; each-before)
 open import denotation.EmissionSet using (LaneOf)
@@ -377,6 +382,13 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     Qo≺s₂ = subst (_≺ (p₀ ⊕ [ ix 1 ])) (sym (trans (⊕-assoc p₀₀ [ ix 1 ] [ last ]) (⊕-assoc p₀ [ ix 0 ] (ix 1 ∷ last ∷ []))))
               (Equivalence.from T-≡ (<ᵖ-part p₀ {ix 0} {ix 1} (ix 1 ∷ last ∷ []) [] refl))
 
+  private
+    -- What lies under an outer row's `sub` past `Qo` lies past its value.
+    below-past : ∀ {o₁ e y} (r₁ : σ₁ o₁ e) → OuterRow.Below r₁ Qo y → ro-at o₁ ≺ y
+    below-past {o₁} r₁ (e′ , zs , eq , qe) = subst (ro-at o₁ ≺_) (sym eq)
+      (Equivalence.from T-≡ (<ᵖ-part o₁ {sub (p₀₀ ⊕ [ ix 1 ])} {sub e′} (ix 1 ∷ ix 0 ∷ []) zs
+        (Equivalence.to T-≡ (≺-≼-≺ {p₀₀ ⊕ [ ix 1 ]} {Qo} {e′} (≺-ext (p₀₀ ⊕ [ ix 1 ]) []) qe))))
+
   -- NO LANE ROW OF A VALUE LIES BETWEEN THE SOURCE'S READING OF AN OUTER ROW
   -- AND THE REAL FLATMAP'S VALUE OF IT: the lane reaches inside another
   -- value's outer row only by joining it past its own subscription, so past
@@ -425,13 +437,81 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
               (≼-split {y} {ro-at o₁} yr)
 
       beyond : OuterRow.Below r₁ Qo y → ro-at o₁ ≺ y
-      beyond (e′ , zs , eq , qe) = subst (ro-at o₁ ≺_) (sym eq)
-        (Equivalence.from T-≡ (<ᵖ-part o₁ {sub q₀} {sub e′} (ix 1 ∷ ix 0 ∷ []) zs (Equivalence.to T-≡ (≺-≼-≺ {q₀} {Qo} {e′} (≺-ext q₀ []) qe))))
+      beyond = below-past r₁
 
   lane-in-outer : op ≡ switchᶠ → ∀ {o₁ x y b} → σ₁ o₁ (out x) → σ₃ y (out b) → (o₁ ⊕ [ sub OS.J ]) ≼ y → y ≼ ro-at o₁ → ⊥
   lane-in-outer op≡ {y = y} {b} r₁ σy jy yr with σ₃-lane σy
   ... | q , a , xo , _ , l , _ with ro-row xo
   ...   | r , n , σr , refl = lane-in r₁ σr xo (subst (λ o′ → RV.Lane o′ (ro-at r) a y (out b)) op≡ l) jy yr
+
+  -- A BOUNDED LANE'S ROW UNDER AN OUTER ROW LIES PAST THAT ROW'S VALUE: a
+  -- lane reaches under an outer row only by joining it past its own
+  -- subscription, so past `Qo`; or by subscribing under that row itself,
+  -- which only its own value's lane does, or under an earlier lane's end
+  -- that already lies past the value.
+  module UnderPast (n : ℕ) {o₁ x} (r₁ : σ₁ o₁ (out x)) where
+    private
+      module Bd = ES.Bounded n fL RO
+      module BI = BoundedI (ok-step p₀₀ ok₂) n fL (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) I-RO
+      open ES.Values RO using (Nth)
+
+      own-row : ∀ {r e} → σ₁ r e → o₁ ⊑ (ro-at r ⊕ [ ix 1 ]) → r ≡ o₁
+      own-row {r} σr os with ⊑-cmp o₁ r os ((sub (p₀₀ ⊕ [ ix 1 ]) ∷ ix 1 ∷ ix 0 ∷ []) L.++ [ ix 1 ] , ⊕-assoc r (sub (p₀₀ ⊕ [ ix 1 ]) ∷ ix 1 ∷ ix 0 ∷ []) [ ix 1 ])
+      ... | inj₁ or = OuterRow.σ₁-lead r₁ σr or
+      ... | inj₂ ro = sym (OuterRow.σ₁-lead σr r₁ ro)
+
+      val-past : ∀ {q a} → RO q (out a) → o₁ ⊑ (q ⊕ [ ix 1 ]) → ro-at o₁ ≺ (q ⊕ [ ix 1 ])
+      val-past xo os with ro-row xo
+      ... | r , _ , σr , refl with own-row σr os
+      ...   | refl = ≺-ext (ro-at r) []
+
+      Qo-past : ∀ {q a s} → RO q (out a) → q ≺ s → Qo ≼ s
+      Qo-past {s = s} xo qs with ro-row xo
+      ... | r , _ , σr , refl = ≺→≼ {Qo} {s} (≺-trans {Qo} {p₀ ⊕ [ ix 1 ]} {s} Qo≺s₂ (≺-trans {p₀ ⊕ [ ix 1 ]} {c ⊕ [ ix 1 ]} {s} s₂≺c₁
+        (≺-trans {c ⊕ [ ix 1 ]} {r} {s} (σ₁-after σr) (≺-trans {r} {ro-at r} {s} (≺-ext r (ix 1 ∷ ix 0 ∷ [])) qs))))
+
+    mutual
+      under-past : ∀ i {q a s y e} → Nth i q a → Bd.Starts i q (Bd.Sched i) s → ES.After (fL a) s y e → o₁ ⊑ y → ro-at o₁ ≺ y
+      under-past i {q} {a} {s} {y} nt st (yr , sy) oy with ⊑? o₁ s
+      ... | yes os = ≺-trans {ro-at o₁} {s} {y} (start-past i nt st os) sy
+      ... | no ¬os = below-past r₁ (under-hot {H = Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)} {s = s} {q = Qo} {y = o₁}
+                      (Qo-past (nth-out nt) (starts-after st)) (OuterRow.hots-under r₁ Qo (≺→≼ {Qo} {p₀ ⊕ [ ix 1 ]} Qo≺s₂))
+                      dj ¬os (InvAt.world (BI.LI (nt , st)) yr) (InvAt.real (BI.LI (nt , st)) yr) oy)
+        where
+          dj : ∀ {w} → Wld (Hots (hot σ₂ ∷ hot σ₁ ∷ env₀)) s w → w ≡ o₁ → ⊥
+          dj ww refl = proj₂ (BI.okS (nt , st)) (inj₂ (inj₁ (_ , r₁))) ww (⊑-inside (⊑-refl o₁))
+
+      start-past : ∀ i {q a s} → Nth i q a → Bd.Starts i q (Bd.Sched i) s → o₁ ⊑ s → ro-at o₁ ≺ s
+      start-past i nt (Bd.room _)              os = val-past (nth-out nt) os
+      start-past i nt (Bd.freed _ _)           os = val-past (nth-out nt) os
+      start-past i nt (Bd.queued _ _ kc _ _) os = sched-past i kc os
+
+      sched-past : ∀ i {c} → Bd.Kth (_≡ c) (Bd.Sched i) 0 → o₁ ⊑ (c ⊕ [ ix 1 ]) → ro-at o₁ ≺ (c ⊕ [ ix 1 ])
+      sched-past zero ()
+      sched-past (suc i) {c} (inj₁ (_ , (_ , _ , _ , nt , st , (cx , sc)) , refl)) os with ⊑-snoc c os
+      ... | inj₁ oc = ≺-trans {ro-at o₁} {c} {c ⊕ [ ix 1 ]} (under-past i nt st (cx , sc) oc) (≺-ext c [])
+      ... | inj₂ eq = ⊥-elim (proj₂ (BI.okS (nt , st)) (inj₂ (inj₁ (_ , r₁))) (InvAt.world (BI.LI (nt , st)) cx) (⊑-inside ([ ix 1 ] , eq)))
+      sched-past (suc i) (inj₂ kc) os = sched-past i kc os
+
+    -- No lane row leads the outer row.
+    lane-lead : ∀ {q a y e} → Bd.Lane q a y e → y ⊑ o₁ → ⊥
+    lane-lead (_ , _ , sb , yr , _) yo = proj₂ (BI.okS sb) (inj₂ (inj₁ (_ , r₁))) (InvAt.world (BI.LI sb) yr) (⊑-inside yo)
+
+    -- A LANE ROW A READER OF IT PLACES PAST A READER OF THE OUTER ROW LIES
+    -- PAST THE ROW'S VALUE: under the row, by `under-past`; beside it, the
+    -- readers keep the order of what they read.
+    read-past : ∀ {q a y e l₁ l₂} → Bd.Lane q a y e → (o₁ ⊕ [ l₁ ]) ≺ (y ⊕ [ l₂ ]) → ro-at o₁ ≺ y
+    read-past {y = y} {l₁ = l₁} {l₂} l@(i , s , (nt , st) , aft) lt with ⊑? o₁ y
+    ... | yes oy = under-past i nt st aft oy
+    ... | no ¬oy with ≼-or-≻ (ro-at o₁) y
+    ...   | inj₁ le = [ (λ lt′ → lt′) , (λ eq → ⊥-elim (¬oy (_ , sym eq))) ]′ (≼-split {ro-at o₁} {y} le)
+    ...   | inj₂ yr with child l₂ yr
+    ...     | inj₁ yo = ⊥-elim ([ (λ y⊑o → lane-lead l y⊑o) , (λ o⊑y → ¬oy o⊑y) ]′ (⊑-cmp y o₁ yo (_ , refl)))
+    ...     | inj₂ ly with <ᵖ-between o₁ (y ⊕ [ l₂ ]) (sub (p₀₀ ⊕ [ ix 1 ]) ∷ ix 1 ∷ ix 0 ∷ [])
+                             (Equivalence.to T-≡ (≺-trans {o₁} {o₁ ⊕ [ l₁ ]} {y ⊕ [ l₂ ]} (≺-ext o₁ []) lt)) (Equivalence.to T-≡ ly)
+    ...       | zs , eq with ⊑-snoc y (zs , eq)
+    ...         | inj₁ oy = ⊥-elim (¬oy oy)
+    ...         | inj₂ eq′ = ⊥-elim (lane-lead l ([ l₂ ] , eq′))
 
   -- NO LANE OF THE REAL FLATMAP SHOWS AN `outerOpen`.
   σ₃-open : ∀ {y n} → σ₃ y (out (instEmit (mark outerOpen) n)) → ⊥
