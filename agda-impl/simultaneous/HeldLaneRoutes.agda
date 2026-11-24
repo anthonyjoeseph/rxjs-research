@@ -52,7 +52,7 @@ open import simultaneous.HeldLim using (run-below)
 import simultaneous.LaneStart as LaneStart
 open import simultaneous.ColdIdle using (aft-or-in)
 open import simultaneous.CombSent using (src-op; closing-mark)
-open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; outerOpen; valuesOf)
+open import simultaneous.InstEmit using (instEmit; mark; value; laneDone; laneStart; begin; burstEnd; outerOpen; valuesOf)
 open import simultaneous.Project using (run-prefix)
 open import denotation.EmissionSet using (Ev; Superseded; Seen; Work)
 open import Data.Maybe using (just)
@@ -276,11 +276,10 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ...     | inj₁ (_ ∷ _ , refl) = InvAt.flat (inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s oks) ry rd
 
   -- NOTHING OF A LANE IS MET PAST ITS `laneDone`.
-  done-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-             → ∀ {q v} → LaneEmit q x v → AC.DoneIn [] xs q → ⊥
-  done-final rx₁ mt xs x ys eq (a , y , xo , refl , l) dn with find dn
+  done-final : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v → AC.DoneIn [] xs q → ⊥
+  done-final xs mt (a , y , xo , refl , l) dn with find dn
   ... | _ , i , (_ , a′ , yd , n , xo′ , refl , ld) with ro-func xo xo′
-  ...   | refl = done-last xo ld l (met-before xs (split-met rx₁ mt xs _ ys eq) i)
+  ...   | refl = done-last xo ld l (met-before xs mt i)
 
   -- AN `outerOpen` THE SCAN MEETS IS AN OUTER VALUE'S, at the source's
   -- reading of the outer's row.
@@ -423,12 +422,11 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ...   | inj₁ y₂y₁ = ⊥-elim (≺-absurd {y₁ ⊕ [ sub LS.J ]} {y₂ ⊕ [ sub LS.J ]} lt (lane-J xo l₂ l₁ y₂y₁))
 
   -- A row of the met run before a row it met there is met before it.
-  in-prefix : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-            → ∀ {u} → u ∈ rx₁ ++ (z , e) ∷ rx₂ → proj₁ u ≺ proj₁ x → u ∈ xs
-  in-prefix rx₁ {z} {e} {rx₂} mt xs x ys refl {u} i ux with ∈-++⁻ xs (subst (u ∈_) (++-assoc xs (x ∷ ys) ((z , e) ∷ rx₂)) i)
+  in-prefix : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {u} → u ∈ xs ++ x ∷ rest → proj₁ u ≺ proj₁ x → u ∈ xs
+  in-prefix xs {x} mt {u} i ux with ∈-++⁻ xs i
   ... | inj₁ i′ = i′
   ... | inj₂ (here refl) = ⊥-elim (≺-irrefl {proj₁ x} ux)
-  ... | inj₂ (there i′) with run-tail xs (subst (Met M) (++-assoc xs (x ∷ ys) ((z , e) ∷ rx₂)) mt)
+  ... | inj₂ (there i′) with run-tail xs mt
   ...   | _ ∷ᴿ rn = ⊥-elim (≺-absurd {proj₁ u} {proj₁ x} ux (run-after rn i′))
 
   opaque
@@ -451,13 +449,13 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
     -- A LANE'S ROW BEFORE A ROW OF IT THE RUN MET IS MET BEFORE THAT ROW:
     -- the lanes show it, never cut between, and their run met it first.
-    catch : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+    catch : ∀ xs {x rest} → Met M (xs ++ x ∷ rest)
           → ∀ {q a y v k b} → RO q (out a) → x ≡ (y ⊕ [ sub LS.J ] , out (Ln v)) → RV.Lane op q a y (out v)
           → RV.Lane op q a k (out b) → k ≺ y → (k ⊕ [ sub LS.J ] , out (Ln b)) ∈ xs
-    catch rx₁ mt xs x ys eq {q} {a} {y} {v} {k} {b} xo x≡ l lk ky =
+    catch xs mt {q} {a} {y} {v} {k} {b} xo x≡ l lk ky =
       let (rs , pr , run , _) = lane-run mt
-          (y′ , e′ , j) = bproj-mem pr (∈-++⁺ˡ (subst ((y ⊕ [ sub LS.J ] , out (Ln v)) ∈_) (sym eq) (∈-++⁺ʳ xs (here (sym x≡)))))
-      in in-prefix rx₁ mt xs _ ys eq
+          (y′ , e′ , j) = bproj-mem pr (∈-++⁺ʳ xs (here (sym x≡)))
+      in in-prefix xs mt
            (catch-run pr run xo l (subst (λ w → (w , out v) ∈ rs) (sym (⊕-injˡ y y′ e′)) j) lk ky)
            (subst (λ x₀ → (k ⊕ [ sub LS.J ]) ≺ proj₁ x₀) (sym x≡) (lane-J xo lk l ky))
 
@@ -529,30 +527,40 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       least : ∀ {k e′} → RV.Lane op q a k e′ → Visible e′ → After (cursor nothing (lane-rows oc)) k → y ≼ k
       least {e′ = end}   lk _ _ ky = proj₂ (proj₁ (lane-seen xo l)) lk ky
       least {k} {out b}  lk _ ak ky =
-        let (_ , j) = in-rows oc (catch (r ++ [ x ]) mt r x [] refl xo x≡ l lk ky) (a , k , xo , refl , lk)
+        let (_ , j) = in-rows oc (catch r mt′ xo x≡ l lk ky) (a , k , xo , refl , lk)
         in ≺-irrefl {k} (run-below rec ak j)
       least {e′ = skip}  _ () _
       least {e′ = pin _} _ () _
   own-run _ {z} {e} {rx₂} mt xo (oc-out {r} {x = x} oc _) = own-run r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc
 
-  -- A LANE'S `begin` IS MET PAST ITS `laneStart`: the lane shows the mark
-  -- before the `begin`, never cut between, so the lanes show it too, and
-  -- their run, having met the later row, met it first.
-  begin-started : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-                → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.StartIn [] xs q
-  begin-started rx₁ mt xs x ys eq {q} (a , y , xo , refl , l) with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+  -- A LANE'S UNDONE EMIT, NO PIECE'S MARK, IS MET PAST ITS `laneStart`:
+  -- the lane shows the mark before it, never cut between, so the lanes
+  -- show it too, and their run, having met the later row, met it first.
+  started-by : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v
+             → (∀ {a s y} → enter (fL a) s y (out v) → Σ Pos λ y₀ → enter (fL a) s y₀ (out (marked laneStart)) × s ≺ y₀ × y₀ ≺ y)
+             → AC.StartIn [] xs q
+  started-by xs mt {q} (a , y , xo , refl , l) st with lane-at op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo l
-  ... | s , oks , r , _ , back with LaneStart.begin-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r
-  ...   | y₀ , r₀ , sy₀ , y₀y = any-map (λ { refl → a , y₀ , _ , xo , refl , back r₀ sy₀ }) (catch rx₁ mt xs _ ys eq xo refl l (back r₀ sy₀) y₀y)
+  ... | s , oks , r , _ , back with st r
+  ...   | y₀ , r₀ , sy₀ , y₀y = any-map (λ { refl → a , y₀ , _ , xo , refl , back r₀ sy₀ }) (catch xs mt xo refl l (back r₀ sy₀) y₀y)
+
+  started : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v
+          → T (undone v) → (v ≡ marked laneStart → ⊥) → (v ≡ marked burstEnd → ⊥) → AC.StartIn [] xs q
+  started xs mt le u nl nb = started-by xs mt le (λ {a} {s} r → LaneStart.plain-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r u nl nb)
+
+  -- A LANE'S `laneDone` IS MET PAST ITS `laneStart` too.
+  done-started : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q kd n} → LaneEmit q x (instEmit (mark (laneDone kd)) n)
+               → AC.StartIn [] xs q
+  done-started xs mt le = started-by xs mt le (λ {a} {s} r → LaneStart.lane-starts _ (f a) (hot σ₂ ∷ hot σ₁ ∷ env₀) m s r)
 
   -- A LANE'S EMIT THE RUN MET IS A ROW OF THE LANES, of a lane running
   -- and never cut by it.
-  emit-σ : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {x q v} → x ∈ rx₁ → LaneEmit q x v
+  emit-σ : ∀ {rx} → Met M rx → ∀ {x q v} → x ∈ rx → LaneEmit q x v
          → Σ Pos λ y → proj₁ x ≡ y ⊕ [ sub LS.J ] × σ₃ y (out v) × RV.Runs op q × ¬ RV.CutAt op q y
-  emit-σ rx₁ mt {q = q} {v} i (a , y , xo , refl , l) =
+  emit-σ mt {q = q} {v} i (a , y , xo , refl , l) =
     let (rs , pr , run , _) = lane-run mt
-        (y′ , e′ , j) = bproj-mem pr (∈-++⁺ˡ i)
+        (y′ , e′ , j) = bproj-mem pr i
         σy = proj₁ (run-row∈ run (subst (λ w → (w , out v) ∈ rs) (sym (⊕-injˡ y y′ e′)) j))
         (q″ , a″ , xo″ , rn , l″ , nc) = σ₃-lane σy
     in go (emit-one (a , y , xo , refl , l) (a″ , y , xo″ , refl , l″)) σy rn nc
@@ -563,24 +571,29 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
   -- NOTHING OF A LANE IS MET PAST A CUT OF IT: the later value's
   -- `outerOpen` the scan met supersedes the lane before its row.
-  cut-final : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-            → ∀ {q v} → LaneEmit q x v → AC.CutIn [] xs q → ⊥
-  cut-final rx₁ mt xs x ys eq {q} le ci@(_ , _ , _ , _ , cb) =
+  cut-final : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v → AC.CutIn [] xs q → ⊥
+  cut-final xs mt {q} le ci@(_ , _ , _ , _ , cb) =
     let (xc , _ , kc) = find cb
         op≡ = row-cut op xc kc
-        (q′ , a′ , xo′ , qq′ , later) = switch-cut op≡ xs (split-met rx₁ mt xs _ ys eq) ci
-        (y , px , σy , rn , nc) = emit-σ rx₁ mt (subst (x ∈_) (sym eq) (∈-++⁺ʳ xs (here refl))) le
+        (q′ , a′ , xo′ , qq′ , later) = switch-cut op≡ xs mt ci
+        (y , px , σy , rn , nc) = emit-σ mt (∈-++⁺ʳ xs (here refl)) le
     in nc (subst (λ o₀ → RV.CutAt o₀ q y) (sym op≡) (q′ , a′ , xo′ , qq′ , later σy px))
 
-  -- A LANE BEGINS ONLY WHILE LIVE: its `begin` row follows its
-  -- `laneStart`, and neither its `laneDone` nor a cut of it.
-  emit-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-            → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.Live [] xs q
-  emit-live rx₁ mt xs x ys eq {q} le@(a , y , xo , refl , l) =
-    own , begin-started rx₁ mt xs x ys eq le , done-final rx₁ mt xs x ys eq le , cut-final rx₁ mt xs x ys eq le
+  -- A LANE EMITS ONLY WHILE LIVE: its undone row, no piece's mark,
+  -- follows its `laneStart`, and neither its `laneDone` nor a cut of it.
+  live-of : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v → AC.StartIn [] xs q → AC.Live [] xs q
+  live-of xs mt {q} le@(a , y , xo , refl , l) si = own , si , done-final xs mt le , cut-final xs mt le
     where
       own : Own q
-      own = let (_ , _ , _ , rn , _) = emit-σ rx₁ mt (subst (_ ∈_) (sym eq) (∈-++⁺ʳ xs (here refl))) le in a , xo , rn
+      own = let (_ , _ , _ , rn , _) = emit-σ mt (∈-++⁺ʳ xs (here refl)) le in a , xo , rn
+
+  lane-live : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q v} → LaneEmit q x v
+            → T (undone v) → (v ≡ marked laneStart → ⊥) → (v ≡ marked burstEnd → ⊥) → AC.Live [] xs q
+  lane-live xs mt le u nl nb = live-of xs mt le (started xs mt le u nl nb)
+
+  emit-live : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
+            → ∀ {q n} → LaneEmit q x (instEmit (mark begin) n) → AC.Live [] xs q
+  emit-live rx₁ mt xs x ys eq le = lane-live xs (split-met rx₁ mt xs x ys eq) le tt (λ ()) (λ ())
 
   -- Rows of a met run keep their order.
   met-order : ∀ (xs : List Row) {u ys zs} → Met M (xs ++ u ∷ ys ++ zs) → ∀ {v} → v ∈ ys → proj₁ u ≺ proj₁ v
@@ -713,16 +726,16 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- A LANE'S `laneDone` TELLS ITS COUNT AS THE RUN MET IT: the run met
   -- every row of the lane before the `laneDone` first, and none after.
   done-told : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ xs x ys → rx₁ ≡ xs ++ x ∷ ys
-            → ∀ {q kd n c} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → OC q xs c → proj₂ c ≤ kd
+            → ∀ {q kd n c} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → OC q xs c → proj₂ c ≡ kd
   done-told rx₁ {z} {e} {rx₂} mt xs x ys eq {q} {kd} {n} {c} (a , yd , xo , refl , ld) oc =
     let (r , told , fd) = done-site xo ld
-    in ℕP.≤-reflexive (trans (cong proj₂ (fold-oc xo fd xs (x ∷ ys ++ (z , e) ∷ rx₂) mt′ h₁ h₂ oc)) (sym told))
+    in trans (cong proj₂ (fold-oc xo fd xs (x ∷ ys ++ (z , e) ∷ rx₂) mt′ h₁ h₂ oc)) (sym told)
     where
       mt′ : Met M (xs ++ x ∷ ys ++ (z , e) ∷ rx₂)
       mt′ = subst (Met M) (trans (cong (_++ (z , e) ∷ rx₂) eq) (++-assoc xs (x ∷ ys) ((z , e) ∷ rx₂))) mt
 
       h₁ : ∀ {y v} → RV.Lane op q a y (out v) → y ≺ yd → (y ⊕ [ sub LS.J ] , out (Ln v)) ∈ xs
-      h₁ l yy = catch rx₁ mt xs _ ys eq xo refl ld l yy
+      h₁ l yy = catch xs (split-met rx₁ mt xs _ ys eq) xo refl ld l yy
 
       h₂ : ∀ {u v} → u ∈ xs → LaneEmit q u v → Σ Pos λ y → proj₁ u ≡ y ⊕ [ sub LS.J ] × y ≺ yd
       h₂ i (a′ , y , xo′ , refl , l′) =
@@ -739,7 +752,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       (λ { {q} {x} {v} (_ , y , _ , eq , _) → y ⊕ [ sub LS.J ] , eq })
       (λ {q} {q′} {x} {v} {v′} → emit-one {q} {q′} {x} {v} {v′})
       (λ { {q} {x} (kd , a , y , n , xo , eq , l) → kd , n , a , y , xo , eq , l })
-      (emit-live rx₁ mt) (done-told rx₁ mt)
+      (emit-live rx₁ mt) (λ xs x ys eq {q} {kd} {n} {c} l oc → ℕP.≤-reflexive (done-told rx₁ mt xs x ys eq {q} {kd} {n} {c} l oc))
     where
       emit-at : ∀ {x k v} → (k , out (Tg laneB v)) ∈ rx₁ → x ≡ (k , out (Tg laneB v)) → Σ Pos λ q → LaneEmit q x v
       emit-at {v = v} i x≡ = let (q , le) = lane-emit rx₁ mt i in q , subst (λ x′ → LaneEmit q x′ v) (sym x≡) le

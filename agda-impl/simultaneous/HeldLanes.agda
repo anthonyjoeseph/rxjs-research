@@ -315,12 +315,6 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       nonempty []      ()
       nonempty (_ ∷ _) ()
 
-  -- A row the run met lies before its last.
-  met-before : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {k e′} → (k , e′) ∈ r₁ → k ≺ z
-  met-before r₁ {z} {e} {r₂} mt i with ∈-∃++ i
-  ... | a₁ , b₁ , refl with run-tail a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ r₂)) mt)
-  ...   | _ ∷ᴿ rn = run-after rn (∈-++⁺ʳ b₁ (here refl))
-
   -- A ROW OF THE REAL FLATMAP'S VALUES IS A LANE'S, run and not cut there.
   σ₃-lane : ∀ {y b} → σ₃ y (out b) → Σ Pos λ q → Σ A λ a → RO q (out a) × RV.Runs op q × RV.Lane op q a y (out b) × ¬ RV.CutAt op q y
   σ₃-lane (r , _) = join-out op fL RO (proj₁ (real-to m op (λ a → laneˢ (g a)) (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) (p₀₀ ⊕ [ ix 1 ]) r))

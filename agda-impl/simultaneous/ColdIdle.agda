@@ -30,7 +30,7 @@ open import denotation.Laws.Modulus using (≺-absurd; ≼-refl; ≺→≼; ≺-
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; begin; over)
-open import simultaneous.Routed using (Idle; nm; nameOf; cnt)
+open import simultaneous.Routed using (Idle; nm; nameOf; cnt; nm-inst)
 open import simultaneous.Relations using (Met; values; values-++)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Layers using (run-after; run-row)
@@ -40,7 +40,7 @@ open import simultaneous.ColdBegin using (same-≺)
 open import simultaneous.ColdEnd using (aft?)
 open import simultaneous.ColdClose using (cold-close)
 open import simultaneous.Instants using (btw)
-open import simultaneous.ColdRuns using (run-has-ex; after-in; values-∈; rise; nm-inst; B⁰; not-now; beg-name)
+open import simultaneous.ColdRuns using (run-has-ex; after-in; values-∈; rise; B⁰; not-now; beg-name)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count; coldˢ)
 

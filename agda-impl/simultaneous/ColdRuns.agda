@@ -36,7 +36,7 @@ open import simultaneous.HeldComb using (ev; ShutRun)
 open import simultaneous.SObs using (lone; module Elaborate)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
-open import simultaneous.Routed using (nm; nameOf; cnt; Carried; Ex; c-value)
+open import simultaneous.Routed using (nm; nameOf; cnt; Carried; Ex; c-value; nm-inst)
 open import simultaneous.Relations using (Met; values; values-++)
 open import simultaneous.Shut using (r₀)
 open import simultaneous.Readings using (rootOf)
@@ -126,13 +126,6 @@ dec-open (m , zero)  n = no λ { (_ , ()) }
 dec-open (m , suc k) n with m ≟ᵖ n
 ... | yes refl = yes (k , refl)
 ... | no ne    = no λ { (_ , refl) → ne refl }
-
--- A name's instant.
-nm-inst : ∀ K → instant (nm (K ∙ [])) ≡ K
-nm-inst frame                 = refl
-nm-inst (cascade t e last)    = refl
-nm-inst (cascade t e (ix _))  = refl
-nm-inst (cascade t e (sub _)) = refl
 
 ------------------------------------------------------------------------
 -- A cold's runs

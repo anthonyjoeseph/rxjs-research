@@ -40,10 +40,12 @@ module _ {A : Set} {S : EmissionSet (IE A)}
     few-up : ∀ {q e} → Proper S q e → Few (Proper S) q → Few S q
     few-up pq (ks , h) = ks , λ rk kq → h (below pq rk kq) kq
 
-    run-up : ∀ {c rs} → Run (Proper S) c rs → Run S c rs
-    run-up R.[] = R.[]
-    run-up ((((pq , _) , fw) , v , a , l) R.∷ rest) = ((pq , few-up pq fw) , v , a , λ rk v′ ak → l (vis rk v′) v′ ak) R.∷ run-up rest
+  -- A run of the proper rows is a run of the stream.
+  run-up : ∀ {c rs} → Run (Proper S) c rs → Run S c rs
+  run-up R.[] = R.[]
+  run-up ((((pq , _) , fw) , v , a , l) R.∷ rest) = ((pq , few-up pq fw) , v , a , λ rk v′ ak → l (vis rk v′) v′ ak) R.∷ run-up rest
 
+  private
     -- The cursor is the last row met.
     last : ∀ {c rs z} → Run S c rs → cursor c rs ≡ just z → c ≡ just z ⊎ Σ (Ev (IE A)) λ e → (z , e) ∈ rs × Proper S z e
     last R.[] eq = inj₁ eq

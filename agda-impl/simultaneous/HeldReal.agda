@@ -88,6 +88,7 @@ open import simultaneous.HeldSrc using (module CombSrc; between-inst; open-mark;
 
 open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
+open import simultaneous.LaneTot using (module LaneTot)
 open import simultaneous.HeldBurst using (module CombBurst)
 open import adequacy.QueuedAt using (few-nth; module QueuedAt)
 open import denotation.EmissionSet using (module Bounded; module Values)
@@ -110,6 +111,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   open FlatHots m ρ op f s env p
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (switch-cut; queue-live)
+  open LaneTot m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (value-tot; over-tot)
   open CombBurst m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (burst-next; Q; okQ; Id; If; module Start; module Run; lane-σ₃; no-end-before; sent-few)
 
   -- NO `laneDone` OF A LANE PRECEDES ITS OWN IN THE SCAN.
@@ -376,12 +378,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
       lt : ¬ instantOf w ≡ instantOf q → instantOf w ≺ⁱ instantOf q
       lt = ≺-instant w q wq
-
-  -- EVERY OUTER ROW THE SOURCE MEETS LIES BEFORE THE CLOSER'S `outerDone`.
-  outer-before-done : ∀ {k v z n} → M k (out (just (inj₁ (outerB , v)))) → M z (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
-                    → k ≺ z
-  outer-before-done mk mz with outer-sent mk | close-sent mz
-  ... | y₁ , w , _ , σy , _ , refl | y₂ , w′ , σy′ , refl = CD.before-done σy (proj₁ σy′) w w′
 
   -- PAST THE CLOSER'S `outerDone`, A COUNTED OUTER ROUTE KEEPS THE SOURCE
   -- IN ITS INSTANT: the scan keeps the outer's routes there only with no
@@ -917,13 +913,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   ... | inj₁ z = inj₁ (trans (exact-past op rx₁ (nocb rx₁ mt)) z)
   ... | inj₂ a = inj₂ (trans (inv-at (inv-past op rx₁)) a)
 
-  named : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark begin) n)))) → n ≡ nameOf q
-  named x with m-rows x tt
-  ... | outer {q = c} {w = w} y eq with refl ← open-mark eq (λ ()) =
-    trans (Held.named H₁ (proj₁ y)) (cong nm (sym (rootOf-ext c [ sub w ])))
-  ... | lane {q = c} {w = w} y  = trans (lane-named y) (cong nm (sym (rootOf-ext c [ sub w ])))
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
-
   early : ∀ {q b a n} → M q (out (just (inj₁ (b , instEmit (value a) n)))) → Early q
   early x with m-rows x tt
   ... | outer y eq = ⊥-elim (open-value eq)
@@ -939,18 +928,6 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       bend (b-outer {w = w} y) = early-inst [ sub w ] (Held.ends H₁ (proj₁ y))
       bend (b-lane {w = w} y)  = early-inst [ sub w ] (lane-ends y)
       bend (b-close {w = w} y) = early-inst [ sub w ] (close-ends y)
-
-  late : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark over) n)))) → Valued (rootOf q) × opos (rootOf q) ⊑ q
-  late x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = late-ext [ sub w ] (Held.late H₁ (proj₁ y))
-  ... | lane {w = w} y = late-ext [ sub w ] (lane-late y)
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
-
-  mdone : ∀ {q b n} → M q (out (just (inj₁ (b , instEmit (mark completed) n)))) → Early q
-  mdone x with m-rows x tt
-  ... | outer {w = w} y eq with refl ← open-mark eq (λ ()) = early-inst [ sub w ] (Held.done H₁ (proj₁ y))
-  ... | lane {w = w} y = early-inst [ sub w ] (lane-done y)
-  ... | close y = ⊥-elim (closing-mark (close-marks y) (λ ()) (λ ()))
 
   comb-runs : ∀ {rx} → Met M rx → Upto (Few R) rx → RunHeld cs′ (outRows op init rx)
   comb-runs {rx} mt up = locals-runs (walk op cs′ init r₀ rx step fin) (comb-shut mt)
