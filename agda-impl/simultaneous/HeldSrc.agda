@@ -280,10 +280,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- over read, and the end find one open unless exempt; and a dead
   -- instant stays dead.
   postulate
-    -- THE SCAN'S COUNTERS ARE OF THE ROW'S INSTANT, OR NONE: those an ended
-    -- lane hands a queued lane's burst.
-    held-current   : ∀ rx₁ {q e rx₂} → Met M (rx₁ ++ (q , e) ∷ rx₂) → Visible e
-                   → Flat.held (proj₁ (past op init rx₁)) ≡ 0 ⊎ Flat.at (proj₁ (past op init rx₁)) ≡ nameOf q
     value-open    : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
                   → Σ ℕ λ k → proj₂ (from r₀ (outRows op init rx₁)) ≡ suc k
     over-open     : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
