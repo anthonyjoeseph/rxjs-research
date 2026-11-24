@@ -325,12 +325,12 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
 
     module Shown {q a} (mq : M q (out a)) (cq : instantOf c ≺ⁱ instantOf q) where
       -- Its rows in its start's instant lie before the source value.
-      at-c : ∀ {v} → instantOf v ≡ instantOf c → instantOf v ≺ⁱ instantOf q
-      at-c vc = subst (_≺ⁱ instantOf q) (sym vc) cq
+      at-c : ∀ v → instantOf v ≡ instantOf c → instantOf v ≺ⁱ instantOf q
+      at-c v vc = subst (_≺ⁱ instantOf q) (sym vc) cq
 
       shown-M : ∀ {k e} → σ₃ k e → instantOf k ≡ instantOf c → ∀ {b} → e ≡ out b → ¬ ¬ M (k ⊕ [ sub LS.J ]) (out (Lr b))
       shown-M {k} σk kc {b} refl κ =
-        lane-shown σk (mq′ mq) (≺→≼ {k ⊕ [ sub LS.J ]} {q} (instant-≺ (k ⊕ [ sub LS.J ]) q (at-c (trans (inst-⊕ k [ sub LS.J ]) kc))))
+        lane-shown σk (mq′ mq) (≺→≼ {k ⊕ [ sub LS.J ]} {q} (instant-≺ (k ⊕ [ sub LS.J ]) q (at-c (k ⊕ [ sub LS.J ]) (trans (inst-⊕ k [ sub LS.J ]) kc))))
           λ (z′ , e″ , m′ , _ , _ , pr) → κ (subst₂ M (proj₁ (pr refl)) (proj₂ (pr refl)) (toM m′))
 
       next-at : ∀ {w k b} → σ₃ k (out b) → instantOf k ≡ instantOf c → (c ⊕ [ sub w ]) ≺ k
@@ -350,7 +350,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
              next-at σEb eb-c (start-below w) (λ mb → _ , inj₁ mb) κ
         where
           Fσ : Few σ₃ Eb
-          Fσ = sent-few mq (at-c eb-c)
+          Fσ = sent-few mq (at-c Eb eb-c)
 
           noend : ∀ {d} → R d end → d ≺ Eb → ⊥
           noend = no-end-before xo rn (uncut u-Eb) (λ ld ydEb → nF (dn-failed ld ydEb))
@@ -391,7 +391,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
             noend : ∀ {d} → R d end → d ≺ (fv ⊕ [ ix 0 ]) → ⊥
             noend = no-end-before xo rn (uncut uf₀) λ ld ydv →
               ≺-irrefl {fv ⊕ [ ix 0 ]} (subst (_≺ (fv ⊕ [ ix 0 ])) (lane-once m undone (inner a₀) E₄ g₂ sL oks (fwd ld) tt r′ nkf) ydv)
-        in lane-σ₃ xo rn (back r′ (after r′)) tt (uncut uf₀) (≼-refl {fv ⊕ [ ix 0 ]}) noend (sent-few mq (at-c fc)) λ σf →
+        in lane-σ₃ xo rn (back r′ (after r′)) tt (uncut uf₀) (≼-refl {fv ⊕ [ ix 0 ]}) noend (sent-few mq (at-c (fv ⊕ [ ix 0 ]) fc)) λ σf →
              next-at σf fc (≺-trans {c ⊕ [ sub w ]} {fv} {fv ⊕ [ ix 0 ]} cf (≺-ext fv {ix 0} []))
                (λ mb → nd , inj₂ (kd , subst (λ b′ → M (fv ⊕ [ ix 0 ] ⊕ [ sub LS.J ]) (out (Lr b′))) b≡ mb)) κ
 
