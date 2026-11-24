@@ -388,9 +388,9 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                  , (λ (l′ , ls , e) → l′ ∷ ls , e) ]′
                  (below-or-under fv sL last (≺-trans {fv} {Eb} {sL ⊕ [ last ]} fEb (under-last sL u-s)))
             uf₀ = under-⊕ uf (ix 0)
-            noend : ∀ {d} → R d end → d ≺ fv ⊕ [ ix 0 ] → ⊥
+            noend : ∀ {d} → R d end → d ≺ (fv ⊕ [ ix 0 ]) → ⊥
             noend = no-end-before xo rn (uncut uf₀) λ ld ydv →
-              ≺-irrefl {fv ⊕ [ ix 0 ]} (subst (_≺ fv ⊕ [ ix 0 ]) (lane-once m undone (inner a₀) E₄ g₂ sL oks (fwd ld) tt r′ nkf) ydv)
+              ≺-irrefl {fv ⊕ [ ix 0 ]} (subst (_≺ (fv ⊕ [ ix 0 ])) (lane-once m undone (inner a₀) E₄ g₂ sL oks (fwd ld) tt r′ nkf) ydv)
         in lane-σ₃ xo rn (back r′ (after r′)) tt (uncut uf₀) (≼-refl {fv ⊕ [ ix 0 ]}) noend (sent-few mq (at-c fc)) λ σf →
              next-at σf fc (≺-trans {c ⊕ [ sub w ]} {fv} {fv ⊕ [ ix 0 ]} cf (≺-ext fv {ix 0} []))
                (λ mb → nd , inj₂ (kd , subst (λ b′ → M (fv ⊕ [ ix 0 ] ⊕ [ sub LS.J ]) (out (Lr b′))) b≡ mb)) κ
