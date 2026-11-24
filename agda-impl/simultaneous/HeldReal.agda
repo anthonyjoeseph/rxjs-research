@@ -229,13 +229,13 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- started and not ended is empty there.
   --
   -- REFUTED: 9e244736 `lanes-by` unrestricted, by a switch whose cut lane loops: the scan meets the next value's lane start the real flatMap never reaches, and drops the cut lane from its count
-  lanes-by : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
+  lanes-by : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z → OutPast z
            → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
            → ∀ {I} → (∀ {k e′} → (k , e′) ∈ r₁ → ¬ (I ≺ⁱ instantOf k)) → ¬ (I ≺ⁱ instantOf z₀)
            → ∀ {v} → Few R v → I ≺ⁱ instantOf v
            → RV.LanesBy op I
-  lanes-by r₁ mt mz₀ le a0 q0 {I} rI Iz Fv Iv {q} {a} x rn nc ¬g =
-    lane-started r₁ mt mz₀ le q0 Fv (ins-lt Iz Iv) x rn nc λ si →
+  lanes-by r₁ mt mz₀ le ow a0 q0 {I} rI Iz Fv Iv {q} {a} x rn nc ¬g =
+    lane-started r₁ mt mz₀ le ow q0 Fv (ins-lt Iz Iv) x rn nc λ si →
       AC.drained r₁ (λ xs y ys eq → past-active op init xs y (no-end r₁ mt xs eq))
         (λ { (_ , _ , _ , _ , refl , _) → refl }) (λ { (_ , _ , _ , _ , _ , refl , _) → refl })
         (λ _ _ _ _ _ _ → start-one) (done-live r₁ mt) a0 (a , x , rn) si (cut-never r₁ mt x nc) done-by
@@ -261,19 +261,19 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- has few rows before a later instant's row.
   --
   -- REFUTED: 9e244736 `lanes-ended` unrestricted, by a switch whose cut lane loops: the lane never ends, the switch's count drops it at the cut, and the scan meets the closer's `outerDone` with no lane running or queued
-  lanes-ended : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
+  lanes-ended : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z → OutPast z
               → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
               → ∀ {I} → (∀ {k e′} → (k , e′) ∈ r₁ → ¬ (I ≺ⁱ instantOf k)) → ¬ (I ≺ⁱ instantOf z₀)
               → ∀ {q} → Few R q → I ≺ⁱ instantOf q
               → ¬ ¬ Σ Pos λ y → σ₃ y end × ¬ (I ≺ⁱ instantOf y)
-  lanes-ended r₁ mt {z₀} mz₀ le a0 q0 {I} rI Iz Fq Iq ¬g =
+  lanes-ended r₁ mt {z₀} mz₀ le ow a0 q0 {I} rI Iz Fq Iq ¬g =
     real-ends op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
       (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
       (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂)
       (shows-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂))
       (λ a s′ oks → shows-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂ s′ oks)
       ro-before (proj₁ Fq , λ x lt → proj₂ Fq (R-from x) lt) Iq
-      (outer-at (outer-by mz₀)) (lanes-by r₁ mt mz₀ le a0 q0 rI Iz Fq Iq)
+      (outer-at (outer-by mz₀)) (lanes-by r₁ mt mz₀ le ow a0 q0 rI Iz Fq Iq)
       λ (y , ry , iy) → ¬g (y , (R-from ry , λ {c′} rc → subst (y ≼_) (end-uniq I₃ (R-from ry) rc) (≼-refl {y})) , iy)
     where
       outer-at : RV.OuterBy (instantOf z₀) → RV.OuterBy I
@@ -342,15 +342,15 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   -- NO VISIBLE ROW OF THE SOURCE PAST A ROW `w` NO ROW MET PASSES LIES IN
   -- A LATER INSTANT: the outer has ended under the mark, the closer ends
   -- in its instant, and the lanes by `w`'s.
-  idle-ends : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z
+  idle-ends : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {z₀ n} → M z₀ (out (just (inj₁ (closeB , instEmit (mark outerDone) n)))) → z₀ ≼ z → OutPast z
             → Flat.active (proj₁ (past op init r₁)) ≡ 0 → Flat.queue (proj₁ (past op init r₁)) ≡ 0
             → ∀ {w ew} → M w ew → (∀ {k e′} → (k , e′) ∈ r₁ → ¬ (instantOf w ≺ⁱ instantOf k)) → ¬ (instantOf w ≺ⁱ instantOf z₀)
             → ∀ {q a} → M q (out a) → Few R q → w ≺ q → instantOf w ≡ instantOf q
-  idle-ends r₁ mt mz₀ le a0 q0 {w} mw rI Iz {q} mq Fq wq with close-sent mz₀
+  idle-ends r₁ mt mz₀ le ow a0 q0 {w} mw rI Iz {q} mq Fq wq with close-sent mz₀
   ... | y₂′ , w′ , σd , refl with CD.done-under (proj₁ σd) | closer-ends σd
   ...   | y₁ , e₁ , (ws , refl) | y₂ , e₂ , i₂ =
     decidable-stable (instantOf w ≟ⁱ instantOf q) λ ne →
-      lanes-ended r₁ mt mz₀ le a0 q0 rI Iz Fq (lt ne) λ (y₃ , e₃ , i₃) →
+      lanes-ended r₁ mt mz₀ le ow a0 q0 rI Iz Fq (lt ne) λ (y₃ , e₃ , i₃) →
         src-ends e₁ e₂ e₃ mw mq (lt ne)
           (ins-le Iz (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₁ h))) (ins-le Iz (λ h → irrⁱ (subst (instantOf Z ≺ⁱ_) i₂′ h))) i₃
     where
@@ -422,7 +422,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
       go : ∀ b → (isZero (Flat.active s₀) ∧ isZero (Flat.queue s₀)) ≡ b → instantOf z ≡ instantOf q
       go true h with both-zero (Flat.active s₀) (Flat.queue s₀) h
-      ... | a0 , q0 = idle-ends r₁ mt′ mz (≼-refl {z}) a0 q0 mz (before-z r₁ mt′) irrⁱ (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) Fq zq
+      ... | a0 , q0 = idle-ends r₁ mt′ mz (≼-refl {z}) (z , _ , mz , ≼-refl {z}) a0 q0 mz (before-z r₁ mt′) irrⁱ (proj₁ (run-row∈ mt (∈-++⁺ʳ (r₁ ++ (z , out xz) ∷ r₂) (here refl)))) Fq zq
       go false h = ⊥-elim (nz (trans (cong (λ o → Flat.outer (proj₁ o)) split≡) (ℕP.n≤0⇒n≡0 (Within.le Wo))))
         where
           oz : Flat.outer (proj₁ (react op (past op init r₁) xz)) ≡ 0
@@ -504,7 +504,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
              → Flat.active (proj₁ (past op init r₁)) ℕ.∸ 1 ≡ 0 → instantOf d ≡ instantOf q
   held-final r₁ {d} r₂ {q} {a} {rx₂} mt Fq (b , kd , nd , refl) q0 fi a0 with finished-from op r₁ fi | next-row r₂ {(q , out a)} {rx₂}
   ... | a₁ , k , _ , a₂ , r₁≡ , (bk , nk , refl) | (z , e′) , r₂′ , nx =
-    idle-ends rp mtp mz₀ (≺→≼ {k} {z} (met-before rp mtp (∈-++⁺ˡ k-in))) a0′ q0′ md rI (before-z r₁ mt₁ k-in) mq Fq dq
+    idle-ends rp mtp mz₀ (≺→≼ {k} {z} (met-before rp mtp (∈-++⁺ˡ k-in))) (q , a , mq , zq) a0′ q0′ md rI (before-z r₁ mt₁ k-in) mq Fq dq
     where
       xd′ : Maybe (Input B)
       xd′ = just (inj₁ (b , instEmit (mark (laneDone kd)) nd))
@@ -541,6 +541,12 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
       dq : d ≺ q
       dq = met-before (r₁ ++ (d , out xd′) ∷ r₂) mt (∈-++⁺ʳ r₁ (here refl))
+
+      zq : z ≼ q
+      zq with subst (λ L → (q , out a) ∈ L) nx (∈-++⁺ʳ r₂ (here refl))
+      ... | here eq = subst (λ x → x ≼ q) (cong proj₁ eq) (≼-refl {q})
+      ... | there j with run-tail rp mtp
+      ...   | _ ∷ᴿ rn = ≺→≼ {z} {q} (run-after rn j)
 
       rI : ∀ {k′ e″} → (k′ , e″) ∈ rp → ¬ (instantOf d ≺ⁱ instantOf k′)
       rI i with ∈-++⁻ r₁ i
