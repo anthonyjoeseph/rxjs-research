@@ -65,7 +65,7 @@ import simultaneous.LaneStart as LaneStart
 open import simultaneous.LaneStart using (laneAt)
 import simultaneous.BurstFew as BurstFew
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; laneSrc; laneˢ; shareˢ; counted; framed; undone; Input)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; laneSrc; laneˢ; shareˢ; counted; framed; undone; Input; each)
 
 ------------------------------------------------------------------------
 -- Positions and instants
