@@ -341,17 +341,25 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
 
-  -- A LANE MARK THE SCAN MEETS IS A LANE'S ROW, one `sub J` below it.
-  lane-mark : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx → mk ≡ laneStart ⊎ Σ ℕ (λ kd → mk ≡ laneDone kd)
-            → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark mk) n))
-  lane-mark mt {b = laneB} i _ with lane-run mt
+  -- A MARK THE SCAN MEETS, NO ROUTE AND NO BRACKET, IS A LANE'S ROW, one
+  -- `sub J` below it.
+  lane-row : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx
+           → (Routing mk → ⊥) → (mk ≡ outerOpen → ⊥) → (mk ≡ outerClose → ⊥) → (mk ≡ outerDone → ⊥)
+           → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark mk) n))
+  lane-row mt {b = laneB} i _ _ _ _ with lane-run mt
   ... | rs , pr , run , _ with bproj-mem pr i
   ...   | y , refl , j = y , refl , refl , proj₁ (run-row∈ run j)
-  lane-mark mt {b = outerB} i mk with outer-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk })
-  ...   | refl = ⊥-elim (lane-routing mk (Held.routing H₁ (proj₁ ox)))
-  lane-mark mt {b = closeB} i mk with close-sent (proj₁ (run-row∈ mt i))
-  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk }) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk }))
+  lane-row mt {b = outerB} i nr nop _ _ with outer-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ nop
+  ...   | refl = ⊥-elim (nr (Held.routing H₁ (proj₁ ox)))
+  lane-row mt {b = closeB} i _ _ nc nd with close-sent (proj₁ (run-row∈ mt i))
+  ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) nc nd)
+
+  -- A LANE MARK THE SCAN MEETS IS A LANE'S ROW.
+  lane-mark : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx → mk ≡ laneStart ⊎ Σ ℕ (λ kd → mk ≡ laneDone kd)
+            → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark mk) n))
+  lane-mark mt i mk = lane-row mt i (lane-routing mk) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk })
+    (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk }) (λ { refl → [ (λ ()) , (λ { (_ , ()) }) ]′ mk })
 
   -- A LANE'S `laneDone`s ARE ONE ROW.
   done-one : ∀ {q a y y′ kd kd′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark (laneDone kd)) n)) → RV.Lane op q a y′ (out (instEmit (mark (laneDone kd′)) n′)) → y ≡ y′
@@ -616,6 +624,11 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                 → Met (RV.Lane op q a) (r₁ ++ [ (y , out (instEmit (mark (laneDone kd)) n)) ]) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y
                 → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   lane-done-own = LI.lane-done op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
+
+  -- A LANE'S `burstEnd` CLOSES ITS SUBSCRIBE BURST.
+  lane-burst-own : ∀ {q a y e yb n} (xo : RO q (out a)) (l : RV.Lane op q a y e) → Visible e → Sync (sub-at xo l) y
+                 → RV.Lane op q a yb (out (instEmit (mark burstEnd) n)) → y ≼ yb
+  lane-burst-own = LI.lane-burst op (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
   -- A LANE COUNTS WHAT ITS PROGRAM COUNTS, exempt for its own burst.
   lane-counts-own : ∀ {q a k e} (xo : RO q (out a)) (l : RV.Lane op q a k e) → Counts (RV.Lane op q a) (λ y → Sync (sub-at xo l) y ⊎ Ex cs y)

@@ -107,8 +107,9 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
                in s , oks , fs , es , r , r′
     where V = vals p ok fp ep
 
-  -- THE LANE PART'S SHARE SHOWS NO `laneStart`: its blocker shows nothing,
-  -- and the program below is held where the bounded merge subscribes it.
+  -- THE LANE PART'S SHARE SHOWS NO MARK BUT A ROUTE'S: its blocker shows
+  -- nothing, and the program below is held where the bounded merge
+  -- subscribes it.
   module Share (a : A) (s : Pos) (ok : Ok (Hots env₂) s) (fs : Fr s) (es : Early s) where
     P : Pos
     P = laneAt s
@@ -182,17 +183,18 @@ module LaneOnce (m : Maybe ℕ) {Γ Θ A B} {Fr : Pos → Set} (op : FlatOp) (f 
     blk (just _) {s′} l with each-one (λ _ → []) (hot tS) s′ l
     ... | _ , _ , _ , ()
 
-    share-quiet : ∀ {y n} → enter (ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′) Q y (out (instEmit (mark laneStart) n)) → ⊥
-    share-quiet r with bounded-out 1 fc dQ Q (flat-at m (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ [])) env′ Q r)
+    share-mark : ∀ {mk} → (Routing mk → ⊥) → ∀ {y n} → enter (ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′) Q y (out (instEmit (mark mk) n)) → ⊥
+    share-mark nr r with bounded-out 1 fc dQ Q (flat-at m (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ [])) env′ Q r)
     ... | _ , true  , _ , _ , _ , _ , (l , _) = blk m l
     ... | _ , false , i , s′ , _ , (N , St) , (l , _) =
       let (es′ , oks′ , fs′) = FlatFit.Bd.start-at fc dQ ad′ (inv-ev m (of (true ∷ false ∷ [])) env′ g′) (λ c → inv-ev m (x a lanePart c) env′ g′)
                            (srcE a lanePart tS Lt tee) Q okQ (proj₁ O) (proj₁ (proj₂ O)) (proj₂ (proj₂ O)) 1 i N St
-      in lane-routing (Held.routing (held a Lt s′ oks′ fs′ es′) l)
+      in nr (Held.routing (held a Lt s′ oks′ fs′ es′) l)
       where
         O = of-outer m _ env′ ad′ Q okQ fQ eQ
-        lane-routing : Routing laneStart → ⊥
-        lane-routing ()
+
+    share-quiet : ∀ {y n} → enter (ev m (flatMap (mergeᶠ (just 1)) (x a lanePart) (of (true ∷ false ∷ []))) env′) Q y (out (instEmit (mark laneStart) n)) → ⊥
+    share-quiet = share-mark (λ ())
 
   -- A LANE STARTS ONCE: its two `laneStart`s, read at one admissible, early
   -- subscription, are where its frame shows its first mark.
