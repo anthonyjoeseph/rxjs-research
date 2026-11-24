@@ -369,6 +369,12 @@ Tracks D σ β = ∀ {rs} → Met β rs → Upto D rs → proj₂ (cnt rs) ≡ 0
 tracks-fin : ∀ {A B} {D : Pos → Set} {σ : EmissionSet A} {β : EmissionSet (IE B)} → Σ (List Pos) (λ ks → ∀ {k e} → σ k e → k ∈ ks) → Tracks D σ β
 tracks-fin (ks , h) _ _ _ _ = ks , λ y _ _ → h y
 
+-- A connect empties where its body does: its runs are its body's.
+tracks-conn : ∀ {A B X} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)
+              (IF : ∀ {t} → Lawful t → InvD (H ∪ʰ t) (F (hot t))) p (ok : Ok H p) → Shows (enter s (p ⊕ [ ix 1 ]))
+            → ∀ {D} {τ : EmissionSet X} → Tracks D τ (Connect.β s F p) → Tracks D τ (enter (Op.connect s F) p)
+tracks-conn s F Is IF p ok sh tr m = tr (ConnRun.back s F Is IF p ok sh m)
+
 -- A row one step under `k`, past the cursor: `k` is past it, or is it.
 pre : ∀ cur {k} → After cur (k ⊕ [ ix 0 ]) → After cur k ⊎ cur ≡ just k
 pre nothing  _ = inj₁ tt

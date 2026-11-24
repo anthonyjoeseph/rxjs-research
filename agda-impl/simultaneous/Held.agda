@@ -42,7 +42,7 @@ open import simultaneous.InstEmit using (begin; stop; subscribed; completed; lan
 open import Data.Product using (Σ; _,_)
 open import Data.Unit using (⊤; tt)
 import denotation.Laws.ShowsJoin as SJ
-open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; placed-conn; empty-few; held-cold;
+open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; tracks-ev; placed-conn; empty-few; held-cold;
   held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
 open import simultaneous.Routed using (Adm; PlacedD; Placed; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
@@ -142,11 +142,16 @@ held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
 held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
-  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real; σ₀) in
-  conn-ev m empty _ env cs g p ok ep (tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
-    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀ tracks-trig λ L₁ ok₁ ep₁ → held-in (
-      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁ tracks-closer λ L₂ ok₂ ep₂ → held-in (
-        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ tracks-real λ L₃ ok₃ ep₃ →
+  let open FlatHots m ρ op f s env p using (trig; real; c; p₀; p₀₀; tracks-trig; tracks-closer; tracks-real; σ₀; σ₁; σ₂; env₀; tk) in
+  conn-ev m empty _ env cs g p ok ep (λ _ _ → tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
+    conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀
+      (λ L₁ ok₁ → tracks-ev m closer (connect real (combined op tk)) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ λ L₂ ok₂ →
+                  tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
+                  tracks-trig) λ L₁ ok₁ ep₁ → held-in (
+      conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁
+        (λ L₂ ok₂ → tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
+                    tracks-closer) λ L₂ ok₂ ep₂ → held-in (
+        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ (λ _ _ → tracks-real) λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok fr ep
             (held-trigger m ρ s env cs p g ok ep (fresh-adm eh) fr
               (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }))

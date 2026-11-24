@@ -210,7 +210,7 @@ held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
 held-connect m ρ s b hs hb = ih
   (λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
-    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
+    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (λ _ _ → connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
       held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ ep₀))
   λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
     placed-conn m (annotate (elab ρ s)) _ env g (λ { ((_ , a) , b) → a , λ {c} ci → b (there ci) }) p ok λ L ok₀ →

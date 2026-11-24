@@ -38,7 +38,7 @@ open import simultaneous.HeldScan using (held-scan-den)
 open import simultaneous.HeldTake using (held-take-den)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
-open import simultaneous.HeldConnect using (held-conn; early-inst; Tracks)
+open import simultaneous.HeldConnect using (held-conn; early-inst; Tracks; tracks-conn)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Ok; InvD; Lawful; _∪ʰ_)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
@@ -472,8 +472,10 @@ shows-ev (just k) A′ env g p ok = k-shows λ n → sk-approx n k A′ env g p 
 -- A connect shows its body, read over its source made hot.
 conn-ev : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) cs → GoodEnv env
         → ∀ p → Ok (Hots env) p → Early p
-        → Tracks (Few (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (enter (ev m A′ env) (p ⊕ [ ix 1 ]))
-                 (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ]))
+        → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
+           → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ])
+           → Tracks (Few (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (enter (ev m A′ env) (p ⊕ [ ix 1 ]))
+                    (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ])))
         → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
            → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ]) → Early (p ⊕ [ ix 0 ])
            → HeldIn (Few (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
@@ -481,17 +483,41 @@ conn-ev : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ 
         → Held (enter (ev m (connect A′ B′) env) p) (p ∷ cs)
 conn-ev nothing A′ B′ env cs g p ok ep tr k =
   held-conn (⟦ A′ ⟧ env) (λ h → ⟦ B′ ⟧ (h ∷ env)) Is IF p ok cs (shows-ev nothing A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
-    (k (src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) (body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok)
-       (early-inst [ ix 0 ] ep)) tr
+    (k L ok′ (early-inst [ ix 0 ] ep)) (tr L ok′)
   where
     Is = inv-⟦⟧ A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (⟦ B′ ⟧ (hot t ∷ env))
     IF L = inv-⟦⟧ B′ (hot _ ∷ env) (good-cons L g)
+    L = src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok
+    ok′ = body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok
 conn-ev (just n) A′ B′ env cs g p ok ep tr k =
   held-conn (approx n A′ env) (λ h → approx n B′ (h ∷ env)) Is IF p ok cs (shows-ev (just n) A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
-    (k (src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
-       (body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
-       (early-inst [ ix 0 ] ep)) tr
+    (k L ok′ (early-inst [ ix 0 ] ep)) (tr L ok′)
+  where
+    Is = inv-approx n A′ env g
+    IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
+    IF L = inv-approx n B′ (hot _ ∷ env) (good-cons L g)
+    L = src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok
+    ok′ = body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok
+
+-- A connect empties where its body does.
+tracks-ev : ∀ m {Δ X B Y} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) → GoodEnv env
+          → ∀ p → Ok (Hots env) p → ∀ {D} {τ : EmissionSet Y}
+          → (Lawful (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ])))
+             → Ok (Hots env ∪ʰ Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) (p ⊕ [ ix 0 ])
+             → Tracks D τ (enter (ev m B′ (hot (Proper (enter (ev m A′ env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ])))
+          → Tracks D τ (enter (ev m (connect A′ B′) env) p)
+tracks-ev nothing A′ B′ env g p ok tr =
+  tracks-conn (⟦ A′ ⟧ env) (λ h → ⟦ B′ ⟧ (h ∷ env)) Is IF p ok (shows-ev nothing A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
+    (tr (src-lawful {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok) (body-ok {s = ⟦ A′ ⟧ env} {F = λ h → ⟦ B′ ⟧ (h ∷ env)} Is IF p ok))
+  where
+    Is = inv-⟦⟧ A′ env g
+    IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (⟦ B′ ⟧ (hot t ∷ env))
+    IF L = inv-⟦⟧ B′ (hot _ ∷ env) (good-cons L g)
+tracks-ev (just n) A′ B′ env g p ok tr =
+  tracks-conn (approx n A′ env) (λ h → approx n B′ (h ∷ env)) Is IF p ok (shows-ev (just n) A′ env g (p ⊕ [ ix 1 ]) (ok-step p ok))
+    (tr (src-lawful {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok)
+        (body-ok {s = approx n A′ env} {F = λ h → approx n B′ (h ∷ env)} Is IF p ok))
   where
     Is = inv-approx n A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
@@ -596,15 +622,13 @@ module FlatHots (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   M : EmissionSet (Maybe (Input B))
   M = enter (ev m src env′) P
 
-  -- EACH CONNECT OF THE FLATMAP LETS ITS BODY EMPTY ONLY ONCE ITS SOURCE
-  -- IS DONE WITH THE INSTANT: the outer read through the closer and the
-  -- real flatMap, the real flatMap's rows read by the scan, which parks
-  -- what it cuts while a connect in scope holds a route.
+  -- THE SCAN EMPTIES ONLY ONCE THE OUTER AND THE CLOSER ARE DONE WITH THE
+  -- INSTANT: the connects between them run the scan as their body, and
+  -- the scan reads the outer itself, parking what it cuts while a connect
+  -- in scope holds a route.
   postulate
-    tracks-trig   : ∀ {D} → Tracks D (enter (ev m trig env₀) (c ⊕ [ ix 1 ]))
-                           (enter (ev m (connect (closer {B = B}) (connect real (combined op tk))) (hot σ₁ ∷ env₀)) p₀)
-    tracks-closer : ∀ {D} → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ]))
-                           (enter (ev m (connect real (combined op tk)) (hot σ₂ ∷ hot σ₁ ∷ env₀)) p₀₀)
+    tracks-trig   : ∀ {D} → Tracks D (enter (ev m trig env₀) (c ⊕ [ ix 1 ])) scanned
+    tracks-closer : ∀ {D} → Tracks D (enter (ev m (closer {B = B}) (hot σ₁ ∷ env₀)) (p₀ ⊕ [ ix 1 ])) scanned
 
   -- The scan, read only where the real flatMap has few rows before.
   --
