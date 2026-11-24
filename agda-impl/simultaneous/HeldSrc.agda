@@ -31,7 +31,7 @@ open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.Empty using (⊥; ⊥-elim)
-open import Data.List.Relation.Unary.Any using (there)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import simultaneous.InstEmit using (begin; completed; instEmit; value; mark; over; outerOpen; outerDone)
 open import Data.Product using (_×_; _,_; proj₁; Σ; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -51,7 +51,7 @@ open import simultaneous.HeldBase using (Bound; shows-ev; EnvHeld; module FlatHo
 open import simultaneous.Routed using (Placed; Adm; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
 open import simultaneous.FlatLanes using (end-last; BProj; past-within; within-of; within₀; co)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ʳ)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; elab; srcLane; laneSrc; annotate; marked; trackers; closer; combined; laneˢ; each; coldˢ;
   Input; react; going; fed; opening; anyHolds; branch; restamp; wrapped; Out; cut; left)
@@ -288,8 +288,6 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                   → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
     outer-tot     : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
                   → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
-    close-tot     : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (closeB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
-                  → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
     over-tot      : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
                   → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
                   → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
@@ -307,6 +305,15 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- no route of the instant last begun, finitely many rows of it follow,
     -- outer, branches and trackers together.
     scan-rest     : Rest scanned
+
+  -- The closer sends only marks it closes with: no value, no completion.
+  close-tot : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (closeB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+            → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  close-tot rx₁ {x = x} mt o _ = ⊥-elim (no-open (m-rows (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) tt) o)
+    where
+      no-open : ∀ {q′} → MRow q′ (out (just (inj₁ (closeB , x)))) → Opens x → ⊥
+      no-open (close y) o-value = closing-value (close-marks y)
+      no-open (close y) o-done  = closing-mark (close-marks y) (λ ()) (λ ())
 
   value-tot : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
             → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
