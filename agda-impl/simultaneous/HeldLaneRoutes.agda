@@ -502,17 +502,20 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   ... | inj₂ (y₀ , eq , v₀ , i , rest) = inj₂ (y₀ , eq , v₀ , ∈-++⁺ˡ i , rest)
 
   -- A LANE'S ROWS A PREFIX MET ARE A RUN OF THE LANE: each its lane's first
-  -- past the last, since the source meets an earlier lane row first.
+  -- past the last, since the source meets an earlier lane row first, and
+  -- so, with the row met next, if it is the lane's.
+  own-snoc : ∀ r {x rx₂} → Met M (r ++ x ∷ rx₂) → ∀ {q a c v} → RO q (out a) → (oc : OC q r c) → (le : LaneEmit q x v)
+           → Met (RV.Lane op q a) (lane-rows (oc-in oc le))
   own-run : ∀ r {z e rx₂} → Met M (r ++ (z , e) ∷ rx₂) → ∀ {q a c} → RO q (out a) → (oc : OC q r c) → Met (RV.Lane op q a) (lane-rows oc)
   own-run _ mt xo oc[] = []ᴿ
-  own-run _ {z} {e} {rx₂} mt {q} {a} xo (oc-in {r} {x = x} {v = v} oc (a′ , y , xo′ , x≡ , l′)) =
+  own-run _ {z} {e} {rx₂} mt xo (oc-in {r} {x = x} oc le) = own-snoc r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc le
+  own-run _ {z} {e} {rx₂} mt xo (oc-out {r} {x = x} oc _) = own-run r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc
+
+  own-snoc r {x} {rx₂} mt {q} {a} {v = v} xo oc (a′ , y , xo′ , x≡ , l′) =
     run-++ rec ((lane-seen xo l , tt , aft (rows-last oc) , least) ∷ᴿ []ᴿ)
     where
-      mt′ : Met M (r ++ x ∷ ((z , e) ∷ rx₂))
-      mt′ = subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt
-
       rec : Met (RV.Lane op q a) (lane-rows oc)
-      rec = own-run r mt′ xo oc
+      rec = own-run r mt xo oc
 
       l : RV.Lane op q a y (out v)
       l = subst (λ b → RV.Lane op q b y (out v)) (sym (ro-func xo xo′)) l′
@@ -522,16 +525,15 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       aft (inj₂ (y₀ , eq , v₀ , i₀ , a₀ , xo₀ , l₀)) =
         subst (λ c → After c y) (sym eq)
           (J-reflect xo (subst (λ b → RV.Lane op q b y₀ (out v₀)) (sym (ro-func xo xo₀)) l₀) l
-            (subst ((y₀ ⊕ [ sub LS.J ]) ≺_) (cong proj₁ x≡) (met-before r mt′ i₀)))
+            (subst ((y₀ ⊕ [ sub LS.J ]) ≺_) (cong proj₁ x≡) (met-before r mt i₀)))
 
       least : ∀ {k e′} → RV.Lane op q a k e′ → Visible e′ → After (cursor nothing (lane-rows oc)) k → y ≼ k
       least {e′ = end}   lk _ _ ky = proj₂ (proj₁ (lane-seen xo l)) lk ky
       least {k} {out b}  lk _ ak ky =
-        let (_ , j) = in-rows oc (catch r mt′ xo x≡ l lk ky) (a , k , xo , refl , lk)
+        let (_ , j) = in-rows oc (catch r mt xo x≡ l lk ky) (a , k , xo , refl , lk)
         in ≺-irrefl {k} (run-below rec ak j)
       least {e′ = skip}  _ () _
       least {e′ = pin _} _ () _
-  own-run _ {z} {e} {rx₂} mt xo (oc-out {r} {x = x} oc _) = own-run r (subst (Met M) (++-assoc r [ x ] ((z , e) ∷ rx₂)) mt) xo oc
 
   -- A LANE'S UNDONE EMIT, NO PIECE'S MARK, IS MET PAST ITS `laneStart`:
   -- the lane shows the mark before it, never cut between, so the lanes

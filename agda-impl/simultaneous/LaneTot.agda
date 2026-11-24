@@ -9,10 +9,12 @@ module simultaneous.LaneTot where
 import Data.List as L
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Membership.Propositional using (_∈_; find)
-open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ)
-open import Data.List.Relation.Unary.Any using (Any; here; there)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ; ∈-++⁺ˡ; ∈-∃++)
+open import Data.List.Properties using (++-assoc)
+open import Data.List.Relation.Unary.Any using (Any; here; there; any?)
 open import Data.Maybe using (Maybe; just)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
+import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
@@ -28,13 +30,15 @@ open import denotation.Position using (Pos; root; _≟ᵖ_; ix; sub; _⊕_; insi
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≼_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful; ok-step; ⊑-≼)
-open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺)
+open import denotation.Laws.Modulus using (≺-absurd; ≺-≼-≺; ≺-irrefl)
 open import simultaneous.SObs using (lone; module Elaborate; Flat; laneB; outerB; closeB)
-open import simultaneous.InstEmit using (instEmit; mark; over; stop; laneStart; laneDone; valuesOf)
+open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone; burstEnd;
+  outerDone; subscribed; completed; valuesOf)
 open import simultaneous.Relations using (Met)
 open import simultaneous.Readings using (rootOf; instantOf)
-open import simultaneous.Routed using (Held; Early; Placed; Ex; Sync; Carried; c-value; c-stop; c-done; c-over; nameOf; nm; Valued; opos)
+open import simultaneous.Routed using (Held; Early; Placed; Ex; Sync; Carried; cnt; c-value; c-stop; c-done; c-over; nameOf; nm; Valued; opos)
 open import simultaneous.HeldConnect using (early-inst; rootOf-ext)
+open import simultaneous.HeldTake using (ex-ext)
 open import simultaneous.Layers using () renaming (run-row to run-row∈)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.RealView using (lane-at)
@@ -50,7 +54,7 @@ open import simultaneous.HeldSrc using (module CombSrc; Opens; o-value; o-done)
 open import simultaneous.HeldLanes using (module CombLanes; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; each; laneˢ)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; each; laneˢ; count)
 
 module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -70,7 +74,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
-  open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (oc-total)
+  open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (oc-total; oc[]; oc-in; oc-out)
 
   -- Whether a row lies in a subscription's burst.
   sync? : ∀ c y → Dec (T (inside c y) × rootOf y ≡ rootOf c)
@@ -137,23 +141,86 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
                → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
                → Σ ℕ λ k → tot (St rx₁) ≡ suc k
 
-    -- PAST ITS BURST A LANE COUNTS A ROUTE OF ITS ROW'S INSTANT: its own
-    -- program holds there (`IH`), and the lane's count is its program's.
-    lane-own : ∀ rx₁ {y v rx₂} → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
-             → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ Sync (sub-at xo l) y → Carried (out v)
-             → ¬ Ex cs′ (y ⊕ [ sub LS.J ]) → ∀ {c} → OC Q rx₁ c → Σ ℕ λ k → c ≡ (nameOf y , suc k)
+    -- A LANE'S STOP ENDS A ROUTE IT COUNTS: the lane's count is its
+    -- program's, whose stops end a route it holds.
+    lane-exact : ∀ {q a} → RO q (out a) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
+               → Σ ℕ λ k → proj₂ (cnt r₁) ≡ suc k
 
-    -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`.
-    start-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark laneStart) n) → OC q xs c
-              → proj₂ c ≡ 0
+    -- PAST ITS BURST, A ROW A LANE CARRIES FINDS A ROUTE OF ITS INSTANT
+    -- the lane counts, unless exempt: its program's rows do.
+    lane-covered : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y e} r₂ → rs ≡ r₁ ++ (y , e) ∷ r₂
+                 → (l : RV.Lane op q a y e) → Carried e → ¬ Sync (sub-at xo l) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
 
-    -- A LANE'S STOP ENDS A ROUTE OF ITS OWN INSTANT THE LANE COUNTS.
-    stop-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark stop) n) → OC q xs c
-             → proj₁ c ≡ nameOf (proj₁ x) × ¬ proj₂ c ≡ 0
+    -- IN A BURST, A LANE'S STOP ENDS A ROUTE OF ITS OWN INSTANT.
+    stop-ex : ∀ {q a} (xo : RO q (out a)) → ∀ {rs} → Met (RV.Lane op q a) rs → ∀ r₁ {y n} r₂ → rs ≡ r₁ ++ (y , out (instEmit (mark stop) n)) ∷ r₂
+            → (l : RV.Lane op q a y (out (instEmit (mark stop) n))) → Sync (sub-at xo l) y ⊎ Ex cs y → proj₁ (cnt r₁) ≡ nameOf y
 
     -- A LANE ENDS COUNTING NOTHING, or routes of its end's own instant.
     done-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q kd n c} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → OC q xs c
              → proj₂ c ≡ 0 ⊎ proj₁ c ≡ nameOf (proj₁ x)
+
+  -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`: a begin of it would
+  -- follow a `laneStart` of it, and it starts once.
+  start-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark laneStart) n) → OC q xs c
+            → proj₂ c ≡ 0
+  start-own xs {rest = rest} mt {q} (a , y , xo , refl , l) oc = aux oc (λ i lu → no-begin i lu)
+    where
+      no-begin : ∀ {u n′} → u ∈ xs → LaneEmit q u (instEmit (mark begin) n′) → ⊥
+      no-begin {u} i lu with ∈-∃++ i
+      ... | a₁ , b₁ , refl with find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ()))
+      ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) with ro-func xo xo₀
+      ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]}
+                  (subst (_≺ y ⊕ [ sub LS.J ]) (cong (_⊕ [ sub LS.J ]) (start-once xo l₀ l)) (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀)))
+
+      step : ∀ {c} v → proj₂ c ≡ 0 → (∀ {n′} → v ≡ instEmit (mark begin) n′ → ⊥) → proj₂ (count {B} c v) ≡ 0
+      step (instEmit (mark begin) _) _ nb = ⊥-elim (nb refl)
+      step (instEmit (mark stop) _)  z _  = cong (ℕ._∸ 1) z
+      step (instEmit (mark over) _)  _ _  = refl
+      step (instEmit (value _) _)    z _  = z
+      step (instEmit (mark outerOpen) _)    z _ = z
+      step (instEmit (mark outerClose) _)   z _ = z
+      step (instEmit (mark laneStart) _)    z _ = z
+      step (instEmit (mark (laneDone _)) _) z _ = z
+      step (instEmit (mark burstEnd) _)     z _ = z
+      step (instEmit (mark outerDone) _)    z _ = z
+      step (instEmit (mark subscribed) _)   z _ = z
+      step (instEmit (mark completed) _)    z _ = z
+
+      aux : ∀ {pre c} → OC q pre c → (∀ {u n′} → u ∈ pre → LaneEmit q u (instEmit (mark begin) n′) → ⊥) → proj₂ c ≡ 0
+      aux oc[] _ = refl
+      aux (oc-out oc _) nb = aux oc (λ i → nb (∈-++⁺ˡ i))
+      aux (oc-in {p₀} {_} {x₀} {v} oc l′) nb =
+        step v (aux oc (λ i → nb (∈-++⁺ˡ i))) (λ e → nb (∈-++⁺ʳ p₀ (here refl)) (subst (LaneEmit q x₀) e l′))
+
+  -- PAST ITS BURST A LANE COUNTS A ROUTE OF ITS ROW'S INSTANT.
+  lane-own : ∀ rx₁ {y v rx₂} → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
+           → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ Sync (sub-at xo l) y → Carried (out v)
+           → ¬ Ex cs′ (y ⊕ [ sub LS.J ]) → ∀ {c} → OC Q rx₁ c → Σ ℕ λ k → c ≡ (nameOf y , suc k)
+  lane-own rx₁ {y} {v} mt {Q} {a} xo l ns car nx oc =
+    let (k , e) = lane-covered xo (own-snoc rx₁ mt xo oc (a , y , xo , refl , l)) (lane-rows oc) [] refl l car ns
+                    (λ ex → nx (there (there (there (there (there (ex-ext [ sub LS.J ] ex)))))))
+    in k , trans (sym (cnt-lane oc)) e
+
+  -- A LANE'S STOP ENDS A ROUTE OF ITS OWN INSTANT THE LANE COUNTS.
+  stop-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark stop) n) → OC q xs c
+           → proj₁ c ≡ nameOf (proj₁ x) × ¬ proj₂ c ≡ 0
+  stop-own xs mt {q} {n} le@(a , y , xo , refl , l) oc =
+    trans (sym (cong proj₁ c≡)) (trans name (cong nm (rootOf-ext y [ sub LS.J ]))) ,
+    λ z → 0≢suc (trans (sym z) (trans (sym (cong proj₂ c≡)) (proj₂ (lane-exact xo rn (lane-rows oc) [] refl))))
+    where
+      rn : Met (RV.Lane op q a) (lane-rows oc ++ [ (y , out (instEmit (mark stop) n)) ])
+      rn = own-snoc xs mt xo oc le
+
+      c≡ = cnt-lane oc
+
+      0≢suc : ∀ {k} → 0 ≡ suc k → ⊥
+      0≢suc ()
+
+      name : proj₁ (cnt (lane-rows oc)) ≡ nameOf y
+      name with sync? (sub-at xo l) y | any? (λ c′ → sync? c′ y) cs
+      ... | yes sy | _      = stop-ex xo rn (lane-rows oc) [] refl l (inj₁ sy)
+      ... | no _   | yes ex = stop-ex xo rn (lane-rows oc) [] refl l (inj₂ ex)
+      ... | no ns  | no nx  = cong proj₁ (proj₂ (lane-covered xo rn (lane-rows oc) [] refl l c-stop ns nx))
 
   done-live : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q kd n} → LaneEmit q x (instEmit (mark (laneDone kd)) n) → AC.Live [] xs q
   done-live xs mt le = live-of xs mt le (done-started xs mt le)
