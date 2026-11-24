@@ -87,7 +87,7 @@ open import simultaneous.HeldLanes using (module CombLanes; bproj-back; bproj-me
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
 open import simultaneous.HeldBurst using (module CombBurst)
 open import adequacy.Census using (module Count)
-open import adequacy.Cursor using (Cur; bef; Owes; Slots; Waiting)
+open import adequacy.Cursor using (Cur; bef; Owes; Slots; Waiting; Whole)
 open import denotation.EmissionSet using (module Bounded; module Values)
 
 module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
@@ -521,32 +521,51 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         row    : Lane q₀ a₀ yd (out b₀)
         ends   : Lane q₀ a₀ ce end
 
-    -- THE JOINER'S STATE AT A CURSOR, AS THE SCAN COUNTS IT: the lanes
-    -- begun and the values waiting (adequacy's `Slots`, `Waiting`,
-    -- `Census`), the scan's queue the waiting.
-    record Joined (C : Cur) (st : Flat Pos) : Set where
+    -- THE JOINER'S BOOK AT A CURSOR: the lanes begun and the values
+    -- waiting (adequacy's `Slots`, `Waiting`, `Whole`, `Census`).  `whole`
+    -- and `waiting` pin `ws` to the values passed and not yet started.
+    record Book (C : Cur) : Set where
       field
         {vs ws} : List (Pos × A)
         {n d}   : ℕ
         slots   : Slots Cn.P C vs ws n
         waiting : Waiting C Cn.P RO vs ws (L.map proj₂ ws)
+        whole   : Whole C Cn.P RO vs ws
         census  : Cn.Census C vs (L.length vs) d
         dead    : d + n ≡ L.length vs
         begun   : ∀ {q a y e} → RO q (out a) → Lane q a y e → ¬ Owes C y → (q , a) ∈ vs
-        queue   : Flat.queue st ≡ L.length ws
+
+    -- The book as the scan counts it: its queue the waiting.
+    record Joined (C : Cur) (st : Flat Pos) : Set where
+      field
+        book  : Book C
+        queue : Flat.queue st ≡ L.length (Book.ws book)
+      open Book book public
 
     postulate
       -- A `laneDone` READ IS A LANE'S, ENDING IN ITS INSTANT.
       done-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → LD xl → Done x
-      -- THE SCAN COUNTS THE JOINER: its state before a `laneDone` it
-      -- reads is the joiner's at the cursor before that lane's end.
-      scan-joined : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
-                  → ¬ ¬ Joined (bef (Done.ce D)) (proj₁ (past op init r₁))
+      -- THE JOINER KEEPS A BOOK before a lane end the scan reads: the
+      -- outer values before it are finitely many, each read as an
+      -- `outerOpen`.  Adequacy's `Admit`, `LaneEnd` and `slots-mv` are
+      -- the three steps, there along a machine run.
+      book-at     : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
+                  → ¬ ¬ Book (bef (Done.ce D))
+      -- THE SCAN'S QUEUE COUNTS THE WAITING: an `outerOpen` read for each
+      -- value passed, a `laneStart` for each lane started.
+      queue-counts : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
+                   → (Bk : Book (bef (Done.ce D))) → ¬ ¬ Flat.queue (proj₁ (past op init r₁)) ≡ L.length (Book.ws Bk)
       -- A LANE SUBSCRIBED ONE STEP BELOW A LANE'S END SHOWS ITS START IN
       -- THE END'S INSTANT, past the ended lane's `laneDone`.
       start-shown : op ≡ mergeᶠ (just k) → ∀ {yd w c i q a} → yd ≺ c → Sub i q (c ⊕ [ ix 1 ]) a
                   → ∀ {q′ a′} → M q′ (out a′) → instantOf c ≺ⁱ instantOf q′
                   → ¬ ¬ Σ Pos λ y → Σ Pos λ n → M y (out (LnMk laneStart n)) × (yd ⊕ [ sub w ]) ≺ y × instantOf y ≡ instantOf c
+
+    -- THE SCAN COUNTS THE JOINER: its state before a `laneDone` it reads
+    -- is the joiner's at the cursor before that lane's end.
+    scan-joined : op ≡ mergeᶠ (just k) → ∀ r₁ {x xl r₂} → Met M (r₁ ++ (x , out xl) ∷ r₂) → (D : Done x)
+                → ¬ ¬ Joined (bef (Done.ce D)) (proj₁ (past op init r₁))
+    scan-joined bd r₁ mt D no = book-at bd r₁ mt D λ Bk → queue-counts bd r₁ mt D Bk λ qe → no (record { book = Bk ; queue = qe })
 
     -- With a value waiting every slot is taken, and the queue's head
     -- starts one step below the first owed end.
