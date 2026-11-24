@@ -517,7 +517,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
         at-x   : x ≡ yd ⊕ [ sub w ]
         before : yd ≺ ce
         same   : instantOf ce ≡ instantOf x
-        outer  : RO q₀ (out a₀)
+        val    : RO q₀ (out a₀)
         row    : Lane q₀ a₀ yd (out b₀)
         ends   : Lane q₀ a₀ ce end
 
@@ -578,7 +578,7 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       let open Done D ; open Joined J using (vs; census; dead; begun)
           (Lvs , nx , _) = Cn.nths-split vs Lv
           (i , sb) = Cn.head-at {ws = ws′} Lvs census dead (proj₁ (proj₂ (wf (here refl)))) nx
-                       (_ , _ , begun outer row (λ le → ≺-absurd {yd} {ce} before le) , ends , (λ ()) , ≼-refl {ce})
+                       (_ , _ , begun val row (λ le → ≺-absurd {yd} {ce} before le) , ends , (λ ()) , ≼-refl {ce})
                        (λ (_ , _ , _ , _ , _ , o) → o)
       in i , q , a , sb
 
