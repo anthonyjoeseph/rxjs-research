@@ -282,7 +282,13 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   -- instant stays dead.  What the scan sends is its counters
   -- (`exact-past`), so these are the sent count's.
   postulate
-    value-tot     : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+    -- per branch: a lane's value or completion, the outer's completion,
+    -- the closer's completion.
+    lane-tot      : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (laneB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+                  → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+    outer-tot     : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+                  → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+    close-tot     : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (closeB , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
                   → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
     over-tot      : ∀ rx₁ {q b n rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , instEmit (mark over) n)))) ∷ rx₂)
                   → Flat.spent (proj₁ (past op init rx₁)) ≡ false → ¬ Ex cs′ q
@@ -301,6 +307,12 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     -- no route of the instant last begun, finitely many rows of it follow,
     -- outer, branches and trackers together.
     scan-rest     : Rest scanned
+
+  value-tot : ∀ rx₁ {q b x rx₂} → Met M (rx₁ ++ (q , out (just (inj₁ (b , x)))) ∷ rx₂) → Opens x → ¬ Ex cs′ q
+            → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
+  value-tot rx₁ {b = laneB}  = lane-tot rx₁
+  value-tot rx₁ {b = outerB} = outer-tot rx₁
+  value-tot rx₁ {b = closeB} = close-tot rx₁
 
   -- THE READINGS UNDER THE SCAN'S SOURCE: the outer at its subscription,
   -- the closer over it, the lanes over both.
