@@ -687,10 +687,10 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     name-in {k} e′ = trans (sym (nm-inst (instantOf k))) (trans (cong instant e′) (nm-inst (instantOf z)))
 
     begin-name : ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark begin) n)))) ∈ rx₁ → In k → n ≡ nameOf z
-    begin-name i ik = trans (named (row∈ i)) (in-name ik)
+    begin-name {k} i ik = trans (named (row∈ i)) (in-name {k} ik)
 
     name-begin : ∀ {k b} → (k , out (just (inj₁ (b , instEmit (mark begin) (nameOf z))))) ∈ rx₁ → In k
-    name-begin i = name-in (sym (named (row∈ i)))
+    name-begin {k} i = name-in {k} (sym (named (row∈ i)))
 
     in-after : ∀ xs {k e′} ys → rx₁ ≡ xs ++ (k , e′) ∷ ys → ∀ {k′ e″} → (k′ , e″) ∈ xs → In k′ → In k
     in-after xs {k} {e′} ys eq {k′} i ik =
@@ -758,7 +758,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
       good : ∀ {k e} → (k , e) ∈ rx₁ → Good N In Ov k e
       good {k} i = record
-        { beg = λ { refl → (λ e → name-in (trans (sym (named (row∈ i))) e)) , begin-name i }
+        { beg = λ { refl → (λ e → name-in {k} (trans (sym (named (row∈ i))) e)) , begin-name i }
         ; ov  = λ { ik refl → ovf i ik }
         ; nod = λ { ik refl → nod′ (row∈ i) (before i) ik } }
 

@@ -57,8 +57,11 @@ open import simultaneous.FlatSim using (tot)
 open import simultaneous.HeldSrc using (module CombSrc; Opens; o-value; o-done)
 open import simultaneous.HeldLanes using (module CombLanes; bproj-mem)
 open import simultaneous.HeldLaneRoutes using (module LaneRoutes)
+open import simultaneous.LaneQueued using (module Queued)
+open import simultaneous.FlatHeld using (LD; past-app)
+open import simultaneous.HeldKeep using (Keeps; Along; OverIn; held-on)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; each; laneˢ; count; opening)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (AIE; IE; each; laneˢ; count; opening; Input; Out; react)
 
 module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
@@ -78,6 +81,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   open CombSrc m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open CombLanes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
   open LaneRoutes m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃
+  open Queued m ρ op f s env cs gd eh hf p ok fr ep H₁ tp L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃ using (Hand; queued-hand; module Hand)
   open Lanes {B} op Own (LaneMark laneStart) DoneMark act LaneEmit using (oc-total; oc[]; oc-in; oc-out)
 
   -- Whether a row lies in a subscription's burst.
@@ -130,18 +134,63 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
   Live? : List Row → Set → Set
   Live? rx₁ Ov = Flat.spent (St rx₁) ≡ false ⊎ Ov → Flat.spent (St rx₁) ≡ false
 
-  postulate
-    -- IN A QUEUED LANE'S SUBSCRIBE BURST, a route an ended lane handed on
-    -- (`held`) holds it.  Route: a queued lane subscribes at an earlier
-    -- lane's end; follow the chain of such ends down to one outside its
-    -- own lane's burst (a lane subscribed at its value never ends in its
-    -- burst while a later value is queued), whose count is positive and
-    -- whose `laneDone` hands it to `held`; every row between lies under
-    -- that end, a row of a lane of the chain, none of which cuts `held`.
-    lane-queued : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
-                → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ sub-at xo l ≡ Q ⊕ [ ix 1 ] → Sync (sub-at xo l) y
-                → Carried (out v) → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
-                → Σ ℕ λ k → tot (St rx₁) ≡ suc k
+  -- No routes at all, none held.
+  held-of : ∀ {S} → tot S ≡ 0 → Flat.held S ≡ 0
+  held-of {S} z = ℕP.n≤0⇒n≡0 (subst (Flat.held S ≤_) z
+    (ℕP.≤-trans (ℕP.m≤n+m (Flat.held S) (Flat.outer S ℕ.+ Flat.lanes S)) (ℕP.m≤m+n _ (Flat.parked S))))
+
+  -- IN A QUEUED LANE'S SUBSCRIBE BURST, THE SCAN HOLDS THE ROUTES HANDED
+  -- it: no row read since asks them back (`held-on`).
+  lane-queued : ∀ rx₁ {y v rx₂} (Ov : Set) → Met M (rx₁ ++ (y ⊕ [ sub LS.J ] , out (Ln v)) ∷ rx₂)
+              → ∀ {Q a} (xo : RO Q (out a)) (l : RV.Lane op Q a y (out v)) → ¬ sub-at xo l ≡ Q ⊕ [ ix 1 ] → Sync (sub-at xo l) y
+              → Carried (out v) → OvBefore rx₁ (y ⊕ [ sub LS.J ]) Ov → Live? rx₁ Ov → ¬ Ex cs′ (y ⊕ [ sub LS.J ])
+              → Σ ℕ λ k → tot (St rx₁) ≡ suc k
+  lane-queued rx₁ {y} Ov mt xo l nq sy car ovf res nx =
+    pos-tot λ z₀ → held-on op (nameOf z) o r₂ along at held lv (subst (λ S → Flat.held (proj₁ S) ≡ 0) past≡ (held-of z₀))
+    where
+      z : Pos
+      z = y ⊕ [ sub LS.J ]
+
+      H : Hand rx₁ z
+      H = queued-hand rx₁ mt xo l nq sy car nx
+      open Hand H
+
+      o : Out B
+      o = react op (past op init r₁) xd
+
+      past≡ : past op init rx₁ ≡ past op o r₂
+      past≡ = trans (cong (past op init) split) (past-app op init r₁ (no-end rx₁ mt r₁ split))
+
+      in₁ : ∀ {x} → x ∈ r₂ → x ∈ rx₁
+      in₁ i = subst (_ ∈_) (sym split) (∈-++⁺ʳ r₁ (there i))
+
+      lv : OverIn r₂ → Flat.spent (proj₁ (past op o r₂)) ≡ false
+      lv (a , k , b , n , c , eq) =
+        let i = subst (_ ∈_) (sym eq) (∈-++⁺ʳ a (here refl))
+        in subst (λ S → Flat.spent (proj₁ S) ≡ false) past≡ (res (inj₂ (ovf (in₁ i) (inst i))))
+
+      along : Along op (nameOf z) o r₂
+      along a {q} {x} c eq = keeps x eq (proj₁ (run-row∈ mt (∈-++⁺ˡ (in₁ i)))) (inst i)
+        where
+          i : (q , out x) ∈ r₂
+          i = subst (_ ∈_) (sym eq) (∈-++⁺ʳ a (here refl))
+
+          keeps : ∀ x′ → r₂ ≡ a ++ (q , out x′) ∷ c → M q (out x′) → instantOf q ≡ instantOf z
+                → Keeps (nameOf z) (proj₁ (past op o a)) x′
+          keeps nothing                                          _ _ _ = tt
+          keeps (just (inj₂ _))                                  _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (value _) _)))         _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark begin) _)))      _ mq iq = trans (named mq) (cong (λ w → nm (w ∙ [])) iq)
+          keeps (just (inj₁ (_ , instEmit (mark (laneDone _)) _))) e _ _ = dones a c e
+          keeps (just (inj₁ (_ , instEmit (mark burstEnd) _)))   e _ _ = bursts a c e
+          keeps (just (inj₁ (_ , instEmit (mark stop) _)))       _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark over) _)))       _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark outerOpen) _)))  _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark outerClose) _))) _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark laneStart) _)))  _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark outerDone) _)))  _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark subscribed) _))) _ _ _ = tt
+          keeps (just (inj₁ (_ , instEmit (mark completed) _)))  _ _ _ = tt
 
   -- A projection keeps nothing of another branch's last row.
   bproj-init : ∀ {b} {h : IE A → IE B} {J} rx {q e rs} → BProj b h J (rx ++ (q , e) ∷ []) rs → brTag b e ≡ nothing → BProj b h J rx rs
