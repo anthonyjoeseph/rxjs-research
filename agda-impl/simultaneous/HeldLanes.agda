@@ -66,6 +66,7 @@ import denotation.Read as Run
 import Data.Nat as ℕ
 import Data.Nat.Properties as ℕP
 import denotation.EmissionSet as ES
+open import adequacy.Bound using (lane-st)
 open import simultaneous.RealView using (module View; real-from; real-to; lane-at; lane-at₂; lane-one; join-out; join-in; cutat-up; join-shows)
 open import simultaneous.HeldTake using (module TakeBack)
 open import simultaneous.TakeKit using (ix<last)
@@ -171,10 +172,7 @@ open-routing ()
 
 -- A LANE'S ROWS LIE PAST ITS VALUE.
 lane-past : ∀ {X Y : Set} op (f : X → Den Y) (o : EmissionSet X) {q a y e} → View.Lane f o op q a y e → q ≺ y
-lane-past (mergeᶠ nothing)  f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
-lane-past (mergeᶠ (just n)) f o {q} {y = y} (_ , s′ , (_ , st) , _ , sy) = ≺-trans {q} {s′} {y} (starts-after st) sy
-lane-past switchᶠ           f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
-lane-past exhaustᶠ          f o {q} {y = y} (_ , sy)                  = ≺-trans {q} {q ⊕ [ ix 1 ]} {y} (≺-ext q []) sy
+lane-past op f o {q} {y = y} l = let (s , _ , qs , sy) = lane-st op f o l in ≺-trans {q} {s} {y} qs sy
 
 -- Whether a flatMap is a bounded merge.
 bounded? : ∀ o → (Σ ℕ λ k → o ≡ mergeᶠ (just k)) ⊎ (∀ k → o ≡ mergeᶠ (just k) → ⊥)

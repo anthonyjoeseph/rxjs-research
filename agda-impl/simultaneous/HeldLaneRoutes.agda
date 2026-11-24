@@ -42,7 +42,9 @@ open import denotation.Laws.Truth.Connect.Cuts using (step≼; next≺)
 open import denotation.Laws.Fold using (latest)
 open import denotation.EmissionSet using (Reach; Dep; module Switch)
 open import denotation.Laws.Count using (em; reach-down; child)
-open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-at₂; lane-fwd; lane-one; join-shows)
+open import simultaneous.RealView using (module View; real-to; join-in; cutat-up; lane-at; lane-at₂; lane-fwd; lane-one; join-shows; kill-cut)
+open import adequacy.LaneEnd using (join-end; done-over)
+open import adequacy.Settle using (done-use)
 open import simultaneous.LaneSite using (FoldOf; f-none; f-step; fold-map; Sited; lane-site)
 open import simultaneous.HeldLanes using (lane-past; bproj-mem; bproj-memʰ; open-cut; open-routing)
 open import simultaneous.Layers using (run-tail; run-after; run-++; cursor-snoc; pinby-vis) renaming (run-row to run-row∈)
@@ -87,18 +89,10 @@ open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE;
 -- value and never cut.
 join-done : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {y} → View.Join f o op y end
           → Ended o y × (∀ {q a} → o q (out a) → View.Runs f o op q → q ≺ y → ¬ View.CutAt f o op q y → Ended (View.Lane f o op q a) y)
-join-done (mergeᶠ nothing)  f o (Joining.oend _ d)         = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done (mergeᶠ nothing)  f o (Joining.lend _ _ _ _ _ d) = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done (mergeᶠ nothing)  f o (Joining.rend () _ _)
-join-done (mergeᶠ (just n)) f o (Joining.oend _ d)         = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done (mergeᶠ (just n)) f o (Joining.lend _ _ _ _ _ d) = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done (mergeᶠ (just n)) f o (Joining.rend () _ _)
-join-done switchᶠ           f o (Joining.oend _ d)         = proj₁ d , λ x r qy nc → proj₂ d x r qy nc
-join-done switchᶠ           f o (Joining.lend _ _ _ _ _ d) = proj₁ d , λ x r qy nc → proj₂ d x r qy nc
-join-done switchᶠ           f o (Joining.rend () _ _)
-join-done exhaustᶠ          f o (Joining.oend _ d)         = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done exhaustᶠ          f o (Joining.lend _ _ _ _ _ d) = proj₁ d , λ x r qy _ → proj₂ d x r qy (λ ())
-join-done exhaustᶠ          f o (Joining.rend () _ _)
+join-done op f o {y} r =
+  let jd = join-end op f o r
+  in done-over op jd , λ x ru qy nc → done-use op jd x ru qy λ {q′} kl →
+       [ (λ le → le) , (λ lt → ⊥-elim (nc (kill-cut op f o kl lt))) ]′ (≼-or-≻ y q′)
 
 -- A SWITCH'S END HAS A LAST VALUE PAST ANY BEFORE IT: the end's reach
 -- lists every joiner row before it, each value's silent row among them, so

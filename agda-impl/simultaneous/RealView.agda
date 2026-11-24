@@ -20,6 +20,7 @@ open import denotation.EmissionSet using (DenEnv; enter)
 open import denotation.Laws.Worlds using (InvD; Ok; InvAt; ⊕-injˡ; ok-step; ok-in; ⊑-refl)
 import denotation.Laws.JoinInv as JoinInv
 import adequacy.Cursor as AC
+open import adequacy.Settle using (jlane)
 open import Data.Nat.Properties using (<-cmp)
 open import Relation.Binary.Definitions using (tri<; tri≈; tri>)
 open import denotation.Laws.Shows using (k-shows; shows-k)
@@ -118,13 +119,17 @@ join-out switchᶠ           f o (Joining.run () _)
 join-out exhaustᶠ          f o (Joining.lane x r l nc _) = _ , _ , x , r , l , nc
 join-out exhaustᶠ          f o (Joining.run () _)
 
+-- A kill before `k` is a cut by `k`.
+kill-cut : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q q′ k} → AC.Pol.Kill (AC.polF op f o) q q′ → q′ ≺ k → View.CutAt f o op q k
+kill-cut switchᶠ    f o (a′ , x , lt) lt′ = _ , a′ , x , lt , lt′
+kill-cut (mergeᶠ nothing)  f o ()
+kill-cut (mergeᶠ (just _)) f o ()
+kill-cut exhaustᶠ   f o ()
+
 -- and each lane's working row, run and not cut there, is one.
 join-in : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q a k e} → o q (out a) → View.Runs f o op q
         → View.Lane f o op q a k e → ¬ View.CutAt f o op q k → Work e → View.Join f o op k e
-join-in (mergeᶠ nothing)  f o x r l nc w = Joining.lane x r l (λ ()) w
-join-in (mergeᶠ (just n)) f o x r l nc w = Joining.lane x r l (λ ()) w
-join-in switchᶠ           f o x r l nc w = Joining.lane x r l nc w
-join-in exhaustᶠ          f o x r l nc w = Joining.lane x r l (λ ()) w
+join-in op f o x r l nc w = jlane op x r l (λ kl lt → nc (kill-cut op f o kl lt)) w
 
 -- A CUT BY A ROW IS A CUT BY EVERY LATER ROW.
 cutat-up : ∀ {A B} op (f : A → Den B) (o : EmissionSet A) {q k k′} → k ≺ k′ → View.CutAt f o op q k → View.CutAt f o op q k′
