@@ -198,6 +198,15 @@ lane-of f o (mergeᶠ (just k)) nb l = ⊥-elim (nb k refl)
 lane-of f o switchᶠ           nb l = l
 lane-of f o exhaustᶠ          nb l = l
 
+-- A list split around a row, regrouped at the row.
+end-shape : ∀ {X : Set} (a₁ : List X) c b₁ x ys z r₂ → ((a₁ ++ c ∷ b₁) ++ x ∷ ys) ++ z ∷ r₂ ≡ a₁ ++ c ∷ ((b₁ ++ x ∷ ys) ++ z ∷ r₂)
+end-shape a₁ c b₁ x ys z r₂ = trans (cong (_++ z ∷ r₂) (++-assoc a₁ (c ∷ b₁) (x ∷ ys))) (++-assoc a₁ (c ∷ (b₁ ++ x ∷ ys)) (z ∷ r₂))
+
+-- A list holding a row is not empty.
+held-nonempty : ∀ {X : Set} (b₁ : List X) {x ys w} → (b₁ ++ x ∷ ys) ++ w ≡ [] → ⊥
+held-nonempty []      ()
+held-nonempty (_ ∷ _) ()
+
 module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
@@ -308,13 +317,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   -- The run holds no end before its last row.
   no-end : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs {x ys} → r₁ ≡ xs ++ x ∷ ys → ∀ {c} → (c , end) ∈ xs → ⊥
   no-end r₁ {z} {e} {r₂} mt xs {x} {ys} refl i with ∈-∃++ i
-  ... | a₁ , b₁ , refl = nonempty b₁ (end-last I-M a₁ (subst (Met M) (shape a₁ b₁) mt))
-    where
-      shape : ∀ a₁ b₁ → ((a₁ ++ (_ , end) ∷ b₁) ++ x ∷ ys) ++ (z , e) ∷ r₂ ≡ a₁ ++ (_ , end) ∷ ((b₁ ++ x ∷ ys) ++ (z , e) ∷ r₂)
-      shape a₁ b₁ = trans (cong (_++ (z , e) ∷ r₂) (++-assoc a₁ _ (x ∷ ys))) (++-assoc a₁ _ _)
-      nonempty : ∀ b₁ {w} → (b₁ ++ x ∷ ys) ++ w ≡ [] → ⊥
-      nonempty []      ()
-      nonempty (_ ∷ _) ()
+  ... | a₁ , b₁ , refl = held-nonempty b₁ (end-last I-M a₁ (subst (Met M) (end-shape a₁ _ b₁ x ys (z , e) r₂) mt))
 
   -- A ROW OF THE REAL FLATMAP'S VALUES IS A LANE'S, run and not cut there.
   σ₃-lane : ∀ {y b} → σ₃ y (out b) → Σ Pos λ q → Σ A λ a → RO q (out a) × RV.Runs op q × RV.Lane op q a y (out b) × ¬ RV.CutAt op q y
@@ -341,14 +344,20 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
                        , λ {c} ce → ≺→≼ {y₀} {c} (≺-≼-≺ {y₀} {y} {c} lt (proj₂ σd ce)))
                      , ≺→≼ {y₀} {y} lt
 
+  -- A lane's row the scan meets is one `sub J` below the lane's.
+  opaque
+    lane-row-lane : ∀ {rx} → Met M rx → ∀ {k x} → (k , out (just (inj₁ (laneB , x)))) ∈ rx → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × laneB ≡ laneB × σ₃ y (out x)
+    lane-row-lane mt i =
+      let (rs , pr , run , _) = lane-run mt
+          (y , k≡ , j) = bproj-mem pr i
+      in y , k≡ , refl , proj₁ (run-row∈ run j)
+
   -- A MARK THE SCAN MEETS, NO ROUTE AND NO BRACKET, IS A LANE'S ROW, one
   -- `sub J` below it.
   lane-row : ∀ {rx} → Met M rx → ∀ {k b mk n} → (k , out (just (inj₁ (b , instEmit (mark mk) n)))) ∈ rx
            → (Routing mk → ⊥) → (mk ≡ outerOpen → ⊥) → (mk ≡ outerClose → ⊥) → (mk ≡ outerDone → ⊥)
            → Σ Pos λ y → k ≡ y ⊕ [ sub LS.J ] × b ≡ laneB × σ₃ y (out (instEmit (mark mk) n))
-  lane-row mt {b = laneB} i _ _ _ _ with lane-run mt
-  ... | rs , pr , run , _ with bproj-mem pr i
-  ...   | y , refl , j = y , refl , refl , proj₁ (run-row∈ run j)
+  lane-row mt {b = laneB} i _ _ _ _ = lane-row-lane mt i
   lane-row mt {b = outerB} i nr nop _ _ with outer-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ nop
   ...   | refl = ⊥-elim (nr (Held.routing H₁ (proj₁ ox)))
