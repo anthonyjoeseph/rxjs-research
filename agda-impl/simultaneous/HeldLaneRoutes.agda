@@ -30,6 +30,7 @@ open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 import Data.Sum as Sum
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; cong₂; subst)
 open import Relation.Nullary using (¬_; yes; no; Dec)
+open import Function.Base using (_∋_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; connected; takeWhile; flatMap; of)
@@ -85,7 +86,7 @@ open import simultaneous.LaneSplit using (Ln)
 open import simultaneous.HeldSrc using (module CombSrc; named-at)
 open import simultaneous.HeldLanes using (module CombLanes)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; marked; Out; Input; react; laneˢ; each; shareˢ; counted; framed; undone)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; marked; Out; Input; react; opening; laneˢ; each; shareˢ; counted; framed; undone)
 
 -- A JOINER'S END: its outer has ended there, and every lane run, past its
 -- value and never cut.
@@ -251,7 +252,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- The run holds no end short of its last row.
   end-free : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {c} → (c , end) ∈ rx₁ → ⊥
   end-free rx₁ {z} {e} {rx₂} mt i with ∈-∃++ i
-  ... | a₁ , b₁ , refl = (λ ()) (++-conicalʳ b₁ _ (end-last I-M a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ rx₂)) mt)))
+  ... | a₁ , b₁ , refl = (((z , e) ∷ rx₂ ≡ [] → ⊥) ∋ λ ()) (++-conicalʳ b₁ _ (end-last I-M a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ rx₂)) mt)))
 
   -- EVERY LANE ROW THE SCAN MEETS IS SOME LANE'S EMIT.
   lane-emit : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {k v} → (k , out (Tg laneB v)) ∈ rx₁
@@ -292,16 +293,21 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
   -- AN `outerOpen` THE SCAN MEETS IS AN OUTER VALUE'S, at the source's
   -- reading of the outer's row.
+  open-at : ∀ {c′ x k n} → σ₁ c′ (out x) → k ≡ c′ ⊕ [ sub OS.J ] → opening x ≡ instEmit (mark outerOpen) n
+          → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × outerB ≡ outerB × n ≡ n′
+  open-at {x = instEmit (value a) n′} σc refl refl = _ , a , n′ , σc , refl , refl , refl
+  open-at {x = instEmit (mark _) _}   σc _    refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ σc)))
+
   open-row : ∀ {rx} → Met M rx → ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark outerOpen) n)))) ∈ rx
            → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × b ≡ outerB × n ≡ n′
   open-row mt {b = laneB} i with lane-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
   open-row mt {b = closeB} i with close-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
-  open-row {rx} mt {b = outerB} i with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
-  ... | rs , pr , run , _ with bproj-memʰ pr i
-  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , refl , refl
-  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
+  open-row {rx} mt {b = outerB} i =
+    let (rs , pr , run , _) = OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+        (c′ , x , k≡ , j , hx) = bproj-memʰ pr i
+    in open-at (proj₁ (run-row∈ run j)) k≡ hx
 
   module QL = Count _≟ᵖ_ (rowKind markQue op) (λ q → Σ A λ a → RO q (out a)) OpenMark (LaneMark laneStart) que
 
