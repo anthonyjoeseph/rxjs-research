@@ -19,6 +19,7 @@ import Data.Nat as ℕ
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Bool using (true; false)
+open import Data.Bool.Properties using (¬-not)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (¬_)
 
@@ -513,11 +514,9 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
 
       res′ : Live? r₁ Ov
       res′ (inj₁ e) = e
-      res′ (inj₂ ov) with Flat.spent (St r₁) in e
-      ... | false = refl
-      ... | true  = ⊥-elim (t≢f (trans (sym (subst (λ S → Flat.spent (proj₁ S) ≡ true) (sym past≡)
-                      (spent-on op (nameOf z) (past op init r₁) ((d , out xd) ∷ r₂) AB.named-on (base-at rx₁ T r₁ r₂ sp B₀) e)))
-                      (res (inj₂ ov))))
+      res′ (inj₂ ov) = ¬-not λ e → t≢f (trans (sym (subst (λ S → Flat.spent (proj₁ S) ≡ true) (sym past≡)
+                         (spent-on op (nameOf z) (past op init r₁) ((d , out xd) ∷ r₂) AB.named-on (base-at rx₁ T r₁ r₂ sp B₀) e)))
+                         (res (inj₂ ov)))
 
   -- AT A LANE'S `laneDone`, A LANE QUEUED AT ITS END IS STILL WAITING:
   -- the queued lane is opened before the `laneDone` and started past the

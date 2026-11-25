@@ -104,9 +104,7 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
       no-begin : ∀ {u n′} → u ∈ xs → LaneEmit q u (instEmit (mark begin) n′) → ⊥
       no-begin {u} i lu with ∈-∃++ i
       ... | a₁ , b₁ , refl with find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ()))
-      ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) with ro-func xo xo₀
-      ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]}
-                  (subst (_≺ (y ⊕ [ sub LS.J ])) (cong (_⊕ [ sub LS.J ]) (start-once xo l₀ l)) (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀)))
+      ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) = start-twice xo l xo₀ l₀ (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀))
 
       step : ∀ {c} v → proj₂ c ≡ 0 → (∀ {n′} → v ≡ instEmit (mark begin) n′ → ⊥) → proj₂ (count {B} c v) ≡ 0
       step (instEmit (mark begin) _) _ nb = ⊥-elim (nb refl)
