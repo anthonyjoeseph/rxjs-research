@@ -648,12 +648,17 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
              → RV.Lane op q a y′ (out (instEmit (mark laneStart) n′)) → y ≡ y′
   start-once = LO.start-once (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) fr₁ (early-inst [ ix 1 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
+  -- A lane starts at one row.
+  start-twice : ∀ {q a a′ y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+              → RO q (out a′) → RV.Lane op q a′ y′ (out (instEmit (mark laneStart) n′)) → (y′ ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ]) → ⊥
+  start-twice {y = y} xo l xo′ l′ lt with ro-func xo xo′
+  ... | refl with start-once xo l l′
+  ...   | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} lt
+
   -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q
   start-first r₁ mt xs x ys eq (a , y , n , xo , refl , l) di with find di
-  ... | _ , i , (a′ , y′ , n′ , xo′ , refl , l′) with ro-func xo xo′
-  ...   | refl with start-once xo l l′
-  ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} (met-before xs (split-met r₁ mt xs _ ys eq) i)
+  ... | _ , i , (a′ , y′ , n′ , xo′ , refl , l′) = start-twice xo l xo′ l′ (met-before xs (split-met r₁ mt xs _ ys eq) i)
 
   -- EACH `laneStart` THE SCAN MEETS STARTS A LANE IT MET QUEUED, NEVER MET
   -- START, AND NEVER EMPTIED.
