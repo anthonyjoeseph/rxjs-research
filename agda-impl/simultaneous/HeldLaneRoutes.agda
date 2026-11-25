@@ -293,7 +293,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
   -- AN `outerOpen` THE SCAN MEETS IS AN OUTER VALUE'S, at the source's
   -- reading of the outer's row.
-  open-at : ∀ {c′ x k n} → σ₁ c′ (out x) → k ≡ c′ ⊕ [ sub OS.J ] → opening x ≡ instEmit (mark outerOpen) n
+  open-at : ∀ {c′ x k n} → σ₁ c′ (out x) → k ≡ c′ ⊕ [ sub OS.J ] → opening {A} {B} x ≡ instEmit (mark outerOpen) n
           → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × outerB ≡ outerB × n ≡ n′
   open-at {x = instEmit (value a) n′} σc refl refl = _ , a , n′ , σc , refl , refl , refl
   open-at {x = instEmit (mark _) _}   σc _    refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ σc)))
