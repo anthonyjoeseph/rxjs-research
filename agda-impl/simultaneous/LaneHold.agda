@@ -95,13 +95,18 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                → (l : RV.Lane op q a y (out v)) → Carried (out v) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   lane-covered xo mt r₁ r₂ refl l c ns nx = Counts.cov (lane-counts-own xo l) r₁ (pre r₁ r₂ mt) c [ ns , nx ]′
 
+  -- A lane starts at none of the rows before its start.
+  first-start : ∀ {q a y n} pre → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+              → (∀ {k e} → (k , e) ∈ pre → k ≺ (y ⊕ [ sub LS.J ])) → (Σ _ λ x → x ∈ pre × LaneMark laneStart q x) → ⊥
+  first-start pre xo l bf (_ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀)) = start-twice xo l xo₀ l₀ (bf i₀)
+
   -- No begin of a lane comes before its `laneStart`.
   no-begin : ∀ xs {rest q a y n} → Met M (xs ++ (y ⊕ [ sub LS.J ] , out (Ln (instEmit (mark laneStart) n))) ∷ rest)
            → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
            → ∀ {u n′} → u ∈ xs → LaneEmit q u (instEmit (mark begin) n′) → ⊥
   no-begin xs mt xo l {u} i lu with ∈-∃++ i
-  ... | a₁ , b₁ , refl with find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ()))
-  ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) = start-twice xo l xo₀ l₀ (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀))
+  ... | a₁ , b₁ , refl = first-start a₁ xo l (λ i₀ → met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀))
+                           (find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ())))
 
   -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`: a begin of it would
   -- follow a `laneStart` of it, and it starts once.
