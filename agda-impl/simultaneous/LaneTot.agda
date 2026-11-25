@@ -101,10 +101,11 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
   -- A ROW OF THE LANES THE SOURCE MEETS IS SOME LANE'S EMIT.
   row-emit : ∀ rx₁ {q v rx₂} → Met M (rx₁ ++ (q , out (Ln v)) ∷ rx₂) → Σ Pos λ Q → LaneEmit Q (q , out (Ln v)) v
-  row-emit rx₁ mt with lane-run mt
-  ... | rs , pr , run , _ with bproj-mem pr (∈-++⁺ʳ rx₁ (here refl))
-  ...   | y , refl , j with σ₃-lane (proj₁ (run-row∈ run j))
-  ...     | Q , a , xo , _ , l , _ = Q , a , y , xo , refl , l
+  row-emit rx₁ {v = v} mt =
+    let (rs , pr , run , _) = lane-run mt
+        (y , y≡ , j) = bproj-mem pr (∈-++⁺ʳ rx₁ (here refl))
+        (Q , a , xo , _ , l , _) = σ₃-lane (proj₁ (run-row∈ run j))
+    in Q , a , y , xo , cong (λ k′ → (k′ , out (Ln v))) y≡ , l
 
   -- A lane's value or completion lies before its step's over.
   row-early : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (Ln x)) ∷ rx₂) → Opens x → Early q
@@ -214,6 +215,25 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       rw : ∀ x → ((x ⊕ [ sub q₀ ]) ⊕ [ ix 1 ]) ⊕ [ ix 0 ] ≡ ro-at x
       rw x = trans (⊕-assoc (x ⊕ [ sub q₀ ]) [ ix 1 ] [ ix 0 ]) (⊕-assoc x [ sub q₀ ] (ix 1 ∷ ix 0 ∷ []))
 
+  -- WITH THE OUTER VALUE'S OPEN MET AND NOTHING PAST THE VALUE MET BEFORE
+  -- THE BURST, the outer holds the value's route.
+  cv-at : ∀ rx₁ {r a n Y v} → σ₁ r (out (instEmit (value a) n))
+        → (∀ rs₁ {x′} rs₂ → BProj outerB (opening {A} {B}) OS.J rx₁ (rs₁ ++ (r , out x′) ∷ rs₂) → Met σ₁ (rs₁ ++ (r , out x′) ∷ rs₂) → rs₂ ≡ [])
+        → ¬ Ex ((c ⊕ [ ix 1 ]) ∷ p ∷ cs) r → rootOf Y ≡ rootOf r → Any (OpenMark (ro-at r)) rx₁
+        → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (Y , out (Ln v)) ∷ []) rs′ → Met σ₁ rs′
+        → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf Y , suc k)
+  cv-at rx₁ {r} {a} {n} σr none-past nr ro oa pr′ rσ with find oa
+  ... | _ , xi , (_ , r′ , _ , _ , eq , refl) with ro-inj r r′ eq
+  ...   | refl with bproj-in (bproj-init rx₁ pr′ refl) xi
+  ...     | y′ , x′ , e₁ , _ , j with ⊕-injˡ r y′ e₁
+  ...       | refl with ∈-∃++ j
+  ...         | rs₁ , rs₂ , refl with none-past rs₁ rs₂ (bproj-init rx₁ pr′ refl) rσ
+  ...           | refl with InvAt.func I₁ (proj₁ (proj₁ (run-row∈ rσ (∈-++⁺ʳ rs₁ (here refl))))) (proj₁ σr)
+  ...             | refl =
+    let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs₁ [] refl c-value nr
+    in _ , bproj-init rx₁ pr′ refl , k
+     , trans (from-++ r₀ rs₁ ((r , out (instEmit (value a) n)) ∷ [])) (trans cov (cong (_, suc k) (cong nm (sym ro))))
+
   -- IN THE BURST OF A LANE SUBSCRIBED AT ITS OUTER VALUE, the outer's
   -- route of that value holds it: the outer meets nothing past the value
   -- before the burst does, and the closer's `outerDone` lies past
@@ -224,7 +244,7 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
             → Σ ℕ λ k → tot (St rx₁) ≡ suc k
   lane-room rx₁ {y} {v} {rx₂} Ov mt {a = a} xo l sq sy ovf res nx with ro-row xo
   ... | r , n , σr , refl = pos-tot λ z₀ → met-open rx₁ mt σr rJ λ oa →
-          let (_ , t) = outer-hold rx₁ Ov mt ovf res nod (cv oa) in 0≢suc (trans (sym z₀) t)
+          let (_ , t) = outer-hold rx₁ Ov mt ovf res nod (cv-at rx₁ {Y = Y} {v = v} σr none-past (λ e → nx (subst (Ex cs′) (sym Yr) (ex-below (sub q₀ ∷ zs′) e))) (trans (cong rootOf Yr) (rootOf-ext r (sub q₀ ∷ zs′))) oa) in 0≢suc (trans (sym z₀) t)
     where
       q₀ : Pos
       q₀ = p₀₀ ⊕ [ ix 1 ]
@@ -282,21 +302,6 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
           Yk : Y ≺ (k ⊕ [ sub OS.J ])
           Yk = past-sub {r} {Y} {k ⊕ [ sub OS.J ]} rY (≺→≼ {r} {k ⊕ [ sub OS.J ]} (≺-trans {r} {k} {k ⊕ [ sub OS.J ]} rk (≺-ext k []))) nk
-
-      cv : Any (OpenMark (ro-at r)) rx₁
-         → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (Y , out (Ln v)) ∷ []) rs′ → Met σ₁ rs′
-         → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf Y , suc k)
-      cv oa pr′ rσ with find oa
-      ... | _ , xi , (_ , r′ , _ , _ , eq , refl) with ro-inj r r′ eq
-      ...   | refl with bproj-in (bproj-init rx₁ pr′ refl) xi
-      ...     | y′ , x′ , e₁ , _ , j with ⊕-injˡ r y′ e₁
-      ...       | refl with ∈-∃++ j
-      ...         | rs₁ , rs₂ , refl with none-past rs₁ rs₂ (bproj-init rx₁ pr′ refl) rσ
-      ...           | refl with InvAt.func I₁ (proj₁ (proj₁ (run-row∈ rσ (∈-++⁺ʳ rs₁ (here refl))))) (proj₁ σr)
-      ...             | refl =
-        let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs₁ [] refl c-value (λ e → nx (subst (Ex cs′) (sym Yr) (ex-below (sub q₀ ∷ zs′) e)))
-        in _ , bproj-init rx₁ pr′ refl , k
-         , trans (from-++ r₀ rs₁ ((r , out (instEmit (value a) n)) ∷ [])) (trans cov (cong (_, suc k) (cong nm (sym (trans (cong rootOf Yr) (rootOf-ext r (sub q₀ ∷ zs′)))))))
 
   -- IN A LANE'S OWN SUBSCRIBE BURST, a route of the outer value that
   -- started the lane holds it, or, for a lane rxjs queued, a route an
