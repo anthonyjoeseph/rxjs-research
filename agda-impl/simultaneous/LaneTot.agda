@@ -100,12 +100,13 @@ module LaneTot (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     (ℕP.≤-trans (ℕP.m≤n+m (Flat.lanes S) (Flat.outer S)) (ℕP.≤-trans (ℕP.m≤m+n _ (Flat.held S)) (ℕP.m≤m+n _ (Flat.parked S)))))
 
   -- A ROW OF THE LANES THE SOURCE MEETS IS SOME LANE'S EMIT.
-  row-emit : ∀ rx₁ {q v rx₂} → Met M (rx₁ ++ (q , out (Ln v)) ∷ rx₂) → Σ Pos λ Q → LaneEmit Q (q , out (Ln v)) v
-  row-emit rx₁ {v = v} mt =
-    let (rs , pr , run , _) = lane-run mt
-        (y , y≡ , j) = bproj-mem pr (∈-++⁺ʳ rx₁ (here refl))
-        (Q , a , xo , _ , l , _) = σ₃-lane (proj₁ (run-row∈ run j))
-    in Q , a , y , xo , cong (λ k′ → (k′ , out (Ln v))) y≡ , l
+  opaque
+    row-emit : ∀ rx₁ {q v rx₂} → Met M (rx₁ ++ (q , out (Ln v)) ∷ rx₂) → Σ Pos λ Q → LaneEmit Q (q , out (Ln v)) v
+    row-emit rx₁ {v = v} mt =
+      let (rs , pr , run , _) = lane-run mt
+          (y , y≡ , j) = bproj-mem pr (∈-++⁺ʳ rx₁ (here refl))
+          (Q , a , xo , _ , l , _) = σ₃-lane (proj₁ (run-row∈ run j))
+      in Q , a , y , xo , cong (λ k′ → (k′ , out (Ln v))) y≡ , l
 
   -- A lane's value or completion lies before its step's over.
   row-early : ∀ rx₁ {q x rx₂} → Met M (rx₁ ++ (q , out (Ln x)) ∷ rx₂) → Opens x → Early q
