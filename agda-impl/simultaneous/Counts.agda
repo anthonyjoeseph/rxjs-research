@@ -34,7 +34,7 @@ open import simultaneous.Relabel using (ev-out; same-mark; RowsAt; cntAt; splitA
 open import simultaneous.HeldTake using (module TakeBack; ++-split′)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.Layers using (run-tail)
-open import simultaneous.HeldRead using (pre-noend)
+open import simultaneous.LiveRuns using (pre-noend)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
 

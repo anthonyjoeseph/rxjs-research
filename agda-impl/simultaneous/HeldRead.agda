@@ -10,7 +10,7 @@ module simultaneous.HeldRead where
 
 open import Data.List using (List; []; _∷_; [_]; _++_)
 open import Data.List.Properties using (++-assoc)
-open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ʳ)
+open import Data.List.Membership.Propositional.Properties using (∈-++⁺ʳ)
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe using (Maybe)
@@ -20,10 +20,11 @@ open import Tree using (mergeᶠ)
 open import denotation.Position using (sub)
 open import denotation.EmissionSet using (Ev; hot; Proper; module Op)
 open import denotation.Laws.Worlds using (⊕-assoc)
-open import denotation.Read using (Run; _∷_; [])
+open import denotation.Read using (_∷_; [])
 open import simultaneous.Routed using (cnt)
 open import simultaneous.DenRows using (merge-out; hot-out; of-mem; scan-out)
-open import simultaneous.Layers using (run-row; run-tail; run-past-end)
+open import simultaneous.Layers using (run-row; run-tail)
+open import simultaneous.LiveRuns using (pre-noend)
 open import simultaneous.Project using (run-prefix)
 open import simultaneous.HeldJoin using (jl; jl-in; zero-suc)
 open import Tree using (Obs; connect; map; of)
@@ -410,15 +411,6 @@ js-mem (false , _) r (just _) ann-just (inj₂ (here refl)) = inj₂ refl
 js-mem (false , _) r (just _) ann-just (inj₂ (there ()))
 js-mem (false , _) r nothing  ann-none (inj₁ ())
 js-mem (false , _) r nothing  ann-none (inj₂ ())
-
--- No end is met before a run's last row.
-pre-noend : ∀ {A} {t : EmissionSet A} pre {w e c} → Run t nothing (pre ++ [ (w , e) ]) → (c , end) ∈ pre → ⊥
-pre-noend {t = t} pre {w} {e} {c} run i with ∈-∃++ i
-... | as , bs , refl with run-tail as (subst (Run t nothing) (++-assoc as ((c , end) ∷ bs) [ (w , e) ]) run)
-...   | (((ce , _) , _) , _) ∷ rest = nonempty bs (run-past-end ce rest)
-  where nonempty : ∀ (zs : List (Pos × Ev _)) → zs ++ [ (w , e) ] ≡ [] → ⊥
-        nonempty []      ()
-        nonempty (_ ∷ _) ()
 
 -- A join names the instant of the row it is sent before: the source
 -- idles there.

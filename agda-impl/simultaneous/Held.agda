@@ -146,12 +146,12 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
   conn-ev m empty _ env cs g p ok ep (λ _ _ → tracks-fin (empty-few m env (p ⊕ [ ix 1 ]))) λ L₀ ok₀ ep₀ → held-in (
     conn-ev m trig _ _ (p ∷ cs) (good-cons L₀ g) c ok₀ ep₀
       (λ L₁ ok₁ → tracks-ev m closer (connect real (combined op tk)) (hot σ₁ ∷ env₀) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ λ L₂ ok₂ →
-                  tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
-                  tracks-trig) λ L₁ ok₁ ep₁ → held-in (
+                  tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ L₃ ok₃ →
+                  tracks-trig (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ g)))) ok₃) λ L₁ ok₁ ep₁ → held-in (
       conn-ev m closer _ _ (c ∷ p ∷ cs) (good-cons L₁ (good-cons L₀ g)) p₀ ok₁ ep₁
-        (λ L₂ ok₂ → tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ _ _ →
-                    tracks-closer) λ L₂ ok₂ ep₂ → held-in (
-        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ (λ _ _ → tracks-real) λ L₃ ok₃ ep₃ →
+        (λ L₂ ok₂ → tracks-ev m real (combined op tk) (hot σ₂ ∷ hot σ₁ ∷ env₀) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ λ L₃ ok₃ →
+                    tracks-closer (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ g)))) ok₃) λ L₂ ok₂ ep₂ → held-in (
+        conn-ev m real _ _ (p₀ ∷ c ∷ p ∷ cs) (good-cons L₂ (good-cons L₁ (good-cons L₀ g))) p₀₀ ok₂ ep₂ (λ L₃ ok₃ → tracks-real (good-cons L₃ (good-cons L₂ (good-cons L₁ (good-cons L₀ g)))) ok₃) λ L₃ ok₃ ep₃ →
           held-comb m ρ op f s env cs g eh hf p ok fr ep
             (held-trigger m ρ s env cs p g ok ep (fresh-adm eh) fr
               (IH.holds (hs (λ i → there (ρ i))) _ cs (good-cons L₀ g) record { bound = EnvHeld.bound eh ; apart = EnvHeld.apart eh }))

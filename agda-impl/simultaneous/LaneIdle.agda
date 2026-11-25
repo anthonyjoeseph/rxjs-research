@@ -68,7 +68,7 @@ open import simultaneous.CombSent using (assoc³)
 open import simultaneous.HeldTrigger using (≺-part; Blocked; blk; module Spots; module Cat₀; module Cat)
 open import simultaneous.Layers using (pinby-vis; run-row; run-tail; run-++; last-met)
 open import simultaneous.Project using (run-prefix)
-open import simultaneous.HeldRead using (pre-noend)
+open import simultaneous.LiveRuns using (pre-noend)
 open import denotation.Read using (Visible; cursor)
 import denotation.Read as Rd
 import simultaneous.Layers as Layers
