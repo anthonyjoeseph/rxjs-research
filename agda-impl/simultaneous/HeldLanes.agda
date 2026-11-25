@@ -652,8 +652,7 @@ module CombLanes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   start-twice : ∀ {q a a′ y y′ n n′} → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
               → RO q (out a′) → RV.Lane op q a′ y′ (out (instEmit (mark laneStart) n′)) → (y′ ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ]) → ⊥
   start-twice {y = y} xo l xo′ l′ lt with ro-func xo xo′
-  ... | refl with start-once xo l l′
-  ...   | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} lt
+  ... | refl = ≺-irrefl {y ⊕ [ sub LS.J ]} (subst (λ w → (w ⊕ [ sub LS.J ]) ≺ (y ⊕ [ sub LS.J ])) (sym (start-once xo l l′)) lt)
 
   -- NO `laneStart` OF A LANE PRECEDES ITS OWN IN THE SCAN.
   start-first : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → LaneMark laneStart q x → ¬ QC.DoneIn [] xs q

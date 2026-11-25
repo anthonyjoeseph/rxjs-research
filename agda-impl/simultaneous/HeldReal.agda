@@ -181,10 +181,14 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   done-uncut r₁ mt xs x ys eq {q} (kd , a , y , n , xo , refl , l) ci
     with switch-cut (ci-op ci) xs (split-met r₁ mt xs _ ys eq) ci | lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ (kd , refl))
   ... | q′ , a′ , xo′ , qq′ , later | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′ | σ₃-lane σd
-  ...   | refl | q₀ , a₀ , xo₀ , _ , l₀ , nc₀ with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-                      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-                      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo₀ xo l₀ l
-  ...     | refl = subst (λ o′ → ¬ RV.CutAt o′ q y) (ci-op ci) nc₀ (q′ , a′ , xo′ , qq′ , later σd refl)
+  ...   | refl | q₀ , a₀ , xo₀ , _ , l₀ , nc₀ =
+    subst (λ o′ → ¬ RV.CutAt o′ q y) (ci-op ci)
+      (subst (λ q″ → ¬ RV.CutAt op q″ y)
+        (lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+           (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+           (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo₀ xo l₀ l)
+        nc₀)
+      (q′ , a′ , xo′ , qq′ , later σd refl)
 
   -- EACH `laneDone` THE SCAN MEETS ENDS A LANE IT MET START, AND NEVER MET
   -- END OR CUT.
