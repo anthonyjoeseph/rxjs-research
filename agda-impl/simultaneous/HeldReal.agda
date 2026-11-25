@@ -15,7 +15,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; _+_; suc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; subst; subst₂)
 
-open import Tree using (Obs; FlatOp; of; map; flatMap; mergeᶠ)
+open import Tree using (Obs; FlatOp; of; map; flatMap; mergeᶠ; switchᶠ)
 open import denotation.Position using (Pos; root; _≟ᵖ_; _≟ⁱ_; ix; sub; _⊕_; _∙_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (hot; enter; DenEnv; module Op; out; end; Few; _≼_; skip; pin; _≺_)
@@ -172,19 +172,23 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   ...   | y , refl , refl , σd with σ₃-lane σd
   ...     | q , a , xo , rn , l , _ = q , (c , a , y , n , xo , refl , l) , (a , xo , rn)
 
+  -- A cut the scan meets is the switch's.
+  ci-op : ∀ {xs q} → AC.CutIn [] xs q → op ≡ switchᶠ
+  ci-op (_ , _ , _ , _ , cb) = let (xc , _ , kc) = find cb in row-cut op xc kc
+
   -- NO SCAN CUT FALLS BETWEEN A LANE'S START AND ITS `laneDone`.
   done-uncut : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ xs x ys → r₁ ≡ xs ++ x ∷ ys → ∀ {q} → DoneMark q x → ¬ AC.CutIn [] xs q
-  done-uncut r₁ mt xs x ys eq {q} (kd , a , y , n , xo , refl , l) ci with ci
-  ... | _ , _ , _ , _ , cb with find cb
-  ...   | xc , _ , kc with row-cut op xc kc
-  ...     | op≡ with switch-cut op≡ xs (split-met r₁ mt xs _ ys eq) ci
-  ...       | q′ , a′ , xo′ , qq′ , later with lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ (kd , refl))
-  ...         | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′
-  ...           | refl with σ₃-lane σd
-  ...             | q₀ , a₀ , xo₀ , _ , l₀ , nc₀ with lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
-                      (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
-                      (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo₀ xo l₀ l
-  ...               | refl = subst (λ o′ → ¬ RV.CutAt o′ q y) op≡ nc₀ (q′ , a′ , xo′ , qq′ , later σd refl)
+  done-uncut r₁ mt xs x ys eq {q} (kd , a , y , n , xo , refl , l) ci
+    with switch-cut (ci-op ci) xs (split-met r₁ mt xs _ ys eq) ci | lane-mark (run-prefix r₁ mt) (in-r₁ r₁ xs _ ys eq) (inj₂ (kd , refl))
+  ... | q′ , a′ , xo′ , qq′ , later | y′ , e′ , _ , σd with ⊕-injˡ y y′ e′ | σ₃-lane σd
+  ...   | refl | q₀ , a₀ , xo₀ , _ , l₀ , nc₀ =
+    subst (λ o′ → ¬ RV.CutAt o′ q y) (ci-op ci)
+      (subst (λ q″ → ¬ RV.CutAt op q″ y)
+        (lane-one op (ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀)) fL
+           (inv-ev m (each valuesOf (connected (there (here refl)))) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂) (λ a → inv-ev m (laneˢ (g a)) (hot σ₂ ∷ hot σ₁ ∷ env₀) g₂)
+           (p₀₀ ⊕ [ ix 1 ]) (ok-step p₀₀ ok₂) xo₀ xo l₀ l)
+        nc₀)
+      (q′ , a′ , xo′ , qq′ , later σd refl)
 
   -- EACH `laneDone` THE SCAN MEETS ENDS A LANE IT MET START, AND NEVER MET
   -- END OR CUT.
@@ -195,11 +199,9 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
 
   -- NO LANE NEVER CUT MEETS A CUT IN THE SCAN.
   cut-never : ∀ r₁ {z e r₂} → Met M (r₁ ++ (z , e) ∷ r₂) → ∀ {q a} → RO q (out a) → ¬ RV.Cut op q → ¬ AC.CutIn [] r₁ q
-  cut-never r₁ mt {q} xo nc ci with ci
-  ... | _ , _ , _ , _ , cb with find cb
-  ...   | xc , _ , kc with row-cut op xc kc
-  ...     | op≡ with switch-cut op≡ r₁ mt ci
-  ...       | q′ , a′ , xo′ , qq′ , _ = subst (λ o′ → ¬ RV.Cut o′ q) op≡ nc (q′ , a′ , xo′ , qq′)
+  cut-never r₁ mt {q} xo nc ci =
+    let (q′ , a′ , xo′ , qq′ , _) = switch-cut (ci-op ci) r₁ mt ci
+    in subst (λ o′ → ¬ RV.Cut o′ q) (ci-op ci) nc (q′ , a′ , xo′ , qq′)
 
   private
     -- What `I` precedes, an instant no later than it precedes.
@@ -229,9 +231,10 @@ module CombReal (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
   done-close : ∀ {rx} → Met M rx → ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark outerDone) n)))) ∈ rx
              → M k (out (just (inj₁ (closeB , instEmit (mark outerDone) n))))
   done-close mt {b = closeB} i = proj₁ (run-row∈ mt i)
-  done-close mt {b = laneB} i with lane-run mt
-  ... | rs , pr , run , _ with bproj-mem pr i
-  ...   | y , refl , j = ⊥-elim (Fit.fine lane-fit (proj₁ (run-row∈ run j)))
+  done-close mt {b = laneB} i =
+    let (rs , pr , run , _) = lane-run mt
+        (y , _ , j) = bproj-mem pr i
+    in ⊥-elim (Fit.fine lane-fit (proj₁ (run-row∈ run j)))
   done-close mt {b = outerB} i with outer-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , x , ox , o≡ , _ with open-mark o≡ (λ ())
   ...   | refl with () ← Held.routing H₁ (proj₁ ox)

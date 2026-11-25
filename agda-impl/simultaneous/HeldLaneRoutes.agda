@@ -13,7 +13,7 @@ module simultaneous.HeldLaneRoutes where
 
 open import Data.List using (List; []; _∷_; _++_; [_])
 open import Data.List.Relation.Unary.All using (_∷_)
-open import Data.List.Properties using (++-assoc; map-++; foldl-++; ∷-injective)
+open import Data.List.Properties using (++-assoc; map-++; foldl-++; ∷-injective; ++-conicalʳ)
 open import Data.List.Membership.Propositional using (find)
 open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻; ∈-map⁺)
 open import Data.List.Relation.Unary.Any using (Any; here; there; any?) renaming (map to any-map)
@@ -29,7 +29,8 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
 import Data.Sum as Sum
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; sym; cong; cong₂; subst)
-open import Relation.Nullary using (¬_; yes; no)
+open import Relation.Nullary using (¬_; yes; no; Dec)
+open import Function.Base using (_∋_)
 open import Relation.Nullary.Decidable using (decidable-stable)
 
 open import Tree using (Obs; FlatOp; mergeᶠ; switchᶠ; exhaustᶠ; connected; takeWhile; flatMap; of)
@@ -85,7 +86,7 @@ open import simultaneous.LaneSplit using (Ln)
 open import simultaneous.HeldSrc using (module CombSrc; named-at)
 open import simultaneous.HeldLanes using (module CombLanes)
 
-open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; marked; Out; Input; react; laneˢ; each; shareˢ; counted; framed; undone)
+open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; AIE; Routes; count; marked; Out; Input; react; opening; laneˢ; each; shareˢ; counted; framed; undone)
 
 -- A JOINER'S END: its outer has ended there, and every lane run, past its
 -- value and never cut.
@@ -184,6 +185,16 @@ lane-before : ∀ m {Γ X} (keep : X → Bool) (o : Obs Timeline Γ X) (ρ : Den
 lane-before nothing  keep o ρ s = take-before keep (ev nothing o ρ) s
 lane-before (just n) keep o ρ s = take-before keep (ev (just n) o ρ) s
 
+-- A position at or one subscription above another precedes it.
+next-≼ : ∀ {w q} J → w ≡ q ⊎ q ≡ w ⊕ [ sub J ] → w ≼ q
+next-≼ {w} J (inj₁ refl) = ≼-refl {w}
+next-≼ {w} J (inj₂ refl) = ≺→≼ {w} {w ⊕ [ sub J ]} (≺-ext w [])
+
+-- A run cut at a row, regrouped around it.
+regroup : ∀ {X : Set} (r₁ W xs ys₁ : List X) x ys₂ → r₁ ≡ xs ++ (ys₁ ++ x ∷ ys₂) → r₁ ++ W ≡ (xs ++ ys₁) ++ x ∷ (ys₂ ++ W)
+regroup r₁ W xs ys₁ x ys₂ r≡ = trans (cong (_++ W) r≡) (trans (++-assoc xs (ys₁ ++ x ∷ ys₂) W)
+  (trans (cong (xs ++_) (++-assoc ys₁ (x ∷ ys₂) W)) (sym (++-assoc xs ys₁ (x ∷ (ys₂ ++ W))))))
+
 module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (op : FlatOp) (f : A → Obs Timeline Γ B)
                   (s : Obs Timeline Γ A) (env : DenEnv Δ) (cs : List Pos) (gd : GoodEnv env) (eh : EnvHeld ρ env cs)
                   (hf : ∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a))
@@ -241,19 +252,16 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   -- The run holds no end short of its last row.
   end-free : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {c} → (c , end) ∈ rx₁ → ⊥
   end-free rx₁ {z} {e} {rx₂} mt i with ∈-∃++ i
-  ... | a₁ , b₁ , refl = nonempty b₁ (end-last I-M a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ rx₂)) mt))
-    where
-      nonempty : ∀ b₂ → b₂ ++ (z , e) ∷ rx₂ ≡ [] → ⊥
-      nonempty []      ()
-      nonempty (_ ∷ _) ()
+  ... | a₁ , b₁ , refl = (((z , e) ∷ rx₂ ≡ [] → ⊥) ∋ λ ()) (++-conicalʳ b₁ _ (end-last I-M a₁ (subst (Met M) (++-assoc a₁ _ ((z , e) ∷ rx₂)) mt)))
 
   -- EVERY LANE ROW THE SCAN MEETS IS SOME LANE'S EMIT.
   lane-emit : ∀ rx₁ {z e rx₂} → Met M (rx₁ ++ (z , e) ∷ rx₂) → ∀ {k v} → (k , out (Tg laneB v)) ∈ rx₁
             → Σ Pos λ q → LaneEmit q (k , out (Tg laneB v)) v
-  lane-emit rx₁ mt i with lane-run mt
-  ... | rs , pr , run , _ with bproj-mem pr (∈-++⁺ˡ i)
-  ...   | y , refl , j with σ₃-lane (proj₁ (run-row∈ run j))
-  ...     | q , a , xo , _ , l , _ = q , a , y , xo , refl , l
+  lane-emit rx₁ mt {k} {v} i =
+    let (rs , pr , run , _) = lane-run mt
+        (y , k≡ , j) = bproj-mem pr (∈-++⁺ˡ i)
+        (q , a , xo , _ , l , _) = σ₃-lane (proj₁ (run-row∈ run j))
+    in q , a , y , xo , cong (λ k′ → (k′ , out (Tg laneB v))) k≡ , l
 
   -- AN EMIT IS ONE LANE'S.
   emit-one : ∀ {q q′ x v v′} → LaneEmit q x v → LaneEmit q′ x v′ → q ≡ q′
@@ -285,16 +293,21 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
 
   -- AN `outerOpen` THE SCAN MEETS IS AN OUTER VALUE'S, at the source's
   -- reading of the outer's row.
+  open-at : ∀ {c′ x k n} → σ₁ c′ (out x) → k ≡ c′ ⊕ [ sub OS.J ] → opening {A} {B} x ≡ instEmit (mark outerOpen) n
+          → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × outerB ≡ outerB × n ≡ n′
+  open-at {x = instEmit (value a) n′} σc refl refl = _ , a , n′ , σc , refl , refl , refl
+  open-at {x = instEmit (mark _) _}   σc _    refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ σc)))
+
   open-row : ∀ {rx} → Met M rx → ∀ {k b n} → (k , out (just (inj₁ (b , instEmit (mark outerOpen) n)))) ∈ rx
            → Σ Pos λ c → Σ A λ a → Σ _ λ n′ → σ₁ c (out (instEmit (value a) n′)) × k ≡ c ⊕ [ sub OS.J ] × b ≡ outerB × n ≡ n′
   open-row mt {b = laneB} i with lane-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , σc , _ = ⊥-elim (σ₃-open σc)
   open-row mt {b = closeB} i with close-sent (proj₁ (run-row∈ mt i))
   ... | _ , _ , cx , _ = ⊥-elim (closing-mark (close-marks cx) (λ ()) (λ ()))
-  open-row {rx} mt {b = outerB} i with OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
-  ... | rs , pr , run , _ with bproj-memʰ pr i
-  ...   | c′ , instEmit (value a) n′ , refl , j , refl = c′ , a , n′ , proj₁ (run-row∈ run j) , refl , refl , refl
-  ...   | c′ , instEmit (mark _) _ , refl , j , refl = ⊥-elim (open-routing (Held.routing H₁ (proj₁ (proj₁ (run-row∈ run j)))))
+  open-row {rx} mt {b = outerB} i =
+    let (rs , pr , run , _) = OS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+        (c′ , x , k≡ , j , hx) = bproj-memʰ pr i
+    in open-at (proj₁ (run-row∈ run j)) k≡ hx
 
   module QL = Count _≟ᵖ_ (rowKind markQue op) (λ q → Σ A λ a → RO q (out a)) OpenMark (LaneMark laneStart) que
 
@@ -352,8 +365,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       W = (z , e) ∷ r₂
 
       eqL : r₁ ++ W ≡ (xs ++ ys₁) ++ xc ∷ (ys₂ ++ W)
-      eqL = trans (cong (_++ W) r≡) (trans (++-assoc xs (ys₁ ++ xc ∷ ys₂) W)
-              (trans (cong (xs ++_) (++-assoc ys₁ (xc ∷ ys₂) W)) (sym (++-assoc xs ys₁ (xc ∷ (ys₂ ++ W))))))
+      eqL = regroup r₁ W xs ys₁ xc ys₂ r≡
 
       x₀≺xc : (y₀ ⊕ [ sub LS.J ]) ≺ (c ⊕ [ sub OS.J ])
       x₀≺xc = subst ((y₀ ⊕ [ sub LS.J ]) ≺_) pc (met-before (xs ++ ys₁) {proj₁ xc} {proj₂ xc} {ys₂ ++ W} (subst (Met M) eqL mt) (∈-++⁺ˡ i₀))
@@ -1043,9 +1055,11 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
       pick {e′ = skip}  l kw = ∈-++⁺ʳ (L.map proj₁ rs) (quiet l tt kw)
       pick {e′ = pin _} l kw = ∈-++⁺ʳ (L.map proj₁ rs) (quiet l tt kw)
       pick {k} {end} l kw = ⊥-elim (end-past rx₁ mt pr xo lv wz fw lw l kw)
-      pick {k} {out b} l kw with any? (k ≟ᵖ_) (L.map proj₁ rs)
-      ... | yes i = ∈-++⁺ˡ i
-      ... | no ni = ⊥-elim (unmet-past rx₁ mt pr xo lv wz fw lw l
+      pick {k} {out b} l kw = pick-dec (any? (k ≟ᵖ_) (L.map proj₁ rs))
+        where
+          pick-dec : Dec (k ∈ L.map proj₁ rs) → k ∈ L.map proj₁ rs ++ proj₁ fw
+          pick-dec (yes i) = ∈-++⁺ˡ i
+          pick-dec (no ni) = ⊥-elim (unmet-past rx₁ mt pr xo lv wz fw lw l
                       (λ i → let (y′ , e′ , j) = bproj-mem pr i in ni (subst (_∈ L.map proj₁ rs) (sym (⊕-injˡ k y′ e′)) (∈-map⁺ proj₁ j))) kw)
 
   -- A WAIT PAST THE LANES' CURSOR AND BEFORE THEIR NEXT ROW IS PAST A
@@ -1136,10 +1150,7 @@ module LaneRoutes (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE 
   lanes-current rx₁ mt with lane-next rx₁ mt
   ... | rs , pr , run , w , wq , fw , af , outl , endl with Flat.lanes (St rx₁) ℕ.≟ 0
   ...   | yes z = inj₁ z
-  ...   | no nz = inj₂ (trans (lane-idle rx₁ mt pr nz (next-≼ wq) fw af
+  ...   | no nz = inj₂ (trans (lane-idle rx₁ mt pr nz (next-≼ LS.J wq) fw af
                          (LN.idle-least {cursor nothing rs} {w} (λ ry ay all → nz (lane-end-shut rx₁ mt pr run ry all)) outl endl))
                          (named-at LS.J wq))
-    where
-      next-≼ : ∀ {w q} → w ≡ q ⊎ q ≡ w ⊕ [ sub LS.J ] → w ≼ q
-      next-≼ {w} (inj₁ refl) = ≼-refl {w}
-      next-≼ {w} (inj₂ refl) = ≺→≼ {w} {w ⊕ [ sub LS.J ]} (≺-ext w [])
+

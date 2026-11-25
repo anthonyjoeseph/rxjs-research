@@ -32,7 +32,6 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≺_)
 open import denotation.Read using (Run) renaming (_∷_ to _∷ᴿ_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
-open import denotation.Laws.Modulus using (≺-irrefl)
 open import simultaneous.SObs using (lone; module Elaborate; Flat)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
@@ -95,19 +94,25 @@ module LaneHold (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ
                → (l : RV.Lane op q a y (out v)) → Carried (out v) → ¬ Sync (sub-at xo l) y → ¬ Ex cs y → Σ ℕ λ k → cnt r₁ ≡ (nameOf y , suc k)
   lane-covered xo mt r₁ r₂ refl l c ns nx = Counts.cov (lane-counts-own xo l) r₁ (pre r₁ r₂ mt) c [ ns , nx ]′
 
+  -- A lane starts at none of the rows before its start.
+  first-start : ∀ {q a y n} pre → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+              → (∀ {k e} → (k , e) ∈ pre → k ≺ (y ⊕ [ sub LS.J ])) → (Σ _ λ x → x ∈ pre × LaneMark laneStart q x) → ⊥
+  first-start pre xo l bf (_ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀)) = start-twice xo l xo₀ l₀ (bf i₀)
+
+  -- No begin of a lane comes before its `laneStart`.
+  no-begin : ∀ xs {rest q a y n} → Met M (xs ++ (y ⊕ [ sub LS.J ] , out (Ln (instEmit (mark laneStart) n))) ∷ rest)
+           → RO q (out a) → RV.Lane op q a y (out (instEmit (mark laneStart) n))
+           → ∀ {u n′} → u ∈ xs → LaneEmit q u (instEmit (mark begin) n′) → ⊥
+  no-begin xs mt xo l {u} i lu with ∈-∃++ i
+  ... | a₁ , b₁ , refl = first-start a₁ xo l (λ i₀ → met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀))
+                           (find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ())))
+
   -- A LANE COUNTS NOTHING BEFORE ITS `laneStart`: a begin of it would
   -- follow a `laneStart` of it, and it starts once.
   start-own : ∀ xs {x rest} → Met M (xs ++ x ∷ rest) → ∀ {q n c} → LaneEmit q x (instEmit (mark laneStart) n) → OC q xs c
             → proj₂ c ≡ 0
-  start-own xs {rest = rest} mt {q} (a , y , xo , refl , l) oc = aux oc (λ i lu → no-begin i lu)
+  start-own xs {rest = rest} mt {q} (a , y , xo , refl , l) oc = aux oc (λ i lu → no-begin xs mt xo l i lu)
     where
-      no-begin : ∀ {u n′} → u ∈ xs → LaneEmit q u (instEmit (mark begin) n′) → ⊥
-      no-begin {u} i lu with ∈-∃++ i
-      ... | a₁ , b₁ , refl with find (started a₁ (subst (Met M) (++-assoc a₁ (u ∷ b₁) _) mt) lu tt (λ ()) (λ ()))
-      ...   | _ , i₀ , (a′ , y₀ , n₀ , xo₀ , refl , l₀) with ro-func xo xo₀
-      ...     | refl = ≺-irrefl {y ⊕ [ sub LS.J ]}
-                  (subst (_≺ (y ⊕ [ sub LS.J ])) (cong (_⊕ [ sub LS.J ]) (start-once xo l₀ l)) (met-before (a₁ ++ u ∷ b₁) mt (∈-++⁺ˡ i₀)))
-
       step : ∀ {c} v → proj₂ c ≡ 0 → (∀ {n′} → v ≡ instEmit (mark begin) n′ → ⊥) → proj₂ (count {B} c v) ≡ 0
       step (instEmit (mark begin) _) _ nb = ⊥-elim (nb refl)
       step (instEmit (mark stop) _)  z _  = cong (ℕ._∸ 1) z

@@ -32,7 +32,7 @@ open import simultaneous.Relations using (Met)
 open import simultaneous.Routed using (Held; Early; Placed; cnt; nameOf)
 open import simultaneous.HeldComb using (ev)
 open import simultaneous.HeldBase using (Ann; EnvHeld; module FlatHots; IH; Fresh)
-open import simultaneous.HeldRead using (Rl; Src; ann-row; ann-just; ann-none)
+open import simultaneous.HeldRead using (Rl; Src; ann-row; ann-just; ann-none; AnnEv)
 open import simultaneous.LiveRuns using (pre-noend)
 open import simultaneous.HeldJoin using (cnt-++)
 open import simultaneous.HeldScanned using (run-before)
@@ -186,14 +186,19 @@ module CombTrack (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
       open IdleAt b srun ne (cursor-snoc nothing pre) (∈-++⁺ʳ pre (here refl)) M (λ z e′ → Visible e′ → After (cursor nothing rx₁) z)
                   (proj₁ nx) wq (λ r′ v′ a′ → proj₂ (proj₂ nx) r′ v′ (a′ v′)) shown using (goal) public
 
+    -- The annotation's row, taken apart as an argument.
+    from-row : ∀ {r′ me} → r ≡ routes-past (r′ , me)
+             → (Σ (List (Pos × Ev (IE (Report.X Rp)))) λ pre → Σ Pos λ w → Σ (Ev (IE (Report.X Rp))) λ e
+                  → Met (Src b) (pre ++ [ (w , e) ]) × r′ ≡ cnt pre × Rl ya w × AnnEv me e)
+             → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf q
+    from-row hl (_ , _ , _ , _ , _ , _ , ann-none) = inj₁ (cong proj₂ hl)
+    from-row hl (pre , w , _ , srun , r′≡ , (zs₀ , ya≡) , ann-just {v′}) =
+      subst (λ x → proj₂ x ≡ 0 ⊎ proj₁ x ≡ nameOf q)
+            (trans (cnt-++ pre [ (w , out v′) ]) (trans (cong (λ x → count x v′) (sym r′≡)) (sym hl)))
+            (Met′.goal srun zs₀ ya≡)
+
     held-at : ∀ (a′ : AIE (Report.X Rp)) → Ann b ya (out a′) → r ≡ routes-past a′ → proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf q
-    held-at (r′ , me) an hl with ann-row b an
-    ... | pre , w , _ , srun , r′≡ , (zs₀ , ya≡) , ann-none = inj₁ (cong proj₂ hl)
-    ... | pre , w , _ , srun , r′≡ , (zs₀ , ya≡) , ann-just {v′} =
-      subst (λ x → proj₂ x ≡ 0 ⊎ proj₁ x ≡ nameOf q) cnt≡ (Met′.goal srun zs₀ ya≡)
-      where
-        cnt≡ : cnt (pre ++ [ (w , out v′) ]) ≡ r
-        cnt≡ = trans (cnt-++ pre [ (w , out v′) ]) (trans (cong (λ x → count x v′) (sym r′≡)) (sym hl))
+    held-at (r′ , me) an hl = from-row hl (ann-row b an)
 
     held′ : proj₂ r ≡ 0 ⊎ proj₁ r ≡ nameOf q
     held′ = held-at a ann held
