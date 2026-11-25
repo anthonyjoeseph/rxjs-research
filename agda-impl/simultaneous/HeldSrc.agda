@@ -421,8 +421,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
     src-func closer-past
 
   -- The lanes' rows a run of the source met are a run of the lanes.
-  lane-run : ∀ {rx} → Met M rx → LS.Runs nothing nothing rx
-  lane-run {rx} mt = LS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
+  opaque
+    lane-run : ∀ {rx} → Met M rx → LS.Runs nothing nothing rx
+    lane-run {rx} mt = LS.run′ (subst (λ d → Run (enter d P) nothing rx) (src-op tk env′ m) mt)
 
   -- Each level the source's reader of the lanes passes through shows its hangs.
   S₂ s₃ : Pos
