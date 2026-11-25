@@ -160,6 +160,10 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
   ρ⁴ i = there (there (there (there (ρ i))))
 
   module LC (a : A) = LaneStart.C ρ⁴ (f a) E₄ m
+
+  -- A lane's denotation, as the lane-start module spells it.
+  lane≡ : ∀ a → fL a ≡ LC.LaneD a
+  lane≡ a = LaneStart.lane-eq ρ⁴ (f a) E₄ m
   module BA (a : A) (s′ : Pos) = BurstFew.BurstAt ρ⁴ (f a) E₄ m s′
 
   Q : Pos
@@ -256,10 +260,10 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     after r = world-after (InvAt.world (If a₀ sL oks) r) (InvAt.real (If a₀ sL oks) r)
 
     toL : ∀ {k e} → enter (LC.LaneD a₀) sL k e → enter (fL a₀) sL k e
-    toL {k} {e} = subst (λ d → enter d sL k e) (sym (LaneStart.lane-eq ρ⁴ (f a₀) E₄ m))
+    toL {k} {e} = subst (λ d → enter d sL k e) (sym (lane≡ a₀))
 
     fromL : ∀ {k e} → enter (fL a₀) sL k e → enter (LC.LaneD a₀) sL k e
-    fromL {k} {e} = subst (λ d → enter d sL k e) (LaneStart.lane-eq ρ⁴ (f a₀) E₄ m)
+    fromL {k} {e} = subst (λ d → enter d sL k e) (lane≡ a₀)
 
     ivMM : InvAt (Hots E₄) sL (enter (LC.MM a₀) sL)
     ivMM = subst (λ d → InvAt (Hots E₄) sL (enter d sL)) (mm-eq ρ⁴ (f a₀) E₄ m) (inv-ev m (inner a₀) E₄ g₂ sL oks)
