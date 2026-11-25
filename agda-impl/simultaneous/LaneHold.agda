@@ -32,7 +32,6 @@ open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (DenEnv; out; enter; hot; _≺_)
 open import denotation.Read using (Run) renaming (_∷_ to _∷ᴿ_)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Ok; Lawful)
-open import denotation.Laws.Modulus using (≺-irrefl)
 open import simultaneous.SObs using (lone; module Elaborate; Flat)
 open import simultaneous.InstEmit using (instEmit; mark; value; begin; over; stop; outerOpen; outerClose; laneStart; laneDone;
   burstEnd; outerDone; subscribed; completed)
