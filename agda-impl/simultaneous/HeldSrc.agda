@@ -824,6 +824,14 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
           held′ = let (a , o) = Above.below fin (cong proj₁ cov)
                   in [ (λ t → ⊥-elim (f≢t (trans (sym (res (Above.live fin a))) t))) , (λ l → l) ]′ o
 
+  outer-cv : ∀ rx₁ {q′ x′} → (∀ x₀ → opening {A} {B} x₀ ≡ x′ → Carried (out x₀)) → ¬ Ex cs′ q′
+           → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (q′ , out (just (inj₁ (outerB , x′)))) ∷ []) rs′ → Met σ₁ rs′
+           → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf q′ , suc k)
+  outer-cv rx₁ carried nx pr′ rσ with bproj-snoc rx₁ pr′
+  ... | rs , y , x₀ , pr , refl , refl , refl =
+    let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs [] refl (carried x₀ refl) (λ e → nx (ex-below [ sub OS.J ] e))
+    in rs , pr , k , trans cov (cong (_, suc k) (cong nm (sym (rootOf-ext y [ sub OS.J ]))))
+
   -- A CARRIED OUTER ROW FINDS A ROUTE THE SCAN COUNTS.  The outer holds a
   -- route of the row's instant there, and no `outerDone` lies before it.
   outer-floor : ∀ rx₁ {q x rx₂} (Ov : Set) → Met M (rx₁ ++ (q , out (just (inj₁ (outerB , x)))) ∷ rx₂)
@@ -833,15 +841,7 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
               → ¬ Ex cs′ q → Σ ℕ λ k → tot (proj₁ (past op init rx₁)) ≡ suc k
   outer-floor rx₁ {q} {x} {rx₂} Ov mt carried ovf res nx = outer-hold rx₁ Ov mt
     (λ i ik → ovf (met-before rx₁ mt i) ik (late (proj₁ (run-row∈ (run-prefix rx₁ mt) i)))) res
-    (λ r kq _ → ≺-absurd {_} {q} kq (outer-before-done (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) r)) (cv carried nx)
-    where
-      cv : ∀ {q′ x′} → (∀ x₀ → opening {A} {B} x₀ ≡ x′ → Carried (out x₀)) → ¬ Ex cs′ q′
-         → ∀ {rs′} → BProj outerB (opening {A} {B}) OS.J (rx₁ ++ (q′ , out (just (inj₁ (outerB , x′)))) ∷ []) rs′ → Met σ₁ rs′
-         → Σ _ λ rs → BProj outerB (opening {A} {B}) OS.J rx₁ rs × Σ ℕ λ k → cnt rs ≡ (nameOf q′ , suc k)
-      cv carried nx pr′ rσ with bproj-snoc rx₁ pr′
-      ... | rs , y , x₀ , pr , refl , refl , refl =
-        let (k , cov) = Held.covered H₁ (σ₁-run rσ) rs [] refl (carried x₀ refl) (λ e → nx (ex-below [ sub OS.J ] e))
-        in rs , pr , k , trans cov (cong (_, suc k) (cong nm (sym (rootOf-ext y [ sub OS.J ]))))
+    (λ r kq _ → ≺-absurd {_} {q} kq (outer-before-done (proj₁ (run-row∈ mt (∈-++⁺ʳ rx₁ (here refl)))) r)) (outer-cv rx₁ carried nx)
 
   -- THE OUTER'S COMPLETION: no over of its instant comes before it, for
   -- an over follows the instant's completion.
