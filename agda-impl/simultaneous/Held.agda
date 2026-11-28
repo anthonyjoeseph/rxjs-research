@@ -17,7 +17,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ)
-open import denotation.Position using (root; _≟ᵖ_; ix; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; spin; Few)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
