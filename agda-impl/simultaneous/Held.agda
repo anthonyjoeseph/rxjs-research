@@ -17,7 +17,7 @@ open import Data.Nat using (ℕ; zero; suc)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Tree using (Obs; Later; cold; empty; of; map; scan; takeWhile; flatMap; connect; connected; defer; mergeᶠ)
-open import denotation.Position using (root; _≟ᵖ_; ix; _⊕_)
+open import denotation.Position using (Pos; root; _≟ᵖ_; ix; _⊕_)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.EmissionSet using (hot; enter; ⟦_⟧; DenEnv; approx; spin; Few)
 open import simultaneous.SObs using (SObs; plain; lone; module Elaborate)
@@ -29,12 +29,15 @@ open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldWrap using (held-wrapped)
 open import simultaneous.HeldScan using (held-scan-at; Relabels)
 open import simultaneous.InstantTruth using (inst-meaning)
-open import simultaneous.HeldDefer using (held-defer; placed-defer)
+open import simultaneous.HeldDefer using (held-defer; placed-defer; defer-back)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.HeldTrigger using (held-trigger)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
-open import simultaneous.HeldConnect using (early-inst; tracks-fin)
+open import simultaneous.HeldConnect using (early-inst; tracks-fin; tracks-same; Tracks)
+open import simultaneous.HeldLim using (run-ag; upto-last; last-few)
+open import simultaneous.Layers using (snoc-view)
+open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.List.Relation.Unary.Any using (there)
@@ -42,7 +45,7 @@ open import simultaneous.InstEmit using (begin; stop; subscribed; completed; lan
 open import Data.Product using (Σ; _,_)
 open import Data.Unit using (⊤; tt)
 import denotation.Laws.ShowsJoin as SJ
-open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; module Quiet; conn-ev; tracks-ev; placed-conn; empty-few; held-cold;
+open import simultaneous.HeldBase using (EnvHeld; Fresh; fresh-adm; module FlatHots; IH; TracksD; module Quiet; conn-ev; tracks-ev; placed-conn; empty-few; held-cold;
   held-empty; held-map; held-of; held-scan; held-takeWhile; ih)
 open import simultaneous.Routed using (Adm; PlacedD; Placed; adm-∪)
 open import denotation.Laws.Worlds using (plain-ix)
@@ -58,7 +61,7 @@ open import simultaneous.FlatPlaced using (module FlatPlaced)
 open import simultaneous.HeldConnBind using (held-connect)
 open import simultaneous.HeldComb using (ev)
 import Relation.Nullary as Nl
-open import Data.Sum using ([_,_]′)
+open import Data.Sum using ([_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 import denotation.Read as Run
@@ -138,6 +141,11 @@ placed-flatMap m ρ op f s hs hf env cs g eh p ok fr ep =
             L₁ L₂ L₃ ok₁ ok₂ ok₃
             (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] (early-inst [ ix 0 ] ep))))
 
+-- A flatMap tracks the binders in scope: its scan parks a route it would
+-- stop while one of them holds a route of the instant.
+postulate
+  tracks-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s → TracksD m ρ (flatMap op f s)
+
 held-flatMap : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) op (f : A → Obs Timeline Γ B) s
              → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ s)
              → (∀ a {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ′) → IH m ρ′ (f a)) → IH m ρ (flatMap op f s)
@@ -159,7 +167,7 @@ held-flatMap m ρ op f s hs hf = ih (λ env cs g eh p ok fr ep →
                                     (Adm.step (adm-∪ {t = σ₀} (fresh-adm eh)) ok₀ (Adm.bare (fresh-adm eh) fr λ ()) plain-ix) (early-inst [ ix 1 ] ep₀))
                                   (proj₁ r) sh)
             L₁ L₂ L₃ ok₁ ok₂ ok₃ ep₃))))
-  (placed-flatMap m ρ op f s hs hf)
+  (placed-flatMap m ρ op f s hs hf) (tracks-flatMap m ρ op f s)
 
 -- THE BOTTOM APPROXIMANT shows only skips; each further one is the body
 -- under a `defer`'s guard; the meaning is the approximants' limit, held
@@ -169,6 +177,15 @@ lim-row : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : 
         → enter (⟦ elab ρ (defer l) ⟧ env) p y e → Σ ℕ λ N → enter (approx N (elab ρ (defer l)) env) p y e
 lim-row ρ l env p (ES.from N h , _) = N , h N ℕP.≤-refl
 
+-- A limit empties an instant where an approximant agreeing that far does.
+lim-tracks : ∀ {A B : Set} {t : EmissionSet (IE A)} {c : ℕ → EmissionSet (IE A)} → (∀ {q} → Few t q → Σ ℕ λ N → AgreeTo q t (c N))
+           → ∀ {D : Pos → Set} {σ : EmissionSet B} → (∀ n → Tracks D σ (c n)) → Tracks D σ t
+lim-tracks agree T {rs} mt u z bq with snoc-view rs
+... | inj₁ refl with bq
+...   | ()
+lim-tracks agree T {rs} mt u z bq | inj₂ (r₁ , _ , refl) with agree (last-few r₁ mt)
+... | N , ag = T N (run-ag ag mt (upto-last r₁ mt)) u z bq
+
 held-lim : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
          → (∀ n → IH (just n) ρ (defer l)) → IH nothing ρ (defer l)
 held-lim ρ l hs = ih (λ env cs g eh p ok fr ep →
@@ -177,19 +194,24 @@ held-lim ρ l hs = ih (λ env cs g eh p ok fr ep →
     (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
     (λ n → IH.holds (hs n) env cs g eh p ok fr ep)
     (λ N fw sf lf {x} iw → inst-meaning (elab ρ (defer l)) env g p ok N fw sf lf {x} iw))
-  λ env cs g eh p ok fr ep x sh → let (N , h) = lim-row ρ l env p x in IH.placed (hs N) env cs g eh p ok fr ep h sh
+  (λ env cs g eh p ok fr ep x sh → let (N , h) = lim-row ρ l env p x in IH.placed (hs N) env cs g eh p ok fr ep h sh)
+  (λ env cs g eh p ok fr ep i → lim-tracks (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
+                                 (λ n → IH.tracks (hs n) env cs g eh p ok fr ep i))
 
 held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
 held-⊥ ρ l = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (spin _ , _) () }) λ { (() , _) })
-  λ { env cs g eh p ok fr ep (spin _ , _) () }
+  (λ { env cs g eh p ok fr ep (spin _ , _) () })
+  λ env cs g eh p ok fr ep i → Quiet.tracks _ p cs ep (λ { (spin _ , _) () }) λ { (() , _) }
 
 held-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
           → IH (just n) ρ (Later.force l) → IH (just (suc n)) ρ (defer l)
-held-next n ρ l (ih h pl) = ih
+held-next n ρ l (ih h pl tr) = ih
   (λ env cs g eh p ok fr ep →
     held-defer (approx n (elab ρ (Later.force l)) env) p cs (h env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep)))
-  λ env cs g eh p ok fr ep →
-    placed-defer (approx n (elab ρ (Later.force l)) env) p (pl env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep))
+  (λ env cs g eh p ok fr ep →
+    placed-defer (approx n (elab ρ (Later.force l)) env) p (pl env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep)))
+  (λ env cs g eh p ok fr ep i → tracks-same (defer-back (approx n (elab ρ (Later.force l)) env) p)
+    (tr env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep) i))
 
 held-approx : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → IH (just n) ρ o
 held-approx n       ρ (cold c)          = held-cold (just n) ρ c

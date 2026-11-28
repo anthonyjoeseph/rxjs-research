@@ -68,7 +68,7 @@ open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
 open import simultaneous.HeldTake using (name-ext; ex-ext)
 open import simultaneous.HeldComb using (ev)
-open import simultaneous.HeldBase using (Bound; IH; ih; Ann; Gap; EnvHeld; Fresh; apart-at; apart-all; gap-hot; AShown; a-value; a-end; ann-ev; fresh-adm)
+open import simultaneous.HeldBase using (Bound; IH; ih; TracksD; Ann; Gap; EnvHeld; Fresh; apart-at; apart-all; gap-hot; AShown; a-value; a-end; ann-ev; fresh-adm)
 open import simultaneous.HeldRead using (read-at; read-end-at)
 open import simultaneous.Routed using (Adm)
 import simultaneous.Routed as Rt
@@ -750,8 +750,12 @@ placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 placed-connected nothing  ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
 placed-connected (just n) ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
 
+-- A reader tracks every binder in scope, its own among them.
+postulate
+  tracks-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → TracksD m ρ (connected i)
+
 held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep
-                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected nothing ρ i)
+                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected nothing ρ i) (tracks-connected nothing ρ i)
 held-connected (just n) ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep
-                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected (just n) ρ i)
+                                 (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)) (placed-connected (just n) ρ i) (tracks-connected (just n) ρ i)

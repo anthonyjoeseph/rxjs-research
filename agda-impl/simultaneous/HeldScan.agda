@@ -90,15 +90,33 @@ same-scanIE : ∀ {A B : Set} (f : B → A → B) → Relabels (scanIE f)
 same-scanIE f st (instEmit (value _) _) = same-value
 same-scanIE f st (instEmit (mark _) _)  = same-mark (λ _ → refl)
 
+-- A run of a relabelling scan is its source's, row for row.
+module ScanBack {A B X : Set} (g : X × IE B → IE A → X × IE B) (sm : Relabels g) (z : X × IE B) (d : Den (IE A)) (p : Pos) where
+  module Sr = ScanRun g z d p
+  module Mr = MapRun proj₂ (Op.scan g z d) p
+
+  sm′ : ∀ {b} c x → b ≡ g c x → Same (proj₂ b) x
+  sm′ c x refl = sm c x
+
+  rows : ∀ {sc rx} → Sr.ScanRows sc rx → Rows≈ (mapRows proj₂ sc) rx
+  rows Sr.[]                       = []
+  rows (Sr.so-out {c = c} {x} eq Sr.∷ rel) = ev-out (sm′ c x eq) ∷ rows rel
+  rows (Sr.so-end Sr.∷ rel)           = ev-end ∷ rows rel
+
+  back′ : ∀ {rs′} → Met Mr.M rs′ → Σ _ λ rs → Met Sr.S rs × Rows≈ rs′ rs
+  back′ m with Mr.back m
+  ... | sc , run , refl with Sr.back run
+  ...   | rx , run′ , rel = rx , run′ , rows rel
+
+scan-back : ∀ {A B X : Set} (g : X × IE B → IE A → X × IE B) (sm : Relabels g) z (d : Den (IE A)) p
+          → ∀ {rs′} → Met (MapRun.M proj₂ (Op.scan g z d) p) rs′ → Σ _ λ rs → Met (enter d p) rs × Rows≈ rs′ rs
+scan-back g sm z d p = ScanBack.back′ g sm z d p
+
 held-scan-at : ∀ {A B X : Set} (g : X × IE B → IE A → X × IE B) → Relabels g → ∀ z (d : Den (IE A)) p {cs}
              → Held (enter d p) cs → Held (enter (Op.map proj₂ (Op.scan g z d)) p) cs
 held-scan-at g sm z d p H = held-same row end-row back′ fwd (rest-same every back′) H
   where
-    module Sr = ScanRun g z d p
-    module Mr = MapRun proj₂ (Op.scan g z d) p
-
-    sm′ : ∀ {b} c x → b ≡ g c x → Same (proj₂ b) x
-    sm′ c x refl = sm c x
+    open ScanBack g sm z d p
 
     row : ∀ {y x′} → Mr.M y (out x′) → Σ _ λ x → Sr.S y (out x) × Same x′ x
     row m with Mr.unmap m
@@ -117,10 +135,6 @@ held-scan-at g sm z d p H = held-same row end-row back′ fwd (rest-same every b
     end-row m with Mr.unmap m
     ... | end , (Scan.send y , _) , refl = y
 
-    rows : ∀ {sc rx} → Sr.ScanRows sc rx → Rows≈ (mapRows proj₂ sc) rx
-    rows Sr.[]                       = []
-    rows (Sr.so-out {c = c} {x} eq Sr.∷ rel) = ev-out (sm′ c x eq) ∷ rows rel
-    rows (Sr.so-end Sr.∷ rel)           = ev-end ∷ rows rel
 
     -- Every source row is the scan's, its value classically folded.
     fwd : ∀ {w} → Few Mr.M w → ∀ {k e} → Sr.S k e → k ≺ w → ¬ ¬ Σ _ λ e′ → Mr.M k e′ × (Visible e → Visible e′)
@@ -129,10 +143,6 @@ held-scan-at g sm z d p H = held-same row end-row back′ fwd (rest-same every b
     fwd _ {e = pin _} x _ no = no (_ , Mr.lift (Sr.toSc (Scan.spin x)) , λ ())
     fwd _ {e = end}   x _ no = no (_ , Mr.lift (Sr.toSc (Scan.send x)) , λ _ → tt)
 
-    back′ : ∀ {rs′} → Met Mr.M rs′ → Σ _ λ rs → Met Sr.S rs × Rows≈ rs′ rs
-    back′ m with Mr.back m
-    ... | sc , run , refl with Sr.back run
-    ...   | rx , run′ , rel = rx , run′ , rows rel
 
 held-scan-den : ∀ {A B : Set} (f : B → A → B) (z : B × IE B) (d : Den (IE A)) {W F} cs → HeldD W F d cs
               → HeldD W F (Op.map proj₂ (Op.scan (scanIE f) z d)) cs

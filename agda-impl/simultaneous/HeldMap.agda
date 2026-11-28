@@ -113,10 +113,16 @@ rows-mapIE (_∷_ {e = end}   (_ , _ , _) run)      = ev-end ∷ rows-mapIE run
 rows-mapIE (_∷_ {e = skip}  (_ , () , _) _)
 rows-mapIE (_∷_ {e = pin _} (_ , () , _) _)
 
+-- A run of a relabelled stream is its source's, row for row.
+map-back : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) p → ∀ {rs′} → Met (MapRun.M (mapIE f) d p) rs′
+         → Σ _ λ rs → Met (MapRun.S (mapIE f) d p) rs × Rows≈ rs′ rs
+map-back f d p m with MapRun.back (mapIE f) d p m
+... | sc , run , refl = sc , run , rows-mapIE run
+
 held-map-den : ∀ {A B : Set} (f : A → B) (d : Den (IE A)) {W F} cs → HeldD W F d cs → HeldD W F (Op.map (mapIE f) d) cs
 held-map-den f d cs h p ok fr ep =
-  held-same row end-row back′ (λ _ {k} {e} x _ no → no (_ , lift x , visible-map {g = mapIE f} e))
-    (rest-same (λ m → proj₁ (unmap m) , proj₁ (proj₂ (unmap m))) back′) (h p ok fr ep)
+  held-same row end-row (map-back f d p) (λ _ {k} {e} x _ no → no (_ , lift x , visible-map {g = mapIE f} e))
+    (rest-same (λ m → proj₁ (unmap m) , proj₁ (proj₂ (unmap m))) (map-back f d p)) (h p ok fr ep)
   where
     open MapRun (mapIE f) d p
 
@@ -128,6 +134,3 @@ held-map-den f d cs h p ok fr ep =
     end-row m with unmap m
     ... | end , y , refl = y
 
-    back′ : ∀ {rs′} → Met M rs′ → Σ _ λ rs → Met S rs × Rows≈ rs′ rs
-    back′ m with back m
-    ... | sc , run , refl = sc , run , rows-mapIE run

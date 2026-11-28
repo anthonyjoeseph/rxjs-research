@@ -253,12 +253,22 @@ Members: `cold-order`, `of-order`, `spin-order`, `map-order`,
 Unproven: past a zero count only finitely many rows of the instant last
 begun remain, read off the source run that lays the scan's run out
 (`Laid`). Open: why the source has finitely many rows of that instant
-past the run — the zero count must say each branch let go of it. A
-connect's echoes are its source's rows: its body empties only once its
-source is done with the instant (`Tracks`). Settled by a body for one
-`Laid` leaf, or a source looping in the instant past a zero count.
+past the run — the zero count must say each branch let go of it.
+Settled by a body for one `Laid` leaf, or a source looping in the
+instant past a zero count.
 
-Members: `laid-rest`, `connect-tracks`, `laid-trig`, `laid-real`.
+Members: `laid-rest`, `laid-trig`, `laid-real`.
+
+#### THE BINDERS TRACKED
+
+Unproven: where a program's count empties an instant, every binder in
+scope has finitely many rows of it left (`TracksD`), at every `D`.
+Riskiest: the reader of another binder and the cold stream, where nothing
+in the program stops an unrelated binder looping in the instant it
+emptied; then the flatMap's, which rests on its scan parking a cut route
+while a binder holds one. Settled by bodies, or such a loop.
+
+Members: `tracks-flatMap`, `tracks-connected`, `tracks-cold`.
 
 #### THE HELD STREAMS
 

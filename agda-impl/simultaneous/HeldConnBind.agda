@@ -61,7 +61,7 @@ open import denotation.Read using (Run)
 import denotation.Read as Run
 
 open import simultaneous.HeldBase using (AShown; a-value; a-end; GapIn; Gap; Ann; Bound; EnvHeld; Fresh; IH; ih; fresh-adm; widen; ev-undone; eh-u;
-  conn-ev; connect-tracks; placed-conn; apart-at; gap-hot)
+  conn-ev; tracks-ev; placed-conn; apart-at; gap-hot)
 open import simultaneous.HeldRead using (s₀; Src; ann-row; ann-end; module AnnConn; ann-just; ann-none)
 open import simultaneous.HeldBack using (ann-last; src-ann-end)
 open import simultaneous.HeldComb using () renaming (run-row to run-row⁺)
@@ -210,8 +210,12 @@ held-connect : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ 
              → IH m ρ s → (∀ {Δ′} (ρ′ : ∀ {X} → X ∈ L.map AIE (A ∷ Γ) → X ∈ Δ′) → IH m ρ′ b) → IH m ρ (connect s b)
 held-connect m ρ s b hs hb = ih
   (λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
-    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep (λ _ _ → connect-tracks m ρ s b env cs g eh p ok ep) λ L ok₀ ep₀ →
+    conn-ev m (annotate (elab ρ s)) _ env cs g p ok ep
+      (λ L ok₀ → IH.tracks (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep) (here refl)) λ L ok₀ ep₀ →
       held-in (IH.holds (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ ep₀))
-  λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
+  (λ env cs g eh p ok fr ep → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
     placed-conn m (annotate (elab ρ s)) _ env g (λ { ((_ , a) , b) → a , λ {c} ci → b (there ci) }) p ok λ L ok₀ →
-      IH.placed (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep)
+      IH.placed (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep))
+  λ env cs g eh p ok fr ep i → let open ConnBind m ρ s hs env cs g eh p ok fr ep in
+    tracks-ev m (annotate (elab ρ s)) _ env g p ok λ L ok₀ →
+      IH.tracks (hb _) _ (p ∷ cs) (good-cons L g) eh′ (p ⊕ [ ix 0 ]) ok₀ fr′ (early-inst [ ix 0 ] ep) (there i)
