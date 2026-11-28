@@ -40,7 +40,7 @@ open import simultaneous.HeldIn using (HeldIn; Upto; RestIn)
 open import denotation.Events using (<ᵖ-apart; <ᵖ-shift; <ᵖ-next; <ᵖ-split; <ᵖ-step)
 open import Data.Bool.Properties using (T-≡)
 open import Function.Bundles using (Equivalence)
-open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end)
+open import simultaneous.Relabel using (Same; same-mark; same-value; Rows≈; []; _∷_; ev-out; ev-end; mem≈; cnt-same; cursor≈)
 
 open import simultaneous.SObs using (lone; module Elaborate)
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE)
@@ -368,6 +368,20 @@ Tracks D σ β = ∀ {rs} → Met β rs → Upto D rs → proj₂ (cnt rs) ≡ 0
 -- A source of finitely many rows tracks every body.
 tracks-fin : ∀ {A B} {D : Pos → Set} {σ : EmissionSet A} {β : EmissionSet (IE B)} → Σ (List Pos) (λ ks → ∀ {k e} → σ k e → k ∈ ks) → Tracks D σ β
 tracks-fin (ks , h) _ _ _ _ = ks , λ y _ _ → h y
+
+-- Rows lying where `D` holds lie there relabelled.
+up≈ : ∀ {A B : Set} {D : Pos → Set} {rs′ : List (Pos × Ev (IE B))} {rs : List (Pos × Ev (IE A))} → Rows≈ rs′ rs → Upto D rs′ → Upto D rs
+up≈ (_ ∷ _)  u (here refl) = u (here refl)
+up≈ (_ ∷ eq) u (there i)   = up≈ eq (λ j → u (there j)) i
+
+-- A relabelling empties an instant where its source does.
+tracks-same : ∀ {A B X : Set} {D : Pos → Set} {σ : EmissionSet X} {t : EmissionSet (IE A)} {t′ : EmissionSet (IE B)}
+            → (∀ {rs′} → Met t′ rs′ → Σ _ λ rs → Met t rs × Rows≈ rs′ rs) → Tracks D σ t → Tracks D σ t′
+tracks-same back T m u z bq with back m
+... | rs , run , eq with mem≈ eq bq
+...   | _ , bq′ , same-mark e with T run (up≈ eq u) (subst (λ r → proj₂ r ≡ 0) (cnt-same eq) z)
+                                     (subst (λ n → (_ , out (instEmit (mark begin) n)) ∈ rs) (trans (sym (e refl)) (cong proj₁ (cnt-same eq))) bq′)
+...     | ks , h = ks , λ y ay iq → h y (subst (λ c → After c _) (cursor≈ eq _) ay) iq
 
 -- A connect empties where its body does: its runs are its body's.
 tracks-conn : ∀ {A B X} {H : Pos → Set} (s : Den A) (F : Den A → Den (IE B)) (Is : InvD H s)

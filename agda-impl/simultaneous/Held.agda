@@ -29,12 +29,15 @@ open import simultaneous.Relabel using (same-mark; same-value)
 open import simultaneous.HeldWrap using (held-wrapped)
 open import simultaneous.HeldScan using (held-scan-at; Relabels)
 open import simultaneous.InstantTruth using (inst-meaning)
-open import simultaneous.HeldDefer using (held-defer; placed-defer)
+open import simultaneous.HeldDefer using (held-defer; placed-defer; defer-back)
 open import simultaneous.LaneLocal using (inv-ev)
 open import simultaneous.HeldTrigger using (held-trigger)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
-open import simultaneous.HeldConnect using (early-inst; tracks-fin)
+open import simultaneous.HeldConnect using (early-inst; tracks-fin; tracks-same; Tracks)
+open import simultaneous.HeldLim using (run-ag; upto-last; last-few)
+open import simultaneous.Layers using (snoc-view)
+open import denotation.Laws.Modulus using (AgreeTo)
 open import denotation.Laws using (good-cons)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
 open import Data.List.Relation.Unary.Any using (there)
@@ -174,11 +177,14 @@ lim-row : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : 
         → enter (⟦ elab ρ (defer l) ⟧ env) p y e → Σ ℕ λ N → enter (approx N (elab ρ (defer l)) env) p y e
 lim-row ρ l env p (ES.from N h , _) = N , h N ℕP.≤-refl
 
--- The meaning of a `defer` tracks the binders in scope, and so does each
--- approximant past the bottom.
-postulate
-  tracks-lim  : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → TracksD nothing ρ (defer l)
-  tracks-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → TracksD (just (suc n)) ρ (defer l)
+-- A limit empties an instant where an approximant agreeing that far does.
+lim-tracks : ∀ {A B : Set} {t : EmissionSet (IE A)} {c : ℕ → EmissionSet (IE A)} → (∀ {q} → Few t q → Σ ℕ λ N → AgreeTo q t (c N))
+           → ∀ {D : Pos → Set} {σ : EmissionSet B} → (∀ n → Tracks D σ (c n)) → Tracks D σ t
+lim-tracks agree T {rs} mt u z bq with snoc-view rs
+... | inj₁ refl with bq
+...   | ()
+lim-tracks agree T {rs} mt u z bq | inj₂ (r₁ , _ , refl) with agree (last-few r₁ mt)
+... | N , ag = T N (run-ag ag mt (upto-last r₁ mt)) u z bq
 
 held-lim : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
          → (∀ n → IH (just n) ρ (defer l)) → IH nothing ρ (defer l)
@@ -189,7 +195,8 @@ held-lim ρ l hs = ih (λ env cs g eh p ok fr ep →
     (λ n → IH.holds (hs n) env cs g eh p ok fr ep)
     (λ N fw sf lf {x} iw → inst-meaning (elab ρ (defer l)) env g p ok N fw sf lf {x} iw))
   (λ env cs g eh p ok fr ep x sh → let (N , h) = lim-row ρ l env p x in IH.placed (hs N) env cs g eh p ok fr ep h sh)
-  (tracks-lim ρ l)
+  (λ env cs g eh p ok fr ep i → lim-tracks (λ fw → let (N , ag) = reached (elab ρ (defer l)) env g p ok fw in N , ag N ℕP.≤-refl)
+                                 (λ n → IH.tracks (hs n) env cs g eh p ok fr ep i))
 
 held-⊥ : ∀ {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A) → IH (just zero) ρ (defer l)
 held-⊥ ρ l = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (spin _ , _) () }) λ { (() , _) })
@@ -198,12 +205,13 @@ held-⊥ ρ l = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (sp
 
 held-next : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (l : Later Timeline Γ A)
           → IH (just n) ρ (Later.force l) → IH (just (suc n)) ρ (defer l)
-held-next n ρ l (ih h pl _) = ih
+held-next n ρ l (ih h pl tr) = ih
   (λ env cs g eh p ok fr ep →
     held-defer (approx n (elab ρ (Later.force l)) env) p cs (h env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep)))
   (λ env cs g eh p ok fr ep →
     placed-defer (approx n (elab ρ (Later.force l)) env) p (pl env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep)))
-  (tracks-next n ρ l)
+  (λ env cs g eh p ok fr ep i → tracks-same (defer-back (approx n (elab ρ (Later.force l)) env) p)
+    (tr env cs g eh (p ⊕ [ ix 1 ]) (ok-step p ok) (Adm.step (fresh-adm eh) ok fr plain-ix) (early-inst [ ix 1 ] ep) i))
 
 held-approx : ∀ n {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → IH (just n) ρ o
 held-approx n       ρ (cold c)          = held-cold (just n) ρ c

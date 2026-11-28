@@ -268,8 +268,7 @@ while a binder holds one; then the reader of another binder, and the
 limit of a `defer`. Settled by bodies, or a binder looping in an
 instant past a program's zero count.
 
-Members: `tracks-flatMap`, `tracks-connected`, `tracks-lim`,
-`tracks-next`, `tracks-cold`, `tracks-map`, `tracks-scan`,
+Members: `tracks-flatMap`, `tracks-connected`, `tracks-lim`, `tracks-cold`,
 `tracks-takeWhile`.
 
 #### THE HELD STREAMS

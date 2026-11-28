@@ -47,10 +47,13 @@ open import simultaneous.Relations using (Met; values; values-++)
 open import simultaneous.Shut using (Shut; r₀)
 open import simultaneous.Routed using (Held; HeldD; Early; Sync; Ex; Carried; c-value; Routing; r-completed; Idle; Rest; cnt; nameOf; nm;
   Valued; opos)
-open import simultaneous.HeldConnect using (rootOf-ext; early-inst)
+open import simultaneous.HeldConnect using (rootOf-ext; early-inst; Tracks)
+open import simultaneous.HeldIn using (Upto)
+open import simultaneous.Project using (run-prefix)
+open import denotation.Laws.Worlds using (Ok)
 open import simultaneous.HeldTo using (Unfailed; IdleTo; HeldTo; held-to)
 open import simultaneous.HeldIn using (++-split)
-open import simultaneous.Layers using (cursor-snoc; after-≺)
+open import simultaneous.Layers using (cursor-snoc; after-≺; run-tail)
 open import simultaneous.TakeKit using (apart; ix<last; module Take) renaming (Run to Shape)
 
 open Elaborate {C = Timeline} _≟ᵖ_ root (fresh (λ p → p)) lone using (IE; count; passes)
@@ -563,25 +566,61 @@ module Holds {X : Set} (incl : Bool) (keep : IE X → Bool) (d : Den (IE X)) {H 
   ... | inj₁ (m′ , cu) = rest-clean m′ cu z bq
   ... | inj₂ ct        = rest-cut ct z bq
 
+  -- A take empties an instant where its source does: a cut run, before
+  -- the value it failed on.
+  tracks-cut : ∀ {B : Set} {D : Pos → Set} {σ : EmissionSet B} → Tracks D σ S → ∀ {rs} → Cut nothing rs → Upto D rs → proj₂ (cnt rs) ≡ 0
+             → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+             → Σ (List Pos) λ ks → ∀ {y e} → σ y e → After (cursor nothing rs) y → rootOf y ≡ rootOf q → y ∈ ks
+  tracks-cut {σ = σ} T (cut {rs₀} {tl} {f} {a} refl run fx nk nF sh (l , ld)) u z {q} bq = proj₁ S-tr , λ y ay rt → proj₂ S-tr y (aft ay) rt
+    where
+      E : cnt (rs₀ ++ tl) ≡ cnt rs₀
+      E = cnt-pre (fails nk) rs₀ tl (tl-q sh)
+
+      S-tr : Σ (List Pos) λ ks → ∀ {y e} → σ y e → After (cursor nothing rs₀) y → rootOf y ≡ rootOf q → y ∈ ks
+      S-tr = T (run-prefix rs₀ run) (λ i → u (∈-++⁺ˡ i)) (trans (cong proj₂ (sym E)) z)
+               (subst (λ n → (q , out (instEmit (mark begin) (proj₁ n))) ∈ rs₀) E (begin-in (fails nk) sh bq))
+
+      hf : After (cursor nothing rs₀) f
+      hf with run-tail rs₀ run
+      ... | (_ , _ , af , _) ∷ [] = af
+
+      aft : ∀ {y} → After (cursor nothing (rs₀ ++ tl)) y → After (cursor nothing rs₀) y
+      aft {y} ay = after-≺ (cursor nothing rs₀) {f} {y} hf (≺-trans {f} {f ⊕ [ l ]} {y} (≺-ext f []) (subst (λ c → After c y) ld ay))
+
+  tracks : ∀ {B : Set} {D : Pos → Set} {σ : EmissionSet B} → Tracks D σ S → Tracks D σ Tk
+  tracks T m u z bq with back c-none m
+  ... | inj₁ (m′ , _) = T m′ u z bq
+  ... | inj₂ ct       = tracks-cut T ct u z bq
+
   holds : Held Tk cs
   holds = record
     { named = named ; covered = covered ; exact = exact ; routing = routing ; shut = shut
     ; early = early ; ends = ends ; done = done ; late = late ; idle = idle ; rest = rest }
 
+-- A take of a held stream, at one position.
+module TakeDen {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H F : Pos → Set} cs (h : HeldD H F d cs) (inv : InvD H d)
+               p (ok : Ok H p) (fr : F p) (ep : Early p) where
+  Hp : Held (enter d p) (p ∷ cs)
+  Hp = h p ok fr ep
+
+  fails : ∀ {x : IE X} → T (not (passes kp x)) → Inert x
+  fails {instEmit (value _) _} _ = i-value
+  fails {instEmit (mark _) _}  ()
+
+  carried : ∀ {x : IE X} → T (not (passes kp x)) → Carried (out x)
+  carried {instEmit (value _) _} _ = c-value
+  carried {instEmit (mark _) _}  ()
+
+  fearly : ∀ {y} {x : IE X} → enter d p y (out x) → T (not (passes kp x)) → Early y
+  fearly {x = instEmit (value _) _} x _ = Held.early Hp x
+  fearly {x = instEmit (mark _) _}  _ ()
+
+  open Holds incl (passes kp) d (p ∷ cs) p (inv p ok) (held-to Hp) fails (λ m r₁ r₂ eq nk nx → Held.covered Hp m r₁ r₂ eq (carried nk) nx) fearly
+    public using (holds; tracks)
+
 held-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H F} cs → HeldD H F d cs → InvD H d → HeldD H F (Op.takeWhile incl (passes kp) d) cs
-held-take-den {X} incl kp d cs h inv p ok fr ep =
-  Holds.holds incl (passes kp) d (p ∷ cs) p (inv p ok) (held-to H) fails (λ m r₁ r₂ eq nk nx → Held.covered H m r₁ r₂ eq (carried nk) nx) fearly
-  where
-    H = h p ok fr ep
+held-take-den incl kp d cs h inv p ok fr ep = TakeDen.holds incl kp d cs h inv p ok fr ep
 
-    fails : ∀ {x : IE X} → T (not (passes kp x)) → Inert x
-    fails {instEmit (value _) _} _ = i-value
-    fails {instEmit (mark _) _}  ()
-
-    carried : ∀ {x : IE X} → T (not (passes kp x)) → Carried (out x)
-    carried {instEmit (value _) _} _ = c-value
-    carried {instEmit (mark _) _}  ()
-
-    fearly : ∀ {y} {x : IE X} → enter d p y (out x) → T (not (passes kp x)) → Early y
-    fearly {x = instEmit (value _) _} x _ = Held.early H x
-    fearly {x = instEmit (mark _) _}  _ ()
+tracks-take-den : ∀ {X : Set} incl (kp : X → Bool) (d : Den (IE X)) {H F} cs → HeldD H F d cs → InvD H d → ∀ p → Ok H p → F p → Early p
+                → ∀ {B : Set} {D : Pos → Set} {σ : EmissionSet B} → Tracks D σ (enter d p) → Tracks D σ (enter (Op.takeWhile incl (passes kp) d) p)
+tracks-take-den incl kp d cs h inv p ok fr ep = TakeDen.tracks incl kp d cs h inv p ok fr ep

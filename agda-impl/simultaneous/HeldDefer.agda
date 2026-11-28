@@ -50,8 +50,12 @@ module DeferRun {A : Set} (s : Den A) (p : Pos) where
     (((x , λ x′ → pr (lift x′)) , ks , λ x′ k≺ → few (lift x′) k≺) , vi , ac , (λ x′ v a → lf (lift x′) v a)) ∷ back run
   back (((((guard , _) , _) , _) , () , _) ∷ _)
 
+-- A run of a defer is its body's, row for row.
+defer-back : ∀ {X : Set} (s : Den (IE X)) p → ∀ {rs′} → Met (DeferRun.D s p) rs′ → Σ _ λ rs → Met (DeferRun.B s p) rs × Rows≈ rs′ rs
+defer-back s p m = _ , DeferRun.back s p m , rows-refl m
+
 held-defer : ∀ {X : Set} (s : Den (IE X)) p cs → Held (enter s (p ⊕ [ ix 1 ])) ((p ⊕ [ ix 1 ]) ∷ cs) → Held (enter (Op.defer s) p) (p ∷ cs)
-held-defer {X} s p cs H = held-ex ex (held-same row end-row back′ (λ _ x _ k → k (_ , lift x , λ v → v)) rest′ H)
+held-defer {X} s p cs H = held-ex ex (held-same row end-row (defer-back s p) (λ _ x _ k → k (_ , lift x , λ v → v)) rest′ H)
   where
     open DeferRun s p
 
@@ -64,9 +68,6 @@ held-defer {X} s p cs H = held-ex ex (held-same row end-row back′ (λ _ x _ k 
 
     end-row : ∀ {y} → D y end → B y end
     end-row (body x , _) = x
-
-    back′ : ∀ {rs′} → Met D rs′ → Σ _ λ rs → Met B rs × Rows≈ rs′ rs
-    back′ m = _ , back m , rows-refl m
 
     rest′ : Rest B → Rest D
     rest′ R m z bq with R (back m) z bq

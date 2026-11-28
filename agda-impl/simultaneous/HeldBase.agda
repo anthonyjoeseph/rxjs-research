@@ -33,12 +33,12 @@ open import denotation.EmissionSet using (Ev; module Op; module Connecting)
 open import Data.Sum using (_⊎_; inj₂)
 open import simultaneous.HeldIn using (HeldIn)
 open import denotation.Laws.Worlds using (Hots; GoodEnv; Shows)
-open import simultaneous.HeldMap using (held-map-den)
-open import simultaneous.HeldScan using (held-scan-den)
-open import simultaneous.HeldTake using (held-take-den)
+open import simultaneous.HeldMap using (held-map-den; map-back)
+open import simultaneous.HeldScan using (held-scan-den; scan-back; same-scanIE)
+open import simultaneous.HeldTake using (held-take-den; tracks-take-den)
 open import simultaneous.CombSent using (src-op; own-op; cat-op; tag-op; no-track; no-close; tag-branch; Cat-of; Tag; sent-branch; Closing; closing-mark; closing-value; closer-marks; closer-good; src-where; Where) renaming (under to w-under; past to w-past)
 open import denotation.EmissionSet using (map-end) renaming (ended to r-ended; late to r-late; shown to r-shown)
-open import simultaneous.HeldConnect using (held-conn; early-inst; Tracks; tracks-conn)
+open import simultaneous.HeldConnect using (held-conn; early-inst; Tracks; tracks-conn; tracks-same)
 open import denotation.Laws using (inv-⟦⟧; inv-approx; good-cons)
 open import denotation.Laws.Worlds using (Ok; InvD; Lawful; _∪ʰ_)
 open import denotation.Laws.Connect using () renaming (lawful to src-lawful; ok₀ to body-ok)
@@ -463,9 +463,6 @@ placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.tend t _ , _)      s-end =
 -- EACH FORMER TRACKS THE BINDERS IN SCOPE.
 postulate
   tracks-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → TracksD m ρ (cold c)
-  tracks-map       : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → TracksD m ρ (map f s)
-  tracks-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → TracksD m ρ (scan f z s)
-  tracks-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → Bool) s → TracksD m ρ (takeWhile i p s)
 
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
 held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
@@ -477,30 +474,34 @@ held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
   (placed-cold m ρ c) (tracks-cold m ρ c)
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
-held-map nothing  ρ f s (ih h pl _) = ih (λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
-                                        (λ env cs g eh → placed-map-den f (⟦ elab ρ s ⟧ env) (pl env cs g eh))
-                                        (tracks-map nothing ρ f s)
-held-map (just n) ρ f s (ih h pl _) = ih (λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh))
-                                        (λ env cs g eh → placed-map-den f (approx n (elab ρ s) env) (pl env cs g eh))
-                                        (tracks-map (just n) ρ f s)
+held-map nothing  ρ f s (ih h pl tr) = ih (λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                         (λ env cs g eh → placed-map-den f (⟦ elab ρ s ⟧ env) (pl env cs g eh))
+                                         (λ env cs g eh p ok fr ep i → tracks-same (map-back f (⟦ elab ρ s ⟧ env) p) (tr env cs g eh p ok fr ep i))
+held-map (just n) ρ f s (ih h pl tr) = ih (λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh))
+                                         (λ env cs g eh → placed-map-den f (approx n (elab ρ s) env) (pl env cs g eh))
+                                         (λ env cs g eh p ok fr ep i → tracks-same (map-back f (approx n (elab ρ s) env) p) (tr env cs g eh p ok fr ep i))
 
 held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
-held-takeWhile nothing  ρ i p s (ih h pl _) = ih
+held-takeWhile nothing  ρ i p s (ih h pl tr) = ih
   (λ env cs g eh → held-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g))
   (λ env cs g eh → placed-take-den i p (⟦ elab ρ s ⟧ env) (fresh-adm eh) (pl env cs g eh))
-  (tracks-takeWhile nothing ρ i p s)
-held-takeWhile (just n) ρ i p s (ih h pl _) = ih
+  (λ env cs g eh q ok fr ep j → tracks-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g) q ok fr ep
+                                  (tr env cs g eh q ok fr ep j))
+held-takeWhile (just n) ρ i p s (ih h pl tr) = ih
   (λ env cs g eh → held-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g))
   (λ env cs g eh → placed-take-den i p (approx n (elab ρ s) env) (fresh-adm eh) (pl env cs g eh))
-  (tracks-takeWhile (just n) ρ i p s)
+  (λ env cs g eh q ok fr ep j → tracks-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g) q ok fr ep
+                                  (tr env cs g eh q ok fr ep j))
 
 held-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
-held-scan nothing  ρ f z s (ih h pl _) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
-                                           (λ env cs g eh → placed-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) (pl env cs g eh))
-                                           (tracks-scan nothing ρ f z s)
-held-scan (just n) ρ f z s (ih h pl _) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh))
-                                           (λ env cs g eh → placed-scan-den f (z , marked begin) (approx n (elab ρ s) env) (pl env cs g eh))
-                                           (tracks-scan (just n) ρ f z s)
+held-scan nothing  ρ f z s (ih h pl tr) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                            (λ env cs g eh → placed-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) (pl env cs g eh))
+                                            (λ env cs g eh p ok fr ep i → tracks-same (scan-back (scanIE f) (same-scanIE f) (z , marked begin) (⟦ elab ρ s ⟧ env) p)
+                                                                                      (tr env cs g eh p ok fr ep i))
+held-scan (just n) ρ f z s (ih h pl tr) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh))
+                                            (λ env cs g eh → placed-scan-den f (z , marked begin) (approx n (elab ρ s) env) (pl env cs g eh))
+                                            (λ env cs g eh p ok fr ep i → tracks-same (scan-back (scanIE f) (same-scanIE f) (z , marked begin) (approx n (elab ρ s) env) p)
+                                                                                      (tr env cs g eh p ok fr ep i))
 
 -- A binder held under `cs` is held under more.
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
