@@ -118,7 +118,10 @@ open import Data.Sum using ([_,_]′)
 open import simultaneous.Relabel using (endAt)
 open import simultaneous.HeldRead using (Rl-trans; under-ext; rd-mg; module AnnConn; ev-ann; ev-cn; CnO; Cn; Fm)
 open import simultaneous.HeldMap using (module MapRun)
-open import simultaneous.HeldFan using (read-fan)
+open import simultaneous.HeldFan using (read-fan; module AnnFan)
+open import simultaneous.HeldConnect using (Tracks)
+open import simultaneous.HeldIn using (Upto)
+open import simultaneous.Layers using (after-≺)
 open import denotation.EmissionSet using (module Connecting)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.Position using (_≟ᵖ_; root)
@@ -352,6 +355,58 @@ cur-run js pre {y} {e} {rs} {(y′ , e′) ∷ rsᵗ′} ((r , _) ∷ᵃ ra) wit
 ... | c′ , c , e₁ , e₂ , rc , ev , i =
   c′ , c , trans (cursor-++ nothing js ((y′ , e′) ∷ rsᵗ′)) e₁ , trans (cursor-++ nothing pre ((y , e) ∷ rs)) e₂ , rc , ev , i
 
+-- No run ends before its last row.
+nonempty : ∀ {B : Set} (xs : List B) {y ys} → xs ++ y ∷ ys ≡ [] → ⊥
+nonempty []      ()
+nonempty (_ ∷ _) ()
+
+end-last : ∀ {A} {t : EmissionSet A} {c} xs {y ys} → Run t c (xs ++ y ∷ ys) → ∀ {k} → (k , end) ∈ xs → ⊥
+end-last (_ ∷ xs) ((((x , _) , _) , _) ∷ run) (here refl) = nonempty xs (run-past-end x run)
+end-last (_ ∷ xs) (_ ∷ run)                   (there i)   = end-last xs run i
+
+no-end : ∀ {A} {t : EmissionSet A} {c} ys {k e} → Run t c (ys ++ [ (k , e) ]) → (∀ {c′} → (k , e) ≡ (c′ , end) → ⊥)
+       → ∀ {c′} → (c′ , end) ∈ ys ++ [ (k , e) ] → ⊥
+no-end ys run ne i with ∈-++⁻ ys i
+... | inj₁ j         = end-last ys run j
+... | inj₂ (here eq) = ne (sym eq)
+... | inj₂ (there ())
+
+-- `Tracks` over the runs that have not met the end.
+TracksLive : ∀ {A B} → (Pos → Set) → EmissionSet A → EmissionSet (IE B) → Set
+TracksLive D σ β = ∀ {rs} → Met β rs → (∀ {c} → (c , end) ∈ rs → ⊥) → Upto D rs → proj₂ (cnt rs) ≡ 0
+                 → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt rs)))) ∈ rs
+                 → Σ (List Pos) λ ks → ∀ {k e} → σ k e → After (cursor nothing rs) k → rootOf k ≡ rootOf q → k ∈ ks
+
+-- A run that met the end tracks as the run before it: its count is that
+-- run's, and its cursor lies past that run's.
+tracks-live : ∀ {A B} {D : Pos → Set} {σ : EmissionSet A} {β : EmissionSet (IE B)} → TracksLive D σ β → Tracks D σ β
+tracks-live lv {rs} m u z {q} bq with snoc-view rs
+... | inj₁ refl with bq
+...   | ()
+tracks-live lv m u z bq | inj₂ (ys , (k , out _) , refl) = lv m (no-end ys m (λ ())) u z bq
+tracks-live lv m u z bq | inj₂ (ys , (k , skip) , refl)  = lv m (no-end ys m (λ ())) u z bq
+tracks-live lv m u z bq | inj₂ (ys , (k , pin _) , refl) = lv m (no-end ys m (λ ())) u z bq
+tracks-live {σ = σ} lv m u z {q} bq | inj₂ (ys , (k , end) , refl) = proj₁ T₀ , λ y ay rt → proj₂ T₀ y (aft ay) rt
+  where
+    E : cnt (ys ++ [ (k , end) ]) ≡ cnt ys
+    E = cnt-++ ys [ (k , end) ]
+
+    bq₀ : (q , out (instEmit (mark begin) (proj₁ (cnt ys)))) ∈ ys
+    bq₀ with ∈-++⁻ ys bq
+    ... | inj₁ i         = subst (λ n → (q , out (instEmit (mark begin) (proj₁ n))) ∈ ys) E i
+    ... | inj₂ (here ())
+    ... | inj₂ (there ())
+
+    T₀ : Σ (List Pos) λ ks → ∀ {y e} → σ y e → After (cursor nothing ys) y → rootOf y ≡ rootOf q → y ∈ ks
+    T₀ = lv (run-prefix ys m) (λ i → end-last ys m i) (λ i → u (∈-++⁺ˡ i)) (trans (cong proj₂ (sym E)) z) bq₀
+
+    hk : After (cursor nothing ys) k
+    hk with run-tail ys m
+    ... | (_ , _ , ak , _) ∷ [] = ak
+
+    aft : ∀ {y} → After (cursor nothing (ys ++ [ (k , end) ])) y → After (cursor nothing ys) y
+    aft {y} ay = after-≺ (cursor nothing ys) {k} {y} hk (subst (λ c → After c y) (cursor-snoc nothing ys) ay)
+
 module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ Gap b p) (ep : Early p) (okr : Ok (Hots (d ∷ᵉ []ᵉ)) p) where
 
   open SrcLaws b using (HS; IS; past; few-vis; live; shS)
@@ -425,8 +480,17 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
     fans-in {ks = k ∷ ks} (here refl) i = ∈-++⁺ˡ i
     fans-in {ks = k ∷ ks} (there j)   i = ∈-++⁺ʳ (fan k) (fans-in j i)
 
+  RestBy : ∀ {Y} → EmissionSet Y → List (Pos × Ev (IE X)) → Pos → Set
+  RestBy U rs′ q = Σ (List Pos) λ ks → ∀ {y e} → U y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ ks
+
   RestAt : List (Pos × Ev (IE X)) → Pos → Set
-  RestAt rs′ q = Σ (List Pos) λ ks → ∀ {y e} → T′ y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ ks
+  RestAt = RestBy T′
+
+  -- Rows of `U` past a cursor below a source row, listed from the
+  -- source's rows past that row.
+  Lift : ∀ {Y} → EmissionSet Y → List (Pos × Ev (IE X)) → Pos → Set
+  Lift U rs′ q = ∀ {q₀ c₀ ws e₁} → cursor nothing rs′ ≡ just (c₀ ⊕ ws) → Src b c₀ e₁ → rootOf q₀ ≡ rootOf q
+               → (ks : List Pos) → (∀ {y e} → Src b y e → c₀ ≺ y → rootOf y ≡ rootOf q₀ → y ∈ ks) → RestBy U rs′ q
 
   -- The reader's rows past its cursor lie under the source's rows past
   -- the source's cursor, under the cursor's row, or are its end.
@@ -459,13 +523,51 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
           below : (y₁ ⊕ zs) ≺ (c₀ ⊕ ws)
           below = ≺-≼-≺ {y₁ ⊕ zs} {c₀} {c₀ ⊕ ws} (past zs s₁ sc₀ lt) (⊑-≼ {c₀} {c₀ ⊕ ws} (ws , refl))
 
+  -- The annotation's rows past the cursor lie under the source's rows
+  -- past the source's cursor, or under the cursor's row.
+  lift-ann : ∀ {rs′ q} → Lift (Ann b) rs′ q
+  lift-ann {rs′} {q} {q₀} {c₀} {ws} cur′ sc₀ iq₀ ks h = AL c₀ ++ ALs ks , pick-row
+    where
+      AL : Pos → List Pos
+      AL y₀ = AnnFan.AL b y₀
+
+      ALs : List Pos → List Pos
+      ALs []       = []
+      ALs (k ∷ ks) = AL k ++ ALs ks
+
+      als-in : ∀ {k ks y} → k ∈ ks → y ∈ AL k → y ∈ ALs ks
+      als-in {ks = k ∷ ks} (here refl) i = ∈-++⁺ˡ i
+      als-in {ks = k ∷ ks} (there j)   i = ∈-++⁺ʳ (AL k) (als-in j i)
+
+      pick-row : ∀ {y e} → Ann b y e → After (cursor nothing rs′) y → rootOf y ≡ rootOf q → y ∈ AL c₀ ++ ALs ks
+      pick-row r a iq with ann-under b r
+      ... | inj₂ (xs , refl) =
+        ⊥-elim (≺-irrefl {body b ⊕ xs} (≺-trans {body b ⊕ xs} {c₀ ⊕ ws} {body b ⊕ xs}
+          (≺-≼-≺ {body b ⊕ xs} {c₀} {c₀ ⊕ ws}
+            (≺-trans {body b ⊕ xs} {s₀ b} {c₀} (body-before xs) (world-after (InvAt.world IS sc₀) (InvAt.real IS sc₀)))
+            (⊑-≼ {c₀} {c₀ ⊕ ws} (ws , refl)))
+          (subst (λ c → After c (body b ⊕ xs)) cur′ a)))
+      ... | inj₁ (y₁ , e₁′ , (zs , refl) , s₁) with c₀ <ᵖ y₁ in e
+      ...   | true = ∈-++⁺ʳ (AL c₀) (als-in k∈ (AnnFan.ann-in b y₁ s₁ r (zs , refl)))
+        where
+          k∈ : y₁ ∈ ks
+          k∈ = h s₁ (to≺ c₀ y₁ e) (trans (sym (rootOf-ext y₁ zs)) (trans iq (sym iq₀)))
+      ...   | false with ≼-split {y₁} {c₀} (λ h′ → subst T e h′)
+      ...     | inj₂ refl = ∈-++⁺ˡ (AnnFan.ann-in b c₀ s₁ r (zs , refl))
+      ...     | inj₁ lt   = ⊥-elim (≺-irrefl {y₁ ⊕ zs} (≺-trans {y₁ ⊕ zs} {c₀ ⊕ ws} {y₁ ⊕ zs} below a′))
+        where
+          a′ : (c₀ ⊕ ws) ≺ (y₁ ⊕ zs)
+          a′ = subst (λ c → After c (y₁ ⊕ zs)) cur′ a
+          below : (y₁ ⊕ zs) ≺ (c₀ ⊕ ws)
+          below = ≺-≼-≺ {y₁ ⊕ zs} {c₀} {c₀ ⊕ ws} (past zs s₁ sc₀ lt) (⊑-≼ {c₀} {c₀ ⊕ ws} (ws , refl))
+
   -- A run read past the joins: the source's count is the reader's, and
   -- holds nothing with a begin of the instant met.
-  rest-read : ∀ {pre y₀ e₀ rs js rs₁′} → Met T′ (js ++ rs₁′) → proj₂ (cnt (js ++ rs₁′)) ≡ 0
-            → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt (js ++ rs₁′))))) ∈ js ++ rs₁′
-            → Met (Src b) (pre ++ (y₀ , e₀) ∷ rs) → L.map proj₂ js ≡ L.map out (jl (cnt pre) e₀)
-            → RowsAt Rl rs₁′ ((y₀ , e₀) ∷ rs) → RestAt (js ++ rs₁′) q
-  rest-read {pre} {y₀} {e₀} {rs} {js} {rs₁′} m z {q} bq run jeq ra =
+  rest-by : ∀ {Y} (U : EmissionSet Y) {pre y₀ e₀ rs js rs₁′} → Met T′ (js ++ rs₁′) → proj₂ (cnt (js ++ rs₁′)) ≡ 0
+          → ∀ {q} → (q , out (instEmit (mark begin) (proj₁ (cnt (js ++ rs₁′))))) ∈ js ++ rs₁′
+          → Met (Src b) (pre ++ (y₀ , e₀) ∷ rs) → L.map proj₂ js ≡ L.map out (jl (cnt pre) e₀)
+          → RowsAt Rl rs₁′ ((y₀ , e₀) ∷ rs) → Lift U (js ++ rs₁′) q → RestBy U (js ++ rs₁′) q
+  rest-by U {pre} {y₀} {e₀} {rs} {js} {rs₁′} m z {q} bq run jeq ra lf =
     sim-case (Past.sim-split Rl (Src b) {pre} jeq {r₂ = []} (sym (++-identityʳ ((y₀ , e₀) ∷ rs))) ra (λ ()))
     where
       S : List (Pos × Ev (IE X))
@@ -478,18 +580,18 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
       SrcRest : Pos → Set
       SrcRest q₀ = Σ (List Pos) λ ks → ∀ {y e} → Src b y e → After (cursor nothing S) y → rootOf y ≡ rootOf q₀ → y ∈ ks
 
-      from-cur : ∀ {q₀} → rootOf q₀ ≡ rootOf q → SrcRest q₀ → Cur → RestAt (js ++ rs₁′) q
+      from-cur : ∀ {q₀} → rootOf q₀ ≡ rootOf q → SrcRest q₀ → Cur → RestBy U (js ++ rs₁′) q
       from-cur {q₀} iq₀ (ks , h) (c′ , c₀ , ec′ , ec₀ , (ws , refl) , e₁ , i₁) =
-        lift-rest (proj₁ (run-row m bq)) {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} ec′ (proj₁ (run-row run (∈-++⁺ʳ pre i₁))) iq₀ ks
+        lf {q₀ = q₀} {c₀ = c₀} {ws = ws} ec′ (proj₁ (run-row run (∈-++⁺ʳ pre i₁))) iq₀ ks
           (λ {y} {e} s a r → h {y} {e} s (subst (λ c → After c y) (sym ec₀) a) r)
 
       Begun : Set
       Begun = Σ Pos λ q₀ → (q₀ , out (instEmit (mark begin) (proj₁ (cnt S)))) ∈ S × rootOf q₀ ≡ rootOf q
 
-      from-begin : proj₂ (cnt S) ≡ 0 → Begun → RestAt (js ++ rs₁′) q
+      from-begin : proj₂ (cnt S) ≡ 0 → Begun → RestBy U (js ++ rs₁′) q
       from-begin z₀ (q₀ , bq₀ , iq₀) = from-cur {q₀} iq₀ (Held.rest HS run z₀ bq₀) (cur-run js pre ra)
 
-      sim-case : Sim (cnt (js ++ rs₁′)) (cnt S) (values (js ++ rs₁′)) → RestAt (js ++ rs₁′) q
+      sim-case : Sim (cnt (js ++ rs₁′)) (cnt S) (values (js ++ rs₁′)) → RestBy U (js ++ rs₁′) q
       sim-case (inj₁ ceq)          = from-begin (trans (sym (cong proj₂ ceq)) z) (J.src-begin run jeq ra m (λ i → i) bq (cong proj₁ ceq))
       sim-case (inj₂ (_ , _ , nb)) = ⊥-elim (lookup nb (out-in bq) is-begin)
 
@@ -514,7 +616,23 @@ module Reader {X} {d : Den (AIE X)} {cs} (b : Bound d cs) (p : Pos) (ng : Nl.¬ 
     where out-end : ∀ {x : IE X} → out x ≡ end → ⊥
           out-end ()
   ... | inj₁ (j-part h) = ⊥-elim (zero-suc (trans (sym z) (proj₂ (begins-held h bq))))
-  ... | inj₁ (j-read run jeq ra) = rest-read m z bq run jeq ra
+  ... | inj₁ (j-read {js = js} {rs₁′} run jeq ra) =
+    rest-by T′ m z bq run jeq ra (λ {q₀} {c₀} {ws} {e₁} → lift-rest (proj₁ (run-row m bq)) {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} {e₁ = e₁})
+
+  -- PAST A ZERO COUNT THE READER'S OWN BINDER FINISHES THE INSTANT: the
+  -- annotation's rows lie under the source's, as the reader's do.
+  track-live : ∀ {D} → TracksLive D (Ann b) T′
+  track-live m ne u z {q} bq with read-back b p ng m
+  ... | inj₂ ((_ , ei) , _) = ⊥-elim (ne ei)
+  ... | inj₁ (j-late h) = ⊥-elim (out-end (proj₁ (h bq)))
+    where out-end : ∀ {x : IE X} → out x ≡ end → ⊥
+          out-end ()
+  ... | inj₁ (j-part h) = ⊥-elim (zero-suc (trans (sym z) (proj₂ (begins-held h bq))))
+  ... | inj₁ (j-read {js = js} {rs₁′} run jeq ra) =
+    rest-by (Ann b) m z bq run jeq ra (λ {q₀} {c₀} {ws} {e₁} → lift-ann {rs′ = js ++ rs₁′} {q = q} {q₀ = q₀} {c₀ = c₀} {ws = ws} {e₁ = e₁})
+
+  track : ∀ {D} → Tracks D (Ann b) T′
+  track = tracks-live track-live
 
   ----------------------------------------------------------------------
   -- Idle
@@ -750,9 +868,33 @@ placed-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
 placed-connected nothing  ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
 placed-connected (just n) ρ i env cs g eh p ok fr ep x sh = ReadPlaced.placed eh i ok fr x sh
 
--- A reader tracks every binder in scope, its own among them.
+-- One binder of a scope, or another.
+data Same∈ {Γ : List Set} {A : Set} (i : A ∈ Γ) : ∀ {Y} → Y ∈ Γ → Set where
+  same : Same∈ i i
+
+same? : ∀ {Γ : List Set} {A Y : Set} (i : A ∈ Γ) (j : Y ∈ Γ) → Same∈ i j ⊎ Nl.¬ Same∈ i j
+same? (here refl) (here refl) = inj₁ same
+same? (here _)    (there _)   = inj₂ λ ()
+same? (there _)   (here _)    = inj₂ λ ()
+same? (there i)   (there j) with same? i j
+... | inj₁ same = inj₁ same
+... | inj₂ ne   = inj₂ λ { same → ne same }
+
+-- A reader tracks every other binder in scope.
 postulate
-  tracks-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → TracksD m ρ (connected i)
+  tracks-other : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) (env : DenEnv Δ) cs → GoodEnv env
+               → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
+               → ∀ {X} (j : X ∈ Γ) → Nl.¬ Same∈ i j → ∀ {D : Pos → Set}
+               → Tracks D (Ann (EnvHeld.bound eh j)) (enter (ev m (elab ρ (connected i)) env) p)
+
+-- A reader tracks every binder in scope: its own as its source's rows.
+tracks-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → TracksD m ρ (connected i)
+tracks-connected nothing ρ i env cs g eh p ok fr ep j with same? i j
+... | inj₁ same = Reader.track (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)
+... | inj₂ ne   = tracks-other nothing ρ i env cs g eh p ok fr ep j ne
+tracks-connected (just n) ρ i env cs g eh p ok fr ep j with same? i j
+... | inj₁ same = Reader.track (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep (ok-mono (hots-one env (ρ (∈-map⁺ AIE i))) ok)
+... | inj₂ ne   = tracks-other (just n) ρ i env cs g eh p ok fr ep j ne
 
 held-connected : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (i : A ∈ Γ) → IH m ρ (connected i)
 held-connected nothing  ρ i = ih (λ env cs g eh p ok fr ep → Reader.held (EnvHeld.bound eh i) p (apart-at (proj₁ fr) i) ep
