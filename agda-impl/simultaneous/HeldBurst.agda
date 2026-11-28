@@ -266,7 +266,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     fromL {k} {e} = subst (λ d → enter d sL k e) (lane≡ a₀)
 
     ivMM : InvAt (Hots E₄) sL (enter (LC.MM a₀) sL)
-    ivMM = subst (λ d → InvAt (Hots E₄) sL (enter d sL)) (mm-eq ρ⁴ (f a₀) E₄ m) (inv-ev m (Tree.flatMap (mergeᶠ nothing) (λ k → shareˢ (laneSrc ρ⁴ (f a₀) k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) E₄ g₂ sL oks)
+    ivMM = subst (λ d → InvAt (Hots E₄) sL (enter d sL)) (mm-eq _ (f a₀) E₄ m) (inv-ev m (Tree.flatMap (mergeᶠ nothing) (λ k → shareˢ (laneSrc ρ⁴ (f a₀) k) (counted (framed k))) (of (lanePart ∷ burstPart ∷ []))) E₄ g₂ sL oks)
 
     module TB = TakeBack true undone (LC.MM a₀) sL ivMM
 
@@ -322,7 +322,7 @@ module CombBurst (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE �
     start-below w = ≺-trans {c ⊕ [ sub w ]} {sL ⊕ [ ix 1 ]} {Eb} (under-≺ sL (s≤s z≤n) (under-⊕ uc (sub w))) (under-ext (sL ⊕ [ ix 1 ]) u-R)
 
     mm-shows : Shows (Merge.JoinT (LC.Sv a₀) (enter (Op.of (lanePart ∷ burstPart ∷ [])) sL))
-    mm-shows = subst (λ F → Shows (Merge.JoinT F (enter (Op.of (lanePart ∷ burstPart ∷ [])) sL))) (sv-eq ρ⁴ (f a₀) E₄ m)
+    mm-shows = subst (λ F → Shows (Merge.JoinT F (enter (Op.of (lanePart ∷ burstPart ∷ [])) sL))) (sv-eq _ (f a₀) E₄ m)
       (k-shows λ n′ → SJ.Flat.sk-merge {n = n′} (Op.of (lanePart ∷ burstPart ∷ [])) (λ k → ev m (shareˢ (laneSrc ρ⁴ (f a₀) k) (counted (framed k))) E₄) (of-inv _)
         (λ k → inv-ev m (shareˢ (laneSrc ρ⁴ (f a₀) k) (counted (framed k))) E₄ g₂) sL oks (sk-of _ sL)
         (λ k s′ ok′ → shows-k (shows-ev m (shareˢ (laneSrc ρ⁴ (f a₀) k) (counted (framed k))) E₄ g₂ s′ ok′)))
