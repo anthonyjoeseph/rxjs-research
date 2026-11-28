@@ -27,7 +27,12 @@ open import denotation.Laws.Worlds using (InvAt; W; step; here; inW; plain-ix; p
   ⊕-injʳ; ⊕-identityʳ; W⁼; w-up; ⊕-assoc; ∙-inj; ⊑-refl; ⊑-cmp)
 open import Data.List.Relation.Unary.All using (All)
 import Data.List.Relation.Unary.All.Properties as AllP
-open import denotation.Position using (_∙_)
+open import denotation.Position using (_∙_; instant; inside; cascade) renaming (tick to tickᵖ)
+open import simultaneous.Instants using (btw)
+open import denotation.EmissionSet using (_≼_)
+open import denotation.Laws.Worlds using (inside-⊑)
+open import simultaneous.ColdFew using (fresh-tick)
+open import Data.Nat.Properties using (<-irrefl)
 open import simultaneous.ColdFew using (fresh-past)
 open import denotation.EmissionSet using (Ev; module Op; module Connecting)
 open import Data.Sum using (_⊎_; inj₂)
@@ -205,6 +210,43 @@ gap-hot {ρ = ρ} {env} eh i a =
   where
     b  = EnvHeld.bound eh i
     IA = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+
+-- NO BINDER ROW LIES IN AN INSTANT ROOTED IN A PROGRAM'S WORLD: a row
+-- past its hot's end is a pin whose end lies in its instant, and every
+-- other row is a hot row, which the world holds none of.
+binder-apart : ∀ {Γ Δ} {ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ} {env : DenEnv Δ} {cs} (eh : EnvHeld ρ env cs) {p I}
+             → Ok (Hots env) p → W (Hots env) p (I ∙ []) → ∀ {X} (i : X ∈ Γ) {k e} → Ann (EnvHeld.bound eh i) k e → instant k ≡ I → ⊥
+binder-apart {ρ = ρ} {env} eh {p} {I} ok w i {k} a ik = proj₂ ok (hot-row a (proper a ik)) w (inst {k} ik)
+  where
+    b  = EnvHeld.bound eh i
+    IA = inv-ev (Bound.m b) (annotate (Bound.src b)) (Bound.env b) (Bound.good b) (Bound.at b ⊕ [ ix 1 ]) (ok-step (Bound.at b) (Bound.ok b))
+
+    hot-row : ∀ {h e′} → Ann b h e′ → (∀ {c} → Ann b c end → h ≼ c) → Hots env h
+    hot-row a′ pr = hots-at env (ρ (∈-map⁺ AIE i)) (Bound.is b) (a′ , pr)
+
+    inst : ∀ {h} → instant h ≡ I → T (inside (I ∙ []) h)
+    inst {_ ∙ zs} refl = ⊑-inside {I ∙ []} {I ∙ zs} (zs , refl)
+
+    inst-⊑ : ∀ {x y} → x ⊑ y → instant y ≡ instant x
+    inst-⊑ {_ ∙ _} (_ , refl) = refl
+
+    end-hot : ∀ {c} → Ann b c end → Hots env c
+    end-hot {c} ac = hot-row ac go
+      where
+        go : ∀ {c′} → Ann b c′ end → c ≼ c′
+        go {c′} ac′ with ≼-or-≻ c c′
+        ... | inj₁ le = le
+        ... | inj₂ lt = ⊥-elim (pinby-vis tt (InvAt.quiet IA ac′ ac lt))
+
+    proper : ∀ {h e′} → Ann b h e′ → instant h ≡ I → ∀ {c} → Ann b c end → h ≼ c
+    proper {h} a′ ih {c} ac with ≼-or-≻ h c
+    ... | inj₁ le = le
+    ... | inj₂ ch with InvAt.quiet IA ac a′ ch
+    ...   | r , refl , rc =
+      ⊥-elim (proj₂ ok (end-hot ac) w (inst {c} (trans (btw r c h rc ch (sym rh)) (trans (sym rh) ih))))
+      where
+        rh : instant h ≡ instant r
+        rh = inst-⊑ (inside-⊑ r h (proj₂ (InvAt.pinned IA a′)))
 
 -- A gap is entered at its own second child alone.
 gap-bare : ∀ {X} (t : EmissionSet (AIE X)) {q l} → GapIn t (q ⊕ [ l ]) → (l ≡ ix 1 → ⊥) → GapIn t q
@@ -460,9 +502,34 @@ placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.fail t nk _ _ , _) _     =
 placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.stop t nk _ , _)   s-end = Adm.bare ad (pl p ok fp ep t (fails-shown kp nk)) λ ()
 placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.tend t _ , _)      s-end = pl p ok fp ep t s-end
 
--- EACH FORMER TRACKS THE BINDERS IN SCOPE.
-postulate
-  tracks-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → TracksD m ρ (cold c)
+-- A cold begins only at its own timer's steps, rooted in its world.
+cold-begin-root : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) (env : DenEnv Δ) → GoodEnv env → ∀ p → Ok (Hots env) p
+                → ∀ {q n} → enter (ev m (elab ρ (cold c)) env) p q (out (instEmit (mark begin) n)) → W (Hots env) p (instant q ∙ [])
+cold-begin-root m ρ c env g p ok x with cold-rows m c env p x tt
+... | step-begin {t} {e} {l} f = strict (peel (InvAt.world (inv-ev m (elab ρ (cold c)) env g p ok) x)) late
+  where
+    late : ∀ {zs} → p ≡ (cascade t e l ∙ zs) → ⊥
+    late eq = <-irrefl (cong tickᵖ eq) (fresh-tick f)
+
+    peel : W (Hots env) p (cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ ix 0 ∷ [])) → W⁼ (Hots env) p (cascade t e l ∙ [])
+    peel w₄ with w-up {x = cascade t e l ∙ (ix 1 ∷ ix 0 ∷ ix 1 ∷ [])} plain-ix (inW w₄)
+    ... | inj₁ eq = ⊥-elim (late eq)
+    ... | inj₂ w₃ with w-up {x = cascade t e l ∙ (ix 1 ∷ ix 0 ∷ [])} plain-ix w₃
+    ...   | inj₁ eq = ⊥-elim (late eq)
+    ...   | inj₂ w₂ with w-up {x = cascade t e l ∙ (ix 1 ∷ [])} plain-ix w₂
+    ...     | inj₁ eq = ⊥-elim (late eq)
+    ...     | inj₂ w₁ with w-up {x = cascade t e l ∙ []} plain-ix w₁
+    ...       | inj₁ eq = ⊥-elim (late eq)
+    ...       | inj₂ w₀ = w₀
+
+    strict : ∀ {y} → W⁼ (Hots env) p y → (p ≡ y → ⊥) → W (Hots env) p y
+    strict (inW w′) _  = w′
+    strict here     ne = ⊥-elim (ne refl)
+
+-- A cold begins no instant a binder has a row in.
+tracks-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → TracksD m ρ (cold c)
+tracks-cold m ρ c env cs g eh p ok fr ep i mt u z bq =
+  [] , λ ak _ rk → ⊥-elim (binder-apart eh ok (cold-begin-root m ρ c env g p ok (proj₁ (run-row∈ mt bq))) i ak (cong instant rk))
 
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
 held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
