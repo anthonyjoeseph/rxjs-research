@@ -473,12 +473,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
       ... | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
       go : ∀ {q′} a′ → LS.M′ q′ (out a′) → y ≺ q′ → q′ ≺ (y ⊕ [ sub J ]) → ⊥
       go nothing r _ _ = ev-none m _ env′ P (toM r)
-      go (just (inj₂ x)) r lt lt′ with track-sent (toM r)
-      ... | _ , _ , hc , eq = apart (inj₂ (inj₂ (inj₂ hc))) eq lt lt′
-      go (just (inj₁ (outerB , x))) r lt lt′ with outer-sent (toM r)
-      ... | _ , _ , _ , σc , _ , eq = apart (inj₂ (inj₁ (_ , σc))) eq lt lt′
-      go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
-      ... | _ , _ , σc , eq = apart (inj₁ (_ , σc)) eq lt lt′
+      go (just (inj₂ x)) r lt lt′ = let (_ , _ , hc , eq) = track-sent (toM r) in apart (inj₂ (inj₂ (inj₂ hc))) eq lt lt′
+      go (just (inj₁ (outerB , x))) r lt lt′ = let (_ , _ , _ , σc , _ , eq) = outer-sent (toM r) in apart (inj₂ (inj₁ (_ , σc))) eq lt lt′
+      go (just (inj₁ (closeB , x))) r lt lt′ = let (_ , _ , σc , eq) = close-sent (toM r) in apart (inj₁ (_ , σc)) eq lt lt′
       go (just (inj₁ (laneB , x))) r lt lt′ with LS.split r
       ... | _ , refl , y′ , refl , ry′ , _ with ⊑-snoc y′ (⊑q lt lt′)
       ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
@@ -577,12 +574,9 @@ module CombSrc (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ 
 
       go : ∀ {q′} a′ → OS.M′ q′ (out a′) → y ≺ q′ → q′ ≺ Y → ⊥
       go nothing r _ _ = ev-none m _ env′ P (toM r)
-      go (just (inj₂ x)) r lt lt′ with track-sent (toM r)
-      ... | _ , _ , hc , eq = apart (inj₂ hc) eq lt lt′
-      go (just (inj₁ (laneB , x))) r lt lt′ with lane-sent (toM r)
-      ... | _ , _ , σc , eq = sent eq (in-σ₃ σc) lt lt′
-      go (just (inj₁ (closeB , x))) r lt lt′ with close-sent (toM r)
-      ... | _ , _ , σc , eq = sent eq (in-σ₂ q₀ q₀≼s₂ σc) lt lt′
+      go (just (inj₂ x)) r lt lt′ = let (_ , _ , hc , eq) = track-sent (toM r) in apart (inj₂ hc) eq lt lt′
+      go (just (inj₁ (laneB , x))) r lt lt′ = let (_ , _ , σc , eq) = lane-sent (toM r) in sent eq (in-σ₃ σc) lt lt′
+      go (just (inj₁ (closeB , x))) r lt lt′ = let (_ , _ , σc , eq) = close-sent (toM r) in sent eq (in-σ₂ q₀ q₀≼s₂ σc) lt lt′
       go (just (inj₁ (outerB , x))) r lt lt′ with OS.split r
       ... | _ , refl , y′ , refl , ry′ , _ with ⊑-snoc y′ (⊑q lt lt′)
       ...   | inj₂ eq = ≺-irrefl {y} (subst (y ≺_) (sym eq) lt)
