@@ -263,13 +263,12 @@ Members: `laid-rest`, `laid-trig`, `laid-real`.
 
 Unproven: where a program's count empties an instant, every binder in
 scope has finitely many rows of it left (`TracksD`), at every `D`.
-Riskiest: the flatMap's, which rests on its scan parking a cut route
-while a binder holds one; then the reader of another binder, and the
-limit of a `defer`. Settled by bodies, or a binder looping in an
-instant past a program's zero count.
+Riskiest: the reader of another binder and the cold stream, where nothing
+in the program stops an unrelated binder looping in the instant it
+emptied; then the flatMap's, which rests on its scan parking a cut route
+while a binder holds one. Settled by bodies, or such a loop.
 
-Members: `tracks-flatMap`, `tracks-connected`, `tracks-lim`, `tracks-cold`,
-`tracks-takeWhile`.
+Members: `tracks-flatMap`, `tracks-connected`, `tracks-cold`.
 
 #### THE HELD STREAMS
 
