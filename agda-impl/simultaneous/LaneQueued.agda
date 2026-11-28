@@ -515,7 +515,7 @@ module Queued (m : Maybe ℕ) {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ �
       res′ : Live? r₁ Ov
       res′ (inj₁ e) = e
       res′ (inj₂ ov) = ¬-not λ e → t≢f (trans (sym (subst (λ S → Flat.spent (proj₁ S) ≡ true) (sym past≡)
-                         (spent-on op (nameOf z) (past op init r₁) ((d , out xd) ∷ r₂) AB.named-on (base-at rx₁ T r₁ r₂ sp B₀) e)))
+                         (spent-on {B = B} op (nameOf z) (past op init r₁) ((d , out xd) ∷ r₂) AB.named-on (base-at rx₁ T r₁ r₂ sp B₀) e)))
                          (res (inj₂ ov)))
 
   -- AT A LANE'S `laneDone`, A LANE QUEUED AT ITS END IS STILL WAITING:
