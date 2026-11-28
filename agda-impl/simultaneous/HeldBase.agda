@@ -237,6 +237,13 @@ fresh-adm eh = record { step = st ; bare = bare ; copy = λ fq → bare fq λ ()
     st ok fq (plain-ix {suc (suc _)})   = bare fq λ ()
     st ok fq plain-last                 = bare fq λ ()
 
+-- WHERE A PROGRAM EMPTIES AN INSTANT, EVERY BINDER IN SCOPE FINISHES IT:
+-- each flatMap watches the connects in scope, parking a route it cuts
+-- while one of them holds a route of the instant.
+TracksD : ∀ (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (o : Obs Timeline Γ A) → Set₁
+TracksD m {Γ} {Δ} ρ o = ∀ (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs) → ∀ p → Ok (Hots env) p → Fresh eh p → Early p
+                      → ∀ {X} (i : X ∈ Γ) {D : Pos → Set} → Tracks D (Ann (EnvHeld.bound eh i)) (enter (ev m (elab ρ o) env) p)
+
 -- Held under every environment of held binders, at every position
 -- admissible under them, with every row a lane can hang on admissible.
 -- A record, so that a statement about a former is compared by its
@@ -246,6 +253,7 @@ record IH (m : Maybe ℕ) {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X �
   field
     holds  : ∀ (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs) → HeldD (Hots env) (Fresh eh) (ev m (elab ρ o) env) cs
     placed : ∀ (env : DenEnv Δ) cs → GoodEnv env → (eh : EnvHeld ρ env cs) → PlacedD (Hots env) (Fresh eh) (ev m (elab ρ o) env)
+    tracks : TracksD m ρ o
 
 ------------------------------------------------------------------------
 -- The formers
@@ -268,6 +276,10 @@ module Quiet {A : Set} (t : EmissionSet (IE A)) (p : Pos) (cs : List Pos) (ep : 
     { covered = λ r₁ r₂ eq _ ne → let (x , v) = run-row r₁ (subst (Met t) eq mt) in ⊥-elim (ne (in-burst x v))
     ; exact   = λ r₁ r₂ eq → ⊥-elim (no-mark (proj₁ (run-row r₁ (subst (Met t) eq mt))))
     ; shut    = λ r₁ r₂ eq _ bq _ _ → ⊥-elim (no-mark (proj₁ (run-row∈ mt (subst (_ ∈_) (sym eq) (∈-++⁺ˡ bq))))) }
+
+  -- Nothing it shows begins an instant.
+  tracks : ∀ {B} {D : Pos → Set} {σ : EmissionSet B} → Tracks D σ t
+  tracks mt _ _ bq = ⊥-elim (no-mark (proj₁ (run-row∈ mt bq)))
 
   held : Held t (p ∷ cs)
   held = held-runs (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x)) early ends (λ x → ⊥-elim (no-mark x)) (λ x → ⊥-elim (no-mark x))
@@ -298,17 +310,21 @@ empty-few (just n) env q = [ q ⊕ [ last ] ] , λ { (at-end , _) → here refl 
 
 held-empty : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) → IH m ρ (empty {A = A})
 held-empty nothing  ρ = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) })
-                          λ env cs g eh p ok fr ep → Fit.placed (emptyE nothing env (fresh-adm eh) p ok fr ep)
+                          (λ env cs g eh p ok fr ep → Fit.placed (emptyE nothing env (fresh-adm eh) p ok fr ep))
+                          λ env cs g eh p ok fr ep i → Quiet.tracks _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
 held-empty (just n) ρ = ih (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) })
-                          λ env cs g eh p ok fr ep → Fit.placed (emptyE (just n) env (fresh-adm eh) p ok fr ep)
+                          (λ env cs g eh p ok fr ep → Fit.placed (emptyE (just n) env (fresh-adm eh) p ok fr ep))
+                          λ env cs g eh p ok fr ep i → Quiet.tracks _ p cs ep (λ { (at-end , _) _ → [ last ] , refl }) λ { (() , _) }
 
 held-of : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (xs : L.List A) → IH m ρ (of xs)
 held-of nothing  ρ xs = ih
   (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x)
-  λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer nothing _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh)
+  (λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer nothing _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh))
+  λ env cs g eh p ok fr ep i → Quiet.tracks _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
 held-of (just n) ρ xs = ih
   (λ env cs g eh p ok fr ep → Quiet.held _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x)
-  λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer (just n) _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh)
+  (λ env cs g eh p ok fr ep r sh → proj₂ (proj₂ (of-outer (just n) _ env (fresh-adm eh) p ok fr ep)) r (shown-vis sh))
+  λ env cs g eh p ok fr ep i → Quiet.tracks _ p cs ep (λ (x , _) _ → of-below p 0 _ x) λ (x , _) → of-mark p xs x
 
 -- So past a zero count, the instant last begun has finitely many rows left.
 cold-rest : ∀ m {Δ A} (c : Timeline A) (env : DenEnv Δ) p → Rest (enter (ev m (coldˢ c) env) p)
@@ -444,6 +460,13 @@ placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.fail t nk _ _ , _) _     =
 placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.stop t nk _ , _)   s-end = Adm.bare ad (pl p ok fp ep t (fails-shown kp nk)) λ ()
 placed-take-den incl kp d ad pl p ok fp ep (TakeWhile.tend t _ , _)      s-end = pl p ok fp ep t s-end
 
+-- EACH FORMER TRACKS THE BINDERS IN SCOPE.
+postulate
+  tracks-cold      : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → TracksD m ρ (cold c)
+  tracks-map       : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → TracksD m ρ (map f s)
+  tracks-scan      : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → TracksD m ρ (scan f z s)
+  tracks-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → Bool) s → TracksD m ρ (takeWhile i p s)
+
 held-cold : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (c : Timeline A) → IH m ρ (cold c)
 held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
   let open ColdHeld p (enter (ev m (elab ρ (cold c)) env) p) (cold-rows m c env p) in
@@ -451,27 +474,33 @@ held-cold m ρ c = ih (λ env cs g eh p ok fr ep →
     { covered = λ r₁ r₂ eq cr ne → cold-covered m c env p mt r₁ r₂ eq cr λ { (here s) → ne (here s) ; (there ()) }
     ; exact   = λ r₁ r₂ eq → ⊥-elim (no-stop (proj₁ (run-row r₁ (subst (Met _) eq mt))))
     ; shut    = cold-shut m c env p mt })
-  (placed-cold m ρ c)
+  (placed-cold m ρ c) (tracks-cold m ρ c)
 
 held-map : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : A → B) s → IH m ρ s → IH m ρ (map f s)
-held-map nothing  ρ f s (ih h pl) = ih (λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
-                                        λ env cs g eh → placed-map-den f (⟦ elab ρ s ⟧ env) (pl env cs g eh)
-held-map (just n) ρ f s (ih h pl) = ih (λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh))
-                                        λ env cs g eh → placed-map-den f (approx n (elab ρ s) env) (pl env cs g eh)
+held-map nothing  ρ f s (ih h pl _) = ih (λ env cs g eh → held-map-den f (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                        (λ env cs g eh → placed-map-den f (⟦ elab ρ s ⟧ env) (pl env cs g eh))
+                                        (tracks-map nothing ρ f s)
+held-map (just n) ρ f s (ih h pl _) = ih (λ env cs g eh → held-map-den f (approx n (elab ρ s) env) cs (h env cs g eh))
+                                        (λ env cs g eh → placed-map-den f (approx n (elab ρ s) env) (pl env cs g eh))
+                                        (tracks-map (just n) ρ f s)
 
 held-takeWhile : ∀ m {Γ Δ A} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) i (p : A → _) s → IH m ρ s → IH m ρ (takeWhile i p s)
-held-takeWhile nothing  ρ i p s (ih h pl) = ih
+held-takeWhile nothing  ρ i p s (ih h pl _) = ih
   (λ env cs g eh → held-take-den i p (⟦ elab ρ s ⟧ env) cs (h env cs g eh) (inv-⟦⟧ (elab ρ s) env g))
-  λ env cs g eh → placed-take-den i p (⟦ elab ρ s ⟧ env) (fresh-adm eh) (pl env cs g eh)
-held-takeWhile (just n) ρ i p s (ih h pl) = ih
+  (λ env cs g eh → placed-take-den i p (⟦ elab ρ s ⟧ env) (fresh-adm eh) (pl env cs g eh))
+  (tracks-takeWhile nothing ρ i p s)
+held-takeWhile (just n) ρ i p s (ih h pl _) = ih
   (λ env cs g eh → held-take-den i p (approx n (elab ρ s) env) cs (h env cs g eh) (inv-approx n (elab ρ s) env g))
-  λ env cs g eh → placed-take-den i p (approx n (elab ρ s) env) (fresh-adm eh) (pl env cs g eh)
+  (λ env cs g eh → placed-take-den i p (approx n (elab ρ s) env) (fresh-adm eh) (pl env cs g eh))
+  (tracks-takeWhile (just n) ρ i p s)
 
 held-scan : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (f : B → A → B) z s → IH m ρ s → IH m ρ (scan f z s)
-held-scan nothing  ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
-                                           λ env cs g eh → placed-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) (pl env cs g eh)
-held-scan (just n) ρ f z s (ih h pl) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh))
-                                           λ env cs g eh → placed-scan-den f (z , marked begin) (approx n (elab ρ s) env) (pl env cs g eh)
+held-scan nothing  ρ f z s (ih h pl _) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) cs (h env cs g eh))
+                                           (λ env cs g eh → placed-scan-den f (z , marked begin) (⟦ elab ρ s ⟧ env) (pl env cs g eh))
+                                           (tracks-scan nothing ρ f z s)
+held-scan (just n) ρ f z s (ih h pl _) = ih (λ env cs g eh → held-scan-den f (z , marked begin) (approx n (elab ρ s) env) cs (h env cs g eh))
+                                           (λ env cs g eh → placed-scan-den f (z , marked begin) (approx n (elab ρ s) env) (pl env cs g eh))
+                                           (tracks-scan (just n) ρ f z s)
 
 -- A binder held under `cs` is held under more.
 widen : ∀ {X} {d : Den (AIE X)} {c cs} → Bound d cs → Bound d (c ∷ cs)
@@ -539,15 +568,6 @@ tracks-ev (just n) A′ B′ env g p ok tr =
     Is = inv-approx n A′ env g
     IF : ∀ {t} → Lawful t → InvD (Hots env ∪ʰ t) (approx n B′ (hot t ∷ env))
     IF L = inv-approx n B′ (hot _ ∷ env) (good-cons L g)
-
--- AN ELABORATED BODY EMPTIES ONLY ONCE ITS SOURCE LETS GO OF THE
--- INSTANT: each flatMap of the body watches the connect, parking a route
--- it cuts while the connect's source holds one of the instant.
-postulate
-  connect-tracks : ∀ m {Γ Δ A B} (ρ : ∀ {X} → X ∈ L.map AIE Γ → X ∈ Δ) (s : Obs Timeline Γ A) (b : Obs Timeline (A ∷ Γ) B)
-                   (env : DenEnv Δ) cs → GoodEnv env → EnvHeld ρ env cs → ∀ p → Ok (Hots env) p → Early p
-                 → ∀ {D} → Tracks D (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))
-                          (enter (ev m (elab (ext ρ) b) (hot (Proper (enter (ev m (annotate (elab ρ s)) env) (p ⊕ [ ix 1 ]))) ∷ env)) (p ⊕ [ ix 0 ]))
 
 -- A connect's rows are its body's, read past the source made hot.
 placed-conn : ∀ m {Δ X B} (A′ : Obs Timeline Δ X) (B′ : Obs Timeline (X ∷ Δ) (IE B)) (env : DenEnv Δ) → GoodEnv env
