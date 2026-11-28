@@ -122,6 +122,7 @@ open import simultaneous.HeldFan using (read-fan; module AnnFan)
 open import simultaneous.HeldConnect using (Tracks)
 open import simultaneous.HeldIn using (Upto)
 open import simultaneous.Layers using (after-≺)
+open import simultaneous.ScanPast using (nonempty)
 open import denotation.EmissionSet using (module Connecting)
 open import denotation.Events using (Timeline; fresh)
 open import denotation.Position using (_≟ᵖ_; root)
@@ -356,10 +357,6 @@ cur-run js pre {y} {e} {rs} {(y′ , e′) ∷ rsᵗ′} ((r , _) ∷ᵃ ra) wit
   c′ , c , trans (cursor-++ nothing js ((y′ , e′) ∷ rsᵗ′)) e₁ , trans (cursor-++ nothing pre ((y , e) ∷ rs)) e₂ , rc , ev , i
 
 -- No run ends before its last row.
-nonempty : ∀ {B : Set} (xs : List B) {y ys} → xs ++ y ∷ ys ≡ [] → ⊥
-nonempty []      ()
-nonempty (_ ∷ _) ()
-
 end-last : ∀ {A} {t : EmissionSet A} {c} xs {y ys} → Run t c (xs ++ y ∷ ys) → ∀ {k} → (k , end) ∈ xs → ⊥
 end-last (_ ∷ xs) ((((x , _) , _) , _) ∷ run) (here refl) = nonempty xs (run-past-end x run)
 end-last (_ ∷ xs) (_ ∷ run)                   (there i)   = end-last xs run i

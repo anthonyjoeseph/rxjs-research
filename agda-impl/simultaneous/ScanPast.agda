@@ -40,10 +40,10 @@ run-catch ((q₀ , e₀) ∷ r) {k = k} ((_ , _ , _ , lst) ∷ rn) tk vk ak kq w
 ...   | inj₁ lt with run-catch r rn tk vk lt kq
 ...     | r₁ , r₂ , e″ , refl = (q₀ , e₀) ∷ r₁ , r₂ , e″ , refl
 
-private
-  nonempty : ∀ {X : Set} (r : List X) {y r′} → r ++ y ∷ r′ ≡ [] → ⊥
-  nonempty []      ()
-  nonempty (_ ∷ _) ()
+-- No list ends before its last element.
+nonempty : ∀ {X : Set} (r : List X) {y r′} → r ++ y ∷ r′ ≡ [] → ⊥
+nonempty []      ()
+nonempty (_ ∷ _) ()
 
 -- The scan past a row it reads, past what it read before.
 past-split : ∀ {B} op (o : Out B) r₁ {q x r₂} → (∀ a₁ {c} a₂ → r₁ ++ (q , out x) ∷ r₂ ≡ a₁ ++ (c , end) ∷ a₂ → a₂ ≡ [])
