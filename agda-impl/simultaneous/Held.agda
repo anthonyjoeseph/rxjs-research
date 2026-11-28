@@ -61,7 +61,7 @@ open import simultaneous.FlatPlaced using (module FlatPlaced)
 open import simultaneous.HeldConnBind using (held-connect)
 open import simultaneous.HeldComb using (ev)
 import Relation.Nullary as Nl
-open import Data.Sum using ([_,_]′)
+open import Data.Sum using ([_,_]′; inj₁; inj₂)
 open import simultaneous.Layers using (run-tail; run-after) renaming (run-row to run-row∈)
 open import denotation.Read using (Visible; After; cursor; Run; loud) renaming (_∷_ to _∷ᴿ_)
 import denotation.Read as Run
